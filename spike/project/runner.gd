@@ -4,7 +4,7 @@ extends Node
 
 const BENCHES: PackedStringArray = ["empty", "move_nodes", "per_node_process", "ray_queries", "signal_traffic",
 		"nbody", "sieve", "array_conversion"]
-const LANGS: PackedStringArray = ["gd", "cs", "as3"]
+const LANGS: PackedStringArray = ["gd", "cs", "as3", "floor"]
 const VERIFY_FRAMES := 10
 # Warm-up ends only when BOTH are met. Frames alone are not enough: a benchmark that runs in 0.1 ms would
 # finish 300 frames before .NET has finished optimising its code.
@@ -72,7 +72,8 @@ func _load_script() -> Script:
 		_:
 			if not ClassDB.class_exists(&"SpikeScript"):
 				return null
-			return ClassDB.class_call_static(&"SpikeScript", &"for_class", StringName(_class_name()))
+			var prefix := "Floor" if _lang == "floor" else ""
+			return ClassDB.class_call_static(&"SpikeScript", &"for_class", StringName(prefix + _class_name()))
 
 
 func _fail(message: String) -> void:

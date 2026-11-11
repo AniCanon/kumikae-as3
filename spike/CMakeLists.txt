@@ -22,11 +22,12 @@ add_library(kas3_spike SHARED
     host/spike_script.cpp
     host/script_instance.cpp
     runtime/godot_calls.cpp
+    floor/floor.cpp
     ${KAS3_BENCHES})
 # The host is glue around godot-cpp, whose casts need RTTI. Everything that stands for generated code
 # (benches/, and the runtime library below) is built with the full flags, RTTI off.
 target_compile_options(kas3_spike PRIVATE -O2 -fno-exceptions -ffp-contract=off)
-set_source_files_properties(${KAS3_BENCHES} PROPERTIES COMPILE_OPTIONS "-fno-rtti")
+set_source_files_properties(${KAS3_BENCHES} floor/floor.cpp PROPERTIES COMPILE_OPTIONS "-fno-rtti")
 target_include_directories(kas3_spike PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(kas3_spike PRIVATE godot-cpp)
 set_target_properties(kas3_spike PROPERTIES
