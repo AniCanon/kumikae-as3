@@ -2,6 +2,9 @@
 
 Design, 2026-11-11. Status: approved by the owner on 2026-11-11.
 
+**Amended by `2026-11-11-performance-redesign.md`,** which replaces this document's speed goal, error
+handling, memory, and collection decisions. Where the two disagree, the redesign wins.
+
 Lines marked **(owner)** are what the owner asked for. Lines marked **(call)** are the designer's decisions,
 made on the owner's behalf and open to being overruled. Lines marked **(unverified)** are believed true but
 were not checked; the stage that depends on one must check it first.
