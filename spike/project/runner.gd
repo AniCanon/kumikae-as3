@@ -3,7 +3,7 @@ extends Node
 ## Usage: godot --headless --fixed-fps 60 --path spike/project -- --bench=NAME --lang=gd|cs|as3 --mode=verify|measure
 
 const BENCHES: PackedStringArray = ["empty", "move_nodes", "per_node_process", "ray_queries", "signal_traffic",
-		"nbody", "sieve", "array_conversion"]
+		"nbody", "sieve", "array_conversion", "saxpy", "shapes", "alloc"]
 const LANGS: PackedStringArray = ["gd", "cs", "as3", "floor"]
 const VERIFY_FRAMES := 10
 # Warm-up ends only when BOTH are met. Frames alone are not enough: a benchmark that runs in 0.1 ms would

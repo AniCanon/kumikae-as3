@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import godot_bin  # noqa: E402
 
 BENCHES = ["empty", "move_nodes", "per_node_process", "ray_queries", "signal_traffic", "nbody", "sieve",
-           "array_conversion"]
+           "array_conversion", "saxpy", "shapes", "alloc"]
 
 
 def command(bench: str, lang: str, mode: str, binary: str | None = None) -> list[str]:
