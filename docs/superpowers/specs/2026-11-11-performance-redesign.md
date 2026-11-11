@@ -20,6 +20,38 @@ change: "Research, use best practices, papers to implement the best in class. We
 margin and the 3% "no worse" allowance were the designer's inventions and are dropped: a fixed margin is
 unreachable where the engine's own work dominates, and "no worse" is weaker than what the owner asked for.
 
+**This gate was set after the first numbers were seen, and the owner has not confirmed it.** Under it,
+`move_nodes` can pass with a lead of a few percent, which is all the plugin route allows (see the floor
+below). If the owner wants a larger margin there, the reserve levers at the end are the way to get it.
+
+### Guarding against fitting the rules to the benchmarks
+
+The rules below were written after studying the six original benchmarks, so passing those six proves less
+than it seems. Three **holdout benchmarks** are therefore added. They were specified here before any
+version 2 code or number existed, they are judged by the same gate, and a holdout failure is a gate failure.
+
+| Name | What it stresses | Work per frame |
+|---|---|---|
+| `saxpy` | A unit-stride numeric loop, where unrolling and vectorising help | Two `Vector.<Number>` of 100,000, filled once (`x[i] = i * 0.5`, `y[i] = i`). Ten passes of `y[i] = a * x[i] + y[i]` with `a = 0.000001`, then one pass summing `y`. Checksum: the last sum. |
+| `shapes` | Objects and overridable method calls | 9,000 objects, one third each of `Circle`, `Rect`, `Tri`, all extending `Shape`, interleaved in one `Vector.<Shape>`. Each has overrides of `area():Number` and `grow(d:Number):void`. Ten passes calling `grow(0.001)` then adding `area()` to a total. Checksum: the total. |
+| `alloc` | Allocation every frame | A `Vector.<Particle>` of 20,000 slots. Each frame every slot is replaced by a new `Particle(x, y, vx, vy)` built from the slot index and frame number, then one pass sums `p.x + p.vy`. Checksum: the sum. |
+
+Containers and classes, pinned for all languages: `saxpy` uses GDScript `PackedFloat64Array`, C# `double[]`;
+`shapes` uses GDScript classes with typed methods, C# an abstract base with `sealed` subclasses; `alloc` uses
+a GDScript `Array[Particle]`, C# `Particle[]` with a `sealed class Particle`.
+
+### Measurement protocol for the re-run
+
+- The first spike's translation (version 1) stays as its own language. Version 1, version 2, the floor, C#,
+  and GDScript are measured in the same run.
+- The order of languages rotates with each repetition.
+- Each repetition also times a fixed standalone calibration loop. A repetition whose calibration differs by
+  more than 5% from the first is discarded and repeated. (Between two earlier runs every language's math
+  benchmarks sped up about 1.5 times for no known reason; this detects that.)
+- The floor is built with the version 2 flags. A version 2 result more than 3% faster than the floor is
+  flagged in the report, because it suggests skipped work. The holdouts have no floor.
+- Five repetitions; warm-up of at least 300 frames and two seconds, as before.
+
 ## What the evidence says
 
 **The floor (measured).** The same benchmarks written as plain C++ through the plugin interface, with no AS3
@@ -82,6 +114,12 @@ The out-of-band pending-error flag stays (no C++ exceptions). What changes is wh
 - **Never after an engine call.** An AS3 error raised inside a callback the engine invoked is reported and
   cleared at that callback's boundary; it never returns through engine code into another AS3 function. This
   matches how Godot treats errors in GDScript and C# callbacks.
+- This is sound only if **every** entry point from the engine into AS3 reports and clears: script method
+  calls and native callables alike. A test must throw inside a signal handler and show the emitter carrying
+  on.
+- **Language consequence:** `try`/`catch` cannot catch an error thrown on the far side of an engine call, for
+  example inside a handler of a signal the `try` block emitted. Flash would have delivered it. This is a
+  listed deviation.
 - The test is marked unlikely and its body kept out of line.
 
 ### 3. Null checks: explicit, with redundant ones removed in the compiler
@@ -151,7 +189,9 @@ goal, where a compatibility layer would own its collections anyway.
 
 Connecting a signal to an AS3 method (`connect("hit", on_hit)`) creates a native callable holding the object
 and a direct entry point **(call)**. The engine then calls straight into it, with no object lookup and no
-dispatch by name. The language needs this for method closures regardless; it also removes most of the
+dispatch by name. The callable carries the owner's instance id, so the engine disconnects it when the owner
+is freed, and the entry point checks a tombstone that the object's destruction sets, so a stale callable
+fails cleanly instead of touching freed memory. The language needs this for method closures regardless; it also removes most of the
 receiving cost of a signal.
 
 ### 9. Compiler flags for generated code
@@ -162,7 +202,13 @@ Unrolling is off because an ahead-of-time compiler has no trip-count profile, an
 usually runs a few times costs more than it saves. GCC makes the same choice at `-O2`. Profile-guided builds
 can turn it back on where a profile supports it.
 
-### 10. What does not change
+### 10. A size-class allocator
+
+AS3 objects are allocated from per-size free lists in chunks, not from the system allocator **(call)**. This
+is standard practice for reference-counted runtimes (mimalloc was built for exactly this use). Main thread
+only, so the lists need no locks. Fixed here, before `alloc` is measured.
+
+### 11. What does not change
 
 - AS3 classes still appear to Godot as scripts attached to objects, in both backends.
 - One IR, two backends, and the conformance suite that keeps them identical.
@@ -199,7 +245,8 @@ These replace the rules in the stage 0 plan for the re-measurement. They are fix
 5. **Line bookkeeping.** None in normal execution. Sites are static constants used only on the error path.
 6. **Numbers.** Unchanged.
 7. **Collections.** `Vector.<T>`: length and data in locals across regions with no resize; counted loops are
-   versioned (guard, check-free loop, checked loop). Engine `Dictionary` and `Array` values are used in place
+   versioned (guard, check-free loop, checked loop). An engine call counts as able to resize or replace any
+   vector, exactly as it counts as able to write any field, so nothing is hoisted across one. Engine `Dictionary` and `Array` values are used in place
    through the engine's own accessors, with constant keys built once and a type check on typed coercion.
    AS3-owned collections convert when passed to the engine.
 8. **Godot objects.** Unchanged.
@@ -209,8 +256,15 @@ These replace the rules in the stage 0 plan for the re-measurement. They are fix
     callable with a direct entry point.
 11. **Strings.** Unchanged.
 12. **Fields in locals.** Fields are read into locals at the start of a call-free region and written back at
-    its exits.
+    every exit from it, error exits included.
 13. **Flags.** As in section 9.
+14. **Allocation.** AS3 objects come from the size-class allocator.
+15. **Virtual calls.** An overridable method is called through the class's method table. The call is tested
+    for a pending error only if some override in the program can throw.
+16. **Evidence in the code.** Every check the rules allow to be omitted is marked at that spot with the rule
+    that allows it.
+
+The floor and the version 2 translation are compiled with the same flags. Version 1 keeps its original flags.
 
 The AS3 source of each benchmark is unchanged except `RayQueries.as`, which now holds the query result as a
 Godot `Dictionary` and tests `is_empty()`, the same shape as the GDScript and C# versions.
