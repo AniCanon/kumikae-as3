@@ -1,6 +1,6 @@
 # Stage 0 speed spike: desktop results
 
-Measured 2026-11-11. Plan: `docs/superpowers/plans/2026-11-11-stage-0-speed-spike.md`.
+Measured 2026-11-11. Raw rows: `2026-11-stage-0-desktop.json` beside this file. Plan: `docs/superpowers/plans/2026-11-11-stage-0-speed-spike.md`.
 
 ## Verdict: the gate fails
 
@@ -55,8 +55,8 @@ Measured:
 - **C# pays in pauses instead.** On `ray_queries` C#'s p99 frame is 23.8 ms against a 2.0 ms median; the
   AS3-shaped code's is 4.1 ms against 4.0 ms. A smaller version of the same pattern shows on
   `array_conversion`. The gate judges medians, so this does not count toward the verdict.
-- **Pure math is slightly behind C#:** 8% on `nbody`, 7% on `sieve`. Both are roughly 100 to 150 times
-  faster than GDScript.
+- **Pure math is slightly behind C#:** 8% on `nbody`, 7% on `sieve`. Against GDScript, `nbody` is about 140
+  times faster and `sieve` about 17 times.
 
 Cautions on how far to trust each number:
 
@@ -68,7 +68,8 @@ Cautions on how far to trust each number:
 - **`sieve` and `nbody` are sensitive to emission details the rules do not pin.** The independent reviewer
   compiled the sieve loop outside the engine and saw 620 µs as written and 531 µs when the vector's length
   and data pointer were held in locals with every check and line store kept (reviewer's figures, not
-  re-measured here). That alone would turn the sieve fail into a pass. Which form a real compiler emits is a
+  re-measured here). That might turn the sieve fail into a pass; it was measured outside the engine, so it is not directly
+  comparable with the C# figure. Which form a real compiler emits is a
   design decision, so these two are best read as "within a few percent of C#, either side".
 - **`move_nodes` has no engine floor.** The gate judges whole-frame time. If most of the frame is the
   engine's own work in `set_position`, no scripting language can be 10% ahead. That floor was not measured.
