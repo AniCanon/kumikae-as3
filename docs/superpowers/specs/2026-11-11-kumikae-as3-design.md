@@ -10,8 +10,9 @@ were not checked; the stage that depends on one must check it first.
 
 Make ActionScript 3 a first-class scripting language for Godot 4.
 
-The owner finds GDScript unclean. C# is pleasant but weak where it matters to them: consoles and mobile, where
-there is no JIT and Godot's support is thin. AS3 is a clean, typed, class-based language that many game
+The owner finds GDScript unclean. C# is pleasant but weak where it matters to them: consoles and mobile. Consoles and
+iOS forbid a JIT, and Godot's C# support on mobile is thin. (Android does allow a JIT, so C# is a stronger
+opponent there.) AS3 is a clean, typed, class-based language that many game
 developers already know. The aim is the language that is nice to write, fast, and behaves the same on every
 platform Godot reaches, including Nintendo Switch through the Kumikae toolchain.
 
@@ -99,9 +100,15 @@ support later needs a reader that lifts AVM2 bytecode into the IR, rather than r
 
 ### Interpreter backend
 
-Runs the IR directly. Used for running the game from the editor and for debug runs on desktop. Provides hot
-reload (changing a script while the game runs) and the debugger hooks. It needs no C++ toolchain on the
-developer's machine, which is what makes "write a script, press play" true.
+Runs the IR directly. Used for running the game from the editor and for debug builds on every platform,
+devices included **(call)**. Provides hot reload (changing a script while the game runs) and the debugger
+hooks. It needs no C++ toolchain on the developer's machine, which is what makes "write a script, press play"
+true.
+
+A build is entirely one or the other: debug builds carry the interpreter and precompiled IR, release builds
+carry native code and no interpreter. Interpreted and native AS3 classes never mix in one process, and the
+front end never ships in a game. Loading AS3 that was not known at build time (mods, downloaded patches) is
+out of scope.
 
 It is not a performance target. It should be in GDScript's range.
 
@@ -127,7 +134,8 @@ What this means for speed, stated plainly:
   name with boxed arguments, the same way it does for C# and GDScript. The runtime should resolve the name to
   a native entry once and cache it.
 - **AS3 calling into the engine** goes through Godot's typed direct-call path for bound methods, with no boxed
-  values and no string conversion.
+  values. Methods that take a variable number of arguments (`emit_signal`, `call`, `call_deferred`, `rpc`)
+  have only the boxed path, so signal emission pays for boxing as it does in every Godot language.
 - **AS3 calling AS3** never touches the engine: a direct C++ call in native builds.
 
 The alternative, registering each AS3 class as a native engine class, would make engine-to-AS3 calls faster
@@ -146,6 +154,15 @@ Mapping rules **(call)**:
   (`move_and_slide`), so Godot's documentation applies unchanged.
 - Godot's built-in value types (`Vector2`, `Vector3`, `Color`, `Transform2D`, and the rest) are value types in
   AS3 too: copied on assignment, never null, never heap-allocated in native builds.
+- **Strings are Godot's own strings underneath (call).** Engine calls are string-heavy, and converting on
+  every call would cost the speed goal. Known difference from Flash: indexing is by Unicode code point, not
+  UTF-16 unit, which only shows on characters outside the basic plane. The compiler documents it.
+- **`Array`, `Vector.<T>`, `Dictionary`, and `Object` are AS3's own types (call)**, so they keep AS3
+  behaviour (sparse arrays, enumeration order, typed vectors stored flat) and stay fast inside AS3 code. They
+  convert to Godot's `Array`, packed arrays, and `Dictionary` only when passed to or returned from the engine.
+  Stage 0 measures that conversion.
+- A plain AS3 object (one that does not extend a Godot class) crosses to the engine as an opaque
+  reference-counted handle. GDScript can hold it and pass it back but not look inside it.
 - Godot integers are 64-bit and AS3's `int` is 32-bit. The mapping must not truncate silently. How (a 64-bit
   integer type, or range checks) is left to the builder, under that rule.
 
@@ -172,6 +189,12 @@ closures; default and rest parameters; `int`, `uint`, `Number`, `Boolean`, `Stri
 `Object` literals, `Dictionary`; `is` and `as`; `for`, `for in`, `for each`, `switch`, labelled loops;
 `try`/`catch`/`finally` and `throw`; untyped values (`*`); metadata tags.
 
+**Standard library in the first version (call):** the top-level functions (`trace`, `parseInt`, `parseFloat`,
+`isNaN`, and the rest), `Math`, the full `String`, `Array`, and `Vector` method sets, the `Error` classes,
+`JSON`, `Date`, and `RegExp` including literal syntax. From `flash.utils`, only `Dictionary` and `getTimer`,
+kept under their original package names so existing habits and code carry over. `ByteArray` and the rest of
+the `flash.*` packages are not included; Godot's own classes cover that ground.
+
 **Left out of the first version, with a clear compiler error (call):** E4X (inline XML), the `with` statement,
 changing a class's `prototype` at run time, user-defined namespaces, `Proxy`, and dynamic classes.
 
@@ -197,6 +220,9 @@ AS3 programmers expect garbage collection: objects referencing each other in a l
   at once with no pauses. A small incremental collector, with a fixed time budget per frame, finds and frees
   loops that counting alone would leak. This avoids the stop-everything pauses of a tracing collector, which
   is a place C# is weak in games.
+- **AS3 code runs on the main thread only in the first version (call).** Reference counts are therefore plain,
+  not atomic, which is cheaper on every assignment. If Godot calls an AS3 script from another thread, the call
+  fails with a clear error rather than corrupting memory. Threading is a later design.
 - Weak references are available for the cases where the programmer wants to avoid a loop outright.
 
 ## Debugging
@@ -209,11 +235,14 @@ AS3 programmers expect garbage collection: objects referencing each other in a l
   file-type recognition and wires up the language server and debug adapter. **(unverified:** which JetBrains
   editions expose LSP and DAP clients to plugins. If DAP is not usable, the plugin implements the platform's
   native debugger interface against the same adapter back end.)
-- **On device, native builds:** generated C++ carries line markers pointing at the `.as` source, so a native
+- **On device:** a debug build runs the interpreter, so the same debug adapter attaches over the network and
+  the experience matches the editor. This is the main route for on-device debugging and needs no native
+  debugger.
+- **On device, release builds:** generated C++ carries line markers pointing at the `.as` source, so a native
   debugger steps through AS3 lines. Variables need debugger formatters to read as AS3 values rather than
   runtime internals; these ship with the project. **(unverified:** native debugging on the console device has
-  not yet been proven by the owner's toolchain. This design does not depend on it for anything except this
-  bullet.)
+  not yet been proven by the owner's toolchain. Only this bullet depends on it. It matters for
+  bugs that appear in native builds alone, which the conformance suite exists to prevent.)
 - **Everywhere:** an uncaught error prints an AS3 stack trace with file and line, in release builds too.
 - **Before running:** the type checker reports type errors and definite null misuse at compile time.
 
@@ -226,9 +255,15 @@ version, in three groups: engine-call-heavy gameplay code (moving many nodes, ph
 traffic), pure computation, and allocation-heavy code (to expose collection pauses, measured as worst frame
 time). It runs on desktop and on at least one mobile device; console runs are recorded privately.
 
-Pass means: ahead of C# on the gameplay group on every platform measured, and no worse than C# on pure
-computation on desktop. If the gate fails, the "How AS3 appears to Godot" decision is the first thing to
-revisit.
+The C# baseline is Godot's official C# support where it exists: desktop, Android (JIT), and iOS (ahead of
+time). Stock Godot has no C# on console, so there the numbers are recorded against GDScript and against the
+same test on desktop, with no pass or fail.
+
+Pass means **(call)**: at least 10% ahead of C# on the gameplay group on every platform that has a baseline,
+beyond run-to-run noise, and no worse than C# on pure computation on desktop.
+
+If the gate fails: first try registering hot callbacks natively (see "How AS3 appears to Godot"). If it still
+fails, stop and take the numbers to the owner before building further. The same rule applies to stage 0.
 
 ## Keeping the two backends identical
 
@@ -255,8 +290,9 @@ Nothing in this design delivers SWF playback, but these choices preserve it:
 Each stage ends in something that can be run and shown. Each gets its own plan.
 
 0. **Speed spike (throwaway).** Hand-written C++ in the shape the native backend would emit, attached to
-   nodes as a script, benchmarked against C# and GDScript on desktop. Purpose: learn whether goal 3 is
-   reachable with the script-instance approach before building a compiler around it.
+   nodes as a script, benchmarked against C# and GDScript on desktop, using the gameplay group and the
+   collection-conversion cost. Purpose: learn whether goal 3 is reachable with the script-instance approach
+   before building a compiler around it. Exit: the performance gate's desktop numbers, pass or fail.
 1. **Front end.** Parse and type-check the first-version language; command-line tool that reports errors
    with file and line; conformance tests for the checker.
 2. **Interpreter in Godot.** IR, interpreter, generated bindings, script-language integration. First
