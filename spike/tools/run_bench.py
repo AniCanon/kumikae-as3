@@ -45,17 +45,26 @@ def parity(bench: str, langs: list[str], binary: str | None = None) -> None:
         assert abs(value - first) <= 1e-6 * scale, f"{bench}: checksums differ: {sums}"
 
 
-def matrix(binary: str | None = None, repetitions: int = 5, langs: list[str] | None = None,
-           benches: list[str] | None = None, progress=None) -> list[dict]:
-    """Every benchmark in every language, `repetitions` times, languages interleaved so drift spreads evenly."""
-    langs = langs or ["gd", "cs", "as3"]
+def rotated(langs: list[str], repetition: int) -> list[str]:
+    """The order of languages for a repetition: rotated by one each time, so none always follows another."""
+    shift = repetition % len(langs)
+    return langs[shift:] + langs[:shift]
+
+
+def sweep(binary: str | None, repetition: int, langs: list[str], benches: list[str], progress=None) -> list[dict]:
+    """One repetition: every benchmark once in every language that has it."""
     rows = []
-    for bench in benches or BENCHES:
-        for repetition in range(repetitions):
-            for lang in langs:
-                row = run(bench, lang, "measure", binary)
-                row["repetition"] = repetition
-                rows.append(row)
-                if progress:
-                    progress(row)
+    for bench in benches:
+        for lang in rotated(langs, repetition):
+            if lang == "as3" and bench not in ORIGINAL:
+                continue  # version 1 exists only for the original benchmarks
+            if lang == "as3v2" and bench not in JUDGED:
+                continue
+            if lang == "floor" and bench not in JUDGED[:6]:
+                continue  # the holdouts have no floor
+            row = run(bench, lang, "measure", binary)
+            row["repetition"] = repetition
+            rows.append(row)
+            if progress:
+                progress(row)
     return rows

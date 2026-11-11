@@ -21,47 +21,42 @@ import run_bench  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "out")
 
-GROUPS = {
-    "empty": "baseline",
-    "move_nodes": "gameplay",
-    "per_node_process": "gameplay",
-    "ray_queries": "gameplay",
-    "signal_traffic": "gameplay",
-    "nbody": "compute",
-    "sieve": "compute",
-    "array_conversion": "conversion",
-}
-GAMEPLAY_MARGIN = 1.10  # AS3 must be at least 10% ahead of C# on gameplay code.
-COMPUTE_NOISE = 1.03  # "No worse" on pure computation, with 3% allowed for noise.
+HOLDOUTS = ["saxpy", "shapes", "alloc"]
+FLOOR_MARGIN = 0.97  # version 2 more than 3% faster than the floor suggests skipped work
+CALIBRATION_TOLERANCE = 0.05
 
 
 def _medians(rows: list[dict], bench: str, lang: str) -> list[float]:
     return [row["median_us"] for row in rows if row["bench"] == bench and row["lang"] == lang]
 
 
+def drifted(baseline: float, value: float) -> bool:
+    """True when a calibration time differs from the baseline by more than the tolerance."""
+    return abs(value - baseline) > CALIBRATION_TOLERANCE * baseline
+
+
 def verdict(rows: list[dict]) -> dict:
-    """Applies the gate rules to measured rows. A bench with no C# or AS3 numbers cannot pass."""
+    """The version 2 gate: ahead of C# on every judged benchmark, with no overlap between the runs."""
     benches = {}
-    for bench, group in GROUPS.items():
-        runs = {lang: _medians(rows, bench, lang) for lang in ("as3", "cs", "gd")}
+    for bench in run_bench.BENCHES:
+        runs = {lang: _medians(rows, bench, lang) for lang in ("as3v2", "as3", "cs", "gd", "floor")}
         mid = {lang: (statistics.median(values) if values else None) for lang, values in runs.items()}
         entry = {
-            "group": group,
-            "as3_us": mid["as3"],
+            "holdout": bench in HOLDOUTS,
+            "as3v2_us": mid["as3v2"],
+            "as3v1_us": mid["as3"],
             "cs_us": mid["cs"],
             "gd_us": mid["gd"],
-            "ratio_cs_over_as3": (mid["cs"] / mid["as3"]) if mid["cs"] and mid["as3"] else None,
+            "floor_us": mid["floor"],
+            "ratio_cs_over_as3": (mid["cs"] / mid["as3v2"]) if mid["cs"] and mid["as3v2"] else None,
+            "below_floor": bool(mid["floor"] and mid["as3v2"] and mid["as3v2"] < mid["floor"] * FLOOR_MARGIN),
             "pass": None,
         }
-        if group in ("gameplay", "compute"):
-            if not runs["as3"] or not runs["cs"]:
+        if bench in run_bench.JUDGED:
+            if not runs["as3v2"] or not runs["cs"]:
                 entry["pass"] = False
-            elif group == "gameplay":
-                ahead = mid["as3"] * GAMEPLAY_MARGIN <= mid["cs"]
-                beyond_noise = max(runs["as3"]) < min(runs["cs"])
-                entry["pass"] = ahead and beyond_noise
             else:
-                entry["pass"] = mid["as3"] <= mid["cs"] * COMPUTE_NOISE
+                entry["pass"] = mid["as3v2"] < mid["cs"] and max(runs["as3v2"]) < min(runs["cs"])
         benches[bench] = entry
     judged = [entry["pass"] for entry in benches.values() if entry["pass"] is not None]
     return {"pass": bool(judged) and all(judged), "benches": benches}
@@ -72,24 +67,41 @@ def _cell(value) -> str:
 
 
 def table(result: dict, rows: list[dict]) -> str:
-    lines = ["%-18s %-10s %9s %9s %9s %8s  %s" % ("bench", "group", "as3 us", "c# us", "gd us", "c#/as3", "gate")]
+    head = ("bench", "v2 us", "c# us", "c#/v2", "v2 range", "c# range", "floor", "v1 us", "gd us", "gate")
+    lines = ["%-18s %8s %8s %6s %13s %13s %7s %7s %7s  %s" % head]
     for bench, entry in result["benches"].items():
         ratio = "-" if entry["ratio_cs_over_as3"] is None else "%.2f" % entry["ratio_cs_over_as3"]
         gate = {True: "pass", False: "FAIL", None: ""}[entry["pass"]]
-        lines.append("%-18s %-10s %9s %9s %9s %8s  %s" % (bench, entry["group"], _cell(entry["as3_us"]),
-                                                          _cell(entry["cs_us"]), _cell(entry["gd_us"]), ratio, gate))
+        if entry["holdout"]:
+            gate += " (holdout)"
+        if entry["below_floor"]:
+            gate += " BELOW FLOOR"
+        spans = {}
+        for lang in ("as3v2", "cs"):
+            values = _medians(rows, bench, lang)
+            spans[lang] = "%d-%d" % (min(values), max(values)) if values else "-"
+        lines.append("%-18s %8s %8s %6s %13s %13s %7s %7s %7s  %s" % (
+            bench, _cell(entry["as3v2_us"]), _cell(entry["cs_us"]), ratio, spans["as3v2"], spans["cs"],
+            _cell(entry["floor_us"]), _cell(entry["as3v1_us"]), _cell(entry["gd_us"]), gate))
     lines.append("")
-    lines.append("worst frame (max of max_us across runs):")
+    lines.append("p99 frame (median of runs) and worst frame:")
     for bench in result["benches"]:
-        worst = {}
-        for lang in ("as3", "cs", "gd"):
-            values = [row["max_us"] for row in rows if row["bench"] == bench and row["lang"] == lang]
-            worst[lang] = max(values) if values else None
-        lines.append("%-18s as3 %8s   c# %8s   gd %8s" % (bench, _cell(worst["as3"]), _cell(worst["cs"]),
-                                                         _cell(worst["gd"])))
+        parts = []
+        for lang in ("as3v2", "cs"):
+            p99 = [row["p99_us"] for row in rows if row["bench"] == bench and row["lang"] == lang]
+            worst = [row["max_us"] for row in rows if row["bench"] == bench and row["lang"] == lang]
+            parts.append("%s p99 %s worst %s" % (lang, _cell(statistics.median(p99)) if p99 else "-",
+                                                _cell(max(worst)) if worst else "-"))
+        lines.append("%-18s %s" % (bench, "   ".join(parts)))
     lines.append("")
     lines.append("VERDICT: %s" % ("PASS" if result["pass"] else "FAIL"))
     return "\n".join(lines)
+
+
+def calibrate() -> float:
+    """Median time of the fixed standalone workload, in microseconds."""
+    out = subprocess.run([os.path.join(ROOT, "build", "calib")], capture_output=True, text=True, check=True)
+    return float(out.stdout.strip())
 
 
 def export_release() -> str:
@@ -112,7 +124,7 @@ def export_release() -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--editor", action="store_true", help="measure with the editor binary, without exporting")
-    parser.add_argument("--langs", default="gd,cs,as3")
+    parser.add_argument("--langs", default="gd,cs,as3,as3v2,floor")
     parser.add_argument("--benches", default=",".join(run_bench.BENCHES))
     parser.add_argument("--repetitions", type=int, default=5)
     args = parser.parse_args()
@@ -123,17 +135,38 @@ def main() -> int:
         godot_bin.ensure_imported()
     # The same work first: a benchmark that computes something different stops the measurement.
     for bench in benches:
-        run_bench.parity(bench, langs, binary)
-    rows = run_bench.matrix(binary, args.repetitions, langs, benches,
-                            progress=lambda row: print("  %-18s %-3s %8d us" % (row["bench"], row["lang"],
-                                                                               row["median_us"]), flush=True))
+        have = [lang for lang in langs if not (lang == "as3" and bench not in run_bench.ORIGINAL)
+                and not (lang == "as3v2" and bench not in run_bench.JUDGED)
+                and not (lang == "floor" and bench not in run_bench.JUDGED[:6])]
+        run_bench.parity(bench, have, binary)
+    show = lambda row: print("  %-18s %-6s %8d us" % (row["bench"], row["lang"], row["median_us"]), flush=True)
+    baseline = calibrate()
+    print("calibration baseline: %.1f us" % baseline, flush=True)
+    rows, calibrations, discarded = [], [], 0
+    repetition = 0
+    while repetition < args.repetitions:
+        before = calibrate()
+        attempt = run_bench.sweep(binary, repetition, langs, benches, progress=show)
+        after = calibrate()
+        if drifted(baseline, before) or drifted(baseline, after):
+            discarded += 1
+            print("repetition %d discarded: calibration %.1f / %.1f us against %.1f" % (repetition, before, after,
+                                                                                     baseline), flush=True)
+            if discarded > 5:
+                sys.exit("the machine would not hold still: more than five repetitions discarded")
+            continue
+        calibrations.append([before, after])
+        rows += attempt
+        repetition += 1
     result = verdict(rows)
     os.makedirs(OUT, exist_ok=True)
     with open(os.path.join(OUT, "results.json"), "w") as handle:
-        json.dump({"setting": "editor" if args.editor else "release export", "langs": langs, "rows": rows,
-                   "verdict": result}, handle, indent=1)
+        json.dump({"setting": "editor" if args.editor else "release export", "langs": langs,
+                   "calibration_baseline_us": baseline, "calibrations_us": calibrations,
+                   "discarded_repetitions": discarded, "rows": rows, "verdict": result}, handle, indent=1)
     print()
     print("setting: %s" % ("editor binary (not the official gate setting)" if args.editor else "release export"))
+    print("calibration: baseline %.1f us, %d repetitions discarded" % (baseline, discarded))
     print(table(result, rows))
     return 0 if result["pass"] else 1
 

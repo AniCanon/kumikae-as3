@@ -49,3 +49,7 @@ add_executable(as3rt_tests tests/runtime_tests.cpp)
 target_compile_options(as3rt_tests PRIVATE ${KAS3_FLAGS})
 target_link_libraries(as3rt_tests PRIVATE as3rt)
 add_test(NAME as3rt_tests COMMAND as3rt_tests)
+
+# Calibration workload for the measurement protocol.
+add_executable(calib tools/calib.cpp)
+target_compile_options(calib PRIVATE -O2)
