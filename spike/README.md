@@ -23,7 +23,17 @@ cd spike/api && godot --headless --dump-extension-api && godot --headless --dump
 ## Test
 
 ```sh
-python3 spike/tests/test_load.py
+spike/tests/run_all.sh
 ```
+
+## Measure
+
+```sh
+python3 spike/tools/gate.py            # release export, all three languages, prints the verdict
+python3 spike/tools/gate.py --editor --langs gd,as3 --repetitions 2   # quick look while working
+```
+
+The C# side needs the Godot 4.7.2 .NET editor and its export templates; point `KAS3_GODOT` at it and set
+`KAS3_REQUIRE_DOTNET=1` so the tests insist on it. Results: `docs/results/2026-11-stage-0-desktop.md`.
 
 `KAS3_GODOT` selects the Godot binary; otherwise `godot` on PATH is used. It must be 4.7.

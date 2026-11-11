@@ -102,6 +102,9 @@ def export_release() -> str:
     macos = os.path.join(app, "Contents", "MacOS")
     if result.returncode != 0 or not os.path.isdir(macos):
         sys.exit("export failed:\n" + result.stdout[-2000:] + result.stderr[-2000:])
+    # The exporter signs with the hardened runtime, and macOS then kills the .NET build on launch.
+    # A plain ad-hoc signature runs. This only changes how the local test app is signed.
+    subprocess.run(["codesign", "--force", "--deep", "-s", "-", app], capture_output=True, text=True, check=True)
     binaries = [name for name in os.listdir(macos) if not name.endswith(".dylib")]
     return os.path.join(macos, binaries[0])
 
