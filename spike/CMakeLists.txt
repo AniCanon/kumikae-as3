@@ -14,8 +14,19 @@ set(GODOTCPP_API_VERSION "4.7" CACHE STRING "" FORCE)
 set(GODOTCPP_TARGET "template_release" CACHE STRING "" FORCE)
 add_subdirectory(third_party/godot-cpp EXCLUDE_FROM_ALL)
 
-add_library(kas3_spike SHARED host/register.cpp)
-target_compile_options(kas3_spike PRIVATE ${KAS3_FLAGS})
+file(GLOB KAS3_BENCHES CONFIGURE_DEPENDS benches/*.cpp)
+add_library(kas3_spike SHARED
+    host/register.cpp
+    host/class_registry.cpp
+    host/spike_language.cpp
+    host/spike_script.cpp
+    host/script_instance.cpp
+    runtime/godot_calls.cpp
+    ${KAS3_BENCHES})
+# The host is glue around godot-cpp, whose casts need RTTI. Everything that stands for generated code
+# (benches/, and the runtime library below) is built with the full flags, RTTI off.
+target_compile_options(kas3_spike PRIVATE -O2 -fno-exceptions -ffp-contract=off)
+set_source_files_properties(${KAS3_BENCHES} PROPERTIES COMPILE_OPTIONS "-fno-rtti")
 target_include_directories(kas3_spike PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(kas3_spike PRIVATE godot-cpp)
 set_target_properties(kas3_spike PROPERTIES
