@@ -5,3 +5,7 @@ config_version=5
 config/name="kas3 spike"
 config/features=PackedStringArray("4.7")
 run/main_scene="res://runner.tscn"
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
