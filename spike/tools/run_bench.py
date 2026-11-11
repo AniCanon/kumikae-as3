@@ -38,3 +38,19 @@ def parity(bench: str, langs: list[str], binary: str | None = None) -> None:
     for lang, value in sums.items():
         scale = max(abs(first), abs(value), 1e-300)
         assert abs(value - first) <= 1e-6 * scale, f"{bench}: checksums differ: {sums}"
+
+
+def matrix(binary: str | None = None, repetitions: int = 5, langs: list[str] | None = None,
+           benches: list[str] | None = None, progress=None) -> list[dict]:
+    """Every benchmark in every language, `repetitions` times, languages interleaved so drift spreads evenly."""
+    langs = langs or ["gd", "cs", "as3"]
+    rows = []
+    for bench in benches or BENCHES:
+        for repetition in range(repetitions):
+            for lang in langs:
+                row = run(bench, lang, "measure", binary)
+                row["repetition"] = repetition
+                rows.append(row)
+                if progress:
+                    progress(row)
+    return rows
