@@ -147,6 +147,18 @@ Value from_variant(const Variant &p_variant) {
 	}
 }
 
+bool value_to_vector2(const Value &p_value, Vector2 *r_out) {
+	if (p_value.tag != Value::OBJECT || p_value.o->cls != BoxedVariant::class_info()) {
+		return false;
+	}
+	const Variant &boxed = static_cast<BoxedVariant *>(p_value.o)->value;
+	if (boxed.get_type() != Variant::VECTOR2) {
+		return false;
+	}
+	*r_out = boxed;
+	return true;
+}
+
 godot::Array to_godot_array(const Array *p_array) {
 	godot::Array result;
 	int32_t length = p_array->length();
@@ -202,6 +214,14 @@ void add_child(GDExtensionObjectPtr p_parent, GDExtensionObjectPtr p_child) {
 
 void attach_script(GDExtensionObjectPtr p_object, const char *p_class) {
 	wrapper_of(p_object)->set_script(SpikeScript::for_class(StringName(p_class)));
+}
+
+void setup_set(GDExtensionObjectPtr p_object, const char *p_property, const Variant &p_value) {
+	wrapper_of(p_object)->set(StringName(p_property), p_value);
+}
+
+Variant object_variant(GDExtensionObjectPtr p_object) {
+	return Variant(wrapper_of(p_object));
 }
 
 void report_uncaught() {

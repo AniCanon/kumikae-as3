@@ -126,10 +126,16 @@ Ref<Array> from_godot_array(const godot::Array &p_array);
 godot::Variant to_variant(const Value &p_value);
 Value from_variant(const godot::Variant &p_variant);
 
+// Coerces an untyped value to Vector2. False when it holds something else.
+bool value_to_vector2(const Value &p_value, godot::Vector2 *r_out);
+
 // Setup helpers, never on a measured path.
 void connect_method(GDExtensionObjectPtr p_owner, const char *p_signal, const char *p_method);
 void add_child(GDExtensionObjectPtr p_parent, GDExtensionObjectPtr p_child);
 void attach_script(GDExtensionObjectPtr p_object, const char *p_class);
+// Dynamic property set by name, for building scenes in _ready. Slow; a compiler would emit direct calls.
+void setup_set(GDExtensionObjectPtr p_object, const char *p_property, const godot::Variant &p_value);
+godot::Variant object_variant(GDExtensionObjectPtr p_object);
 // The AS3 object behind a script instance the host created, or null.
 Object *script_object_of(GDExtensionObjectPtr p_owner);
 

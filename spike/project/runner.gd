@@ -42,10 +42,18 @@ func _ready() -> void:
 	# Run after every other node each frame, so frame N of the runner sees N frames of the benchmark.
 	process_priority = 1000000
 	process_physics_priority = 1000000
+	var script := _load_script()
+	if script == null:
+		_fail("cannot load bench: %s/%s" % [_lang, _bench_name])
+		return
 	_bench = Node2D.new()
 	_bench.name = "Bench"
-	_bench.set_script(_load_script())
+	_bench.set_script(script)
 	add_child(_bench)
+
+
+func _class_name() -> String:
+	return "NBody" if _bench_name == "nbody" else _bench_name.to_pascal_case()
 
 
 func _load_script() -> Script:
@@ -53,9 +61,11 @@ func _load_script() -> Script:
 		"gd":
 			return load("res://benches/gd/%s.gd" % _bench_name)
 		"cs":
-			return load("res://benches/cs/%s.cs" % _bench_name.to_pascal_case())
+			return load("res://benches/cs/%s.cs" % _class_name())
 		_:
-			return ClassDB.class_call_static(&"SpikeScript", &"for_class", StringName(_bench_name.to_pascal_case()))
+			if not ClassDB.class_exists(&"SpikeScript"):
+				return null
+			return ClassDB.class_call_static(&"SpikeScript", &"for_class", StringName(_class_name()))
 
 
 func _fail(message: String) -> void:

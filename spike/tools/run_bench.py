@@ -18,7 +18,7 @@ def command(bench: str, lang: str, mode: str, binary: str | None = None) -> list
         head = [godot_bin.godot_path(), "--path", godot_bin.PROJECT]
     else:
         head = [binary]
-    return head + ["--headless", "--fixed-fps", "60", "--",
+    return head + ["--headless", "--fixed-fps", "60", "--quit-after", "20000", "--",
                    f"--bench={bench}", f"--lang={lang}", f"--mode={mode}"]
 
 

@@ -19,7 +19,8 @@ class LoadTest(unittest.TestCase):
     def test_extension_loads(self):
         godot_bin.ensure_imported()
         result = subprocess.run(
-            [godot_bin.godot_path(), "--headless", "--path", os.path.join(ROOT, "project"), "--quit-after", "2"],
+            [godot_bin.godot_path(), "--headless", "--path", os.path.join(ROOT, "project"), "--quit-after", "600",
+             "--", "--bench=empty", "--lang=gd", "--mode=verify"],
             capture_output=True, text=True, timeout=120)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("kas3_spike loaded", result.stdout)

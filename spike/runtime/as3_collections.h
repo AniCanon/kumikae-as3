@@ -11,6 +11,22 @@
 #include <utility>
 #include <vector>
 
+// Inline bounds check, as a compiler would emit it: one branch, straight to the error exit.
+#define AS3_BOUNDS(vec, i) \
+	do { \
+		if (AS3_UNLIKELY((uint32_t)(i) >= (uint32_t)(vec)->length)) { \
+			::as3::throw_range(); \
+			return {}; \
+		} \
+	} while (0)
+#define AS3_BOUNDS_VOID(vec, i) \
+	do { \
+		if (AS3_UNLIKELY((uint32_t)(i) >= (uint32_t)(vec)->length)) { \
+			::as3::throw_range(); \
+			return; \
+		} \
+	} while (0)
+
 namespace as3 {
 
 // Vector.<T>: contiguous, typed, bounds-checked on every index.
