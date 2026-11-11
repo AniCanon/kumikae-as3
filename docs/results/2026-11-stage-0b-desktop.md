@@ -5,8 +5,12 @@ Raw rows: `2026-11-stage-0b-desktop.json` beside this file.
 
 ## Verdict: the gate fails, narrowly
 
-Seven of the nine judged benchmarks pass. The two that fail are ties with C#, not losses: version 2 is 1%
-ahead on the median in both, but the runs overlap, and the gate requires no overlap.
+Seven of the nine judged benchmarks pass. The two that fail are ties with C#: in this run version 2's median
+was 1% ahead on both, in the independent reviewer's spot runs C#'s was slightly ahead on both, and the runs
+overlap either way. Which language is really ahead on those two is unknown.
+
+**What this supports:** code compiled this way can match plain C++ through the plugin interface, and beats
+C# where the engine is not the bottleneck. **What it does not support:** "beats C# on every benchmark".
 
 The gate: version 2 must be ahead of C# on every judged benchmark, with its slowest run faster than C#'s
 fastest. This definition was set by the designer after the first spike's numbers and has not been confirmed
@@ -68,19 +72,57 @@ Microseconds. p99 is the median of the five runs' 99th-percentile frames; worst 
 | `alloc` | 57 | 71 | 400 | 433 |
 
 On the two benchmarks that create garbage (`ray_queries`, `alloc`), C#'s slow frames are 5 to 12 times its
-median; version 2's stay within a few percent of its median. The gate judges medians, so this does not count
+median; version 2's stay within 4% of its median on `ray_queries` and 19% on `alloc`. The gate judges medians, so this does not count
 toward the verdict. `saxpy` had one slow version 2 frame (1.3 ms) of unknown cause.
 
 ## The two failures
 
-- **`ray_queries`.** Version 2 is at the floor (1,339 against 1,331), so there is nothing left to remove on
-  this route. C# is at the same level because the engine's own work dominates: it builds a six-entry
+- **`ray_queries`.** Version 2 is at the floor (1,339 against 1,331). The reviewer found about 4% still
+  available to both: the call helper constructs an engine dictionary per ray that the call then overwrites.
+  Beyond that there is little left on this route. C# is at the same level because the engine's own work dominates: it builds a six-entry
   dictionary for every ray, and both languages then read one key from it. The engine has an internal query
   that fills a plain struct instead; code linked into the engine can call it, a plugin cannot.
 - **`shapes`.** Calling an overridable method through the class's method table costs the same as C#'s virtual
   call. The version 2 rules do not include devirtualisation. A compiler that sees the whole program knows
   `Shape` has exactly three final subclasses and could test the class and run the method body inline; that
   optimisation was listed in the research but not put in the rules.
+
+## Findings of the independent review
+
+A reviewer on a separate pass re-read every translation against the rules, re-ran spot measurements, and
+checked every table cell against the raw data. No translation was found to break the rules in a way that
+makes it faster than a compliant compiler could emit, and the cells match. Its other findings, which qualify
+the table above:
+
+- **`sieve` passes only because of `-fno-unroll-loops`.** With the flag version 2 is about 9% ahead of C#;
+  without it, about 5% behind (reviewer's measurement). The plain C++ floor moves identically, so this is a
+  property of the C++ compiler, not of AS3. The flag was chosen from sieve data, so for that benchmark it is
+  fitted. As a general policy it held up on the benchmarks it was not chosen for: `saxpy` and `nbody` were
+  unchanged with and without it.
+- **`shapes` is a best case.** Its tie depends on the compiler proving that no override of `grow` or `area`
+  can throw, resize the vector, or release an element. Those proofs are true of this code. Where they are not
+  available (for example overrides that call the engine), the reviewer measured the conservative form about
+  20% behind C#.
+- **The holdouts were held out from measurement, not from rule design.** The allocator rule, the virtual-call
+  rule, and the "engine call can resize" clause were written in the same sitting as the holdout
+  specifications. Each holdout is also engine-free and close to the ideal case for one rule. They show the
+  rules are not fitted to six numbers; they do not show how the rules fare on ordinary game code.
+- **Ratios against C# move between sessions on engine-bound benchmarks.** C# ÷ floor on `move_nodes` was 1.04
+  in one session and 1.14 in another; on `ray_queries` 1.13 and 1.02. The likely cause is which class of CPU
+  core the process lands on (this machine has two), which the calibration workload cannot see because it is a
+  separate process. Leads of a few percent on those benchmarks should be read as "about level or slightly
+  ahead".
+- **`alloc` is a best case for a free-list allocator** (everything is replaced every frame) and a poor one
+  for C#'s generational collector.
+
+Defects found in the spike, none on a measured path:
+
+- An AS3 error raised while constructing a script instance is not reported and cleared, and an error that is
+  propagating can be swallowed if a destructor on the error path calls the engine and re-enters AS3. Entry
+  points need to save and restore the pending error.
+- `ray_queries` indexes the engine dictionary with the form that inserts a missing key; it should look up.
+- Call thunks do not check the argument count.
+- The pooled allocator never returns memory and does not check for allocation failure.
 
 ## What changed since the first spike
 
@@ -91,8 +133,9 @@ Measurement protocol, as specified there: all five languages in one run; languag
 repetition; a fixed standalone workload timed before and after every repetition (baseline 386.6 µs; no
 repetition drifted more than 5%, none discarded); warm-up of at least 300 frames and two seconds.
 
-Absolute times are about 25% lower than in the first spike's document for every language. The cause is
-unknown; the calibration workload was stable throughout this run, and all comparisons here are within the run.
+Absolute times are lower than in the first spike's document for every language: about a third lower on five
+benchmarks and 16% on `move_nodes`. The reviewer's session reproduced the first document's absolute times.
+CPU core placement is the suspected cause. All comparisons here are within one run.
 
 ## What was not measured
 

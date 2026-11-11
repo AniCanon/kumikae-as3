@@ -117,6 +117,9 @@ The out-of-band pending-error flag stays (no C++ exceptions). What changes is wh
 - This is sound only if **every** entry point from the engine into AS3 reports and clears: script method
   calls and native callables alike. A test must throw inside a signal handler and show the emitter carrying
   on.
+- Entry points must also **save and restore** an error that is already propagating: a destructor running on
+  an error exit may call the engine, which may re-enter AS3. Construction of a script instance is an entry
+  point too. (Found in review of the spike, which does neither.)
 - **Language consequence:** `try`/`catch` cannot catch an error thrown on the far side of an engine call, for
   example inside a handler of a signal the `try` block emitted. Flash would have delivered it. This is a
   listed deviation.
@@ -175,6 +178,7 @@ This reverses the first design's decision.
   value of the Godot type and uses the Godot API on it (`is_empty()`, `has()`, indexing). Reading one key
   reads one key.
 - Indexing with a constant key uses a key built once.
+- Reading a key must be a lookup, never the engine's inserting index operation.
 - Coercing an element to a typed variable checks the element's type and throws `TypeError` on mismatch.
 - AS3's own `Array`, `Vector.<T>`, `Object`, and `Dictionary` (the `flash.utils` one) remain AS3 types with
   AS3 behaviour. Passing one to the engine still converts.
