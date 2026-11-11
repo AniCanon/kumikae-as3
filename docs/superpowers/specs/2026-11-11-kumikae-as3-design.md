@@ -1,6 +1,6 @@
 # Kumikae AS3: ActionScript 3 for Godot
 
-Design, 2026-11-11. Status: awaiting owner approval.
+Design, 2026-11-11. Status: approved by the owner on 2026-11-11.
 
 Lines marked **(owner)** are what the owner asked for. Lines marked **(call)** are the designer's decisions,
 made on the owner's behalf and open to being overruled. Lines marked **(unverified)** are believed true but
@@ -331,7 +331,7 @@ Later, separately designed: an await form for signals, the Flash API library, SW
 - Whether script metadata tag names need a prefix to avoid clashing with Flex-era tags.
 - The file extension is `.as`.
 
-## Open question for the owner
+## Repository visibility
 
-- **Is this repository public and open source,** like the Kumikae toolkit (MIT, under the AniCanon
-  organisation), or private? No licence file or remote is created until this is answered.
+**Private for now (owner).** The owner will open it once it is ready. No licence file until then. Before it
+goes public, trim the "Constraints" section's description of the console fork.
