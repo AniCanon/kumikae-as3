@@ -6,15 +6,15 @@
 
 **Architecture:** A throwaway GDExtension (`kas3_spike`) presents hand-translated "AS3-shaped" C++ classes to Godot as scripts attached to nodes, through the script-language extension interface. The same seven benchmarks are written in GDScript, C#, and AS3-shaped C++; a parity check proves they do the same work, and a runner script measures frame times in a release export and prints a gate verdict.
 
-**Tech Stack:** Godot 4.7.2 (.NET edition, so one binary runs all three languages), godot-cpp, CMake, C++17 with `-O2 -fno-exceptions -fno-rtti`, .NET 10 SDK, Python 3 (standard library only).
+**Tech Stack:** Godot 4.7.2 (.NET edition, so one binary runs all three languages), godot-cpp, CMake, C++17 with `-O2 -fno-exceptions -fno-rtti -ffp-contract=off`, .NET 10 SDK, Python 3 (standard library only).
 
 **Spec:** `docs/superpowers/specs/2026-11-11-kumikae-as3-design.md` (sections "How AS3 appears to Godot", "Godot API bindings", "Memory", "Performance gate", "Stages" item 0).
 
 ## Global Constraints
 
 - Everything lives under `spike/` and is throwaway. No file outside `spike/` and `docs/` is created. Keeping any of it is a new decision for the owner.
-- Godot 4.7 is the baseline. All three languages run in the same Godot 4.7.2 .NET binary.
-- No C++ exceptions and no RTTI in the extension: compile with `-fno-exceptions -fno-rtti`. No `-ffast-math`, no flags a normal release export would not use.
+- Godot 4.7 is the baseline. Measurement (Tasks 3 and 7) runs all three languages in the same Godot 4.7.2 .NET binary. Tasks 1, 2, 4, 5 and 6 need no C# and run on the standard 4.7.2 already installed.
+- No C++ exceptions and no RTTI in the extension: compile with `-fno-exceptions -fno-rtti -ffp-contract=off`. Fused multiply-add is off because generated code must match the interpreter bit for bit. No `-ffast-math`, no flags a normal release export would not use.
 - No JIT, no platform-specific code in the runtime or the benchmark classes.
 - AS3 code runs on the main thread only; reference counts are plain (non-atomic).
 - No console vendor material in this repository: no SDK names, tool names, or device results.
@@ -30,10 +30,10 @@ These define "the shape the compiler would emit". Every AS3-shaped C++ class in 
 2. **References.** `as3::Ref<T>` retains on copy and releases on destruction. Parameters are borrowed (`T *`, no retain) unless stored. A local that receives a new or returned object owns it.
 3. **Null checks.** Every member access or call through a nullable reference is preceded by `AS3_NULLCHECK(p)`, except on `this` and on a reference constructed in the same block.
 4. **Errors.** `throw` sets `as3::pending_error` and returns. After every call that can throw (any call to an AS3 function that is not provably non-throwing, and every null or bounds check), the caller tests `AS3_PENDING()` and returns. `try`/`catch` is a test of the same flag.
-5. **Line bookkeeping.** Each AS3 function opens an `as3::Frame` on a shadow stack (function name, file name). Before each statement that contains an operation that can throw, the generated code stores the AS3 line number into the frame (`AS3_LINE(n)`).
+5. **Line bookkeeping.** Each AS3 function opens an `as3::Frame` on a shadow stack (function name, file name). Before each statement that contains an operation that can throw, the generated code stores the AS3 line number into the frame (`AS3_LINE(n)`). Engine calls count as able to throw, because the engine can call back into AS3; each is followed by `AS3_PENDING()`. Pure arithmetic on locals and fields of `this` does not.
 6. **Numbers.** `Number` is `double`. `int` is `int32_t` with wrapping arithmetic, `uint` is `uint32_t`. Passing to a Godot integer parameter widens to `int64_t`.
-7. **Collections.** `Vector.<T>` is `as3::Vector<T>` (contiguous, bounds-checked on every index, `RangeError` on failure). `Array` is `as3::Array` of tagged values. Both are AS3 objects with headers. They convert to Godot `PackedVector2Array` / `Array` only at an engine call.
-8. **Godot objects.** Held as a raw `GDExtensionObjectPtr` with a null check only (GDScript's release behaviour). Godot value types (`Vector2`) are plain structs on the stack.
+7. **Collections.** `Vector.<T>` is `as3::Vector<T>` (contiguous, bounds-checked on every index, `RangeError` on failure). `Array` is `as3::Array` of tagged values. Both are AS3 objects with headers. `Object` literals and `Dictionary` are `as3::Dict` (insertion-ordered hash map from Godot `String` to tagged value). All of these convert at an engine call, eagerly and in full: an AS3 collection passed in is copied to a new Godot `PackedVector2Array` / `Array` / `Dictionary`, and a Godot collection returned is copied into a new AS3 one before any element is read. Reading a returned Godot collection in place is forbidden.
+8. **Godot objects.** A non-reference-counted Godot object (`Node`) is held as a raw `GDExtensionObjectPtr` with a null check only (GDScript's release behaviour). A Godot `RefCounted` object (`PhysicsRayQueryParameters2D`) is held in `as3::GodotRef`, which calls the engine's `reference` on copy and `unreference` on destruction and frees the object at zero. Godot value types (`Vector2`) are plain structs on the stack.
 9. **Engine calls.** `object_method_bind_ptrcall` through a `GDExtensionMethodBindPtr` fetched once at library load with `classdb_get_method_bind` and the hash from `extension_api.json`. No godot-cpp wrapper classes on any measured path. Vararg methods (`emit_signal`) use `object_method_bind_call` with Variants.
 10. **Engine calling in.** Arrives at the script instance's `call` function with a `StringName` and Variant arguments. The instance resolves the name through a per-class table keyed by the `StringName`'s interned pointer, unboxes arguments, and calls the typed C++ method directly.
 11. **Strings** are Godot `String`.
@@ -51,6 +51,10 @@ All run with `--headless --fixed-fps 60`, which gives a constant delta of 1/60 s
 | `nbody` | compute | Five bodies as class instances with `Number` fields (the classic n-body initial values), 2,000 steps of dt 0.01 per frame. Checksum: system energy. |
 | `sieve` | compute | Sieve of Eratosthenes below 200,000 in a `Vector.<int>` per frame, counting primes. Checksum: prime count (17,984) times frames run. |
 | `array_conversion` | conversion | Per frame, 20 times: build a 1,000-point `Vector.<Vector2>` and pass it to `Line2D.set_points`; build a 1,000-int `Array` and pass it to `set_meta("data", ...)`. Checksum: `Line2D.get_point_count()` plus the meta array's size. |
+
+**Same work, pinned per benchmark.** In every language: `move_nodes` keeps its children in a typed array filled once in `_ready` (GDScript `Array[Node2D]`, C# `Node2D[]`, AS3 `Vector.<Node2D>`). `ray_queries` fetches the space state each frame, reuses one parameters object, and reads `position` out of each returned dictionary by key. `nbody` bodies are class instances allocated once (C# `class`, not `struct`), held in an array. `sieve` allocates its flags array once and refills it each frame (GDScript `PackedInt32Array`, C# `int[]`, AS3 `Vector.<int>`). `array_conversion` builds both collections fresh on each of its 20 iterations.
+
+An eighth benchmark, `empty` (a root `Node2D` whose script has an empty `_process`), is reported as the engine-overhead baseline and judged by nothing.
 
 If the fastest language finishes a benchmark's frame in under 1 ms, scale that benchmark's count up for all three languages equally and record the new count in the results.
 
@@ -71,11 +75,11 @@ If the fastest language finishes a benchmark's frame in under 1 ms, scale that b
 - Create (submodule): `spike/third_party/godot-cpp`
 
 **Interfaces:**
-- Produces: CMake target `kas3_spike` writing `spike/project/bin/libkas3_spike.<platform>.<arch>.dylib`; extension entry symbol `kas3_spike_init`; `godot_bin.py` function `godot_path() -> str` returning `$KAS3_GODOT` or failing with the message below.
+- Produces: CMake target `kas3_spike` writing `spike/project/bin/libkas3_spike.<platform>.<arch>.dylib`; extension entry symbol `kas3_spike_init`; `godot_bin.py` function `godot_path() -> str` as specified below.
 
-**Prerequisite for the owner (cannot be done by the worker without permission):** install the Godot 4.7.2 .NET editor and its export templates, and set `KAS3_GODOT` to its binary. The worker asks before downloading anything.
+`godot_path()` returns `$KAS3_GODOT` when set, otherwise `godot` from PATH; it fails with `Godot 4.7 not found: set KAS3_GODOT` when the binary is missing or its `--version` does not start with `4.7.`.
 
-- [ ] **Step 1: Write the failing test** `spike/tests/test_load.py`: runs `godot_path()` with `--headless --path spike/project --quit` and asserts exit code 0, stdout contains `kas3_spike loaded`, and `--version` output starts with `4.7.` and contains `mono`. When `KAS3_GODOT` is unset it must fail with exactly: `Set KAS3_GODOT to a Godot 4.7 .NET editor binary`.
+- [ ] **Step 1: Write the failing test** `spike/tests/test_load.py`: runs `godot_path()` with `--headless --path spike/project --quit` and asserts exit code 0, stdout contains `kas3_spike loaded`, and `--version` output starts with `4.7.`. With `KAS3_GODOT=/nonexistent` it must fail with exactly: `Godot 4.7 not found: set KAS3_GODOT`.
 - [ ] **Step 2: Run** `python3 spike/tests/test_load.py`. Expected: FAIL (no project).
 - [ ] **Step 3: Add godot-cpp.** Dump the API from the target binary (`$KAS3_GODOT --headless --dump-extension-api` and `--dump-gdextension-interface`) into `spike/api/`. Add godot-cpp as a submodule at its newest revision that builds against that dump using its custom-API-file CMake option; record the chosen commit and option name in `spike/README.md`. godot-cpp is used for class registration only (rule 9).
 - [ ] **Step 4: Write `CMakeLists.txt` and `register.cpp`.** Flags per Global Constraints. `kas3_spike_init` registers at scene level and prints `kas3_spike loaded`. `.gitignore` excludes `spike/build/`, `spike/project/bin/`, `spike/project/.godot/`, `spike/out/`.
@@ -85,11 +89,11 @@ If the fastest language finishes a benchmark's frame in under 1 ms, scale that b
 ### Task 2: Runner and GDScript benchmarks
 
 **Files:**
-- Create: `spike/project/runner.gd`, `spike/project/runner.tscn`, `spike/project/benches/gd/{move_nodes,per_node_process,per_node_child,ray_queries,signal_traffic,nbody,sieve,array_conversion}.gd`, `spike/tools/run_bench.py`, `spike/tests/test_runner.py`
+- Create: `spike/project/runner.gd`, `spike/project/runner.tscn`, `spike/project/benches/gd/{empty,move_nodes,per_node_process,per_node_child,ray_queries,signal_traffic,nbody,sieve,array_conversion}.gd`, `spike/tools/run_bench.py`, `spike/tests/test_runner.py`
 
 **Interfaces:**
 - Produces: command line `godot --headless --fixed-fps 60 --path spike/project -- --bench=<name> --lang=<gd|cs|as3> --mode=<verify|measure>`.
-  - `verify`: 10 frames, prints one line `{"bench","lang","checksum"}` as JSON, exits 0.
+  - `verify`: 10 frames, prints one line `{"bench","lang","checksum","delta","physics_ticks"}` as JSON, exits 0.
   - `measure`: 300 warm-up frames, then 600 measured frames; prints one JSON line `{"bench","lang","frames":600,"median_us","p99_us","max_us","checksum"}`. Frame time is the wall time between consecutive runner `_process` calls (`Time.get_ticks_usec()`).
   - An unknown bench or lang prints `unknown bench: <name>` or `unknown lang: <name>` to stderr and exits 2.
 - Produces: `run_bench.py` functions `run(bench: str, lang: str, mode: str, binary: str | None = None) -> dict` and `parity(bench: str, langs: list[str]) -> None` (raises `AssertionError` naming both checksums when they differ by more than 1e-6 relative).
@@ -98,19 +102,22 @@ If the fastest language finishes a benchmark's frame in under 1 ms, scale that b
 - [ ] **Step 1: Write the failing tests** in `spike/tests/test_runner.py`:
   - `test_verify_prints_checksum`: `run("sieve", "gd", "verify")["checksum"] == 17984 * 10`.
   - `test_measure_shape`: `run("sieve", "gd", "measure")` has exactly the keys above and `frames == 600`.
-  - `test_warmup_excluded`: set env `KAS3_SLOW_FIRST_FRAMES=300` (the runner sleeps 5 ms in each warm-up frame when set); assert `max_us < 5000` for `sieve`.
+  - `test_warmup_excluded`: set env `KAS3_SLOW_FIRST_FRAMES=300` (the runner sleeps 20 ms in each warm-up frame when set); assert `max_us < 10000` for `empty`.
+  - `test_fixed_step`: in `verify` mode the runner also prints `delta` (the last `_process` delta) and `physics_ticks`; assert `abs(delta - 1/60) < 1e-9` and `physics_ticks == 10`. If this fails, `--fixed-fps` does not behave as this plan assumes: stop and report before writing benchmarks.
   - `test_unknown_bench_exits_2`: `--bench=nope` exits 2 with `unknown bench: nope` on stderr.
   - `test_nbody_energy`: checksum after 10 frames equals the value computed by the plain-Python n-body reference inside the test, within 1e-9 relative.
 - [ ] **Step 2: Run** `python3 -m unittest spike/tests/test_runner.py`. Expected: FAIL.
 - [ ] **Step 3: Implement `runner.gd` and `run_bench.py`.**
-- [ ] **Step 4: Implement the seven GDScript benchmarks** exactly as the Benchmarks table specifies, fully typed.
+- [ ] **Step 4: Implement `empty` and the seven GDScript benchmarks** exactly as the Benchmarks table and "Same work" paragraph specify, fully typed.
 - [ ] **Step 5: Run the tests.** Expected: PASS.
 - [ ] **Step 6: Commit** `spike: add benchmark runner and GDScript benchmarks`.
 
 ### Task 3: C# benchmarks
 
 **Files:**
-- Create: `spike/project/Spike.csproj`, `spike/project/benches/cs/{MoveNodes,PerNodeProcess,PerNodeChild,RayQueries,SignalTraffic,NBody,Sieve,ArrayConversion}.cs`, `spike/tests/test_parity_cs.py`
+- Create: `spike/project/Spike.csproj`, `spike/project/benches/cs/{Empty,MoveNodes,PerNodeProcess,PerNodeChild,RayQueries,SignalTraffic,NBody,Sieve,ArrayConversion}.cs`, `spike/tests/test_parity_cs.py`
+
+**Prerequisite for the owner (the worker asks before downloading anything):** install the Godot 4.7.2 .NET editor and set `KAS3_GODOT` to its binary. From this task on, `test_load.py` gains an assertion that `--version` contains `mono` when `KAS3_REQUIRE_DOTNET=1`, and Tasks 3 and 7 set that variable.
 
 **Interfaces:**
 - Consumes: runner command line and `parity()` from Task 2.
@@ -138,13 +145,14 @@ If the fastest language finishes a benchmark's frame in under 1 ms, scale that b
   - `int capture_stack(char *buffer, int capacity)`: writes `\tat <function>() [<file>:<line>]` per frame, innermost first; called by `throw_error` so the trace is that of the throw site.
   - `const char *pending_trace()`.
   - Macros `AS3_FRAME(fn, file)`, `AS3_LINE(n)`, `AS3_NULLCHECK(p)` (throws `TypeError` with message `Error #1009: Cannot access a property or method of a null object reference.` and returns the enclosing function's zero value), `AS3_PENDING()`.
-  - `template <class T> struct Vector : Object` with `length`, `at(int32_t)` (bounds-checked, `RangeError`), `push`; `struct Array : Object` holding `as3::Value` (tagged: undefined, null, int, Number, Boolean, Object).
+  - `template <class T> struct Vector : Object` with `length`, `at(int32_t)` (bounds-checked, `RangeError`), `push`; `struct Array : Object` holding `as3::Value` (tagged: undefined, null, int, Number, Boolean, Object); `struct Dict : Object` with `set(key, Value)`, `get(key) -> Value` (undefined when absent), and insertion-ordered iteration. `Dict` keys are a template parameter here so the tests need no Godot; the host instantiates it with Godot `String`.
 
 - [ ] **Step 1: Write the failing tests** in `runtime_tests.cpp` (plain `main` with assertions, no framework):
   - `ref_counts`: two `Ref` copies give refcount 2; destroying both calls `destroy` exactly once.
   - `null_check_sets_error`: a function doing `AS3_NULLCHECK(nullptr)` returns 0 and leaves `pending_error->type` equal to `"TypeError"`.
   - `error_propagates_through_frames`: `a()` calls `b()` calls `c()` which throws at line 7; after return, `pending_trace()` equals `"\tat c() [t.as:7]\n\tat b() [t.as:4]\n\tat a() [t.as:2]\n"`.
   - `vector_bounds`: `at(5)` on a 3-element vector sets a `RangeError`; `at(2)` does not.
+  - `dict_order_and_missing`: after `set("b",1)`, `set("a",2)`, iteration yields `b` then `a`; `get("zzz")` is undefined.
   - `int_wraps`: `int32_t` add of `2147483647 + 1` through the runtime's `add_int` yields `-2147483648`.
 - [ ] **Step 2: Run** `cmake --build spike/build && ctest --test-dir spike/build`. Expected: FAIL to compile.
 - [ ] **Step 3: Implement the runtime.** Header-inline everything on a hot path (`retain`, `release`, the macros, `Vector::at`).
@@ -164,11 +172,12 @@ If the fastest language finishes a benchmark's frame in under 1 ms, scale that b
   - `struct as3::ScriptClass { const char *name; const char *godot_base; as3::Object *(*create)(GDExtensionObjectPtr owner); const MethodEntry *methods; int method_count; const char *const *signals; int signal_count; };`
   - `void as3::register_class(const ScriptClass *)`, `const ScriptClass *as3::find_class(const char *name)`.
   - Godot class `SpikeScript` (extends `ScriptExtension`) with static method `SpikeScript.for_class(name: StringName) -> SpikeScript`; Godot class `SpikeLanguage` (extends `ScriptLanguageExtension`), registered with the engine at init and removed at shutdown.
-  - `godot_calls.h`: `GDExtensionMethodBindPtr as3::bind(const char *cls, const char *method, int64_t hash)` and inline typed `ptrcall` helpers; `as3::report_uncaught()` which prints `<Type>: <message>` then the trace through Godot's error printing, then clears the error.
+  - The script reports each name in `ScriptClass::signals` as a script signal (so `connect` and `emit_signal` work on the owner); signal argument metadata is not needed.
+  - `godot_calls.h`: `class as3::GodotRef` (rule 8); conversion functions `to_godot_array(const as3::Array *)`, `to_packed_vector2(const as3::Vector<Vector2> *)`, `from_godot_dictionary(GDExtensionConstTypePtr) -> as3::Ref<as3::Dict>` (rule 7, eager); `GDExtensionMethodBindPtr as3::bind(const char *cls, const char *method, int64_t hash)` and inline typed `ptrcall` helpers; `as3::report_uncaught()` which prints `<Type>: <message>` then the trace through Godot's error printing, then clears the error.
   - The script instance's `call` resolves names through a per-class table keyed by interned `StringName` pointer (rule 10). After every thunk it tests `AS3_PENDING()` and calls `report_uncaught()`.
-  - `Probe` (AS3 source in `spike/as3/Probe.as`, translation in `probe.cpp`): `_ready()` sets `count = 0`; `_process(delta)` increments `count`; `get_count():int`; `explode():void` throws `Error("boom")` at line 12 of `Probe.as`.
+  - `Probe` (AS3 source in `spike/as3/Probe.as`, translation in `probe.cpp`): `_ready()` sets `count = 0`; `_process(delta)` increments `count`; `get_count():int`; `explode():void` throws `Error("boom")` at line 12 of `Probe.as`; signal `pinged`, which `_ready` connects to `on_pinged` (adds 100 to `count`); `ping():void` emits it.
 
-- [ ] **Step 1: Write the failing test.** `host_test.gd` attaches `SpikeScript.for_class("Probe")` to a `Node`, runs 5 frames, prints `count=<get_count()>`, calls `explode()`, runs 1 more frame, prints `alive`, then calls `node.call("no_such_method")` and prints `survived`. `test_host.py` asserts stdout has `count=5`, `alive`, `survived`; stderr has `Error: boom` followed by `\tat Probe/explode() [Probe.as:12]` exactly once; exit code 0.
+- [ ] **Step 1: Write the failing test.** `host_test.gd` attaches `SpikeScript.for_class("Probe")` to a `Node`, runs 5 frames, prints `count=<get_count()>`, calls `ping()` and prints `pinged=<get_count()>`, calls `explode()`, runs 1 more frame, prints `alive`, then calls `node.call("no_such_method")` and prints `survived`. `test_host.py` asserts stdout has `count=5`, `pinged=105`, `alive`, `survived`; stderr has `Error: boom` followed by `\tat Probe/explode() [Probe.as:12]` exactly once; exit code 0.
 - [ ] **Step 2: Run it.** Expected: FAIL (`SpikeScript` unknown).
 - [ ] **Step 3: Implement the registry, language, script, and instance.** Use `script_instance_create3` with `GDExtensionScriptInstanceInfo3`; check the exact member names against `spike/api/gdextension_interface.h`. Implement only the virtuals Godot needs to attach a script and call methods; property and inspector support is out of scope.
 - [ ] **Step 4: Write `Probe.as` and its translation** following every Translation rule.
@@ -178,7 +187,7 @@ If the fastest language finishes a benchmark's frame in under 1 ms, scale that b
 ### Task 6: AS3-shaped benchmarks
 
 **Files:**
-- Create: `spike/as3/{MoveNodes,PerNodeProcess,PerNodeChild,RayQueries,SignalTraffic,NBody,Sieve,ArrayConversion}.as`, `spike/benches/{move_nodes,per_node_process,ray_queries,signal_traffic,nbody,sieve,array_conversion}.cpp`, `spike/benches/binds.{h,cpp}`, `spike/tests/test_parity_as3.py`, `spike/tests/check_rules.py`
+- Create: `spike/as3/{Empty,MoveNodes,PerNodeProcess,PerNodeChild,RayQueries,SignalTraffic,NBody,Sieve,ArrayConversion}.as`, `spike/benches/{empty,move_nodes,per_node_process,ray_queries,signal_traffic,nbody,sieve,array_conversion}.cpp`, `spike/benches/binds.{h,cpp}`, `spike/tests/test_parity_as3.py`, `spike/tests/check_rules.py`
 - Modify: `spike/project/runner.gd` (for `as3`, attach `SpikeScript.for_class(<Name>)`), `spike/CMakeLists.txt`
 
 **Interfaces:**
@@ -187,7 +196,7 @@ If the fastest language finishes a benchmark's frame in under 1 ms, scale that b
 
 - [ ] **Step 1: Write the failing tests.**
   - `test_parity_as3.py`: for each of the seven benchmarks, `parity(bench, ["gd", "as3"])`.
-  - `check_rules.py`: a textual check over `spike/benches/*.cpp` that fails if any file includes a godot-cpp class header (`godot_cpp/classes/`), uses `try`, `throw`, `dynamic_cast` or `std::atomic`, or contains a function with `AS3_FRAME` but no `AS3_LINE`.
+  - `check_rules.py`: a textual check over `spike/benches/*.cpp` that fails if any file includes a godot-cpp class header (`godot_cpp/classes/`), uses `try`, `throw`, `dynamic_cast` or `std::atomic`, contains a function with `AS3_FRAME` but no `AS3_LINE`, or calls a Godot `Dictionary` or `Array` accessor outside `godot_calls.cpp` (rule 7: returned collections are converted, never read in place).
 - [ ] **Step 2: Run both.** Expected: parity FAILS (`unknown lang` path), rules check passes vacuously.
 - [ ] **Step 3: Write the eight `.as` files** as an AS3 programmer would write them against the Godot API (`extends Node2D`, `override public function _process(delta:Number):void`), with `[Signal]` metadata in `SignalTraffic.as`.
 - [ ] **Step 4: Translate each to C++ by the Translation rules,** keeping a `// Foo.as:<line>` comment on each `AS3_LINE`. Worked example of the shape, for the inner loop of `MoveNodes._process`:
@@ -209,7 +218,10 @@ if (p.x > 1000.0f) p.x -= 1000.0f;
 // MoveNodes.as:18   child.position = p;
 AS3_LINE(18);
 ptrcall_void(binds::Node2D_set_position, child, &p);
+if (AS3_PENDING()) return;
 ```
+
+  Line 15's engine call is likewise followed by `if (AS3_PENDING()) return;` (rule 5); it is left out above only to keep the example short. Lines 16 and 17 store no line number because they are pure arithmetic.
 
   The null check before line 18 is omitted only because line 15 already proved `child` non-null in the same block (rule 3). Apply the same reasoning everywhere and no further.
 - [ ] **Step 5: Run** the build, `check_rules.py`, and the parity test. Expected: PASS.
@@ -243,7 +255,9 @@ ptrcall_void(binds::Node2D_set_position, child, &p);
 - [ ] **Step 6: Write `docs/results/2026-11-stage-0-desktop.md`:** machine and OS, Godot and .NET versions, godot-cpp commit, compiler and flags, the full table (median, p99, max per benchmark and language, ratios), the verdict, and a short list of anything surprising. Say plainly what was not measured: mobile, console, allocation and collection pauses, and the interpreter.
 - [ ] **Step 7: Commit** `spike: record desktop speed gate results`.
 
-### Task 8 (only if Task 7 fails on `per_node_process` or `signal_traffic`): native callback registration
+### Task 8 (only if Task 7 fails on `per_node_process`): native callback registration
+
+If the gate fails on any other benchmark (`move_nodes`, `ray_queries`, `signal_traffic`, or a compute benchmark), there is no prepared remedy: finish the results document, stop, and report the numbers to the owner. Do not tune the translation rules to pass.
 
 The spec says: on failure, first try registering hot callbacks natively, then stop and take the numbers to the owner.
 
