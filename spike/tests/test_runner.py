@@ -75,7 +75,8 @@ class RunnerTest(unittest.TestCase):
 
     def test_measure_shape(self):
         row = run_bench.run("sieve", "gd", "measure")
-        self.assertEqual(set(row), {"bench", "lang", "frames", "median_us", "p99_us", "max_us", "checksum"})
+        self.assertEqual(set(row), {"bench", "lang", "frames", "median_us", "p99_us", "max_us", "checksum",
+                                    "warmup_ms", "warmup_frames"})
         self.assertEqual(row["frames"], 600)
 
     def test_warmup_excluded(self):
@@ -85,6 +86,12 @@ class RunnerTest(unittest.TestCase):
         finally:
             del os.environ["KAS3_SLOW_FIRST_FRAMES"]
         self.assertLess(row["max_us"], 10000)
+
+    def test_warmup_lasts_two_seconds(self):
+        # A JIT needs wall time, not frames, to reach steady state: a fast benchmark must still warm up for 2 s.
+        row = run_bench.run("empty", "gd", "measure")
+        self.assertGreaterEqual(row["warmup_ms"], 2000)
+        self.assertGreaterEqual(row["warmup_frames"], 300)
 
     def test_fixed_step(self):
         row = run_bench.run("empty", "gd", "verify")

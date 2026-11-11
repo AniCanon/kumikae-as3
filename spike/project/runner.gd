@@ -6,7 +6,10 @@ const BENCHES: PackedStringArray = ["empty", "move_nodes", "per_node_process", "
 		"nbody", "sieve", "array_conversion"]
 const LANGS: PackedStringArray = ["gd", "cs", "as3"]
 const VERIFY_FRAMES := 10
+# Warm-up ends only when BOTH are met. Frames alone are not enough: a benchmark that runs in 0.1 ms would
+# finish 300 frames before .NET has finished optimising its code.
 const WARMUP_FRAMES := 300
+const WARMUP_USEC := 2000000
 const MEASURE_FRAMES := 600
 
 var _bench_name := ""
@@ -19,6 +22,10 @@ var _last_delta := 0.0
 var _last_usec := 0
 var _times := PackedInt64Array()
 var _slow_warmup := 0
+var _start_usec := 0
+var _warming := true
+var _warmup_frames := 0
+var _warmup_usec := 0
 
 
 func _ready() -> void:
@@ -87,9 +94,15 @@ func _process(delta: float) -> void:
 		if _frames == VERIFY_FRAMES:
 			_finish({"delta": _last_delta, "physics_ticks": _physics_ticks})
 		return
-	if _frames <= WARMUP_FRAMES:
+	if _warming:
+		if _start_usec == 0:
+			_start_usec = now
 		if _frames <= _slow_warmup:
 			OS.delay_msec(20)
+		if _frames >= WARMUP_FRAMES and now - _start_usec >= WARMUP_USEC:
+			_warming = false
+			_warmup_frames = _frames
+			_warmup_usec = now - _start_usec
 		_last_usec = Time.get_ticks_usec()
 		return
 	_times.append(now - _last_usec)
@@ -98,6 +111,8 @@ func _process(delta: float) -> void:
 		_times.sort()
 		_finish({
 			"frames": MEASURE_FRAMES,
+			"warmup_frames": _warmup_frames,
+			"warmup_ms": _warmup_usec / 1000,
 			"median_us": _times[MEASURE_FRAMES / 2],
 			"p99_us": _times[int(MEASURE_FRAMES * 0.99)],
 			"max_us": _times[MEASURE_FRAMES - 1],
