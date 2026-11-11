@@ -1,0 +1,3 @@
+[submodule "spike/third_party/godot-cpp"]
+	path = spike/third_party/godot-cpp
+	url = https://github.com/godotengine/godot-cpp

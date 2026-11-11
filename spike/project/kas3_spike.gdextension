@@ -1,0 +1,8 @@
+[configuration]
+
+entry_symbol = "kas3_spike_init"
+compatibility_minimum = "4.7"
+
+[libraries]
+
+macos = "res://bin/libkas3_spike.macos.arm64.dylib"
