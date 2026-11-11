@@ -52,6 +52,15 @@ a GDScript `Array[Particle]`, C# `Particle[]` with a `sealed class Particle`.
   flagged in the report, because it suggests skipped work. The holdouts have no floor.
 - Five repetitions; warm-up of at least 300 frames and two seconds, as before.
 
+### Outcome and the owner's decision
+
+The re-measurement (`docs/results/2026-11-stage-0b-desktop.md`) put version 2 clearly ahead of C# on six
+benchmarks, ahead on a seventh only with unrolling off, and level on two. The gate as written above failed.
+
+**The owner accepted that result on 2026-11-11 (owner):** ahead of or level with C# everywhere, with steadier
+frame times, meets the requirement, and the compiler is to be built on this design. Whole-program
+devirtualisation joins the compiler's planned optimisations. Linking into the engine stays in reserve.
+
 ## What the evidence says
 
 **The floor (measured).** The same benchmarks written as plain C++ through the plugin interface, with no AS3
