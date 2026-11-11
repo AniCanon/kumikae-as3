@@ -8,6 +8,7 @@
 #include <gdextension_interface.h>
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -128,6 +129,15 @@ Value from_variant(const godot::Variant &p_variant);
 
 // Coerces an untyped value to Vector2. False when it holds something else.
 bool value_to_vector2(const Value &p_value, godot::Vector2 *r_out);
+
+// A method closure as a native callable (redesign section 8): the engine calls p_thunk on p_self directly.
+// It reports invalid, and refuses calls, once the owner's script instance is gone.
+typedef void (*ClosureThunk)(Object *p_self, const GDExtensionConstVariantPtr *p_args, int64_t p_argc,
+		GDExtensionVariantPtr r_ret);
+godot::Callable make_closure(GDExtensionObjectPtr p_owner, Object *p_self, ClosureThunk p_thunk);
+void connect_closure(GDExtensionObjectPtr p_owner, const char *p_signal, Object *p_self, ClosureThunk p_thunk);
+// Called by the host when an owner's script instance is freed.
+void invalidate_closures(GDExtensionObjectPtr p_owner);
 
 // Setup helpers, never on a measured path.
 void connect_method(GDExtensionObjectPtr p_owner, const char *p_signal, const char *p_method);

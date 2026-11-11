@@ -10,6 +10,8 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <unordered_map>
+#include <vector>
 
 using namespace godot;
 
@@ -222,6 +224,82 @@ void setup_set(GDExtensionObjectPtr p_object, const char *p_property, const Vari
 
 Variant object_variant(GDExtensionObjectPtr p_object) {
 	return Variant(wrapper_of(p_object));
+}
+
+// ---- method closures as native callables ----
+
+struct Closure {
+	Object *self;
+	ClosureThunk thunk;
+	GDExtensionObjectPtr owner;
+};
+static std::unordered_map<GDExtensionObjectPtr, std::vector<Closure *>> closures_by_owner;
+
+static void closure_call(void *p_userdata, const GDExtensionConstVariantPtr *p_args, GDExtensionInt p_argc,
+		GDExtensionVariantPtr r_return, GDExtensionCallError *r_error) {
+	Closure *closure = static_cast<Closure *>(p_userdata);
+	if (AS3_UNLIKELY(closure->self == nullptr)) {
+		r_error->error = GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL;
+		return;
+	}
+	closure->thunk(closure->self, p_args, p_argc, r_return);
+	// Every entry from the engine reports and clears, so no error returns into engine code (rule 4).
+	if (AS3_PENDING()) {
+		report_uncaught();
+	}
+	r_error->error = GDEXTENSION_CALL_OK;
+}
+
+static GDExtensionBool closure_is_valid(void *p_userdata) {
+	return static_cast<Closure *>(p_userdata)->self != nullptr;
+}
+
+static void closure_free(void *p_userdata) {
+	Closure *closure = static_cast<Closure *>(p_userdata);
+	if (closure->self) {
+		auto found = closures_by_owner.find(closure->owner);
+		if (found != closures_by_owner.end()) {
+			std::vector<Closure *> &list = found->second;
+			for (size_t i = 0; i < list.size(); i++) {
+				if (list[i] == closure) {
+					list[i] = list.back();
+					list.pop_back();
+					break;
+				}
+			}
+		}
+	}
+	delete closure;
+}
+
+Callable make_closure(GDExtensionObjectPtr p_owner, Object *p_self, ClosureThunk p_thunk) {
+	Closure *closure = new Closure{ p_self, p_thunk, p_owner };
+	closures_by_owner[p_owner].push_back(closure);
+	GDExtensionCallableCustomInfo2 info = {};
+	info.callable_userdata = closure;
+	info.token = gdextension_interface::token;
+	info.object_id = gdextension_interface::object_get_instance_id(p_owner);
+	info.call_func = closure_call;
+	info.is_valid_func = closure_is_valid;
+	info.free_func = closure_free;
+	Callable callable;
+	gdextension_interface::callable_custom_create2(callable._native_ptr(), &info);
+	return callable;
+}
+
+void connect_closure(GDExtensionObjectPtr p_owner, const char *p_signal, Object *p_self, ClosureThunk p_thunk) {
+	wrapper_of(p_owner)->connect(StringName(p_signal), make_closure(p_owner, p_self, p_thunk));
+}
+
+void invalidate_closures(GDExtensionObjectPtr p_owner) {
+	auto found = closures_by_owner.find(p_owner);
+	if (found == closures_by_owner.end()) {
+		return;
+	}
+	for (Closure *closure : found->second) {
+		closure->self = nullptr;
+	}
+	closures_by_owner.erase(found);
 }
 
 void report_uncaught() {

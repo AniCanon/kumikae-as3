@@ -37,12 +37,37 @@ def check(path: str, text: str) -> list:
     return problems
 
 
+V2_BANNED = BANNED + [
+    (r"AS3_FRAME|AS3_LINE", "keeps line bookkeeping in normal execution (v2 rule 5)"),
+    (r"AS3_PENDING\(\)", "tests the error flag by hand; use AS3_PROPAGATE so the call site is recorded (v2 rule 4)"),
+    (r"as3::(from_godot_dictionary|from_godot_array)", "copies an engine collection (v2 rule 7)"),
+    (r"\bnew\b(?!\s*\()|\bdelete\b", "allocates outside the size-class pool (v2 rule 14)"),
+]
+
+
+def check_v2(path: str, text: str) -> list:
+    problems = []
+    code = strip_comments(text)
+    for pattern, why in V2_BANNED:
+        if re.search(pattern, code):
+            problems.append(f"{path}: {why}")
+    # Rule 16: a translation must say, in place, which rule lets it leave a check out.
+    if "elided" in text and not re.search(r"rule \d+", text):
+        problems.append(f"{path}: omits checks without naming the rule that allows it (v2 rule 16)")
+    return problems
+
+
 def main() -> int:
     problems = []
     files = sorted(glob.glob(os.path.join(ROOT, "benches", "*.cpp")))
     for path in files:
         with open(path) as handle:
             problems += check(os.path.relpath(path, ROOT), handle.read())
+    v2_files = sorted(glob.glob(os.path.join(ROOT, "benches_v2", "*.cpp")))
+    for path in v2_files:
+        with open(path) as handle:
+            problems += check_v2(os.path.relpath(path, ROOT), handle.read())
+    files += v2_files
     for problem in problems:
         print(problem)
     print("check_rules: %d files, %s" % (len(files), "OK" if not problems else "%d problems" % len(problems)))

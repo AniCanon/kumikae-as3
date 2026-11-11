@@ -104,6 +104,7 @@ static GDExtensionScriptLanguagePtr instance_get_language(GDExtensionScriptInsta
 static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
 	objects_by_owner.erase(instance->owner);
+	as3::invalidate_closures(instance->owner);
 	as3::release(instance->object);
 	delete instance;
 }

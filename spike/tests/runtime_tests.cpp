@@ -1,6 +1,7 @@
 // Tests for the AS3-shaped runtime core. No Godot, no framework.
 #include "runtime/as3_collections.h"
 #include "runtime/as3rt.h"
+#include "runtime/as3rt2.h"
 
 #include <cstdio>
 #include <cstring>
@@ -139,7 +140,97 @@ static void int_wraps() {
 	CHECK(as3::mul_int(65536, 65536) == 0);
 }
 
+// ---- version 2 runtime ----
+
+static int v2_leaf(as3::Object *p_object) {
+	AS3_FN("Leaf/read", "v2.as");
+	AS3_CHECK_NULL(p_object, 9);
+	return 7;
+}
+static int v2_middle(as3::Object *p_object) {
+	AS3_FN("Middle/call", "v2.as");
+	int value = v2_leaf(p_object);
+	AS3_PROPAGATE(5);
+	return value + 1;
+}
+static void v2_top(as3::Object *p_object, int *r_out) {
+	AS3_FN("Top/run", "v2.as");
+	*r_out = v2_middle(p_object);
+	AS3_PROPAGATE_VOID(2);
+}
+
+static void v2_trace_is_built_on_the_error_path() {
+	as3::clear_error();
+	int out = -1;
+	as3::Object thing{ 1, &thing_class };
+	v2_top(&thing, &out);
+	CHECK(out == 8);
+	CHECK(as3::pending_error == nullptr);
+	v2_top(nullptr, &out);
+	CHECK(as3::pending_error && std::strcmp(as3::pending_error->type, "TypeError") == 0);
+	CHECK(std::strcmp(as3::pending_trace(),
+			"\tat Leaf/read() [v2.as:9]\n\tat Middle/call() [v2.as:5]\n\tat Top/run() [v2.as:2]\n") == 0);
+	as3::clear_error();
+}
+
+static int v2_index(const int32_t *p_data, int32_t p_length, int32_t p_index) {
+	AS3_FN("Vec/at", "v2.as");
+	AS3_CHECK_BOUNDS(p_index, p_length, 3);
+	return p_data[p_index];
+}
+
+static void v2_bounds_check_throws_range_error() {
+	as3::clear_error();
+	int32_t data[3] = { 4, 5, 6 };
+	CHECK(v2_index(data, 3, 2) == 6);
+	CHECK(as3::pending_error == nullptr);
+	CHECK(v2_index(data, 3, 3) == 0);
+	CHECK(as3::pending_error && std::strcmp(as3::pending_error->type, "RangeError") == 0);
+	CHECK(std::strcmp(as3::pending_trace(), "\tat Vec/at() [v2.as:3]\n") == 0);
+	as3::clear_error();
+	CHECK(v2_index(data, 3, -1) == 0);
+	CHECK(as3::pending_error != nullptr);
+	as3::clear_error();
+}
+
+static void v2_pool_reuses_freed_blocks() {
+	void *a = as3::pool_alloc(40);
+	void *b = as3::pool_alloc(40);
+	CHECK(a != b);
+	as3::pool_free(a, 40);
+	void *c = as3::pool_alloc(40);
+	CHECK(c == a);
+	void *d = as3::pool_alloc(48);
+	CHECK(d != b && d != c);
+	void *big = as3::pool_alloc(4096);
+	CHECK(big != nullptr);
+	as3::pool_free(big, 4096);
+	as3::pool_free(b, 40);
+	as3::pool_free(c, 40);
+	as3::pool_free(d, 48);
+}
+
+static void v2_pool_blocks_do_not_overlap() {
+	unsigned char *blocks[200];
+	for (int i = 0; i < 200; i++) {
+		blocks[i] = static_cast<unsigned char *>(as3::pool_alloc(24));
+		std::memset(blocks[i], i, 24);
+	}
+	bool intact = true;
+	for (int i = 0; i < 200; i++) {
+		for (int k = 0; k < 24; k++) {
+			intact = intact && blocks[i][k] == (unsigned char)i;
+		}
+		as3::pool_free(blocks[i], 24);
+	}
+	CHECK(intact);
+}
+
 int main() {
+	v2_trace_is_built_on_the_error_path();
+	v2_bounds_check_throws_range_error();
+	v2_pool_reuses_freed_blocks();
+	v2_pool_blocks_do_not_overlap();
 	ref_counts();
 	null_check_sets_error();
 	error_propagates_through_frames();

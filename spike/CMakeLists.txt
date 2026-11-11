@@ -15,6 +15,7 @@ set(GODOTCPP_TARGET "template_release" CACHE STRING "" FORCE)
 add_subdirectory(third_party/godot-cpp EXCLUDE_FROM_ALL)
 
 file(GLOB KAS3_BENCHES CONFIGURE_DEPENDS benches/*.cpp)
+file(GLOB KAS3_BENCHES_V2 CONFIGURE_DEPENDS benches_v2/*.cpp)
 add_library(kas3_spike SHARED
     host/register.cpp
     host/class_registry.cpp
@@ -23,11 +24,14 @@ add_library(kas3_spike SHARED
     host/script_instance.cpp
     runtime/godot_calls.cpp
     floor/floor.cpp
-    ${KAS3_BENCHES})
+    ${KAS3_BENCHES}
+    ${KAS3_BENCHES_V2})
 # The host is glue around godot-cpp, whose casts need RTTI. Everything that stands for generated code
 # (benches/, and the runtime library below) is built with the full flags, RTTI off.
 target_compile_options(kas3_spike PRIVATE -O2 -fno-exceptions -ffp-contract=off)
-set_source_files_properties(${KAS3_BENCHES} floor/floor.cpp PROPERTIES COMPILE_OPTIONS "-fno-rtti")
+set_source_files_properties(${KAS3_BENCHES} PROPERTIES COMPILE_OPTIONS "-fno-rtti")
+# Version 2 and the floor share the version 2 flags (redesign section 9): unrolling off.
+set_source_files_properties(${KAS3_BENCHES_V2} floor/floor.cpp PROPERTIES COMPILE_OPTIONS "-fno-rtti;-fno-unroll-loops")
 target_include_directories(kas3_spike PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(kas3_spike PRIVATE godot-cpp)
 set_target_properties(kas3_spike PROPERTIES

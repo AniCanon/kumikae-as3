@@ -15,7 +15,7 @@ class ParityAs3Test(unittest.TestCase):
         godot_bin.ensure_imported()
 
     def test_parity_with_gdscript(self):
-        for bench in run_bench.BENCHES:
+        for bench in run_bench.ORIGINAL:
             with self.subTest(bench=bench):
                 run_bench.parity(bench, ["gd", "as3"])
 

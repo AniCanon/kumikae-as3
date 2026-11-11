@@ -13,6 +13,11 @@ BENCHES = ["empty", "move_nodes", "per_node_process", "ray_queries", "signal_tra
            "array_conversion", "saxpy", "shapes", "alloc"]
 
 
+ORIGINAL = BENCHES[:8]  # what the first spike measured; version 1 exists only for these
+JUDGED = ["move_nodes", "per_node_process", "ray_queries", "signal_traffic", "nbody", "sieve",
+          "saxpy", "shapes", "alloc"]  # what the version 2 gate judges; the last three are holdouts
+
+
 def command(bench: str, lang: str, mode: str, binary: str | None = None) -> list[str]:
     if binary is None:
         head = [godot_bin.godot_path(), "--path", godot_bin.PROJECT]
