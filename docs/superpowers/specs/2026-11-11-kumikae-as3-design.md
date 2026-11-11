@@ -50,7 +50,9 @@ These make the project a failure even if everything technically works.
   defined once and tested against both backends.
 - **A JIT, anywhere.** iOS and consoles forbid it. A design that needs one on any platform has failed goal 2.
 - **A private dialect.** Code that looks like AS3 but surprises AS3 programmers. Deviations from AS3 are
-  allowed only where listed under "Language", and each must produce a clear compiler message.
+  allowed only where this document lists them (the "Language" section, string indexing under "Godot API
+  bindings", and main-thread-only under "Memory"), and each must be documented and, where the compiler can
+  see it, reported clearly.
 - **Console vendor material in this repository.** No SDK names, tool names, device results, or adapter
   internals. Console-specific work lives in the console fork and the private adapter.
 
@@ -63,8 +65,10 @@ These make the project a failure even if everything technically works.
   on console must be linked statically and registered from the platform layer or as an out-of-tree module,
   without touching upstream directories.
 - **The console toolchain compiles C and C++ only.** The runtime and all generated code must be portable C++
-  with no platform-specific dependencies and no dependence on exceptions or RTTI being enabled (Godot builds
-  with both off) **(call)**.
+  with no platform-specific dependencies and no dependence on C++ exceptions or RTTI **(call)**. Godot
+  builds with C++ exceptions disabled (checked in the console fork's build script). Consequence: AS3
+  `throw`/`catch` cannot be C++ exceptions. Generated code propagates errors explicitly through return paths,
+  and that cost is part of what the benchmarks measure.
 - **No Rust in the shipped runtime (call).** It would need its own console target. The editor-side compiler
   could in principle be anything, but one language across compiler and runtime is simpler.
 
@@ -115,12 +119,15 @@ It is not a performance target. It should be in GDScript's range.
 ### Native backend
 
 Translates the IR to C++, which the target platform's own C++ compiler turns into machine code. Used for
-every exported game on every platform. Exporting therefore requires a C++ toolchain for the target, as C#
+every release export on every platform. A release export therefore requires a C++ toolchain for the target, as C#
 exports require the .NET SDK. Typed AS3 becomes plain C++: classes become structs with direct member access,
 calls between AS3 classes become direct C++ calls, `int` and `Number` become machine integers and doubles.
 
 Precedent: Adobe AIR compiled AS3 ahead of time for iOS, Unity compiles C# through C++ (IL2CPP), Haxe has a
 C++ target.
+
+On desktop and Android the game's generated code is compiled into its own library, loaded beside the runtime
+extension. On iOS and console it is linked statically into the application with the runtime.
 
 ### How AS3 appears to Godot
 
@@ -237,7 +244,8 @@ AS3 programmers expect garbage collection: objects referencing each other in a l
   native debugger interface against the same adapter back end.)
 - **On device:** a debug build runs the interpreter, so the same debug adapter attaches over the network and
   the experience matches the editor. This is the main route for on-device debugging and needs no native
-  debugger.
+  debugger. **(unverified:** that a console unit can accept this network connection from the development
+  machine; Godot's own remote debugger faces the same question there.)
 - **On device, release builds:** generated C++ carries line markers pointing at the `.as` source, so a native
   debugger steps through AS3 lines. Variables need debugger formatters to read as AS3 values rather than
   runtime internals; these ship with the project. **(unverified:** native debugging on the console device has
@@ -253,10 +261,11 @@ Goal 3 is checked, not assumed.
 A benchmark suite compares AS3 native builds against Godot C# and GDScript on the same machine and engine
 version, in three groups: engine-call-heavy gameplay code (moving many nodes, physics queries, signal
 traffic), pure computation, and allocation-heavy code (to expose collection pauses, measured as worst frame
-time). It runs on desktop and on at least one mobile device; console runs are recorded privately.
+time). It runs on desktop, one Android device, and one iOS device; console runs are recorded privately.
 
 The C# baseline is Godot's official C# support where it exists: desktop, Android (JIT), and iOS (ahead of
-time). Stock Godot has no C# on console, so there the numbers are recorded against GDScript and against the
+time) **(unverified:** the state of Godot 4.7's C# on Android and iOS; the mobile stage confirms what the
+baseline actually is before measuring). Stock Godot has no C# on console, so there the numbers are recorded against GDScript and against the
 same test on desktop, with no pass or fail.
 
 Pass means **(call)**: at least 10% ahead of C# on the gameplay group on every platform that has a baseline,
@@ -292,7 +301,10 @@ Each stage ends in something that can be run and shown. Each gets its own plan.
 0. **Speed spike (throwaway).** Hand-written C++ in the shape the native backend would emit, attached to
    nodes as a script, benchmarked against C# and GDScript on desktop, using the gameplay group and the
    collection-conversion cost. Purpose: learn whether goal 3 is reachable with the script-instance approach
-   before building a compiler around it. Exit: the performance gate's desktop numbers, pass or fail.
+   before building a compiler around it. The spike's C++ must pay every cost real generated code will pay:
+   reference-count updates, null checks, line bookkeeping for release stack traces, and error propagation
+   without C++ exceptions. A spike without them would flatter the design. Exit: the performance gate's
+   desktop numbers, pass or fail.
 1. **Front end.** Parse and type-check the first-version language; command-line tool that reports errors
    with file and line; conformance tests for the checker.
 2. **Interpreter in Godot.** IR, interpreter, generated bindings, script-language integration. First
@@ -300,10 +312,12 @@ Each stage ends in something that can be run and shown. Each gets its own plan.
    hot reload.
 3. **Native export on desktop.** C++ generator, export integration, the conformance suite on both backends,
    the benchmark suite and the performance gate.
-4. **Mobile.** iOS and Android exports; benchmark on a device.
+4. **Mobile.** iOS and Android, both build kinds: interpreted debug builds and native release builds. The
+   performance gate on devices.
 5. **Console.** Static linking and registration in the owner's console build; the same test game running on
-   hardware. Work that touches vendor material stays out of this repository.
-6. **Tooling.** Language server, debug adapter, JetBrains plugin, on-device debugging. Basic editor
+   hardware, as an interpreted debug build and as a native release build. Work that touches vendor material stays out of this repository.
+6. **Tooling.** Language server, debug adapter, JetBrains plugin, attaching the debugger to debug builds on
+   devices, and source-level debugging of release builds. Basic editor
    highlighting and error reporting arrive with stage 2; this stage is the full experience.
 
 Later, separately designed: an await form for signals, the Flash API library, SWF loading, web export.
