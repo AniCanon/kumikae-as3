@@ -337,9 +337,10 @@ static void test_review_findings() {
 			{ "ints[count]", "int" },
 			{ "ints[big]", "int" },
 			// `as` gives null when the value is not of the type, so it is never a bare number or Boolean.
-			{ "any as int", "Object" },
-			{ "any as Number", "Object" },
-			{ "any as Boolean", "Object" },
+			// As in Adobe's compiler; as3corelib stores `x as Number` in a Number.
+			{ "any as int", "int" },
+			{ "any as Number", "Number" },
+			{ "any as Boolean", "Boolean" },
 			{ "any as String", "String" },
 			// Compound bitwise assignment.
 			{ "any &= 1", "int" },

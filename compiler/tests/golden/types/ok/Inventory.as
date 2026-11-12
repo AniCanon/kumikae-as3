@@ -37,10 +37,10 @@ package game {
 			var where:Vector2 = position;
 			var half:Number = where.x / 2 + totalWeight;
 			var label:String = "Items: " + items.length + " of " + capacity;
-			var names:Array = items.map(function(item:Item, index:int, all:Vector.<Item>):String {
-				return item.name.toUpperCase();
+			var heavy:Vector.<Item> = items.filter(function(item:Item, index:int, all:Vector.<Item>):Boolean {
+				return item.weight > 1;
 			});
-			var first:String = names.length > 0 ? names[0] : null;
+			var first:String = heavy.length > 0 ? heavy[0].name : null;
 			var slots:int = capacity - items.length;
 			var mask:int = slots << 2 | 1;
 			var ratio:Number = items.length / capacity;

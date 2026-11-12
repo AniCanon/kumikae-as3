@@ -209,6 +209,109 @@ class Typer {
 		return any_;
 	}
 
+	// ---- conversions ----
+
+	enum class Fit {
+		Yes,
+		Cast, // The value may be of the type, but only a cast can say so.
+		No,
+	};
+
+	// Whether an object of p_class is always one of p_target: the class, a base, or an interface that it,
+	// a base, or one of those interfaces declares. *r_unsure is set if part of the hierarchy is not known.
+	bool is_a(Symbol *p_class, Symbol *p_target, bool *r_unsure) const {
+		std::vector<Symbol *> pending;
+		for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
+			if (owner->klass->broken || owner->klass->incomplete) {
+				*r_unsure = true;
+			}
+			pending.push_back(owner);
+			if (owner->kind != SymbolKind::Class) {
+				break;
+			}
+		}
+		for (size_t i = 0; i < pending.size(); i++) {
+			if (pending[i] == p_target) {
+				return true;
+			}
+			if (pending[i]->klass->broken) {
+				*r_unsure = true;
+			}
+			for (Symbol *parent : pending[i]->klass->interfaces) {
+				if (!parent) {
+					*r_unsure = true; // One that did not resolve.
+				} else if (std::find(pending.begin(), pending.end(), parent) == pending.end()) {
+					pending.push_back(parent);
+				}
+			}
+		}
+		return false;
+	}
+
+	// May a value of type p_from be used where p_to is expected, with no cast written?
+	Fit fits(const Type *p_from, const Type *p_to) const {
+		if (p_from == p_to || p_from->kind == Type::Any || p_from->kind == Type::Unknown ||
+				p_to->kind == Type::Any || p_to->kind == Type::Unknown || p_to->kind == Type::Void) {
+			return Fit::Yes;
+		}
+		if (p_from->kind == Type::Void) {
+			return Fit::No;
+		}
+		// Anything converts to a Boolean, everything is an Object, and the number types convert to each
+		// other. Adobe's compiler only warns when null is stored in a number, so nothing is said here.
+		if (p_to == boolean_ || p_to == object_ || (numeric(p_from) && numeric(p_to)) || p_from->kind == Type::Null) {
+			return Fit::Yes;
+		}
+		if (p_from->kind == Type::ClassObject) {
+			return p_to == class_type_ ? Fit::Yes : Fit::No;
+		}
+		if (p_to->kind == Type::ClassObject || p_to->kind == Type::Null) {
+			return Fit::Yes; // Not a type that can be written.
+		}
+		if (p_from->kind == Type::Vector || p_to->kind == Type::Vector) {
+			if (p_from->kind == Type::Vector && p_to->kind == Type::Vector) {
+				// Vectors of different element types are unrelated, even when the elements are related.
+				bool unknown = p_from->element->kind == Type::Unknown || p_to->element->kind == Type::Unknown;
+				return unknown ? Fit::Yes : Fit::No;
+			}
+			return p_from == object_ ? Fit::Cast : Fit::No;
+		}
+		Symbol *from = p_from->symbol;
+		Symbol *to = p_to->symbol;
+		if (!from || !to) {
+			return Fit::Yes;
+		}
+		bool unsure = false;
+		if (is_a(from, to, &unsure)) {
+			return Fit::Yes;
+		}
+		bool narrower = p_from == object_ || is_a(to, from, &unsure);
+		if (unsure) {
+			return Fit::Yes;
+		}
+		return narrower ? Fit::Cast : Fit::No;
+	}
+
+	// Reports a value that does not fit where it is stored or passed.
+	void store(Expr *p_value, const Type *p_to) {
+		if (!p_value || !p_value->type || !p_to) {
+			return;
+		}
+		switch (fits(p_value->type, p_to)) {
+			case Fit::Yes:
+				break;
+			case Fit::Cast:
+				error(p_value->offset, "a value of type " + quoted(compilation_.type_name(p_value->type)) +
+											   " may not be a " + quoted(compilation_.type_name(p_to)) +
+											   "; use 'as' or a cast");
+				break;
+			case Fit::No:
+				error(p_value->offset, "can't use a value of type " + quoted(compilation_.type_name(p_value->type)) +
+											   " where " + quoted(compilation_.type_name(p_to)) + " is expected");
+				break;
+		}
+	}
+
 	// ---- symbols ----
 
 	const Type *symbol_type(Symbol *p_symbol, const Type *p_element) {
@@ -578,10 +681,9 @@ class Typer {
 				return boolean_;
 			case TokenKind::KwAs:
 				if (right->kind == Type::ClassObject) {
-					// `as` gives null when the value is not of the type, so the result is never a bare
-					// number or Boolean: those cannot hold null.
-					const Type *result = right->element;
-					return numeric(result) || result == boolean_ ? object_ : result;
+					// The type named, as in Adobe's compiler: `x as Number` may be stored in a Number.
+					// (When the value is not one, the null it gives becomes 0 on being stored.)
+					return right->element;
 				}
 				return right->kind == Type::Unknown ? unknown_ : any_;
 			case TokenKind::AmpAmp:
@@ -690,6 +792,9 @@ class Typer {
 				Assign *assign = static_cast<Assign *>(p_expression);
 				const Type *target = expression(assign->target);
 				const Type *value = expression(assign->value);
+				if (assign->op == TokenKind::Assign) {
+					store(assign->value, target);
+				}
 				if (target->kind == Type::Unknown) {
 					return unknown_;
 				}
@@ -746,6 +851,7 @@ class Typer {
 	void declarators(VarDecl *p_decl) {
 		for (Declarator &declarator : p_decl->declarators) {
 			shown(declarator.initializer);
+			store(declarator.initializer, compilation_.type_of(declarator.type));
 		}
 	}
 
