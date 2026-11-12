@@ -332,7 +332,7 @@ void Compilation::declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_i
 
 void Compilation::declare_member(Unit &p_unit, Symbol *p_owner, Symbol *p_member) {
 	p_member->owner = p_owner;
-	auto inserted = p_owner->klass->members.emplace(p_member->name, p_member);
+	auto inserted = p_owner->klass->table(p_member->is_static()).emplace(p_member->name, p_member);
 	if (!inserted.second) {
 		p_unit.diagnostics.error(p_member->offset,
 				quoted(p_member->name) + " is already defined at " + where(p_unit, inserted.first->second));
@@ -341,7 +341,7 @@ void Compilation::declare_member(Unit &p_unit, Symbol *p_owner, Symbol *p_member
 
 void Compilation::declare_accessor(Unit &p_unit, Symbol *p_owner, FunctionDecl *p_function) {
 	bool getter = p_function->accessor == FunctionDecl::Getter;
-	auto &members = p_owner->klass->members;
+	auto &members = p_owner->klass->table((p_function->modifiers.bits & Modifiers::Static) != 0);
 	auto found = members.find(p_function->name);
 	Symbol *property = nullptr;
 	if (found == members.end()) {
@@ -351,9 +351,7 @@ void Compilation::declare_accessor(Unit &p_unit, Symbol *p_owner, FunctionDecl *
 		members.emplace(property->name, property);
 	} else {
 		property = found->second;
-		bool same_static = ((p_function->modifiers.bits ^ property->modifiers) & Modifiers::Static) == 0;
-		if (property->kind != SymbolKind::Property || (getter ? property->getter : property->setter) ||
-				!same_static) {
+		if (property->kind != SymbolKind::Property || (getter ? property->getter : property->setter)) {
 			p_unit.diagnostics.error(p_function->name_offset,
 					quoted(p_function->name) + " is already defined at " + where(p_unit, property));
 			return;

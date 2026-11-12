@@ -283,19 +283,18 @@ class Typer {
 	// The member of that name that an object of the class or interface has, whatever its visibility.
 	Symbol *instance_member(Symbol *p_class, std::string_view p_name) {
 		if (p_class->kind == SymbolKind::Class) {
-			// A static of a subclass does not hide an instance member inherited under the same name.
-			Symbol *fallback = nullptr;
 			for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
 				if (Symbol *member = find_in(owner->klass->members, p_name)) {
-					if (!member->is_static()) {
-						return member;
-					}
-					if (!fallback) {
-						fallback = member;
-					}
+					return member;
 				}
 			}
-			return fallback;
+			// None. A static member of that name is returned so that the error can say so.
+			for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
+				if (Symbol *member = find_in(owner->klass->statics, p_name)) {
+					return member;
+				}
+			}
+			return nullptr;
 		}
 		// An interface: itself, everything it extends, then what every object has.
 		std::vector<Symbol *> pending{ p_class };
@@ -353,14 +352,15 @@ class Typer {
 				if (!owner) {
 					return unknown_;
 				}
-				Symbol *member = find_in(owner->klass->members, p_member->name);
+				Symbol *member = find_in(owner->klass->statics, p_member->name);
 				if (!member) {
-					error(p_member->name_offset, quoted(owner->name) + " has no static member " + quoted(p_member->name));
-					return unknown_;
-				}
-				if (!member->is_static()) {
-					error(p_member->name_offset, quoted(p_member->name) + " is an instance member of " +
-														 std::string(owner->name) + "; it needs an object");
+					if (find_in(owner->klass->members, p_member->name)) {
+						error(p_member->name_offset, quoted(p_member->name) + " is an instance member of " +
+															 std::string(owner->name) + "; it needs an object");
+					} else {
+						error(p_member->name_offset,
+								quoted(owner->name) + " has no static member " + quoted(p_member->name));
+					}
 					return unknown_;
 				}
 				if (!accessible(member, p_member->name_offset)) {

@@ -114,33 +114,12 @@ Found Compilation::lookup_package_level(const Context &p_from, std::string_view 
 	return found;
 }
 
-// True if the definition's package is the current one or has been imported, singly or whole.
-bool Compilation::imported(const Context &p_from, const Symbol *p_definition) const {
-	if (p_definition->package == p_from.package) {
-		return true;
-	}
-	for (const ImportScope *scope = p_from.imports; scope; scope = scope->parent) {
-		for (const ResolvedImport &import : scope->imports) {
-			if (import.symbol == p_definition || import.package == p_definition->package) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
 Found Compilation::lookup_qualified(const Context &p_from, const std::string &p_package,
 		std::string_view p_name) const {
 	Found found;
 	auto package = packages_.find(p_package);
 	if (package != packages_.end()) {
 		add_match(*this, p_from, find_in(package->second.definitions, p_name), found);
-	}
-	// AS3 requires the import even when the name is written out in full.
-	if (found.first && !imported(p_from, found.first)) {
-		found.hidden = found.first;
-		found.first = nullptr;
-		found.unimported = true;
 	}
 	return found;
 }
@@ -171,9 +150,7 @@ Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
 	Found found = last == 0 ? lookup_package_level(p_from, p_type->name[0])
 							: lookup_qualified(p_from, join(p_type->name, last), p_type->name[last]);
 	if (!found.first) {
-		if (found.unimported) {
-			diagnostics.error(p_type->offset, quoted(shown) + " must be imported before it is used");
-		} else if (found.hidden && last > 0) {
+		if (found.hidden && last > 0) {
 			diagnostics.error(p_type->offset, quoted(shown) + " is not public");
 		} else if (found.suppressed) {
 			// A failed import has been reported, and may be where this name was to come from.
@@ -423,24 +400,27 @@ static bool inherited_visible(const Symbol *p_member, const Symbol *p_base, cons
 
 Symbol *Compilation::find_member(Symbol *p_class, std::string_view p_name, bool p_static_only,
 		Symbol **r_instance, Symbol **r_hidden) const {
-	for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
-		Symbol *member = find_in(owner->klass->members, p_name);
-		if (!member) {
-			continue;
-		}
-		if (owner != p_class && !inherited_visible(member, owner, p_class->package)) {
-			if (r_hidden && !*r_hidden) {
-				*r_hidden = member;
+	// An object's own members come before those of its class, as they do when the program runs.
+	for (int statics = 0; statics < 2; statics++) {
+		for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
+			Symbol *member = find_in(owner->klass->table(statics != 0), p_name);
+			if (!member) {
+				continue;
 			}
-			continue;
-		}
-		if (p_static_only && !member->is_static()) {
-			if (r_instance && !*r_instance) {
-				*r_instance = member;
+			if (owner != p_class && !inherited_visible(member, owner, p_class->package)) {
+				if (r_hidden && !*r_hidden) {
+					*r_hidden = member;
+				}
+				continue;
 			}
-			continue;
+			if (p_static_only && !statics) {
+				if (r_instance && !*r_instance) {
+					*r_instance = member;
+				}
+				break;
+			}
+			return member;
 		}
-		return member;
 	}
 	return nullptr;
 }
@@ -492,7 +472,8 @@ void Compilation::check_overrides(Symbol *p_class) {
 	// True if a built-in base declares the name at all, visible or not, static or not.
 	auto builtin_has = [&](std::string_view p_name) {
 		for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
-			if (base->unit->is_builtin && find_in(base->klass->members, p_name)) {
+			if (base->unit->is_builtin &&
+					(find_in(base->klass->members, p_name) || find_in(base->klass->statics, p_name))) {
 				return true;
 			}
 		}

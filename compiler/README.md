@@ -75,7 +75,7 @@ its names mean: inside it, names resolve only to other declarations, and its own
 - **Definitions:** duplicates in a package or a class; one definition per package block, named after its
   file; `dynamic` classes and `native` outside a declaration file are rejected.
 - **Imports and type names:** every import and every written type must name something visible. A name
-  written with its package (`flash.utils.getTimer`) still needs the import, as in Adobe's compiler. After
+  written with its package (`flash.utils.getTimer`) needs no import. After
   an import that names nothing, the names it could have supplied aren't reported again.
 - **The class hierarchy:** `extends` names a class that isn't final, `implements` names interfaces, and
   nothing inherits from itself.
@@ -88,7 +88,8 @@ its names mean: inside it, names resolve only to other declarations, and its own
 
 - **Members through `.`:** the member must exist and be reachable. `private` is reachable inside its class,
   `protected` inside its class and subclasses, and unmarked members inside their package. A static member
-  is reached through its own class (`Base.count`, not `Sub.count` and not `object.count`).
+  is reached through its own class (`Base.count`, not `Sub.count` and not `object.count`). A static and
+  an instance member may share a name; a bare name in instance code means the instance member.
 
 Not checked yet (the next part of stage 1c): whether a value fits where it is used (assignments, arguments,
 returns), argument counts, override signatures, whether a class implements all of its interfaces' methods,
@@ -187,6 +188,13 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 - `tests/golden/names/ok/X.as` with `X.names`, and `tests/golden/names/errors/X.as` with `X.diag`: whole
   programs through `kas3c check`.
 - The corpus is also checked as one program, with `tests/stubs/godot.as` standing in for Godot.
+
+- `tests/fetch_external.sh` fetches six open-source AS3 projects (Starling, Away3D, Flixel, FlashPunk,
+  as3-signals, as3corelib; about 190,000 lines) into `tests/external/`, which git ignores. They are pinned
+  by commit and are not part of this repository. `python3 -I tests/run_external.py build/kas3c --check`
+  parses and checks them and prints the errors counted by message. A crash or hang fails; errors don't,
+  because these projects use Flash's library, namespaces and XML syntax. An error of any other kind on
+  this code is presumed to be a bug in the compiler until shown otherwise.
 
 To add a golden test, add the `.as` file, run
 `python3 compiler/tests/run_golden.py compiler/build/kas3c compiler/tests --update`, and **read the generated

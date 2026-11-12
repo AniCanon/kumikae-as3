@@ -108,7 +108,11 @@ struct ClassInfo {
 	Symbol *symbol = nullptr;
 	Symbol *base = nullptr; // Null for Object, for interfaces, and after an error.
 	std::vector<Symbol *> interfaces; // What a class implements, or what an interface extends.
-	std::unordered_map<std::string_view, Symbol *> members; // The constructor is not among them.
+	// What the class's objects have. The constructor is not among them.
+	std::unordered_map<std::string_view, Symbol *> members;
+	// What the class itself has. A static member may share its name with an instance member.
+	std::unordered_map<std::string_view, Symbol *> statics;
+	std::unordered_map<std::string_view, Symbol *> &table(bool p_static) { return p_static ? statics : members; }
 	Symbol *constructor = nullptr;
 	ImportScope imports; // Imports written in the class body.
 	bool broken = false; // Its `extends` did not resolve, or it was part of a cycle.
@@ -161,7 +165,6 @@ struct Found {
 	Symbol *first = nullptr;
 	Symbol *second = nullptr; // Set when the name is ambiguous.
 	Symbol *hidden = nullptr; // A match that exists but is not visible from here.
-	bool unimported = false; // `hidden` was named by its package, without the import AS3 requires.
 	bool suppressed = false; // No match, but a failed import could have supplied one: stay quiet.
 };
 
@@ -200,7 +203,6 @@ class Compilation {
 	void cut_interface_cycles();
 	void check_overrides(Symbol *p_class);
 	void inherit_properties(Symbol *p_class);
-	bool imported(const Context &p_from, const Symbol *p_definition) const;
 
 public:
 	Compilation(); // Loads the built-in declarations.
@@ -254,9 +256,10 @@ public:
 	// Resolves a written type, recording the reference and reporting what is wrong. Returns the class or
 	// interface, or null for `*`, `void`, a null p_type, or an error.
 	Symbol *resolve_type(const Context &p_from, TypeRef *p_type);
-	// A member of the class or of its bases that code inside p_class may name. With p_static_only, instance
-	// members are passed over, as they are for code in a static method; *r_instance receives the first one
-	// passed over. *r_hidden receives a match that exists but is not visible from the class.
+	// A member of the class or of its bases that code inside p_class may name: an instance member first,
+	// then a static one. With p_static_only, instance members are passed over, as they are for code in a
+	// static method; *r_instance receives the first one passed over. *r_hidden receives a match that exists
+	// but is not visible from the class.
 	Symbol *find_member(Symbol *p_class, std::string_view p_name, bool p_static_only, Symbol **r_instance,
 			Symbol **r_hidden) const;
 	// True if the members that the class inherits are not all known: a base failed to resolve, or is a

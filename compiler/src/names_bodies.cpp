@@ -538,7 +538,6 @@ class Resolver {
 		std::string package(first->text);
 		Member *best = nullptr;
 		Symbol *best_symbol = nullptr;
-		Symbol *unimported = nullptr;
 		for (size_t i = chain.size(); i-- > 0;) {
 			Member *link = chain[i];
 			if (compilation_.find_package(package)) {
@@ -546,8 +545,6 @@ class Resolver {
 				if (found.first) {
 					best = link;
 					best_symbol = found.first;
-				} else if (found.unimported) {
-					unimported = found.hidden;
 				}
 			}
 			package += '.';
@@ -556,10 +553,6 @@ class Resolver {
 		if (best) {
 			best->symbol = best_symbol;
 			record(best->name_offset, best->name, best_symbol);
-			return;
-		}
-		if (unimported) {
-			error(first->offset, quoted(compilation_.qualified_name(unimported)) + " must be imported before it is used");
 			return;
 		}
 		name(first); // Reports it.

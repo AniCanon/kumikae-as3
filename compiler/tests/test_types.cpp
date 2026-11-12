@@ -27,7 +27,8 @@ static std::string fixture(const std::string &p_body) {
 		   "public var big:uint; public var list:Array; public var ints:Vector.<int>;\n"
 		   "public var grid:Vector.<Vector.<String>>; public var any:*; public var obj:Object; public var other:Main;\n"
 		   "public var shape:Shape; public var fn:Function; public var node:Node; private var mine:int;\n"
-		   "public static var total:int; public static function make():Main { return null; }\n"
+		   "public static var total:int; public static function make():Main { return null; }"
+		   " public static var twin:int; public var twin:String;\n"
 		   "public function get size():Number { return 0; } public function set size(v:Number):void {}\n"
 		   "public function get width():Number { return 0; }\n"
 		   "public function area():Number { return 0; }\n"
@@ -242,6 +243,8 @@ static void test_calls_and_new() {
 }
 
 static void test_members() {
+	// A static and an instance member of one name.
+	check_types({ { "Main.twin", "int" }, { "this.twin", "String" }, { "twin", "String" }, { "other.twin", "String" } });
 	check_types({
 			{ "other.count", "int" },
 			{ "other.other.label", "String" },

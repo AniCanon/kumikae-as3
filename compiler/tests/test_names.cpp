@@ -131,8 +131,13 @@ static void test_declare() {
 			"'x' is already defined at line 2");
 	CHECK_MAIN("package { public class Main {\nvar x:int;\nfunction /*!*/x():void {}\n} }",
 			"'x' is already defined at line 2");
-	CHECK_MAIN("package { public class Main {\nstatic var x:int;\nvar /*!*/x:int;\n} }",
+	// A static member and an instance member may share a name: one belongs to the class, one to its objects.
+	CHECK_MAIN("package { public class Main {\nstatic var x:int;\nvar x:String;\n} }");
+	CHECK_MAIN("package { public class Main {\nstatic var x:int;\nstatic var /*!*/x:int;\n} }",
 			"'x' is already defined at line 2");
+	CHECK_MAIN("package { public class Main {\nstatic function x():void {}\nfunction x():void {}\n"
+			   "function get y():int { return 0; }\nstatic function get y():int { return 0; }\n"
+			   "static function set y(value:int):void {}\n} }");
 	CHECK_MAIN("package { public class Main {\nvar a:int, b:int, /*!*/a:int;\n} }",
 			"'a' is already defined at line 2");
 	// A getter and a setter are one property.
@@ -142,10 +147,6 @@ static void test_declare() {
 	CHECK_MAIN("package { public class Main {\n"
 			   "function get x():int { return 0; }\n"
 			   "function get /*!*/x():int { return 0; }\n} }",
-			"'x' is already defined at line 2");
-	CHECK_MAIN("package { public class Main {\n"
-			   "function get x():int { return 0; }\n"
-			   "static function set /*!*/x(value:int):void {}\n} }",
 			"'x' is already defined at line 2");
 	CHECK_MAIN("package { public class Main {\nvar x:int;\nfunction get /*!*/x():int { return 0; }\n} }",
 			"'x' is already defined at line 2");
@@ -242,11 +243,10 @@ static void test_type_names() {
 			"unknown type 'godot.Nope'", "unknown type 'nowhere.Node'");
 	CHECK_GODOT("package { import godot.*; public class Main { var a:/*!*/godot.Hidden; } }",
 			"'godot.Hidden' is not public");
-	// As in Adobe's compiler, a name written with its package still needs the import.
-	CHECK_GODOT("package { public class Main { var a:/*!*/godot.Node; function f():void {\n"
-				"new /*!*/godot.Node(); /*!*/flash.utils.getTimer(); } } }",
-			"'godot.Node' must be imported before it is used", "'godot.Node' must be imported before it is used",
-			"'flash.utils.getTimer' must be imported before it is used");
+	// A name written with its package needs no import. (Starling relies on it.)
+	CHECK_GODOT("package { public class Main { var a:godot.Node; function f():void {\n"
+				"new godot.Node(); flash.utils.getTimer(); } } }");
+	CHECK_GODOT("package { public class Main { var a:/*!*/godot.Hidden; } }", "'godot.Hidden' is not public");
 	CHECK_EQ(check_files({
 					 { "lib/Thing.as", "package lib { public class Thing {} }" },
 					 { "lib/User.as", "package lib { public class User { var t:lib.Thing; } }" },
@@ -569,6 +569,16 @@ static void test_bindings() {
 			{ "Main.as", "package { import a.*; import a.b.*; public class Main { function f():void { a.b.C.n = 1; } } }" },
 	});
 	CHECK(binds(dump, "C -> class a.b.C"));
+	// A static and an instance member of one name: instance code sees the instance member, static code the
+	// static one.
+	dump = names_of({ { "Main.as", "package { public class Main {\nstatic var twin:int;\nvar twin:String;\n"
+								   "function f():void { twin; }\nstatic function g():void { twin; } } }" } });
+	CHECK(binds(dump, "4:21 twin -> field Main.twin @3:5"));
+	CHECK(binds(dump, "5:28 twin -> field Main.twin @2:12"));
+	// An inherited instance member comes before a static of the class itself.
+	dump = names_of({ { "Main.as", "package { public class Main extends Base {\nstatic var twin:int;\n"
+								   "function f():void { twin; } } }\nclass Base { var twin:String; }" } });
+	CHECK(binds(dump, "3:21 twin -> field Base.twin"));
 	// A static method does not see instance members: the name binds further out.
 	dump = names_of({ { "Main.as", "package { import flash.utils.getTimer; public class Main {\n"
 								   "public function getTimer():int { return 0; }\n"

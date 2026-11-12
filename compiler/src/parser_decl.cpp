@@ -76,6 +76,30 @@ List<Metadata> Parser::parse_metadata_tags() {
 
 // Access words are reserved; `static final override dynamic native` are ordinary identifiers with a meaning
 // only here. Which modifiers suit which definition is checked later, with the types.
+// True at a name that is followed by the rest of a member definition: a member put in a namespace.
+bool Parser::at_namespace_attribute() {
+	if (!at(TokenKind::Identifier)) {
+		return false;
+	}
+	const Token &next = peek2();
+	switch (next.kind) {
+		case TokenKind::KwVar:
+		case TokenKind::KwConst:
+		case TokenKind::KwFunction:
+		case TokenKind::KwPublic:
+		case TokenKind::KwPrivate:
+		case TokenKind::KwProtected:
+		case TokenKind::KwInternal:
+			return true;
+		case TokenKind::Identifier: {
+			std::string_view word = text(next);
+			return word == "static" || word == "final" || word == "override" || word == "native";
+		}
+		default:
+			return false;
+	}
+}
+
 Modifiers Parser::parse_modifiers() {
 	Modifiers modifiers;
 	for (;;) {
@@ -177,7 +201,11 @@ ClassDecl *Parser::parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Me
 					members.push_back(function);
 				} else if (!panic_ && !parse_unsupported_statement()) {
 					// (If the metadata or modifiers already failed, that error is the one to show.)
-					error_at(start, "expected a member definition");
+					if (at_namespace_attribute()) {
+						error_at(current_.offset, "namespaces are not supported"); // `mx_internal function f()`
+					} else {
+						error_at(start, "expected a member definition");
+					}
 				}
 			}
 			if (panic_) {

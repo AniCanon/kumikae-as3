@@ -73,6 +73,7 @@ private:
 	// ---- tokens (parser.cpp) ----
 	const Token &peek() const { return current_; }
 	const Token &peek2();
+	bool at_namespace_attribute();
 	Token advance();
 	bool at(TokenKind p_kind) const { return current_.kind == p_kind; }
 	bool at_word(std::string_view p_word) const;
