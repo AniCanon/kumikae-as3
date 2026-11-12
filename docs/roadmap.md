@@ -138,6 +138,7 @@ After it comes the language server's first slice, and then the interpreter.
 | Decision | Outcome |
 |---|---|
 | Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
+| Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the [language additions](superpowers/specs/2026-11-12-language-additions.md) list. |
 | 64-bit integers in declarations | A Godot integer marked 64-bit is declared `Number`, which is exact to 2^53. Object ids use higher bits, so stage 2 must settle a 64-bit type before bindings ship. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
 | [Godot naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
