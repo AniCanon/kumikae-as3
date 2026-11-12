@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -136,11 +137,29 @@ struct Reference {
 	Symbol *symbol;
 };
 
-// One source file.
-struct Unit {
+// A source file and its syntax tree. Parsing is most of the cost of a check, so a tool that checks again
+// and again keeps these and hands them to each new Compilation. The passes write onto the tree: only one
+// Compilation may use a Parsed at a time, and the one before it must not be asked anything afterwards.
+struct Parsed {
 	Source source;
 	Arena arena;
-	Diagnostics diagnostics;
+	Diagnostics diagnostics; // Syntax errors.
+	Program *tree = nullptr;
+	bool used = false; // A Compilation has written onto the tree.
+
+	Parsed(std::string p_path, std::string p_text) :
+			source(std::move(p_path), std::move(p_text)) {}
+};
+
+std::shared_ptr<Parsed> parse_file(std::string p_path, std::string p_text);
+// The embedded library, parsed.
+std::vector<std::shared_ptr<Parsed>> parse_builtins();
+
+// One source file in a Compilation.
+struct Unit {
+	std::shared_ptr<Parsed> parsed;
+	const Source &source;
+	Diagnostics diagnostics; // The syntax errors, then what the passes report.
 	Program *tree = nullptr;
 	bool is_declaration = false; // Declares what exists elsewhere: `native`, no bodies.
 	bool is_builtin = false; // Part of the embedded library.
@@ -151,8 +170,8 @@ struct Unit {
 	std::vector<Reference> references;
 	std::vector<TypedExpression> typed;
 
-	Unit(std::string p_path, std::string p_text) :
-			source(std::move(p_path), std::move(p_text)) {}
+	explicit Unit(std::shared_ptr<Parsed> p_parsed) :
+			parsed(std::move(p_parsed)), source(parsed->source), diagnostics(parsed->diagnostics), tree(parsed->tree) {}
 };
 
 // Where a name is looked up from.
@@ -209,12 +228,18 @@ class Compilation {
 
 public:
 	Compilation(); // Loads the built-in declarations.
+	// The same, with the built-in declarations already parsed (parse_builtins()).
+	explicit Compilation(const std::vector<std::shared_ptr<Parsed>> &p_builtins);
 
 	// Parses the file. The returned unit lives as long as the compilation.
 	Unit *add(std::string p_path, std::string p_text, bool p_is_declaration = false);
+	// A file parsed earlier. What an earlier Compilation wrote onto its tree is removed.
+	Unit *add(std::shared_ptr<Parsed> p_parsed, bool p_is_declaration = false);
 	// Resolves names in every file added so far. Does nothing if any file has a syntax error, so that one
 	// mistake is not reported twice. Call once.
-	void check();
+	// With p_through_syntax_errors, names are resolved all the same, for tools that answer questions about
+	// code that is being typed. What is reported does not change: syntax errors only.
+	void check(bool p_through_syntax_errors = false);
 	bool has_errors() const;
 	// The diagnostics of every file, in the order the files were added.
 	std::string format_diagnostics() const;

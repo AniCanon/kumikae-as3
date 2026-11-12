@@ -5,6 +5,9 @@
 namespace kas3 {
 
 void Diagnostics::error(uint32_t p_offset, std::string p_message) {
+	if (muted_) {
+		return;
+	}
 	count_++;
 	if ((int)items_.size() >= LIMIT) {
 		return;

@@ -1,6 +1,8 @@
 // The program model and the declare pass.
 #include "names.h"
 
+#include "ast_walk.h"
+
 #include "builtins.h"
 #include "parser.h"
 
@@ -99,33 +101,65 @@ static bool definition_name(Node *p_node, std::string_view *r_name, uint32_t *r_
 	}
 }
 
-Compilation::Compilation() {
+std::shared_ptr<Parsed> parse_file(std::string p_path, std::string p_text) {
+	std::shared_ptr<Parsed> parsed = std::make_shared<Parsed>(std::move(p_path), std::move(p_text));
+	parsed->tree = parse(parsed->source, parsed->arena, parsed->diagnostics);
+	return parsed;
+}
+
+std::vector<std::shared_ptr<Parsed>> parse_builtins() {
+	std::vector<std::shared_ptr<Parsed>> files;
+	for (int i = 0; i < BUILTIN_FILE_COUNT; i++) {
+		files.push_back(parse_file(BUILTIN_FILES[i].path, BUILTIN_FILES[i].text));
+	}
+	return files;
+}
+
+Compilation::Compilation() :
+		Compilation(parse_builtins()) {}
+
+Compilation::Compilation(const std::vector<std::shared_ptr<Parsed>> &p_builtins) {
 	void_.kind = Type::Void;
 	null_.kind = Type::Null;
 	unknown_.kind = Type::Unknown;
 	top_level_ = package("");
-	for (int i = 0; i < BUILTIN_FILE_COUNT; i++) {
-		Unit *unit = add(BUILTIN_FILES[i].path, BUILTIN_FILES[i].text, true);
-		unit->is_builtin = true;
+	for (const std::shared_ptr<Parsed> &file : p_builtins) {
+		add(file, true)->is_builtin = true;
 	}
 }
 
 Unit *Compilation::add(std::string p_path, std::string p_text, bool p_is_declaration) {
-	units_.emplace_back(std::move(p_path), std::move(p_text));
+	return add(parse_file(std::move(p_path), std::move(p_text)), p_is_declaration);
+}
+
+Unit *Compilation::add(std::shared_ptr<Parsed> p_parsed, bool p_is_declaration) {
+	if (p_parsed->used) {
+		clear_annotations(p_parsed->tree);
+	}
+	p_parsed->used = true;
+	units_.emplace_back(std::move(p_parsed));
 	Unit &unit = units_.back();
 	unit.is_declaration = p_is_declaration;
-	unit.tree = parse(unit.source, unit.arena, unit.diagnostics);
 	return &unit;
 }
 
-void Compilation::check() {
+void Compilation::check(bool p_through_syntax_errors) {
 	if (checked_) {
 		return;
 	}
 	checked_ = true;
+	bool syntax_errors = false;
 	for (const Unit &unit : units_) {
-		if (unit.diagnostics.has_errors()) {
+		syntax_errors = syntax_errors || unit.diagnostics.has_errors();
+	}
+	if (syntax_errors) {
+		if (!p_through_syntax_errors) {
 			return;
+		}
+		// A file that lost a declaration to a syntax error makes other files look wrong. Nothing the passes
+		// find is certain, so nothing they find is reported.
+		for (Unit &unit : units_) {
+			unit.diagnostics.mute();
 		}
 	}
 	for (Unit &unit : units_) {

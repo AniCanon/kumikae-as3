@@ -211,6 +211,7 @@ void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports,
 			r_scope.failed.push_back(import->name[last]);
 			continue;
 		}
+		import->symbol = symbol;
 		ResolvedImport resolved;
 		resolved.symbol = symbol;
 		r_scope.imports.push_back(resolved);

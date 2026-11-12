@@ -384,6 +384,7 @@ struct Import : Node { // `import a.b.C;` or `import a.b.*;`
 	List<std::string_view> name;
 	List<uint32_t> name_offsets;
 	bool wildcard = false;
+	Symbol *symbol = nullptr; // The definition it names, when there is one and it may be imported.
 };
 struct PackageDecl : Node {
 	static const NodeKind KIND = NodeKind::PackageDecl;

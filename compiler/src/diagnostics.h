@@ -17,12 +17,15 @@ struct Diagnostic {
 class Diagnostics {
 	std::vector<Diagnostic> items_;
 	int count_ = 0;
+	bool muted_ = false;
 
 public:
 	// Errors beyond this many are counted but not stored.
 	static const int LIMIT = 100;
 
 	void error(uint32_t p_offset, std::string p_message);
+	// Errors reported from now on are dropped.
+	void mute() { muted_ = true; }
 	bool has_errors() const { return count_ > 0; }
 	// Every error reported, including those past the limit.
 	int count() const { return count_; }
