@@ -8,6 +8,9 @@ The owner decided on 2026-11-12: **no new keywords or syntax yet. First get thin
 script runs in Godot (stage 2), the language is AS3 as Adobe defined it, and every valid AS3 program is
 accepted.
 
+**What is needed to make things work is allowed** (the owner, same day): metadata such as `[Export]` and
+`[Signal]`, and anything else a running script can't do without. What is parked is the optional kind.
+
 ActionScript 3 (2006) is the last version of the language. Adobe cancelled its successor and ECMAScript 4
 was abandoned, so any later version would be this project's to define. This page keeps the candidates in
 one place so that they are decided together, not one at a time as they come up.
