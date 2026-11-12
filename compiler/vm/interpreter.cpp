@@ -213,8 +213,18 @@ void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
 
 // Leaves frames until p_depth remain, adding each to the stack trace.
 void Interpreter::unwind(size_t p_depth) {
+	bool innermost = true;
 	while (frames_.size() > p_depth) {
-		trace_ += site(frames_.back()) + "\n";
+		// A caller is at the instruction after its call: step back to the call for the line number.
+		if (!innermost && frames_.back().pc > 0) {
+			frames_.back().pc--;
+		}
+		innermost = false;
+		// A runaway recursion has thousands of frames: the first few and a count say as much.
+		if (trace_lines_ < MAX_TRACE) {
+			trace_ += site(frames_.back()) + "\n";
+		}
+		trace_lines_++;
 		pop();
 	}
 }
@@ -246,6 +256,7 @@ bool Interpreter::run(size_t p_depth) {
 					frames_.back().pc++;
 					if (!carry_on) {
 						stopped_ = true;
+						halted_ = true;
 					}
 				}
 				break;
@@ -671,7 +682,16 @@ bool Interpreter::run_program() {
 			}
 		}
 	}
+	if (!ok && halted_ && !pending_) {
+		trace_.clear();
+		trace_lines_ = 0;
+		return false; // Stopped on request: there is no error to report.
+	}
 	if (!ok) {
+		if (trace_lines_ > MAX_TRACE) {
+			trace_ += "\t... " + std::to_string(trace_lines_ - MAX_TRACE) + " more\n";
+		}
+		trace_lines_ = 0;
 		std::string report = pending_ ? object_text(pending_) + "\n" + trace_ : trace_;
 		while (!report.empty() && report.back() == '\n') {
 			report.pop_back();

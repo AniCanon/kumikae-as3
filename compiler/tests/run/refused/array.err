@@ -1,0 +1,3 @@
+array.as:1:64: error: the type 'Array' is not supported by the interpreter yet
+array.as:1:72: error: an Array is not supported by the interpreter yet
+array.as:1:88: error: 'length' used as a value is not supported by the interpreter yet

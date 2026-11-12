@@ -1,0 +1,3 @@
+math.as:1:62: error: calling 'floor' is not supported by the interpreter yet
+math.as:1:84: error: 'PI' used as a value is not supported by the interpreter yet
+math.as:1:88: error: calling 'parseInt' is not supported by the interpreter yet

@@ -1,0 +1,3 @@
+Problem: negative: -1
+	at err_throw/check()[err_throw.as:14]
+	at err_throw()[err_throw.as:9]

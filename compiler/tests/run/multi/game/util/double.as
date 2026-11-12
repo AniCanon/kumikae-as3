@@ -1,0 +1,3 @@
+package game.util {
+	public function double(value:int):int { return value * 2; }
+}

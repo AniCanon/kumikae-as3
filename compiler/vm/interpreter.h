@@ -19,6 +19,8 @@ class Interpreter {
 public:
 	// Calls may nest this deep. One more is an AS3 error.
 	static const size_t MAX_FRAMES = 10000;
+	// A stack trace shows this many frames, then how many more there were.
+	static const size_t MAX_TRACE = 32;
 
 	// Called at each statement, when set: where a debugger stops. Returning false ends the run.
 	typedef bool (*StatementHook)(Interpreter &p_interpreter, void *p_data);
@@ -40,7 +42,9 @@ private:
 	Str *null_text_ = nullptr; // "null"
 	Object *pending_ = nullptr; // An error on its way out.
 	std::string trace_; // Its stack trace, built as frames are left.
-	bool stopped_ = false;
+	size_t trace_lines_ = 0;
+	bool stopped_ = false; // Nothing more is to run.
+	bool halted_ = false; // Because the statement hook said so, not because of an error.
 	StatementHook hook_ = nullptr;
 	void *hook_data_ = nullptr;
 

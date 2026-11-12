@@ -1,0 +1,1 @@
+args.as:1:47: error: the program's first class is created with no arguments, so its constructor can't require any

@@ -1,0 +1,2 @@
+regex.as:1:64: error: the type 'RegExp' is not supported by the interpreter yet
+regex.as:1:73: error: a regular expression is not supported by the interpreter yet

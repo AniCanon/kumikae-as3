@@ -1,0 +1,6 @@
+object.as:1:66: error: the type 'Object' is not supported by the interpreter yet
+object.as:1:75: error: an Object literal is not supported by the interpreter yet
+object.as:1:91: error: the type 'Object' is not supported by the interpreter yet
+object.as:1:100: error: converting an object to a number is not supported by the interpreter yet
+object.as:1:104: error: creating a 'Object' is not supported by the interpreter yet
+object.as:1:120: error: indexing with '[]' is not supported by the interpreter yet
