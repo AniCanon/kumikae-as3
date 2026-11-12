@@ -56,6 +56,13 @@ target_include_directories(kas3ir PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ir)
 target_link_libraries(kas3ir PUBLIC kas3front)
 target_compile_options(kas3ir PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
+# The interpreter and its runtime. No Godot header: the engine is reached through vm/host.h.
+file(GLOB KAS3_VM_SOURCES CONFIGURE_DEPENDS vm/*.cpp)
+add_library(kas3vm STATIC ${KAS3_VM_SOURCES})
+target_include_directories(kas3vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vm)
+target_link_libraries(kas3vm PUBLIC kas3ir)
+target_compile_options(kas3vm PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+
 # The language server: JSON, the workspace and the message loop. The Godot editor does not need it.
 file(GLOB KAS3_LSP_SOURCES CONFIGURE_DEPENDS lsp/*.cpp)
 add_library(kas3lsp STATIC ${KAS3_LSP_SOURCES})
@@ -68,7 +75,7 @@ file(GLOB KAS3_TESTS CONFIGURE_DEPENDS tests/test_*.cpp)
 foreach(test_source ${KAS3_TESTS})
     get_filename_component(test_name ${test_source} NAME_WE)
     add_executable(${test_name} ${test_source})
-    target_link_libraries(${test_name} PRIVATE kas3lsp kas3ir)
+    target_link_libraries(${test_name} PRIVATE kas3lsp kas3vm)
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_compile_definitions(${test_name} PRIVATE KAS3_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME ${test_name} COMMAND ${test_name})
@@ -76,7 +83,7 @@ endforeach()
 
 # The command-line tool.
 add_executable(kas3c tools/kas3c.cpp)
-target_link_libraries(kas3c PRIVATE kas3lsp kas3ir)
+target_link_libraries(kas3c PRIVATE kas3lsp kas3vm)
 target_compile_options(kas3c PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
 # Not a test: prints how long a re-check takes (tests/bench/generate_project.py writes a project to try).

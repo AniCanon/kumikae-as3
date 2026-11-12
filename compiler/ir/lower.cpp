@@ -1,0 +1,1849 @@
+#include "lower.h"
+
+#include "ast_walk.h"
+
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <unordered_map>
+
+namespace kas3 {
+namespace ir {
+
+namespace {
+
+struct Loop {
+	std::vector<uint32_t> breaks; // Jumps to patch to the loop's end.
+	std::vector<uint32_t> continues; // Jumps to patch to where the loop continues.
+};
+
+class Lowerer {
+	Compilation &compilation_;
+	Module &module_;
+	bool failed_ = false;
+
+	Symbol *int_ = nullptr;
+	Symbol *uint_ = nullptr;
+	Symbol *number_ = nullptr;
+	Symbol *boolean_ = nullptr;
+	Symbol *string_ = nullptr;
+	Symbol *object_ = nullptr;
+	Symbol *error_ = nullptr;
+
+	std::unordered_map<const Symbol *, uint32_t> classes_;
+	std::unordered_map<const Symbol *, uint32_t> functions_; // Methods, constructors, package functions.
+	std::unordered_map<const Symbol *, uint32_t> fields_; // Instance fields: the slot.
+	std::unordered_map<const Symbol *, uint32_t> globals_; // Static fields and package variables.
+	std::unordered_map<const Symbol *, uint32_t> slots_; // Instance methods: the method-table slot.
+	std::unordered_map<std::string, uint32_t> strings_;
+	std::unordered_map<uint32_t, std::unordered_map<std::string, uint32_t>> slot_names_; // Per class.
+	std::unordered_map<const Unit *, uint32_t> files_;
+
+	// The function being lowered.
+	Unit *unit_ = nullptr;
+	Function *function_ = nullptr;
+	Symbol *class_ = nullptr;
+	bool constructor_ = false;
+	std::unordered_map<const Symbol *, uint32_t> locals_;
+	std::vector<Loop> loops_;
+
+	// ---- reporting ----
+
+	void refuse(uint32_t p_offset, const std::string &p_what) {
+		failed_ = true;
+		if (unit_) {
+			unit_->diagnostics.error(p_offset, p_what + " is not supported by the interpreter yet");
+		}
+	}
+
+	// ---- tables ----
+
+	uint32_t string(const std::string &p_text) {
+		auto found = strings_.find(p_text);
+		if (found != strings_.end()) {
+			return found->second;
+		}
+		module_.strings.push_back(p_text);
+		return strings_[p_text] = (uint32_t)module_.strings.size() - 1;
+	}
+
+	uint32_t number(double p_value) {
+		for (size_t i = 0; i < module_.numbers.size(); i++) {
+			// Bit-for-bit: 0 and -0 are different constants, and NaN is itself.
+			if (std::memcmp(&module_.numbers[i], &p_value, sizeof(double)) == 0) {
+				return (uint32_t)i;
+			}
+		}
+		module_.numbers.push_back(p_value);
+		return (uint32_t)module_.numbers.size() - 1;
+	}
+
+	uint32_t file(const Unit *p_unit) {
+		auto found = files_.find(p_unit);
+		if (found != files_.end()) {
+			return found->second;
+		}
+		module_.files.push_back(p_unit->source.path());
+		std::vector<uint32_t> lines;
+		for (int line = 1; line <= p_unit->source.line_count(); line++) {
+			lines.push_back(p_unit->source.line_start(line));
+		}
+		module_.lines.push_back(std::move(lines));
+		return files_[p_unit] = (uint32_t)module_.files.size() - 1;
+	}
+
+	std::string class_name(const Symbol *p_class) const {
+		return p_class->package && !p_class->package->name.empty() ? p_class->package->name + "." + std::string(p_class->name)
+																   : std::string(p_class->name);
+	}
+
+	// ---- types ----
+
+	bool kind_of(const Type *p_type, Kind *r_kind) const {
+		if (!p_type) {
+			return false;
+		}
+		if (p_type->kind == Type::Void) {
+			*r_kind = Kind::Void;
+			return true;
+		}
+		if (p_type->kind != Type::Instance || !p_type->symbol) {
+			return false;
+		}
+		const Symbol *symbol = p_type->symbol;
+		if (symbol == int_) {
+			*r_kind = Kind::I32;
+		} else if (symbol == uint_) {
+			*r_kind = Kind::U32;
+		} else if (symbol == number_) {
+			*r_kind = Kind::F64;
+		} else if (symbol == boolean_) {
+			*r_kind = Kind::Bool;
+		} else if (symbol == string_) {
+			*r_kind = Kind::Str;
+		} else if (classes_.count(symbol) || is_error(symbol)) {
+			*r_kind = Kind::Obj;
+		} else {
+			return false;
+		}
+		return true;
+	}
+
+	// The kind a written type names; refused if the interpreter has no such values yet.
+	Kind written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing) {
+		if (!p_type) {
+			if (p_missing == Kind::Void) {
+				return Kind::Void;
+			}
+			refuse(p_offset, "a declaration without a type");
+			return Kind::F64;
+		}
+		Kind kind = Kind::Void;
+		if (!kind_of(compilation_.type_of(p_type), &kind)) {
+			refuse(p_type->offset, "the type '" + compilation_.type_name(compilation_.type_of(p_type)) + "'");
+			return Kind::F64;
+		}
+		return kind;
+	}
+
+	// A built-in class that is Error or extends it. These are the only built-in classes with objects so far.
+	bool is_error(const Symbol *p_class) const {
+		for (const Symbol *at = p_class; at && at->klass; at = at->klass->base) {
+			if (at == error_) {
+				return at->unit && at->unit->is_builtin;
+			}
+		}
+		return false;
+	}
+
+	// ---- declarations ----
+
+	// The class's index, creating the built-in Error classes on first use.
+	bool class_index(const Symbol *p_class, uint32_t *r_index) {
+		auto found = classes_.find(p_class);
+		if (found != classes_.end()) {
+			*r_index = found->second;
+			return true;
+		}
+		if (!p_class || !p_class->unit || !p_class->unit->is_builtin || !is_error(p_class)) {
+			return false;
+		}
+		// Error and its built-in subclasses: one field, and a constructor that stores the message.
+		uint32_t base = NONE;
+		if (p_class != error_ && !class_index(p_class->klass->base, &base)) {
+			return false;
+		}
+		Class klass;
+		klass.name = class_name(p_class);
+		klass.base = base;
+		klass.fields.push_back({ "message", Kind::Str });
+		Function constructor;
+		constructor.name = klass.name;
+		constructor.owner = (uint32_t)module_.classes.size();
+		constructor.parameters = 2;
+		constructor.registers = { Kind::Obj, Kind::Str };
+		Instruction store;
+		store.op = Op::SetField;
+		store.a = 0;
+		store.b = 0;
+		store.c = 1;
+		constructor.code.push_back(store);
+		Instruction done;
+		done.op = Op::ReturnVoid;
+		constructor.code.push_back(done);
+		klass.constructor = (uint32_t)module_.functions.size();
+		module_.functions.push_back(std::move(constructor));
+		module_.classes.push_back(std::move(klass));
+		uint32_t index = (uint32_t)module_.classes.size() - 1;
+		classes_[p_class] = index;
+		if (p_class->klass->constructor) {
+			functions_[p_class->klass->constructor] = module_.classes[index].constructor;
+		}
+		Symbol *message = nullptr;
+		auto member = error_->klass->members.find("message");
+		if (member != error_->klass->members.end()) {
+			message = member->second;
+			fields_[message] = 0;
+		}
+		*r_index = index;
+		return true;
+	}
+
+	void declare_class(Unit &p_unit, ClassDecl *p_decl) {
+		Symbol *symbol = p_decl->symbol;
+		if (!symbol || !symbol->klass) {
+			return;
+		}
+		unit_ = &p_unit;
+		if (p_decl->implements.count > 0) {
+			refuse(p_decl->implements[0]->offset, "'implements'");
+		}
+		Class klass;
+		klass.name = class_name(symbol);
+		Symbol *base = symbol->klass->base;
+		if (base && base != object_) {
+			if (!class_index(base, &klass.base)) {
+				refuse(p_decl->extends ? p_decl->extends->offset : p_decl->name_offset,
+						"extending '" + std::string(base->name) + "'");
+			} else {
+				klass.fields = module_.classes[klass.base].fields;
+				klass.methods = module_.classes[klass.base].methods;
+			}
+		}
+		uint32_t index = (uint32_t)module_.classes.size();
+		if (klass.base != NONE) {
+			slot_names_[index] = slot_names_[klass.base];
+		}
+		classes_[symbol] = index;
+		module_.classes.push_back(std::move(klass));
+
+		auto new_function = [&](FunctionDecl *p_function, const std::string &p_name, bool p_static) {
+			Function function;
+			function.name = p_name;
+			function.file = file(&p_unit);
+			function.position = p_function ? p_function->name_offset : p_decl->name_offset;
+			function.owner = index;
+			function.is_static = p_static;
+			module_.functions.push_back(std::move(function));
+			return (uint32_t)module_.functions.size() - 1;
+		};
+		const std::string name = module_.classes[index].name;
+		bool has_constructor = false;
+		for (Node *member : p_decl->members) {
+			if (member->kind == NodeKind::VarDecl) {
+				VarDecl *decl = static_cast<VarDecl *>(member);
+				for (Declarator &declarator : decl->declarators) {
+					if (!declarator.symbol) {
+						continue;
+					}
+					Kind kind = written_kind(declarator.type, declarator.offset, Kind::F64);
+					if (decl->modifiers.bits & Modifiers::Static) {
+						globals_[declarator.symbol] = (uint32_t)module_.globals.size();
+						module_.globals.push_back({ name + "." + std::string(declarator.name), kind });
+					} else {
+						fields_[declarator.symbol] = (uint32_t)module_.classes[index].fields.size();
+						module_.classes[index].fields.push_back({ std::string(declarator.name), kind });
+					}
+				}
+			} else if (member->kind == NodeKind::FunctionDecl) {
+				FunctionDecl *function = static_cast<FunctionDecl *>(member);
+				if (!function->symbol) {
+					continue;
+				}
+				if (function->accessor != FunctionDecl::None) {
+					refuse(function->name_offset, "a getter or setter");
+					continue;
+				}
+				bool is_static = (function->modifiers.bits & Modifiers::Static) != 0;
+				if (symbol->klass->constructor == function->symbol) {
+					has_constructor = true;
+					uint32_t made = new_function(function, name, false);
+					module_.classes[index].constructor = made;
+					functions_[function->symbol] = made;
+					continue;
+				}
+				uint32_t made = new_function(function, name + "/" + std::string(function->name), is_static);
+				functions_[function->symbol] = made;
+				if (is_static) {
+					continue;
+				}
+				// An override takes the slot of what it overrides.
+				std::unordered_map<std::string, uint32_t> &names = slot_names_[index];
+				std::string key(function->name);
+				auto slot = names.find(key);
+				if (slot != names.end() && (function->modifiers.bits & Modifiers::Override)) {
+					module_.classes[index].methods[slot->second] = made;
+					slots_[function->symbol] = slot->second;
+				} else {
+					uint32_t added = (uint32_t)module_.classes[index].methods.size();
+					module_.classes[index].methods.push_back(made);
+					// A private method is not seen by subclasses, so its name is not recorded for them.
+					if (!(function->modifiers.bits & Modifiers::Private)) {
+						names[key] = added;
+					}
+					slots_[function->symbol] = added;
+				}
+			}
+		}
+		if (!has_constructor) {
+			module_.classes[index].constructor = new_function(nullptr, name, false);
+		}
+	}
+
+	// ---- emitting ----
+
+	uint32_t emit(Op p_op, uint32_t p_position, uint32_t p_a = 0, uint32_t p_b = 0, uint32_t p_c = 0) {
+		Instruction instruction;
+		instruction.op = p_op;
+		instruction.a = p_a;
+		instruction.b = p_b;
+		instruction.c = p_c;
+		instruction.position = p_position;
+		function_->code.push_back(instruction);
+		return (uint32_t)function_->code.size() - 1;
+	}
+
+	uint32_t here() const { return (uint32_t)function_->code.size(); }
+
+	void patch(uint32_t p_jump, uint32_t p_target) {
+		Instruction &instruction = function_->code[p_jump];
+		(instruction.op == Op::Jump ? instruction.a : instruction.b) = p_target;
+	}
+
+	uint32_t reg(Kind p_kind) {
+		function_->registers.push_back(p_kind);
+		return (uint32_t)function_->registers.size() - 1;
+	}
+
+	Kind kind_at(uint32_t p_reg) const {
+		return p_reg < function_->registers.size() ? function_->registers[p_reg] : Kind::Void;
+	}
+
+	uint32_t arguments(std::vector<uint32_t> p_list) {
+		function_->argument_lists.push_back(std::move(p_list));
+		return (uint32_t)function_->argument_lists.size() - 1;
+	}
+
+	// The default value of a kind, in a new register.
+	uint32_t default_value(Kind p_kind, uint32_t p_position) {
+		uint32_t out = reg(p_kind == Kind::Void ? Kind::F64 : p_kind);
+		switch (p_kind) {
+			case Kind::I32:
+				emit(Op::ConstI32, p_position, out, 0);
+				break;
+			case Kind::U32:
+				emit(Op::ConstU32, p_position, out, 0);
+				break;
+			case Kind::Bool:
+				emit(Op::ConstBool, p_position, out, 0);
+				break;
+			case Kind::Str:
+			case Kind::Obj:
+				emit(Op::ConstNull, p_position, out);
+				break;
+			default:
+				emit(Op::ConstF64, p_position, out, number(std::numeric_limits<double>::quiet_NaN()));
+				break;
+		}
+		return out;
+	}
+
+	// The value in p_reg as p_to, in a new register unless it is that kind already.
+	uint32_t convert(uint32_t p_reg, Kind p_to, uint32_t p_position) {
+		Kind from = kind_at(p_reg);
+		if (from == p_to || p_to == Kind::Void) {
+			return p_reg;
+		}
+		auto via = [&](Op p_op, Kind p_kind, uint32_t p_source) {
+			uint32_t out = reg(p_kind);
+			emit(p_op, p_position, out, p_source);
+			return out;
+		};
+		auto to_number = [&]() -> uint32_t {
+			switch (from) {
+				case Kind::I32:
+					return via(Op::I32ToF64, Kind::F64, p_reg);
+				case Kind::U32:
+					return via(Op::U32ToF64, Kind::F64, p_reg);
+				case Kind::Bool:
+					return via(Op::BoolToF64, Kind::F64, p_reg);
+				case Kind::Str:
+					return via(Op::StrToF64, Kind::F64, p_reg);
+				case Kind::F64:
+					return p_reg;
+				default:
+					refuse(p_position, "converting an object to a number");
+					return via(Op::ConstF64, Kind::F64, number(0));
+			}
+		};
+		switch (p_to) {
+			case Kind::F64:
+				return to_number();
+			case Kind::I32:
+				if (from == Kind::U32) {
+					return via(Op::U32ToI32, Kind::I32, p_reg);
+				}
+				return via(Op::F64ToI32, Kind::I32, to_number());
+			case Kind::U32:
+				if (from == Kind::I32) {
+					return via(Op::I32ToU32, Kind::U32, p_reg);
+				}
+				return via(Op::F64ToU32, Kind::U32, to_number());
+			case Kind::Bool:
+				switch (from) {
+					case Kind::I32:
+						return via(Op::I32ToBool, Kind::Bool, p_reg);
+					case Kind::U32:
+						return via(Op::U32ToBool, Kind::Bool, p_reg);
+					case Kind::F64:
+						return via(Op::F64ToBool, Kind::Bool, p_reg);
+					case Kind::Str:
+						return via(Op::StrToBool, Kind::Bool, p_reg);
+					default:
+						return via(Op::ObjToBool, Kind::Bool, p_reg);
+				}
+			case Kind::Str:
+				switch (from) {
+					case Kind::I32:
+						return via(Op::I32ToStr, Kind::Str, p_reg);
+					case Kind::U32:
+						return via(Op::U32ToStr, Kind::Str, p_reg);
+					case Kind::F64:
+						return via(Op::F64ToStr, Kind::Str, p_reg);
+					case Kind::Bool:
+						return via(Op::BoolToStr, Kind::Str, p_reg);
+					default:
+						return via(Op::ObjToStr, Kind::Str, p_reg);
+				}
+			case Kind::Obj:
+				refuse(p_position, "converting a value to an object");
+				return default_value(Kind::Obj, p_position);
+			default:
+				return p_reg;
+		}
+	}
+
+	// ---- expressions ----
+
+	Kind natural(Expr *p_expression) {
+		Kind kind = Kind::Void;
+		if (p_expression->type && p_expression->type->kind == Type::Null) {
+			return Kind::Obj;
+		}
+		if (!kind_of(p_expression->type, &kind)) {
+			refuse(p_expression->offset, "a value of type '" + compilation_.type_name(p_expression->type) + "'");
+			return Kind::F64;
+		}
+		return kind;
+	}
+
+	static bool is_null(const Expr *p_expression) {
+		return p_expression->kind == NodeKind::NullLit;
+	}
+
+	// True if evaluating the expression can change a local variable.
+	static bool writes_locals(Expr *p_expression) {
+		bool writes = false;
+		walk(p_expression, [&](Node *p_node) {
+			if (p_node->kind == NodeKind::Assign || p_node->kind == NodeKind::Postfix) {
+				writes = true;
+			} else if (p_node->kind == NodeKind::Unary) {
+				TokenKind op = static_cast<Unary *>(p_node)->op;
+				writes = writes || op == TokenKind::PlusPlus || op == TokenKind::MinusMinus;
+			}
+		});
+		return writes;
+	}
+
+	// A value that a later operand must not be able to change: a local's own register is copied if p_later
+	// can write locals.
+	uint32_t settled(uint32_t p_reg, Expr *p_later, uint32_t p_position) {
+		if (!p_later || !writes_locals(p_later)) {
+			return p_reg;
+		}
+		for (const auto &local : locals_) {
+			if (local.second == p_reg) {
+				uint32_t copy = reg(kind_at(p_reg));
+				emit(Op::Move, p_position, copy, p_reg);
+				return copy;
+			}
+		}
+		return p_reg;
+	}
+
+	// Evaluates the expression and gives the register holding its value as p_want (Void: as it comes).
+	uint32_t expression(Expr *p_expression, Kind p_want) {
+		if (!p_expression) {
+			return default_value(p_want, 0);
+		}
+		if (is_null(p_expression)) {
+			// null is whatever is asked for: no reference, 0, or false.
+			uint32_t out = default_value(p_want == Kind::Void ? Kind::Obj : p_want == Kind::F64 ? Kind::I32 : p_want, p_expression->offset);
+			return p_want == Kind::F64 ? convert(out, Kind::F64, p_expression->offset) : out;
+		}
+		uint32_t value = evaluate(p_expression, p_want);
+		return convert(value, p_want, p_expression->offset);
+	}
+
+	static double literal_value(const NumberLit *p_literal) {
+		std::string text(p_literal->text);
+		if (text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) {
+			double value = 0;
+			for (size_t i = 2; i < text.size(); i++) {
+				char c = text[i];
+				int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 0;
+				value = value * 16 + digit;
+			}
+			return value;
+		}
+		return std::strtod(text.c_str(), nullptr);
+	}
+
+	// The characters a string literal stands for.
+	static std::string unescape(std::string_view p_text) {
+		std::string out;
+		if (p_text.size() < 2) {
+			return out;
+		}
+		auto hex = [&](size_t p_at, size_t p_count, uint32_t *r_value) {
+			uint32_t value = 0;
+			if (p_at + p_count > p_text.size() - 1) {
+				return false;
+			}
+			for (size_t i = 0; i < p_count; i++) {
+				char c = p_text[p_at + i];
+				int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+				if (digit < 0) {
+					return false;
+				}
+				value = value * 16 + (uint32_t)digit;
+			}
+			*r_value = value;
+			return true;
+		};
+		auto utf8 = [&](uint32_t p_code) {
+			if (p_code < 0x80) {
+				out += (char)p_code;
+			} else if (p_code < 0x800) {
+				out += (char)(0xC0 | (p_code >> 6));
+				out += (char)(0x80 | (p_code & 0x3F));
+			} else {
+				out += (char)(0xE0 | (p_code >> 12));
+				out += (char)(0x80 | ((p_code >> 6) & 0x3F));
+				out += (char)(0x80 | (p_code & 0x3F));
+			}
+		};
+		for (size_t i = 1; i + 1 < p_text.size(); i++) {
+			char c = p_text[i];
+			if (c != '\\' || i + 2 >= p_text.size()) {
+				out += c;
+				continue;
+			}
+			char escape = p_text[++i];
+			uint32_t code = 0;
+			switch (escape) {
+				case 'n':
+					out += '\n';
+					break;
+				case 't':
+					out += '\t';
+					break;
+				case 'r':
+					out += '\r';
+					break;
+				case 'b':
+					out += '\b';
+					break;
+				case 'f':
+					out += '\f';
+					break;
+				case '0':
+					out += '\0';
+					break;
+				case 'x':
+					if (hex(i + 1, 2, &code)) {
+						utf8(code);
+						i += 2;
+					} else {
+						out += 'x';
+					}
+					break;
+				case 'u':
+					if (hex(i + 1, 4, &code)) {
+						utf8(code);
+						i += 4;
+					} else {
+						out += 'u';
+					}
+					break;
+				default:
+					out += escape; // Quotes, the backslash, and anything else stand for themselves.
+					break;
+			}
+		}
+		return out;
+	}
+
+	Symbol *callee_symbol(Expr *p_callee) {
+		if (p_callee->kind == NodeKind::Name) {
+			return static_cast<Name *>(p_callee)->symbol;
+		}
+		if (p_callee->kind == NodeKind::Member) {
+			Member *member = static_cast<Member *>(p_callee);
+			return member->symbol ? member->symbol : member->member;
+		}
+		return nullptr;
+	}
+
+	// The object a member is reached through, checked for null unless it is `this` or `super`.
+	uint32_t receiver(Expr *p_object) {
+		if (p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr) {
+			return 0;
+		}
+		uint32_t object = expression(p_object, Kind::Void);
+		if (kind_at(object) != Kind::Obj) {
+			refuse(p_object->offset, "a member of a value of type '" + compilation_.type_name(p_object->type) + "'");
+			return default_value(Kind::Obj, p_object->offset);
+		}
+		emit(Op::NullCheck, p_object->offset, object);
+		return object;
+	}
+
+	// A place a value can be stored: a local, a field of an object, or a global.
+	struct Place {
+		enum Where { Nowhere, Register, FieldOf, GlobalSlot } where = Nowhere;
+		uint32_t index = 0; // The register, the field slot, or the global.
+		uint32_t object = 0; // For FieldOf.
+		Kind kind = Kind::F64;
+	};
+
+	Place place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_position) {
+		Place place;
+		if (!p_symbol) {
+			refuse(p_position, "this name");
+			return place;
+		}
+		auto local = locals_.find(p_symbol);
+		if (local != locals_.end()) {
+			place.where = Place::Register;
+			place.index = local->second;
+			place.kind = kind_at(local->second);
+			return place;
+		}
+		auto global = globals_.find(p_symbol);
+		if (global != globals_.end()) {
+			place.where = Place::GlobalSlot;
+			place.index = global->second;
+			place.kind = module_.globals[global->second].kind;
+			return place;
+		}
+		auto field = fields_.find(p_symbol);
+		if (field != fields_.end() && p_symbol->owner) {
+			uint32_t owner = 0;
+			if (class_index(p_symbol->owner, &owner)) {
+				place.where = Place::FieldOf;
+				place.index = field->second;
+				place.object = p_object;
+				place.kind = module_.classes[owner].fields[field->second].kind;
+				return place;
+			}
+		}
+		refuse(p_position, p_symbol->kind == SymbolKind::Property ? "a getter or setter"
+																  : "'" + std::string(p_symbol->name) + "' used as a value");
+		return place;
+	}
+
+	// Evaluates what is needed to reach the place: the object of `a.b`, once.
+	Place place_of(Expr *p_target) {
+		if (p_target->kind == NodeKind::Name) {
+			Name *name = static_cast<Name *>(p_target);
+			if (name->symbol && name->symbol->is_instance_member() && function_->is_static) {
+				refuse(name->offset, "this name");
+				return Place();
+			}
+			return place_of_symbol(name->symbol, 0, name->offset);
+		}
+		if (p_target->kind == NodeKind::Member) {
+			Member *member = static_cast<Member *>(p_target);
+			Symbol *symbol = member->symbol ? member->symbol : member->member;
+			if (symbol && (globals_.count(symbol) || !symbol->is_instance_member())) {
+				return place_of_symbol(symbol, 0, member->name_offset);
+			}
+			// Is the class known before the object is evaluated? A String's `length` is not a field.
+			if (symbol && !fields_.count(symbol)) {
+				refuse(member->name_offset, symbol->kind == SymbolKind::Property ? "a getter or setter"
+																			  : "'" + std::string(symbol->name) + "' used as a value");
+				return Place();
+			}
+			uint32_t object = receiver(member->object);
+			return place_of_symbol(symbol, object, member->name_offset);
+		}
+		refuse(p_target->offset, "this kind of assignment target");
+		return Place();
+	}
+
+	uint32_t load(const Place &p_place, uint32_t p_position) {
+		switch (p_place.where) {
+			case Place::Register:
+				return p_place.index;
+			case Place::FieldOf: {
+				uint32_t out = reg(p_place.kind);
+				emit(Op::GetField, p_position, out, p_place.object, p_place.index);
+				return out;
+			}
+			case Place::GlobalSlot: {
+				uint32_t out = reg(p_place.kind);
+				emit(Op::GetGlobal, p_position, out, p_place.index);
+				return out;
+			}
+			default:
+				return default_value(Kind::F64, p_position);
+		}
+	}
+
+	void store(const Place &p_place, uint32_t p_value, uint32_t p_position) {
+		switch (p_place.where) {
+			case Place::Register:
+				if (p_place.index != p_value) {
+					emit(Op::Move, p_position, p_place.index, p_value);
+				}
+				break;
+			case Place::FieldOf:
+				emit(Op::SetField, p_position, p_place.object, p_place.index, p_value);
+				break;
+			case Place::GlobalSlot:
+				emit(Op::SetGlobal, p_position, p_place.index, p_value);
+				break;
+			default:
+				break;
+		}
+	}
+
+	// The class a `new`, `is`, `as` or conversion names.
+	Symbol *named_class(Expr *p_expression) {
+		Symbol *symbol = callee_symbol(p_expression);
+		return symbol && symbol->is_type() ? symbol : nullptr;
+	}
+
+	bool kind_of_class(const Symbol *p_class, Kind *r_kind) {
+		if (p_class == int_) {
+			*r_kind = Kind::I32;
+		} else if (p_class == uint_) {
+			*r_kind = Kind::U32;
+		} else if (p_class == number_) {
+			*r_kind = Kind::F64;
+		} else if (p_class == boolean_) {
+			*r_kind = Kind::Bool;
+		} else if (p_class == string_) {
+			*r_kind = Kind::Str;
+		} else {
+			return false;
+		}
+		return true;
+	}
+
+	// The arguments of a call as the function's parameters expect them, defaults filled in.
+	void call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position,
+			std::vector<uint32_t> &r_list) {
+		uint32_t count = p_function ? p_function->parameters.count : 0;
+		if (p_arguments.count > count) {
+			refuse(p_position, "a call with extra arguments");
+		}
+		for (uint32_t i = 0; i < count; i++) {
+			Parameter &parameter = p_function->parameters[i];
+			if (parameter.is_rest) {
+				refuse(p_position, "a call to a function with a rest parameter");
+				break;
+			}
+			Kind kind = Kind::F64;
+			const Type *type = compilation_.type_of(parameter.type);
+			if (!parameter.type || !kind_of(type, &kind)) {
+				refuse(p_position, "a call to a function with a parameter of type '" + compilation_.type_name(type) + "'");
+				break;
+			}
+			Expr *value = i < p_arguments.count ? p_arguments[i] : parameter.default_value;
+			Expr *later = nullptr;
+			for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
+				later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
+			}
+			r_list.push_back(settled(expression(value, kind), later, p_position));
+		}
+	}
+
+	uint32_t call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind) {
+		Kind kind = Kind::Void;
+		if (p_function->type && !kind_of(compilation_.type_of(p_function->type), &kind)) {
+			refuse(p_position, "a call to a function that returns '" + compilation_.type_name(compilation_.type_of(p_function->type)) + "'");
+		}
+		*r_kind = kind;
+		return kind == Kind::Void ? NONE : reg(kind);
+	}
+
+	uint32_t call(Call *p_call, Kind p_want) {
+		Expr *callee = p_call->callee;
+		uint32_t position = p_call->offset;
+		// super(...): the base class's constructor.
+		if (callee->kind == NodeKind::SuperExpr) {
+			Symbol *base = class_ && class_->klass ? class_->klass->base : nullptr;
+			uint32_t base_index = 0;
+			if (base && base != object_ && class_index(base, &base_index)) {
+				std::vector<uint32_t> list = { 0 };
+				constructor_arguments(base, p_call->arguments, position, list);
+				emit(Op::Call, position, NONE, module_.classes[base_index].constructor, arguments(std::move(list)));
+			}
+			return 0; // No value: the checker lets nothing use it.
+		}
+		Symbol *symbol = callee_symbol(callee);
+		if (!symbol) {
+			refuse(callee->offset, "calling a value");
+			return default_value(p_want, position);
+		}
+		// A conversion written as a call: int(x), String(x).
+		Kind conversion = Kind::Void;
+		if (symbol->is_type()) {
+			if (kind_of_class(symbol, &conversion) && p_call->arguments.count == 1) {
+				return expression(p_call->arguments[0], conversion);
+			}
+			refuse(callee->offset, "a cast to '" + std::string(symbol->name) + "'");
+			return default_value(p_want, position);
+		}
+		if (symbol->unit && symbol->unit->is_builtin && symbol->kind == SymbolKind::Function && symbol->name == "trace") {
+			std::vector<uint32_t> list;
+			for (uint32_t i = 0; i < p_call->arguments.count; i++) {
+				Expr *later = nullptr;
+				for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
+					later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
+				}
+				uint32_t value = expression(p_call->arguments[i], Kind::Str);
+				// A null string traces as "null".
+				uint32_t text = reg(Kind::Str);
+				emit(Op::StrToStr, p_call->arguments[i]->offset, text, value);
+				list.push_back(settled(text, later, position));
+			}
+			emit(Op::Trace, position, arguments(std::move(list)));
+			return 0;
+		}
+		auto function = functions_.find(symbol);
+		if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
+			refuse(callee->offset, "calling '" + std::string(symbol->name) + "'");
+			return default_value(p_want, position);
+		}
+		FunctionDecl *decl = static_cast<FunctionDecl *>(symbol->node);
+		std::vector<uint32_t> list;
+		bool direct = true;
+		if (symbol->kind == SymbolKind::Method && !symbol->is_static()) {
+			direct = (symbol->modifiers & Modifiers::Private) != 0;
+			if (callee->kind == NodeKind::Member) {
+				Expr *object = static_cast<Member *>(callee)->object;
+				direct = direct || object->kind == NodeKind::SuperExpr;
+				list.push_back(receiver(object));
+			} else {
+				if (function_->is_static) {
+					refuse(callee->offset, "this call");
+				}
+				list.push_back(0);
+			}
+		}
+		call_arguments(decl, p_call->arguments, position, list);
+		Kind kind = Kind::Void;
+		uint32_t out = call_result(symbol, position, &kind);
+		if (direct) {
+			emit(Op::Call, position, out, function->second, arguments(std::move(list)));
+		} else {
+			emit(Op::CallVirtual, position, out, slots_[symbol], arguments(std::move(list)));
+		}
+		return out == NONE ? 0 : out;
+	}
+
+	void constructor_arguments(Symbol *p_class, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
+		if (is_error(p_class) && p_class->unit->is_builtin) {
+			// Error(message = ""): the one parameter the interpreter keeps.
+			if (p_arguments.count > 1) {
+				refuse(p_position, "an Error with an id");
+			}
+			if (p_arguments.count >= 1) {
+				r_list.push_back(expression(p_arguments[0], Kind::Str));
+			} else {
+				uint32_t empty = reg(Kind::Str);
+				emit(Op::ConstStr, p_position, empty, string(""));
+				r_list.push_back(empty);
+			}
+			return;
+		}
+		Symbol *constructor = p_class->klass ? p_class->klass->constructor : nullptr;
+		FunctionDecl *decl = constructor && constructor->node && constructor->node->kind == NodeKind::FunctionDecl
+				? static_cast<FunctionDecl *>(constructor->node)
+				: nullptr;
+		call_arguments(decl, p_arguments, p_position, r_list);
+	}
+
+	uint32_t evaluate(Expr *p_expression, Kind p_want) {
+		uint32_t position = p_expression->offset;
+		switch (p_expression->kind) {
+			case NodeKind::NumberLit: {
+				double value = literal_value(static_cast<NumberLit *>(p_expression));
+				Kind kind = natural(p_expression);
+				// A literal is written straight into the kind that is wanted, when it fits exactly.
+				if ((p_want == Kind::F64 || p_want == Kind::I32 || p_want == Kind::U32) && kind != p_want) {
+					bool fits = p_want == Kind::F64 || (value == std::floor(value) && (p_want == Kind::I32 ? value >= -2147483648.0 && value <= 2147483647.0 : value >= 0 && value <= 4294967295.0));
+					kind = fits ? p_want : kind;
+				}
+				uint32_t out = reg(kind);
+				if (kind == Kind::I32) {
+					emit(Op::ConstI32, position, out, (uint32_t)(int32_t)value);
+				} else if (kind == Kind::U32) {
+					emit(Op::ConstU32, position, out, (uint32_t)value);
+				} else {
+					emit(Op::ConstF64, position, out, number(value));
+				}
+				return out;
+			}
+			case NodeKind::StringLit: {
+				uint32_t out = reg(Kind::Str);
+				emit(Op::ConstStr, position, out, string(unescape(static_cast<StringLit *>(p_expression)->text)));
+				return out;
+			}
+			case NodeKind::BoolLit: {
+				uint32_t out = reg(Kind::Bool);
+				emit(Op::ConstBool, position, out, static_cast<BoolLit *>(p_expression)->value ? 1 : 0);
+				return out;
+			}
+			case NodeKind::ThisExpr:
+				if (function_->is_static) {
+					refuse(position, "'this' here");
+					return default_value(Kind::Obj, position);
+				}
+				return 0;
+			case NodeKind::Name: {
+				Name *name = static_cast<Name *>(p_expression);
+				natural(p_expression);
+				return load(place_of(name), position);
+			}
+			case NodeKind::Member: {
+				Member *member = static_cast<Member *>(p_expression);
+				Symbol *symbol = member->symbol ? member->symbol : member->member;
+				// The one member of a built-in value so far: a string's length.
+				if (symbol && symbol->owner == string_ && symbol->name == "length") {
+					uint32_t text = expression(member->object, Kind::Str);
+					emit(Op::NullCheck, member->object->offset, text);
+					uint32_t out = reg(Kind::I32);
+					emit(Op::StrLength, position, out, text);
+					return out;
+				}
+				natural(p_expression);
+				return load(place_of(member), member->name_offset);
+			}
+			case NodeKind::Call:
+				return call(static_cast<Call *>(p_expression), p_want);
+			case NodeKind::New: {
+				New *made = static_cast<New *>(p_expression);
+				Symbol *symbol = named_class(made->callee);
+				uint32_t index = 0;
+				if (!symbol || !class_index(symbol, &index)) {
+					refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
+					return default_value(Kind::Obj, position);
+				}
+				uint32_t out = reg(Kind::Obj);
+				emit(Op::New, position, out, index);
+				std::vector<uint32_t> list = { out };
+				constructor_arguments(symbol, made->arguments, position, list);
+				emit(Op::Call, position, NONE, module_.classes[index].constructor, arguments(std::move(list)));
+				return out;
+			}
+			case NodeKind::Unary:
+				return unary(static_cast<Unary *>(p_expression), p_want);
+			case NodeKind::Postfix: {
+				Postfix *postfix = static_cast<Postfix *>(p_expression);
+				Place place = place_of(postfix->operand);
+				// The value is the old one, as a number.
+				uint32_t old = convert(load(place, position), Kind::F64, position);
+				if (old == place.index && place.where == Place::Register) {
+					uint32_t copy = reg(Kind::F64);
+					emit(Op::Move, position, copy, old);
+					old = copy;
+				}
+				uint32_t one = reg(Kind::F64);
+				emit(Op::ConstF64, position, one, number(1));
+				uint32_t next = reg(Kind::F64);
+				emit(postfix->op == TokenKind::PlusPlus ? Op::AddF64 : Op::SubF64, position, next, old, one);
+				store(place, convert(next, place.kind, position), position);
+				return old;
+			}
+			case NodeKind::Binary:
+				return binary(static_cast<Binary *>(p_expression), p_want);
+			case NodeKind::Assign:
+				return assign(static_cast<Assign *>(p_expression));
+			case NodeKind::Conditional: {
+				Conditional *conditional = static_cast<Conditional *>(p_expression);
+				Kind kind = p_want != Kind::Void ? p_want : natural(p_expression);
+				uint32_t out = reg(kind);
+				uint32_t test = expression(conditional->condition, Kind::Bool);
+				uint32_t to_else = emit(Op::JumpIfNot, position, test, 0);
+				uint32_t then_value = expression(conditional->then_value, kind);
+				emit(Op::Move, position, out, then_value);
+				uint32_t to_end = emit(Op::Jump, position, 0);
+				patch(to_else, here());
+				uint32_t else_value = expression(conditional->else_value, kind);
+				emit(Op::Move, position, out, else_value);
+				patch(to_end, here());
+				return out;
+			}
+			case NodeKind::SuperExpr:
+				refuse(position, "'super' used as a value");
+				break;
+			case NodeKind::RegexLit:
+				refuse(position, "a regular expression");
+				break;
+			case NodeKind::ArrayLit:
+				refuse(position, "an Array");
+				break;
+			case NodeKind::ObjectLit:
+				refuse(position, "an Object literal");
+				break;
+			case NodeKind::VectorLit:
+				refuse(position, "a Vector");
+				break;
+			case NodeKind::FunctionExpr:
+				refuse(position, "a function used as a value");
+				break;
+			case NodeKind::Index:
+				refuse(position, "indexing with '[]'");
+				break;
+			case NodeKind::TypeApply:
+				refuse(position, "a Vector");
+				break;
+			default:
+				refuse(position, "this expression");
+				break;
+		}
+		return default_value(p_want, position);
+	}
+
+	uint32_t unary(Unary *p_unary, Kind p_want) {
+		uint32_t position = p_unary->offset;
+		(void)p_want;
+		switch (p_unary->op) {
+			case TokenKind::Minus: {
+				uint32_t out = reg(Kind::F64);
+				emit(Op::NegF64, position, out, expression(p_unary->operand, Kind::F64));
+				return out;
+			}
+			case TokenKind::Plus:
+				return expression(p_unary->operand, Kind::F64);
+			case TokenKind::Bang: {
+				uint32_t out = reg(Kind::Bool);
+				emit(Op::Not, position, out, expression(p_unary->operand, Kind::Bool));
+				return out;
+			}
+			case TokenKind::Tilde: {
+				uint32_t out = reg(Kind::I32);
+				emit(Op::BitNot, position, out, expression(p_unary->operand, Kind::I32));
+				return out;
+			}
+			case TokenKind::PlusPlus:
+			case TokenKind::MinusMinus: {
+				Place place = place_of(p_unary->operand);
+				uint32_t old = convert(load(place, position), Kind::F64, position);
+				uint32_t one = reg(Kind::F64);
+				emit(Op::ConstF64, position, one, number(1));
+				uint32_t next = reg(Kind::F64);
+				emit(p_unary->op == TokenKind::PlusPlus ? Op::AddF64 : Op::SubF64, position, next, old, one);
+				uint32_t stored = convert(next, place.kind, position);
+				store(place, stored, position);
+				return stored;
+			}
+			default:
+				refuse(position, "this operator");
+				return default_value(Kind::F64, position);
+		}
+	}
+
+	static bool is_numeric(Kind p_kind) {
+		return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::F64;
+	}
+
+	// An arithmetic, bitwise or string operation on two values already evaluated.
+	uint32_t operate(TokenKind p_op, uint32_t p_left, uint32_t p_right, bool p_string, uint32_t p_position) {
+		if (p_string) {
+			uint32_t left = reg(Kind::Str), right = reg(Kind::Str), out = reg(Kind::Str);
+			emit(Op::StrToStr, p_position, left, convert(p_left, Kind::Str, p_position));
+			emit(Op::StrToStr, p_position, right, convert(p_right, Kind::Str, p_position));
+			emit(Op::Concat, p_position, out, left, right);
+			return out;
+		}
+		Op op = Op::AddF64;
+		Kind operands = Kind::F64;
+		Kind result = Kind::F64;
+		switch (p_op) {
+			case TokenKind::Plus:
+			case TokenKind::PlusAssign:
+				op = Op::AddF64;
+				break;
+			case TokenKind::Minus:
+			case TokenKind::MinusAssign:
+				op = Op::SubF64;
+				break;
+			case TokenKind::Star:
+			case TokenKind::StarAssign:
+				op = Op::MulF64;
+				break;
+			case TokenKind::Slash:
+			case TokenKind::SlashAssign:
+				op = Op::DivF64;
+				break;
+			case TokenKind::Percent:
+			case TokenKind::PercentAssign:
+				op = Op::ModF64;
+				break;
+			case TokenKind::Amp:
+			case TokenKind::AmpAssign:
+				op = Op::BitAnd;
+				operands = result = Kind::I32;
+				break;
+			case TokenKind::Pipe:
+			case TokenKind::PipeAssign:
+				op = Op::BitOr;
+				operands = result = Kind::I32;
+				break;
+			case TokenKind::Caret:
+			case TokenKind::CaretAssign:
+				op = Op::BitXor;
+				operands = result = Kind::I32;
+				break;
+			case TokenKind::ShiftLeft:
+			case TokenKind::ShiftLeftAssign:
+				op = Op::Shl;
+				operands = result = Kind::I32;
+				break;
+			case TokenKind::ShiftRight:
+			case TokenKind::ShiftRightAssign:
+				op = Op::Shr;
+				operands = result = Kind::I32;
+				break;
+			case TokenKind::ShiftRightUnsigned:
+			case TokenKind::ShiftRightUnsignedAssign:
+				op = Op::UShr;
+				operands = Kind::I32;
+				result = Kind::U32;
+				break;
+			default:
+				refuse(p_position, "this operator");
+				break;
+		}
+		uint32_t out = reg(result);
+		uint32_t left = convert(p_left, op == Op::UShr ? Kind::U32 : operands, p_position);
+		emit(op, p_position, out, left, convert(p_right, operands, p_position));
+		return out;
+	}
+
+	bool is_string_type(const Type *p_type) const {
+		return p_type && p_type->kind == Type::Instance && p_type->symbol == string_;
+	}
+
+	uint32_t binary(Binary *p_binary, Kind p_want) {
+		uint32_t position = p_binary->offset;
+		Expr *left = p_binary->left;
+		Expr *right = p_binary->right;
+		switch (p_binary->op) {
+			case TokenKind::AmpAmp:
+			case TokenKind::PipePipe: {
+				// As a condition it is a Boolean; otherwise it is one of its operands, which must then be
+				// of one kind.
+				Kind kind = Kind::Bool;
+				if (p_want != Kind::Bool) {
+					Kind a = is_null(left) ? Kind::Void : natural(left);
+					Kind b = is_null(right) ? Kind::Void : natural(right);
+					kind = a == Kind::Void ? b : a;
+					if (kind == Kind::Void || (a != Kind::Void && b != Kind::Void && a != b)) {
+						refuse(position, "'&&' or '||' between values of different types");
+						kind = Kind::Bool;
+					}
+				}
+				uint32_t out = reg(kind);
+				emit(Op::Move, position, out, expression(left, kind));
+				uint32_t test = convert(out, Kind::Bool, position);
+				uint32_t skip = emit(p_binary->op == TokenKind::AmpAmp ? Op::JumpIfNot : Op::JumpIf, position, test, 0);
+				emit(Op::Move, position, out, expression(right, kind));
+				patch(skip, here());
+				return out;
+			}
+			case TokenKind::Comma:
+				expression(left, Kind::Void);
+				return expression(right, p_want);
+			case TokenKind::KwIs:
+			case TokenKind::KwAs: {
+				Symbol *symbol = named_class(right);
+				uint32_t index = 0;
+				if (!symbol || !class_index(symbol, &index)) {
+					refuse(right->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " with this type");
+					return default_value(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj, position);
+				}
+				uint32_t object = expression(left, Kind::Void);
+				if (kind_at(object) != Kind::Obj) {
+					refuse(left->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " on a value that is not an object");
+					return default_value(Kind::Bool, position);
+				}
+				uint32_t out = reg(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj);
+				emit(p_binary->op == TokenKind::KwIs ? Op::IsClass : Op::AsClass, position, out, object, index);
+				return out;
+			}
+			case TokenKind::Less:
+			case TokenKind::Greater:
+			case TokenKind::LessEqual:
+			case TokenKind::GreaterEqual: {
+				bool strings = is_string_type(left->type) && is_string_type(right->type);
+				Kind kind = strings ? Kind::Str : Kind::F64;
+				uint32_t a = settled(expression(left, kind), right, position);
+				uint32_t b = expression(right, kind);
+				bool swap = p_binary->op == TokenKind::Greater || p_binary->op == TokenKind::GreaterEqual;
+				bool or_equal = p_binary->op == TokenKind::LessEqual || p_binary->op == TokenKind::GreaterEqual;
+				uint32_t out = reg(Kind::Bool);
+				emit(strings ? (or_equal ? Op::LeStr : Op::LtStr) : (or_equal ? Op::LeF64 : Op::LtF64), position, out, swap ? b : a,
+						swap ? a : b);
+				return out;
+			}
+			case TokenKind::Equal:
+			case TokenKind::NotEqual:
+			case TokenKind::StrictEqual:
+			case TokenKind::StrictNotEqual: {
+				Kind a = is_null(left) ? Kind::Void : natural(left);
+				Kind b = is_null(right) ? Kind::Void : natural(right);
+				bool strict = p_binary->op == TokenKind::StrictEqual || p_binary->op == TokenKind::StrictNotEqual;
+				Kind kind = Kind::F64;
+				Op op = Op::EqF64;
+				if (a == Kind::Void && b == Kind::Void) {
+					kind = Kind::Obj;
+					op = Op::EqRef;
+				} else if (a == Kind::Void || b == Kind::Void) {
+					// Against null: a reference is compared; a number or a Boolean is never null.
+					kind = a == Kind::Void ? b : a;
+					if (!is_reference(kind)) {
+						refuse(position, "comparing a number or a Boolean with null");
+					}
+					op = kind == Kind::Str ? Op::EqStr : Op::EqRef;
+				} else if (a == Kind::Str && b == Kind::Str) {
+					kind = Kind::Str;
+					op = Op::EqStr;
+				} else if (a == Kind::Obj && b == Kind::Obj) {
+					kind = Kind::Obj;
+					op = Op::EqRef;
+				} else if (a == Kind::Bool && b == Kind::Bool) {
+					kind = Kind::Bool;
+					op = Op::EqBool;
+				} else if ((is_numeric(a) && is_numeric(b)) || (!strict && (is_numeric(a) || a == Kind::Bool) && (is_numeric(b) || b == Kind::Bool))) {
+					kind = Kind::F64;
+				} else {
+					refuse(position, "comparing values of these two types");
+				}
+				uint32_t x = settled(expression(left, kind), right, position);
+				uint32_t y = expression(right, kind);
+				uint32_t out = reg(Kind::Bool);
+				emit(op, position, out, x, y);
+				if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
+					uint32_t negated = reg(Kind::Bool);
+					emit(Op::Not, position, negated, out);
+					return negated;
+				}
+				return out;
+			}
+			case TokenKind::KwIn:
+			case TokenKind::KwInstanceof:
+				refuse(position, p_binary->op == TokenKind::KwIn ? "'in'" : "'instanceof'");
+				return default_value(Kind::Bool, position);
+			default: {
+				bool strings = p_binary->op == TokenKind::Plus && is_string_type(p_binary->type);
+				uint32_t a = settled(expression(left, Kind::Void), right, position);
+				uint32_t b = expression(right, Kind::Void);
+				return operate(p_binary->op, a, b, strings, position);
+			}
+		}
+	}
+
+	uint32_t assign(Assign *p_assign) {
+		uint32_t position = p_assign->offset;
+		Place place = place_of(p_assign->target);
+		uint32_t value = 0;
+		if (p_assign->op == TokenKind::Assign) {
+			value = expression(p_assign->value, place.kind);
+		} else if (p_assign->op == TokenKind::AmpAmpAssign || p_assign->op == TokenKind::PipePipeAssign) {
+			refuse(position, "'&&=' or '||='");
+			value = default_value(place.kind, position);
+		} else {
+			uint32_t old = settled(load(place, position), p_assign->value, position);
+			bool strings = p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Str || is_string_type(p_assign->value->type));
+			uint32_t right = expression(p_assign->value, Kind::Void);
+			value = convert(operate(p_assign->op, old, right, strings, position), place.kind, position);
+		}
+		store(place, value, position);
+		return value;
+	}
+
+	// ---- statements ----
+
+	void declare_locals(Node *p_body) {
+		walk(p_body, [&](Node *p_node) {
+			if (p_node->kind != NodeKind::VarDecl) {
+				return;
+			}
+			for (Declarator &declarator : static_cast<VarDecl *>(p_node)->declarators) {
+				if (!declarator.symbol || locals_.count(declarator.symbol)) {
+					continue;
+				}
+				Kind kind = written_kind(declarator.type, declarator.offset, Kind::F64);
+				uint32_t local = reg(kind);
+				locals_[declarator.symbol] = local;
+				function_->locals.push_back({ std::string(declarator.name), local });
+				// A Number starts as NaN. The rest start as zero, which is what a fresh register holds.
+				if (kind == Kind::F64) {
+					emit(Op::ConstF64, declarator.offset, local, number(std::numeric_limits<double>::quiet_NaN()));
+				}
+			}
+		});
+	}
+
+	void statement(Stmt *p_statement) {
+		if (!p_statement) {
+			return;
+		}
+		uint32_t position = p_statement->offset;
+		if (p_statement->kind != NodeKind::Block && p_statement->kind != NodeKind::Empty) {
+			emit(Op::Stmt, position);
+		}
+		switch (p_statement->kind) {
+			case NodeKind::Block:
+				for (Stmt *inner : static_cast<Block *>(p_statement)->statements) {
+					statement(inner);
+				}
+				break;
+			case NodeKind::Empty:
+			case NodeKind::ImportStmt:
+				break;
+			case NodeKind::ExprStmt:
+				expression(static_cast<ExprStmt *>(p_statement)->expr, Kind::Void);
+				break;
+			case NodeKind::VarStmt:
+				variables(static_cast<VarStmt *>(p_statement)->decl);
+				break;
+			case NodeKind::If: {
+				If *branch = static_cast<If *>(p_statement);
+				uint32_t test = expression(branch->condition, Kind::Bool);
+				uint32_t to_else = emit(Op::JumpIfNot, position, test, 0);
+				statement(branch->then_branch);
+				if (branch->else_branch) {
+					uint32_t to_end = emit(Op::Jump, position, 0);
+					patch(to_else, here());
+					statement(branch->else_branch);
+					patch(to_end, here());
+				} else {
+					patch(to_else, here());
+				}
+				break;
+			}
+			case NodeKind::While: {
+				While *loop = static_cast<While *>(p_statement);
+				uint32_t top = here();
+				uint32_t test = expression(loop->condition, Kind::Bool);
+				uint32_t out = emit(Op::JumpIfNot, position, test, 0);
+				loops_.emplace_back();
+				statement(loop->body);
+				emit(Op::Jump, position, top);
+				patch(out, here());
+				finish_loop(top);
+				break;
+			}
+			case NodeKind::DoWhile: {
+				DoWhile *loop = static_cast<DoWhile *>(p_statement);
+				uint32_t top = here();
+				loops_.emplace_back();
+				statement(loop->body);
+				uint32_t test_at = here();
+				uint32_t test = expression(loop->condition, Kind::Bool);
+				emit(Op::JumpIf, position, test, top);
+				finish_loop(test_at);
+				break;
+			}
+			case NodeKind::For: {
+				For *loop = static_cast<For *>(p_statement);
+				statement(loop->init);
+				uint32_t top = here();
+				uint32_t out = NONE;
+				if (loop->condition) {
+					uint32_t test = expression(loop->condition, Kind::Bool);
+					out = emit(Op::JumpIfNot, position, test, 0);
+				}
+				loops_.emplace_back();
+				statement(loop->body);
+				uint32_t update_at = here();
+				if (loop->update) {
+					expression(loop->update, Kind::Void);
+				}
+				emit(Op::Jump, position, top);
+				if (out != NONE) {
+					patch(out, here());
+				}
+				finish_loop(update_at);
+				break;
+			}
+			case NodeKind::Break:
+			case NodeKind::Continue: {
+				bool is_break = p_statement->kind == NodeKind::Break;
+				std::string_view label = is_break ? static_cast<Break *>(p_statement)->label : static_cast<Continue *>(p_statement)->label;
+				if (!label.empty()) {
+					refuse(position, "a labelled 'break' or 'continue'");
+				} else if (!loops_.empty()) {
+					uint32_t jump = emit(Op::Jump, position, 0);
+					(is_break ? loops_.back().breaks : loops_.back().continues).push_back(jump);
+				}
+				break;
+			}
+			case NodeKind::Return: {
+				Return *result = static_cast<Return *>(p_statement);
+				if (constructor_ || function_->result == Kind::Void) {
+					if (result->value) {
+						expression(result->value, Kind::Void);
+					}
+					emit(Op::ReturnVoid, position);
+				} else {
+					uint32_t value = result->value ? expression(result->value, function_->result) : default_value(function_->result, position);
+					emit(Op::Return, position, value);
+				}
+				break;
+			}
+			case NodeKind::Throw: {
+				uint32_t value = expression(static_cast<Throw *>(p_statement)->value, Kind::Void);
+				if (kind_at(value) != Kind::Obj) {
+					refuse(position, "throwing a value that is not an object");
+				} else {
+					emit(Op::Throw, position, value);
+				}
+				break;
+			}
+			case NodeKind::Switch:
+				refuse(position, "'switch'");
+				break;
+			case NodeKind::Try:
+				refuse(position, "'try'");
+				break;
+			case NodeKind::ForIn:
+				refuse(position, static_cast<ForIn *>(p_statement)->each ? "'for each'" : "'for in'");
+				break;
+			case NodeKind::Labeled:
+				refuse(position, "a label");
+				break;
+			case NodeKind::FunctionStmt:
+				refuse(position, "a function inside a function");
+				break;
+			default:
+				refuse(position, "this statement");
+				break;
+		}
+	}
+
+	void finish_loop(uint32_t p_continue_at) {
+		for (uint32_t jump : loops_.back().breaks) {
+			patch(jump, here());
+		}
+		for (uint32_t jump : loops_.back().continues) {
+			patch(jump, p_continue_at);
+		}
+		loops_.pop_back();
+	}
+
+	void variables(VarDecl *p_decl) {
+		for (Declarator &declarator : p_decl->declarators) {
+			auto local = locals_.find(declarator.symbol);
+			if (local == locals_.end() || !declarator.initializer) {
+				continue; // Without an initializer a `var` keeps what the variable holds: it is declared once.
+			}
+			uint32_t value = expression(declarator.initializer, kind_at(local->second));
+			if (value != local->second) {
+				emit(Op::Move, declarator.offset, local->second, value);
+			}
+		}
+	}
+
+	// ---- functions ----
+
+	void begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {
+		function_ = &module_.functions[p_function];
+		unit_ = &p_unit;
+		class_ = p_class;
+		constructor_ = false;
+		locals_.clear();
+		loops_.clear();
+	}
+
+	// Parameters take the first registers; an instance method's first is `this`.
+	void parameters(FunctionDecl *p_function) {
+		if (!function_->is_static) {
+			function_->registers.push_back(Kind::Obj);
+			function_->locals.push_back({ "this", 0 });
+		}
+		if (p_function) {
+			for (Parameter &parameter : p_function->parameters) {
+				if (parameter.is_rest) {
+					refuse(parameter.offset, "a rest parameter");
+				}
+				Kind kind = written_kind(parameter.type, parameter.offset, Kind::F64);
+				uint32_t local = reg(kind);
+				if (parameter.symbol) {
+					locals_[parameter.symbol] = local;
+				}
+				function_->locals.push_back({ std::string(parameter.name), local });
+			}
+		}
+		function_->parameters = (uint32_t)function_->registers.size();
+	}
+
+	void end(uint32_t p_position) {
+		if (function_->result == Kind::Void) {
+			emit(Op::ReturnVoid, p_position);
+		} else {
+			// Falling off the end gives the type's default value.
+			emit(Op::Return, p_position, default_value(function_->result, p_position));
+		}
+	}
+
+	void lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl) {
+		auto found = functions_.find(p_decl->symbol);
+		if (found == functions_.end()) {
+			return;
+		}
+		begin(found->second, p_unit, p_class);
+		parameters(p_decl);
+		if (p_decl->return_type) {
+			function_->result = written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void);
+		} else {
+			unit_ = &p_unit;
+			refuse(p_decl->name_offset, "a function without a return type");
+		}
+		if (p_decl->body) {
+			declare_locals(p_decl->body);
+			statement(p_decl->body);
+		}
+		end(p_decl->end ? p_decl->end - 1 : p_decl->offset);
+	}
+
+	static bool calls_super(Block *p_body) {
+		bool found = false;
+		walk(p_body, [&](Node *p_node) {
+			found = found || (p_node->kind == NodeKind::Call && static_cast<Call *>(p_node)->callee->kind == NodeKind::SuperExpr);
+		});
+		return found;
+	}
+
+	void lower_constructor(Unit &p_unit, ClassDecl *p_class) {
+		Symbol *symbol = p_class->symbol;
+		uint32_t index = classes_[symbol];
+		Symbol *constructor = symbol->klass->constructor;
+		FunctionDecl *decl = constructor && constructor->node && constructor->node->kind == NodeKind::FunctionDecl
+				? static_cast<FunctionDecl *>(constructor->node)
+				: nullptr;
+		begin(module_.classes[index].constructor, p_unit, symbol);
+		constructor_ = true;
+		parameters(decl);
+		if (decl && decl->body) {
+			declare_locals(decl->body);
+		}
+		// The class's own fields get their values first, before any constructor body runs.
+		for (Node *member : p_class->members) {
+			if (member->kind != NodeKind::VarDecl || (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
+				continue;
+			}
+			for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
+				auto field = fields_.find(declarator.symbol);
+				if (field != fields_.end() && declarator.initializer) {
+					Kind kind = module_.classes[index].fields[field->second].kind;
+					emit(Op::SetField, declarator.offset, 0, field->second, expression(declarator.initializer, kind));
+				}
+			}
+		}
+		// Then the base class's constructor, unless the body calls it itself.
+		Symbol *base = symbol->klass->base;
+		uint32_t base_index = 0;
+		if (base && base != object_ && class_index(base, &base_index) && !(decl && decl->body && calls_super(decl->body))) {
+			std::vector<uint32_t> list = { 0 };
+			List<Expr *> none;
+			constructor_arguments(base, none, p_class->name_offset, list);
+			emit(Op::Call, p_class->name_offset, NONE, module_.classes[base_index].constructor, arguments(std::move(list)));
+		}
+		if (decl && decl->body) {
+			statement(decl->body);
+		}
+		emit(Op::ReturnVoid, decl && decl->end ? decl->end - 1 : p_class->name_offset);
+	}
+
+	// A function that gives the class's static fields their values.
+	void lower_statics(Unit &p_unit, ClassDecl *p_class) {
+		bool any = false;
+		for (Node *member : p_class->members) {
+			if (member->kind == NodeKind::VarDecl && (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
+				for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
+					any = any || (declarator.initializer && globals_.count(declarator.symbol));
+				}
+			}
+		}
+		if (!any) {
+			return;
+		}
+		Function function;
+		function.name = module_.classes[classes_[p_class->symbol]].name + "$static";
+		function.file = file(&p_unit);
+		function.position = p_class->name_offset;
+		function.owner = classes_[p_class->symbol];
+		function.is_static = true;
+		module_.functions.push_back(std::move(function));
+		uint32_t index = (uint32_t)module_.functions.size() - 1;
+		module_.initializers.push_back(index);
+		begin(index, p_unit, p_class->symbol);
+		for (Node *member : p_class->members) {
+			if (member->kind != NodeKind::VarDecl || !(static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
+				continue;
+			}
+			for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
+				auto global = globals_.find(declarator.symbol);
+				if (global != globals_.end() && declarator.initializer) {
+					emit(Op::Stmt, declarator.offset);
+					emit(Op::SetGlobal, declarator.offset, global->second,
+							expression(declarator.initializer, module_.globals[global->second].kind));
+				}
+			}
+		}
+		emit(Op::ReturnVoid, p_class->name_offset);
+	}
+
+	void lower_unit(Unit &p_unit) {
+		auto lower = [&](const List<Node *> &p_definitions) {
+			for (Node *definition : p_definitions) {
+				if (definition->kind == NodeKind::ClassDecl) {
+					ClassDecl *decl = static_cast<ClassDecl *>(definition);
+					if (!decl->symbol || !classes_.count(decl->symbol)) {
+						continue;
+					}
+					lower_statics(p_unit, decl);
+					lower_constructor(p_unit, decl);
+					for (Node *member : decl->members) {
+						if (member->kind == NodeKind::FunctionDecl) {
+							FunctionDecl *function = static_cast<FunctionDecl *>(member);
+							if (function->symbol && function->symbol != decl->symbol->klass->constructor &&
+									function->accessor == FunctionDecl::None) {
+								lower_function(p_unit, decl->symbol, function);
+							}
+						}
+					}
+				} else if (definition->kind == NodeKind::FunctionDecl) {
+					lower_function(p_unit, nullptr, static_cast<FunctionDecl *>(definition));
+				} else if (definition->kind == NodeKind::VarDecl) {
+					lower_package_variables(p_unit, static_cast<VarDecl *>(definition));
+				}
+			}
+		};
+		if (p_unit.tree->package) {
+			lower(p_unit.tree->package->definitions);
+		}
+		lower(p_unit.tree->definitions);
+	}
+
+	void lower_package_variables(Unit &p_unit, VarDecl *p_decl) {
+		for (Declarator &declarator : p_decl->declarators) {
+			auto global = globals_.find(declarator.symbol);
+			if (global == globals_.end() || !declarator.initializer) {
+				continue;
+			}
+			Function function;
+			function.name = std::string(declarator.name) + "$init";
+			function.file = file(&p_unit);
+			function.position = declarator.offset;
+			function.is_static = true;
+			module_.functions.push_back(std::move(function));
+			uint32_t index = (uint32_t)module_.functions.size() - 1;
+			module_.initializers.push_back(index);
+			begin(index, p_unit, nullptr);
+			emit(Op::SetGlobal, declarator.offset, global->second,
+					expression(declarator.initializer, module_.globals[global->second].kind));
+			emit(Op::ReturnVoid, declarator.offset);
+		}
+	}
+
+	// Classes in an order where each comes after its base.
+	void collect(Unit &p_unit, std::vector<std::pair<Unit *, ClassDecl *>> &r_classes) {
+		auto each = [&](const List<Node *> &p_definitions) {
+			for (Node *definition : p_definitions) {
+				if (definition->kind == NodeKind::ClassDecl && static_cast<ClassDecl *>(definition)->symbol) {
+					r_classes.push_back({ &p_unit, static_cast<ClassDecl *>(definition) });
+				}
+			}
+		};
+		if (p_unit.tree->package) {
+			each(p_unit.tree->package->definitions);
+		}
+		each(p_unit.tree->definitions);
+	}
+
+public:
+	Lowerer(Compilation &p_compilation, Module &p_module) :
+			compilation_(p_compilation), module_(p_module) {
+		int_ = compilation_.builtin("int");
+		uint_ = compilation_.builtin("uint");
+		number_ = compilation_.builtin("Number");
+		boolean_ = compilation_.builtin("Boolean");
+		string_ = compilation_.builtin("String");
+		object_ = compilation_.builtin("Object");
+		error_ = compilation_.builtin("Error");
+	}
+
+	bool run() {
+		std::vector<Unit *> units;
+		for (Unit &unit : compilation_.units()) {
+			if (!unit.is_declaration && unit.tree) {
+				units.push_back(&unit);
+			}
+		}
+		if (units.empty()) {
+			return false;
+		}
+		// The interpreter raises these itself, whether or not the program names them.
+		class_index(error_, &module_.error_class);
+		if (Symbol *type_error = compilation_.builtin("TypeError")) {
+			class_index(type_error, &module_.type_error_class);
+		}
+		// Classes first, each after its base, so that field slots and method tables can be inherited.
+		std::vector<std::pair<Unit *, ClassDecl *>> classes;
+		for (Unit *unit : units) {
+			collect(*unit, classes);
+		}
+		std::unordered_map<const Symbol *, bool> declared;
+		for (size_t done = 0; done < classes.size();) {
+			size_t before = done;
+			for (auto &entry : classes) {
+				Symbol *symbol = entry.second->symbol;
+				Symbol *base = symbol->klass ? symbol->klass->base : nullptr;
+				bool base_is_ours = false;
+				for (auto &other : classes) {
+					base_is_ours = base_is_ours || other.second->symbol == base;
+				}
+				if (!declared[symbol] && (!base_is_ours || declared[base])) {
+					declare_class(*entry.first, entry.second);
+					declared[symbol] = true;
+					done++;
+				}
+			}
+			if (done == before) {
+				break; // A cycle: the checker has reported it.
+			}
+		}
+		// Then everything else at package level.
+		for (Unit *unit : units) {
+			unit_ = unit;
+			auto others = [&](const List<Node *> &p_definitions) {
+				List<Node *> rest;
+				std::vector<Node *> kept;
+				for (Node *definition : p_definitions) {
+					if (definition->kind != NodeKind::ClassDecl) {
+						kept.push_back(definition);
+					}
+				}
+				rest.items = kept.data();
+				rest.count = (uint32_t)kept.size();
+				for (Node *definition : rest) {
+					switch (definition->kind) {
+						case NodeKind::InterfaceDecl:
+							refuse(static_cast<InterfaceDecl *>(definition)->name_offset, "an interface");
+							break;
+						case NodeKind::FunctionDecl: {
+							FunctionDecl *decl = static_cast<FunctionDecl *>(definition);
+							if (decl->symbol) {
+								Function function;
+								function.name = decl->symbol->package && !decl->symbol->package->name.empty() && !decl->symbol->file_private
+										? decl->symbol->package->name + "." + std::string(decl->name)
+										: std::string(decl->name);
+								function.file = file(unit);
+								function.position = decl->name_offset;
+								function.is_static = true;
+								functions_[decl->symbol] = (uint32_t)module_.functions.size();
+								module_.functions.push_back(std::move(function));
+							}
+							break;
+						}
+						case NodeKind::VarDecl:
+							for (Declarator &declarator : static_cast<VarDecl *>(definition)->declarators) {
+								if (declarator.symbol) {
+									globals_[declarator.symbol] = (uint32_t)module_.globals.size();
+									module_.globals.push_back(
+											{ std::string(declarator.name), written_kind(declarator.type, declarator.offset, Kind::F64) });
+								}
+							}
+							break;
+						default:
+							break;
+					}
+				}
+			};
+			if (unit->tree->package) {
+				others(unit->tree->package->definitions);
+			}
+			others(unit->tree->definitions);
+		}
+		for (Unit *unit : units) {
+			lower_unit(*unit);
+		}
+		// The program starts with the first class of the first file's package block.
+		unit_ = units[0];
+		if (units[0]->tree->package) {
+			for (Node *definition : units[0]->tree->package->definitions) {
+				if (definition->kind == NodeKind::ClassDecl && module_.entry_class == NONE) {
+					auto found = classes_.find(static_cast<ClassDecl *>(definition)->symbol);
+					if (found != classes_.end()) {
+						module_.entry_class = found->second;
+						Symbol *constructor = static_cast<ClassDecl *>(definition)->symbol->klass->constructor;
+						FunctionDecl *decl = constructor && constructor->node ? static_cast<FunctionDecl *>(constructor->node) : nullptr;
+						for (uint32_t i = 0; decl && i < decl->parameters.count; i++) {
+							if (!decl->parameters[i].default_value) {
+								failed_ = true;
+								unit_->diagnostics.error(decl->name_offset,
+										"the program's first class is created with no arguments, so its constructor can't require any");
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+		if (module_.entry_class == NONE && !failed_) {
+			failed_ = true;
+			units[0]->diagnostics.error(0, "the first file has no class to start the program with");
+		}
+		return !failed_;
+	}
+};
+
+} // namespace
+
+bool lower(Compilation &p_compilation, Module *r_module) {
+	Lowerer lowerer(p_compilation, *r_module);
+	return lowerer.run();
+}
+
+} // namespace ir
+} // namespace kas3

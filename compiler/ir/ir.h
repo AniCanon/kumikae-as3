@@ -45,7 +45,7 @@ inline bool is_reference(Kind p_kind) {
 	X(BitAnd, "RRR") X(BitOr, "RRR") X(BitXor, "RRR") X(Shl, "RRR") X(Shr, "RRR") X(UShr, "RRR") X(BitNot, "RR-") \
 	X(LtF64, "RRR") X(LeF64, "RRR") X(EqF64, "RRR") X(LtStr, "RRR") X(LeStr, "RRR") X(EqStr, "RRR") \
 	X(EqBool, "RRR") X(EqRef, "RRR") X(Not, "RR-") \
-	X(Concat, "RRR") \
+	X(Concat, "RRR") X(StrLength, "RR-") \
 	X(Jump, "L--") X(JumpIf, "RL-") X(JumpIfNot, "RL-") \
 	X(GetField, "RRD") X(SetField, "RDR") X(GetGlobal, "RG-") X(SetGlobal, "GR-") \
 	X(NullCheck, "R--") \
@@ -114,6 +114,7 @@ struct Global {
 
 struct Module {
 	std::vector<std::string> files; // Paths, for stack traces.
+	std::vector<std::vector<uint32_t>> lines; // Per file: the offset each line starts at.
 	std::vector<Class> classes;
 	std::vector<Function> functions;
 	std::vector<Global> globals; // Static fields and package-level variables.
@@ -121,6 +122,8 @@ struct Module {
 	std::vector<double> numbers;
 	std::vector<uint32_t> initializers; // Functions run once, in order, before the entry.
 	uint32_t entry_class = NONE; // Constructed with no arguments to start the program.
+	uint32_t error_class = NONE; // Error, and TypeError: the classes of the errors the interpreter raises.
+	uint32_t type_error_class = NONE;
 };
 
 // The module as text, for tests and for reading.

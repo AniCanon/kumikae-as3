@@ -3,6 +3,8 @@
 #include "builtins.h"
 #include "ast_printer.h"
 #include "diagnostics.h"
+#include "interpreter.h"
+#include "lower.h"
 #include "names.h"
 #include "parser.h"
 #include "server.h"
@@ -10,6 +12,7 @@
 
 #include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -17,6 +20,8 @@
 static const char *const USAGE =
 		"usage: kas3c parse [--dump-ast] <file>...\n"
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
+		"       kas3c run <file>...\n"
+		"       kas3c ir <file>...\n"
 		"       kas3c lsp [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
@@ -31,6 +36,12 @@ static const char *const USAGE =
 		"       --dump-types           also print the type of every statement and initializer\n"
 		"       --declarations <file>  a file that declares what exists elsewhere\n"
 		"       --no-godot             don't load Godot's API (the `godot` package)\n"
+		"\n"
+		"run    Check the files as one program and run it: the first file's class is\n"
+		"       constructed, and what it traces goes to standard output. An error that\n"
+		"       nothing catches goes to standard error with its stack trace.\n"
+		"\n"
+		"ir     Check the files as one program and print the typed IR the interpreter runs.\n"
 		"\n"
 		"lsp    Serve an editor over standard input and output with the Language Server\n"
 		"       Protocol: errors as you type, go to definition, find references, hover,\n"
@@ -135,6 +146,68 @@ static int run_check(int p_argc, char **p_argv) {
 	return compilation.has_errors() ? 1 : 0;
 }
 
+// Checks the files and lowers them. Prints the errors and returns false if there are any.
+static bool compile(int p_argc, char **p_argv, kas3::ir::Module *r_module, int *r_status) {
+	kas3::Compilation compilation;
+	int files = 0;
+	for (int i = 2; i < p_argc; i++) {
+		if (p_argv[i][0] == '-' && p_argv[i][1] != 0) {
+			*r_status = usage_error();
+			return false;
+		}
+		std::string text;
+		if (!kas3::read_file(p_argv[i], &text)) {
+			std::fprintf(stderr, "kas3c: cannot read %s\n", p_argv[i]);
+			*r_status = 2;
+			return false;
+		}
+		compilation.add(p_argv[i], std::move(text));
+		files++;
+	}
+	if (files == 0) {
+		*r_status = usage_error();
+		return false;
+	}
+	compilation.check();
+	bool lowered = !compilation.has_errors() && kas3::ir::lower(compilation, r_module);
+	std::fputs(compilation.format_diagnostics().c_str(), stderr);
+	*r_status = 1;
+	return lowered && !compilation.has_errors();
+}
+
+static int run_ir(int p_argc, char **p_argv) {
+	kas3::ir::Module module;
+	int status = 0;
+	if (!compile(p_argc, p_argv, &module, &status)) {
+		return status;
+	}
+	std::fputs(kas3::ir::print(module).c_str(), stdout);
+	return 0;
+}
+
+static int run_run(int p_argc, char **p_argv) {
+	kas3::ir::Module module;
+	int status = 0;
+	if (!compile(p_argc, p_argv, &module, &status)) {
+		return status;
+	}
+	bool ok = false;
+	{
+		kas3::vm::StandaloneHost host;
+		kas3::vm::Interpreter interpreter(module, host);
+		ok = interpreter.run_program();
+	}
+	std::fflush(stdout);
+	// Everything the program made should be gone by now. Objects that refer to each other in a loop are
+	// not collected yet.
+	if (std::getenv("KAS3_REPORT_LEAKS") && (kas3::vm::live_objects() || kas3::vm::live_strings())) {
+		std::fprintf(stderr, "kas3c: %zu objects and %zu strings were never freed\n", kas3::vm::live_objects(),
+				kas3::vm::live_strings());
+		return 3;
+	}
+	return ok ? 0 : 1;
+}
+
 static int run_lsp(int p_argc, char **p_argv) {
 	kas3::Workspace::Options options;
 	for (int i = 2; i < p_argc; i++) {
@@ -168,6 +241,12 @@ int main(int p_argc, char **p_argv) {
 	}
 	if (command == "check") {
 		return run_check(p_argc, p_argv);
+	}
+	if (command == "run") {
+		return run_run(p_argc, p_argv);
+	}
+	if (command == "ir") {
+		return run_ir(p_argc, p_argv);
 	}
 	if (command == "lsp") {
 		return run_lsp(p_argc, p_argv);
