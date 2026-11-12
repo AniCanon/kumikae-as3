@@ -12,13 +12,15 @@ The [roadmap](roadmap.md) says what is being built now. This page says what is o
 - When an item is fixed, its line is removed and the commit says so.
 - An item marked **decision** needs the owner's answer, not code.
 
-## Decisions for the owner
+## Decided by the owner, to build
 
-| Item | Why it matters |
-|---|---|
-| A 64-bit integer type for Godot's integers, or keep `Number` | `Number` is exact only to 2^53, and object ids use higher bits. Due before the bindings are called complete (stage 2b-3). |
-| Static fields: set before the program starts (now), or on a class's first use (Flash) | A static that reads another class's static declared later sees its default. |
-| A null object: reported before the call's arguments are evaluated (now), or after | Flash and JavaScript differ here. |
+Decided on 2026-11-12. Each is owed as code and tests.
+
+| Decision | What to build | When |
+|---|---|---|
+| **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | A real 64-bit integer type, `Int64`, with one rule in the generator: a Godot integer that Godot's description marks as 64-bit is an `Int64`. The hand-kept table of 31 exceptions goes away. An `Int64` converts to `int`, `uint` or `Number` where one is expected, with a check that raises a `RangeError` if the value does not fit, so nothing is ever cut off silently. It needs its own short design first. | Stage 2b-3 |
+| **Static fields get their values on a class's first use,** as in Flash | Replace "before the program starts, in file order" with a first-use check; the compiler removes the check where it can prove the order. | The clean-up pass after stage 2b-1 |
+| **A call on a null object evaluates its arguments first,** then raises the error, as in Flash | Move the null check after the arguments in the lowering. | The clean-up pass after stage 2b-1 |
 
 ## Stage 1d: Godot's API in AS3
 
