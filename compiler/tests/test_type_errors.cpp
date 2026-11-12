@@ -93,7 +93,74 @@ static void test_unknown_is_silent() {
 			{ "unknown type 'Gone'", UNRELATED("Vector.<?>", "Array") });
 }
 
+static const char *const CALLABLES =
+		"public function none():void {} public function one(a:int):void {} public function two(a:int, b:String):void {}\n"
+		"public function opt(a:int, b:String = null, c:Number = 0):void {} public function rest(a:int, ...more):void {}\n"
+		"public function loose(a, b:*):void {} public static function fixed(a:Base):void {}\n"
+		"public function get size():int { return 0; } public function takes(s:Shape, v:Vector.<int> = null):void {}\n";
+
+static void test_argument_counts() {
+	expect(program("none(); one(1); two(1, \"a\"); opt(1); opt(1, \"a\"); opt(1, \"a\", 2); rest(1); rest(1, 2, 3, \"x\");\n"
+				   "loose(1, 2); Main.fixed(sub); fixed(null); this.one(1); sub2.one(2); fn(1, 2, 3); any.one(); obj.one(1, 2);\n"
+				   "helper(1); new Thing(1); new Thing(1, \"a\"); new Plain(); new Plain; new Base(); int(1.5); String(1);\n"
+				   "Sub(base); new Array(1, 2, 3); new Vector.<int>(3, true); new Date(1, 2, 3); new Error(\"x\", 2); trace(1, 2);\n"
+				   "var local:Function = function(a:int):void {}; local(); local(1, 2); nested(1);\n"
+				   "function nested(a:int):void {}",
+				   std::string(CALLABLES) + "public var sub2:Main;",
+				   "function helper(a:int, b:int = 0):void {} class Thing { public function Thing(a:int, b:String = null) {} }\n"
+				   "class Plain {}\n"),
+			{});
+	expect(program("/*!*/none(1); /*!*/one(); /*!*/one(1, 2); /*!*/two(1); /*!*/opt(); /*!*/opt(1, \"a\", 2, 3); /*!*/rest();\n"
+				   "Main./*!*/fixed(); this./*!*/two(); /*!*/helper(); /*!*/helper(1, 2, 3); new /*!*/Thing(); new /*!*/Thing(1, \"a\", 3);\n"
+				   "new /*!*/Plain(1); new /*!*/Thing; /*!*/nested(); /*!*/nested(1, 2); sub2./*!*/one();\n"
+				   "function nested(a:int):void {}",
+				   std::string(CALLABLES) + "public var sub2:Main;",
+				   "function helper(a:int, b:int = 0):void {} class Thing { public function Thing(a:int, b:String = null) {} }\n"
+				   "class Plain {}\n"),
+			{ "'none' takes no arguments but 1 was given", "'one' takes 1 argument but 0 were given",
+					"'one' takes 1 argument but 2 were given", "'two' takes 2 arguments but 1 was given",
+					"'opt' takes at least 1 argument but 0 were given", "'opt' takes at most 3 arguments but 4 were given",
+					"'rest' takes at least 1 argument but 0 were given", "'fixed' takes 1 argument but 0 were given",
+					"'two' takes 2 arguments but 0 were given", "'helper' takes at least 1 argument but 0 were given",
+					"'helper' takes at most 2 arguments but 3 were given", "'Thing' takes at least 1 argument but 0 were given",
+					"'Thing' takes at most 2 arguments but 3 were given", "'Plain' takes no arguments but 1 was given",
+					"'Thing' takes at least 1 argument but 0 were given", "'nested' takes 1 argument but 0 were given",
+					"'nested' takes 1 argument but 2 were given", "'one' takes 1 argument but 0 were given" });
+	// `super(...)` is a call of the base class's constructor.
+	expect("package { public class Main extends Base { public function Main() { /*!*/super(); } } }\n"
+		   "class Base { public function Base(a:int) {} }\n"
+		   "class Fine extends Base { public function Fine() { super(1); } }\n"
+		   "class Wrong extends Base { public function Wrong() { super(/*!*/\"x\"); } }\n"
+		   "class Bare extends Plain { public function Bare() { /*!*/super(1); } } class Plain {}\n",
+			{ "'Base' takes 1 argument but 0 were given", UNRELATED("String", "int"),
+					"'Plain' takes no arguments but 1 was given" });
+}
+
+static void test_argument_types() {
+	expect(program("one(1.5); one(any); two(count, label); two(1, null); opt(1, null, count); rest(1, \"x\", obj);\n"
+				   "loose(\"a\", sub); fixed(sub); fixed(this); takes(sub); takes(round, ints); takes(null, null);\n"
+				   "ints.push(1, 2); ints.push(ratio); subs.push(sub); subs.push(null); subs.indexOf(sub); list.push(1, \"a\");\n"
+				   "label.charAt(1); Math.max(1, 2, 3); new Thing(count); helper(ratio);",
+				   CALLABLES, "function helper(a:int):void {} class Thing { public function Thing(a:int) {} }\n"),
+			{});
+	expect(program("one(/*!*/\"a\"); two(/*!*/label, /*!*/count); opt(1, /*!*/2); rest(/*!*/label, label); fixed(/*!*/other);\n"
+				   "fixed(/*!*/obj); takes(/*!*/base); takes(sub, /*!*/subs); ints.indexOf(/*!*/\"a\"); subs.indexOf(/*!*/base);\n"
+				   "subs.indexOf(sub, /*!*/other); ints.push(\"unchecked\"); label.charAt(/*!*/label); new Thing(/*!*/label); helper(/*!*/flag);\n"
+				   "one(/*!*/nothing());",
+				   CALLABLES, "function helper(a:int):void {} class Thing { public function Thing(a:int) {} }\n"),
+			{ UNRELATED("String", "int"), UNRELATED("String", "int"), UNRELATED("int", "String"),
+					UNRELATED("int", "String"), UNRELATED("String", "int"), UNRELATED("Other", "Base"),
+					NEEDS_CAST("Object", "Base"), UNRELATED("Base", "Shape"),
+					UNRELATED("Vector.<Sub>", "Vector.<int>"), UNRELATED("String", "int"), NEEDS_CAST("Base", "Sub"),
+					UNRELATED("Other", "int"), UNRELATED("String", "Number"), UNRELATED("String", "int"),
+					UNRELATED("Boolean", "int"), UNRELATED("void", "int") });
+	// A vector whose element type is unknown takes anything.
+	expect(program("var v:Vector.</*!*/Gone> = null; v.push(1, \"a\", sub);"), { "unknown type 'Gone'" });
+}
+
 int main() {
+	test_argument_counts();
+	test_argument_types();
 	test_conversions_accepted();
 	test_conversions_rejected();
 	test_stores();

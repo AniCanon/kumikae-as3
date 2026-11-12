@@ -544,6 +544,68 @@ class Typer {
 		}
 	}
 
+	static std::string counted(size_t p_count, const char *p_noun) {
+		return std::to_string(p_count) + " " + p_noun + (p_count == 1 ? "" : "s");
+	}
+
+	// Checks the arguments of a call against the function's parameters: how many, then each one's type.
+	void arguments(FunctionDecl *p_function, std::string_view p_name, const List<Expr *> &p_arguments,
+			uint32_t p_offset, const Type *p_element) {
+		size_t required = 0;
+		size_t most = 0;
+		bool rest = false;
+		for (const Parameter &parameter : p_function->parameters) {
+			if (parameter.is_rest) {
+				rest = true;
+				break;
+			}
+			most++;
+			if (!parameter.default_value) {
+				required = most;
+			}
+		}
+		size_t given = p_arguments.count;
+		if (given < required || (given > most && !rest)) {
+			std::string takes;
+			if (rest || (required < most && given < required)) {
+				takes = "at least " + counted(required, "argument");
+			} else if (required < most) {
+				takes = "at most " + counted(most, "argument");
+			} else {
+				takes = most == 0 ? "no arguments" : counted(most, "argument");
+			}
+			error(p_offset, quoted(p_name) + " takes " + takes + " but " + std::to_string(given) +
+									(given == 1 ? " was" : " were") + " given");
+			return;
+		}
+		for (size_t i = 0; i < given && i < most; i++) {
+			store(p_arguments[i], compilation_.type_of(p_function->parameters[i].type, p_element));
+		}
+	}
+
+	// The arguments of `new C(...)` or `super(...)`.
+	void construct(const Type *p_instance, const List<Expr *> &p_arguments, uint32_t p_offset) {
+		bool vector = p_instance->kind == Type::Vector;
+		Symbol *owner = vector ? compilation_.vector_class() : p_instance->symbol;
+		if (!owner || owner->kind != SymbolKind::Class) {
+			return;
+		}
+		if (Symbol *constructor = owner->klass->constructor) {
+			arguments(static_cast<FunctionDecl *>(constructor->node), owner->name, p_arguments, p_offset,
+					vector ? p_instance->element : nullptr);
+		} else if (!owner->unit->is_declaration && p_arguments.count > 0) {
+			// A class that declares no constructor takes no arguments. One in a declaration file may
+			// simply not say.
+			error(p_offset, quoted(owner->name) + " takes no arguments but " + std::to_string(p_arguments.count) +
+									(p_arguments.count == 1 ? " was" : " were") + " given");
+		}
+	}
+
+	// Where the name of what is being called or constructed is written.
+	static uint32_t name_offset(const Expr *p_callee) {
+		return p_callee->kind == NodeKind::Member ? static_cast<const Member *>(p_callee)->name_offset : p_callee->offset;
+	}
+
 	const Type *call(Call *p_call) {
 		list(p_call->arguments);
 		Expr *callee = p_call->callee;
@@ -552,6 +614,9 @@ class Typer {
 		}
 		if (callee->kind == NodeKind::SuperExpr) {
 			callee->type = unknown_;
+			if (class_ && !static_ && class_->klass->base && !compilation_.hierarchy_broken(class_)) {
+				construct(compilation_.instance_type(class_->klass->base), p_call->arguments, callee->offset);
+			}
 			return compilation_.void_type(); // `super(...)` in a constructor.
 		}
 		const Type *type = expression(callee);
@@ -568,7 +633,9 @@ class Typer {
 		}
 		if (symbol && (symbol->kind == SymbolKind::Method || symbol->kind == SymbolKind::Function ||
 							  symbol->kind == SymbolKind::LocalFunction)) {
-			return compilation_.type_of(static_cast<FunctionDecl *>(symbol->node)->return_type, element);
+			FunctionDecl *function = static_cast<FunctionDecl *>(symbol->node);
+			arguments(function, symbol->name, p_call->arguments, name_offset(callee), element);
+			return compilation_.type_of(function->return_type, element);
 		}
 		switch (type->kind) {
 			case Type::ClassObject:
@@ -776,6 +843,7 @@ class Typer {
 				list(create->arguments);
 				const Type *callee = expression(create->callee);
 				if (callee->kind == Type::ClassObject) {
+					construct(callee->element, create->arguments, name_offset(create->callee));
 					return callee->element;
 				}
 				return callee->kind == Type::Any || dynamic_value(callee) ? any_ : unknown_;
