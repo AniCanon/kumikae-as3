@@ -25,7 +25,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 - A script class named like a Godot class is ambiguous in the default package.
 - Acronyms come out lower-case: `getAabb`, not `getAABB`.
-- `print()` needs at least one argument.
 - Four properties lose their element type.
 - One wide flag enum of `RenderingServer` is declared `int`.
 - The corpus prefix test loads Godot's API for one prefix in 293 only.
@@ -38,7 +37,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 - `Math.floor`, `Math.round`, `Math.abs`, `Math.max`, `parseInt` and `cond ? int : uint` count as fractions,
   so `cell * Math.floor(x)` is a `Vector2`, not a `Vector2i`. The error does not suggest `int(...)`.
-- `v++`, `~v` and `v <<= 1` on a value type are not reported.
 - A malformed tag in a declaration file (both `left` and `right`, two rules for one operator) is resolved
   silently.
 - `for each` over a packed array does not check the variable's type.
@@ -50,9 +48,8 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths.
 - The same file reached through a symbolic link, or under a different letter case, or in a different
   Unicode form, counts as two files.
-- Find references does not list overrides of a method.
 - Symbol search covers the project only, not Godot's classes.
-- `super(...)` goes nowhere on go to definition; `new X()` goes to the class, not the constructor.
+- On go to definition, `new X()` goes to the class, not to its constructor.
 - While any file has a syntax error, type errors are hidden everywhere. Silencing only the broken region
   would be kinder.
 - A changed line is sent as a whole document; ranged changes are ignored.

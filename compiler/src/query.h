@@ -66,7 +66,8 @@ public:
 	const Occurrence *at(const Unit &p_unit, uint32_t p_offset);
 	Place declaration(const Symbol *p_symbol) const;
 	// Every use in the program's files, in file order, then by position. Declaration files are searched
-	// only for the declaration itself.
+	// only for the declaration itself. For a method, the methods that override it and the one it overrides
+	// count as the same thing: a call through a base class may reach any of them.
 	std::vector<Place> references(const Symbol *p_symbol, bool p_with_declaration);
 	// The declaration as one line of AS3: "function hit(by:Node, power:int = 1):void".
 	std::string describe(const Symbol *p_symbol) const;

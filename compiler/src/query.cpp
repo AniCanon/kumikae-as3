@@ -184,6 +184,7 @@ const std::vector<Occurrence> &Queries::occurrences(const Unit &p_unit) {
 			list.push_back({ p_offset, (uint32_t)p_name.size(), p_symbol, p_declaration });
 		}
 	};
+	Symbol *enclosing = nullptr; // The class whose members are being walked.
 	walk(p_unit.tree, [&](Node *p_node) {
 		switch (p_node->kind) {
 			case NodeKind::Name: {
@@ -204,6 +205,16 @@ const std::vector<Occurrence> &Queries::occurrences(const Unit &p_unit) {
 				add(member->name_offset, member->name, member->symbol ? member->symbol : member->member, false);
 				break;
 			}
+			case NodeKind::Call: {
+				// `super(...)`: the base class's constructor, or the class if it declares none.
+				Call *call = static_cast<Call *>(p_node);
+				Symbol *base = enclosing && enclosing->klass ? enclosing->klass->base : nullptr;
+				if (call->callee && call->callee->kind == NodeKind::SuperExpr && base) {
+					Symbol *constructor = base->klass ? base->klass->constructor : nullptr;
+					add(call->callee->offset, "super", constructor ? constructor : base, false);
+				}
+				break;
+			}
 			case NodeKind::Import: {
 				Import *import = static_cast<Import *>(p_node);
 				if (import->name.count > 0 && !import->wildcard) {
@@ -214,6 +225,7 @@ const std::vector<Occurrence> &Queries::occurrences(const Unit &p_unit) {
 			}
 			case NodeKind::ClassDecl: {
 				ClassDecl *decl = static_cast<ClassDecl *>(p_node);
+				enclosing = decl->symbol; // Parents come first in the walk, and classes do not nest.
 				add(decl->name_offset, decl->name, decl->symbol, true);
 				break;
 			}
@@ -271,6 +283,33 @@ Place Queries::declaration(const Symbol *p_symbol) const {
 	return place;
 }
 
+// True if one class is the other, or one of its bases.
+static bool in_line(const Symbol *p_a, const Symbol *p_b) {
+	for (const Symbol *at = p_a; at && at->klass; at = at->klass->base) {
+		if (at == p_b) {
+			return true;
+		}
+	}
+	for (const Symbol *at = p_b; at && at->klass; at = at->klass->base) {
+		if (at == p_a) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// The same thing for the purpose of finding uses: the symbol itself, or for an instance method or
+// property, one that overrides it or that it overrides.
+static bool same_member(const Symbol *p_found, const Symbol *p_wanted) {
+	if (p_found == p_wanted) {
+		return true;
+	}
+	return p_found && p_found->kind == p_wanted->kind && p_wanted->is_instance_member() && p_found->is_instance_member() &&
+			p_wanted->kind != SymbolKind::Field && p_found->name == p_wanted->name && p_found->owner != p_wanted->owner &&
+			!(p_found->modifiers & Modifiers::Private) && !(p_wanted->modifiers & Modifiers::Private) &&
+			in_line(p_found->owner, p_wanted->owner);
+}
+
 std::vector<Place> Queries::references(const Symbol *p_symbol, bool p_with_declaration) {
 	std::vector<Place> places;
 	if (!p_symbol) {
@@ -281,7 +320,7 @@ std::vector<Place> Queries::references(const Symbol *p_symbol, bool p_with_decla
 			continue;
 		}
 		for (const Occurrence &item : occurrences(unit)) {
-			if (item.symbol == p_symbol && (p_with_declaration || !item.is_declaration)) {
+			if (same_member(item.symbol, p_symbol) && (p_with_declaration || !item.is_declaration)) {
 				places.push_back({ &unit, item.offset, item.length });
 			}
 		}

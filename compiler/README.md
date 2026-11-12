@@ -226,7 +226,7 @@ is declared, who refers to it). The Godot editor will use the same three.
 
 Limits:
 
-- Find references lists uses of one symbol. A method that overrides it is a different symbol.
+- Find references on a method also lists the methods that override it and the one it overrides.
 - Workspace symbols are the project's own. Godot's classes are not listed.
 - Changes must arrive as whole documents, which is what the server asks the editor for.
 - No completion, signature help, rename or code actions yet.

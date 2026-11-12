@@ -396,6 +396,56 @@ static void test_index() {
 	(void)living;
 }
 
+// `super(...)` goes to the base class's constructor, and a method's references include the methods that
+// override it and the one it overrides.
+static void test_super_and_overrides() {
+	Compilation compilation;
+	Unit *unit = compilation.add("Zoo.as",
+			"package { public class Zoo { function f(a:Animal, d:Dog, p:Puppy):void { a.speak(); d.speak(); p.speak(); a.other(); } } }\n" // 1
+			"class Animal {\n" // 2
+			"	public function Animal(name:String) {}\n" // 3
+			"	public function speak():void {}\n" // 4
+			"	public function other():void {}\n" // 5
+			"}\n"
+			"class Dog extends Animal {\n" // 7
+			"	public function Dog() { super(\"dog\"); }\n" // 8
+			"	override public function speak():void { super.speak(); }\n" // 9
+			"}\n"
+			"class Puppy extends Dog {\n" // 11
+			"	override public function speak():void {}\n" // 12
+			"}\n"
+			"class Plain extends Bare { public function Plain() { super(); } }\n" // 14
+			"class Bare {}\n" // 15
+			"class Stranger { public function speak():void {} function g(s:Stranger):void { s.speak(); } }\n"); // 16
+	compilation.check(true);
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	Queries index(compilation);
+	// The constructor the call runs; the class, where it declares none.
+	CHECK_EQ(definition(index, unit, "super(\"dog\")", 1, 2), std::string("Zoo.as:3:18+6"));
+	CHECK_EQ(definition(index, unit, "super();", 1, 1), std::string("Zoo.as:15:7+4"));
+	auto places = [&](const char *p_needle, int p_nth, bool p_with_declaration) {
+		const Occurrence *found = index.at(*unit, offset_of(unit, p_needle, p_nth));
+		std::string out;
+		if (found) {
+			for (const Place &item : index.references(found->symbol, p_with_declaration)) {
+				Position at = unit->source.position(item.offset);
+				out += std::to_string(at.line) + ":" + std::to_string(at.column) + " ";
+			}
+		}
+		return out;
+	};
+	// From any of the three: every call that may reach it, and with declarations all three of those.
+	const std::string calls = "1:76 1:87 1:98 9:48 ";
+	const std::string all = "1:76 1:87 1:98 4:18 9:27 9:48 12:27 ";
+	CHECK_EQ(places("speak():void {}", 1, false), calls); // Animal's.
+	CHECK_EQ(places("speak():void { super", 1, false), calls); // Dog's.
+	CHECK_EQ(places("speak():void {}", 2, true), all); // Puppy's.
+	CHECK_EQ(places("speak(); d.", 1, true), all);
+	// A method of the same name in an unrelated class is another method.
+	CHECK_EQ(places("speak():void {} function g", 1, true), std::string("16:34 16:82 "));
+	CHECK_EQ(places("other():void", 1, false), std::string("1:109 "));
+}
+
 static void test_describe() {
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -556,6 +606,7 @@ static void test_typing() {
 int main() {
 	test_typing();
 	test_index();
+	test_super_and_overrides();
 	test_describe();
 	test_outline();
 	test_queries_on_broken_files();

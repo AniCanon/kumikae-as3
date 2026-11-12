@@ -163,8 +163,9 @@ Open items:
 
 - **The [backlog](backlog.md) pass is under way,** before the next slice, as the owner asked. Done so far: the
   two decisions above, the number constants (`NaN`, `int.MAX_VALUE`), reading a variable from the debugger
-  hook, a stop on every pass of a loop, four language-server faults, and three faults in attaching scripts
-  in Godot.
+  hook, a stop on every pass of a loop, four language-server faults, three faults in attaching scripts
+  in Godot, `print()` with no arguments, errors for `++` and bit operators on Godot values, and go to
+  definition on `super(...)` with find references across overrides.
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
 - **Language server:** Rider is not yet tried (the plugin is installed); Windows is not supported.
