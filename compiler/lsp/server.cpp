@@ -253,6 +253,13 @@ void Server::settle(std::vector<std::string> &r_out) {
 		return;
 	}
 	workspace_.compilation();
+	if (workspace_.cut_off() && !warned_cut_off_) {
+		warned_cut_off_ = true;
+		std::string text = "Kumikae AS3: this project has more than " + std::to_string(workspace_.max_files()) +
+				" .as files. The rest are not read, so names they define are reported as unknown.";
+		r_out.push_back(write_json(Json::object().set("jsonrpc", "2.0").set("method", "window/showMessage").set("params",
+				Json::object().set("type", 2).set("message", text))));
+	}
 	publish(r_out);
 }
 

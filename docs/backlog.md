@@ -50,7 +50,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths.
 - The same file reached through a symbolic link, or under a different letter case, or in a different
   Unicode form, counts as two files.
-- A project over 20,000 files is cut off with a note on standard error only, not in the editor.
 - Find references does not list overrides of a method.
 - Symbol search covers the project only, not Godot's classes.
 - `super(...)` goes nowhere on go to definition; `new X()` goes to the class, not the constructor.
@@ -79,9 +78,7 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - GDScript cannot set a script's field, only read it; a script's method and property lists are empty.
 - A value-type argument from GDScript is not checked against the parameter's type: a `Vector3` passes where a
   `Vector2` is wanted.
-- A method that returns a script object gives GDScript null, with no error.
-- A script for `CharacterBody2D` can be attached to a plain `Node`.
-- A `.as` file whose class extends no Godot class loads, then silently will not attach.
+- A method that returns a script object can't hand it to Godot: the caller gets null, and an error says so.
 - A script's private methods and fields can be reached from GDScript.
 - A handle on a Godot object that has since been freed still counts as not null.
 - `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions

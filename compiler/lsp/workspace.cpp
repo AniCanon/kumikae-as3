@@ -152,9 +152,13 @@ void Workspace::scan(const std::string &p_folder) {
 		if ((found != files_.end() && found->second.open) || declaration(path) >= 0) {
 			continue;
 		}
-		if (load(path) && ++count >= MAX_FILES) {
-			std::fprintf(stderr, "kas3c: %s has more than %zu .as files; the rest are not read\n", p_folder.c_str(), MAX_FILES);
+		if (count >= options_.max_files) {
+			cut_off_ = true; // One more than is read: the editor is told.
+			std::fprintf(stderr, "kas3c: %s has more than %zu .as files; the rest are not read\n", p_folder.c_str(), options_.max_files);
 			break;
+		}
+		if (load(path)) {
+			count++;
 		}
 	}
 }

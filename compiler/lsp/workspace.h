@@ -15,14 +15,15 @@ namespace kas3 {
 
 class Workspace {
 public:
+	// The most files read from a project, unless the options say otherwise.
+	static const size_t MAX_FILES = 20000;
+
 	struct Options {
 		bool godot = true; // Load Godot's API.
 		std::vector<std::string> declarations; // More declaration files.
 		std::string support_folder; // Where the embedded declarations are written. Empty: the temporary folder.
+		size_t max_files = MAX_FILES; // No more files than this are read from a project.
 	};
-	// No more files than this are read from a project.
-	static const size_t MAX_FILES = 20000;
-
 private:
 	struct File {
 		std::shared_ptr<Parsed> parsed;
@@ -40,6 +41,7 @@ private:
 	std::unordered_map<std::string, Unit *> units_; // By the path an editor knows the file by.
 	std::string support_folder_; // Empty until the embedded declarations have been written.
 	bool stale_ = true;
+	bool cut_off_ = false; // The project has more files than are read.
 	int checks_ = 0;
 
 	void scan(const std::string &p_folder);
@@ -69,6 +71,9 @@ public:
 	void file_changed_on_disk(const std::string &p_path);
 
 	bool stale() const { return stale_; }
+	// True if the project had more .as files than the limit, so some were left out.
+	bool cut_off() const { return cut_off_; }
+	size_t max_files() const { return options_.max_files; }
 	int checks() const { return checks_; } // How many times the program has been checked.
 	// All three check the program first if anything changed. What they return is good until the next
 	// change.

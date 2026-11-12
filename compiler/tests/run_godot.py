@@ -87,10 +87,16 @@ expected = {
     "counted references": "1 hello=hello",
     "counted freed": "true",
     "things": "a.Thing b.Thing",
+    "wrong node has script": "false",
+    "plain can attach": "false",
+    "returned script object": "<null>",
 }
 for name, value in expected.items():
     check("check: " + name, lines.get(name) == value, "got %r, expected %r" % (lines.get(name), value))
 check("a call on a freed object is an AS3 error", "CHECK survived freed object" in output and "freed" in output, output[-800:])
+check("says why a script won't attach to the wrong kind of object", "can only be attached to a CharacterBody2D" in output, output[-900:])
+check("says why a plain class is not a script", "Plain.as" in output and "does not extend a Godot class" in output, output[-900:])
+check("says a script object can't be returned to Godot", "returns a script object" in output, output[-900:])
 check("checks: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
 check("checks: nothing leaked", "leaked" not in output.lower(), output[-600:])
 

@@ -5,6 +5,7 @@
 
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
 using kas3::Project;
@@ -16,6 +17,8 @@ void AS3Script::set_file(const String &p_resource_path) {
 	class_ = program.valid() ? program.class_of_file(file_) : kas3::ir::NONE;
 	// Only a class that extends a Godot class can be attached to an object.
 	if (class_ != kas3::ir::NONE && program.module().classes[class_].native_base.empty()) {
+		UtilityFunctions::push_error(String("ActionScript: ") + p_resource_path +
+				": its class does not extend a Godot class, so it can't be attached to anything.");
 		class_ = kas3::ir::NONE;
 	}
 }
@@ -32,7 +35,17 @@ StringName AS3Script::_get_instance_base_type() const {
 }
 
 void *AS3Script::_instance_create(Object *p_for_object) const {
-	return class_ == kas3::ir::NONE ? nullptr : create_script_instance(this, p_for_object);
+	if (class_ == kas3::ir::NONE) {
+		return nullptr;
+	}
+	// The script's code reaches the object's members as members of the class it extends.
+	StringName base = _get_instance_base_type();
+	if (!p_for_object->is_class(String(base))) {
+		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(file_.c_str()) + " can only be attached to a " +
+				String(base) + ", not to a " + p_for_object->get_class() + ".");
+		return nullptr;
+	}
+	return create_script_instance(this, p_for_object);
 }
 
 bool AS3Script::_has_method(const StringName &p_method) const {

@@ -22,5 +22,6 @@ package {
 		public function takeString(s:String):String { return s; }
 		public function takeNode(n:Node):Boolean { return n != null; }
 		public function takeFlag(b:Boolean):Boolean { return b; }
+		public function myself():Checks { return this; }
 	}
 }

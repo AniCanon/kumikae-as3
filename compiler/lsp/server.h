@@ -19,6 +19,7 @@ class Server {
 	bool exited_ = false;
 	int exit_code_ = 1;
 	bool utf8_ = false; // Positions count bytes. Otherwise UTF-16 code units.
+	bool warned_cut_off_ = false; // The editor has been told the project is too big to read whole.
 	bool watch_files_ = false; // The editor lets the server ask to be told about files changing on disk.
 	int published_check_ = -1; // The check whose errors the editor has.
 	int next_request_ = 1;

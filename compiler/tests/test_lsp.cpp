@@ -507,6 +507,32 @@ static void test_declaration_files() {
 	fs::remove_all(root);
 }
 
+// A project with more files than the server reads says so in the editor, not only on standard error.
+static void test_file_limit() {
+	fs::path root = fresh_folder("many");
+	for (int i = 0; i < 5; i++) {
+		write(root / ("C" + std::to_string(i) + ".as"), "package { public class C" + std::to_string(i) + " {} }");
+	}
+	Workspace::Options few = options(false);
+	few.max_files = 3;
+	Session session(few);
+	session.initialize(root.string());
+	int warnings = 0;
+	for (int round = 0; round < 2; round++) {
+		session.settle();
+		for (const Json &message : session.received) {
+			if (message.get("method").string() == "window/showMessage") {
+				warnings++;
+				CHECK_EQ(message.get("params").get("type").integer(), (int64_t)2);
+				CHECK(message.get("params").get("message").string().find("more than 3") != std::string::npos);
+			}
+		}
+	}
+	CHECK_EQ(warnings, 1); // Once.
+	CHECK_EQ(session.server.workspace().program_units().size(), (size_t)3);
+	fs::remove_all(root);
+}
+
 static void test_file_watching() {
 	Session session;
 	Json params = Json::object();
@@ -630,6 +656,7 @@ int main() {
 	test_positions();
 	test_navigation();
 	test_declaration_files();
+	test_file_limit();
 	test_file_watching();
 	test_agreement();
 	test_typing();

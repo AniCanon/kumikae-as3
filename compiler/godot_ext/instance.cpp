@@ -5,6 +5,7 @@
 #include "script.h"
 
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 #include <vector>
 
@@ -158,7 +159,10 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		program.interpreter().discard(function.registers[i + 1], arguments[i + 1]);
 	}
-	if (ok && function.result != ir::Kind::Void && function.result != ir::Kind::Obj) {
+	if (ok && function.result == ir::Kind::Obj) {
+		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) +
+				" returns a script object, which can't be handed to Godot yet. The caller gets null.");
+	} else if (ok && function.result != ir::Kind::Void) {
 		*reinterpret_cast<Variant *>(r_return) = kas3::to_variant(function.result, result);
 	}
 	if (ok) {
