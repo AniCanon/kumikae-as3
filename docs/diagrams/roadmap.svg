@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 940" width="1000" height="940" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" role="img" aria-label="Roadmap">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1020" width="1000" height="1020" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" role="img" aria-label="Roadmap">
 <title>Roadmap</title>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5F6368"/></marker></defs>
-<rect x="0.5" y="0.5" width="999" height="939" rx="14" fill="#FFFFFF" stroke="#DADCE0"/>
+<rect x="0.5" y="0.5" width="999" height="1019" rx="14" fill="#FFFFFF" stroke="#DADCE0"/>
 <text x="40" y="48" font-size="20" text-anchor="start" font-weight="bold" fill="#202124">Roadmap</text>
 <text x="40" y="72" font-size="13" text-anchor="start" font-weight="normal" fill="#5F6368">Each stage ends in something you can run. The second line is how you know it&#x27;s done.</text>
-<line x1="76" y1="134.0" x2="76" y2="854.0" stroke="#BDC1C6" stroke-width="2"/>
+<line x1="76" y1="134.0" x2="76" y2="934.0" stroke="#BDC1C6" stroke-width="2"/>
 <rect x="116" y="100" width="844" height="68" rx="10" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
 <circle cx="76" cy="134.0" r="22" fill="#1E8E3E"/>
 <text x="76" y="139.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">0</text>
@@ -39,49 +39,57 @@
 <text x="888.0" y="366.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Next</text>
 <rect x="116" y="420" width="844" height="68" rx="10" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
 <circle cx="76" cy="454.0" r="22" fill="#3D6FB6"/>
-<text x="76" y="459.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">2</text>
-<text x="136" y="442" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Interpreter in Godot</text>
-<text x="136" y="461" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Scripts run in the editor, with exports, signals and hot reload.</text>
-<text x="136" y="478" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: An AS3 script on a CharacterBody2D moves a character.</text>
+<text x="76" y="459.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">L1</text>
+<text x="136" y="442" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Language server, first slice (proposed)</text>
+<text x="136" y="461" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">kas3c lsp: errors as you type and go to definition.</text>
+<text x="136" y="478" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: A typing mistake shows up in VS Code and Rider at once.</text>
 <rect x="832" y="430" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
 <text x="888.0" y="446.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
 <rect x="116" y="500" width="844" height="68" rx="10" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
 <circle cx="76" cy="534.0" r="22" fill="#3D6FB6"/>
-<text x="76" y="539.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">3</text>
-<text x="136" y="522" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Native export on desktop</text>
-<text x="136" y="541" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Release builds compile AS3 to native code through C++.</text>
-<text x="136" y="558" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The speed gate passes on real compiled AS3.</text>
+<text x="76" y="539.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">2</text>
+<text x="136" y="522" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Interpreter in Godot</text>
+<text x="136" y="541" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Scripts run in the editor, with exports, signals and hot reload.</text>
+<text x="136" y="558" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: An AS3 script on a CharacterBody2D moves a character.</text>
 <rect x="832" y="510" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
 <text x="888.0" y="526.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
 <rect x="116" y="580" width="844" height="68" rx="10" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
 <circle cx="76" cy="614.0" r="22" fill="#3D6FB6"/>
-<text x="76" y="619.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">4</text>
-<text x="136" y="602" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Mobile</text>
-<text x="136" y="621" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">iOS and Android, debug and release builds.</text>
-<text x="136" y="638" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The same game runs on both, and the speed gate passes on devices.</text>
+<text x="76" y="619.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">3</text>
+<text x="136" y="602" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Native export on desktop</text>
+<text x="136" y="621" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Release builds compile AS3 to native code through C++.</text>
+<text x="136" y="638" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The speed gate passes on real compiled AS3.</text>
 <rect x="832" y="590" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
 <text x="888.0" y="606.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
 <rect x="116" y="660" width="844" height="68" rx="10" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
 <circle cx="76" cy="694.0" r="22" fill="#3D6FB6"/>
-<text x="76" y="699.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">5</text>
-<text x="136" y="682" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Console</text>
-<text x="136" y="701" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Nintendo Switch through the Kumikae build.</text>
-<text x="136" y="718" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The same game runs on hardware, debug and release.</text>
+<text x="76" y="699.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">4</text>
+<text x="136" y="682" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Mobile</text>
+<text x="136" y="701" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">iOS and Android, debug and release builds.</text>
+<text x="136" y="718" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The same game runs on both, and the speed gate passes on devices.</text>
 <rect x="832" y="670" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
 <text x="888.0" y="686.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
 <rect x="116" y="740" width="844" height="68" rx="10" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
 <circle cx="76" cy="774.0" r="22" fill="#3D6FB6"/>
-<text x="76" y="779.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">6</text>
-<text x="136" y="762" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Tooling</text>
-<text x="136" y="781" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Language server, debugger and JetBrains plugin.</text>
-<text x="136" y="798" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Breakpoints and stepping from Rider, on a device too.</text>
+<text x="76" y="779.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">5</text>
+<text x="136" y="762" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Console</text>
+<text x="136" y="781" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Nintendo Switch through the Kumikae build.</text>
+<text x="136" y="798" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The same game runs on hardware, debug and release.</text>
 <rect x="832" y="750" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
 <text x="888.0" y="766.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
-<rect x="116" y="820" width="844" height="68" rx="10" fill="#F1F3F4" stroke="#80868B" stroke-width="1.5"/>
-<circle cx="76" cy="854.0" r="22" fill="#80868B"/>
-<text x="76" y="859.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">+</text>
-<text x="136" y="842" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Later, designed separately</text>
-<text x="136" y="861" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">An await form for signals, the Flash API, SWF loading, web export.</text>
-<rect x="832" y="830" width="112" height="24" rx="12.0" fill="#80868B"/>
-<text x="888.0" y="846.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Later</text>
+<rect x="116" y="820" width="844" height="68" rx="10" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
+<circle cx="76" cy="854.0" r="22" fill="#3D6FB6"/>
+<text x="76" y="859.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">6</text>
+<text x="136" y="842" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Tooling</text>
+<text x="136" y="861" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">The rest of the language server, the debugger and the JetBrains plugin.</text>
+<text x="136" y="878" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Breakpoints and stepping from Rider, on a device too.</text>
+<rect x="832" y="830" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
+<text x="888.0" y="846.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
+<rect x="116" y="900" width="844" height="68" rx="10" fill="#F1F3F4" stroke="#80868B" stroke-width="1.5"/>
+<circle cx="76" cy="934.0" r="22" fill="#80868B"/>
+<text x="76" y="939.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">+</text>
+<text x="136" y="922" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Later, designed separately</text>
+<text x="136" y="941" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">An await form for signals, the Flash API, SWF loading, web export.</text>
+<rect x="832" y="910" width="112" height="24" rx="12.0" fill="#80868B"/>
+<text x="888.0" y="926.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Later</text>
 </svg>

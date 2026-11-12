@@ -51,6 +51,20 @@ column. Stage 1 has three parts.
 | 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | In progress |
 | 1c. Types | Type checking in `kas3c check` | Every expression has a type. Type errors and definite null misuse are reported. | Next |
 
+### Language server, first slice (proposed)
+
+**Delivers:** `kas3c lsp`, the program an editor talks to. Errors as you type, go to definition, find
+references and a document outline, in VS Code and JetBrains IDEs.
+
+**Done when:** a typing mistake shows an error at once, and go to definition works on locals, classes,
+imports and inherited members.
+
+**Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
+stage faster to build. The owner hasn't approved this order yet. Completion follows once types exist; the
+JetBrains plugin and Godot's documentation in hover stay in stage 6.
+
+Read more: [language server design](superpowers/specs/2026-11-12-language-server-design.md).
+
 ### Stage 2: interpreter in Godot
 
 **Delivers:** AS3 scripts that run in the Godot editor.
@@ -83,8 +97,8 @@ touches console vendor material stays out of this repository.
 
 ### Stage 6: tooling
 
-**Delivers:** the language server, the debug adapter, and one JetBrains plugin that covers Rider and the
-other IDEs.
+**Delivers:** the rest of the language server (Godot's documentation, code actions, rename), the debug
+adapter, and one JetBrains plugin that covers Rider and the other IDEs.
 
 **Done when:** you can set a breakpoint in Rider and step through AS3, in the editor and on a device.
 
@@ -117,12 +131,14 @@ The design keeps each of these possible. No stage above delivers them.
 
 | Decision | Why it matters |
 |---|---|
+| Whether to build the language server's first slice before the interpreter | The [language server design](superpowers/specs/2026-11-12-language-server-design.md) proposes it. It gives you something to use in an editor sooner, and delays the interpreter by that much. |
 | Permission to download an open-source AS3 codebase as a test corpus | Every AS3 file the parser has seen so far was written by a model. Real code would find gaps that our tests share. |
 | When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
 
 ## How to follow progress
 
 - **This page and the diagram** change when a stage or part changes status.
+- **Repository:** `AniCanon/kumikae-as3` on GitHub, private.
 - **Branches:** `main` holds finished, reviewed work. Each part is built on its own branch, such as
   `feat/frontend-names`, and merges when its review is clean.
 - **To update the diagram,** change a status in [`diagrams/build.py`](diagrams/build.py), and then run

@@ -169,6 +169,8 @@ The throwaway speed spike is kept on the `spike/stage-0b` branch.
 - [Design](docs/superpowers/specs/2026-11-11-kumikae-as3-design.md): goals, shape, language scope and stages.
 - [Performance redesign](docs/superpowers/specs/2026-11-11-performance-redesign.md): the rules that generated
   code follows, and the owner's decision on the speed goal. Where the two documents disagree, this one wins.
+- [Language server](docs/superpowers/specs/2026-11-12-language-server-design.md): the plan for editor
+  support, proposed and not yet approved.
 
 ## Licence
 
