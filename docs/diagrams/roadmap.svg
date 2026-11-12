@@ -105,7 +105,7 @@
 <circle cx="76" cy="1094.0" r="22" fill="#80868B"/>
 <text x="76" y="1099.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">+</text>
 <text x="136" y="1082" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Later, designed separately</text>
-<text x="136" y="1101" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">An await form for signals, the Flash API, SWF loading, web export.</text>
+<text x="136" y="1101" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">First-class async/await, the Flash API, SWF loading, web export.</text>
 <rect x="832" y="1070" width="112" height="24" rx="12.0" fill="#80868B"/>
 <text x="888.0" y="1086.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Later</text>
 </svg>

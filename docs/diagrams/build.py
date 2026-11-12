@@ -49,7 +49,7 @@ ROADMAP = [
      "The same game runs on hardware, debug and release.", "planned"),
     ("6", "Tooling", "The rest of the language server, the debugger and the JetBrains plugin.",
      "Breakpoints and stepping from Rider, on a device too.", "planned"),
-    ("+", "Later, designed separately", "An await form for signals, the Flash API, SWF loading, web export.",
+    ("+", "Later, designed separately", "First-class async/await, the Flash API, SWF loading, web export.",
      "", "later"),
 ]
 

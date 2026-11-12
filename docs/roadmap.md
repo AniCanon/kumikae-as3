@@ -121,7 +121,9 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 ### Later, designed separately
 
-- A way to wait for a signal in the middle of a function, like GDScript's `await`.
+- `async` and `await` as a first-class part of the language, with work off the main thread and debugger
+  support. A research document comes first: how far to go beyond main-thread-only, what it costs, and what
+  the debugger needs. See [language additions](superpowers/specs/2026-11-12-language-additions.md#async-and-await-research-before-design).
 - The Flash API (`flash.display.Sprite`, `MovieClip`) as a library on top of Godot nodes.
 - Loading `.swf` files.
 - Web export.
@@ -146,6 +148,7 @@ Before it starts, the language server's first slice needs its check by hand in V
 | Decision | Outcome |
 |---|---|
 | Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
+| `async`/`await` | The owner wants it first-class, not limited to the main thread, efficient, and with a proper debugger. Research first, after stage 2; no syntax chosen yet. |
 | Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the [language additions](superpowers/specs/2026-11-12-language-additions.md) list. |
 | 64-bit integers in declarations | A Godot integer marked 64-bit is declared `Number`, which is exact to 2^53. Object ids use higher bits, so stage 2 must settle a 64-bit type before bindings ship. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |

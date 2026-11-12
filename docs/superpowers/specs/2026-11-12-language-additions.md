@@ -37,13 +37,40 @@ The first three kinds are allowed now. The fourth is what the decision parks.
 
 | Candidate | Why | Needs new syntax? |
 |---|---|---|
-| Waiting for a signal inside a function, as GDScript's `await` | Sequences without callback chains. Already listed as "later" in the roadmap. | Yes, or a library form built on closures. |
+| `async` and `await`, with work off the main thread | Sequences without callback chains, and heavy work (a download, loading a level) that does not stall the game. The owner wants this first-class; see below. | Yes. |
 | A 64-bit integer type | Godot integers are 64-bit, and object ids don't fit a `Number`. Stage 2 must settle this anyway. | No: a library type would do. |
 | Real enums | A Godot enum is an `int` today, so a wrong constant is not reported. | No, if done as a check using the enum recorded in the declarations. Yes, for scripts to declare their own. |
 | Types that can't be `null` | Null errors found before running. | Yes. |
 | Typed function types | A signal handler's parameters checked against the signal. | No, as a check on `connect`. Yes, as a written type. |
 | `getNode` without the `as` cast | `getNode("Hitbox") as Area2D` is the most repeated line in a script. | No: metadata on a field, as SwiftGodot's `@Node`. |
 | Abstract classes and private constructors | Apache Royale's AS3 compiler offers both. | Yes. |
+
+## Async and await: research before design
+
+The owner's direction, 2026-11-12:
+
+- **First-class,** not a library form: `async` functions and `await`, with a proper debugger (step over an
+  `await`, see where a paused function is waiting and what started it).
+- **Not main thread only.** That is too conservative: heavy work such as a background download must not
+  stall the game.
+- **Performance and efficiency matter.** An `await` that finishes at once should cost close to nothing, and a
+  paused function should hold little memory.
+
+No syntax or runtime is chosen yet. Before the design is written, a research document answers these, with
+measurements where a number decides it:
+
+| Question | What to compare |
+|---|---|
+| Is the larger, multi-threaded design worth its cost, and how much of it? | Main thread only (GDScript's `await`); main thread plus background tasks that hand results back (C#'s `Task` on a thread pool); full structured concurrency with checked thread safety (Swift's tasks, actors and `Sendable`). |
+| How is a paused function represented? | A state machine written by the compiler (C#), against separate stacks. It must work in the interpreter and in generated C++, with no JIT, on every target including consoles. |
+| What may a background task touch? | Godot's scene tree is not thread-safe. Whether the compiler can prove a task touches no node, or the runtime must hop back to the main thread, decides how much checking the language needs. |
+| What does it cost? | Time per `await`, memory per paused function, and the cost of a thread hop, measured against C# in Godot and GDScript, as the speed spike did. |
+| What happens to a paused function when its node is freed? | Cancellation, and what `try`/`catch`/`finally` see. |
+| What does the debugger need? | Stepping across an `await`, a paused function's variables, and a call chain that crosses the pause. This shapes the debug adapter in stage 6. |
+| What do AS3 programmers expect? | JavaScript's `async`/`await` (the same language family), and what Apache Royale and Haxe did. |
+
+**When:** after stage 2, when the interpreter exists to measure with, and before the debug adapter is
+designed, so that the two are designed together.
 
 ## When to return to this
 
