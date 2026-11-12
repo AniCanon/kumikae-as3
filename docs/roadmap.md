@@ -9,7 +9,9 @@ For why the project exists and how it works, see the [README](../README.md).
 
 **Stage 1 of 6, the front end.** The parser, name resolution and type checking are built and checked against
 about 190,000 lines of real AS3. The compiler knows Godot's whole API under AS3 names, including arithmetic
-on its math types. The front end is complete; the language server's first slice is next.
+on its math types, and reports its errors to an editor through a language server. The front end is
+complete. The language server's first slice is built and passes its tests; it has not yet been tried by hand
+in VS Code and Rider.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -56,20 +58,27 @@ column.
 | 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the [naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | `moveAndSlide()`, `position`, `timer.timeout.connect(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | Done |
 | 1e. Godot's math types | Operators and indexing on `Vector2` and its relatives | `position + velocity * delta` has a type, and a wrong operand is reported. | Done |
 
-### Language server, first slice
+### Language server, first slice (built; editor check pending)
 
 **Delivers:** `kas3c lsp`, the program an editor talks to. Errors as you type, go to definition, find
-references and a document outline, in VS Code and JetBrains IDEs.
+references, hover, a document outline and symbol search.
 
-**Done when:** a typing mistake shows an error at once, and go to definition works on locals, classes,
-imports and inherited members.
+**Done when:** in VS Code and Rider, a typing mistake shows an error at once, and go to definition works on
+locals, classes, imports, inherited members and Godot's API.
+
+| Part | Status |
+|---|---|
+| The server: protocol, errors as you type, definition, references, hover, outline, symbols | Done. Tested by scripted sessions that send what an editor sends. |
+| Speed: a re-check of 100,000 lines in under 50 ms | Done: about 27 ms, by keeping the parse of files that did not change. |
+| A VS Code client and the [set-up guide](../editors/README.md) | Written. Not yet run: it needs one library from npm, and Rider needs a plugin. |
+| Tried by hand in VS Code and Rider | Not yet. |
 
 **Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
-stage faster to build. The owner left the order to the builder. Rider gives plugins a language-server
-client, so this slice serves the Rider goal directly. Completion follows once types exist; the JetBrains
-plugin and Godot's documentation in hover stay in stage 6.
+stage faster to build. The owner left the order to the builder. Completion follows in a second slice; the
+JetBrains plugin and Godot's documentation in hover stay in stage 6.
 
-Read more: [language server design](superpowers/specs/2026-11-12-language-server-design.md).
+Read more: [language server design](superpowers/specs/2026-11-12-language-server-design.md),
+[how the server works](../compiler/README.md#language-server).
 
 ### Stage 2: interpreter in Godot
 
@@ -119,20 +128,18 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What comes next: the language server's first slice
+## What comes next: the interpreter (stage 2)
 
-**Goal:** `kas3c lsp`, the program an editor talks to. A typing mistake shows an error at once, and go to
-definition works on locals, classes, imports, inherited members and Godot's API.
+**Goal:** an AS3 script on a `CharacterBody2D` moves a character in the Godot editor.
 
 | Step | What it does |
 |---|---|
-| 1. The protocol | `kas3c lsp` reads and answers the editor's messages. |
-| 2. Errors as you type | Every change to a file is checked, and the errors are sent to the editor. |
-| 3. Go to definition and find references | From the names the compiler has already resolved. |
-| 4. Outline | The classes and members of a file. |
-| 5. Editors | A minimal VS Code extension, and the Rider set-up through its language-server client. |
+| 1. Typed IR | The checked syntax tree becomes the one form of the program that both backends read. |
+| 2. Interpreter | Runs the IR. |
+| 3. Godot bindings | Generated from Godot's API description: how a script calls the engine and the engine calls a script. |
+| 4. The extension | Godot loads `.as` files as scripts, with exports, signals and hot reload. |
 
-After it comes the interpreter (stage 2), where a script first runs in Godot.
+Before it starts, the language server's first slice needs its check by hand in VS Code and Rider.
 
 ## Decisions made
 

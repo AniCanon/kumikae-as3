@@ -119,15 +119,16 @@ struct Occurrence { uint32_t offset; uint32_t length; Symbol *symbol; bool is_de
 struct Place { const Unit *unit; uint32_t offset; uint32_t length; };
 struct OutlineItem { std::string name; SymbolKind kind; bool is_const; bool is_constructor;
 		uint32_t offset, end, name_offset, name_length; std::vector<OutlineItem> children; };
-class Index {
+class Queries { // Named Index in the first draft; that is an AST node's name.
 public:
-	explicit Index(Compilation &p_compilation); // After check().
+	explicit Queries(Compilation &p_compilation); // After check().
 	const Occurrence *at(const Unit &p_unit, uint32_t p_offset); // The name under or just before the offset.
 	Place declaration(const Symbol *p_symbol) const; // unit is null for `arguments`.
 	std::vector<Place> references(const Symbol *p_symbol, bool p_with_declaration);
 	std::string describe(const Symbol *p_symbol) const; // "function hit(by:Node, power:int = 1):void"
 	std::vector<OutlineItem> outline(const Unit &p_unit) const;
-	std::vector<const Symbol *> find(std::string_view p_query, size_t p_limit) const; // Program files only.
+	std::string context(const Symbol *p_symbol) const; // "method of game.Player"
+	std::vector<FoundSymbol> find(std::string_view p_query, size_t p_limit); // Program files only.
 };
 ```
 
@@ -174,7 +175,7 @@ public:
 	void close(const std::string &p_path);
 	void file_changed_on_disk(const std::string &p_path);
 	Compilation &compilation(); // Checks first if anything changed.
-	Index &index();
+	Queries &queries();
 	Unit *unit(const std::string &p_path);
 	std::vector<Unit *> program_units();
 	std::string real_path(const Unit &p_unit); // A file an editor can open, also for Godot's declarations.

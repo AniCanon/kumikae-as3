@@ -4,7 +4,8 @@ The front end of the ActionScript 3 compiler for Godot: source text to a checked
 lexer, the parser, name resolution, type checking, and Godot's API as AS3 declarations.
 
 It is a static library (`kas3front`) built without exceptions or RTTI, so that the same code can run in the
-command-line tool, inside the Godot editor, and in the language server.
+command-line tool, inside the Godot editor, and in the language server. The language server is a second
+library, `kas3lsp` (`lsp/`), and both are in `kas3c`.
 
 ## Build and test
 
@@ -50,6 +51,54 @@ A type is a class name, `Vector.<T>`, `Class.<T>` for a class itself (the expres
 `--dump-names` prints one line per resolved name, in source order:
 `<line>:<col> <name> -> <kind> <qualified name> <where>`, where `<where>` is `@<line>:<col>` in the same
 file, `@<path>:<line>:<col>` in another, `(built in)`, or `(Godot)`.
+
+## Language server
+
+`kas3c lsp` serves an editor over standard input and output with the Language Server Protocol. To connect an
+editor, see [editors](../editors/README.md).
+
+```sh
+compiler/build/kas3c lsp                        # the project is the folder the editor opens
+compiler/build/kas3c lsp --no-godot             # without Godot's API
+compiler/build/kas3c lsp --declarations lib.as  # lib.as declares what exists elsewhere
+```
+
+| It answers | With |
+|---|---|
+| A file opening or changing | The file's errors: what `kas3c check` prints for the project. |
+| Go to definition | Where the name under the cursor is declared, in the project, the built-in library or Godot's API. |
+| Find references | Every use of it in the project's files. |
+| Hover | Its declaration, and the class or package it belongs to. |
+| Document symbols | The classes and members of the file. |
+| Workspace symbols | The project's definitions whose name contains the query. |
+
+How it works:
+
+- **The project** is the nearest folder at or above the opened one that has a `project.godot`, or else the
+  opened folder. Every `.as` file under it is part of the program, except in folders whose name starts with
+  a dot. An open file's text in the editor stands in for the file on disk.
+- **Every change checks the whole program again.** A file that did not change keeps its syntax tree, so
+  only the changed file is parsed again. On a generated project of 100,000 lines a re-check takes about
+  27 ms with Godot's API loaded (`build/bench_recheck <folder>`; `tests/bench/generate_project.py` writes
+  the project).
+- **Typing bursts are checked once.** A change marks the program as stale; the check runs when no further
+  message is waiting, or when a request needs an answer.
+- **While any file has a syntax error, only syntax errors are reported,** as `kas3c check` does. Names are
+  still resolved, so go to definition, hover and the outline keep working in a half-typed file.
+- **Positions** are counted in UTF-16 code units, or in bytes when the editor offers UTF-8.
+- **Godot's API and the built-in library** are written, read-only, to `kas3c-declarations` in the system's
+  temporary folder, so that go to definition has a file to open. No errors are ever reported for them.
+
+The library side is `Compilation::check(true)` (resolve names despite syntax errors), `parse_file` and
+`Compilation::add(parsed)` (reuse a parse), and `Queries` in `src/query.h` (what is at a position, where it
+is declared, who refers to it). The Godot editor will use the same three.
+
+Limits:
+
+- Find references lists uses of one symbol. A method that overrides it is a different symbol.
+- Workspace symbols are the project's own. Godot's classes are not listed.
+- Changes must arrive as whole documents, which is what the server asks the editor for.
+- No completion, signature help, rename or code actions yet.
 
 ## Declaration files
 
@@ -322,6 +371,15 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 - `godot/test_naming.py` and `godot/test_generate.py`: the naming rules, the generator on a small fixture
   (`godot/fixture_api.json`), and Godot's whole API. The whole-API tests need Godot's API description,
   which is not in this repository; without it they are skipped and say so.
+
+- `tests/test_query.cpp`: checking through syntax errors, reusing a parse, and the queries. It runs every
+  byte-prefix of each corpus file, and each file with one byte missing, through all of them.
+- `tests/test_json.cpp`, `tests/test_workspace.cpp`: the server's JSON module, and the project as files on
+  disk with open buffers over them.
+- `tests/test_lsp.cpp`: the server driven in process, one message at a time. It also checks that what the
+  server publishes for every golden error file is what `kas3c check` prints, and types through each corpus
+  file as an editor would.
+- `tests/test_lsp_stdio.py`: `kas3c lsp` as a real process: framing, malformed input, exit codes.
 
 - `tests/fetch_external.sh` fetches six open-source AS3 projects (Starling, Away3D, Flixel, FlashPunk,
   as3-signals, as3corelib; about 190,000 lines) into `tests/external/`, which git ignores. They are pinned

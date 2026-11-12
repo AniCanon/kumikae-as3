@@ -1,6 +1,8 @@
 # Kumikae AS3: language server
 
-Design, 2026-11-12. Status: **the owner left the order to the builder; the first slice follows stage 1.**
+Design, 2026-11-12. Status: **the first slice (L1) is built; its check by hand in VS Code and Rider is pending.**
+What was built, and the decisions made while building, are in the
+[plan](../plans/2026-11-12-language-server-first-slice.md) and the [compiler README](../../../compiler/README.md#language-server).
 
 This document plans the language server that the main design lists under stage 6 ("Tooling"). It proposes
 building the server in slices, the first of them much earlier than stage 6.
@@ -132,8 +134,12 @@ L2 then follows stage 1c's types as soon as L1 exists. L3 and L4 stay in stage 6
 - ~~Which JetBrains editions give plugins an LSP client.~~ Checked 2026-11-12: JetBrains' plugin
   documentation lists Rider among the IDEs with the LSP API, and JetBrains announced the client API as
   open source from the 2026.2 release. Which Rider versions the plugin must support is still to decide.
-- That whole-program re-checking meets the 50 ms budget at 100,000 lines.
-- UTF-8 position support in the target editors.
+- ~~That whole-program re-checking meets the 50 ms budget at 100,000 lines.~~ Measured 2026-11-12: re-parsing
+  everything takes about 85 ms, so the server keeps the parse of files that did not change. A re-check then
+  takes about 27 ms.
+- ~~UTF-8 position support in the target editors.~~ No longer matters: the server uses UTF-16 unless the
+  editor offers UTF-8.
+- That the LSP4IJ plugin runs in Rider and accepts a user-defined server for `*.as`.
 
 ## Left to the builder
 

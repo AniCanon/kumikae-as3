@@ -6,7 +6,8 @@ You write AS3 classes that extend Godot's own classes. The same source runs in t
 and Android, and on Nintendo Switch through the Kumikae build.
 
 > **Status: early.** Today the compiler checks an AS3 program against Godot's whole API and reports syntax,
-> name and type errors. Nothing runs inside Godot yet. The [roadmap](docs/roadmap.md) shows what comes next
+> name and type errors, on the command line and to an editor through its language server. Nothing runs
+> inside Godot yet. The [roadmap](docs/roadmap.md) shows what comes next
 > and how you can tell when each stage is done.
 
 ## What you will write
@@ -70,11 +71,12 @@ package game {
 | Report type errors (assignments, arguments, returns, overrides, interfaces, constants) | **Works** |
 | Godot's whole API under AS3 names (`moveAndSlide()`, `timer.timeout.connect(f)`, `Key.ESCAPE`) | **Works** |
 | Arithmetic on Godot's math types (`position + velocity * delta` is a `Vector2`; `position + node` is an error) | **Works** |
-| Errors as you type and go to definition, in VS Code and Rider | Next |
+| Language server (`kas3c lsp`): errors as you type, go to definition, find references, hover, outline | **Works** in scripted sessions; [not yet tried in an editor](editors/README.md) |
 | Run a script in the Godot editor | Planned (stage 2) |
 | Export a release build as native code | Planned (stage 3) |
 | iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |
-| Language server, debugger, JetBrains plugin | Planned (stage 6) |
+| Completion, rename, Godot's documentation in hover | Planned |
+| Debugger, JetBrains plugin | Planned (stage 6) |
 
 ## Try the compiler
 
@@ -109,6 +111,7 @@ Errors go to standard error as `<file>:<line>:<column>: error: <message>`. The e
 are no errors, 1 when a file has errors, and 2 for bad usage or an unreadable file.
 
 For what the compiler accepts and checks, and its limits, see the [compiler README](compiler/README.md).
+To see the errors in an editor as you type, see [editors](editors/README.md).
 
 ## How it works
 
@@ -182,6 +185,8 @@ For what each stage delivers and what is being built now, see the [roadmap](docs
 |---|---|
 | `compiler/` | The front end as a library (`kas3front`), the `kas3c` command-line tool, and their tests. |
 | `compiler/godot/` | The generator that writes Godot's API as AS3 declarations, and its output, `godot.as`. |
+| `compiler/lsp/` | The language server behind `kas3c lsp`. |
+| `editors/` | How to connect an editor, and the VS Code client. |
 | `docs/roadmap.md` | The plan: stages, what each delivers, and current progress. |
 | `docs/diagrams/` | The diagrams on this page, and the script that generates them. |
 | `docs/superpowers/specs/` | The design, and the performance redesign that amends it. |
@@ -196,7 +201,7 @@ The throwaway speed spike is kept on the `spike/stage-0b` branch.
 - [Performance redesign](docs/superpowers/specs/2026-11-11-performance-redesign.md): the rules that generated
   code follows, and the owner's decision on the speed goal. Where the two documents disagree, this one wins.
 - [Language server](docs/superpowers/specs/2026-11-12-language-server-design.md): the plan for editor
-  support. Its first slice follows stage 1.
+  support. Its first slice is built.
 - [Godot naming](docs/superpowers/specs/2026-11-12-godot-naming-design.md): how Godot's API is named in AS3.
   Approved.
 - [Language additions](docs/superpowers/specs/2026-11-12-language-additions.md): candidates for going beyond
