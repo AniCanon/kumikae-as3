@@ -145,8 +145,8 @@ with tempfile.TemporaryDirectory() as folder:
 		private var timer:Timer = new Timer();
 
 		override public function _ready():void {
-			timer.timeout.connect(onTimeout);
-			(getNode("Hitbox") as Area2D).bodyEntered.connect(onBodyEntered);
+			timer.timeout.add(onTimeout);
+			(getNode("Hitbox") as Area2D).bodyEntered.add(onBodyEntered);
 			processMode = Node.PROCESS_MODE_PAUSABLE;
 		}
 

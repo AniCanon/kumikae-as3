@@ -108,13 +108,15 @@ AS3 has no enum type, so an enum value is an `int`.
 - **A signal is a property holding a `Signal`, named in lowerCamel (call):**
 
   ```actionscript
-  button.pressed.connect(onPressed);
-  timer.timeout.disconnect(onTimeout);
+  button.pressed.add(onPressed);
+  timer.timeout.addOnce(onTimeout);   // called once, then removed
+  timer.timeout.remove(onTimeout);
   healthChanged.emit(health);
   ```
 
-  The verbs are Godot's (`connect`, `disconnect`, `emit`). This is the as3-signals shape, which AS3
-  programmers know, and it is what SwiftGodot chose.
+  `add`, `addOnce` and `remove` are the as3-signals names, which AS3 programmers know; the owner chose
+  them over Godot's `connect` and `disconnect`, which also still work (see "Decided by the owner after
+  approval"). `emit` is Godot's.
 - A script declares one with the metadata the main design already has:
   `[Signal] public var healthChanged:Signal;`
 - There is no `addEventListener` form. One way to do it.
@@ -134,6 +136,15 @@ AS3 has no enum type, so an enum value is an `int`.
 - **String-based calls use Godot's names:** `call("add_child", node)`, `connect("body_entered", f)`. The
   engine resolves these, not the compiler. This is the "two naming worlds" problem that C# has. The typed
   forms above avoid it, and the language server can warn on a lowerCamel string that matches nothing.
+
+## Decided by the owner after approval
+
+- **Listening to a signal is `add`, `addOnce` and `remove` (owner, 2026-11-12).** The owner prefers these
+  to Godot's `connect` and `disconnect`. They are the names as3-signals uses. `add(f)` is `connect(f)`,
+  `addOnce(f)` is `connect(f)` with Godot's one-shot flag, and `remove(f)` is `disconnect(f)`. Godot's own
+  `connect`, `disconnect` and `isConnected` stay declared, so code that follows a Godot tutorial still
+  checks, and `connect`'s flags stay reachable. `emit` is unchanged. Once `await` exists, most one-off
+  listeners become `await timer.timeout`.
 
 ## Decided while building (stage 1d)
 
@@ -215,7 +226,7 @@ package {
         [Signal] public var died:Signal;
 
         override public function _ready():void {
-            (getNode("Hitbox") as Area2D).bodyEntered.connect(onBodyEntered);
+            (getNode("Hitbox") as Area2D).bodyEntered.add(onBodyEntered);
         }
 
         override public function _physicsProcess(delta:Number):void {
@@ -244,7 +255,7 @@ package {
 | `position.x = 5` | `position.x = 5` |
 | `visible = false` | `visible = false` |
 | `func _physics_process(delta)` | `override public function _physicsProcess(delta:Number):void` |
-| `timer.timeout.connect(f)` | `timer.timeout.connect(f)` |
+| `timer.timeout.connect(f)` | `timer.timeout.add(f)` |
 | `Input.is_action_pressed("jump")` | `Input.isActionPressed("jump")` |
 | `KEY_ESCAPE` | `Key.ESCAPE` |
 | `Node.PROCESS_MODE_PAUSABLE` | `Node.PROCESS_MODE_PAUSABLE` |

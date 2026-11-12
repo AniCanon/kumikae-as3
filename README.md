@@ -23,7 +23,7 @@ package game {
         [Signal] public var died:Signal;
 
         override public function _ready():void {
-            (getNode("Hitbox") as Area2D).bodyEntered.connect(onBodyEntered);
+            (getNode("Hitbox") as Area2D).bodyEntered.add(onBodyEntered);
         }
 
         override public function _physicsProcess(delta:Number):void {
@@ -69,7 +69,7 @@ package game {
 | Resolve names: packages, imports, classes, scopes (`kas3c check`) | **Works** |
 | Give every expression a type and resolve `a.b` (`kas3c check --dump-types`) | **Works** |
 | Report type errors (assignments, arguments, returns, overrides, interfaces, constants) | **Works** |
-| Godot's whole API under AS3 names (`moveAndSlide()`, `timer.timeout.connect(f)`, `Key.ESCAPE`) | **Works** |
+| Godot's whole API under AS3 names (`moveAndSlide()`, `timer.timeout.add(f)`, `Key.ESCAPE`) | **Works** |
 | Arithmetic on Godot's math types (`position + velocity * delta` is a `Vector2`; `position + node` is an error) | **Works** |
 | Language server (`kas3c lsp`): errors as you type, go to definition, find references, hover, outline | **Works** in scripted sessions; [not yet tried in an editor](editors/README.md) |
 | Run a script in the Godot editor | Planned (stage 2) |

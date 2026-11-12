@@ -6,7 +6,7 @@ package {
 		[Signal] public var boom:Signal;
 		private var state:int = 0;
 
-		override public function _ready():void { boom.connect(onBoom); }
+		override public function _ready():void { boom.add(onBoom); }
 		public function fire():void { boom.emit(); state++; }
 		public function onBoom():void {
 			state++;

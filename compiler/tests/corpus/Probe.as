@@ -6,7 +6,7 @@ package {
 		[Signal] public var pinged:Signal;
 		private var count:int;
 
-		override public function _ready():void { count = 0; pinged.connect(onPinged); }
+		override public function _ready():void { count = 0; pinged.add(onPinged); }
 		override public function _process(delta:Number):void { count++; }
 		public function getCount():int { return count; }
 		public function explode():void {

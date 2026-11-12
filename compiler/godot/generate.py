@@ -56,6 +56,15 @@ OBJECT_EXTRAS = [
     _extra("free", virtual=False),
 ]
 
+# AS3's spelling for listening to a signal, beside Godot's connect and disconnect: the names AS3
+# programmers know from as3-signals. The binding maps them: add is connect, addOnce is connect with the
+# one-shot flag, remove is disconnect.
+SIGNAL_EXTRAS = [
+    ("add", "public native function add(listener:Function):void;"),
+    ("addOnce", "public native function addOnce(listener:Function):void;"),
+    ("remove", "public native function remove(listener:Function):void;"),
+]
+
 # Members that AS3's own Object stands for. A script writes toString() as in any AS3 class; the binding
 # answers Godot's _to_string with it and calls Godot's to_string for it, so neither is declared.
 AS3_HAS_METHOD = {("Object", "to_string")}
@@ -502,6 +511,10 @@ class Generator:
             out.extend(self.function(where, name, method.get("arguments", []), method.get("return_type"), None,
                                      method["is_vararg"], "static " if method["is_static"] else "",
                                      (owner, method["name"])))
+        if owner == "Signal":
+            for name, line in SIGNAL_EXTRAS:
+                self.claim(owner, name, "AS3's " + name, {})
+                out.append(line)
         self.lines.extend(self.enum_lines(entry))
         self.lines.extend(self.operator_lines(entry))
         self.block("public final native class %s" % as3_name, out)

@@ -207,6 +207,23 @@ class Fixture(unittest.TestCase):
         self.assertIn("public native function connect(callable:Function, flags:int = 0):int;", signal)
         self.assertIn("public native function emit(...rest):void;", signal)
 
+    def test_signal_listeners(self):
+        # AS3's spelling beside Godot's: add, addOnce and remove.
+        signal = self.members("Signal")
+        self.assertIn("public native function add(listener:Function):void;", signal)
+        self.assertIn("public native function addOnce(listener:Function):void;", signal)
+        self.assertIn("public native function remove(listener:Function):void;", signal)
+        self.assertIn("public native function connect(callable:Function, flags:int = 0):int;", signal)  # Godot's stays.
+
+    def test_signal_listener_clash(self):
+        # If Godot ever gives Signal a method of one of those names, the generator stops.
+        api = fixture()
+        for entry in api["builtin_classes"]:
+            if entry["name"] == "Signal":
+                entry["methods"].append({"name": "add_once", "is_vararg": False, "is_const": False, "is_static": False})
+        with self.assertRaises(generate.Refused):
+            generate.generate(api)
+
     def test_global_functions(self):
         self.assertIn("\tpublic native function print(arg1:*, ...rest):void;\n", self.text)
         self.assertIn("\tpublic native function lerp(from:*, to:*, weight:*):*;\n", self.text)
@@ -410,7 +427,7 @@ class FixtureCompiles(unittest.TestCase):
 		[Signal] public var died:Signal;
 
 		override public function _ready():void {
-			(getNode("Hitbox") as Node).childEnteredTree.connect(onEntered);
+			(getNode("Hitbox") as Node).childEnteredTree.add(onEntered); died.addOnce(onEntered); died.remove(onEntered);
 			processMode = Node.PROCESS_MODE_ALWAYS;
 			var at:Vector2 = new Vector2(1, 2);
 			at.x = Vector2.ZERO.distanceTo(new Vector2());

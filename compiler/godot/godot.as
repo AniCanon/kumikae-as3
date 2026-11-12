@@ -934,6 +934,9 @@ package godot {
 		public native function getConnections():GodotArray;
 		public native function hasConnections():Boolean;
 		public native function emit(...rest):void;
+		public native function add(listener:Function):void;
+		public native function addOnce(listener:Function):void;
+		public native function remove(listener:Function):void;
 	}
 	[Operators]
 	[Indexed(element="*", keyed="true")]
