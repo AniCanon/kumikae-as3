@@ -1,0 +1,52 @@
+{
+  "name": "kumikae-as3",
+  "displayName": "Kumikae AS3",
+  "description": "ActionScript 3 for Godot: errors as you type, go to definition, find references, hover and outline, from kas3c.",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "languages": [
+      {
+        "id": "actionscript",
+        "aliases": ["ActionScript 3", "actionscript"],
+        "extensions": [".as"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "actionscript",
+        "scopeName": "source.actionscript.kas3",
+        "path": "./syntaxes/actionscript.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Kumikae AS3",
+      "properties": {
+        "kas3.serverPath": {
+          "type": "string",
+          "default": "kas3c",
+          "description": "The kas3c program: a full path, or a name found on the PATH."
+        },
+        "kas3.godot": {
+          "type": "boolean",
+          "default": true,
+          "description": "Load Godot's API (the godot package)."
+        },
+        "kas3.declarations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "More declaration files to load."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

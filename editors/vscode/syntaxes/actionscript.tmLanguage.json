@@ -1,0 +1,43 @@
+{
+  "name": "ActionScript 3",
+  "scopeName": "source.actionscript.kas3",
+  "patterns": [
+    { "name": "comment.line.double-slash.actionscript", "match": "//.*$" },
+    { "name": "comment.block.actionscript", "begin": "/\\*", "end": "\\*/" },
+    {
+      "name": "string.quoted.double.actionscript",
+      "begin": "\"",
+      "end": "\"|$",
+      "patterns": [{ "name": "constant.character.escape.actionscript", "match": "\\\\." }]
+    },
+    {
+      "name": "string.quoted.single.actionscript",
+      "begin": "'",
+      "end": "'|$",
+      "patterns": [{ "name": "constant.character.escape.actionscript", "match": "\\\\." }]
+    },
+    { "name": "meta.metadata.actionscript", "match": "^\\s*\\[[A-Za-z_][A-Za-z0-9_]*[^\\]]*\\]\\s*$" },
+    { "name": "constant.numeric.actionscript", "match": "\\b(0[xX][0-9a-fA-F]+|[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?)\\b" },
+    { "name": "constant.language.actionscript", "match": "\\b(true|false|null|undefined|NaN|Infinity)\\b" },
+    {
+      "name": "keyword.control.actionscript",
+      "match": "\\b(if|else|for|each|in|while|do|switch|case|default|break|continue|return|throw|try|catch|finally|with)\\b"
+    },
+    {
+      "name": "storage.type.actionscript",
+      "match": "\\b(package|import|class|interface|function|var|const|extends|implements|get|set|namespace|use)\\b"
+    },
+    {
+      "name": "storage.modifier.actionscript",
+      "match": "\\b(public|private|protected|internal|static|final|override|dynamic|native)\\b"
+    },
+    { "name": "keyword.operator.word.actionscript", "match": "\\b(new|delete|typeof|instanceof|is|as|void)\\b" },
+    { "name": "variable.language.actionscript", "match": "\\b(this|super|arguments)\\b" },
+    {
+      "name": "support.type.actionscript",
+      "match": "\\b(int|uint|Number|Boolean|String|Array|Object|Function|Class|Vector|Dictionary|RegExp|Date|Error|XML)\\b"
+    },
+    { "name": "entity.name.type.actionscript", "match": "\\b[A-Z][A-Za-z0-9_$]*\\b" },
+    { "name": "entity.name.function.actionscript", "match": "\\b[a-z_$][A-Za-z0-9_$]*(?=\\s*\\()" }
+  ]
+}
