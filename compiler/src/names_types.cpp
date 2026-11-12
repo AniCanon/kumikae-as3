@@ -162,6 +162,8 @@ class Typer {
 	Symbol *class_ = nullptr; // The class whose member is being typed, if any.
 	bool static_ = false;
 	int closures_ = 0; // How many function expressions or nested functions enclose the current code.
+	FunctionDecl *current_ = nullptr; // The innermost function being typed.
+	bool leaves_ = false; // It has a `return <value>` or a `throw` somewhere in its own body.
 
 	const Type *any_;
 	const Type *unknown_;
@@ -977,10 +979,11 @@ class Typer {
 				}
 			} break;
 			case NodeKind::Return:
-				expression(static_cast<Return *>(p_statement)->value);
+				returned(static_cast<Return *>(p_statement));
 				break;
 			case NodeKind::Throw:
 				expression(static_cast<Throw *>(p_statement)->value);
+				leaves_ = true;
 				break;
 			case NodeKind::Try: {
 				Try *attempt = static_cast<Try *>(p_statement);
@@ -1003,11 +1006,53 @@ class Typer {
 		}
 	}
 
+	void returned(Return *p_return) {
+		const Type *value = expression(p_return->value);
+		if (!p_return->value || !current_) {
+			return;
+		}
+		leaves_ = true;
+		bool constructor = class_ && class_->klass->constructor && class_->klass->constructor->node == current_;
+		TypeRef *declared = current_->return_type;
+		if (constructor) {
+			error(p_return->value->offset, "a constructor can't return a value");
+		} else if (declared && declared->form == TypeRef::Void) {
+			// Passing on the result of another function that returns nothing is left alone.
+			if (value->kind != Type::Void && value->kind != Type::Unknown) {
+				error(p_return->value->offset, "a function declared 'void' can't return a value");
+			}
+		} else {
+			store(p_return->value, compilation_.type_of(declared));
+		}
+	}
+
 	void function(FunctionDecl *p_function) {
 		for (Parameter &parameter : p_function->parameters) {
 			expression(parameter.default_value);
+			if (!parameter.is_rest) {
+				store(parameter.default_value, compilation_.type_of(parameter.type));
+			}
 		}
+		FunctionDecl *outer = current_;
+		bool outer_leaves = leaves_;
+		current_ = p_function;
+		leaves_ = false;
 		statement(p_function->body);
+		// Paths are not followed: only a body with no `return <value>` and no `throw` anywhere is reported.
+		TypeRef *declared = p_function->return_type;
+		bool constructor = class_ && class_->klass->constructor && class_->klass->constructor->node == p_function;
+		if (p_function->body && !leaves_ && !constructor && declared && declared->form != TypeRef::Void &&
+				declared->form != TypeRef::Any) {
+			const Type *type = compilation_.type_of(declared);
+			if (type->kind != Type::Unknown) {
+				bool named = !p_function->name.empty();
+				error(named ? p_function->name_offset : p_function->offset,
+						(named ? quoted(p_function->name) : std::string("this function")) + " is declared to return " +
+								quoted(compilation_.type_name(type)) + " but never returns a value");
+			}
+		}
+		current_ = outer;
+		leaves_ = outer_leaves;
 	}
 
 	void definition(Node *p_node) {

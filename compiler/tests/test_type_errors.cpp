@@ -158,7 +158,65 @@ static void test_argument_types() {
 	expect(program("var v:Vector.</*!*/Gone> = null; v.push(1, \"a\", sub);"), { "unknown type 'Gone'" });
 }
 
+#define VOID_RETURN "a function declared 'void' can't return a value"
+
+static void test_returns() {
+	// What fits the declared type.
+	expect(program("", "public function a():int { return 1.5; } public function b():String { return null; }\n"
+					   "public function c():Base { return sub; } public function d():* { return 1; }\n"
+					   "public function e() { return 1; } public function f():void { return; }\n"
+					   "public function g():Shape { if (flag) { return sub; } return null; }\n"
+					   "public function get h():Number { return count; } public function i():Object { return 1; }\n"
+					   "public function j():void { nothing(); } public function k():int { throw new Error(\"no\"); }\n"
+					   "public function l():void { return nothing(); } public function set m(v:int):void { return; }\n"
+					   "public function n():int { while (true) { if (flag) { return 1; } } }\n"
+					   "public function o():Function { return function():int { return 1; }; }\n"
+					   "public function p():void { var q:Function = function():int { return 1; }; }"),
+			{});
+	// What does not.
+	expect(program("", "public function a():String { return /*!*/1; } public function b():Sub { return /*!*/base; }\n"
+					   "public function c():int { return /*!*/label; } public function get d():String { return /*!*/count; }\n"
+					   "public function e():Vector.<int> { return /*!*/subs; }\n"
+					   "public function f():int { var g:Function = function():String { return /*!*/1; }; return /*!*/\"x\"; }"),
+			{ UNRELATED("int", "String"), NEEDS_CAST("Base", "Sub"), UNRELATED("String", "int"),
+					UNRELATED("int", "String"), UNRELATED("Vector.<Sub>", "Vector.<int>"), UNRELATED("int", "String"),
+					UNRELATED("String", "int") });
+	// A value from a function that has none to give.
+	expect(program("", "public function a():void { return /*!*/1; } public function set b(v:int):void { return /*!*/v; }\n"
+					   "public function c():void { var d:Function = function():int { return 1; }; return /*!*/label; }\n"
+					   "public function e():int { var f:Function = function():void { return /*!*/2; }; return 1; }"),
+			{ VOID_RETURN, VOID_RETURN, VOID_RETURN, VOID_RETURN });
+	expect("package { public class Main { public function Main() { return /*!*/1; } } }\n"
+		   "class Other { public function Other() { return; } }\n",
+			{ "a constructor can't return a value" });
+	// A declared type and nothing returned at all.
+	expect(program("", "public function /*!*/a():int {} public function get /*!*/b():String { nothing(); }\n"
+					   "public function /*!*/c():Base { var d:Function = function():int { return 1; }; }\n"
+					   "public function e():int { var f:Function = /*!*/function():String {}; return 1; }\n"
+					   "public function /*!*/g():int { return; }",
+				   "function /*!*/loose():Number {}\n"),
+			{ "'a' is declared to return 'int' but never returns a value",
+					"'b' is declared to return 'String' but never returns a value",
+					"'c' is declared to return 'Base' but never returns a value",
+					"this function is declared to return 'String' but never returns a value",
+					"'g' is declared to return 'int' but never returns a value",
+					"'loose' is declared to return 'Number' but never returns a value" });
+	// Declarations without bodies return nothing and say nothing.
+	expect("package { public class Main implements Shape { public function area():Number { return 1; } } }\n"
+		   "interface Shape { function area():Number; }\n",
+			{});
+}
+
+static void test_parameter_defaults() {
+	expect(program("", "public function a(x:int = 1, y:String = null, z:Number = 2, w:Object = \"s\", v:Boolean = false, u:* = 1,"
+					   " t = 2, s:Array = null, r:uint = 0xFF):void {}\n"
+					   "public function b(x:int = /*!*/\"a\", y:String = /*!*/1, z:Sub = null):void {}"),
+			{ UNRELATED("String", "int"), UNRELATED("int", "String") });
+}
+
 int main() {
+	test_returns();
+	test_parameter_defaults();
 	test_argument_counts();
 	test_argument_types();
 	test_conversions_accepted();
