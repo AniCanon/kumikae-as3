@@ -7,7 +7,7 @@ For why the project exists and how it works, see the [README](../README.md).
 
 ## Where we are
 
-**Stage 1 of 6, the front end.** The parser, name resolution and expression types are built. Reporting type errors is next.
+**Stage 1 of 6, the front end.** The parser, name resolution, expression types and type errors are built, and checked against about 190,000 lines of real AS3. Godot's API in AS3 is next.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -50,8 +50,8 @@ column. Stage 1 has three parts.
 | 1a. Parser | `kas3c parse` | Every syntax error is reported with its position, and no input can crash the parser. | Done |
 | 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | Done |
 | 1c-1. Expression types | `kas3c check --dump-types` | Every expression has a type, and `a.b` resolves to a member with AS3's access rules. | Done |
-| 1c-2. Type errors | Type checking in `kas3c check` | A value that doesn't fit where it is used is reported: assignments, arguments, returns, overrides, interfaces, `const`, definite null misuse. | Next |
-| 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the [naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | `moveAndSlide()`, `position`, `timer.timeout.connect(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | After 1c-2 |
+| 1c-2. Type errors | Type checking in `kas3c check` | A value that doesn't fit where it is used is reported: assignments, arguments, returns, overrides, interfaces, `const`. | Done |
+| 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the [naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | `moveAndSlide()`, `position`, `timer.timeout.connect(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | Next |
 | 1c-3. Godot's math types | Operators on `Vector2` and its relatives | `position + velocity * delta` has a type. | After 1d |
 
 ### Language server, first slice
@@ -117,18 +117,17 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What comes next: stage 1c-2, type errors
+## What comes next: stage 1d, Godot's API in AS3
 
-**Goal:** `kas3c check` reports a value that doesn't fit where it is used, before the program runs.
+**Goal:** every Godot class, method, property, signal and constant can be named from AS3, under the
+[naming design](superpowers/specs/2026-11-12-godot-naming-design.md). The design needs your approval first.
 
 | Step | What it does |
 |---|---|
-| 1. Conversions | Decides which conversions AS3 applies silently, and records each one once so that both backends apply the same one. |
-| 2. Assignments and initializers | Checks that the value fits the variable, field or property. |
-| 3. Calls | Checks argument counts and types, including constructors and `super(...)`. |
-| 4. Returns | Checks `return` against the declared type, and missing returns. |
-| 5. Class rules | Override signatures, interface completeness, assignment to `const`. |
-| 6. Null | Reports use of a value that is definitely `null`. |
+| 1. Generator | Reads Godot's API description and writes one AS3 declaration file for the `godot` package. |
+| 2. Clash test | Fails if any generated name clashes with another or with an AS3 built-in. |
+| 3. Signals and enums | `timer.timeout.connect(f)` and `Key.ESCAPE` check. |
+| 4. Corpus | The test programs are rewritten to the new names, and the hand-written stand-in is deleted. |
 
 ## Decisions made
 

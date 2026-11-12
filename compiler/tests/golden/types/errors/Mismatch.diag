@@ -1,0 +1,15 @@
+golden/types/errors/Mismatch.as:3:15: error: 'Mismatch' must implement 'reset' from Scored
+golden/types/errors/Mismatch.as:6:27: error: can't use a value of type 'String' where 'int' is expected
+golden/types/errors/Mismatch.as:9:4: error: 'Entity' takes 1 argument but 2 were given
+golden/types/errors/Mismatch.as:10:11: error: a constructor can't return a value
+golden/types/errors/Mismatch.as:17:28: error: 'update' must have the same parameters and return type as 'update' in Entity
+golden/types/errors/Mismatch.as:18:24: error: a value of type 'Entity' may not be a 'Mismatch'; use 'as' or a cast
+golden/types/errors/Mismatch.as:19:23: error: can't use a value of type 'int' where 'String' is expected
+golden/types/errors/Mismatch.as:20:18: error: can't use a value of type 'int' where 'String' is expected
+golden/types/errors/Mismatch.as:21:4: error: 'move' takes 2 arguments but 1 was given
+golden/types/errors/Mismatch.as:22:4: error: 'move' takes 2 arguments but 3 were given
+golden/types/errors/Mismatch.as:23:4: error: can't assign to the constant 'LIVES'
+golden/types/errors/Mismatch.as:24:4: error: 'points' is read-only
+golden/types/errors/Mismatch.as:25:4: error: can't assign to the method 'update'
+golden/types/errors/Mismatch.as:26:11: error: a function declared 'void' can't return a value
+golden/types/errors/Mismatch.as:29:19: error: 'total' is declared to return 'Number' but never returns a value

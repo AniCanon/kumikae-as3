@@ -91,9 +91,36 @@ its names mean: inside it, names resolve only to other declarations, and its own
   is reached through its own class (`Base.count`, not `Sub.count` and not `object.count`). A static and
   an instance member may share a name; a bare name in instance code means the instance member.
 
-Not checked yet (the next part of stage 1c): whether a value fits where it is used (assignments, arguments,
-returns), argument counts, override signatures, whether a class implements all of its interfaces' methods,
-and assignment to `const`.
+- **Values that don't fit:** a value stored in a variable, field or property, passed as an argument,
+  returned, or given as a parameter default must fit the declared type. See "What fits" below.
+- **Argument counts** of calls to a known function, method or constructor, and of `super(...)`.
+- **Returns:** a value returned from a `void` function, a setter or a constructor; a function with a
+  declared type whose body has no `return` with a value and no `throw` anywhere.
+- **Overrides** must repeat the parameters and return type of the method they override.
+- **Interfaces:** a class must have a public method or accessor, with the same signature, for every method
+  of every interface it names.
+- **Writes** to a `const`, to a property with no setter, to a method, a package function or a class.
+
+## What fits
+
+A value of type A may be used where B is expected when one of these holds:
+
+- Either is `*`, or the compiler does not know one of them.
+- A is B, or B is `Object` or `Boolean`.
+- Both are number types (`int`, `uint`, `Number`).
+- A is `null`.
+- A is a class and B is one of its base classes, or an interface that it or a base class implements.
+- A is an interface and B is one that it extends.
+- Both are `Vector` with the same element type. `Vector.<Sub>` does not fit `Vector.<Base>`.
+- A is a class itself (`Player`, not a player) and B is `Class`.
+
+Otherwise it is an error. When B is a subclass or implementer of A, the message asks for a cast
+(`a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`). A `void` result fits only `*`.
+
+**Reported only where AS3's rule is certain.** These are not checked: compound assignment (`s += 1`),
+operands of operators and comparisons, conditions, `for each` variables, calls through a `Function` value,
+class names called as conversions (`int(x)`), `null` stored in a number (Adobe's compiler warns), and use of
+a value that is certainly `null`.
 
 ## How expressions are typed
 
@@ -106,8 +133,7 @@ and assignment to `const`.
 - **An assignment has the type of what is assigned to.** `i = n` and `i += n` are `int` when `i` is. Adobe's
   reference describes the result as the assigned value; which of the two its compiler produces has not been
   checked.
-- **`x as int`, `as uint`, `as Number` and `as Boolean` are `Object`,** because `as` gives `null` when the
-  value is not of the type.
+- **`x as T` has the type `T`,** also for `int`, `Number` and `Boolean`, as in Adobe's compiler.
 - **Only a number indexes a vector's elements.** `v[i]` with a numeric `i` has the element type; any other
   index is `*`.
 - **An unknown member of a dynamic class is `*`.** The dynamic classes are `Object`, `Class`, `Array`,
@@ -182,6 +208,7 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   every byte-prefix of each one, to check that no malformed input can crash or hang it.
 
 - `tests/test_types.cpp`: one expression per check, each with the type it must have.
+- `tests/test_type_errors.cpp`: values that fit and values that don't, with the expected errors marked.
 - `tests/golden/types/`: whole programs through `kas3c check --dump-types`.
 - `tests/test_names.cpp`: name resolution, one check per message, with the expected error positions marked
   in the source as `/*!*/`.

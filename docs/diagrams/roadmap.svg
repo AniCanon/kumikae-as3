@@ -29,22 +29,22 @@
 <text x="136" y="318" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Unknown and duplicate names are reported before running.</text>
 <rect x="832" y="270" width="112" height="24" rx="12.0" fill="#1E8E3E"/>
 <text x="888.0" y="286.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
-<rect x="116" y="340" width="844" height="68" rx="10" fill="#FFF1CC" stroke="#C77700" stroke-width="1.5"/>
-<circle cx="76" cy="374.0" r="22" fill="#C77700"/>
+<rect x="116" y="340" width="844" height="68" rx="10" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
+<circle cx="76" cy="374.0" r="22" fill="#1E8E3E"/>
 <text x="76" y="379.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">1c</text>
 <text x="136" y="362" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Types</text>
-<text x="136" y="381" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Part 1, expression types and member access: built. Part 2, type errors: next.</text>
-<text x="136" y="398" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Type errors and definite null misuse are reported before running.</text>
-<rect x="832" y="350" width="112" height="24" rx="12.0" fill="#C77700"/>
-<text x="888.0" y="366.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">In progress</text>
-<rect x="116" y="420" width="844" height="68" rx="10" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
-<circle cx="76" cy="454.0" r="22" fill="#3D6FB6"/>
+<text x="136" y="381" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Every expression has a type; values that don&#x27;t fit are reported.</text>
+<text x="136" y="398" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Type errors are reported before running. Checked against 190,000 lines of real AS3.</text>
+<rect x="832" y="350" width="112" height="24" rx="12.0" fill="#1E8E3E"/>
+<text x="888.0" y="366.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
+<rect x="116" y="420" width="844" height="68" rx="10" fill="#FFF8E6" stroke="#C77700" stroke-width="1.5"/>
+<circle cx="76" cy="454.0" r="22" fill="#C77700"/>
 <text x="76" y="459.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">1d</text>
 <text x="136" y="442" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Godot&#x27;s API in AS3</text>
 <text x="136" y="461" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Godot&#x27;s 1,036 classes as AS3 declarations: moveAndSlide(), position, Key.ESCAPE.</text>
 <text x="136" y="478" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Every Godot name checks, and no generated name clashes.</text>
-<rect x="832" y="430" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
-<text x="888.0" y="446.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
+<rect x="832" y="430" width="112" height="24" rx="12.0" fill="#C77700"/>
+<text x="888.0" y="446.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Next</text>
 <rect x="116" y="500" width="844" height="68" rx="10" fill="#E6EEFA" stroke="#3D6FB6" stroke-width="1.5"/>
 <circle cx="76" cy="534.0" r="22" fill="#3D6FB6"/>
 <text x="76" y="539.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">L1</text>
