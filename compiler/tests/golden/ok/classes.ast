@@ -1,0 +1,84 @@
+Program @1:1
+  PackageDecl name="game.actors" @1:1
+    Import name="godot.CharacterBody2D" @2:2
+    Import name="godot.Vector2" @3:2
+    ClassDecl name="Player" mods=public,final @5:2
+      extends:
+        Type CharacterBody2D @5:36
+      implements:
+        Type IDamageable @5:63
+      VarDecl const mods=public,static @6:3
+        Declarator name="MAX_HP" @6:23
+          Type int @6:30
+          NumberLit text="100" @6:36
+      VarDecl mods=private @7:3
+        Declarator name="_hp" @7:15
+          Type int @7:19
+          Name text="MAX_HP" @7:25
+      VarDecl mods=protected @8:3
+        Declarator name="velocity" @8:17
+          Type Vector2 @8:26
+          New has_arguments @8:36
+            Name text="Vector2" @8:40
+            NumberLit text="0" @8:48
+            NumberLit text="0" @8:51
+      FunctionDecl name="Player" mods=public @10:3
+        Parameter name="name" @10:26
+          Type String @10:31
+          StringLit text="\"hero\"" @10:40
+        Block @10:48
+          ExprStmt @11:4
+            Call @11:4
+              SuperExpr @11:4
+      FunctionDecl name="_process" mods=public,override @14:3
+        Parameter name="delta" @14:37
+          Type Number @14:43
+        returns:
+          Type void @14:51
+        Block @14:56
+          ExprStmt @15:4
+            Assign op="+=" @15:4
+              Member name="x" @15:4
+                Name text="position" @15:4
+              Binary op="*" @15:18
+                Member name="x" @15:18
+                  Name text="velocity" @15:18
+                Name text="delta" @15:31
+      FunctionDecl name="hp" getter mods=public @18:3
+        returns:
+          Type int @18:28
+        Block @18:32
+          Return @18:34
+            Name text="_hp" @18:41
+      FunctionDecl name="hp" setter mods=public @19:3
+        Parameter name="value" @19:26
+          Type int @19:32
+        returns:
+          Type void @19:37
+        Block @19:42
+          ExprStmt @19:44
+            Assign op="=" @19:44
+              Name text="_hp" @19:44
+              Conditional @19:50
+                Binary op="<" @19:50
+                  Name text="value" @19:50
+                  NumberLit text="0" @19:58
+                NumberLit text="0" @19:62
+                Name text="value" @19:66
+      FunctionDecl name="create" mods=internal,static @20:3
+        Parameter name="names" rest @20:35
+        returns:
+          Type Player @20:45
+        Block @20:52
+          Return @20:54
+            New has_arguments @20:61
+              Name text="Player" @20:65
+              Index @20:72
+                Name text="names" @20:72
+                NumberLit text="0" @20:78
+      FunctionDecl name="fast" mods=public,native @21:3
+        Parameter name="x" @21:31
+          Type int @21:33
+        returns:
+          Type int @21:38
+  ClassDecl name="Helper" @25:1

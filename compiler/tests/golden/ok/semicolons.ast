@@ -1,0 +1,43 @@
+Program @1:1
+  FunctionDecl name="f" @1:1
+    Parameter name="a" @1:12
+      Type int @1:14
+    Parameter name="b" @1:19
+      Type int @1:21
+    returns:
+      Type int @1:26
+    Block @1:30
+      VarDecl @2:2
+        Declarator name="x" @2:6
+          Name text="a" @2:10
+      VarDecl @3:2
+        Declarator name="y" @3:6
+          Name text="b" @3:10
+      ExprStmt @4:2
+        Assign op="=" @4:2
+          Name text="x" @4:2
+          Call @4:6
+            Name text="y" @4:6
+            Name text="a" @5:3
+      ExprStmt @6:2
+        Assign op="=" @6:2
+          Name text="x" @6:2
+          Index @6:6
+            Name text="y" @6:6
+            NumberLit text="0" @7:3
+      ExprStmt @8:2
+        Name text="x" @8:2
+      ExprStmt @9:2
+        Unary op="++" @9:2
+          Name text="y" @9:4
+      If @10:2
+        Name text="x" @10:6
+        Return @10:9
+      ExprStmt @11:2
+        Assign op="=" @11:2
+          Name text="y" @11:2
+          NumberLit text="1" @11:6
+      Return @12:2
+        Binary op="+" @12:9
+          Name text="x" @12:9
+          Name text="y" @12:13

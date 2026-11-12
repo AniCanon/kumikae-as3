@@ -6,4 +6,4 @@ spike/api/
 __pycache__/
 .superpowers/
 .DS_Store
-/compiler/build/
+/compiler/build*/

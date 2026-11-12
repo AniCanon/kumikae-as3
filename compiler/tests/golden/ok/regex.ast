@@ -1,0 +1,37 @@
+Program @1:1
+  VarDecl @1:1
+    Declarator name="a" @1:5
+      Type RegExp @1:7
+      RegexLit text="/ab+c/gi" @1:16
+  VarDecl @2:1
+    Declarator name="b" @2:5
+      Type Array @2:7
+      Call @2:15
+        Member name="split" @2:15
+          StringLit text="\"a b\"" @2:15
+        RegexLit text="/\\s+/" @2:27
+  VarDecl @3:1
+    Declarator name="c" @3:5
+      Type Number @3:7
+      Binary op="/" @3:16
+        Binary op="/" @3:16
+          Name text="total" @3:16
+          Name text="count" @3:24
+        NumberLit text="2" @3:32
+  VarDecl @4:1
+    Declarator name="d" @4:5
+      Type RegExp @4:7
+      RegexLit text="/[/\"']/" @4:16
+  VarDecl @5:1
+    Declarator name="e" @5:5
+      Type Boolean @5:7
+      Call @5:17
+        Member name="test" @5:17
+          RegexLit text="/=/" @5:17
+        StringLit text="\"=\"" @5:26
+  VarDecl @6:1
+    Declarator name="f" @6:5
+      Type Number @6:7
+      Binary op="/" @6:17
+        Name text="a" @6:17
+        NumberLit text="2" @6:22

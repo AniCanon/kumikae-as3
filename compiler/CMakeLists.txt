@@ -29,3 +29,13 @@ foreach(test_source ${KAS3_TESTS})
     target_compile_definitions(${test_name} PRIVATE KAS3_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# The command-line tool.
+add_executable(kas3c tools/kas3c.cpp)
+target_link_libraries(kas3c PRIVATE kas3front)
+target_compile_options(kas3c PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:kas3c>)
+add_test(NAME golden COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_golden.py
+    $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)

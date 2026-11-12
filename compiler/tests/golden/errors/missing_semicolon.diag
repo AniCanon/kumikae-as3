@@ -1,0 +1,2 @@
+golden/errors/missing_semicolon.as:2:16: error: expected ';' but found 'var'
+golden/errors/missing_semicolon.as:3:6: error: expected ';' but found 'h'

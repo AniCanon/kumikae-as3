@@ -1,0 +1,9 @@
+golden/errors/unsupported.as:1:1: error: namespaces are not supported
+golden/errors/unsupported.as:2:1: error: namespaces are not supported
+golden/errors/unsupported.as:3:1: error: 'include' is not supported
+golden/errors/unsupported.as:4:1: error: E4X (XML syntax) is not supported
+golden/errors/unsupported.as:7:3: error: the 'with' statement is not supported
+golden/errors/unsupported.as:8:14: error: namespaces are not supported
+golden/errors/unsupported.as:9:15: error: E4X (XML syntax) is not supported
+golden/errors/unsupported.as:10:14: error: E4X (XML syntax) is not supported
+golden/errors/unsupported.as:11:15: error: E4X (XML syntax) is not supported

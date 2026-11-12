@@ -29,6 +29,9 @@ const Token &Parser::peek2() {
 Token Parser::advance() {
 	Token token = current_;
 	previous_end_ = token.offset + token.length;
+	if (aborted_) {
+		return token; // Already at the end: see enter().
+	}
 	if (has_next_) {
 		current_ = next_;
 		has_next_ = false;
@@ -62,6 +65,9 @@ std::string Parser::describe(const Token &p_token) const {
 }
 
 void Parser::error_at(uint32_t p_offset, std::string p_message, bool p_panic) {
+	if (aborted_) {
+		return;
+	}
 	if (p_panic) {
 		panic_ = true;
 	}
@@ -96,7 +102,12 @@ bool Parser::enter() {
 			too_deep_reported_ = true;
 			diagnostics_.error(current_.offset, "code is nested too deeply");
 		}
-		panic_ = true;
+		// Stop here. Unwinding 256 levels would otherwise report every unclosed bracket on the way out, so
+		// the parser jumps to the end of the file and says nothing more.
+		aborted_ = true;
+		uint32_t end = (uint32_t)source_.text().size();
+		current_ = Token{ TokenKind::EndOfFile, end, 0, false };
+		has_next_ = false;
 		return false;
 	}
 	depth_++;

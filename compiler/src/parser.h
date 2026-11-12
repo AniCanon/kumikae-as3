@@ -48,6 +48,7 @@ private:
 	int depth_ = 0;
 	bool too_deep_reported_ = false;
 	bool too_long_reported_ = false;
+	bool aborted_ = false; // Nesting ran past the cap: the rest of the file is not parsed.
 	uint32_t last_height_ = 1; // Height of the expression most recently returned.
 
 	bool panic_ = false; // An error was reported; the enclosing list should resynchronise.

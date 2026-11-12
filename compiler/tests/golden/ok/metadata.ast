@@ -1,0 +1,20 @@
+Program @1:1
+  PackageDecl @1:1
+    ClassDecl name="Tagged" mods=public @2:2
+      Metadata name="Tool" @2:2
+      Metadata name="Signal" args=[name="hit", args="amount:int"] @3:2
+      VarDecl mods=public @5:3
+        Metadata name="Export" @5:3
+        Declarator name="speed" @5:23
+          Type Number @5:29
+          NumberLit text="200" @5:38
+      VarDecl mods=public @6:3
+        Metadata name="Export" args=[min="0", max="10"] @6:3
+        Metadata name="Inspectable" @7:3
+        Declarator name="level" @8:14
+          Type int @8:20
+          NumberLit text="1" @8:26
+      VarDecl const mods=private,static @10:3
+        Metadata name="Embed" args=[source="a.png", mimeType="image/png"] @10:3
+        Declarator name="ICON" @11:24
+          Type Class @11:29

@@ -1,0 +1,111 @@
+Program @1:1
+  VarDecl @1:1
+    Declarator name="a" @1:5
+      Type int @1:7
+      Binary op="-" @1:13
+        Binary op="+" @1:13
+          NumberLit text="1" @1:13
+          Binary op="*" @1:17
+            NumberLit text="2" @1:17
+            NumberLit text="3" @1:21
+        Binary op="%" @1:25
+          Binary op="/" @1:25
+            NumberLit text="4" @1:25
+            NumberLit text="2" @1:29
+          NumberLit text="3" @1:33
+  VarDecl @2:1
+    Declarator name="b" @2:5
+      Type Boolean @2:7
+      Binary op="||" @2:17
+        Binary op="||" @2:17
+          Unary op="!" @2:17
+            Name text="a" @2:18
+          Binary op="&&" @2:23
+            Binary op=">" @2:23
+              Name text="a" @2:23
+              NumberLit text="1" @2:27
+            Binary op="<=" @2:32
+              Name text="a" @2:32
+              NumberLit text="9" @2:37
+        Binary op="===" @2:42
+          Name text="a" @2:42
+          NumberLit text="3" @2:48
+  VarDecl @3:1
+    Declarator name="c" @3:5
+      Type int @3:7
+      Binary op="|" @3:13
+        Binary op="&" @3:13
+          Binary op=">>>" @3:13
+            Binary op=">>" @3:13
+              Binary op="<<" @3:13
+                Name text="a" @3:13
+                NumberLit text="2" @3:18
+              NumberLit text="1" @3:23
+            NumberLit text="0" @3:29
+          NumberLit text="0xFF" @3:33
+        Binary op="^" @3:40
+          NumberLit text="1" @3:40
+          NumberLit text="2" @3:44
+  VarDecl @4:1
+    Declarator name="d" @4:5
+      Type * @4:7
+      Conditional @4:11
+        Name text="a" @4:11
+        Name text="b" @4:15
+        Name text="c" @4:19
+  VarDecl @5:1
+    Declarator name="e" @5:5
+      Type Object @5:7
+      ObjectLit @5:16
+        Field key="x" @5:18
+          NumberLit text="1" @5:21
+        Field key="y" string @5:24
+          ArrayLit @5:29
+            NumberLit text="1" @5:30
+            hole
+            NumberLit text="3" @5:35
+        Field key="nested" @5:39
+          ObjectLit @5:47
+            Field key="z" @5:49
+              NullLit @5:52
+  VarDecl @6:1
+    Declarator name="f" @6:5
+      Type int @6:7
+      Binary op="," @6:14
+        Binary op="," @6:14
+          Binary op="," @6:14
+            Assign op="+=" @6:14
+              Name text="a" @6:14
+              NumberLit text="2" @6:19
+            Postfix op="++" @6:22
+              Name text="a" @6:22
+          Unary op="--" @6:27
+            Name text="a" @6:29
+        Unary op="-" @6:32
+          Name text="a" @6:33
+  VarDecl @7:1
+    Declarator name="g" @7:5
+      Type Boolean @7:7
+      Binary op="&&" @7:17
+        Binary op="&&" @7:17
+          Binary op="is" @7:17
+            Name text="e" @7:17
+            Name text="Object" @7:22
+          Binary op="in" @7:32
+            StringLit text="\"x\"" @7:32
+            Name text="e" @7:39
+        Binary op="instanceof" @7:44
+          Name text="e" @7:44
+          Name text="Object" @7:57
+  VarDecl @8:1
+    Declarator name="h" @8:5
+      Type String @8:7
+      Binary op="+" @8:17
+        Call @8:17
+          Member name="toString" @8:17
+            Member name="x" @8:17
+              Binary op="as" @8:17
+                Name text="e" @8:17
+                Name text="Object" @8:22
+        Unary op="typeof" @8:45
+          Name text="e" @8:52

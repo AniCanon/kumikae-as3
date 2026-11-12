@@ -1,0 +1,22 @@
+Program @1:1
+  PackageDecl @1:1
+    InterfaceDecl name="IDamageable" mods=public @2:2
+      extends:
+        Type IEntity @2:39
+        Type IEventDispatcher @2:48
+      FunctionDecl name="damage" @3:3
+        Parameter name="amount" @3:19
+          Type int @3:26
+        Parameter name="source" @3:31
+          Type Object @3:38
+          NullLit @3:47
+        returns:
+          Type Boolean @3:53
+      FunctionDecl name="hp" getter @4:3
+        returns:
+          Type int @4:21
+      FunctionDecl name="hp" setter @5:3
+        Parameter name="value" @5:19
+          Type int @5:25
+        returns:
+          Type void @5:30

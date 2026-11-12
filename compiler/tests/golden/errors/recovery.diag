@@ -1,0 +1,3 @@
+golden/errors/recovery.as:2:6: error: expected a variable name but found '='
+golden/errors/recovery.as:5:7: error: expected an expression but found ';'
+golden/errors/recovery.as:7:12: error: expected an expression but found ';'

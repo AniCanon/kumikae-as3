@@ -246,6 +246,11 @@ static void depth_and_length_caps() {
 	std::string nested(300, '(');
 	Parsed deep = expr(nested);
 	CHECK_EQ(count(deep.errors, "code is nested too deeply"), 1);
+	// Past the cap the parser stops: one diagnostic, not one per unclosed bracket.
+	CHECK_EQ(count(deep.errors, "error:"), 1);
+	Parsed balanced = stmt("{ var x:int = " + nested + "1" + std::string(300, ')') + "; var y:int = 2; }");
+	CHECK_EQ(count(balanced.errors, "error:"), 1);
+	CHECK_EQ(count(balanced.errors, "code is nested too deeply"), 1);
 	std::string unary(1000, '-');
 	CHECK_EQ(count(expr(unary + "a").errors, "code is nested too deeply"), 1);
 

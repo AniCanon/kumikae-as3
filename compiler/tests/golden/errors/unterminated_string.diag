@@ -1,0 +1,2 @@
+golden/errors/unterminated_string.as:1:16: error: unterminated string
+golden/errors/unterminated_string.as:3:16: error: unterminated string

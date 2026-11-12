@@ -1,0 +1,112 @@
+Program @1:1
+  FunctionDecl name="run" @1:1
+    Parameter name="list" @1:14
+      Type Array @1:19
+    Parameter name="limit" @1:26
+      Type int @1:32
+    returns:
+      Type int @1:37
+    Block @1:41
+      VarDecl @2:2
+        Declarator name="total" @2:6
+          Type int @2:12
+          NumberLit text="0" @2:18
+      Labeled label="outer" @3:2
+        For @3:9
+          init:
+            VarDecl @3:14
+              Declarator name="i" @3:18
+                Type int @3:20
+                NumberLit text="0" @3:26
+          condition:
+            Binary op="<" @3:29
+              Name text="i" @3:29
+              Member name="length" @3:33
+                Name text="list" @3:33
+          update:
+            Postfix op="++" @3:46
+              Name text="i" @3:46
+          Block @3:51
+            If @4:3
+              Binary op="==" @4:7
+                Index @4:7
+                  Name text="list" @4:7
+                  Name text="i" @4:12
+                NullLit @4:18
+              Continue label="outer" @4:24
+              else:
+                If @5:8
+                  Binary op=">" @5:12
+                    Name text="total" @5:12
+                    Name text="limit" @5:20
+                  Break @5:27
+            ExprStmt @6:3
+              Assign op="+=" @6:3
+                Name text="total" @6:3
+                Index @6:12
+                  Name text="list" @6:12
+                  Name text="i" @6:17
+      ForIn @8:2
+        VarDecl @8:7
+          Declarator name="key" @8:11
+            Type String @8:15
+        Name text="list" @8:25
+        ExprStmt @8:31
+          Call @8:31
+            Name text="trace" @8:31
+            Name text="key" @8:37
+      ForIn each @9:2
+        VarDecl @9:12
+          Declarator name="item" @9:16
+            Type * @9:21
+        Name text="list" @9:26
+        Block @9:32
+          ExprStmt @9:34
+            Call @9:34
+              Name text="trace" @9:34
+              Name text="item" @9:40
+      DoWhile @10:2
+        Block @10:5
+          ExprStmt @10:7
+            Postfix op="--" @10:7
+              Name text="total" @10:7
+        Binary op=">" @10:25
+          Name text="total" @10:25
+          Name text="limit" @10:33
+      While @11:2
+        BoolLit false @11:9
+        Empty @11:16
+      Switch @12:2
+        Name text="total" @12:10
+        Case @13:3
+          NumberLit text="0" @13:8
+        Case @14:3
+          NumberLit text="1" @14:8
+          Return @14:11
+            NumberLit text="1" @14:18
+        Default @15:3
+          Throw @15:12
+            New has_arguments @15:18
+              Name text="Error" @15:22
+              StringLit text="\"bad\"" @15:28
+      Try @17:2
+        Block @17:6
+          ExprStmt @17:8
+            Call @17:8
+              Name text="risky" @17:8
+        Catch name="e" @17:19
+          Type TypeError @17:28
+          Block @17:39
+            ExprStmt @17:41
+              Call @17:41
+                Name text="trace" @17:41
+                Name text="e" @17:47
+        Catch name="e" @17:53
+          Block @17:63
+        finally:
+          Block @17:75
+            ExprStmt @17:77
+              Call @17:77
+                Name text="done" @17:77
+      Return @18:2
+        Name text="total" @18:9
