@@ -45,7 +45,15 @@ add_custom_command(OUTPUT ${godot_path}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot.as ${CMAKE_CURRENT_SOURCE_DIR}/godot/embed.py
     COMMENT "Embedding Godot's API declarations")
 
-add_library(kas3front STATIC ${KAS3_SOURCES} ${builtins_path} ${godot_path})
+# So are Godot's own names for what godot.as declares (godot/godot_names.txt, by the same generator).
+set(godot_names_path "${CMAKE_CURRENT_BINARY_DIR}/godot_names_data.cpp")
+add_custom_command(OUTPUT ${godot_names_path}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/godot/embed.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot_names.txt ${godot_names_path} godot_names_text
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot_names.txt ${CMAKE_CURRENT_SOURCE_DIR}/godot/embed.py
+    COMMENT "Embedding Godot's names")
+
+add_library(kas3front STATIC ${KAS3_SOURCES} ${builtins_path} ${godot_path} ${godot_names_path})
 target_include_directories(kas3front PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(kas3front PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 

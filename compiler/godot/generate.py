@@ -1,10 +1,13 @@
 """Writes Godot's API as AS3 declarations for the `godot` package.
 
-Usage: generate.py <extension_api.json> <out.as>
+Usage: generate.py <extension_api.json> <out.as> [<names.txt>]
 
 The input is Godot's own API description (`godot --dump-extension-api`). The output is one declaration
 file: `native` classes and functions with no bodies, which the compiler reads to learn which names exist.
 The naming rules are in naming.py and docs/superpowers/specs/2026-11-12-godot-naming-design.md.
+
+With a third argument it also writes the Godot spelling of every declared class and member, one
+"AS3 name=Godot name" line each, for the bindings.
 
 The generator stops (Refused) on anything it does not understand. It never guesses a type.
 """
@@ -174,6 +177,7 @@ class Generator:
         self.singletons = {entry["type"] for entry in api["singletons"]}
         self.as3 = as3_names()
         self.lines = []
+        self.godot_names = {}  # "Class.member" or "Class" in AS3 -> the Godot spelling.
         self.defined = set()
         self.names = {}  # Godot class name -> {AS3 member name: what it is}
         self.left_out = []  # Members with raw pointers.
@@ -328,6 +332,9 @@ class Generator:
         if other is not None:
             raise Refused("%s: '%s' names both %s and %s" % (owner, name, other, what))
         own[name] = what
+        # "the method move_and_slide": the last word is Godot's own name for it.
+        if what.startswith("the "):
+            self.godot_names["%s.%s" % (naming.class_name(owner), name)] = what.split(" ")[-1]
 
     def integer(self, value, where):
         if not isinstance(value, int) or isinstance(value, bool):
@@ -572,6 +579,16 @@ class Generator:
                      for method in entry.get("methods", [])}
         return sorted((set(WIDTHS) - self.used_widths) | ((AS3_HAS_METHOD | LISTEN_BY_NAME) - described))
 
+    def names_text(self):
+        """One "AS3 name=Godot name" line per declared class and member, sorted. Call after run()."""
+        names = dict(self.godot_names)
+        for group in ("classes", "builtin_classes"):
+            for entry in self.api[group]:
+                as3_name = naming.class_name(entry["name"])
+                if as3_name in self.defined:
+                    names[as3_name] = entry["name"]
+        return "".join("%s=%s\n" % item for item in sorted(names.items()))
+
     def run(self):
         try:
             return self.write()
@@ -618,8 +635,12 @@ def generate(api):
     return Generator(api).run()
 
 
+def names_text(generator):
+    return generator.names_text()
+
+
 def main(arguments):
-    if len(arguments) != 3:
+    if len(arguments) not in (3, 4):
         sys.stderr.write(__doc__)
         return 2
     with open(arguments[1]) as file:
@@ -636,6 +657,9 @@ def main(arguments):
         return 1
     with open(arguments[2], "w") as file:
         file.write(text)
+    if len(arguments) == 4:
+        with open(arguments[3], "w") as file:
+            file.write(generator.names_text())
     sys.stderr.write("%d lines; %d members with raw pointers left out\n" % (len(generator.lines),
                                                                            len(generator.left_out)))
     return 0

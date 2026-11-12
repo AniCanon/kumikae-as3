@@ -495,6 +495,42 @@ class RealApi(unittest.TestCase):
         self.assertTrue(self.text == read(os.path.join(HERE, "godot.as")),
                         "godot.as is stale: run generate.py again")
 
+    def test_the_committed_names_are_current(self):
+        self.assertTrue(self.generator.names_text() == read(os.path.join(HERE, "godot_names.txt")),
+                        "godot_names.txt is stale: run generate.py again")
+
+    def test_godot_names(self):
+        # The Godot spelling of everything declared, for the bindings: never worked out backwards from the
+        # AS3 name, which loses information (getNode3d).
+        names = dict(line.split("=") for line in self.generator.names_text().split("\n") if line)
+        self.assertEqual(names["CharacterBody2D.moveAndSlide"], "move_and_slide")
+        self.assertEqual(names["Node._physicsProcess"], "_physics_process")
+        self.assertEqual(names["Node2D.position"], "position")
+        self.assertEqual(names["CharacterBody2D.velocity"], "velocity")
+        self.assertEqual(names["Node.childEnteredTree"], "child_entered_tree")
+        self.assertEqual(names["GodotObject"], "Object")
+        self.assertEqual(names["GodotObject.getInstanceId"], "get_instance_id")
+        self.assertEqual(names["Vector2.distanceTo"], "distance_to")
+        self.assertEqual(names["Vector2.x"], "x")
+        self.assertEqual(names["Input.isActionPressed"], "is_action_pressed")
+        self.assertEqual(names["Node"], "Node")
+        self.assertGreater(len(names), 15000)
+        # Every member line of a Godot class in godot.as has its name here, except AS3's own additions.
+        own = {"Signal.add", "Signal.addOnce", "Signal.remove", "Signal.removeAll", "Signal.has", "Signal.numListeners"}
+        missing = []
+        klass = None
+        import re
+        for line in self.text.split("\n"):
+            head = re.match(r"\tpublic (?:final )?native class (\w+)", line)
+            if head:
+                klass = head.group(1)
+            member = re.match(r"\t\tpublic (?:static |final )*(?:native function (?:get |set )?|var )(\w+)", line)
+            if klass and member and member.group(1) != klass:
+                key = "%s.%s" % (klass, member.group(1))
+                if key not in names and key not in own:
+                    missing.append(key)
+        self.assertEqual(missing[:10], [])
+
     def test_only_the_listed_classes_are_renamed(self):
         names = [entry["name"] for group in ("classes", "builtin_classes", "global_enums")
                  for entry in self.api[group]]

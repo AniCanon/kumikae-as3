@@ -710,7 +710,25 @@ static void test_corpus_prefixes() {
 	CHECK_EQ(whole.format_diagnostics(), std::string());
 }
 
+static void test_godot_names() {
+	std::string name;
+	CHECK(godot_name("CharacterBody2D", "moveAndSlide", &name));
+	CHECK_EQ(name, std::string("move_and_slide"));
+	CHECK(godot_name("Node", "_physicsProcess", &name));
+	CHECK_EQ(name, std::string("_physics_process"));
+	CHECK(godot_name("GodotObject", "", &name));
+	CHECK_EQ(name, std::string("Object"));
+	CHECK(godot_name("Node2D", "position", &name));
+	CHECK_EQ(name, std::string("position"));
+	// The declaring class is asked, not a subclass; and nothing is made up.
+	CHECK(!godot_name("CharacterBody2D", "position", &name));
+	CHECK(!godot_name("Node", "noSuchThing", &name));
+	CHECK(!godot_name("NoSuchClass", "", &name));
+	CHECK(!godot_name("Signal", "add", &name)); // AS3's own addition: the binding maps it.
+}
+
 int main() {
+	test_godot_names();
 	test_model();
 	test_declare();
 	test_imports();

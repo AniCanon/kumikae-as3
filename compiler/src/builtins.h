@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 
 namespace kas3 {
 
@@ -17,5 +18,12 @@ extern const int BUILTIN_FILE_COUNT;
 // the built-ins: add it to a Compilation as a declaration file under GODOT_DECLARATIONS_PATH.
 std::string godot_declarations();
 inline const char *const GODOT_DECLARATIONS_PATH = "<godot>/godot.as";
+
+// Godot's own spelling of what godot.as declares, for calling the engine: "move_and_slide" for
+// ("CharacterBody2D", "moveAndSlide"), "Object" for the class "GodotObject" (an empty member). The class is
+// the one that declares the member, not a subclass. False if nothing of that name is declared. The names
+// come from Godot's API description (compiler/godot/godot_names.txt), never from reversing the AS3 name.
+bool godot_name(std::string_view p_class, std::string_view p_member, std::string *r_name);
+std::string godot_names_text();
 
 } // namespace kas3

@@ -32,5 +32,5 @@ godot --headless --dump-extension-api
 ```
 
 ```bash
-python3 compiler/godot/generate.py extension_api.json compiler/godot/godot.as
+python3 compiler/godot/generate.py extension_api.json compiler/godot/godot.as compiler/godot/godot_names.txt
 ```
