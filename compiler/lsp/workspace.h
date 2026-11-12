@@ -70,6 +70,9 @@ public:
 	// A file or a folder was created, changed or deleted outside the editor.
 	void file_changed_on_disk(const std::string &p_path);
 
+	// The text the workspace holds for a file right now (the editor's, if it is open), without checking
+	// anything. Null if it holds none.
+	const std::string *text(const std::string &p_path) const;
 	bool stale() const { return stale_; }
 	// True if the project had more .as files than the limit, so some were left out.
 	bool cut_off() const { return cut_off_; }

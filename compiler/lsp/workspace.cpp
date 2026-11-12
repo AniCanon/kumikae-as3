@@ -282,6 +282,16 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 	}
 }
 
+const std::string *Workspace::text(const std::string &p_path) const {
+	std::string path = normal(p_path);
+	int declared = declaration(path);
+	if (declared >= 0) {
+		return &declarations_[(size_t)declared]->source.text();
+	}
+	auto found = files_.find(path);
+	return found == files_.end() || !found->second.parsed ? nullptr : &found->second.parsed->source.text();
+}
+
 void Workspace::check() {
 	// The old compilation goes first: the new one writes onto the same trees.
 	queries_.reset();

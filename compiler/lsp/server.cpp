@@ -163,9 +163,13 @@ Json Server::location(const Place &p_place) {
 }
 
 uint32_t Server::offset_at(const Unit &p_unit, const Json &p_position) const {
+	return offset_in(p_unit.source, p_position);
+}
+
+uint32_t Server::offset_in(const Source &p_source, const Json &p_position) const {
 	int64_t line = p_position.get("line").integer(-1);
 	int64_t character = p_position.get("character").integer(0);
-	const Source &source = p_unit.source;
+	const Source &source = p_source;
 	if (line < 0) {
 		return 0;
 	}
@@ -282,7 +286,7 @@ Json Server::initialize(const Json &p_params) {
 	initialized_ = true;
 	Json provided = Json::object();
 	provided.set("positionEncoding", utf8_ ? "utf-8" : "utf-16");
-	provided.set("textDocumentSync", Json::object().set("openClose", true).set("change", 1)); // Whole documents.
+	provided.set("textDocumentSync", Json::object().set("openClose", true).set("change", 2)); // The ranges that changed.
 	provided.set("definitionProvider", true);
 	provided.set("referencesProvider", true);
 	provided.set("hoverProvider", true);
@@ -405,12 +409,32 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 			workspace_.open(path, document.get("text").string());
 		}
 	} else if (p_method == "textDocument/didChange") {
-		// Whole documents were asked for: the last change is the text. A change with a range is one the
-		// server did not ask for and cannot place.
+		// Each change applies to the text the one before it left: a range of it replaced, or, with no
+		// range, the whole of it.
+		const std::string *held = path.empty() ? nullptr : workspace_.text(path);
 		const Json &changes = p_params.get("contentChanges");
-		const Json &last = changes.at(changes.size() ? changes.size() - 1 : 0);
-		if (!path.empty() && last.get("text").is_string() && !last.has("range")) {
-			workspace_.change(path, last.get("text").string());
+		bool any = false;
+		std::string text = held ? *held : std::string();
+		for (const Json &change : changes.items()) {
+			if (!change.get("text").is_string()) {
+				continue;
+			}
+			const Json &range = change.get("range");
+			if (!range.is_object()) {
+				text = change.get("text").string();
+			} else {
+				Source before(std::string(), text);
+				uint32_t from = offset_in(before, range.get("start"));
+				uint32_t to = offset_in(before, range.get("end"));
+				if (to < from) {
+					std::swap(from, to);
+				}
+				text = before.text().substr(0, from) + change.get("text").string() + before.text().substr(to);
+			}
+			any = true;
+		}
+		if (!path.empty() && any) {
+			workspace_.change(path, std::move(text));
 		}
 	} else if (p_method == "textDocument/didClose") {
 		if (!path.empty()) {

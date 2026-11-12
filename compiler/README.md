@@ -228,7 +228,7 @@ Limits:
 
 - Find references on a method also lists the methods that override it and the one it overrides.
 - Workspace symbols are the project's own. Godot's classes are not listed.
-- Changes must arrive as whole documents, which is what the server asks the editor for.
+- A change arrives as the range of text that changed; a whole document is accepted too.
 - No completion, signature help, rename or code actions yet.
 - A file is known by the path the editor gives. The same file reached through a symbolic link, or under a
   name that differs only in letter case, counts as a second file and its classes are reported as already

@@ -167,7 +167,7 @@ static void test_lifecycle() {
 	Json answer = session.request("initialize", Json::object().set("capabilities", Json::object()));
 	const Json &capabilities = answer.get("result").get("capabilities");
 	CHECK_EQ(capabilities.get("positionEncoding").string(), std::string("utf-16"));
-	CHECK_EQ(capabilities.get("textDocumentSync").get("change").integer(), (int64_t)1);
+	CHECK_EQ(capabilities.get("textDocumentSync").get("change").integer(), (int64_t)2); // Changed ranges.
 	CHECK(capabilities.get("textDocumentSync").get("openClose").boolean());
 	CHECK(capabilities.get("definitionProvider").boolean());
 	CHECK(capabilities.get("referencesProvider").boolean());
@@ -533,6 +533,51 @@ static void test_file_limit() {
 	fs::remove_all(root);
 }
 
+// An editor sends the part of a document that changed. Several changes in one message apply in order, each
+// to the text the one before left, with positions counted as the editor counts them.
+static void test_ranged_changes() {
+	for (int encoding = 0; encoding < 2; encoding++) {
+		bool utf8 = encoding == 1;
+		Session session;
+		session.initialize(std::string(), utf8);
+		// "é" is one UTF-16 unit and two bytes; "😀" is two units and four bytes.
+		session.open(MAIN, "package {\npublic class Main {\n\tvar s:String = \"\xC3\xA9\xF0\x9F\x98\x80\"; var n:int = 1;\n}\n}\n");
+		session.settle();
+		CHECK_EQ(session.published(), std::string());
+		auto range = [](int p_line, int p_from, int p_to_line, int p_to) {
+			return Json::object()
+					.set("start", Json::object().set("line", p_line).set("character", p_from))
+					.set("end", Json::object().set("line", p_to_line).set("character", p_to));
+		};
+		auto change = [&](Json p_changes) {
+			session.notify("textDocument/didChange",
+					Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", 2)).set("contentChanges", std::move(p_changes)));
+			session.settle();
+		};
+		// Replace the `1` after the non-ASCII text with a string: the position differs by encoding.
+		int one = utf8 ? 38 : 35;
+		change(Json::array().push(Json::object().set("range", range(2, one, 2, one + 1)).set("text", "\"x\"")));
+		CHECK_EQ(session.published(), MAIN + " 2:" + std::to_string(one) + "-2:" + std::to_string(one + 3) +
+											   " can't use a value of type 'String' where 'int' is expected\n");
+		// Two changes at once: an insertion of a new line, then a fix on the line it pushed down.
+		change(Json::array()
+						.push(Json::object().set("range", range(1, 19, 1, 19)).set("text", "\n\tvar extra:Missing;"))
+						.push(Json::object().set("range", range(3, one, 3, one + 3)).set("text", "2")));
+		CHECK_EQ(session.published(), MAIN + " 2:11-2:18 unknown type 'Missing'\n");
+		// A deletion across lines, and a whole-document change mixed in.
+		change(Json::array().push(Json::object().set("range", range(1, 19, 2, 19)).set("text", "")));
+		CHECK_EQ(session.published(), MAIN + " clear\n");
+		change(Json::array()
+						.push(Json::object().set("text", "package { public class Main { var a:int; } }"))
+						.push(Json::object().set("range", range(0, 36, 0, 39)).set("text", "Nope")));
+		CHECK_EQ(session.published(), MAIN + " 0:36-0:40 unknown type 'Nope'\n");
+		// A range past the end of the text is clamped to it, not a crash.
+		change(Json::array().push(Json::object().set("range", range(50, 0, 99, 7)).set("text", " ")));
+		change(Json::array().push(Json::object().set("range", range(0, 36, 0, 40)).set("text", "int")));
+		CHECK_EQ(session.published(), MAIN + " clear\n");
+	}
+}
+
 static void test_file_watching() {
 	Session session;
 	Json params = Json::object();
@@ -657,6 +702,7 @@ int main() {
 	test_navigation();
 	test_declaration_files();
 	test_file_limit();
+	test_ranged_changes();
 	test_file_watching();
 	test_agreement();
 	test_typing();
