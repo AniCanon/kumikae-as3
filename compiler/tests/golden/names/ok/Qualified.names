@@ -3,14 +3,14 @@
 7:30 Dictionary -> class flash.utils.Dictionary (built in)
 8:24 Dictionary -> class flash.utils.Dictionary (built in)
 8:53 Dictionary -> class flash.utils.Dictionary (built in)
-9:18 Node -> class godot.Node @stubs/godot.as:5:22
-9:35 Node -> class godot.Node @stubs/godot.as:5:22
+9:18 Node -> class godot.Node (Godot)
+9:35 Node -> class godot.Node (Godot)
 10:15 int -> class int (built in)
 10:21 getTimer -> function flash.utils.getTimer (built in)
 10:46 getTimer -> function flash.utils.getTimer (built in)
 11:12 Vector -> class Vector (built in)
-11:26 Node -> class godot.Node @stubs/godot.as:5:22
-11:45 Node -> class godot.Node @stubs/godot.as:5:22
+11:26 Node -> class godot.Node (Godot)
+11:45 Node -> class godot.Node (Godot)
 11:51 node -> local node @9:7
 12:15 Error -> class Error (built in)
 12:27 RangeError -> class RangeError (built in)

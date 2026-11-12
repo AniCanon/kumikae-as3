@@ -1,4 +1,5 @@
 // Type errors: a value that does not fit where it is used.
+#include "builtins.h"
 #include "check.h"
 #include "marked.h"
 #include "names.h"
@@ -376,7 +377,45 @@ static void test_review_findings() {
 			{ "'Main' must implement 'area' from Shape", SAME_AS("f", "Base"), "'Sub' must implement 'area' from Shape" });
 }
 
+// A program that uses Godot's real API.
+static void expect_godot(const std::string &p_source, std::initializer_list<const char *> p_messages) {
+	MarkedSource source = mark("Main.as", p_source, p_messages);
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Main.as", source.text);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), source.expected);
+}
+
+// AS3's own collections convert when they are passed to the engine (performance redesign, section 7).
+// What comes back from the engine stays a Godot collection.
+static void test_engine_collections() {
+	const std::string head = "package { import godot.*; public class Main extends Line2D {\n"
+							 "public function run(list:Array, v2:Vector.<Vector2>, names:Vector.<String>, "
+							 "numbers:Vector.<Number>, ints:Vector.<int>, o:Object, node:Node):void {\n";
+	expect_godot(head + "points = v2; points = list; var a:GodotArray = list; a = names; a = [1, 2];\n"
+						"var d:GodotDictionary = o; d = {x: 1}; d = new flash.utils.Dictionary();\n"
+						"var f:PackedFloat32Array = numbers; f = ints; var b:PackedByteArray = ints;\n"
+						"var s:PackedStringArray = names; setMeta(\"k\", list); addChild(node);\n"
+						"var c:PackedColorArray = new <Color>[]; var i:PackedInt64Array = numbers; } } }\n",
+			{});
+	expect_godot(head + "points = /*!*/names; var f:PackedFloat32Array = /*!*/names; var a:GodotArray = /*!*/node;\n"
+						"var d:GodotDictionary = /*!*/list; var back:Array = /*!*/a; var v:Vector.<Vector2> = /*!*/points;\n"
+						"var s:PackedStringArray = /*!*/numbers; d = /*!*/node; var o2:flash.utils.Dictionary = /*!*/d;\n"
+						"var c:PackedColorArray = /*!*/v2; } } }\n",
+			{ UNRELATED("Vector.<String>", "PackedVector2Array"), UNRELATED("Vector.<String>", "PackedFloat32Array"),
+					UNRELATED("Node", "GodotArray"), UNRELATED("Array", "GodotDictionary"),
+					UNRELATED("GodotArray", "Array"), UNRELATED("PackedVector2Array", "Vector.<Vector2>"),
+					UNRELATED("Vector.<Number>", "PackedStringArray"), UNRELATED("Node", "GodotDictionary"),
+					UNRELATED("GodotDictionary", "Dictionary"), UNRELATED("Vector.<Vector2>", "PackedColorArray") });
+	// A class of the same name outside the `godot` package gets no such treatment.
+	expect("package { public class Main { public function run(list:Array):void { var a:GodotArray = /*!*/list; } } }\n"
+		   "class GodotArray {}\n",
+			{ UNRELATED("Array", "GodotArray") });
+}
+
 int main() {
+	test_engine_collections();
 	test_review_findings();
 	test_constants();
 	test_override_signatures();

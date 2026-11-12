@@ -15,7 +15,7 @@ package game {
 		override public function _process(delta:Number):void {
 			var where:Vector2 = position;
 			rotation += delta;
-			add_child(new Enemy(this));
+			addChild(new Enemy(this));
 			score = points + Enemy.count;
 		}
 

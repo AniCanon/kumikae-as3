@@ -11,7 +11,7 @@ package {
 
 		override public function _ready():void {
 			line = new Line2D();
-			add_child(line);
+			addChild(line);
 		}
 
 		override public function _process(delta:Number):void {
@@ -25,13 +25,13 @@ package {
 				for (i = 0; i < SIZE; i++) {
 					data.push(i + k);
 				}
-				set_meta("data", data);
+				setMeta("data", data);
 			}
 		}
 
 		public function checksum():Number {
-			var data:Array = get_meta("data") as Array;
-			return line.get_point_count() + data.length;
+			var data:Array = getMeta("data") as Array;
+			return line.getPointCount() + data.length;
 		}
 	}
 }

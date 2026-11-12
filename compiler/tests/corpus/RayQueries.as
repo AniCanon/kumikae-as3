@@ -1,7 +1,7 @@
 package {
 	import godot.CircleShape2D;
 	import godot.CollisionShape2D;
-	import godot.Dictionary;
+	import godot.GodotDictionary;
 	import godot.Node2D;
 	import godot.PhysicsDirectSpaceState2D;
 	import godot.PhysicsRayQueryParameters2D;
@@ -24,21 +24,21 @@ package {
 					var circle:CircleShape2D = new CircleShape2D();
 					circle.radius = 20;
 					shape.shape = circle;
-					body.add_child(shape);
+					body.addChild(shape);
 					body.position = new Vector2(gx * 100 + 50, gy * 100 + 50);
-					add_child(body);
+					addChild(body);
 				}
 			}
 			params = new PhysicsRayQueryParameters2D();
 		}
 
-		override public function _physics_process(delta:Number):void {
-			var space:PhysicsDirectSpaceState2D = get_world_2d().direct_space_state;
+		override public function _physicsProcess(delta:Number):void {
+			var space:PhysicsDirectSpaceState2D = getWorld2d().directSpaceState;
 			for (var i:int = 0; i < RAYS; i++) {
 				params.from = new Vector2(-50, i % 800);
 				params.to = new Vector2(850, (i * 7) % 800);
-				var result:Dictionary = space.intersect_ray(params);
-				if (!result.is_empty()) {
+				var result:GodotDictionary = space.intersectRay(params);
+				if (!result.isEmpty()) {
 					hits++;
 					var pos:Vector2 = result["position"];
 					sumX += pos.x;

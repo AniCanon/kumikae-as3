@@ -1,4 +1,5 @@
 // What `kas3c check --dump-names` prints.
+#include "builtins.h"
 #include "names.h"
 
 #include <algorithm>
@@ -36,6 +37,8 @@ std::string Compilation::dump_names() const {
 			}
 			if (!symbol->unit || symbol->unit->is_builtin) {
 				result += " (built in)";
+			} else if (symbol->unit->source.path() == GODOT_DECLARATIONS_PATH) {
+				result += " (Godot)"; // Its line numbers change with every Godot version.
 			} else {
 				Position declared = symbol->unit->source.position(symbol->offset);
 				result += " @";

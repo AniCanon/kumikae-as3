@@ -1,17 +1,18 @@
 package {
 	import godot.Node;
+	import godot.Signal;
 
-	[Signal(name="pinged")]
 	public class Probe extends Node {
+		[Signal] public var pinged:Signal;
 		private var count:int;
 
-		override public function _ready():void { count = 0; connect("pinged", on_pinged); }
+		override public function _ready():void { count = 0; pinged.connect(onPinged); }
 		override public function _process(delta:Number):void { count++; }
-		public function get_count():int { return count; }
+		public function getCount():int { return count; }
 		public function explode():void {
 			throw new Error("boom");
 		}
-		public function ping():void { emit_signal("pinged"); }
-		public function on_pinged():void { count += 100; }
+		public function ping():void { pinged.emit(); }
+		public function onPinged():void { count += 100; }
 	}
 }

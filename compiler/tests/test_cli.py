@@ -134,6 +134,70 @@ with tempfile.TemporaryDirectory() as folder:
         result = run("parse", "--dump-ast", deep)
         check(name, result.returncode == 1 and ": error: " in result.stderr, "exit %d" % result.returncode)
 
+    # check: Godot's API is known without any option, under its AS3 names.
+    player = os.path.join(folder, "Player.as")
+    program = """package {
+	import godot.*;
+
+	public class Player extends CharacterBody2D {
+		[Export] public var maxSpeed:Number = 300;
+		[Signal] public var died:Signal;
+		private var timer:Timer = new Timer();
+
+		override public function _ready():void {
+			timer.timeout.connect(onTimeout);
+			(getNode("Hitbox") as Area2D).bodyEntered.connect(onBodyEntered);
+			processMode = Node.PROCESS_MODE_PAUSABLE;
+		}
+
+		override public function _physicsProcess(delta:Number):void {
+			var direction:Number = Input.getAxis("left", "right");
+			velocity.x = direction * maxSpeed;
+			if (isOnFloor() && Input.isKeyPressed(Key.ESCAPE)) {
+				velocity.y = -400;
+			}
+			moveAndSlide();
+			position = new Vector2(lerp(position.x, 0, 0.5), Vector2.ZERO.y);
+			var ticks:Number = Time.getTicksUsec();
+			var data:GodotDictionary = new GodotDictionary();
+			if (!data.isEmpty() || GodotJSON.stringify(data) == "") { print("ticks", ticks); }
+		}
+
+		private function onTimeout():void {}
+
+		private function onBodyEntered(body:Node2D):void {
+			if (body.isInGroup("enemies")) {
+				died.emit();
+				queueFree();
+			}
+		}
+	}
+}
+"""
+    with open(player, "w") as handle:
+        handle.write(program)
+    result = run("check", player)
+    check("godot program", result.returncode == 0 and result.stderr == "", repr(result.stderr))
+
+    wrong = program.replace("_physicsProcess(delta:Number)", "_physicsProcess(delta:int)")
+    wrong = wrong.replace("moveAndSlide();", "move_and_slide();").replace("new Timer()", "new Timer(5)")
+    wrong = wrong.replace("died.emit();", "body.name = 5;")
+    with open(player, "w") as handle:
+        handle.write(wrong)
+    result = run("check", player)
+    messages = [line.split(": error: ")[1] for line in result.stderr.splitlines()]
+    check("godot errors", result.returncode == 1 and messages == [
+        "'Timer' takes no arguments but 1 was given",
+        "'_physicsProcess' must have the same parameters and return type as '_physicsProcess' in Node",
+        "undefined name 'move_and_slide'",
+        "can't use a value of type 'int' where 'String' is expected",
+    ], repr(result.stderr))
+
+    with open(player, "w") as handle:
+        handle.write(program)
+    result = run("check", "--no-godot", player)
+    check("no godot", result.returncode == 1 and "can't find package 'godot'" in result.stderr, repr(result.stderr))
+
 for failure in failures:
     print("FAIL " + failure)
 print("cli: %s" % ("OK" if not failures else "%d failed" % len(failures)))

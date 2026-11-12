@@ -36,7 +36,16 @@ if(NOT "${builtins_old}" STREQUAL "${builtins_cpp}")
     file(WRITE ${builtins_path} "${builtins_cpp}")
 endif()
 
-add_library(kas3front STATIC ${KAS3_SOURCES} ${builtins_path})
+# Godot's API as AS3 declarations (godot/godot.as, written by godot/generate.py) is embedded too.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+set(godot_path "${CMAKE_CURRENT_BINARY_DIR}/godot_data.cpp")
+add_custom_command(OUTPUT ${godot_path}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/godot/embed.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot.as ${godot_path}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/godot/godot.as ${CMAKE_CURRENT_SOURCE_DIR}/godot/embed.py
+    COMMENT "Embedding Godot's API declarations")
+
+add_library(kas3front STATIC ${KAS3_SOURCES} ${builtins_path} ${godot_path})
 target_include_directories(kas3front PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(kas3front PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
@@ -56,7 +65,8 @@ add_executable(kas3c tools/kas3c.cpp)
 target_link_libraries(kas3c PRIVATE kas3front)
 target_compile_options(kas3c PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
 add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:kas3c>)
 add_test(NAME golden COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_golden.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME godot COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/godot -p "test_*.py")
+set_tests_properties(godot PROPERTIES ENVIRONMENT "KAS3C=$<TARGET_FILE:kas3c>")

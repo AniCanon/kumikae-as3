@@ -177,6 +177,8 @@ class Typer {
 	const Type *string_;
 	const Type *array_;
 	const Type *object_;
+	const Type *dictionary_ = nullptr; // flash.utils.Dictionary
+	Package *godot_ = nullptr; // Godot's API, if the program has it.
 	const Type *function_;
 	const Type *regexp_;
 	const Type *class_type_;
@@ -279,6 +281,47 @@ class Typer {
 		return false;
 	}
 
+	// AS3's own collections are converted when they are handed to the engine: an Array or a Vector becomes
+	// a Godot array, a Vector becomes the packed array of its element type, and an Object or a
+	// flash.utils.Dictionary becomes a Godot dictionary. Nothing converts on the way back.
+	bool converts_to_engine(const Type *p_from, const Type *p_to) const {
+		auto in_godot = [&](const Type *p_type) {
+			return godot_ && p_type->kind == Type::Instance && p_type->symbol && p_type->symbol->package == godot_;
+		};
+		if (!in_godot(p_to)) {
+			return false;
+		}
+		std::string_view name = p_to->symbol->name;
+		if (name == "GodotArray") {
+			return p_from == array_ || p_from->kind == Type::Vector;
+		}
+		if (name == "GodotDictionary") {
+			return p_from == object_ || p_from == dictionary_;
+		}
+		const std::string_view head = "Packed";
+		const std::string_view tail = "Array";
+		if (name.size() <= head.size() + tail.size() || name.substr(0, head.size()) != head ||
+				name.substr(name.size() - tail.size()) != tail) {
+			return false;
+		}
+		if (p_from == array_) {
+			return true; // Its elements are checked when it is converted.
+		}
+		if (p_from->kind != Type::Vector) {
+			return false;
+		}
+		std::string_view element = name.substr(head.size(), name.size() - head.size() - tail.size());
+		const Type *from = p_from->element;
+		if (element == "Byte" || element == "Int32" || element == "Int64" || element == "Float32" ||
+				element == "Float64") {
+			return numeric(from);
+		}
+		if (element == "String") {
+			return from == string_;
+		}
+		return in_godot(from) && from->symbol->name == element; // Vector2, Vector3, Vector4, Color.
+	}
+
 	Fit fits(const Type *p_from, const Type *p_to) const {
 		if (p_from == p_to || p_from->kind == Type::Any || p_to->kind == Type::Any || p_to->kind == Type::Void ||
 				unresolved(p_from) || unresolved(p_to)) {
@@ -290,6 +333,9 @@ class Typer {
 		// Anything converts to a Boolean, everything is an Object, and the number types convert to each
 		// other. Adobe's compiler only warns when null is stored in a number, so nothing is said here.
 		if (p_to == boolean_ || p_to == object_ || (numeric(p_from) && numeric(p_to)) || p_from->kind == Type::Null) {
+			return Fit::Yes;
+		}
+		if (converts_to_engine(p_from, p_to)) {
 			return Fit::Yes;
 		}
 		if (p_from->kind == Type::ClassObject) {
@@ -1200,6 +1246,13 @@ public:
 		function_ = builtin("Function");
 		regexp_ = builtin("RegExp");
 		class_type_ = builtin("Class");
+		godot_ = compilation_.find_package("godot");
+		if (Package *utils = compilation_.find_package("flash.utils")) {
+			auto found = utils->definitions.find("Dictionary");
+			if (found != utils->definitions.end()) {
+				dictionary_ = compilation_.instance_type(found->second);
+			}
+		}
 	}
 
 	void run() {

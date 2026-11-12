@@ -1,0 +1,1175 @@
+{
+ "header": {
+  "version_full_name": "Fixture Engine v0"
+ },
+ "global_constants": [
+  {
+   "name": "INT32_MAX",
+   "value": 2147483647,
+   "is_bitfield": false
+  }
+ ],
+ "global_enums": [
+  {
+   "name": "Side",
+   "is_bitfield": false,
+   "values": [
+    {
+     "name": "SIDE_LEFT",
+     "value": 0
+    },
+    {
+     "name": "SIDE_TOP",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "name": "Key",
+   "is_bitfield": false,
+   "values": [
+    {
+     "name": "KEY_ESCAPE",
+     "value": 4194305
+    },
+    {
+     "name": "KEY_0",
+     "value": 48
+    },
+    {
+     "name": "KEY_A",
+     "value": 65
+    }
+   ]
+  },
+  {
+   "name": "Error",
+   "is_bitfield": false,
+   "values": [
+    {
+     "name": "OK",
+     "value": 0
+    },
+    {
+     "name": "FAILED",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "name": "Variant.Type",
+   "is_bitfield": false,
+   "values": [
+    {
+     "name": "TYPE_NIL",
+     "value": 0
+    },
+    {
+     "name": "TYPE_MAX",
+     "value": 39
+    }
+   ]
+  },
+  {
+   "name": "Wide",
+   "is_bitfield": true,
+   "values": [
+    {
+     "name": "WIDE_LOW",
+     "value": 1
+    },
+    {
+     "name": "WIDE_HIGH",
+     "value": 34359738368
+    }
+   ]
+  }
+ ],
+ "utility_functions": [
+  {
+   "name": "print",
+   "category": "general",
+   "is_vararg": true,
+   "hash": 1,
+   "arguments": [
+    {
+     "name": "arg1",
+     "type": "Variant"
+    }
+   ]
+  },
+  {
+   "name": "lerp",
+   "return_type": "Variant",
+   "category": "math",
+   "is_vararg": false,
+   "hash": 1,
+   "arguments": [
+    {
+     "name": "from",
+     "type": "Variant"
+    },
+    {
+     "name": "to",
+     "type": "Variant"
+    },
+    {
+     "name": "weight",
+     "type": "Variant"
+    }
+   ]
+  },
+  {
+   "name": "deg_to_rad",
+   "return_type": "float",
+   "category": "math",
+   "is_vararg": false,
+   "hash": 1,
+   "arguments": [
+    {
+     "name": "deg",
+     "type": "float"
+    }
+   ]
+  },
+  {
+   "name": "typeof",
+   "return_type": "int",
+   "category": "general",
+   "is_vararg": false,
+   "hash": 1,
+   "arguments": [
+    {
+     "name": "variable",
+     "type": "Variant"
+    }
+   ]
+  },
+  {
+   "name": "is_finite",
+   "return_type": "bool",
+   "category": "math",
+   "is_vararg": false,
+   "hash": 1,
+   "arguments": [
+    {
+     "name": "x",
+     "type": "float"
+    }
+   ]
+  }
+ ],
+ "builtin_classes": [
+  {
+   "name": "Nil",
+   "is_keyed": false,
+   "operators": [],
+   "constructors": [
+    {
+     "index": 0
+    }
+   ],
+   "has_destructor": false
+  },
+  {
+   "name": "int",
+   "is_keyed": false,
+   "operators": [],
+   "constructors": [
+    {
+     "index": 0
+    }
+   ],
+   "has_destructor": false
+  },
+  {
+   "name": "String",
+   "is_keyed": false,
+   "operators": [],
+   "methods": [
+    {
+     "name": "to_upper",
+     "return_type": "String",
+     "is_vararg": false,
+     "is_const": true,
+     "is_static": false,
+     "hash": 1
+    }
+   ],
+   "constructors": [
+    {
+     "index": 0
+    }
+   ],
+   "has_destructor": true
+  },
+  {
+   "name": "Callable",
+   "is_keyed": false,
+   "operators": [],
+   "constructors": [
+    {
+     "index": 0
+    }
+   ],
+   "has_destructor": true
+  },
+  {
+   "name": "Vector2",
+   "indexing_return_type": "float",
+   "is_keyed": false,
+   "members": [
+    {
+     "name": "x",
+     "type": "float"
+    },
+    {
+     "name": "y",
+     "type": "float"
+    }
+   ],
+   "constants": [
+    {
+     "name": "ZERO",
+     "type": "Vector2",
+     "value": "Vector2(0, 0)"
+    },
+    {
+     "name": "AXIS_COUNT",
+     "type": "int",
+     "value": "2"
+    }
+   ],
+   "enums": [
+    {
+     "name": "Axis",
+     "values": [
+      {
+       "name": "AXIS_X",
+       "value": 0
+      },
+      {
+       "name": "AXIS_Y",
+       "value": 1
+      }
+     ]
+    }
+   ],
+   "operators": [
+    {
+     "name": "+",
+     "right_type": "Vector2",
+     "return_type": "Vector2"
+    }
+   ],
+   "methods": [
+    {
+     "name": "distance_to",
+     "return_type": "float",
+     "is_vararg": false,
+     "is_const": true,
+     "is_static": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "to",
+       "type": "Vector2"
+      }
+     ]
+    },
+    {
+     "name": "from_angle",
+     "return_type": "Vector2",
+     "is_vararg": false,
+     "is_const": false,
+     "is_static": true,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "angle",
+       "type": "float"
+      }
+     ]
+    }
+   ],
+   "constructors": [
+    {
+     "index": 0
+    },
+    {
+     "index": 1,
+     "arguments": [
+      {
+       "name": "from",
+       "type": "Vector2"
+      }
+     ]
+    },
+    {
+     "index": 2,
+     "arguments": [
+      {
+       "name": "x",
+       "type": "float"
+      },
+      {
+       "name": "y",
+       "type": "float"
+      }
+     ]
+    }
+   ],
+   "has_destructor": false
+  },
+  {
+   "name": "Signal",
+   "is_keyed": false,
+   "operators": [],
+   "methods": [
+    {
+     "name": "connect",
+     "return_type": "int",
+     "is_vararg": false,
+     "is_const": false,
+     "is_static": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "callable",
+       "type": "Callable"
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default_value": "0"
+      }
+     ]
+    },
+    {
+     "name": "emit",
+     "is_vararg": true,
+     "is_const": true,
+     "is_static": false,
+     "hash": 1
+    }
+   ],
+   "constructors": [
+    {
+     "index": 0
+    },
+    {
+     "index": 1,
+     "arguments": [
+      {
+       "name": "from",
+       "type": "Signal"
+      }
+     ]
+    },
+    {
+     "index": 2,
+     "arguments": [
+      {
+       "name": "object",
+       "type": "Object"
+      },
+      {
+       "name": "signal",
+       "type": "StringName"
+      }
+     ]
+    }
+   ],
+   "has_destructor": true
+  },
+  {
+   "name": "Array",
+   "indexing_return_type": "Variant",
+   "is_keyed": false,
+   "operators": [],
+   "methods": [
+    {
+     "name": "size",
+     "return_type": "int",
+     "is_vararg": false,
+     "is_const": true,
+     "is_static": false,
+     "hash": 1
+    }
+   ],
+   "constructors": [
+    {
+     "index": 0
+    }
+   ],
+   "has_destructor": true
+  },
+  {
+   "name": "Dictionary",
+   "is_keyed": true,
+   "operators": [],
+   "methods": [
+    {
+     "name": "is_empty",
+     "return_type": "bool",
+     "is_vararg": false,
+     "is_const": true,
+     "is_static": false,
+     "hash": 1
+    }
+   ],
+   "constructors": [
+    {
+     "index": 0
+    }
+   ],
+   "has_destructor": true
+  }
+ ],
+ "classes": [
+  {
+   "name": "Object",
+   "is_refcounted": false,
+   "is_instantiable": true,
+   "api_type": "core",
+   "constants": [
+    {
+     "name": "NOTIFICATION_POSTINITIALIZE",
+     "value": 0
+    }
+   ],
+   "enums": [
+    {
+     "name": "ConnectFlags",
+     "is_bitfield": false,
+     "values": [
+      {
+       "name": "CONNECT_DEFERRED",
+       "value": 1
+      },
+      {
+       "name": "CONNECT_ONE_SHOT",
+       "value": 4
+      }
+     ]
+    }
+   ],
+   "methods": [
+    {
+     "name": "get_class",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "String"
+     }
+    },
+    {
+     "name": "get",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "property",
+       "type": "StringName"
+      }
+     ],
+     "return_value": {
+      "type": "Variant"
+     }
+    },
+    {
+     "name": "set",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "property",
+       "type": "StringName"
+      },
+      {
+       "name": "value",
+       "type": "Variant"
+      }
+     ]
+    },
+    {
+     "name": "call",
+     "is_const": false,
+     "is_vararg": true,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "method",
+       "type": "StringName"
+      }
+     ],
+     "return_value": {
+      "type": "Variant"
+     }
+    },
+    {
+     "name": "get_instance_id",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "int",
+      "meta": "uint64"
+     }
+    },
+    {
+     "name": "to_string",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "String"
+     }
+    },
+    {
+     "name": "is_class",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "class",
+       "type": "String"
+      }
+     ],
+     "return_value": {
+      "type": "bool"
+     }
+    }
+   ],
+   "signals": [
+    {
+     "name": "script_changed"
+    }
+   ]
+  },
+  {
+   "name": "Node",
+   "is_refcounted": false,
+   "is_instantiable": true,
+   "inherits": "Object",
+   "api_type": "core",
+   "constants": [
+    {
+     "name": "NOTIFICATION_READY",
+     "value": 13
+    }
+   ],
+   "enums": [
+    {
+     "name": "ProcessMode",
+     "is_bitfield": false,
+     "values": [
+      {
+       "name": "PROCESS_MODE_INHERIT",
+       "value": 0
+      },
+      {
+       "name": "PROCESS_MODE_ALWAYS",
+       "value": 3
+      }
+     ]
+    },
+    {
+     "name": "InternalMode",
+     "is_bitfield": false,
+     "values": [
+      {
+       "name": "INTERNAL_MODE_DISABLED",
+       "value": 0
+      },
+      {
+       "name": "INTERNAL_MODE_FRONT",
+       "value": 1
+      }
+     ]
+    }
+   ],
+   "methods": [
+    {
+     "name": "_process",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": true,
+     "hash": 1,
+     "is_required": false,
+     "arguments": [
+      {
+       "name": "delta",
+       "type": "float",
+       "meta": "double"
+      }
+     ]
+    },
+    {
+     "name": "_physics_process",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": true,
+     "hash": 1,
+     "is_required": false,
+     "arguments": [
+      {
+       "name": "delta",
+       "type": "float",
+       "meta": "double"
+      }
+     ]
+    },
+    {
+     "name": "_ready",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": true,
+     "hash": 1,
+     "is_required": false
+    },
+    {
+     "name": "add_child",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "node",
+       "type": "Node",
+       "meta": "required"
+      },
+      {
+       "name": "force_readable_name",
+       "type": "bool",
+       "default_value": "false"
+      },
+      {
+       "name": "internal",
+       "type": "enum::Node.InternalMode",
+       "default_value": "0"
+      }
+     ]
+    },
+    {
+     "name": "get_children",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "include_internal",
+       "type": "bool",
+       "default_value": "false"
+      }
+     ],
+     "return_value": {
+      "type": "typedarray::Node"
+     }
+    },
+    {
+     "name": "get_node",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "path",
+       "type": "NodePath"
+      }
+     ],
+     "return_value": {
+      "type": "Node"
+     }
+    },
+    {
+     "name": "set_name",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "name",
+       "type": "StringName"
+      }
+     ]
+    },
+    {
+     "name": "get_name",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "StringName"
+     }
+    },
+    {
+     "name": "set_process_mode",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "mode",
+       "type": "enum::Node.ProcessMode"
+      }
+     ]
+    },
+    {
+     "name": "get_process_mode",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "enum::Node.ProcessMode"
+     }
+    },
+    {
+     "name": "is_inside_tree",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "bool"
+     }
+    },
+    {
+     "name": "get_index",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "include_internal",
+       "type": "bool",
+       "default_value": "false"
+      }
+     ],
+     "return_value": {
+      "type": "int",
+      "meta": "int32"
+     }
+    },
+    {
+     "name": "rpc",
+     "is_const": false,
+     "is_vararg": true,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "method",
+       "type": "StringName"
+      }
+     ],
+     "return_value": {
+      "type": "enum::Error"
+     }
+    },
+    {
+     "name": "set_owner_ptr",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "owner",
+       "type": "const void*"
+      }
+     ]
+    },
+    {
+     "name": "print_orphan_nodes",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": true,
+     "is_virtual": false,
+     "hash": 1
+    },
+    {
+     "name": "set_tint",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "color",
+       "type": "Color",
+       "default_value": "Color(1, 1, 1, 1)"
+      },
+      {
+       "name": "label",
+       "type": "String",
+       "default_value": "\"hi\""
+      },
+      {
+       "name": "group",
+       "type": "StringName",
+       "default_value": "&\"\""
+      },
+      {
+       "name": "scale",
+       "type": "float",
+       "default_value": "1.0"
+      },
+      {
+       "name": "callback",
+       "type": "Callable",
+       "default_value": "Callable()"
+      },
+      {
+       "name": "extra",
+       "type": "Variant",
+       "default_value": "null"
+      },
+      {
+       "name": "items",
+       "type": "Array",
+       "default_value": "[]"
+      }
+     ]
+    }
+   ],
+   "signals": [
+    {
+     "name": "ready"
+    },
+    {
+     "name": "child_entered_tree",
+     "arguments": [
+      {
+       "name": "node",
+       "type": "Node"
+      }
+     ]
+    }
+   ],
+   "properties": [
+    {
+     "type": "StringName",
+     "name": "name",
+     "setter": "set_name",
+     "getter": "get_name"
+    },
+    {
+     "type": "int",
+     "name": "process_mode",
+     "setter": "set_process_mode",
+     "getter": "get_process_mode"
+    },
+    {
+     "type": "Node",
+     "name": "owner",
+     "setter": "set_owner",
+     "getter": "get_owner"
+    }
+   ]
+  },
+  {
+   "name": "Control",
+   "is_refcounted": false,
+   "is_instantiable": true,
+   "inherits": "Node",
+   "api_type": "core",
+   "methods": [
+    {
+     "name": "set_anchor",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "side",
+       "type": "enum::Side"
+      },
+      {
+       "name": "anchor",
+       "type": "float",
+       "meta": "float"
+      }
+     ]
+    },
+    {
+     "name": "get_anchor",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "side",
+       "type": "enum::Side"
+      }
+     ],
+     "return_value": {
+      "type": "float",
+      "meta": "float"
+     }
+    },
+    {
+     "name": "get_size",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "Vector2"
+     }
+    },
+    {
+     "name": "set_theme",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "theme",
+       "type": "Texture2D"
+      }
+     ]
+    },
+    {
+     "name": "get_theme",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "Texture2D"
+     }
+    }
+   ],
+   "properties": [
+    {
+     "type": "float",
+     "name": "anchor_left",
+     "setter": "set_anchor",
+     "getter": "get_anchor",
+     "index": 0
+    },
+    {
+     "type": "Vector2",
+     "name": "size",
+     "setter": "",
+     "getter": "get_size"
+    },
+    {
+     "type": "Texture2D,-AtlasTexture",
+     "name": "theme",
+     "setter": "set_theme",
+     "getter": "get_theme"
+    },
+    {
+     "type": "typedarray::Node",
+     "name": "data",
+     "setter": "_set_data",
+     "getter": "_get_data"
+    }
+   ]
+  },
+  {
+   "name": "Texture2D",
+   "is_refcounted": true,
+   "is_instantiable": false,
+   "inherits": "Object",
+   "api_type": "core"
+  },
+  {
+   "name": "Color",
+   "is_refcounted": false,
+   "is_instantiable": true,
+   "inherits": "Object",
+   "api_type": "core"
+  },
+  {
+   "name": "Input",
+   "is_refcounted": false,
+   "is_instantiable": false,
+   "inherits": "Object",
+   "api_type": "core",
+   "methods": [
+    {
+     "name": "is_action_pressed",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "action",
+       "type": "StringName"
+      },
+      {
+       "name": "exact_match",
+       "type": "bool",
+       "default_value": "false"
+      }
+     ],
+     "return_value": {
+      "type": "bool"
+     }
+    },
+    {
+     "name": "set_mouse_mode",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "mode",
+       "type": "int"
+      }
+     ]
+    },
+    {
+     "name": "get_mouse_mode",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "int"
+     }
+    },
+    {
+     "name": "get_ticks",
+     "is_const": true,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "int",
+      "meta": "int64"
+     }
+    },
+    {
+     "name": "set_flags",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "flags",
+       "type": "bitfield::Wide"
+      }
+     ]
+    }
+   ],
+   "signals": [
+    {
+     "name": "joy_connection_changed"
+    }
+   ],
+   "properties": [
+    {
+     "type": "int",
+     "name": "mouse_mode",
+     "setter": "set_mouse_mode",
+     "getter": "get_mouse_mode"
+    }
+   ]
+  },
+  {
+   "name": "JSON",
+   "is_refcounted": true,
+   "is_instantiable": true,
+   "inherits": "Object",
+   "api_type": "core",
+   "methods": [
+    {
+     "name": "new",
+     "is_const": false,
+     "is_vararg": true,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "return_value": {
+      "type": "Variant"
+     }
+    },
+    {
+     "name": "parse",
+     "is_const": false,
+     "is_vararg": false,
+     "is_static": false,
+     "is_virtual": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "text",
+       "type": "String"
+      }
+     ],
+     "return_value": {
+      "type": "enum::Error"
+     }
+    }
+   ]
+  }
+ ],
+ "singletons": [
+  {
+   "name": "Input",
+   "type": "Input"
+  }
+ ],
+ "native_structures": []
+}

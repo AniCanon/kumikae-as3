@@ -9,7 +9,7 @@ package {
 		override public function _ready():void {
 			for (var i:int = 0; i < COUNT; i++) {
 				var child:Node2D = new PerNodeChild();
-				add_child(child);
+				addChild(child);
 				children.push(child);
 			}
 		}

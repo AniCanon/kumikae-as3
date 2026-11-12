@@ -1,5 +1,6 @@
 // kas3c: the command-line front end.
 #include "arena.h"
+#include "builtins.h"
 #include "ast_printer.h"
 #include "diagnostics.h"
 #include "names.h"
@@ -13,7 +14,7 @@
 
 static const char *const USAGE =
 		"usage: kas3c parse [--dump-ast] <file>...\n"
-		"       kas3c check [--dump-names] [--dump-types] [--declarations <file>]... <file>...\n"
+		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
 		"\n"
@@ -26,6 +27,7 @@ static const char *const USAGE =
 		"       --dump-names           also print what every name refers to\n"
 		"       --dump-types           also print the type of every statement and initializer\n"
 		"       --declarations <file>  a file that declares what exists elsewhere\n"
+		"       --no-godot             don't load Godot's API (the `godot` package)\n"
 		"\n"
 		"Exit status: 0 no errors, 1 errors found, 2 bad usage or an unreadable file.\n";
 
@@ -69,10 +71,15 @@ static int run_check(int p_argc, char **p_argv) {
 	bool dump_names = false;
 	bool dump_types = false;
 	bool unreadable = false;
+	bool godot = true;
 	int files = 0;
 	kas3::Compilation compilation;
 	for (int i = 2; i < p_argc; i++) {
 		bool declaration = false;
+		if (std::strcmp(p_argv[i], "--no-godot") == 0) {
+			godot = false;
+			continue;
+		}
 		if (std::strcmp(p_argv[i], "--dump-names") == 0) {
 			dump_names = true;
 			continue;
@@ -103,6 +110,9 @@ static int run_check(int p_argc, char **p_argv) {
 	}
 	if (files == 0) {
 		return usage_error();
+	}
+	if (godot) {
+		compilation.add(kas3::GODOT_DECLARATIONS_PATH, kas3::godot_declarations(), true);
 	}
 	compilation.check();
 	std::fputs(compilation.format_diagnostics().c_str(), stderr);

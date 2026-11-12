@@ -1,4 +1,5 @@
 // Name resolution: what `kas3c check` reports.
+#include "builtins.h"
 #include "check.h"
 #include "names.h"
 
@@ -679,11 +680,10 @@ static void test_review_findings() {
 // Truncated files mostly fail to parse, but many prefixes are whole programs with missing pieces. None may
 // crash or hang the checker, alone or beside the complete corpus.
 static void test_corpus_prefixes() {
-	std::string stub;
-	CHECK(read_file(std::string(KAS3_TESTS_DIR) + "/stubs/godot.as", &stub));
+	const std::string godot = godot_declarations();
 	int files = 0;
 	Compilation whole; // The complete corpus as one program: its files refer to each other.
-	whole.add("godot.as", stub, true);
+	whole.add(GODOT_DECLARATIONS_PATH, godot, true);
 	for (const auto &entry : std::filesystem::directory_iterator(std::string(KAS3_TESTS_DIR) + "/corpus")) {
 		if (entry.path().extension() != ".as") {
 			continue;
@@ -695,7 +695,11 @@ static void test_corpus_prefixes() {
 		whole.add(name, text);
 		for (size_t length = 0; length < text.size(); length++) {
 			Compilation compilation;
-			compilation.add("godot.as", stub, true);
+			// Godot's API takes far longer to load than a prefix takes to check, so only some prefixes get
+			// it. The others still run every pass, with the Godot names unknown.
+			if (length % 293 == 0) {
+				compilation.add(GODOT_DECLARATIONS_PATH, godot, true);
+			}
 			compilation.add(name, text.substr(0, length));
 			compilation.check();
 			check::checks()++;

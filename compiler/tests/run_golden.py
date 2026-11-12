@@ -11,7 +11,7 @@ Usage: run_golden.py <path to kas3c> <tests dir> [--update]
   golden/types/ok/X.as      `check --dump-types` must be clean and equal X.types
   golden/types/errors/X.as  `check` must fail; the diagnostics must equal X.diag
   corpus/*.as               checked together as one program, must be clean
-  Name checks are given stubs/godot.as, a stand-in for Godot's classes, as a declaration file.
+  Godot's API (the `godot` package) is built into kas3c.
 
 --update rewrites the .ast and .diag files from what kas3c prints now. Read the result before committing it:
 a golden file that records a bug is worse than no test.
@@ -30,7 +30,7 @@ failed = []
 
 
 def run_check(*arguments):
-    return subprocess.run([kas3c, "check", "--declarations", "stubs/godot.as", *arguments], capture_output=True,
+    return subprocess.run([kas3c, "check", *arguments], capture_output=True,
                           text=True, cwd=tests, timeout=60)
 
 

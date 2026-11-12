@@ -12,7 +12,7 @@ package {
 			for (var i:int = 0; i < COUNT; i++) {
 				var child:Node2D = new Node2D();
 				child.position = new Vector2(i % 1000, int(i / 1000));
-				add_child(child);
+				addChild(child);
 				children.push(child);
 			}
 		}

@@ -1,5 +1,5 @@
 golden/types/errors/Access.as:10:10: error: 'shared' is a static member of Access; write Access.shared
-golden/types/errors/Access.as:11:11: error: 'hidden' is an instance member of Access; it needs an object
+golden/types/errors/Access.as:11:11: error: 'stash' is an instance member of Access; it needs an object
 golden/types/errors/Access.as:12:11: error: 'Access' has no static member 'missing'
 golden/types/errors/Access.as:13:10: error: 'secret' is private in Vault
 golden/types/errors/Access.as:14:10: error: 'guarded' is protected in Vault
