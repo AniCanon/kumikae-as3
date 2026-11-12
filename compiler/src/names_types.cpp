@@ -805,8 +805,240 @@ class Typer {
 		return p_type == function_ || p_type == object_ || p_type == class_type_;
 	}
 
+	// ---- operators and indexing that a declaration describes ----
+	//
+	// A class in a declaration file may carry [Operator(op, right or left, returns)] and [Indexed(element,
+	// keyed)] tags. Godot's value types do: its API description lists every operator. The tags are read once
+	// per class.
+
+	struct OperatorRule {
+		std::string_view op;
+		enum Side : uint8_t { Right, Left, Unary } side = Right; // Where the other operand is.
+		const Type *other = nullptr; // Null for a unary operator.
+		const Type *result = nullptr;
+	};
+	struct Described {
+		std::vector<OperatorRule> operators;
+		const Type *element = nullptr; // What indexing gives; null if the class is not indexed.
+		bool keyed = false; // Indexed by any key, not only by a number.
+	};
+	std::unordered_map<Symbol *, Described> described_;
+
+	// The type a tag names: a number type, Boolean, `*`, or a class in the declaring class's package.
+	const Type *tag_type(Symbol *p_class, std::string_view p_name) {
+		if (p_name == "int") {
+			return int_;
+		}
+		if (p_name == "Number") {
+			return number_;
+		}
+		if (p_name == "Boolean") {
+			return boolean_;
+		}
+		if (p_name == "*") {
+			return any_;
+		}
+		if (!p_class->package) {
+			return nullptr;
+		}
+		auto found = p_class->package->definitions.find(p_name);
+		if (found == p_class->package->definitions.end() || found->second->kind != SymbolKind::Class) {
+			return nullptr;
+		}
+		return compilation_.instance_type(found->second);
+	}
+
+	// What the class's declaration says about operators and indexing, or null if it says nothing.
+	const Described *described(const Type *p_type) {
+		Symbol *symbol = p_type->kind == Type::Instance ? p_type->symbol : nullptr;
+		if (!symbol || symbol->kind != SymbolKind::Class || !symbol->unit || !symbol->unit->is_declaration ||
+				!symbol->node || symbol->node->kind != NodeKind::ClassDecl) {
+			return nullptr;
+		}
+		auto cached = described_.find(symbol);
+		if (cached != described_.end()) {
+			return cached->second.operators.empty() && !cached->second.element ? nullptr : &cached->second;
+		}
+		Described result;
+		for (const Metadata &tag : static_cast<ClassDecl *>(symbol->node)->metadata) {
+			std::string_view op, left, right, returns, element, keyed;
+			for (const MetadataArg &argument : tag.args) {
+				if (argument.key == "op") {
+					op = argument.value;
+				} else if (argument.key == "left") {
+					left = argument.value;
+				} else if (argument.key == "right") {
+					right = argument.value;
+				} else if (argument.key == "returns") {
+					returns = argument.value;
+				} else if (argument.key == "element") {
+					element = argument.value;
+				} else if (argument.key == "keyed") {
+					keyed = argument.value;
+				}
+			}
+			if (tag.name == "Indexed") {
+				result.element = tag_type(symbol, element);
+				result.keyed = keyed == "true";
+			} else if (tag.name == "Operator") {
+				OperatorRule rule;
+				rule.op = op;
+				rule.result = tag_type(symbol, returns);
+				if (!left.empty()) {
+					rule.side = OperatorRule::Left;
+					rule.other = tag_type(symbol, left);
+				} else if (!right.empty()) {
+					rule.other = tag_type(symbol, right);
+				} else {
+					rule.side = OperatorRule::Unary;
+				}
+				// A tag that names a type the program does not have describes nothing.
+				if (!op.empty() && rule.result && (rule.other || rule.side == OperatorRule::Unary)) {
+					result.operators.push_back(rule);
+				}
+			}
+		}
+		const Described &stored = described_.emplace(symbol, std::move(result)).first->second;
+		return stored.operators.empty() && !stored.element ? nullptr : &stored;
+	}
+
+	bool has_operators(const Type *p_type) {
+		const Described *found = described(p_type);
+		return found && !found->operators.empty();
+	}
+
+	// An expression whose value is a whole number: an int or uint, or sums, differences, products and
+	// remainders of such. AS3 computes `i + 1` as a Number, but Godot gives Vector2i * int a Vector2i and
+	// Vector2i * float a Vector2, and `cell * (i + 1)` must stay on the grid.
+	bool whole(const Expr *p_expression) const {
+		if (!p_expression || !p_expression->type) {
+			return false;
+		}
+		if (p_expression->kind == NodeKind::Binary) {
+			const Binary *binary = static_cast<const Binary *>(p_expression);
+			switch (binary->op) {
+				case TokenKind::Plus:
+				case TokenKind::Minus:
+				case TokenKind::Star:
+				case TokenKind::Percent:
+					return whole(binary->left) && whole(binary->right);
+				default:
+					break;
+			}
+		}
+		if (p_expression->kind == NodeKind::Unary) {
+			const Unary *unary = static_cast<const Unary *>(p_expression);
+			if (unary->op == TokenKind::Minus || unary->op == TokenKind::Plus) {
+				return whole(unary->operand);
+			}
+		}
+		return p_expression->type == int_ || p_expression->type == uint_;
+	}
+
+	// Whether an operand of type p_type is what a rule asks for. *r_exact is cleared when a whole number
+	// meets a rule for Number, or the reverse: such a rule is used only if no other matches.
+	bool operand_matches(const Expr *p_operand, const Type *p_type, const Type *p_wanted, bool *r_exact) const {
+		if (numeric(p_wanted)) {
+			if (!numeric(p_type)) {
+				return false;
+			}
+			*r_exact = whole(p_operand) == (p_wanted == int_);
+			return true;
+		}
+		*r_exact = true;
+		return !numeric(p_type) && p_type != boolean_ && p_type != string_ && fits(p_type, p_wanted) == Fit::Yes;
+	}
+
+	// An operand that could be anything: nothing is said about an operator on it.
+	bool open_ended(const Type *p_type) const {
+		return p_type->kind == Type::Any || p_type->kind == Type::Unknown || p_type->kind == Type::Null ||
+				p_type == object_;
+	}
+
+	// The type of `left op right` where a declaration describes operators for one of the operands. Null
+	// if neither class describes any: the caller then does what it did before. Reports an operator that
+	// the classes don't have.
+	const Type *described_binary(TokenKind p_op, Expr *p_left, Expr *p_right, uint32_t p_offset) {
+		const Type *left = p_left ? p_left->type : nullptr;
+		const Type *right = p_right ? p_right->type : nullptr;
+		if (!left || !right || (!has_operators(left) && !has_operators(right))) {
+			return nullptr;
+		}
+		if (open_ended(left) || open_ended(right)) {
+			return unknown_;
+		}
+		std::string_view op = token_kind_spelling(p_op);
+		const Type *loose = nullptr;
+		for (int pass = 0; pass < 2; pass++) {
+			const Described *rules = described(pass == 0 ? left : right);
+			if (!rules) {
+				continue;
+			}
+			for (const OperatorRule &rule : rules->operators) {
+				if (rule.op != op || rule.side != (pass == 0 ? OperatorRule::Right : OperatorRule::Left)) {
+					continue;
+				}
+				bool exact = true;
+				if (!operand_matches(pass == 0 ? p_right : p_left, pass == 0 ? right : left, rule.other, &exact)) {
+					continue;
+				}
+				if (exact) {
+					return rule.result;
+				}
+				if (!loose) {
+					loose = rule.result;
+				}
+			}
+		}
+		if (loose) {
+			return loose;
+		}
+		error(p_offset, "can't use " + quoted(op) + " on " + quoted(compilation_.type_name(left)) + " and " +
+								quoted(compilation_.type_name(right)));
+		return unknown_;
+	}
+
+	// The same for `-x` and `+x`.
+	const Type *described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset) {
+		const Described *rules = has_operators(p_operand) ? described(p_operand) : nullptr;
+		if (!rules) {
+			return nullptr;
+		}
+		std::string_view op = token_kind_spelling(p_op);
+		for (const OperatorRule &rule : rules->operators) {
+			if (rule.side == OperatorRule::Unary && rule.op == op) {
+				return rule.result;
+			}
+		}
+		error(p_offset, "can't use " + quoted(op) + " on " + quoted(compilation_.type_name(p_operand)));
+		return unknown_;
+	}
+
+	// The plain operator of a compound assignment, or Error if it has none that a class could describe.
+	static TokenKind compound_operator(TokenKind p_op) {
+		switch (p_op) {
+			case TokenKind::PlusAssign:
+				return TokenKind::Plus;
+			case TokenKind::MinusAssign:
+				return TokenKind::Minus;
+			case TokenKind::StarAssign:
+				return TokenKind::Star;
+			case TokenKind::SlashAssign:
+				return TokenKind::Slash;
+			case TokenKind::PercentAssign:
+				return TokenKind::Percent;
+			default:
+				return TokenKind::Error;
+		}
+	}
+
 	const Type *unary(Unary *p_unary) {
 		const Type *operand = expression(p_unary->operand);
+		if (p_unary->op == TokenKind::Minus || p_unary->op == TokenKind::Plus) {
+			if (const Type *result = described_unary(p_unary->op, operand, p_unary->offset)) {
+				return result;
+			}
+		}
 		switch (p_unary->op) {
 			case TokenKind::Bang:
 			case TokenKind::KwDelete:
@@ -886,14 +1118,16 @@ class Typer {
 		const Type *left = expression(p_binary->left);
 		const Type *right = expression(p_binary->right);
 		switch (p_binary->op) {
-			case TokenKind::Equal:
-			case TokenKind::NotEqual:
-			case TokenKind::StrictEqual:
-			case TokenKind::StrictNotEqual:
 			case TokenKind::Less:
 			case TokenKind::Greater:
 			case TokenKind::LessEqual:
 			case TokenKind::GreaterEqual:
+				described_binary(p_binary->op, p_binary->left, p_binary->right, p_binary->offset);
+				return boolean_;
+			case TokenKind::Equal:
+			case TokenKind::NotEqual:
+			case TokenKind::StrictEqual:
+			case TokenKind::StrictNotEqual:
 			case TokenKind::KwIs:
 			case TokenKind::KwIn:
 			case TokenKind::KwInstanceof:
@@ -911,6 +1145,13 @@ class Typer {
 			case TokenKind::Comma:
 				return right;
 			default:
+				// A string plus anything is a string, whatever the other side is.
+				if (!(p_binary->op == TokenKind::Plus && (left == string_ || right == string_))) {
+					if (const Type *result = described_binary(p_binary->op, p_binary->left, p_binary->right,
+								p_binary->offset)) {
+						return result;
+					}
+				}
 				return arithmetic(p_binary->op, left, right);
 		}
 	}
@@ -978,6 +1219,12 @@ class Typer {
 				if (object->kind == Type::Unknown || object->kind == Type::Void || object->kind == Type::Null) {
 					return unknown_;
 				}
+				if (const Described *rules = described(object)) {
+					// A number reaches the elements. Any other key may name a property, as in `v["x"]`.
+					if (rules->element && (rules->keyed || numeric(key))) {
+						return rules->element;
+					}
+				}
 				return any_;
 			}
 			case NodeKind::TypeApply: {
@@ -1037,6 +1284,19 @@ class Typer {
 						break;
 					default:
 						break;
+				}
+				TokenKind plain = compound_operator(assign->op);
+				if (plain != TokenKind::Error && !(plain == TokenKind::Plus && (target == string_ || value == string_))) {
+					if (const Type *result = described_binary(plain, assign->target, assign->value, assign->offset)) {
+						// Value types don't convert to each other, so a result of another type can't go back.
+						if (result->kind != Type::Unknown && target->kind != Type::Any &&
+								fits(result, target) != Fit::Yes) {
+							error(assign->offset, "can't use a value of type " + quoted(compilation_.type_name(result)) +
+														  " where " + quoted(compilation_.type_name(target)) +
+														  " is expected");
+						}
+						return target;
+					}
 				}
 				if (assign->op == TokenKind::Assign || (numeric(target) && !bitwise)) {
 					return target; // The value, converted to what it is stored in.
