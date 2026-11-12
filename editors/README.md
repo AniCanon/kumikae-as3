@@ -17,8 +17,13 @@ too.
 Open the folder that holds `project.godot`, or any folder inside it. Every `.as` file in the project is
 part of the program.
 
-> **Not yet tried in an editor.** The server is tested by scripted sessions that send what an editor sends.
-> The two set-ups below are written from each editor's documentation and have not been run by hand.
+> **Tried so far (2026-11-12):**
+> - **VS Code 1.145:** works. With the client below, VS Code started the server, opened a script that
+>   extends `CharacterBody2D`, received its two errors, and received the shorter list after the file changed.
+>   This was confirmed from a log of the messages between the two; nobody has looked at the squiggles yet.
+>   It found one fault, now fixed: VS Code starts a server with `--stdio`, which `kas3c lsp` used to reject.
+> - **Rider 2026.2:** the LSP4IJ plugin installs (`rider installPlugins com.redhat.devtools.lsp4ij`). Adding
+>   the server in its settings, steps 2 to 4 below, has not been tried.
 
 > **Windows is not supported yet.** The server runs on macOS and Linux. On Windows it does not read the
 > editor's messages correctly and does not recognise which files belong to the project.

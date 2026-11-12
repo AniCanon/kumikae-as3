@@ -111,6 +111,7 @@ editor, see [editors](../editors/README.md).
 
 ```sh
 compiler/build/kas3c lsp                        # the project is the folder the editor opens
+compiler/build/kas3c lsp --stdio                # the same: some editors' clients add it
 compiler/build/kas3c lsp --no-godot             # without Godot's API
 compiler/build/kas3c lsp --declarations lib.as  # lib.as declares what exists elsewhere
 ```

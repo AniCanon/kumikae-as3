@@ -37,7 +37,7 @@ ROADMAP = [
      "Every Godot name checks, and no generated name clashes.", "done"),
     ("1e", "Godot's math types", "Operators on Vector2 and its relatives: position + velocity * delta.",
      "Arithmetic on Godot's value types has a type.", "done"),
-    ("L1", "Language server, first slice", "kas3c lsp: errors as you type, go to definition. Built; editor check pending.",
+    ("L1", "Language server, first slice", "kas3c lsp: errors as you type, go to definition. Works in VS Code; Rider pending.",
      "A typing mistake shows up in VS Code and Rider at once.", "now"),
     ("2", "Interpreter in Godot", "Scripts run in the editor. Built so far: kas3c run executes AS3 on the command line.",
      "An AS3 script on a CharacterBody2D moves a character.", "now"),

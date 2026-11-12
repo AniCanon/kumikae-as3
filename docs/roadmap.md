@@ -10,8 +10,8 @@ For why the project exists and how it works, see the [README](../README.md).
 **Stage 1 of 6, the front end.** The parser, name resolution and type checking are built and checked against
 about 190,000 lines of real AS3. The compiler knows Godot's whole API under AS3 names, including arithmetic
 on its math types, and reports its errors to an editor through a language server. The front end is
-complete. The language server's first slice is built and passes its tests; it has not yet been tried by hand
-in VS Code and Rider.
+complete. The language server's first slice is built and passes its tests; it works in VS Code and is
+not yet tried in Rider.
 
 **Stage 2 has started.** Its first slice runs AS3 on the command line: `kas3c run` executes classes,
 inheritance, numbers, strings and loops through the typed IR and the interpreter. It is built, reviewed and
@@ -74,8 +74,9 @@ locals, classes, imports, inherited members and Godot's API.
 |---|---|
 | The server: protocol, errors as you type, definition, references, hover, outline, symbols | Done. Tested by scripted sessions that send what an editor sends. |
 | Speed: a re-check of 100,000 lines in under 50 ms | Done: about 27 ms, by keeping the parse of files that did not change. |
-| A VS Code client and the [set-up guide](../editors/README.md) | Written. Not yet run: it needs one library from npm, and Rider needs a plugin. |
-| Tried by hand in VS Code and Rider | Not yet. |
+| A VS Code client and the [set-up guide](../editors/README.md) | Done. |
+| Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. Not yet looked at by eye. |
+| Tried in Rider | The LSP4IJ plugin is installed in Rider 2026.2. Adding the server in its settings is not yet tried. |
 | Windows | Not yet: the server runs on macOS and Linux only. To do before the slice is called done. |
 
 **Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
@@ -158,7 +159,7 @@ The design keeps each of these possible. No stage above delivers them.
 It needs Godot's extension headers. A copy is on this machine from the speed spike; a fresh copy would be a
 download, which needs the owner's yes.
 
-Still open from the language server's first slice: its check by hand in VS Code and Rider, and Windows.
+Still open from the language server's first slice: Rider, a look by eye in VS Code, and Windows.
 
 ## Decisions made
 

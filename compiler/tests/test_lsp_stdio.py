@@ -147,6 +147,10 @@ check("unasked exit", process.wait(timeout=20) == 0)
 process.stdout.close()
 process.stderr.close()
 
+# Editors' clients say how to talk by adding --stdio (VS Code's does): it is the only way, and accepted.
+code, messages, errors = session(START + END, "--no-godot", "--stdio")
+check("--stdio", code == 0 and messages is not None and len(messages) == 2 and errors == b"", repr((code, errors)))
+
 result = subprocess.run([KAS3C, "lsp", "--bogus"], input=b"", capture_output=True, timeout=60)
 check("bad option", result.returncode == 2 and result.stdout == b"" and b"usage: kas3c" in result.stderr, repr(result))
 

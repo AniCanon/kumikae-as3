@@ -22,7 +22,7 @@ static const char *const USAGE =
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c run <file>...\n"
 		"       kas3c ir <file>...\n"
-		"       kas3c lsp [--no-godot] [--declarations <file>]...\n"
+		"       kas3c lsp [--stdio] [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
 		"\n"
@@ -213,6 +213,8 @@ static int run_lsp(int p_argc, char **p_argv) {
 	for (int i = 2; i < p_argc; i++) {
 		if (std::strcmp(p_argv[i], "--no-godot") == 0) {
 			options.godot = false;
+		} else if (std::strcmp(p_argv[i], "--stdio") == 0) {
+			// Standard input and output are the only way in; editors' clients say so anyway.
 		} else if (std::strcmp(p_argv[i], "--declarations") == 0 && i + 1 < p_argc) {
 			options.declarations.push_back(p_argv[++i]);
 		} else {
