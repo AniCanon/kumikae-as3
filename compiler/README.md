@@ -1,7 +1,8 @@
 # Kumikae AS3 compiler
 
 The front end of the ActionScript 3 compiler for Godot: source text to a checked syntax tree. It contains the
-lexer, the parser and name resolution. Type checking comes next.
+lexer, the parser, name resolution, and the first part of type checking: every expression has a type, and
+`a.b` resolves to a member.
 
 It is a static library (`kas3front`) built without exceptions or RTTI, so that the same code can run in the
 command-line tool, inside the Godot editor, and in the language server.
@@ -39,6 +40,10 @@ compiler/build/kas3c check src/*.as                        # report syntax and n
 compiler/build/kas3c check --dump-names src/Player.as      # also print what every name refers to
 compiler/build/kas3c check --declarations godot.as src/*.as
 ```
+
+`--dump-types` prints the type of each expression statement and each initializer, as `<line>:<col> <type>`.
+A type is a class name, `Vector.<T>`, `Class.<T>` for a class itself (the expression `Math`), `*`, `void`,
+`null`, or `?` when the compiler could not work it out.
 
 `--dump-names` prints one line per resolved name, in source order:
 `<line>:<col> <name> -> <kind> <qualified name> <where>`, where `<where>` is `@<line>:<col>` in the same
@@ -81,8 +86,27 @@ its names mean: inside it, names resolve only to other declarations, and its own
   definitions and imports. Also `this` and instance members in static code, `break` and `continue` targets,
   and assignment targets.
 
-Not checked yet (stage 1c, types): anything after a `.` on a value, the types of expressions, override
-signatures, and whether a class implements all of its interfaces' methods.
+- **Members through `.`:** the member must exist and be reachable. `private` is reachable inside its class,
+  `protected` inside its class and subclasses, and unmarked members inside their package. A static member
+  is reached through its own class (`Base.count`, not `Sub.count` and not `object.count`).
+
+Not checked yet (the next part of stage 1c): whether a value fits where it is used (assignments, arguments,
+returns), argument counts, override signatures, whether a class implements all of its interfaces' methods,
+and assignment to `const`.
+
+## How expressions are typed
+
+- **Arithmetic on two numbers is a `Number`,** as in AS3: `int + int` is computed without wrapping, and wraps
+  only when it is stored in an `int`. Bitwise operators give `int`; `>>>` gives `uint`.
+- **`+` with a `String` on either side is a `String`.** With a `*` on either side it is `*`.
+- **A whole-number literal is an `int` if it fits, then a `uint`, then a `Number`.**
+- **An unknown member of a dynamic class is `*`.** The dynamic classes are `Object`, `Array`, `Vector`,
+  `Date`, `RegExp`, `Error` and `Dictionary`. Their subclasses are not dynamic.
+- **`this` inside a nested function is `*`,** because AS3 decides it when the function is called.
+- **Arithmetic on anything but numbers, strings and Booleans has no type yet (`?`).** Godot's math types get
+  their operators in a later part.
+- **"has no member" is reported only when every member of the type is known.** Nothing is reported on `*`,
+  on a type that failed to resolve, or on a class whose base class is unknown.
 
 ## What parses
 
@@ -121,8 +145,11 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 - **Helpers outside the package block count as part of the file's package** when deciding whether an
   `internal` class is visible. Adobe's compiler is stricter.
 - **Inside a class whose base class is unknown, undefined names aren't reported,** because the missing class
-  may declare them. The same holds for subclasses of `Array`, `Date`, `RegExp` and `Dictionary`, whose
-  members aren't declared until stage 1c.
+  may declare them.
+- **Members of the built-in classes are exempt from the override rules.** A subclass of `Array` may define
+  `push`, and any class may define `toString`, without `override`. Not checked against Adobe's compiler.
+- **`protected` members are reachable through any object,** from code in the declaring class or a subclass.
+  Adobe's reference doesn't say whether its compiler allows this.
 - **`this` inside a closure in a static method is an error.** AS3 allows it, with `this` being the global
   object.
 - **Static code doesn't see instance members.** A name that matches only an instance member is an error; a
@@ -138,6 +165,8 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 - `tests/corpus/*.as`: real-shaped programs that must parse with no diagnostics. The parser test also parses
   every byte-prefix of each one, to check that no malformed input can crash or hang it.
 
+- `tests/test_types.cpp`: one expression per check, each with the type it must have.
+- `tests/golden/types/`: whole programs through `kas3c check --dump-types`.
 - `tests/test_names.cpp`: name resolution, one check per message, with the expected error positions marked
   in the source as `/*!*/`.
 - `tests/golden/names/ok/X.as` with `X.names`, and `tests/golden/names/errors/X.as` with `X.diag`: whole

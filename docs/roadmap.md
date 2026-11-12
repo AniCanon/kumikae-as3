@@ -7,7 +7,7 @@ For why the project exists and how it works, see the [README](../README.md).
 
 ## Where we are
 
-**Stage 1 of 6, the front end.** The parser and name resolution are built. Type checking is next.
+**Stage 1 of 6, the front end.** The parser, name resolution and expression types are built. Reporting type errors is next.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -49,7 +49,9 @@ column. Stage 1 has three parts.
 |---|---|---|---|
 | 1a. Parser | `kas3c parse` | Every syntax error is reported with its position, and no input can crash the parser. | Done |
 | 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | Done |
-| 1c. Types | Type checking in `kas3c check` | Every expression has a type. Type errors and definite null misuse are reported. | Next |
+| 1c-1. Expression types | `kas3c check --dump-types` | Every expression has a type, and `a.b` resolves to a member with AS3's access rules. | Done |
+| 1c-2. Type errors | Type checking in `kas3c check` | A value that doesn't fit where it is used is reported: assignments, arguments, returns, overrides, interfaces, `const`, definite null misuse. | Next |
+| 1c-3. Godot's math types | Operators on `Vector2` and its relatives | `position + velocity * delta` has a type. Needs the Godot naming decision. | After 1c-2 |
 
 ### Language server, first slice (proposed)
 
@@ -113,18 +115,18 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What comes next: stage 1c, types
+## What comes next: stage 1c-2, type errors
 
-**Goal:** `kas3c check` gives every expression a type and reports type errors before the program runs.
+**Goal:** `kas3c check` reports a value that doesn't fit where it is used, before the program runs.
 
 | Step | What it does |
 |---|---|
-| 1. Built-in members | Declares the full member lists of `String`, `Array`, `Vector`, `Math` and the rest. |
-| 2. Types of expressions | Works out the type of every literal, name, call and operator. |
-| 3. Members through `.` | Resolves `a.b` on a value, with access rules. |
-| 4. Conversions | Records each implicit conversion once, so that both backends apply the same one. |
-| 5. Checks | Assignments, calls, returns, override signatures, interface completeness, `const`, definite null misuse. |
-| 6. Godot's math types | Allows `+ - * /` and comparison on `Vector2` and its relatives. |
+| 1. Conversions | Decides which conversions AS3 applies silently, and records each one once so that both backends apply the same one. |
+| 2. Assignments and initializers | Checks that the value fits the variable, field or property. |
+| 3. Calls | Checks argument counts and types, including constructors and `super(...)`. |
+| 4. Returns | Checks `return` against the declared type, and missing returns. |
+| 5. Class rules | Override signatures, interface completeness, assignment to `const`. |
+| 6. Null | Reports use of a value that is definitely `null`. |
 
 ## Decisions waiting on the owner
 

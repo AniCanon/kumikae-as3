@@ -51,7 +51,8 @@ package game {
 |---|---|
 | Parse AS3 and report syntax errors (`kas3c parse`) | **Works** |
 | Resolve names: packages, imports, classes, scopes (`kas3c check`) | **Works** |
-| Check types | Next |
+| Give every expression a type and resolve `a.b` (`kas3c check --dump-types`) | **Works** |
+| Report type errors (assignments, arguments, returns) | Next |
 | Run a script in the Godot editor | Planned (stage 2) |
 | Export a release build as native code | Planned (stage 3) |
 | iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |
