@@ -20,6 +20,7 @@ package godot {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function connect(callable:Function, flags:int = 0):int;
 		public native function emit(...rest):void;
+		public native function getObjectId():Number;
 	}
 	public final native class GodotArray {
 		public native function GodotArray();
@@ -35,14 +36,24 @@ package godot {
 		public static const CONNECT_ONE_SHOT:int = 4;
 		public static const NOTIFICATION_POSTINITIALIZE:int = 0;
 		public native function GodotObject();
-		public native function get scriptChanged():Signal;
-		public native function getClass():String;
-		public native function get(property:String):*;
-		public native function set(property:String, value:*):void;
-		public native function call(method:String, ...rest):*;
-		public native function getInstanceId():Number;
-		public native function toString():String;
-		public native function isClass(class_:String):Boolean;
+		public final native function get scriptChanged():Signal;
+		public final native function getClass():String;
+		public final native function get(property:String):*;
+		public final native function set(property:String, value:*):void;
+		public final native function call(method:String, ...rest):*;
+		public final native function getInstanceId():Number;
+		public final native function toString():String;
+		public final native function isClass(class_:String):Boolean;
+		public native function _notification(what:int):void;
+		public native function _toString():String;
+		public native function _get(property:String):*;
+		public native function _set(property:String, value:*):Boolean;
+		[Godot(returns="Array[GodotDictionary]")]
+		public native function _getPropertyList():GodotArray;
+		public native function _validateProperty(property:GodotDictionary):void;
+		public native function _propertyCanRevert(property:String):Boolean;
+		public native function _propertyGetRevert(property:String):*;
+		public final native function free():void;
 	}
 	[GodotEnum(name="ProcessMode", values="PROCESS_MODE_INHERIT,PROCESS_MODE_ALWAYS")]
 	[GodotEnum(name="InternalMode", values="INTERNAL_MODE_DISABLED,INTERNAL_MODE_FRONT")]
@@ -53,50 +64,52 @@ package godot {
 		public static const INTERNAL_MODE_FRONT:int = 1;
 		public static const NOTIFICATION_READY:int = 13;
 		public native function Node();
-		public native function get name():String;
-		public native function set name(value:String):void;
+		public final native function get name():String;
+		public final native function set name(value:String):void;
 		[Godot(returns="enum:Node.ProcessMode")]
-		public native function get processMode():int;
-		public native function set processMode(value:int):void;
-		public native function get owner():Node;
-		public native function set owner(value:Node):void;
-		public native function get ready():Signal;
-		public native function get childEnteredTree():Signal;
+		public final native function get processMode():int;
+		public final native function set processMode(value:int):void;
+		public final native function get owner():Node;
+		public final native function set owner(value:Node):void;
+		public final native function get ready():Signal;
+		public final native function get childEnteredTree():Signal;
 		public native function _process(delta:Number):void;
 		public native function _physicsProcess(delta:Number):void;
 		public native function _ready():void;
 		[Godot(internal_="enum:Node.InternalMode")]
-		public native function addChild(node:Node, forceReadableName:Boolean = false, internal_:int = 0):void;
+		public final native function addChild(node:Node, forceReadableName:Boolean = false, internal_:int = 0):void;
 		[Godot(returns="Array[Node]")]
-		public native function getChildren(includeInternal:Boolean = false):GodotArray;
-		public native function getNode(path:String):Node;
-		public native function isInsideTree():Boolean;
-		public native function getIndex(includeInternal:Boolean = false):int;
+		public final native function getChildren(includeInternal:Boolean = false):GodotArray;
+		public final native function getNode(path:String):Node;
+		public final native function isInsideTree():Boolean;
+		public final native function getIndex(includeInternal:Boolean = false):int;
 		[Godot(returns="enum:GodotError")]
-		public native function rpc(method:String, ...rest):int;
+		public final native function rpc(method:String, ...rest):int;
 		public static native function printOrphanNodes():void;
-		public native function setTint(color:Color = null, label:String = "hi", group:String = "", scale:Number = 1.0, callback:Function = null, extra:* = null, items:GodotArray = null):void;
+		public final native function setTint(color:Color = null, label:String = "hi", group:String = "", scale:Number = 1.0, callback:Function = null, extra:* = null, items:GodotArray = null):void;
 	}
 	public native class Control extends Node {
 		public native function Control();
-		public native function get anchorLeft():Number;
-		public native function set anchorLeft(value:Number):void;
-		public native function get size():Vector2;
-		public native function get theme():Texture2D;
-		public native function set theme(value:Texture2D):void;
+		public final native function get anchorLeft():Number;
+		public final native function set anchorLeft(value:Number):void;
+		public final native function get size():Vector2;
+		public final native function get theme():Texture2D;
+		public final native function set theme(value:Texture2D):void;
 		[Godot(returns="Array[Node]")]
-		public native function get data():GodotArray;
-		public native function set data(value:GodotArray):void;
+		public final native function get data():GodotArray;
+		public final native function set data(value:GodotArray):void;
 		[Godot(side="enum:Side")]
-		public native function setAnchor(side:int, anchor:Number):void;
+		public final native function setAnchor(side:int, anchor:Number):void;
 		[Godot(side="enum:Side")]
-		public native function getAnchor(side:int):Number;
+		public final native function getAnchor(side:int):Number;
 	}
+	[Abstract]
 	public native class Texture2D extends GodotObject {
 	}
 	public native class Color extends GodotObject {
 		public native function Color();
 	}
+	[Abstract]
 	public native class Input extends GodotObject {
 		public static native function get mouseMode():int;
 		public static native function set mouseMode(value:int):void;
@@ -108,27 +121,32 @@ package godot {
 	}
 	public native class GodotJSON extends GodotObject {
 		public native function GodotJSON();
-		public native function new_(...rest):*;
+		public final native function new_(...rest):*;
 		[Godot(returns="enum:GodotError")]
-		public native function parse(text:String):int;
+		public final native function parse(text:String):int;
 	}
+	[Abstract]
 	public final native class Side {
 		public static const LEFT:int = 0;
 		public static const TOP:int = 1;
 	}
+	[Abstract]
 	public final native class Key {
 		public static const ESCAPE:int = 4194305;
 		public static const KEY_0:int = 48;
 		public static const A:int = 65;
 	}
+	[Abstract]
 	public final native class GodotError {
 		public static const OK:int = 0;
 		public static const FAILED:int = 1;
 	}
+	[Abstract]
 	public final native class VariantType {
 		public static const NIL:int = 0;
 		public static const MAX:int = 39;
 	}
+	[Abstract]
 	public final native class Wide {
 		public static const LOW:Number = 1;
 		public static const HIGH:Number = 34359738368;
@@ -136,4 +154,6 @@ package godot {
 	public native function print(arg1:*, ...rest):void;
 	public native function lerp(from:*, to:*, weight:*):*;
 	public native function degToRad(deg:Number):Number;
+	public native function instanceFromId(instanceId:Number):GodotObject;
+	public native function randi():uint;
 }

@@ -91,7 +91,16 @@ the [naming design](../docs/superpowers/specs/2026-11-12-godot-naming-design.md)
 
 What the declarations decide beyond the names:
 
-- **Integers.** AS3's `int` is 32 bits. A Godot integer that the description marks as 64-bit is a `Number`.
+- **Integers.** AS3's `int` is 32 bits. A Godot integer that the description marks as 64-bit is a `Number`,
+  and an unsigned 32-bit one is a `uint`. The description marks widths only on the methods of classes; for
+  global functions and value types a short table in the generator names the wide ones (`randi()`,
+  `instanceFromId()`, `PackedInt64Array`'s elements).
+- **Only virtual methods can be overridden.** Every other method, property and signal is `final`, so
+  `override public function addChild(...)` is an error: the engine would never call it.
+- **A class the engine won't create** (`CanvasItem`, `Input`, `Key`) is tagged `[Abstract]`, and `new` on it
+  is an error. A script may still extend one.
+- **`GodotObject`'s virtuals and `free()`** (`_notification`, `_toString`, `_get`, `_set` and four more)
+  are missing from Godot's description. The generator adds them from a list of its own.
 - **Enums** are `int`. A `[Godot(...)]` tag on the member records which enum a parameter or result is.
 - **Defaults.** A default that is not a number, boolean, string or `null` is written `null`; the real
   default is applied when the call is made.
@@ -101,6 +110,9 @@ What the declarations decide beyond the names:
 - **Singletons** are classes with static members: `Input.isActionPressed("jump")`.
 - **Left out:** 60 methods that take raw pointers; `typeof` and `isFinite`, which AS3 has; Godot's own
   `String`, `StringName`, `NodePath` and `Callable` classes, for which you write `String` and `Function`.
+
+Loading the declarations costs about 30 ms and 26 MB on each run of `kas3c check` (3 ms and 3 MB
+without them, measured on one small file).
 
 To regenerate for another Godot version, see [`godot/NOTICE.md`](godot/NOTICE.md). The generator stops on
 anything it has no rule for: an unknown kind of type, a name that clashes with another or with an AS3

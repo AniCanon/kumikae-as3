@@ -157,6 +157,26 @@
      "type": "float"
     }
    ]
+  },
+  {
+   "name": "instance_from_id",
+   "return_type": "Object",
+   "category": "general",
+   "is_vararg": false,
+   "hash": 1,
+   "arguments": [
+    {
+     "name": "instance_id",
+     "type": "int"
+    }
+   ]
+  },
+  {
+   "name": "randi",
+   "return_type": "int",
+   "category": "random",
+   "is_vararg": false,
+   "hash": 1
   }
  ],
  "builtin_classes": [
@@ -348,6 +368,14 @@
     {
      "name": "emit",
      "is_vararg": true,
+     "is_const": true,
+     "is_static": false,
+     "hash": 1
+    },
+    {
+     "name": "get_object_id",
+     "return_type": "int",
+     "is_vararg": false,
      "is_const": true,
      "is_static": false,
      "hash": 1

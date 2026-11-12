@@ -76,10 +76,10 @@ class Fixture(unittest.TestCase):
 
     def test_methods(self):
         node = self.members("Node")
-        self.assertIn("public native function getNode(path:String):Node;", node)
-        self.assertIn("public native function isInsideTree():Boolean;", node)
+        self.assertIn("public final native function getNode(path:String):Node;", node)
+        self.assertIn("public final native function isInsideTree():Boolean;", node)
         self.assertIn("public static native function printOrphanNodes():void;", node)
-        self.assertIn("public native function getIndex(includeInternal:Boolean = false):int;", node)
+        self.assertIn("public final native function getIndex(includeInternal:Boolean = false):int;", node)
 
     def test_virtuals_keep_the_underscore(self):
         node = self.members("Node")
@@ -87,58 +87,58 @@ class Fixture(unittest.TestCase):
         self.assertIn("public native function _physicsProcess(delta:Number):void;", node)
 
     def test_varargs(self):
-        self.assertIn("public native function call(method:String, ...rest):*;", self.members("GodotObject"))
-        self.assertIn("public native function new_(...rest):*;", self.members("GodotJSON"))
+        self.assertIn("public final native function call(method:String, ...rest):*;", self.members("GodotObject"))
+        self.assertIn("public final native function new_(...rest):*;", self.members("GodotJSON"))
 
     def test_keyword_parameter(self):
-        self.assertIn("public native function isClass(class_:String):Boolean;", self.members("GodotObject"))
+        self.assertIn("public final native function isClass(class_:String):Boolean;", self.members("GodotObject"))
 
     def test_methods_named_get_and_set(self):
         god = self.members("GodotObject")
-        self.assertIn("public native function get(property:String):*;", god)
-        self.assertIn("public native function set(property:String, value:*):void;", god)
+        self.assertIn("public final native function get(property:String):*;", god)
+        self.assertIn("public final native function set(property:String, value:*):void;", god)
 
     def test_pointer_methods_are_left_out(self):
         self.assertNotIn("setOwnerPtr", self.text)
 
     def test_wide_integers_are_numbers(self):
-        self.assertIn("public native function getInstanceId():Number;", self.members("GodotObject"))
+        self.assertIn("public final native function getInstanceId():Number;", self.members("GodotObject"))
         self.assertIn("public static native function getTicks():Number;", self.members("Input"))
 
     def test_defaults(self):
         self.assertIn(
-            'public native function setTint(color:Color = null, label:String = "hi", group:String = "", '
+            'public final native function setTint(color:Color = null, label:String = "hi", group:String = "", '
             "scale:Number = 1.0, callback:Function = null, extra:* = null, items:GodotArray = null):void;",
             self.members("Node"))
 
     def test_properties_replace_their_accessors(self):
         node = self.members("Node")
-        self.assertIn("public native function get name():String;", node)
-        self.assertIn("public native function set name(value:String):void;", node)
+        self.assertIn("public final native function get name():String;", node)
+        self.assertIn("public final native function set name(value:String):void;", node)
         self.assertFalse([line for line in node if "getName" in line or "setName" in line])
 
     def test_property_type_without_a_described_getter(self):
-        self.assertIn("public native function get owner():Node;", self.members("Node"))
-        self.assertIn("public native function get data():GodotArray;", self.members("Control"))
+        self.assertIn("public final native function get owner():Node;", self.members("Node"))
+        self.assertIn("public final native function get data():GodotArray;", self.members("Control"))
 
     def test_indexed_property_keeps_its_accessors(self):
         control = self.members("Control")
-        self.assertIn("public native function get anchorLeft():Number;", control)
-        self.assertIn("public native function set anchorLeft(value:Number):void;", control)
-        self.assertIn("public native function setAnchor(side:int, anchor:Number):void;", control)
-        self.assertIn("public native function getAnchor(side:int):Number;", control)
+        self.assertIn("public final native function get anchorLeft():Number;", control)
+        self.assertIn("public final native function set anchorLeft(value:Number):void;", control)
+        self.assertIn("public final native function setAnchor(side:int, anchor:Number):void;", control)
+        self.assertIn("public final native function getAnchor(side:int):Number;", control)
 
     def test_read_only_property(self):
         control = self.members("Control")
-        self.assertIn("public native function get size():Vector2;", control)
+        self.assertIn("public final native function get size():Vector2;", control)
         self.assertFalse([line for line in control if "set size(" in line])
 
     def test_property_type_from_a_list(self):
-        self.assertIn("public native function get theme():Texture2D;", self.members("Control"))
+        self.assertIn("public final native function get theme():Texture2D;", self.members("Control"))
 
     def test_signals_are_properties(self):
-        self.assertIn("public native function get ready():Signal;", self.members("Node"))
-        self.assertIn("public native function get childEnteredTree():Signal;", self.members("Node"))
+        self.assertIn("public final native function get ready():Signal;", self.members("Node"))
+        self.assertIn("public final native function get childEnteredTree():Signal;", self.members("Node"))
 
     def test_constants_and_enum_values(self):
         node = self.members("Node")
@@ -148,20 +148,20 @@ class Fixture(unittest.TestCase):
     def test_enums_are_recorded(self):
         self.assertIn('\t[GodotEnum(name="ProcessMode", values="PROCESS_MODE_INHERIT,PROCESS_MODE_ALWAYS")]\n', self.text)
         node = self.members("Node")
-        at = node.index("public native function addChild(node:Node, forceReadableName:Boolean = false, "
+        at = node.index("public final native function addChild(node:Node, forceReadableName:Boolean = false, "
                         "internal_:int = 0):void;")
         self.assertEqual(node[at - 1], '[Godot(internal_="enum:Node.InternalMode")]')
-        at = node.index("public native function get processMode():int;")
+        at = node.index("public final native function get processMode():int;")
         self.assertEqual(node[at - 1], '[Godot(returns="enum:Node.ProcessMode")]')
 
     def test_typed_arrays_are_recorded(self):
         node = self.members("Node")
-        at = node.index("public native function getChildren(includeInternal:Boolean = false):GodotArray;")
+        at = node.index("public final native function getChildren(includeInternal:Boolean = false):GodotArray;")
         self.assertEqual(node[at - 1], '[Godot(returns="Array[Node]")]')
 
     def test_global_enum_parameter_names_its_class(self):
         node = self.members("Node")
-        at = node.index("public native function rpc(method:String, ...rest):int;")
+        at = node.index("public final native function rpc(method:String, ...rest):int;")
         self.assertEqual(node[at - 1], '[Godot(returns="enum:GodotError")]')
 
     def test_singleton_members_are_static(self):
@@ -215,6 +215,25 @@ class Fixture(unittest.TestCase):
     def test_functions_as3_already_has_are_left_out(self):
         self.assertNotIn("typeof", self.text)
         self.assertNotIn("isFinite", self.text)
+
+    def test_what_the_description_leaves_out_of_object(self):
+        god = self.members("GodotObject")
+        self.assertIn("public native function _notification(what:int):void;", god)
+        self.assertIn("public native function _toString():String;", god)
+        self.assertIn("public native function _get(property:String):*;", god)
+        self.assertIn("public native function _set(property:String, value:*):Boolean;", god)
+        self.assertIn("public final native function free():void;", god)
+
+    def test_classes_that_cannot_be_created(self):
+        self.assertIn("\t[Abstract]\n\tpublic native class Texture2D extends GodotObject {", self.text)
+        self.assertIn("\t[Abstract]\n\tpublic native class Input extends GodotObject {", self.text)
+        self.assertIn("\t[Abstract]\n\tpublic final native class Key {", self.text)
+        self.assertNotIn("\t[Abstract]\n\tpublic native class Node ", self.text)
+
+    def test_wide_integers_the_description_does_not_mark(self):
+        self.assertIn("\tpublic native function instanceFromId(instanceId:Number):GodotObject;\n", self.text)
+        self.assertIn("\tpublic native function randi():uint;\n", self.text)
+        self.assertIn("public native function getObjectId():Number;", self.members("Signal"))
 
     def test_global_constants_are_left_out(self):
         self.assertNotIn("INT32_MAX", self.text)
@@ -272,6 +291,49 @@ class Refusals(unittest.TestCase):
         api = fixture()
         self.node(api)["methods"][3]["arguments"][1]["name"] = "node"
         self.refuses(api, "Node.add_child: two parameters named 'node'")
+
+    def test_unknown_integer_width(self):
+        api = fixture()
+        self.node(api)["methods"][11]["return_value"]["meta"] = "int128"
+        self.refuses(api, "unknown width 'int128' in Node.get_index")
+
+    def test_names_that_are_not_identifiers(self):
+        for change, message in (
+                (lambda node: node["constants"].append({"name": "2D_MODE", "value": 1}), "Node: '2D_MODE' is not a name"),
+                (lambda node: node["enums"][0]["values"].append({"name": "A-B", "value": 9}), "Node: 'A-B' is not a name"),
+                (lambda node: node["methods"].append(dict(node["methods"][10], name="a-b")), "Node: 'a-b' is not a name"),
+                (lambda node: node["signals"].append({"name": "3d_ready"}), "Node: '3dReady' is not a name"),
+                (lambda node: node["constants"].append({"name": "new", "value": 1}), "Node: 'new' is not a name")):
+            api = fixture()
+            change(self.node(api))
+            self.refuses(api, message)
+
+    def test_global_enum_value_that_is_not_a_name(self):
+        api = fixture()
+        api["global_enums"][0]["values"].append({"name": "SIDE_new", "value": 9})
+        self.refuses(api, "Side: 'new' is not a name")
+
+    def test_constant_that_is_not_an_integer(self):
+        api = fixture()
+        self.node(api)["constants"].append({"name": "HALF", "value": 0.5})
+        self.refuses(api, "Node.HALF: the value 0.5 is not an integer")
+
+    def test_pointer_where_nothing_can_be_left_out(self):
+        api = fixture()
+        api["utility_functions"][0]["arguments"][0]["type"] = "const void*"
+        self.refuses(api, "raw pointer type in print")
+
+    def test_subclass_describing_a_base_method_again(self):
+        api = fixture()
+        control = [c for c in api["classes"] if c["name"] == "Control"][0]
+        control["methods"].append(copy.deepcopy(self.node(api)["methods"][5]))
+        self.refuses(api, "Control: 'getNode' names both")
+
+    def test_object_method_the_generator_adds_is_described(self):
+        api = fixture()
+        api["classes"][0]["methods"].append({"name": "free", "is_const": False, "is_vararg": False,
+                                             "is_static": False, "is_virtual": False, "hash": 1})
+        self.refuses(api, "Object: 'free' names both")
 
     def test_unknown_default(self):
         api = fixture()
@@ -366,6 +428,10 @@ class RealApi(unittest.TestCase):
     def test_one_method_is_named_like_a_keyword(self):
         import re
         self.assertEqual(re.findall(r"function (\w+_)\(", self.text), ["new_"])
+        self.assertEqual(set(re.findall(r"function get (\w+_)\(", self.text)), {"function_"})
+
+    def test_every_hand_kept_entry_is_used(self):
+        self.assertEqual(self.generator.unused_widths(), [])
 
     def test_what_is_left_out(self):
         self.assertEqual(len(self.generator.left_out), 60)
@@ -379,15 +445,15 @@ class RealApi(unittest.TestCase):
                          len(self.api["global_enums"]))
 
     def test_the_names_the_design_promises(self):
-        for line in ("public native function moveAndSlide():Boolean;",
+        for line in ("public final native function moveAndSlide():Boolean;",
                      "public native function _physicsProcess(delta:Number):void;",
-                     "public native function get timeout():Signal;",
+                     "public final native function get timeout():Signal;",
                      "public static const ESCAPE:int = 4194305;",
                      "public static const PROCESS_MODE_PAUSABLE:int = 1;",
                      "public static native function isActionPressed(action:String, exactMatch:Boolean = false)"
                      ":Boolean;",
-                     "public native function get visible():Boolean;",
-                     "public native function isOnFloor():Boolean;"):
+                     "public final native function get visible():Boolean;",
+                     "public final native function isOnFloor():Boolean;"):
             self.assertIn("\t\t" + line + "\n", self.text)
         self.assertNotIn("isVisible()", self.text)
         self.assertIn("\tpublic native function degToRad(deg:Number):Number;\n", self.text)

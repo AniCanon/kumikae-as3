@@ -198,6 +198,15 @@ with tempfile.TemporaryDirectory() as folder:
     result = run("check", "--no-godot", player)
     check("no godot", result.returncode == 1 and "can't find package 'godot'" in result.stderr, repr(result.stderr))
 
+    # A program that defines a name Godot has is told so at its own line, once.
+    clash = os.path.join(folder, "Node.as")
+    with open(clash, "w") as handle:
+        handle.write("package godot {\n\tpublic class Node {}\n}\n")
+    result = run("check", clash)
+    check("godot clash", result.returncode == 1 and
+          result.stderr == "%s:2:15: error: 'Node' is already defined in Godot's API\n" % clash,
+          repr(result.stderr[:300]))
+
 for failure in failures:
     print("FAIL " + failure)
 print("cli: %s" % ("OK" if not failures else "%d failed" % len(failures)))

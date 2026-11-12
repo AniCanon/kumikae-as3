@@ -414,7 +414,29 @@ static void test_engine_collections() {
 			{ UNRELATED("Array", "GodotArray") });
 }
 
+// What Godot's declarations say about creating and overriding.
+static void test_godot_classes() {
+	expect_godot("package { import godot.*; public class Main extends Node {\n"
+				 "override public function _notification(what:int):void {}\n"
+				 "override public function _toString():String { return \"main\"; }\n"
+				 "public function run(o:GodotObject):void { o.free(); free(); var a:Node = new Node(); var m:Mine = new Mine(); } } }\n"
+				 "import godot.CanvasItem;\nclass Mine extends CanvasItem {}\n",
+			{});
+	expect_godot("package { import godot.*; public class Main extends Node {\n"
+				 "public function run():void { new /*!*/CanvasItem(); new /*!*/Input(); new /*!*/Key(); new godot./*!*/Viewport(); }\n"
+				 "override public function /*!*/addChild(node:Node, forceReadableName:Boolean = false, internal_:int = 0):void {}\n"
+				 "override public function get /*!*/name():String { return \"\"; }\n"
+				 "override public function /*!*/_notification(what:String):void {} } }\n",
+			{ "'CanvasItem' can't be created with 'new'", "'Input' can't be created with 'new'",
+					"'Key' can't be created with 'new'", "'Viewport' can't be created with 'new'",
+					"can't override 'addChild': it is final in Node", "can't override 'name': it is final in Node",
+					"'_notification' must have the same parameters and return type as '_notification' in GodotObject" });
+	// The tag means nothing in a program's own files.
+	expect("package { public class Main { public function run():void { new Helper(); } } }\n[Abstract] class Helper {}\n", {});
+}
+
 int main() {
+	test_godot_classes();
 	test_engine_collections();
 	test_review_findings();
 	test_constants();

@@ -100,7 +100,7 @@ static void test_declare() {
 			 }),
 			std::string("b/Thing.as:1:29: error: 'Thing' is already defined at a/Thing.as:1:29\n"));
 	CHECK_MAIN("package { public class /*!*//*!*/String {} }", "'String' must be defined in a file named String.as",
-			"'String' is already defined at the built-in library");
+			"'String' is already defined in the built-in library");
 	// The same name in two packages is fine.
 	CHECK_EQ(check_files({
 					 { "a/Thing.as", "package a { public class Thing {} }" },

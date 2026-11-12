@@ -719,6 +719,21 @@ class Typer {
 		}
 	}
 
+	// A class in a declaration file that is tagged [Abstract]: one the engine does not let a program create.
+	static bool abstract(const Type *p_instance) {
+		Symbol *symbol = p_instance->kind == Type::Instance ? p_instance->symbol : nullptr;
+		if (!symbol || symbol->kind != SymbolKind::Class || !symbol->unit || !symbol->unit->is_declaration ||
+				!symbol->node || symbol->node->kind != NodeKind::ClassDecl) {
+			return false;
+		}
+		for (const Metadata &tag : static_cast<ClassDecl *>(symbol->node)->metadata) {
+			if (tag.name == "Abstract") {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// The arguments of `new C(...)` or `super(...)`.
 	void construct(const Type *p_instance, const List<Expr *> &p_arguments, uint32_t p_offset) {
 		bool vector = p_instance->kind == Type::Vector;
@@ -980,6 +995,11 @@ class Typer {
 				list(create->arguments);
 				const Type *callee = expression(create->callee);
 				if (callee->kind == Type::ClassObject) {
+					if (abstract(callee->element)) {
+						error(name_offset(create->callee),
+								quoted(callee->element->symbol->name) + " can't be created with 'new'");
+						return callee->element;
+					}
 					construct(callee->element, create->arguments, name_offset(create->callee));
 					return callee->element;
 				}

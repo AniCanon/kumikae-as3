@@ -203,13 +203,16 @@ std::string Compilation::qualified_name(const Symbol *p_symbol) const {
 
 std::string Compilation::where(const Unit &p_from, const Symbol *p_symbol) const {
 	if (!p_symbol->unit || p_symbol->unit->is_builtin) {
-		return "the built-in library";
+		return "in the built-in library";
+	}
+	if (p_symbol->unit->source.path() == GODOT_DECLARATIONS_PATH) {
+		return "in Godot's API"; // Not a file the reader can open.
 	}
 	Position position = p_symbol->unit->source.position(p_symbol->offset);
 	if (p_symbol->unit == &p_from) {
-		return "line " + std::to_string(position.line);
+		return "at line " + std::to_string(position.line);
 	}
-	return p_symbol->unit->source.path() + ":" + std::to_string(position.line) + ":" +
+	return "at " + p_symbol->unit->source.path() + ":" + std::to_string(position.line) + ":" +
 			std::to_string(position.column);
 }
 
@@ -328,7 +331,7 @@ void Compilation::declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_i
 	auto inserted = table.emplace(p_symbol->name, p_symbol);
 	if (!inserted.second) {
 		p_unit.diagnostics.error(p_symbol->offset,
-				quoted(p_symbol->name) + " is already defined at " + where(p_unit, inserted.first->second));
+				quoted(p_symbol->name) + " is already defined " + where(p_unit, inserted.first->second));
 	}
 }
 
@@ -337,7 +340,7 @@ void Compilation::declare_member(Unit &p_unit, Symbol *p_owner, Symbol *p_member
 	auto inserted = p_owner->klass->table(p_member->is_static()).emplace(p_member->name, p_member);
 	if (!inserted.second) {
 		p_unit.diagnostics.error(p_member->offset,
-				quoted(p_member->name) + " is already defined at " + where(p_unit, inserted.first->second));
+				quoted(p_member->name) + " is already defined " + where(p_unit, inserted.first->second));
 	}
 }
 
@@ -355,7 +358,7 @@ void Compilation::declare_accessor(Unit &p_unit, Symbol *p_owner, FunctionDecl *
 		property = found->second;
 		if (property->kind != SymbolKind::Property || (getter ? property->getter : property->setter)) {
 			p_unit.diagnostics.error(p_function->name_offset,
-					quoted(p_function->name) + " is already defined at " + where(p_unit, property));
+					quoted(p_function->name) + " is already defined " + where(p_unit, property));
 			return;
 		}
 	}
@@ -395,7 +398,7 @@ void Compilation::declare_class_members(Unit &p_unit, Symbol *p_class, ClassDecl
 			decl->symbol = symbol;
 			if (decl->name == p_decl->name) {
 				if (p_class->klass->constructor) {
-					p_unit.diagnostics.error(decl->name_offset, quoted(decl->name) + " is already defined at " +
+					p_unit.diagnostics.error(decl->name_offset, quoted(decl->name) + " is already defined " +
 																		where(p_unit, p_class->klass->constructor));
 				} else {
 					p_class->klass->constructor = symbol;

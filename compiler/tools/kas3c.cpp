@@ -73,11 +73,17 @@ static int run_check(int p_argc, char **p_argv) {
 	bool unreadable = false;
 	bool godot = true;
 	int files = 0;
+	for (int i = 2; i < p_argc; i++) {
+		godot = godot && std::strcmp(p_argv[i], "--no-godot") != 0;
+	}
 	kas3::Compilation compilation;
+	if (godot) {
+		// Before the program's files: a name the program defines again is then reported in the program.
+		compilation.add(kas3::GODOT_DECLARATIONS_PATH, kas3::godot_declarations(), true);
+	}
 	for (int i = 2; i < p_argc; i++) {
 		bool declaration = false;
 		if (std::strcmp(p_argv[i], "--no-godot") == 0) {
-			godot = false;
 			continue;
 		}
 		if (std::strcmp(p_argv[i], "--dump-names") == 0) {
@@ -110,9 +116,6 @@ static int run_check(int p_argc, char **p_argv) {
 	}
 	if (files == 0) {
 		return usage_error();
-	}
-	if (godot) {
-		compilation.add(kas3::GODOT_DECLARATIONS_PATH, kas3::godot_declarations(), true);
 	}
 	compilation.check();
 	std::fputs(compilation.format_diagnostics().c_str(), stderr);

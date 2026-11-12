@@ -79,8 +79,8 @@ signals; make the script's members look native from the engine's side too.
   (`Node` has both `_ready` and the signal `ready`). With it, the rule produces **no clash** between any
   method, property, signal and constant of any class, inherited members included **(measured)**.
 - Parameters are lowerCamel. A parameter or method named like an AS3 keyword gets a trailing underscore:
-  `class_`, `default_`. That is 49 parameters of classes, 38 of built-in types, and one method,
-  `GDScript.new` **(measured)**.
+  `class_`, `default_`. That is 49 parameters of classes, 38 of built-in types, 10 properties
+  (`function_`), and one method, `GDScript.new` **(measured)**.
 
 ### 3. Constants and enums
 
@@ -143,7 +143,8 @@ These follow from the rules above and from Godot's API description. They were th
   (`anchor_left` reads through `get_anchor(side)`). The property is declared (`anchorLeft`), and the shared
   accessor stays (`getAnchor(side)`). Only an accessor that takes nothing else is hidden.
 - **A 64-bit Godot integer is a `Number`.** AS3's `int` is 32 bits. 688 parameters and results are marked
-  64-bit in the description. A `Number` is exact to 2^53; object ids use higher bits, so stage 2 must
+  64-bit in the description. It marks widths only on the methods of classes, so a second hand-kept table
+  names the wide integers of global functions and value types (31 entries). A `Number` is exact to 2^53; object ids use higher bits, so stage 2 must
   settle a real 64-bit type before bindings ship.
 - **A default that AS3 can't write is `null`.** AS3 defaults are constants, so `Vector2(0, 0)`, `[]` and
   `Callable()` are declared `= null`. The real default is applied by the binding.
@@ -162,6 +163,14 @@ These follow from the rules above and from Godot's API description. They were th
 - **AS3's collections convert when they are handed to the engine.** An `Array` or `Vector` fits where a
   `GodotArray` or a packed array is expected, and an `Object` or `flash.utils.Dictionary` fits a
   `GodotDictionary`. Nothing converts on the way back, as the performance redesign decided.
+- **Only virtuals can be overridden.** Every other Godot member is declared `final`. A script that
+  overrides `addChild()` is told so, because the engine would never call the override. This includes
+  `toString()`: a script overrides `_toString()`.
+- **`new` on a class the engine won't create is an error** (`CanvasItem`, `Input`, `Key`). The declaration
+  tags such a class `[Abstract]`. A script may still extend one.
+- **`GodotObject`'s virtuals and `free()` come from a hand-kept list** (`_notification`, `_toString`, `_get`,
+  `_set`, `_getPropertyList`, `_validateProperty`, `_propertyCanRevert`, `_propertyGetRevert`). Godot's
+  description leaves them out. `_init` is not among them: an AS3 class has a constructor.
 - **Left out:** 60 methods with raw pointer parameters, the 11 integer-limit constants (`int.MAX_VALUE`
   exists), and operators, which stage 1e adds.
 

@@ -34,9 +34,77 @@ AS3_STANDS_FOR = {
 # Global functions that AS3 already has: `typeof` is an operator and `isFinite` a top-level function.
 FUNCTIONS_LEFT_OUT = {"typeof", "is_finite"}
 
+# What Godot's description leaves out of Object, because the engine handles these itself. Scripts override
+# the virtuals and call free(), so they are declared here. The generator refuses if the description ever
+# gains one of them.
+def _extra(name, arguments=(), result=None, virtual=True):
+    entry = {"name": name, "is_const": False, "is_vararg": False, "is_static": False, "is_virtual": virtual,
+             "arguments": [{"name": argument, "type": kind} for argument, kind in arguments]}
+    if result:
+        entry["return_value"] = {"type": result}
+    return entry
+
+
+OBJECT_EXTRAS = [
+    _extra("_notification", [("what", "int")]),
+    _extra("_to_string", result="String"),
+    _extra("_get", [("property", "StringName")], "Variant"),
+    _extra("_set", [("property", "StringName"), ("value", "Variant")], "bool"),
+    _extra("_get_property_list", result="typedarray::Dictionary"),
+    _extra("_validate_property", [("property", "Dictionary")]),
+    _extra("_property_can_revert", [("property", "StringName")], "bool"),
+    _extra("_property_get_revert", [("property", "StringName")], "Variant"),
+    _extra("free", virtual=False),
+]
+
+# Integers that need more than AS3's 32-bit int, where the description gives no width: it gives one only
+# for the methods of classes. Keyed by (built-in class or "" for a global function, method); the value
+# maps a parameter name, or "return", to the AS3 type. A test checks that every entry is still used.
+_INT64_ELEMENT = {"value": "Number"}
+WIDTHS = {
+    ("", "instance_from_id"): {"instance_id": "Number"},
+    ("", "is_instance_id_valid"): {"id": "Number"},
+    ("", "rid_allocate_id"): {"return": "Number"},
+    ("", "rid_from_int64"): {"base": "Number"},
+    ("", "seed"): {"base": "Number"},
+    ("", "rand_from_seed"): {"seed": "Number"},
+    ("", "randi"): {"return": "uint"},
+    ("", "hash"): {"return": "uint"},
+    ("Signal", "get_object_id"): {"return": "Number"},
+    ("RID", "get_id"): {"return": "Number"},
+    ("Color", "to_argb64"): {"return": "Number"},
+    ("Color", "to_abgr64"): {"return": "Number"},
+    ("Color", "to_rgba64"): {"return": "Number"},
+    ("Color", "hex64"): {"hex": "Number"},
+    ("Color", "to_argb32"): {"return": "uint"},
+    ("Color", "to_abgr32"): {"return": "uint"},
+    ("Color", "to_rgba32"): {"return": "uint"},
+    ("Color", "hex"): {"hex": "uint"},
+    ("Color", "from_rgbe9995"): {"rgbe": "uint"},
+    ("PackedInt64Array", "get"): {"return": "Number"},
+    ("PackedInt64Array", "set"): _INT64_ELEMENT,
+    ("PackedInt64Array", "push_back"): _INT64_ELEMENT,
+    ("PackedInt64Array", "append"): _INT64_ELEMENT,
+    ("PackedInt64Array", "insert"): _INT64_ELEMENT,
+    ("PackedInt64Array", "fill"): _INT64_ELEMENT,
+    ("PackedInt64Array", "has"): _INT64_ELEMENT,
+    ("PackedInt64Array", "bsearch"): _INT64_ELEMENT,
+    ("PackedInt64Array", "find"): _INT64_ELEMENT,
+    ("PackedInt64Array", "rfind"): _INT64_ELEMENT,
+    ("PackedInt64Array", "count"): _INT64_ELEMENT,
+    ("PackedInt64Array", "erase"): _INT64_ELEMENT,
+}
+
 NUMBER = re.compile(r"-?\d+(\.\d+)?(e[-+]?\d+)?$")
-INT32 = range(-(2 ** 31), 2 ** 31)
+NAME = re.compile(r"[A-Za-z_]\w*$")
 NUMERIC = {"int", "uint", "Number"}
+INT_WIDTHS = {None: "int", "int8": "int", "int16": "int", "int32": "int", "char16": "int", "char32": "int",
+              "uint8": "uint", "uint16": "uint", "uint32": "uint", "int64": "Number", "uint64": "Number",
+              "required": "int"}
+
+
+def is_int32(value):
+    return -(2 ** 31) <= value < 2 ** 31
 
 
 class Refused(Exception):
@@ -44,7 +112,7 @@ class Refused(Exception):
 
 
 class Pointer(Exception):
-    """A raw pointer type: the member that has one is left out."""
+    """A raw pointer type: the method that has one is left out."""
 
 
 def as3_names():
@@ -60,7 +128,7 @@ def as3_names():
 
 
 def wide(values):
-    return any(value["value"] not in INT32 for value in values)
+    return any(not is_int32(value["value"]) for value in values)
 
 
 class Generator:
@@ -75,6 +143,7 @@ class Generator:
         self.defined = set()
         self.names = {}  # Godot class name -> {AS3 member name: what it is}
         self.left_out = []  # Members with raw pointers.
+        self.used_widths = set()
         # Every enum, by the name type strings use, with whether it needs more than 32 bits.
         self.enums = {}
         for entry in api["global_enums"]:
@@ -104,7 +173,7 @@ class Generator:
     def type(self, text, meta, where):
         """(AS3 type, what the AS3 type does not say or None) for one of the description's type strings."""
         if "*" in text:
-            raise Pointer()
+            raise Pointer(where)
         prefix, separator, rest = text.partition("::")
         if separator:
             if prefix in ("enum", "bitfield"):
@@ -120,11 +189,9 @@ class Generator:
         if "," in text:  # A property that takes one of several classes; the leading "-" ones are excluded.
             text = [part for part in text.split(",") if not part.startswith("-")][0]
         if text == "int":
-            if meta in ("int64", "uint64"):
-                return "Number", None
-            if meta in ("uint8", "uint16", "uint32"):
-                return "uint", None
-            return "int", None
+            if meta not in INT_WIDTHS:
+                raise Refused("unknown width '%s' in %s" % (meta, where))
+            return INT_WIDTHS[meta], None
         result = self.known(text)
         if result is None:
             raise Refused("unknown type '%s' in %s" % (text, where))
@@ -163,15 +230,23 @@ class Generator:
             return "null"  # AS3 defaults are constants. The binding supplies the real value.
         raise Refused("%s: can't write the default '%s' for a parameter of type %s" % (where, value, as3))
 
-    def parameters(self, arguments, vararg, where, notes):
+    def name(self, name, owner):
+        """A name that is about to be written, checked to be one AS3 can read."""
+        if not NAME.match(name) or name in naming.KEYWORDS:
+            raise Refused("%s: '%s' is not a name" % (owner, name))
+        return name
+
+    def parameters(self, arguments, vararg, where, notes, widths):
         written = []
         seen = set()
         for argument in arguments:
-            name = naming.member(argument["name"])
+            name = self.name(naming.member(argument["name"]), where)
             if name in seen or name == "returns":
                 raise Refused("%s: two parameters named '%s'" % (where, name))
             seen.add(name)
             as3, note = self.type(argument["type"], argument.get("meta"), where)
+            if as3 == "int" and argument["name"] in widths:
+                as3 = widths[argument["name"]]
             if note:
                 notes.append('%s="%s"' % (name, note))
             text = "%s:%s" % (name, as3)
@@ -182,13 +257,21 @@ class Generator:
             written.append("...args" if "rest" in seen else "...rest")
         return ", ".join(written)
 
-    def function(self, where, name, arguments, result, result_meta, vararg, modifiers):
+    def function(self, where, name, arguments, result, result_meta, vararg, modifiers, width_key=None):
         """The lines of one function declaration, or raises Pointer."""
         notes = []
-        parameters = self.parameters(arguments, vararg, where, notes)
+        widths = WIDTHS.get(width_key, {})
+        if widths:
+            self.used_widths.add(width_key)
+            unknown = set(widths) - {argument["name"] for argument in arguments} - {"return"}
+            if unknown or ("return" in widths and result != "int"):
+                raise Refused("%s: the width table names something it does not have" % where)
+        parameters = self.parameters(arguments, vararg, where, notes, widths)
         returns = "void"
         if result is not None:
             returns, note = self.type(result, result_meta, where)
+            if returns == "int" and "return" in widths:
+                returns = widths["return"]
             if note:
                 notes.append('returns="%s"' % note)
         lines = ["[Godot(%s)]" % ", ".join(notes)] if notes else []
@@ -196,18 +279,23 @@ class Generator:
         return lines
 
     def claim(self, owner, name, what, inherited):
-        """Records that `owner` has a member `name`. False if it only repeats an inherited method."""
+        """Records that `owner` has a member `name`, which no other member of it or of a base may have."""
+        self.name(name, owner)
         own = self.names[owner]
         other = own.get(name) or inherited.get(name)
         if other is not None:
-            if name not in own and other == what and what.startswith("the method "):
-                return False  # A subclass describes a method its base already has.
             raise Refused("%s: '%s' names both %s and %s" % (owner, name, other, what))
         own[name] = what
-        return True
+
+    def integer(self, value, where):
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise Refused("%s: the value %r is not an integer" % (where, value))
+        return value
 
     def constants(self, entry, owner, inherited, out):
         for enum in entry.get("enums", []):
+            for value in enum["values"]:
+                self.integer(value["value"], "%s.%s" % (owner, value["name"]))
             kind = "Number" if wide(enum["values"]) else "int"
             for value in enum["values"]:
                 self.claim(owner, value["name"], "the constant " + value["name"], inherited)
@@ -215,7 +303,8 @@ class Generator:
         for constant in entry.get("constants", []):
             self.claim(owner, constant["name"], "the constant " + constant["name"], inherited)
             if "type" not in constant:  # A class's constants are integers.
-                kind = "int" if constant["value"] in INT32 else "Number"
+                self.integer(constant["value"], "%s.%s" % (owner, constant["name"]))
+                kind = "int" if is_int32(constant["value"]) else "Number"
                 out.append("public static const %s:%s = %d;" % (constant["name"], kind, constant["value"]))
                 continue
             as3, _ = self.type(constant["type"], None, owner + "." + constant["name"])
@@ -257,6 +346,9 @@ class Generator:
         self.names[owner] = {}
         inherited = self.inherited(owner)
         static = "static " if owner in self.singletons else ""
+        # Nothing but a virtual can be overridden: the engine would never call the override.
+        sealed = static or "final "
+        methods = entry.get("methods", []) + (OBJECT_EXTRAS if owner == "Object" else [])
         out = []
         self.constants(entry, owner, inherited, out)
         if entry["is_instantiable"]:
@@ -267,8 +359,6 @@ class Generator:
         for prop in entry.get("properties", []):
             where = "%s.%s" % (owner, prop["name"])
             name = naming.member(prop["name"])
-            if not re.match(r"[A-Za-z_]\w*$", name):
-                raise Refused("%s: not a name" % where)
             getter, setter = prop.get("getter"), prop.get("setter")
             if not getter and not setter:
                 raise Refused("%s: no accessor" % where)
@@ -286,32 +376,37 @@ class Generator:
             if getter:
                 if note:
                     out.append('[Godot(returns="%s")]' % note)
-                out.append("public %snative function get %s():%s;" % (static, name, as3))
+                out.append("public %snative function get %s():%s;" % (sealed, name, as3))
             if setter:
-                out.append("public %snative function set %s(value:%s):void;" % (static, name, as3))
+                out.append("public %snative function set %s(value:%s):void;" % (sealed, name, as3))
 
         for signal in entry.get("signals", []):
             name = naming.member(signal["name"])
             self.claim(owner, name, "the signal " + signal["name"], inherited)
-            out.append("public %snative function get %s():Signal;" % (static, name))
+            out.append("public %snative function get %s():Signal;" % (sealed, name))
 
-        for method in entry.get("methods", []):
+        for method in methods:
             if method["name"] in hidden:
                 continue
             where = "%s.%s" % (owner, method["name"])
             name = naming.member(method["name"])
             result = method.get("return_value", {})
-            modifiers = "static " if (static and not method["is_virtual"]) or method["is_static"] else ""
+            if method["is_virtual"]:
+                modifiers = ""
+            else:
+                modifiers = "static " if static or method["is_static"] else "final "
             try:
                 lines = self.function(where, name, method.get("arguments", []), result.get("type"),
                                       result.get("meta"), method["is_vararg"], modifiers)
             except Pointer:
                 self.left_out.append(where)
                 continue
-            if self.claim(owner, name, "the method " + method["name"], inherited):
-                out.extend(lines)
+            self.claim(owner, name, "the method " + method["name"], inherited)
+            out.extend(lines)
 
         self.lines.extend(self.enum_lines(entry))
+        if not entry["is_instantiable"]:
+            self.lines.append("\t[Abstract]")
         extends = " extends " + naming.class_name(entry["inherits"]) if entry.get("inherits") else ""
         self.block("public native class %s%s" % (as3_name, extends), out)
 
@@ -352,17 +447,23 @@ class Generator:
             name = naming.member(method["name"])
             self.claim(owner, name, "the method " + method["name"], {})
             out.extend(self.function(where, name, method.get("arguments", []), method.get("return_type"), None,
-                                     method["is_vararg"], "static " if method["is_static"] else ""))
+                                     method["is_vararg"], "static " if method["is_static"] else "",
+                                     (owner, method["name"])))
         self.lines.extend(self.enum_lines(entry))
         self.block("public final native class %s" % as3_name, out)
 
     def global_enum(self, entry):
         as3_name = naming.class_name(entry["name"])
         self.define(as3_name)
+        for value in entry["values"]:
+            self.integer(value["value"], "%s.%s" % (entry["name"], value["name"]))
         kind = "Number" if wide(entry["values"]) else "int"
         names = naming.enum_values([value["name"] for value in entry["values"]])
         if len(set(names)) != len(names):
             raise Refused("%s: two values with one name" % entry["name"])
+        for name in names:
+            self.name(name, entry["name"])
+        self.lines.append("\t[Abstract]")
         self.block("public final native class %s" % as3_name,
                    ["public static const %s:%s = %d;" % (name, kind, value["value"])
                     for name, value in zip(names, entry["values"])])
@@ -370,10 +471,10 @@ class Generator:
     def global_function(self, entry):
         if entry["name"] in FUNCTIONS_LEFT_OUT:
             return
-        name = naming.member(entry["name"])
+        name = self.name(naming.member(entry["name"]), "godot")
         self.define(name)
         for line in self.function(entry["name"], name, entry.get("arguments", []), entry.get("return_type"),
-                                  None, entry["is_vararg"], ""):
+                                  None, entry["is_vararg"], "", ("", entry["name"])):
             self.lines.append("\t" + line)
 
     def block(self, head, members):
@@ -381,7 +482,17 @@ class Generator:
         self.lines.extend("\t\t" + member for member in members)
         self.lines.append("\t}")
 
+    def unused_widths(self):
+        """Entries of the width table that matched nothing in the description."""
+        return sorted(set(WIDTHS) - self.used_widths)
+
     def run(self):
+        try:
+            return self.write()
+        except Pointer as pointer:
+            raise Refused("raw pointer type in %s, where nothing can be left out" % pointer.args[0])
+
+    def write(self):
         version = self.api["header"]["version_full_name"]
         self.lines += [
             "// Godot's API as AS3 declarations. Generated by compiler/godot/generate.py from the API description",
@@ -432,6 +543,10 @@ def main(arguments):
         text = generator.run()
     except Refused as refusal:
         sys.stderr.write("generate.py: %s\n" % refusal)
+        return 1
+    except (KeyError, IndexError, TypeError, ValueError, AttributeError, RecursionError) as error:
+        sys.stderr.write("generate.py: the description is not shaped as expected (%s: %s)\n" %
+                         (type(error).__name__, error))
         return 1
     with open(arguments[2], "w") as file:
         file.write(text)
