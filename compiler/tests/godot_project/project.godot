@@ -1,0 +1,7 @@
+; A project for testing the AS3 extension in headless Godot. See compiler/tests/run_godot.py.
+config_version=5
+
+[application]
+
+config/name="kas3 test"
+config/features=PackedStringArray("4.7")

@@ -3,6 +3,7 @@ project(kas3 CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON) # The libraries also go into the Godot extension, a shared library.
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -78,6 +79,23 @@ target_include_directories(kas3lsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lsp)
 target_link_libraries(kas3lsp PUBLIC kas3front)
 target_compile_options(kas3lsp PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
+# The Godot extension: AS3 as a Godot scripting language. Optional, because it needs godot-cpp, which is not
+# in this repository:  cmake -DKAS3_GODOT_CPP=<path to a godot-cpp checkout for Godot 4.7> ...
+set(KAS3_GODOT_CPP "" CACHE PATH "A godot-cpp checkout; empty to leave the Godot extension out")
+if(KAS3_GODOT_CPP)
+    set(GODOTCPP_API_VERSION "4.7" CACHE STRING "" FORCE)
+    set(GODOTCPP_TARGET "template_release" CACHE STRING "" FORCE)
+    add_subdirectory(${KAS3_GODOT_CPP} ${CMAKE_CURRENT_BINARY_DIR}/godot-cpp EXCLUDE_FROM_ALL)
+    file(GLOB KAS3_GODOT_SOURCES CONFIGURE_DEPENDS godot_ext/*.cpp)
+    add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES})
+    # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
+    target_compile_options(kas3_godot PRIVATE -fno-exceptions)
+    target_link_libraries(kas3_godot PRIVATE godot-cpp kas3vm)
+    set_target_properties(kas3_godot PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/godot_project/bin
+        OUTPUT_NAME kas3_godot)
+endif()
+
 enable_testing()
 file(GLOB KAS3_TESTS CONFIGURE_DEPENDS tests/test_*.cpp)
 foreach(test_source ${KAS3_TESTS})
@@ -102,6 +120,9 @@ add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test
 add_test(NAME lsp_stdio COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp_stdio.py $<TARGET_FILE:kas3c>)
 add_test(NAME programs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_programs.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+# AS3 inside Godot. Skips itself, with a message, without the extension library or Godot 4.7.
+add_test(NAME godot_extension COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_godot.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME golden COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_golden.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME godot COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/godot -p "test_*.py")

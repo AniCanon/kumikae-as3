@@ -109,6 +109,12 @@ public:
 	// parameters left out take their defaults. A reference returned in r_result is the caller's to release.
 	// False if there is no such method, or it failed.
 	bool call_method(Object *p_object, std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result);
+	// Calls a function the host has already found. The first argument of a method is its object.
+	bool call_function(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+		return p_function < module_.functions.size() && call(p_function, p_arguments, p_count, r_result);
+	}
+	// Gives up a value the host was holding for the interpreter: a result, or an argument it made.
+	void discard(ir::Kind p_kind, Slot p_value) { drop(p_kind, p_value); }
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
 	void release_object(Object *p_object);

@@ -1,0 +1,80 @@
+#include "script.h"
+
+#include "language.h"
+#include "program.h"
+
+#include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
+
+using namespace godot;
+using kas3::Project;
+
+void AS3Script::set_file(const String &p_resource_path) {
+	file_ = ProjectSettings::get_singleton()->globalize_path(p_resource_path).utf8().get_data();
+	source_ = FileAccess::get_file_as_string(p_resource_path);
+	Project &program = Project::get();
+	class_ = program.valid() ? program.class_of_file(file_) : kas3::ir::NONE;
+	// Only a class that extends a Godot class can be attached to an object.
+	if (class_ != kas3::ir::NONE && program.module().classes[class_].native_base.empty()) {
+		class_ = kas3::ir::NONE;
+	}
+}
+
+StringName AS3Script::_get_global_name() const {
+	return StringName();
+}
+
+StringName AS3Script::_get_instance_base_type() const {
+	if (class_ == kas3::ir::NONE) {
+		return StringName("Object");
+	}
+	return StringName(Project::get().module().classes[class_].native_base.c_str());
+}
+
+void *AS3Script::_instance_create(Object *p_for_object) const {
+	return class_ == kas3::ir::NONE ? nullptr : create_script_instance(this, p_for_object);
+}
+
+bool AS3Script::_has_method(const StringName &p_method) const {
+	return class_ != kas3::ir::NONE && script_method(class_, p_method) != kas3::ir::NONE;
+}
+
+ScriptLanguage *AS3Script::_get_language() const {
+	return AS3Language::singleton;
+}
+
+uint32_t script_method(uint32_t p_class, const StringName &p_name) {
+	Project &program = Project::get();
+	if (!program.valid() || p_class >= program.module().classes.size()) {
+		return kas3::ir::NONE;
+	}
+	CharString utf8 = String(p_name).utf8();
+	std::string_view name(utf8.get_data(), (size_t)utf8.length());
+	for (const auto &entry : program.module().classes[p_class].virtuals) {
+		if (entry.first == name) {
+			return entry.second;
+		}
+	}
+	return program.interpreter().find_method(p_class, name);
+}
+
+PackedStringArray AS3ScriptLoader::_get_recognized_extensions() const {
+	PackedStringArray extensions;
+	extensions.push_back("as");
+	return extensions;
+}
+
+bool AS3ScriptLoader::_handles_type(const StringName &p_type) const {
+	return p_type == StringName("Script") || p_type == StringName("AS3Script");
+}
+
+String AS3ScriptLoader::_get_resource_type(const String &p_path) const {
+	return p_path.get_extension().to_lower() == "as" ? String("AS3Script") : String();
+}
+
+Variant AS3ScriptLoader::_load(const String &p_path, const String &, bool, int32_t) const {
+	Ref<AS3Script> script;
+	script.instantiate();
+	script->set_file(p_path);
+	return script;
+}
