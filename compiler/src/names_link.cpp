@@ -160,6 +160,13 @@ Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
 	}
 	Diagnostics &diagnostics = p_from.unit->diagnostics;
 	uint32_t last = p_type->name.count - 1;
+	if (last == 0 && p_type->form == TypeRef::Named && p_from.klass == vector_ && p_type->name[0] == "T") {
+		if (!element_) {
+			element_ = new_symbol(SymbolKind::Class, "T", p_from.unit, 0);
+		}
+		p_type->symbol = element_;
+		return element_;
+	}
 	std::string shown = join(p_type->name, p_type->name.count);
 	Found found = last == 0 ? lookup_package_level(p_from, p_type->name[0])
 							: lookup_qualified(p_from, join(p_type->name, last), p_type->name[last]);
@@ -474,8 +481,9 @@ void Compilation::check_overrides(Symbol *p_class) {
 	Diagnostics &diagnostics = p_class->unit->diagnostics;
 	// The instance member of that name that a base class hands down, if any.
 	auto inherited = [&](std::string_view p_name) -> Symbol * {
-		// Object's methods live on the prototype in AS3: a class may define its own without `override`.
-		for (Symbol *base = p_class->klass->base; base && base != object_; base = base->klass->base) {
+		// Members of the built-in classes live in the AS3 namespace or on the prototype: a class may define
+		// its own without `override`.
+		for (Symbol *base = p_class->klass->base; base && !base->unit->is_builtin; base = base->klass->base) {
 			Symbol *member = find_in(base->klass->members, p_name);
 			if (member && !member->is_static() && inherited_visible(member, base, p_class->package)) {
 				return member;

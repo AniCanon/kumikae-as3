@@ -260,7 +260,7 @@ void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block
 			symbol->klass = &classes_.back();
 			symbol->klass->symbol = symbol;
 			decl->symbol = symbol;
-			if (decl->modifiers.bits & Modifiers::Dynamic) {
+			if ((decl->modifiers.bits & Modifiers::Dynamic) && !p_unit.is_declaration) {
 				p_unit.diagnostics.error(decl->name_offset, "dynamic classes are not supported");
 			}
 			if (p_unit.is_builtin) {

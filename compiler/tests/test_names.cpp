@@ -635,11 +635,14 @@ static void test_review_findings() {
 	CHECK_MAIN("package { public class Main extends Error { function f():String { return toString() + message; } } }");
 	CHECK_MAIN("package { public class Main { override public function /*!*/toString():String { return \"\"; } } }",
 			"'toString' is marked 'override' but no base class has a method to override");
-	// Built-in classes whose members aren't declared yet: nothing is reported as undefined in a subclass.
+	// Members of built-in classes are found by bare name in a subclass.
 	CHECK_MAIN("package { public class Main extends Array { function top():* { return this[length - 1]; }\n"
 			   "function add(x:*):void { push(x); } } }");
 	CHECK_MAIN("package { import flash.utils.Dictionary; public class Main extends Dictionary {\n"
-			   "function f():void { anything(); } } }");
+			   "function f():void { /*!*/anything(); toJSON(\"\"); } } }",
+			"undefined name 'anything'");
+	// Built-in members are exempt from the override rules.
+	CHECK_MAIN("package { public class Main extends Array { public function push(x:*):void {} public var length:int; } }");
 	// A base member that is internal to another package.
 	CHECK_EQ(check_files({
 					 { "a/Base.as", "package a { public class Base { internal var secret:int; var plain:int; public var open:int; } }" },

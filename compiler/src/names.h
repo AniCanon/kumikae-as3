@@ -149,6 +149,7 @@ class Compilation {
 	Package *top_level_ = nullptr;
 	Symbol *object_ = nullptr;
 	Symbol *vector_ = nullptr;
+	Symbol *element_ = nullptr; // `T`, the element type inside the built-in Vector.
 	bool checked_ = false;
 
 	// declare
@@ -193,6 +194,8 @@ public:
 	Package *find_package(const std::string &p_name);
 	Package *top_level() const { return top_level_; }
 	Symbol *vector_class() const { return vector_; }
+	Symbol *object_class() const { return object_; }
+	Symbol *element_parameter() const { return element_; }
 	std::deque<Unit> &units() { return units_; }
 
 	// Resolves the imports into r_scope, reporting those that name nothing.
