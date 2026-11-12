@@ -138,6 +138,9 @@ std::string print(const Module &p_module) {
 			out += "  #" + std::to_string(i) + " " +
 					(klass.methods[i] < p_module.functions.size() ? p_module.functions[klass.methods[i]].name : "?") + "\n";
 		}
+		if (klass.static_init != NONE && klass.static_init < p_module.functions.size()) {
+			out += "  static " + p_module.functions[klass.static_init].name + "\n";
+		}
 		for (const auto &entry : klass.virtuals) {
 			out += "  virtual " + entry.first + " " + (entry.second < p_module.functions.size() ? p_module.functions[entry.second].name : "?") + "\n";
 		}

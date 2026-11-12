@@ -72,6 +72,12 @@ public:
 
 	// For an object: adds the member, or replaces it. Returns this.
 	Json &set(std::string_view p_key, Json p_value);
+	// For an object that is being read: adds the member without looking for the key. A key given twice
+	// is then there twice, and get() answers with the last.
+	void append(std::string p_key, Json p_value) {
+		keys_.push_back(std::move(p_key));
+		items_.push_back(std::move(p_value));
+	}
 	// For an array. Returns this.
 	Json &push(Json p_value);
 };

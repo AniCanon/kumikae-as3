@@ -2,6 +2,7 @@
 
 #include "json.h"
 
+#include <chrono>
 #include <string>
 
 using namespace kas3;
@@ -93,7 +94,25 @@ static void test_access() {
 	CHECK_EQ(write_json(Json((uint32_t)4000000000u)), std::string("4000000000"));
 }
 
+// A very wide object is read in time proportional to its size, and a key given twice keeps its last value.
+static void test_wide() {
+	std::string text = "{";
+	for (int i = 0; i < 200000; i++) {
+		text += (i ? ",\"k" : "\"k") + std::to_string(i) + "\":" + std::to_string(i);
+	}
+	text += ",\"k7\":-1}";
+	auto start = std::chrono::steady_clock::now();
+	Json value;
+	CHECK(parse_json(text, &value));
+	double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+	CHECK(seconds < 2.0);
+	CHECK_EQ(value.size(), (size_t)200001);
+	CHECK_EQ(value.get("k199999").integer(), (int64_t)199999);
+	CHECK_EQ(value.get("k7").integer(), (int64_t)-1);
+}
+
 int main() {
+	test_wide();
 	test_values();
 	test_strings();
 	test_malformed();

@@ -206,7 +206,7 @@ public:
 				if (!value(&member, p_depth + 1)) {
 					return false;
 				}
-				r_value->set(key, std::move(member));
+				r_value->append(std::move(key), std::move(member));
 				skip_space();
 				if (at_ < text_.size() && text_[at_] == ',') {
 					at_++;
@@ -408,7 +408,7 @@ const Json &Json::at(size_t p_index) const {
 
 const Json &Json::get(std::string_view p_key) const {
 	if (kind_ == Object) {
-		for (size_t i = 0; i < keys_.size(); i++) {
+		for (size_t i = keys_.size(); i-- > 0;) { // The last of a key given twice.
 			if (keys_[i] == p_key) {
 				return items_[i];
 			}

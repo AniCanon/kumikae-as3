@@ -27,6 +27,7 @@ Interpreter::Interpreter(const ir::Module &p_module, Host &p_host) :
 			methods_[i][name.substr(name.rfind('/') == std::string::npos ? 0 : name.rfind('/') + 1)] = method;
 		}
 	}
+	class_used_.assign(module_.classes.size(), 0);
 	globals_.resize(module_.globals.size());
 	for (size_t i = 0; i < globals_.size(); i++) {
 		globals_[i].bits = 0;
@@ -414,6 +415,52 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 	return nullptr;
 }
 
+// The class and the bases above it that have not been used yet, the class first.
+static std::vector<uint32_t> unused_chain(const ir::Module &p_module, std::vector<uint8_t> &r_used, uint32_t p_class) {
+	std::vector<uint32_t> chain;
+	for (uint32_t at = p_class; at != NONE && !r_used[at]; at = p_module.classes[at].base) {
+		r_used[at] = 1; // Marked before anything runs: a class that reads itself in a circle sees defaults.
+		chain.push_back(at);
+	}
+	return chain;
+}
+
+void Interpreter::use_class(uint32_t p_class) {
+	// Pushed last runs first: the base class's fields are set before the subclass's.
+	for (uint32_t klass : unused_chain(module_, class_used_, p_class)) {
+		uint32_t initializer = module_.classes[klass].static_init;
+		if (initializer != NONE && !push(initializer, nullptr, 0, NONE)) {
+			return;
+		}
+	}
+}
+
+bool Interpreter::use_class_now(uint32_t p_class) {
+	std::vector<uint32_t> chain = unused_chain(module_, class_used_, p_class);
+	for (size_t i = chain.size(); i-- > 0;) {
+		uint32_t initializer = module_.classes[chain[i]].static_init;
+		if (initializer != NONE && !call(initializer, nullptr, 0)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool Interpreter::local_at(size_t p_frame, std::string_view p_name, Slot *r_value, Kind *r_kind) const {
+	if (p_frame >= frames_.size()) {
+		return false;
+	}
+	const Function &function = module_.functions[frames_[p_frame].function];
+	for (const ir::Local &local : function.locals) {
+		if (local.name == p_name && local.reg < function.registers.size()) {
+			*r_value = stack_[frames_[p_frame].base + local.reg];
+			*r_kind = function.registers[local.reg];
+			return true;
+		}
+	}
+	return false;
+}
+
 bool Interpreter::start() {
 	if (started_) {
 		return true;
@@ -449,8 +496,17 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		return nullptr;
 	}
 	const ir::Class &klass = module_.classes[p_class];
+	if (!use_class_now(p_class)) {
+		if (p_owner) {
+			host_.drop(p_owner);
+		}
+		return nullptr;
+	}
 	Object *object = new_object(p_class, klass.fields.size());
 	if (!object) {
+		if (p_owner) {
+			host_.drop(p_owner);
+		}
 		return nullptr;
 	}
 	for (size_t i = 0; i < klass.fields.size(); i++) {
@@ -795,6 +851,11 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				r[in.a].b = value;
 				break;
 			}
+			case Op::InitClass:
+				if (!class_used_[in.a]) {
+					use_class(in.a); // What it pushes runs before the next instruction of this frame.
+				}
+				break;
 			case Op::NullCheck:
 				if (!r[in.a].p) {
 					raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");

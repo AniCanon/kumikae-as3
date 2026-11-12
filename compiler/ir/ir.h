@@ -54,6 +54,7 @@ inline bool is_engine(Kind p_kind) {
 	X(Concat, "RRR") X(StrLength, "RR-") \
 	X(Jump, "L--") X(JumpIf, "RL-") X(JumpIfNot, "RL-") \
 	X(GetField, "RRD") X(SetField, "RDR") X(GetGlobal, "RG-") X(SetGlobal, "GR-") \
+	X(InitClass, "C--") /* The class is used: give its static fields their values, if this is the first time. */ \
 	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
 	X(IsClass, "RRC") X(AsClass, "RRC") \
@@ -114,6 +115,7 @@ struct Class {
 	std::vector<Field> fields; // The base's first: a field keeps its slot in every subclass.
 	std::vector<uint32_t> methods; // The method table: function indices, the base's slots first.
 	uint32_t constructor = NONE;
+	uint32_t static_init = NONE; // The function that gives the class's static fields their values, if any.
 	uint32_t to_string = NONE; // The class's toString(), its own or inherited: what converting to a String calls.
 	// For a script class, one that extends a Godot class directly or through other script classes: Godot's
 	// name for that class. Field 0 then holds the Godot object the script is attached to.
@@ -135,7 +137,9 @@ struct Module {
 	std::vector<Global> globals; // Static fields and package-level variables.
 	std::vector<std::string> strings;
 	std::vector<double> numbers;
-	std::vector<uint32_t> initializers; // Functions run once, in order, before the entry.
+	// Functions run once, in order, before anything else: package-level variables. (A class's static fields
+	// are set on the class's first use: Class::static_init.)
+	std::vector<uint32_t> initializers;
 	uint32_t entry_class = NONE; // Constructed with no arguments to start the program.
 	uint32_t error_class = NONE; // Error, and TypeError: the classes of the errors the interpreter raises.
 	uint32_t type_error_class = NONE;

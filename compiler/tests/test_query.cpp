@@ -479,7 +479,7 @@ static void test_outline() {
 		}
 		return out;
 	};
-	CHECK_EQ(names("HEALTH", 10), std::string("game.Player.health game.Player.health "));
+	CHECK_EQ(names("HEALTH", 10), std::string("game.Player.health ")); // Once, though it has a getter and a setter.
 	CHECK_EQ(names("play", 10), std::string("game.Player game.Player.Player "));
 	CHECK_EQ(names("a", 3), std::string("game.Player game.Player.MAX game.Player.target "));
 	CHECK(index.find("", 1000).size() > 15);

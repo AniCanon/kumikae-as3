@@ -51,7 +51,8 @@ private:
 	size_t trace_lines_ = 0;
 	bool stopped_ = false; // Nothing more is to run.
 	bool halted_ = false; // Because the statement hook said so, not because of an error.
-	bool started_ = false; // The static initializers have run.
+	bool started_ = false; // The package-level initializers have run.
+	std::vector<uint8_t> class_used_; // Per class: its static fields have been (or are being) given values.
 	int entries_ = 0; // Calls from outside in progress.
 	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
 	StatementHook hook_ = nullptr;
@@ -70,6 +71,8 @@ private:
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);
 	void report();
+	void use_class(uint32_t p_class); // From running code: pushes what must run first.
+	bool use_class_now(uint32_t p_class); // From outside: runs it.
 	std::string site(const Frame &p_frame) const;
 	std::string object_text(Object *p_object) const;
 	bool is_class(const Object *p_object, uint32_t p_class) const;
@@ -126,6 +129,9 @@ public:
 	const ir::Function &function_at(size_t p_frame) const { return module_.functions[frames_[p_frame].function]; }
 	// The line (from 1) the frame is at.
 	int line_at(size_t p_frame) const;
+	// A local variable or parameter of the frame by name: its value as held (no new reference) and its
+	// kind. False if the frame's function has no such local.
+	bool local_at(size_t p_frame, std::string_view p_name, Slot *r_value, ir::Kind *r_kind) const;
 };
 
 } // namespace vm

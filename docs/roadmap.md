@@ -161,7 +161,9 @@ The design keeps each of these possible. No stage above delivers them.
 
 Open items:
 
-- **Then the [backlog](backlog.md):** the owner asked for a clean-up pass after this slice and before the next.
+- **The [backlog](backlog.md) pass is under way,** before the next slice, as the owner asked. Done so far: the
+  two decisions above, the number constants (`NaN`, `int.MAX_VALUE`), reading a variable from the debugger
+  hook, a stop on every pass of a loop, and three language-server faults.
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
 - **Language server:** Rider is not yet tried (the plugin is installed); Windows is not supported.
@@ -175,7 +177,7 @@ Open items:
 | Deferred review findings | The owner said on 2026-11-12 that all of them are to be fixed. They are listed in the [backlog](backlog.md) and stay there until fixed or ruled on. |
 | Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the [language additions](superpowers/specs/2026-11-12-language-additions.md) list. |
 | 64-bit integers | Decided on 2026-11-12: supported, in the way that is easiest to maintain. A real `Int64` type, given by one rule from Godot's description with no hand-kept table, converting to `int` or `Number` with a range check and never silently. Built in stage 2b-3; until then such values are declared `Number`. |
-| Static fields and null calls | Decided on 2026-11-12: both follow Flash. A class's static fields are set on its first use, and a call on a null object evaluates its arguments before raising the error. Built in the clean-up pass after stage 2b-1. |
+| Static fields and null calls | Decided on 2026-11-12, and built: both follow Flash. A class's static fields are set on its first use, and a call on a null object evaluates its arguments before raising the error. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
 | [Godot naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
 

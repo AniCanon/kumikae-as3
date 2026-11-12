@@ -697,6 +697,48 @@ class Lowerer {
 		return out;
 	}
 
+	// NaN, Infinity, and the limits of the number types: constants of the built-in library.
+	bool builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg) {
+		if (!p_symbol || !p_symbol->unit || !p_symbol->unit->is_builtin ||
+				(p_symbol->kind != SymbolKind::Variable && p_symbol->kind != SymbolKind::Field)) {
+			return false;
+		}
+		const Symbol *owner = p_symbol->owner;
+		std::string_view name = p_symbol->name;
+		const double infinity = std::numeric_limits<double>::infinity();
+		const double nan = std::numeric_limits<double>::quiet_NaN();
+		if (!owner || owner == number_) {
+			double value = 0;
+			if (name == "NaN") {
+				value = nan;
+			} else if ((!owner && name == "Infinity") || (owner && name == "POSITIVE_INFINITY")) {
+				value = infinity;
+			} else if (owner && name == "NEGATIVE_INFINITY") {
+				value = -infinity;
+			} else if (owner && name == "MAX_VALUE") {
+				value = std::numeric_limits<double>::max();
+			} else if (owner && name == "MIN_VALUE") {
+				value = std::numeric_limits<double>::denorm_min(); // The smallest above zero, as in AS3.
+			} else {
+				return false;
+			}
+			*r_reg = reg(Kind::F64);
+			emit(Op::ConstF64, p_position, *r_reg, number(value));
+			return true;
+		}
+		if (owner == int_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
+			*r_reg = reg(Kind::I32);
+			emit(Op::ConstI32, p_position, *r_reg, name == "MAX_VALUE" ? 0x7FFFFFFFu : 0x80000000u);
+			return true;
+		}
+		if (owner == uint_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
+			*r_reg = reg(Kind::U32);
+			emit(Op::ConstU32, p_position, *r_reg, name == "MAX_VALUE" ? 0xFFFFFFFFu : 0u);
+			return true;
+		}
+		return false;
+	}
+
 	Symbol *callee_symbol(Expr *p_callee) {
 		if (p_callee->kind == NodeKind::Name) {
 			return static_cast<Name *>(p_callee)->symbol;
@@ -706,6 +748,15 @@ class Lowerer {
 			return member->symbol ? member->symbol : member->member;
 		}
 		return nullptr;
+	}
+
+	// Marks a use of a class from outside it: its static fields get their values the first time. Code inside
+	// the class needs no mark, since it can only be running because the class was used.
+	void touch(const Symbol *p_class, uint32_t p_position) {
+		auto found = classes_.find(p_class);
+		if (found != classes_.end() && p_class != class_ && !is_error(p_class)) {
+			emit(Op::InitClass, p_position, found->second);
+		}
 	}
 
 	// The object a member is reached through, checked for null unless it is `this` or `super`.
@@ -718,7 +769,8 @@ class Lowerer {
 			refuse(p_object->offset, "a member of a value of type '" + compilation_.type_name(p_object->type) + "'");
 			return default_value(Kind::Obj, p_object->offset);
 		}
-		emit(Op::NullCheck, p_object->offset, object);
+		// No check here: a missing object is reported where it is used, after whatever else the expression
+		// evaluates first (a call's arguments, an assignment's value), as in Flash.
 		return object;
 	}
 
@@ -807,6 +859,9 @@ class Lowerer {
 		}
 		auto global = globals_.find(p_symbol);
 		if (global != globals_.end()) {
+			if (p_symbol->owner) {
+				touch(p_symbol->owner, p_position);
+			}
 			place.where = Place::GlobalSlot;
 			place.index = global->second;
 			place.kind = module_.globals[global->second].kind;
@@ -1074,6 +1129,12 @@ class Lowerer {
 			}
 		}
 		call_arguments(decl, p_call->arguments, position, list);
+		if (symbol->kind == SymbolKind::Method && !symbol->is_static() && list[0] != 0) {
+			emit(Op::NullCheck, position, list[0]); // After the arguments.
+		}
+		if (symbol->is_static() && symbol->owner) {
+			touch(symbol->owner, position);
+		}
 		Kind kind = Kind::Void;
 		uint32_t out = call_result(symbol, position, &kind);
 		if (direct) {
@@ -1191,6 +1252,10 @@ class Lowerer {
 				return 0;
 			case NodeKind::Name: {
 				Name *name = static_cast<Name *>(p_expression);
+				uint32_t constant = 0;
+				if (builtin_constant(name->symbol, position, &constant)) {
+					return constant;
+				}
 				natural(p_expression);
 				return load(place_of(name), position);
 			}
@@ -1204,6 +1269,10 @@ class Lowerer {
 					uint32_t out = reg(Kind::I32);
 					emit(Op::StrLength, position, out, text);
 					return out;
+				}
+				uint32_t constant = 0;
+				if (builtin_constant(symbol, position, &constant)) {
+					return constant;
 				}
 				natural(p_expression);
 				return load(place_of(member), member->name_offset);
@@ -1236,6 +1305,7 @@ class Lowerer {
 					refuse(made->callee->offset, "creating a script class with 'new'");
 					return default_value(Kind::Obj, position);
 				}
+				touch(symbol, position);
 				uint32_t out = reg(Kind::Obj);
 				emit(Op::New, position, out, index);
 				std::vector<uint32_t> list = { out };
@@ -1620,8 +1690,9 @@ class Lowerer {
 			return;
 		}
 		uint32_t position = p_statement->offset;
-		if (p_statement->kind != NodeKind::Block && p_statement->kind != NodeKind::Empty) {
-			emit(Op::Stmt, position);
+		bool loop = p_statement->kind == NodeKind::While || p_statement->kind == NodeKind::DoWhile || p_statement->kind == NodeKind::For;
+		if (p_statement->kind != NodeKind::Block && p_statement->kind != NodeKind::Empty && !loop) {
+			emit(Op::Stmt, position); // A loop marks its condition instead, once for each pass.
 		}
 		switch (p_statement->kind) {
 			case NodeKind::Block:
@@ -1656,6 +1727,7 @@ class Lowerer {
 			case NodeKind::While: {
 				While *loop = static_cast<While *>(p_statement);
 				uint32_t top = here();
+				emit(Op::Stmt, position);
 				uint32_t test = expression(loop->condition, Kind::Bool);
 				uint32_t out = emit(Op::JumpIfNot, position, test, 0);
 				loops_.emplace_back();
@@ -1671,6 +1743,7 @@ class Lowerer {
 				loops_.emplace_back();
 				statement(loop->body);
 				uint32_t test_at = here();
+				emit(Op::Stmt, loop->condition ? loop->condition->offset : position);
 				uint32_t test = expression(loop->condition, Kind::Bool);
 				emit(Op::JumpIf, position, test, top);
 				finish_loop(test_at);
@@ -1678,10 +1751,14 @@ class Lowerer {
 			}
 			case NodeKind::For: {
 				For *loop = static_cast<For *>(p_statement);
+				if (!loop->init) {
+					emit(Op::Stmt, position);
+				}
 				statement(loop->init);
 				uint32_t top = here();
 				uint32_t out = NONE;
 				if (loop->condition) {
+					emit(Op::Stmt, loop->condition->offset);
 					uint32_t test = expression(loop->condition, Kind::Bool);
 					out = emit(Op::JumpIfNot, position, test, 0);
 				}
@@ -1931,7 +2008,7 @@ class Lowerer {
 		function.is_static = true;
 		module_.functions.push_back(std::move(function));
 		uint32_t index = (uint32_t)module_.functions.size() - 1;
-		module_.initializers.push_back(index);
+		module_.classes[classes_[p_class->symbol]].static_init = index; // Run on the class's first use.
 		begin(index, p_unit, p_class->symbol);
 		for (Node *member : p_class->members) {
 			if (member->kind != NodeKind::VarDecl || !(static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {

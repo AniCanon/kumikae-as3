@@ -14,13 +14,12 @@ The [roadmap](roadmap.md) says what is being built now. This page says what is o
 
 ## Decided by the owner, to build
 
-Decided on 2026-11-12. Each is owed as code and tests.
+Decided on 2026-11-12. Each is owed as code and tests. (Two more decisions of that day are built: static
+fields are set on a class's first use, and a call on a null object evaluates its arguments first.)
 
 | Decision | What to build | When |
 |---|---|---|
 | **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | A real 64-bit integer type, `Int64`, with one rule in the generator: a Godot integer that Godot's description marks as 64-bit is an `Int64`. The hand-kept table of 31 exceptions goes away. An `Int64` converts to `int`, `uint` or `Number` where one is expected, with a check that raises a `RangeError` if the value does not fit, so nothing is ever cut off silently. It needs its own short design first. | Stage 2b-3 |
-| **Static fields get their values on a class's first use,** as in Flash | Replace "before the program starts, in file order" with a first-use check; the compiler removes the check where it can prove the order. | The clean-up pass after stage 2b-1 |
-| **A call on a null object evaluates its arguments first,** then raises the error, as in Flash | Move the null check after the arguments in the lowering. | The clean-up pass after stage 2b-1 |
 
 ## Stage 1d: Godot's API in AS3
 
@@ -52,9 +51,6 @@ Decided on 2026-11-12. Each is owed as code and tests.
 - The same file reached through a symbolic link, or under a different letter case, or in a different
   Unicode form, counts as two files.
 - A project over 20,000 files is cut off with a note on standard error only, not in the editor.
-- A message with 200,000 keys blocks the server for 26 seconds (`Json::set` is linear).
-- A `Content-Length` header with a trailing space ends the server silently.
-- Symbol search lists a get/set property twice.
 - Find references does not list overrides of a method.
 - Symbol search covers the project only, not Godot's classes.
 - `super(...)` goes nowhere on go to definition; `new X()` goes to the class, not the constructor.
@@ -64,10 +60,7 @@ Decided on 2026-11-12. Each is owed as code and tests.
 
 ## Stage 2a: interpreter core
 
-- The debugger hook can't read a variable's value yet.
-- A `while` condition has one statement marker, so a stop on that line happens once.
 - Objects that refer to each other in a loop are never freed (the cycle collector is planned for 2d).
-- `NaN`, `Infinity` and `int.MAX_VALUE` are refused with an unhelpful message.
 - A string of 4 GiB or more is truncated; running out of memory while building a string aborts.
 - No existing corpus program runs yet: each stops in the checker or is refused.
 - There is one IR golden file; the plan called for more.

@@ -151,6 +151,12 @@ process.stderr.close()
 code, messages, errors = session(START + END, "--no-godot", "--stdio")
 check("--stdio", code == 0 and messages is not None and len(messages) == 2 and errors == b"", repr((code, errors)))
 
+# White space after the length is allowed.
+spaced = json.dumps({"jsonrpc": "2.0", "id": 8, "method": "workspace/symbol", "params": {"query": ""}}).encode()
+spaced = b"Content-Length: %d  \r\n\r\n" % len(spaced) + spaced
+code, messages, errors = session(START + spaced + END, "--no-godot")
+check("length with a space", code == 0 and messages is not None and any(m.get("id") == 8 for m in messages), repr((code, messages)))
+
 result = subprocess.run([KAS3C, "lsp", "--bogus"], input=b"", capture_output=True, timeout=60)
 check("bad option", result.returncode == 2 and result.stdout == b"" and b"usage: kas3c" in result.stderr, repr(result))
 

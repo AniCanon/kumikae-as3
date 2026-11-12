@@ -423,6 +423,14 @@ std::vector<FoundSymbol> Queries::find(std::string_view p_query, size_t p_limit)
 		if (found.size() >= p_limit || !contains_ignoring_case(name, p_query)) {
 			return;
 		}
+		// A property with a getter and a setter is one definition: its first accessor stands for it.
+		if (p_item.kind == SymbolKind::Property) {
+			for (const FoundSymbol &earlier : found) {
+				if (earlier.kind == SymbolKind::Property && earlier.unit == &p_unit && earlier.name == name && earlier.container == p_container) {
+					return;
+				}
+			}
+		}
 		FoundSymbol symbol;
 		symbol.name = std::move(name);
 		symbol.container = p_container;

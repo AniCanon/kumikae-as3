@@ -42,6 +42,13 @@ static bool on_statement(vm::Interpreter &p_interpreter, void *p_data) {
 	Steps *steps = static_cast<Steps *>(p_data);
 	size_t top = p_interpreter.depth() - 1;
 	steps->seen += p_interpreter.function_at(top).name + ":" + std::to_string(p_interpreter.line_at(top)) + " ";
+	// A debugger reads a variable by name.
+	vm::Slot value;
+	ir::Kind kind = ir::Kind::Void;
+	if (p_interpreter.local_at(top, "result", &value, &kind) && kind == ir::Kind::I32 && p_interpreter.line_at(top) == 10) {
+		steps->seen += "(result=" + std::to_string(value.i) + ") ";
+	}
+	CHECK(!p_interpreter.local_at(top, "no such local", &value, &kind));
 	// A caller is on the line of its call, not the one after.
 	if (top > 0) {
 		steps->seen += "(from " + std::to_string(p_interpreter.line_at(top - 1)) + ") ";
@@ -72,7 +79,7 @@ static void test_statement_hook() {
 		vm::Interpreter interpreter(module, host);
 		interpreter.set_statement_hook(on_statement, &steps);
 		CHECK(interpreter.run_program());
-		CHECK_EQ(steps.seen, std::string("Main:4 Main:5 Main/twice:9 (from 5) Main/twice:10 (from 5) Main:6 "));
+		CHECK_EQ(steps.seen, std::string("Main:4 Main:5 Main/twice:9 (from 5) Main/twice:10 (result=2) (from 5) Main:6 "));
 		CHECK_EQ(host.printed, std::string("2\n"));
 	}
 	// Returning false stops the program there, without an error.
@@ -571,7 +578,31 @@ static void test_engine_calls() {
 	}
 }
 
+// A loop's condition is somewhere a debugger can stop on every pass.
+static void test_loop_markers() {
+	Compilation compilation;
+	compilation.add("Main.as", "package { public class Main { public function Main() {\n"
+							   "var n:int = 0;\n"
+							   "while (n < 2) {\n"
+							   "n++;\n"
+							   "}\n"
+							   "for (var i:int = 0; i < 2; i++) {\n"
+							   "n += i;\n"
+							   "}\n"
+							   "} } }");
+	compilation.check();
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module));
+	Recorder host;
+	Steps steps;
+	vm::Interpreter interpreter(module, host);
+	interpreter.set_statement_hook(on_statement, &steps);
+	CHECK(interpreter.run_program());
+	CHECK_EQ(steps.seen, std::string("Main:2 Main:3 Main:4 Main:3 Main:4 Main:3 Main:6 Main:6 Main:7 Main:6 Main:7 Main:6 "));
+}
+
 int main() {
+	test_loop_markers();
 	test_engine_calls();
 	test_entry_points();
 	test_statement_hook();

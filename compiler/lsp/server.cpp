@@ -551,6 +551,9 @@ public:
 						value = value * 10 + (size_t)(line[digits++] - '0');
 						any = true;
 					}
+					while (digits < line.size() && (line[digits] == ' ' || line[digits] == '\t')) {
+						digits++;
+					}
 					if (any && digits == line.size()) {
 						length = value;
 					}
