@@ -49,12 +49,19 @@ add_library(kas3front STATIC ${KAS3_SOURCES} ${builtins_path} ${godot_path})
 target_include_directories(kas3front PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(kas3front PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
+# The language server: JSON, the workspace and the message loop. The Godot editor does not need it.
+file(GLOB KAS3_LSP_SOURCES CONFIGURE_DEPENDS lsp/*.cpp)
+add_library(kas3lsp STATIC ${KAS3_LSP_SOURCES})
+target_include_directories(kas3lsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lsp)
+target_link_libraries(kas3lsp PUBLIC kas3front)
+target_compile_options(kas3lsp PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+
 enable_testing()
 file(GLOB KAS3_TESTS CONFIGURE_DEPENDS tests/test_*.cpp)
 foreach(test_source ${KAS3_TESTS})
     get_filename_component(test_name ${test_source} NAME_WE)
     add_executable(${test_name} ${test_source})
-    target_link_libraries(${test_name} PRIVATE kas3front)
+    target_link_libraries(${test_name} PRIVATE kas3lsp)
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_compile_definitions(${test_name} PRIVATE KAS3_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME ${test_name} COMMAND ${test_name})
@@ -62,7 +69,7 @@ endforeach()
 
 # The command-line tool.
 add_executable(kas3c tools/kas3c.cpp)
-target_link_libraries(kas3c PRIVATE kas3front)
+target_link_libraries(kas3c PRIVATE kas3lsp)
 target_compile_options(kas3c PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
 add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:kas3c>)
