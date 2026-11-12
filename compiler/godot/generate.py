@@ -564,7 +564,12 @@ class Generator:
             return
         name = self.name(naming.member(entry["name"]), "godot")
         self.define(name)
-        for line in self.function(entry["name"], name, entry.get("arguments", []), entry.get("return_type"),
+        arguments = entry.get("arguments", [])
+        # Godot describes print(arg1, ...) though print() is allowed. A lone leading argument of a function
+        # that takes any number of them is not a minimum; two (max, min) are.
+        if entry["is_vararg"] and len(arguments) == 1 and arguments[0]["type"] == "Variant":
+            arguments = []
+        for line in self.function(entry["name"], name, arguments, entry.get("return_type"),
                                   None, entry["is_vararg"], "", ("", entry["name"])):
             self.lines.append("\t" + line)
 

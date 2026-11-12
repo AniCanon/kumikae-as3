@@ -228,7 +228,7 @@ class Fixture(unittest.TestCase):
             generate.generate(api)
 
     def test_global_functions(self):
-        self.assertIn("\tpublic native function print(arg1:*, ...rest):void;\n", self.text)
+        self.assertIn("\tpublic native function print(...rest):void;\n", self.text)
         self.assertIn("\tpublic native function lerp(from:*, to:*, weight:*):*;\n", self.text)
         self.assertIn("\tpublic native function degToRad(deg:Number):Number;\n", self.text)
 
@@ -494,6 +494,15 @@ class RealApi(unittest.TestCase):
     def test_the_committed_file_is_current(self):
         self.assertTrue(self.text == read(os.path.join(HERE, "godot.as")),
                         "godot.as is stale: run generate.py again")
+
+    def test_print_takes_any_number_of_arguments(self):
+        # Godot describes print(arg1, ...) though print() is allowed: a lone leading argument of a function
+        # that takes any number is not required.
+        self.assertIn("\tpublic native function print(...rest):void;", self.text)
+        self.assertIn("\tpublic native function str(...rest):String;", self.text)
+        self.assertNotIn("function print(arg1", self.text)
+        # Two leading arguments are a real minimum.
+        self.assertIn("\tpublic native function max(arg1:*, arg2:*, ...rest):*;", self.text)
 
     def test_the_committed_names_are_current(self):
         self.assertTrue(self.generator.names_text() == read(os.path.join(HERE, "godot_names.txt")),

@@ -179,6 +179,15 @@ static void test_no_operator() {
 					NO_OPERATOR("/", "Vector2", "String") });
 }
 
+// Operators that no Godot type has: counting up and down, bit operations.
+static void test_never_operators() {
+	expect("/*!*/a++; /*!*/++a; /*!*/a--; /*!*/~a; /*!*/a <<= 1; /*!*/a &= 3; /*!*/gd++;",
+			{ NO_UNARY("++", "Vector2"), NO_UNARY("++", "Vector2"), NO_UNARY("--", "Vector2"), NO_UNARY("~", "Vector2"),
+					NO_UNARY("<<=", "Vector2"), NO_UNARY("&=", "Vector2"), NO_UNARY("++", "GodotDictionary") });
+	// Numbers, and values that could be anything, are untouched.
+	expect("var n:int = 1; n++; ~n; n <<= 2; any++; ~any; mine++; node++;", {});
+}
+
 // Nothing is said where the operand could be anything, or where the class says nothing about operators.
 static void test_silence() {
 	types({
@@ -295,6 +304,7 @@ int main() {
 	test_comparisons();
 	test_results_are_checked_where_stored();
 	test_no_operator();
+	test_never_operators();
 	test_silence();
 	test_compound_assignment();
 	test_tags_outside_declarations();

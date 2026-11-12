@@ -1037,6 +1037,16 @@ class Typer {
 		return unknown_;
 	}
 
+	// For the operators no class describes (`++`, `--`, `~`, and the bit assignments): a type whose
+	// operators are all known has none of them. True if that was reported.
+	bool never_operator(TokenKind p_op, const Type *p_operand, uint32_t p_offset) {
+		if (!has_operators(p_operand)) {
+			return false;
+		}
+		error(p_offset, "can't use " + quoted(token_kind_spelling(p_op)) + " on " + quoted(compilation_.type_name(p_operand)));
+		return true;
+	}
+
 	// The plain operator of a compound assignment, or Error if it has none that a class could describe.
 	static TokenKind compound_operator(TokenKind p_op) {
 		switch (p_op) {
@@ -1071,9 +1081,15 @@ class Typer {
 			case TokenKind::KwVoid:
 				return any_;
 			case TokenKind::Tilde:
+				if (never_operator(p_unary->op, operand, p_unary->offset)) {
+					return unknown_;
+				}
 				return primitive(operand) ? int_ : unknown_;
 			case TokenKind::PlusPlus:
 			case TokenKind::MinusMinus:
+				if (never_operator(p_unary->op, operand, p_unary->offset)) {
+					return unknown_;
+				}
 				written(p_unary->operand);
 				return numeric(operand) ? operand : (primitive(operand) ? number_ : unknown_);
 			case TokenKind::Minus:
@@ -1279,6 +1295,9 @@ class Typer {
 				return unary(static_cast<Unary *>(p_expression));
 			case NodeKind::Postfix: {
 				const Type *operand = expression(static_cast<Postfix *>(p_expression)->operand);
+				if (never_operator(static_cast<Postfix *>(p_expression)->op, operand, p_expression->offset)) {
+					return unknown_;
+				}
 				written(static_cast<Postfix *>(p_expression)->operand);
 				return numeric(operand) ? operand : (primitive(operand) ? number_ : unknown_);
 			}
@@ -1307,6 +1326,9 @@ class Typer {
 						break;
 					default:
 						break;
+				}
+				if (bitwise && never_operator(assign->op, target, assign->offset)) {
+					return target;
 				}
 				TokenKind plain = compound_operator(assign->op);
 				if (plain != TokenKind::Error && !(plain == TokenKind::Plus && (target == string_ || value == string_))) {

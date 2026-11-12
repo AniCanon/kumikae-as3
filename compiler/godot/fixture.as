@@ -174,7 +174,7 @@ package godot {
 		public static const LOW:Number = 1;
 		public static const HIGH:Number = 34359738368;
 	}
-	public native function print(arg1:*, ...rest):void;
+	public native function print(...rest):void;
 	public native function lerp(from:*, to:*, weight:*):*;
 	public native function degToRad(deg:Number):Number;
 	public native function instanceFromId(instanceId:Number):GodotObject;
