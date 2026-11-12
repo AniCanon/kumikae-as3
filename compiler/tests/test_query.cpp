@@ -226,6 +226,30 @@ static void test_reuse() {
 		CHECK_EQ(resolved(), 0);
 		CHECK(compilation.format_diagnostics().find("'B'") != std::string::npos);
 	}
+	// Every kind of annotation is wiped: here a name reached through its package, and a catch variable.
+	std::shared_ptr<Parsed> odd = parse_file("Odd.as",
+			"package { public class Odd { function f():int { try { return flash.utils.getTimer(); } catch (e:Error) {} return 0; } } }");
+	auto marks = [&]() {
+		int members = 0, catches = 0;
+		walk(odd->tree, [&](Node *p_node) {
+			members += p_node->kind == NodeKind::Member && static_cast<Member *>(p_node)->symbol != nullptr;
+			if (p_node->kind == NodeKind::Try) {
+				for (const CatchClause &clause : static_cast<Try *>(p_node)->catches) {
+					catches += clause.symbol != nullptr;
+				}
+			}
+		});
+		return std::to_string(members) + " " + std::to_string(catches);
+	};
+	{
+		Compilation compilation(builtins);
+		compilation.add(odd);
+		compilation.check(true);
+		CHECK_EQ(compilation.format_diagnostics(), std::string());
+		CHECK_EQ(marks(), std::string("1 1"));
+	}
+	clear_annotations(odd->tree);
+	CHECK_EQ(marks(), std::string("0 0"));
 	// The wipe leaves nothing behind.
 	CHECK(annotations(corpus[1]->tree) > 10);
 	CHECK(annotations(godot->tree) > 10000);

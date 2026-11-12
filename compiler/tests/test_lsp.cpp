@@ -42,6 +42,8 @@ struct Session {
 
 	explicit Session(bool p_godot = false) :
 			server(options(p_godot)) {}
+	explicit Session(Workspace::Options p_options) :
+			server(std::move(p_options)) {}
 
 	void take(const std::vector<std::string> &p_out) {
 		for (const std::string &text : p_out) {
@@ -324,6 +326,10 @@ static void test_positions() {
 	CHECK(hover.get("result").get("contents").get("value").string().find("var \xC3\xA9t\xC3\xA9:Nope") != std::string::npos);
 	CHECK_EQ(spot(Json::object().set("uri", MAIN).set("range", hover.get("result").get("range"))), std::string("Main.as 1:44-1:47"));
 
+	// One unit before `n`, counting the emoji as two: the space, where there is no name.
+	CHECK(wide.request("textDocument/hover", Session::at(MAIN, 1, 26)).get("result").is_null());
+	CHECK(wide.request("textDocument/hover", Session::at(MAIN, 1, 27)).get("result").is_object());
+
 	Session narrow;
 	narrow.initialize(std::string(), true);
 	narrow.open(MAIN, text);
@@ -343,6 +349,11 @@ static void test_positions() {
 	wide.change(MAIN, "package {\r\npublic class Main {\rvar a:Nope;\r\n} }");
 	wide.settle();
 	CHECK_EQ(wide.published(), MAIN + " 2:6-2:10 unknown type 'Nope'\n");
+	// A string left open at a lone carriage return: the range stays on its line.
+	wide.change(MAIN, "package { public class Main {\rvar s:String = \"abc\rvar t:String = \"x\";\r} }");
+	wide.settle();
+	std::string open_string = wide.published();
+	CHECK(open_string.find(MAIN + " 1:15-1:16 ") == 0);
 }
 
 static void test_navigation() {
@@ -474,6 +485,28 @@ static void test_navigation() {
 	fs::remove_all(root);
 }
 
+// A declaration file given on the command line: its errors are reported, as `kas3c check` reports them.
+static void test_declaration_files() {
+	fs::path root = fresh_folder("declared");
+	fs::path declared = root / "lib" / "engine.as";
+	write(declared, "package engine { public native class Motor { public native function run(:void; } }");
+	write(root / "Main.as", "package { public class Main { var n:int = \"x\"; } }");
+	Workspace::Options with = options(false);
+	with.declarations.push_back(declared.string());
+	Session session(with);
+	session.initialize(root.string());
+	session.settle();
+	CHECK_EQ(session.published(), uri_from_path(declared.string()) + " 0:72-0:73 expected a parameter name but found ':'\n");
+	write(declared, "package engine { public native class Motor { public native function run():void; } }");
+	session.notify("workspace/didChangeWatchedFiles",
+			Json::object().set("changes", Json::array().push(Json::object().set("uri", uri_from_path(declared.string())).set("type", 2))));
+	session.settle();
+	CHECK_EQ(session.published(),
+			uri_from_path(declared.string()) + " clear\n" + uri_from_path((root / "Main.as").string()) +
+					" 0:42-0:45 can't use a value of type 'String' where 'int' is expected\n");
+	fs::remove_all(root);
+}
+
 static void test_file_watching() {
 	Session session;
 	Json params = Json::object();
@@ -488,7 +521,7 @@ static void test_file_watching() {
 	CHECK(ask.has("id"));
 	const Json &registration = ask.get("params").get("registrations").at(0);
 	CHECK_EQ(registration.get("method").string(), std::string("workspace/didChangeWatchedFiles"));
-	CHECK_EQ(registration.get("registerOptions").get("watchers").at(0).get("globPattern").string(), std::string("**/*.as"));
+	CHECK_EQ(registration.get("registerOptions").get("watchers").at(0).get("globPattern").string(), std::string("**/*"));
 }
 
 // What the server publishes for a file is what `kas3c check` prints for it.
@@ -596,6 +629,7 @@ int main() {
 	test_diagnostics();
 	test_positions();
 	test_navigation();
+	test_declaration_files();
 	test_file_watching();
 	test_agreement();
 	test_typing();

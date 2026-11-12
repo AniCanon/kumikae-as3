@@ -128,6 +128,25 @@ check("noise", code == 1 and messages == [], repr((code, messages)))
 code, messages, errors = session(START + notify("exit"), "--no-godot")
 check("exit without shutdown", code == 1, repr(code))
 
+# Errors as you type: with nothing asked, the errors arrive once the editor pauses.
+import select
+import time
+process = subprocess.Popen([KAS3C, "lsp", "--no-godot"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE)
+process.stdin.write(START + opened("package { public class Main { var n:int = \"x\"; } }"))
+process.stdin.flush()
+collected = b""
+deadline = time.time() + 20
+while time.time() < deadline and b"publishDiagnostics" not in collected:
+    if select.select([process.stdout], [], [], 0.2)[0]:
+        collected += os.read(process.stdout.fileno(), 65536)
+check("unasked", b"publishDiagnostics" in collected and b"can't use a value of type" in collected, repr(collected[-300:]))
+process.stdin.write(END)
+process.stdin.close()
+check("unasked exit", process.wait(timeout=20) == 0)
+process.stdout.close()
+process.stderr.close()
+
 result = subprocess.run([KAS3C, "lsp", "--bogus"], input=b"", capture_output=True, timeout=60)
 check("bad option", result.returncode == 2 and result.stdout == b"" and b"usage: kas3c" in result.stderr, repr(result))
 

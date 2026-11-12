@@ -201,7 +201,7 @@ void Server::publish(std::vector<std::string> &r_out) {
 		r_out.push_back("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":" +
 				write_json(Json(p_uri)) + ",\"diagnostics\":" + p_diagnostics + "}}");
 	};
-	for (Unit *unit : workspace_.program_units()) {
+	for (Unit *unit : workspace_.reported_units()) {
 		std::string uri = uri_of(*unit);
 		if (uri.empty()) {
 			continue;
@@ -381,7 +381,7 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 	std::string path = path_from_uri(document.get("uri").string());
 	if (p_method == "initialized") {
 		if (watch_files_) {
-			Json watchers = Json::array().push(Json::object().set("globPattern", "**/*.as"));
+			Json watchers = Json::array().push(Json::object().set("globPattern", "**/*"));
 			Json registration = Json::object()
 										.set("id", "kas3c-watch")
 										.set("method", "workspace/didChangeWatchedFiles")

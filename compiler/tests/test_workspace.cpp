@@ -145,12 +145,31 @@ static void test_buffers() {
 	write(outside / "Out.as", "package { public class Out {} }");
 	workspace.file_changed_on_disk((outside / "Out.as").string());
 	CHECK_EQ(paths(workspace, root), std::string("Player.as sub/Extra.as "));
-	// But a file outside the project that the editor opens is checked while it is open.
-	workspace.open((outside / "Out.as").string(), "package { public class Out extends Player {} }");
-	CHECK_EQ(workspace.program_units().size(), (size_t)3);
-	CHECK(workspace.unit((outside / "Out.as").string()) != nullptr);
-	workspace.close((outside / "Out.as").string());
+	// A file the editor opens from outside the project, or from a dot folder in it, is not part of the
+	// program: a second copy of a class must not put an error on the project's own file.
+	workspace.open((outside / "Player.as").string(), "package { public class Player {} }");
+	workspace.open((root / ".bak" / "Player.as").string(), "package { public class Player {} }");
 	CHECK_EQ(workspace.program_units().size(), (size_t)2);
+	CHECK(workspace.unit((outside / "Player.as").string()) == nullptr);
+	CHECK_EQ(workspace.compilation().format_diagnostics(), extra + ":1:38: error: unknown type 'Enemy'\n");
+	workspace.close((outside / "Player.as").string());
+	workspace.close((root / ".bak" / "Player.as").string());
+	CHECK_EQ(workspace.program_units().size(), (size_t)2);
+	// A folder deleted or created as a whole: its files leave and join the program.
+	fs::remove_all(root / "sub");
+	workspace.file_changed_on_disk((root / "sub").string());
+	CHECK_EQ(paths(workspace, root), std::string("Player.as "));
+	write(root / "pack" / "deep" / "Two.as", "package { public class Two {} }");
+	write(root / "pack" / "One.as", "package { public class One {} }");
+	workspace.file_changed_on_disk((root / "pack").string());
+	CHECK_EQ(paths(workspace, root), std::string("Player.as pack/One.as pack/deep/Two.as "));
+	fs::rename(root / "pack", root / "moved");
+	workspace.file_changed_on_disk((root / "pack").string());
+	workspace.file_changed_on_disk((root / "moved").string());
+	CHECK_EQ(paths(workspace, root), std::string("Player.as moved/One.as moved/deep/Two.as "));
+	fs::remove_all(root / "moved");
+	workspace.file_changed_on_disk((root / "moved").string());
+	CHECK_EQ(paths(workspace, root), std::string("Player.as "));
 	// A buffer for a file that was never saved goes away when it closes.
 	std::string unsaved = (root / "New.as").string();
 	workspace.open(unsaved, "package { public class New {} }");
@@ -230,6 +249,28 @@ static void test_godot() {
 	third.set_root(root.string());
 	CHECK_EQ(third.compilation().format_diagnostics(), player + ":1:92: error: 'Motor' has no member 'stop'\n");
 	CHECK_EQ(third.program_units().size(), (size_t)1);
+	// The declaration file is inside the project, but it is read once, as a declaration file: no
+	// "already defined", and errors in it are reported as `kas3c check` reports them.
+	write(declared, "package engine { public native class Motor { public native function run(:void; } }");
+	third.file_changed_on_disk(declared.string());
+	CHECK_EQ(third.program_units().size(), (size_t)1);
+	CHECK_EQ(third.reported_units().size(), (size_t)2);
+	CHECK_EQ(third.compilation().format_diagnostics(),
+			declared.string() + ":1:73: error: expected a parameter name but found ':'\n");
+	// The editor's text for it stands in, as for any file.
+	third.open(declared.string(), "package engine { public native class Motor { public native function run():void; } }");
+	CHECK_EQ(third.program_units().size(), (size_t)1);
+	CHECK_EQ(third.compilation().format_diagnostics(), player + ":1:92: error: 'Motor' has no member 'stop'\n");
+	third.close(declared.string());
+	CHECK(third.compilation().format_diagnostics().find("expected a parameter name") != std::string::npos);
+
+	// With no folder for the embedded declarations, files still open.
+	Workspace::Options nowhere;
+	nowhere.godot = false;
+	nowhere.support_folder = "/";
+	Workspace fourth(nowhere);
+	fourth.open("/work/Main.as", "package { public class Main {} }");
+	CHECK_EQ(fourth.program_units().size(), (size_t)1);
 	fs::remove_all(root);
 	fs::remove_all(support);
 }

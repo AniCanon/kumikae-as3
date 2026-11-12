@@ -16,7 +16,7 @@ function start() {
   const server = { command: settings.get("serverPath", "kas3c"), args, transport: TransportKind.stdio };
   client = new LanguageClient("kas3", "Kumikae AS3", server, {
     documentSelector: [{ scheme: "file", language: "actionscript" }],
-    synchronize: { fileEvents: vscode.workspace.createFileSystemWatcher("**/*.as") },
+    synchronize: { fileEvents: vscode.workspace.createFileSystemWatcher("**/*") },
   });
   return client.start();
 }

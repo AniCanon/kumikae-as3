@@ -34,7 +34,7 @@ private:
 	std::map<std::string, File> files_; // By path: the order they are checked in.
 	std::vector<std::shared_ptr<Parsed>> builtins_;
 	std::shared_ptr<Parsed> godot_;
-	std::vector<std::shared_ptr<Parsed>> declarations_;
+	std::vector<std::shared_ptr<Parsed>> declarations_; // The files named in the options, by absolute path.
 	std::unique_ptr<Compilation> compilation_;
 	std::unique_ptr<Queries> queries_;
 	std::unordered_map<std::string, Unit *> units_; // By the path an editor knows the file by.
@@ -42,7 +42,10 @@ private:
 	bool stale_ = true;
 	int checks_ = 0;
 
-	void scan();
+	void scan(const std::string &p_folder);
+	int declaration(const std::string &p_path) const; // Its place in declarations_, or -1.
+	bool is_support(const std::string &p_path) const;
+	bool included(const std::string &p_path) const;
 	bool in_project(const std::string &p_path) const;
 	bool load(const std::string &p_path);
 	void check();
@@ -57,10 +60,12 @@ public:
 	void set_root(const std::string &p_folder);
 	const std::string &root() const { return root_; }
 
+	// The editor's text for a file. A file outside the project (or in a dot folder of it) is not part of
+	// the program, unless there is no project folder at all: then the open files are the program.
 	void open(const std::string &p_path, std::string p_text);
 	void change(const std::string &p_path, std::string p_text);
 	void close(const std::string &p_path);
-	// A file was created, changed or deleted outside the editor.
+	// A file or a folder was created, changed or deleted outside the editor.
 	void file_changed_on_disk(const std::string &p_path);
 
 	bool stale() const { return stale_; }
@@ -70,7 +75,9 @@ public:
 	Compilation &compilation();
 	Queries &queries();
 	Unit *unit(const std::string &p_path); // Null if the file is not part of the program.
-	std::vector<Unit *> program_units(); // The files diagnostics are reported for.
+	std::vector<Unit *> program_units(); // The program's own files.
+	// The files errors are reported for: the program's, and the declaration files named in the options.
+	std::vector<Unit *> reported_units();
 	// A file an editor can open: the unit's own path, or for Godot's API and the built-in library a
 	// read-only copy written to the support folder. Empty if that copy can't be written.
 	std::string real_path(const Unit &p_unit);

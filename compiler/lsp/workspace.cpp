@@ -61,13 +61,18 @@ Workspace::Workspace(Options p_options) :
 	if (options_.godot) {
 		godot_ = parse_file(GODOT_DECLARATIONS_PATH, godot_declarations());
 	}
+	std::error_code error;
 	for (const std::string &path : options_.declarations) {
+		// By absolute path, so that an editor can open it and the project scan can recognise it.
+		fs::path absolute = fs::absolute(fs::path(path), error);
+		std::string full = normal(error ? path : absolute.string());
 		std::string text;
-		if (read_file(path, &text)) {
-			declarations_.push_back(parse_file(normal(path), std::move(text)));
+		if (read_file(full, &text)) {
+			declarations_.push_back(parse_file(full, std::move(text)));
+		} else {
+			std::fprintf(stderr, "kas3c: cannot read %s\n", path.c_str());
 		}
 	}
-	std::error_code error;
 	if (options_.support_folder.empty()) {
 		fs::path temporary = fs::temp_directory_path(error);
 		if (!error) {
@@ -103,13 +108,32 @@ void Workspace::set_root(const std::string &p_folder) {
 	for (auto file = files_.begin(); file != files_.end();) {
 		file = file->second.open ? std::next(file) : files_.erase(file);
 	}
-	scan();
+	scan(root_);
 	stale_ = true;
 }
 
-void Workspace::scan() {
+int Workspace::declaration(const std::string &p_path) const {
+	for (size_t i = 0; i < declarations_.size(); i++) {
+		if (declarations_[i]->source.path() == p_path) {
+			return (int)i;
+		}
+	}
+	return -1;
+}
+
+bool Workspace::is_support(const std::string &p_path) const {
+	return !options_.support_folder.empty() && options_.support_folder != "/" &&
+			starts_with(p_path, options_.support_folder + "/");
+}
+
+// Whether a file the workspace holds is part of the program.
+bool Workspace::included(const std::string &p_path) const {
+	return root_.empty() || in_project(p_path);
+}
+
+void Workspace::scan(const std::string &p_folder) {
 	std::error_code error;
-	fs::recursive_directory_iterator at(root_, fs::directory_options::skip_permission_denied, error);
+	fs::recursive_directory_iterator at(p_folder, fs::directory_options::skip_permission_denied, error);
 	const fs::recursive_directory_iterator end;
 	size_t count = 0;
 	for (; !error && at != end; at.increment(error)) {
@@ -125,10 +149,11 @@ void Workspace::scan() {
 		}
 		std::string path = at->path().string();
 		auto found = files_.find(path);
-		if (found != files_.end() && found->second.open) {
+		if ((found != files_.end() && found->second.open) || declaration(path) >= 0) {
 			continue;
 		}
 		if (load(path) && ++count >= MAX_FILES) {
+			std::fprintf(stderr, "kas3c: %s has more than %zu .as files; the rest are not read\n", p_folder.c_str(), MAX_FILES);
 			break;
 		}
 	}
@@ -168,8 +193,16 @@ bool Workspace::load(const std::string &p_path) {
 
 void Workspace::open(const std::string &p_path, std::string p_text) {
 	std::string path = normal(p_path);
-	if (starts_with(path, options_.support_folder + "/")) {
+	if (is_support(path)) {
 		return; // Our own copy of the embedded declarations: it is in the program already.
+	}
+	int declared = declaration(path);
+	if (declared >= 0) {
+		if (declarations_[(size_t)declared]->source.text() != p_text) {
+			declarations_[(size_t)declared] = parse_file(path, std::move(p_text));
+			stale_ = true;
+		}
+		return;
 	}
 	File &file = files_[path];
 	if (file.parsed && file.open && file.parsed->source.text() == p_text) {
@@ -186,6 +219,10 @@ void Workspace::change(const std::string &p_path, std::string p_text) {
 
 void Workspace::close(const std::string &p_path) {
 	std::string path = normal(p_path);
+	if (declaration(path) >= 0) {
+		file_changed_on_disk(path); // Back to what is on disk.
+		return;
+	}
 	auto found = files_.find(path);
 	if (found == files_.end() || !found->second.open) {
 		return;
@@ -199,6 +236,15 @@ void Workspace::close(const std::string &p_path) {
 
 void Workspace::file_changed_on_disk(const std::string &p_path) {
 	std::string path = normal(p_path);
+	int declared = declaration(path);
+	if (declared >= 0) {
+		std::string text;
+		if (read_file(path, &text) && text != declarations_[(size_t)declared]->source.text()) {
+			declarations_[(size_t)declared] = parse_file(path, std::move(text));
+			stale_ = true;
+		}
+		return;
+	}
 	auto found = files_.find(path);
 	if (found != files_.end() && found->second.open) {
 		return; // The editor's text is the file for now.
@@ -209,6 +255,26 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 	if (found != files_.end()) {
 		files_.erase(found);
 		stale_ = true;
+		return;
+	}
+	if (root_.empty() || (path != root_ && !starts_with(path, root_ + "/"))) {
+		return;
+	}
+	// Not a file of the program: perhaps a folder. What was under it and is gone leaves the program, and
+	// what is under it now joins.
+	std::error_code error;
+	const std::string prefix = path + "/";
+	for (auto file = files_.lower_bound(prefix); file != files_.end() && starts_with(file->first, prefix);) {
+		if (!file->second.open && !fs::is_regular_file(file->first, error)) {
+			file = files_.erase(file);
+			stale_ = true;
+		} else {
+			++file;
+		}
+	}
+	// A folder inside a dot folder holds nothing of the program: ask as if for a file in it.
+	if (fs::is_directory(path, error) && (path == root_ || in_project(prefix + "x.as"))) {
+		scan(path);
 	}
 }
 
@@ -226,7 +292,9 @@ void Workspace::check() {
 		compilation_->add(declaration, true);
 	}
 	for (const auto &file : files_) {
-		compilation_->add(file.second.parsed);
+		if (included(file.first)) {
+			compilation_->add(file.second.parsed);
+		}
 	}
 	compilation_->check(true);
 	queries_ = std::make_unique<Queries>(*compilation_);
@@ -261,6 +329,16 @@ std::vector<Unit *> Workspace::program_units() {
 	std::vector<Unit *> units;
 	for (Unit &unit : compilation().units()) {
 		if (!unit.is_declaration) {
+			units.push_back(&unit);
+		}
+	}
+	return units;
+}
+
+std::vector<Unit *> Workspace::reported_units() {
+	std::vector<Unit *> units;
+	for (Unit &unit : compilation().units()) {
+		if (!unit.is_builtin && unit.source.path() != GODOT_DECLARATIONS_PATH) {
 			units.push_back(&unit);
 		}
 	}
