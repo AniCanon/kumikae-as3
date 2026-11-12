@@ -1427,10 +1427,6 @@ package godot {
 		public final native function getSignalConnectionList(signal:String):GodotArray;
 		[Godot(returns="Array[GodotDictionary]")]
 		public final native function getIncomingConnections():GodotArray;
-		[Godot(returns="enum:GodotError")]
-		public final native function connect(signal:String, callable:Function, flags:uint = 0):int;
-		public final native function disconnect(signal:String, callable:Function):void;
-		public final native function isConnected(signal:String, callable:Function):Boolean;
 		public final native function hasConnections(signal:String):Boolean;
 		public final native function setBlockSignals(enable:Boolean):void;
 		public final native function isBlockingSignals():Boolean;

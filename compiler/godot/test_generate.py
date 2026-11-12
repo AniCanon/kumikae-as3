@@ -507,6 +507,14 @@ class RealApi(unittest.TestCase):
         self.assertEqual(re.findall(r"function (\w+_)\(", self.text), ["new_"])
         self.assertEqual(set(re.findall(r"function get (\w+_)\(", self.text)), {"function_"})
 
+    def test_signals_are_listened_to_through_their_property(self):
+        # The string form (`connect("timeout", f)`) is not declared: `timer.timeout.add(f)` is the one way.
+        members = lines_of(self.text, "GodotObject")
+        self.assertEqual([line for line in members if " connect(" in line or " disconnect(" in line or
+                          " isConnected(" in line], [])
+        self.assertIn("public final native function emitSignal(signal:String, ...rest):int;", members)
+        self.assertIn("public native function add(listener:Function):void;", lines_of(self.text, "Signal"))
+
     def test_every_hand_kept_entry_is_used(self):
         self.assertEqual(self.generator.unused_widths(), [])
 

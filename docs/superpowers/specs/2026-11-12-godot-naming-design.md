@@ -133,7 +133,7 @@ AS3 has no enum type, so an enum value is an `int`.
 - **A script's members are shown to the engine in snake_case (call).** `maxSpeed` marked `[Export]` appears
   as `max_speed`, labelled "Max Speed" in the inspector; `takeDamage()` is callable from GDScript as
   `take_damage()`; `_physicsProcess` answers the engine's `_physics_process`. The class name is unchanged.
-- **String-based calls use Godot's names:** `call("add_child", node)`, `connect("body_entered", f)`. The
+- **String-based calls use Godot's names:** `call("add_child", node)`, `emitSignal("body_entered", body)`. The
   engine resolves these, not the compiler. This is the "two naming worlds" problem that C# has. The typed
   forms above avoid it, and the language server can warn on a lowerCamel string that matches nothing.
 
@@ -146,6 +146,10 @@ AS3 has no enum type, so an enum value is an `int`.
   to do it. `timer.timeout.connect(f)` copied from a Godot tutorial is reported as an unknown member. `emit`
   is unchanged. Cost: `connect`'s other flags (deferred, reference-counted) have no spelling yet. Once
   `await` exists, most one-off listeners become `await timer.timeout`.
+- **A signal is listened to through its property only (owner, 2026-11-12).** The string form on every
+  object, `connect("timeout", f)`, with `disconnect` and `isConnected`, is not declared. Cost: a signal whose
+  name is known only at run time can't be listened to until a spelling is designed for it.
+  `emitSignal("name", ...)` and `hasSignal("name")` stay.
 - **Where AS3 has its own way, the AS3 way is the one declared (owner, 2026-11-12: "I want it to feel
   native AS3").** `toString()` and the signal verbs follow this rule. New cases are decided the same way and
   listed here.
@@ -169,7 +173,7 @@ These follow from the rules above and from Godot's API description. They were th
 - **`VariantType` and `VariantOperator`** are the classes for Godot's `Variant.Type` and
   `Variant.Operator`.
 - **A singleton's inherited members are not reachable.** `Input.isActionPressed()` is static; `Input` has no
-  object to call `connect()` on. Its signals are static properties, so `Input.joyConnectionChanged.connect(f)`
+  object to call `connect()` on. Its signals are static properties, so `Input.joyConnectionChanged.add(f)`
   works.
 - **The engine's names can't be recovered by rule.** Turning lowerCamel back to snake_case gives the wrong
   name for 172 of 16,822 methods, 8 of them virtual (`_forward_3d_gui_input`). So Godot's own members are

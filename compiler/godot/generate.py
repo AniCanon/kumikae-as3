@@ -71,6 +71,10 @@ SIGNAL_REPLACED = {"connect", "disconnect", "is_connected"}
 # answers Godot's _to_string with it and calls Godot's to_string for it, so neither is declared.
 AS3_HAS_METHOD = {("Object", "to_string")}
 
+# Listening to a signal by its name in a string. A signal is listened to through its property
+# (`timer.timeout.add(f)`), so these are not declared: one way to do it.
+LISTEN_BY_NAME = {("Object", "connect"), ("Object", "disconnect"), ("Object", "is_connected")}
+
 # Integers that need more than AS3's 32-bit int, where the description gives no width: it gives one only
 # for the methods of classes. Keyed by (built-in class or "" for a global function, method); the value
 # maps a parameter name, or "return", to the AS3 type. A test checks that every entry is still used.
@@ -415,7 +419,7 @@ class Generator:
             out.append("public %snative function get %s():Signal;" % (sealed, name))
 
         for method in methods:
-            if method["name"] in hidden or (owner, method["name"]) in AS3_HAS_METHOD:
+            if method["name"] in hidden or (owner, method["name"]) in AS3_HAS_METHOD | LISTEN_BY_NAME:
                 continue
             where = "%s.%s" % (owner, method["name"])
             name = naming.member(method["name"])
@@ -557,7 +561,7 @@ class Generator:
         """Entries of the hand-kept tables that matched nothing in the description."""
         described = {(entry["name"], method["name"]) for entry in self.api["classes"]
                      for method in entry.get("methods", [])}
-        return sorted((set(WIDTHS) - self.used_widths) | (AS3_HAS_METHOD - described))
+        return sorted((set(WIDTHS) - self.used_widths) | ((AS3_HAS_METHOD | LISTEN_BY_NAME) - described))
 
     def run(self):
         try:
