@@ -219,7 +219,7 @@ class Fixture(unittest.TestCase):
     def test_what_the_description_leaves_out_of_object(self):
         god = self.members("GodotObject")
         self.assertIn("public native function _notification(what:int):void;", god)
-        self.assertIn("public native function _toString():String;", god)
+        self.assertNotIn("_toString", self.text)
         self.assertIn("public native function _get(property:String):*;", god)
         self.assertIn("public native function _set(property:String, value:*):Boolean;", god)
         self.assertIn("public final native function free():void;", god)
@@ -234,6 +234,11 @@ class Fixture(unittest.TestCase):
         self.assertIn("\tpublic native function instanceFromId(instanceId:Number):GodotObject;\n", self.text)
         self.assertIn("\tpublic native function randi():uint;\n", self.text)
         self.assertIn("public native function getObjectId():Number;", self.members("Signal"))
+
+    def test_to_string_is_as3s(self):
+        # AS3's Object already has toString(). A script overrides that, and the binding answers Godot's
+        # _to_string with it, so neither of Godot's two methods is declared.
+        self.assertFalse([line for line in self.members("GodotObject") if "toString" in line])
 
     def test_global_constants_are_left_out(self):
         self.assertNotIn("INT32_MAX", self.text)

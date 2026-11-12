@@ -1164,7 +1164,6 @@ package godot {
 		public final native function propertyCanRevert(property:String):Boolean;
 		public final native function propertyGetRevert(property:String):*;
 		public final native function notification(what:int, reversed:Boolean = false):void;
-		public final native function toString():String;
 		public final native function getInstanceId():Number;
 		public final native function setScript(script:*):void;
 		public final native function getScript():*;
@@ -1209,7 +1208,6 @@ package godot {
 		public final native function isQueuedForDeletion():Boolean;
 		public final native function cancelFree():void;
 		public native function _notification(what:int):void;
-		public native function _toString():String;
 		public native function _get(property:String):*;
 		public native function _set(property:String, value:*):Boolean;
 		[Godot(returns="Array[GodotDictionary]")]

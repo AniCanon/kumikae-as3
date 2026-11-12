@@ -47,7 +47,6 @@ def _extra(name, arguments=(), result=None, virtual=True):
 
 OBJECT_EXTRAS = [
     _extra("_notification", [("what", "int")]),
-    _extra("_to_string", result="String"),
     _extra("_get", [("property", "StringName")], "Variant"),
     _extra("_set", [("property", "StringName"), ("value", "Variant")], "bool"),
     _extra("_get_property_list", result="typedarray::Dictionary"),
@@ -56,6 +55,10 @@ OBJECT_EXTRAS = [
     _extra("_property_get_revert", [("property", "StringName")], "Variant"),
     _extra("free", virtual=False),
 ]
+
+# Members that AS3's own Object stands for. A script writes toString() as in any AS3 class; the binding
+# answers Godot's _to_string with it and calls Godot's to_string for it, so neither is declared.
+AS3_HAS_METHOD = {("Object", "to_string")}
 
 # Integers that need more than AS3's 32-bit int, where the description gives no width: it gives one only
 # for the methods of classes. Keyed by (built-in class or "" for a global function, method); the value
@@ -386,7 +389,7 @@ class Generator:
             out.append("public %snative function get %s():Signal;" % (sealed, name))
 
         for method in methods:
-            if method["name"] in hidden:
+            if method["name"] in hidden or (owner, method["name"]) in AS3_HAS_METHOD:
                 continue
             where = "%s.%s" % (owner, method["name"])
             name = naming.member(method["name"])
@@ -483,8 +486,10 @@ class Generator:
         self.lines.append("\t}")
 
     def unused_widths(self):
-        """Entries of the width table that matched nothing in the description."""
-        return sorted(set(WIDTHS) - self.used_widths)
+        """Entries of the hand-kept tables that matched nothing in the description."""
+        described = {(entry["name"], method["name"]) for entry in self.api["classes"]
+                     for method in entry.get("methods", [])}
+        return sorted((set(WIDTHS) - self.used_widths) | (AS3_HAS_METHOD - described))
 
     def run(self):
         try:

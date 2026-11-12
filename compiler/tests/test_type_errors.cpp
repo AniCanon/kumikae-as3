@@ -418,7 +418,7 @@ static void test_engine_collections() {
 static void test_godot_classes() {
 	expect_godot("package { import godot.*; public class Main extends Node {\n"
 				 "override public function _notification(what:int):void {}\n"
-				 "override public function _toString():String { return \"main\"; }\n"
+				 "public function toString():String { return \"main\"; }\n"
 				 "public function run(o:GodotObject):void { o.free(); free(); var a:Node = new Node(); var m:Mine = new Mine(); } } }\n"
 				 "import godot.CanvasItem;\nclass Mine extends CanvasItem {}\n",
 			{});
@@ -431,6 +431,14 @@ static void test_godot_classes() {
 					"'Key' can't be created with 'new'", "'Viewport' can't be created with 'new'",
 					"can't override 'addChild': it is final in Node", "can't override 'name': it is final in Node",
 					"'_notification' must have the same parameters and return type as '_notification' in GodotObject" });
+	// toString() is AS3's own: a script writes it as in any AS3 class, and Godot's two methods are not declared.
+	expect_godot("package { import godot.*; public class Main extends Node {\n"
+				 "override public function toString():String { return name; }\n"
+				 "public function run(n:Node, o:GodotObject):String { return n.toString() + o.toString() + String(n); } } }\n",
+			{});
+	expect_godot("package { import godot.*; public class Main extends Node {\n"
+				 "override public function /*!*/_toString():String { return \"\"; } } }\n",
+			{ "'_toString' is marked 'override' but no base class has a method to override" });
 	// The tag means nothing in a program's own files.
 	expect("package { public class Main { public function run():void { new Helper(); } } }\n[Abstract] class Helper {}\n", {});
 }

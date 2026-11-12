@@ -164,11 +164,15 @@ These follow from the rules above and from Godot's API description. They were th
   `GodotArray` or a packed array is expected, and an `Object` or `flash.utils.Dictionary` fits a
   `GodotDictionary`. Nothing converts on the way back, as the performance redesign decided.
 - **Only virtuals can be overridden.** Every other Godot member is declared `final`. A script that
-  overrides `addChild()` is told so, because the engine would never call the override. This includes
-  `toString()`: a script overrides `_toString()`.
+  overrides `addChild()` is told so, because the engine would never call the override.
+- **`toString()` is AS3's own (owner, 2026-11-12: "solve it at compiler level").** A script writes
+  `public function toString():String`, as in any AS3 class. The binding answers Godot's `_to_string` with
+  it and calls Godot's `to_string` for it, so `print(node)` in Godot and `String(node)` in AS3 give the same
+  text. Neither of Godot's two methods is declared. This is the one exception to "virtuals keep their
+  underscore".
 - **`new` on a class the engine won't create is an error** (`CanvasItem`, `Input`, `Key`). The declaration
   tags such a class `[Abstract]`. A script may still extend one.
-- **`GodotObject`'s virtuals and `free()` come from a hand-kept list** (`_notification`, `_toString`, `_get`,
+- **`GodotObject`'s virtuals and `free()` come from a hand-kept list** (`_notification`, `_get`,
   `_set`, `_getPropertyList`, `_validateProperty`, `_propertyCanRevert`, `_propertyGetRevert`). Godot's
   description leaves them out. `_init` is not among them: an AS3 class has a constructor.
 - **Left out:** 60 methods with raw pointer parameters, the 11 integer-limit constants (`int.MAX_VALUE`

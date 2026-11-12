@@ -97,9 +97,11 @@ What the declarations decide beyond the names:
   `instanceFromId()`, `PackedInt64Array`'s elements).
 - **Only virtual methods can be overridden.** Every other method, property and signal is `final`, so
   `override public function addChild(...)` is an error: the engine would never call it.
+- **`toString()` is AS3's.** A script writes `public function toString():String` as in any AS3 class.
+  Godot's `to_string()` and `_to_string()` are not declared; the binding maps them.
 - **A class the engine won't create** (`CanvasItem`, `Input`, `Key`) is tagged `[Abstract]`, and `new` on it
   is an error. A script may still extend one.
-- **`GodotObject`'s virtuals and `free()`** (`_notification`, `_toString`, `_get`, `_set` and four more)
+- **`GodotObject`'s virtuals and `free()`** (`_notification`, `_get`, `_set` and four more)
   are missing from Godot's description. The generator adds them from a list of its own.
 - **Enums** are `int`. A `[Godot(...)]` tag on the member records which enum a parameter or result is.
 - **Defaults.** A default that is not a number, boolean, string or `null` is written `null`; the real
