@@ -71,7 +71,7 @@ package game {
 | Report type errors (assignments, arguments, returns, overrides, interfaces, constants) | **Works** |
 | Godot's whole API under AS3 names (`moveAndSlide()`, `timer.timeout.add(f)`, `Key.ESCAPE`) | **Works** |
 | Arithmetic on Godot's math types (`position + velocity * delta` is a `Vector2`; `position + node` is an error) | **Works** |
-| Language server (`kas3c lsp`): errors as you type, go to definition, find references, hover, outline | **Works** in scripted sessions; [not yet tried in an editor](editors/README.md) |
+| Language server (`kas3c lsp`): errors as you type, go to definition, find references, hover, outline | **Works** in scripted sessions on macOS and Linux; [not yet tried in an editor, and not on Windows](editors/README.md) |
 | Run a script in the Godot editor | Planned (stage 2) |
 | Export a release build as native code | Planned (stage 3) |
 | iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |

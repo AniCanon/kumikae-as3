@@ -30,10 +30,12 @@ package godot {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function emit(...rest):void;
 		public native function getObjectId():Number;
-		public native function add(listener:Function):void;
-		public native function addOnce(listener:Function):void;
+		public native function add(listener:Function, deferred:Boolean = false):void;
+		public native function addOnce(listener:Function, deferred:Boolean = false):void;
 		public native function remove(listener:Function):void;
+		public native function removeAll():void;
 		public native function has(listener:Function):Boolean;
+		public native function get numListeners():int;
 	}
 	[Operators]
 	[Indexed(element="*")]

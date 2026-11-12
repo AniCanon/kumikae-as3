@@ -209,9 +209,11 @@ class Fixture(unittest.TestCase):
     def test_signal_listeners(self):
         # AS3's spelling beside Godot's: add, addOnce and remove.
         signal = self.members("Signal")
-        self.assertIn("public native function add(listener:Function):void;", signal)
-        self.assertIn("public native function addOnce(listener:Function):void;", signal)
+        self.assertIn("public native function add(listener:Function, deferred:Boolean = false):void;", signal)
+        self.assertIn("public native function addOnce(listener:Function, deferred:Boolean = false):void;", signal)
         self.assertIn("public native function remove(listener:Function):void;", signal)
+        self.assertIn("public native function removeAll():void;", signal)
+        self.assertIn("public native function get numListeners():int;", signal)
         self.assertIn("public native function has(listener:Function):Boolean;", signal)
         # Godot's own spelling is not declared: one way to do it.
         self.assertEqual([line for line in signal if "connect" in line.lower()], [])
@@ -428,7 +430,7 @@ class FixtureCompiles(unittest.TestCase):
 		[Signal] public var died:Signal;
 
 		override public function _ready():void {
-			(getNode("Hitbox") as Node).childEnteredTree.add(onEntered); died.addOnce(onEntered); died.remove(onEntered);
+			(getNode("Hitbox") as Node).childEnteredTree.add(onEntered); died.addOnce(onEntered, true); died.remove(onEntered); died.removeAll(); var listeners:int = died.numListeners; var byName:String = "died"; this[byName].add(onEntered);
 			processMode = Node.PROCESS_MODE_ALWAYS;
 			var at:Vector2 = new Vector2(1, 2);
 			at.x = Vector2.ZERO.distanceTo(new Vector2());
@@ -513,7 +515,10 @@ class RealApi(unittest.TestCase):
         self.assertEqual([line for line in members if " connect(" in line or " disconnect(" in line or
                           " isConnected(" in line], [])
         self.assertIn("public final native function emitSignal(signal:String, ...rest):int;", members)
-        self.assertIn("public native function add(listener:Function):void;", lines_of(self.text, "Signal"))
+        signal = lines_of(self.text, "Signal")
+        self.assertIn("public native function add(listener:Function, deferred:Boolean = false):void;", signal)
+        # numListeners stands for Godot's two ways of asking.
+        self.assertEqual([line for line in signal if "Connections" in line], [])
 
     def test_every_hand_kept_entry_is_used(self):
         self.assertEqual(self.generator.unused_widths(), [])

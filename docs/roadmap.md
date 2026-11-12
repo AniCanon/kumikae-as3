@@ -72,6 +72,7 @@ locals, classes, imports, inherited members and Godot's API.
 | Speed: a re-check of 100,000 lines in under 50 ms | Done: about 27 ms, by keeping the parse of files that did not change. |
 | A VS Code client and the [set-up guide](../editors/README.md) | Written. Not yet run: it needs one library from npm, and Rider needs a plugin. |
 | Tried by hand in VS Code and Rider | Not yet. |
+| Windows | Not yet: the server runs on macOS and Linux only. To do before the slice is called done. |
 
 **Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
 stage faster to build. The owner left the order to the builder. Completion follows in a second slice; the

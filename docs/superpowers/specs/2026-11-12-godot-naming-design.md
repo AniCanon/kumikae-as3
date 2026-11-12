@@ -111,6 +111,7 @@ AS3 has no enum type, so an enum value is an `int`.
   button.pressed.add(onPressed);
   timer.timeout.addOnce(onTimeout);   // called once, then removed
   timer.timeout.remove(onTimeout);
+  timer[signalName].add(onTimeout);   // a name known only at run time
   healthChanged.emit(health);
   ```
 
@@ -139,17 +140,29 @@ AS3 has no enum type, so an enum value is an `int`.
 
 ## Decided by the owner after approval
 
-- **Listening to a signal is `add`, `addOnce`, `remove` and `has` (owner, 2026-11-12).** The owner prefers
-  these to Godot's `connect` and `disconnect`, and wants the API to feel native to AS3. They are the names
-  as3-signals uses. `add(f)` is `connect(f)`, `addOnce(f)` is `connect(f)` with Godot's one-shot flag,
-  `remove(f)` is `disconnect(f)` and `has(f)` is `is_connected(f)`. Godot's three are not declared: one way
-  to do it. `timer.timeout.connect(f)` copied from a Godot tutorial is reported as an unknown member. `emit`
-  is unchanged. Cost: `connect`'s other flags (deferred, reference-counted) have no spelling yet. Once
-  `await` exists, most one-off listeners become `await timer.timeout`.
+- **Listening to a signal is spelled the AS3 way (owner, 2026-11-12).** The owner prefers these names, which
+  are the ones as3-signals uses, to Godot's `connect` and `disconnect`. Godot's own spelling is not declared:
+  one way to do it. `emit` is unchanged.
+
+  | AS3 | Godot | Notes |
+  |---|---|---|
+  | `signal.add(f)` | `connect(f)` | Adding a listener that is already there does nothing, as with AS3's `addEventListener`. Godot would report an error. |
+  | `signal.add(f, true)` | `connect(f, CONNECT_DEFERRED)` | An optional `deferred:Boolean`, as AS3's own optional parameters on `addEventListener`. The listener is called at the end of the frame. |
+  | `signal.addOnce(f)` | `connect(f, CONNECT_ONE_SHOT)` | Also takes `deferred`. |
+  | `signal.remove(f)` | `disconnect(f)` | |
+  | `signal.removeAll()` | `disconnect` for each connection | |
+  | `signal.has(f)` | `is_connected(f)` | |
+  | `signal.numListeners` | `get_connections().size()`, `has_connections()` | |
+
+  Godot's reference-counted and persist flags have no spelling: the first is what "adding twice does
+  nothing" replaces, and the second is for the editor.
 - **A signal is listened to through its property only (owner, 2026-11-12).** The string form on every
-  object, `connect("timeout", f)`, with `disconnect` and `isConnected`, is not declared. Cost: a signal whose
-  name is known only at run time can't be listened to until a spelling is designed for it.
+  object, `connect("timeout", f)`, with `disconnect` and `isConnected`, is not declared.
   `emitSignal("name", ...)` and `hasSignal("name")` stay.
+- **A signal whose name is known only at run time is reached as any AS3 property is:**
+  `timer[signalName].add(f)`. In AS3 `object["name"]` means `object.name`, so no new API is needed. The name
+  is the AS3 one (`"bodyEntered"`), the compiler can't check it, and a wrong name fails when the line runs.
+  Godot's `new Signal(object, "body_entered")` stays for a signal that a GDScript or C# scene defines.
 - **Where AS3 has its own way, the AS3 way is the one declared (owner, 2026-11-12: "I want it to feel
   native AS3").** `toString()` and the signal verbs follow this rule. New cases are decided the same way and
   listed here.

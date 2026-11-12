@@ -20,6 +20,9 @@ part of the program.
 > **Not yet tried in an editor.** The server is tested by scripted sessions that send what an editor sends.
 > The two set-ups below are written from each editor's documentation and have not been run by hand.
 
+> **Windows is not supported yet.** The server runs on macOS and Linux. On Windows it does not read the
+> editor's messages correctly and does not recognise which files belong to the project.
+
 ## VS Code
 
 The client is in [`vscode/`](vscode/). It needs one library from npm.

@@ -57,15 +57,24 @@ OBJECT_EXTRAS = [
 ]
 
 # Listening to a signal is spelled the AS3 way, with the names AS3 programmers know from as3-signals, and
-# Godot's own spelling is not declared: one way to do it. The binding maps them: add is connect, addOnce is
-# connect with the one-shot flag, remove is disconnect, has is is_connected.
+# Godot's own spelling is not declared: one way to do it. The binding maps them:
+#   add(f)            connect(f); adding a listener that is already there does nothing, as in AS3
+#   add(f, true)      connect(f, CONNECT_DEFERRED): the listener is called at the end of the frame
+#   addOnce(f)        connect(f, CONNECT_ONE_SHOT)
+#   remove(f)         disconnect(f)
+#   removeAll()       disconnect for every connection
+#   has(f)            is_connected(f)
+#   numListeners      get_connections().size()
+# A signal whose name is known only at run time is reached as any AS3 property is: `timer[name].add(f)`.
 SIGNAL_EXTRAS = [
-    ("add", "public native function add(listener:Function):void;"),
-    ("addOnce", "public native function addOnce(listener:Function):void;"),
+    ("add", "public native function add(listener:Function, deferred:Boolean = false):void;"),
+    ("addOnce", "public native function addOnce(listener:Function, deferred:Boolean = false):void;"),
     ("remove", "public native function remove(listener:Function):void;"),
+    ("removeAll", "public native function removeAll():void;"),
     ("has", "public native function has(listener:Function):Boolean;"),
+    ("numListeners", "public native function get numListeners():int;"),
 ]
-SIGNAL_REPLACED = {"connect", "disconnect", "is_connected"}
+SIGNAL_REPLACED = {"connect", "disconnect", "is_connected", "get_connections", "has_connections"}
 
 # Members that AS3's own Object stands for. A script writes toString() as in any AS3 class; the binding
 # answers Godot's _to_string with it and calls Godot's to_string for it, so neither is declared.
