@@ -8,8 +8,8 @@ For why the project exists and how it works, see the [README](../README.md).
 ## Where we are
 
 **Stage 1 of 6, the front end.** The parser, name resolution and type checking are built and checked against
-about 190,000 lines of real AS3. The compiler knows Godot's whole API under AS3 names. Arithmetic on
-Godot's math types is next.
+about 190,000 lines of real AS3. The compiler knows Godot's whole API under AS3 names, including arithmetic
+on its math types. The front end is complete; the language server's first slice is next.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -54,7 +54,7 @@ column.
 | 1c-1. Expression types | `kas3c check --dump-types` | Every expression has a type, and `a.b` resolves to a member with AS3's access rules. | Done |
 | 1c-2. Type errors | Type checking in `kas3c check` | A value that doesn't fit where it is used is reported: assignments, arguments, returns, overrides, interfaces, `const`. | Done |
 | 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the [naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | `moveAndSlide()`, `position`, `timer.timeout.connect(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | Done |
-| 1e. Godot's math types | Operators and indexing on `Vector2` and its relatives | `position + velocity * delta` has a type, and a wrong operand is reported. | Next |
+| 1e. Godot's math types | Operators and indexing on `Vector2` and its relatives | `position + velocity * delta` has a type, and a wrong operand is reported. | Done |
 
 ### Language server, first slice
 
@@ -119,19 +119,20 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What comes next: stage 1e, Godot's math types
+## What comes next: the language server's first slice
 
-**Goal:** arithmetic, comparison and indexing on Godot's value types are typed and checked, so that
-`position + velocity * delta` is a `Vector2` and `position + "x"` is an error.
+**Goal:** `kas3c lsp`, the program an editor talks to. A typing mistake shows an error at once, and go to
+definition works on locals, classes, imports, inherited members and Godot's API.
 
 | Step | What it does |
 |---|---|
-| 1. Operators in the declarations | The generator records each value type's operators from Godot's API description. |
-| 2. Typing | An operator on a Godot value type has the result type the description gives. |
-| 3. Errors | An operand that the type has no operator for is reported. |
-| 4. Indexing | `array[i]`, `dictionary[key]` and `vector[0]` have types. |
+| 1. The protocol | `kas3c lsp` reads and answers the editor's messages. |
+| 2. Errors as you type | Every change to a file is checked, and the errors are sent to the editor. |
+| 3. Go to definition and find references | From the names the compiler has already resolved. |
+| 4. Outline | The classes and members of a file. |
+| 5. Editors | A minimal VS Code extension, and the Rider set-up through its language-server client. |
 
-After it comes the language server's first slice, and then the interpreter.
+After it comes the interpreter (stage 2), where a script first runs in Godot.
 
 ## Decisions made
 

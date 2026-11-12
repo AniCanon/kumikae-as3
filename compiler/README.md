@@ -182,9 +182,42 @@ Otherwise it is an error. When B is a subclass or implementer of A, the message 
 (`a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`). A `void` result fits only `*`.
 
 **Reported only where AS3's rule is certain.** These are not checked: compound assignment (`s += 1`),
-operands of operators and comparisons, conditions, `for each` variables, calls through a `Function` value,
+operands of operators and comparisons (except on Godot's value types, described below), conditions, `for each` variables, calls through a `Function` value,
 class names called as conversions (`int(x)`), an assignment used as a value (`a = b = c`), `null` stored in
 a number (Adobe's compiler warns), and use of a value that is certainly `null`.
+
+## Operators on Godot's value types
+
+AS3 has no operators on objects. Godot's value types have them, and Godot's API description lists every
+one, so `godot.as` carries them as tags on each class and the compiler looks them up:
+
+```actionscript
+[Operator(op="+", right="Vector2", returns="Vector2")]
+[Operator(op="*", right="Number", returns="Vector2")]
+[Operator(op="*", left="Number", returns="Vector2")]   // 2 * v
+[Operator(op="-", returns="Vector2")]                  // -v
+[Indexed(element="Number")]                            // v[0]
+public final native class Vector2 { ... }
+```
+
+- **The operators are `+ - * / %`, unary `-` and `+`, and `< > <= >=`.** `==` and `!=` work on every type
+  and need no tag.
+- **The result has the type Godot gives it:** `position + velocity * delta` is a `Vector2`,
+  `transform * point` is a `Vector2`, `transform * transform` is a `Transform2D`.
+- **An operator the type doesn't have is an error:** `can't use '+' on 'Vector2' and 'Node'`. Nothing is
+  said when the other operand is `*`, an `Object`, `null` or unknown, or when neither class has tags.
+- **Whole numbers and fractions.** Godot gives `Vector2i * int` a `Vector2i` and `Vector2i * float` a
+  `Vector2`. An operand is a whole number if it is an `int` or `uint`, or a sum, difference, product or
+  remainder of whole numbers, so `cell * (i + 1)` is a `Vector2i`. `cell * 0.5`, `cell * n` and
+  `cell * (i / 2)` are `Vector2`. Where the type has only one of the two forms, that one is used.
+- **`+` with a `String` is a `String`,** as everywhere in AS3.
+- **Compound assignment** (`position += step`) is checked the same way, and a result of another type is an
+  error: `cell *= 0.5` gives a `Vector2`, which can't go back into a `Vector2i`.
+- **Indexing** a class tagged `[Indexed]` with a number gives the element: `points[0]` is a `Vector2`,
+  `vector[0]` is a `Number`. A `GodotArray` or `GodotDictionary` gives `*`. Any other key gives `*`,
+  because AS3 lets `v["x"]` name a property. Storing into `points[i]` is checked like any store.
+- **The tags work in any declaration file,** not only Godot's. In a program's own source they mean
+  nothing.
 
 ## How expressions are typed
 
@@ -273,6 +306,8 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 
 - `tests/test_types.cpp`: one expression per check, each with the type it must have.
 - `tests/test_type_errors.cpp`: values that fit and values that don't, with the expected errors marked.
+- `tests/test_godot_math.cpp`: operators and indexing on Godot's value types, against Godot's real
+  declarations.
 - `tests/golden/types/`: whole programs through `kas3c check --dump-types`.
 - `tests/test_names.cpp`: name resolution, one check per message, with the expected error positions marked
   in the source as `/*!*/`.
