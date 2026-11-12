@@ -177,9 +177,9 @@ The throwaway speed spike is kept on the `spike/stage-0b` branch.
 - [Performance redesign](docs/superpowers/specs/2026-11-11-performance-redesign.md): the rules that generated
   code follows, and the owner's decision on the speed goal. Where the two documents disagree, this one wins.
 - [Language server](docs/superpowers/specs/2026-11-12-language-server-design.md): the plan for editor
-- [Godot naming design](docs/superpowers/specs/2026-11-12-godot-naming-design.md): how Godot's API is named in AS3
-  (proposed).
-  support, proposed and not yet approved.
+  support. Its first slice follows stage 1.
+- [Godot naming](docs/superpowers/specs/2026-11-12-godot-naming-design.md): how Godot's API is named in AS3.
+  Proposed, not yet approved.
 
 ## Licence
 
