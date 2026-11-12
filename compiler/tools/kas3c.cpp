@@ -5,8 +5,10 @@
 #include "diagnostics.h"
 #include "names.h"
 #include "parser.h"
+#include "server.h"
 #include "source.h"
 
+#include <csignal>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -15,6 +17,7 @@
 static const char *const USAGE =
 		"usage: kas3c parse [--dump-ast] <file>...\n"
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
+		"       kas3c lsp [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
 		"\n"
@@ -28,6 +31,10 @@ static const char *const USAGE =
 		"       --dump-types           also print the type of every statement and initializer\n"
 		"       --declarations <file>  a file that declares what exists elsewhere\n"
 		"       --no-godot             don't load Godot's API (the `godot` package)\n"
+		"\n"
+		"lsp    Serve an editor over standard input and output with the Language Server\n"
+		"       Protocol: errors as you type, go to definition, find references, hover,\n"
+		"       outline and symbol search. The project is the folder the editor opens.\n"
 		"\n"
 		"Exit status: 0 no errors, 1 errors found, 2 bad usage or an unreadable file.\n";
 
@@ -128,6 +135,24 @@ static int run_check(int p_argc, char **p_argv) {
 	return compilation.has_errors() ? 1 : 0;
 }
 
+static int run_lsp(int p_argc, char **p_argv) {
+	kas3::Workspace::Options options;
+	for (int i = 2; i < p_argc; i++) {
+		if (std::strcmp(p_argv[i], "--no-godot") == 0) {
+			options.godot = false;
+		} else if (std::strcmp(p_argv[i], "--declarations") == 0 && i + 1 < p_argc) {
+			options.declarations.push_back(p_argv[++i]);
+		} else {
+			return usage_error();
+		}
+	}
+#ifndef _WIN32
+	// An editor that goes away must not kill the server in the middle of a write.
+	std::signal(SIGPIPE, SIG_IGN);
+#endif
+	return kas3::run_server(0, 1, std::move(options));
+}
+
 int main(int p_argc, char **p_argv) {
 	if (p_argc < 2) {
 		return usage_error();
@@ -143,6 +168,9 @@ int main(int p_argc, char **p_argv) {
 	}
 	if (command == "check") {
 		return run_check(p_argc, p_argv);
+	}
+	if (command == "lsp") {
+		return run_lsp(p_argc, p_argv);
 	}
 	if (command != "parse") {
 		return usage_error();

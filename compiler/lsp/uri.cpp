@@ -1,5 +1,7 @@
 #include "uri.h"
 
+#include <filesystem>
+
 namespace kas3 {
 
 namespace {
@@ -47,6 +49,10 @@ std::string path_from_uri(std::string_view p_uri) {
 		path.erase(0, 1);
 	}
 	return path;
+}
+
+std::string normal_path(std::string_view p_path) {
+	return std::filesystem::path(p_path).lexically_normal().string();
 }
 
 std::string uri_from_path(std::string_view p_path) {

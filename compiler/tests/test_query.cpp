@@ -487,7 +487,50 @@ static void test_queries_on_broken_files() {
 	}
 }
 
+// Every prefix of every corpus file, and every file with one byte missing: the tolerant check and the
+// queries must get through all of them. With Godot's API for some.
+static void test_typing() {
+	std::vector<std::shared_ptr<Parsed>> builtins = parse_builtins();
+	std::shared_ptr<Parsed> godot = parse_file(GODOT_DECLARATIONS_PATH, godot_declarations());
+	int files = 0;
+	for (const auto &entry : std::filesystem::directory_iterator(std::string(KAS3_TESTS_DIR) + "/corpus")) {
+		std::string text;
+		if (entry.path().extension() != ".as" || !read_file(entry.path().string(), &text)) {
+			continue;
+		}
+		files++;
+		std::string name = entry.path().filename().string();
+		for (size_t i = 0; i < text.size() * 2; i++) {
+			size_t at = i / 2;
+			std::string edited = i % 2 == 0 ? text.substr(0, at) : text.substr(0, at) + text.substr(at + 1);
+			Compilation compilation(builtins);
+			if (i % 211 == 0) {
+				compilation.add(godot, true);
+			}
+			Unit *unit = compilation.add(name, edited);
+			compilation.check(true);
+			Queries queries(compilation);
+			for (uint32_t back = 0; back < 4 && back <= at; back++) {
+				const Occurrence *found = queries.at(*unit, (uint32_t)at - back);
+				if (found) {
+					queries.declaration(found->symbol);
+					queries.describe(found->symbol);
+					queries.context(found->symbol);
+					queries.references(found->symbol, true);
+				}
+			}
+			if (i % 16 == 0) {
+				queries.outline(*unit);
+				queries.find("e", 20);
+			}
+			check::checks()++;
+		}
+	}
+	CHECK_EQ(files, 14);
+}
+
 int main() {
+	test_typing();
 	test_index();
 	test_describe();
 	test_outline();

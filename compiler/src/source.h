@@ -30,6 +30,10 @@ public:
 	// The line without its line break; empty if the line number is out of range.
 	std::string_view line_text(int p_line) const;
 	int line_count() const { return (int)line_starts_.size(); }
+	// Where the line begins; the end of the text if the line number is out of range.
+	uint32_t line_start(int p_line) const {
+		return p_line >= 1 && p_line <= line_count() ? line_starts_[(size_t)p_line - 1] : (uint32_t)text_.size();
+	}
 };
 
 // False if the file cannot be read.

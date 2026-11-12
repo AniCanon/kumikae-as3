@@ -1,6 +1,7 @@
 #include "workspace.h"
 
 #include "builtins.h"
+#include "uri.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -13,7 +14,7 @@ namespace fs = std::filesystem;
 namespace {
 
 std::string normal(const std::string &p_path) {
-	return fs::path(p_path).lexically_normal().string();
+	return normal_path(p_path);
 }
 
 bool starts_with(const std::string &p_text, const std::string &p_prefix) {
