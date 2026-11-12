@@ -70,11 +70,18 @@ void Project::unload() {
 }
 
 uint32_t Project::class_of_file(const std::string &p_path) const {
+	// The class named after the file and declared in it: two folders may each have a Thing.as.
+	std::error_code error;
+	std::filesystem::path wanted = std::filesystem::weakly_canonical(p_path, error);
 	std::string stem = std::filesystem::path(p_path).stem().string();
 	for (size_t i = 0; i < module_.classes.size(); i++) {
-		const std::string &name = module_.classes[i].name;
-		size_t dot = name.rfind('.');
-		if ((dot == std::string::npos ? name : name.substr(dot + 1)) == stem) {
+		const ir::Class &klass = module_.classes[i];
+		size_t dot = klass.name.rfind('.');
+		if ((dot == std::string::npos ? klass.name : klass.name.substr(dot + 1)) != stem || klass.constructor == ir::NONE) {
+			continue;
+		}
+		uint32_t file = module_.functions[klass.constructor].file;
+		if (file < module_.files.size() && std::filesystem::weakly_canonical(module_.files[file], error) == wanted) {
 			return (uint32_t)i;
 		}
 	}

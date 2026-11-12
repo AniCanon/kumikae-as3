@@ -5,6 +5,9 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <godot_cpp/classes/ref_counted.hpp>
+
+#include <new>
 #include <vector>
 
 using namespace godot;
@@ -134,7 +137,10 @@ void *GodotHost::construct(std::string_view p_type, const Argument *p_arguments,
 bool GodotHost::call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, ir::Kind p_result,
 		vm::Slot *r_result, std::string *r_error) {
 	Variant *receiver = static_cast<Variant *>(p_receiver);
-	if (receiver->get_type() == Variant::OBJECT && !(Object *)*receiver) {
+	// An object Godot has freed leaves a dangling pointer in the handle: ask Godot whether it is still
+	// there before anything touches it.
+	// (A handle copied after the object went is empty: see copy().)
+	if (receiver->get_type() == Variant::NIL || (receiver->get_type() == Variant::OBJECT && !receiver->get_validated_object())) {
 		*r_error = "'" + std::string(p_method) + "' was called on an object Godot has freed";
 		return false;
 	}
@@ -182,11 +188,41 @@ bool GodotHost::set(void *p_receiver, std::string_view p_property, const Argumen
 	return true;
 }
 
+void *GodotHost::borrow(Object *p_object) {
+	// A Variant holding a reference-counted object counts as a reference to it. This one must not, so its
+	// reference is given back at once, and drop() frees the memory without running the Variant's
+	// destructor, which would give it back a second time. A Variant holding an object owns no other memory.
+	void *memory = ::operator new(sizeof(Variant));
+	new (memory) Variant(p_object);
+	if (RefCounted *counted = Object::cast_to<RefCounted>(p_object)) {
+		counted->unreference();
+	}
+	borrowed_.insert(memory);
+	return memory;
+}
+
 void *GodotHost::copy(void *p_value) {
-	return p_value ? new Variant(*static_cast<Variant *>(p_value)) : nullptr;
+	if (!p_value) {
+		return nullptr;
+	}
+	Variant *value = static_cast<Variant *>(p_value);
+	// A copy of an object handle whose object is gone would try to count a reference on freed memory.
+	if (value->get_type() == Variant::OBJECT && !value->get_validated_object()) {
+		return new Variant();
+	}
+	return new Variant(*value);
 }
 
 void GodotHost::drop(void *p_value) {
+	if (!p_value) {
+		return;
+	}
+	auto borrowed = borrowed_.find(p_value);
+	if (borrowed != borrowed_.end()) {
+		borrowed_.erase(borrowed);
+		::operator delete(p_value);
+		return;
+	}
 	delete static_cast<Variant *>(p_value);
 }
 

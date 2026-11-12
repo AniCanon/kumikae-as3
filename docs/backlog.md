@@ -84,6 +84,13 @@ Decided on 2026-11-12. Each is owed as code and tests.
 - A script attached to a reference-counted Godot object would keep it alive for ever.
 - godot-cpp is built as `template_release` and loaded by the editor binary; whether editor features need a
   debug build is unchecked.
-- GDScript cannot set a script's field, only read it.
-
-More will be added here when this slice's review reports.
+- GDScript cannot set a script's field, only read it; a script's method and property lists are empty.
+- A value-type argument from GDScript is not checked against the parameter's type: a `Vector3` passes where a
+  `Vector2` is wanted.
+- A method that returns a script object gives GDScript null, with no error.
+- A script for `CharacterBody2D` can be attached to a plain `Node`.
+- A `.as` file whose class extends no Godot class loads, then silently will not attach.
+- A script's private methods and fields can be reached from GDScript.
+- A handle on a Godot object that has since been freed still counts as not null.
+- `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions
+  but skips a virtual that a C++ extension class implements.

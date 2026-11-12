@@ -6,10 +6,19 @@
 
 #include <godot_cpp/variant/variant.hpp>
 
+#include <unordered_set>
+
 namespace kas3 {
 
 class GodotHost final : public vm::Host {
+	std::unordered_set<void *> borrowed_; // Handles made by borrow().
+
 public:
+	// A handle on an object that does not keep it alive, for a script's hold on what it is attached to: a
+	// script on a reference-counted object must not keep that object from being freed. Dropped like any
+	// other handle. Copies of it are ordinary handles.
+	void *borrow(godot::Object *p_object);
+
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;
 	void *construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) override;

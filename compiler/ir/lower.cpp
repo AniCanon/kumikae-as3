@@ -242,6 +242,19 @@ class Lowerer {
 		return true;
 	}
 
+	// Gives the class its place in the module, before any class is filled in: a field may be of a class
+	// declared later.
+	void reserve_class(ClassDecl *p_decl) {
+		Symbol *symbol = p_decl->symbol;
+		if (!symbol || !symbol->klass || classes_.count(symbol)) {
+			return;
+		}
+		Class klass;
+		klass.name = class_name(symbol);
+		classes_[symbol] = (uint32_t)module_.classes.size();
+		module_.classes.push_back(std::move(klass));
+	}
+
 	void declare_class(Unit &p_unit, ClassDecl *p_decl) {
 		Symbol *symbol = p_decl->symbol;
 		if (!symbol || !symbol->klass) {
@@ -271,12 +284,11 @@ class Lowerer {
 				klass.virtuals = module_.classes[klass.base].virtuals;
 			}
 		}
-		uint32_t index = (uint32_t)module_.classes.size();
+		uint32_t index = classes_[symbol];
 		if (klass.base != NONE) {
 			slot_names_[index] = slot_names_[klass.base];
 		}
-		classes_[symbol] = index;
-		module_.classes.push_back(std::move(klass));
+		module_.classes[index] = std::move(klass);
 
 		auto new_function = [&](FunctionDecl *p_function, const std::string &p_name, bool p_static) {
 			Function function;
@@ -344,7 +356,10 @@ class Lowerer {
 							continue;
 						}
 						std::string godot;
-						if (is_godot(inherited->second) && godot_name(at->name, function->name, &godot)) {
+						if (!is_godot(inherited->second)) {
+							continue; // A script class's override of it: Godot's declaration is further up.
+						}
+						if (godot_name(at->name, function->name, &godot)) {
 							bool replaced = false;
 							for (auto &entry : module_.classes[index].virtuals) {
 								if (entry.first == godot) {
@@ -1022,6 +1037,19 @@ class Lowerer {
 			return 0;
 		}
 		if (is_godot(symbol) && symbol->kind == SymbolKind::Method && !symbol->is_static()) {
+			bool through_super = callee->kind == NodeKind::Member && static_cast<Member *>(callee)->object->kind == NodeKind::SuperExpr;
+			if (through_super && !(symbol->modifiers & Modifiers::Final)) {
+				// Godot's own version of a virtual does nothing. Asking the engine for it would come straight
+				// back to the script. The arguments are still evaluated.
+				for (Expr *argument : p_call->arguments) {
+					expression(argument, Kind::Void);
+				}
+				Kind kind = Kind::Void;
+				if (symbol->type) {
+					kind_of(compilation_.type_of(symbol->type), &kind);
+				}
+				return kind == Kind::Void ? 0 : default_value(kind, position);
+			}
 			return engine_call(p_call, symbol);
 		}
 		auto function = functions_.find(symbol);
@@ -1201,6 +1229,11 @@ class Lowerer {
 				}
 				if (!symbol || !class_index(symbol, &index)) {
 					refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
+					return default_value(Kind::Obj, position);
+				}
+				if (!module_.classes[index].native_base.empty()) {
+					// It would have no Godot object behind it: a script comes to life attached to one.
+					refuse(made->callee->offset, "creating a script class with 'new'");
 					return default_value(Kind::Obj, position);
 				}
 				uint32_t out = reg(Kind::Obj);
@@ -1477,6 +1510,18 @@ class Lowerer {
 				} else if (a == Kind::Void || b == Kind::Void) {
 					// Against null: a reference is compared; a number or a Boolean is never null.
 					kind = a == Kind::Void ? b : a;
+					if (kind == Kind::Ref) {
+						// A Godot object against null: is there one?
+						uint32_t object = expression(a == Kind::Void ? right : left, Kind::Ref);
+						uint32_t present = reg(Kind::Bool);
+						emit(Op::ObjToBool, position, present, object);
+						if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
+							return present;
+						}
+						uint32_t absent = reg(Kind::Bool);
+						emit(Op::Not, position, absent, present);
+						return absent;
+					}
 					if (is_engine(kind)) {
 						refuse(position, "comparing a Godot value with null");
 					} else if (!is_reference(kind)) {
@@ -1762,6 +1807,13 @@ class Lowerer {
 			}
 		}
 		fn().parameters = (uint32_t)fn().registers.size();
+		fn().required = fn().parameters;
+		for (uint32_t i = 0; p_function && i < p_function->parameters.count; i++) {
+			if (p_function->parameters[i].default_value) {
+				fn().required = fn().parameters - (p_function->parameters.count - i);
+				break;
+			}
+		}
 		// A parameter the caller left out takes its default here, in the function that runs.
 		for (uint32_t i = 0; p_function && i < p_function->parameters.count; i++) {
 			Parameter &parameter = p_function->parameters[i];
@@ -2012,7 +2064,6 @@ public:
 					base_is_ours = base_is_ours || other.second->symbol == base;
 				}
 				if (!declared[symbol] && (!base_is_ours || declared[base])) {
-					declare_class(*entry.first, entry.second);
 					declared[symbol] = true;
 					ordered.push_back(entry);
 					done++;
@@ -2021,6 +2072,12 @@ public:
 			if (done == before) {
 				break; // A cycle: the checker has reported it.
 			}
+		}
+		for (auto &entry : ordered) {
+			reserve_class(entry.second);
+		}
+		for (auto &entry : ordered) {
+			declare_class(*entry.first, entry.second);
 		}
 		// Then everything else at package level.
 		for (Unit *unit : units) {

@@ -97,7 +97,7 @@ properties, signals and hot reload.
 | Slice | Delivers | Done when | Status |
 |---|---|---|---|
 | 2a. Interpreter core | The typed IR, the interpreter, `kas3c run`, and the start of the conformance suite | A class with fields, methods, inheritance, numbers, strings and loops runs and traces the right output. | Done |
-| 2b-1. In Godot, first slice | The extension: a `.as` file is a script; Godot calls its methods; it reads and writes properties, calls methods and makes `Vector2`s | An AS3 script on a `CharacterBody2D` moves the body, in headless Godot 4.7.2. | Built |
+| 2b-1. In Godot, first slice | The extension: a `.as` file is a script; Godot calls its methods; it reads and writes properties, calls methods and makes `Vector2`s | An AS3 script on a `CharacterBody2D` moves the body, in headless Godot 4.7.2. | Done |
 | 2b-2. What stage 1 promised | Signals (`add`, `addOnce`, `remove`, `has`, `emit`), `toString`, real defaults, `object[name]`, collections crossing the boundary, the other value types and their operators | Each promise has a test in Godot. | Next |
 | 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the 64-bit integer decision | The test programs that need no unsupported language feature run in Godot. | Planned |
 | 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library | The corpus programs run. | Planned |

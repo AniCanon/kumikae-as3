@@ -16,8 +16,56 @@ namespace vm = kas3::vm;
 struct ScriptInstance {
 	vm::Object *object;
 	Object *owner;
-	const AS3Script *script;
+	Ref<AS3Script> script; // Kept alive for as long as anything runs it.
 };
+
+// Whether a value arriving from Godot may be taken as a parameter of this kind. Numbers are taken as
+// GDScript itself would take them, but one that does not fit an int or a uint is refused, never wrapped.
+static bool accepts(ir::Kind p_kind, const Variant &p_value) {
+	Variant::Type type = p_value.get_type();
+	bool number = type == Variant::INT || type == Variant::FLOAT;
+	switch (p_kind) {
+		case ir::Kind::F64:
+			return number;
+		case ir::Kind::I32:
+		case ir::Kind::U32: {
+			if (!number) {
+				return false;
+			}
+			double value = (double)p_value;
+			double low = p_kind == ir::Kind::I32 ? -2147483648.0 : 0.0;
+			double high = p_kind == ir::Kind::I32 ? 2147483647.0 : 4294967295.0;
+			return value >= low && value <= high && (type == Variant::FLOAT || (int64_t)p_value == (int64_t)value);
+		}
+		case ir::Kind::Bool:
+			return type == Variant::BOOL;
+		case ir::Kind::Str:
+			return type == Variant::STRING || type == Variant::STRING_NAME || type == Variant::NIL;
+		case ir::Kind::Ref:
+			return type == Variant::OBJECT || type == Variant::NIL;
+		case ir::Kind::Val:
+			// Which value type the parameter wants is not recorded yet: anything that is a value passes.
+			return type != Variant::OBJECT && type != Variant::NIL && !number && type != Variant::BOOL && type != Variant::STRING;
+		default:
+			return false; // A script object can't come from Godot.
+	}
+}
+
+static GDExtensionVariantType expected_type(ir::Kind p_kind) {
+	switch (p_kind) {
+		case ir::Kind::F64:
+			return GDEXTENSION_VARIANT_TYPE_FLOAT;
+		case ir::Kind::I32:
+		case ir::Kind::U32:
+			return GDEXTENSION_VARIANT_TYPE_INT;
+		case ir::Kind::Bool:
+			return GDEXTENSION_VARIANT_TYPE_BOOL;
+		case ir::Kind::Str:
+			return GDEXTENSION_VARIANT_TYPE_STRING;
+		default:
+			return GDEXTENSION_VARIANT_TYPE_OBJECT;
+	}
+}
 
 static GDExtensionBool instance_set(GDExtensionScriptInstanceDataPtr, GDExtensionConstStringNamePtr, GDExtensionConstVariantPtr) {
 	return false;
@@ -81,17 +129,27 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 		r_error->expected = (int32_t)wanted;
 		return;
 	}
+	size_t needed = function.required > 0 ? function.required - 1 : 0;
+	if ((size_t)p_argc < needed) {
+		r_error->error = GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS;
+		r_error->expected = (int32_t)needed;
+		return;
+	}
+	// Every argument is checked before any is converted, so that a refusal leaves nothing to give back.
+	for (size_t i = 0; i < (size_t)p_argc; i++) {
+		ir::Kind kind = function.registers[i + 1];
+		if (!accepts(kind, *reinterpret_cast<const Variant *>(p_args[i]))) {
+			r_error->error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
+			r_error->argument = (int32_t)i;
+			r_error->expected = (int32_t)expected_type(kind);
+			return;
+		}
+	}
 	std::vector<vm::Slot> arguments((size_t)p_argc + 1);
 	arguments[0].bits = 0;
 	arguments[0].p = instance->object;
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		ir::Kind kind = function.registers[i + 1];
-		if (kind == ir::Kind::Obj) {
-			r_error->error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
-			r_error->argument = (int32_t)i;
-			return;
-		}
-		arguments[i + 1] = kas3::from_variant(kind, *reinterpret_cast<const Variant *>(p_args[i]));
+		arguments[i + 1] = kas3::from_variant(function.registers[i + 1], *reinterpret_cast<const Variant *>(p_args[i]));
 	}
 	vm::Slot result;
 	result.bits = 0;
@@ -127,6 +185,14 @@ static GDExtensionScriptLanguagePtr instance_get_language(GDExtensionScriptInsta
 	return AS3Language::singleton->_owner;
 }
 
+// For a script on a reference-counted object, Godot asks before freeing it when its count reaches zero.
+// The script holds no reference of its own to the object, so the answer is always yes.
+static void instance_refcount_incremented(GDExtensionScriptInstanceDataPtr) {}
+
+static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDataPtr) {
+	return true;
+}
+
 static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
 	Project::get().interpreter().release_object(instance->object);
@@ -151,6 +217,8 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 		info.get_script_func = instance_get_script;
 		info.is_placeholder_func = instance_is_placeholder;
 		info.get_language_func = instance_get_language;
+		info.refcount_incremented_func = instance_refcount_incremented;
+		info.refcount_decremented_func = instance_refcount_decremented;
 		info.free_func = instance_free;
 		ready = true;
 	}
@@ -158,15 +226,14 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	if (!program.valid()) {
 		return nullptr;
 	}
-	// The script's own handle on the object it is attached to. It does not keep the object alive.
-	Variant owner(p_owner);
-	vm::Object *object = program.interpreter().construct(p_script->get_class_index(), &owner);
+	// The script's handle on the object it is attached to does not keep that object alive.
+	vm::Object *object = program.interpreter().construct(p_script->get_class_index(), program.host().borrow(p_owner));
 	if (!object) {
 		return nullptr;
 	}
 	ScriptInstance *instance = new ScriptInstance();
 	instance->object = object;
 	instance->owner = p_owner;
-	instance->script = p_script;
+	instance->script = Ref<AS3Script>(const_cast<AS3Script *>(p_script));
 	return gdextension_interface::script_instance_create3(&info, instance);
 }

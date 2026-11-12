@@ -95,6 +95,7 @@ struct Function {
 	bool is_static = false; // No receiver: a static method or a package function.
 	// The first registers are the parameters; an instance method's first parameter is `this`.
 	uint32_t parameters = 0;
+	uint32_t required = 0; // How many of them have no default: a caller must pass at least these.
 	Kind result = Kind::Void;
 	std::vector<Kind> registers;
 	std::vector<Instruction> code;

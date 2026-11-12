@@ -69,7 +69,12 @@ void Interpreter::drop(Kind p_kind, Slot &p_slot) {
 			drop_object(object);
 		}
 	} else if (ir::is_engine(p_kind) && p_slot.p) {
-		host_.drop(p_slot.p);
+		// Letting go of an engine value can run engine code that calls back in and moves the registers:
+		// the slot is emptied first and not touched again.
+		void *handle = p_slot.p;
+		p_slot.bits = 0;
+		host_.drop(handle);
+		return;
 	}
 	p_slot.bits = 0;
 }
@@ -117,7 +122,9 @@ void Interpreter::drop_object(Object *p_object) {
 					dead.push_back(other);
 				}
 			} else if (ir::is_engine(klass.fields[i].kind) && field.p) {
-				host_.drop(field.p);
+				void *handle = field.p;
+				field.p = nullptr;
+				host_.drop(handle);
 			}
 		}
 		free_object(object);
@@ -220,15 +227,20 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 }
 
 void Interpreter::pop() {
-	Frame &frame = frames_.back();
-	const Function &function = module_.functions[frame.function];
+	// Giving up a register can call back into the interpreter, which pushes and pops frames above this
+	// one: nothing is kept across a drop but the frame's place.
+	const size_t index = frames_.size() - 1;
+	const size_t base = frames_[index].base;
+	const Function &function = module_.functions[frames_[index].function];
 	for (size_t i = 0; i < function.registers.size(); i++) {
 		if (held(function.registers[i])) {
-			drop(function.registers[i], stack_[frame.base + i]);
+			Slot value = stack_[base + i];
+			stack_[base + i].bits = 0;
+			drop(function.registers[i], value);
 		}
 	}
-	stack_.resize(frame.base);
-	frames_.pop_back();
+	stack_.resize(base);
+	frames_.resize(index);
 }
 
 // Starts an error on its way out: an object of the class with the message.
@@ -447,7 +459,9 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		}
 	}
 	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref && p_owner) {
-		object->fields()[0].p = host_.copy(p_owner);
+		object->fields()[0].p = p_owner; // The object's own from here on.
+	} else if (p_owner) {
+		host_.drop(p_owner);
 	}
 	Slot self;
 	self.bits = 0;

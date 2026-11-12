@@ -28,6 +28,7 @@ public:
 
 	bool valid() const { return valid_; }
 	vm::Interpreter &interpreter() { return *interpreter_; }
+	GodotHost &host() { return host_; }
 	const ir::Module &module() const { return module_; }
 	// The class a script file declares: the one named after the file. NONE if there is none.
 	uint32_t class_of_file(const std::string &p_path) const;

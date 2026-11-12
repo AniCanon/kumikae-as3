@@ -65,6 +65,35 @@ check("the AS3 error was reported", "TypeError: Error #1009" in output and "at P
 check("the engine carried on", "RESULT after error steps=30" in output, output[-600:])
 check("no crash", run.returncode == 0, "exit %d" % run.returncode)
 
+# The faults the first review of this slice found.
+run = subprocess.run([godot, "--headless", "--path", project, "-s", "checks.gd"], capture_output=True, text=True,
+                     timeout=300)
+output = run.stdout + run.stderr
+lines = dict(line[len("CHECK "):].split("=", 1) for line in output.split("\n") if line.startswith("CHECK ") and "=" in line)
+expected = {
+    "script alive": "true",
+    "derived steps": "300",
+    "ready": "1",
+    "two": "12.0",
+    "too few": "<null>",
+    "default": "8",
+    "int": "42",
+    "big int": "<null>",
+    "negative uint": "<null>",
+    "number from text": "<null>",
+    "node from int": "<null>",
+    "string from null": "<null>",
+    "flag": "true",
+    "counted references": "1 hello=hello",
+    "counted freed": "true",
+    "things": "a.Thing b.Thing",
+}
+for name, value in expected.items():
+    check("check: " + name, lines.get(name) == value, "got %r, expected %r" % (lines.get(name), value))
+check("a call on a freed object is an AS3 error", "CHECK survived freed object" in output and "freed" in output, output[-800:])
+check("checks: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
+check("checks: nothing leaked", "leaked" not in output.lower(), output[-600:])
+
 for failure in failures:
     print("FAIL " + failure)
 print("godot: %s" % ("OK" if not failures else "%d failed" % len(failures)))

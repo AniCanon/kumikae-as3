@@ -437,8 +437,9 @@ static void test_engine_calls() {
 		CHECK(interpreter.get_field(object, "steps", &steps));
 		CHECK_EQ(steps.i, 2);
 		CHECK(!interpreter.get_field(object, "missing", &steps));
-		// Every box handed out during the calls was given back: only the owner's and the instance's copy remain.
-		CHECK_EQ(engine.boxes, 2);
+		// Every box handed out during the calls was given back: only the owner's handle, now the script
+		// object's own, remains.
+		CHECK_EQ(engine.boxes, 1);
 
 		// A property read into a local, a member of a value, a call that returns a number.
 		engine.log.clear();
@@ -446,7 +447,7 @@ static void test_engine_calls() {
 		CHECK(interpreter.call_method(object, "where", nullptr, 0, &result));
 		CHECK_EQ(result.d, 7.75);
 		CHECK_EQ(engine.log, std::string("get #1.position\nget #4.x\ncall #1.get_physics_process_delta_time()\n"));
-		CHECK_EQ(engine.boxes, 2);
+		CHECK_EQ(engine.boxes, 1);
 		// Strings cross both ways.
 		engine.log.clear();
 		vm::Slot text;
@@ -468,10 +469,74 @@ static void test_engine_calls() {
 		CHECK_EQ(engine.log, std::string("call #1.set_physics_process(true)\n"));
 		CHECK(engine.errors.find("Error: the engine refused set_physics_process\n\tat Player/wrong()[Player.as:14]") == 0);
 		interpreter.release_object(object);
-		CHECK_EQ(engine.boxes, 1); // The instance let go of its owner.
+		CHECK_EQ(engine.boxes, 0); // The script object gave up its handle on its owner.
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
+
+	// An override of an override: the engine's virtual goes to the last one; `super` on one of Godot's
+	// virtuals does nothing more (Godot's own does nothing); a class may name one from a later file.
+	{
+		Compilation program;
+		program.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		program.add("A.as", "package { import godot.*; public class A extends Node { public var other:Z; public var n:int;\n"
+							"override public function _ready():void { n++; super._ready(); }\n"
+							"public function need(a:int, b:int, c:int = 3):int { return a; } } }");
+		program.add("Z.as", "package { public class Z extends A { override public function _ready():void { n += 100; } } }");
+		program.check();
+		CHECK_EQ(program.format_diagnostics(), std::string());
+		ir::Module out;
+		CHECK(ir::lower(program, &out, ir::LowerMode::Library));
+		CHECK_EQ(program.format_diagnostics(), std::string());
+		std::string found;
+		for (const ir::Class &klass : out.classes) {
+			for (const auto &entry : klass.virtuals) {
+				found += klass.name + ":" + entry.first + "=" + out.functions[entry.second].name + " ";
+			}
+		}
+		CHECK_EQ(found, std::string("A:_ready=A/_ready Z:_ready=Z/_ready "));
+		for (const ir::Function &function : out.functions) {
+			if (function.name == "A/_ready") {
+				for (const ir::Instruction &instruction : function.code) {
+					CHECK(instruction.op != ir::Op::HostCall);
+				}
+			}
+			if (function.name == "A/need") {
+				CHECK_EQ(function.required, 3u); // `this` and the two parameters without a default.
+			}
+		}
+	}
+	// A handle whose release calls back into the interpreter (an object's destructor running a script):
+	// the registers it sits in are already let go of.
+	{
+		struct Vengeful : FakeEngine {
+			vm::Interpreter *interpreter = nullptr;
+			vm::Object *object = nullptr;
+			int reentered = 0;
+			void drop(void *p_value) override {
+				FakeEngine::drop(p_value);
+				if (p_value && interpreter && object && reentered < 50) {
+					reentered++;
+					vm::Slot result;
+					interpreter->call_method(object, "where", nullptr, 0, &result);
+				}
+			}
+		};
+		Vengeful engine;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		void *owner = engine.box();
+		vm::Object *object = interpreter.construct(player, owner);
+		engine.interpreter = &interpreter;
+		engine.object = object;
+		vm::Slot result;
+		CHECK(interpreter.call_method(object, "where", nullptr, 0, &result));
+		CHECK(engine.reentered > 10);
+		CHECK_EQ(engine.errors, std::string());
+		engine.interpreter = nullptr;
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
 
 	// What this slice does not do yet is refused by name.
 	auto refused = [](const char *p_body) {
@@ -492,6 +557,7 @@ static void test_engine_calls() {
 		"function f():void { print(\"hello\"); }",
 		"function f():void { position.x = 5; }",
 		"function f():void { addChild(this); }",
+		"function f():void { var other:Player = new Player(); }",
 		"function f():Boolean { return position == null; }",
 	};
 	for (const char *body : bodies) {

@@ -99,7 +99,9 @@ public:
 	bool start();
 	// A new object of the class, its constructor run with no arguments. One reference, the caller's: give
 	// it back with release_object(). Null if the constructor failed.
-	// For a script class, p_owner is the Godot object it is attached to: the object keeps its own handle.
+	// For a script class, p_owner is a handle on the Godot object it is attached to. The handle is handed
+	// over: the script object drops it when it is freed, and so does this call if it fails. The host
+	// decides what such a handle is; it should not keep the Godot object alive.
 	Object *construct(uint32_t p_class, void *p_owner = nullptr);
 	// A field by its AS3 name: the value as it is held (no new reference) and its kind. False if there is
 	// no such field.
