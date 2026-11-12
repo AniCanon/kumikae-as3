@@ -180,6 +180,20 @@ static void non_ascii_identifier() {
 	CHECK_EQ(join(lex("$a _b a1").kinds), std::string("identifier identifier identifier"));
 }
 
+static void unicode_spaces_are_whitespace() {
+	// No-break space, ideographic space, and a byte-order mark in the middle of a file.
+	CHECK_EQ(join(lex("x =\xC2\xA0" "1;").kinds), std::string("identifier '=' number ';'"));
+	CHECK_EQ(join(lex("a\xE3\x80\x80+ b").kinds), std::string("identifier '+' identifier"));
+	CHECK_EQ(join(lex("a \xEF\xBB\xBF b").kinds), std::string("identifier identifier"));
+	// Line and paragraph separators end a line.
+	Lexed separated = lex("a\xE2\x80\xA8" "b\xE2\x80\xA9" "c");
+	CHECK_EQ(join(separated.kinds), std::string("identifier identifier identifier"));
+	CHECK(separated.newline_before[1]);
+	CHECK(separated.newline_before[2]);
+	// Other non-ASCII characters are still identifier characters.
+	CHECK_EQ((int)lex("\xE6\x97\xA5\xE6\x9C\xAC = 1").texts[0].size(), 6);
+}
+
 static void control_character() {
 	Lexed result = lex("a \x01 b");
 	CHECK_EQ(join(result.kinds), std::string("identifier error identifier"));
@@ -228,6 +242,7 @@ int main() {
 	regex_rescan_rewinds_past_later_tokens();
 	unterminated_regex();
 	non_ascii_identifier();
+	unicode_spaces_are_whitespace();
 	control_character();
 	end_of_file_repeats();
 	offsets_and_lengths();

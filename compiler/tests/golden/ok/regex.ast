@@ -32,6 +32,6 @@ Program @1:1
   VarDecl @6:1
     Declarator name="f" @6:5
       Type Number @6:7
-      Binary op="/" @6:17
-        Name text="a" @6:17
+      Binary op="/" @6:16
+        Name text="a" @6:16
         NumberLit text="2" @6:22

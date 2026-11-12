@@ -63,16 +63,18 @@ void Parser::end_statement() {
 
 Block *Parser::parse_block() {
 	Block *block = node<Block>(current_.offset);
-	if (!expect(TokenKind::LBrace, "'{'").length) {
+	Token open = expect(TokenKind::LBrace, "'{'");
+	if (!open.length) {
 		return finish(block);
 	}
+	int level = brace_depth_;
 	std::vector<Stmt *> statements;
 	while (!at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
 		uint32_t before = current_.offset;
 		panic_ = false;
 		statements.push_back(parse_statement());
 		if (panic_) {
-			synchronize();
+			synchronize(level);
 			panic_ = false;
 		}
 		// Whatever happened, move forward, so that no input can make this loop spin.
@@ -80,7 +82,7 @@ Block *Parser::parse_block() {
 			advance();
 		}
 	}
-	expect(TokenKind::RBrace, "'}'");
+	expect_close(TokenKind::RBrace, open);
 	block->statements = to_list(statements);
 	return finish(block);
 }
@@ -95,7 +97,9 @@ Stmt *Parser::parse_statement() {
 	if (!enter()) {
 		return finish(node<Empty>(current_.offset));
 	}
+	statement_depth_++;
 	Stmt *statement = parse_statement_inner();
+	statement_depth_--;
 	leave();
 	return statement;
 }
@@ -119,7 +123,7 @@ bool Parser::parse_unsupported_statement() {
 
 Import *Parser::parse_import() {
 	Import *import = node<Import>(advance().offset);
-	import->name = parse_dotted_name("a name to import", &import->wildcard);
+	import->name = parse_dotted_name("a name to import", &import->wildcard, &import->name_offsets);
 	end_statement();
 	return finish(import);
 }
@@ -145,9 +149,9 @@ Stmt *Parser::parse_statement_inner() {
 			return parse_for();
 		case TokenKind::KwWhile: {
 			While *loop = node<While>(advance().offset);
-			expect(TokenKind::LParen, "'('");
+			Token open = expect(TokenKind::LParen, "'('");
 			loop->condition = parse_expression();
-			expect(TokenKind::RParen, "')'");
+			expect_close(TokenKind::RParen, open);
 			loop->body = parse_statement();
 			return finish(loop);
 		}
@@ -155,9 +159,9 @@ Stmt *Parser::parse_statement_inner() {
 			DoWhile *loop = node<DoWhile>(advance().offset);
 			loop->body = parse_statement();
 			expect(TokenKind::KwWhile, "'while'");
-			expect(TokenKind::LParen, "'('");
+			Token open = expect(TokenKind::LParen, "'('");
 			loop->condition = parse_expression();
-			expect(TokenKind::RParen, "')'");
+			expect_close(TokenKind::RParen, open);
 			end_statement();
 			return finish(loop);
 		}
@@ -166,6 +170,7 @@ Stmt *Parser::parse_statement_inner() {
 		case TokenKind::KwBreak: {
 			Break *jump = node<Break>(advance().offset);
 			if (at(TokenKind::Identifier) && !current_.newline_before) {
+				jump->label_offset = current_.offset;
 				jump->label = text(advance());
 			}
 			end_statement();
@@ -174,6 +179,7 @@ Stmt *Parser::parse_statement_inner() {
 		case TokenKind::KwContinue: {
 			Continue *jump = node<Continue>(advance().offset);
 			if (at(TokenKind::Identifier) && !current_.newline_before) {
+				jump->label_offset = current_.offset;
 				jump->label = text(advance());
 			}
 			end_statement();
@@ -213,9 +219,10 @@ Stmt *Parser::parse_statement_inner() {
 		case TokenKind::KwWith: {
 			error_at(start, "the 'with' statement is not supported", false);
 			advance();
-			if (accept(TokenKind::LParen)) {
+			if (at(TokenKind::LParen)) {
+				Token open = advance();
 				parse_expression();
-				expect(TokenKind::RParen, "')'");
+				expect_close(TokenKind::RParen, open);
 			}
 			parse_statement();
 			return finish(node<Empty>(start));
@@ -248,9 +255,9 @@ Stmt *Parser::parse_statement_inner() {
 
 Stmt *Parser::parse_if() {
 	If *branch = node<If>(advance().offset);
-	expect(TokenKind::LParen, "'('");
+	Token open = expect(TokenKind::LParen, "'('");
 	branch->condition = parse_expression();
-	expect(TokenKind::RParen, "')'");
+	expect_close(TokenKind::RParen, open);
 	branch->then_branch = parse_statement();
 	if (accept(TokenKind::KwElse)) {
 		branch->else_branch = parse_statement();
@@ -265,7 +272,7 @@ Stmt *Parser::parse_for() {
 		advance();
 		each = true;
 	}
-	expect(TokenKind::LParen, "'('");
+	Token open = expect(TokenKind::LParen, "'('");
 
 	// The first clause is parsed with `in` switched off as an operator, so that `for (k in o)` is seen.
 	VarDecl *declaration = nullptr;
@@ -295,7 +302,7 @@ Stmt *Parser::parse_for() {
 		}
 		advance();
 		loop->collection = parse_expression();
-		expect(TokenKind::RParen, "')'");
+		expect_close(TokenKind::RParen, open);
 		loop->body = parse_statement();
 		return finish(loop);
 	}
@@ -323,19 +330,21 @@ Stmt *Parser::parse_for() {
 	if (!at(TokenKind::RParen)) {
 		loop->update = parse_expression();
 	}
-	expect(TokenKind::RParen, "')'");
+	expect_close(TokenKind::RParen, open);
 	loop->body = parse_statement();
 	return finish(loop);
 }
 
 Stmt *Parser::parse_switch() {
 	Switch *choice = node<Switch>(advance().offset);
-	expect(TokenKind::LParen, "'('");
+	Token open_paren = expect(TokenKind::LParen, "'('");
 	choice->subject = parse_expression();
-	expect(TokenKind::RParen, "')'");
+	expect_close(TokenKind::RParen, open_paren);
 	std::vector<SwitchCase> cases;
 	bool has_default = false;
-	if (expect(TokenKind::LBrace, "'{'").length) {
+	Token open = expect(TokenKind::LBrace, "'{'");
+	if (open.length) {
+		int level = brace_depth_;
 		while (!at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
 			SwitchCase clause;
 			clause.offset = current_.offset;
@@ -350,7 +359,7 @@ Stmt *Parser::parse_switch() {
 				advance();
 			} else {
 				error_expected("'case' or 'default'");
-				synchronize();
+				synchronize(level);
 				panic_ = false;
 				if (current_.offset == clause.offset && !at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
 					advance();
@@ -365,7 +374,7 @@ Stmt *Parser::parse_switch() {
 				panic_ = false;
 				body.push_back(parse_statement());
 				if (panic_) {
-					synchronize();
+					synchronize(level);
 					panic_ = false;
 				}
 				if (current_.offset == before && !at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
@@ -373,9 +382,10 @@ Stmt *Parser::parse_switch() {
 				}
 			}
 			clause.body = to_list(body);
+			clause.end = previous_end_;
 			cases.push_back(clause);
 		}
-		expect(TokenKind::RBrace, "'}'");
+		expect_close(TokenKind::RBrace, open);
 	}
 	choice->cases = to_list(cases);
 	return finish(choice);
@@ -388,7 +398,7 @@ Stmt *Parser::parse_try() {
 	while (at(TokenKind::KwCatch)) {
 		CatchClause clause;
 		clause.offset = advance().offset;
-		expect(TokenKind::LParen, "'('");
+		Token open = expect(TokenKind::LParen, "'('");
 		if (at(TokenKind::Identifier)) {
 			clause.name = text(advance());
 		} else {
@@ -397,8 +407,9 @@ Stmt *Parser::parse_try() {
 		if (accept(TokenKind::Colon)) {
 			clause.type = parse_type();
 		}
-		expect(TokenKind::RParen, "')'");
+		expect_close(TokenKind::RParen, open);
 		clause.body = parse_block();
+		clause.end = previous_end_;
 		catches.push_back(clause);
 	}
 	attempt->catches = to_list(catches);
@@ -434,6 +445,7 @@ VarDecl *Parser::parse_variable_declaration(Modifiers p_modifiers, List<Metadata
 			Restore no_in(no_in_, !p_allow_in);
 			declarator.initializer = parse_assignment();
 		}
+		declarator.end = previous_end_;
 		declarators.push_back(declarator);
 		if (!accept(TokenKind::Comma)) {
 			break;
@@ -454,13 +466,15 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 		function->accessor = text(advance()) == "get" ? FunctionDecl::Getter : FunctionDecl::Setter;
 	}
 	if (at(TokenKind::Identifier) || (function->accessor != FunctionDecl::None && is_identifier_like(current_.kind))) {
+		function->name_offset = current_.offset;
 		function->name = text(advance());
 	} else if (p_name_required) {
 		error_expected("a function name");
 	}
 
 	std::vector<Parameter> parameters;
-	if (expect(TokenKind::LParen, "'('").length) {
+	Token open = expect(TokenKind::LParen, "'('");
+	if (open.length) {
 		bool rest_seen = false;
 		uint32_t rest_offset = 0;
 		while (!at(TokenKind::RParen) && !at(TokenKind::EndOfFile)) {
@@ -488,19 +502,29 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 				Restore brackets(bracket_ends_initializer_, false);
 				parameter.default_value = parse_assignment();
 			}
+			parameter.end = previous_end_;
 			parameters.push_back(parameter);
 			if (!accept(TokenKind::Comma)) {
 				break;
 			}
 		}
-		expect(TokenKind::RParen, "')'");
+		expect_close(TokenKind::RParen, open);
 	}
 	function->parameters = to_list(parameters);
 	if (accept(TokenKind::Colon)) {
 		function->return_type = parse_type();
 	}
+	function_height_ = 1;
 	if (at(TokenKind::LBrace)) {
+		// A function body starts a fresh count of statement nesting; its height is what the body reached.
+		uint32_t saved_depth = statement_depth_;
+		uint32_t saved_height = body_height_;
+		statement_depth_ = 0;
+		body_height_ = 0;
 		function->body = parse_function_body();
+		function_height_ = body_height_ + 3;
+		statement_depth_ = saved_depth;
+		body_height_ = saved_height;
 	} else if (p_body_expected) {
 		error_expected("'{'");
 	}

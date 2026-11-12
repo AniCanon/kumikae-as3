@@ -115,12 +115,12 @@ Expr *Parser::parse_expression() {
 	while (at(TokenKind::Comma)) {
 		advance();
 		Expr *right = parse_assignment();
-		height = std::max(height, last_height_) + 1;
-		if (height > MAX_HEIGHT) {
+		uint32_t taller = std::max(height, last_height_) + 1;
+		if (taller > MAX_CHAIN) {
 			report_too_long(right->offset);
-			height = MAX_HEIGHT;
-			continue;
+			continue; // Keep consuming, but stop growing the tree.
 		}
+		height = taller;
 		Binary *comma = node<Binary>(left->offset);
 		comma->op = TokenKind::Comma;
 		comma->left = left;
@@ -128,6 +128,7 @@ Expr *Parser::parse_expression() {
 		left = finish(comma);
 	}
 	last_height_ = height;
+	note_height();
 	return left;
 }
 
@@ -144,9 +145,10 @@ Expr *Parser::parse_assignment() {
 		assign->op = op;
 		assign->target = target;
 		assign->value = value;
-		last_height_ = std::max(target_height, last_height_) + 1;
+		grow(std::max(target_height, last_height_) + 1);
 		target = finish(assign);
 	}
+	note_height();
 	leave();
 	return target;
 }
@@ -171,7 +173,7 @@ Expr *Parser::parse_conditional() {
 	conditional->condition = condition;
 	conditional->then_value = then_value;
 	conditional->else_value = else_value;
-	last_height_ = height + 1;
+	grow(height + 1);
 	return finish(conditional);
 }
 
@@ -188,12 +190,12 @@ Expr *Parser::parse_binary(int p_min_level) {
 		}
 		advance();
 		Expr *right = parse_binary(level + 1);
-		height = std::max(height, last_height_) + 1;
-		if (height > MAX_HEIGHT) {
+		uint32_t taller = std::max(height, last_height_) + 1;
+		if (taller > MAX_CHAIN) {
 			report_too_long(right->offset);
-			height = MAX_HEIGHT;
 			continue; // Keep consuming the chain, but stop growing the tree.
 		}
+		height = taller;
 		Binary *binary = node<Binary>(left->offset);
 		binary->op = op;
 		binary->left = left;
@@ -215,7 +217,7 @@ Expr *Parser::parse_unary() {
 	Unary *unary = node<Unary>(op.offset);
 	unary->op = op.kind;
 	unary->operand = parse_unary();
-	last_height_++;
+	grow(last_height_ + 1);
 	leave();
 	return finish(unary);
 }
@@ -227,7 +229,7 @@ Expr *Parser::parse_postfix() {
 		Postfix *postfix = node<Postfix>(operand->offset);
 		postfix->op = advance().kind;
 		postfix->operand = operand;
-		last_height_++;
+		grow(last_height_ + 1);
 		return finish(postfix);
 	}
 	return operand;
@@ -247,7 +249,7 @@ List<Expr *> Parser::parse_arguments(uint32_t *r_height) {
 	Restore brackets(bracket_ends_initializer_, false);
 	std::vector<Expr *> arguments;
 	uint32_t height = 0;
-	advance(); // '('
+	Token open = advance(); // '('
 	while (!at(TokenKind::RParen) && !at(TokenKind::EndOfFile)) {
 		uint32_t before = current_.offset;
 		arguments.push_back(parse_assignment());
@@ -259,7 +261,7 @@ List<Expr *> Parser::parse_arguments(uint32_t *r_height) {
 			break;
 		}
 	}
-	expect(TokenKind::RParen, "')'");
+	expect_close(TokenKind::RParen, open);
 	*r_height = height;
 	return to_list(arguments);
 }
@@ -268,7 +270,6 @@ List<Expr *> Parser::parse_arguments(uint32_t *r_height) {
 Expr *Parser::parse_call_member(bool p_allow_calls) {
 	Expr *left = parse_primary();
 	uint32_t height = last_height_;
-	bool overflow = false;
 	for (;;) {
 		Expr *link = nullptr;
 		uint32_t child_height = 0;
@@ -299,7 +300,7 @@ Expr *Parser::parse_call_member(bool p_allow_calls) {
 			if (bracket_ends_initializer_ && current_.newline_before) {
 				break;
 			}
-			advance();
+			Token open = advance();
 			Index *index = node<Index>(left->offset);
 			index->object = left;
 			{
@@ -308,7 +309,7 @@ Expr *Parser::parse_call_member(bool p_allow_calls) {
 				index->index = parse_expression();
 			}
 			child_height = last_height_;
-			expect(TokenKind::RBracket, "']'");
+			expect_close(TokenKind::RBracket, open);
 			link = index;
 		} else if (at(TokenKind::LParen) && p_allow_calls) {
 			Call *call = node<Call>(left->offset);
@@ -318,21 +319,22 @@ Expr *Parser::parse_call_member(bool p_allow_calls) {
 		} else {
 			break;
 		}
-		height = std::max(height, child_height) + 1;
-		if (height > MAX_HEIGHT) {
+		uint32_t taller = std::max(height, child_height) + 1;
+		if (taller > MAX_CHAIN) {
 			report_too_long(current_.offset);
-			height = MAX_HEIGHT;
-			overflow = true;
+			continue; // Keep consuming the chain, but stop growing the tree.
 		}
-		if (!overflow) {
-			left = finish(link);
-		}
+		height = taller;
+		left = finish(link);
 	}
 	last_height_ = height;
 	return left;
 }
 
 Expr *Parser::parse_new() {
+	if (!enter()) {
+		return missing_expression();
+	}
 	Token keyword = advance();
 	// `new <int>[1, 2]` is a vector literal.
 	if (at(TokenKind::Less)) {
@@ -342,7 +344,8 @@ Expr *Parser::parse_new() {
 		expect_type_close();
 		uint32_t height = 0;
 		std::vector<Expr *> elements;
-		if (expect(TokenKind::LBracket, "'['").length) {
+		if (at(TokenKind::LBracket)) {
+			Token open = advance();
 			Restore allow_in(no_in_, false);
 			Restore brackets(bracket_ends_initializer_, false);
 			while (!at(TokenKind::RBracket) && !at(TokenKind::EndOfFile)) {
@@ -353,10 +356,13 @@ Expr *Parser::parse_new() {
 					break;
 				}
 			}
-			expect(TokenKind::RBracket, "']'");
+			expect_close(TokenKind::RBracket, open);
+		} else {
+			error_expected("'['");
 		}
 		vector->elements = to_list(elements);
-		last_height_ = height + 1;
+		grow(height + 1);
+		leave();
 		return finish(vector);
 	}
 	New *create = node<New>(keyword.offset);
@@ -368,14 +374,16 @@ Expr *Parser::parse_new() {
 		create->has_arguments = true;
 		height = std::max(height, arguments_height);
 	}
-	last_height_ = height + 1;
+	grow(height + 1);
+	leave();
 	return finish(create);
 }
 
 Expr *Parser::parse_array_literal() {
 	Restore allow_in(no_in_, false);
 	Restore brackets(bracket_ends_initializer_, false);
-	ArrayLit *array = node<ArrayLit>(advance().offset);
+	Token open = advance();
+	ArrayLit *array = node<ArrayLit>(open.offset);
 	std::vector<Expr *> elements;
 	uint32_t height = 0;
 	while (!at(TokenKind::RBracket) && !at(TokenKind::EndOfFile)) {
@@ -391,16 +399,17 @@ Expr *Parser::parse_array_literal() {
 			break;
 		}
 	}
-	expect(TokenKind::RBracket, "']'");
+	expect_close(TokenKind::RBracket, open);
 	array->elements = to_list(elements);
-	last_height_ = height + 1;
+	grow(height + 1);
 	return finish(array);
 }
 
 Expr *Parser::parse_object_literal() {
 	Restore allow_in(no_in_, false);
 	Restore brackets(bracket_ends_initializer_, false);
-	ObjectLit *object = node<ObjectLit>(advance().offset);
+	Token open = advance();
+	ObjectLit *object = node<ObjectLit>(open.offset);
 	std::vector<ObjectField> fields;
 	uint32_t height = 0;
 	while (!at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
@@ -418,15 +427,16 @@ Expr *Parser::parse_object_literal() {
 		}
 		expect(TokenKind::Colon, "':'");
 		field.value = parse_assignment();
+		field.end = previous_end_;
 		height = std::max(height, last_height_);
 		fields.push_back(field);
 		if (!accept(TokenKind::Comma)) {
 			break;
 		}
 	}
-	expect(TokenKind::RBrace, "'}'");
+	expect_close(TokenKind::RBrace, open);
 	object->fields = to_list(fields);
-	last_height_ = height + 1;
+	grow(height + 2); // The literal and its field.
 	return finish(object);
 }
 
@@ -434,7 +444,7 @@ Expr *Parser::parse_function_expression() {
 	Token keyword = advance();
 	FunctionExpr *expression = node<FunctionExpr>(keyword.offset);
 	expression->function = parse_function_rest(keyword.offset, Modifiers(), List<Metadata>(), true, false, false);
-	last_height_ = 1;
+	grow(function_height_ + 1);
 	return finish(expression);
 }
 
@@ -490,14 +500,23 @@ Expr *Parser::parse_primary() {
 			return finish(name);
 		}
 		case TokenKind::LParen: {
-			advance();
+			Token open = advance();
 			Expr *inner;
+			uint32_t height;
 			{
 				Restore allow_in(no_in_, false);
 				Restore brackets(bracket_ends_initializer_, false);
 				inner = parse_expression();
+				height = last_height_;
 			}
-			expect(TokenKind::RParen, "')'");
+			expect_close(TokenKind::RParen, open);
+			// No node of its own: the inner expression is marked and its range widened to the parentheses.
+			inner->parenthesized = true;
+			inner->offset = open.offset;
+			if (previous_end_ > inner->end) {
+				inner->end = previous_end_;
+			}
+			last_height_ = height;
 			return inner;
 		}
 		case TokenKind::LBracket:
@@ -510,7 +529,9 @@ Expr *Parser::parse_primary() {
 			return parse_new();
 		case TokenKind::At:
 			error_at(current_.offset, "E4X (XML syntax) is not supported", false);
-			advance();
+			while (at(TokenKind::At)) {
+				advance();
+			}
 			return parse_primary();
 		case TokenKind::Less:
 			// Inline XML. Skip to the end of the statement or line, whichever comes first.
@@ -566,6 +587,11 @@ TypeRef *Parser::parse_type() {
 	if (!enter()) {
 		return type;
 	}
+	// Type arguments nest by recursion and are not part of any expression's height, so they get their own,
+	// much smaller cap.
+	if (++type_depth_ > MAX_TYPE_DEPTH) {
+		abort_too_deep();
+	}
 	if (at(TokenKind::Star)) {
 		advance();
 	} else if (at(TokenKind::StarAssign)) {
@@ -580,13 +606,17 @@ TypeRef *Parser::parse_type() {
 		type->form = TypeRef::Void;
 	} else if (at(TokenKind::Identifier)) {
 		std::vector<std::string_view> parts;
+		std::vector<uint32_t> offsets;
+		offsets.push_back(current_.offset);
 		parts.push_back(text(advance()));
 		while (at(TokenKind::Dot) && peek2().kind == TokenKind::Identifier) {
 			advance();
+			offsets.push_back(current_.offset);
 			parts.push_back(text(advance()));
 		}
 		type->form = TypeRef::Named;
 		type->name = to_list(parts);
+		type->name_offsets = to_list(offsets);
 		if (at(TokenKind::DotLess)) {
 			advance();
 			type->form = TypeRef::Applied;
@@ -596,13 +626,15 @@ TypeRef *Parser::parse_type() {
 	} else {
 		error_expected("a type");
 	}
+	type_depth_--;
 	leave();
 	return finish(type);
 }
 
 // `a.b.C`, and for imports `a.b.*`.
-List<std::string_view> Parser::parse_dotted_name(const char *p_what, bool *r_wildcard) {
+List<std::string_view> Parser::parse_dotted_name(const char *p_what, bool *r_wildcard, List<uint32_t> *r_offsets) {
 	std::vector<std::string_view> parts;
+	std::vector<uint32_t> offsets;
 	if (r_wildcard) {
 		*r_wildcard = false;
 	}
@@ -610,6 +642,7 @@ List<std::string_view> Parser::parse_dotted_name(const char *p_what, bool *r_wil
 		error_expected(p_what);
 		return to_list(parts);
 	}
+	offsets.push_back(current_.offset);
 	parts.push_back(text(advance()));
 	while (at(TokenKind::Dot)) {
 		advance();
@@ -622,7 +655,11 @@ List<std::string_view> Parser::parse_dotted_name(const char *p_what, bool *r_wil
 			error_expected(p_what);
 			break;
 		}
+		offsets.push_back(current_.offset);
 		parts.push_back(text(advance()));
+	}
+	if (r_offsets) {
+		*r_offsets = to_list(offsets);
 	}
 	return to_list(parts);
 }

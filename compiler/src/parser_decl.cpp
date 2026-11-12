@@ -31,13 +31,16 @@ List<Metadata> Parser::parse_metadata_tags() {
 		}
 		tag.name = text(advance());
 		std::vector<MetadataArg> args;
-		if (accept(TokenKind::LParen)) {
+		if (at(TokenKind::LParen)) {
+			Token open_paren = advance();
 			while (!at(TokenKind::RParen) && !at(TokenKind::EndOfFile)) {
 				MetadataArg arg;
-				auto value = [this](std::string_view *r_value) {
+				auto value = [this](std::string_view *r_value, bool *r_is_string) {
+					*r_is_string = false;
 					if (at(TokenKind::String)) {
 						std::string_view quoted = text(advance());
 						*r_value = quoted.substr(1, quoted.size() - 2);
+						*r_is_string = true;
 						return true;
 					}
 					if (at(TokenKind::Number) || is_identifier_like(current_.kind)) {
@@ -47,12 +50,12 @@ List<Metadata> Parser::parse_metadata_tags() {
 					error_expected("a metadata value");
 					return false;
 				};
-				if (!value(&arg.value)) {
+				if (!value(&arg.value, &arg.value_is_string)) {
 					break;
 				}
 				if (accept(TokenKind::Assign)) {
 					arg.key = arg.value;
-					if (!value(&arg.value)) {
+					if (!value(&arg.value, &arg.value_is_string)) {
 						break;
 					}
 				}
@@ -61,10 +64,11 @@ List<Metadata> Parser::parse_metadata_tags() {
 					break;
 				}
 			}
-			expect(TokenKind::RParen, "')'");
+			expect_close(TokenKind::RParen, open_paren);
 		}
 		tag.args = to_list(args);
 		expect(TokenKind::RBracket, "']'");
+		tag.end = previous_end_;
 		tags.push_back(tag);
 	}
 	return to_list(tags);
@@ -127,6 +131,7 @@ ClassDecl *Parser::parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Me
 	decl->metadata = p_metadata;
 	advance(); // 'class'
 	if (at(TokenKind::Identifier)) {
+		decl->name_offset = current_.offset;
 		decl->name = text(advance());
 	} else {
 		error_expected("a class name");
@@ -142,7 +147,9 @@ ClassDecl *Parser::parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Me
 		decl->implements = to_list(interfaces);
 	}
 	std::vector<Node *> members;
-	if (expect(TokenKind::LBrace, "'{'").length) {
+	Token open = expect(TokenKind::LBrace, "'{'");
+	if (open.length) {
+		int level = brace_depth_;
 		while (!at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
 			uint32_t start = current_.offset;
 			panic_ = false;
@@ -168,19 +175,20 @@ ClassDecl *Parser::parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Me
 						end_statement();
 					}
 					members.push_back(function);
-				} else if (!parse_unsupported_statement()) {
+				} else if (!panic_ && !parse_unsupported_statement()) {
+					// (If the metadata or modifiers already failed, that error is the one to show.)
 					error_at(start, "expected a member definition");
 				}
 			}
 			if (panic_) {
-				synchronize();
+				synchronize(level);
 				panic_ = false;
 			}
 			if (current_.offset == start && !at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
 				advance();
 			}
 		}
-		expect(TokenKind::RBrace, "'}'");
+		expect_close(TokenKind::RBrace, open);
 	}
 	decl->members = to_list(members);
 	return finish(decl);
@@ -192,6 +200,7 @@ InterfaceDecl *Parser::parse_interface(uint32_t p_offset, Modifiers p_modifiers,
 	decl->metadata = p_metadata;
 	advance(); // 'interface'
 	if (at(TokenKind::Identifier)) {
+		decl->name_offset = current_.offset;
 		decl->name = text(advance());
 	} else {
 		error_expected("an interface name");
@@ -204,7 +213,9 @@ InterfaceDecl *Parser::parse_interface(uint32_t p_offset, Modifiers p_modifiers,
 		decl->extends = to_list(bases);
 	}
 	std::vector<FunctionDecl *> methods;
-	if (expect(TokenKind::LBrace, "'{'").length) {
+	Token open = expect(TokenKind::LBrace, "'{'");
+	if (open.length) {
+		int level = brace_depth_;
 		while (!at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
 			uint32_t start = current_.offset;
 			panic_ = false;
@@ -228,19 +239,19 @@ InterfaceDecl *Parser::parse_interface(uint32_t p_offset, Modifiers p_modifiers,
 						end_statement();
 					}
 					methods.push_back(function);
-				} else {
+				} else if (!panic_) {
 					error_at(current_.offset, "expected a method signature");
 				}
 			}
 			if (panic_) {
-				synchronize();
+				synchronize(level);
 				panic_ = false;
 			}
 			if (current_.offset == start && !at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
 				advance();
 			}
 		}
-		expect(TokenKind::RBrace, "'}'");
+		expect_close(TokenKind::RBrace, open);
 	}
 	decl->methods = to_list(methods);
 	return finish(decl);
@@ -249,13 +260,14 @@ InterfaceDecl *Parser::parse_interface(uint32_t p_offset, Modifiers p_modifiers,
 PackageDecl *Parser::parse_package() {
 	PackageDecl *package = node<PackageDecl>(advance().offset);
 	if (at(TokenKind::Identifier)) {
-		package->name = parse_dotted_name("a package name", nullptr);
+		package->name = parse_dotted_name("a package name", nullptr, nullptr);
 	}
 	std::vector<Import *> imports;
 	std::vector<Node *> definitions;
-	if (expect(TokenKind::LBrace, "'{'").length) {
+	Token open = expect(TokenKind::LBrace, "'{'");
+	if (open.length) {
 		parse_definitions(true, imports, definitions, nullptr);
-		expect(TokenKind::RBrace, "'}'");
+		expect_close(TokenKind::RBrace, open);
 	}
 	package->imports = to_list(imports);
 	package->definitions = to_list(definitions);
@@ -265,6 +277,7 @@ PackageDecl *Parser::parse_package() {
 // The contents of a file (p_in_package false) or of a package block (true, stopping at its `}`).
 void Parser::parse_definitions(bool p_in_package, std::vector<Import *> &r_imports,
 		std::vector<Node *> &r_definitions, PackageDecl **r_package) {
+	int level = brace_depth_;
 	while (!at(TokenKind::EndOfFile)) {
 		if (p_in_package && at(TokenKind::RBrace)) {
 			return;
@@ -303,12 +316,12 @@ void Parser::parse_definitions(bool p_in_package, std::vector<Import *> &r_impor
 				variable->offset = start;
 				end_statement();
 				r_definitions.push_back(variable);
-			} else if (!parse_unsupported_statement()) {
+			} else if (!panic_ && !parse_unsupported_statement()) {
 				error_at(start, "expected a class, interface, function or variable definition");
 			}
 		}
 		if (panic_) {
-			synchronize();
+			synchronize(level);
 			panic_ = false;
 		}
 		if (current_.offset == start && !at(TokenKind::EndOfFile) && !(p_in_package && at(TokenKind::RBrace))) {
@@ -322,6 +335,13 @@ Program *Parser::parse_program() {
 	std::vector<Import *> imports;
 	std::vector<Node *> definitions;
 	parse_definitions(false, imports, definitions, &program->package);
+	if (aborted_) {
+		// Nesting ran past a cap part-way down. What was built around that point is not within the height
+		// bound, so none of it is returned: the caller gets the diagnostic and an empty program.
+		program->package = nullptr;
+		imports.clear();
+		definitions.clear();
+	}
 	program->imports = to_list(imports);
 	program->definitions = to_list(definitions);
 	program->end = (uint32_t)source_.text().size();

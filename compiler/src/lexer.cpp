@@ -26,6 +26,28 @@ static bool is_line_break(char p_c) {
 	return p_c == '\n' || p_c == '\r';
 }
 
+// Non-ASCII characters that are spacing, not part of a name. Returns the length in bytes (0 if p_text does
+// not start with one) and whether it ends a line: no-break space, ideographic space, a byte-order mark,
+// and the line and paragraph separators.
+static uint32_t unicode_space(const char *p_text, uint32_t p_left, bool *r_line_break) {
+	const unsigned char *c = reinterpret_cast<const unsigned char *>(p_text);
+	*r_line_break = false;
+	if (p_left >= 2 && c[0] == 0xC2 && c[1] == 0xA0) {
+		return 2;
+	}
+	if (p_left >= 3 && c[0] == 0xE3 && c[1] == 0x80 && c[2] == 0x80) {
+		return 3;
+	}
+	if (p_left >= 3 && c[0] == 0xEF && c[1] == 0xBB && c[2] == 0xBF) {
+		return 3;
+	}
+	if (p_left >= 3 && c[0] == 0xE2 && c[1] == 0x80 && (c[2] == 0xA8 || c[2] == 0xA9)) {
+		*r_line_break = true;
+		return 3;
+	}
+	return 0;
+}
+
 Lexer::Lexer(const Source &p_source, Diagnostics &p_diagnostics) :
 		diagnostics_(p_diagnostics),
 		text_(p_source.text().data()),
@@ -57,6 +79,14 @@ bool Lexer::skip_trivia(Token *r_error) {
 		} else if (is_line_break(c)) {
 			newline = true;
 			position_++;
+		} else if ((unsigned char)c >= 0x80) {
+			bool line_break;
+			uint32_t length = unicode_space(text_ + position_, size_ - position_, &line_break);
+			if (!length) {
+				break;
+			}
+			newline = newline || line_break;
+			position_ += length;
 		} else if (c == '/' && position_ + 1 < size_ && text_[position_ + 1] == '/') {
 			while (position_ < size_ && !is_line_break(text_[position_])) {
 				position_++;
@@ -292,6 +322,11 @@ Token Lexer::next() {
 	char c = text_[position_];
 	if (is_identifier_start(c)) {
 		while (position_ < size_ && is_identifier_part(text_[position_])) {
+			bool line_break;
+			if ((unsigned char)text_[position_] >= 0x80 &&
+					unicode_space(text_ + position_, size_ - position_, &line_break)) {
+				break; // A Unicode space ends the name.
+			}
 			position_++;
 		}
 		return make(keyword_kind(std::string_view(text_ + start, position_ - start)), start, newline);

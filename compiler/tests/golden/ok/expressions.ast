@@ -71,7 +71,7 @@ Program @1:1
   VarDecl @6:1
     Declarator name="f" @6:5
       Type int @6:7
-      Binary op="," @6:14
+      Binary op="," @6:13
         Binary op="," @6:14
           Binary op="," @6:14
             Assign op="+=" @6:14
@@ -100,11 +100,11 @@ Program @1:1
   VarDecl @8:1
     Declarator name="h" @8:5
       Type String @8:7
-      Binary op="+" @8:17
-        Call @8:17
-          Member name="toString" @8:17
-            Member name="x" @8:17
-              Binary op="as" @8:17
+      Binary op="+" @8:16
+        Call @8:16
+          Member name="toString" @8:16
+            Member name="x" @8:16
+              Binary op="as" @8:16
                 Name text="e" @8:17
                 Name text="Object" @8:22
         Unary op="typeof" @8:45

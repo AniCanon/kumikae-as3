@@ -66,13 +66,35 @@ with tempfile.TemporaryDirectory() as folder:
     check("unreadable plus bad", result.returncode == 2 and "cannot read" in result.stderr and
           ": error: " in result.stderr, repr(result.stderr))
 
-    # A long expression must print without exhausting the stack.
+    # A long expression must print without exhausting the stack, and one past the cap is an error.
     deep = os.path.join(folder, "Deep.as")
     with open(deep, "w") as handle:
-        handle.write("var x:int = 1" + "+1" * 4000 + ";\n")
+        handle.write("var x:int = 1" + "+1" * 400 + ";\n")
     result = run("parse", "--dump-ast", deep)
-    check("long sum prints", result.returncode == 0 and result.stdout.count("NumberLit") == 4001,
+    check("long sum prints", result.returncode == 0 and result.stdout.count("NumberLit") == 401,
           "%d %d" % (result.returncode, result.stdout.count("NumberLit")))
+    with open(deep, "w") as handle:
+        handle.write("var x:int = 1" + "+1" * 100000 + ";\n")
+    result = run("parse", "--dump-ast", deep)
+    check("too long sum", result.returncode == 1 and result.stderr.count("expression is too long") == 1,
+          "%d %r" % (result.returncode, result.stderr[:200]))
+
+    # Shapes that once crashed: each must exit 1 with a diagnostic, never die on a signal.
+    crashers = {
+        "new chain": "x = " + "new " * 50000 + "A;",
+        "at chain": "x = " + "@" * 300000 + "a;",
+        "nested functions": "var f:Function = " + "function():* { return 1" + "+1" * 300 + "+ " * 0 +
+                            ";};" * 0 + "",
+    }
+    nested = "1" + "+1" * 400
+    for _ in range(60):
+        nested = "function():* { return " + nested + "+1" + "+1" * 400 + "; }"
+    crashers["nested functions"] = "var f:Function = " + nested + ";"
+    for name, text in crashers.items():
+        with open(deep, "w") as handle:
+            handle.write(text + "\n")
+        result = run("parse", "--dump-ast", deep)
+        check(name, result.returncode == 1 and ": error: " in result.stderr, "exit %d" % result.returncode)
 
 for failure in failures:
     print("FAIL " + failure)

@@ -25,8 +25,12 @@ class Parser {
 public:
 	// Recursion is capped at this many nested constructs.
 	static const int MAX_DEPTH = 256;
-	// Trees built in a loop (operator chains, member and call chains) are capped at this height.
-	static const uint32_t MAX_HEIGHT = 4096;
+	// No syntax tree is taller than about this, so later passes may recurse over it safely.
+	static const uint32_t MAX_HEIGHT = 512;
+	// Chains built in a loop (operators, members, calls) stop growing here, leaving room for what encloses them.
+	static const uint32_t MAX_CHAIN = 448;
+	// `Vector.<Vector.<...>>` may nest this far.
+	static const int MAX_TYPE_DEPTH = 32;
 
 	Parser(const Source &p_source, Arena &p_arena, Diagnostics &p_diagnostics);
 
@@ -46,10 +50,18 @@ private:
 	uint32_t previous_end_ = 0; // Where the last consumed token ended.
 
 	int depth_ = 0;
+	int type_depth_ = 0;
 	bool too_deep_reported_ = false;
 	bool too_long_reported_ = false;
 	bool aborted_ = false; // Nesting ran past the cap: the rest of the file is not parsed.
 	uint32_t last_height_ = 1; // Height of the expression most recently returned.
+
+	uint32_t statement_depth_ = 0; // Statements enclosing the current position, within the current function.
+	uint32_t body_height_ = 0; // Tallest thing seen so far in the current function body.
+	uint32_t function_height_ = 1; // Height of the function most recently parsed.
+	int brace_depth_ = 0; // `{` consumed and not yet closed.
+	bool eof_error_ = false; // An error at the end of the file was reported; the rest would follow from it.
+	bool ended_in_lexer_error_ = false; // The last token before the end was one the lexer rejected.
 
 	bool panic_ = false; // An error was reported; the enclosing list should resynchronise.
 	bool has_error_offset_ = false;
@@ -66,6 +78,11 @@ private:
 	bool at_word(std::string_view p_word) const;
 	bool accept(TokenKind p_kind);
 	Token expect(TokenKind p_kind, const char *p_what);
+	void expect_close(TokenKind p_kind, const Token &p_opener);
+	bool at_modifier_word() const;
+	void abort_too_deep();
+	bool grow(uint32_t p_height);
+	void note_height();
 	std::string_view text(const Token &p_token) const { return lexer_.text(p_token); }
 	std::string describe(const Token &p_token) const;
 	void error_at(uint32_t p_offset, std::string p_message, bool p_panic = true);
@@ -73,7 +90,7 @@ private:
 	bool enter();
 	void leave() { depth_--; }
 	void report_too_long(uint32_t p_offset);
-	void synchronize();
+	void synchronize(int p_level);
 	void skip_to_statement_end();
 	void skip_xml();
 	void note_current();
@@ -116,7 +133,7 @@ private:
 	TypeRef *parse_type();
 	void expect_type_close();
 	std::string_view parse_property_name(const char *p_what);
-	List<std::string_view> parse_dotted_name(const char *p_what, bool *r_wildcard);
+	List<std::string_view> parse_dotted_name(const char *p_what, bool *r_wildcard, List<uint32_t> *r_offsets);
 
 	// ---- statements (parser_stmt.cpp) ----
 	Stmt *parse_statement();

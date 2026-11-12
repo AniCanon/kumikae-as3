@@ -179,6 +179,13 @@ static void nested_type_arguments() {
 	NO_ERRORS(nested);
 	CHECK(has(nested.tree, "Type Vector.<int>"));
 	NO_ERRORS(expr("new Vector.<Vector.<Vector.<int>>>()"));
+	std::string deep_type = "new ";
+	for (int i = 0; i < 200; i++) {
+		deep_type += "Vector.<";
+	}
+	Parsed too_deep_type = expr(deep_type + "int" + std::string(200, '>') + "()");
+	CHECK_EQ(count(too_deep_type.errors, "error:"), 1);
+	CHECK_EQ(count(too_deep_type.errors, "code is nested too deeply"), 1);
 	NO_ERRORS(expr("x = new Vector.<Vector.<int>>= y")); // `>>=` closes two lists and leaves `=`
 	CHECK_EQ(expr("a >> b").tree, std::string("Binary op=\">>\"\n  Name text=\"a\"\n  Name text=\"b\"\n"));
 	CHECK_EQ(expr("a >>> b").tree, std::string("Binary op=\">>>\"\n  Name text=\"a\"\n  Name text=\"b\"\n"));
@@ -236,8 +243,12 @@ static void postfix_needs_same_line() {
 
 static void expression_errors() {
 	CHECK_EQ(expr("1 +").errors, std::string("t.as:1:4: error: expected an expression but found end of file\n"));
-	CHECK_EQ(expr("(1 + 2").errors, std::string("t.as:1:7: error: expected ')' but found end of file\n"));
-	CHECK_EQ(expr("f(1, 2").errors, std::string("t.as:1:7: error: expected ')' but found end of file\n"));
+	CHECK_EQ(expr("(1 + 2").errors, std::string("t.as:1:1: error: '(' is never closed\n"));
+	CHECK_EQ(expr("f(1, 2").errors, std::string("t.as:1:2: error: '(' is never closed\n"));
+	CHECK_EQ(expr("a[1").errors, std::string("t.as:1:2: error: '[' is never closed\n"));
+	CHECK_EQ(expr("[1, 2").errors, std::string("t.as:1:1: error: '[' is never closed\n"));
+	CHECK_EQ(expr("{ a: 1").errors, std::string("t.as:1:1: error: '{' is never closed\n"));
+	CHECK_EQ(expr("(1 + 2 ]").errors, std::string("t.as:1:8: error: expected ')' but found ']'\n"));
 	CHECK_EQ(expr("a.").errors, std::string("t.as:1:3: error: expected a property name but found end of file\n"));
 	CHECK_EQ(expr("x = 12abc").errors, std::string("t.as:1:5: error: invalid number\n"));
 }
@@ -272,10 +283,132 @@ static void depth_and_length_caps() {
 	}
 	CHECK_EQ(count(expr(calls).errors, "expression is too long"), 1);
 	std::string fine = "1";
-	for (int i = 0; i < 4000; i++) {
+	for (int i = 0; i < 400; i++) {
 		fine += "+1";
 	}
 	NO_ERRORS(expr(fine));
+}
+
+static void deep_and_long_inputs_do_not_crash() {
+	// `new` and `@` used to recurse without counting.
+	std::string news;
+	for (int i = 0; i < 50000; i++) {
+		news += "new ";
+	}
+	Parsed chained_new = expr(news + "A");
+	CHECK_EQ(count(chained_new.errors, "code is nested too deeply"), 1);
+	CHECK_EQ(count(chained_new.errors, "error:"), 1);
+	Parsed chained_at = expr(std::string(300000, '@') + "a");
+	CHECK_EQ(count(chained_at.errors, "error:"), 1);
+	CHECK_EQ(count(chained_at.errors, "E4X"), 1);
+
+	// A long chain inside nested function bodies: the height of the whole tree is what must stay bounded.
+	std::string sum = "1";
+	for (int i = 0; i < 400; i++) {
+		sum += "+1";
+	}
+	std::string nested = sum;
+	for (int i = 0; i < 60; i++) {
+		nested = "function():* { return " + nested + "+" + sum + "; }";
+	}
+	Source source("t.as", "var f:Function = " + nested + ";");
+	Arena arena;
+	Diagnostics diagnostics;
+	Program *tree = parse(source, arena, diagnostics);
+	std::string printed = print_ast(tree, source);
+	size_t deepest = 0;
+	size_t line_start = 0;
+	while (line_start < printed.size()) {
+		size_t indent = printed.find_first_not_of(' ', line_start) - line_start;
+		deepest = indent > deepest ? indent : deepest;
+		line_start = printed.find('\n', line_start) + 1;
+	}
+	CHECK_EQ(deepest / 2 <= 600 ? (size_t)0 : deepest / 2, (size_t)0);
+	CHECK_EQ(count(diagnostics.format(source), "expression is too long"), 1);
+	CHECK(count(diagnostics.format(source), "error:") <= 2);
+
+	// Below the cap, nothing is reported.
+	NO_ERRORS(expr(sum));
+	NO_ERRORS(stmt("var g:Function = function():* { return function():* { return " + sum + "; }; };"));
+}
+
+static void ranges() {
+	// (a + b) * c
+	Source source("t.as", "(a + b) * c");
+	Arena arena;
+	Diagnostics diagnostics;
+	Expr *product = parse_expression_for_test(source, arena, diagnostics);
+	CHECK(product->kind == NodeKind::Binary);
+	CHECK_EQ(product->offset, 0u);
+	CHECK_EQ(product->end, 11u);
+	Expr *sum = static_cast<Binary *>(product)->left;
+	CHECK(sum->parenthesized);
+	CHECK_EQ(sum->offset, 0u);
+	CHECK_EQ(sum->end, 7u);
+	Expr *c = static_cast<Binary *>(product)->right;
+	CHECK(!c->parenthesized);
+	CHECK_EQ(c->offset, 10u);
+	CHECK_EQ(c->end, 11u);
+
+	//                     0         1         2         3         4         5         6
+	//                     0123456789012345678901234567890123456789012345678901234567890123456789
+	Source file("t.as", "[Tag(a=\"x\", 5)] public class Foo { function bar(p:int = 1):void { break out; } }");
+	Arena file_arena;
+	Diagnostics file_diagnostics;
+	Program *program = parse(file, file_arena, file_diagnostics);
+	CHECK_EQ(file_diagnostics.format(file), std::string(""));
+	ClassDecl *decl = static_cast<ClassDecl *>(program->definitions[0]);
+	CHECK_EQ(decl->offset, 0u);
+	CHECK_EQ(decl->name_offset, 29u);
+	CHECK_EQ(decl->end, (uint32_t)file.text().size());
+	CHECK_EQ(decl->metadata[0].offset, 0u);
+	CHECK_EQ(decl->metadata[0].end, 15u);
+	CHECK(decl->metadata[0].args[0].value_is_string);
+	CHECK(!decl->metadata[0].args[1].value_is_string);
+	FunctionDecl *bar = static_cast<FunctionDecl *>(decl->members[0]);
+	CHECK_EQ(bar->offset, 35u);
+	CHECK_EQ(bar->name_offset, 44u);
+	CHECK_EQ(bar->parameters[0].offset, 48u);
+	CHECK_EQ(bar->parameters[0].end, 57u);
+	Break *jump = static_cast<Break *>(bar->body->statements[0]);
+	CHECK_EQ(jump->label_offset, 72u);
+	CHECK_EQ(std::string(file.text().substr(jump->label_offset, 3)), std::string("out"));
+
+	Source typed("t.as", "var v:flash.utils.Dictionary = null, w:int;");
+	Arena typed_arena;
+	Diagnostics typed_diagnostics;
+	Program *typed_program = parse(typed, typed_arena, typed_diagnostics);
+	VarDecl *variable = static_cast<VarDecl *>(typed_program->definitions[0]);
+	CHECK_EQ(variable->declarators[0].offset, 4u);
+	CHECK_EQ(variable->declarators[0].end, 35u);
+	CHECK_EQ(variable->declarators[1].end, 42u);
+	TypeRef *type = variable->declarators[0].type;
+	CHECK_EQ(type->name_offsets.count, 3u);
+	CHECK_EQ(type->name_offsets[0], 6u);
+	CHECK_EQ(type->name_offsets[2], 18u);
+}
+
+static void member_level_recovery() {
+	// A bad metadata value is one mistake: no second error at the '['.
+	Parsed tagged = program("class A {\n\t[A(z=!)] var d:int;\n\tvar e:int;\n}\n");
+	CHECK_EQ(count(tagged.errors, "error:"), 1);
+	CHECK(has(tagged.tree, "Declarator name=\"e\""));
+	// A member starting with a contextual modifier is a place to resume.
+	Parsed resumed = program("class A {\n\tprivate var x:int = 1 +;\n\toverride function g():void {}\n}\nclass B {}\n");
+	CHECK_EQ(count(resumed.errors, "error:"), 1);
+	CHECK(has(resumed.tree, "FunctionDecl name=\"g\""));
+	CHECK(has(resumed.tree, "ClassDecl name=\"B\""));
+	// A mistake inside a method body must not disturb the members and classes after it.
+	Parsed body = program("class A {\n\tfunction f():void { o = {,}; }\n\tfunction g():void {}\n}\nclass B {}\n");
+	CHECK_EQ(count(body.errors, "error:"), 1);
+	CHECK(has(body.tree, "FunctionDecl name=\"g\""));
+	CHECK(has(body.tree, "ClassDecl name=\"B\""));
+	Parsed misspelt = program("class A {\n\tpublic funtion f():void { a(); }\n\tpublic function g():void {}\n}\n");
+	CHECK_EQ(count(misspelt.errors, "error:"), 1);
+	CHECK(has(misspelt.tree, "FunctionDecl name=\"g\""));
+	CHECK_EQ(program("class A {\n\tfunction f():void {\n\t\tg();\n").errors,
+			std::string("t.as:2:20: error: '{' is never closed\n"));
+	CHECK_EQ(program("[Meta(").errors, std::string("t.as:1:6: error: '(' is never closed\n"));
 }
 
 static void unsupported_in_expressions() {
@@ -447,7 +580,22 @@ static void statement_errors_and_recovery() {
 	CHECK(has(recovered.errors, "t.as:1:"));
 	CHECK(has(recovered.errors, "t.as:3:"));
 	CHECK(has(recovered.tree, "Name text=\"ok\""));
-	CHECK_EQ(stmt("{ a();").errors, std::string("t.as:1:7: error: expected '}' but found end of file\n"));
+	CHECK_EQ(stmt("{ a();").errors, std::string("t.as:1:1: error: '{' is never closed\n"));
+	// Only the innermost unclosed construct is reported; the rest follow from it.
+	CHECK_EQ(stmt("{ if (a) { f(1, ").errors, std::string("t.as:1:13: error: '(' is never closed\n"));
+	CHECK_EQ(stmt("{ try {").errors, std::string("t.as:1:7: error: '{' is never closed\n"));
+	CHECK_EQ(stmt("{ var s = \"abc").errors, std::string("t.as:1:11: error: unterminated string\n"));
+	CHECK_EQ(stmt("{ a(); /* x").errors, std::string("t.as:1:8: error: unterminated comment\n"));
+	// One mistake inside nested braces must not end the enclosing block early.
+	Parsed literal = stmt("{ o = {,}; ok(); }");
+	CHECK_EQ(count(literal.errors, "error:"), 1);
+	CHECK(has(literal.tree, "Name text=\"ok\""));
+	Parsed header = stmt("{ for (;;;) { a(); } ok(); }");
+	CHECK_EQ(count(header.errors, "error:"), 1);
+	CHECK(has(header.tree, "Name text=\"ok\""));
+	Parsed fields = stmt("{ o = {a:1 b:2}; ok(); }");
+	CHECK_EQ(count(fields.errors, "error:"), 1);
+	CHECK(has(fields.tree, "Name text=\"ok\""));
 	CHECK_EQ(stmt("{ var s = \"abc\nvar t = 1; }").errors, std::string("t.as:1:11: error: unterminated string\n"));
 }
 
@@ -700,6 +848,7 @@ int main() {
 	modifier_errors();
 	top_level_errors();
 	unsupported_definitions();
+	member_level_recovery();
 	whole_program_never_crashes();
 	corpus_parses_cleanly();
 	every_prefix_of_the_corpus_parses();
@@ -713,6 +862,8 @@ int main() {
 	postfix_needs_same_line();
 	expression_errors();
 	depth_and_length_caps();
+	deep_and_long_inputs_do_not_crash();
+	ranges();
 	unsupported_in_expressions();
 	var_forms();
 	if_else_chain();

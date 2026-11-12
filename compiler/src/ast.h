@@ -42,7 +42,9 @@ struct Node {
 	uint32_t end = 0;
 };
 
-struct Expr : Node {};
+struct Expr : Node {
+	bool parenthesized = false; // Written inside parentheses; the range includes them.
+};
 struct Stmt : Node {};
 
 // ---- types ----
@@ -52,6 +54,7 @@ struct TypeRef : Node {
 	enum Form : uint8_t { Any, Void, Named, Applied }; // `*`, `void`, `a.b.C`, `Vector.<T>`
 	Form form = Any;
 	List<std::string_view> name; // Dotted parts, for Named and Applied.
+	List<uint32_t> name_offsets; // Where each part starts.
 	TypeRef *argument = nullptr; // For Applied.
 };
 
@@ -60,11 +63,13 @@ struct TypeRef : Node {
 struct MetadataArg {
 	std::string_view key; // Empty if positional.
 	std::string_view value;
+	bool value_is_string = false; // Written in quotes.
 };
 struct Metadata {
 	std::string_view name;
 	List<MetadataArg> args;
 	uint32_t offset = 0;
+	uint32_t end = 0;
 };
 
 struct Modifiers {
@@ -86,7 +91,8 @@ struct Declarator {
 	std::string_view name;
 	TypeRef *type = nullptr;
 	Expr *initializer = nullptr;
-	uint32_t offset = 0;
+	uint32_t offset = 0; // Of the name.
+	uint32_t end = 0;
 };
 struct VarDecl : Node {
 	static const NodeKind KIND = NodeKind::VarDecl;
@@ -102,6 +108,7 @@ struct Parameter {
 	Expr *default_value = nullptr;
 	bool is_rest = false;
 	uint32_t offset = 0;
+	uint32_t end = 0;
 };
 struct Block;
 struct FunctionDecl : Node {
@@ -109,6 +116,7 @@ struct FunctionDecl : Node {
 	enum Accessor : uint8_t { None, Getter, Setter };
 	Accessor accessor = None;
 	std::string_view name; // Empty for an anonymous function expression.
+	uint32_t name_offset = 0;
 	Modifiers modifiers;
 	List<Metadata> metadata;
 	List<Parameter> parameters;
@@ -156,6 +164,7 @@ struct ObjectField {
 	bool key_is_string = false;
 	Expr *value = nullptr;
 	uint32_t offset = 0;
+	uint32_t end = 0;
 };
 struct ObjectLit : Expr {
 	static const NodeKind KIND = NodeKind::ObjectLit;
@@ -278,6 +287,7 @@ struct SwitchCase {
 	bool is_default = false;
 	List<Stmt *> body;
 	uint32_t offset = 0;
+	uint32_t end = 0;
 };
 struct Switch : Stmt {
 	static const NodeKind KIND = NodeKind::Switch;
@@ -287,10 +297,12 @@ struct Switch : Stmt {
 struct Break : Stmt {
 	static const NodeKind KIND = NodeKind::Break;
 	std::string_view label; // Empty when absent.
+	uint32_t label_offset = 0;
 };
 struct Continue : Stmt {
 	static const NodeKind KIND = NodeKind::Continue;
 	std::string_view label;
+	uint32_t label_offset = 0;
 };
 struct Return : Stmt {
 	static const NodeKind KIND = NodeKind::Return;
@@ -305,6 +317,7 @@ struct CatchClause {
 	TypeRef *type = nullptr;
 	Block *body = nullptr;
 	uint32_t offset = 0;
+	uint32_t end = 0;
 };
 struct Try : Stmt {
 	static const NodeKind KIND = NodeKind::Try;
@@ -332,6 +345,7 @@ struct ImportStmt : Stmt { // An import inside a function body.
 struct ClassDecl : Node {
 	static const NodeKind KIND = NodeKind::ClassDecl;
 	std::string_view name;
+	uint32_t name_offset = 0;
 	Modifiers modifiers;
 	List<Metadata> metadata;
 	TypeRef *extends = nullptr;
@@ -341,6 +355,7 @@ struct ClassDecl : Node {
 struct InterfaceDecl : Node {
 	static const NodeKind KIND = NodeKind::InterfaceDecl;
 	std::string_view name;
+	uint32_t name_offset = 0;
 	Modifiers modifiers;
 	List<Metadata> metadata;
 	List<TypeRef *> extends;
@@ -349,6 +364,7 @@ struct InterfaceDecl : Node {
 struct Import : Node { // `import a.b.C;` or `import a.b.*;`
 	static const NodeKind KIND = NodeKind::Import;
 	List<std::string_view> name;
+	List<uint32_t> name_offsets;
 	bool wildcard = false;
 };
 struct PackageDecl : Node {
