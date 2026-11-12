@@ -5,6 +5,14 @@
 // (c) 2007-2014 Juan Linietsky, Ariel Manzur; MIT licence. See compiler/godot/NOTICE.md.
 package godot {
 	[GodotEnum(name="Axis", values="AXIS_X,AXIS_Y")]
+	[Operator(op="-", returns="Vector2")]
+	[Operator(op="+", right="Vector2", returns="Vector2")]
+	[Operator(op="*", right="Number", returns="Vector2")]
+	[Operator(op="*", right="int", returns="Vector2")]
+	[Operator(op="<", right="Vector2", returns="Boolean")]
+	[Operator(op="*", left="int", returns="Vector2")]
+	[Operator(op="*", left="Number", returns="Vector2")]
+	[Indexed(element="Number")]
 	public final native class Vector2 {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -22,13 +30,20 @@ package godot {
 		public native function emit(...rest):void;
 		public native function getObjectId():Number;
 	}
+	[Indexed(element="*")]
 	public final native class GodotArray {
 		public native function GodotArray();
 		public native function size():int;
 	}
+	[Indexed(element="*", keyed="true")]
 	public final native class GodotDictionary {
 		public native function GodotDictionary();
 		public native function isEmpty():Boolean;
+	}
+	[Indexed(element="Number")]
+	public final native class PackedInt64Array {
+		public native function PackedInt64Array();
+		public native function get(index:int):Number;
 	}
 	[GodotEnum(name="ConnectFlags", values="CONNECT_DEFERRED,CONNECT_ONE_SHOT")]
 	public native class GodotObject {

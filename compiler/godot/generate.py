@@ -98,6 +98,13 @@ WIDTHS = {
     ("PackedInt64Array", "erase"): _INT64_ELEMENT,
 }
 
+# Godot's operators that AS3 writes the same way. A unary one is described as "unary-".
+OPERATORS = {"+", "-", "*", "/", "%", "<", ">", "<=", ">="}
+UNARY = {"unary-": "-", "unary+": "+"}
+# Operators that are not recorded: every type has == and !=, and AS3 has no such operator on these types
+# for the rest (the bitwise ones exist only on Godot's int).
+OPERATORS_LEFT_OUT = {"==", "!=", "not", "in", "and", "or", "xor", "**", "~", "<<", ">>", "&", "|", "^"}
+
 NUMBER = re.compile(r"-?\d+(\.\d+)?(e[-+]?\d+)?$")
 NAME = re.compile(r"[A-Za-z_]\w*$")
 NUMERIC = {"int", "uint", "Number"}
@@ -146,6 +153,14 @@ class Generator:
         self.defined = set()
         self.names = {}  # Godot class name -> {AS3 member name: what it is}
         self.left_out = []  # Members with raw pointers.
+        # Operators whose left operand is a number (`2 * v`), by the class of the right operand.
+        self.number_on_left = {}
+        for entry in api["builtin_classes"]:
+            if entry["name"] in ("int", "float"):
+                for operator in entry.get("operators", []):
+                    if operator["name"] in OPERATORS and operator.get("right_type") in self.builtins:
+                        self.number_on_left.setdefault(operator["right_type"], []).append(
+                            (operator["name"], entry["name"], operator["return_type"]))
         self.used_widths = set()
         # Every enum, by the name type strings use, with whether it needs more than 32 bits.
         self.enums = {}
@@ -433,6 +448,40 @@ class Generator:
             written.append(text)
         return "public native function %s(%s);" % (as3_name, ", ".join(written))
 
+    def operand(self, name):
+        """How an operator's operand or result type is written in a tag, or None if AS3 has no such operand."""
+        if name in ("int", "float", "bool"):
+            return AS3_STANDS_FOR[name]
+        return naming.class_name(name) if name in self.builtins else None
+
+    def operator_lines(self, entry):
+        owner = entry["name"]
+        lines = []
+        for operator in entry.get("operators", []):
+            name = operator["name"]
+            if name in OPERATORS_LEFT_OUT:
+                continue
+            returns = self.operand(operator["return_type"])
+            if name in UNARY:
+                if returns:
+                    lines.append('\t[Operator(op="%s", returns="%s")]' % (UNARY[name], returns))
+                continue
+            if name not in OPERATORS:
+                raise Refused("%s: unknown operator '%s'" % (owner, name))
+            right = self.operand(operator.get("right_type"))
+            if right and returns:
+                lines.append('\t[Operator(op="%s", right="%s", returns="%s")]' % (name, right, returns))
+        for name, left, result in self.number_on_left.get(owner, []):
+            returns = self.operand(result)
+            if returns:
+                lines.append('\t[Operator(op="%s", left="%s", returns="%s")]' % (name, self.operand(left), returns))
+        if entry.get("indexing_return_type"):
+            element = self.type(entry["indexing_return_type"], None, owner + " indexing")[0]
+            if element == "int":
+                element = WIDTHS.get((owner, "get"), {}).get("return", element)
+            lines.append('\t[Indexed(element="%s"%s)]' % (element, ', keyed="true"' if entry["is_keyed"] else ""))
+        return lines
+
     def builtin_class(self, entry):
         owner = entry["name"]
         as3_name = naming.class_name(owner)
@@ -453,6 +502,7 @@ class Generator:
                                      method["is_vararg"], "static " if method["is_static"] else "",
                                      (owner, method["name"])))
         self.lines.extend(self.enum_lines(entry))
+        self.lines.extend(self.operator_lines(entry))
         self.block("public final native class %s" % as3_name, out)
 
     def global_enum(self, entry):

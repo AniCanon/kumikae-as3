@@ -194,7 +194,45 @@
   {
    "name": "int",
    "is_keyed": false,
-   "operators": [],
+   "operators": [
+    {
+     "name": "*",
+     "right_type": "Vector2",
+     "return_type": "Vector2"
+    },
+    {
+     "name": "&",
+     "right_type": "int",
+     "return_type": "int"
+    }
+   ],
+   "constructors": [
+    {
+     "index": 0
+    }
+   ],
+   "has_destructor": false
+  },
+  {
+   "name": "float",
+   "is_keyed": false,
+   "operators": [
+    {
+     "name": "*",
+     "right_type": "Vector2",
+     "return_type": "Vector2"
+    },
+    {
+     "name": "*",
+     "right_type": "float",
+     "return_type": "float"
+    },
+    {
+     "name": "in",
+     "right_type": "Dictionary",
+     "return_type": "bool"
+    }
+   ],
    "constructors": [
     {
      "index": 0
@@ -205,7 +243,13 @@
   {
    "name": "String",
    "is_keyed": false,
-   "operators": [],
+   "operators": [
+    {
+     "name": "%",
+     "right_type": "Vector2",
+     "return_type": "String"
+    }
+   ],
    "methods": [
     {
      "name": "to_upper",
@@ -277,8 +321,47 @@
    ],
    "operators": [
     {
+     "name": "==",
+     "right_type": "Variant",
+     "return_type": "bool"
+    },
+    {
+     "name": "unary-",
+     "return_type": "Vector2"
+    },
+    {
      "name": "+",
      "right_type": "Vector2",
+     "return_type": "Vector2"
+    },
+    {
+     "name": "*",
+     "right_type": "float",
+     "return_type": "Vector2"
+    },
+    {
+     "name": "*",
+     "right_type": "int",
+     "return_type": "Vector2"
+    },
+    {
+     "name": "<",
+     "right_type": "Vector2",
+     "return_type": "bool"
+    },
+    {
+     "name": "in",
+     "right_type": "Dictionary",
+     "return_type": "bool"
+    },
+    {
+     "name": "**",
+     "right_type": "int",
+     "return_type": "Vector2"
+    },
+    {
+     "name": "*",
+     "right_type": "Callable",
      "return_type": "Vector2"
     }
    ],
@@ -444,6 +527,35 @@
      "is_const": true,
      "is_static": false,
      "hash": 1
+    }
+   ],
+   "constructors": [
+    {
+     "index": 0
+    }
+   ],
+   "has_destructor": true,
+   "indexing_return_type": "Variant"
+  },
+  {
+   "name": "PackedInt64Array",
+   "indexing_return_type": "int",
+   "is_keyed": false,
+   "operators": [],
+   "methods": [
+    {
+     "name": "get",
+     "return_type": "int",
+     "is_vararg": false,
+     "is_const": true,
+     "is_static": false,
+     "hash": 1,
+     "arguments": [
+      {
+       "name": "index",
+       "type": "int"
+      }
+     ]
     }
    ],
    "constructors": [

@@ -240,6 +240,49 @@ class Fixture(unittest.TestCase):
         # _to_string with it, so neither of Godot's two methods is declared.
         self.assertFalse([line for line in self.members("GodotObject") if "toString" in line])
 
+    def tags(self, class_name):
+        """The tag lines written before a class."""
+        lines = self.text.split("\n")
+        at = [i for i, line in enumerate(lines) if (" class %s " % class_name) in line + " "][0]
+        result = []
+        while lines[at - 1].startswith("\t["):
+            at -= 1
+            result.insert(0, lines[at].strip())
+        return result
+
+    def test_operators(self):
+        tags = self.tags("Vector2")
+        self.assertIn('[Operator(op="+", right="Vector2", returns="Vector2")]', tags)
+        self.assertIn('[Operator(op="*", right="Number", returns="Vector2")]', tags)
+        self.assertIn('[Operator(op="*", right="int", returns="Vector2")]', tags)
+        self.assertIn('[Operator(op="<", right="Vector2", returns="Boolean")]', tags)
+        self.assertIn('[Operator(op="-", returns="Vector2")]', tags)
+
+    def test_operators_with_a_number_on_the_left(self):
+        tags = self.tags("Vector2")
+        self.assertIn('[Operator(op="*", left="Number", returns="Vector2")]', tags)
+        self.assertIn('[Operator(op="*", left="int", returns="Vector2")]', tags)
+
+    def test_operators_as3_does_not_have_are_left_out(self):
+        operators = [line for line in self.text.split("\n") if "[Operator(" in line]
+        self.assertEqual(len(operators), 7)
+        for line in operators:
+            self.assertNotIn('"=="', line)
+            self.assertNotIn('"in"', line)
+            self.assertNotIn('"**"', line)
+            self.assertNotIn('"&"', line)
+            self.assertNotIn("String", line)
+            self.assertNotIn("Function", line)
+
+    def test_indexing(self):
+        self.assertIn('[Indexed(element="Number")]', self.tags("Vector2"))
+        self.assertIn('[Indexed(element="*")]', self.tags("GodotArray"))
+        self.assertIn('[Indexed(element="*", keyed="true")]', self.tags("GodotDictionary"))
+        self.assertEqual([tag for tag in self.tags("Signal") if "Indexed" in tag], [])
+
+    def test_indexing_a_wide_integer(self):
+        self.assertIn('[Indexed(element="Number")]', self.tags("PackedInt64Array"))
+
     def test_global_constants_are_left_out(self):
         self.assertNotIn("INT32_MAX", self.text)
 
@@ -339,6 +382,12 @@ class Refusals(unittest.TestCase):
         api["classes"][0]["methods"].append({"name": "free", "is_const": False, "is_vararg": False,
                                              "is_static": False, "is_virtual": False, "hash": 1})
         self.refuses(api, "Object: 'free' names both")
+
+    def test_unknown_operator(self):
+        api = fixture()
+        [c for c in api["builtin_classes"] if c["name"] == "Vector2"][0]["operators"].append(
+            {"name": "<=>", "right_type": "Vector2", "return_type": "int"})
+        self.refuses(api, "Vector2: unknown operator '<=>'")
 
     def test_unknown_default(self):
         api = fixture()
