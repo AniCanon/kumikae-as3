@@ -314,6 +314,63 @@ class Typer {
 		}
 	}
 
+	// Reports a write to something that can't be written: `x = ...`, `x += ...`, `x++`.
+	void written(Expr *p_target) {
+		if (!p_target) {
+			return;
+		}
+		Symbol *symbol = nullptr;
+		uint32_t offset = p_target->offset;
+		bool own_object = true; // Named bare or through `this`.
+		if (p_target->kind == NodeKind::Name) {
+			symbol = static_cast<Name *>(p_target)->symbol;
+		} else if (p_target->kind == NodeKind::Member) {
+			Member *member = static_cast<Member *>(p_target);
+			symbol = member->symbol ? member->symbol : member->member;
+			offset = member->name_offset;
+			own_object = member->object && member->object->kind == NodeKind::ThisExpr;
+		}
+		if (!symbol) {
+			return;
+		}
+		std::string name = quoted(symbol->name);
+		switch (symbol->kind) {
+			case SymbolKind::Field:
+			case SymbolKind::Variable:
+			case SymbolKind::Local: {
+				if (!symbol->is_const) {
+					break;
+				}
+				// An instance constant gets its value in the constructor of its own class.
+				bool constructing = symbol->kind == SymbolKind::Field && !symbol->is_static() && own_object &&
+						closures_ == 0 && class_ == symbol->owner && class_->klass->constructor &&
+						class_->klass->constructor->node == current_;
+				if (!constructing) {
+					error(offset, "can't assign to the constant " + name);
+				}
+			} break;
+			case SymbolKind::Property:
+				// The setter may be in a base class that did not resolve, or in another interface.
+				if (symbol->getter && !symbol->setter && symbol->owner && symbol->owner->kind == SymbolKind::Class &&
+						!compilation_.hierarchy_broken(symbol->owner)) {
+					error(offset, name + " is read-only");
+				}
+				break;
+			case SymbolKind::Method:
+				error(offset, "can't assign to the method " + name);
+				break;
+			case SymbolKind::Function:
+				error(offset, "can't assign to the function " + name);
+				break;
+			case SymbolKind::Class:
+			case SymbolKind::Interface:
+				error(offset, "can't assign to the class " + name);
+				break;
+			default:
+				break;
+		}
+	}
+
 	// ---- symbols ----
 
 	const Type *symbol_type(Symbol *p_symbol, const Type *p_element) {
@@ -670,6 +727,7 @@ class Typer {
 				return primitive(operand) ? int_ : unknown_;
 			case TokenKind::PlusPlus:
 			case TokenKind::MinusMinus:
+				written(p_unary->operand);
 				return numeric(operand) ? operand : (primitive(operand) ? number_ : unknown_);
 			case TokenKind::Minus:
 				if (p_unary->operand && p_unary->operand->kind == NodeKind::NumberLit) {
@@ -854,6 +912,7 @@ class Typer {
 				return unary(static_cast<Unary *>(p_expression));
 			case NodeKind::Postfix: {
 				const Type *operand = expression(static_cast<Postfix *>(p_expression)->operand);
+				written(static_cast<Postfix *>(p_expression)->operand);
 				return numeric(operand) ? operand : (primitive(operand) ? number_ : unknown_);
 			}
 			case NodeKind::Binary:
@@ -862,6 +921,7 @@ class Typer {
 				Assign *assign = static_cast<Assign *>(p_expression);
 				const Type *target = expression(assign->target);
 				const Type *value = expression(assign->value);
+				written(assign->target);
 				if (assign->op == TokenKind::Assign) {
 					store(assign->value, target);
 				}

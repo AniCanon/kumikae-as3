@@ -295,7 +295,50 @@ static void test_interfaces() {
 	CHECK_EQ(compilation.format_diagnostics(), std::string());
 }
 
+static void test_constants() {
+	const std::string members = "public const LIMIT:int = 3; public static const MAX:int = 9; public var free:int;\n"
+								"public function get size():int { return 0; } public function get both():int { return 0; }\n"
+								"public function set both(v:int):void {} public function set only(v:int):void {}\n"
+								"public function method():void {} public static function make():void {}\n";
+	expect(program("free = 1; both = 2; only = 3; this.both++; count += 1; var a:int = LIMIT + MAX + size; list.length = 0;\n"
+				   "const local:int = 1; var b:int = local; ints.length = 3; any.LIMIT = 1; obj.size = 2; ints[0]++;",
+				   members),
+			{});
+	expect(program("/*!*/LIMIT = 1; this./*!*/LIMIT = 2; /*!*/MAX += 1; Main./*!*/MAX = 3; /*!*/LIMIT++; --/*!*/MAX;\n"
+				   "const local:int = 1; /*!*/local = 2; /*!*/local -= 1; /*!*/size = 4; this./*!*/size += 1; base2./*!*/size = 1;\n"
+				   "/*!*/method = null; this./*!*/method = fn; Main./*!*/make = null; /*!*/helper = null; /*!*/Main = null;\n"
+				   "/*!*/Shape = null; /*!*/PACKAGE_LIMIT = 2; label./*!*/length = 1; /*!*/size++;",
+				   members + "public var base2:Main;", "function helper():void {} const PACKAGE_LIMIT:int = 1;\n"),
+			{ "can't assign to the constant 'LIMIT'", "can't assign to the constant 'LIMIT'",
+					"can't assign to the constant 'MAX'", "can't assign to the constant 'MAX'",
+					"can't assign to the constant 'LIMIT'", "can't assign to the constant 'MAX'",
+					"can't assign to the constant 'local'", "can't assign to the constant 'local'", "'size' is read-only",
+					"'size' is read-only", "'size' is read-only", "can't assign to the method 'method'",
+					"can't assign to the method 'method'", "can't assign to the method 'make'",
+					"can't assign to the function 'helper'", "can't assign to the class 'Main'",
+					"can't assign to the class 'Shape'", "can't assign to the constant 'PACKAGE_LIMIT'",
+					"'length' is read-only", "'size' is read-only" });
+	// An instance constant may be given its value in the constructor of its own class, and nowhere else.
+	expect("package { public class Main { public const LIMIT:int; public static const MAX:int = 1;\n"
+		   "public function Main(other:Main) { LIMIT = 1; this.LIMIT = 2; /*!*/MAX = 3; other./*!*/LIMIT = 4;\n"
+		   "var f:Function = function():void { /*!*/LIMIT = 5; }; } } }\n"
+		   "class Sub extends Main { public function Sub() { super(null); /*!*/LIMIT = 6; } }\n",
+			{ "can't assign to the constant 'MAX'", "can't assign to the constant 'LIMIT'",
+					"can't assign to the constant 'LIMIT'", "can't assign to the constant 'LIMIT'" });
+	// A property whose other half may be in a base that did not resolve, or in an interface, is left alone.
+	expect("package { public class Main extends /*!*/Gone { public function get size():int { return 0; }\n"
+		   "public function f(s:Sized):void { size = 1; s.width = 2; } } }\n"
+		   "interface Sized { function get width():int; }\n",
+			{ "unknown type 'Gone'" });
+	// A setter inherited beside a getter declared here.
+	expect("package { public class Main extends Base { override public function get size():int { return 0; }\n"
+		   "public function f():void { size = 1; } } }\n"
+		   "class Base { public function get size():int { return 0; } public function set size(v:int):void {} }\n",
+			{});
+}
+
 int main() {
+	test_constants();
 	test_override_signatures();
 	test_interfaces();
 	test_returns();
