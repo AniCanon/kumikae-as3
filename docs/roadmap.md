@@ -13,9 +13,9 @@ on its math types, and reports its errors to an editor through a language server
 complete. The language server's first slice is built and passes its tests; it works in VS Code and is
 not yet tried in Rider.
 
-**Stage 2 has started.** Its first slice runs AS3 on the command line: `kas3c run` executes classes,
-inheritance, numbers, strings and loops through the typed IR and the interpreter. It is built, reviewed and
-fixed. Godot is the next slice.
+**Stage 2 is under way.** `kas3c run` executes AS3 on the command line (classes, inheritance, numbers,
+strings, loops), and a first AS3 script attached to a `CharacterBody2D` moves the body in headless Godot
+4.7.2. Signals, `Input`, operators on Godot's values and the rest of the language come next.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -96,7 +96,9 @@ properties, signals and hot reload.
 | Slice | Delivers | Done when | Status |
 |---|---|---|---|
 | 2a. Interpreter core | The typed IR, the interpreter, `kas3c run`, and the start of the conformance suite | A class with fields, methods, inheritance, numbers, strings and loops runs and traces the right output. | Done |
-| 2b. In Godot | The extension: a `.as` file is a script; engine calls in both directions; generated bindings | An AS3 script on a `CharacterBody2D` moves a character, in headless Godot 4.7.2. | Next |
+| 2b-1. In Godot, first slice | The extension: a `.as` file is a script; Godot calls its methods; it reads and writes properties, calls methods and makes `Vector2`s | An AS3 script on a `CharacterBody2D` moves the body, in headless Godot 4.7.2. | Built |
+| 2b-2. What stage 1 promised | Signals (`add`, `addOnce`, `remove`, `has`, `emit`), `toString`, real defaults, `object[name]`, collections crossing the boundary, the other value types and their operators | Each promise has a test in Godot. | Next |
+| 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the 64-bit integer decision | The test programs that need no unsupported language feature run in Godot. | Planned |
 | 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library | The corpus programs run. | Planned |
 | 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game. | Planned |
 
@@ -145,21 +147,24 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What comes next: AS3 inside Godot (stage 2b)
+## What comes next: what stage 1 promised (stage 2b-2)
 
-**Goal:** an AS3 script on a `CharacterBody2D` moves a character, in headless Godot 4.7.2.
+**Goal:** everything the compiler already accepts about Godot also runs.
 
 | Step | What it does |
 |---|---|
-| 1. The extension | Godot loads a library that registers AS3 as a scripting language. |
-| 2. Scripts | A `.as` file attached to a node is compiled and gets an instance per node. |
-| 3. Calls in | `_ready` and `_physicsProcess` reach the interpreter. |
-| 4. Calls out | Generated bindings: `moveAndSlide()`, `position`, `Input`, and operators on `Vector2`. |
+| 1. Operators | `position + velocity * delta` runs as Godot's own operators. |
+| 2. Signals | `timer.timeout.add(f)`, `addOnce`, `remove`, `has`, `emit`; a method used as a listener. |
+| 3. Parts of values | `position.x = 5` writes the property back. |
+| 4. `toString`, real defaults, `object[name]` | The remaining promises in the [stage 2a plan](superpowers/plans/2026-11-12-stage-2a-interpreter-core.md). |
 
-It needs Godot's extension headers. A copy is on this machine from the speed spike; a fresh copy would be a
-download, which needs the owner's yes.
+Open items:
 
-Still open from the language server's first slice: Rider, a look by eye in VS Code, and Windows.
+- **A decision for the owner:** a 64-bit integer type for Godot's integers, or keep `Number`.
+- **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
+  are clean.
+- **Language server:** Rider is not yet tried (the plugin is installed); VS Code works but has not been
+  looked at by eye; Windows is not supported.
 
 ## Decisions made
 

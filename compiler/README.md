@@ -104,6 +104,78 @@ How it works:
 Differences from Flash so far: a string's `length` counts characters, not UTF-16 units, and strings compare
 by character.
 
+## Inside Godot
+
+`godot_ext/` is a GDExtension that registers ActionScript 3 as a Godot scripting language. A `.as` file is
+then a script: attach it to a node whose class it extends.
+
+It needs [godot-cpp](https://github.com/godotengine/godot-cpp) for Godot 4.7, which is not in this
+repository. Give CMake a checkout of it:
+
+```sh
+cmake -S compiler -B compiler/build-godot -DKAS3_GODOT_CPP=<path to godot-cpp>
+cmake --build compiler/build-godot --target kas3_godot
+```
+
+The library is written to `tests/godot_project/bin`, beside the project that tests it:
+
+```sh
+python3 compiler/tests/run_godot.py compiler/tests   # runs the project in headless Godot 4.7
+```
+
+To use it in a project of your own, copy `tests/godot_project/kas3.gdextension` and the `bin` folder into
+it.
+
+**What works so far (stage 2b-1):**
+
+```actionscript
+package {
+	import godot.*;
+
+	public class Player extends CharacterBody2D {
+		private var speed:Number = 200;
+		public var steps:int = 0;
+
+		override public function _physicsProcess(delta:Number):void {
+			velocity = new Vector2(speed, 0);
+			moveAndSlide();
+			steps++;
+		}
+	}
+}
+```
+
+- A script class extends a Godot class. Godot calls the virtual methods it overrides (`_physicsProcess` is
+  Godot's `_physics_process`), and any other method by its AS3 name, from GDScript too.
+- The script reads and writes the node's properties, calls its methods, and makes Godot values with `new`.
+- Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript can read a
+  script's fields.
+- An AS3 error inside a call from the engine is reported in Godot's own error output, with the AS3 stack
+  trace, and the engine carries on.
+
+**Refused by name until the next slices:** operators on Godot values (`position + offset`), singletons
+(`Input`), constants and static members of Godot classes, signals, `print` and the other global functions,
+changing one part of a value (`position.x = 5`), creating Godot objects with `new`, passing a script object
+to Godot, and everything `kas3c run` refuses.
+
+How it works:
+
+- **One program per project.** Every `.as` file under the project is compiled together when the first
+  script loads. A script that fails to compile is reported once, and no script loads.
+- **The interpreter does not know Godot.** `vm/host.h` is the whole boundary. The extension implements it
+  with Godot's own calls; the tests implement it with a recorder.
+- **Godot's names come from Godot.** `godot/godot_names.txt` (21,472 names, written by the generator from
+  Godot's API description) says that `moveAndSlide` is `move_and_slide`. Nothing is worked out backwards
+  from the AS3 name.
+- **In the interpreter a Godot value is boxed** and calls go by name. That is the simple, slow path, in
+  GDScript's range. The same typed IR will give the native backend direct calls and inline values.
+- **Calls can nest.** The engine calls a script, which calls the engine, which may call a script again,
+  up to 64 levels deep.
+
+Known fault: the first time Godot's editor scans a project that has the extension (for example
+`godot --headless --import`), Godot crashes as it exits, after the scan has done its work. Later runs are
+clean. The speed spike's extension does the same; the cause is not yet known.
+
 ## Language server
 
 `kas3c lsp` serves an editor over standard input and output with the Language Server Protocol. To connect an
@@ -448,7 +520,10 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   construct the interpreter does not run yet. Every other test program must run or be refused without
   crashing, and nothing a program makes may be left alive when it ends.
 - `tests/test_ir.cpp`, `tests/test_runtime.cpp`, `tests/test_vm.cpp`: the IR printer, the number rules
-  (checked against Node), and the hook and frames a debugger will use.
+  (checked against Node), the hook and frames a debugger will use, calls into the interpreter that nest
+  and fail, and a script run against a fake engine that records every request.
+- `tests/run_godot.py` with `tests/godot_project/`: the milestone script in headless Godot. It skips itself,
+  saying so, without the extension library or Godot 4.7.
 
 - `tests/fetch_external.sh` fetches six open-source AS3 projects (Starling, Away3D, Flixel, FlashPunk,
   as3-signals, as3corelib; about 190,000 lines) into `tests/external/`, which git ignores. They are pinned

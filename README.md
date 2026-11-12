@@ -7,7 +7,8 @@ and Android, and on Nintendo Switch through the Kumikae build.
 
 > **Status: early.** Today the compiler checks an AS3 program against Godot's whole API and reports syntax,
 > name and type errors, on the command line and to an editor through its language server. Nothing runs
-> inside Godot yet, but a first part of the language now runs on the command line (`kas3c run`). The [roadmap](docs/roadmap.md) shows what comes next
+> inside Godot yet, but a first part of the language now runs on the command line (`kas3c run`), and a
+> first AS3 script moves a body in headless Godot. The [roadmap](docs/roadmap.md) shows what comes next
 > and how you can tell when each stage is done.
 
 ## What you will write
@@ -73,7 +74,8 @@ package game {
 | Arithmetic on Godot's math types (`position + velocity * delta` is a `Vector2`; `position + node` is an error) | **Works** |
 | Language server (`kas3c lsp`): errors as you type, go to definition, find references, hover, outline | **Works** in VS Code on macOS; [Rider not yet tried, and not on Windows](editors/README.md) |
 | Run an AS3 program on the command line (`kas3c run`): classes, inheritance, numbers, strings, loops | **Works** for that part of the language; the rest is refused by name |
-| Run a script in the Godot editor | Next (stage 2b) |
+| An AS3 script attached to a Godot node (`CharacterBody2D`), run by headless Godot 4.7.2 | **Works** for a first script: properties, method calls, `Vector2`. Signals, `Input` and operators are next |
+| Run a script in the Godot editor | Planned (stage 2d) |
 | Export a release build as native code | Planned (stage 3) |
 | iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |
 | Completion, rename, Godot's documentation in hover | Planned |
@@ -187,6 +189,8 @@ For what each stage delivers and what is being built now, see the [roadmap](docs
 | `compiler/` | The front end as a library (`kas3front`), the `kas3c` command-line tool, and their tests. |
 | `compiler/godot/` | The generator that writes Godot's API as AS3 declarations, and its output, `godot.as`. |
 | `compiler/lsp/` | The language server behind `kas3c lsp`. |
+| `compiler/ir/`, `compiler/vm/` | The typed IR and the interpreter that runs it. |
+| `compiler/godot_ext/` | The Godot extension: AS3 as a Godot scripting language. |
 | `editors/` | How to connect an editor, and the VS Code client. |
 | `docs/roadmap.md` | The plan: stages, what each delivers, and current progress. |
 | `docs/diagrams/` | The diagrams on this page, and the script that generates them. |
