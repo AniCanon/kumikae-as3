@@ -1,5 +1,4 @@
 golden/names/errors/Undefined.as:2:9: error: can't find 'nowhere.Thing'
-golden/names/errors/Undefined.as:6:20: error: unknown type 'Thing'
 golden/names/errors/Undefined.as:9:19: error: '_ready' overrides a method of Node and must be marked 'override'
 golden/names/errors/Undefined.as:10:4: error: undefined name 'missing'
 golden/names/errors/Undefined.as:11:21: error: unknown type 'Gone'

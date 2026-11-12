@@ -7,7 +7,7 @@ For why the project exists and how it works, see the [README](../README.md).
 
 ## Where we are
 
-**Stage 1 of 6, the front end.** The parser is built. Name resolution is in progress. Type checking is next.
+**Stage 1 of 6, the front end.** The parser and name resolution are built. Type checking is next.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -48,7 +48,7 @@ column. Stage 1 has three parts.
 | Part | Delivers | Done when | Status |
 |---|---|---|---|
 | 1a. Parser | `kas3c parse` | Every syntax error is reported with its position, and no input can crash the parser. | Done |
-| 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | In progress |
+| 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | Done |
 | 1c. Types | Type checking in `kas3c check` | Every expression has a type. Type errors and definite null misuse are reported. | Next |
 
 ### Language server, first slice (proposed)
@@ -113,25 +113,25 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What is being built now: stage 1b, names
+## What comes next: stage 1c, types
 
-**Goal:** `kas3c check` reads a set of `.as` files as one program and works out what every name refers to.
+**Goal:** `kas3c check` gives every expression a type and reports type errors before the program runs.
 
 | Step | What it does |
 |---|---|
-| 1. Program model | Reads several files as one program, and finds each file's package and definitions. |
-| 2. Declarations without bodies | Lets the compiler know about classes it doesn't compile, such as the built-in types and, later, Godot's classes. |
-| 3. Imports and type names | Resolves `import` and every type name, and reports unknown or ambiguous ones. |
-| 4. Class hierarchy | Resolves `extends` and `implements`, and reports cycles and misuse. |
-| 5. Members | Collects fields, methods, getters and setters, and checks `override`. |
-| 6. Scopes | Resolves every name inside function bodies, including closures and hoisted `var` declarations. |
-| 7. Carry-overs from the parser | Rejects `dynamic` classes, invalid assignment targets, and similar cases the parser lets through. |
+| 1. Built-in members | Declares the full member lists of `String`, `Array`, `Vector`, `Math` and the rest. |
+| 2. Types of expressions | Works out the type of every literal, name, call and operator. |
+| 3. Members through `.` | Resolves `a.b` on a value, with access rules. |
+| 4. Conversions | Records each implicit conversion once, so that both backends apply the same one. |
+| 5. Checks | Assignments, calls, returns, override signatures, interface completeness, `const`, definite null misuse. |
+| 6. Godot's math types | Allows `+ - * /` and comparison on `Vector2` and its relatives. |
 
 ## Decisions waiting on the owner
 
 | Decision | Why it matters |
 |---|---|
 | Whether to build the language server's first slice before the interpreter | The [language server design](superpowers/specs/2026-11-12-language-server-design.md) proposes it. It gives you something to use in an editor sooner, and delays the interpreter by that much. |
+| How Godot's classes are named in AS3 | Godot has classes named `Object`, `Array`, `String` and `Dictionary`, as AS3 does. With `import godot.*`, the bare names would be ambiguous. Stage 2 needs a rule: a prefix, a different package layout, or letting an import win over a built-in. |
 | Permission to download an open-source AS3 codebase as a test corpus | Every AS3 file the parser has seen so far was written by a model. Real code would find gaps that our tests share. |
 | When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
 
@@ -140,7 +140,7 @@ The design keeps each of these possible. No stage above delivers them.
 - **This page and the diagram** change when a stage or part changes status.
 - **Repository:** `AniCanon/kumikae-as3` on GitHub, private.
 - **Branches:** `main` holds finished, reviewed work. Each part is built on its own branch, such as
-  `feat/frontend-names`, and merges when its review is clean.
+  `feat/frontend-types`, and merges when its review is clean.
 - **To update the diagram,** change a status in [`diagrams/build.py`](diagrams/build.py), and then run
   `python3 docs/diagrams/build.py`.
 

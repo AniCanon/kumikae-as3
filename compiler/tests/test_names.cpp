@@ -197,8 +197,14 @@ static void test_imports() {
 				"public class Main extends Node {} }");
 	// A project checked one file at a time: one error per import, and nothing else.
 	CHECK_MAIN("package { import /*!*/a.B; import /*!*/c.D;\n"
-			   "public class Main extends /*!*/B { var d:/*!*/D; function f():void { g(); } } }",
-			"can't find 'a.B'", "can't find 'c.D'", "unknown type 'B'", "unknown type 'D'");
+			   "public class Main extends B { var d:D; var e:D; function f():void { g(); new D(); D.x; } } }",
+			"can't find 'a.B'", "can't find 'c.D'");
+	CHECK_MAIN("package { import /*!*/nowhere.*;\n"
+			   "public class Main { var x:Thing; function f():void { other(); var y:/*!*/int.<int>; } } }",
+			"can't find package 'nowhere'", "only Vector takes a type parameter");
+	// Only the names the failed import could have supplied are excused.
+	CHECK_MAIN("package { import /*!*/a.B; public class Main { var c:/*!*/C; function f():void { /*!*/g(); } } }",
+			"can't find 'a.B'", "unknown type 'C'", "undefined name 'g'");
 	// Imports outside the package block serve the helpers; those inside serve the block.
 	CHECK_GODOT("package { public class Main { var n:/*!*/Node; } }\nimport godot.Node;\nclass Helper extends Node {}",
 			"unknown type 'Node'");
@@ -230,10 +236,22 @@ static void test_type_names() {
 	CHECK_MAIN("package { public class Main { var x:/*!*/Array.<int>; } }", "only Vector takes a type parameter");
 	CHECK_MAIN("package { public class Main { var x:/*!*/Main.<int>; } }", "only Vector takes a type parameter");
 	// Named by package.
-	CHECK_GODOT("package { public class Main { var a:godot.Node; var b:flash.utils.Dictionary; } }");
-	CHECK_GODOT("package { public class Main { var a:/*!*/godot.Nope; var b:/*!*/nowhere.Node; } }",
+	CHECK_GODOT("package { import godot.Node; import flash.utils.*;\n"
+				"public class Main { var a:godot.Node; var b:flash.utils.Dictionary; } }");
+	CHECK_GODOT("package { import godot.*; public class Main { var a:/*!*/godot.Nope; var b:/*!*/nowhere.Node; } }",
 			"unknown type 'godot.Nope'", "unknown type 'nowhere.Node'");
-	CHECK_GODOT("package { public class Main { var a:/*!*/godot.Hidden; } }", "'godot.Hidden' is not public");
+	CHECK_GODOT("package { import godot.*; public class Main { var a:/*!*/godot.Hidden; } }",
+			"'godot.Hidden' is not public");
+	// As in Adobe's compiler, a name written with its package still needs the import.
+	CHECK_GODOT("package { public class Main { var a:/*!*/godot.Node; function f():void {\n"
+				"new /*!*/godot.Node(); /*!*/flash.utils.getTimer(); } } }",
+			"'godot.Node' must be imported before it is used", "'godot.Node' must be imported before it is used",
+			"'flash.utils.getTimer' must be imported before it is used");
+	CHECK_EQ(check_files({
+					 { "lib/Thing.as", "package lib { public class Thing {} }" },
+					 { "lib/User.as", "package lib { public class User { var t:lib.Thing; } }" },
+			 }),
+			std::string());
 
 	// Ambiguity: nothing shadows anything at package level.
 	CHECK_EQ(check_files({
@@ -405,7 +423,7 @@ static void test_bodies_resolve() {
 	// A catch variable ends with its block.
 	CHECK_MAIN(in_method("try {} catch (e:Error) {}\ntrace(/*!*/e);"), "undefined name 'e'");
 	// Dotted names.
-	CHECK_GODOT("package { public class Main { function f():void {\n"
+	CHECK_GODOT("package { import flash.utils.*; import godot.*; public class Main { function f():void {\n"
 				"var t:int = flash.utils.getTimer(); var n:* = new godot.Node(); godot.print(1);\n"
 				"godot.Node.make().add_child(null); var d:* = new flash.utils.Dictionary(true);\n} } }");
 	CHECK_GODOT("package { public class Main { function f():void { /*!*/godot.Nope.x(); /*!*/nowhere.Node; } } }",
@@ -509,6 +527,139 @@ static void test_bodies_limits() {
 }
 
 
+static std::string names_of(std::initializer_list<File> p_files) {
+	Compilation compilation;
+	for (const File &file : p_files) {
+		compilation.add(file.path, file.text, file.declaration);
+	}
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	return compilation.dump_names();
+}
+
+// True if some line of the dump ends with p_binding, as in "trace -> field Main.trace @2:5".
+static bool binds(const std::string &p_dump, const std::string &p_binding) {
+	bool found = p_dump.find(p_binding + " ") != std::string::npos || p_dump.find(p_binding + "\n") != std::string::npos;
+	if (!found) {
+		std::printf("  missing \"%s\" in:\n%s", p_binding.c_str(), p_dump.c_str());
+	}
+	return found;
+}
+
+// What a name binds to, not only that it binds.
+static void test_bindings() {
+	// The innermost wins: a local over a class and over a package-level name.
+	std::string dump = names_of({ { "Main.as", in_method("var Base:int; Base = 1; var package_variable:String; "
+															"package_variable = null;") } });
+	CHECK(binds(dump, "Base -> local Base"));
+	CHECK(binds(dump, "package_variable -> local package_variable"));
+	// A class member over a package-level name.
+	dump = names_of({ { "Main.as", "package { public class Main { var trace:int; static var counter:int;\n"
+								   "function f():void { trace = counter; } } }\nvar counter:String;" } });
+	CHECK(binds(dump, "trace -> field Main.trace"));
+	CHECK(binds(dump, "counter -> field Main.counter"));
+	// A parameter over a package path at the root of a dotted name.
+	dump = names_of({ { "godot.as", GODOT_STUB, true },
+			{ "Main.as", "package { import godot.*; public class Main { function f(godot:Object):void { godot.Node; } } }" } });
+	CHECK(binds(dump, "godot -> parameter godot"));
+	// The longest package prefix that has the definition.
+	dump = names_of({
+			{ "a/b.as", "package a { public var b:Object; }" },
+			{ "a/b/C.as", "package a.b { public class C { public static var n:int; } }" },
+			{ "Main.as", "package { import a.*; import a.b.*; public class Main { function f():void { a.b.C.n = 1; } } }" },
+	});
+	CHECK(binds(dump, "C -> class a.b.C"));
+	// A static method does not see instance members: the name binds further out.
+	dump = names_of({ { "Main.as", "package { import flash.utils.getTimer; public class Main {\n"
+								   "public function getTimer():int { return 0; }\n"
+								   "public static function now():int { return getTimer(); }\n"
+								   "public function later():int { return getTimer(); } } }" } });
+	CHECK(binds(dump, "3:43 getTimer -> function flash.utils.getTimer (built in)"));
+	CHECK(binds(dump, "4:38 getTimer -> method Main.getTimer"));
+	dump = names_of({ { "Main.as", "package { public class Main extends Mid { static function f():void { sbase = 1; } } }\n"
+								   "class Mid extends Base { var sbase:String; }\nclass Base { static var sbase:int; }" } });
+	CHECK(binds(dump, "sbase -> field Base.sbase"));
+	// A user's class does not change what a declaration file's names mean.
+	dump = names_of({
+			{ "godot.as", "package godot { public native class Node { public native function add_child(n:Node):void; }\n"
+						  "public native class Sprite extends Node {} }", true },
+			{ "Node.as", "package { public class Node { public var next:Node; } }" },
+			{ "Main.as", "package { import godot.Sprite; public class Main extends Sprite { var n:Node; } }" },
+	});
+	CHECK(binds(dump, "Node -> class Node @Node.as:1:24"));
+	CHECK_EQ(check_files({
+					 { "godot.as", "package godot { public native class Object {}\npublic native class Node extends Object {\n"
+								   "public native function get_class():String; } }", true },
+					 { "Main.as", "package { import godot.Node; public class Main extends Node {\n"
+								  "function f():void { get_class(); } } }" },
+			 }),
+			std::string());
+	CHECK_EQ(check_files({ { "flash/utils/Boolean.as", "package flash.utils { public class Boolean {} }" } }), std::string());
+
+	// A setter added beside an inherited getter: the property has both halves.
+	Compilation compilation;
+	Unit *unit = compilation.add("Main.as", "package { public class Main extends Mid {\n"
+											"public function set v(x:int):void {} function f():int { return v; } } }\n"
+											"class Mid extends Base {}\nclass Base { public function get v():int { return 0; } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	const Symbol *property = nullptr;
+	for (const Reference &reference : unit->references) {
+		if (reference.name == "v") {
+			property = reference.symbol;
+		}
+	}
+	CHECK(property && property->getter && property->setter);
+}
+
+static void test_review_findings() {
+	// An instance member at the root of a dotted name, in static code.
+	const std::string statics = "package { public class Main {\nvar items:Array;\n";
+	CHECK_MAIN(statics + "static function f():void { /*!*/items.length; }\nstatic var s:int = /*!*/items.length;\n} }",
+			"can't use the instance member 'items' in a static context",
+			"can't use the instance member 'items' in a static context");
+	// `override` only belongs on instance methods.
+	CHECK_MAIN("package { public class Main extends Base {\noverride static function /*!*/sf():void {}\n"
+			   "override var /*!*/v:int;\n} }\nclass Base { static function sf():void {} }\n"
+			   "override function /*!*/pf():void {}",
+			"'override' can only be used on an instance method", "'override' can only be used on an instance method",
+			"'override' can only be used on an instance method");
+	// A named function expression's name is outside its body, so a local may reuse it.
+	CHECK_MAIN(in_method("var g:Function = function f():void { var f:int; f = 1; };\n"
+						 "var h:Function = function k():void { function k():void {} k(); };"));
+	// Stacked labels.
+	CHECK_MAIN(in_method("a: b: for (;;) { continue a; }"));
+	CHECK_MAIN(in_method("a: b: { for (;;) { continue /*!*/a; } }"), "'a' does not label a loop");
+	// Object's methods can be called by bare name, and defined without `override`.
+	CHECK_MAIN("package { public class Main { function f():void { hasOwnProperty(\"x\"); toString(); valueOf(); } } }");
+	CHECK_MAIN("package { public class Main extends Error { function f():String { return toString() + message; } } }");
+	CHECK_MAIN("package { public class Main { override public function /*!*/toString():String { return \"\"; } } }",
+			"'toString' is marked 'override' but no base class has a method to override");
+	// Built-in classes whose members aren't declared yet: nothing is reported as undefined in a subclass.
+	CHECK_MAIN("package { public class Main extends Array { function top():* { return this[length - 1]; }\n"
+			   "function add(x:*):void { push(x); } } }");
+	CHECK_MAIN("package { import flash.utils.Dictionary; public class Main extends Dictionary {\n"
+			   "function f():void { anything(); } } }");
+	// A base member that is internal to another package.
+	CHECK_EQ(check_files({
+					 { "a/Base.as", "package a { public class Base { internal var secret:int; var plain:int; public var open:int; } }" },
+					 { "Main.as", "package { import a.Base; public class Main extends Base {\n"
+								  "function f():void { open = 1; secret = 2; } } }" },
+			 }),
+			std::string("Main.as:2:31: error: 'secret' in Base is not visible from this package\n"));
+	// Past the limit of 100, the errors kept are the first in the file.
+	std::string many = "package { public class Main extends Base {\n";
+	std::string base = "class Base {\n";
+	for (int i = 0; i < 150; i++) {
+		many += "public function m" + std::to_string(i) + "():void {}\n";
+		base += "public function m" + std::to_string(i) + "():void {}\n";
+	}
+	std::string output = check_files({ { "Main.as", many + "} }\n" + base + "}\n" } });
+	CHECK(output.find("Main.as:2:17: error: 'm0' overrides") == 0);
+	CHECK(output.find("'m99' overrides") != std::string::npos);
+	CHECK(output.find("'m100' overrides") == std::string::npos);
+}
+
 // Truncated files mostly fail to parse, but many prefixes are whole programs with missing pieces. None may
 // crash or hang the checker, alone or beside the complete corpus.
 static void test_corpus_prefixes() {
@@ -526,11 +677,7 @@ static void test_corpus_prefixes() {
 		std::string name = entry.path().filename().string();
 		files++;
 		whole.add(name, text);
-		// Every prefix that ends at a line break or a closing brace: these are the ones likely to parse.
 		for (size_t length = 0; length < text.size(); length++) {
-			if (length > 0 && text[length - 1] != '\n' && text[length - 1] != '}' && text[length - 1] != ';') {
-				continue;
-			}
 			Compilation compilation;
 			compilation.add("godot.as", stub, true);
 			compilation.add(name, text.substr(0, length));
@@ -553,6 +700,8 @@ int main() {
 	test_bodies_resolve();
 	test_bodies_errors();
 	test_bodies_limits();
+	test_bindings();
+	test_review_findings();
 	test_corpus_prefixes();
 	return check::finish();
 }

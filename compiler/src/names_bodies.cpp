@@ -30,6 +30,10 @@ std::string quoted(std::string_view p_name) {
 }
 
 bool is_loop(const Stmt *p_statement) {
+	// `a: b: for (;;)` labels the loop twice.
+	while (p_statement->kind == NodeKind::Labeled && static_cast<const Labeled *>(p_statement)->body) {
+		p_statement = static_cast<const Labeled *>(p_statement)->body;
+	}
 	switch (p_statement->kind) {
 		case NodeKind::While:
 		case NodeKind::DoWhile:
@@ -97,12 +101,10 @@ class Resolver {
 			}
 		}
 		Symbol *hidden = nullptr;
+		Symbol *instance = nullptr; // An instance member that static code can't reach.
 		if (context_.klass && context_.klass->kind == SymbolKind::Class) {
-			Symbol *member = compilation_.find_member(context_.klass, p_name, &hidden);
+			Symbol *member = compilation_.find_member(context_.klass, p_name, static_, &instance, &hidden);
 			if (member) {
-				if (static_ && member->is_instance_member() && p_report) {
-					error(p_offset, "can't use the instance member " + quoted(p_name) + " in a static context");
-				}
 				return member;
 			}
 		}
@@ -115,6 +117,10 @@ class Resolver {
 		}
 		if (found.second) {
 			error(p_offset, compilation_.ambiguous_message(p_name, found));
+		} else if (instance) {
+			error(p_offset, "can't use the instance member " + quoted(p_name) + " in a static context");
+		} else if (found.suppressed) {
+			// A failed import has been reported, and may be where this name was to come from.
 		} else if (hidden) {
 			if (hidden->modifiers & Modifiers::Private) {
 				error(p_offset, quoted(p_name) + " is private in " + std::string(hidden->owner->name));
@@ -260,8 +266,21 @@ class Resolver {
 	// ---- functions ----
 
 	void function(FunctionDecl *p_function, bool p_expression) {
+		// A named function expression can call itself by its name. The name sits just outside the body, so a
+		// parameter or local may reuse it.
+		Scope self;
+		self.parent = scope_;
 		Scope scope;
 		scope.parent = scope_;
+		if (p_expression && !p_function->name.empty()) {
+			Symbol *symbol = compilation_.new_symbol(SymbolKind::LocalFunction, p_function->name, &unit_,
+					p_function->name_offset);
+			symbol->node = p_function;
+			symbol->type = p_function->return_type;
+			p_function->symbol = symbol;
+			self.names.emplace(p_function->name, symbol);
+			scope.parent = &self;
+		}
 		Scope *outer_scope = scope_;
 		Scope *outer_function = function_scope_;
 		ImportScope *outer_imports = context_.imports;
@@ -297,15 +316,6 @@ class Resolver {
 			}
 		}
 		type(p_function->return_type);
-		if (p_expression && !p_function->name.empty()) {
-			// A named function expression can call itself by that name.
-			Symbol *symbol = compilation_.new_symbol(SymbolKind::LocalFunction, p_function->name, &unit_,
-					p_function->name_offset);
-			symbol->node = p_function;
-			symbol->type = p_function->return_type;
-			p_function->symbol = symbol;
-			scope.names.emplace(p_function->name, symbol);
-		}
 		if (!arguments_) {
 			arguments_ = compilation_.new_symbol(SymbolKind::Arguments, "arguments", nullptr, 0);
 		}
@@ -527,6 +537,7 @@ class Resolver {
 		std::string package(first->text);
 		Member *best = nullptr;
 		Symbol *best_symbol = nullptr;
+		Symbol *unimported = nullptr;
 		for (size_t i = chain.size(); i-- > 0;) {
 			Member *link = chain[i];
 			if (compilation_.find_package(package)) {
@@ -534,6 +545,8 @@ class Resolver {
 				if (found.first) {
 					best = link;
 					best_symbol = found.first;
+				} else if (found.unimported) {
+					unimported = found.hidden;
 				}
 			}
 			package += '.';
@@ -542,6 +555,10 @@ class Resolver {
 		if (best) {
 			best->symbol = best_symbol;
 			record(best->name_offset, best->name, best_symbol);
+			return;
+		}
+		if (unimported) {
+			error(first->offset, quoted(compilation_.qualified_name(unimported)) + " must be imported before it is used");
 			return;
 		}
 		name(first); // Reports it.

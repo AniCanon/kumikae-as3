@@ -76,6 +76,9 @@ struct ResolvedImport {
 struct ImportScope {
 	ImportScope *parent = nullptr;
 	std::vector<ResolvedImport> imports;
+	// Imports that named nothing. A name one of them could have supplied is not reported again.
+	std::vector<std::string_view> failed;
+	bool failed_wildcard = false;
 };
 
 struct ClassInfo {
@@ -86,6 +89,8 @@ struct ClassInfo {
 	Symbol *constructor = nullptr;
 	ImportScope imports; // Imports written in the class body.
 	bool broken = false; // Its `extends` did not resolve, or it was part of a cycle.
+	bool incomplete = false; // A built-in class whose members are not declared yet: marked [Incomplete].
+	bool inherited = false; // Property halves have been filled in from the bases.
 	uint32_t mark = 0; // For cycle detection.
 };
 
@@ -132,6 +137,8 @@ struct Found {
 	Symbol *first = nullptr;
 	Symbol *second = nullptr; // Set when the name is ambiguous.
 	Symbol *hidden = nullptr; // A match that exists but is not visible from here.
+	bool unimported = false; // `hidden` was named by its package, without the import AS3 requires.
+	bool suppressed = false; // No match, but a failed import could have supplied one: stay quiet.
 };
 
 class Compilation {
@@ -162,6 +169,8 @@ class Compilation {
 	void cut_class_cycles();
 	void cut_interface_cycles();
 	void check_overrides(Symbol *p_class);
+	void inherit_properties(Symbol *p_class);
+	bool imported(const Context &p_from, const Symbol *p_definition) const;
 
 public:
 	Compilation(); // Loads the built-in declarations.
@@ -197,10 +206,13 @@ public:
 	// Resolves a written type, recording the reference and reporting what is wrong. Returns the class or
 	// interface, or null for `*`, `void`, a null p_type, or an error.
 	Symbol *resolve_type(const Context &p_from, TypeRef *p_type);
-	// A member of the class or of its bases that code inside p_class may name. *r_hidden receives a match
-	// that exists but is private to a base.
-	Symbol *find_member(Symbol *p_class, std::string_view p_name, Symbol **r_hidden) const;
-	// True if the class, or a class it derives from, failed to resolve its base.
+	// A member of the class or of its bases that code inside p_class may name. With p_static_only, instance
+	// members are passed over, as they are for code in a static method; *r_instance receives the first one
+	// passed over. *r_hidden receives a match that exists but is not visible from the class.
+	Symbol *find_member(Symbol *p_class, std::string_view p_name, bool p_static_only, Symbol **r_instance,
+			Symbol **r_hidden) const;
+	// True if the members that the class inherits are not all known: a base failed to resolve, or is a
+	// built-in class whose members are not declared yet.
 	bool hierarchy_broken(Symbol *p_class) const;
 
 	// "a.b.C", "C", or "C in this file" for a helper; "Owner.name" for a member.

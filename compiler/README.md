@@ -47,7 +47,7 @@ file, `@<path>:<line>:<col>` in another, or `(built in)`.
 ## Declaration files
 
 A declaration file tells the compiler which names exist without giving their code. It is ordinary AS3 in
-which every class and function is `native` and has no body:
+which classes and functions are `native` and have no body. Like any file, it has one package block.
 
 ```actionscript
 package godot {
@@ -62,15 +62,21 @@ of declaration files in `builtins/`, embedded into the compiler when it is built
 `--declarations`. Stage 2 generates the declarations for Godot's classes from Godot's own API description;
 until then `tests/stubs/godot.as` is a small hand-written stand-in.
 
+A declaration file describes code that was compiled without your program, so your program can't change what
+its names mean: inside it, names resolve only to other declarations, and its own package comes first.
+
 ## What `check` checks
 
 - **Definitions:** duplicates in a package or a class; one definition per package block, named after its
   file; `dynamic` classes and `native` outside a declaration file are rejected.
-- **Imports and type names:** every import and every written type must name something visible.
+- **Imports and type names:** every import and every written type must name something visible. A name
+  written with its package (`flash.utils.getTimer`) still needs the import, as in Adobe's compiler. After
+  an import that names nothing, the names it could have supplied aren't reported again.
 - **The class hierarchy:** `extends` names a class that isn't final, `implements` names interfaces, and
   nothing inherits from itself.
-- **Overrides:** `override` is present exactly when a base class has that method; final methods and fields
-  can't be overridden.
+- **Overrides:** on an instance method, `override` is present exactly when a base class has that method;
+  final methods and fields can't be overridden; `override` anywhere else is an error. `Object`'s methods
+  (`toString` and the rest) need no `override`, as in AS3.
 - **Names in function bodies:** locals, parameters, closures, members, inherited members, package-level
   definitions and imports. Also `this` and instance members in static code, `break` and `continue` targets,
   and assignment targets.
@@ -103,17 +109,24 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 
 - **Nothing shadows anything at package level.** A simple name is looked up at once in the file's helpers,
   the current package, the top-level package and every import. Two different matches are an error; write
-  the name with its package. (Same as Adobe's compiler.)
+  the name with its package. Adobe's documentation says the same for two imports. Whether Adobe's compiler
+  also reports a same-package or top-level name against an import has not been checked.
+- **A built-in name can't be told apart from an imported one of the same spelling.** With a class `Object`
+  in package `godot`, `import godot.*` makes a bare `Object` ambiguous, and the built-in one has no longer
+  spelling. Stage 2 must settle how Godot's classes are named with this in mind.
 - **Names are checked only when every file parses.** With a syntax error anywhere, `check` reports syntax
   errors only.
 - **One function may declare a variable twice only with the same type.** Adobe's compiler warns in that case
   and this one is silent; with different types both report an error.
 - **Helpers outside the package block count as part of the file's package** when deciding whether an
   `internal` class is visible. Adobe's compiler is stricter.
-- **A bare call to one of `Object`'s prototype methods isn't found.** Inside a class that doesn't define
-  `toString`, write `this.toString()`, not `toString()`. Stage 1c revisits this.
 - **Inside a class whose base class is unknown, undefined names aren't reported,** because the missing class
-  may declare them.
+  may declare them. The same holds for subclasses of `Array`, `Date`, `RegExp` and `Dictionary`, whose
+  members aren't declared until stage 1c.
+- **`this` inside a closure in a static method is an error.** AS3 allows it, with `this` being the global
+  object.
+- **Static code doesn't see instance members.** A name that matches only an instance member is an error; a
+  name that also matches something further out (an import, a base class's static) binds to that.
 - **A dotted name prefers the longest package.** If package `a` defines `b` and package `a.b` defines `C`,
   then `a.b.C` is the class.
 

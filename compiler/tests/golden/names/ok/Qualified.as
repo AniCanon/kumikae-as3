@@ -1,6 +1,7 @@
 package tools {
 	import flash.utils.Dictionary;
 	import flash.utils.getTimer;
+	import godot.Node;
 
 	public function Qualified():Object {
 		var cache:Dictionary = new Dictionary();

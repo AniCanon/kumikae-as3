@@ -4,10 +4,22 @@
 // compiler reads it to learn which names exist; it generates no code for it.
 //
 // Stage 1c (types) adds the full member lists. Until then only the members that a subclass can reach by
-// their bare names are declared: those of the Error family. Object declares no methods on purpose: in AS3
-// toString and its relatives live on the prototype, so a class may define them without `override`.
+// their bare names are declared: those of Object and of the Error family. A class that can be extended and
+// whose members are still missing is marked [Incomplete]: the compiler reports no undefined name inside
+// its subclasses.
+//
+// In AS3, Object's methods live on the prototype, so a class may define its own without `override`. The
+// compiler knows that about Object.
 package {
-	public native class Object {}
+	public native class Object {
+		public native function hasOwnProperty(name:String):Boolean;
+		public native function isPrototypeOf(theClass:Object):Boolean;
+		public native function propertyIsEnumerable(name:String):Boolean;
+		public native function setPropertyIsEnumerable(name:String, isEnum:Boolean = true):void;
+		public native function toLocaleString():String;
+		public native function toString():String;
+		public native function valueOf():Object;
+	}
 	public final native class Class {}
 	public final native class Function {}
 	public final native class Boolean {}
@@ -15,11 +27,14 @@ package {
 	public final native class uint {}
 	public final native class Number {}
 	public final native class String {}
+	[Incomplete]
 	public native class Array {}
 	public final native class Vector {}
 	public final native class Math {}
 	public final native class JSON {}
+	[Incomplete]
 	public native class Date {}
+	[Incomplete]
 	public native class RegExp {}
 
 	public native class Error {

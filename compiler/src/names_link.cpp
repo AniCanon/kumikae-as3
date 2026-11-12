@@ -39,6 +39,11 @@ Context Compilation::context_of(Symbol *p_class) {
 }
 
 bool Compilation::visible(const Symbol *p_definition, const Context &p_from) const {
+	// A declaration file describes code that was compiled without this program: nothing the program defines
+	// can change what its names mean.
+	if (p_from.unit->is_declaration && !p_definition->unit->is_declaration) {
+		return false;
+	}
 	if (p_definition->file_private) {
 		return p_definition->unit == p_from.unit;
 	}
@@ -70,11 +75,20 @@ static Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_t
 
 // AS3 opens every namespace in reach at once: the file's helpers, the current package, the top-level package,
 // and every import. Two different matches are an ambiguity, never a shadowing.
+//
+// A declaration file is different: its own package comes first, then its imports, then the top level, so that
+// a library's `Object` is the library's.
 Found Compilation::lookup_package_level(const Context &p_from, std::string_view p_name) const {
 	Found found;
+	bool ordered = p_from.unit->is_declaration;
 	add_match(*this, p_from, find_in(p_from.unit->helpers, p_name), found);
 	add_match(*this, p_from, find_in(p_from.package->definitions, p_name), found);
-	add_match(*this, p_from, find_in(top_level_->definitions, p_name), found);
+	if (ordered && found.first) {
+		return found;
+	}
+	if (!ordered) {
+		add_match(*this, p_from, find_in(top_level_->definitions, p_name), found);
+	}
 	for (const ImportScope *scope = p_from.imports; scope; scope = scope->parent) {
 		for (const ResolvedImport &import : scope->imports) {
 			if (import.symbol) {
@@ -86,7 +100,33 @@ Found Compilation::lookup_package_level(const Context &p_from, std::string_view 
 			}
 		}
 	}
+	if (ordered && !found.first) {
+		add_match(*this, p_from, find_in(top_level_->definitions, p_name), found);
+	}
+	if (!found.first) {
+		for (const ImportScope *scope = p_from.imports; scope && !found.suppressed; scope = scope->parent) {
+			found.suppressed = scope->failed_wildcard;
+			for (std::string_view failed : scope->failed) {
+				found.suppressed |= failed == p_name;
+			}
+		}
+	}
 	return found;
+}
+
+// True if the definition's package is the current one or has been imported, singly or whole.
+bool Compilation::imported(const Context &p_from, const Symbol *p_definition) const {
+	if (p_definition->package == p_from.package) {
+		return true;
+	}
+	for (const ImportScope *scope = p_from.imports; scope; scope = scope->parent) {
+		for (const ResolvedImport &import : scope->imports) {
+			if (import.symbol == p_definition || import.package == p_definition->package) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 Found Compilation::lookup_qualified(const Context &p_from, const std::string &p_package,
@@ -95,6 +135,12 @@ Found Compilation::lookup_qualified(const Context &p_from, const std::string &p_
 	auto package = packages_.find(p_package);
 	if (package != packages_.end()) {
 		add_match(*this, p_from, find_in(package->second.definitions, p_name), found);
+	}
+	// AS3 requires the import even when the name is written out in full.
+	if (found.first && !imported(p_from, found.first)) {
+		found.hidden = found.first;
+		found.first = nullptr;
+		found.unimported = true;
 	}
 	return found;
 }
@@ -118,8 +164,12 @@ Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
 	Found found = last == 0 ? lookup_package_level(p_from, p_type->name[0])
 							: lookup_qualified(p_from, join(p_type->name, last), p_type->name[last]);
 	if (!found.first) {
-		if (found.hidden && last > 0) {
+		if (found.unimported) {
+			diagnostics.error(p_type->offset, quoted(shown) + " must be imported before it is used");
+		} else if (found.hidden && last > 0) {
 			diagnostics.error(p_type->offset, quoted(shown) + " is not public");
+		} else if (found.suppressed) {
+			// A failed import has been reported, and may be where this name was to come from.
 		} else {
 			diagnostics.error(p_type->offset, "unknown type " + quoted(shown));
 		}
@@ -155,6 +205,7 @@ void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports,
 			Package *found = find_package(name);
 			if (!found || found->definitions.empty()) {
 				p_unit.diagnostics.error(offset, "can't find package " + quoted(name));
+				r_scope.failed_wildcard = true;
 				continue;
 			}
 			ResolvedImport resolved;
@@ -168,10 +219,12 @@ void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports,
 		Symbol *symbol = found ? find_in(found->definitions, import->name[last]) : nullptr;
 		if (!symbol) {
 			p_unit.diagnostics.error(offset, "can't find " + quoted(shown));
+			r_scope.failed.push_back(import->name[last]);
 			continue;
 		}
 		if (!(symbol->modifiers & Modifiers::Public) && symbol->package != p_unit.package) {
 			p_unit.diagnostics.error(offset, quoted(shown) + " is not public");
+			r_scope.failed.push_back(import->name[last]);
 			continue;
 		}
 		ResolvedImport resolved;
@@ -343,7 +396,7 @@ void Compilation::cut_interface_cycles() {
 
 bool Compilation::hierarchy_broken(Symbol *p_class) const {
 	for (const ClassInfo *info = p_class->klass; info; info = info->base ? info->base->klass : nullptr) {
-		if (info->broken) {
+		if (info->broken || info->incomplete) {
 			return true;
 		}
 	}
@@ -361,31 +414,68 @@ static bool inherited_visible(const Symbol *p_member, const Symbol *p_base, cons
 	return p_base->package == p_package;
 }
 
-Symbol *Compilation::find_member(Symbol *p_class, std::string_view p_name, Symbol **r_hidden) const {
-	Symbol *own = find_in(p_class->klass->members, p_name);
-	if (own) {
-		return own;
-	}
-	for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
-		Symbol *member = find_in(base->klass->members, p_name);
+Symbol *Compilation::find_member(Symbol *p_class, std::string_view p_name, bool p_static_only,
+		Symbol **r_instance, Symbol **r_hidden) const {
+	for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
+		Symbol *member = find_in(owner->klass->members, p_name);
 		if (!member) {
 			continue;
 		}
-		if (inherited_visible(member, base, p_class->package)) {
-			return member;
+		if (owner != p_class && !inherited_visible(member, owner, p_class->package)) {
+			if (r_hidden && !*r_hidden) {
+				*r_hidden = member;
+			}
+			continue;
 		}
-		if (r_hidden && !*r_hidden) {
-			*r_hidden = member;
+		if (p_static_only && !member->is_static()) {
+			if (r_instance && !*r_instance) {
+				*r_instance = member;
+			}
+			continue;
 		}
+		return member;
 	}
 	return nullptr;
+}
+
+// A class that declares one half of a property beside an inherited other half sees both. Bases first.
+void Compilation::inherit_properties(Symbol *p_class) {
+	std::vector<Symbol *> chain;
+	for (Symbol *owner = p_class; owner && !owner->klass->inherited; owner = owner->klass->base) {
+		chain.push_back(owner);
+	}
+	for (size_t i = chain.size(); i-- > 0;) {
+		Symbol *owner = chain[i];
+		owner->klass->inherited = true;
+		if (!owner->klass->base) {
+			continue;
+		}
+		for (auto &entry : owner->klass->members) {
+			Symbol *property = entry.second;
+			if (property->kind != SymbolKind::Property || property->is_static() ||
+					(property->getter && property->setter)) {
+				continue;
+			}
+			Symbol *base = find_member(owner->klass->base, property->name, false, nullptr, nullptr);
+			if (base && base->kind == SymbolKind::Property && !base->is_static() &&
+					inherited_visible(base, base->owner, owner->package)) {
+				if (!property->getter) {
+					property->getter = base->getter;
+				}
+				if (!property->setter) {
+					property->setter = base->setter;
+				}
+			}
+		}
+	}
 }
 
 void Compilation::check_overrides(Symbol *p_class) {
 	Diagnostics &diagnostics = p_class->unit->diagnostics;
 	// The instance member of that name that a base class hands down, if any.
 	auto inherited = [&](std::string_view p_name) -> Symbol * {
-		for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
+		// Object's methods live on the prototype in AS3: a class may define its own without `override`.
+		for (Symbol *base = p_class->klass->base; base && base != object_; base = base->klass->base) {
 			Symbol *member = find_in(base->klass->members, p_name);
 			if (member && !member->is_static() && inherited_visible(member, base, p_class->package)) {
 				return member;
@@ -422,32 +512,27 @@ void Compilation::check_overrides(Symbol *p_class) {
 			diagnostics.error(offset, name + " conflicts with " + name + " inherited from " + base_name);
 		}
 	};
-	for (auto &entry : p_class->klass->members) {
-		Symbol *member = entry.second;
-		if (member->is_static()) {
-			continue;
-		}
-		Symbol *base = inherited(member->name);
-		switch (member->kind) {
-			case SymbolKind::Field:
+	// In the order written, so that the errors kept when there are too many are the first in the file.
+	for (Node *node : static_cast<ClassDecl *>(p_class->node)->members) {
+		if (node->kind == NodeKind::VarDecl) {
+			VarDecl *decl = static_cast<VarDecl *>(node);
+			if (decl->modifiers.bits & Modifiers::Static) {
+				continue;
+			}
+			for (Declarator &declarator : decl->declarators) {
+				Symbol *base = inherited(declarator.name);
 				if (base) {
-					diagnostics.error(member->offset, quoted(member->name) + " conflicts with " + quoted(member->name) +
-															  " inherited from " + std::string(base->owner->name));
+					diagnostics.error(declarator.offset, quoted(declarator.name) + " conflicts with " +
+																 quoted(declarator.name) + " inherited from " +
+																 std::string(base->owner->name));
 				}
-				break;
-			case SymbolKind::Method:
-				check_function(static_cast<FunctionDecl *>(member->node), base);
-				break;
-			case SymbolKind::Property:
-				if (member->getter) {
-					check_function(member->getter, base);
-				}
-				if (member->setter) {
-					check_function(member->setter, base);
-				}
-				break;
-			default:
-				break;
+			}
+		} else if (node->kind == NodeKind::FunctionDecl) {
+			FunctionDecl *function = static_cast<FunctionDecl *>(node);
+			if ((function->modifiers.bits & Modifiers::Static) || function->symbol == p_class->klass->constructor) {
+				continue;
+			}
+			check_function(function, inherited(function->name));
 		}
 	}
 }
@@ -465,6 +550,7 @@ void Compilation::link_hierarchy() {
 	for (ClassInfo &info : classes_) {
 		if (info.symbol->kind == SymbolKind::Class && !hierarchy_broken(info.symbol)) {
 			check_overrides(info.symbol);
+			inherit_properties(info.symbol);
 		}
 	}
 }

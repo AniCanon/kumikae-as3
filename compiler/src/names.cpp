@@ -242,6 +242,13 @@ void Compilation::check_native(Unit &p_unit, uint16_t p_modifiers, uint32_t p_of
 	}
 }
 
+// Called for everything that is not an instance method.
+static void check_override_allowed(Unit &p_unit, uint16_t p_modifiers, uint32_t p_offset) {
+	if (p_modifiers & Modifiers::Override) {
+		p_unit.diagnostics.error(p_offset, "'override' can only be used on an instance method");
+	}
+}
+
 void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block) {
 	switch (p_node->kind) {
 		case NodeKind::ClassDecl: {
@@ -256,6 +263,12 @@ void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block
 			if (decl->modifiers.bits & Modifiers::Dynamic) {
 				p_unit.diagnostics.error(decl->name_offset, "dynamic classes are not supported");
 			}
+			if (p_unit.is_builtin) {
+				for (const Metadata &tag : decl->metadata) {
+					symbol->klass->incomplete |= tag.name == "Incomplete";
+				}
+			}
+			check_override_allowed(p_unit, decl->modifiers.bits, decl->name_offset);
 			check_native(p_unit, decl->modifiers.bits, decl->name_offset);
 			declare_package_level(p_unit, symbol, p_in_block);
 			declare_class_members(p_unit, symbol, decl);
@@ -280,6 +293,7 @@ void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block
 			symbol->type = decl->return_type;
 			decl->symbol = symbol;
 			check_native(p_unit, decl->modifiers.bits, decl->name_offset);
+			check_override_allowed(p_unit, decl->modifiers.bits, decl->name_offset);
 			declare_package_level(p_unit, symbol, p_in_block);
 		} break;
 		case NodeKind::VarDecl: {
@@ -291,6 +305,7 @@ void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block
 				symbol->type = declarator.type;
 				symbol->is_const = decl->is_const;
 				declarator.symbol = symbol;
+				check_override_allowed(p_unit, decl->modifiers.bits, declarator.offset);
 				declare_package_level(p_unit, symbol, p_in_block);
 			}
 		} break;
@@ -354,11 +369,15 @@ void Compilation::declare_class_members(Unit &p_unit, Symbol *p_class, ClassDecl
 				symbol->type = declarator.type;
 				symbol->is_const = decl->is_const;
 				declarator.symbol = symbol;
+				check_override_allowed(p_unit, decl->modifiers.bits, declarator.offset);
 				declare_member(p_unit, p_class, symbol);
 			}
 		} else if (member->kind == NodeKind::FunctionDecl) {
 			FunctionDecl *decl = static_cast<FunctionDecl *>(member);
 			check_native(p_unit, decl->modifiers.bits, decl->name_offset);
+			if (decl->modifiers.bits & Modifiers::Static) {
+				check_override_allowed(p_unit, decl->modifiers.bits, decl->name_offset);
+			}
 			if (decl->accessor != FunctionDecl::None) {
 				declare_accessor(p_unit, p_class, decl);
 				continue;

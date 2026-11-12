@@ -30,7 +30,7 @@ ROADMAP = [
     ("1a", "Parser", "kas3c parse reads AS3 and reports syntax errors.",
      "Every syntax error has a file, line and column.", "done"),
     ("1b", "Names", "kas3c check resolves packages, imports, classes and scopes.",
-     "Unknown and duplicate names are reported before running.", "now"),
+     "Unknown and duplicate names are reported before running.", "done"),
     ("1c", "Types", "The checker gives every expression a type.",
      "Type errors and definite null misuse are reported before running.", "next"),
     ("L1", "Language server, first slice (proposed)", "kas3c lsp: errors as you type and go to definition.",

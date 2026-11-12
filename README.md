@@ -5,8 +5,8 @@ ActionScript 3 as a first-class scripting language for Godot 4.
 You write AS3 classes that extend Godot's own classes. The same source runs in the editor, on desktop, on iOS
 and Android, and on Nintendo Switch through the Kumikae build.
 
-> **Status: early.** Today the compiler can parse AS3 and report syntax errors. Nothing runs inside Godot
-> yet. The [roadmap](docs/roadmap.md) shows what comes next and how you can tell when each stage is done.
+> **Status: early.** Today the compiler can parse AS3 and resolve names, and it reports syntax and name
+> errors. Nothing runs inside Godot yet. The [roadmap](docs/roadmap.md) shows what comes next and how you can tell when each stage is done.
 
 ## What you will write
 
@@ -50,14 +50,14 @@ package game {
 | Capability | Status |
 |---|---|
 | Parse AS3 and report syntax errors (`kas3c parse`) | **Works** |
-| Resolve names: packages, imports, classes, scopes (`kas3c check`) | In progress |
+| Resolve names: packages, imports, classes, scopes (`kas3c check`) | **Works** |
 | Check types | Next |
 | Run a script in the Godot editor | Planned (stage 2) |
 | Export a release build as native code | Planned (stage 3) |
 | iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |
 | Language server, debugger, JetBrains plugin | Planned (stage 6) |
 
-## Try the parser
+## Try the compiler
 
 Before you begin, install CMake 3.22 or later, a C++17 compiler, and Python 3 (for the tests).
 
@@ -80,10 +80,16 @@ Before you begin, install CMake 3.22 or later, a C++17 compiler, and Python 3 (f
    compiler/build/kas3c parse --dump-ast compiler/tests/corpus/Shapes.as
    ```
 
+4. Check a file's names, and print what each one refers to:
+
+   ```bash
+   compiler/build/kas3c check --dump-names --declarations compiler/tests/stubs/godot.as compiler/tests/corpus/Shapes.as
+   ```
+
 Errors go to standard error as `<file>:<line>:<column>: error: <message>`. The exit status is 0 when there
 are no errors, 1 when a file has errors, and 2 for bad usage or an unreadable file.
 
-For the grammar the parser accepts and its limits, see the [compiler README](compiler/README.md).
+For what the compiler accepts and checks, and its limits, see the [compiler README](compiler/README.md).
 
 ## How it works
 
