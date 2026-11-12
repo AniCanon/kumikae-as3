@@ -98,10 +98,21 @@ and assignment to `const`.
 
 - **Arithmetic on two numbers is a `Number`,** as in AS3: `int + int` is computed without wrapping, and wraps
   only when it is stored in an `int`. Bitwise operators give `int`; `>>>` gives `uint`.
-- **`+` with a `String` on either side is a `String`.** With a `*` on either side it is `*`.
-- **A whole-number literal is an `int` if it fits, then a `uint`, then a `Number`.**
-- **An unknown member of a dynamic class is `*`.** The dynamic classes are `Object`, `Array`, `Vector`,
-  `Date`, `RegExp`, `Error` and `Dictionary`. Their subclasses are not dynamic.
+- **`+` with a `String` on either side is a `String`,** whatever the other side is. Otherwise, with a `*` on
+  either side it is `*`.
+- **A whole-number literal is an `int` if it fits, then a `uint`, then a `Number`.** `-0` is a `Number`,
+  because an `int` has no negative zero.
+- **An assignment has the type of what is assigned to.** `i = n` and `i += n` are `int` when `i` is. Adobe's
+  reference describes the result as the assigned value; which of the two its compiler produces has not been
+  checked.
+- **`x as int`, `as uint`, `as Number` and `as Boolean` are `Object`,** because `as` gives `null` when the
+  value is not of the type.
+- **Only a number indexes a vector's elements.** `v[i]` with a numeric `i` has the element type; any other
+  index is `*`.
+- **An unknown member of a dynamic class is `*`.** The dynamic classes are `Object`, `Class`, `Array`,
+  `Vector`, `Date`, `RegExp`, `Dictionary`, and `Error` with its built-in subclasses. Classes you derive
+  from them are not dynamic.
+- **Calling, or using `new` on, a value typed `Function`, `Class` or `Object` gives `*`.**
 - **`this` inside a nested function is `*`,** because AS3 decides it when the function is called.
 - **Arithmetic on anything but numbers, strings and Booleans has no type yet (`?`).** Godot's math types get
   their operators in a later part.
@@ -146,8 +157,12 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   `internal` class is visible. Adobe's compiler is stricter.
 - **Inside a class whose base class is unknown, undefined names aren't reported,** because the missing class
   may declare them.
-- **Members of the built-in classes are exempt from the override rules.** A subclass of `Array` may define
-  `push`, and any class may define `toString`, without `override`. Not checked against Adobe's compiler.
+- **A built-in member may be redefined with or without `override`.** A subclass of `Array` may define
+  `push`, and any class may define `toString`, either way. Which one AS3 wants depends on whether the member
+  is in the `AS3` namespace, on the prototype, or public, and this compiler doesn't model that. Adobe's
+  compiler is stricter.
+- **A class itself has only its own static members.** `Player.toString()` and `Player.prototype` are
+  reported as missing static members.
 - **`protected` members are reachable through any object,** from code in the declaring class or a subclass.
   Adobe's reference doesn't say whether its compiler allows this.
 - **`this` inside a closure in a static method is an error.** AS3 allows it, with `this` being the global

@@ -633,8 +633,11 @@ static void test_review_findings() {
 	// Object's methods can be called by bare name, and defined without `override`.
 	CHECK_MAIN("package { public class Main { function f():void { hasOwnProperty(\"x\"); toString(); valueOf(); } } }");
 	CHECK_MAIN("package { public class Main extends Error { function f():String { return toString() + message; } } }");
-	CHECK_MAIN("package { public class Main { override public function /*!*/toString():String { return \"\"; } } }",
-			"'toString' is marked 'override' but no base class has a method to override");
+	// A built-in member may be redefined with or without `override`: which it needs depends on AS3
+	// namespaces, which this compiler does not model.
+	CHECK_MAIN("package { public class Main { override public function toString():String { return \"\"; } } }");
+	CHECK_MAIN("package { public class Main extends Error {\n"
+			   "override public function getStackTrace():String { return \"\"; } } }");
 	// Members of built-in classes are found by bare name in a subclass.
 	CHECK_MAIN("package { public class Main extends Array { function top():* { return this[length - 1]; }\n"
 			   "function add(x:*):void { push(x); } } }");

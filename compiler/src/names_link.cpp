@@ -481,9 +481,7 @@ void Compilation::check_overrides(Symbol *p_class) {
 	Diagnostics &diagnostics = p_class->unit->diagnostics;
 	// The instance member of that name that a base class hands down, if any.
 	auto inherited = [&](std::string_view p_name) -> Symbol * {
-		// Members of the built-in classes live in the AS3 namespace or on the prototype: a class may define
-		// its own without `override`.
-		for (Symbol *base = p_class->klass->base; base && !base->unit->is_builtin; base = base->klass->base) {
+		for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
 			Symbol *member = find_in(base->klass->members, p_name);
 			if (member && !member->is_static() && inherited_visible(member, base, p_class->package)) {
 				return member;
@@ -491,8 +489,25 @@ void Compilation::check_overrides(Symbol *p_class) {
 		}
 		return nullptr;
 	};
+	// True if a built-in base declares the name at all, visible or not, static or not.
+	auto builtin_has = [&](std::string_view p_name) {
+		for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
+			if (base->unit->is_builtin && find_in(base->klass->members, p_name)) {
+				return true;
+			}
+		}
+		return false;
+	};
 	// p_accessor: None for a plain method, Getter or Setter for half of a property.
 	auto check_function = [&](FunctionDecl *p_function, Symbol *p_base) {
+		// A built-in member may be redefined with or without `override`. Which one AS3 wants depends on
+		// whether the member is in the AS3 namespace, on the prototype, or public; that is not modelled.
+		if (p_base && p_base->unit->is_builtin) {
+			return;
+		}
+		if (!p_base && (p_function->modifiers.bits & Modifiers::Override) && builtin_has(p_function->name)) {
+			return;
+		}
 		std::string name = quoted(p_function->name);
 		uint32_t offset = p_function->name_offset;
 		FunctionDecl *overridden = nullptr;
@@ -529,7 +544,7 @@ void Compilation::check_overrides(Symbol *p_class) {
 			}
 			for (Declarator &declarator : decl->declarators) {
 				Symbol *base = inherited(declarator.name);
-				if (base) {
+				if (base && !base->unit->is_builtin) {
 					diagnostics.error(declarator.offset, quoted(declarator.name) + " conflicts with " +
 																 quoted(declarator.name) + " inherited from " +
 																 std::string(base->owner->name));

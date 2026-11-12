@@ -5,8 +5,9 @@
 //
 // Three things are special to this file:
 // - `T` inside Vector is the vector's element type.
-// - Members declared here are exempt from the override rules. In AS3 they live in the AS3 namespace or on
-//   the prototype, so a subclass may define `toString` or `push` as a new public method.
+// - A member declared here may be redefined in a subclass with or without `override`. Which one AS3 wants
+//   depends on whether the member is in the AS3 namespace, on the prototype, or public, and this compiler
+//   does not model that.
 // - Where the reference documents two constructor forms, or leaves trailing parameters optional without
 //   giving a default, the parameters here are given defaults so that every documented call is accepted.
 package {
@@ -21,7 +22,7 @@ package {
 		public native function valueOf():Object;
 	}
 
-	public final native class Class {}
+	public dynamic native class Class {}
 
 	public final native class Function {
 		public native function get length():int;

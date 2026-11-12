@@ -174,6 +174,7 @@ class Typer {
 	const Type *object_;
 	const Type *function_;
 	const Type *regexp_;
+	const Type *class_type_;
 
 	void error(uint32_t p_offset, std::string p_message) { unit_.diagnostics.error(p_offset, std::move(p_message)); }
 
@@ -282,12 +283,19 @@ class Typer {
 	// The member of that name that an object of the class or interface has, whatever its visibility.
 	Symbol *instance_member(Symbol *p_class, std::string_view p_name) {
 		if (p_class->kind == SymbolKind::Class) {
+			// A static of a subclass does not hide an instance member inherited under the same name.
+			Symbol *fallback = nullptr;
 			for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
 				if (Symbol *member = find_in(owner->klass->members, p_name)) {
-					return member;
+					if (!member->is_static()) {
+						return member;
+					}
+					if (!fallback) {
+						fallback = member;
+					}
 				}
 			}
-			return nullptr;
+			return fallback;
 		}
 		// An interface: itself, everything it extends, then what every object has.
 		std::vector<Symbol *> pending{ p_class };
@@ -397,20 +405,34 @@ class Typer {
 	// ---- expressions ----
 
 	const Type *number_literal(const NumberLit *p_literal) const {
-		std::string text(p_literal->text);
-		bool hex = text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
-		if (!hex && text.find_first_of(".eE") != std::string::npos) {
-			return number_;
-		}
-		char *end = nullptr;
-		unsigned long long value = std::strtoull(text.c_str(), &end, hex ? 16 : 10);
-		if (!end || *end != 0 || text.size() > 18) {
+		unsigned long long value = 0;
+		if (!whole_value(p_literal, &value)) {
 			return number_;
 		}
 		if (value <= 2147483647ull) {
 			return int_;
 		}
 		return value <= 4294967295ull ? uint_ : number_;
+	}
+
+	// The value of a literal written as a whole number, if it is small enough to matter here.
+	bool whole_value(const NumberLit *p_literal, unsigned long long *r_value) const {
+		std::string text(p_literal->text);
+		bool hex = text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
+		if (!hex && text.find_first_of(".eE") != std::string::npos) {
+			return false;
+		}
+		size_t start = hex ? 2 : 0;
+		while (start + 1 < text.size() && text[start] == '0') {
+			start++;
+		}
+		std::string digits = text.substr(start);
+		if (digits.empty() || digits.size() > 15) {
+			return false;
+		}
+		char *end = nullptr;
+		*r_value = std::strtoull(digits.c_str(), &end, hex ? 16 : 10);
+		return end && *end == 0;
 	}
 
 	void list(const List<Expr *> &p_list) {
@@ -451,10 +473,15 @@ class Typer {
 			case Type::Any:
 				return any_;
 			case Type::Instance:
-				return type == function_ ? any_ : unknown_;
+				return dynamic_value(type) ? any_ : unknown_;
 			default:
 				return unknown_;
 		}
+	}
+
+	// A value that may be a function or a class, known only when the program runs.
+	bool dynamic_value(const Type *p_type) const {
+		return p_type == function_ || p_type == object_ || p_type == class_type_;
 	}
 
 	const Type *unary(Unary *p_unary) {
@@ -475,8 +502,10 @@ class Typer {
 			case TokenKind::Minus:
 				if (p_unary->operand && p_unary->operand->kind == NodeKind::NumberLit) {
 					// `-1` is an int, and so is -2147483648, whose digits alone are not.
-					std::string_view text = static_cast<NumberLit *>(p_unary->operand)->text;
-					if (operand == int_ || text == "2147483648") {
+					// Not -0: an int has no negative zero.
+					unsigned long long value = 0;
+					if (whole_value(static_cast<NumberLit *>(p_unary->operand), &value) && value > 0 &&
+							value <= 2147483648ull) {
 						return int_;
 					}
 				}
@@ -491,6 +520,10 @@ class Typer {
 	const Type *arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right) {
 		if (p_left->kind == Type::Unknown || p_right->kind == Type::Unknown) {
 			return unknown_;
+		}
+		// A string plus anything is a string: the other side is converted.
+		if ((p_op == TokenKind::Plus || p_op == TokenKind::PlusAssign) && (p_left == string_ || p_right == string_)) {
+			return string_;
 		}
 		// On anything but the primitives the result depends on the class. Godot's math types get their
 		// rules in a later stage; until then the type is unknown.
@@ -512,8 +545,14 @@ class Typer {
 			case TokenKind::Caret:
 			case TokenKind::ShiftLeft:
 			case TokenKind::ShiftRight:
+			case TokenKind::AmpAssign:
+			case TokenKind::PipeAssign:
+			case TokenKind::CaretAssign:
+			case TokenKind::ShiftLeftAssign:
+			case TokenKind::ShiftRightAssign:
 				return int_;
 			case TokenKind::ShiftRightUnsigned:
+			case TokenKind::ShiftRightUnsignedAssign:
 				return uint_;
 			default:
 				// AS3 computes int + int as a Number; the wrap to 32 bits happens when it is stored in an int.
@@ -539,7 +578,10 @@ class Typer {
 				return boolean_;
 			case TokenKind::KwAs:
 				if (right->kind == Type::ClassObject) {
-					return right->element;
+					// `as` gives null when the value is not of the type, so the result is never a bare
+					// number or Boolean: those cannot hold null.
+					const Type *result = right->element;
+					return numeric(result) || result == boolean_ ? object_ : result;
 				}
 				return right->kind == Type::Unknown ? unknown_ : any_;
 			case TokenKind::AmpAmp:
@@ -596,18 +638,26 @@ class Typer {
 			case NodeKind::Member: {
 				Member *member = static_cast<Member *>(p_expression);
 				if (member->symbol) {
-					return symbol_type(member->symbol, nullptr); // A definition named by its package.
+					// A definition named by its package. The path below it is not a value.
+					for (Expr *part = member->object; part; part = part->kind == NodeKind::Member ? static_cast<Member *>(part)->object : nullptr) {
+						part->type = unknown_;
+					}
+					return symbol_type(member->symbol, nullptr);
 				}
 				return member_type(expression(member->object), member);
 			}
 			case NodeKind::Index: {
 				Index *index = static_cast<Index *>(p_expression);
 				const Type *object = expression(index->object);
-				expression(index->index);
+				const Type *key = expression(index->index);
 				if (object->kind == Type::Vector) {
-					return object->element;
+					// Only a number reaches the elements; `v["length"]` is a property.
+					return numeric(key) ? object->element : (key->kind == Type::Unknown ? unknown_ : any_);
 				}
-				return object->kind == Type::Unknown ? unknown_ : any_;
+				if (object->kind == Type::Unknown || object->kind == Type::Void || object->kind == Type::Null) {
+					return unknown_;
+				}
+				return any_;
 			}
 			case NodeKind::TypeApply: {
 				TypeApply *apply = static_cast<TypeApply *>(p_expression);
@@ -626,7 +676,7 @@ class Typer {
 				if (callee->kind == Type::ClassObject) {
 					return callee->element;
 				}
-				return callee->kind == Type::Any ? any_ : unknown_;
+				return callee->kind == Type::Any || dynamic_value(callee) ? any_ : unknown_;
 			}
 			case NodeKind::Unary:
 				return unary(static_cast<Unary *>(p_expression));
@@ -640,7 +690,23 @@ class Typer {
 				Assign *assign = static_cast<Assign *>(p_expression);
 				const Type *target = expression(assign->target);
 				const Type *value = expression(assign->value);
-				if (assign->op == TokenKind::Assign || numeric(target)) {
+				if (target->kind == Type::Unknown) {
+					return unknown_;
+				}
+				bool bitwise = false;
+				switch (assign->op) {
+					case TokenKind::AmpAssign:
+					case TokenKind::PipeAssign:
+					case TokenKind::CaretAssign:
+					case TokenKind::ShiftLeftAssign:
+					case TokenKind::ShiftRightAssign:
+					case TokenKind::ShiftRightUnsignedAssign:
+						bitwise = true;
+						break;
+					default:
+						break;
+				}
+				if (assign->op == TokenKind::Assign || (numeric(target) && !bitwise)) {
 					return target; // The value, converted to what it is stored in.
 				}
 				if (assign->op == TokenKind::AmpAmpAssign || assign->op == TokenKind::PipePipeAssign) {
@@ -822,6 +888,7 @@ public:
 		object_ = builtin("Object");
 		function_ = builtin("Function");
 		regexp_ = builtin("RegExp");
+		class_type_ = builtin("Class");
 	}
 
 	void run() {

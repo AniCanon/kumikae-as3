@@ -29,15 +29,17 @@ static std::string fixture(const std::string &p_body) {
 		   "public var shape:Shape; public var fn:Function; public var node:Node; private var mine:int;\n"
 		   "public static var total:int; public static function make():Main { return null; }\n"
 		   "public function get size():Number { return 0; } public function set size(v:Number):void {}\n"
+		   "public function get width():Number { return 0; }\n"
 		   "public function area():Number { return 0; }\n"
-		   "public function untyped() {}\n"
+		   "public function untyped() {} public function set only(v:String):void {} public var cls:Class;\n"
 		   "public function run(param:int, ...rest):void {\n" +
 			p_body +
 			"\n}\n} }\n"
 			"class Base { public var inherited:String; protected var guarded:int; private var secret:int;\n"
 			"internal var near:int; public static var base_total:int;\n"
 			"public function base_method():Base { return this; } }\n"
-			"interface Shape { function area():Number; function get size():Number; }\n";
+			"interface Shape extends Sized { function area():Number; function get size():Number; }\n"
+			"interface Sized { function get width():Number; }\n";
 }
 
 struct Case {
@@ -46,7 +48,7 @@ struct Case {
 };
 
 // Each expression becomes one statement of the method; its type must be the one given.
-static void check_types(std::initializer_list<Case> p_cases) {
+static void check_types(std::initializer_list<Case> p_cases, bool p_clean = true) {
 	std::string body;
 	for (const Case &item : p_cases) {
 		body += item.expression;
@@ -56,11 +58,13 @@ static void check_types(std::initializer_list<Case> p_cases) {
 	compilation.add("godot.as", GODOT_STUB, true);
 	Unit *unit = compilation.add("Main.as", fixture(body));
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
-	// Lines 1 to 10 are the fixture's head; statement i is on line 11 + i.
+	if (p_clean) {
+		CHECK_EQ(compilation.format_diagnostics(), std::string());
+	}
+	// Lines 1 to 11 are the fixture's head; statement i is on line 12 + i.
 	std::vector<std::string> types(p_cases.size(), "(none)");
 	for (const TypedExpression &typed : unit->typed) {
-		int line = unit->source.position(typed.offset).line - 11;
+		int line = unit->source.position(typed.offset).line - 12;
 		if (line >= 0 && line < (int)types.size() && types[line] == "(none)") {
 			types[line] = compilation.type_name(typed.type);
 		}
@@ -321,6 +325,117 @@ static void test_errors() {
 			std::string("Main.as:1:83: error: 'near' in Thing is not visible from this package\n"));
 }
 
+static void test_review_findings() {
+	check_types({
+			// Only a number indexes a vector's elements.
+			{ "ints[label]", "*" },
+			{ "ints[\"length\"]", "*" },
+			{ "ints[any]", "*" },
+			{ "ints[count]", "int" },
+			{ "ints[big]", "int" },
+			// `as` gives null when the value is not of the type, so it is never a bare number or Boolean.
+			{ "any as int", "Object" },
+			{ "any as Number", "Object" },
+			{ "any as Boolean", "Object" },
+			{ "any as String", "String" },
+			// Compound bitwise assignment.
+			{ "any &= 1", "int" },
+			{ "any <<= 1", "int" },
+			{ "any >>>= 1", "uint" },
+			{ "flag |= true", "int" },
+			{ "count &= 3", "int" },
+			// Literals.
+			{ "0x00000000000000000001", "int" },
+			{ "0x000000000000000000FF", "int" },
+			{ "-0", "Number" },
+			{ "-0x80000000", "int" },
+			{ "-2147483649", "Number" },
+			// A string plus anything is a string.
+			{ "\"\" + obj", "String" },
+			{ "\"at \" + this", "String" },
+			{ "other + \"!\"", "String" },
+			{ "label += obj", "String" },
+			// Calls and `new` whose result is decided when the program runs.
+			{ "new cls()", "*" },
+			{ "cls(obj)", "*" },
+			{ "new fn()", "*" },
+			{ "obj()", "*" },
+			{ "cls.NAME", "*" },
+			{ "cls.create()", "*" },
+			// More of what the plan names.
+			{ "shape.width", "Number" },
+			{ "only", "String" },
+			{ "count += 1", "int" },
+			{ "++count", "int" },
+			{ "flag &&= flag", "Boolean" },
+			{ "flag ? 1 : null", "*" },
+			{ "void 0", "*" },
+			{ "super.inherited", "String" },
+	});
+	// `this` in a nested named function, as in a function expression, is the caller's.
+	check_types({ { "function inner():void {\nthis;\n}", "(none)" }, { "", "*" } });
+
+	// Unknown is not `*`: after an error, and on void and null.
+	check_types({
+			{ "missing_name", "?" },
+			{ "missing_name.a.b", "?" },
+			{ "other.nope", "?" },
+			{ "other.nope.more", "?" },
+			{ "other.secret", "?" },
+			{ "Main.nope", "?" },
+			{ "trace(1).x", "?" },
+			{ "null.x", "?" },
+			{ "trace(1)[0]", "?" },
+			{ "missing_name + 1", "?" },
+			{ "flag ? missing_name : 1", "?" },
+			{ "missing_name || other", "?" },
+			{ "missing_name[0]", "?" },
+			{ "any as missing_name", "?" },
+			{ "new missing_name()", "?" },
+			{ "missing_name()", "?" },
+			{ "var gone:Gone = null; gone", "null" },
+			{ "gone", "?" },
+			{ "gone.x", "?" },
+	}, false);
+
+	// A static of a subclass does not hide an inherited instance member of the same name.
+	check_errors("", {},
+			"class Low { public var count:String; }\n"
+			"class High extends Low { public static var count:int; public static function toString():String { return \"\"; }\n"
+			"function f(h:High):void { h.count.charAt(0); h.toString(); High.count.toFixed(1); } }\n");
+	// `super` is the base class; `super(...)` has no value.
+	check_errors("super./*!*/mine;", { "'Base' has no member 'mine'" });
+	// Every place an expression can appear is typed.
+	check_errors("try {} catch (e:Error) { other./*!*/a1; }\n"
+				 "switch (count) { case other./*!*/a2: other./*!*/a3; }\n"
+				 "for (var i:int = 0; i < 1; other./*!*/a4) {}\n"
+				 "var f:Function = function(x:* = other./*!*/a5):* { return other./*!*/a6; };\n"
+				 "do { throw other./*!*/a7; } while (other./*!*/a8);\n"
+				 "for each (other./*!*/a9 in other./*!*/a10) {}\n"
+				 "if (other./*!*/a11) {} else { lab: { other./*!*/a12; } }",
+			{ "'Main' has no member 'a1'", "'Main' has no member 'a2'", "'Main' has no member 'a3'",
+					"'Main' has no member 'a4'", "'Main' has no member 'a5'", "'Main' has no member 'a6'",
+					"'Main' has no member 'a7'", "'Main' has no member 'a8'", "'Main' has no member 'a9'",
+					"'Main' has no member 'a10'", "'Main' has no member 'a11'", "'Main' has no member 'a12'" });
+	// Code after a class is outside it.
+	check_errors("", { "'mine' is private in Main" }, "function peek(m:Main):void { m./*!*/mine; }\n");
+
+	Compilation compilation;
+	Unit *unit = compilation.add("Main.as", "package { public class Main extends Error {\n"
+											"public function Main() {\nsuper();\n}\n"
+											"override public function getStackTrace():String { return \"\"; }\n"
+											"public static function last():void {} } }\n"
+											"function later():void {\nthis;\n}\n"
+											"class List extends Array { public var length:int; public function push(x:*):void {} }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(unit->typed.size(), (size_t)2);
+	if (unit->typed.size() == 2) {
+		CHECK_EQ(compilation.type_name(unit->typed[0].type), std::string("void"));
+		CHECK_EQ(compilation.type_name(unit->typed[1].type), std::string("*"));
+	}
+}
+
 static void test_limits() {
 	// A long chain on an unknown root, and on a dynamic one.
 	std::string chain = "any";
@@ -336,6 +451,7 @@ int main() {
 	test_calls_and_new();
 	test_members();
 	test_errors();
+	test_review_findings();
 	test_limits();
 	return check::finish();
 }

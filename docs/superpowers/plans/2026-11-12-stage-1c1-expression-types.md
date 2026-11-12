@@ -34,9 +34,9 @@ iterative walks over anything the parser builds in a loop, stage by name.
 6. **Arithmetic on two numbers has type `Number`,** as in AS3: `int + int` is computed without wrapping and
    wraps only when stored to an `int`. Bitwise operators give `int`, `>>>` gives `uint`. `+` with a `String`
    gives `String`. Arithmetic involving a class type gives *unknown*, with no error, until part 3.
-7. **Members of built-in classes are exempt from the override rules.** In AS3 they live in the `AS3`
-   namespace or on the prototype, so a subclass may define `push` or `toString` as a new public method.
-   Unverified against Adobe's compiler. Cost if wrong: a redefinition that Adobe rejects is accepted.
+7. **A built-in member may be redefined with or without `override`** (amended after review). Which one AS3
+   wants depends on whether the member is in the `AS3` namespace, on the prototype, or public, which this
+   compiler does not model. Cost: accepts redefinitions that Adobe's compiler rejects.
 8. **`protected` is reachable through any instance** from code in the declaring class or a subclass. Adobe's
    reference doesn't say; this is the behaviour AS3 programmers report. Cost if wrong: accepts more.
 9. **Statics are not inherited:** `Sub.staticOfBase` is an error (Adobe's reference, "Static class members
