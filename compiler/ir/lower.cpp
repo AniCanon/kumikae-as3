@@ -1759,7 +1759,7 @@ public:
 		error_ = compilation_.builtin("Error");
 	}
 
-	bool run() {
+	bool run(LowerMode p_mode) {
 		std::vector<Unit *> units;
 		for (Unit &unit : compilation_.units()) {
 			if (!unit.is_declaration && unit.tree) {
@@ -1862,6 +1862,9 @@ public:
 		}
 		// The program starts with the first class of the first file's package block.
 		unit_ = units[0];
+		if (p_mode == LowerMode::Library) {
+			return !failed_;
+		}
 		if (units[0]->tree->package) {
 			for (Node *definition : units[0]->tree->package->definitions) {
 				if (definition->kind == NodeKind::ClassDecl && module_.entry_class == NONE) {
@@ -1892,9 +1895,9 @@ public:
 
 } // namespace
 
-bool lower(Compilation &p_compilation, Module *r_module) {
+bool lower(Compilation &p_compilation, Module *r_module, LowerMode p_mode) {
 	Lowerer lowerer(p_compilation, *r_module);
-	return lowerer.run();
+	return lowerer.run(p_mode);
 }
 
 } // namespace ir

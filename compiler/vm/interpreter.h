@@ -10,6 +10,8 @@
 #include "runtime.h"
 
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace kas3 {
@@ -21,6 +23,9 @@ public:
 	static const size_t MAX_FRAMES = 10000;
 	// A stack trace shows this many frames, then how many more there were.
 	static const size_t MAX_TRACE = 32;
+	// A call from outside may be made while another is in progress (the engine calls a script, which calls
+	// the engine, which calls a script) this many levels deep.
+	static const int MAX_ENTRIES = 64;
 
 	// Called at each statement, when set: where a debugger stops. Returning false ends the run.
 	typedef bool (*StatementHook)(Interpreter &p_interpreter, void *p_data);
@@ -46,6 +51,9 @@ private:
 	size_t trace_lines_ = 0;
 	bool stopped_ = false; // Nothing more is to run.
 	bool halted_ = false; // Because the statement hook said so, not because of an error.
+	bool started_ = false; // The static initializers have run.
+	int entries_ = 0; // Calls from outside in progress.
+	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
 	StatementHook hook_ = nullptr;
 	void *hook_data_ = nullptr;
 
@@ -56,8 +64,9 @@ private:
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
 	void unwind(size_t p_depth);
-	bool run(size_t p_depth);
-	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count);
+	bool run(size_t p_depth, Slot *r_result);
+	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);
+	void report();
 	std::string site(const Frame &p_frame) const;
 	std::string object_text(Object *p_object) const;
 	bool is_class(const Object *p_object, uint32_t p_class) const;
@@ -76,6 +85,25 @@ public:
 	// Runs the static initializers, then constructs the entry class. False if an error reached the top:
 	// the host has been given it.
 	bool run_program();
+
+	// ---- for a host that keeps the interpreter and calls into it ----
+	//
+	// Each of these is an entry from outside. An error that nothing catches ends that entry only: the host
+	// is given it, and the interpreter is fit for the next call. An entry may be made while another is in
+	// progress.
+
+	// Runs the static initializers, the first time it is called.
+	bool start();
+	// A new object of the class, its constructor run with no arguments. One reference, the caller's: give
+	// it back with release_object(). Null if the constructor failed.
+	Object *construct(uint32_t p_class);
+	// Calls the object's method of that name. The arguments are in the method's parameter kinds, and
+	// parameters left out take their defaults. A reference returned in r_result is the caller's to release.
+	// False if there is no such method, or it failed.
+	bool call_method(Object *p_object, std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result);
+	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
+	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
+	void release_object(Object *p_object);
 
 	// For a debugger: the frames, innermost last.
 	size_t depth() const { return frames_.size(); }

@@ -19,6 +19,14 @@ Interpreter::Interpreter(const ir::Module &p_module, Host &p_host) :
 		strings_.push_back(new_string(constant));
 	}
 	null_text_ = new_string("null");
+	// A method's function by name, for calls from outside: the class's own and what it inherits.
+	methods_.resize(module_.classes.size());
+	for (size_t i = 0; i < module_.classes.size(); i++) {
+		for (uint32_t method : module_.classes[i].methods) {
+			const std::string &name = module_.functions[method].name;
+			methods_[i][name.substr(name.rfind('/') == std::string::npos ? 0 : name.rfind('/') + 1)] = method;
+		}
+	}
 	globals_.resize(module_.globals.size());
 	for (size_t i = 0; i < globals_.size(); i++) {
 		globals_[i].bits = 0;
@@ -234,16 +242,127 @@ void Interpreter::unwind(size_t p_depth) {
 	}
 }
 
-bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_count) {
+// One entry from outside: runs the function to its end. An error is reported to the host and cleared, so
+// that the next entry starts clean; an error that was already on its way out when this entry began is put
+// back afterwards.
+bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+	Object *outer_error = pending_;
+	std::string outer_trace = std::move(trace_);
+	size_t outer_lines = trace_lines_;
+	bool outer_stopped = stopped_;
+	bool outer_halted = halted_;
+	pending_ = nullptr;
+	trace_.clear();
+	trace_lines_ = 0;
+	stopped_ = false;
+	halted_ = false;
+
 	size_t depth = frames_.size();
-	if (!push(p_function, p_arguments, p_count, NONE)) {
+	bool ok = false;
+	if (entries_ >= MAX_ENTRIES) {
+		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+	} else {
+		entries_++;
+		ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
+		entries_--;
+	}
+	if (!ok) {
+		report();
+	}
+	pending_ = outer_error;
+	trace_ = std::move(outer_trace);
+	trace_lines_ = outer_lines;
+	stopped_ = outer_stopped;
+	halted_ = outer_halted;
+	return ok;
+}
+
+// Gives the host the error that ended an entry, and forgets it.
+void Interpreter::report() {
+	if (!(halted_ && !pending_)) { // Stopped on request: there is no error to report.
+		if (trace_lines_ > MAX_TRACE) {
+			trace_ += "\t... " + std::to_string(trace_lines_ - MAX_TRACE) + " more\n";
+		}
+		std::string text = pending_ ? object_text(pending_) + "\n" + trace_ : trace_;
+		while (!text.empty() && text.back() == '\n') {
+			text.pop_back();
+		}
+		host_.error(text);
+	}
+	if (pending_ && release(pending_)) {
+		drop_object(pending_);
+	}
+	pending_ = nullptr;
+	trace_.clear();
+	trace_lines_ = 0;
+}
+
+bool Interpreter::start() {
+	if (started_) {
+		return true;
+	}
+	started_ = true;
+	bool ok = true;
+	for (uint32_t initializer : module_.initializers) {
+		ok = ok && call(initializer, nullptr, 0);
+	}
+	return ok;
+}
+
+Object *Interpreter::construct(uint32_t p_class) {
+	if (p_class >= module_.classes.size()) {
+		return nullptr;
+	}
+	const ir::Class &klass = module_.classes[p_class];
+	Object *object = new_object(p_class, klass.fields.size());
+	if (!object) {
+		return nullptr;
+	}
+	for (size_t i = 0; i < klass.fields.size(); i++) {
+		if (klass.fields[i].kind == Kind::F64) {
+			object->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
+		}
+	}
+	Slot self;
+	self.bits = 0;
+	self.p = object;
+	if (klass.constructor != NONE && !call(klass.constructor, &self, 1)) {
+		release_object(object);
+		return nullptr;
+	}
+	return object;
+}
+
+uint32_t Interpreter::find_method(uint32_t p_class, std::string_view p_name) const {
+	if (p_class >= methods_.size()) {
+		return NONE;
+	}
+	auto found = methods_[p_class].find(std::string(p_name));
+	return found == methods_[p_class].end() ? NONE : found->second;
+}
+
+bool Interpreter::call_method(Object *p_object, std::string_view p_name, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+	uint32_t method = p_object ? find_method(p_object->klass, p_name) : NONE;
+	if (method == NONE) {
 		return false;
 	}
-	return run(depth);
+	std::vector<Slot> arguments(p_count + 1);
+	arguments[0].bits = 0;
+	arguments[0].p = p_object;
+	for (size_t i = 0; i < p_count; i++) {
+		arguments[i + 1] = p_arguments[i];
+	}
+	return call(method, arguments.data(), arguments.size(), r_result);
+}
+
+void Interpreter::release_object(Object *p_object) {
+	if (release(p_object)) {
+		drop_object(p_object);
+	}
 }
 
 // Runs until the frame above p_depth returns. False if an error left it instead.
-bool Interpreter::run(size_t p_depth) {
+bool Interpreter::run(size_t p_depth, Slot *r_result) {
 	while (frames_.size() > p_depth) {
 		if (pending_ || stopped_) {
 			unwind(p_depth);
@@ -642,6 +761,8 @@ bool Interpreter::run(size_t p_depth) {
 					} else {
 						target = value;
 					}
+				} else if (in.op == Op::Return && frames_.size() == p_depth && r_result) {
+					*r_result = value; // The caller from outside takes it, with its reference.
 				} else if (in.op == Op::Return && ir::is_reference(kind)) {
 					drop(kind, value); // Nobody wants it.
 				}
@@ -682,50 +803,18 @@ bool Interpreter::run(size_t p_depth) {
 }
 
 bool Interpreter::run_program() {
-	bool ok = true;
-	for (uint32_t initializer : module_.initializers) {
-		ok = ok && call(initializer, nullptr, 0);
+	if (!start()) {
+		return false;
 	}
-	if (ok && module_.entry_class != NONE) {
-		const ir::Class &klass = module_.classes[module_.entry_class];
-		Object *entry = new_object(module_.entry_class, klass.fields.size());
-		if (entry) {
-			for (size_t i = 0; i < klass.fields.size(); i++) {
-				if (klass.fields[i].kind == Kind::F64) {
-					entry->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
-				}
-			}
-			Slot self;
-			self.bits = 0;
-			self.p = entry;
-			ok = call(klass.constructor, &self, 1);
-			if (release(entry)) {
-				drop_object(entry);
-			}
-		}
+	if (module_.entry_class == NONE) {
+		return true;
 	}
-	if (!ok && halted_ && !pending_) {
-		trace_.clear();
-		trace_lines_ = 0;
-		return false; // Stopped on request: there is no error to report.
+	Object *entry = construct(module_.entry_class);
+	if (!entry) {
+		return false;
 	}
-	if (!ok) {
-		if (trace_lines_ > MAX_TRACE) {
-			trace_ += "\t... " + std::to_string(trace_lines_ - MAX_TRACE) + " more\n";
-		}
-		trace_lines_ = 0;
-		std::string report = pending_ ? object_text(pending_) + "\n" + trace_ : trace_;
-		while (!report.empty() && report.back() == '\n') {
-			report.pop_back();
-		}
-		host_.error(report);
-		if (pending_ && release(pending_)) {
-			drop_object(pending_);
-		}
-		pending_ = nullptr;
-		trace_.clear();
-	}
-	return ok;
+	release_object(entry);
+	return true;
 }
 
 } // namespace vm

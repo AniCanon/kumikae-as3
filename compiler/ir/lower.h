@@ -11,7 +11,12 @@ namespace ir {
 // checked and have no errors. A construct the interpreter does not run yet is reported on its file as
 // "... is not supported by the interpreter yet", and the result is then false.
 // The program starts by constructing the first class of the first file's package block.
-bool lower(Compilation &p_compilation, Module *r_module);
+enum class LowerMode {
+	Program, // Starts by constructing the first class of the first file's package block.
+	Library, // No entry: a host constructs objects and calls their methods.
+};
+
+bool lower(Compilation &p_compilation, Module *r_module, LowerMode p_mode = LowerMode::Program);
 
 } // namespace ir
 } // namespace kas3
