@@ -2,6 +2,7 @@
 #include "arena.h"
 #include "ast_printer.h"
 #include "diagnostics.h"
+#include "names.h"
 #include "parser.h"
 #include "source.h"
 
@@ -12,13 +13,19 @@
 
 static const char *const USAGE =
 		"usage: kas3c parse [--dump-ast] <file>...\n"
+		"       kas3c check [--dump-names] [--declarations <file>]... <file>...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
 		"\n"
 		"parse  Read ActionScript 3 source files and report syntax errors.\n"
 		"       --dump-ast  also print each file's syntax tree\n"
 		"\n"
-		"Exit status: 0 no errors, 1 syntax errors found, 2 bad usage or an unreadable file.\n";
+		"check  Read the files as one program and report syntax errors and names that\n"
+		"       are unknown, ambiguous, duplicated or misused.\n"
+		"       --dump-names           also print what every name refers to\n"
+		"       --declarations <file>  a file that declares what exists elsewhere\n"
+		"\n"
+		"Exit status: 0 no errors, 1 errors found, 2 bad usage or an unreadable file.\n";
 
 static int usage_error() {
 	std::fputs(USAGE, stderr);
@@ -56,6 +63,48 @@ static int run_parse(const std::vector<std::string> &p_files, bool p_dump_ast) {
 	return errors ? 1 : 0;
 }
 
+static int run_check(int p_argc, char **p_argv) {
+	bool dump_names = false;
+	bool unreadable = false;
+	int files = 0;
+	kas3::Compilation compilation;
+	for (int i = 2; i < p_argc; i++) {
+		bool declaration = false;
+		if (std::strcmp(p_argv[i], "--dump-names") == 0) {
+			dump_names = true;
+			continue;
+		}
+		if (std::strcmp(p_argv[i], "--declarations") == 0) {
+			if (++i >= p_argc) {
+				return usage_error();
+			}
+			declaration = true;
+		} else if (p_argv[i][0] == '-' && p_argv[i][1] != 0) {
+			return usage_error();
+		}
+		std::string text;
+		if (!kas3::read_file(p_argv[i], &text)) {
+			std::fprintf(stderr, "kas3c: cannot read %s\n", p_argv[i]);
+			unreadable = true;
+			continue;
+		}
+		compilation.add(p_argv[i], std::move(text), declaration);
+		files += declaration ? 0 : 1;
+	}
+	if (unreadable) {
+		return 2;
+	}
+	if (files == 0) {
+		return usage_error();
+	}
+	compilation.check();
+	std::fputs(compilation.format_diagnostics().c_str(), stderr);
+	if (dump_names) {
+		std::fputs(compilation.dump_names().c_str(), stdout);
+	}
+	return compilation.has_errors() ? 1 : 0;
+}
+
 int main(int p_argc, char **p_argv) {
 	if (p_argc < 2) {
 		return usage_error();
@@ -68,6 +117,9 @@ int main(int p_argc, char **p_argv) {
 	if (command == "--help") {
 		std::fputs(USAGE, stdout);
 		return 0;
+	}
+	if (command == "check") {
+		return run_check(p_argc, p_argv);
 	}
 	if (command != "parse") {
 		return usage_error();

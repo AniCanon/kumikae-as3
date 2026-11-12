@@ -257,6 +257,11 @@ List<Expr *> Parser::parse_arguments(uint32_t *r_height) {
 		if (!accept(TokenKind::Comma)) {
 			break;
 		}
+		if (at(TokenKind::RParen)) {
+			// `f(a,)`: AS3 has no trailing comma in arguments.
+			error_at(current_.offset, "expected an expression but found ')'", false);
+			break;
+		}
 		if (current_.offset == before) {
 			break;
 		}
@@ -286,6 +291,7 @@ Expr *Parser::parse_call_member(bool p_allow_calls) {
 			}
 			Member *member = node<Member>(left->offset);
 			member->object = left;
+			member->name_offset = current_.offset;
 			member->name = parse_property_name("a property name");
 			link = member;
 		} else if (at(TokenKind::DotLess)) {

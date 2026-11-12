@@ -39,6 +39,44 @@ with tempfile.TemporaryDirectory() as folder:
     result = run("frobnicate")
     check("unknown command", result.returncode == 2 and "usage: kas3c parse" in result.stderr)
 
+    # check: names across files.
+    undefined = os.path.join(folder, "Undefined.as")
+    with open(undefined, "w") as handle:
+        handle.write("package { public class Undefined { var x:Missing; } }\n")
+    stub = os.path.join(folder, "lib.as")
+    with open(stub, "w") as handle:
+        handle.write("package lib { public native class Missing {} }\n")
+    uses = os.path.join(folder, "Uses.as")
+    with open(uses, "w") as handle:
+        handle.write("package { import lib.Missing; public class Uses { var x:Missing; } }\n")
+
+    result = run("check", good)
+    check("check clean", result.returncode == 0 and result.stdout == "" and result.stderr == "", repr(result))
+    result = run("check", bad)
+    check("check syntax error", result.returncode == 1 and "Bad.as:1:" in result.stderr, repr(result))
+    result = run("check", undefined)
+    check("check name error", result.returncode == 1 and
+          result.stderr == "%s:1:42: error: unknown type 'Missing'\n" % undefined and result.stdout == "",
+          repr(result))
+    result = run("check", "--declarations", stub, uses)
+    check("check with declarations", result.returncode == 0 and result.stderr == "", repr(result))
+    result = run("check", uses)
+    check("check without declarations", result.returncode == 1 and "can't find 'lib.Missing'" in result.stderr,
+          repr(result))
+    result = run("check")
+    check("check no files", result.returncode == 2 and "usage: kas3c parse" in result.stderr)
+    result = run("check", "--declarations")
+    check("check dangling option", result.returncode == 2)
+    result = run("check", "--declarations", os.path.join(folder, "nope.as"), good)
+    check("check unreadable declarations", result.returncode == 2 and "cannot read" in result.stderr)
+    result = run("check", os.path.join(folder, "nope.as"))
+    check("check unreadable", result.returncode == 2 and "cannot read" in result.stderr)
+    result = run("check", "--bogus", good)
+    check("check unknown option", result.returncode == 2)
+    result = run("check", "--dump-names", uses, "--declarations", stub)
+    check("check dump", result.returncode == 0 and
+          result.stdout == "1:57 Missing -> class lib.Missing @%s:1:35\n" % stub, repr(result))
+
     result = run("parse")
     check("parse without files", result.returncode == 2 and "usage: kas3c parse" in result.stderr)
 

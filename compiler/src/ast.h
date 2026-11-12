@@ -10,6 +10,8 @@
 
 namespace kas3 {
 
+struct Symbol; // What a name refers to. Filled in by name resolution (names.h); null before it.
+
 template <class T>
 struct List {
 	T *items = nullptr;
@@ -56,6 +58,7 @@ struct TypeRef : Node {
 	List<std::string_view> name; // Dotted parts, for Named and Applied.
 	List<uint32_t> name_offsets; // Where each part starts.
 	TypeRef *argument = nullptr; // For Applied.
+	Symbol *symbol = nullptr; // The class or interface, for Named and Applied.
 };
 
 // ---- declarations (declared early: expressions and statements refer to them) ----
@@ -93,6 +96,7 @@ struct Declarator {
 	Expr *initializer = nullptr;
 	uint32_t offset = 0; // Of the name.
 	uint32_t end = 0;
+	Symbol *symbol = nullptr;
 };
 struct VarDecl : Node {
 	static const NodeKind KIND = NodeKind::VarDecl;
@@ -109,6 +113,7 @@ struct Parameter {
 	bool is_rest = false;
 	uint32_t offset = 0;
 	uint32_t end = 0;
+	Symbol *symbol = nullptr;
 };
 struct Block;
 struct FunctionDecl : Node {
@@ -122,6 +127,7 @@ struct FunctionDecl : Node {
 	List<Parameter> parameters;
 	TypeRef *return_type = nullptr; // Null when not written.
 	Block *body = nullptr; // Null for interface methods and `native` functions.
+	Symbol *symbol = nullptr; // Null for an anonymous function expression.
 };
 
 // ---- expressions ----
@@ -154,6 +160,7 @@ struct SuperExpr : Expr {
 struct Name : Expr {
 	static const NodeKind KIND = NodeKind::Name;
 	std::string_view text;
+	Symbol *symbol = nullptr;
 };
 struct ArrayLit : Expr {
 	static const NodeKind KIND = NodeKind::ArrayLit;
@@ -183,6 +190,10 @@ struct Member : Expr { // `a.b`
 	static const NodeKind KIND = NodeKind::Member;
 	Expr *object = nullptr;
 	std::string_view name;
+	uint32_t name_offset = 0;
+	// Set when the chain up to here names a definition by its package (`flash.utils.getTimer`). The object
+	// below is then a package path, not a value.
+	Symbol *symbol = nullptr;
 };
 struct Index : Expr { // `a[b]`
 	static const NodeKind KIND = NodeKind::Index;
@@ -314,10 +325,12 @@ struct Throw : Stmt {
 };
 struct CatchClause {
 	std::string_view name;
+	uint32_t name_offset = 0;
 	TypeRef *type = nullptr;
 	Block *body = nullptr;
 	uint32_t offset = 0;
 	uint32_t end = 0;
+	Symbol *symbol = nullptr;
 };
 struct Try : Stmt {
 	static const NodeKind KIND = NodeKind::Try;
@@ -351,6 +364,7 @@ struct ClassDecl : Node {
 	TypeRef *extends = nullptr;
 	List<TypeRef *> implements;
 	List<Node *> members; // VarDecl, FunctionDecl or Import.
+	Symbol *symbol = nullptr;
 };
 struct InterfaceDecl : Node {
 	static const NodeKind KIND = NodeKind::InterfaceDecl;
@@ -360,6 +374,7 @@ struct InterfaceDecl : Node {
 	List<Metadata> metadata;
 	List<TypeRef *> extends;
 	List<FunctionDecl *> methods;
+	Symbol *symbol = nullptr;
 };
 struct Import : Node { // `import a.b.C;` or `import a.b.*;`
 	static const NodeKind KIND = NodeKind::Import;

@@ -403,6 +403,7 @@ Stmt *Parser::parse_try() {
 		clause.offset = advance().offset;
 		Token open = expect(TokenKind::LParen, "'('");
 		if (at(TokenKind::Identifier)) {
+			clause.name_offset = current_.offset;
 			clause.name = text(advance());
 		} else {
 			error_expected("a name for the caught error");
