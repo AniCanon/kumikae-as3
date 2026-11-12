@@ -7,6 +7,8 @@
 // Recursion follows the syntax tree, which the parser keeps under about 512 levels.
 #include "names.h"
 
+#include <map>
+#include <unordered_set>
 #include <algorithm>
 #include <cstdlib>
 
@@ -163,6 +165,7 @@ class Typer {
 	bool static_ = false;
 	int closures_ = 0; // How many function expressions or nested functions enclose the current code.
 	FunctionDecl *current_ = nullptr; // The innermost function being typed.
+	mutable std::map<std::pair<Symbol *, Symbol *>, std::pair<bool, bool>> related_; // is_a's answers.
 	bool leaves_ = false; // It has a `return <value>` or a `throw` somewhere in its own body.
 
 	const Type *any_;
@@ -222,7 +225,22 @@ class Typer {
 	// Whether an object of p_class is always one of p_target: the class, a base, or an interface that it,
 	// a base, or one of those interfaces declares. *r_unsure is set if part of the hierarchy is not known.
 	bool is_a(Symbol *p_class, Symbol *p_target, bool *r_unsure) const {
+		// Asked again and again for the same pair, and a hierarchy can be deep.
+		auto known = related_.find({ p_class, p_target });
+		if (known != related_.end()) {
+			*r_unsure |= known->second.second;
+			return known->second.first;
+		}
+		bool unsure = false;
+		bool result = walk_is_a(p_class, p_target, &unsure);
+		related_[{ p_class, p_target }] = { result, unsure };
+		*r_unsure |= unsure;
+		return result;
+	}
+
+	bool walk_is_a(Symbol *p_class, Symbol *p_target, bool *r_unsure) const {
 		std::vector<Symbol *> pending;
+		std::unordered_set<Symbol *> seen;
 		for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
 			if (owner->klass->broken || owner->klass->incomplete) {
 				*r_unsure = true;
@@ -242,7 +260,7 @@ class Typer {
 			for (Symbol *parent : pending[i]->klass->interfaces) {
 				if (!parent) {
 					*r_unsure = true; // One that did not resolve.
-				} else if (std::find(pending.begin(), pending.end(), parent) == pending.end()) {
+				} else if (seen.insert(parent).second) {
 					pending.push_back(parent);
 				}
 			}
@@ -251,9 +269,19 @@ class Typer {
 	}
 
 	// May a value of type p_from be used where p_to is expected, with no cast written?
+	// True if the type, or an element type inside it, did not resolve.
+	static bool unresolved(const Type *p_type) {
+		for (; p_type; p_type = p_type->element) {
+			if (p_type->kind == Type::Unknown) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	Fit fits(const Type *p_from, const Type *p_to) const {
-		if (p_from == p_to || p_from->kind == Type::Any || p_from->kind == Type::Unknown ||
-				p_to->kind == Type::Any || p_to->kind == Type::Unknown || p_to->kind == Type::Void) {
+		if (p_from == p_to || p_from->kind == Type::Any || p_to->kind == Type::Any || p_to->kind == Type::Void ||
+				unresolved(p_from) || unresolved(p_to)) {
 			return Fit::Yes;
 		}
 		if (p_from->kind == Type::Void) {
@@ -273,8 +301,7 @@ class Typer {
 		if (p_from->kind == Type::Vector || p_to->kind == Type::Vector) {
 			if (p_from->kind == Type::Vector && p_to->kind == Type::Vector) {
 				// Vectors of different element types are unrelated, even when the elements are related.
-				bool unknown = p_from->element->kind == Type::Unknown || p_to->element->kind == Type::Unknown;
-				return unknown ? Fit::Yes : Fit::No;
+				return Fit::No;
 			}
 			return p_from == object_ ? Fit::Cast : Fit::No;
 		}
@@ -296,7 +323,8 @@ class Typer {
 
 	// Reports a value that does not fit where it is stored or passed.
 	void store(Expr *p_value, const Type *p_to) {
-		if (!p_value || !p_value->type || !p_to) {
+		// Which type Adobe's compiler gives `a = b` used as a value is not known, so it is not judged.
+		if (!p_value || !p_value->type || !p_to || p_value->kind == NodeKind::Assign) {
 			return;
 		}
 		switch (fits(p_value->type, p_to)) {
@@ -357,7 +385,10 @@ class Typer {
 				}
 				break;
 			case SymbolKind::Method:
-				error(offset, "can't assign to the method " + name);
+				// A built-in class's methods may be on its prototype, where they can be replaced.
+				if (!symbol->unit->is_builtin) {
+					error(offset, "can't assign to the method " + name);
+				}
 				break;
 			case SymbolKind::Function:
 				error(offset, "can't assign to the function " + name);
@@ -1077,8 +1108,9 @@ class Typer {
 		if (constructor) {
 			error(p_return->value->offset, "a constructor can't return a value");
 		} else if (declared && declared->form == TypeRef::Void) {
-			// Passing on the result of another function that returns nothing is left alone.
-			if (value->kind != Type::Void && value->kind != Type::Unknown) {
+			// Passing on the result of another function that returns nothing is left alone, and so is a
+			// value that may be `undefined`.
+			if (value->kind != Type::Void && value->kind != Type::Unknown && value->kind != Type::Any) {
 				error(p_return->value->offset, "a function declared 'void' can't return a value");
 			}
 		} else {

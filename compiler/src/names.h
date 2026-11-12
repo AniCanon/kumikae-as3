@@ -119,6 +119,9 @@ struct ClassInfo {
 	bool incomplete = false; // A built-in class whose members are not declared yet: marked [Incomplete].
 	bool inherited = false; // Property halves have been filled in from the bases.
 	uint32_t mark = 0; // For cycle detection.
+	// Whether this class or a base is broken or incomplete, once the hierarchy is settled.
+	bool chain_known = false;
+	bool chain_broken = false;
 };
 
 struct Package {
@@ -260,6 +263,7 @@ public:
 	// then a static one. With p_static_only, instance members are passed over, as they are for code in a
 	// static method; *r_instance receives the first one passed over. *r_hidden receives a match that exists
 	// but is not visible from the class.
+	void settle_hierarchy();
 	Symbol *find_member(Symbol *p_class, std::string_view p_name, bool p_static_only, Symbol **r_instance,
 			Symbol **r_hidden) const;
 	// True if the members that the class inherits are not all known: a base failed to resolve, or is a

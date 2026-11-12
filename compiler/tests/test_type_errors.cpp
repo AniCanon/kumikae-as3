@@ -89,8 +89,7 @@ static void test_unknown_is_silent() {
 				   "class Lost extends /*!*/Gone {} class Half implements /*!*/Nope {}\n"),
 			{ "unknown type 'Gone'", "unknown type 'Nope'" });
 	// An unknown element type.
-	expect(program("var v:Vector.</*!*/Gone> = null; ints = v; v = ints; list = /*!*/v;"),
-			{ "unknown type 'Gone'", UNRELATED("Vector.<?>", "Array") });
+	expect(program("var v:Vector.</*!*/Gone> = null; ints = v; v = ints; list = v;"), { "unknown type 'Gone'" });
 }
 
 static const char *const CALLABLES =
@@ -144,7 +143,7 @@ static void test_argument_types() {
 				   CALLABLES, "function helper(a:int):void {} class Thing { public function Thing(a:int) {} }\n"),
 			{});
 	expect(program("one(/*!*/\"a\"); two(/*!*/label, /*!*/count); opt(1, /*!*/2); rest(/*!*/label, label); fixed(/*!*/other);\n"
-				   "fixed(/*!*/obj); takes(/*!*/base); takes(sub, /*!*/subs); ints.indexOf(/*!*/\"a\"); subs.indexOf(/*!*/base);\n"
+				   "fixed(/*!*/obj); takes(/*!*/base); takes(sub, /*!*/subs); ints.insertAt(0, /*!*/\"a\"); subs.insertAt(0, /*!*/base);\n"
 				   "subs.indexOf(sub, /*!*/other); ints.push(\"unchecked\"); label.charAt(/*!*/label); new Thing(/*!*/label); helper(/*!*/flag);\n"
 				   "one(/*!*/nothing());",
 				   CALLABLES, "function helper(a:int):void {} class Thing { public function Thing(a:int) {} }\n"),
@@ -337,7 +336,48 @@ static void test_constants() {
 			{});
 }
 
+// Valid programs that the first version of these checks rejected, found in review.
+static void test_review_findings() {
+	// Built-in declarations as loose as Adobe's.
+	expect(program("var m:Array = /re/.exec(label); if (obj.hasOwnProperty(obj)) {} obj.isPrototypeOf(1);\n"
+				   "obj.propertyIsEnumerable(count); label.split(); label.indexOf(); label.match(); label.replace();\n"
+				   "label.search(); label.lastIndexOf(); Math.max(ratio); Math.min(); Math.max(); new RegExp(/a/);\n"
+				   "new RegExp(); var n:Number = obj.valueOf(); subs.indexOf(base); subs.lastIndexOf(obj);"),
+			{});
+	// Built-in methods live on the prototype and may be replaced.
+	expect(program("obj.toString = function():String { return \"x\"; }; list.toString = null; obj.valueOf = fn;"), {});
+	// The value of an assignment used as a value: which type Adobe gives it is not known.
+	expect(program("label = obj = \"x\"; sub = base = new Sub(); var s:String = (obj = \"y\"); one(obj = 1);",
+				   "public function one(a:int):void {}"),
+			{});
+	// `return` of something that may be nothing, in a function declared void.
+	expect(program("", "public function a():void { return undefined; } public function b():void { return fn(); }\n"
+					   "public function c():void { return any; } public function d():void { return void 0; }\n"
+					   "public function e():void { return /*!*/obj; }"),
+			{ VOID_RETURN });
+	// An unknown type anywhere inside a type.
+	expect(program("var y:Vector.<Vector.</*!*/Gone>> = null; grids = y; y = grids; take(y);",
+				   "public var grids:Vector.<Vector.<Main>>; public function take(v:Vector.<Vector.<Main>>):void {}"),
+			{ "unknown type 'Gone'" });
+	// Gaps the review's deliberate breakages showed.
+	expect(program("var s:Shape = /*!*/obj;"), { NEEDS_CAST("Object", "Shape") });
+	expect("package { public class Main { public const LIMIT:int;\n"
+		   "public function Main() { var f:Function = function():void { /*!*/LIMIT = 5; }; } } }\n",
+			{ "can't assign to the constant 'LIMIT'" });
+	expect(program("", "public function a():int { return 1; function /*!*/g():int {} }"),
+			{ "'g' is declared to return 'int' but never returns a value" });
+	expect(program("flash.utils./*!*/getTimer = null; flash.utils./*!*/getTimer(1);"),
+			{ "can't assign to the function 'getTimer'", "'getTimer' takes no arguments but 1 was given" });
+	expect("package { public class /*!*/Main extends Base implements Shape { override public function /*!*/f(r:Array):void {} } }\n"
+		   "class Base { public function f(...r):void {} private function area():void {} }\n"
+		   "class /*!*/Sub extends Base implements Shape {}\n"
+		   "interface Shape { function area():void; }\n"
+		   "class Fine implements Shape { public function area() {} }\n",
+			{ "'Main' must implement 'area' from Shape", SAME_AS("f", "Base"), "'Sub' must implement 'area' from Shape" });
+}
+
 int main() {
+	test_review_findings();
 	test_constants();
 	test_override_signatures();
 	test_interfaces();

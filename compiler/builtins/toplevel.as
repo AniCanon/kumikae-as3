@@ -13,13 +13,13 @@
 package {
 	public dynamic native class Object {
 		public native function Object();
-		public native function hasOwnProperty(name:String):Boolean;
-		public native function isPrototypeOf(theClass:Object):Boolean;
-		public native function propertyIsEnumerable(name:String):Boolean;
+		public native function hasOwnProperty(name:* = null):Boolean;
+		public native function isPrototypeOf(theClass:* = null):Boolean;
+		public native function propertyIsEnumerable(name:* = null):Boolean;
 		public native function setPropertyIsEnumerable(name:String, isEnum:Boolean = true):void;
 		public native function toLocaleString():String;
 		public native function toString():String;
-		public native function valueOf():Object;
+		public native function valueOf():*;
 	}
 
 	public dynamic native class Class {}
@@ -79,14 +79,14 @@ package {
 		public native function charAt(index:Number = 0):String;
 		public native function charCodeAt(index:Number = 0):Number;
 		public native function concat(...args):String;
-		public native function indexOf(val:String, startIndex:Number = 0):int;
-		public native function lastIndexOf(val:String, startIndex:Number = 0x7FFFFFFF):int;
+		public native function indexOf(val:String = "undefined", startIndex:Number = 0):int;
+		public native function lastIndexOf(val:String = "undefined", startIndex:Number = 0x7FFFFFFF):int;
 		public native function localeCompare(other:String, ...values):int;
-		public native function match(pattern:*):Array;
-		public native function replace(pattern:*, repl:Object):String;
-		public native function search(pattern:*):int;
+		public native function match(pattern:* = null):Array;
+		public native function replace(pattern:* = null, repl:* = null):String;
+		public native function search(pattern:* = null):int;
 		public native function slice(startIndex:Number = 0, endIndex:Number = 0x7FFFFFFF):String;
-		public native function split(delimiter:*, limit:Number = 0x7FFFFFFF):Array;
+		public native function split(delimiter:* = null, limit:Number = 0x7FFFFFFF):Array;
 		public native function substr(startIndex:Number = 0, len:Number = 0x7FFFFFFF):String;
 		public native function substring(startIndex:Number = 0, endIndex:Number = 0x7FFFFFFF):String;
 		public native function toLocaleLowerCase():String;
@@ -137,10 +137,10 @@ package {
 		public native function every(callback:Function, thisObject:Object = null):Boolean;
 		public native function filter(callback:Function, thisObject:Object = null):Vector.<T>;
 		public native function forEach(callback:Function, thisObject:Object = null):void;
-		public native function indexOf(searchElement:T, fromIndex:int = 0):int;
+		public native function indexOf(searchElement:*, fromIndex:int = 0):int;
 		public native function insertAt(index:int, element:T):void;
 		public native function join(sep:String = ","):String;
-		public native function lastIndexOf(searchElement:T, fromIndex:int = 0x7FFFFFFF):int;
+		public native function lastIndexOf(searchElement:*, fromIndex:int = 0x7FFFFFFF):int;
 		public native function map(callback:Function, thisObject:Object = null):Vector.<T>;
 		public native function pop():T;
 		public native function push(...args):uint;
@@ -179,8 +179,8 @@ package {
 		public static native function sqrt(val:Number):Number;
 		public static native function tan(val:Number):Number;
 		public static native function atan2(y:Number, x:Number):Number;
-		public static native function max(val1:Number, val2:Number, ...rest):Number;
-		public static native function min(val1:Number, val2:Number, ...rest):Number;
+		public static native function max(val1:Number = -Infinity, val2:Number = -Infinity, ...rest):Number;
+		public static native function min(val1:Number = Infinity, val2:Number = Infinity, ...rest):Number;
 		public static native function pow(base:Number, pow:Number):Number;
 		public static native function random():Number;
 	}
@@ -260,14 +260,14 @@ package {
 
 	public dynamic native class RegExp {
 		public var lastIndex:Number;
-		public native function RegExp(re:String = "", flags:String = "");
+		public native function RegExp(re:* = null, flags:* = null);
 		public native function get dotall():Boolean;
 		public native function get extended():Boolean;
 		public native function get global():Boolean;
 		public native function get ignoreCase():Boolean;
 		public native function get multiline():Boolean;
 		public native function get source():String;
-		public native function exec(str:String):Object;
+		public native function exec(str:String = ""):*;
 		public native function test(str:String):Boolean;
 	}
 

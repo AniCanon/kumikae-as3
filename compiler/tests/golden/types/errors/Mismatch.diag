@@ -5,7 +5,7 @@ golden/types/errors/Mismatch.as:10:11: error: a constructor can't return a value
 golden/types/errors/Mismatch.as:17:28: error: 'update' must have the same parameters and return type as 'update' in Entity
 golden/types/errors/Mismatch.as:18:24: error: a value of type 'Entity' may not be a 'Mismatch'; use 'as' or a cast
 golden/types/errors/Mismatch.as:19:23: error: can't use a value of type 'int' where 'String' is expected
-golden/types/errors/Mismatch.as:20:18: error: can't use a value of type 'int' where 'String' is expected
+golden/types/errors/Mismatch.as:20:22: error: can't use a value of type 'int' where 'String' is expected
 golden/types/errors/Mismatch.as:21:4: error: 'move' takes 2 arguments but 1 was given
 golden/types/errors/Mismatch.as:22:4: error: 'move' takes 2 arguments but 3 were given
 golden/types/errors/Mismatch.as:23:4: error: can't assign to the constant 'LIVES'

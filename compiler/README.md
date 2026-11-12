@@ -94,12 +94,14 @@ its names mean: inside it, names resolve only to other declarations, and its own
 - **Values that don't fit:** a value stored in a variable, field or property, passed as an argument,
   returned, or given as a parameter default must fit the declared type. See "What fits" below.
 - **Argument counts** of calls to a known function, method or constructor, and of `super(...)`.
-- **Returns:** a value returned from a `void` function, a setter or a constructor; a function with a
+- **Returns:** a value of a known type returned from a `void` function, a setter or a constructor (a `*`
+  value, which may be `undefined`, is let through); a function with a
   declared type whose body has no `return` with a value and no `throw` anywhere.
 - **Overrides** must repeat the parameters and return type of the method they override.
 - **Interfaces:** a class must have a public method or accessor, with the same signature, for every method
   of every interface it names.
-- **Writes** to a `const`, to a property with no setter, to a method, a package function or a class.
+- **Writes** to a `const`, to a property with no setter, to a method, a package function or a class. A
+  built-in class's methods may be replaced (`o.toString = f`), because they may live on its prototype.
 
 ## What fits
 
@@ -119,8 +121,8 @@ Otherwise it is an error. When B is a subclass or implementer of A, the message 
 
 **Reported only where AS3's rule is certain.** These are not checked: compound assignment (`s += 1`),
 operands of operators and comparisons, conditions, `for each` variables, calls through a `Function` value,
-class names called as conversions (`int(x)`), `null` stored in a number (Adobe's compiler warns), and use of
-a value that is certainly `null`.
+class names called as conversions (`int(x)`), an assignment used as a value (`a = b = c`), `null` stored in
+a number (Adobe's compiler warns), and use of a value that is certainly `null`.
 
 ## How expressions are typed
 

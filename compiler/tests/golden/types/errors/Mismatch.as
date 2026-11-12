@@ -17,7 +17,7 @@ package {
 		override public function update(delta:int):void {
 			var best:Mismatch = find("hero");
 			var label:String = score;
-			names.indexOf(score);
+			names.insertAt(0, score);
 			move(1);
 			move(1, 2, 3);
 			LIVES = 2;

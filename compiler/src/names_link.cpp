@@ -380,11 +380,36 @@ void Compilation::cut_interface_cycles() {
 
 bool Compilation::hierarchy_broken(Symbol *p_class) const {
 	for (const ClassInfo *info = p_class->klass; info; info = info->base ? info->base->klass : nullptr) {
+		if (info->chain_known) {
+			return info->chain_broken;
+		}
 		if (info->broken || info->incomplete) {
 			return true;
 		}
 	}
 	return false;
+}
+
+// Works the answer to hierarchy_broken out once for every class, so that a deep hierarchy is not walked
+// again for each question. Called when no base class will change any more.
+void Compilation::settle_hierarchy() {
+	std::vector<ClassInfo *> chain;
+	for (ClassInfo &start : classes_) {
+		chain.clear();
+		bool broken = false;
+		for (ClassInfo *info = &start; info; info = info->base ? info->base->klass : nullptr) {
+			if (info->chain_known) {
+				broken = info->chain_broken;
+				break;
+			}
+			chain.push_back(info);
+		}
+		for (size_t i = chain.size(); i-- > 0;) {
+			broken = broken || chain[i]->broken || chain[i]->incomplete;
+			chain[i]->chain_broken = broken;
+			chain[i]->chain_known = true;
+		}
+	}
 }
 
 // What code in a class of package p_package may name on a base class.
@@ -551,6 +576,7 @@ void Compilation::link_hierarchy() {
 	}
 	cut_class_cycles();
 	cut_interface_cycles();
+	settle_hierarchy();
 	for (ClassInfo &info : classes_) {
 		if (info.symbol->kind == SymbolKind::Class && !hierarchy_broken(info.symbol)) {
 			check_overrides(info.symbol);
