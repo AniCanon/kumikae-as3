@@ -20,11 +20,17 @@ enum class Kind : uint8_t {
 	Bool,
 	Str, // String, or null
 	Obj, // An object of a class, or null
+	Val, // A value of one of Godot's value types (Vector2, Color, Signal, ...): copied when assigned
+	Ref, // A Godot object (a node, a resource), or null
 };
 
 const char *kind_name(Kind p_kind);
 inline bool is_reference(Kind p_kind) {
 	return p_kind == Kind::Str || p_kind == Kind::Obj;
+}
+// Held by the engine: the interpreter keeps a handle that the host gave it.
+inline bool is_engine(Kind p_kind) {
+	return p_kind == Kind::Val || p_kind == Kind::Ref;
 }
 
 // How an instruction uses its three operands.
@@ -51,6 +57,8 @@ inline bool is_reference(Kind p_kind) {
 	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
 	X(IsClass, "RRC") X(AsClass, "RRC") \
+	/* The engine. Names are Godot's own. In HostCall the first argument is what the method is called on. */ \
+	X(HostNew, "RSA") X(HostCall, "rSA") X(HostGet, "RRS") X(HostSet, "RSR") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") X(Trace, "A--")
 
@@ -106,6 +114,11 @@ struct Class {
 	std::vector<uint32_t> methods; // The method table: function indices, the base's slots first.
 	uint32_t constructor = NONE;
 	uint32_t to_string = NONE; // The class's toString(), its own or inherited: what converting to a String calls.
+	// For a script class, one that extends a Godot class directly or through other script classes: Godot's
+	// name for that class. Field 0 then holds the Godot object the script is attached to.
+	std::string native_base;
+	// The engine's virtual methods the class answers: Godot's name ("_physics_process") and the function.
+	std::vector<std::pair<std::string, uint32_t>> virtuals;
 };
 
 struct Global {

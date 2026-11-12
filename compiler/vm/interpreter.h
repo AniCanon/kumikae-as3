@@ -60,6 +60,9 @@ private:
 	void drop(ir::Kind p_kind, Slot &p_slot);
 	void drop_object(Object *p_object);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value); // Takes over one reference.
+	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
+	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.
+	const char *host_op(const ir::Function &p_function, const ir::Instruction &p_instruction);
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
@@ -96,7 +99,12 @@ public:
 	bool start();
 	// A new object of the class, its constructor run with no arguments. One reference, the caller's: give
 	// it back with release_object(). Null if the constructor failed.
-	Object *construct(uint32_t p_class);
+	// For a script class, p_owner is the Godot object it is attached to: the object keeps its own handle.
+	Object *construct(uint32_t p_class, void *p_owner = nullptr);
+	// A field by its AS3 name: the value as it is held (no new reference) and its kind. False if there is
+	// no such field.
+	bool get_field(Object *p_object, std::string_view p_name, Slot *r_value, ir::Kind *r_kind = nullptr) const;
+	const ir::Module &module() const { return module_; }
 	// Calls the object's method of that name. The arguments are in the method's parameter kinds, and
 	// parameters left out take their defaults. A reference returned in r_result is the caller's to release.
 	// False if there is no such method, or it failed.

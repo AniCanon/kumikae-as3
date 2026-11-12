@@ -68,8 +68,31 @@ void Interpreter::drop(Kind p_kind, Slot &p_slot) {
 		if (release(object)) {
 			drop_object(object);
 		}
+	} else if (ir::is_engine(p_kind) && p_slot.p) {
+		host_.drop(p_slot.p);
 	}
 	p_slot.bits = 0;
+}
+
+static bool held(Kind p_kind) {
+	return ir::is_reference(p_kind) || ir::is_engine(p_kind);
+}
+
+Slot Interpreter::share(Kind p_kind, Slot p_value) {
+	if (ir::is_reference(p_kind)) {
+		retain(static_cast<Counted *>(p_value.p));
+	} else if (ir::is_engine(p_kind) && p_value.p) {
+		p_value.p = host_.copy(p_value.p);
+	}
+	return p_value;
+}
+
+void Interpreter::put(Kind p_kind, Slot &p_target, Slot p_owned) {
+	Slot old = p_target;
+	p_target = p_owned;
+	if (held(p_kind)) {
+		drop(p_kind, old);
+	}
 }
 
 // Frees an object whose last reference is gone, and whatever that in turn leaves unreferenced. A list
@@ -93,6 +116,8 @@ void Interpreter::drop_object(Object *p_object) {
 				if (release(other)) {
 					dead.push_back(other);
 				}
+			} else if (ir::is_engine(klass.fields[i].kind) && field.p) {
+				host_.drop(field.p);
 			}
 		}
 		free_object(object);
@@ -188,10 +213,7 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	stack_.resize(stack_.size() + function.registers.size(), zero);
 	size_t count = std::min<size_t>(std::min<size_t>(p_count, function.parameters), function.registers.size());
 	for (size_t i = 0; i < count; i++) {
-		stack_[frame.base + i] = source[i];
-		if (ir::is_reference(function.registers[i])) {
-			retain(static_cast<Counted *>(source[i].p));
-		}
+		stack_[frame.base + i] = share(function.registers[i], source[i]);
 	}
 	frames_.push_back(frame);
 	return true;
@@ -201,7 +223,7 @@ void Interpreter::pop() {
 	Frame &frame = frames_.back();
 	const Function &function = module_.functions[frame.function];
 	for (size_t i = 0; i < function.registers.size(); i++) {
-		if (ir::is_reference(function.registers[i])) {
+		if (held(function.registers[i])) {
 			drop(function.registers[i], stack_[frame.base + i]);
 		}
 	}
@@ -297,6 +319,89 @@ void Interpreter::report() {
 	trace_lines_ = 0;
 }
 
+// One request to the engine. Raises an AS3 error if the engine refuses.
+const char *Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
+	const size_t base = frames_.back().base;
+	const size_t frame_index = frames_.size() - 1;
+	Slot *r = stack_.data() + base;
+	static const char *const NULL_ERROR = "Error #1009: Cannot access a property or method of a null object reference.";
+	std::string error;
+	bool ok = false;
+	Slot result;
+	result.bits = 0;
+	Kind kind = Kind::Void;
+	uint32_t target = NONE;
+	Host::Argument arguments[16];
+	std::vector<Host::Argument> many;
+	Host::Argument *values = arguments;
+	size_t count = 0;
+	auto gather = [&](const std::vector<uint32_t> &p_list, size_t p_from) {
+		count = p_list.size() - p_from;
+		if (count > 16) {
+			many.resize(count);
+			values = many.data();
+		}
+		for (size_t i = 0; i < count; i++) {
+			values[i].kind = p_function.registers[p_list[p_from + i]];
+			values[i].slot = r[p_list[p_from + i]];
+		}
+	};
+	switch (p_in.op) {
+		case Op::HostNew: {
+			gather(p_function.argument_lists[p_in.c], 0);
+			target = p_in.a;
+			kind = Kind::Val;
+			result.p = host_.construct(module_.strings[p_in.b], values, count, &error);
+			ok = result.p != nullptr;
+			break;
+		}
+		case Op::HostCall: {
+			const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+			void *receiver = list.empty() ? nullptr : r[list[0]].p;
+			if (!receiver) {
+				raise(module_.type_error_class, NULL_ERROR);
+				return NULL_ERROR;
+			}
+			gather(list, 1);
+			target = p_in.a;
+			kind = target == NONE ? Kind::Void : p_function.registers[target];
+			ok = host_.call(receiver, module_.strings[p_in.b], values, count, kind, target == NONE ? nullptr : &result, &error);
+			break;
+		}
+		case Op::HostGet: {
+			void *receiver = r[p_in.b].p;
+			if (!receiver) {
+				raise(module_.type_error_class, NULL_ERROR);
+				return NULL_ERROR;
+			}
+			target = p_in.a;
+			kind = p_function.registers[target];
+			ok = host_.get(receiver, module_.strings[p_in.c], kind, &result, &error);
+			break;
+		}
+		default: {
+			void *receiver = r[p_in.a].p;
+			if (!receiver) {
+				raise(module_.type_error_class, NULL_ERROR);
+				return NULL_ERROR;
+			}
+			Host::Argument value;
+			value.kind = p_function.registers[p_in.c];
+			value.slot = r[p_in.c];
+			ok = host_.set(receiver, module_.strings[p_in.b], value, &error);
+			break;
+		}
+	}
+	if (!ok) {
+		raise(module_.error_class, error.empty() ? "the engine refused" : error);
+		return "refused";
+	}
+	if (target != NONE && frame_index < frames_.size()) {
+		put(kind, stack_[frames_[frame_index].base + target], result);
+	}
+	return nullptr;
+}
+
 bool Interpreter::start() {
 	if (started_) {
 		return true;
@@ -309,7 +414,25 @@ bool Interpreter::start() {
 	return ok;
 }
 
-Object *Interpreter::construct(uint32_t p_class) {
+bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_value, Kind *r_kind) const {
+	if (!p_object) {
+		return false;
+	}
+	const ir::Class &klass = module_.classes[p_object->klass];
+	// The class's own field hides a base's of the same name: the last one wins.
+	for (size_t i = klass.fields.size(); i-- > 0;) {
+		if (klass.fields[i].name == p_name) {
+			*r_value = p_object->fields()[i];
+			if (r_kind) {
+				*r_kind = klass.fields[i].kind;
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 	if (p_class >= module_.classes.size()) {
 		return nullptr;
 	}
@@ -322,6 +445,9 @@ Object *Interpreter::construct(uint32_t p_class) {
 		if (klass.fields[i].kind == Kind::F64) {
 			object->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
 		}
+	}
+	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref && p_owner) {
+		object->fields()[0].p = host_.copy(p_owner);
 	}
 	Slot self;
 	self.bits = 0;
@@ -406,12 +532,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::Move: {
 				Kind kind = function.registers[in.a];
-				if (ir::is_reference(kind)) {
-					retain(static_cast<Counted *>(r[in.b].p));
-					assign(kind, r[in.a], r[in.b].p);
-				} else {
-					r[in.a] = r[in.b];
-				}
+				put(kind, r[in.a], share(kind, r[in.b]));
 				break;
 			}
 			case Op::I32ToF64:
@@ -631,12 +752,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					break;
 				}
 				Kind kind = function.registers[in.a];
-				if (ir::is_reference(kind)) {
-					retain(static_cast<Counted *>(object->fields()[in.c].p));
-					assign(kind, r[in.a], object->fields()[in.c].p);
-				} else {
-					r[in.a] = object->fields()[in.c];
-				}
+				put(kind, r[in.a], share(kind, object->fields()[in.c]));
 				break;
 			}
 			case Op::SetField: {
@@ -646,32 +762,17 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					break;
 				}
 				Kind kind = module_.classes[object->klass].fields[in.b].kind;
-				if (ir::is_reference(kind)) {
-					retain(static_cast<Counted *>(r[in.c].p));
-					assign(kind, object->fields()[in.b], r[in.c].p);
-				} else {
-					object->fields()[in.b] = r[in.c];
-				}
+				put(kind, object->fields()[in.b], share(kind, r[in.c]));
 				break;
 			}
 			case Op::GetGlobal: {
 				Kind kind = module_.globals[in.b].kind;
-				if (ir::is_reference(kind)) {
-					retain(static_cast<Counted *>(globals_[in.b].p));
-					assign(kind, r[in.a], globals_[in.b].p);
-				} else {
-					r[in.a] = globals_[in.b];
-				}
+				put(kind, r[in.a], share(kind, globals_[in.b]));
 				break;
 			}
 			case Op::SetGlobal: {
 				Kind kind = module_.globals[in.a].kind;
-				if (ir::is_reference(kind)) {
-					retain(static_cast<Counted *>(r[in.b].p));
-					assign(kind, globals_[in.a], r[in.b].p);
-				} else {
-					globals_[in.a] = r[in.b];
-				}
+				put(kind, globals_[in.a], share(kind, r[in.b]));
 				break;
 			}
 			case Op::ArgMissing: {
@@ -746,24 +847,16 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				value.bits = 0;
 				Kind kind = function.result;
 				if (in.op == Op::Return) {
-					value = r[in.a];
-					if (ir::is_reference(kind)) {
-						retain(static_cast<Counted *>(value.p));
-					}
+					value = share(kind, r[in.a]);
 				}
 				uint32_t result = frame.result;
 				pop();
 				if (in.op == Op::Return && result != NONE && frames_.size() > p_depth) {
 					const Frame &caller = frames_.back();
-					Slot &target = stack_[caller.base + result];
-					if (ir::is_reference(kind)) {
-						assign(kind, target, value.p);
-					} else {
-						target = value;
-					}
+					put(kind, stack_[caller.base + result], value);
 				} else if (in.op == Op::Return && frames_.size() == p_depth && r_result) {
 					*r_result = value; // The caller from outside takes it, with its reference.
-				} else if (in.op == Op::Return && ir::is_reference(kind)) {
+				} else if (in.op == Op::Return && held(kind)) {
 					drop(kind, value); // Nobody wants it.
 				}
 				break;
@@ -776,6 +869,16 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				}
 				retain(thrown);
 				pending_ = thrown;
+				break;
+			}
+			case Op::HostNew:
+			case Op::HostCall:
+			case Op::HostGet:
+			case Op::HostSet: {
+				// The engine may call back into AS3 before it answers, which can move the registers: nothing
+				// read before the call is used after it.
+				const char *failure = host_op(function, in);
+				(void)failure;
 				break;
 			}
 			case Op::Trace: {

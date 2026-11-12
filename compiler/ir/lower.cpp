@@ -1,6 +1,7 @@
 #include "lower.h"
 
 #include "ast_walk.h"
+#include "builtins.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -30,6 +31,7 @@ class Lowerer {
 	Symbol *string_ = nullptr;
 	Symbol *object_ = nullptr;
 	Symbol *error_ = nullptr;
+	Symbol *godot_object_ = nullptr; // godot.GodotObject: what every Godot object class extends.
 
 	std::unordered_map<const Symbol *, uint32_t> classes_;
 	std::unordered_map<const Symbol *, uint32_t> functions_; // Methods, constructors, package functions.
@@ -127,9 +129,36 @@ class Lowerer {
 			*r_kind = Kind::Str;
 		} else if (classes_.count(symbol) || is_error(symbol)) {
 			*r_kind = Kind::Obj;
+		} else if (is_godot(symbol) && symbol->kind == SymbolKind::Class) {
+			*r_kind = is_godot_object(symbol) ? Kind::Ref : Kind::Val;
 		} else {
 			return false;
 		}
+		return true;
+	}
+
+	// Declared in Godot's API.
+	static bool is_godot(const Symbol *p_symbol) {
+		return p_symbol && p_symbol->unit && p_symbol->unit->is_declaration && p_symbol->unit->source.path() == GODOT_DECLARATIONS_PATH;
+	}
+
+	// A Godot class whose objects the engine owns (a node, a resource), as against a value type.
+	bool is_godot_object(const Symbol *p_class) const {
+		for (const Symbol *at = p_class; at && at->klass; at = at->klass->base) {
+			if (at == godot_object_) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// Godot's own name for a member or (with no member) a class it declares.
+	bool engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_string) {
+		std::string name;
+		if (!p_class || !godot_name(p_class->name, p_member, &name)) {
+			return false;
+		}
+		*r_string = string(name);
 		return true;
 	}
 
@@ -225,7 +254,12 @@ class Lowerer {
 		Class klass;
 		klass.name = class_name(symbol);
 		Symbol *base = symbol->klass->base;
-		if (base && base != object_) {
+		std::string godot_base;
+		if (base && is_godot(base) && is_godot_object(base) && godot_name(base->name, std::string_view(), &godot_base)) {
+			// A script: it is attached to an object of that Godot class, kept in its first field.
+			klass.native_base = godot_base;
+			klass.fields.push_back({ "$owner", Kind::Ref });
+		} else if (base && base != object_) {
 			if (!class_index(base, &klass.base)) {
 				refuse(p_decl->extends ? p_decl->extends->offset : p_decl->name_offset,
 						"extending '" + std::string(base->name) + "'");
@@ -233,6 +267,8 @@ class Lowerer {
 				klass.fields = module_.classes[klass.base].fields;
 				klass.methods = module_.classes[klass.base].methods;
 				klass.to_string = module_.classes[klass.base].to_string;
+				klass.native_base = module_.classes[klass.base].native_base;
+				klass.virtuals = module_.classes[klass.base].virtuals;
 			}
 		}
 		uint32_t index = (uint32_t)module_.classes.size();
@@ -299,6 +335,29 @@ class Lowerer {
 				}
 				if (is_static) {
 					continue;
+				}
+				// A method that overrides one of Godot's is what the engine calls under Godot's name.
+				if (function->modifiers.bits & Modifiers::Override) {
+					for (Symbol *at = symbol->klass->base; at && at->klass; at = at->klass->base) {
+						auto inherited = at->klass->members.find(function->name);
+						if (inherited == at->klass->members.end()) {
+							continue;
+						}
+						std::string godot;
+						if (is_godot(inherited->second) && godot_name(at->name, function->name, &godot)) {
+							bool replaced = false;
+							for (auto &entry : module_.classes[index].virtuals) {
+								if (entry.first == godot) {
+									entry.second = made;
+									replaced = true;
+								}
+							}
+							if (!replaced) {
+								module_.classes[index].virtuals.push_back({ godot, made });
+							}
+						}
+						break;
+					}
 				}
 				// An override takes the slot of what it overrides.
 				std::unordered_map<std::string, uint32_t> &names = slot_names_[index];
@@ -372,6 +431,8 @@ class Lowerer {
 				break;
 			case Kind::Str:
 			case Kind::Obj:
+			case Kind::Val:
+			case Kind::Ref:
 				emit(Op::ConstNull, p_position, out);
 				break;
 			default:
@@ -386,6 +447,10 @@ class Lowerer {
 		Kind from = kind_at(p_reg);
 		if (from == p_to || p_to == Kind::Void) {
 			return p_reg;
+		}
+		if (is_engine(from) || is_engine(p_to)) {
+			refuse(p_position, is_engine(from) ? "converting a Godot value" : "passing this value where a Godot value is expected");
+			return default_value(p_to, p_position);
 		}
 		auto via = [&](Op p_op, Kind p_kind, uint32_t p_source) {
 			uint32_t out = reg(p_kind);
@@ -644,11 +709,73 @@ class Lowerer {
 
 	// A place a value can be stored: a local, a field of an object, or a global.
 	struct Place {
-		enum Where { Nowhere, Register, FieldOf, GlobalSlot } where = Nowhere;
-		uint32_t index = 0; // The register, the field slot, or the global.
-		uint32_t object = 0; // For FieldOf.
+		enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine } where = Nowhere;
+		uint32_t index = 0; // The register, the field slot, the global, or the string of Godot's name.
+		uint32_t object = 0; // For FieldOf and Engine: the register holding the object.
 		Kind kind = Kind::F64;
+		bool of_value = false; // For Engine: a member of a value type, which is a copy.
 	};
+
+	// The engine object a Godot member is reached through: the script's own owner when nothing is
+	// written before the name, or the value of what is written.
+	uint32_t engine_receiver(Expr *p_object, uint32_t p_position, bool *r_of_value) {
+		*r_of_value = false;
+		if (!p_object || p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr) {
+			uint32_t klass = 0;
+			if (fn().is_static || !class_ || !class_index(class_, &klass) || module_.classes[klass].native_base.empty()) {
+				refuse(p_position, "this use of a Godot member");
+				return default_value(Kind::Ref, p_position);
+			}
+			uint32_t owner = reg(Kind::Ref);
+			emit(Op::GetField, p_position, owner, 0, 0);
+			return owner;
+		}
+		uint32_t object = expression(p_object, Kind::Void);
+		Kind kind = kind_at(object);
+		if (kind == Kind::Ref || kind == Kind::Val) {
+			*r_of_value = kind == Kind::Val;
+			return object;
+		}
+		// Another script object: its owner.
+		uint32_t klass = 0;
+		const Type *type = p_object->type;
+		if (kind == Kind::Obj && type && type->kind == Type::Instance && class_index(type->symbol, &klass) &&
+				!module_.classes[klass].native_base.empty()) {
+			emit(Op::NullCheck, p_object->offset, object);
+			uint32_t owner = reg(Kind::Ref);
+			emit(Op::GetField, p_position, owner, object, 0);
+			return owner;
+		}
+		refuse(p_position, "this use of a Godot member");
+		return default_value(Kind::Ref, p_position);
+	}
+
+	// A property or field of an engine object.
+	Place engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position) {
+		Place place;
+		uint32_t name = 0;
+		Kind kind = Kind::F64;
+		if (p_symbol->is_static() || !engine_name(p_symbol->owner, p_symbol->name, &name)) {
+			refuse(p_position, "'" + std::string(p_symbol->name) + "' of Godot's " + std::string(p_symbol->owner ? p_symbol->owner->name : "API"));
+			return place;
+		}
+		// A property's type is what its getter returns, or what its setter takes.
+		TypeRef *type = p_symbol->type;
+		if (p_symbol->kind == SymbolKind::Property) {
+			type = p_symbol->getter ? p_symbol->getter->return_type
+					: p_symbol->setter && p_symbol->setter->parameters.count ? p_symbol->setter->parameters[0].type
+																			   : nullptr;
+		}
+		if (!type || !kind_of(compilation_.type_of(type), &kind) || kind == Kind::Void) {
+			refuse(p_position, "a Godot member of type '" + compilation_.type_name(compilation_.type_of(type)) + "'");
+			return place;
+		}
+		place.where = Place::Engine;
+		place.index = name;
+		place.kind = kind;
+		place.object = engine_receiver(p_object, p_position, &place.of_value);
+		return place;
+	}
 
 	Place place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_position) {
 		Place place;
@@ -690,6 +817,9 @@ class Lowerer {
 	Place place_of(Expr *p_target, Expr *p_later = nullptr) {
 		if (p_target->kind == NodeKind::Name) {
 			Name *name = static_cast<Name *>(p_target);
+			if (name->symbol && is_godot(name->symbol) && (name->symbol->kind == SymbolKind::Property || name->symbol->kind == SymbolKind::Field)) {
+				return engine_place(name->symbol, nullptr, name->offset);
+			}
 			if (name->symbol && name->symbol->is_instance_member() && fn().is_static) {
 				refuse(name->offset, "this name");
 				return Place();
@@ -699,6 +829,9 @@ class Lowerer {
 		if (p_target->kind == NodeKind::Member) {
 			Member *member = static_cast<Member *>(p_target);
 			Symbol *symbol = member->symbol ? member->symbol : member->member;
+			if (symbol && is_godot(symbol) && (symbol->kind == SymbolKind::Property || symbol->kind == SymbolKind::Field)) {
+				return engine_place(symbol, member->object, member->name_offset);
+			}
 			if (symbol && (globals_.count(symbol) || !symbol->is_instance_member())) {
 				return place_of_symbol(symbol, 0, member->name_offset);
 			}
@@ -729,6 +862,11 @@ class Lowerer {
 				emit(Op::GetGlobal, p_position, out, p_place.index);
 				return out;
 			}
+			case Place::Engine: {
+				uint32_t out = reg(p_place.kind);
+				emit(Op::HostGet, p_position, out, p_place.object, p_place.index);
+				return out;
+			}
 			default:
 				return default_value(Kind::F64, p_position);
 		}
@@ -746,6 +884,14 @@ class Lowerer {
 				break;
 			case Place::GlobalSlot:
 				emit(Op::SetGlobal, p_position, p_place.index, p_value);
+				break;
+			case Place::Engine:
+				if (p_place.of_value) {
+					// `position.x = 5` would change a copy: the property has to be set as a whole.
+					refuse(p_position, "changing one part of a Godot value");
+				} else {
+					emit(Op::HostSet, p_position, p_place.object, p_place.index, p_value);
+				}
 				break;
 			default:
 				break;
@@ -875,6 +1021,9 @@ class Lowerer {
 			emit(Op::Trace, position, arguments(std::move(list)));
 			return 0;
 		}
+		if (is_godot(symbol) && symbol->kind == SymbolKind::Method && !symbol->is_static()) {
+			return engine_call(p_call, symbol);
+		}
 		auto function = functions_.find(symbol);
 		if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
 			refuse(callee->offset, "calling '" + std::string(symbol->name) + "'");
@@ -904,6 +1053,52 @@ class Lowerer {
 		} else {
 			emit(Op::CallVirtual, position, out, slots_[symbol], arguments(std::move(list)));
 		}
+		return out == NONE ? 0 : out;
+	}
+
+	// Arguments for the engine: each as its parameter says, or as it comes where the parameter takes anything.
+	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
+		uint32_t count = p_function ? p_function->parameters.count : 0;
+		for (uint32_t i = 0; i < p_arguments.count; i++) {
+			Kind kind = Kind::Void;
+			if (i < count && !p_function->parameters[i].is_rest && p_function->parameters[i].type) {
+				const Type *type = compilation_.type_of(p_function->parameters[i].type);
+				if (type && type->kind != Type::Any && !kind_of(type, &kind)) {
+					refuse(p_arguments[i]->offset, "passing a value of type '" + compilation_.type_name(type) + "' to Godot");
+					kind = Kind::Void;
+				}
+			}
+			Expr *later = nullptr;
+			for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
+				later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
+			}
+			uint32_t value = expression(p_arguments[i], kind);
+			if (kind_at(value) == Kind::Obj || kind_at(value) == Kind::U32) {
+				refuse(p_arguments[i]->offset, kind_at(value) == Kind::Obj ? "passing a script object to Godot" : "passing a uint to Godot");
+			}
+			r_list.push_back(settled(value, later, p_position));
+		}
+	}
+
+	uint32_t engine_call(Call *p_call, Symbol *p_method) {
+		uint32_t position = p_call->offset;
+		uint32_t name = 0;
+		if (!engine_name(p_method->owner, p_method->name, &name)) {
+			refuse(p_call->callee->offset, "calling '" + std::string(p_method->name) + "'");
+			return 0;
+		}
+		Kind kind = Kind::Void;
+		if (p_method->type && !kind_of(compilation_.type_of(p_method->type), &kind)) {
+			refuse(position, "a call to a Godot method that returns '" + compilation_.type_name(compilation_.type_of(p_method->type)) + "'");
+		}
+		bool of_value = false;
+		Expr *object = p_call->callee->kind == NodeKind::Member ? static_cast<Member *>(p_call->callee)->object : nullptr;
+		std::vector<uint32_t> list;
+		list.push_back(settled(engine_receiver(object, position, &of_value), writer(p_call->arguments), position));
+		FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
+		engine_arguments(decl, p_call->arguments, position, list);
+		uint32_t out = kind == Kind::Void ? NONE : reg(kind);
+		emit(Op::HostCall, position, out, name, arguments(std::move(list)));
 		return out == NONE ? 0 : out;
 	}
 
@@ -991,6 +1186,19 @@ class Lowerer {
 				New *made = static_cast<New *>(p_expression);
 				Symbol *symbol = named_class(made->callee);
 				uint32_t index = 0;
+				uint32_t type_name = 0;
+				if (symbol && is_godot(symbol) && !is_godot_object(symbol) && engine_name(symbol, std::string_view(), &type_name)) {
+					// One of Godot's value types: the engine makes it.
+					Symbol *constructor = symbol->klass ? symbol->klass->constructor : nullptr;
+					FunctionDecl *decl = constructor && constructor->node && constructor->node->kind == NodeKind::FunctionDecl
+							? static_cast<FunctionDecl *>(constructor->node)
+							: nullptr;
+					std::vector<uint32_t> list;
+					engine_arguments(decl, made->arguments, position, list);
+					uint32_t value = reg(Kind::Val);
+					emit(Op::HostNew, position, value, type_name, arguments(std::move(list)));
+					return value;
+				}
 				if (!symbol || !class_index(symbol, &index)) {
 					refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
 					return default_value(Kind::Obj, position);
@@ -1269,7 +1477,9 @@ class Lowerer {
 				} else if (a == Kind::Void || b == Kind::Void) {
 					// Against null: a reference is compared; a number or a Boolean is never null.
 					kind = a == Kind::Void ? b : a;
-					if (!is_reference(kind)) {
+					if (is_engine(kind)) {
+						refuse(position, "comparing a Godot value with null");
+					} else if (!is_reference(kind)) {
 						refuse(position, "comparing a number or a Boolean with null");
 					}
 					op = kind == Kind::Str ? Op::EqStr : Op::EqRef;
@@ -1303,6 +1513,13 @@ class Lowerer {
 				refuse(position, p_binary->op == TokenKind::KwIn ? "'in'" : "'instanceof'");
 				return default_value(Kind::Bool, position);
 			default: {
+				Kind left_kind = Kind::Void, right_kind = Kind::Void;
+				kind_of(left->type, &left_kind);
+				kind_of(right->type, &right_kind);
+				if (is_engine(left_kind) || is_engine(right_kind)) {
+					refuse(position, "an operator on a Godot value");
+					return default_value(p_want, position);
+				}
 				bool strings = p_binary->op == TokenKind::Plus && is_string_type(p_binary->type);
 				uint32_t a = settled(expression(left, Kind::Void), right, position);
 				uint32_t b = expression(right, Kind::Void);
@@ -1757,6 +1974,10 @@ public:
 		string_ = compilation_.builtin("String");
 		object_ = compilation_.builtin("Object");
 		error_ = compilation_.builtin("Error");
+		if (Package *godot = compilation_.find_package("godot")) {
+			auto found = godot->definitions.find("GodotObject");
+			godot_object_ = found == godot->definitions.end() ? nullptr : found->second;
+		}
 	}
 
 	bool run(LowerMode p_mode) {

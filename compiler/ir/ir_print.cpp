@@ -22,6 +22,10 @@ const char *kind_name(Kind p_kind) {
 			return "String";
 		case Kind::Obj:
 			return "Object";
+		case Kind::Val:
+			return "GodotValue";
+		case Kind::Ref:
+			return "GodotObject";
 	}
 	return "?";
 }
@@ -123,6 +127,9 @@ std::string print(const Module &p_module) {
 		if (klass.base != NONE && klass.base < p_module.classes.size()) {
 			out += " extends " + p_module.classes[klass.base].name;
 		}
+		if (!klass.native_base.empty()) {
+			out += " on Godot's " + klass.native_base;
+		}
 		out += "\n";
 		for (size_t i = 0; i < klass.fields.size(); i++) {
 			out += "  ." + std::to_string(i) + " " + klass.fields[i].name + ":" + kind_name(klass.fields[i].kind) + "\n";
@@ -130,6 +137,9 @@ std::string print(const Module &p_module) {
 		for (size_t i = 0; i < klass.methods.size(); i++) {
 			out += "  #" + std::to_string(i) + " " +
 					(klass.methods[i] < p_module.functions.size() ? p_module.functions[klass.methods[i]].name : "?") + "\n";
+		}
+		for (const auto &entry : klass.virtuals) {
+			out += "  virtual " + entry.first + " " + (entry.second < p_module.functions.size() ? p_module.functions[entry.second].name : "?") + "\n";
 		}
 		if (klass.constructor != NONE && klass.constructor < p_module.functions.size()) {
 			out += "  new " + p_module.functions[klass.constructor].name + "\n";

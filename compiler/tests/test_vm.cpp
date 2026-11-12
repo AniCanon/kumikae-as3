@@ -1,6 +1,7 @@
 // The interpreter as a library: what a debugger will use, and what the host is told.
 #include "check.h"
 
+#include "builtins.h"
 #include "interpreter.h"
 #include "lower.h"
 #include "names.h"
@@ -268,7 +269,244 @@ static void test_entry_points() {
 	CHECK(ir::lower(third, &library, ir::LowerMode::Library));
 }
 
+// A script that extends a Godot class, run against a host that records what it is asked to do.
+static const char *const PLAYER =
+		"package {\n"
+		"	import godot.*;\n"
+		"	public class Player extends CharacterBody2D {\n"
+		"		private var speed:Number = 200;\n"
+		"		public var steps:int = 0;\n"
+		"		override public function _physicsProcess(delta:Number):void {\n"
+		"			velocity = new Vector2(speed, 0);\n"
+		"			moveAndSlide();\n"
+		"			steps++;\n"
+		"		}\n"
+		"		public function where():Number { var at:Vector2 = position; return at.x + delta2(); }\n"
+		"		private function delta2():Number { return getPhysicsProcessDeltaTime(); }\n"
+		"		public function rename(to:String):String { name = to; return name; }\n"
+		"		public function wrong():void { setPhysicsProcess(true); queueFree(); }\n"
+		"	}\n"
+		"}\n";
+
+// Stands in for the engine: every value it hands out is a numbered box, and it writes down each request.
+struct FakeEngine : vm::Host {
+	std::string log, errors;
+	int boxes = 0; // Handed out and not yet dropped.
+	int next = 1;
+	bool fail_calls = false;
+	std::string name = "Player";
+
+	static std::string show(const vm::Host::Argument &p_argument) {
+		switch (p_argument.kind) {
+			case ir::Kind::F64:
+				return vm::number_to_string(p_argument.slot.d);
+			case ir::Kind::I32:
+				return std::to_string(p_argument.slot.i);
+			case ir::Kind::Bool:
+				return p_argument.slot.b ? "true" : "false";
+			case ir::Kind::Str:
+				return p_argument.slot.p ? "\"" + std::string(static_cast<vm::Str *>(p_argument.slot.p)->view()) + "\"" : "null";
+			default:
+				return "#" + std::to_string((intptr_t)p_argument.slot.p);
+		}
+	}
+	static std::string list(const Argument *p_arguments, size_t p_count) {
+		std::string out;
+		for (size_t i = 0; i < p_count; i++) {
+			out += (i ? ", " : "") + show(p_arguments[i]);
+		}
+		return out;
+	}
+	void *box() {
+		boxes++;
+		return (void *)(intptr_t)next++;
+	}
+	void give(ir::Kind p_kind, vm::Slot *r_result, double p_number, const std::string &p_text) {
+		if (!r_result) {
+			return;
+		}
+		r_result->bits = 0;
+		switch (p_kind) {
+			case ir::Kind::F64:
+				r_result->d = p_number;
+				break;
+			case ir::Kind::I32:
+				r_result->i = (int32_t)p_number;
+				break;
+			case ir::Kind::Bool:
+				r_result->b = p_number != 0;
+				break;
+			case ir::Kind::Str:
+				r_result->p = vm::new_string(p_text);
+				break;
+			case ir::Kind::Val:
+			case ir::Kind::Ref:
+				r_result->p = box();
+				break;
+			default:
+				break;
+		}
+	}
+	void print(std::string_view p_text) override { log += "print " + std::string(p_text) + "\n"; }
+	void error(std::string_view p_text) override { errors += std::string(p_text) + "\n"; }
+	void *construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *) override {
+		void *made = box();
+		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
+		return made;
+	}
+	bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, ir::Kind p_kind,
+			vm::Slot *r_result, std::string *r_error) override {
+		log += "call #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
+		if (fail_calls) {
+			*r_error = "the engine refused " + std::string(p_method);
+			return false;
+		}
+		give(p_kind, r_result, 0.25, "text");
+		return true;
+	}
+	bool get(void *p_receiver, std::string_view p_property, ir::Kind p_kind, vm::Slot *r_result, std::string *) override {
+		log += "get #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + "\n";
+		give(p_kind, r_result, 7.5, name);
+		return true;
+	}
+	bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *) override {
+		log += "set #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + " = " + show(p_value) + "\n";
+		if (p_property == "name" && p_value.slot.p) {
+			name = std::string(static_cast<vm::Str *>(p_value.slot.p)->view());
+		}
+		return true;
+	}
+	void *copy(void *p_value) override {
+		if (p_value) {
+			boxes++;
+		}
+		return p_value;
+	}
+	void drop(void *p_value) override {
+		if (p_value) {
+			boxes--;
+		}
+	}
+};
+
+static void test_engine_calls() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Player.as", PLAYER);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	uint32_t player = ir::NONE;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		if (module.classes[i].name == "Player") {
+			player = (uint32_t)i;
+		}
+	}
+	CHECK(player != ir::NONE);
+	if (player == ir::NONE) {
+		return;
+	}
+	// The class says which Godot class it extends and which of its methods answer the engine's virtuals.
+	CHECK_EQ(module.classes[player].native_base, std::string("CharacterBody2D"));
+	CHECK_EQ(module.classes[player].virtuals.size(), (size_t)1);
+	CHECK_EQ(module.classes[player].virtuals[0].first, std::string("_physics_process"));
+	{
+		FakeEngine engine;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		void *owner = engine.box(); // #1: the node the script is attached to.
+		vm::Object *object = interpreter.construct(player, owner);
+		CHECK(object != nullptr);
+		engine.log.clear();
+		vm::Slot delta;
+		delta.bits = 0;
+		delta.d = 1.0 / 60;
+		for (int frame = 0; frame < 2; frame++) {
+			CHECK(interpreter.call_method(object, "_physicsProcess", &delta, 1, nullptr));
+		}
+		CHECK_EQ(engine.log, std::string("construct Vector2(200, 0) -> #2\n"
+										 "set #1.velocity = #2\n"
+										 "call #1.move_and_slide()\n"
+										 "construct Vector2(200, 0) -> #3\n"
+										 "set #1.velocity = #3\n"
+										 "call #1.move_and_slide()\n"));
+		// The AS3 field counted on its own side.
+		vm::Slot steps;
+		CHECK(interpreter.get_field(object, "steps", &steps));
+		CHECK_EQ(steps.i, 2);
+		CHECK(!interpreter.get_field(object, "missing", &steps));
+		// Every box handed out during the calls was given back: only the owner's and the instance's copy remain.
+		CHECK_EQ(engine.boxes, 2);
+
+		// A property read into a local, a member of a value, a call that returns a number.
+		engine.log.clear();
+		vm::Slot result;
+		CHECK(interpreter.call_method(object, "where", nullptr, 0, &result));
+		CHECK_EQ(result.d, 7.75);
+		CHECK_EQ(engine.log, std::string("get #1.position\nget #4.x\ncall #1.get_physics_process_delta_time()\n"));
+		CHECK_EQ(engine.boxes, 2);
+		// Strings cross both ways.
+		engine.log.clear();
+		vm::Slot text;
+		text.bits = 0;
+		text.p = vm::new_string("Hero");
+		CHECK(interpreter.call_method(object, "rename", &text, 1, &result));
+		vm::Str *renamed = static_cast<vm::Str *>(result.p);
+		CHECK(renamed && std::string(renamed->view()) == "Hero");
+		CHECK_EQ(engine.log, std::string("set #1.name = \"Hero\"\nget #1.name\n"));
+		for (vm::Str *string : { static_cast<vm::Str *>(text.p), renamed }) {
+			if (vm::release(string)) {
+				vm::free_string(string);
+			}
+		}
+		// A call the engine refuses is an AS3 error with the engine's words, at the right line.
+		engine.fail_calls = true;
+		engine.log.clear();
+		CHECK(!interpreter.call_method(object, "wrong", nullptr, 0, nullptr));
+		CHECK_EQ(engine.log, std::string("call #1.set_physics_process(true)\n"));
+		CHECK(engine.errors.find("Error: the engine refused set_physics_process\n\tat Player/wrong()[Player.as:14]") == 0);
+		interpreter.release_object(object);
+		CHECK_EQ(engine.boxes, 1); // The instance let go of its owner.
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+
+	// What this slice does not do yet is refused by name.
+	auto refused = [](const char *p_body) {
+		Compilation program;
+		program.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		program.add("Player.as", std::string("package { import godot.*; public class Player extends Node2D {\n") + p_body + "\n} }");
+		program.check();
+		std::string checked = program.format_diagnostics();
+		ir::Module out;
+		bool lowered = ir::lower(program, &out, ir::LowerMode::Library);
+		std::string text = program.format_diagnostics();
+		return std::string(checked.empty() ? "" : "CHECK ") + (lowered ? "LOWERED " : "") + text;
+	};
+	const char *bodies[] = {
+		"function f():void { position = position + new Vector2(1, 0); }",
+		"function f():void { if (Input.isActionPressed(\"jump\")) {} }",
+		"function f():void { treeEntered.add(g); } function g():void {}",
+		"function f():void { print(\"hello\"); }",
+		"function f():void { position.x = 5; }",
+		"function f():void { addChild(this); }",
+		"function f():Boolean { return position == null; }",
+	};
+	for (const char *body : bodies) {
+		std::string result = refused(body);
+		check::checks()++;
+		if (result.find("CHECK ") == 0 || result.find("LOWERED") != std::string::npos ||
+				result.find("is not supported by the interpreter yet") == std::string::npos) {
+			check::failures()++;
+			std::printf("FAIL not refused: %s\n  %s\n", body, result.c_str());
+		}
+	}
+}
+
 int main() {
+	test_engine_calls();
 	test_entry_points();
 	test_statement_hook();
 	test_refused_program();
