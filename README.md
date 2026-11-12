@@ -193,6 +193,7 @@ For what each stage delivers and what is being built now, see the [roadmap](docs
 | `compiler/godot_ext/` | The Godot extension: AS3 as a Godot scripting language. |
 | `editors/` | How to connect an editor, and the VS Code client. |
 | `docs/roadmap.md` | The plan: stages, what each delivers, and current progress. |
+| `docs/backlog.md` | What reviews put off: every deferred item, owed until fixed. |
 | `docs/diagrams/` | The diagrams on this page, and the script that generates them. |
 | `docs/superpowers/specs/` | The design, and the performance redesign that amends it. |
 | `docs/superpowers/plans/` | The step-by-step plan for each stage. |

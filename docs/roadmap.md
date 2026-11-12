@@ -3,7 +3,8 @@
 This page is the plan for Kumikae AS3: what each stage delivers, how you can tell that it's done, and what is
 being built now. It's written for the project owner and for anyone who joins later.
 
-For why the project exists and how it works, see the [README](../README.md).
+For why the project exists and how it works, see the [README](../README.md). For everything a review put
+off, see the [backlog](backlog.md): those items are owed, not dropped.
 
 ## Where we are
 
@@ -172,6 +173,7 @@ Open items:
 |---|---|
 | Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
 | `async`/`await` | The owner wants it first-class, not limited to the main thread, efficient, and with a proper debugger. Research first, after stage 2; no syntax chosen yet. |
+| Deferred review findings | The owner said on 2026-11-12 that all of them are to be fixed. They are listed in the [backlog](backlog.md) and stay there until fixed or ruled on. |
 | Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the [language additions](superpowers/specs/2026-11-12-language-additions.md) list. |
 | 64-bit integers in declarations | A Godot integer marked 64-bit is declared `Number`, which is exact to 2^53. Object ids use higher bits, so stage 2 must settle a 64-bit type before bindings ship. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
