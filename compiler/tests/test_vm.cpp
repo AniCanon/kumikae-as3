@@ -41,6 +41,10 @@ static bool on_statement(vm::Interpreter &p_interpreter, void *p_data) {
 	Steps *steps = static_cast<Steps *>(p_data);
 	size_t top = p_interpreter.depth() - 1;
 	steps->seen += p_interpreter.function_at(top).name + ":" + std::to_string(p_interpreter.line_at(top)) + " ";
+	// A caller is on the line of its call, not the one after.
+	if (top > 0) {
+		steps->seen += "(from " + std::to_string(p_interpreter.line_at(top - 1)) + ") ";
+	}
 	return ++steps->count < steps->limit;
 }
 
@@ -67,7 +71,7 @@ static void test_statement_hook() {
 		vm::Interpreter interpreter(module, host);
 		interpreter.set_statement_hook(on_statement, &steps);
 		CHECK(interpreter.run_program());
-		CHECK_EQ(steps.seen, std::string("Main:4 Main:5 Main/twice:9 Main/twice:10 Main:6 "));
+		CHECK_EQ(steps.seen, std::string("Main:4 Main:5 Main/twice:9 (from 5) Main/twice:10 (from 5) Main:6 "));
 		CHECK_EQ(host.printed, std::string("2\n"));
 	}
 	// Returning false stops the program there, without an error.
@@ -78,7 +82,7 @@ static void test_statement_hook() {
 		vm::Interpreter interpreter(module, host);
 		interpreter.set_statement_hook(on_statement, &steps);
 		CHECK(!interpreter.run_program());
-		CHECK_EQ(steps.seen, std::string("Main:4 Main:5 Main/twice:9 "));
+		CHECK_EQ(steps.seen, std::string("Main:4 Main:5 Main/twice:9 (from 5) "));
 		CHECK_EQ(host.printed, std::string());
 		CHECK_EQ(host.errors, std::string());
 		CHECK_EQ(interpreter.depth(), (size_t)0);

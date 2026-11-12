@@ -75,9 +75,9 @@ for path in sorted(glob.glob(os.path.join(refused, "*.as"))):
     name = "refused/" + os.path.basename(path)
     result = run("run", [os.path.basename(path)], refused)
     compare(name, result.stderr, path[:-3] + ".err")
-    check(name + " status", result.returncode == 1 and result.stdout == "" and
-          "is not supported by the interpreter yet" in result.stderr or "the program's first class" in result.stderr or
-          "has no class to start" in result.stderr, "exit %d" % result.returncode)
+    named = ("is not supported by the interpreter yet" in result.stderr or "the program's first class" in result.stderr or
+             "has no class to start" in result.stderr)
+    check(name + " status", result.returncode == 1 and result.stdout == "" and named, "exit %d" % result.returncode)
 
 # Everything else in the test tree: run it or refuse it, but never crash, hang or leak.
 others = sorted(glob.glob(os.path.join(tests, "corpus", "*.as")) + glob.glob(os.path.join(tests, "golden", "**", "*.as"),

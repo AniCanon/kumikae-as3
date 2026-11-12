@@ -31,6 +31,7 @@ private:
 		uint32_t pc;
 		size_t base; // Where its registers start in stack_.
 		uint32_t result; // The caller's register for the value returned, or NONE.
+		uint32_t arguments; // How many the caller passed.
 	};
 
 	const ir::Module &module_;

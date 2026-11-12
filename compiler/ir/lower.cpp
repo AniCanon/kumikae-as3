@@ -42,11 +42,14 @@ class Lowerer {
 
 	// The function being lowered.
 	Unit *unit_ = nullptr;
-	Function *function_ = nullptr;
+	uint32_t function_index_ = 0; // By index: the list of functions can grow while a body is lowered.
 	Symbol *class_ = nullptr;
 	bool constructor_ = false;
 	std::unordered_map<const Symbol *, uint32_t> locals_;
 	std::vector<Loop> loops_;
+
+	Function &fn() { return module_.functions[function_index_]; }
+	const Function &fn() const { return module_.functions[function_index_]; }
 
 	// ---- reporting ----
 
@@ -229,6 +232,7 @@ class Lowerer {
 			} else {
 				klass.fields = module_.classes[klass.base].fields;
 				klass.methods = module_.classes[klass.base].methods;
+				klass.to_string = module_.classes[klass.base].to_string;
 			}
 		}
 		uint32_t index = (uint32_t)module_.classes.size();
@@ -285,6 +289,14 @@ class Lowerer {
 				}
 				uint32_t made = new_function(function, name + "/" + std::string(function->name), is_static);
 				functions_[function->symbol] = made;
+				if (function->name == "toString" && !is_static) {
+					const Type *result = function->return_type ? compilation_.type_of(function->return_type) : nullptr;
+					if (function->parameters.count == 0 && result && result->kind == Type::Instance && result->symbol == string_) {
+						module_.classes[index].to_string = made;
+					} else {
+						refuse(function->name_offset, "a toString() that takes arguments or does not return a String");
+					}
+				}
 				if (is_static) {
 					continue;
 				}
@@ -320,29 +332,29 @@ class Lowerer {
 		instruction.b = p_b;
 		instruction.c = p_c;
 		instruction.position = p_position;
-		function_->code.push_back(instruction);
-		return (uint32_t)function_->code.size() - 1;
+		fn().code.push_back(instruction);
+		return (uint32_t)fn().code.size() - 1;
 	}
 
-	uint32_t here() const { return (uint32_t)function_->code.size(); }
+	uint32_t here() const { return (uint32_t)fn().code.size(); }
 
 	void patch(uint32_t p_jump, uint32_t p_target) {
-		Instruction &instruction = function_->code[p_jump];
+		Instruction &instruction = fn().code[p_jump];
 		(instruction.op == Op::Jump ? instruction.a : instruction.b) = p_target;
 	}
 
 	uint32_t reg(Kind p_kind) {
-		function_->registers.push_back(p_kind);
-		return (uint32_t)function_->registers.size() - 1;
+		fn().registers.push_back(p_kind);
+		return (uint32_t)fn().registers.size() - 1;
 	}
 
 	Kind kind_at(uint32_t p_reg) const {
-		return p_reg < function_->registers.size() ? function_->registers[p_reg] : Kind::Void;
+		return p_reg < fn().registers.size() ? fn().registers[p_reg] : Kind::Void;
 	}
 
 	uint32_t arguments(std::vector<uint32_t> p_list) {
-		function_->argument_lists.push_back(std::move(p_list));
-		return (uint32_t)function_->argument_lists.size() - 1;
+		fn().argument_lists.push_back(std::move(p_list));
+		return (uint32_t)fn().argument_lists.size() - 1;
 	}
 
 	// The default value of a kind, in a new register.
@@ -675,10 +687,10 @@ class Lowerer {
 	}
 
 	// Evaluates what is needed to reach the place: the object of `a.b`, once.
-	Place place_of(Expr *p_target) {
+	Place place_of(Expr *p_target, Expr *p_later = nullptr) {
 		if (p_target->kind == NodeKind::Name) {
 			Name *name = static_cast<Name *>(p_target);
-			if (name->symbol && name->symbol->is_instance_member() && function_->is_static) {
+			if (name->symbol && name->symbol->is_instance_member() && fn().is_static) {
 				refuse(name->offset, "this name");
 				return Place();
 			}
@@ -696,7 +708,7 @@ class Lowerer {
 																			  : "'" + std::string(symbol->name) + "' used as a value");
 				return Place();
 			}
-			uint32_t object = receiver(member->object);
+			uint32_t object = settled(receiver(member->object), p_later, member->name_offset);
 			return place_of_symbol(symbol, object, member->name_offset);
 		}
 		refuse(p_target->offset, "this kind of assignment target");
@@ -782,13 +794,25 @@ class Lowerer {
 				refuse(p_position, "a call to a function with a parameter of type '" + compilation_.type_name(type) + "'");
 				break;
 			}
-			Expr *value = i < p_arguments.count ? p_arguments[i] : parameter.default_value;
+			if (i >= p_arguments.count) {
+				break; // Left out: the function that is called supplies its own default.
+			}
 			Expr *later = nullptr;
 			for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
 				later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
 			}
-			r_list.push_back(settled(expression(value, kind), later, p_position));
+			r_list.push_back(settled(expression(p_arguments[i], kind), later, p_position));
 		}
+	}
+
+	// The first of the expressions that can change a local variable, or null.
+	static Expr *writer(const List<Expr *> &p_expressions) {
+		for (Expr *expression : p_expressions) {
+			if (writes_locals(expression)) {
+				return expression;
+			}
+		}
+		return nullptr;
 	}
 
 	uint32_t call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind) {
@@ -823,7 +847,14 @@ class Lowerer {
 		Kind conversion = Kind::Void;
 		if (symbol->is_type()) {
 			if (kind_of_class(symbol, &conversion) && p_call->arguments.count == 1) {
-				return expression(p_call->arguments[0], conversion);
+				uint32_t value = expression(p_call->arguments[0], conversion);
+				if (conversion == Kind::Str) {
+					// The conversion written out always gives a string: a missing one becomes "null".
+					uint32_t text = reg(Kind::Str);
+					emit(Op::StrToStr, position, text, value);
+					return text;
+				}
+				return value;
 			}
 			refuse(callee->offset, "a cast to '" + std::string(symbol->name) + "'");
 			return default_value(p_want, position);
@@ -857,9 +888,9 @@ class Lowerer {
 			if (callee->kind == NodeKind::Member) {
 				Expr *object = static_cast<Member *>(callee)->object;
 				direct = direct || object->kind == NodeKind::SuperExpr;
-				list.push_back(receiver(object));
+				list.push_back(settled(receiver(object), writer(p_call->arguments), position));
 			} else {
-				if (function_->is_static) {
+				if (fn().is_static) {
 					refuse(callee->offset, "this call");
 				}
 				list.push_back(0);
@@ -930,7 +961,7 @@ class Lowerer {
 				return out;
 			}
 			case NodeKind::ThisExpr:
-				if (function_->is_static) {
+				if (fn().is_static) {
 					refuse(position, "'this' here");
 					return default_value(Kind::Obj, position);
 				}
@@ -1282,7 +1313,7 @@ class Lowerer {
 
 	uint32_t assign(Assign *p_assign) {
 		uint32_t position = p_assign->offset;
-		Place place = place_of(p_assign->target);
+		Place place = place_of(p_assign->target, p_assign->value);
 		uint32_t value = 0;
 		if (p_assign->op == TokenKind::Assign) {
 			value = expression(p_assign->value, place.kind);
@@ -1313,7 +1344,7 @@ class Lowerer {
 				Kind kind = written_kind(declarator.type, declarator.offset, Kind::F64);
 				uint32_t local = reg(kind);
 				locals_[declarator.symbol] = local;
-				function_->locals.push_back({ std::string(declarator.name), local });
+				fn().locals.push_back({ std::string(declarator.name), local });
 				// A Number starts as NaN. The rest start as zero, which is what a fresh register holds.
 				if (kind == Kind::F64) {
 					emit(Op::ConstF64, declarator.offset, local, number(std::numeric_limits<double>::quiet_NaN()));
@@ -1419,13 +1450,13 @@ class Lowerer {
 			}
 			case NodeKind::Return: {
 				Return *result = static_cast<Return *>(p_statement);
-				if (constructor_ || function_->result == Kind::Void) {
+				if (constructor_ || fn().result == Kind::Void) {
 					if (result->value) {
 						expression(result->value, Kind::Void);
 					}
 					emit(Op::ReturnVoid, position);
 				} else {
-					uint32_t value = result->value ? expression(result->value, function_->result) : default_value(function_->result, position);
+					uint32_t value = result->value ? expression(result->value, fn().result) : default_value(fn().result, position);
 					emit(Op::Return, position, value);
 				}
 				break;
@@ -1486,7 +1517,7 @@ class Lowerer {
 	// ---- functions ----
 
 	void begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {
-		function_ = &module_.functions[p_function];
+		function_index_ = p_function;
 		unit_ = &p_unit;
 		class_ = p_class;
 		constructor_ = false;
@@ -1496,9 +1527,9 @@ class Lowerer {
 
 	// Parameters take the first registers; an instance method's first is `this`.
 	void parameters(FunctionDecl *p_function) {
-		if (!function_->is_static) {
-			function_->registers.push_back(Kind::Obj);
-			function_->locals.push_back({ "this", 0 });
+		if (!fn().is_static) {
+			fn().registers.push_back(Kind::Obj);
+			fn().locals.push_back({ "this", 0 });
 		}
 		if (p_function) {
 			for (Parameter &parameter : p_function->parameters) {
@@ -1510,18 +1541,34 @@ class Lowerer {
 				if (parameter.symbol) {
 					locals_[parameter.symbol] = local;
 				}
-				function_->locals.push_back({ std::string(parameter.name), local });
+				fn().locals.push_back({ std::string(parameter.name), local });
 			}
 		}
-		function_->parameters = (uint32_t)function_->registers.size();
+		fn().parameters = (uint32_t)fn().registers.size();
+		// A parameter the caller left out takes its default here, in the function that runs.
+		for (uint32_t i = 0; p_function && i < p_function->parameters.count; i++) {
+			Parameter &parameter = p_function->parameters[i];
+			if (!parameter.default_value || !parameter.symbol) {
+				continue;
+			}
+			uint32_t local = locals_[parameter.symbol];
+			uint32_t missing = reg(Kind::Bool);
+			emit(Op::ArgMissing, parameter.offset, missing, local);
+			uint32_t skip = emit(Op::JumpIfNot, parameter.offset, missing, 0);
+			uint32_t value = expression(parameter.default_value, kind_at(local));
+			if (value != local) {
+				emit(Op::Move, parameter.offset, local, value);
+			}
+			patch(skip, here());
+		}
 	}
 
 	void end(uint32_t p_position) {
-		if (function_->result == Kind::Void) {
+		if (fn().result == Kind::Void) {
 			emit(Op::ReturnVoid, p_position);
 		} else {
 			// Falling off the end gives the type's default value.
-			emit(Op::Return, p_position, default_value(function_->result, p_position));
+			emit(Op::Return, p_position, default_value(fn().result, p_position));
 		}
 	}
 
@@ -1533,7 +1580,7 @@ class Lowerer {
 		begin(found->second, p_unit, p_class);
 		parameters(p_decl);
 		if (p_decl->return_type) {
-			function_->result = written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void);
+			fn().result = written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void);
 		} else {
 			unit_ = &p_unit;
 			refuse(p_decl->name_offset, "a function without a return type");
@@ -1641,7 +1688,6 @@ class Lowerer {
 					if (!decl->symbol || !classes_.count(decl->symbol)) {
 						continue;
 					}
-					lower_statics(p_unit, decl);
 					lower_constructor(p_unit, decl);
 					for (Node *member : decl->members) {
 						if (member->kind == NodeKind::FunctionDecl) {
@@ -1734,6 +1780,7 @@ public:
 			collect(*unit, classes);
 		}
 		std::unordered_map<const Symbol *, bool> declared;
+		std::vector<std::pair<Unit *, ClassDecl *>> ordered; // Each class after its base.
 		for (size_t done = 0; done < classes.size();) {
 			size_t before = done;
 			for (auto &entry : classes) {
@@ -1746,6 +1793,7 @@ public:
 				if (!declared[symbol] && (!base_is_ours || declared[base])) {
 					declare_class(*entry.first, entry.second);
 					declared[symbol] = true;
+					ordered.push_back(entry);
 					done++;
 				}
 			}
@@ -1804,6 +1852,10 @@ public:
 				others(unit->tree->package->definitions);
 			}
 			others(unit->tree->definitions);
+		}
+		// Static fields get their values a class at a time, a base class before its subclasses.
+		for (auto &entry : ordered) {
+			lower_statics(*entry.first, entry.second);
 		}
 		for (Unit *unit : units) {
 			lower_unit(*unit);

@@ -132,6 +132,10 @@ int Interpreter::line_at(size_t p_frame) const {
 	const Frame &frame = frames_[p_frame];
 	const Function &function = module_.functions[frame.function];
 	uint32_t pc = frame.pc < function.code.size() ? frame.pc : (uint32_t)function.code.size() - 1;
+	// A frame that is waiting for a call to return is at the instruction after the call.
+	if (p_frame + 1 < frames_.size() && pc > 0) {
+		pc--;
+	}
 	uint32_t position = function.code.empty() ? function.position : function.code[pc].position;
 	if (function.file >= module_.lines.size()) {
 		return 0;
@@ -159,6 +163,7 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	frame.pc = 0;
 	frame.base = stack_.size();
 	frame.result = p_result;
+	frame.arguments = (uint32_t)p_count;
 	Slot zero;
 	zero.bits = 0;
 	// The arguments may live in stack_ itself, which is about to grow: copy them first.
@@ -359,9 +364,18 @@ bool Interpreter::run(size_t p_depth) {
 			case Op::BoolToStr:
 				assign(Kind::Str, r[in.a], text(r[in.b].b ? "true" : "false"));
 				break;
-			case Op::ObjToStr:
-				assign(Kind::Str, r[in.a], text(object_text(static_cast<Object *>(r[in.b].p))));
+			case Op::ObjToStr: {
+				Object *object = static_cast<Object *>(r[in.b].p);
+				uint32_t own = object ? module_.classes[object->klass].to_string : NONE;
+				if (own != NONE) {
+					// The class says how it reads: call its toString(), whose result lands in the register.
+					Slot self = r[in.b];
+					push(own, &self, 1, in.a); // `frame` and `r` are stale after this.
+				} else {
+					assign(Kind::Str, r[in.a], text(object_text(object)));
+				}
 				break;
+			}
 			case Op::StrToStr: {
 				Str *string = r[in.b].p ? static_cast<Str *>(r[in.b].p) : null_text_;
 				retain(string);
@@ -433,10 +447,12 @@ bool Interpreter::run(size_t p_depth) {
 				bool value;
 				if (in.op == Op::EqStr) {
 					value = left == right || (left && right && left->view() == right->view());
+				} else if (left && right) {
+					value = in.op == Op::LtStr ? left->view() < right->view() : left->view() <= right->view();
 				} else {
-					// Ordering treats a missing string as "null", as converting it would.
-					std::string_view a = left ? left->view() : std::string_view("null");
-					std::string_view b = right ? right->view() : std::string_view("null");
+					// With a missing string the two are compared as numbers: null is 0.
+					double a = left ? string_to_number(left->view()) : 0;
+					double b = right ? string_to_number(right->view()) : 0;
 					value = in.op == Op::LtStr ? a < b : a <= b;
 				}
 				r[in.a].bits = 0;
@@ -537,6 +553,12 @@ bool Interpreter::run(size_t p_depth) {
 				} else {
 					globals_[in.a] = r[in.b];
 				}
+				break;
+			}
+			case Op::ArgMissing: {
+				bool value = in.b >= frame.arguments;
+				r[in.a].bits = 0;
+				r[in.a].b = value;
 				break;
 			}
 			case Op::NullCheck:

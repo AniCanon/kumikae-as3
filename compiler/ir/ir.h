@@ -48,7 +48,7 @@ inline bool is_reference(Kind p_kind) {
 	X(Concat, "RRR") X(StrLength, "RR-") \
 	X(Jump, "L--") X(JumpIf, "RL-") X(JumpIfNot, "RL-") \
 	X(GetField, "RRD") X(SetField, "RDR") X(GetGlobal, "RG-") X(SetGlobal, "GR-") \
-	X(NullCheck, "R--") \
+	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
 	X(IsClass, "RRC") X(AsClass, "RRC") \
 	X(Return, "R--") X(ReturnVoid, "---") \
@@ -105,6 +105,7 @@ struct Class {
 	std::vector<Field> fields; // The base's first: a field keeps its slot in every subclass.
 	std::vector<uint32_t> methods; // The method table: function indices, the base's slots first.
 	uint32_t constructor = NONE;
+	uint32_t to_string = NONE; // The class's toString(), its own or inherited: what converting to a String calls.
 };
 
 struct Global {
