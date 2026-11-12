@@ -1,0 +1,175 @@
+# Kumikae AS3
+
+ActionScript 3 as a first-class scripting language for Godot 4.
+
+You write AS3 classes that extend Godot's own classes. The same source runs in the editor, on desktop, on iOS
+and Android, and on Nintendo Switch through the Kumikae build.
+
+> **Status: early.** Today the compiler can parse AS3 and report syntax errors. Nothing runs inside Godot
+> yet. The [roadmap](docs/roadmap.md) shows what comes next and how you can tell when each stage is done.
+
+## What you will write
+
+This is the target. It doesn't run yet, and details such as how you reach Godot's `Input` can still change.
+
+```actionscript
+package game {
+    import godot.CharacterBody2D;
+    import godot.Input;
+    import godot.Vector2;
+
+    public class Player extends CharacterBody2D {
+        [Export] public var speed:Number = 300;
+
+        override public function _physics_process(delta:Number):void {
+            var direction:Vector2 = Input.get_vector("left", "right", "up", "down");
+            velocity = direction * speed;
+            move_and_slide();
+        }
+    }
+}
+```
+
+- The class extends a Godot class, so you attach the script to a node as you attach a GDScript or C# script.
+- `[Export]` shows the field in the inspector. Metadata tags are already AS3 syntax.
+- Godot's names keep Godot's spelling (`move_and_slide`), so Godot's documentation applies unchanged.
+- `direction * speed` works because the compiler allows arithmetic on Godot's math types.
+
+## Why AS3
+
+| Goal | What it means |
+|---|---|
+| First-class in Godot | Scripts extend Godot classes, attach to nodes, export properties and use signals. |
+| One codebase | The same source runs on desktop, iOS, Android and Nintendo Switch, with no per-platform code. |
+| Fast | Release builds are native code. The target is ahead of or level with Godot C#, with steadier frames. |
+| Easy to use | Write a script, press play. No build step while you edit. |
+| Easy to debug | Breakpoints and stepping from JetBrains IDEs, in the editor and on a device. |
+
+## What works today
+
+| Capability | Status |
+|---|---|
+| Parse AS3 and report syntax errors (`kas3c parse`) | **Works** |
+| Resolve names: packages, imports, classes, scopes (`kas3c check`) | In progress |
+| Check types | Next |
+| Run a script in the Godot editor | Planned (stage 2) |
+| Export a release build as native code | Planned (stage 3) |
+| iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |
+| Language server, debugger, JetBrains plugin | Planned (stage 6) |
+
+## Try the parser
+
+Before you begin, install CMake 3.22 or later, a C++17 compiler, and Python 3 (for the tests).
+
+1. Build the compiler:
+
+   ```bash
+   cmake -S compiler -B compiler/build
+   cmake --build compiler/build -j
+   ```
+
+2. Run the tests:
+
+   ```bash
+   ctest --test-dir compiler/build --output-on-failure
+   ```
+
+3. Parse a file and print its syntax tree:
+
+   ```bash
+   compiler/build/kas3c parse --dump-ast compiler/tests/corpus/Shapes.as
+   ```
+
+Errors go to standard error as `<file>:<line>:<column>: error: <message>`. The exit status is 0 when there
+are no errors, 1 when a file has errors, and 2 for bad usage or an unreadable file.
+
+For the grammar the parser accepts and its limits, see the [compiler README](compiler/README.md).
+
+## How it works
+
+![How an .as file becomes a running game](docs/diagrams/pipeline.svg)
+
+1. **The front end** reads your `.as` files, resolves names, and checks types. It reports every error with a
+   file, line and column.
+2. **The typed IR** (intermediate representation) is the single definition of what your program means. Both
+   ways of running the program read it and nothing else.
+3. **The interpreter** runs the IR directly. The editor and debug builds use it, so you need no C++ toolchain
+   while you work, and you get hot reload and the debugger.
+4. **The C++ generator** turns the IR into C++, and the platform's own C++ compiler turns that into native
+   code. Release builds use it. There is no just-in-time compiler on any platform, because iOS and consoles
+   forbid one.
+
+A build is entirely one kind or the other:
+
+| | Debug build | Release build |
+|---|---|---|
+| Runs your code with | The interpreter | Native code |
+| You need | Nothing extra | A C++ toolchain for the target, as C# exports need the .NET SDK |
+| Desktop and Android | A Godot extension that stock Godot 4.7 loads | The same, plus your game's own library |
+| iOS and Nintendo Switch | Linked into the application | Linked into the application |
+
+Both kinds must behave identically. One suite of AS3 programs runs on both, and a difference between them is
+a failing test.
+
+### Where the speed comes from
+
+![The three kinds of call](docs/diagrams/calls.svg)
+
+1. **Godot calls your script** (`_physics_process`, signal handlers). Godot calls by name with boxed
+   arguments, as it does for C# and GDScript. The runtime looks the name up once and caches it.
+2. **Your script calls Godot** (`move_and_slide()`). The call goes through Godot's typed direct-call path,
+   with no boxed values.
+3. **Your script calls your own code** (`enemy.hit()`). In a release build this is a direct C++ call that
+   never touches the engine.
+
+### Measured so far
+
+Before building the compiler, we wrote by hand the C++ that the compiler will generate, and measured it
+against Godot C# on desktop. Lower is better. The figures are median frame times in microseconds.
+
+| Benchmark | AS3-shaped C++ | C# | GDScript |
+|---|---|---|---|
+| Move many nodes | 615 | 686 | 1,405 |
+| A script on every node | 1,002 | 1,682 | 2,253 |
+| Signal traffic | 510 | 1,062 | 1,799 |
+| Physics ray queries | 1,339 | 1,354 | 1,513 |
+| N-body simulation | 60 | 63 | 9,753 |
+| Allocation-heavy code | 48 | 74 | 6,397 |
+
+- The hand-written code was ahead of C# on seven of nine benchmarks (one of them only with a compiler flag
+  that turns loop unrolling off) and level on two.
+- Its slow frames were steadier. On the two benchmarks that create garbage, C#'s slowest frames were 5 to 12
+  times its median.
+- These figures come from hand-written code, not from the compiler. Stage 3 measures real compiled AS3.
+
+For the full tables and what was not measured, see the
+[stage 0b results](docs/results/2026-11-stage-0b-desktop.md).
+
+## Roadmap
+
+![Roadmap](docs/diagrams/roadmap.svg)
+
+For what each stage delivers and what is being built now, see the [roadmap](docs/roadmap.md).
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `compiler/` | The front end as a library (`kas3front`), the `kas3c` command-line tool, and their tests. |
+| `docs/roadmap.md` | The plan: stages, what each delivers, and current progress. |
+| `docs/diagrams/` | The diagrams on this page, and the script that generates them. |
+| `docs/superpowers/specs/` | The design, and the performance redesign that amends it. |
+| `docs/superpowers/plans/` | The step-by-step plan for each stage. |
+| `docs/results/` | Benchmark results, with the raw data. |
+
+The throwaway speed spike is kept on the `spike/stage-0b` branch.
+
+## Design documents
+
+- [Design](docs/superpowers/specs/2026-11-11-kumikae-as3-design.md): goals, shape, language scope and stages.
+- [Performance redesign](docs/superpowers/specs/2026-11-11-performance-redesign.md): the rules that generated
+  code follows, and the owner's decision on the speed goal. Where the two documents disagree, this one wins.
+
+## Licence
+
+This repository is private for now and has no licence file.
