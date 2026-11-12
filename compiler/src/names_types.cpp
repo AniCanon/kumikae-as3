@@ -821,31 +821,36 @@ class Typer {
 		std::vector<OperatorRule> operators;
 		const Type *element = nullptr; // What indexing gives; null if the class is not indexed.
 		bool keyed = false; // Indexed by any key, not only by a number.
+		bool complete = false; // The operators listed are all it has: another use is an error.
 	};
 	std::unordered_map<Symbol *, Described> described_;
 
-	// The type a tag names: a number type, Boolean, `*`, or a class in the declaring class's package.
-	const Type *tag_type(Symbol *p_class, std::string_view p_name) {
-		if (p_name == "int") {
-			return int_;
-		}
-		if (p_name == "Number") {
-			return number_;
-		}
-		if (p_name == "Boolean") {
-			return boolean_;
-		}
+	// The type a tag names: `*`, or a class or interface in the tagged class's package, in the top-level
+	// package, or written with its package. An unknown name is reported where the tag is.
+	const Type *tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name) {
 		if (p_name == "*") {
 			return any_;
 		}
-		if (!p_class->package) {
-			return nullptr;
+		Package *package = p_class->package;
+		std::string_view name = p_name;
+		size_t dot = p_name.rfind('.');
+		if (dot != std::string_view::npos) {
+			package = compilation_.find_package(std::string(p_name.substr(0, dot)));
+			name = p_name.substr(dot + 1);
 		}
-		auto found = p_class->package->definitions.find(p_name);
-		if (found == p_class->package->definitions.end() || found->second->kind != SymbolKind::Class) {
-			return nullptr;
+		for (Package *place : { package, dot == std::string_view::npos ? compilation_.top_level() : nullptr }) {
+			if (!place) {
+				continue;
+			}
+			auto found = place->definitions.find(name);
+			if (found != place->definitions.end() &&
+					(found->second->kind == SymbolKind::Class || found->second->kind == SymbolKind::Interface)) {
+				return compilation_.instance_type(found->second);
+			}
 		}
-		return compilation_.instance_type(found->second);
+		p_class->unit->diagnostics.error(p_tag.offset, "unknown type " + quoted(p_name) + " in an [" +
+															   std::string(p_tag.name) + "] tag");
+		return nullptr;
 	}
 
 	// What the class's declaration says about operators and indexing, or null if it says nothing.
@@ -857,9 +862,15 @@ class Typer {
 		}
 		auto cached = described_.find(symbol);
 		if (cached != described_.end()) {
-			return cached->second.operators.empty() && !cached->second.element ? nullptr : &cached->second;
+			return cached->second.complete || cached->second.element ? &cached->second : nullptr;
 		}
 		Described result;
+		// A subclass is one of its base, so it has what its base has.
+		if (symbol->klass && symbol->klass->base) {
+			if (const Described *base = described(compilation_.instance_type(symbol->klass->base))) {
+				result = *base;
+			}
+		}
 		for (const Metadata &tag : static_cast<ClassDecl *>(symbol->node)->metadata) {
 			std::string_view op, left, right, returns, element, keyed;
 			for (const MetadataArg &argument : tag.args) {
@@ -878,17 +889,22 @@ class Typer {
 				}
 			}
 			if (tag.name == "Indexed") {
-				result.element = tag_type(symbol, element);
-				result.keyed = keyed == "true";
+				if (const Type *type = tag_type(symbol, tag, element)) {
+					result.element = type;
+					result.keyed = keyed == "true";
+				}
+			} else if (tag.name == "Operators") {
+				result.complete = true;
 			} else if (tag.name == "Operator") {
+				result.complete = true;
 				OperatorRule rule;
 				rule.op = op;
-				rule.result = tag_type(symbol, returns);
+				rule.result = tag_type(symbol, tag, returns);
 				if (!left.empty()) {
 					rule.side = OperatorRule::Left;
-					rule.other = tag_type(symbol, left);
+					rule.other = tag_type(symbol, tag, left);
 				} else if (!right.empty()) {
-					rule.other = tag_type(symbol, right);
+					rule.other = tag_type(symbol, tag, right);
 				} else {
 					rule.side = OperatorRule::Unary;
 				}
@@ -899,12 +915,13 @@ class Typer {
 			}
 		}
 		const Described &stored = described_.emplace(symbol, std::move(result)).first->second;
-		return stored.operators.empty() && !stored.element ? nullptr : &stored;
+		return stored.complete || stored.element ? &stored : nullptr;
 	}
 
+	// Whether the class's declaration lists its operators, so that one it does not list is an error.
 	bool has_operators(const Type *p_type) {
 		const Described *found = described(p_type);
-		return found && !found->operators.empty();
+		return found && found->complete;
 	}
 
 	// An expression whose value is a whole number: an int or uint, or sums, differences, products and
@@ -938,15 +955,21 @@ class Typer {
 	// Whether an operand of type p_type is what a rule asks for. *r_exact is cleared when a whole number
 	// meets a rule for Number, or the reverse: such a rule is used only if no other matches.
 	bool operand_matches(const Expr *p_operand, const Type *p_type, const Type *p_wanted, bool *r_exact) const {
+		*r_exact = true;
 		if (numeric(p_wanted)) {
 			if (!numeric(p_type)) {
 				return false;
 			}
-			*r_exact = whole(p_operand) == (p_wanted == int_);
-			return true;
+			// A whole number is also a Number, so it may use a form declared for Number when there is no
+			// other. A fraction is never a whole number.
+			bool is_whole = whole(p_operand);
+			*r_exact = is_whole == (p_wanted != number_);
+			return *r_exact || is_whole;
 		}
-		*r_exact = true;
-		return !numeric(p_type) && p_type != boolean_ && p_type != string_ && fits(p_type, p_wanted) == Fit::Yes;
+		if (p_wanted == boolean_ || p_wanted == string_ || numeric(p_type) || p_type == boolean_ || p_type == string_) {
+			return p_type == p_wanted; // Everything converts to these two, and they to nothing here.
+		}
+		return fits(p_type, p_wanted) == Fit::Yes;
 	}
 
 	// An operand that could be anything: nothing is said about an operator on it.

@@ -280,6 +280,11 @@ class Fixture(unittest.TestCase):
         self.assertIn('[Indexed(element="*", keyed="true")]', self.tags("GodotDictionary"))
         self.assertEqual([tag for tag in self.tags("Signal") if "Indexed" in tag], [])
 
+    def test_every_value_type_says_its_operators_are_all_listed(self):
+        for name in ("Vector2", "Signal", "GodotArray", "GodotDictionary"):
+            self.assertIn("[Operators]", self.tags(name))
+        self.assertNotIn("[Operators]", self.tags("Node"))
+
     def test_indexing_a_wide_integer(self):
         self.assertIn('[Indexed(element="Number")]', self.tags("PackedInt64Array"))
 

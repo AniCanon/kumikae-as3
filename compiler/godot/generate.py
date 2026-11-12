@@ -456,7 +456,8 @@ class Generator:
 
     def operator_lines(self, entry):
         owner = entry["name"]
-        lines = []
+        # Says that the tags after it are every operator the type has: any other use is an error.
+        lines = ["\t[Operators]"]
         for operator in entry.get("operators", []):
             name = operator["name"]
             if name in OPERATORS_LEFT_OUT:

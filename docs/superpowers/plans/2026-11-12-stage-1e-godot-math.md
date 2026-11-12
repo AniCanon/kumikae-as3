@@ -34,15 +34,21 @@ them") and `docs/superpowers/specs/2026-11-12-godot-naming-design.md` section 6.
    operand is a number (`2 * v`), on the class of the right operand: `[Operator(op="*", left="Number",
    returns="Vector2")]`. A Godot `int` is written `int` and a `float` is written `Number`.
 3. **Which number.** An `int` or `uint` operand looks for the `int` form, a `Number` operand for the
-   `Number` form; if the class has only the other form, that one is used. So `Vector2i * 2` is a
-   `Vector2i` and `Vector2i * 0.5` is a `Vector2`, as in Godot. Cost: AS3 computes `i + 1` as a `Number`,
-   so `cell * (i + 1)` is a `Vector2`; write `cell * int(i + 1)`.
+   `Number` form. So `Vector2i * 2` is a `Vector2i` and `Vector2i * 0.5` is a `Vector2`, as in Godot.
+   **Changed while building:** an operand is whole if it is an `int` or `uint` or a sum, difference,
+   product or remainder of whole operands, so `cell * (i + 1)` is a `Vector2i` although AS3 types `i + 1`
+   as a `Number`. A whole operand may use a `Number` form when there is no `int` form; the reverse is an
+   error (`Vector2i % 0.5`), as in Godot. Cost: `Math.floor(x)` is a `Number`, so
+   `cell * Math.floor(x)` is a `Vector2`; write `int(Math.floor(x))`.
 4. **When it is an error.** One operand's class has `[Operator]` tags, both operand types are known and
-   neither is `*`, and no tag matches: `can't use '+' on 'Vector2' and 'Node'`. A class with no tags
-   (`RID`, a script's own class) is left as today: the type is unknown and nothing is said.
+   neither is `*`, `Object` or `null`, and no tag matches: `can't use '+' on 'Vector2' and 'Node'`.
+   **Changed after review:** every built-in type carries an `[Operators]` tag saying its list is complete,
+   so a type with no operators at all (`GodotDictionary`, `Signal`) is checked too. A class with no such
+   tag (a script's own class, `Node`) is left as before: the type is unknown and nothing is said.
 5. **`+` with a `String`** stays a `String`: AS3's rule comes first.
-6. **Compound assignment** (`position += step`) uses the same lookup for its type and its error. Whether
-   the result fits the target is still not checked, as for numbers.
+6. **Compound assignment** (`position += step`) uses the same lookup. **Changed while building:** its type
+   is the target's, and a result that does not fit the target is an error (`cell *= 0.5` gives a
+   `Vector2`). Value types don't convert to each other, so the error is certain.
 7. **Indexing.** `[Indexed(element="Vector2")]` on a class: a number key gives the element type. A
    `[Indexed(element="*", keyed="true")]` class gives the element for any key. Any other key gives `*`,
    because AS3 lets `v["x"]` name a property. Storing into `packed[i]` is checked like any store.

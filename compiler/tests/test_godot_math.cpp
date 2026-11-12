@@ -19,7 +19,7 @@ static std::string program(const std::string &p_body) {
 		   "public var rect:Rect2; public var rid:RID; public var q:Quaternion; public var basis:Basis;\n"
 		   "public var i:int; public var u:uint; public var n:Number; public var s:String; public var any:*;\n"
 		   "public var obj:Object; public var node:Node; public var list:Array; public var mine:Mine;\n"
-		   "public var points:PackedVector2Array; public var wide:PackedInt64Array; public var bytes:PackedByteArray;\n"
+		   "public var points:PackedVector2Array; public var wide:PackedInt64Array; public var bytes:PackedByteArray; public var names:PackedStringArray;\n"
 		   "public var ga:GodotArray; public var gd:GodotDictionary; public function run(delta:Number):void {\n" +
 			p_body + "\n} } }\nclass Mine {}\n";
 }
@@ -94,6 +94,7 @@ static void test_arithmetic() {
 			{ "-a", "Vector2" },
 			{ "+a", "Vector2" },
 			{ "-c", "Color" },
+			{ "ga + list", "GodotArray" },
 			{ "a + s", "String" },
 			{ "s + a", "String" },
 	});
@@ -137,10 +138,12 @@ static void test_whole_and_fractional_numbers() {
 			{ "vi * (i + n)", "Vector2" },
 			{ "n * vi", "Vector2" },
 			{ "vi + wi", "Vector2i" },
-			// Vector2 has no int-only form to prefer, and Vector2i has no Number form of %: the other is used.
-			{ "a * i", "Vector2" },
-			{ "vi % n", "Vector2i" },
+			// A whole number is also a Number, so it may use a form that Godot has only for float.
+			{ "t * i", "Transform2D" },
 	});
+	// The reverse does not hold: Godot has Vector2i % int and no Vector2i % float.
+	expect("/*!*/vi % n; /*!*/vi % 0.5;",
+			{ NO_OPERATOR("%", "Vector2i", "Number"), NO_OPERATOR("%", "Vector2i", "Number") });
 }
 
 static void test_comparisons() {
@@ -164,6 +167,9 @@ static void test_results_are_checked_where_stored() {
 }
 
 static void test_no_operator() {
+	expect("/*!*/gd + 1; /*!*/-gd; /*!*/gd - gd; /*!*/names * 2;", // Types with no operators at all.
+			{ NO_OPERATOR("+", "GodotDictionary", "int"), NO_UNARY("-", "GodotDictionary"),
+					NO_OPERATOR("-", "GodotDictionary", "GodotDictionary"), NO_OPERATOR("*", "PackedStringArray", "int") });
 	expect("/*!*/rid + 1; /*!*/a + node; /*!*/a % b; /*!*/a + 1; /*!*/a - c; /*!*/a * true; /*!*/node * a; /*!*/a + mine;\n"
 		   "/*!*/-rect; /*!*/a + list; /*!*/a / s;",
 			{ NO_OPERATOR("+", "RID", "int"), NO_OPERATOR("+", "Vector2", "Node"), NO_OPERATOR("%", "Vector2", "Vector2"),
@@ -180,7 +186,6 @@ static void test_silence() {
 			{ "any * a", "?" },
 			{ "a + obj", "?" },
 			{ "a + null", "?" },
-			{ "gd + 1", "?" },
 			{ "mine + mine", "?" },
 			{ "node * 2", "?" },
 			{ "-node", "?" },
@@ -197,6 +202,9 @@ static void test_compound_assignment() {
 			{ "a *= 2", "Vector2" },
 			{ "vi *= 2", "Vector2i" },
 			{ "c *= d", "Color" },
+			{ "a /= 2", "Vector2" },
+			{ "vi %= 2", "Vector2i" },
+			{ "s += a", "String" },
 			{ "a += any", "Vector2" },
 			{ "any += a", "*" },
 	});
@@ -221,25 +229,33 @@ static void test_tags_outside_declarations() {
 	CHECK_EQ(compilation.type_name(unit->typed[1].type), std::string("*"));
 }
 
-// A declaration file of the program's own may describe operators too; a tag that names a type the program
-// does not have is ignored.
+// A declaration file of the program's own may describe operators too. A tag may name any type the file
+// can see; one that names nothing is reported where it is written. A subclass has its base's operators.
 static void test_other_declarations() {
 	Compilation compilation;
+	compilation.add("other.as", "package other { public native class Rate {} }\n", true);
 	compilation.add("lib.as",
 			"package lib {\n"
 			"[Operator(op=\"+\", right=\"Money\", returns=\"Money\")] [Operator(op=\"*\", right=\"Ghost\", returns=\"Money\")]\n"
-			"[Operator(op=\"-\", right=\"Money\", returns=\"Ghost\")] [Operator(op=\"*\", right=\"Number\", returns=\"Money\")]\n"
-			"public final native class Money {} }\n",
+			"[Operator(op=\"*\", right=\"Number\", returns=\"Money\")] [Operator(op=\">\", right=\"uint\", returns=\"Boolean\")]\n"
+			"[Operator(op=\"/\", right=\"other.Rate\", returns=\"Money\")] [Operator(op=\"%\", right=\"String\", returns=\"String\")]\n"
+			"[Operator(op=\"-\", returns=\"Money\")] [Indexed(element=\"String\")]\n"
+			"public native class Money {}\n"
+			"public native class Bonus extends Money {} }\n",
 			true);
 	Unit *unit = compilation.add("Main.as",
-			"package { import lib.Money; public class Main { public function run(a:Money, b:Money):void {\n"
-			"a + b;\na * 2;\na - b;\na / b;\n} } }\n");
+			"package { import lib.*; import other.Rate; public class Main {\n"
+			"public function run(a:Money, b:Money, r:Rate, u:uint, s:String, x:Bonus):void {\n"
+			"a + b;\na * 2;\na / r;\na % s;\na[0];\nx + a;\na + x;\n-x;\nx[1];\na > u;\na - b;\na * r;\n} } }\n");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string("Main.as:4:1: error: can't use '-' on 'Money' and 'Money'\n"
-															   "Main.as:5:1: error: can't use '/' on 'Money' and 'Money'\n"));
-	CHECK_EQ(compilation.type_name(unit->typed[0].type), std::string("Money"));
-	CHECK_EQ(compilation.type_name(unit->typed[1].type), std::string("Money"));
-	CHECK_EQ(compilation.type_name(unit->typed[2].type), std::string("?"));
+	CHECK_EQ(compilation.format_diagnostics(),
+			std::string("lib.as:2:52: error: unknown type 'Ghost' in an [Operator] tag\n"
+						"Main.as:13:1: error: can't use '-' on 'Money' and 'Money'\n"
+						"Main.as:14:1: error: can't use '*' on 'Money' and 'Rate'\n"));
+	const char *expected[] = { "Money", "Money", "Money", "String", "String", "Money", "Money", "Money", "String", "Boolean" };
+	for (int i = 0; i < 10; i++) {
+		CHECK_EQ(compilation.type_name(unit->typed[i].type), std::string(expected[i]));
+	}
 }
 
 static void test_indexing() {
@@ -253,6 +269,8 @@ static void test_indexing() {
 			{ "c[0]", "Number" },
 			{ "bytes[0]", "int" },
 			{ "wide[0]", "Number" },
+			{ "names[0]", "String" },
+			{ "names[0].length", "int" },
 			{ "ga[0]", "*" },
 			{ "gd[\"k\"]", "*" },
 			{ "gd[node]", "*" },
@@ -264,9 +282,10 @@ static void test_indexing() {
 			{ "points[0] + a", "Vector2" },
 	});
 	expect("points[0] = a; points[i] = new Vector2(1, 2); ga[0] = node; gd[\"k\"] = 1; bytes[0] = 255; a[0] = 1.5;\n"
-		   "points[0] = /*!*/\"s\"; points[1] = /*!*/v3; a[0] = /*!*/node; var z:Vector3 = /*!*/points[0];",
+		   "points[0] = /*!*/\"s\"; points[1] = /*!*/v3; a[0] = /*!*/node; var z:Vector3 = /*!*/points[0];\n"
+		   "names[0] = \"x\"; names[1] = /*!*/a; var k:Vector2 = /*!*/names[0];",
 			{ UNRELATED("String", "Vector2"), UNRELATED("Vector3", "Vector2"), UNRELATED("Node", "Number"),
-					UNRELATED("Vector2", "Vector3") });
+					UNRELATED("Vector2", "Vector3"), UNRELATED("Vector2", "String"), UNRELATED("String", "Vector2") });
 }
 
 int main() {

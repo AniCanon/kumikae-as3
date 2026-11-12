@@ -5,6 +5,7 @@
 // (c) 2007-2014 Juan Linietsky, Ariel Manzur; MIT licence. See compiler/godot/NOTICE.md.
 package godot {
 	[GodotEnum(name="Axis", values="AXIS_X,AXIS_Y")]
+	[Operators]
 	[Operator(op="-", returns="Vector2")]
 	[Operator(op="+", returns="Vector2")]
 	[Operator(op="*", right="int", returns="Vector2")]
@@ -86,6 +87,7 @@ package godot {
 		public static native function fromAngle(angle:Number):Vector2;
 	}
 	[GodotEnum(name="Axis", values="AXIS_X,AXIS_Y")]
+	[Operators]
 	[Operator(op="-", returns="Vector2i")]
 	[Operator(op="+", returns="Vector2i")]
 	[Operator(op="*", right="int", returns="Vector2i")]
@@ -137,6 +139,7 @@ package godot {
 		public native function max(with_:Vector2i):Vector2i;
 		public native function maxi(with_:int):Vector2i;
 	}
+	[Operators]
 	[Operator(op="*", right="Transform2D", returns="Rect2")]
 	public final native class Rect2 {
 		public var position:Vector2;
@@ -160,6 +163,7 @@ package godot {
 		public native function growIndividual(left:Number, top:Number, right:Number, bottom:Number):Rect2;
 		public native function abs():Rect2;
 	}
+	[Operators]
 	public final native class Rect2i {
 		public var position:Vector2i;
 		public var size:Vector2i;
@@ -180,6 +184,7 @@ package godot {
 		public native function abs():Rect2i;
 	}
 	[GodotEnum(name="Axis", values="AXIS_X,AXIS_Y,AXIS_Z")]
+	[Operators]
 	[Operator(op="-", returns="Vector3")]
 	[Operator(op="+", returns="Vector3")]
 	[Operator(op="*", right="int", returns="Vector3")]
@@ -273,6 +278,7 @@ package godot {
 		public static native function octahedronDecode(uv:Vector2):Vector3;
 	}
 	[GodotEnum(name="Axis", values="AXIS_X,AXIS_Y,AXIS_Z")]
+	[Operators]
 	[Operator(op="-", returns="Vector3i")]
 	[Operator(op="+", returns="Vector3i")]
 	[Operator(op="*", right="int", returns="Vector3i")]
@@ -327,6 +333,7 @@ package godot {
 		public native function max(with_:Vector3i):Vector3i;
 		public native function maxi(with_:int):Vector3i;
 	}
+	[Operators]
 	[Operator(op="*", right="int", returns="Transform2D")]
 	[Operator(op="/", right="int", returns="Transform2D")]
 	[Operator(op="*", right="Number", returns="Transform2D")]
@@ -367,6 +374,7 @@ package godot {
 		public native function lookingAt(target:Vector2 = null):Transform2D;
 	}
 	[GodotEnum(name="Axis", values="AXIS_X,AXIS_Y,AXIS_Z,AXIS_W")]
+	[Operators]
 	[Operator(op="-", returns="Vector4")]
 	[Operator(op="+", returns="Vector4")]
 	[Operator(op="*", right="int", returns="Vector4")]
@@ -432,6 +440,7 @@ package godot {
 		public native function maxf(with_:Number):Vector4;
 	}
 	[GodotEnum(name="Axis", values="AXIS_X,AXIS_Y,AXIS_Z,AXIS_W")]
+	[Operators]
 	[Operator(op="-", returns="Vector4i")]
 	[Operator(op="+", returns="Vector4i")]
 	[Operator(op="*", right="int", returns="Vector4i")]
@@ -482,6 +491,7 @@ package godot {
 		public native function distanceTo(to:Vector4i):Number;
 		public native function distanceSquaredTo(to:Vector4i):int;
 	}
+	[Operators]
 	[Operator(op="-", returns="Plane")]
 	[Operator(op="+", returns="Plane")]
 	[Operator(op="*", right="Transform3D", returns="Plane")]
@@ -507,6 +517,7 @@ package godot {
 		public native function intersectsRay(from:Vector3, dir:Vector3):*;
 		public native function intersectsSegment(from:Vector3, to:Vector3):*;
 	}
+	[Operators]
 	[Operator(op="-", returns="Quaternion")]
 	[Operator(op="+", returns="Quaternion")]
 	[Operator(op="*", right="int", returns="Quaternion")]
@@ -547,6 +558,7 @@ package godot {
 		public native function getAxis():Vector3;
 		public native function getAngle():Number;
 	}
+	[Operators]
 	[Operator(op="*", right="Transform3D", returns="AABB")]
 	public final native class AABB {
 		public var position:Vector3;
@@ -579,6 +591,7 @@ package godot {
 		public native function intersectsSegment(from:Vector3, to:Vector3):*;
 		public native function intersectsRay(from:Vector3, dir:Vector3):*;
 	}
+	[Operators]
 	[Operator(op="*", right="int", returns="Basis")]
 	[Operator(op="/", right="int", returns="Basis")]
 	[Operator(op="*", right="Number", returns="Basis")]
@@ -617,6 +630,7 @@ package godot {
 		public static native function fromScale(scale:Vector3):Basis;
 		public static native function fromEuler(euler:Vector3, order:int = 2):Basis;
 	}
+	[Operators]
 	[Operator(op="*", right="int", returns="Transform3D")]
 	[Operator(op="/", right="int", returns="Transform3D")]
 	[Operator(op="*", right="Number", returns="Transform3D")]
@@ -649,6 +663,7 @@ package godot {
 		public native function isFinite():Boolean;
 	}
 	[GodotEnum(name="Planes", values="PLANE_NEAR,PLANE_FAR,PLANE_LEFT,PLANE_TOP,PLANE_RIGHT,PLANE_BOTTOM")]
+	[Operators]
 	[Operator(op="*", right="Vector4", returns="Vector4")]
 	[Operator(op="*", right="Projection", returns="Projection")]
 	[Indexed(element="Vector4")]
@@ -693,6 +708,7 @@ package godot {
 		public native function getPixelsPerMeter(forPixelWidth:int):int;
 		public native function getLodMultiplier():Number;
 	}
+	[Operators]
 	[Operator(op="-", returns="Color")]
 	[Operator(op="+", returns="Color")]
 	[Operator(op="*", right="int", returns="Color")]
@@ -895,6 +911,7 @@ package godot {
 		public static native function fromRgbe9995(rgbe:uint):Color;
 		public static native function fromRgba8(r8:int, g8:int, b8:int, a8:int = 255):Color;
 	}
+	[Operators]
 	[Operator(op="<", right="RID", returns="Boolean")]
 	[Operator(op="<=", right="RID", returns="Boolean")]
 	[Operator(op=">", right="RID", returns="Boolean")]
@@ -904,6 +921,7 @@ package godot {
 		public native function isValid():Boolean;
 		public native function getId():Number;
 	}
+	[Operators]
 	public final native class Signal {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function isNull():Boolean;
@@ -917,6 +935,7 @@ package godot {
 		public native function hasConnections():Boolean;
 		public native function emit(...rest):void;
 	}
+	[Operators]
 	[Indexed(element="*", keyed="true")]
 	public final native class GodotDictionary {
 		public native function GodotDictionary(base:GodotDictionary = null, keyType:int = 0, keyClassName:String = null, keyScript:* = null, valueType:int = 0, valueClassName:String = null, valueScript:* = null);
@@ -955,6 +974,7 @@ package godot {
 		public native function isReadOnly():Boolean;
 		public native function recursiveEqual(dictionary:GodotDictionary, recursionCount:int):Boolean;
 	}
+	[Operators]
 	[Operator(op="<", right="GodotArray", returns="Boolean")]
 	[Operator(op="<=", right="GodotArray", returns="Boolean")]
 	[Operator(op=">", right="GodotArray", returns="Boolean")]
@@ -1015,6 +1035,7 @@ package godot {
 		public native function makeReadOnly():void;
 		public native function isReadOnly():Boolean;
 	}
+	[Operators]
 	[Operator(op="+", right="PackedByteArray", returns="PackedByteArray")]
 	[Indexed(element="int")]
 	public final native class PackedByteArray {
@@ -1089,6 +1110,7 @@ package godot {
 		public native function encodeDouble(byteOffset:int, value:Number):void;
 		public native function encodeVar(byteOffset:int, value:*, allowObjects:Boolean = false):int;
 	}
+	[Operators]
 	[Operator(op="+", right="PackedInt32Array", returns="PackedInt32Array")]
 	[Indexed(element="int")]
 	public final native class PackedInt32Array {
@@ -1117,6 +1139,7 @@ package godot {
 		public native function count(value:int):int;
 		public native function erase(value:int):Boolean;
 	}
+	[Operators]
 	[Operator(op="+", right="PackedInt64Array", returns="PackedInt64Array")]
 	[Indexed(element="Number")]
 	public final native class PackedInt64Array {
@@ -1145,6 +1168,7 @@ package godot {
 		public native function count(value:Number):int;
 		public native function erase(value:Number):Boolean;
 	}
+	[Operators]
 	[Operator(op="+", right="PackedFloat32Array", returns="PackedFloat32Array")]
 	[Indexed(element="Number")]
 	public final native class PackedFloat32Array {
@@ -1173,6 +1197,7 @@ package godot {
 		public native function count(value:Number):int;
 		public native function erase(value:Number):Boolean;
 	}
+	[Operators]
 	[Operator(op="+", right="PackedFloat64Array", returns="PackedFloat64Array")]
 	[Indexed(element="Number")]
 	public final native class PackedFloat64Array {
@@ -1201,6 +1226,7 @@ package godot {
 		public native function count(value:Number):int;
 		public native function erase(value:Number):Boolean;
 	}
+	[Operators]
 	[Operator(op="+", right="PackedStringArray", returns="PackedStringArray")]
 	[Indexed(element="String")]
 	public final native class PackedStringArray {
@@ -1229,6 +1255,7 @@ package godot {
 		public native function count(value:String):int;
 		public native function erase(value:String):Boolean;
 	}
+	[Operators]
 	[Operator(op="*", right="Transform2D", returns="PackedVector2Array")]
 	[Operator(op="+", right="PackedVector2Array", returns="PackedVector2Array")]
 	[Indexed(element="Vector2")]
@@ -1258,6 +1285,7 @@ package godot {
 		public native function count(value:Vector2):int;
 		public native function erase(value:Vector2):Boolean;
 	}
+	[Operators]
 	[Operator(op="*", right="Transform3D", returns="PackedVector3Array")]
 	[Operator(op="+", right="PackedVector3Array", returns="PackedVector3Array")]
 	[Indexed(element="Vector3")]
@@ -1287,6 +1315,7 @@ package godot {
 		public native function count(value:Vector3):int;
 		public native function erase(value:Vector3):Boolean;
 	}
+	[Operators]
 	[Operator(op="+", right="PackedColorArray", returns="PackedColorArray")]
 	[Indexed(element="Color")]
 	public final native class PackedColorArray {
@@ -1315,6 +1344,7 @@ package godot {
 		public native function count(value:Color):int;
 		public native function erase(value:Color):Boolean;
 	}
+	[Operators]
 	[Operator(op="+", right="PackedVector4Array", returns="PackedVector4Array")]
 	[Indexed(element="Vector4")]
 	public final native class PackedVector4Array {

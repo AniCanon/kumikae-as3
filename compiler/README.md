@@ -192,6 +192,7 @@ AS3 has no operators on objects. Godot's value types have them, and Godot's API 
 one, so `godot.as` carries them as tags on each class and the compiler looks them up:
 
 ```actionscript
+[Operators]                                            // the list that follows is complete
 [Operator(op="+", right="Vector2", returns="Vector2")]
 [Operator(op="*", right="Number", returns="Vector2")]
 [Operator(op="*", left="Number", returns="Vector2")]   // 2 * v
@@ -205,19 +206,23 @@ public final native class Vector2 { ... }
 - **The result has the type Godot gives it:** `position + velocity * delta` is a `Vector2`,
   `transform * point` is a `Vector2`, `transform * transform` is a `Transform2D`.
 - **An operator the type doesn't have is an error:** `can't use '+' on 'Vector2' and 'Node'`. Nothing is
-  said when the other operand is `*`, an `Object`, `null` or unknown, or when neither class has tags.
+  said when the other operand is `*`, an `Object`, `null` or unknown, or when neither class lists its
+  operators.
 - **Whole numbers and fractions.** Godot gives `Vector2i * int` a `Vector2i` and `Vector2i * float` a
   `Vector2`. An operand is a whole number if it is an `int` or `uint`, or a sum, difference, product or
   remainder of whole numbers, so `cell * (i + 1)` is a `Vector2i`. `cell * 0.5`, `cell * n` and
-  `cell * (i / 2)` are `Vector2`. Where the type has only one of the two forms, that one is used.
+  `cell * (i / 2)` are `Vector2`. A whole number may use a form Godot has only for fractions
+  (`transform * 2`); a fraction may not use a whole-number form (`cell % 0.5` is an error). A call such as
+  `Math.floor(x)` is a `Number` in AS3, so write `cell * int(Math.floor(x))`.
 - **`+` with a `String` is a `String`,** as everywhere in AS3.
 - **Compound assignment** (`position += step`) is checked the same way, and a result of another type is an
   error: `cell *= 0.5` gives a `Vector2`, which can't go back into a `Vector2i`.
 - **Indexing** a class tagged `[Indexed]` with a number gives the element: `points[0]` is a `Vector2`,
   `vector[0]` is a `Number`. A `GodotArray` or `GodotDictionary` gives `*`. Any other key gives `*`,
   because AS3 lets `v["x"]` name a property. Storing into `points[i]` is checked like any store.
-- **The tags work in any declaration file,** not only Godot's. In a program's own source they mean
-  nothing.
+- **The tags work in any declaration file,** not only Godot's. A tag names a type as the file would:
+  `Number`, `String`, a class of its own package, or `other.Rate`; a name that means nothing is reported
+  at the tag. A subclass has its base's operators. In a program's own source the tags mean nothing.
 
 ## How expressions are typed
 

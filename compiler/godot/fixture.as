@@ -5,6 +5,7 @@
 // (c) 2007-2014 Juan Linietsky, Ariel Manzur; MIT licence. See compiler/godot/NOTICE.md.
 package godot {
 	[GodotEnum(name="Axis", values="AXIS_X,AXIS_Y")]
+	[Operators]
 	[Operator(op="-", returns="Vector2")]
 	[Operator(op="+", right="Vector2", returns="Vector2")]
 	[Operator(op="*", right="Number", returns="Vector2")]
@@ -24,22 +25,26 @@ package godot {
 		public native function distanceTo(to:Vector2):Number;
 		public static native function fromAngle(angle:Number):Vector2;
 	}
+	[Operators]
 	public final native class Signal {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function connect(callable:Function, flags:int = 0):int;
 		public native function emit(...rest):void;
 		public native function getObjectId():Number;
 	}
+	[Operators]
 	[Indexed(element="*")]
 	public final native class GodotArray {
 		public native function GodotArray();
 		public native function size():int;
 	}
+	[Operators]
 	[Indexed(element="*", keyed="true")]
 	public final native class GodotDictionary {
 		public native function GodotDictionary();
 		public native function isEmpty():Boolean;
 	}
+	[Operators]
 	[Indexed(element="Number")]
 	public final native class PackedInt64Array {
 		public native function PackedInt64Array();
