@@ -310,6 +310,7 @@ class Resolver {
 			type(parameter.type);
 			Symbol *symbol = compilation_.new_symbol(SymbolKind::Parameter, parameter.name, &unit_, parameter.offset);
 			symbol->type = parameter.type;
+			symbol->is_rest = parameter.is_rest;
 			parameter.symbol = symbol;
 			if (!scope.names.emplace(parameter.name, symbol).second) {
 				error(parameter.offset, "duplicate parameter " + quoted(parameter.name));

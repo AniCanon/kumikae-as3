@@ -406,7 +406,7 @@ static void test_bodies_resolve() {
 			"var o:Object = { field: 1, nothing: 2 };\n"
 			"var v:Vector.<int> = new <int>[1, 2]; var w:* = new Vector.<int>(3);\n"
 			"var r:RegExp = /a+/g; var a:Array = [1, , 2];\n"
-			"this.field = 1; this.anything(); o.whatever.deeper = 2; o[local] = 3;\n"
+			"this.field = 1; this.method(); o.whatever.deeper = 2; o[local] = 3;\n"
 			"label: for (;;) { while (true) { continue label; } break label; }\n"
 			"switch (local) { case 1: break; default: break; }\n"));
 	// Shadowing: the innermost wins, silently.

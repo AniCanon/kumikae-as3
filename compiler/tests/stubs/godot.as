@@ -19,12 +19,29 @@ package godot {
 		public native function set rotation(value:Number):void;
 		public native function get_world_2d():Object;
 	}
-	public native class Line2D extends Node2D {}
+	public native class Line2D extends Node2D {
+		public var points:Object;
+		public native function get_point_count():int;
+	}
 	public native class StaticBody2D extends Node2D {}
-	public native class CollisionShape2D extends Node2D {}
-	public native class CircleShape2D {}
-	public native class PhysicsDirectSpaceState2D {}
-	public native class PhysicsRayQueryParameters2D {}
-	public native class Dictionary {}
-	public final native class Vector2 {}
+	public native class CollisionShape2D extends Node2D {
+		public var shape:Object;
+	}
+	public native class CircleShape2D {
+		public var radius:Number;
+	}
+	public native class PhysicsDirectSpaceState2D {
+		public native function intersect_ray(query:PhysicsRayQueryParameters2D):Dictionary;
+	}
+	public native class PhysicsRayQueryParameters2D {
+		public var from:Vector2;
+		public var to:Vector2;
+	}
+	public native class Dictionary {
+		public native function is_empty():Boolean;
+	}
+	public final native class Vector2 {
+		public var x:Number;
+		public var y:Number;
+	}
 }

@@ -13,7 +13,7 @@
 
 static const char *const USAGE =
 		"usage: kas3c parse [--dump-ast] <file>...\n"
-		"       kas3c check [--dump-names] [--declarations <file>]... <file>...\n"
+		"       kas3c check [--dump-names] [--dump-types] [--declarations <file>]... <file>...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
 		"\n"
@@ -23,6 +23,7 @@ static const char *const USAGE =
 		"check  Read the files as one program and report syntax errors and names that\n"
 		"       are unknown, ambiguous, duplicated or misused.\n"
 		"       --dump-names           also print what every name refers to\n"
+		"       --dump-types           also print the type of every statement and initializer\n"
 		"       --declarations <file>  a file that declares what exists elsewhere\n"
 		"\n"
 		"Exit status: 0 no errors, 1 errors found, 2 bad usage or an unreadable file.\n";
@@ -65,6 +66,7 @@ static int run_parse(const std::vector<std::string> &p_files, bool p_dump_ast) {
 
 static int run_check(int p_argc, char **p_argv) {
 	bool dump_names = false;
+	bool dump_types = false;
 	bool unreadable = false;
 	int files = 0;
 	kas3::Compilation compilation;
@@ -72,6 +74,10 @@ static int run_check(int p_argc, char **p_argv) {
 		bool declaration = false;
 		if (std::strcmp(p_argv[i], "--dump-names") == 0) {
 			dump_names = true;
+			continue;
+		}
+		if (std::strcmp(p_argv[i], "--dump-types") == 0) {
+			dump_types = true;
 			continue;
 		}
 		if (std::strcmp(p_argv[i], "--declarations") == 0) {
@@ -101,6 +107,9 @@ static int run_check(int p_argc, char **p_argv) {
 	std::fputs(compilation.format_diagnostics().c_str(), stderr);
 	if (dump_names) {
 		std::fputs(compilation.dump_names().c_str(), stdout);
+	}
+	if (dump_types) {
+		std::fputs(compilation.dump_types().c_str(), stdout);
 	}
 	return compilation.has_errors() ? 1 : 0;
 }

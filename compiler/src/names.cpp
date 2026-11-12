@@ -7,6 +7,7 @@
 namespace kas3 {
 
 void resolve_bodies(Compilation &p_compilation); // names_bodies.cpp
+void type_bodies(Compilation &p_compilation); // names_types.cpp
 
 const char *symbol_kind_name(SymbolKind p_kind) {
 	switch (p_kind) {
@@ -98,6 +99,9 @@ static bool definition_name(Node *p_node, std::string_view *r_name, uint32_t *r_
 }
 
 Compilation::Compilation() {
+	void_.kind = Type::Void;
+	null_.kind = Type::Null;
+	unknown_.kind = Type::Unknown;
 	top_level_ = package("");
 	for (int i = 0; i < BUILTIN_FILE_COUNT; i++) {
 		Unit *unit = add(BUILTIN_FILES[i].path, BUILTIN_FILES[i].text, true);
@@ -135,6 +139,7 @@ void Compilation::check() {
 	}
 	link_hierarchy();
 	resolve_bodies(*this);
+	type_bodies(*this);
 }
 
 bool Compilation::has_errors() const {

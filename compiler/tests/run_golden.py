@@ -8,6 +8,8 @@ Usage: run_golden.py <path to kas3c> <tests dir> [--update]
 
   golden/names/ok/X.as      `check --dump-names` must be clean and equal X.names
   golden/names/errors/X.as  `check` must fail; the diagnostics must equal X.diag
+  golden/types/ok/X.as      `check --dump-types` must be clean and equal X.types
+  golden/types/errors/X.as  `check` must fail; the diagnostics must equal X.diag
   corpus/*.as               checked together as one program, must be clean
   Name checks are given stubs/godot.as, a stand-in for Godot's classes, as a declaration file.
 
@@ -87,6 +89,20 @@ for source in relative_paths("golden/names/ok/*.as"):
     compare(source, result.stdout, os.path.join(tests, source[:-3] + ".names"))
 
 for source in relative_paths("golden/names/errors/*.as"):
+    result = run_check(source)
+    if result.returncode != 1:
+        failed.append("%s: expected exit 1, got %d\n%s" % (source, result.returncode, result.stderr))
+        continue
+    compare(source, result.stderr, os.path.join(tests, source[:-3] + ".diag"))
+
+for source in relative_paths("golden/types/ok/*.as"):
+    result = run_check("--dump-types", source)
+    if result.returncode != 0 or result.stderr:
+        failed.append("%s: expected a clean check, got exit %d\n%s" % (source, result.returncode, result.stderr))
+        continue
+    compare(source, result.stdout, os.path.join(tests, source[:-3] + ".types"))
+
+for source in relative_paths("golden/types/errors/*.as"):
     result = run_check(source)
     if result.returncode != 1:
         failed.append("%s: expected exit 1, got %d\n%s" % (source, result.returncode, result.stderr))

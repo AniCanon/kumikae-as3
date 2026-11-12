@@ -6,7 +6,7 @@
 8:28 LIMIT -> field Members.LIMIT @6:23
 12:4 created -> field Members.created @7:22
 15:43 Number -> class Number (built in)
-16:14 Vector2 -> class godot.Vector2 @stubs/godot.as:29:28
+16:14 Vector2 -> class godot.Vector2 @stubs/godot.as:43:28
 16:24 position -> property Node2D.position @stubs/godot.as:16:30
 17:4 rotation -> property Node2D.rotation @stubs/godot.as:18:30
 17:16 delta -> parameter delta @15:37

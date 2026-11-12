@@ -51,6 +51,7 @@ struct Symbol {
 	TypeRef *type = nullptr; // The declared type; for a function or method, the return type. May be null.
 	uint16_t modifiers = 0; // Modifiers bits.
 	bool is_const = false;
+	bool is_rest = false; // A `...rest` parameter.
 	bool file_private = false; // Declared outside the file's package block.
 	Package *package = nullptr; // For package-level definitions and file helpers.
 	Symbol *owner = nullptr; // The class or interface, for members.
@@ -64,6 +65,28 @@ struct Symbol {
 		return (kind == SymbolKind::Field || kind == SymbolKind::Method || kind == SymbolKind::Property) &&
 				!is_static();
 	}
+};
+
+// A static type. Interned: two equal types are the same object.
+struct Type {
+	enum Kind : uint8_t {
+		Any, // `*`
+		Void,
+		Null, // The type of `null`.
+		Unknown, // Could not be worked out; an error has been reported, or the rule is not built yet.
+		Instance, // An object of a class or interface.
+		Vector, // Vector.<element>
+		ClassObject, // The class itself, as in `Math` or `Player`: `element` is the type of its instances.
+	};
+	Kind kind = Any;
+	Symbol *symbol = nullptr; // For Instance.
+	const Type *element = nullptr; // For Vector and ClassObject.
+};
+
+// An expression whose type `--dump-types` prints: a statement's, or an initializer's.
+struct TypedExpression {
+	uint32_t offset;
+	const Type *type;
 };
 
 // One import, resolved: a single definition, or a whole package.
@@ -119,6 +142,7 @@ struct Unit {
 	ImportScope block_imports; // Imports inside the package block.
 	ImportScope outer_imports; // Imports outside it.
 	std::vector<Reference> references;
+	std::vector<TypedExpression> typed;
 
 	Unit(std::string p_path, std::string p_text) :
 			source(std::move(p_path), std::move(p_text)) {}
@@ -151,6 +175,11 @@ class Compilation {
 	Symbol *vector_ = nullptr;
 	Symbol *element_ = nullptr; // `T`, the element type inside the built-in Vector.
 	bool checked_ = false;
+	std::deque<Type> types_;
+	std::unordered_map<const Symbol *, const Type *> instance_types_;
+	std::unordered_map<const Type *, const Type *> vector_types_;
+	std::unordered_map<const Type *, const Type *> class_object_types_;
+	Type any_, void_, null_, unknown_;
 
 	// declare
 	void declare_unit(Unit &p_unit);
@@ -186,6 +215,22 @@ public:
 	std::string format_diagnostics() const;
 	// One line per resolved reference in each file that is not a declaration file.
 	std::string dump_names() const;
+	// One line per expression statement and initializer in each file that is not a declaration file.
+	std::string dump_types() const;
+	// "int", "Vector.<String>", "Class.<Math>", "*", "void", "null", or "?" for unknown.
+	std::string type_name(const Type *p_type) const;
+
+	const Type *any_type() const { return &any_; }
+	const Type *void_type() const { return &void_; }
+	const Type *null_type() const { return &null_; }
+	const Type *unknown_type() const { return &unknown_; }
+	const Type *instance_type(Symbol *p_class); // Vector.<*> for the Vector class itself.
+	const Type *vector_type(const Type *p_element);
+	const Type *class_object_type(const Type *p_instance);
+	// The type a written type means. p_element is what `T` stands for inside Vector's declaration.
+	const Type *type_of(const TypeRef *p_type, const Type *p_element = nullptr);
+	// A top-level built-in class by name, or null.
+	Symbol *builtin(std::string_view p_name) const;
 
 	// ---- used by the passes ----
 

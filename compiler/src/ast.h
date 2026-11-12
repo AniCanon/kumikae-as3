@@ -10,6 +10,7 @@
 
 namespace kas3 {
 
+struct Type; // The static type of an expression. Filled in by the types pass (names.h); null before it.
 struct Symbol; // What a name refers to. Filled in by name resolution (names.h); null before it.
 
 template <class T>
@@ -46,6 +47,7 @@ struct Node {
 
 struct Expr : Node {
 	bool parenthesized = false; // Written inside parentheses; the range includes them.
+	const Type *type = nullptr;
 };
 struct Stmt : Node {};
 
@@ -194,6 +196,7 @@ struct Member : Expr { // `a.b`
 	// Set when the chain up to here names a definition by its package (`flash.utils.getTimer`). The object
 	// below is then a package path, not a value.
 	Symbol *symbol = nullptr;
+	Symbol *member = nullptr; // The member of the object's type that this names, when it is known.
 };
 struct Index : Expr { // `a[b]`
 	static const NodeKind KIND = NodeKind::Index;

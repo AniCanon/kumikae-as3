@@ -1,0 +1,10 @@
+golden/types/errors/Access.as:10:10: error: 'shared' is a static member of Access; write Access.shared
+golden/types/errors/Access.as:11:11: error: 'hidden' is an instance member of Access; it needs an object
+golden/types/errors/Access.as:12:11: error: 'Access' has no static member 'missing'
+golden/types/errors/Access.as:13:10: error: 'secret' is private in Vault
+golden/types/errors/Access.as:14:10: error: 'guarded' is protected in Vault
+golden/types/errors/Access.as:15:17: error: 'secret' is private in Vault
+golden/types/errors/Access.as:16:9: error: 'String' has no member 'size'
+golden/types/errors/Access.as:17:13: error: 'Vector2' has no member 'z'
+golden/types/errors/Access.as:18:24: error: 'String' has no member 'nope'
+golden/types/errors/Access.as:20:4: error: undefined name 'unknown_name'
