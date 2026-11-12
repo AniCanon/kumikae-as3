@@ -52,6 +52,54 @@ A type is a class name, `Vector.<T>`, `Class.<T>` for a class itself (the expres
 `<line>:<col> <name> -> <kind> <qualified name> <where>`, where `<where>` is `@<line>:<col>` in the same
 file, `@<path>:<line>:<col>` in another, `(built in)`, or `(Godot)`.
 
+## Running a program
+
+`kas3c run` checks the files as one program and runs it. The first file's class is constructed, as Flash
+constructs a document class, and what it traces goes to standard output.
+
+```sh
+compiler/build/kas3c run Main.as game/*.as   # run; the entry class is Main
+compiler/build/kas3c ir Main.as              # print the typed IR that is run
+```
+
+An error that nothing catches goes to standard error with an AS3 stack trace, and the exit status is 1:
+
+```
+TypeError: Error #1009: Cannot access a property or method of a null object reference.
+	at Player/hit()[Player.as:10]
+	at Player()[Player.as:6]
+```
+
+**What runs so far (stage 2a):** classes with fields, constructors, methods and statics; inheritance with
+`override` and `super`; `int`, `uint`, `Number`, `Boolean`, `String` and `null` with AS3's conversions;
+every arithmetic, comparison, logical and bitwise operator; assignment and `++`/`--`; `if`, `while`, `do`,
+`for`, `break`, `continue`, `return`; calls with default parameters; `new`, `is`, `as`; `trace`; `throw`;
+`Error` and its subclasses; several files, packages, and package-level functions and variables.
+
+**What is refused, by name, until later slices:** function values and closures, `Array`, `Vector`,
+`Object` and `Dictionary`, untyped values (`*`), interfaces, `try`, `switch`, `for in`, labels, getters and
+setters, rest parameters, regular expressions, `Math` and the other library functions, `String`'s methods
+other than `length`, and the `godot` package. A program that uses one of these does not run: the compiler
+says `... is not supported by the interpreter yet` at the place.
+
+How it works:
+
+- **The IR** (`ir/ir.h`) is the one meaning of a program that the interpreter and, later, the C++ generator
+  both read. It is register-based and typed: an instruction says whether it adds two `Number`s or compares
+  two strings, so values carry no tags. It is plain data with no pointers into the syntax tree, so that it
+  can be written to a file and run without the compiler.
+- **Arithmetic follows AS3 exactly.** `int + int` is computed as a `Number` and wraps to 32 bits when it is
+  stored in an `int`, which is what the checker's types say.
+- **The interpreter** (`vm/interpreter.h`) keeps its own stack of frames and never recurses in C++ for an AS3
+  call. Runaway recursion is therefore an AS3 error, not a crash, and a debugger can walk the frames.
+- **For a debugger:** every instruction has a source position, every function lists its named locals, and
+  each statement begins with a marker where a hook can stop the program.
+- **Memory** is reference-counted. Objects that refer to each other in a loop are not freed yet.
+- **Nothing in `vm/` or `ir/` names Godot.** What the engine will supply goes through `vm/host.h`.
+
+Differences from Flash so far: a string's `length` counts characters, not UTF-16 units, and strings compare
+by character.
+
 ## Language server
 
 `kas3c lsp` serves an editor over standard input and output with the Language Server Protocol. To connect an
@@ -388,6 +436,14 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   server publishes for every golden error file is what `kas3c check` prints, and types through each corpus
   file as an editor would.
 - `tests/test_lsp_stdio.py`: `kas3c lsp` as a real process: framing, malformed input, exit codes.
+
+- `tests/run/*.as` with `.out` (and `.err`): programs through `kas3c run`, the start of the conformance suite.
+  The expected output for numbers, strings and evaluation order was produced by Node from a line-by-line
+  JavaScript copy, since AS3 and JavaScript share those rules. `tests/run/refused/` holds one program per
+  construct the interpreter does not run yet. Every other test program must run or be refused without
+  crashing, and nothing a program makes may be left alive when it ends.
+- `tests/test_ir.cpp`, `tests/test_runtime.cpp`, `tests/test_vm.cpp`: the IR printer, the number rules
+  (checked against Node), and the hook and frames a debugger will use.
 
 - `tests/fetch_external.sh` fetches six open-source AS3 projects (Starling, Away3D, Flixel, FlashPunk,
   as3-signals, as3corelib; about 190,000 lines) into `tests/external/`, which git ignores. They are pinned

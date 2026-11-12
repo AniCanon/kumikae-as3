@@ -13,6 +13,9 @@ on its math types, and reports its errors to an editor through a language server
 complete. The language server's first slice is built and passes its tests; it has not yet been tried by hand
 in VS Code and Rider.
 
+**Stage 2 has started.** Its first slice runs AS3 on the command line: `kas3c run` executes classes,
+inheritance, numbers, strings and loops through the typed IR and the interpreter. Godot is the next slice.
+
 ![Roadmap](diagrams/roadmap.svg)
 
 ## How to read a stage
@@ -81,15 +84,24 @@ JetBrains plugin and Godot's documentation in hover stay in stage 6.
 Read more: [language server design](superpowers/specs/2026-11-12-language-server-design.md),
 [how the server works](../compiler/README.md#language-server).
 
-### Stage 2: interpreter in Godot
+### Stage 2: interpreter in Godot (in progress)
 
 **Delivers:** AS3 scripts that run in the Godot editor.
 
-**Done when:** an AS3 script on a `CharacterBody2D` moves a character in the editor. Exported properties,
-signals and hot reload follow in the same stage.
+**Done when:** an AS3 script on a `CharacterBody2D` moves a character in the editor, with exported
+properties, signals and hot reload.
 
-**Built in this stage:** the typed IR, the interpreter, the bindings generated from Godot's API description,
-and the integration that makes AS3 appear to Godot as a scripting language.
+| Slice | Delivers | Done when | Status |
+|---|---|---|---|
+| 2a. Interpreter core | The typed IR, the interpreter, `kas3c run`, and the start of the conformance suite | A class with fields, methods, inheritance, numbers, strings and loops runs and traces the right output. | Built |
+| 2b. In Godot | The extension: a `.as` file is a script; engine calls in both directions; generated bindings | An AS3 script on a `CharacterBody2D` moves a character, in headless Godot 4.7.2. | Next |
+| 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library | The corpus programs run. | Planned |
+| 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game. | Planned |
+
+Godot comes before the rest of the language because the engine boundary decides how values are represented.
+
+Read more: [stage 2a plan](superpowers/plans/2026-11-12-stage-2a-interpreter-core.md), which also lists what
+earlier stages promised to this one.
 
 ### Stage 3: native export on desktop
 
@@ -131,18 +143,21 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What comes next: the interpreter (stage 2)
+## What comes next: AS3 inside Godot (stage 2b)
 
-**Goal:** an AS3 script on a `CharacterBody2D` moves a character in the Godot editor.
+**Goal:** an AS3 script on a `CharacterBody2D` moves a character, in headless Godot 4.7.2.
 
 | Step | What it does |
 |---|---|
-| 1. Typed IR | The checked syntax tree becomes the one form of the program that both backends read. |
-| 2. Interpreter | Runs the IR. |
-| 3. Godot bindings | Generated from Godot's API description: how a script calls the engine and the engine calls a script. |
-| 4. The extension | Godot loads `.as` files as scripts, with exports, signals and hot reload. |
+| 1. The extension | Godot loads a library that registers AS3 as a scripting language. |
+| 2. Scripts | A `.as` file attached to a node is compiled and gets an instance per node. |
+| 3. Calls in | `_ready` and `_physicsProcess` reach the interpreter. |
+| 4. Calls out | Generated bindings: `moveAndSlide()`, `position`, `Input`, and operators on `Vector2`. |
 
-Before it starts, the language server's first slice needs its check by hand in VS Code and Rider.
+It needs Godot's extension headers. A copy is on this machine from the speed spike; a fresh copy would be a
+download, which needs the owner's yes.
+
+Still open from the language server's first slice: its check by hand in VS Code and Rider, and Windows.
 
 ## Decisions made
 
