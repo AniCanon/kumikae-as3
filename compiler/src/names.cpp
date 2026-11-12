@@ -8,6 +8,7 @@ namespace kas3 {
 
 void resolve_bodies(Compilation &p_compilation); // names_bodies.cpp
 void type_bodies(Compilation &p_compilation); // names_types.cpp
+void check_class_rules(Compilation &p_compilation); // names_rules.cpp
 
 const char *symbol_kind_name(SymbolKind p_kind) {
 	switch (p_kind) {
@@ -139,6 +140,7 @@ void Compilation::check() {
 	}
 	link_hierarchy();
 	resolve_bodies(*this);
+	check_class_rules(*this);
 	type_bodies(*this);
 }
 

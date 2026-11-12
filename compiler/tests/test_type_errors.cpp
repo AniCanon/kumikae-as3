@@ -214,7 +214,90 @@ static void test_parameter_defaults() {
 			{ UNRELATED("String", "int"), UNRELATED("int", "String") });
 }
 
+#define SAME_AS(name, owner) "'" name "' must have the same parameters and return type as '" name "' in " owner
+
+static void test_override_signatures() {
+	const std::string base = "class Base { public function f(a:int, b:String = null):Number { return 0; }\n"
+							 "public function g(...rest):void {} public function h():Base { return null; } public function k(a) {}\n"
+							 "public function get size():int { return 0; } public function set size(v:int):void {}\n"
+							 "private function hidden(a:int):void {} }\n";
+	expect("package { public class Main extends Base {\n"
+		   "override public function f(x:int, y:String = \"\"):Number { return 1; }\n"
+		   "override public function g(...more):void {} override public function h():Base { return this; }\n"
+		   "override public function k(a:*):* {} override public function get size():int { return 1; }\n"
+		   "override public function set size(value:int):void {} } }\n" +
+					base + "class Deep extends Main { override public function f(a:int, b:String = null):Number { return 2; } }\n",
+			{});
+	expect("package { public class Main extends Base {\n"
+		   "override public function /*!*/f(a:int):Number { return 1; }\n"
+		   "override public function /*!*/g(a:int):void {}\n"
+		   "override public function /*!*/h():Main { return this; }\n"
+		   "override public function /*!*/k(a:int) {}\n"
+		   "override public function get /*!*/size():Number { return 1; }\n"
+		   "override public function set /*!*/size(value:Number):void {} } }\n" +
+					base +
+					"class A extends Base { override public function /*!*/f(a:int, b:String):Number { return 1; } }\n"
+					"class B extends Base { override public function /*!*/f(a:Number, b:String = null):Number { return 1; } }\n"
+					"class C extends Base { override public function /*!*/f(a:int, b:String = null):int { return 1; } }\n"
+					"class D extends Base { override public function /*!*/f(a:int, b:String = null, c:int = 0):Number { return 1; } }\n"
+					"class E extends Base { override public function /*!*/h():void {} }\n",
+			{ SAME_AS("f", "Base"), SAME_AS("g", "Base"), SAME_AS("h", "Base"), SAME_AS("k", "Base"), SAME_AS("size", "Base"),
+					SAME_AS("size", "Base"), SAME_AS("f", "Base"), SAME_AS("f", "Base"), SAME_AS("f", "Base"),
+					SAME_AS("f", "Base"), SAME_AS("h", "Base") });
+	// The same type written two ways, and types that did not resolve.
+	Compilation compilation;
+	compilation.add("lib/Thing.as", "package lib { public class Thing {} }");
+	compilation.add("lib/Base.as", "package lib { public class Base { public function f(t:Thing):lib.Thing { return t; }\n"
+								   "public function g(t:Gone):void {} } }");
+	compilation.add("Main.as", "package { import lib.*; public class Main extends Base {\n"
+							   "override public function f(t:lib.Thing):Thing { return t; }\n"
+							   "override public function g(t:int):void {} } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string("lib/Base.as:2:21: error: unknown type 'Gone'\n"));
+}
+
+static void test_interfaces() {
+	const std::string shapes = "interface Shape extends Sized { function area(scale:Number = 1):Number; function get name():String;\n"
+							   "function set name(value:String):void; }\n"
+							   "interface Sized { function get width():int; }\n";
+	expect("package { public class Main implements Shape {\n"
+		   "public function area(scale:Number = 1):Number { return 0; } public function get name():String { return null; }\n"
+		   "public function set name(v:String):void {} public function get width():int { return 0; } } }\n" +
+					shapes +
+					"class Half { public function area(scale:Number = 1):Number { return 0; } public function get width():int { return 0; } }\n"
+					"class Whole extends Half implements Shape { public function get name():String { return null; }\n"
+					"public function set name(v:String):void {} }\n"
+					"class Child extends Main {} class Again extends Main implements Sized {}\n"
+					"class Unsure extends /*!*/Gone implements Shape {} class Odd implements Shape, /*!*/Nope {}\n",
+			{ "unknown type 'Gone'", "unknown type 'Nope'" });
+	expect("package { public class /*!*//*!*//*!*//*!*/Main implements Shape {} }\n" + shapes +
+					"class /*!*/A implements Sized { public var width:int; }\n"
+					"class B implements Sized { function get /*!*/width():int { return 0; } }\n"
+					"class C implements Sized { public function get /*!*/width():Number { return 0; } }\n"
+					"class D implements Shape { public function /*!*/area(scale:Number):Number { return 0; }\n"
+					"public function get name():String { return null; } public function set /*!*/name(v:Object):void {}\n"
+					"public function get width():int { return 0; } }\n"
+					"class /*!*/E implements Sized { public static function get width():int { return 0; } }\n"
+					"class /*!*/F implements Shape { public function area(scale:Number = 1):Number { return 0; }\n"
+					"public function get name():String { return null; } public function get width():int { return 0; } }\n",
+			{ "'Main' must implement 'area' from Shape", "'Main' must implement the getter 'name' from Shape",
+					"'Main' must implement the setter 'name' from Shape", "'Main' must implement the getter 'width' from Sized",
+					"'A' must implement the getter 'width' from Sized", "'width' must be public to implement Sized",
+					SAME_AS("width", "Sized"), SAME_AS("area", "Shape"), SAME_AS("name", "Shape"),
+					"'E' must implement the getter 'width' from Sized", "'F' must implement the setter 'name' from Shape" });
+	// A class in a declaration file is taken at its word.
+	Compilation compilation;
+	compilation.add("lib.as", "package lib { public interface Shape { function area():Number; }\n"
+							  "public native class Disc implements Shape {} }",
+			true);
+	compilation.add("Main.as", "package { import lib.*; public class Main extends Disc {} }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+}
+
 int main() {
+	test_override_signatures();
+	test_interfaces();
 	test_returns();
 	test_parameter_defaults();
 	test_argument_counts();
