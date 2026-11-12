@@ -115,7 +115,7 @@ AS3 has no enum type, so an enum value is an `int`.
   ```
 
   `add`, `addOnce` and `remove` are the as3-signals names, which AS3 programmers know; the owner chose
-  them over Godot's `connect` and `disconnect`, which also still work (see "Decided by the owner after
+  them over Godot's `connect` and `disconnect`, which are not declared (see "Decided by the owner after
   approval"). `emit` is Godot's.
 - A script declares one with the metadata the main design already has:
   `[Signal] public var healthChanged:Signal;`
@@ -139,12 +139,16 @@ AS3 has no enum type, so an enum value is an `int`.
 
 ## Decided by the owner after approval
 
-- **Listening to a signal is `add`, `addOnce` and `remove` (owner, 2026-11-12).** The owner prefers these
-  to Godot's `connect` and `disconnect`. They are the names as3-signals uses. `add(f)` is `connect(f)`,
-  `addOnce(f)` is `connect(f)` with Godot's one-shot flag, and `remove(f)` is `disconnect(f)`. Godot's own
-  `connect`, `disconnect` and `isConnected` stay declared, so code that follows a Godot tutorial still
-  checks, and `connect`'s flags stay reachable. `emit` is unchanged. Once `await` exists, most one-off
-  listeners become `await timer.timeout`.
+- **Listening to a signal is `add`, `addOnce`, `remove` and `has` (owner, 2026-11-12).** The owner prefers
+  these to Godot's `connect` and `disconnect`, and wants the API to feel native to AS3. They are the names
+  as3-signals uses. `add(f)` is `connect(f)`, `addOnce(f)` is `connect(f)` with Godot's one-shot flag,
+  `remove(f)` is `disconnect(f)` and `has(f)` is `is_connected(f)`. Godot's three are not declared: one way
+  to do it. `timer.timeout.connect(f)` copied from a Godot tutorial is reported as an unknown member. `emit`
+  is unchanged. Cost: `connect`'s other flags (deferred, reference-counted) have no spelling yet. Once
+  `await` exists, most one-off listeners become `await timer.timeout`.
+- **Where AS3 has its own way, the AS3 way is the one declared (owner, 2026-11-12: "I want it to feel
+  native AS3").** `toString()` and the signal verbs follow this rule. New cases are decided the same way and
+  listed here.
 
 ## Decided while building (stage 1d)
 

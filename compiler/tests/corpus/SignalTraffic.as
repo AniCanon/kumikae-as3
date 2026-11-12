@@ -10,7 +10,7 @@ package {
 		private var total:Number = 0;
 
 		override public function _ready():void {
-			hit.connect(onHit);
+			hit.add(onHit);
 		}
 
 		override public function _process(delta:Number):void {

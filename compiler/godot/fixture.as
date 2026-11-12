@@ -28,12 +28,12 @@ package godot {
 	[Operators]
 	public final native class Signal {
 		public native function Signal(object:* = null, signal:String = null);
-		public native function connect(callable:Function, flags:int = 0):int;
 		public native function emit(...rest):void;
 		public native function getObjectId():Number;
 		public native function add(listener:Function):void;
 		public native function addOnce(listener:Function):void;
 		public native function remove(listener:Function):void;
+		public native function has(listener:Function):Boolean;
 	}
 	[Operators]
 	[Indexed(element="*")]

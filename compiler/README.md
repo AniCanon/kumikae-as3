@@ -131,7 +131,7 @@ the [naming design](../docs/superpowers/specs/2026-11-12-godot-naming-design.md)
 | `move_and_slide()` | `moveAndSlide()` |
 | `is_visible()`, `set_visible(v)` | the property `visible` |
 | `_physics_process(delta)` | `override public function _physicsProcess(delta:Number):void` |
-| the signal `timeout` | `timer.timeout.add(f)`, also `addOnce(f)` and `remove(f)`; Godot's `connect(f)` works too |
+| the signal `timeout` | `timer.timeout.add(f)`, also `addOnce(f)`, `remove(f)` and `has(f)`; Godot's `connect` is not declared |
 | `KEY_ESCAPE` | `Key.ESCAPE` |
 | `Node.PROCESS_MODE_PAUSABLE` | unchanged |
 | `Input.is_action_pressed("jump")` | `Input.isActionPressed("jump")` |

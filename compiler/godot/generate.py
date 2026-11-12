@@ -56,14 +56,16 @@ OBJECT_EXTRAS = [
     _extra("free", virtual=False),
 ]
 
-# AS3's spelling for listening to a signal, beside Godot's connect and disconnect: the names AS3
-# programmers know from as3-signals. The binding maps them: add is connect, addOnce is connect with the
-# one-shot flag, remove is disconnect.
+# Listening to a signal is spelled the AS3 way, with the names AS3 programmers know from as3-signals, and
+# Godot's own spelling is not declared: one way to do it. The binding maps them: add is connect, addOnce is
+# connect with the one-shot flag, remove is disconnect, has is is_connected.
 SIGNAL_EXTRAS = [
     ("add", "public native function add(listener:Function):void;"),
     ("addOnce", "public native function addOnce(listener:Function):void;"),
     ("remove", "public native function remove(listener:Function):void;"),
+    ("has", "public native function has(listener:Function):Boolean;"),
 ]
+SIGNAL_REPLACED = {"connect", "disconnect", "is_connected"}
 
 # Members that AS3's own Object stands for. A script writes toString() as in any AS3 class; the binding
 # answers Godot's _to_string with it and calls Godot's to_string for it, so neither is declared.
@@ -505,6 +507,8 @@ class Generator:
             out.append("public var %s:%s;" % (name, self.type(member["type"], None, owner + "." + name)[0]))
         out.append(self.constructor(entry, as3_name))
         for method in entry.get("methods", []):
+            if owner == "Signal" and method["name"] in SIGNAL_REPLACED:
+                continue
             where = "%s.%s" % (owner, method["name"])
             name = naming.member(method["name"])
             self.claim(owner, name, "the method " + method["name"], {})

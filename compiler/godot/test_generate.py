@@ -204,7 +204,6 @@ class Fixture(unittest.TestCase):
 
     def test_signal_class(self):
         signal = self.members("Signal")
-        self.assertIn("public native function connect(callable:Function, flags:int = 0):int;", signal)
         self.assertIn("public native function emit(...rest):void;", signal)
 
     def test_signal_listeners(self):
@@ -213,7 +212,9 @@ class Fixture(unittest.TestCase):
         self.assertIn("public native function add(listener:Function):void;", signal)
         self.assertIn("public native function addOnce(listener:Function):void;", signal)
         self.assertIn("public native function remove(listener:Function):void;", signal)
-        self.assertIn("public native function connect(callable:Function, flags:int = 0):int;", signal)  # Godot's stays.
+        self.assertIn("public native function has(listener:Function):Boolean;", signal)
+        # Godot's own spelling is not declared: one way to do it.
+        self.assertEqual([line for line in signal if "connect" in line.lower()], [])
 
     def test_signal_listener_clash(self):
         # If Godot ever gives Signal a method of one of those names, the generator stops.
@@ -437,7 +438,7 @@ class FixtureCompiles(unittest.TestCase):
 			}
 			addChild(new Node(), true);
 			Input.mouseMode = 1;
-			Input.joyConnectionChanged.connect(onEntered);
+			Input.joyConnectionChanged.add(onEntered);
 			var children:GodotArray = getChildren();
 			var error:int = rpc("go", 1, 2);
 			if (error != GodotError.OK) { died.emit(); }

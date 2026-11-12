@@ -928,15 +928,13 @@ package godot {
 		public native function getObject():GodotObject;
 		public native function getObjectId():Number;
 		public native function getName():String;
-		public native function connect(callable:Function, flags:int = 0):int;
-		public native function disconnect(callable:Function):void;
-		public native function isConnected(callable:Function):Boolean;
 		public native function getConnections():GodotArray;
 		public native function hasConnections():Boolean;
 		public native function emit(...rest):void;
 		public native function add(listener:Function):void;
 		public native function addOnce(listener:Function):void;
 		public native function remove(listener:Function):void;
+		public native function has(listener:Function):Boolean;
 	}
 	[Operators]
 	[Indexed(element="*", keyed="true")]
