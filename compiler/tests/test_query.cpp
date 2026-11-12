@@ -5,6 +5,7 @@
 #include "ast_walk.h"
 #include "builtins.h"
 #include "names.h"
+#include "query.h"
 
 #include <filesystem>
 #include <memory>
@@ -234,7 +235,263 @@ static void test_reuse() {
 	CHECK_EQ(annotations(godot->tree), 0);
 }
 
+// The offset of the p_nth place (from 1) where p_needle is written.
+static uint32_t offset_of(const Unit *p_unit, const char *p_needle, int p_nth = 1) {
+	size_t found = std::string::npos;
+	for (int i = 0; i < p_nth; i++) {
+		found = p_unit->source.text().find(p_needle, found == std::string::npos ? 0 : found + 1);
+		if (found == std::string::npos) {
+			std::printf("NOT FOUND: %s #%d\n", p_needle, p_nth);
+			check::failures()++;
+			return 0;
+		}
+	}
+	return (uint32_t)found;
+}
+
+static std::string place(const Place &p_place) {
+	if (!p_place.unit) {
+		return "nowhere";
+	}
+	Position at = p_place.unit->source.position(p_place.offset);
+	return p_place.unit->source.path() + ":" + std::to_string(at.line) + ":" + std::to_string(at.column) + "+" +
+			std::to_string(p_place.length);
+}
+
+// Where the name at the p_nth p_needle is declared.
+static std::string definition(Queries &p_index, const Unit *p_unit, const char *p_needle, int p_nth = 1, uint32_t p_plus = 0) {
+	const Occurrence *found = p_index.at(*p_unit, offset_of(p_unit, p_needle, p_nth) + p_plus);
+	return found ? place(p_index.declaration(found->symbol)) : "nothing";
+}
+
+static const char *const PLAYER =
+		"package game {\n" // 1
+		"import godot.CharacterBody2D;\n" // 2
+		"import godot.Vector2;\n" // 3
+		"public class Player extends CharacterBody2D implements Living {\n" // 4
+		"	public static const MAX:int = 3;\n" // 5
+		"	private var speed:Number = 200;\n" // 6
+		"	public var target:Enemy;\n" // 7
+		"	public function Player(start:Number = 1) { speed = start; }\n" // 8
+		"	public function get health():int { return 1; }\n" // 9
+		"	public function set health(value:int):void {}\n" // 10
+		"	override public function _physicsProcess(delta:Number):void {\n" // 11
+		"		var step:Vector2 = velocity * delta;\n" // 12
+		"		this.speed = step.length() + speed;\n" // 13
+		"		target.hurt(MAX, \"hit\");\n" // 14
+		"		moveAndSlide();\n" // 15
+		"		health = Player.MAX + target.armor;\n" // 16
+		"		try { helper(); } catch (problem:Error) { trace(problem); }\n" // 17
+		"	}\n"
+		"	public function alive(...rest):Boolean { return arguments.length > 0; }\n" // 19
+		"}\n"
+		"}\n"
+		"function helper():void {}\n"; // 22
+static const char *const ENEMY =
+		"package game {\n"
+		"public class Enemy extends Base {\n" // 2
+		"	public function hurt(amount:int, why:String = \"x\"):void { armor -= amount; }\n" // 3
+		"}\n"
+		"}\n"
+		"class Base { public var armor:int = 5; }\n"; // 6
+static const char *const LIVING = "package game { public interface Living { function alive(...rest):Boolean; } }";
+
+static void test_index() {
+	Compilation compilation;
+	Unit *godot = compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	Unit *player = compilation.add("game/Player.as", PLAYER);
+	Unit *enemy = compilation.add("game/Enemy.as", ENEMY);
+	Unit *living = compilation.add("game/Living.as", LIVING);
+	compilation.check(true);
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	Queries index(compilation);
+
+	// Go to definition.
+	CHECK_EQ(definition(index, player, "step.length"), std::string("game/Player.as:12:7+4")); // A local.
+	CHECK_EQ(definition(index, player, "delta;"), std::string("game/Player.as:11:43+5")); // A parameter.
+	CHECK_EQ(definition(index, player, "speed = start"), std::string("game/Player.as:6:14+5")); // A field.
+	CHECK_EQ(definition(index, player, "speed = step"), std::string("game/Player.as:6:14+5")); // Through `this.`.
+	CHECK_EQ(definition(index, player, "hurt"), std::string("game/Enemy.as:3:18+4")); // A method of another object.
+	CHECK_EQ(definition(index, player, "armor"), std::string("game/Enemy.as:6:25+5")); // Inherited, from a helper class.
+	CHECK_EQ(definition(index, player, "Enemy"), std::string("game/Enemy.as:2:14+5")); // A class in a type.
+	CHECK_EQ(definition(index, player, "Living"), std::string("game/Living.as:1:33+6"));
+	CHECK_EQ(definition(index, player, "MAX + "), std::string("game/Player.as:5:22+3")); // A static through its class.
+	CHECK_EQ(definition(index, player, "Player.MAX"), std::string("game/Player.as:4:14+6"));
+	CHECK_EQ(definition(index, player, "health = "), std::string("game/Player.as:9:22+6")); // A property: its getter.
+	CHECK_EQ(definition(index, player, "helper();"), std::string("game/Player.as:22:10+6")); // A file helper.
+	CHECK_EQ(definition(index, player, "problem);"), std::string("game/Player.as:17:28+7")); // A catch variable.
+	CHECK_EQ(definition(index, player, "arguments"), std::string("nowhere"));
+	// Godot's API: imports, a base class, an inherited property and method.
+	std::string body = definition(index, player, "CharacterBody2D;");
+	CHECK(body.rfind("<godot>/godot.as:", 0) == 0);
+	CHECK_EQ(definition(index, player, "CharacterBody2D implements"), body);
+	const Occurrence *move = index.at(*player, offset_of(player, "moveAndSlide"));
+	CHECK(move && move->symbol->name == "moveAndSlide" && move->symbol->unit == godot);
+	CHECK(move && !move->is_declaration && move->length == 12);
+	const Occurrence *velocity = index.at(*player, offset_of(player, "velocity"));
+	CHECK(velocity && velocity->symbol->owner && velocity->symbol->owner->name == "CharacterBody2D");
+	const Occurrence *length = index.at(*player, offset_of(player, "length()"));
+	CHECK(length && length->symbol->owner && length->symbol->owner->name == "Vector2");
+	// A declaration is an occurrence of itself.
+	const Occurrence *declared = index.at(*player, offset_of(player, "speed:Number"));
+	CHECK(declared && declared->is_declaration && declared->symbol->kind == SymbolKind::Field);
+	CHECK_EQ(definition(index, player, "set health", 1, 4), std::string("game/Player.as:9:22+6"));
+	CHECK_EQ(definition(index, player, "_physicsProcess"), std::string("game/Player.as:11:27+15"));
+	// The position right after the last letter still finds the name; one further does not.
+	CHECK_EQ(definition(index, player, "hurt", 1, 4), std::string("game/Enemy.as:3:18+4"));
+	CHECK_EQ(definition(index, player, "moveAndSlide", 1, 13), std::string("nothing"));
+	// Whitespace, a keyword, a literal and the end of the file.
+	CHECK_EQ(definition(index, player, "\tpublic static"), std::string("nothing"));
+	CHECK_EQ(definition(index, player, "override"), std::string("nothing"));
+	CHECK_EQ(definition(index, player, "\"hit\"", 1, 2), std::string("nothing"));
+	CHECK(index.at(*player, (uint32_t)player->source.text().size()) == nullptr);
+	CHECK(index.at(*player, 1u << 30) == nullptr);
+
+	// Find references.
+	auto places = [&](const Unit *p_unit, const char *p_needle, bool p_with_declaration) {
+		const Occurrence *found = index.at(*p_unit, offset_of(p_unit, p_needle));
+		std::string out;
+		if (found) {
+			for (const Place &item : index.references(found->symbol, p_with_declaration)) {
+				out += place(item) + " ";
+			}
+		}
+		return out;
+	};
+	CHECK_EQ(places(enemy, "armor -=", true),
+			std::string("game/Player.as:16:32+5 game/Enemy.as:3:60+5 game/Enemy.as:6:25+5 "));
+	CHECK_EQ(places(enemy, "armor -=", false), std::string("game/Player.as:16:32+5 game/Enemy.as:3:60+5 "));
+	CHECK_EQ(places(player, "speed:Number", false),
+			std::string("game/Player.as:8:45+5 game/Player.as:13:8+5 game/Player.as:13:32+5 "));
+	// A Godot method: its uses in the program, and its declaration in Godot's file.
+	std::string uses = places(player, "moveAndSlide", true);
+	CHECK(uses.rfind("game/Player.as:15:3+12 <godot>/godot.as:", 0) == 0);
+	// A property: both accessors are declarations.
+	CHECK_EQ(places(player, "health = ", true),
+			std::string("game/Player.as:9:22+6 game/Player.as:10:22+6 game/Player.as:16:3+6 "));
+	(void)living;
+}
+
+static void test_describe() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	Unit *player = compilation.add("game/Player.as", PLAYER);
+	Unit *enemy = compilation.add("game/Enemy.as", ENEMY);
+	compilation.add("game/Living.as", LIVING);
+	compilation.check(true);
+	Queries index(compilation);
+	auto describe = [&](const Unit *p_unit, const char *p_needle, int p_nth = 1) {
+		const Occurrence *found = index.at(*p_unit, offset_of(p_unit, p_needle, p_nth));
+		return found ? index.describe(found->symbol) + " | " + index.context(found->symbol) : std::string("nothing");
+	};
+	CHECK_EQ(describe(player, "Player extends"),
+			std::string("class Player extends CharacterBody2D implements Living | class in package game"));
+	CHECK_EQ(describe(player, "Living"), std::string("interface Living | interface in package game"));
+	CHECK_EQ(describe(player, "MAX"), std::string("static const MAX:int = 3 | field of game.Player"));
+	CHECK_EQ(describe(player, "speed"), std::string("var speed:Number | field of game.Player"));
+	CHECK_EQ(describe(player, "hurt"),
+			std::string("function hurt(amount:int, why:String = \"x\"):void | method of game.Enemy"));
+	CHECK_EQ(describe(player, "health = "), std::string("function get health():int | property of game.Player"));
+	CHECK_EQ(describe(player, "alive"), std::string("function alive(...rest):Boolean | method of game.Player"));
+	CHECK_EQ(describe(player, "Player(start"), std::string("function Player(start:Number = 1) | constructor of game.Player"));
+	CHECK_EQ(describe(player, "step.length"), std::string("var step:Vector2 | local variable"));
+	CHECK_EQ(describe(player, "delta;"), std::string("delta:Number | parameter"));
+	CHECK_EQ(describe(player, "problem);"), std::string("problem:Error | catch variable"));
+	CHECK_EQ(describe(player, "arguments"), std::string("arguments:Array | the arguments of this call"));
+	CHECK_EQ(describe(player, "helper();"), std::string("function helper():void | function in game/Player.as"));
+	CHECK_EQ(describe(enemy, "Base"), std::string("class Base | class in game/Enemy.as"));
+	CHECK_EQ(describe(player, "moveAndSlide"),
+			std::string("function moveAndSlide():Boolean | method of godot.CharacterBody2D"));
+	CHECK_EQ(describe(player, "trace"), std::string("function trace(...rest):void | function, built in"));
+	CHECK_EQ(describe(player, "velocity"), std::string("function get velocity():Vector2 | property of godot.CharacterBody2D"));
+}
+
+static std::string outline_text(const std::vector<OutlineItem> &p_items, const Unit *p_unit, int p_depth = 0) {
+	std::string out;
+	for (const OutlineItem &item : p_items) {
+		CHECK(!item.name.empty());
+		CHECK(item.offset <= item.name_offset && item.name_offset + item.name_length <= item.end);
+		CHECK(item.end <= p_unit->source.text().size());
+		out += std::string((size_t)p_depth * 2, ' ') + symbol_kind_name(item.kind) + (item.is_const ? " const" : "") +
+				(item.is_constructor ? " constructor" : "") + " " + item.name + "\n";
+		out += outline_text(item.children, p_unit, p_depth + 1);
+	}
+	return out;
+}
+
+static void test_outline() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	Unit *player = compilation.add("game/Player.as", PLAYER);
+	Unit *enemy = compilation.add("game/Enemy.as", ENEMY);
+	Unit *living = compilation.add("game/Living.as", LIVING);
+	Unit *loose = compilation.add("loose.as", "package { public function loose(a:int):void {} }\nvar counter:int, other:int;");
+	Unit *broken = compilation.add("Broken.as", "package { public class Broken { var a:int; function (");
+	compilation.check(true);
+	Queries index(compilation);
+	CHECK_EQ(outline_text(index.outline(*player), player),
+			std::string("class Player\n"
+						"  field const MAX\n"
+						"  field speed\n"
+						"  field target\n"
+						"  method constructor Player\n"
+						"  property get health\n"
+						"  property set health\n"
+						"  method _physicsProcess\n"
+						"  method alive\n"
+						"function helper\n"));
+	CHECK_EQ(outline_text(index.outline(*enemy), enemy), std::string("class Enemy\n  method hurt\nclass Base\n  field armor\n"));
+	CHECK_EQ(outline_text(index.outline(*living), living), std::string("interface Living\n  method alive\n"));
+	CHECK_EQ(outline_text(index.outline(*loose), loose), std::string("function loose\nvariable counter\nvariable other\n"));
+	// A half-typed file: what has a name is listed, what has none is left out.
+	CHECK_EQ(outline_text(index.outline(*broken), broken), std::string("class Broken\n  field a\n"));
+
+	// Finding definitions by name.
+	auto names = [&](const char *p_query, size_t p_limit) {
+		std::string out;
+		for (const FoundSymbol &found : index.find(p_query, p_limit)) {
+			out += (found.container.empty() ? "" : found.container + ".") + found.name + " ";
+			CHECK(found.unit && !found.unit->is_declaration);
+		}
+		return out;
+	};
+	CHECK_EQ(names("HEALTH", 10), std::string("game.Player.health game.Player.health "));
+	CHECK_EQ(names("play", 10), std::string("game.Player game.Player.Player "));
+	CHECK_EQ(names("a", 3), std::string("game.Player game.Player.MAX game.Player.target "));
+	CHECK(index.find("", 1000).size() > 15);
+	CHECK_EQ(names("Node", 10), std::string()); // Godot's own classes are not listed.
+}
+
+// Every query answers on files that do not parse.
+static void test_queries_on_broken_files() {
+	const std::string text = PLAYER;
+	for (size_t length = 0; length <= text.size(); length += 7) {
+		Compilation compilation;
+		Unit *player = compilation.add("game/Player.as", text.substr(0, length));
+		Unit *enemy = compilation.add("game/Enemy.as", ENEMY);
+		compilation.check(true);
+		Queries index(compilation);
+		for (uint32_t offset = 0; offset <= length; offset += 3) {
+			const Occurrence *found = index.at(*player, offset);
+			if (found) {
+				index.declaration(found->symbol);
+				index.describe(found->symbol);
+				index.context(found->symbol);
+				index.references(found->symbol, true);
+			}
+			check::checks()++;
+		}
+		index.outline(*player);
+		index.outline(*enemy);
+		index.find("e", 50);
+	}
+}
+
 int main() {
+	test_index();
+	test_describe();
+	test_outline();
+	test_queries_on_broken_files();
 	test_tolerant();
 	test_import_symbol();
 	test_reuse();
