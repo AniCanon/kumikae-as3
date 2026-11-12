@@ -151,7 +151,10 @@ Token Lexer::lex_number(uint32_t p_start, bool p_newline_before) {
 		}
 	}
 	// "12abc", "0x" and "1e" are one bad token, not a number followed by a name.
-	if (position_ < size_ && is_identifier_part(text_[position_])) {
+	bool line_break;
+	bool space_follows = position_ < size_ && (unsigned char)text_[position_] >= 0x80 &&
+			unicode_space(text_ + position_, size_ - position_, &line_break) != 0;
+	if (position_ < size_ && is_identifier_part(text_[position_]) && !space_follows) {
 		valid = false;
 		while (position_ < size_ && is_identifier_part(text_[position_])) {
 			position_++;

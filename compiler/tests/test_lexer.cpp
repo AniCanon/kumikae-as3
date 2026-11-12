@@ -185,6 +185,8 @@ static void unicode_spaces_are_whitespace() {
 	CHECK_EQ(join(lex("x =\xC2\xA0" "1;").kinds), std::string("identifier '=' number ';'"));
 	CHECK_EQ(join(lex("a\xE3\x80\x80+ b").kinds), std::string("identifier '+' identifier"));
 	CHECK_EQ(join(lex("a \xEF\xBB\xBF b").kinds), std::string("identifier identifier"));
+	CHECK_EQ(join(lex("x = 1\xC2\xA0+ 2;").kinds), std::string("identifier '=' number '+' number ';'"));
+	CHECK_EQ(lex("x = 1\xC2\xA0+ 2;").errors, std::string(""));
 	// Line and paragraph separators end a line.
 	Lexed separated = lex("a\xE2\x80\xA8" "b\xE2\x80\xA9" "c");
 	CHECK_EQ(join(separated.kinds), std::string("identifier identifier identifier"));

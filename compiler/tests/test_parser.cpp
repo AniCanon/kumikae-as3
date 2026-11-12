@@ -327,6 +327,50 @@ static void deep_and_long_inputs_do_not_crash() {
 	CHECK_EQ(count(diagnostics.format(source), "expression is too long"), 1);
 	CHECK(count(diagnostics.format(source), "error:") <= 2);
 
+	// Named nested functions and parameter defaults count toward the same bound.
+	auto depth_of = [](const std::string &p_text, std::string *r_errors) {
+		Source text_source("t.as", p_text);
+		Arena text_arena;
+		Diagnostics text_diagnostics;
+		Program *text_tree = parse(text_source, text_arena, text_diagnostics);
+		std::string text_printed = print_ast(text_tree, text_source);
+		*r_errors = text_diagnostics.format(text_source);
+		size_t most = 0;
+		size_t start = 0;
+		while (start < text_printed.size()) {
+			size_t indent = text_printed.find_first_not_of(' ', start) - start;
+			most = indent > most ? indent : most;
+			start = text_printed.find('\n', start) + 1;
+		}
+		return most / 2;
+	};
+	std::string long_sum = "1";
+	for (int i = 0; i < 440; i++) {
+		long_sum += "+1";
+	}
+	std::string named = "var x:int = " + long_sum + ";";
+	for (int i = 0; i < 120; i++) {
+		named = "function f" + std::to_string(i) + "():void { " + named + " }";
+	}
+	std::string named_errors;
+	CHECK(depth_of(named, &named_errors) <= 600);
+	CHECK_EQ(count(named_errors, "code is nested too deeply"), 1);
+	std::string defaults = long_sum;
+	for (int i = 0; i < 120; i++) {
+		defaults = "function (a:* = " + defaults + "):void {}";
+	}
+	std::string default_errors;
+	CHECK(depth_of("var g:Function = " + defaults + ";", &default_errors) <= 600);
+	CHECK_EQ(count(default_errors, "code is nested too deeply"), 1);
+	// Twenty named functions deep is ordinary code and must be accepted.
+	std::string modest = "var x:int = 1 + 2;";
+	for (int i = 0; i < 20; i++) {
+		modest = "function f" + std::to_string(i) + "():void { " + modest + " }";
+	}
+	std::string modest_errors;
+	CHECK(depth_of(modest, &modest_errors) > 40);
+	CHECK_EQ(modest_errors, std::string(""));
+
 	// Below the cap, nothing is reported.
 	NO_ERRORS(expr(sum));
 	NO_ERRORS(stmt("var g:Function = function():* { return function():* { return " + sum + "; }; };"));
@@ -836,6 +880,30 @@ static void every_prefix_of_the_corpus_parses() {
 	CHECK(parsed > 10000);
 }
 
+// Every corpus file with one byte removed: mistakes in the middle of a file, which exercise recovery.
+static void every_single_byte_deletion_of_the_corpus_parses() {
+	int parsed = 0;
+	bool all_returned = true;
+	for (const char *name : CORPUS) {
+		std::string text;
+		if (!read_file(std::string(KAS3_TESTS_DIR) + "/corpus/" + name + ".as", &text)) {
+			continue;
+		}
+		for (size_t index = 0; index < text.size(); index++) {
+			std::string damaged = text;
+			damaged.erase(index, 1);
+			Source source("damaged.as", damaged);
+			Arena arena;
+			Diagnostics diagnostics;
+			Program *tree = parse(source, arena, diagnostics);
+			all_returned = all_returned && tree != nullptr && !print_ast(tree, source).empty();
+			parsed++;
+		}
+	}
+	CHECK(all_returned);
+	CHECK(parsed > 10000);
+}
+
 int main() {
 	empty_file();
 	package_with_class();
@@ -852,6 +920,7 @@ int main() {
 	whole_program_never_crashes();
 	corpus_parses_cleanly();
 	every_prefix_of_the_corpus_parses();
+	every_single_byte_deletion_of_the_corpus_parses();
 	precedence();
 	calls_and_members();
 	reserved_word_after_dot();

@@ -506,3 +506,17 @@ These are binding and extend the tasks named.
 - **Task 6, malformed input in bulk.** A test parses every byte-prefix of every file in `tests/corpus/` (added to this task from Task 7's list so the test has inputs) and asserts that `parse` returns a tree every time. It prints nothing per prefix.
 - **Task 7, sanitizers.** `compiler/CMakeLists.txt` has an option `KAS3_SANITIZE` adding `-fsanitize=address,undefined` to everything. Before the final commit, the whole suite is run once in a separate build directory with it on, and must pass.
 - **Committing.** Stage `compiler` and `docs` by name. Never `git add -A` on this branch: the working directory holds ignored and unignored leftovers from other branches.
+
+## Superseded after the final review
+
+The independent review found that the limits above did not bound the tree. They are replaced by:
+
+- Chains built in a loop stop at 448 links (`expression is too long`), not 4,096.
+- Tree height is tracked through expressions, statements, nested functions and parameter defaults and capped
+  at 512; past that the parser reports `code is nested too deeply` and returns an empty program.
+- Type arguments nest at most 32 deep.
+- An unclosed `(`, `[` or `{` at the end of the file is reported where it was opened
+  (`'{' is never closed`), innermost only.
+- After one error, nothing more is reported until the parser has resynchronised.
+
+`compiler/README.md` states the limits as built.

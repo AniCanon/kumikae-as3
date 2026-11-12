@@ -40,6 +40,18 @@ statements ended by a line break instead of a semicolon.
 Reported as unsupported, each with its own message: E4X (inline XML), the `with` statement, namespaces, and
 `include`.
 
+## Limits
+
+These keep every syntax tree shallow enough for later passes to walk by plain recursion.
+
+- Constructs nest at most 256 deep by recursion (brackets, blocks, unary operators, `else if` chains).
+- A chain of operators, member accesses or calls stops growing at 448 links; a longer one is reported as
+  `expression is too long` and parsing continues.
+- No tree is taller than about 512 levels in total, counting statements, nested functions and parameter
+  defaults. Past that, the file is reported as `code is nested too deeply` and **no tree is returned**.
+- Type arguments (`Vector.<Vector.<...>>`) nest at most 32 deep.
+- Source files are limited to 4 GB (offsets are 32-bit).
+
 ## Tests
 
 - `tests/test_*.cpp`: unit tests for source positions, the lexer, the tree printer, and the parser.

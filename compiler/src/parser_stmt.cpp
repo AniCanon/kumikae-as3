@@ -213,6 +213,9 @@ Stmt *Parser::parse_statement_inner() {
 			if (peek2().kind == TokenKind::Identifier) {
 				FunctionStmt *statement = node<FunctionStmt>(advance().offset);
 				statement->function = parse_function_rest(start, Modifiers(), List<Metadata>(), true, false, true);
+				// The nested function's height counts toward the body it sits in.
+				last_height_ = function_height_ + 1;
+				note_height();
 				return finish(statement);
 			}
 			break;
@@ -473,6 +476,7 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	}
 
 	std::vector<Parameter> parameters;
+	uint32_t defaults_height = 0; // Tallest default value, which hangs below this function in the tree.
 	Token open = expect(TokenKind::LParen, "'('");
 	if (open.length) {
 		bool rest_seen = false;
@@ -501,6 +505,9 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 				Restore allow_in(no_in_, false);
 				Restore brackets(bracket_ends_initializer_, false);
 				parameter.default_value = parse_assignment();
+				if (last_height_ > defaults_height) {
+					defaults_height = last_height_;
+				}
 			}
 			parameter.end = previous_end_;
 			parameters.push_back(parameter);
@@ -514,7 +521,7 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	if (accept(TokenKind::Colon)) {
 		function->return_type = parse_type();
 	}
-	function_height_ = 1;
+	uint32_t height = defaults_height + 2;
 	if (at(TokenKind::LBrace)) {
 		// A function body starts a fresh count of statement nesting; its height is what the body reached.
 		uint32_t saved_depth = statement_depth_;
@@ -522,11 +529,17 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 		statement_depth_ = 0;
 		body_height_ = 0;
 		function->body = parse_function_body();
-		function_height_ = body_height_ + 3;
+		if (body_height_ + 3 > height) {
+			height = body_height_ + 3;
+		}
 		statement_depth_ = saved_depth;
 		body_height_ = saved_height;
 	} else if (p_body_expected) {
 		error_expected("'{'");
+	}
+	function_height_ = height;
+	if (height > MAX_HEIGHT) {
+		abort_too_deep();
 	}
 	return finish(function);
 }
