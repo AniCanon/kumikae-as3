@@ -1,0 +1,35 @@
+3:21 int -> class int (built in)
+5:29 int -> class int (built in)
+5:43 int -> class int (built in)
+6:4 early -> local early @7:8
+6:12 limit -> parameter limit @5:23
+7:14 int -> class int (built in)
+8:15 int -> class int (built in)
+8:24 i -> local i @8:13
+8:28 limit -> parameter limit @5:23
+8:35 i -> local i @8:13
+9:16 int -> class int (built in)
+9:22 i -> local i @8:13
+10:5 total -> local total @23:8
+10:14 inside -> local inside @9:9
+13:5 later -> local function later @17:13
+13:11 rest -> parameter rest @5:34
+14:21 Error -> class Error (built in)
+15:5 trace -> function trace (built in)
+15:11 problem -> catch variable problem @14:13
+15:28 arguments -> arguments (built in)
+17:25 int -> class int (built in)
+18:5 total -> local total @23:8
+18:14 count -> parameter count @17:19
+18:22 early -> local early @7:8
+20:14 Function -> class Function (built in)
+20:46 int -> class int (built in)
+20:51 int -> class int (built in)
+21:12 n -> parameter n @20:44
+21:20 countdown -> local function countdown @20:34
+21:30 n -> parameter n @20:44
+21:39 total -> local total @23:8
+23:14 Number -> class Number (built in)
+23:23 again -> local again @20:8
+24:11 int -> class int (built in)
+24:15 total -> local total @23:8

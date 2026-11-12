@@ -1,0 +1,7 @@
+golden/names/errors/Hierarchy.as:2:33: error: 'Hierarchy' inherits from itself
+golden/names/errors/Hierarchy.as:2:51: error: 'Error' is not an interface
+golden/names/errors/Hierarchy.as:15:24: error: 'Loop' inherits from itself
+golden/names/errors/Hierarchy.as:21:22: error: can't extend 'Sealed': it is final
+golden/names/errors/Hierarchy.as:23:6: error: 'a' is already defined at line 22
+golden/names/errors/Hierarchy.as:26:15: error: dynamic classes are not supported
+golden/names/errors/Hierarchy.as:26:29: error: can't extend 'String': it is final

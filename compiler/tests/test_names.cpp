@@ -2,6 +2,7 @@
 #include "check.h"
 #include "names.h"
 
+#include <filesystem>
 #include <initializer_list>
 #include <string>
 
@@ -507,6 +508,41 @@ static void test_bodies_limits() {
 	CHECK_MAIN(in_method("method(1,/*!*/);"), "expected an expression but found ')'");
 }
 
+
+// Truncated files mostly fail to parse, but many prefixes are whole programs with missing pieces. None may
+// crash or hang the checker, alone or beside the complete corpus.
+static void test_corpus_prefixes() {
+	std::string stub;
+	CHECK(read_file(std::string(KAS3_TESTS_DIR) + "/stubs/godot.as", &stub));
+	int files = 0;
+	Compilation whole; // The complete corpus as one program: its files refer to each other.
+	whole.add("godot.as", stub, true);
+	for (const auto &entry : std::filesystem::directory_iterator(std::string(KAS3_TESTS_DIR) + "/corpus")) {
+		if (entry.path().extension() != ".as") {
+			continue;
+		}
+		std::string text;
+		CHECK(read_file(entry.path().string(), &text));
+		std::string name = entry.path().filename().string();
+		files++;
+		whole.add(name, text);
+		// Every prefix that ends at a line break or a closing brace: these are the ones likely to parse.
+		for (size_t length = 0; length < text.size(); length++) {
+			if (length > 0 && text[length - 1] != '\n' && text[length - 1] != '}' && text[length - 1] != ';') {
+				continue;
+			}
+			Compilation compilation;
+			compilation.add("godot.as", stub, true);
+			compilation.add(name, text.substr(0, length));
+			compilation.check();
+			check::checks()++;
+		}
+	}
+	CHECK_EQ(files, 14);
+	whole.check();
+	CHECK_EQ(whole.format_diagnostics(), std::string());
+}
+
 int main() {
 	test_model();
 	test_declare();
@@ -517,5 +553,6 @@ int main() {
 	test_bodies_resolve();
 	test_bodies_errors();
 	test_bodies_limits();
+	test_corpus_prefixes();
 	return check::finish();
 }

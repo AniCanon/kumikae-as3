@@ -1,0 +1,14 @@
+golden/names/errors/Undefined.as:2:9: error: can't find 'nowhere.Thing'
+golden/names/errors/Undefined.as:6:20: error: unknown type 'Thing'
+golden/names/errors/Undefined.as:9:19: error: '_ready' overrides a method of Node and must be marked 'override'
+golden/names/errors/Undefined.as:10:4: error: undefined name 'missing'
+golden/names/errors/Undefined.as:11:21: error: unknown type 'Gone'
+golden/names/errors/Undefined.as:11:34: error: unknown type 'Gone'
+golden/names/errors/Undefined.as:13:14: error: undefined label 'inner'
+golden/names/errors/Undefined.as:15:4: error: 'break' is only allowed in a loop or switch
+golden/names/errors/Undefined.as:19:4: error: can't use the instance member '_process' in a static context
+golden/names/errors/Undefined.as:20:11: error: 'this' can't be used in a static context
+golden/names/errors/Undefined.as:23:28: error: 'nothing' is marked 'override' but no base class has a method to override
+golden/names/errors/Undefined.as:25:8: error: 'x' is already defined in this function with a different type (line 24)
+golden/names/errors/Undefined.as:26:4: error: can't assign to this expression
+golden/names/errors/Undefined.as:26:4: error: undefined name 'f'
