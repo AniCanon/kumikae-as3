@@ -99,6 +99,14 @@ Limits:
 - Workspace symbols are the project's own. Godot's classes are not listed.
 - Changes must arrive as whole documents, which is what the server asks the editor for.
 - No completion, signature help, rename or code actions yet.
+- A file is known by the path the editor gives. The same file reached through a symbolic link, or under a
+  name that differs only in letter case, counts as a second file and its classes are reported as already
+  defined.
+- A file the editor opens from outside the project, or from a folder whose name starts with a dot, is not
+  checked, unless no folder is open at all.
+- A project of more than 20,000 `.as` files is read up to that number. The server says so on standard
+  error only.
+- Not yet usable on Windows.
 
 ## Declaration files
 
