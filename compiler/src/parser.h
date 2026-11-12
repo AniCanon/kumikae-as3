@@ -74,7 +74,7 @@ private:
 	void report_too_long(uint32_t p_offset);
 	void synchronize();
 	void skip_to_statement_end();
-	void skip_line();
+	void skip_xml();
 	void note_current();
 
 	template <class T>

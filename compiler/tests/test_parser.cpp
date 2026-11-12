@@ -44,7 +44,6 @@ static Parsed stmt(const std::string &p_text) {
 	return Parsed{ strip_positions(print_node(tree, source)), diagnostics.format(source) };
 }
 
-#ifdef KAS3_HAVE_PROGRAM
 static Parsed program(const std::string &p_text) {
 	Source source("t.as", p_text);
 	Arena arena;
@@ -53,7 +52,6 @@ static Parsed program(const std::string &p_text) {
 	CHECK(tree != nullptr);
 	return Parsed{ strip_positions(print_ast(tree, source)), diagnostics.format(source) };
 }
-#endif
 
 static bool has(const std::string &p_text, const char *p_part) {
 	return p_text.find(p_part) != std::string::npos;
@@ -461,7 +459,245 @@ static void unsupported_statements() {
 	CHECK(has(imported.tree, "Import name=\"flash.utils.getTimer\""));
 }
 
+// ---- Task 6: declarations, packages, parse() ----
+
+static void empty_file() {
+	Parsed result = program("");
+	NO_ERRORS(result);
+	CHECK_EQ(result.tree, std::string("Program\n"));
+	NO_ERRORS(program("// just a comment\n"));
+}
+
+static void package_with_class() {
+	Parsed result = program("package game.actors {\n\timport godot.Node2D;\n\n"
+							"\tpublic class Player extends Node2D implements IHit, IMove {\n\t}\n}\n");
+	NO_ERRORS(result);
+	CHECK_EQ(result.tree, std::string(R"(Program
+  PackageDecl name="game.actors"
+    Import name="godot.Node2D"
+    ClassDecl name="Player" mods=public
+      extends:
+        Type Node2D
+      implements:
+        Type IHit
+        Type IMove
+)"));
+	NO_ERRORS(program("package { class A {} }"));
+	CHECK(has(program("package { class A {} }").tree, "  PackageDecl\n    ClassDecl name=\"A\"\n"));
+}
+
+static void members() {
+	Parsed result = program(R"(package {
+	public class Unit {
+		[Export] public var speed:Number = 200;
+		private static const MAX:int = 3;
+		override public function _process(delta:Number):void { }
+		public function get hp():int { return _hp; }
+		public function set hp(v:int):void { }
+		function get():int { return 0; }
+		public native function fast(x:int):int;
+		internal final function done():void {}
+	}
+})");
+	NO_ERRORS(result);
+	CHECK(has(result.tree, "VarDecl mods=public\n        Metadata name=\"Export\"\n        Declarator name=\"speed\""));
+	CHECK(has(result.tree, "VarDecl const mods=private,static\n"));
+	CHECK(has(result.tree, "FunctionDecl name=\"_process\" mods=public,override\n"));
+	CHECK(has(result.tree, "FunctionDecl name=\"hp\" getter mods=public\n"));
+	CHECK(has(result.tree, "FunctionDecl name=\"hp\" setter mods=public\n"));
+	CHECK(has(result.tree, "FunctionDecl name=\"get\"\n"));
+	CHECK(has(result.tree, "FunctionDecl name=\"fast\" mods=public,native\n"));
+	CHECK(has(result.tree, "FunctionDecl name=\"done\" mods=internal,final\n"));
+	CHECK_EQ(program("class A { function f():void }").errors,
+			std::string("t.as:1:29: error: expected '{' but found '}'\n"));
+}
+
+static void metadata_forms() {
+	Parsed result = program(R"([Signal(name="hit", args="amount:int")]
+[Tool]
+[Embed(source="a.png", mimeType="image/png")]
+[Foo(1, bar)]
+class A {}
+)");
+	NO_ERRORS(result);
+	CHECK(has(result.tree, "Metadata name=\"Signal\" args=[name=\"hit\", args=\"amount:int\"]\n"));
+	CHECK(has(result.tree, "Metadata name=\"Tool\"\n"));
+	CHECK(has(result.tree, "Metadata name=\"Embed\" args=[source=\"a.png\", mimeType=\"image/png\"]\n"));
+	CHECK(has(result.tree, "Metadata name=\"Foo\" args=[\"1\", \"bar\"]\n"));
+}
+
+static void metadata_after_initializer_without_semicolon() {
+	Parsed result = program("class A {\n\tpublic var a:int = 1\n\t[Export]\n\tpublic var b:int = 2\n}\n");
+	NO_ERRORS(result);
+	CHECK_EQ(count(result.tree, "VarDecl mods=public"), 2);
+	CHECK(has(result.tree, "Metadata name=\"Export\"\n      Declarator name=\"b\""));
+	Parsed top = program("var a:Array = b\n[Export]\nvar c:int = 1\n");
+	NO_ERRORS(top);
+	CHECK_EQ(count(top.tree, "VarDecl"), 2);
+	// Inside a function body the bracket still continues the expression.
+	CHECK(has(program("function f():void {\n\tvar a:* = b\n\t[0]\n}\n").tree, "Index"));
+}
+
+static void interface_forms() {
+	Parsed result = program("interface IHit extends IA, IB { function hit(n:int):void; function get hp():int; }");
+	NO_ERRORS(result);
+	CHECK_EQ(result.tree, std::string(R"(Program
+  InterfaceDecl name="IHit"
+    extends:
+      Type IA
+      Type IB
+    FunctionDecl name="hit"
+      Parameter name="n"
+        Type int
+      returns:
+        Type void
+    FunctionDecl name="hp" getter
+      returns:
+        Type int
+)"));
+	CHECK_EQ(program("interface I { function f():void {} }").errors,
+			std::string("t.as:1:33: error: interface methods cannot have a body\n"));
+	CHECK_EQ(program("interface I { public function f():void; }").errors,
+			std::string("t.as:1:15: error: interface methods cannot have modifiers\n"));
+	NO_ERRORS(program("interface I { function a():void\n function b():void\n }"));
+}
+
+static void helpers_outside_package() {
+	Parsed result = program("package { public class Main {} }\nclass Helper { }\nfunction util():void { }\n");
+	NO_ERRORS(result);
+	CHECK_EQ(result.tree, std::string(R"(Program
+  PackageDecl
+    ClassDecl name="Main" mods=public
+  ClassDecl name="Helper"
+  FunctionDecl name="util"
+    returns:
+      Type void
+    Block
+)"));
+}
+
+static void imports() {
+	CHECK(has(program("import flash.utils.*;").tree, "Import name=\"flash.utils\" wildcard\n"));
+	Parsed in_class = program("class A { import flash.utils.Dictionary; var d:Dictionary; }");
+	NO_ERRORS(in_class);
+	CHECK(has(in_class.tree, "    Import name=\"flash.utils.Dictionary\"\n"));
+	NO_ERRORS(program("package a { import b.C\n import d.E\n class F {} }"));
+}
+
+static void modifier_errors() {
+	CHECK_EQ(program("public public class A {}").errors, std::string("t.as:1:8: error: duplicate 'public'\n"));
+	CHECK_EQ(program("public private class A {}").errors,
+			std::string("t.as:1:8: error: only one access modifier is allowed\n"));
+	CHECK_EQ(program("class A { static static var x:int; }").errors, std::string("t.as:1:18: error: duplicate 'static'\n"));
+	NO_ERRORS(program("public dynamic class A {}"));
+	CHECK(has(program("public dynamic class A {}").tree, "mods=public,dynamic"));
+}
+
+static void top_level_errors() {
+	Parsed stray = program("x = 1;\nclass A {}\n");
+	CHECK_EQ(stray.errors, std::string("t.as:1:1: error: expected a class, interface, function or variable definition\n"));
+	CHECK(has(stray.tree, "ClassDecl name=\"A\""));
+	Parsed twice = program("package a { }\npackage b { }\n");
+	CHECK_EQ(twice.errors, std::string("t.as:2:1: error: only one package block is allowed in a file\n"));
+	Parsed member = program("class A {\n\tx = 1;\n\tvar y:int;\n}\n");
+	CHECK_EQ(member.errors, std::string("t.as:2:2: error: expected a member definition\n"));
+	CHECK(has(member.tree, "Declarator name=\"y\""));
+}
+
+static void unsupported_definitions() {
+	struct Case {
+		const char *text;
+		const char *message;
+	};
+	const Case cases[] = {
+		{ "namespace mx_internal;\nclass A {}", "t.as:1:1: error: namespaces are not supported\n" },
+		{ "namespace ns = \"http://x\";\nclass A {}", "t.as:1:1: error: namespaces are not supported\n" },
+		{ "use namespace mx_internal;\nclass A {}", "t.as:1:1: error: namespaces are not supported\n" },
+		{ "include \"other.as\";\nclass A {}", "t.as:1:1: error: 'include' is not supported\n" },
+		{ "default xml namespace = ns;\nclass A {}", "t.as:1:1: error: E4X (XML syntax) is not supported\n" },
+		{ "class B { function f():void { with (o) { g(); } } }\nclass A {}",
+				"t.as:1:31: error: the 'with' statement is not supported\n" },
+		{ "class B { function f():void { var x:* = a::b; } }\nclass A {}",
+				"t.as:1:42: error: namespaces are not supported\n" },
+		{ "class B { var x:XML = <a/>; }\nclass A {}", "t.as:1:23: error: E4X (XML syntax) is not supported\n" },
+		{ "class B { function f():void { var x:* = a..b + a.@c; } }\nclass A {}",
+				"t.as:1:42: error: E4X (XML syntax) is not supported\nt.as:1:50: error: E4X (XML syntax) is not supported\n" },
+	};
+	for (const Case &item : cases) {
+		Parsed result = program(item.text);
+		CHECK_EQ(result.errors, std::string(item.message));
+		CHECK(has(result.tree, "ClassDecl name=\"A\""));
+	}
+}
+
+static void whole_program_never_crashes() {
+	std::string braces(5000, '{');
+	std::string control("\x00\x01\x02", 3);
+	for (const std::string &text : { std::string("package {"), std::string("class"), std::string("class A { function"),
+				 std::string("class A { var x:Vector.<"), std::string("["), std::string("}}}}"), braces, control }) {
+		Parsed result = program(text);
+		CHECK(!result.errors.empty());
+		CHECK(!result.tree.empty());
+	}
+}
+
+static const char *const CORPUS[] = { "Alloc", "ArrayConversion", "Empty", "MoveNodes", "NBody", "PerNodeChild",
+	"PerNodeProcess", "Probe", "RayQueries", "Saxpy", "Shapes", "Sieve", "SignalTraffic", "V2Probe" };
+
+static void corpus_parses_cleanly() {
+	for (const char *name : CORPUS) {
+		std::string path = std::string(KAS3_TESTS_DIR) + "/corpus/" + name + ".as";
+		std::string text;
+		CHECK(read_file(path, &text));
+		Source source(path, text);
+		Arena arena;
+		Diagnostics diagnostics;
+		Program *tree = parse(source, arena, diagnostics);
+		CHECK(tree != nullptr);
+		CHECK_EQ(diagnostics.format(source), std::string(""));
+		CHECK(tree->package != nullptr || tree->definitions.count > 0);
+	}
+}
+
+// Every prefix of every corpus file is a malformed program. Parsing each must finish and return a tree.
+static void every_prefix_of_the_corpus_parses() {
+	int parsed = 0;
+	bool all_returned = true;
+	for (const char *name : CORPUS) {
+		std::string text;
+		if (!read_file(std::string(KAS3_TESTS_DIR) + "/corpus/" + name + ".as", &text)) {
+			continue;
+		}
+		for (size_t length = 0; length <= text.size(); length++) {
+			Source source("prefix.as", text.substr(0, length));
+			Arena arena;
+			Diagnostics diagnostics;
+			Program *tree = parse(source, arena, diagnostics);
+			all_returned = all_returned && tree != nullptr;
+			// Printing walks the whole tree, which checks that it is well formed.
+			all_returned = all_returned && !print_ast(tree, source).empty();
+			parsed++;
+		}
+	}
+	CHECK(all_returned);
+	CHECK(parsed > 10000);
+}
+
 int main() {
+	empty_file();
+	package_with_class();
+	members();
+	metadata_forms();
+	metadata_after_initializer_without_semicolon();
+	interface_forms();
+	helpers_outside_package();
+	imports();
+	modifier_errors();
+	top_level_errors();
+	unsupported_definitions();
+	whole_program_never_crashes();
+	corpus_parses_cleanly();
+	every_prefix_of_the_corpus_parses();
 	precedence();
 	calls_and_members();
 	reserved_word_after_dot();

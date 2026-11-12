@@ -513,9 +513,9 @@ Expr *Parser::parse_primary() {
 			advance();
 			return parse_primary();
 		case TokenKind::Less:
-			// Inline XML. Skip the rest of the line.
+			// Inline XML. Skip to the end of the statement or line, whichever comes first.
 			error_at(current_.offset, "E4X (XML syntax) is not supported", false);
-			skip_line();
+			skip_xml();
 			return missing_expression();
 		case TokenKind::Error:
 			// The lexer reported it. Take it as the expression and carry on.

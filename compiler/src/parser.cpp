@@ -141,12 +141,11 @@ void Parser::skip_to_statement_end() {
 	}
 }
 
-void Parser::skip_line() {
-	while (!at(TokenKind::EndOfFile)) {
+// Skips inline XML: everything up to a `;` (left in place) or the end of the line.
+void Parser::skip_xml() {
+	advance();
+	while (!at(TokenKind::EndOfFile) && !at(TokenKind::Semicolon) && !current_.newline_before) {
 		advance();
-		if (current_.newline_before) {
-			return;
-		}
 	}
 }
 
