@@ -72,6 +72,10 @@ add_executable(kas3c tools/kas3c.cpp)
 target_link_libraries(kas3c PRIVATE kas3lsp)
 target_compile_options(kas3c PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
+# Not a test: prints how long a re-check takes (tests/bench/generate_project.py writes a project to try).
+add_executable(bench_recheck tools/bench_recheck.cpp)
+target_link_libraries(bench_recheck PRIVATE kas3lsp)
+
 add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:kas3c>)
 add_test(NAME lsp_stdio COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp_stdio.py $<TARGET_FILE:kas3c>)
 add_test(NAME golden COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_golden.py
