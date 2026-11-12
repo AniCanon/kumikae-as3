@@ -180,7 +180,7 @@ The throwaway speed spike is kept on the `spike/stage-0b` branch.
 - [Language server](docs/superpowers/specs/2026-11-12-language-server-design.md): the plan for editor
   support. Its first slice follows stage 1.
 - [Godot naming](docs/superpowers/specs/2026-11-12-godot-naming-design.md): how Godot's API is named in AS3.
-  Proposed, not yet approved.
+  Approved.
 
 ## Licence
 

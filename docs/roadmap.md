@@ -120,7 +120,7 @@ The design keeps each of these possible. No stage above delivers them.
 ## What comes next: stage 1d, Godot's API in AS3
 
 **Goal:** every Godot class, method, property, signal and constant can be named from AS3, under the
-[naming design](superpowers/specs/2026-11-12-godot-naming-design.md). The design needs your approval first.
+[naming design](superpowers/specs/2026-11-12-godot-naming-design.md), which the owner approved on 2026-11-12.
 
 | Step | What it does |
 |---|---|
@@ -135,12 +135,12 @@ The design keeps each of these possible. No stage above delivers them.
 |---|---|
 | Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
+| [Godot naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
 
 ## Decisions waiting on the owner
 
 | Decision | Why it matters |
 |---|---|
-| Approval of the [Godot naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | You asked for first-class naming. The design proposes lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties (`timer.timeout.connect(f)`), `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's (`GodotObject`, `GodotArray`, `GodotDictionary`, `GodotJSON`, `GodotError`). Names are costly to change once code uses them. |
 | When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
 
 ## How to follow progress

@@ -1,12 +1,12 @@
 # Kumikae AS3: how Godot's API is named in AS3
 
-Design, 2026-11-12. Status: **proposed. The owner set the direction; the rules below are not yet approved.**
+Design, 2026-11-12. Status: **approved by the owner on 2026-11-12.**
 
 This document replaces one mapping rule of the main design: "method and property names keep Godot's
 spelling (`move_and_slide`)". Everything else in the main design and the performance redesign stands.
 
 Lines marked **(owner)** are what the owner asked for. Lines marked **(call)** are the designer's decisions,
-open to being overruled. Lines marked **(measured)** come from running the rule over Godot 4.7's API
+which the owner approved with the rest. Lines marked **(measured)** come from running the rule over Godot 4.7's API
 description: 1,036 classes, 16,822 methods, 4,162 properties, 503 signals.
 
 ## Intent
