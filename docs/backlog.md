@@ -52,7 +52,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - On go to definition, `new X()` goes to the class, not to its constructor.
 - While any file has a syntax error, type errors are hidden everywhere. Silencing only the broken region
   would be kinder.
-- A changed line is sent as a whole document; ranged changes are ignored.
 
 ## Stage 2a: interpreter core
 
@@ -73,8 +72,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - godot-cpp is built as `template_release` and loaded by the editor binary; whether editor features need a
   debug build is unchecked.
 - GDScript cannot set a script's field, only read it; a script's method and property lists are empty.
-- A value-type argument from GDScript is not checked against the parameter's type: a `Vector3` passes where a
-  `Vector2` is wanted.
 - A method that returns a script object can't hand it to Godot: the caller gets null, and an error says so.
 - A script's private methods and fields can be reached from GDScript.
 - A handle on a Godot object that has since been freed still counts as not null.

@@ -23,5 +23,7 @@ package {
 		public function takeNode(n:Node):Boolean { return n != null; }
 		public function takeFlag(b:Boolean):Boolean { return b; }
 		public function myself():Checks { return this; }
+		public function takeVector(v:Vector2):Number { return v.x; }
+		public function takeBody(b:CharacterBody2D):Boolean { return b != null; }
 	}
 }

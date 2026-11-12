@@ -98,6 +98,9 @@ struct Function {
 	uint32_t parameters = 0;
 	uint32_t required = 0; // How many of them have no default: a caller must pass at least these.
 	Kind result = Kind::Void;
+	// For each parameter that is a Godot value or object: Godot's name for its type ("Vector2",
+	// "CharacterBody2D"), by register. Empty for the others. A host checks what arrives against it.
+	std::vector<std::string> parameter_types;
 	std::vector<Kind> registers;
 	std::vector<Instruction> code;
 	std::vector<std::vector<uint32_t>> argument_lists;

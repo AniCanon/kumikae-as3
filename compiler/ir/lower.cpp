@@ -1877,6 +1877,15 @@ class Lowerer {
 				}
 				Kind kind = written_kind(parameter.type, parameter.offset, Kind::F64);
 				uint32_t local = reg(kind);
+				if (is_engine(kind) && parameter.type) {
+					// What the engine must be handing over for this parameter.
+					const Type *type = compilation_.type_of(parameter.type);
+					std::string godot;
+					if (type && type->symbol && godot_name(type->symbol->name, std::string_view(), &godot)) {
+						fn().parameter_types.resize(local + 1);
+						fn().parameter_types[local] = godot;
+					}
+				}
 				if (parameter.symbol) {
 					locals_[parameter.symbol] = local;
 				}

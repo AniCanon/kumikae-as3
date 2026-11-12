@@ -62,6 +62,12 @@ func _physics_process(_delta: float) -> bool:
 	print("CHECK things=%s %s" % [first.which(), second.which()])
 	first.free()
 	second.free()
+	# A Godot value or object must be of the type the parameter names.
+	print("CHECK vector=%s" % str(Callable(node, "takeVector").callv([Vector2(3, 4)])))
+	print("CHECK wrong vector=%s" % str(Callable(node, "takeVector").callv([Vector3(1, 2, 3)])))
+	print("CHECK body=%s" % str(Callable(node, "takeBody").callv([derived])))
+	print("CHECK no body=%s" % str(Callable(node, "takeBody").callv([null])))
+	print("CHECK wrong body=%s" % str(Callable(node, "takeBody").callv([node])))
 	# A script is only attached to an object of the Godot class it extends.
 	var wrong := Node.new()
 	attach("res://Base.as", wrong)

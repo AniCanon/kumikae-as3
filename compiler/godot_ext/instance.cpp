@@ -22,7 +22,7 @@ struct ScriptInstance {
 
 // Whether a value arriving from Godot may be taken as a parameter of this kind. Numbers are taken as
 // GDScript itself would take them, but one that does not fit an int or a uint is refused, never wrapped.
-static bool accepts(ir::Kind p_kind, const Variant &p_value) {
+static bool accepts(ir::Kind p_kind, const std::string &p_godot_type, const Variant &p_value) {
 	Variant::Type type = p_value.get_type();
 	bool number = type == Variant::INT || type == Variant::FLOAT;
 	switch (p_kind) {
@@ -42,11 +42,19 @@ static bool accepts(ir::Kind p_kind, const Variant &p_value) {
 			return type == Variant::BOOL;
 		case ir::Kind::Str:
 			return type == Variant::STRING || type == Variant::STRING_NAME || type == Variant::NIL;
-		case ir::Kind::Ref:
-			return type == Variant::OBJECT || type == Variant::NIL;
+		case ir::Kind::Ref: {
+			if (type == Variant::NIL) {
+				return true; // No object.
+			}
+			Object *object = type == Variant::OBJECT ? p_value.get_validated_object() : nullptr;
+			return object && (p_godot_type.empty() || object->is_class(String::utf8(p_godot_type.c_str())));
+		}
 		case ir::Kind::Val:
-			// Which value type the parameter wants is not recorded yet: anything that is a value passes.
-			return type != Variant::OBJECT && type != Variant::NIL && !number && type != Variant::BOOL && type != Variant::STRING;
+			// The value type the parameter names, and no other: a Vector3 is not a Vector2.
+			if (type == Variant::OBJECT || type == Variant::NIL) {
+				return false;
+			}
+			return p_godot_type.empty() || Variant::get_type_name(type) == String::utf8(p_godot_type.c_str());
 		default:
 			return false; // A script object can't come from Godot.
 	}
@@ -139,7 +147,8 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 	// Every argument is checked before any is converted, so that a refusal leaves nothing to give back.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		ir::Kind kind = function.registers[i + 1];
-		if (!accepts(kind, *reinterpret_cast<const Variant *>(p_args[i]))) {
+		const std::string godot_type = i + 1 < function.parameter_types.size() ? function.parameter_types[i + 1] : std::string();
+		if (!accepts(kind, godot_type, *reinterpret_cast<const Variant *>(p_args[i]))) {
 			r_error->error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
 			r_error->argument = (int32_t)i;
 			r_error->expected = (int32_t)expected_type(kind);
