@@ -74,6 +74,7 @@ TypeError: Error #1009: Cannot access a property or method of a null object refe
 `override` and `super`; `int`, `uint`, `Number`, `Boolean`, `String` and `null` with AS3's conversions;
 every arithmetic, comparison, logical and bitwise operator; assignment and `++`/`--`; `if`, `while`, `do`,
 `for`, `break`, `continue`, `return`; calls with default parameters; `new`, `is`, `as`; `trace`; `throw`;
+a class's own `toString()`;
 `Error` and its subclasses; several files, packages, and package-level functions and variables.
 
 **What is refused, by name, until later slices:** function values and closures, `Array`, `Vector`,
@@ -94,6 +95,9 @@ How it works:
   call. Runaway recursion is therefore an AS3 error, not a crash, and a debugger can walk the frames.
 - **For a debugger:** every instruction has a source position, every function lists its named locals, and
   each statement begins with a marker where a hook can stop the program.
+- **Static fields** get their values before the program starts, a class at a time in file order, a base
+  class before its subclasses. Flash does it on a class's first use, so a static that reads another class's
+  static declared later sees that one's default here.
 - **Memory** is reference-counted. Objects that refer to each other in a loop are not freed yet.
 - **Nothing in `vm/` or `ir/` names Godot.** What the engine will supply goes through `vm/host.h`.
 

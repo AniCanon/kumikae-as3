@@ -14,7 +14,8 @@ complete. The language server's first slice is built and passes its tests; it ha
 in VS Code and Rider.
 
 **Stage 2 has started.** Its first slice runs AS3 on the command line: `kas3c run` executes classes,
-inheritance, numbers, strings and loops through the typed IR and the interpreter. Godot is the next slice.
+inheritance, numbers, strings and loops through the typed IR and the interpreter. It is built, reviewed and
+fixed. Godot is the next slice.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -93,7 +94,7 @@ properties, signals and hot reload.
 
 | Slice | Delivers | Done when | Status |
 |---|---|---|---|
-| 2a. Interpreter core | The typed IR, the interpreter, `kas3c run`, and the start of the conformance suite | A class with fields, methods, inheritance, numbers, strings and loops runs and traces the right output. | Built |
+| 2a. Interpreter core | The typed IR, the interpreter, `kas3c run`, and the start of the conformance suite | A class with fields, methods, inheritance, numbers, strings and loops runs and traces the right output. | Done |
 | 2b. In Godot | The extension: a `.as` file is a script; engine calls in both directions; generated bindings | An AS3 script on a `CharacterBody2D` moves a character, in headless Godot 4.7.2. | Next |
 | 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library | The corpus programs run. | Planned |
 | 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game. | Planned |
