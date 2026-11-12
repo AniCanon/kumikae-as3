@@ -7,7 +7,9 @@ For why the project exists and how it works, see the [README](../README.md).
 
 ## Where we are
 
-**Stage 1 of 6, the front end.** The parser, name resolution, expression types and type errors are built, and checked against about 190,000 lines of real AS3. Godot's API in AS3 is next.
+**Stage 1 of 6, the front end.** The parser, name resolution and type checking are built and checked against
+about 190,000 lines of real AS3. The compiler knows Godot's whole API under AS3 names. Arithmetic on
+Godot's math types is next.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -43,7 +45,7 @@ Read more: [performance redesign](superpowers/specs/2026-11-11-performance-redes
 ### Stage 1: front end (in progress)
 
 **Delivers:** a command-line compiler, `kas3c`, that reads AS3 and reports every error with a file, line and
-column. Stage 1 has three parts.
+column.
 
 | Part | Delivers | Done when | Status |
 |---|---|---|---|
@@ -51,8 +53,8 @@ column. Stage 1 has three parts.
 | 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | Done |
 | 1c-1. Expression types | `kas3c check --dump-types` | Every expression has a type, and `a.b` resolves to a member with AS3's access rules. | Done |
 | 1c-2. Type errors | Type checking in `kas3c check` | A value that doesn't fit where it is used is reported: assignments, arguments, returns, overrides, interfaces, `const`. | Done |
-| 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the [naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | `moveAndSlide()`, `position`, `timer.timeout.connect(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | Next |
-| 1c-3. Godot's math types | Operators on `Vector2` and its relatives | `position + velocity * delta` has a type. | After 1d |
+| 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the [naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | `moveAndSlide()`, `position`, `timer.timeout.connect(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | Done |
+| 1e. Godot's math types | Operators and indexing on `Vector2` and its relatives | `position + velocity * delta` has a type, and a wrong operand is reported. | Next |
 
 ### Language server, first slice
 
@@ -117,23 +119,26 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What comes next: stage 1d, Godot's API in AS3
+## What comes next: stage 1e, Godot's math types
 
-**Goal:** every Godot class, method, property, signal and constant can be named from AS3, under the
-[naming design](superpowers/specs/2026-11-12-godot-naming-design.md), which the owner approved on 2026-11-12.
+**Goal:** arithmetic, comparison and indexing on Godot's value types are typed and checked, so that
+`position + velocity * delta` is a `Vector2` and `position + "x"` is an error.
 
 | Step | What it does |
 |---|---|
-| 1. Generator | Reads Godot's API description and writes one AS3 declaration file for the `godot` package. |
-| 2. Clash test | Fails if any generated name clashes with another or with an AS3 built-in. |
-| 3. Signals and enums | `timer.timeout.connect(f)` and `Key.ESCAPE` check. |
-| 4. Corpus | The test programs are rewritten to the new names, and the hand-written stand-in is deleted. |
+| 1. Operators in the declarations | The generator records each value type's operators from Godot's API description. |
+| 2. Typing | An operator on a Godot value type has the result type the description gives. |
+| 3. Errors | An operand that the type has no operator for is reported. |
+| 4. Indexing | `array[i]`, `dictionary[key]` and `vector[0]` have types. |
+
+After it comes the language server's first slice, and then the interpreter.
 
 ## Decisions made
 
 | Decision | Outcome |
 |---|---|
 | Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
+| 64-bit integers in declarations | A Godot integer marked 64-bit is declared `Number`, which is exact to 2^53. Object ids use higher bits, so stage 2 must settle a 64-bit type before bindings ship. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
 | [Godot naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
 

@@ -160,8 +160,9 @@ C++ call code for the native backend.
 
 Mapping rules **(call)**:
 
-- Godot classes become AS3 classes in a `godot` package. Method and property names keep Godot's spelling
-  (`move_and_slide`), so Godot's documentation applies unchanged.
+- Godot classes become AS3 classes in a `godot` package. ~~Method and property names keep Godot's spelling
+  (`move_and_slide`).~~ **Replaced on 2026-11-12** by the
+  [naming design](2026-11-12-godot-naming-design.md): members are lowerCamel (`moveAndSlide`).
 - Godot's built-in value types (`Vector2`, `Vector3`, `Color`, `Transform2D`, and the rest) are value types in
   AS3 too: copied on assignment, never null, never heap-allocated in native builds.
 - **Strings are Godot's own strings underneath (call).** Engine calls are string-heavy, and converting on

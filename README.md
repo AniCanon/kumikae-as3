@@ -5,26 +5,39 @@ ActionScript 3 as a first-class scripting language for Godot 4.
 You write AS3 classes that extend Godot's own classes. The same source runs in the editor, on desktop, on iOS
 and Android, and on Nintendo Switch through the Kumikae build.
 
-> **Status: early.** Today the compiler can parse AS3 and resolve names, and it reports syntax and name
-> errors. Nothing runs inside Godot yet. The [roadmap](docs/roadmap.md) shows what comes next and how you can tell when each stage is done.
+> **Status: early.** Today the compiler checks an AS3 program against Godot's whole API and reports syntax,
+> name and type errors. Nothing runs inside Godot yet. The [roadmap](docs/roadmap.md) shows what comes next
+> and how you can tell when each stage is done.
 
 ## What you will write
 
-This is the target. It doesn't run yet, and details such as how you reach Godot's `Input` can still change.
+This script doesn't run yet, but `kas3c check` already accepts it and reports a mistake in it.
 
 ```actionscript
 package game {
-    import godot.CharacterBody2D;
-    import godot.Input;
-    import godot.Vector2;
+    import godot.*;
 
     public class Player extends CharacterBody2D {
-        [Export] public var speed:Number = 300;
+        [Export] public var maxSpeed:Number = 300;
+        [Signal] public var died:Signal;
 
-        override public function _physics_process(delta:Number):void {
-            var direction:Vector2 = Input.get_vector("left", "right", "up", "down");
-            velocity = direction * speed;
-            move_and_slide();
+        override public function _ready():void {
+            (getNode("Hitbox") as Area2D).bodyEntered.connect(onBodyEntered);
+        }
+
+        override public function _physicsProcess(delta:Number):void {
+            velocity.x = Input.getAxis("left", "right") * maxSpeed;
+            if (isOnFloor() && Input.isActionJustPressed("jump")) {
+                velocity.y = -400;
+            }
+            moveAndSlide();
+        }
+
+        private function onBodyEntered(body:Node2D):void {
+            if (body.isInGroup("enemies")) {
+                died.emit();
+                queueFree();
+            }
         }
     }
 }
@@ -32,8 +45,10 @@ package game {
 
 - The class extends a Godot class, so you attach the script to a node as you attach a GDScript or C# script.
 - `[Export]` shows the field in the inspector. Metadata tags are already AS3 syntax.
-- Godot's names keep Godot's spelling (`move_and_slide`), so Godot's documentation applies unchanged.
-- `direction * speed` works because the compiler allows arithmetic on Godot's math types.
+- **Godot's API reads as AS3.** Methods are lowerCamel (`moveAndSlide`), Godot's properties are AS3
+  properties (`velocity`, `visible`), and a signal is a property you connect to (`bodyEntered.connect`).
+  The [naming design](docs/superpowers/specs/2026-11-12-godot-naming-design.md) has every rule.
+- `velocity.x = ...` changes the body's velocity. The compiler writes the changed vector back.
 
 ## Why AS3
 
@@ -53,7 +68,8 @@ package game {
 | Resolve names: packages, imports, classes, scopes (`kas3c check`) | **Works** |
 | Give every expression a type and resolve `a.b` (`kas3c check --dump-types`) | **Works** |
 | Report type errors (assignments, arguments, returns, overrides, interfaces, constants) | **Works** |
-| Godot's API named for AS3 (`moveAndSlide()`, `timer.timeout.connect(f)`) | Next |
+| Godot's whole API under AS3 names (`moveAndSlide()`, `timer.timeout.connect(f)`, `Key.ESCAPE`) | **Works** |
+| Arithmetic on Godot's math types (`position + velocity * delta`) | Next |
 | Run a script in the Godot editor | Planned (stage 2) |
 | Export a release build as native code | Planned (stage 3) |
 | iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |
@@ -82,10 +98,10 @@ Before you begin, install CMake 3.22 or later, a C++17 compiler, and Python 3 (f
    compiler/build/kas3c parse --dump-ast compiler/tests/corpus/Shapes.as
    ```
 
-4. Check a file's names, and print what each one refers to:
+4. Check a program that uses Godot's API, and print what each name refers to:
 
    ```bash
-   compiler/build/kas3c check --dump-names --declarations compiler/tests/stubs/godot.as compiler/tests/corpus/Shapes.as
+   compiler/build/kas3c check --dump-names compiler/tests/corpus/RayQueries.as
    ```
 
 Errors go to standard error as `<file>:<line>:<column>: error: <message>`. The exit status is 0 when there
@@ -123,9 +139,9 @@ a failing test.
 
 ![The three kinds of call](docs/diagrams/calls.svg)
 
-1. **Godot calls your script** (`_physics_process`, signal handlers). Godot calls by name with boxed
+1. **Godot calls your script** (`_physicsProcess`, signal handlers). Godot calls by name with boxed
    arguments, as it does for C# and GDScript. The runtime looks the name up once and caches it.
-2. **Your script calls Godot** (`move_and_slide()`). The call goes through Godot's typed direct-call path,
+2. **Your script calls Godot** (`moveAndSlide()`). The call goes through Godot's typed direct-call path,
    with no boxed values.
 3. **Your script calls your own code** (`enemy.hit()`). In a release build this is a direct C++ call that
    never touches the engine.
@@ -164,6 +180,7 @@ For what each stage delivers and what is being built now, see the [roadmap](docs
 | Path | Contents |
 |---|---|
 | `compiler/` | The front end as a library (`kas3front`), the `kas3c` command-line tool, and their tests. |
+| `compiler/godot/` | The generator that writes Godot's API as AS3 declarations, and its output, `godot.as`. |
 | `docs/roadmap.md` | The plan: stages, what each delivers, and current progress. |
 | `docs/diagrams/` | The diagrams on this page, and the script that generates them. |
 | `docs/superpowers/specs/` | The design, and the performance redesign that amends it. |

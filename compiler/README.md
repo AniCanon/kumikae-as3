@@ -1,8 +1,7 @@
 # Kumikae AS3 compiler
 
 The front end of the ActionScript 3 compiler for Godot: source text to a checked syntax tree. It contains the
-lexer, the parser, name resolution, and the first part of type checking: every expression has a type, and
-`a.b` resolves to a member.
+lexer, the parser, name resolution, type checking, and Godot's API as AS3 declarations.
 
 It is a static library (`kas3front`) built without exceptions or RTTI, so that the same code can run in the
 command-line tool, inside the Godot editor, and in the language server.
@@ -38,8 +37,11 @@ duplicated or misused:
 ```sh
 compiler/build/kas3c check src/*.as                        # report syntax and name errors
 compiler/build/kas3c check --dump-names src/Player.as      # also print what every name refers to
-compiler/build/kas3c check --declarations godot.as src/*.as
+compiler/build/kas3c check --declarations lib.as src/*.as  # lib.as declares what exists elsewhere
+compiler/build/kas3c check --no-godot src/*.as             # without Godot's API
 ```
+
+Godot's API (the `godot` package) is built into `kas3c`, so `import godot.*` needs no option.
 
 `--dump-types` prints the type of each expression statement and each initializer, as `<line>:<col> <type>`.
 A type is a class name, `Vector.<T>`, `Class.<T>` for a class itself (the expression `Math`), `*`, `void`,
@@ -47,7 +49,7 @@ A type is a class name, `Vector.<T>`, `Class.<T>` for a class itself (the expres
 
 `--dump-names` prints one line per resolved name, in source order:
 `<line>:<col> <name> -> <kind> <qualified name> <where>`, where `<where>` is `@<line>:<col>` in the same
-file, `@<path>:<line>:<col>` in another, or `(built in)`.
+file, `@<path>:<line>:<col>` in another, `(built in)`, or `(Godot)`.
 
 ## Declaration files
 
@@ -55,20 +57,54 @@ A declaration file tells the compiler which names exist without giving their cod
 which classes and functions are `native` and have no body. Like any file, it has one package block.
 
 ```actionscript
-package godot {
-    public native class Node {
-        public native function add_child(node:Node):void;
+package physics {
+    public native class Body {
+        public native function applyForce(x:Number, y:Number):void;
     }
 }
 ```
 
 The built-in library (`Object`, `String`, `Error`, `trace`, `flash.utils.Dictionary`, and the rest) is a set
 of declaration files in `builtins/`, embedded into the compiler when it is built. Pass further ones with
-`--declarations`. Stage 2 generates the declarations for Godot's classes from Godot's own API description;
-until then `tests/stubs/godot.as` is a small hand-written stand-in.
+`--declarations`. Godot's API is one more declaration file, described in the next section.
 
 A declaration file describes code that was compiled without your program, so your program can't change what
 its names mean: inside it, names resolve only to other declarations, and its own package comes first.
+
+## Godot's API
+
+`godot/godot.as` declares all of Godot 4.7's API for AS3: 1,036 classes, 30 value and collection types, 22
+global enums and 112 global functions. `godot/generate.py` writes it from Godot's own API description under
+the [naming design](../docs/superpowers/specs/2026-11-12-godot-naming-design.md), and the build embeds it.
+
+| Godot | AS3 |
+|---|---|
+| `move_and_slide()` | `moveAndSlide()` |
+| `is_visible()`, `set_visible(v)` | the property `visible` |
+| `_physics_process(delta)` | `override public function _physicsProcess(delta:Number):void` |
+| the signal `timeout` | `timer.timeout.connect(f)` |
+| `KEY_ESCAPE` | `Key.ESCAPE` |
+| `Node.PROCESS_MODE_PAUSABLE` | unchanged |
+| `Input.is_action_pressed("jump")` | `Input.isActionPressed("jump")` |
+| `Object`, `Array`, `Dictionary`, `JSON`, `Error` | `GodotObject`, `GodotArray`, `GodotDictionary`, `GodotJSON`, `GodotError` |
+| `print()`, `lerp()`, `deg_to_rad()` | `print()`, `lerp()`, `degToRad()` |
+
+What the declarations decide beyond the names:
+
+- **Integers.** AS3's `int` is 32 bits. A Godot integer that the description marks as 64-bit is a `Number`.
+- **Enums** are `int`. A `[Godot(...)]` tag on the member records which enum a parameter or result is.
+- **Defaults.** A default that is not a number, boolean, string or `null` is written `null`; the real
+  default is applied when the call is made.
+- **Value types** (`Vector2`, `Color`) have one constructor that accepts each of Godot's forms:
+  `new Vector2()`, `new Vector2(1, 2)`, `new Vector2(other)`.
+- **Indexed properties.** `anchorLeft` is a property, and `setAnchor(side, value)` is still a method.
+- **Singletons** are classes with static members: `Input.isActionPressed("jump")`.
+- **Left out:** 60 methods that take raw pointers; `typeof` and `isFinite`, which AS3 has; Godot's own
+  `String`, `StringName`, `NodePath` and `Callable` classes, for which you write `String` and `Function`.
+
+To regenerate for another Godot version, see [`godot/NOTICE.md`](godot/NOTICE.md). The generator stops on
+anything it has no rule for: an unknown kind of type, a name that clashes with another or with an AS3
+built-in.
 
 ## What `check` checks
 
@@ -115,6 +151,18 @@ A value of type A may be used where B is expected when one of these holds:
 - A is an interface and B is one that it extends.
 - Both are `Vector` with the same element type. `Vector.<Sub>` does not fit `Vector.<Base>`.
 - A is a class itself (`Player`, not a player) and B is `Class`.
+- B is one of Godot's collections and A is the AS3 collection that converts to it when it is handed to the
+  engine:
+
+  | B | A |
+  |---|---|
+  | `GodotArray` | `Array`, or any `Vector` |
+  | `PackedInt32Array` and the other packed number arrays | `Array`, or a `Vector` of a number type |
+  | `PackedStringArray` | `Array`, or `Vector.<String>` |
+  | `PackedVector2Array`, `PackedVector3Array`, `PackedVector4Array`, `PackedColorArray` | `Array`, or a `Vector` of that type |
+  | `GodotDictionary` | `Object`, or `flash.utils.Dictionary` |
+
+  Nothing converts on the way back: a collection that comes from the engine stays Godot's.
 
 Otherwise it is an error. When B is a subclass or implementer of A, the message asks for a cast
 (`a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`). A `void` result fits only `*`.
@@ -175,9 +223,9 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   the current package, the top-level package and every import. Two different matches are an error; write
   the name with its package. Adobe's documentation says the same for two imports. Whether Adobe's compiler
   also reports a same-package or top-level name against an import has not been checked.
-- **A built-in name can't be told apart from an imported one of the same spelling.** With a class `Object`
-  in package `godot`, `import godot.*` makes a bare `Object` ambiguous, and the built-in one has no longer
-  spelling. Stage 2 must settle how Godot's classes are named with this in mind.
+- **A built-in name can't be told apart from an imported one of the same spelling.** A class `Object` in an
+  imported package would make a bare `Object` ambiguous, and the built-in one has no longer spelling. This
+  is why Godot's `Object` is `GodotObject` here.
 - **Names are checked only when every file parses.** With a syntax error anywhere, `check` reports syntax
   errors only.
 - **One function may declare a variable twice only with the same type.** Adobe's compiler warns in that case
@@ -216,7 +264,10 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   in the source as `/*!*/`.
 - `tests/golden/names/ok/X.as` with `X.names`, and `tests/golden/names/errors/X.as` with `X.diag`: whole
   programs through `kas3c check`.
-- The corpus is also checked as one program, with `tests/stubs/godot.as` standing in for Godot.
+- The corpus is also checked as one program against Godot's API.
+- `godot/test_naming.py` and `godot/test_generate.py`: the naming rules, the generator on a small fixture
+  (`godot/fixture_api.json`), and Godot's whole API. The whole-API tests need Godot's API description,
+  which is not in this repository; without it they are skipped and say so.
 
 - `tests/fetch_external.sh` fetches six open-source AS3 projects (Starling, Away3D, Flixel, FlashPunk,
   as3-signals, as3corelib; about 190,000 lines) into `tests/external/`, which git ignores. They are pinned

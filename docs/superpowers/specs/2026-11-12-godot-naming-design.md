@@ -79,7 +79,8 @@ signals; make the script's members look native from the engine's side too.
   (`Node` has both `_ready` and the signal `ready`). With it, the rule produces **no clash** between any
   method, property, signal and constant of any class, inherited members included **(measured)**.
 - Parameters are lowerCamel. A parameter or method named like an AS3 keyword gets a trailing underscore:
-  `class_`, `default_`. That is 49 parameters and one method, `GDScript.new` **(measured)**.
+  `class_`, `default_`. That is 49 parameters of classes, 38 of built-in types, and one method,
+  `GDScript.new` **(measured)**.
 
 ### 3. Constants and enums
 
@@ -134,6 +135,36 @@ AS3 has no enum type, so an enum value is an `int`.
   engine resolves these, not the compiler. This is the "two naming worlds" problem that C# has. The typed
   forms above avoid it, and the language server can warn on a lowerCamel string that matches nothing.
 
+## Decided while building (stage 1d)
+
+These follow from the rules above and from Godot's API description. They were the builder's calls.
+
+- **Accessors that take an index stay methods.** 433 properties share an accessor with others
+  (`anchor_left` reads through `get_anchor(side)`). The property is declared (`anchorLeft`), and the shared
+  accessor stays (`getAnchor(side)`). Only an accessor that takes nothing else is hidden.
+- **A 64-bit Godot integer is a `Number`.** AS3's `int` is 32 bits. 688 parameters and results are marked
+  64-bit in the description. A `Number` is exact to 2^53; object ids use higher bits, so stage 2 must
+  settle a real 64-bit type before bindings ship.
+- **A default that AS3 can't write is `null`.** AS3 defaults are constants, so `Vector2(0, 0)`, `[]` and
+  `Callable()` are declared `= null`. The real default is applied by the binding.
+- **A value type has one constructor** that accepts each of Godot's forms. AS3 has no overloading, so the
+  parameters are optional and typed `*` where the forms disagree: `new Vector2()`, `new Vector2(1, 2)`,
+  `new Vector2(other)`.
+- **`VariantType` and `VariantOperator`** are the classes for Godot's `Variant.Type` and
+  `Variant.Operator`.
+- **A singleton's inherited members are not reachable.** `Input.isActionPressed()` is static; `Input` has no
+  object to call `connect()` on. Its signals are static properties, so `Input.joyConnectionChanged.connect(f)`
+  works.
+- **The engine's names can't be recovered by rule.** Turning lowerCamel back to snake_case gives the wrong
+  name for 172 of 16,822 methods, 8 of them virtual (`_forward_3d_gui_input`). So Godot's own members are
+  bound through a table that the generator's input supplies; only a script's own members are renamed by
+  rule (section 7).
+- **AS3's collections convert when they are handed to the engine.** An `Array` or `Vector` fits where a
+  `GodotArray` or a packed array is expected, and an `Object` or `flash.utils.Dictionary` fits a
+  `GodotDictionary`. Nothing converts on the way back, as the performance redesign decided.
+- **Left out:** 60 methods with raw pointer parameters, the 11 integer-limit constants (`int.MAX_VALUE`
+  exists), and operators, which stage 1e adds.
+
 ## What this does not decide
 
 - **Typed arrays.** `Array[Node]` is a `GodotArray` for now; the declaration records the element type.
@@ -147,15 +178,15 @@ AS3 has no enum type, so an enum value is an `int`.
 ## Cost
 
 - Nothing has shipped, so nothing breaks for users.
-- The test corpus and the Godot stand-in use 15 distinct snake_case method names across 10 files
-  **(measured)**. They are rewritten when the declaration generator lands.
+- The test corpus used 15 distinct snake_case method names across 10 files **(measured)**. They were
+  rewritten when the declaration generator landed, and the hand-written stand-in was deleted.
 - The names come from a generator, so a rule change later is a regeneration, not hand edits. The hand-kept
   parts are the five-name clash table and the keyword list.
 
 ## What to build
 
-A **declaration generator**: Godot's API description in, one AS3 declaration file for the `godot` package
-out, following the rules above. It replaces the hand-written stand-in, and stage 1c part 3 (math
+**Built in stage 1d** (`compiler/godot/`). A **declaration generator**: Godot's API description in, one AS3 declaration file for the `godot` package
+out, following the rules above. It replaces the hand-written stand-in, and stage 1e (math
 operators), the interpreter and the language server's completion all read its output. It ships with a test
 that fails if any generated name clashes with another or with an AS3 built-in, so that a new Godot version
 cannot introduce a clash unnoticed.
