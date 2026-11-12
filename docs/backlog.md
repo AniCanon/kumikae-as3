@@ -48,7 +48,6 @@ Decided on 2026-11-12. Each is owed as code and tests.
 ## Language server, first slice
 
 - **Rider is not yet tried.** The LSP4IJ plugin is installed; adding the server in its settings is not.
-- **VS Code has not been looked at by eye,** only through a log of its messages.
 - **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths.
 - The same file reached through a symbolic link, or under a different letter case, or in a different
   Unicode form, counts as two files.

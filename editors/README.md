@@ -20,7 +20,8 @@ part of the program.
 > **Tried so far (2026-11-12):**
 > - **VS Code 1.145:** works. With the client below, VS Code started the server, opened a script that
 >   extends `CharacterBody2D`, received its two errors, and received the shorter list after the file changed.
->   This was confirmed from a log of the messages between the two; nobody has looked at the squiggles yet.
+>   This was confirmed from a log of the messages between the two, and the owner saw both errors underlined
+>   in the editor.
 >   It found one fault, now fixed: VS Code starts a server with `--stdio`, which `kas3c lsp` used to reject.
 > - **Rider 2026.2:** the LSP4IJ plugin installs (`rider installPlugins com.redhat.devtools.lsp4ij`). Adding
 >   the server in its settings, steps 2 to 4 below, has not been tried.

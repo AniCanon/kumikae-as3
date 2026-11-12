@@ -76,7 +76,7 @@ locals, classes, imports, inherited members and Godot's API.
 | The server: protocol, errors as you type, definition, references, hover, outline, symbols | Done. Tested by scripted sessions that send what an editor sends. |
 | Speed: a re-check of 100,000 lines in under 50 ms | Done: about 27 ms, by keeping the parse of files that did not change. |
 | A VS Code client and the [set-up guide](../editors/README.md) | Done. |
-| Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. Not yet looked at by eye. |
+| Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. The owner confirmed the underlined errors by eye. |
 | Tried in Rider | The LSP4IJ plugin is installed in Rider 2026.2. Adding the server in its settings is not yet tried. |
 | Windows | Not yet: the server runs on macOS and Linux only. To do before the slice is called done. |
 
@@ -164,8 +164,7 @@ Open items:
 - **Then the [backlog](backlog.md):** the owner asked for a clean-up pass after this slice and before the next.
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
-- **Language server:** Rider is not yet tried (the plugin is installed); VS Code works but has not been
-  looked at by eye; Windows is not supported.
+- **Language server:** Rider is not yet tried (the plugin is installed); Windows is not supported.
 
 ## Decisions made
 
