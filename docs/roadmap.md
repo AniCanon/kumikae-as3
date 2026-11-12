@@ -51,9 +51,10 @@ column. Stage 1 has three parts.
 | 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | Done |
 | 1c-1. Expression types | `kas3c check --dump-types` | Every expression has a type, and `a.b` resolves to a member with AS3's access rules. | Done |
 | 1c-2. Type errors | Type checking in `kas3c check` | A value that doesn't fit where it is used is reported: assignments, arguments, returns, overrides, interfaces, `const`, definite null misuse. | Next |
-| 1c-3. Godot's math types | Operators on `Vector2` and its relatives | `position + velocity * delta` has a type. Needs the Godot naming decision. | After 1c-2 |
+| 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the [naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | `moveAndSlide()`, `position`, `timer.timeout.connect(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | After 1c-2 |
+| 1c-3. Godot's math types | Operators on `Vector2` and its relatives | `position + velocity * delta` has a type. | After 1d |
 
-### Language server, first slice (proposed)
+### Language server, first slice
 
 **Delivers:** `kas3c lsp`, the program an editor talks to. Errors as you type, go to definition, find
 references and a document outline, in VS Code and JetBrains IDEs.
@@ -62,8 +63,9 @@ references and a document outline, in VS Code and JetBrains IDEs.
 imports and inherited members.
 
 **Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
-stage faster to build. The owner hasn't approved this order yet. Completion follows once types exist; the
-JetBrains plugin and Godot's documentation in hover stay in stage 6.
+stage faster to build. The owner left the order to the builder. Rider gives plugins a language-server
+client, so this slice serves the Rider goal directly. Completion follows once types exist; the JetBrains
+plugin and Godot's documentation in hover stay in stage 6.
 
 Read more: [language server design](superpowers/specs/2026-11-12-language-server-design.md).
 
@@ -128,13 +130,18 @@ The design keeps each of these possible. No stage above delivers them.
 | 5. Class rules | Override signatures, interface completeness, assignment to `const`. |
 | 6. Null | Reports use of a value that is definitely `null`. |
 
+## Decisions made
+
+| Decision | Outcome |
+|---|---|
+| Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
+| A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
+
 ## Decisions waiting on the owner
 
 | Decision | Why it matters |
 |---|---|
-| Whether to build the language server's first slice before the interpreter | The [language server design](superpowers/specs/2026-11-12-language-server-design.md) proposes it. It gives you something to use in an editor sooner, and delays the interpreter by that much. |
-| How Godot's classes are named in AS3 | Godot has classes named `Object`, `Array`, `String` and `Dictionary`, as AS3 does. With `import godot.*`, the bare names would be ambiguous. Stage 2 needs a rule: a prefix, a different package layout, or letting an import win over a built-in. |
-| Permission to download an open-source AS3 codebase as a test corpus | Every AS3 file the parser has seen so far was written by a model. Real code would find gaps that our tests share. |
+| Approval of the [Godot naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | You asked for first-class naming. The design proposes lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties (`timer.timeout.connect(f)`), `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's (`GodotObject`, `GodotArray`, `GodotDictionary`, `GodotJSON`, `GodotError`). Names are costly to change once code uses them. |
 | When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
 
 ## How to follow progress
