@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <unordered_map>
 
 namespace kas3 {
@@ -792,6 +793,7 @@ class Lowerer {
 		return object;
 	}
 
+	struct Part;
 	// A place a value can be stored: a local, a field of an object, or a global.
 	struct Place {
 		enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine } where = Nowhere;
@@ -800,7 +802,24 @@ class Lowerer {
 		Kind kind = Kind::F64;
 		bool of_value = false; // For Engine: a member of a value type, which is a copy.
 		const Type *type = nullptr; // For Engine: what the member is declared to be.
+		// For Engine: the member is one part of a Godot value that is itself stored somewhere
+		// (`position.x`). Godot's values are copies, so writing the part is: read the whole value, change
+		// the part, write the whole value back.
+		std::shared_ptr<Part> part;
 	};
+	struct Part {
+		Place whole; // Where the value is stored.
+		uint32_t value = NONE; // The register it was read into, once it has been.
+	};
+
+	// The value a part belongs to, read from where it is stored the first time it is needed. A plain
+	// assignment needs it only after the new value has been worked out.
+	uint32_t whole_of(const Place &p_place, uint32_t p_position) {
+		if (p_place.part->value == NONE) {
+			p_place.part->value = load(p_place.part->whole, p_position);
+		}
+		return p_place.part->value;
+	}
 
 	// The engine object a Godot member is reached through: the script's own owner when nothing is
 	// written before the name, or the value of what is written.
@@ -860,6 +879,15 @@ class Lowerer {
 		place.index = name;
 		place.kind = kind;
 		place.type = compilation_.type_of(type);
+		Kind whole = Kind::Void;
+		if (p_object && (p_object->kind == NodeKind::Name || p_object->kind == NodeKind::Member) && kind_of(p_object->type, &whole) &&
+				whole == Kind::Val) {
+			// A member of a value that is itself stored somewhere.
+			place.of_value = true;
+			place.part = std::make_shared<Part>();
+			place.part->whole = place_of(p_object);
+			return place;
+		}
 		place.object = engine_receiver(p_object, p_position, &place.of_value);
 		return place;
 	}
@@ -953,8 +981,9 @@ class Lowerer {
 				return out;
 			}
 			case Place::Engine: {
+				uint32_t object = p_place.part ? whole_of(p_place, p_position) : p_place.object;
 				uint32_t out = engine_reg(p_place.kind, p_place.type);
-				emit(Op::HostGet, p_position, out, p_place.object, p_place.index);
+				emit(Op::HostGet, p_position, out, object, p_place.index);
 				return out;
 			}
 			default:
@@ -976,9 +1005,13 @@ class Lowerer {
 				emit(Op::SetGlobal, p_position, p_place.index, p_value);
 				break;
 			case Place::Engine:
-				if (p_place.of_value) {
-					// `position.x = 5` would change a copy: the property has to be set as a whole.
-					refuse(p_position, "changing one part of a Godot value");
+				if (p_place.part) {
+					uint32_t whole = whole_of(p_place, p_position);
+					emit(Op::HostSet, p_position, whole, p_place.index, p_value);
+					store(p_place.part->whole, whole, p_position);
+				} else if (p_place.of_value) {
+					// `a.normalized().x = 5` would change a copy that nobody keeps.
+					refuse(p_position, "changing one part of a Godot value that is not stored anywhere");
 				} else {
 					emit(Op::HostSet, p_position, p_place.object, p_place.index, p_value);
 				}

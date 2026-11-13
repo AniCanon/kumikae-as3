@@ -44,5 +44,21 @@ package {
 		public function traced(v:Vector2):void { trace(v, v.x); }
 		public function keep(n:Node):void { kept = n; }
 		public function keptText():String { return "kept " + kept; }
+
+		// One part of a value: read, change, write back.
+		private var held:Vector2 = new Vector2(1, 2);
+		public function setX(n:Number):Vector2 { position.x = n; return position; }
+		public function addX(n:Number):Vector2 { position.x += n; return position; }
+		public function bumpX():Vector2 { position.x++; return position; }
+		public function nested(n:Number):Vector2 { transform.origin.y = n; return position; }
+		public function heldPart(n:Number):Vector2 { held.y = n; return held; }
+		public function localPart(v:Vector2, n:Number):Vector2 {
+			var w:Vector2 = v;
+			w.x = n;
+			return w + v; // v is not changed: w is a copy.
+		}
+		public function next():Values { calls++; return this; }
+		public function otherPart(n:Number):int { next().position.y = n; return calls; }
+		public function fromItself():Vector2 { position.x = position.y; return position; }
 	}
 }

@@ -67,5 +67,23 @@ func _physics_process(_delta: float) -> bool:
 	ask("keep", [gone])
 	gone.free()
 	show("freed text", ask("keptText", []), "kept " + str(gone))
+	# One part of a value. The twin has the same done to it in GDScript.
+	var twin := Node2D.new()
+	twin.position = node.position
+	twin.position.x = 7
+	show("set x", ask("setX", [7.0]), twin.position)
+	twin.position.x += 2.5
+	show("add x", ask("addX", [2.5]), twin.position)
+	twin.position.x += 1
+	show("bump x", ask("bumpX", []), twin.position)
+	twin.transform.origin.y = -4
+	show("nested", ask("nested", [-4.0]), twin.position)
+	show("held part", ask("heldPart", [9.0]), Vector2(1, 9))
+	show("local part", ask("localPart", [a, 6.0]), Vector2(6, a.y) + a)
+	twin.position.y = 3
+	show("other part", [ask("otherPart", [3.0]), node.position], [1, twin.position])
+	twin.position.x = twin.position.y
+	show("from itself", ask("fromItself", []), twin.position)
+	twin.free()
 	node.queue_free()
 	return true

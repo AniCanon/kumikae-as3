@@ -301,6 +301,7 @@ struct FakeEngine : vm::Host {
 	int boxes = 0; // Handed out and not yet dropped.
 	int next = 1;
 	bool fail_calls = false;
+	bool fail_sets = false;
 	std::string name = "Player";
 
 	static std::string show(const vm::Host::Argument &p_argument) {
@@ -392,8 +393,12 @@ struct FakeEngine : vm::Host {
 		give(p_wanted.kind, r_result, 1, "text");
 		return true;
 	}
-	bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *) override {
+	bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) override {
 		log += "set #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + " = " + show(p_value) + "\n";
+		if (fail_sets) {
+			*r_error = "the engine refused to set " + std::string(p_property);
+			return false;
+		}
 		if (p_property == "name" && p_value.slot.p) {
 			name = std::string(static_cast<vm::Str *>(p_value.slot.p)->view());
 		}
@@ -425,6 +430,8 @@ static void test_engine_operators() {
 						 "  public function say(v:Vector2, n:Node):String { trace(v); return \"v=\" + v + n.toString() + String(n); }\n"
 						 "  public function sayNothing():String { var n:Node; var v:Vector2; trace(n); return v + \"\"; }\n"
 						 "  public function sayNobody():String { var n:Node; return n.toString(); }\n"
+						 "  public function nudge(n:Number):void { position.x = n; }\n"
+						 "  public function nudgeMore(n:Number):void { transform.origin.x += n; }\n"
 						 "} }\n";
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -492,6 +499,26 @@ static void test_engine_operators() {
 		vm::free_string(static_cast<vm::Str *>(result.p));
 		CHECK(!interpreter.call_method(object, "sayNobody", nullptr, 0, nullptr));
 		CHECK(engine.errors.find("TypeError: Error #1009") == 0);
+		engine.errors.clear();
+		// One part of a value: the value is read after the new part is worked out, changed, and written back.
+		engine.log.clear();
+		engine.next = 20;
+		vm::Slot amount;
+		amount.bits = 0;
+		amount.d = 5;
+		CHECK(interpreter.call_method(object, "nudge", &amount, 1, nullptr));
+		CHECK_EQ(engine.log, std::string("get #1.position\nset #20.x = 5\nset #1.position = #20\n"));
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "nudgeMore", &amount, 1, nullptr));
+		CHECK_EQ(engine.log, std::string("get #1.transform\nget #21.origin\nget #22.x\nset #22.x = 12.5\nset #21.origin = #22\n"
+										 "set #1.transform = #21\n"));
+		CHECK_EQ(engine.boxes, 2);
+		// A write the engine refuses leaves no handle behind.
+		engine.fail_sets = true;
+		CHECK(!interpreter.call_method(object, "nudge", &amount, 1, nullptr));
+		CHECK(engine.errors.find("Error: the engine refused to set x") == 0);
+		CHECK_EQ(engine.boxes, 2);
+		engine.fail_sets = false;
 		engine.errors.clear();
 		// An operator the engine refuses is an AS3 error, and nothing is left behind.
 		engine.fail_calls = true;
@@ -669,7 +696,7 @@ static void test_engine_calls() {
 		"function f():void { if (Input.isActionPressed(\"jump\")) {} }",
 		"function f():void { treeEntered.add(g); } function g():void {}",
 		"function f():void { print(\"hello\"); }",
-		"function f():void { position.x = 5; }",
+		"function f():void { position.normalized().x = 5; }",
 		"function f():void { addChild(this); }",
 		"function f():void { var other:Player = new Player(); }",
 	};

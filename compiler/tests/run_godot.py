@@ -134,6 +134,7 @@ output = compare("values.gd", [
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
     "freed text",
+    "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
 ])
 traced = re.search(r"EXPECT TRACE (.*)", output)
 check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])
