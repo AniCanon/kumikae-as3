@@ -68,6 +68,10 @@ func _physics_process(_delta: float) -> bool:
 	print("CHECK body=%s" % str(Callable(node, "takeBody").callv([derived])))
 	print("CHECK no body=%s" % str(Callable(node, "takeBody").callv([null])))
 	print("CHECK wrong body=%s" % str(Callable(node, "takeBody").callv([node])))
+	# An object that is not there is null, however GDScript came by it.
+	print("CHECK missing node=%s" % str(Callable(node, "takeNode").callv([node.get_node_or_null("missing")])))
+	print("CHECK no instance=%s" % str(Callable(node, "takeNode").callv([instance_from_id(0)])))
+	print("CHECK null script object=%s" % str(Callable(node, "nobody").callv([])))
 	# A script is only attached to an object of the Godot class it extends.
 	var wrong := Node.new()
 	attach("res://Base.as", wrong)

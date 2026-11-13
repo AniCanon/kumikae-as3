@@ -565,9 +565,11 @@ class Generator:
         name = self.name(naming.member(entry["name"]), "godot")
         self.define(name)
         arguments = entry.get("arguments", [])
-        # Godot describes print(arg1, ...) though print() is allowed. A lone leading argument of a function
-        # that takes any number of them is not a minimum; two (max, min) are.
-        if entry["is_vararg"] and len(arguments) == 1 and arguments[0]["type"] == "Variant":
+        # Godot describes print(arg1, ...) though print() is allowed. For a function that takes any number
+        # of arguments and returns nothing (the print and push_error families), a lone leading argument is
+        # not a minimum. str(), which returns a value, does need one, and max and min need two.
+        if (entry["is_vararg"] and len(arguments) == 1 and arguments[0]["type"] == "Variant" and
+                entry.get("return_type") is None):
             arguments = []
         for line in self.function(entry["name"], name, arguments, entry.get("return_type"),
                                   None, entry["is_vararg"], "", ("", entry["name"])):

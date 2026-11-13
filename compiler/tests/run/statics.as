@@ -15,6 +15,9 @@ package {
 			trace(Helper.twice(4), log);
 			trace(Loop1.a, Loop2.b);
 			trace(log);
+			// A class that extends Error is a class like any other.
+			var problem:Problem = new Problem("p");
+			trace(Problem.made, log);
 		}
 		public static function note(text:String, value:int):int {
 			log += text + " ";
@@ -48,6 +51,10 @@ class Helper {
 }
 // Two classes that read each other: the one that started first sees the other's value; the other sees a
 // default, because the first is still being set up.
+class Problem extends Error {
+	public static var made:int = statics.note("Problem", 5);
+	public function Problem(message:String) { super(message); }
+}
 class Loop1 {
 	public static var a:int = Loop2.b + 1;
 }

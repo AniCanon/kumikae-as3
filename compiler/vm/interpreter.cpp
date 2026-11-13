@@ -268,6 +268,12 @@ void Interpreter::unwind(size_t p_depth) {
 			frames_.back().pc--;
 		}
 		innermost = false;
+		// A class whose static fields were being set when the error came is not ready: the next use of it
+		// sets them again, and fails again, where carrying on would run with fields that were never set.
+		const Function &leaving = module_.functions[frames_.back().function];
+		if (leaving.owner != NONE && module_.classes[leaving.owner].static_init == frames_.back().function) {
+			forget_class(leaving.owner);
+		}
 		// A runaway recursion has thousands of frames: the first few and a count say as much.
 		if (trace_lines_ < MAX_TRACE) {
 			trace_ += site(frames_.back()) + "\n";
@@ -425,11 +431,24 @@ static std::vector<uint32_t> unused_chain(const ir::Module &p_module, std::vecto
 	return chain;
 }
 
+// The class and every class that extends it are unused again.
+void Interpreter::forget_class(uint32_t p_class) {
+	for (size_t i = 0; i < module_.classes.size(); i++) {
+		for (uint32_t at = (uint32_t)i; at != NONE; at = module_.classes[at].base) {
+			if (at == p_class) {
+				class_used_[i] = 0;
+				break;
+			}
+		}
+	}
+}
+
 void Interpreter::use_class(uint32_t p_class) {
 	// Pushed last runs first: the base class's fields are set before the subclass's.
 	for (uint32_t klass : unused_chain(module_, class_used_, p_class)) {
 		uint32_t initializer = module_.classes[klass].static_init;
 		if (initializer != NONE && !push(initializer, nullptr, 0, NONE)) {
+			forget_class(klass); // No room to run it. What was pushed is forgotten as its frames are left.
 			return;
 		}
 	}
@@ -440,6 +459,7 @@ bool Interpreter::use_class_now(uint32_t p_class) {
 	for (size_t i = chain.size(); i-- > 0;) {
 		uint32_t initializer = module_.classes[chain[i]].static_init;
 		if (initializer != NONE && !call(initializer, nullptr, 0)) {
+			forget_class(chain[i]); // And with it the subclasses that were waiting their turn.
 			return false;
 		}
 	}

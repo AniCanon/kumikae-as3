@@ -422,6 +422,9 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 			const Json &range = change.get("range");
 			if (!range.is_object()) {
 				text = change.get("text").string();
+				held = &text; // From here on there is a whole text to change.
+			} else if (!held) {
+				continue; // A piece of a document the server was never given.
 			} else {
 				Source before(std::string(), text);
 				uint32_t from = offset_in(before, range.get("start"));

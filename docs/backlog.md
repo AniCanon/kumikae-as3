@@ -53,6 +53,20 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - While any file has a syntax error, type errors are hidden everywhere. Silencing only the broken region
   would be kinder.
 
+## Backlog pass, November 2026
+
+Found by the review of the clean-up pass itself.
+
+- A document that starts with a byte-order mark: a changed range on its first line lands one character early.
+- In UTF-8 position mode, a position inside a multi-byte character splits the character.
+- A Godot member reached through a missing script object (`other.getChild(note())`) is reported before the
+  call's arguments are evaluated; for AS3's own members the arguments come first.
+- A static call's arguments are evaluated before the class's static fields are set, and `x is C` does not
+  set up `C`. Whether Flash does the same is unchecked.
+- Find references does not link an interface's method to the methods that implement it.
+- Tests are missing for: private and static members of the same name not counting as overrides, and the
+  base-first order when a host constructs an object.
+
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector is planned for 2d).

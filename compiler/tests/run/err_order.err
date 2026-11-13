@@ -1,2 +1,2 @@
 TypeError: Error #1009: Cannot access a property or method of a null object reference.
-	at err_order()[err_order.as:8]
+	at err_order()[err_order.as:9]

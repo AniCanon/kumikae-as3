@@ -43,8 +43,9 @@ static bool accepts(ir::Kind p_kind, const std::string &p_godot_type, const Vari
 		case ir::Kind::Str:
 			return type == Variant::STRING || type == Variant::STRING_NAME || type == Variant::NIL;
 		case ir::Kind::Ref: {
-			if (type == Variant::NIL) {
-				return true; // No object.
+			// No object: null itself, or an object-typed value that holds none (what get_node_or_null gives).
+			if (type == Variant::NIL || (type == Variant::OBJECT && ((ObjectID)p_value).is_null())) {
+				return true;
 			}
 			Object *object = type == Variant::OBJECT ? p_value.get_validated_object() : nullptr;
 			return object && (p_godot_type.empty() || object->is_class(String::utf8(p_godot_type.c_str())));
@@ -168,7 +169,7 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		program.interpreter().discard(function.registers[i + 1], arguments[i + 1]);
 	}
-	if (ok && function.result == ir::Kind::Obj) {
+	if (ok && function.result == ir::Kind::Obj && result.p) {
 		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) +
 				" returns a script object, which can't be handed to Godot yet. The caller gets null.");
 	} else if (ok && function.result != ir::Kind::Void) {

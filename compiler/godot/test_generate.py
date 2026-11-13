@@ -499,7 +499,9 @@ class RealApi(unittest.TestCase):
         # Godot describes print(arg1, ...) though print() is allowed: a lone leading argument of a function
         # that takes any number is not required.
         self.assertIn("\tpublic native function print(...rest):void;", self.text)
-        self.assertIn("\tpublic native function str(...rest):String;", self.text)
+        # But str() with nothing is refused by Godot: only the functions that return nothing take none.
+        self.assertIn("\tpublic native function str(arg1:*, ...rest):String;", self.text)
+        self.assertIn("\tpublic native function pushError(...rest):void;", self.text)
         self.assertNotIn("function print(arg1", self.text)
         # Two leading arguments are a real minimum.
         self.assertIn("\tpublic native function max(arg1:*, arg2:*, ...rest):*;", self.text)

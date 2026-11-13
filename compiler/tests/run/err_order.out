@@ -1,3 +1,4 @@
 true 2147483647 -2147483648 4294967295 NaN Infinity -Infinity NaN
+5e-324 -Infinity Infinity 1.7976931348623157e+308 0
 evaluated first
 evaluated second

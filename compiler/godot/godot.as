@@ -31387,7 +31387,7 @@ package godot {
 	public native function randFromSeed(seed:Number):PackedInt64Array;
 	public native function weakref(obj:*):*;
 	public native function typeConvert(variant:*, type:int):*;
-	public native function str(...rest):String;
+	public native function str(arg1:*, ...rest):String;
 	public native function errorString(error:int):String;
 	public native function typeString(type:int):String;
 	public native function print(...rest):void;

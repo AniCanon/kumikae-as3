@@ -754,7 +754,7 @@ class Lowerer {
 	// the class needs no mark, since it can only be running because the class was used.
 	void touch(const Symbol *p_class, uint32_t p_position) {
 		auto found = classes_.find(p_class);
-		if (found != classes_.end() && p_class != class_ && !is_error(p_class)) {
+		if (found != classes_.end() && p_class != class_) {
 			emit(Op::InitClass, p_position, found->second);
 		}
 	}
@@ -1115,10 +1115,12 @@ class Lowerer {
 		FunctionDecl *decl = static_cast<FunctionDecl *>(symbol->node);
 		std::vector<uint32_t> list;
 		bool direct = true;
+		bool on_another = false; // Called on something other than `this`: it may be missing.
 		if (symbol->kind == SymbolKind::Method && !symbol->is_static()) {
 			direct = (symbol->modifiers & Modifiers::Private) != 0;
 			if (callee->kind == NodeKind::Member) {
 				Expr *object = static_cast<Member *>(callee)->object;
+				on_another = object->kind != NodeKind::ThisExpr && object->kind != NodeKind::SuperExpr;
 				direct = direct || object->kind == NodeKind::SuperExpr;
 				list.push_back(settled(receiver(object), writer(p_call->arguments), position));
 			} else {
@@ -1129,7 +1131,7 @@ class Lowerer {
 			}
 		}
 		call_arguments(decl, p_call->arguments, position, list);
-		if (symbol->kind == SymbolKind::Method && !symbol->is_static() && list[0] != 0) {
+		if (on_another) {
 			emit(Op::NullCheck, position, list[0]); // After the arguments.
 		}
 		if (symbol->is_static() && symbol->owner) {
@@ -1751,12 +1753,12 @@ class Lowerer {
 			}
 			case NodeKind::For: {
 				For *loop = static_cast<For *>(p_statement);
-				if (!loop->init) {
-					emit(Op::Stmt, position);
-				}
 				statement(loop->init);
 				uint32_t top = here();
 				uint32_t out = NONE;
+				if (!loop->condition) {
+					emit(Op::Stmt, position);
+				}
 				if (loop->condition) {
 					emit(Op::Stmt, loop->condition->offset);
 					uint32_t test = expression(loop->condition, Kind::Bool);

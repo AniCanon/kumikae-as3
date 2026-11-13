@@ -571,6 +571,18 @@ static void test_ranged_changes() {
 						.push(Json::object().set("text", "package { public class Main { var a:int; } }"))
 						.push(Json::object().set("range", range(0, 36, 0, 39)).set("text", "Nope")));
 		CHECK_EQ(session.published(), MAIN + " 0:36-0:40 unknown type 'Nope'\n");
+		// A range written back to front means the same range.
+		change(Json::array().push(Json::object().set("range", range(0, 40, 0, 36)).set("text", "Nah")));
+		CHECK_EQ(session.published(), MAIN + " 0:36-0:39 unknown type 'Nah'\n");
+		change(Json::array().push(Json::object().set("range", range(0, 36, 0, 39)).set("text", "Nope")));
+		session.settle();
+		// A changed range of a file the server does not hold is not a document.
+		session.notify("textDocument/didChange",
+				Json::object()
+						.set("textDocument", Json::object().set("uri", "file:///work/Nowhere.as").set("version", 2))
+						.set("contentChanges", Json::array().push(Json::object().set("range", range(0, 0, 0, 0)).set("text", "zzz("))));
+		session.settle();
+		CHECK_EQ(session.published(), std::string());
 		// A range past the end of the text is clamped to it, not a crash.
 		change(Json::array().push(Json::object().set("range", range(50, 0, 99, 7)).set("text", " ")));
 		change(Json::array().push(Json::object().set("range", range(0, 36, 0, 40)).set("text", "int")));

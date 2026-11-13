@@ -71,6 +71,7 @@ private:
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);
 	void report();
+	void forget_class(uint32_t p_class); // Its static fields were not all set: it is not used yet, after all.
 	void use_class(uint32_t p_class); // From running code: pushes what must run first.
 	bool use_class_now(uint32_t p_class); // From outside: runs it.
 	std::string site(const Frame &p_frame) const;

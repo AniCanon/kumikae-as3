@@ -589,6 +589,12 @@ static void test_loop_markers() {
 							   "for (var i:int = 0; i < 2; i++) {\n"
 							   "n += i;\n"
 							   "}\n"
+							   "do {\n"
+							   "n--;\n"
+							   "} while (n > 2);\n"
+							   "for (;;) {\n"
+							   "if (n < 5) { break; }\n"
+							   "}\n"
 							   "} } }");
 	compilation.check();
 	ir::Module module;
@@ -598,10 +604,61 @@ static void test_loop_markers() {
 	vm::Interpreter interpreter(module, host);
 	interpreter.set_statement_hook(on_statement, &steps);
 	CHECK(interpreter.run_program());
-	CHECK_EQ(steps.seen, std::string("Main:2 Main:3 Main:4 Main:3 Main:4 Main:3 Main:6 Main:6 Main:7 Main:6 Main:7 Main:6 "));
+	CHECK_EQ(steps.seen, std::string("Main:2 Main:3 Main:4 Main:3 Main:4 Main:3 Main:6 Main:6 Main:7 Main:6 Main:7 Main:6 Main:10 Main:11 Main:12 Main:13 Main:13 "));
+}
+
+// A class whose static fields could not be given their values is not quietly usable afterwards: the next
+// use tries again and fails again. A subclass is no better off than its base.
+static void test_failed_static_initializer() {
+	Compilation compilation;
+	compilation.add("Boom.as", "package { public class Boom {\n"
+							   "public static var a:int = 5;\n"
+							   "public static var b:int = boom();\n"
+							   "public static var c:int = 9;\n"
+							   "private static function boom():int { var none:Boom; return none.value; }\n"
+							   "public var value:int;\n"
+							   "} }\n"
+							   "class Child extends Boom { public static var own:int = 3; }\n"
+							   "class Fine { public static var n:int = 1; }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	uint32_t boom = ir::NONE, child = ir::NONE, fine = ir::NONE;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		boom = module.classes[i].name == "Boom" ? (uint32_t)i : boom;
+		child = module.classes[i].name == "Child" ? (uint32_t)i : child;
+		fine = module.classes[i].name == "Fine" ? (uint32_t)i : fine;
+	}
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.start());
+		auto errors = [&]() {
+			int count = 0;
+			for (size_t at = host.errors.find("Error #1009"); at != std::string::npos; at = host.errors.find("Error #1009", at + 1)) {
+				count++;
+			}
+			return count;
+		};
+		CHECK(interpreter.construct(boom) == nullptr);
+		CHECK_EQ(errors(), 1);
+		CHECK(interpreter.construct(boom) == nullptr); // Not a half-made class the second time.
+		CHECK_EQ(errors(), 2);
+		CHECK(interpreter.construct(child) == nullptr); // Nor through a subclass.
+		CHECK_EQ(errors(), 3);
+		CHECK(interpreter.construct(child) == nullptr);
+		CHECK_EQ(errors(), 4);
+		vm::Object *other = interpreter.construct(fine); // Another class is untouched.
+		CHECK(other != nullptr);
+		interpreter.release_object(other);
+		CHECK_EQ(interpreter.depth(), (size_t)0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
 int main() {
+	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();
 	test_entry_points();

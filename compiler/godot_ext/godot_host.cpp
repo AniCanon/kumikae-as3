@@ -64,7 +64,9 @@ vm::Slot from_variant(ir::Kind p_kind, const Variant &p_value) {
 			break;
 		case ir::Kind::Val:
 		case ir::Kind::Ref:
-			if (p_value.get_type() != Variant::NIL) {
+			// An object-typed value that holds no object is null, like null itself.
+			if (p_value.get_type() != Variant::NIL &&
+					!(p_value.get_type() == Variant::OBJECT && ((ObjectID)p_value).is_null())) {
 				slot.p = new Variant(p_value);
 			}
 			break;
