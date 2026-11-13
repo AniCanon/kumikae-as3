@@ -88,6 +88,17 @@ Found by the review of the clean-up pass itself.
   text for the same node reads `<Node2D#123>`. And a `toString()` that raises an error ends the caller
   through `"" + this`, but through Godot's text it is reported and Godot's text stands.
 
+## Stage 2b-2, part B: signals
+
+- Only a method of a script object can be a listener. A function written in place, a package function and
+  a static method wait for closures (2c).
+- A signal's own `numListeners` and `emit` can't follow `object[name]` as a property read: only its
+  methods can (`timer[name].add(f)`).
+- A plain AS3 object that listens to a signal and also holds the signal's object keeps both alive (the
+  cycle collector, 2d).
+- A singleton's signals (`Input.joyConnectionChanged`) wait for singletons (2b-3); a script's own signals
+  wait for `[Signal]` (2d).
+
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector is planned for 2d).

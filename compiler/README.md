@@ -128,7 +128,7 @@ python3 compiler/tests/run_godot.py compiler/tests   # runs the project in headl
 To use it in a project of your own, copy `tests/godot_project/kas3.gdextension` and the `bin` folder into
 it.
 
-**What works so far (stages 2b-1 and 2b-2, part A):**
+**What works so far (stages 2b-1 and 2b-2):**
 
 ```actionscript
 package {
@@ -164,12 +164,17 @@ package {
 - An argument left out takes Godot's default. So does a `null` written last for a parameter declared
   `= null`.
 - A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
+- Signals are listened to the AS3 way: `timer.timeout.add(onTimeout)`, `add(f, true)` for the end of the
+  frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`. Adding a listener twice does
+  nothing. A listener goes when its object is freed.
+- A method is a function wherever Godot takes one: `array.filter(isBig)`.
+- `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs.
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,
   never taken as if it fitted.
 - An AS3 error inside a call from the engine is reported in Godot's own error output, with the AS3 stack
   trace, and the engine carries on.
 
-**Refused by name until the next slices:** signals, singletons (`Input`), constants and static members of
+**Refused by name until the next slices:** singletons (`Input`), constants and static members of
 Godot classes, `print` and the other global functions, elements of Godot's untyped collections, creating
 Godot objects with `new`, passing a script object to Godot, and everything `kas3c run` refuses.
 
