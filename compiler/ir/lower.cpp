@@ -1323,17 +1323,11 @@ class Lowerer {
 		if (object != Kind::Ref && !script) {
 			return NONE;
 		}
-		if (script && index->index->kind == NodeKind::StringLit) {
-			// A script's own member, written as a string: not a signal of the Godot object behind it.
-			std::string own = unescape(static_cast<StringLit *>(index->index)->text);
-			for (const Symbol *at = type->symbol; at && at->klass && classes_.count(at); at = at->klass->base) {
-				if (at->klass->members.count(own)) {
-					return NONE;
-				}
-			}
-		}
+		// A script object goes as itself: the name may be one of its own fields that holds a signal.
 		bool of_value = false;
-		*r_object = settled(engine_receiver(index->object, p_expression->offset, &of_value), index->index, p_expression->offset);
+		uint32_t object_reg = script ? (index->object->kind == NodeKind::ThisExpr ? 0u : receiver(index->object))
+									 : engine_receiver(index->object, p_expression->offset, &of_value);
+		*r_object = settled(object_reg, index->index, p_expression->offset);
 		*r_object = settled(*r_object, p_later, p_expression->offset);
 		*r_name = settled(expression(index->index, Kind::Str), p_later, p_expression->offset);
 		uint32_t out = reg(Kind::Val);

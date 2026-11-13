@@ -17,6 +17,12 @@ package {
 		private function isBig(n:int):Boolean { return n > 2; }
 
 		public function reset():void { count = 0; }
+		// A loop of a listener and what it listens to; a listener nothing else holds; a signal in a field.
+		private var mine:Signal;
+		public function loop(r:Resource):void { var h:Holder = new Holder(); h.res = r; r.changed.add(h.heard); }
+		public function unheld(other:Node):void { other.renamed.add(new Listener().heard); }
+		public function total():int { return Listener.total; }
+		public function byOwnField(name:String):void { mine = renamed; this[name].add(onRenamed); }
 		// What the review of this slice left open.
 		public function mixed():void { renamed.add(onRenamed); renamed.addOnce(onRenamed); }
 		public function mixedBack():void { renamed.addOnce(onceOnly); renamed.add(onceOnly); }

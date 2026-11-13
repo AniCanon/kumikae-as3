@@ -94,16 +94,14 @@ Found by the review of the clean-up pass itself.
   a static method wait for closures (2c).
 - A signal's own `numListeners` and `emit` can't follow `object[name]` as a property read: only its
   methods can (`timer[name].add(f)`).
-- A plain AS3 object that listens to a signal and also holds the signal's object keeps both alive (the
-  cycle collector, 2d).
 - A singleton's signals (`Input.joyConnectionChanged`) wait for singletons (2b-3); a script's own signals
   wait for `[Signal]` (2d).
-- `this[name].add(f)` with a name known only as the program runs, naming a script's own field, is taken
-  for a signal lookup and fails when it runs. (Written as a string in the source, it is refused.)
-- Script objects still held by listeners when the program is unloaded are not freed (only at exit).
-- An error from `emit` does not name the listener's method.
-- A listener called with the wrong number of arguments is not called, and Godot prints the error: it is
-  not an AS3 error with a stack trace.
+- A listener and the object it listens to are freed when only each other holds them, but only in the
+  direct case: the listener's own field holds a reference-counted object. Held through another object, or
+  a callable given to something other than a signal, the loop stays (the cycle collector, 2d).
+- If GDScript keeps a copy of a plain AS3 listener's callable and nothing else refers to the listener or
+  to the object it listens to, the listener is removed from the signal all the same.
+- An AS3 error raised for a listener's arguments has no stack trace: the listener was never entered.
 
 ## Stage 2a: interpreter core
 

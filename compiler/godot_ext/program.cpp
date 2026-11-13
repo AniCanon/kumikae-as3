@@ -1,6 +1,7 @@
 #include "program.h"
 
 #include "builtins.h"
+#include "callable.h"
 #include "lower.h"
 #include "names.h"
 
@@ -73,6 +74,9 @@ Project &Project::get() {
 void Project::unload() {
 	// First, so that whatever is destroyed along with the program (a listener held through one of its
 	// static fields) knows the program is no longer there to be used.
+	if (program && program->valid_) {
+		release_listeners(); // While the interpreter is still there to free what they hold.
+	}
 	loads++;
 	delete program;
 	program = nullptr;

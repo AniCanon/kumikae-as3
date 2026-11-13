@@ -5,6 +5,7 @@
 #include "runtime.h"
 
 #include <godot_cpp/variant/callable.hpp>
+#include <godot_cpp/variant/signal.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
 namespace kas3 {
@@ -14,6 +15,12 @@ namespace kas3 {
 // the callable's connections when that object is freed, and a callable kept elsewhere then refuses to run.
 godot::Variant *make_callable(vm::Object *p_object, uint32_t p_function, godot::Object *p_owner);
 
+// Tells a callable made here that it has been added to that signal as a listener.
+void listener_added(const godot::Callable &p_callable, const godot::Signal &p_signal);
+// Once a frame: frees a listener and the object it listens to when they are held only by each other.
+void sweep_listeners();
+// Before the program is unloaded: every callable lets go of its script object, and refuses to run after.
+void release_listeners();
 // Whether the callable is one of those: a listener that a script added.
 bool is_script_listener(const godot::Callable &p_callable);
 

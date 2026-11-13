@@ -4,6 +4,7 @@ extends SceneTree
 var node: Node
 var other: Node
 var late: Node
+var looped: WeakRef
 var frames := 0
 
 func show(name: String, got, want) -> void:
@@ -32,10 +33,20 @@ func _physics_process(_delta: float) -> bool:
 		show("deferred after the frame", node.count, 1)
 		# Its owner was freed before the frame ended: nothing ran, nothing crashed.
 		show("deferred with its owner freed", is_instance_valid(late), false)
+		return false
+	if frames > 3 and frames < 10:
+		return false # Whole frames pass: listeners are looked over once in each.
+	if frames == 10:
+		# A listener and the object it listens to, held only by each other, are both gone.
+		show("a loop is freed", looped.get_ref() == null, true)
+		# A listener that only its signal holds is still there, and still hears.
+		var before: int = node.total()
+		rename(other)
+		show("an unheld listener stays", node.total() - before, 1)
 		node.queue_free()
 		other.queue_free()
 		return true
-	if frames > 3:
+	if frames > 10:
 		return true
 	# add: the listener hears the signal.
 	node.listen()
@@ -128,7 +139,16 @@ func _physics_process(_delta: float) -> bool:
 	other.emit_signal("hit", 5)
 	node.fireUser(other, 2)
 	other.emit_signal("hit", "five")
+	other.emit_signal("hit", 1, 2)
 	show("user signal", node.count, 7)
+	# A signal kept in a script's own field, reached by the field's name.
+	node.stopAll()
+	node.reset()
+	node.byOwnField("mine")
+	rename(node)
+	node.byOwnField("count")
+	show("own signal field by name", node.count, 1)
+	node.stopAll()
 	# A method as a function anywhere Godot takes one.
 	show("filter", node.filtered([1, 2, 3, 4]), [3, 4])
 	# The listener goes when its owner goes: nothing is left connected, and a kept callable fails cleanly.
@@ -150,6 +170,13 @@ func _physics_process(_delta: float) -> bool:
 	late.listenLater(other)
 	rename(other)
 	show("deferred not yet", node.count, 0)
+	var resource := Resource.new()
+	looped = weakref(resource)
+	node.loop(resource)
+	resource = null
+	show("a loop lives until the frame ends", looped.get_ref() != null, true)
+	other.renamed.get_connections().map(func(c): other.renamed.disconnect(c.callable))
+	node.unheld(other)
 	node.keepPlain(Resource.new()) # Still held when Godot shuts down: nothing may crash then.
 	late.free()
 	return false

@@ -800,7 +800,6 @@ static void test_engine_calls() {
 	const char *bodies[] = {
 		"function f():void { if (Input.isActionPressed(\"jump\")) {} }",
 		"function f():void { treeEntered.add(function():void {}); }",
-		"public var mine:int; function f():void { this[\"mine\"].add(f); }",
 		"function f(n:Node):void { var x:int = n[\"name\"].length; }",
 		"function f():void { print(\"hello\"); }",
 		"function f():void { position.normalized().x = 5; }",

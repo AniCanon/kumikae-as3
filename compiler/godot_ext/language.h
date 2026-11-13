@@ -2,6 +2,8 @@
 // their methods: the editor features (templates, completion, the debugger) answer "nothing".
 #pragma once
 
+#include "callable.h"
+
 #include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/classes/script_language_extension.hpp>
 #include <godot_cpp/classes/script_language_extension_profiling_info.hpp>
@@ -96,7 +98,7 @@ public:
 		return 0;
 	}
 	int32_t _profiling_get_frame_data(godot::ScriptLanguageExtensionProfilingInfo *, int32_t) override { return 0; }
-	void _frame() override {}
+	void _frame() override { kas3::sweep_listeners(); }
 	bool _handles_global_class_type(const godot::String &) const override { return false; }
 	godot::Dictionary _get_global_class_name(const godot::String &) const override { return {}; }
 };

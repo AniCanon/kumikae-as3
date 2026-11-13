@@ -460,6 +460,31 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			}
 			target = p_in.a;
 			kind = p_function.registers[target];
+			if (p_function.registers[p_in.b] == Kind::Obj) {
+				// A script object: one of its own fields by that name, or else the Godot object behind it.
+				Object *object = static_cast<Object *>(receiver);
+				const ir::Class &klass = module_.classes[object->klass];
+				bool own = false;
+				for (size_t i = klass.fields.size(); i-- > 0 && !own;) {
+					if (klass.fields[i].name == name->view()) {
+						own = true;
+						if (klass.fields[i].kind != Kind::Val) {
+							error = "'" + std::string(name->view()) + "' is not a signal";
+						} else {
+							result.p = host_.copy(object->fields()[i].p);
+							ok = true;
+						}
+					}
+				}
+				if (own) {
+					break;
+				}
+				receiver = klass.native_base.empty() ? nullptr : object->fields()[0].p;
+				if (!receiver) {
+					error = "'" + std::string(name->view()) + "' is not a signal";
+					break;
+				}
+			}
 			ok = host_.member(receiver, name->view(), wanted(target), &result, &error);
 			break;
 		}

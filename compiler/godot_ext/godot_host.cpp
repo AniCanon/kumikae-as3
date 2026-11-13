@@ -294,6 +294,7 @@ static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, cons
 				*r_error = "Godot could not add the listener";
 				return false;
 			}
+			listener_added(callable, signal);
 		}
 		return true;
 	}
