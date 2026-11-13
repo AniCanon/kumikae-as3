@@ -142,8 +142,27 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 
 static void instance_notification(GDExtensionScriptInstanceDataPtr, int32_t, GDExtensionBool) {}
 
-static void instance_to_string(GDExtensionScriptInstanceDataPtr, GDExtensionBool *r_is_valid, GDExtensionStringPtr) {
+// Godot asking how the object reads (`str(node)`, `print(node)`): the script's toString(), if it has one.
+// Without one, Godot's own text stands.
+static void instance_to_string(GDExtensionScriptInstanceDataPtr p_data, GDExtensionBool *r_is_valid, GDExtensionStringPtr r_out) {
+	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+	Project &program = Project::get();
 	*r_is_valid = false;
+	uint32_t own = program.module().classes[instance->object->klass].to_string;
+	if (own == ir::NONE) {
+		return;
+	}
+	vm::Slot self, result;
+	self.bits = 0;
+	self.p = instance->object;
+	result.bits = 0;
+	if (!program.interpreter().call_function(own, &self, 1, &result)) {
+		return; // The error has been reported.
+	}
+	const vm::Str *text = static_cast<const vm::Str *>(result.p);
+	*reinterpret_cast<String *>(r_out) = text ? String::utf8(text->view().data(), (int64_t)text->view().size()) : String("null");
+	program.interpreter().discard(ir::Kind::Str, result);
+	*r_is_valid = true;
 }
 
 static GDExtensionObjectPtr instance_get_script(GDExtensionScriptInstanceDataPtr p_data) {

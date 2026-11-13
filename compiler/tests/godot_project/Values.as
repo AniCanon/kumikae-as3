@@ -70,5 +70,16 @@ package {
 		public function packed(p:PackedInt32Array, i:int):int { return p[i]; }
 		public function setPacked(p:PackedInt32Array, i:int, n:int):PackedInt32Array { p[i] = n; return p; }
 		public function outOfRange(v:Vector2):Number { return v[5]; }
+
+		// Arguments left out: Godot fills in its own defaults.
+		public function clampDefault(c:Color):Color { return c.clamp(); }
+		public function clampOne(c:Color):Color { return c.clamp(new Color(0.25, 0.25, 0.25, 1)); }
+		public function clampTrailingNull(c:Color):Color { return c.clamp(new Color(0.25, 0.25, 0.25, 1), null); }
+		public function clampBothNull(c:Color):Color { return c.clamp(null, null); }
+		public function clampMiddleNull(c:Color):Color { return c.clamp(null, new Color(0.5, 0.5, 0.5, 1)); }
+		public function looking(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target); }
+		public function lookingNull(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target, null); }
+		public function wholeNumbers():Color { return new Color(1, 0, 1); }
+		public function describe():String { return "I am " + this; }
 	}
 }

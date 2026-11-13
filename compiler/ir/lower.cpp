@@ -1249,7 +1249,14 @@ class Lowerer {
 	// Arguments for the engine: each as its parameter says, or as it comes where the parameter takes anything.
 	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
 		uint32_t count = p_function ? p_function->parameters.count : 0;
-		for (uint32_t i = 0; i < p_arguments.count; i++) {
+		// A default that AS3 can't write is declared `= null`, and Godot fills in the real one when the
+		// argument is left out. A `null` written last for such a parameter is the same as leaving it out.
+		uint32_t written = p_arguments.count;
+		while (written > 0 && written <= count && is_null(p_arguments[written - 1]) && p_function->parameters[written - 1].default_value &&
+				is_null(p_function->parameters[written - 1].default_value)) {
+			written--;
+		}
+		for (uint32_t i = 0; i < written; i++) {
 			Kind kind = Kind::Void;
 			if (i < count && !p_function->parameters[i].is_rest && p_function->parameters[i].type) {
 				const Type *type = compilation_.type_of(p_function->parameters[i].type);

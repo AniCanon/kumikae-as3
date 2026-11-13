@@ -137,7 +137,10 @@ output = compare("values.gd", [
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
     "first", "color part", "set second", "add element", "position element", "packed", "set packed",
     "packed out of range", "out of range",
+    "clamp default", "clamp one", "clamp trailing null", "clamp both null", "clamp middle null", "looking",
+    "looking null", "whole numbers", "to string", "to string in AS3", "no to string", "no to string in AS3",
 ])
+check("a null that is not the last argument is an AS3 error", "at Values/clampMiddleNull()" in output, output[-800:])
 check("an index out of range is an AS3 error", "at Values/outOfRange()" in output and "at Values/packed()" in output, output[-800:])
 traced = re.search(r"EXPECT TRACE (.*)", output)
 check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])
