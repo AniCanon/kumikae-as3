@@ -148,6 +148,16 @@ check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1)
 check("toString() on a missing node is an AS3 error", "at Values/nullOwn()" in output, output[-800:])
 check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" in output, output[-800:])
 
+# Signals, the AS3 way.
+output = compare("signals.gd", [
+    "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "arguments", "removes itself",
+    "after a failing listener", "another object's signal", "by name", "by a wrong name", "user signal", "filter",
+    "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
+    "deferred with its owner freed",
+])
+check("an error inside a listener is reported", "at Signals/fails()" in output, output[-800:])
+check("a wrong signal name is an AS3 error", output.count("at Signals/listenByName()") == 2, output[-800:])
+
 for failure in failures:
     print("FAIL " + failure)
 print("godot: %s" % ("OK" if not failures else "%d failed" % len(failures)))

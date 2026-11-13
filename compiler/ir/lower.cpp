@@ -33,6 +33,8 @@ class Lowerer {
 	Symbol *object_ = nullptr;
 	Symbol *error_ = nullptr;
 	Symbol *godot_object_ = nullptr; // godot.GodotObject: what every Godot object class extends.
+	Symbol *signal_ = nullptr; // godot.Signal
+	Symbol *function_ = nullptr; // Function
 
 	std::unordered_map<const Symbol *, uint32_t> classes_;
 	std::unordered_map<const Symbol *, uint32_t> functions_; // Methods, constructors, package functions.
@@ -1147,6 +1149,18 @@ class Lowerer {
 			return 0; // No value: the checker lets nothing use it.
 		}
 		Symbol *symbol = callee_symbol(callee);
+		if (!symbol && callee->kind == NodeKind::Member && signal_ && signal_->klass) {
+			// `timer[name].add(f)`: the checker can't know what `timer[name]` is. A signal's method written
+			// after it says a signal is meant; the engine checks that it is one when the line runs.
+			Member *member = static_cast<Member *>(callee);
+			auto verb = signal_->klass->members.find(member->name);
+			if (verb != signal_->klass->members.end() && verb->second->kind == SymbolKind::Method) {
+				uint32_t found = signal_by_name(member->object);
+				if (found != NONE) {
+					return engine_call(p_call, verb->second, found);
+				}
+			}
+		}
 		if (!symbol) {
 			refuse(callee->offset, "calling a value");
 			return default_value(p_want, position);
@@ -1248,6 +1262,72 @@ class Lowerer {
 		return out == NONE ? 0 : out;
 	}
 
+	// A method written where Godot takes a function (`onHit`, `this.onHit`, `other.onHit`): the method
+	// bound to its object. A private method is that very function; any other is the object's own override,
+	// found when the line runs.
+	uint32_t bound_method(Expr *p_expression) {
+		uint32_t position = p_expression->offset;
+		if (is_null(p_expression)) {
+			return default_value(Kind::Val, position);
+		}
+		Symbol *symbol = callee_symbol(p_expression);
+		auto function = functions_.find(symbol);
+		if (!symbol || symbol->kind != SymbolKind::Method || symbol->is_static() || function == functions_.end()) {
+			refuse(position, "a function used as a value, other than a method of a script object");
+			return default_value(Kind::Val, position);
+		}
+		uint32_t object = 0;
+		if (p_expression->kind == NodeKind::Member) {
+			Expr *written = static_cast<Member *>(p_expression)->object;
+			if (written->kind == NodeKind::SuperExpr) {
+				refuse(position, "a method of 'super' used as a value");
+				return default_value(Kind::Val, position);
+			}
+			if (written->kind != NodeKind::ThisExpr) {
+				object = receiver(written);
+				emit(Op::NullCheck, position, object);
+			}
+		}
+		if (object == 0 && fn().is_static) {
+			refuse(position, "this name");
+			return default_value(Kind::Val, position);
+		}
+		bool exact = (symbol->modifiers & Modifiers::Private) != 0;
+		uint32_t out = reg(Kind::Val);
+		emit(Op::HostBind, position, out, object, exact ? function->second : (slots_[symbol] | ir::BIND_SLOT));
+		return out;
+	}
+
+	// `object[name]` where a signal's member follows: the signal, by its AS3 name. NONE if this is not one.
+	uint32_t signal_by_name(Expr *p_expression) {
+		if (p_expression->kind != NodeKind::Index) {
+			return NONE;
+		}
+		Index *index = static_cast<Index *>(p_expression);
+		Kind object = Kind::Void;
+		if (!kind_of(index->object->type, &object) || !is_string_type(index->index->type)) {
+			return NONE;
+		}
+		// A Godot object, or a script object, which stands for the Godot object it is attached to.
+		uint32_t klass = 0;
+		const Type *type = index->object->type;
+		bool script = object == Kind::Obj && type && type->kind == Type::Instance && class_index(type->symbol, &klass) &&
+				!module_.classes[klass].native_base.empty();
+		if (object != Kind::Ref && !script) {
+			return NONE;
+		}
+		bool of_value = false;
+		uint32_t node = settled(engine_receiver(index->object, p_expression->offset, &of_value), index->index, p_expression->offset);
+		uint32_t name = expression(index->index, Kind::Str);
+		uint32_t out = reg(Kind::Val);
+		if (fn().engine_types.size() <= out) {
+			fn().engine_types.resize(out + 1);
+		}
+		fn().engine_types[out] = "Signal";
+		emit(Op::HostMember, p_expression->offset, out, node, name);
+		return out;
+	}
+
 	// Arguments for the engine: each as its parameter says, or as it comes where the parameter takes anything.
 	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
 		uint32_t count = p_function ? p_function->parameters.count : 0;
@@ -1262,6 +1342,15 @@ class Lowerer {
 			Kind kind = Kind::Void;
 			if (i < count && !p_function->parameters[i].is_rest && p_function->parameters[i].type) {
 				const Type *type = compilation_.type_of(p_function->parameters[i].type);
+				if (type && type->kind == Type::Instance && type->symbol == function_ && function_) {
+					// Godot takes a function here: a method goes bound to its object.
+					Expr *later = nullptr;
+					for (uint32_t next = i + 1; next < written && !later; next++) {
+						later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
+					}
+					r_list.push_back(settled(bound_method(p_arguments[i]), later, p_position));
+					continue;
+				}
 				if (type && type->kind != Type::Any && !kind_of(type, &kind)) {
 					refuse(p_arguments[i]->offset, "passing a value of type '" + compilation_.type_name(type) + "' to Godot");
 					kind = Kind::Void;
@@ -1279,7 +1368,7 @@ class Lowerer {
 		}
 	}
 
-	uint32_t engine_call(Call *p_call, Symbol *p_method) {
+	uint32_t engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver = NONE) {
 		uint32_t position = p_call->offset;
 		uint32_t name = 0;
 		if (!engine_name(p_method->owner, p_method->name, &name)) {
@@ -1293,7 +1382,7 @@ class Lowerer {
 		bool of_value = false;
 		Expr *object = p_call->callee->kind == NodeKind::Member ? static_cast<Member *>(p_call->callee)->object : nullptr;
 		std::vector<uint32_t> list;
-		list.push_back(settled(engine_receiver(object, position, &of_value), writer(p_call->arguments), position));
+		list.push_back(settled(p_receiver != NONE ? p_receiver : engine_receiver(object, position, &of_value), writer(p_call->arguments), position));
 		FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
 		engine_arguments(decl, p_call->arguments, position, list);
 		uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
@@ -2321,7 +2410,10 @@ public:
 		if (Package *godot = compilation_.find_package("godot")) {
 			auto found = godot->definitions.find("GodotObject");
 			godot_object_ = found == godot->definitions.end() ? nullptr : found->second;
+			found = godot->definitions.find("Signal");
+			signal_ = found == godot->definitions.end() ? nullptr : found->second;
 		}
+		function_ = compilation_.builtin("Function");
 	}
 
 	bool run(LowerMode p_mode) {

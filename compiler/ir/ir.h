@@ -63,6 +63,10 @@ inline bool is_engine(Kind p_kind) {
 	/* An operator on Godot values: the operator as AS3 writes it ("+", "=="), and one or two operands. */ \
 	X(HostOperate, "RSA") \
 	X(HostIndexGet, "RRR") X(HostIndexSet, "RRR") /* value[key]: out, value, key; and value, key, new element. */ \
+	/* A method bound to its object, as a function Godot can call: out, the object, and the function, or \
+	   with the top bit set a method-table slot to look up in the object's own class. */ \
+	X(HostBind, "RRI") \
+	X(HostMember, "RRR") /* object[name], the name being AS3's and known only now: out, object, name. */ \
 	X(HostToStr, "RR-") /* Godot's text for one of its values or objects; "null" for a missing one. */ \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") X(Trace, "A--")
@@ -77,6 +81,7 @@ const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.
 
 const uint32_t NONE = 0xFFFFFFFFu;
+const uint32_t BIND_SLOT = 0x80000000u; // In HostBind: the operand is a method-table slot.
 
 struct Instruction {
 	Op op = Op::Stmt;

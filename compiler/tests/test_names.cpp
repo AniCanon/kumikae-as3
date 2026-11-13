@@ -724,7 +724,9 @@ static void test_godot_names() {
 	CHECK(!godot_name("CharacterBody2D", "position", &name));
 	CHECK(!godot_name("Node", "noSuchThing", &name));
 	CHECK(!godot_name("NoSuchClass", "", &name));
-	CHECK(!godot_name("Signal", "add", &name)); // AS3's own addition: the binding maps it.
+	// AS3's own addition: Godot has no one method for it, so the name is marked for the binding to compose.
+	CHECK(godot_name("Signal", "add", &name) && name == "@add");
+	CHECK(godot_name("Signal", "numListeners", &name) && name == "@numListeners");
 }
 
 int main() {

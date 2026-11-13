@@ -1,5 +1,15 @@
 #include "godot_host.h"
 
+#include "builtins.h"
+#include "callable.h"
+
+#include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/callable.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/signal.hpp>
+
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
@@ -208,9 +218,67 @@ void *GodotHost::construct(std::string_view p_type, const Argument *p_arguments,
 	return made;
 }
 
+// The AS3 way of listening to a signal, made from Godot's own calls. p_verb is "@add" and so on: the
+// names the generator gives members that Godot has no one method for.
+static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, const vm::Host::Argument *p_arguments, size_t p_count,
+		const vm::Host::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	if (p_receiver.get_type() != Variant::SIGNAL) {
+		*r_error = "this value is not a signal";
+		return false;
+	}
+	Signal signal = p_receiver;
+	if (!ObjectDB::get_instance(signal.get_object_id())) {
+		*r_error = "the signal belongs to an object Godot has freed";
+		return false;
+	}
+	if (p_verb == "@removeAll" || p_verb == "@numListeners") {
+		Array connections = signal.get_connections();
+		if (p_verb == "@numListeners") {
+			return take(p_result, Variant((int64_t)connections.size()), "numListeners", r_result, r_error);
+		}
+		for (int64_t i = 0; i < connections.size(); i++) {
+			signal.disconnect(Dictionary(connections[i])["callable"]);
+		}
+		return true;
+	}
+	Variant listener = p_count >= 1 ? to_variant(p_arguments[0].kind, p_arguments[0].slot) : Variant();
+	if (listener.get_type() != Variant::CALLABLE) {
+		*r_error = "the listener is null";
+		return false;
+	}
+	Callable callable = listener;
+	bool connected = signal.is_connected(callable);
+	if (p_verb == "@has") {
+		return take(p_result, Variant(connected), "has", r_result, r_error);
+	}
+	if (p_verb == "@remove") {
+		if (connected) {
+			signal.disconnect(callable);
+		}
+		return true;
+	}
+	if (p_verb == "@add" || p_verb == "@addOnce") {
+		// Adding a listener that is already there does nothing, as with AS3's addEventListener.
+		if (!connected) {
+			bool deferred = p_count >= 2 && p_arguments[1].kind == ir::Kind::Bool && p_arguments[1].slot.b;
+			int64_t flags = (deferred ? Object::CONNECT_DEFERRED : 0) | (p_verb == "@addOnce" ? Object::CONNECT_ONE_SHOT : 0);
+			if (signal.connect(callable, flags) != OK) {
+				*r_error = "Godot could not add the listener";
+				return false;
+			}
+		}
+		return true;
+	}
+	*r_error = "Godot has no '" + std::string(p_verb.substr(1)) + "' on a signal";
+	return false;
+}
+
 bool GodotHost::call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
 	Variant *receiver = static_cast<Variant *>(p_receiver);
+	if (!p_method.empty() && p_method[0] == '@') {
+		return signal_verb(*receiver, p_method, p_arguments, p_count, p_result, r_result, r_error);
+	}
 	// An object Godot has freed leaves a dangling pointer in the handle: ask Godot whether it is still
 	// there before anything touches it.
 	// (A handle copied after the object went is empty: see copy().)
@@ -297,6 +365,9 @@ bool GodotHost::operate(std::string_view p_operator, const Argument *p_arguments
 }
 
 bool GodotHost::get(void *p_receiver, std::string_view p_property, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	if (!p_property.empty() && p_property[0] == '@') {
+		return signal_verb(*static_cast<Variant *>(p_receiver), p_property, nullptr, 0, p_result, r_result, r_error);
+	}
 	bool valid = false;
 	Variant value = static_cast<Variant *>(p_receiver)->get_named(StringName(to_godot(p_property)), valid);
 	if (!valid) {
@@ -345,6 +416,44 @@ bool GodotHost::index_set(void *p_receiver, const Argument &p_key, const Argumen
 		return false;
 	}
 	return true;
+}
+
+void *GodotHost::bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) {
+	Object *owner = nullptr;
+	if (p_owner) {
+		owner = static_cast<Variant *>(p_owner)->get_validated_object();
+		if (!owner) {
+			*r_error = "the object this script is attached to has been freed";
+			return nullptr;
+		}
+	}
+	return make_callable(p_object, p_function, owner);
+}
+
+bool GodotHost::member(void *p_receiver, std::string_view p_name, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	Object *object = static_cast<Variant *>(p_receiver)->get_validated_object();
+	if (!object) {
+		*r_error = "'" + std::string(p_name) + "' was asked of an object Godot has freed";
+		return false;
+	}
+	// The name is AS3's. Godot's own comes from the name table, for the object's class or one it extends.
+	std::string godot;
+	bool found = false;
+	for (StringName at = object->get_class(); !found && !String(at).is_empty(); at = ClassDB::get_parent_class(at)) {
+		CharString klass = String(at).utf8();
+		found = godot_name(std::string_view(klass.get_data()) == "Object" ? "GodotObject" : klass.get_data(), p_name, &godot);
+	}
+	if (!found) {
+		CharString klass = String(object->get_class()).utf8();
+		*r_error = "a " + std::string(klass.get_data()) + " has no '" + std::string(p_name) + "'";
+		return false;
+	}
+	Variant value = object->get(StringName(to_godot(godot)));
+	if (p_result.type == "Signal" && value.get_type() != Variant::SIGNAL) {
+		*r_error = "'" + std::string(p_name) + "' is not a signal";
+		return false;
+	}
+	return take(p_result, value, p_name, r_result, r_error);
 }
 
 vm::Str *GodotHost::text(void *p_value) {

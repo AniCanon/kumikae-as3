@@ -437,6 +437,32 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			ok = host_.get(receiver, module_.strings[p_in.c], wanted(target), &result, &error);
 			break;
 		}
+		case Op::HostBind: {
+			Object *object = static_cast<Object *>(r[p_in.b].p);
+			if (!object) {
+				raise(module_.type_error_class, NULL_ERROR);
+				return NULL_ERROR;
+			}
+			const ir::Class &klass = module_.classes[object->klass];
+			uint32_t function = (p_in.c & ir::BIND_SLOT) ? klass.methods[p_in.c & ~ir::BIND_SLOT] : p_in.c;
+			target = p_in.a;
+			kind = Kind::Val;
+			result.p = host_.bind(object, function, klass.native_base.empty() ? nullptr : object->fields()[0].p, &error);
+			ok = result.p != nullptr;
+			break;
+		}
+		case Op::HostMember: {
+			void *receiver = r[p_in.b].p;
+			const Str *name = static_cast<const Str *>(r[p_in.c].p);
+			if (!receiver || !name) {
+				raise(module_.type_error_class, NULL_ERROR);
+				return NULL_ERROR;
+			}
+			target = p_in.a;
+			kind = p_function.registers[target];
+			ok = host_.member(receiver, name->view(), wanted(target), &result, &error);
+			break;
+		}
 		case Op::HostIndexGet: {
 			void *receiver = r[p_in.b].p;
 			if (!receiver) {
@@ -1038,6 +1064,8 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostGet:
 			case Op::HostOperate:
 			case Op::HostToStr:
+			case Op::HostBind:
+			case Op::HostMember:
 			case Op::HostIndexGet:
 			case Op::HostIndexSet:
 			case Op::HostSet: {

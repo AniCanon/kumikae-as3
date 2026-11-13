@@ -78,18 +78,24 @@ static GDExtensionBool instance_has_method(GDExtensionScriptInstanceDataPtr p_da
 	return script_method(instance->object->klass, *reinterpret_cast<const StringName *>(p_name)) != ir::NONE;
 }
 
-// The engine calling a script method: arguments in as the method's parameters expect them, the result out.
-// An AS3 error ends here: the interpreter has reported it, and the engine carries on.
+// The engine calling a script method by name.
 static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionConstStringNamePtr p_method,
 		const GDExtensionConstVariantPtr *p_args, GDExtensionInt p_argc, GDExtensionVariantPtr r_return,
 		GDExtensionCallError *r_error) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
-	Project &program = Project::get();
 	uint32_t method = script_method(instance->object->klass, *reinterpret_cast<const StringName *>(p_method));
 	if (method == ir::NONE) {
 		r_error->error = GDEXTENSION_CALL_ERROR_INVALID_METHOD;
 		return;
 	}
+	kas3::call_script(instance->object, method, reinterpret_cast<const Variant *const *>(p_args), p_argc,
+			reinterpret_cast<Variant *>(r_return), r_error);
+}
+
+void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant *const *p_args, int64_t p_argc, Variant *r_return,
+		GDExtensionCallError *r_error) {
+	Project &program = Project::get();
+	uint32_t method = p_function;
 	const ir::Function &function = program.module().functions[method];
 	// Register 0 is `this`; the parameters follow.
 	size_t wanted = function.parameters > 0 ? function.parameters - 1 : 0;
@@ -108,7 +114,7 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		ir::Kind kind = function.registers[i + 1];
 		const std::string godot_type = i + 1 < function.engine_types.size() ? function.engine_types[i + 1] : std::string();
-		if (!kas3::arrives(kind, godot_type, *reinterpret_cast<const Variant *>(p_args[i]))) {
+		if (!kas3::arrives(kind, godot_type, *p_args[i])) {
 			r_error->error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
 			r_error->argument = (int32_t)i;
 			r_error->expected = (int32_t)expected_type(kind);
@@ -117,9 +123,9 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 	}
 	std::vector<vm::Slot> arguments((size_t)p_argc + 1);
 	arguments[0].bits = 0;
-	arguments[0].p = instance->object;
+	arguments[0].p = p_object;
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		arguments[i + 1] = kas3::from_variant(function.registers[i + 1], *reinterpret_cast<const Variant *>(p_args[i]));
+		arguments[i + 1] = kas3::from_variant(function.registers[i + 1], *p_args[i]);
 	}
 	vm::Slot result;
 	result.bits = 0;
@@ -132,7 +138,7 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) +
 				" returns a script object, which can't be handed to Godot yet. The caller gets null.");
 	} else if (ok && function.result != ir::Kind::Void) {
-		*reinterpret_cast<Variant *>(r_return) = kas3::to_variant(function.result, result);
+		*r_return = kas3::to_variant(function.result, result);
 	}
 	if (ok) {
 		program.interpreter().discard(function.result, result);

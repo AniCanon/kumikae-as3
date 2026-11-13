@@ -546,6 +546,8 @@ class Generator:
         if owner == "Signal":
             for name, line in SIGNAL_EXTRAS:
                 self.claim(owner, name, "AS3's " + name, {})
+                # Godot has no one method for it: the binding composes it. '@' marks such a name.
+                self.godot_names["Signal.%s" % name] = "@" + name
                 out.append(line)
         self.lines.extend(self.enum_lines(entry))
         self.lines.extend(self.operator_lines(entry))

@@ -16,6 +16,11 @@ using namespace godot;
 namespace kas3 {
 
 static Project *program = nullptr;
+static uint64_t loads = 0;
+
+uint64_t Project::generation() {
+	return loads;
+}
 
 Project &Project::get() {
 	if (!program) {
@@ -25,6 +30,7 @@ Project &Project::get() {
 		return *program;
 	}
 	program->loaded_ = true;
+	loads++;
 	std::string root = ProjectSettings::get_singleton()->globalize_path("res://").utf8().get_data();
 	// Every .as file under the project, in a fixed order; folders whose name starts with a dot are not
 	// part of a project.
@@ -67,6 +73,7 @@ Project &Project::get() {
 void Project::unload() {
 	delete program;
 	program = nullptr;
+	loads++;
 }
 
 uint32_t Project::class_of_file(const std::string &p_path) const {

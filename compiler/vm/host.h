@@ -81,6 +81,20 @@ struct Host {
 		*r_error = "there is no engine here";
 		return false;
 	}
+	// A method bound to its object, as a function the engine can call: a handle on an engine value. The
+	// host keeps the object alive for as long as that value lives (retain, and release through the
+	// interpreter). p_owner is the engine object the script object is attached to, or null.
+	virtual void *bind(Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) {
+		(void)p_object, (void)p_function, (void)p_owner;
+		*r_error = "there is no engine here";
+		return nullptr;
+	}
+	// A member of an engine object by its AS3 name, known only as the program runs: `timer[name]`.
+	virtual bool member(void *p_receiver, std::string_view p_name, const Wanted &p_result, Slot *r_result, std::string *r_error) {
+		(void)p_receiver, (void)p_name, (void)p_result, (void)r_result;
+		*r_error = "there is no engine here";
+		return false;
+	}
 	// The engine's own text for a value or an object, as a new Str that is the caller's.
 	virtual Str *text(void *p_value) {
 		(void)p_value;

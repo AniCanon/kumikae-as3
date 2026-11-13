@@ -387,6 +387,19 @@ struct FakeEngine : vm::Host {
 		log += "set #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "] = " + show(p_value) + "\n";
 		return true;
 	}
+	const ir::Module *module = nullptr;
+	void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *) override {
+		void *made = box();
+		log += "bind " + (module ? module->functions[p_function].name : std::to_string(p_function)) + " of " +
+				(module ? module->classes[p_object->klass].name : std::string("?")) + " owner #" + std::to_string((intptr_t)p_owner) + " -> #" +
+				std::to_string((intptr_t)made) + "\n";
+		return made;
+	}
+	bool member(void *p_receiver, std::string_view p_name, const Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+		log += "member #" + std::to_string((intptr_t)p_receiver) + "[" + std::string(p_name) + "] as " + std::string(p_wanted.type) + "\n";
+		give(p_wanted.kind, r_result, 0, "");
+		return true;
+	}
 	vm::Str *text(void *p_value) override {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
@@ -425,6 +438,75 @@ struct FakeEngine : vm::Host {
 		}
 	}
 };
+
+// A method where Godot takes a function goes bound to its object; a signal by name is the engine's to find.
+static void test_engine_listeners() {
+	const char *base = "package { import godot.*;\n"
+					   "public class Base extends Node {\n"
+					   "  private function mine():void {}\n"
+					   "  public function shared():void {}\n"
+					   "  public function listenBase():void { renamed.add(mine); renamed.add(shared); }\n"
+					   "} }\n";
+	const char *source = "package { import godot.*;\n"
+						 "public class Child extends Base {\n"
+						 "  private function mine():void {}\n"
+						 "  override public function shared():void {}\n"
+						 "  public function listen(other:Child, name:String):void {\n"
+						 "    renamed.add(this.mine, true);\n"
+						 "    other.renamed.addOnce(other.shared);\n"
+						 "    other[name].remove(mine);\n"
+						 "  }\n"
+						 "  public function nobody():void { var other:Child; renamed.add(other.shared); }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Base.as", base);
+	compilation.add("Child.as", source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		uint32_t child = 0;
+		for (size_t i = 0; i < module.classes.size(); i++) {
+			child = module.classes[i].name == "Child" ? (uint32_t)i : child;
+		}
+		vm::Object *object = interpreter.construct(child, engine.box()); // #1
+		vm::Object *other = interpreter.construct(child, engine.box()); // #2
+		CHECK(object != nullptr && other != nullptr);
+		// A private method is the one written in that class; any other is the object's own override.
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "listenBase", nullptr, 0, nullptr));
+		CHECK_EQ(engine.log, std::string("get #1.renamed\nbind Base/mine of Child owner #1 -> #4\ncall #3.@add(#4)\n"
+										 "get #1.renamed\nbind Child/shared of Child owner #1 -> #6\ncall #5.@add(#6)\n"));
+		// The object written before the method is the one bound; a name known only now goes to the engine.
+		engine.log.clear();
+		vm::Slot arguments[2];
+		arguments[0].bits = 0;
+		arguments[0].p = other;
+		arguments[1].bits = 0;
+		arguments[1].p = vm::new_string("renamed");
+		CHECK(interpreter.call_method(object, "listen", arguments, 2, nullptr));
+		CHECK_EQ(engine.log, std::string("get #1.renamed\nbind Child/mine of Child owner #1 -> #8\ncall #7.@add(#8, true)\n"
+										 "get #2.renamed\nbind Child/shared of Child owner #2 -> #10\ncall #9.@addOnce(#10)\n"
+										 "member #2[renamed] as Signal\nbind Child/mine of Child owner #1 -> #12\ncall #11.@remove(#12)\n"));
+		vm::free_string(static_cast<vm::Str *>(arguments[1].p));
+		CHECK_EQ(engine.boxes, 2);
+		// A method of a missing object is an AS3 error.
+		CHECK(!interpreter.call_method(object, "nobody", nullptr, 0, nullptr));
+		CHECK(engine.errors.find("TypeError: Error #1009") == 0);
+		interpreter.release_object(object);
+		interpreter.release_object(other);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
 
 // Operators on Godot's values are the engine's to carry out.
 static void test_engine_operators() {
@@ -716,7 +798,8 @@ static void test_engine_calls() {
 	};
 	const char *bodies[] = {
 		"function f():void { if (Input.isActionPressed(\"jump\")) {} }",
-		"function f():void { treeEntered.add(g); } function g():void {}",
+		"function f():void { treeEntered.add(function():void {}); }",
+		"function f(n:Node):void { var x:int = n[\"name\"].length; }",
 		"function f():void { print(\"hello\"); }",
 		"function f():void { position.normalized().x = 5; }",
 		"function f():void { position.normalized()[0] = 5; }",
@@ -819,6 +902,7 @@ int main() {
 	test_loop_markers();
 	test_engine_calls();
 	test_engine_operators();
+	test_engine_listeners();
 	test_entry_points();
 	test_statement_hook();
 	test_refused_program();
