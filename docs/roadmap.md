@@ -98,9 +98,10 @@ properties, signals and hot reload.
 |---|---|---|---|
 | 2a. Interpreter core | The typed IR, the interpreter, `kas3c run`, and the start of the conformance suite | A class with fields, methods, inheritance, numbers, strings and loops runs and traces the right output. | Done |
 | 2b-1. In Godot, first slice | The extension: a `.as` file is a script; Godot calls its methods; it reads and writes properties, calls methods and makes `Vector2`s | An AS3 script on a `CharacterBody2D` moves the body, in headless Godot 4.7.2. | Done |
-| 2b-2. What stage 1 promised | Signals (`add`, `addOnce`, `remove`, `has`, `emit`), `toString`, real defaults, `object[name]`, collections crossing the boundary, the other value types and their operators | Each promise has a test in Godot. | Next |
+| 2b-2, part A. Godot's values | Operators and comparison on Godot's values, their text, `position.x = 5`, elements by index, defaults Godot fills in, a script's `toString()` shown by Godot | Each has a test in Godot that compares the result with GDScript's. | Done |
+| 2b-2, part B. Signals | A method as a listener; `add`, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`; `timer[name].add(f)` | Each has a test in Godot. | Next |
 | 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the 64-bit integer decision | The test programs that need no unsupported language feature run in Godot. | Planned |
-| 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library | The corpus programs run. | Planned |
+| 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library. With them, what stage 1 promised that needs them: AS3 collections converting when handed to Godot, `object[name]` in general, and elements of Godot's untyped collections | The corpus programs run. | Planned |
 | 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game. | Planned |
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
@@ -148,25 +149,35 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 The design keeps each of these possible. No stage above delivers them.
 
-## What comes next: what stage 1 promised (stage 2b-2)
+## What comes next: signals (stage 2b-2, part B)
 
-**Goal:** everything the compiler already accepts about Godot also runs.
+**Goal:** a script listens to Godot's signals the AS3 way.
 
 | Step | What it does |
 |---|---|
-| 1. Operators | `position + velocity * delta` runs as Godot's own operators. |
-| 2. Signals | `timer.timeout.add(f)`, `addOnce`, `remove`, `has`, `emit`; a method used as a listener. |
-| 3. Parts of values | `position.x = 5` writes the property back. |
-| 4. `toString`, real defaults, `object[name]` | The remaining promises in the [stage 2a plan](superpowers/plans/2026-11-12-stage-2a-interpreter-core.md). |
+| 1. A method as a listener | `onTimeout` or `this.onTimeout` where Godot expects a function becomes a Godot callable that holds the object and the method. Two of the same are equal; it stops working, cleanly, when its object is freed. |
+| 2. The signal verbs | `timer.timeout.add(f)`, `add(f, true)` for the end of the frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`. Adding a listener twice does nothing. |
+| 3. `object[name]` | `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs. |
+
+Read more: [stage 2b-2 plan](superpowers/plans/2026-11-13-stage-2b2-values-and-signals.md).
+
+**Part A, Godot's values, is done.** What runs now:
+
+- Operators as Godot's own: `position + velocity * delta`, `-v`, `v == w`, `a == b` for two nodes, `v += w`.
+- Text: `trace(v)`, `"at " + v`, `String(v)` and `v.toString()` give Godot's text for the value or object.
+- One part of a value: `position.x = 5`, `position.x += 5`, `transform.origin.y = 3`.
+- Elements by index: `v[0]`, `v[1] = 3`, a packed array's elements.
+- Arguments left out take Godot's defaults, and so does a `null` written last for one.
+- A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
+- What Godot gives back is checked against the type it was declared as: a wrong one is an AS3 error.
+
+Three promises of stage 1 need AS3's untyped value or its own collections, and moved to stage 2c with them:
+AS3 `Array`, `Vector` and `Object` converting when handed to Godot; `object[name]` other than for a signal;
+and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) pass is under way,** before the next slice, as the owner asked. Done so far: the
-  two decisions above, the number constants (`NaN`, `int.MAX_VALUE`), reading a variable from the debugger
-  hook, a stop on every pass of a loop, four language-server faults, three faults in attaching scripts
-  in Godot, `print()` with no arguments, errors for `++` and bit operators on Godot values, go to
-  definition on `super(...)` with find references across overrides, changed ranges in the language server,
-  and type checks on Godot values and objects passed in from GDScript.
+- **The [backlog](backlog.md) pass is done** and merged. What remains is listed there.
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
 - **Language server:** Rider is not yet tried (the plugin is installed); Windows is not supported.

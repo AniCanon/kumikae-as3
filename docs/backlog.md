@@ -67,6 +67,17 @@ Found by the review of the clean-up pass itself.
 - Tests are missing for: private and static members of the same name not counting as overrides, and the
   base-first order when a host constructs an object.
 
+## Stage 2b-2, part A: Godot's values
+
+- A `null` that is not the last argument, for a parameter whose default AS3 can't write
+  (`color.clamp(null, max)`), is an error when the line runs. Giving it Godot's real default needs the
+  defaults in the name table.
+- A `Number` used as an index (`v[i]` with `i:Number`) goes to Godot as a fraction, which Godot refuses.
+- One part of a value that is stored nowhere (`a.normalized().x = 5`) is refused, though for Godot's shared
+  values (packed arrays) the write would be seen.
+- `position.x = f()` reads `position` after `f()` runs; if `f()` raises an error for a missing object the
+  order of the two errors is not Flash's.
+
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector is planned for 2d).
@@ -88,6 +99,7 @@ Found by the review of the clean-up pass itself.
 - GDScript cannot set a script's field, only read it; a script's method and property lists are empty.
 - A method that returns a script object can't hand it to Godot: the caller gets null, and an error says so.
 - A script's private methods and fields can be reached from GDScript.
-- A handle on a Godot object that has since been freed still counts as not null.
+- A handle on a Godot object that has since been freed still counts as not null. Its text is Godot's
+  `<Freed Object>`.
 - `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions
   but skips a virtual that a C++ extension class implements.

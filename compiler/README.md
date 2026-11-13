@@ -128,7 +128,7 @@ python3 compiler/tests/run_godot.py compiler/tests   # runs the project in headl
 To use it in a project of your own, copy `tests/godot_project/kas3.gdextension` and the `bin` folder into
 it.
 
-**What works so far (stage 2b-1):**
+**What works so far (stages 2b-1 and 2b-2, part A):**
 
 ```actionscript
 package {
@@ -156,13 +156,22 @@ package {
 - A script class may extend another script class, and may be attached to a reference-counted object
   without keeping it alive.
 - A Godot object can be compared with `null`. Calling a method on one that Godot has freed is an AS3 error.
+- Operators on Godot's values are Godot's own: `position + velocity * delta`, `-v`, `v == w`, `v += w`. Two
+  Godot objects are equal when they are the same object.
+- `trace(v)`, `"at " + v`, `String(v)` and `v.toString()` give Godot's text for a value or an object.
+- One part of a value can be written: `position.x = 5` reads the value, changes the part and writes it
+  back. So do `position.x += 5`, `transform.origin.y = 3` and `v[0] = 1`.
+- An argument left out takes Godot's default. So does a `null` written last for a parameter declared
+  `= null`.
+- A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
+- What Godot gives back is checked against its declared type. A value of another type is an AS3 error,
+  never taken as if it fitted.
 - An AS3 error inside a call from the engine is reported in Godot's own error output, with the AS3 stack
   trace, and the engine carries on.
 
-**Refused by name until the next slices:** operators on Godot values (`position + offset`), singletons
-(`Input`), constants and static members of Godot classes, signals, `print` and the other global functions,
-changing one part of a value (`position.x = 5`), creating Godot objects with `new`, passing a script object
-to Godot, and everything `kas3c run` refuses.
+**Refused by name until the next slices:** signals, singletons (`Input`), constants and static members of
+Godot classes, `print` and the other global functions, elements of Godot's untyped collections, creating
+Godot objects with `new`, passing a script object to Godot, and everything `kas3c run` refuses.
 
 How it works:
 
