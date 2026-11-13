@@ -60,6 +60,8 @@ inline bool is_engine(Kind p_kind) {
 	X(IsClass, "RRC") X(AsClass, "RRC") \
 	/* The engine. Names are Godot's own. In HostCall the first argument is what the method is called on. */ \
 	X(HostNew, "RSA") X(HostCall, "rSA") X(HostGet, "RRS") X(HostSet, "RSR") \
+	/* An operator on Godot values: the operator as AS3 writes it ("+", "=="), and one or two operands. */ \
+	X(HostOperate, "RSA") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") X(Trace, "A--")
 
@@ -98,9 +100,10 @@ struct Function {
 	uint32_t parameters = 0;
 	uint32_t required = 0; // How many of them have no default: a caller must pass at least these.
 	Kind result = Kind::Void;
-	// For each parameter that is a Godot value or object: Godot's name for its type ("Vector2",
-	// "CharacterBody2D"), by register. Empty for the others. A host checks what arrives against it.
-	std::vector<std::string> parameter_types;
+	// For each register that takes a Godot value or object from outside (a parameter, or the result of a
+	// request to the engine): Godot's name for its type ("Vector2", "CharacterBody2D"), by register. Empty
+	// for the others, and the vector may be shorter than the registers. A host checks what arrives against it.
+	std::vector<std::string> engine_types;
 	std::vector<Kind> registers;
 	std::vector<Instruction> code;
 	std::vector<std::vector<uint32_t>> argument_lists;

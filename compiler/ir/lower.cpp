@@ -422,6 +422,19 @@ class Lowerer {
 		return (uint32_t)fn().registers.size() - 1;
 	}
 
+	// A register for what the engine gives back. The host checks what arrives against the type.
+	uint32_t engine_reg(Kind p_kind, const Type *p_type) {
+		uint32_t out = reg(p_kind);
+		std::string godot;
+		if (is_engine(p_kind) && p_type && p_type->symbol && godot_name(p_type->symbol->name, std::string_view(), &godot)) {
+			if (fn().engine_types.size() <= out) {
+				fn().engine_types.resize(out + 1);
+			}
+			fn().engine_types[out] = godot;
+		}
+		return out;
+	}
+
 	Kind kind_at(uint32_t p_reg) const {
 		return p_reg < fn().registers.size() ? fn().registers[p_reg] : Kind::Void;
 	}
@@ -781,6 +794,7 @@ class Lowerer {
 		uint32_t object = 0; // For FieldOf and Engine: the register holding the object.
 		Kind kind = Kind::F64;
 		bool of_value = false; // For Engine: a member of a value type, which is a copy.
+		const Type *type = nullptr; // For Engine: what the member is declared to be.
 	};
 
 	// The engine object a Godot member is reached through: the script's own owner when nothing is
@@ -840,6 +854,7 @@ class Lowerer {
 		place.where = Place::Engine;
 		place.index = name;
 		place.kind = kind;
+		place.type = compilation_.type_of(type);
 		place.object = engine_receiver(p_object, p_position, &place.of_value);
 		return place;
 	}
@@ -933,7 +948,7 @@ class Lowerer {
 				return out;
 			}
 			case Place::Engine: {
-				uint32_t out = reg(p_place.kind);
+				uint32_t out = engine_reg(p_place.kind, p_place.type);
 				emit(Op::HostGet, p_position, out, p_place.object, p_place.index);
 				return out;
 			}
@@ -1188,7 +1203,7 @@ class Lowerer {
 		list.push_back(settled(engine_receiver(object, position, &of_value), writer(p_call->arguments), position));
 		FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
 		engine_arguments(decl, p_call->arguments, position, list);
-		uint32_t out = kind == Kind::Void ? NONE : reg(kind);
+		uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
 		emit(Op::HostCall, position, out, name, arguments(std::move(list)));
 		return out == NONE ? 0 : out;
 	}
@@ -1388,13 +1403,19 @@ class Lowerer {
 		uint32_t position = p_unary->offset;
 		(void)p_want;
 		switch (p_unary->op) {
-			case TokenKind::Minus: {
+			case TokenKind::Minus:
+			case TokenKind::Plus: {
+				Kind result = Kind::Void;
+				if (is_engine(natural(p_unary->operand)) && kind_of(p_unary->type, &result) && result != Kind::Void) {
+					return engine_operate(p_unary->op, { expression(p_unary->operand, Kind::Void) }, result, p_unary->type, position);
+				}
+				if (p_unary->op == TokenKind::Plus) {
+					return expression(p_unary->operand, Kind::F64);
+				}
 				uint32_t out = reg(Kind::F64);
 				emit(Op::NegF64, position, out, expression(p_unary->operand, Kind::F64));
 				return out;
 			}
-			case TokenKind::Plus:
-				return expression(p_unary->operand, Kind::F64);
 			case TokenKind::Bang: {
 				uint32_t out = reg(Kind::Bool);
 				emit(Op::Not, position, out, expression(p_unary->operand, Kind::Bool));
@@ -1425,6 +1446,35 @@ class Lowerer {
 
 	static bool is_numeric(Kind p_kind) {
 		return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::F64;
+	}
+
+	// An operator that Godot carries out, because an operand is one of its values. The operator goes as
+	// AS3 writes it; `v += w` is `v + w`.
+	uint32_t engine_operate(TokenKind p_op, std::vector<uint32_t> p_operands, Kind p_result, const Type *p_type, uint32_t p_position) {
+		std::string_view spelling = token_kind_spelling(p_op);
+		switch (p_op) {
+			case TokenKind::StrictEqual:
+				spelling = "==";
+				break;
+			case TokenKind::StrictNotEqual:
+				spelling = "!=";
+				break;
+			default:
+				// A compound assignment is spelled as its operator and '='.
+				if (spelling.size() >= 2 && spelling.back() == '=' && p_op != TokenKind::Equal && p_op != TokenKind::NotEqual &&
+						p_op != TokenKind::LessEqual && p_op != TokenKind::GreaterEqual) {
+					spelling.remove_suffix(1);
+				}
+				break;
+		}
+		for (uint32_t operand : p_operands) {
+			if (kind_at(operand) == Kind::Obj) {
+				refuse(p_position, "an operator between a Godot value and a script object");
+			}
+		}
+		uint32_t out = engine_reg(p_result, p_type);
+		emit(Op::HostOperate, p_position, out, string(std::string(spelling)), arguments(std::move(p_operands)));
+		return out;
 	}
 
 	// An arithmetic, bitwise or string operation on two values already evaluated.
@@ -1556,6 +1606,11 @@ class Lowerer {
 			case TokenKind::Greater:
 			case TokenKind::LessEqual:
 			case TokenKind::GreaterEqual: {
+				if (is_engine(natural(left)) || is_engine(natural(right))) {
+					uint32_t a = settled(expression(left, Kind::Void), right, position);
+					uint32_t b = expression(right, Kind::Void);
+					return engine_operate(p_binary->op, { a, b }, Kind::Bool, nullptr, position);
+				}
 				bool strings = is_string_type(left->type) && is_string_type(right->type);
 				Kind kind = strings ? Kind::Str : Kind::F64;
 				uint32_t a = settled(expression(left, kind), right, position);
@@ -1582,9 +1637,9 @@ class Lowerer {
 				} else if (a == Kind::Void || b == Kind::Void) {
 					// Against null: a reference is compared; a number or a Boolean is never null.
 					kind = a == Kind::Void ? b : a;
-					if (kind == Kind::Ref) {
-						// A Godot object against null: is there one?
-						uint32_t object = expression(a == Kind::Void ? right : left, Kind::Ref);
+					if (is_engine(kind)) {
+						// A Godot object or value against null: is there one?
+						uint32_t object = expression(a == Kind::Void ? right : left, kind);
 						uint32_t present = reg(Kind::Bool);
 						emit(Op::ObjToBool, position, present, object);
 						if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
@@ -1594,12 +1649,15 @@ class Lowerer {
 						emit(Op::Not, position, absent, present);
 						return absent;
 					}
-					if (is_engine(kind)) {
-						refuse(position, "comparing a Godot value with null");
-					} else if (!is_reference(kind)) {
+					if (!is_reference(kind)) {
 						refuse(position, "comparing a number or a Boolean with null");
 					}
 					op = kind == Kind::Str ? Op::EqStr : Op::EqRef;
+				} else if (is_engine(a) || is_engine(b)) {
+					// Godot's own equality: the same object, or equal values.
+					uint32_t x = settled(expression(left, Kind::Void), right, position);
+					uint32_t y = expression(right, Kind::Void);
+					return engine_operate(p_binary->op, { x, y }, Kind::Bool, nullptr, position);
 				} else if (a == Kind::Str && b == Kind::Str) {
 					kind = Kind::Str;
 					op = Op::EqStr;
@@ -1633,11 +1691,17 @@ class Lowerer {
 				Kind left_kind = Kind::Void, right_kind = Kind::Void;
 				kind_of(left->type, &left_kind);
 				kind_of(right->type, &right_kind);
-				if (is_engine(left_kind) || is_engine(right_kind)) {
-					refuse(position, "an operator on a Godot value");
-					return default_value(p_want, position);
-				}
 				bool strings = p_binary->op == TokenKind::Plus && is_string_type(p_binary->type);
+				if (!strings && (is_engine(left_kind) || is_engine(right_kind))) {
+					Kind result = Kind::Void;
+					if (!kind_of(p_binary->type, &result) || result == Kind::Void) {
+						refuse(position, "this operator on a Godot value");
+						return default_value(p_want, position);
+					}
+					uint32_t a = settled(expression(left, Kind::Void), right, position);
+					uint32_t b = expression(right, Kind::Void);
+					return engine_operate(p_binary->op, { a, b }, result, p_binary->type, position);
+				}
 				uint32_t a = settled(expression(left, Kind::Void), right, position);
 				uint32_t b = expression(right, Kind::Void);
 				return operate(p_binary->op, a, b, strings, position);
@@ -1658,7 +1722,11 @@ class Lowerer {
 			uint32_t old = settled(load(place, position), p_assign->value, position);
 			bool strings = p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Str || is_string_type(p_assign->value->type));
 			uint32_t right = expression(p_assign->value, Kind::Void);
-			value = convert(operate(p_assign->op, old, right, strings, position), place.kind, position);
+			if (!strings && (is_engine(kind_at(old)) || is_engine(kind_at(right)))) {
+				value = convert(engine_operate(p_assign->op, { old, right }, place.kind, p_assign->target->type, position), place.kind, position);
+			} else {
+				value = convert(operate(p_assign->op, old, right, strings, position), place.kind, position);
+			}
 		}
 		store(place, value, position);
 		return value;
@@ -1884,8 +1952,8 @@ class Lowerer {
 					const Type *type = compilation_.type_of(parameter.type);
 					std::string godot;
 					if (type && type->symbol && godot_name(type->symbol->name, std::string_view(), &godot)) {
-						fn().parameter_types.resize(local + 1);
-						fn().parameter_types[local] = godot;
+						fn().engine_types.resize(local + 1);
+						fn().engine_types[local] = godot;
 					}
 				}
 				if (parameter.symbol) {

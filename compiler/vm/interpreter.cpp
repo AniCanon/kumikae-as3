@@ -350,6 +350,17 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 	result.bits = 0;
 	Kind kind = Kind::Void;
 	uint32_t target = NONE;
+	// What the engine gives must be what the register was declared to hold.
+	auto wanted = [&](uint32_t p_target) {
+		Host::Wanted want;
+		if (p_target != NONE) {
+			want.kind = p_function.registers[p_target];
+			if (p_target < p_function.engine_types.size()) {
+				want.type = p_function.engine_types[p_target];
+			}
+		}
+		return want;
+	};
 	Host::Argument arguments[16];
 	std::vector<Host::Argument> many;
 	Host::Argument *values = arguments;
@@ -384,7 +395,24 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			gather(list, 1);
 			target = p_in.a;
 			kind = target == NONE ? Kind::Void : p_function.registers[target];
-			ok = host_.call(receiver, module_.strings[p_in.b], values, count, kind, target == NONE ? nullptr : &result, &error);
+			ok = host_.call(receiver, module_.strings[p_in.b], values, count, wanted(target), target == NONE ? nullptr : &result, &error);
+			break;
+		}
+		case Op::HostOperate: {
+			gather(p_function.argument_lists[p_in.c], 0);
+			const std::string &op = module_.strings[p_in.b];
+			// Only a comparison takes a missing value: `node == null`. Arithmetic on one is an error.
+			if (op != "==" && op != "!=") {
+				for (size_t i = 0; i < count; i++) {
+					if (ir::is_engine(values[i].kind) && !values[i].slot.p) {
+						raise(module_.type_error_class, NULL_ERROR);
+						return NULL_ERROR;
+					}
+				}
+			}
+			target = p_in.a;
+			kind = p_function.registers[target];
+			ok = host_.operate(op, values, count, wanted(target), &result, &error);
 			break;
 		}
 		case Op::HostGet: {
@@ -395,7 +423,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			}
 			target = p_in.a;
 			kind = p_function.registers[target];
-			ok = host_.get(receiver, module_.strings[p_in.c], kind, &result, &error);
+			ok = host_.get(receiver, module_.strings[p_in.c], wanted(target), &result, &error);
 			break;
 		}
 		default: {
@@ -969,6 +997,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostNew:
 			case Op::HostCall:
 			case Op::HostGet:
+			case Op::HostOperate:
 			case Op::HostSet: {
 				// The engine may call back into AS3 before it answers, which can move the registers: nothing
 				// read before the call is used after it.

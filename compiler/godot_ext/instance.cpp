@@ -20,47 +20,6 @@ struct ScriptInstance {
 	Ref<AS3Script> script; // Kept alive for as long as anything runs it.
 };
 
-// Whether a value arriving from Godot may be taken as a parameter of this kind. Numbers are taken as
-// GDScript itself would take them, but one that does not fit an int or a uint is refused, never wrapped.
-static bool accepts(ir::Kind p_kind, const std::string &p_godot_type, const Variant &p_value) {
-	Variant::Type type = p_value.get_type();
-	bool number = type == Variant::INT || type == Variant::FLOAT;
-	switch (p_kind) {
-		case ir::Kind::F64:
-			return number;
-		case ir::Kind::I32:
-		case ir::Kind::U32: {
-			if (!number) {
-				return false;
-			}
-			double value = (double)p_value;
-			double low = p_kind == ir::Kind::I32 ? -2147483648.0 : 0.0;
-			double high = p_kind == ir::Kind::I32 ? 2147483647.0 : 4294967295.0;
-			return value >= low && value <= high && (type == Variant::FLOAT || (int64_t)p_value == (int64_t)value);
-		}
-		case ir::Kind::Bool:
-			return type == Variant::BOOL;
-		case ir::Kind::Str:
-			return type == Variant::STRING || type == Variant::STRING_NAME || type == Variant::NIL;
-		case ir::Kind::Ref: {
-			// No object: null itself, or an object-typed value that holds none (what get_node_or_null gives).
-			if (type == Variant::NIL || (type == Variant::OBJECT && ((ObjectID)p_value).is_null())) {
-				return true;
-			}
-			Object *object = type == Variant::OBJECT ? p_value.get_validated_object() : nullptr;
-			return object && (p_godot_type.empty() || object->is_class(String::utf8(p_godot_type.c_str())));
-		}
-		case ir::Kind::Val:
-			// The value type the parameter names, and no other: a Vector3 is not a Vector2.
-			if (type == Variant::OBJECT || type == Variant::NIL) {
-				return false;
-			}
-			return p_godot_type.empty() || Variant::get_type_name(type) == String::utf8(p_godot_type.c_str());
-		default:
-			return false; // A script object can't come from Godot.
-	}
-}
-
 static GDExtensionVariantType expected_type(ir::Kind p_kind) {
 	switch (p_kind) {
 		case ir::Kind::F64:
@@ -148,8 +107,8 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 	// Every argument is checked before any is converted, so that a refusal leaves nothing to give back.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		ir::Kind kind = function.registers[i + 1];
-		const std::string godot_type = i + 1 < function.parameter_types.size() ? function.parameter_types[i + 1] : std::string();
-		if (!accepts(kind, godot_type, *reinterpret_cast<const Variant *>(p_args[i]))) {
+		const std::string godot_type = i + 1 < function.engine_types.size() ? function.engine_types[i + 1] : std::string();
+		if (!kas3::arrives(kind, godot_type, *reinterpret_cast<const Variant *>(p_args[i]))) {
 			r_error->error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
 			r_error->argument = (int32_t)i;
 			r_error->expected = (int32_t)expected_type(kind);

@@ -40,14 +40,28 @@ struct Host {
 	}
 	// Calls a method. The result arrives as p_result kind: a string as a new Str, an engine value as a
 	// handle, both the caller's. r_result is null when the result is not wanted.
+	// What the interpreter wants back: the kind, and for an engine value Godot's name for its type
+	// ("Vector2", "Node"; empty when it is not known). The host refuses what does not fit.
+	struct Wanted {
+		ir::Kind kind = ir::Kind::Void;
+		std::string_view type;
+	};
 	virtual bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count,
-			ir::Kind p_result, Slot *r_result, std::string *r_error) {
+			const Wanted &p_result, Slot *r_result, std::string *r_error) {
 		(void)p_receiver, (void)p_method, (void)p_arguments, (void)p_count, (void)p_result, (void)r_result;
 		*r_error = "there is no engine here";
 		return false;
 	}
-	virtual bool get(void *p_receiver, std::string_view p_property, ir::Kind p_result, Slot *r_result, std::string *r_error) {
+	virtual bool get(void *p_receiver, std::string_view p_property, const Wanted &p_result, Slot *r_result, std::string *r_error) {
 		(void)p_receiver, (void)p_property, (void)p_result, (void)r_result;
+		*r_error = "there is no engine here";
+		return false;
+	}
+	// An operator as AS3 writes it ("+", "==", "<"), on one operand or two, at least one of them an engine
+	// value. A null handle is null.
+	virtual bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
+			Slot *r_result, std::string *r_error) {
+		(void)p_operator, (void)p_arguments, (void)p_count, (void)p_result, (void)r_result;
 		*r_error = "there is no engine here";
 		return false;
 	}

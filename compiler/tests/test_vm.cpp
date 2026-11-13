@@ -361,8 +361,9 @@ struct FakeEngine : vm::Host {
 		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, ir::Kind p_kind,
+	bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted,
 			vm::Slot *r_result, std::string *r_error) override {
+		ir::Kind p_kind = p_wanted.kind;
 		log += "call #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
 		if (fail_calls) {
 			*r_error = "the engine refused " + std::string(p_method);
@@ -371,9 +372,20 @@ struct FakeEngine : vm::Host {
 		give(p_kind, r_result, 0.25, "text");
 		return true;
 	}
-	bool get(void *p_receiver, std::string_view p_property, ir::Kind p_kind, vm::Slot *r_result, std::string *) override {
+	bool get(void *p_receiver, std::string_view p_property, const Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "get #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + "\n";
-		give(p_kind, r_result, 7.5, name);
+		give(p_wanted.kind, r_result, 7.5, name);
+		return true;
+	}
+	bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted, vm::Slot *r_result,
+			std::string *r_error) override {
+		log += "operate " + std::string(p_operator) + " (" + list(p_arguments, p_count) + ") as " + ir::kind_name(p_wanted.kind) +
+				(p_wanted.type.empty() ? "" : " " + std::string(p_wanted.type)) + "\n";
+		if (fail_calls) {
+			*r_error = "the engine refused " + std::string(p_operator);
+			return false;
+		}
+		give(p_wanted.kind, r_result, 1, "text");
 		return true;
 	}
 	bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *) override {
@@ -395,6 +407,76 @@ struct FakeEngine : vm::Host {
 		}
 	}
 };
+
+// Operators on Godot's values are the engine's to carry out.
+static void test_engine_operators() {
+	const char *source = "package { import godot.*; public class Mover extends Node2D {\n"
+						 "  public function step(by:Vector2, n:int):Boolean {\n"
+						 "    var v:Vector2 = position + by * n;\n"
+						 "    v -= by;\n"
+						 "    return -v == by;\n"
+						 "  }\n"
+						 "  public function nobody():Vector2 { var v:Vector2; return v + v; }\n"
+						 "  public function isNobody(n:Node):Boolean { return n == this.getParent() || n != null; }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Mover.as", source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	{
+		FakeEngine engine;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		uint32_t mover = 0;
+		for (size_t i = 0; i < module.classes.size(); i++) {
+			mover = module.classes[i].name == "Mover" ? (uint32_t)i : mover;
+		}
+		vm::Object *object = interpreter.construct(mover, engine.box()); // #1
+		CHECK(object != nullptr);
+		vm::Slot arguments[2];
+		arguments[0].bits = 0;
+		arguments[0].p = engine.box(); // #2: the caller's, and the caller's to drop.
+		arguments[1].bits = 0;
+		arguments[1].i = 3;
+		vm::Slot result;
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "step", arguments, 2, &result));
+		// Left to right, each operand as the checker typed it, and each result as the type the checker gave.
+		CHECK_EQ(engine.log, std::string("get #1.position\n"
+										 "operate * (#2, 3) as GodotValue Vector2\n"
+										 "operate + (#3, #4) as GodotValue Vector2\n"
+										 "operate - (#5, #2) as GodotValue Vector2\n"
+										 "operate - (#6) as GodotValue Vector2\n"
+										 "operate == (#7, #2) as Boolean\n"));
+		CHECK(result.b);
+		CHECK_EQ(engine.boxes, 2); // The owner and the caller's argument: every other handle was dropped.
+		// Arithmetic on a missing value is an AS3 error before the engine is asked.
+		engine.log.clear();
+		CHECK(!interpreter.call_method(object, "nobody", nullptr, 0, nullptr));
+		CHECK_EQ(engine.log, std::string());
+		CHECK(engine.errors.find("TypeError: Error #1009") == 0);
+		// A comparison takes a missing value.
+		engine.log.clear();
+		engine.errors.clear();
+		vm::Slot none;
+		none.bits = 0;
+		CHECK(interpreter.call_method(object, "isNobody", &none, 1, &result));
+		CHECK_EQ(engine.log, std::string("call #1.get_parent()\noperate == (#0, #8) as Boolean\n"));
+		CHECK_EQ(engine.errors, std::string());
+		// An operator the engine refuses is an AS3 error, and nothing is left behind.
+		engine.fail_calls = true;
+		CHECK(!interpreter.call_method(object, "step", arguments, 2, nullptr));
+		CHECK(engine.errors.find("Error: the engine refused *") == 0);
+		interpreter.release_object(object);
+		CHECK_EQ(engine.boxes, 1);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
 
 static void test_engine_calls() {
 	Compilation compilation;
@@ -558,14 +640,12 @@ static void test_engine_calls() {
 		return std::string(checked.empty() ? "" : "CHECK ") + (lowered ? "LOWERED " : "") + text;
 	};
 	const char *bodies[] = {
-		"function f():void { position = position + new Vector2(1, 0); }",
 		"function f():void { if (Input.isActionPressed(\"jump\")) {} }",
 		"function f():void { treeEntered.add(g); } function g():void {}",
 		"function f():void { print(\"hello\"); }",
 		"function f():void { position.x = 5; }",
 		"function f():void { addChild(this); }",
 		"function f():void { var other:Player = new Player(); }",
-		"function f():Boolean { return position == null; }",
 	};
 	for (const char *body : bodies) {
 		std::string result = refused(body);
@@ -661,6 +741,7 @@ int main() {
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();
+	test_engine_operators();
 	test_entry_points();
 	test_statement_hook();
 	test_refused_program();

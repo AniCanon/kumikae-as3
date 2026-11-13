@@ -108,6 +108,33 @@ check("says a script object can't be returned to Godot", output.count("returns a
 check("checks: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
 check("checks: nothing leaked", "leaked" not in output.lower(), output[-600:])
 
+def compare(script, names):
+    """Runs a driver that prints `VALUE name=<from AS3>|<from GDScript>` and checks that the two agree."""
+    run = subprocess.run([godot, "--headless", "--path", project, "-s", script], capture_output=True, text=True,
+                         timeout=300)
+    output = run.stdout + run.stderr
+    seen = {}
+    for line in output.split("\n"):
+        if line.startswith("VALUE ") and "=" in line:
+            name, both = line[len("VALUE "):].split("=", 1)
+            seen[name] = both.split("|", 1)
+    for name in names:
+        pair = seen.get(name)
+        check("%s: %s" % (script, name), pair is not None and len(pair) == 2 and pair[0] == pair[1],
+              "got %r" % (pair,))
+    check("%s: no crash" % script, run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
+    check("%s: nothing leaked" % script, "leaked" not in output.lower(), output[-600:])
+    return output
+
+
+# Godot's values: operators, as GDScript works them out.
+output = compare("values.gd", [
+    "add", "sub", "times", "times int", "number first", "divide", "negate", "cells", "cells by number", "cells over",
+    "tint", "same", "not same", "differs", "same node", "not same node", "other node", "chain", "compound", "moved",
+    "cells over zero", "after the error",
+])
+check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" in output, output[-800:])
+
 for failure in failures:
     print("FAIL " + failure)
 print("godot: %s" % ("OK" if not failures else "%d failed" % len(failures)))

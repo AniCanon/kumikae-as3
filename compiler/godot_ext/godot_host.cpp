@@ -33,11 +33,71 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 			return string ? Variant(text(string->view())) : Variant();
 		}
 		case ir::Kind::Val:
-		case ir::Kind::Ref:
-			return p_slot.p ? *static_cast<const Variant *>(p_slot.p) : Variant();
+		case ir::Kind::Ref: {
+			const Variant *value = static_cast<const Variant *>(p_slot.p);
+			// A copy of a handle whose object Godot has freed would count a reference on freed memory.
+			if (!value || (value->get_type() == Variant::OBJECT && !value->get_validated_object())) {
+				return Variant();
+			}
+			return *value;
+		}
 		default:
 			return Variant();
 	}
+}
+
+bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_value) {
+	Variant::Type type = p_value.get_type();
+	bool number = type == Variant::INT || type == Variant::FLOAT;
+	switch (p_kind) {
+		case ir::Kind::F64:
+			return number;
+		case ir::Kind::I32:
+		case ir::Kind::U32: {
+			if (!number) {
+				return false;
+			}
+			double value = (double)p_value;
+			double low = p_kind == ir::Kind::I32 ? -2147483648.0 : 0.0;
+			double high = p_kind == ir::Kind::I32 ? 2147483647.0 : 4294967295.0;
+			return value >= low && value <= high && (type == Variant::FLOAT || (int64_t)p_value == (int64_t)value);
+		}
+		case ir::Kind::Bool:
+			return type == Variant::BOOL;
+		case ir::Kind::Str:
+			return type == Variant::STRING || type == Variant::STRING_NAME || type == Variant::NODE_PATH || type == Variant::NIL;
+		case ir::Kind::Ref: {
+			// No object: null itself, or an object-typed value that holds none (what get_node_or_null gives).
+			if (type == Variant::NIL || (type == Variant::OBJECT && ((ObjectID)p_value).is_null())) {
+				return true;
+			}
+			Object *object = type == Variant::OBJECT ? p_value.get_validated_object() : nullptr;
+			return object && (p_godot_type.empty() || object->is_class(text(p_godot_type)));
+		}
+		case ir::Kind::Val:
+			// The value type that is named, and no other: a Vector3 is not a Vector2. Nothing at all is null.
+			if (type == Variant::OBJECT) {
+				return false;
+			}
+			return type == Variant::NIL || p_godot_type.empty() || Variant::get_type_name(type) == text(p_godot_type);
+		default:
+			return false; // A script object can't come from Godot.
+	}
+}
+
+// What Godot gave, as the interpreter asked for it; refused if it is something else.
+static bool take(const vm::Host::Wanted &p_wanted, const Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error) {
+	if (!r_result || p_wanted.kind == ir::Kind::Void) {
+		return true;
+	}
+	if (!arrives(p_wanted.kind, p_wanted.type, p_value)) {
+		CharString got = Variant::get_type_name(p_value.get_type()).utf8();
+		*r_error = "Godot's '" + std::string(p_from) + "' gave a " + std::string(got.get_data()) + " where " +
+				(p_wanted.type.empty() ? std::string(ir::kind_name(p_wanted.kind)) : std::string(p_wanted.type)) + " was expected";
+		return false;
+	}
+	*r_result = from_variant(p_wanted.kind, p_value);
+	return true;
 }
 
 vm::Slot from_variant(ir::Kind p_kind, const Variant &p_value) {
@@ -136,7 +196,7 @@ void *GodotHost::construct(std::string_view p_type, const Argument *p_arguments,
 	return made;
 }
 
-bool GodotHost::call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, ir::Kind p_result,
+bool GodotHost::call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
 	Variant *receiver = static_cast<Variant *>(p_receiver);
 	// An object Godot has freed leaves a dangling pointer in the handle: ask Godot whether it is still
@@ -163,21 +223,70 @@ bool GodotHost::call(void *p_receiver, std::string_view p_method, const Argument
 		*r_error = describe(error, p_method);
 		return false;
 	}
-	if (r_result) {
-		*r_result = from_variant(p_result, result);
-	}
-	return true;
+	return take(p_result, result, p_method, r_result, r_error);
 }
 
-bool GodotHost::get(void *p_receiver, std::string_view p_property, ir::Kind p_result, vm::Slot *r_result, std::string *r_error) {
+// AS3's spelling of an operator, as Godot's. With one operand, '-' and '+' are the unary ones.
+static bool operator_of(std::string_view p_operator, size_t p_count, Variant::Operator *r_operator) {
+	static const struct {
+		const char *spelling;
+		Variant::Operator op;
+	} TABLE[] = {
+		{ "==", Variant::OP_EQUAL }, { "!=", Variant::OP_NOT_EQUAL }, { "<", Variant::OP_LESS }, { "<=", Variant::OP_LESS_EQUAL },
+		{ ">", Variant::OP_GREATER }, { ">=", Variant::OP_GREATER_EQUAL }, { "+", Variant::OP_ADD }, { "-", Variant::OP_SUBTRACT },
+		{ "*", Variant::OP_MULTIPLY }, { "/", Variant::OP_DIVIDE }, { "%", Variant::OP_MODULE }, { "<<", Variant::OP_SHIFT_LEFT },
+		{ ">>", Variant::OP_SHIFT_RIGHT }, { "&", Variant::OP_BIT_AND }, { "|", Variant::OP_BIT_OR }, { "^", Variant::OP_BIT_XOR },
+	};
+	if (p_count == 1) {
+		if (p_operator == "-" || p_operator == "+") {
+			*r_operator = p_operator == "-" ? Variant::OP_NEGATE : Variant::OP_POSITIVE;
+			return true;
+		}
+		if (p_operator == "~") {
+			*r_operator = Variant::OP_BIT_NEGATE;
+			return true;
+		}
+		return false;
+	}
+	for (const auto &entry : TABLE) {
+		if (p_operator == entry.spelling) {
+			*r_operator = entry.op;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool GodotHost::operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
+		vm::Slot *r_result, std::string *r_error) {
+	Variant::Operator op = Variant::OP_ADD;
+	if (p_count < 1 || p_count > 2 || !operator_of(p_operator, p_count, &op)) {
+		*r_error = "Godot has no operator '" + std::string(p_operator) + "'";
+		return false;
+	}
+	Variant left = to_variant(p_arguments[0].kind, p_arguments[0].slot);
+	Variant right = p_count == 2 ? to_variant(p_arguments[1].kind, p_arguments[1].slot) : Variant();
+	Variant result;
+	bool valid = false;
+	Variant::evaluate(op, left, right, result, valid);
+	if (!valid) {
+		CharString a = Variant::get_type_name(left.get_type()).utf8();
+		CharString b = Variant::get_type_name(right.get_type()).utf8();
+		*r_error = p_count == 2 ? "Godot can't work out " + std::string(a.get_data()) + " " + std::string(p_operator) + " " + std::string(b.get_data()) + " for these values"
+								: "Godot can't work out " + std::string(p_operator) + std::string(a.get_data());
+		return false;
+	}
+	return take(p_result, result, p_operator, r_result, r_error);
+}
+
+bool GodotHost::get(void *p_receiver, std::string_view p_property, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	bool valid = false;
 	Variant value = static_cast<Variant *>(p_receiver)->get_named(StringName(text(p_property)), valid);
 	if (!valid) {
 		*r_error = "Godot has no '" + std::string(p_property) + "' on this value";
 		return false;
 	}
-	*r_result = from_variant(p_result, value);
-	return true;
+	return take(p_result, value, p_property, r_result, r_error);
 }
 
 bool GodotHost::set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) {
