@@ -150,9 +150,12 @@ AS3 has no enum type, so an enum value is an `int`.
   | `signal.add(f, true)` | `connect(f, CONNECT_DEFERRED)` | An optional `deferred:Boolean`, as AS3's own optional parameters on `addEventListener`. The listener is called at the end of the frame. |
   | `signal.addOnce(f)` | `connect(f, CONNECT_ONE_SHOT)` | Also takes `deferred`. |
   | `signal.remove(f)` | `disconnect(f)` | |
-  | `signal.removeAll()` | `disconnect` for each connection | |
+  | `signal.removeAll()` | `disconnect` for each listener a script added | The engine and GDScript connect listeners of their own (a container listens to its children). Those are left alone. |
   | `signal.has(f)` | `is_connected(f)` | |
-  | `signal.numListeners` | `get_connections().size()`, `has_connections()` | |
+  | `signal.numListeners` | the count of listeners scripts added | So it is 0 after `removeAll()`. (Changed while building stage 2b-2, when the owner asked for the review's open points to be fixed.) |
+
+  A listener is there to stay (`add`) or for once only (`addOnce`), not both: adding it the other way
+  without removing it first is an error, as in as3-signals.
 
   Godot's reference-counted and persist flags have no spelling: the first is what "adding twice does
   nothing" replaces, and the second is for the editor.

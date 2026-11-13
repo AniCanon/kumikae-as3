@@ -70,8 +70,21 @@ func _physics_process(_delta: float) -> bool:
 	var theirs := func(): pass
 	node.renamed.connect(theirs)
 	node.listen()
+	show("counts what scripts added", [node.listeners(), node.renamed.get_connections().size()], [1, 2])
 	node.stopAll()
-	show("remove all leaves others", [node.isListening(), node.renamed.is_connected(theirs)], [false, true])
+	show("remove all leaves others", [node.isListening(), node.renamed.is_connected(theirs), node.listeners()], [false, true, 0])
+	# The same listener can't be both lasting and once-only: the second call is an error, as in as3-signals.
+	node.mixed()
+	node.mixedBack()
+	show("lasting or once, not both", node.listeners(), 2)
+	node.stopAll()
+	# A signal made from nothing; null as an argument; arguments are worked out before a wrong name fails.
+	node.empty()
+	other.add_user_signal("ping", [{"name": "n", "type": TYPE_OBJECT}])
+	node.reset()
+	node.ping(other)
+	node.wrongName(other)
+	show("null argument and order", node.count, 1050)
 	node.renamed.disconnect(theirs)
 	# Arguments reach the listener.
 	node.reset()

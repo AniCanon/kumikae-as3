@@ -79,6 +79,8 @@ expected = {
     "default": "8",
     "int": "42",
     "big int": "<null>",
+    "whole float as int": "3",
+    "fraction as int": "<null>",
     "negative uint": "<null>",
     "number from text": "<null>",
     "node from int": "<null>",
@@ -150,13 +152,17 @@ check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" 
 
 # Signals, the AS3 way.
 output = compare("signals.gd", [
-    "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "remove all leaves others", "arguments", "removes itself",
+    "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "counts what scripts added", "remove all leaves others", "lasting or once, not both",
+    "null argument and order", "arguments", "removes itself",
     "after a failing listener", "another object's signal", "by name", "by a wrong name", "user signal", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed",
 ])
 check("an error inside a listener is reported", "at Signals/fails()" in output, output[-800:])
 check("a wrong signal name is an AS3 error", output.count("at Signals/listenByName()") == 2, output[-800:])
+check("add after addOnce, and the reverse, are AS3 errors", "at Signals/mixed()" in output and "at Signals/mixedBack()" in output,
+      output[-800:])
+check("an empty signal says so", "the signal is empty" in output and "at Signals/empty()" in output, output[-800:])
 
 for failure in failures:
     print("FAIL " + failure)

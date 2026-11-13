@@ -495,7 +495,7 @@ static void test_engine_listeners() {
 		CHECK(interpreter.call_method(object, "listen", arguments, 2, nullptr));
 		CHECK_EQ(engine.log, std::string("get #1.renamed\nbind Child/mine of Child owner #1 -> #8\ncall #7.@add(#8, true)\n"
 										 "get #2.renamed\nbind Child/shared of Child owner #2 -> #10\ncall #9.@addOnce(#10)\n"
-										 "member #2[renamed] as Signal\nbind Child/mine of Child owner #1 -> #12\ncall #11.@remove(#12)\n"));
+										 "bind Child/mine of Child owner #1 -> #11\nmember #2[renamed] as Signal\ncall #12.@remove(#11)\n"));
 		vm::free_string(static_cast<vm::Str *>(arguments[1].p));
 		CHECK_EQ(engine.boxes, 2);
 		// A method of a missing object is an AS3 error.
@@ -800,6 +800,7 @@ static void test_engine_calls() {
 	const char *bodies[] = {
 		"function f():void { if (Input.isActionPressed(\"jump\")) {} }",
 		"function f():void { treeEntered.add(function():void {}); }",
+		"public var mine:int; function f():void { this[\"mine\"].add(f); }",
 		"function f(n:Node):void { var x:int = n[\"name\"].length; }",
 		"function f():void { print(\"hello\"); }",
 		"function f():void { position.normalized().x = 5; }",

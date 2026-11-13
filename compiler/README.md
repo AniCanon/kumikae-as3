@@ -166,7 +166,8 @@ package {
 - A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
 - Signals are listened to the AS3 way: `timer.timeout.add(onTimeout)`, `add(f, true)` for the end of the
   frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`. Adding a listener twice does
-  nothing. A listener goes when its object is freed.
+  nothing. `removeAll` and `numListeners` are about the listeners scripts added, not the engine's own. A
+  listener goes when its object is freed.
 - A method is a function wherever Godot takes one: `array.filter(isBig)`.
 - `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs.
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,

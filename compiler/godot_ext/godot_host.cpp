@@ -76,7 +76,8 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 			double value = (double)p_value;
 			double low = p_kind == ir::Kind::I32 ? -2147483648.0 : 0.0;
 			double high = p_kind == ir::Kind::I32 ? 2147483647.0 : 4294967295.0;
-			return value >= low && value <= high && (type == Variant::FLOAT || (int64_t)p_value == (int64_t)value);
+			// A fraction is not a whole number: 3.0 is taken, 2.5 is not.
+			return value >= low && value <= high && (type == Variant::FLOAT ? value == (double)(int64_t)value : (int64_t)p_value == (int64_t)value);
 		}
 		case ir::Kind::Bool:
 			return type == Variant::BOOL;
@@ -227,6 +228,10 @@ static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, cons
 		return false;
 	}
 	Signal signal = p_receiver;
+	if (signal.is_null()) {
+		*r_error = "the signal is empty: it belongs to no object";
+		return false;
+	}
 	if (!ObjectDB::get_instance(signal.get_object_id())) {
 		*r_error = "the signal belongs to an object Godot has freed";
 		return false;
@@ -234,7 +239,12 @@ static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, cons
 	if (p_verb == "@removeAll" || p_verb == "@numListeners") {
 		Array connections = signal.get_connections();
 		if (p_verb == "@numListeners") {
-			return take(p_result, Variant((int64_t)connections.size()), "numListeners", r_result, r_error);
+			// The listeners scripts added: the ones removeAll() would take away.
+			int64_t count = 0;
+			for (int64_t i = 0; i < connections.size(); i++) {
+				count += is_script_listener(Dictionary(connections[i])["callable"]) ? 1 : 0;
+			}
+			return take(p_result, Variant(count), "numListeners", r_result, r_error);
 		}
 		// What scripts added, and only that: the engine and GDScript connect listeners of their own (a
 		// container listens to its children), which are not AS3's to take away.
@@ -263,7 +273,20 @@ static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, cons
 		return true;
 	}
 	if (p_verb == "@add" || p_verb == "@addOnce") {
-		// Adding a listener that is already there does nothing, as with AS3's addEventListener.
+		// Adding a listener that is already there does nothing, as with AS3's addEventListener. But it
+		// can't be there both to stay and for once only: that is an error, as in as3-signals.
+		bool once = p_verb == "@addOnce";
+		if (connected) {
+			Array connections = signal.get_connections();
+			for (int64_t i = 0; i < connections.size(); i++) {
+				Dictionary connection = connections[i];
+				if (Callable(connection["callable"]) == callable && (((int64_t)connection["flags"] & Object::CONNECT_ONE_SHOT) != 0) != once) {
+					*r_error = once ? "this listener was added with add(): remove it before adding it with addOnce()"
+									: "this listener was added with addOnce(): remove it before adding it with add()";
+					return false;
+				}
+			}
+		}
 		if (!connected) {
 			bool deferred = p_count >= 2 && p_arguments[1].kind == ir::Kind::Bool && p_arguments[1].slot.b;
 			int64_t flags = (deferred ? Object::CONNECT_DEFERRED : 0) | (p_verb == "@addOnce" ? Object::CONNECT_ONE_SHOT : 0);

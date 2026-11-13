@@ -42,6 +42,8 @@ func _physics_process(_delta: float) -> bool:
 	print("CHECK default=%s" % str(Callable(node, "withDefault").callv([1])))
 	print("CHECK int=%s" % str(Callable(node, "takeInt").callv([42])))
 	print("CHECK big int=%s" % str(Callable(node, "takeInt").callv([5000000000])))
+	print("CHECK whole float as int=%s" % str(Callable(node, "takeInt").callv([3.0])))
+	print("CHECK fraction as int=%s" % str(Callable(node, "takeInt").callv([2.5])))
 	print("CHECK negative uint=%s" % str(Callable(node, "takeUint").callv([-1])))
 	print("CHECK number from text=%s" % str(Callable(node, "takeNumber").callv(["abc"])))
 	print("CHECK node from int=%s" % str(Callable(node, "takeNode").callv([5])))

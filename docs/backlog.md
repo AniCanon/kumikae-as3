@@ -98,20 +98,12 @@ Found by the review of the clean-up pass itself.
   cycle collector, 2d).
 - A singleton's signals (`Input.joyConnectionChanged`) wait for singletons (2b-3); a script's own signals
   wait for `[Signal]` (2d).
-- `this["count"].add(f)` on a script's own field is taken for a signal lookup, and fails when it runs.
+- `this[name].add(f)` with a name known only as the program runs, naming a script's own field, is taken
+  for a signal lookup and fails when it runs. (Written as a string in the source, it is refused.)
 - Script objects still held by listeners when the program is unloaded are not freed (only at exit).
-- `new Signal().add(f)` says the signal's object was freed; it never had one. An error from `emit` does
-  not name the listener's method. `signal.emit(null)` is refused as "passing a script object".
-- `o["nope"].add(f, g())` raises its error before `g()` runs; AS3's own members evaluate arguments first.
+- An error from `emit` does not name the listener's method.
 - A listener called with the wrong number of arguments is not called, and Godot prints the error: it is
   not an AS3 error with a stack trace.
-- **decision** `removeAll()` removes the listeners scripts added, and leaves the engine's and GDScript's.
-  `numListeners` counts all of them, as the naming design says, so it can be more than 0 after
-  `removeAll()`.
-- **decision** `add` then `addOnce` of the same listener leaves it permanent, and the other order leaves it
-  one-shot: the second call does nothing. as3-signals raises an error there.
-- **decision** A fraction given to an `int` parameter from Godot is cut (2.5 arrives as 2), though other
-  misfits are refused.
 
 ## Stage 2a: interpreter core
 

@@ -17,6 +17,14 @@ package {
 		private function isBig(n:int):Boolean { return n > 2; }
 
 		public function reset():void { count = 0; }
+		// What the review of this slice left open.
+		public function mixed():void { renamed.add(onRenamed); renamed.addOnce(onRenamed); }
+		public function mixedBack():void { renamed.addOnce(onceOnly); renamed.add(onceOnly); }
+		public function empty():void { new Signal().add(onRenamed); }
+		public function onPing(n:Node):void { count += n == null ? 1000 : 1; }
+		public function ping(other:Node):void { new Signal(other, "ping").add(onPing); new Signal(other, "ping").emit(null); }
+		public function note():Boolean { count += 50; return false; }
+		public function wrongName(other:Node):void { other["nothingAtAll"].add(onRenamed, note()); }
 		// A plain listener on a signal of something only a static field holds: both go when the program does.
 		public function keepPlain(r:Resource):void { held = r; helper = new Listener(); r.changed.add(helper.heard); }
 		public function listen():void { renamed.add(onRenamed); }

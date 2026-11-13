@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <unordered_map>
@@ -1155,9 +1156,10 @@ class Lowerer {
 			Member *member = static_cast<Member *>(callee);
 			auto verb = signal_->klass->members.find(member->name);
 			if (verb != signal_->klass->members.end() && verb->second->kind == SymbolKind::Method) {
-				uint32_t found = signal_by_name(member->object);
+				uint32_t object = 0, name = 0;
+				uint32_t found = signal_by_name(member->object, writer(p_call->arguments), &object, &name);
 				if (found != NONE) {
-					return engine_call(p_call, verb->second, found);
+					return engine_call(p_call, verb->second, found, [&]() { emit(Op::HostMember, member->object->offset, found, object, name); });
 				}
 			}
 		}
@@ -1301,7 +1303,10 @@ class Lowerer {
 	}
 
 	// `object[name]` where a signal's member follows: the signal, by its AS3 name. NONE if this is not one.
-	uint32_t signal_by_name(Expr *p_expression) {
+	// The object and the name are worked out here; the register is filled by a HostMember that the caller
+	// emits once the call's arguments are worked out, so that a wrong name fails after them, as a wrong
+	// member does in AS3.
+	uint32_t signal_by_name(Expr *p_expression, Expr *p_later, uint32_t *r_object, uint32_t *r_name) {
 		if (p_expression->kind != NodeKind::Index) {
 			return NONE;
 		}
@@ -1318,15 +1323,24 @@ class Lowerer {
 		if (object != Kind::Ref && !script) {
 			return NONE;
 		}
+		if (script && index->index->kind == NodeKind::StringLit) {
+			// A script's own member, written as a string: not a signal of the Godot object behind it.
+			std::string own = unescape(static_cast<StringLit *>(index->index)->text);
+			for (const Symbol *at = type->symbol; at && at->klass && classes_.count(at); at = at->klass->base) {
+				if (at->klass->members.count(own)) {
+					return NONE;
+				}
+			}
+		}
 		bool of_value = false;
-		uint32_t node = settled(engine_receiver(index->object, p_expression->offset, &of_value), index->index, p_expression->offset);
-		uint32_t name = expression(index->index, Kind::Str);
+		*r_object = settled(engine_receiver(index->object, p_expression->offset, &of_value), index->index, p_expression->offset);
+		*r_object = settled(*r_object, p_later, p_expression->offset);
+		*r_name = settled(expression(index->index, Kind::Str), p_later, p_expression->offset);
 		uint32_t out = reg(Kind::Val);
 		if (fn().engine_types.size() <= out) {
 			fn().engine_types.resize(out + 1);
 		}
 		fn().engine_types[out] = "Signal";
-		emit(Op::HostMember, p_expression->offset, out, node, name);
 		return out;
 	}
 
@@ -1362,6 +1376,9 @@ class Lowerer {
 			for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
 				later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
 			}
+			if (kind == Kind::Void && is_null(p_arguments[i])) {
+				kind = Kind::Ref; // `null` where Godot takes anything: nothing.
+			}
 			uint32_t value = expression(p_arguments[i], kind);
 			if (kind_at(value) == Kind::Obj) {
 				refuse(p_arguments[i]->offset, "passing a script object to Godot");
@@ -1370,7 +1387,7 @@ class Lowerer {
 		}
 	}
 
-	uint32_t engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver = NONE) {
+	uint32_t engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver = NONE, const std::function<void()> &p_before = nullptr) {
 		uint32_t position = p_call->offset;
 		uint32_t name = 0;
 		if (!engine_name(p_method->owner, p_method->name, &name)) {
@@ -1387,6 +1404,9 @@ class Lowerer {
 		list.push_back(settled(p_receiver != NONE ? p_receiver : engine_receiver(object, position, &of_value), writer(p_call->arguments), position));
 		FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
 		engine_arguments(decl, p_call->arguments, position, list);
+		if (p_before) {
+			p_before(); // What the receiver still needs, now that the arguments are worked out.
+		}
 		uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
 		emit(Op::HostCall, position, out, name, arguments(std::move(list)));
 		return out == NONE ? 0 : out;
