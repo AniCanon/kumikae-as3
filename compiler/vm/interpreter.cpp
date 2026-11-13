@@ -437,6 +437,34 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			ok = host_.get(receiver, module_.strings[p_in.c], wanted(target), &result, &error);
 			break;
 		}
+		case Op::HostIndexGet: {
+			void *receiver = r[p_in.b].p;
+			if (!receiver) {
+				raise(module_.type_error_class, NULL_ERROR);
+				return NULL_ERROR;
+			}
+			Host::Argument key;
+			key.kind = p_function.registers[p_in.c];
+			key.slot = r[p_in.c];
+			target = p_in.a;
+			kind = p_function.registers[target];
+			ok = host_.index_get(receiver, key, wanted(target), &result, &error);
+			break;
+		}
+		case Op::HostIndexSet: {
+			void *receiver = r[p_in.a].p;
+			if (!receiver) {
+				raise(module_.type_error_class, NULL_ERROR);
+				return NULL_ERROR;
+			}
+			Host::Argument key, value;
+			key.kind = p_function.registers[p_in.b];
+			key.slot = r[p_in.b];
+			value.kind = p_function.registers[p_in.c];
+			value.slot = r[p_in.c];
+			ok = host_.index_set(receiver, key, value, &error);
+			break;
+		}
 		default: {
 			void *receiver = r[p_in.a].p;
 			if (!receiver) {
@@ -1010,6 +1038,8 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostGet:
 			case Op::HostOperate:
 			case Op::HostToStr:
+			case Op::HostIndexGet:
+			case Op::HostIndexSet:
 			case Op::HostSet: {
 				// The engine may call back into AS3 before it answers, which can move the registers: nothing
 				// read before the call is used after it.

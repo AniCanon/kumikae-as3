@@ -70,6 +70,17 @@ struct Host {
 		*r_error = "there is no engine here";
 		return false;
 	}
+	// An element of an engine value, by a number or another key: `vector[0]`.
+	virtual bool index_get(void *p_receiver, const Argument &p_key, const Wanted &p_result, Slot *r_result, std::string *r_error) {
+		(void)p_receiver, (void)p_key, (void)p_result, (void)r_result;
+		*r_error = "there is no engine here";
+		return false;
+	}
+	virtual bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) {
+		(void)p_receiver, (void)p_key, (void)p_value;
+		*r_error = "there is no engine here";
+		return false;
+	}
 	// The engine's own text for a value or an object, as a new Str that is the caller's.
 	virtual Str *text(void *p_value) {
 		(void)p_value;

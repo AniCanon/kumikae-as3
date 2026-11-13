@@ -28,6 +28,8 @@ public:
 	bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error) override;
 	bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) override;
+	bool index_get(void *p_receiver, const Argument &p_key, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) override;
 	vm::Str *text(void *p_value) override;
 	void *copy(void *p_value) override;
 	void drop(void *p_value) override;

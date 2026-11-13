@@ -135,7 +135,10 @@ output = compare("values.gd", [
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
     "freed text",
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
+    "first", "color part", "set second", "add element", "position element", "packed", "set packed",
+    "packed out of range", "out of range",
 ])
+check("an index out of range is an AS3 error", "at Values/outOfRange()" in output and "at Values/packed()" in output, output[-800:])
 traced = re.search(r"EXPECT TRACE (.*)", output)
 check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])
 check("toString() on a missing node is an AS3 error", "at Values/nullOwn()" in output, output[-800:])

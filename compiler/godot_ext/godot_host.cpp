@@ -305,6 +305,37 @@ bool GodotHost::set(void *p_receiver, std::string_view p_property, const Argumen
 	return true;
 }
 
+// "element 5 of this Vector2", for an error.
+static std::string element(const Variant &p_key, const Variant &p_of) {
+	CharString key = p_key.stringify().utf8();
+	CharString type = Variant::get_type_name(p_of.get_type()).utf8();
+	return "element " + std::string(key.get_data()) + " of this " + std::string(type.get_data());
+}
+
+bool GodotHost::index_get(void *p_receiver, const Argument &p_key, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	const Variant *receiver = static_cast<Variant *>(p_receiver);
+	Variant key = to_variant(p_key.kind, p_key.slot);
+	bool valid = false;
+	Variant value = receiver->get(key, &valid);
+	if (!valid) {
+		*r_error = "Godot has no " + element(key, *receiver);
+		return false;
+	}
+	return take(p_result, value, "[]", r_result, r_error);
+}
+
+bool GodotHost::index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) {
+	Variant *receiver = static_cast<Variant *>(p_receiver);
+	Variant key = to_variant(p_key.kind, p_key.slot);
+	bool valid = false;
+	receiver->set(key, to_variant(p_value.kind, p_value.slot), &valid);
+	if (!valid) {
+		*r_error = "Godot could not set " + element(key, *receiver);
+		return false;
+	}
+	return true;
+}
+
 vm::Str *GodotHost::text(void *p_value) {
 	CharString utf8 = static_cast<Variant *>(p_value)->stringify().utf8();
 	return vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));

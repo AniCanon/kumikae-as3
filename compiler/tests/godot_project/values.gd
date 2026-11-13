@@ -84,6 +84,19 @@ func _physics_process(_delta: float) -> bool:
 	show("other part", [ask("otherPart", [3.0]), node.position], [1, twin.position])
 	twin.position.x = twin.position.y
 	show("from itself", ask("fromItself", []), twin.position)
+	# By index.
+	show("first", ask("first", [a]), a[0])
+	show("color part", ask("colorPart", [Color(1, 0.5, 0.25)]), Color(1, 0.5, 0.25)[1])
+	show("set second", ask("setSecond", [a, 9.0]), Vector2(a.x, 9))
+	show("add element", ask("addElement", [a, 2.0]), Vector2(a.x + 2, a.y))
+	twin.position[0] = -8
+	show("position element", ask("positionElement", [-8.0]), twin.position)
+	var numbers := PackedInt32Array([4, 5, 6])
+	show("packed", ask("packed", [numbers, 2]), numbers[2])
+	var changed := PackedInt32Array([4, 77, 6])
+	show("set packed", ask("setPacked", [PackedInt32Array([4, 5, 6]), 1, 77]), changed)
+	show("packed out of range", ask("packed", [numbers, 3]), null)
+	show("out of range", ask("outOfRange", [a]), null)
 	twin.free()
 	node.queue_free()
 	return true

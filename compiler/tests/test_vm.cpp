@@ -378,6 +378,15 @@ struct FakeEngine : vm::Host {
 		give(p_wanted.kind, r_result, 7.5, name);
 		return true;
 	}
+	bool index_get(void *p_receiver, const Argument &p_key, const Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+		log += "get #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "]\n";
+		give(p_wanted.kind, r_result, 2.5, "text");
+		return true;
+	}
+	bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *) override {
+		log += "set #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "] = " + show(p_value) + "\n";
+		return true;
+	}
 	vm::Str *text(void *p_value) override {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
@@ -432,6 +441,7 @@ static void test_engine_operators() {
 						 "  public function sayNobody():String { var n:Node; return n.toString(); }\n"
 						 "  public function nudge(n:Number):void { position.x = n; }\n"
 						 "  public function nudgeMore(n:Number):void { transform.origin.x += n; }\n"
+						 "  public function element(i:int, n:Number):Number { position[i] += n; return position[i + 1]; }\n"
 						 "} }\n";
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -512,6 +522,18 @@ static void test_engine_operators() {
 		CHECK(interpreter.call_method(object, "nudgeMore", &amount, 1, nullptr));
 		CHECK_EQ(engine.log, std::string("get #1.transform\nget #21.origin\nget #22.x\nset #22.x = 12.5\nset #21.origin = #22\n"
 										 "set #1.transform = #21\n"));
+		CHECK_EQ(engine.boxes, 2);
+		// An element: the key is worked out once.
+		engine.log.clear();
+		engine.next = 30;
+		vm::Slot element[2];
+		element[0].bits = 0;
+		element[0].i = 1;
+		element[1].bits = 0;
+		element[1].d = 4;
+		CHECK(interpreter.call_method(object, "element", element, 2, &result));
+		CHECK_EQ(engine.log, std::string("get #1.position\nget #30[1]\nset #30[1] = 6.5\nset #1.position = #30\nget #1.position\nget #31[2]\n"));
+		CHECK_EQ(result.d, 2.5);
 		CHECK_EQ(engine.boxes, 2);
 		// A write the engine refuses leaves no handle behind.
 		engine.fail_sets = true;
@@ -697,6 +719,8 @@ static void test_engine_calls() {
 		"function f():void { treeEntered.add(g); } function g():void {}",
 		"function f():void { print(\"hello\"); }",
 		"function f():void { position.normalized().x = 5; }",
+		"function f():void { position.normalized()[0] = 5; }",
+		"function f(a:GodotArray):void { var x:int = a[0]; }",
 		"function f():void { addChild(this); }",
 		"function f():void { var other:Player = new Player(); }",
 	};

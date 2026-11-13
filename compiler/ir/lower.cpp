@@ -802,6 +802,7 @@ class Lowerer {
 		Kind kind = Kind::F64;
 		bool of_value = false; // For Engine: a member of a value type, which is a copy.
 		const Type *type = nullptr; // For Engine: what the member is declared to be.
+		uint32_t key = NONE; // For Engine: the place is an element (`value[key]`); the register holding the key.
 		// For Engine: the member is one part of a Godot value that is itself stored somewhere
 		// (`position.x`). Godot's values are copies, so writing the part is: read the whole value, change
 		// the part, write the whole value back.
@@ -962,6 +963,34 @@ class Lowerer {
 			uint32_t object = settled(receiver(member->object), p_later, member->name_offset);
 			return place_of_symbol(symbol, object, member->name_offset);
 		}
+		if (p_target->kind == NodeKind::Index) {
+			// An element of one of Godot's values: `vector[0]`.
+			Index *index = static_cast<Index *>(p_target);
+			Kind whole = Kind::Void;
+			if (kind_of(index->object->type, &whole) && whole == Kind::Val) {
+				Place place;
+				if (!kind_of(p_target->type, &place.kind) || place.kind == Kind::Void) {
+					refuse(p_target->offset, "an element of type '" + compilation_.type_name(p_target->type) + "'");
+					return Place();
+				}
+				place.where = Place::Engine;
+				place.type = p_target->type;
+				place.of_value = true;
+				if (index->object->kind == NodeKind::Name || index->object->kind == NodeKind::Member) {
+					place.part = std::make_shared<Part>();
+					place.part->whole = place_of(index->object);
+				} else {
+					place.object = settled(expression(index->object, Kind::Void), index->index, p_target->offset);
+				}
+				place.key = settled(expression(index->index, Kind::Void), p_later, p_target->offset);
+				if (kind_at(place.key) == Kind::Obj) {
+					refuse(index->index->offset, "a script object as the key of a Godot value");
+				}
+				return place;
+			}
+			refuse(p_target->offset, "indexing with '[]'");
+			return Place();
+		}
 		refuse(p_target->offset, "this kind of assignment target");
 		return Place();
 	}
@@ -983,7 +1012,11 @@ class Lowerer {
 			case Place::Engine: {
 				uint32_t object = p_place.part ? whole_of(p_place, p_position) : p_place.object;
 				uint32_t out = engine_reg(p_place.kind, p_place.type);
-				emit(Op::HostGet, p_position, out, object, p_place.index);
+				if (p_place.key != NONE) {
+					emit(Op::HostIndexGet, p_position, out, object, p_place.key);
+				} else {
+					emit(Op::HostGet, p_position, out, object, p_place.index);
+				}
 				return out;
 			}
 			default:
@@ -1007,7 +1040,11 @@ class Lowerer {
 			case Place::Engine:
 				if (p_place.part) {
 					uint32_t whole = whole_of(p_place, p_position);
-					emit(Op::HostSet, p_position, whole, p_place.index, p_value);
+					if (p_place.key != NONE) {
+						emit(Op::HostIndexSet, p_position, whole, p_place.key, p_value);
+					} else {
+						emit(Op::HostSet, p_position, whole, p_place.index, p_value);
+					}
 					store(p_place.part->whole, whole, p_position);
 				} else if (p_place.of_value) {
 					// `a.normalized().x = 5` would change a copy that nobody keeps.
@@ -1434,8 +1471,7 @@ class Lowerer {
 				refuse(position, "a function used as a value");
 				break;
 			case NodeKind::Index:
-				refuse(position, "indexing with '[]'");
-				break;
+				return load(place_of(p_expression), position);
 			case NodeKind::TypeApply:
 				refuse(position, "a Vector");
 				break;

@@ -60,5 +60,15 @@ package {
 		public function next():Values { calls++; return this; }
 		public function otherPart(n:Number):int { next().position.y = n; return calls; }
 		public function fromItself():Vector2 { position.x = position.y; return position; }
+
+		// By index.
+		public function first(v:Vector2):Number { return v[0]; }
+		public function colorPart(c:Color):Number { return c[1]; }
+		public function setSecond(v:Vector2, n:Number):Vector2 { var w:Vector2 = v; w[1] = n; return w; }
+		public function addElement(v:Vector2, n:Number):Vector2 { var w:Vector2 = v; w[0] += n; return w; }
+		public function positionElement(n:Number):Vector2 { position[0] = n; return position; }
+		public function packed(p:PackedInt32Array, i:int):int { return p[i]; }
+		public function setPacked(p:PackedInt32Array, i:int, n:int):PackedInt32Array { p[i] = n; return p; }
+		public function outOfRange(v:Vector2):Number { return v[5]; }
 	}
 }
