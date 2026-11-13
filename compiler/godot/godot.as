@@ -951,7 +951,7 @@ package godot {
 		public native function hasAll(keys:GodotArray):Boolean;
 		public native function findKey(value:*):*;
 		public native function erase(key:*):Boolean;
-		public native function hash():int;
+		public native function hash():uint;
 		public native function keys():GodotArray;
 		public native function values():GodotArray;
 		public native function duplicate(deep:Boolean = false):GodotDictionary;
@@ -987,7 +987,7 @@ package godot {
 		public native function size():int;
 		public native function isEmpty():Boolean;
 		public native function clear():void;
-		public native function hash():int;
+		public native function hash():uint;
 		public native function assign(array:GodotArray):void;
 		public native function get(index:int):*;
 		public native function set(index:int, value:*):void;
@@ -1077,10 +1077,10 @@ package godot {
 		public native function decodeS8(byteOffset:int):int;
 		public native function decodeU16(byteOffset:int):int;
 		public native function decodeS16(byteOffset:int):int;
-		public native function decodeU32(byteOffset:int):int;
+		public native function decodeU32(byteOffset:int):uint;
 		public native function decodeS32(byteOffset:int):int;
-		public native function decodeU64(byteOffset:int):int;
-		public native function decodeS64(byteOffset:int):int;
+		public native function decodeU64(byteOffset:int):Number;
+		public native function decodeS64(byteOffset:int):Number;
 		public native function decodeHalf(byteOffset:int):Number;
 		public native function decodeFloat(byteOffset:int):Number;
 		public native function decodeDouble(byteOffset:int):Number;
@@ -1102,10 +1102,10 @@ package godot {
 		public native function encodeS8(byteOffset:int, value:int):void;
 		public native function encodeU16(byteOffset:int, value:int):void;
 		public native function encodeS16(byteOffset:int, value:int):void;
-		public native function encodeU32(byteOffset:int, value:int):void;
+		public native function encodeU32(byteOffset:int, value:uint):void;
 		public native function encodeS32(byteOffset:int, value:int):void;
-		public native function encodeU64(byteOffset:int, value:int):void;
-		public native function encodeS64(byteOffset:int, value:int):void;
+		public native function encodeU64(byteOffset:int, value:Number):void;
+		public native function encodeS64(byteOffset:int, value:Number):void;
 		public native function encodeHalf(byteOffset:int, value:Number):void;
 		public native function encodeFloat(byteOffset:int, value:Number):void;
 		public native function encodeDouble(byteOffset:int, value:Number):void;

@@ -81,5 +81,16 @@ package {
 		public function lookingNull(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target, null); }
 		public function wholeNumbers():Color { return new Color(1, 0, 1); }
 		public function describe():String { return "I am " + this; }
+
+		// What the review of this slice found.
+		public function negCells(c:Vector2i):Vector2i { return c * -1; }
+		public function cellsPlus(c:Vector2i, n:int):Vector2i { return c * (n + 1); }
+		public function cellsCompound(c:Vector2i, n:int):Vector2i { var d:Vector2i = c; d *= n + 1; return d; }
+		public function bump():Number { position = new Vector2(100, 200); return 1; }
+		public function plainOrder():Vector2 { position = new Vector2(1, 2); position.x = bump(); return position; }
+		public function compoundOrder():Vector2 { position = new Vector2(1, 2); position.x += bump(); return position; }
+		public function mixed(v:Vector2, n:Node):Boolean { return v == 5 || n == "x" || !(v != 5); }
+		public function bigHash(a:GodotArray):Number { return a.hash(); }
+		public function decode(b:PackedByteArray):Number { return b.decodeU32(0); }
 	}
 }

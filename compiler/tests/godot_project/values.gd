@@ -117,6 +117,17 @@ func _physics_process(_delta: float) -> bool:
 	named.free()
 	show("no to string", str(node).contains("<Node2D#"), true)
 	show("no to string in AS3", ask("describe", []), "I am [object Values]")
+	# What the review of this slice found.
+	show("negative cells", ask("negCells", [cell]), cell * -1)
+	show("cells plus", ask("cellsPlus", [cell, 2]), cell * 3)
+	show("cells compound", ask("cellsCompound", [cell, 2]), cell * 3)
+	twin.position = Vector2(1, 2)
+	twin.position.x = (func(): twin.position = Vector2(100, 200); return 1).call()
+	show("plain order", ask("plainOrder", []), twin.position)
+	show("compound order", ask("compoundOrder", []), Vector2(2, 2))
+	show("mixed", ask("mixed", [a, root]), false)
+	show("big hash", ask("bigHash", [[]]), float([].hash()))
+	show("decode", ask("decode", [PackedByteArray([255, 255, 255, 255])]), 4294967295.0)
 	twin.free()
 	node.queue_free()
 	return true

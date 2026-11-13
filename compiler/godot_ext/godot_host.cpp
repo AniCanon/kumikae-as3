@@ -98,6 +98,12 @@ static bool take(const vm::Host::Wanted &p_wanted, const Variant &p_value, std::
 	}
 	if (!arrives(p_wanted.kind, p_wanted.type, p_value)) {
 		CharString got = Variant::get_type_name(p_value.get_type()).utf8();
+		if ((p_wanted.kind == ir::Kind::I32 || p_wanted.kind == ir::Kind::U32) && (p_value.get_type() == Variant::INT || p_value.get_type() == Variant::FLOAT)) {
+			CharString number = p_value.stringify().utf8();
+			*r_error = "Godot's '" + std::string(p_from) + "' gave " + std::string(number.get_data()) + ", which does not fit " +
+					(p_wanted.kind == ir::Kind::I32 ? "an int" : "a uint");
+			return false;
+		}
 		*r_error = "Godot's '" + std::string(p_from) + "' gave a " + std::string(got.get_data()) + " where " +
 				(p_wanted.type.empty() ? std::string(ir::kind_name(p_wanted.kind)) : std::string(p_wanted.type)) + " was expected";
 		return false;
@@ -275,6 +281,11 @@ bool GodotHost::operate(std::string_view p_operator, const Argument *p_arguments
 	Variant result;
 	bool valid = false;
 	Variant::evaluate(op, left, right, result, valid);
+	if (!valid && (op == Variant::OP_EQUAL || op == Variant::OP_NOT_EQUAL)) {
+		// Two things Godot can't compare are not equal, as in AS3: `vector == 5` is false.
+		result = op == Variant::OP_NOT_EQUAL;
+		valid = true;
+	}
 	if (!valid) {
 		CharString a = Variant::get_type_name(left.get_type()).utf8();
 		CharString b = Variant::get_type_name(right.get_type()).utf8();

@@ -72,11 +72,21 @@ Found by the review of the clean-up pass itself.
 - A `null` that is not the last argument, for a parameter whose default AS3 can't write
   (`color.clamp(null, max)`), is an error when the line runs. Giving it Godot's real default needs the
   defaults in the name table.
-- A `Number` used as an index (`v[i]` with `i:Number`) goes to Godot as a fraction, which Godot refuses.
-- One part of a value that is stored nowhere (`a.normalized().x = 5`) is refused, though for Godot's shared
-  values (packed arrays) the write would be seen.
-- `position.x = f()` reads `position` after `f()` runs; if `f()` raises an error for a missing object the
-  order of the two errors is not Flash's.
+- A `Number` used as an index is cut to a whole number by Godot: `v[1.5]` reads element 1, and `v[NaN]`
+  element 0.
+- One part of a value that is stored nowhere (`a.normalized().x = 5`) is refused. So is `points[0].x = 5`
+  on a packed array of vectors, though there the value is stored.
+- A local that the right-hand side reassigns is read after it: `a.position.x = (a = b, 5)` writes to `b`.
+  (A whole property behaves the same: `a.visible = (a = b, false)`.)
+- A freed node is not `null` in `kept == null`, but equals a variable that holds null.
+- `x >>>= vector` passes the checker and fails when it runs.
+- Reading or writing a property of a freed node says Godot has no such property, not that the node is
+  freed. A freed node passed as an argument gets Godot's own error, and no AS3 error.
+- A whole number worked out from `int`s (`cell * (a * b)`) goes to Godot as a 32-bit `int`: a product past
+  2^31 wraps. Goes away with `Int64`.
+- **decision** `"" + this` in a script without `toString()` reads `[object Values]` (AS3's), while Godot's
+  text for the same node reads `<Node2D#123>`. And a `toString()` that raises an error ends the caller
+  through `"" + this`, but through Godot's text it is reported and Godot's text stands.
 
 ## Stage 2a: interpreter core
 

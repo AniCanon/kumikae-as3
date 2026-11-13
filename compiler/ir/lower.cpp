@@ -813,8 +813,8 @@ class Lowerer {
 		uint32_t value = NONE; // The register it was read into, once it has been.
 	};
 
-	// The value a part belongs to, read from where it is stored the first time it is needed. A plain
-	// assignment needs it only after the new value has been worked out.
+	// The value a part belongs to. It is read where the place is worked out, before anything to the right
+	// of it runs, as GDScript does: `position.x = f()` keeps the `y` that `position` had before `f()`.
 	uint32_t whole_of(const Place &p_place, uint32_t p_position) {
 		if (p_place.part->value == NONE) {
 			p_place.part->value = load(p_place.part->whole, p_position);
@@ -887,6 +887,7 @@ class Lowerer {
 			place.of_value = true;
 			place.part = std::make_shared<Part>();
 			place.part->whole = place_of(p_object);
+			whole_of(place, p_position);
 			return place;
 		}
 		place.object = engine_receiver(p_object, p_position, &place.of_value);
@@ -979,6 +980,7 @@ class Lowerer {
 				if (index->object->kind == NodeKind::Name || index->object->kind == NodeKind::Member) {
 					place.part = std::make_shared<Part>();
 					place.part->whole = place_of(index->object);
+					whole_of(place, p_target->offset);
 				} else {
 					place.object = settled(expression(index->object, Kind::Void), index->index, p_target->offset);
 				}
@@ -1270,8 +1272,8 @@ class Lowerer {
 				later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
 			}
 			uint32_t value = expression(p_arguments[i], kind);
-			if (kind_at(value) == Kind::Obj || kind_at(value) == Kind::U32) {
-				refuse(p_arguments[i]->offset, kind_at(value) == Kind::Obj ? "passing a script object to Godot" : "passing a uint to Godot");
+			if (kind_at(value) == Kind::Obj) {
+				refuse(p_arguments[i]->offset, "passing a script object to Godot");
 			}
 			r_list.push_back(settled(value, later, p_position));
 		}
@@ -1497,7 +1499,7 @@ class Lowerer {
 			case TokenKind::Plus: {
 				Kind result = Kind::Void;
 				if (is_engine(natural(p_unary->operand)) && kind_of(p_unary->type, &result) && result != Kind::Void) {
-					return engine_operate(p_unary->op, { expression(p_unary->operand, Kind::Void) }, result, p_unary->type, position);
+					return engine_operate(p_unary->op, { operand(p_unary->operand) }, result, p_unary->type, position);
 				}
 				if (p_unary->op == TokenKind::Plus) {
 					return expression(p_unary->operand, Kind::F64);
@@ -1536,6 +1538,47 @@ class Lowerer {
 
 	static bool is_numeric(Kind p_kind) {
 		return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::F64;
+	}
+
+	// An operand for the engine, as the checker typed it: Godot tells a whole number from a fraction
+	// (`Vector2i * 2` is a Vector2i), and the interpreter's own arithmetic is all in fractions.
+	uint32_t operand(Expr *p_expression) {
+		Kind kind = Kind::Void;
+		if (!kind_of(p_expression->type, &kind) || !is_numeric(kind)) {
+			kind = Kind::Void;
+		} else if (kind == Kind::F64 && whole(p_expression)) {
+			kind = Kind::I32;
+		}
+		return expression(p_expression, kind);
+	}
+
+	// The checker's rule for a whole number (names_types.cpp, `whole`): an int or uint, or sums,
+	// differences, products and remainders of such. AS3 works `i + 1` out as a Number, but the checker
+	// gave `cell * (i + 1)` the type Godot gives a whole number, so a whole number is what Godot must get.
+	bool whole(const Expr *p_expression) {
+		if (!p_expression || !p_expression->type) {
+			return false;
+		}
+		if (p_expression->kind == NodeKind::Binary) {
+			const Binary *binary = static_cast<const Binary *>(p_expression);
+			switch (binary->op) {
+				case TokenKind::Plus:
+				case TokenKind::Minus:
+				case TokenKind::Star:
+				case TokenKind::Percent:
+					return whole(binary->left) && whole(binary->right);
+				default:
+					break;
+			}
+		}
+		if (p_expression->kind == NodeKind::Unary) {
+			const Unary *unary = static_cast<const Unary *>(p_expression);
+			if (unary->op == TokenKind::Minus || unary->op == TokenKind::Plus) {
+				return whole(unary->operand);
+			}
+		}
+		Kind kind = Kind::Void;
+		return kind_of(p_expression->type, &kind) && (kind == Kind::I32 || kind == Kind::U32);
 	}
 
 	// An operator that Godot carries out, because an operand is one of its values. The operator goes as
@@ -1697,8 +1740,8 @@ class Lowerer {
 			case TokenKind::LessEqual:
 			case TokenKind::GreaterEqual: {
 				if (is_engine(natural(left)) || is_engine(natural(right))) {
-					uint32_t a = settled(expression(left, Kind::Void), right, position);
-					uint32_t b = expression(right, Kind::Void);
+					uint32_t a = settled(operand(left), right, position);
+					uint32_t b = operand(right);
 					return engine_operate(p_binary->op, { a, b }, Kind::Bool, nullptr, position);
 				}
 				bool strings = is_string_type(left->type) && is_string_type(right->type);
@@ -1745,8 +1788,8 @@ class Lowerer {
 					op = kind == Kind::Str ? Op::EqStr : Op::EqRef;
 				} else if (is_engine(a) || is_engine(b)) {
 					// Godot's own equality: the same object, or equal values.
-					uint32_t x = settled(expression(left, Kind::Void), right, position);
-					uint32_t y = expression(right, Kind::Void);
+					uint32_t x = settled(operand(left), right, position);
+					uint32_t y = operand(right);
 					return engine_operate(p_binary->op, { x, y }, Kind::Bool, nullptr, position);
 				} else if (a == Kind::Str && b == Kind::Str) {
 					kind = Kind::Str;
@@ -1788,8 +1831,8 @@ class Lowerer {
 						refuse(position, "this operator on a Godot value");
 						return default_value(p_want, position);
 					}
-					uint32_t a = settled(expression(left, Kind::Void), right, position);
-					uint32_t b = expression(right, Kind::Void);
+					uint32_t a = settled(operand(left), right, position);
+					uint32_t b = operand(right);
 					return engine_operate(p_binary->op, { a, b }, result, p_binary->type, position);
 				}
 				uint32_t a = settled(expression(left, Kind::Void), right, position);
@@ -1811,8 +1854,11 @@ class Lowerer {
 		} else {
 			uint32_t old = settled(load(place, position), p_assign->value, position);
 			bool strings = p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Str || is_string_type(p_assign->value->type));
-			uint32_t right = expression(p_assign->value, Kind::Void);
-			if (!strings && (is_engine(kind_at(old)) || is_engine(kind_at(right)))) {
+			Kind right_kind = Kind::Void;
+			kind_of(p_assign->value->type, &right_kind);
+			bool engine = !strings && (is_engine(kind_at(old)) || is_engine(right_kind));
+			uint32_t right = engine ? operand(p_assign->value) : expression(p_assign->value, Kind::Void);
+			if (engine) {
 				value = convert(engine_operate(p_assign->op, { old, right }, place.kind, p_assign->target->type, position), place.kind, position);
 			} else {
 				value = convert(operate(p_assign->op, old, right, strings, position), place.kind, position);

@@ -139,6 +139,7 @@ output = compare("values.gd", [
     "packed out of range", "out of range",
     "clamp default", "clamp one", "clamp trailing null", "clamp both null", "clamp middle null", "looking",
     "looking null", "whole numbers", "to string", "to string in AS3", "no to string", "no to string in AS3",
+    "negative cells", "cells plus", "cells compound", "plain order", "compound order", "mixed", "big hash", "decode",
 ])
 check("a null that is not the last argument is an AS3 error", "at Values/clampMiddleNull()" in output, output[-800:])
 check("an index out of range is an AS3 error", "at Values/outOfRange()" in output and "at Values/packed()" in output, output[-800:])
