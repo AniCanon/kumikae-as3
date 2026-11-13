@@ -62,6 +62,7 @@ inline bool is_engine(Kind p_kind) {
 	X(HostNew, "RSA") X(HostCall, "rSA") X(HostGet, "RRS") X(HostSet, "RSR") \
 	/* An operator on Godot values: the operator as AS3 writes it ("+", "=="), and one or two operands. */ \
 	X(HostOperate, "RSA") \
+	X(HostToStr, "RR-") /* Godot's text for one of its values or objects; "null" for a missing one. */ \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") X(Trace, "A--")
 

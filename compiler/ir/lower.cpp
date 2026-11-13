@@ -476,6 +476,11 @@ class Lowerer {
 		if (from == p_to || p_to == Kind::Void) {
 			return p_reg;
 		}
+		if (is_engine(from) && p_to == Kind::Str) {
+			uint32_t out = reg(Kind::Str);
+			emit(Op::HostToStr, p_position, out, p_reg);
+			return out;
+		}
 		if (is_engine(from) || is_engine(p_to)) {
 			refuse(p_position, is_engine(from) ? "converting a Godot value" : "passing this value where a Godot value is expected");
 			return default_value(p_to, p_position);
@@ -1105,6 +1110,15 @@ class Lowerer {
 			}
 			emit(Op::Trace, position, arguments(std::move(list)));
 			return 0;
+		}
+		if (symbol->name == "toString" && p_call->arguments.count == 0 && callee->kind == NodeKind::Member &&
+				static_cast<Member *>(callee)->object->kind != NodeKind::SuperExpr && is_engine(natural(static_cast<Member *>(callee)->object))) {
+			// AS3's own toString() on one of Godot's values or objects: Godot's text for it.
+			uint32_t value = expression(static_cast<Member *>(callee)->object, Kind::Void);
+			emit(Op::NullCheck, position, value);
+			uint32_t out = reg(Kind::Str);
+			emit(Op::HostToStr, position, out, value);
+			return out;
 		}
 		if (is_godot(symbol) && symbol->kind == SymbolKind::Method && !symbol->is_static()) {
 			bool through_super = callee->kind == NodeKind::Member && static_cast<Member *>(callee)->object->kind == NodeKind::SuperExpr;

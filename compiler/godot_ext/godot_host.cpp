@@ -14,7 +14,14 @@ using namespace godot;
 
 namespace kas3 {
 
-static String text(std::string_view p_text) {
+// A handle on a reference-counted object that is gone. Copying it would count a reference on freed
+// memory. (Only a script's hold on its own owner can be one: any other handle keeps its object alive.) A
+// handle on any other freed object is safe to copy, and Godot knows it as a freed object.
+static bool is_dangling(const Variant &p_value) {
+	return p_value.get_type() == Variant::OBJECT && ((ObjectID)p_value).is_ref_counted() && !p_value.get_validated_object();
+}
+
+static String to_godot(std::string_view p_text) {
 	return String::utf8(p_text.data(), (int64_t)p_text.size());
 }
 
@@ -30,13 +37,12 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 			return Variant(p_slot.b);
 		case ir::Kind::Str: {
 			const vm::Str *string = static_cast<const vm::Str *>(p_slot.p);
-			return string ? Variant(text(string->view())) : Variant();
+			return string ? Variant(to_godot(string->view())) : Variant();
 		}
 		case ir::Kind::Val:
 		case ir::Kind::Ref: {
 			const Variant *value = static_cast<const Variant *>(p_slot.p);
-			// A copy of a handle whose object Godot has freed would count a reference on freed memory.
-			if (!value || (value->get_type() == Variant::OBJECT && !value->get_validated_object())) {
+			if (!value || is_dangling(*value)) {
 				return Variant();
 			}
 			return *value;
@@ -72,14 +78,14 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 				return true;
 			}
 			Object *object = type == Variant::OBJECT ? p_value.get_validated_object() : nullptr;
-			return object && (p_godot_type.empty() || object->is_class(text(p_godot_type)));
+			return object && (p_godot_type.empty() || object->is_class(to_godot(p_godot_type)));
 		}
 		case ir::Kind::Val:
 			// The value type that is named, and no other: a Vector3 is not a Vector2. Nothing at all is null.
 			if (type == Variant::OBJECT) {
 				return false;
 			}
-			return type == Variant::NIL || p_godot_type.empty() || Variant::get_type_name(type) == text(p_godot_type);
+			return type == Variant::NIL || p_godot_type.empty() || Variant::get_type_name(type) == to_godot(p_godot_type);
 		default:
 			return false; // A script object can't come from Godot.
 	}
@@ -155,15 +161,15 @@ static std::string describe(const GDExtensionCallError &p_error, std::string_vie
 }
 
 void GodotHost::print(std::string_view p_text) {
-	UtilityFunctions::print(text(p_text));
+	UtilityFunctions::print(to_godot(p_text));
 }
 
 void GodotHost::error(std::string_view p_text) {
-	UtilityFunctions::push_error(text(p_text));
+	UtilityFunctions::push_error(to_godot(p_text));
 }
 
 void *GodotHost::construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) {
-	String wanted = text(p_type);
+	String wanted = to_godot(p_type);
 	int type = -1;
 	for (int i = 0; i < Variant::VARIANT_MAX; i++) {
 		if (Variant::get_type_name((Variant::Type)i) == wanted) {
@@ -218,7 +224,7 @@ bool GodotHost::call(void *p_receiver, std::string_view p_method, const Argument
 	Variant result;
 	GDExtensionCallError error;
 	error.error = GDEXTENSION_CALL_OK;
-	receiver->callp(StringName(text(p_method)), pointers.data(), (int)p_count, result, error);
+	receiver->callp(StringName(to_godot(p_method)), pointers.data(), (int)p_count, result, error);
 	if (error.error != GDEXTENSION_CALL_OK) {
 		*r_error = describe(error, p_method);
 		return false;
@@ -281,7 +287,7 @@ bool GodotHost::operate(std::string_view p_operator, const Argument *p_arguments
 
 bool GodotHost::get(void *p_receiver, std::string_view p_property, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	bool valid = false;
-	Variant value = static_cast<Variant *>(p_receiver)->get_named(StringName(text(p_property)), valid);
+	Variant value = static_cast<Variant *>(p_receiver)->get_named(StringName(to_godot(p_property)), valid);
 	if (!valid) {
 		*r_error = "Godot has no '" + std::string(p_property) + "' on this value";
 		return false;
@@ -291,12 +297,17 @@ bool GodotHost::get(void *p_receiver, std::string_view p_property, const Wanted 
 
 bool GodotHost::set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) {
 	bool valid = false;
-	static_cast<Variant *>(p_receiver)->set_named(StringName(text(p_property)), to_variant(p_value.kind, p_value.slot), valid);
+	static_cast<Variant *>(p_receiver)->set_named(StringName(to_godot(p_property)), to_variant(p_value.kind, p_value.slot), valid);
 	if (!valid) {
 		*r_error = "Godot could not set '" + std::string(p_property) + "' on this value";
 		return false;
 	}
 	return true;
+}
+
+vm::Str *GodotHost::text(void *p_value) {
+	CharString utf8 = static_cast<Variant *>(p_value)->stringify().utf8();
+	return vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));
 }
 
 void *GodotHost::borrow(Object *p_object) {
@@ -317,8 +328,7 @@ void *GodotHost::copy(void *p_value) {
 		return nullptr;
 	}
 	Variant *value = static_cast<Variant *>(p_value);
-	// A copy of an object handle whose object is gone would try to count a reference on freed memory.
-	if (value->get_type() == Variant::OBJECT && !value->get_validated_object()) {
+	if (is_dangling(*value)) {
 		return new Variant();
 	}
 	return new Variant(*value);

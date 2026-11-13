@@ -50,5 +50,22 @@ func _physics_process(_delta: float) -> bool:
 	# Godot refuses to divide whole numbers by zero: an AS3 error, and the script carries on.
 	show("cells over zero", ask("cellsOver", [cell, 0]), null)
 	show("after the error", ask("add", [a, a]), a + a)
+	# Text: Godot's own for its values and objects.
+	show("text", ask("text", [a]), "at " + str(a))
+	show("text after", ask("textAfter", [a]), str(a) + " here")
+	show("cast", ask("cast", [a]), str(a))
+	show("own", ask("own", [a]), str(a))
+	show("color text", ask("colorText", [Color(1, 0.5, 0.25)]), str(Color(1, 0.5, 0.25)))
+	show("node text", ask("nodeText", [root]), str(root))
+	show("node joined", ask("nodeJoined", [root]), "node " + str(root))
+	show("null text", ask("nullText", []), "v=null")
+	show("null node", ask("nullNode", [null]), "null")
+	show("null own", ask("nullOwn", [null]), null)
+	ask("traced", [a])
+	print("EXPECT TRACE %s %s" % [str(a), str(a.x)])
+	var gone := Node.new()
+	ask("keep", [gone])
+	gone.free()
+	show("freed text", ask("keptText", []), "kept " + str(gone))
 	node.queue_free()
 	return true

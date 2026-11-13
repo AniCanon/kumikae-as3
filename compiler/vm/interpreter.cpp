@@ -415,6 +415,17 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			ok = host_.operate(op, values, count, wanted(target), &result, &error);
 			break;
 		}
+		case Op::HostToStr: {
+			target = p_in.a;
+			kind = Kind::Str;
+			result.p = r[p_in.b].p ? host_.text(r[p_in.b].p) : nullptr;
+			if (!result.p) {
+				retain(null_text_);
+				result.p = null_text_;
+			}
+			ok = true;
+			break;
+		}
 		case Op::HostGet: {
 			void *receiver = r[p_in.b].p;
 			if (!receiver) {
@@ -998,6 +1009,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostCall:
 			case Op::HostGet:
 			case Op::HostOperate:
+			case Op::HostToStr:
 			case Op::HostSet: {
 				// The engine may call back into AS3 before it answers, which can move the registers: nothing
 				// read before the call is used after it.

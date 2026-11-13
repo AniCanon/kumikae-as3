@@ -377,6 +377,10 @@ struct FakeEngine : vm::Host {
 		give(p_wanted.kind, r_result, 7.5, name);
 		return true;
 	}
+	vm::Str *text(void *p_value) override {
+		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
+		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
+	}
 	bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted, vm::Slot *r_result,
 			std::string *r_error) override {
 		log += "operate " + std::string(p_operator) + " (" + list(p_arguments, p_count) + ") as " + ir::kind_name(p_wanted.kind) +
@@ -418,6 +422,9 @@ static void test_engine_operators() {
 						 "  }\n"
 						 "  public function nobody():Vector2 { var v:Vector2; return v + v; }\n"
 						 "  public function isNobody(n:Node):Boolean { return n == this.getParent() || n != null; }\n"
+						 "  public function say(v:Vector2, n:Node):String { trace(v); return \"v=\" + v + n.toString() + String(n); }\n"
+						 "  public function sayNothing():String { var n:Node; var v:Vector2; trace(n); return v + \"\"; }\n"
+						 "  public function sayNobody():String { var n:Node; return n.toString(); }\n"
 						 "} }\n";
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -467,6 +474,25 @@ static void test_engine_operators() {
 		CHECK(interpreter.call_method(object, "isNobody", &none, 1, &result));
 		CHECK_EQ(engine.log, std::string("call #1.get_parent()\noperate == (#0, #8) as Boolean\n"));
 		CHECK_EQ(engine.errors, std::string());
+		// Text is the engine's; a missing value reads "null" without asking it.
+		engine.log.clear();
+		vm::Slot pair[2];
+		pair[0] = arguments[0];
+		pair[1].bits = 0;
+		pair[1].p = engine.box(); // #9
+		CHECK(interpreter.call_method(object, "say", pair, 2, &result));
+		CHECK_EQ(engine.log, std::string("text #2\nprint <#2>\ntext #2\ntext #9\ntext #9\n"));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("v=<#2><#9><#9>"));
+		vm::free_string(static_cast<vm::Str *>(result.p));
+		engine.drop(pair[1].p);
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "sayNothing", nullptr, 0, &result));
+		CHECK_EQ(engine.log, std::string("print null\n"));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("null"));
+		vm::free_string(static_cast<vm::Str *>(result.p));
+		CHECK(!interpreter.call_method(object, "sayNobody", nullptr, 0, nullptr));
+		CHECK(engine.errors.find("TypeError: Error #1009") == 0);
+		engine.errors.clear();
 		// An operator the engine refuses is an AS3 error, and nothing is left behind.
 		engine.fail_calls = true;
 		CHECK(!interpreter.call_method(object, "step", arguments, 2, nullptr));

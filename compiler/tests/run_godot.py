@@ -132,7 +132,12 @@ output = compare("values.gd", [
     "add", "sub", "times", "times int", "number first", "divide", "negate", "cells", "cells by number", "cells over",
     "tint", "same", "not same", "differs", "same node", "not same node", "other node", "chain", "compound", "moved",
     "cells over zero", "after the error",
+    "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
+    "freed text",
 ])
+traced = re.search(r"EXPECT TRACE (.*)", output)
+check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])
+check("toString() on a missing node is an AS3 error", "at Values/nullOwn()" in output, output[-800:])
 check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" in output, output[-800:])
 
 for failure in failures:

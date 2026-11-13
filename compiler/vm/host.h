@@ -70,6 +70,11 @@ struct Host {
 		*r_error = "there is no engine here";
 		return false;
 	}
+	// The engine's own text for a value or an object, as a new Str that is the caller's.
+	virtual Str *text(void *p_value) {
+		(void)p_value;
+		return nullptr;
+	}
 	// Another handle for the same value (for a value type, a copy of it), and giving one up.
 	virtual void *copy(void *p_value) { return p_value; }
 	virtual void drop(void *p_value) { (void)p_value; }

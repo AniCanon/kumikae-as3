@@ -28,5 +28,21 @@ package {
 			return v;
 		}
 		public function moved(by:Vector2):Vector2 { return position + by; }
+
+		// Text.
+		private var kept:Node;
+		public function text(v:Vector2):String { return "at " + v; }
+		public function textAfter(v:Vector2):String { return v + " here"; }
+		public function cast(v:Vector2):String { return String(v); }
+		public function own(v:Vector2):String { return v.toString(); }
+		public function colorText(c:Color):String { return String(c); }
+		public function nodeText(n:Node):String { return n.toString(); }
+		public function nodeJoined(n:Node):String { return "node " + n; }
+		public function nullText():String { var v:Vector2; return "v=" + v; }
+		public function nullNode(n:Node):String { return String(n); }
+		public function nullOwn(n:Node):String { return n.toString(); }
+		public function traced(v:Vector2):void { trace(v, v.x); }
+		public function keep(n:Node):void { kept = n; }
+		public function keptText():String { return "kept " + kept; }
 	}
 }
