@@ -457,6 +457,7 @@ static void test_engine_listeners() {
 						 "    other[name].remove(mine);\n"
 						 "  }\n"
 						 "  public function nobody():void { var other:Child; renamed.add(other.shared); }\n"
+						 "  public static function wire(other:Child):void { other.renamed.add(other.shared); }\n"
 						 "} }\n";
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);

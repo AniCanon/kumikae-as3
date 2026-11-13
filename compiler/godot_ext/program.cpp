@@ -71,9 +71,11 @@ Project &Project::get() {
 }
 
 void Project::unload() {
+	// First, so that whatever is destroyed along with the program (a listener held through one of its
+	// static fields) knows the program is no longer there to be used.
+	loads++;
 	delete program;
 	program = nullptr;
-	loads++;
 }
 
 uint32_t Project::class_of_file(const std::string &p_path) const {

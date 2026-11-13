@@ -66,6 +66,13 @@ func _physics_process(_delta: float) -> bool:
 	node.stopAll()
 	rename(node)
 	show("remove all", [node.count, node.listeners()], [103, 0])
+	# removeAll takes away what AS3 added, and leaves listeners that GDScript or the engine itself added.
+	var theirs := func(): pass
+	node.renamed.connect(theirs)
+	node.listen()
+	node.stopAll()
+	show("remove all leaves others", [node.isListening(), node.renamed.is_connected(theirs)], [false, true])
+	node.renamed.disconnect(theirs)
 	# Arguments reach the listener.
 	node.reset()
 	node.listenChild()
@@ -130,5 +137,6 @@ func _physics_process(_delta: float) -> bool:
 	late.listenLater(other)
 	rename(other)
 	show("deferred not yet", node.count, 0)
+	node.keepPlain(Resource.new()) # Still held when Godot shuts down: nothing may crash then.
 	late.free()
 	return false

@@ -1277,6 +1277,7 @@ class Lowerer {
 			return default_value(Kind::Val, position);
 		}
 		uint32_t object = 0;
+		bool on_this = true;
 		if (p_expression->kind == NodeKind::Member) {
 			Expr *written = static_cast<Member *>(p_expression)->object;
 			if (written->kind == NodeKind::SuperExpr) {
@@ -1284,11 +1285,12 @@ class Lowerer {
 				return default_value(Kind::Val, position);
 			}
 			if (written->kind != NodeKind::ThisExpr) {
+				on_this = false;
 				object = receiver(written);
 				emit(Op::NullCheck, position, object);
 			}
 		}
-		if (object == 0 && fn().is_static) {
+		if (on_this && fn().is_static) {
 			refuse(position, "this name");
 			return default_value(Kind::Val, position);
 		}

@@ -6,6 +6,7 @@ package {
 		public var count:int = 0;
 		public var last:String = "";
 		private var helper:Listener;
+		public static var held:Resource;
 
 		private function onRenamed():void { count++; }
 		public function onChild(child:Node):void { last = child.name; count += 10; }
@@ -16,6 +17,8 @@ package {
 		private function isBig(n:int):Boolean { return n > 2; }
 
 		public function reset():void { count = 0; }
+		// A plain listener on a signal of something only a static field holds: both go when the program does.
+		public function keepPlain(r:Resource):void { held = r; helper = new Listener(); r.changed.add(helper.heard); }
 		public function listen():void { renamed.add(onRenamed); }
 		public function listenTwice():void { renamed.add(onRenamed); renamed.add(this.onRenamed); }
 		public function listenLater(other:Node):void { other.renamed.add(onRenamed, true); }

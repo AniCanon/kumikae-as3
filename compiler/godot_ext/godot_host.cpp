@@ -236,8 +236,13 @@ static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, cons
 		if (p_verb == "@numListeners") {
 			return take(p_result, Variant((int64_t)connections.size()), "numListeners", r_result, r_error);
 		}
+		// What scripts added, and only that: the engine and GDScript connect listeners of their own (a
+		// container listens to its children), which are not AS3's to take away.
 		for (int64_t i = 0; i < connections.size(); i++) {
-			signal.disconnect(Dictionary(connections[i])["callable"]);
+			Callable callable = Dictionary(connections[i])["callable"];
+			if (is_script_listener(callable) && signal.is_connected(callable)) {
+				signal.disconnect(callable);
+			}
 		}
 		return true;
 	}

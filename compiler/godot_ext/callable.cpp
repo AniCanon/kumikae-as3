@@ -74,15 +74,20 @@ public:
 		}
 		// The call may drop the last other reference to this callable (a listener that removes itself).
 		vm::Object *object = object_;
+		const uint64_t program = program_;
 		vm::retain(object);
 		call_script(object, function_, p_arguments, p_argcount, &r_return_value, &r_call_error);
-		if (Project::generation() == program_) {
+		if (Project::generation() == program) {
 			Project::get().interpreter().release_object(object);
 		}
 	}
 };
 
 } // namespace
+
+bool is_script_listener(const Callable &p_callable) {
+	return p_callable.is_custom() && dynamic_cast<BoundMethod *>(p_callable.get_custom()) != nullptr;
+}
 
 Variant *make_callable(vm::Object *p_object, uint32_t p_function, Object *p_owner) {
 	return new Variant(Callable(memnew(BoundMethod(p_object, p_function, p_owner))));
