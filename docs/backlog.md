@@ -21,11 +21,11 @@ it stands.
 
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
-| **2b-3** | The rest of Godot's API (under way) | 9 | `Int64` and what waits on it, singletons, freed objects, how errors reach Godot |
-| **2c** | The rest of the language | 13 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2b-3** | The rest of Godot's API (under way) | 6 | `Int64` and what waits on it, singletons, freed objects, how errors reach Godot |
+| **2c** | The rest of the language | 16 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
 | **2d** | Editor features | 14 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 20 | What is left |
+| **clean-up** | A pass that closes stage 2 | 24 | What is left |
 | **decision** | The owner | 3 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
@@ -37,14 +37,15 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 | Decision | What to build | When |
 |---|---|---|
-| **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | A real 64-bit integer type, `Int64`, with one rule in the generator: a Godot integer that Godot's description marks as 64-bit is an `Int64`. The hand-kept table of 31 exceptions goes away. An `Int64` converts to `int`, `uint` or `Number` where one is expected, with a check that raises a `RangeError` if the value does not fit, so nothing is ever cut off silently. It needs its own short design first. | Stage 2b-3 |
+| **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | Built in stage 2b-3, part B: the `Int64` type, by one rule in the generator (approved 2026-11-14). See the [design](superpowers/specs/2026-11-14-int64-design.md). | Done |
 
 ## Stage 1d: Godot's API in AS3
 
 - A script class named like a Godot class is ambiguous in the default package. **clean-up**
 - Acronyms come out lower-case: `getAabb`, not `getAABB`. **clean-up**
 - Four properties lose their element type. **2c**
-- One wide flag enum of `RenderingServer` is declared `int`. **2b-3**
+- One flag enum of `RenderingServer` whose listed values all fit 32 bits is declared `int`, though Godot
+  holds its flags in 64. **clean-up**
 - The corpus prefix test loads Godot's API for one prefix in 293 only. **clean-up**
 - Loading Godot's API costs about 30 ms on every `kas3c check`. **clean-up**
 - The merged constructors accept calls no overload has: `new Vector3(1, 2)`. **clean-up**
@@ -53,8 +54,8 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Stage 1e: Godot's math types
 
-- `Math.floor`, `Math.round`, `Math.abs`, `Math.max`, `parseInt` and `cond ? int : uint` count as fractions,
-  so `cell * Math.floor(x)` is a `Vector2`, not a `Vector2i`. The error does not suggest `int(...)`. **2b-3**
+- `cell * Math.floor(x)` now checks as a `Vector2i` (so do `Math.round`, `Math.ceil`, `Math.abs`, `Math.max`,
+  `Math.min` and `parseInt` of whole numbers), but `Math` itself does not run yet. **2c**
 - A malformed tag in a declaration file (both `left` and `right`, two rules for one operator) is resolved
   silently. **clean-up**
 - `for each` over a packed array does not check the variable's type. **2c**
@@ -102,8 +103,6 @@ Found by the review of the clean-up pass itself.
 - `x >>>= vector` passes the checker and fails when it runs. **clean-up**
 - Reading or writing a property of a freed node says Godot has no such property, not that the node is
   freed. A freed node passed as an argument gets Godot's own error, and no AS3 error. **2b-3**
-- A whole number worked out from `int`s (`cell * (a * b)`) goes to Godot as a 32-bit `int`: a product past
-  2^31 wraps. Goes away with `Int64`. **2b-3**
 - **decision** `"" + this` in a script without `toString()` reads `[object Values]` (AS3's), while Godot's
   text for the same node reads `<Node2D#123>`. And a `toString()` that raises an error ends the caller
   through `"" + this`, but through Godot's text it is reported and Godot's text stands.
@@ -157,6 +156,16 @@ Found by the review of the clean-up pass itself.
 - A class's static method that fails inside Godot (wrong arguments) is reported by Godot only: the script
   carries on with nothing. **clean-up**
 - A singleton is looked up each time its name is written. **clean-up**
+
+## Stage 2b-3, part B: `Int64`
+
+- `PackedByteArray` takes an `Int64` for a byte, and Godot keeps its low 8 bits without an error:
+  `bytes.append(300)` stores 44, as in GDScript. Its elements read as `Int64`. **clean-up**
+- A whole number written out is an `Int64` only where one is expected or beside one. Elsewhere it is a
+  `Number`, as in Flash: `var n:Number = 9007199254740993` rounds. **clean-up**
+- `x.toString(radix)` on an `Int64` waits for the standard library. **2c**
+- `Vector.<Int64>` and an `Int64` in an `Array` or `Object` wait for those types. **2c**
+- Every program's IR now carries the `RangeError` class, used or not. **clean-up**
 
 ## Stage 2a: interpreter core
 

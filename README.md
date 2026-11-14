@@ -74,7 +74,7 @@ package game {
 | Arithmetic on Godot's math types (`position + velocity * delta` is a `Vector2`; `position + node` is an error) | **Works** |
 | Language server (`kas3c lsp`): errors as you type, go to definition, find references, hover, outline | **Works** in VS Code on macOS; [Rider not yet tried, and not on Windows](editors/README.md) |
 | Run an AS3 program on the command line (`kas3c run`): classes, inheritance, numbers, strings, loops | **Works** for that part of the language; the rest is refused by name |
-| An AS3 script attached to a Godot node (`CharacterBody2D`), run by headless Godot 4.7.2 | **Works** for properties, method calls, operators on Godot's values (`position + velocity * delta`, `position.x = 5`), signals (`timer.timeout.add(onTimeout)`), singletons (`Input.isActionPressed("jump")`), constants (`Vector2.ZERO`) and static methods. `Int64` and global functions are next |
+| An AS3 script attached to a Godot node (`CharacterBody2D`), run by headless Godot 4.7.2 | **Works** for properties, method calls, operators on Godot's values (`position + velocity * delta`, `position.x = 5`), signals (`timer.timeout.add(onTimeout)`), singletons (`Input.isActionPressed("jump")`), constants (`Vector2.ZERO`), static methods and Godot's 64-bit integers (`Int64`). Global functions are next |
 | Run a script in the Godot editor | Planned (stage 2d) |
 | Export a release build as native code | Planned (stage 3) |
 | iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |

@@ -178,6 +178,10 @@ package {
 - A variable of a Godot value that has parts (`Vector2`, `Color`, `Transform2D`) starts at the type's zero
   when no value is written, as in GDScript. `null` can still be assigned. Any other Godot value (an array,
   a signal) starts missing.
+- Godot's integer is an AS3 type, `Int64`. `items.size()`, `randi()` and an object's id are `Int64`s.
+  One converts to an `int`, a `uint` or a `Number` where that is expected, and a `RangeError` says so if
+  the value does not fit; `int(x)` written out cuts it, as in Flash. Arithmetic on it wraps at 64 bits,
+  `/` gives a `Number`, and a comparison with a `Number` is exact.
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,
   never taken as if it fitted.
 - An AS3 error inside a call from the engine is reported in Godot's own error output, with the AS3 stack
@@ -301,10 +305,9 @@ the [naming design](../docs/superpowers/specs/2026-11-12-godot-naming-design.md)
 
 What the declarations decide beyond the names:
 
-- **Integers.** AS3's `int` is 32 bits. A Godot integer that the description marks as 64-bit is a `Number`,
-  and an unsigned 32-bit one is a `uint`. The description marks widths only on the methods of classes; for
-  global functions and value types a short table in the generator names the wide ones (`randi()`,
-  `instanceFromId()`, `PackedInt64Array`'s elements).
+- **Integers.** Godot's integer has 64 bits and is the AS3 type `Int64`. An integer is an `int` or a
+  `uint` only where Godot's description says it is narrower: by a width mark, or by belonging to a type
+  that stores 32-bit integers (`Vector2i` and its relatives, `PackedInt32Array`). Nothing is kept by hand.
 - **Only virtual methods can be overridden.** Every other method, property and signal is `final`, so
   `override public function addChild(...)` is an error: the engine would never call it.
 - **`toString()` is AS3's.** A script writes `public function toString():String` as in any AS3 class.

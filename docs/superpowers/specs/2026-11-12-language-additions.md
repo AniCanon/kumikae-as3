@@ -72,6 +72,17 @@ measurements where a number decides it:
 **When:** after stage 2, when the interpreter exists to measure with, and before the debug adapter is
 designed, so that the two are designed together.
 
+## Prior art: Apache Royale's optional extensions
+
+Apache Royale, the AS3 compiler that came out of Apache Flex, extends the language with features that are
+each switched on by a compiler flag: abstract classes, arrow functions, import aliases, the null
+conditional operator (`?.`), the nullish coalescing operator (`??`), private constructors, strict function
+types, type inference, and verbatim strings. Its documentation warns that other AS3 compilers do not
+accept them. Source: <https://apache.github.io/royale-docs/features/as3>.
+
+When this list is returned to, a candidate that Royale already has should take Royale's spelling, so that
+AS3 written for one compiler reads the same in the other.
+
 ## When to return to this
 
 After stage 2, when scripts run and real use shows which of these hurts most. The candidates that need no
