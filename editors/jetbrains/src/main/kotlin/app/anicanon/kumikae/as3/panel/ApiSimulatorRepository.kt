@@ -1,5 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.simulator.BinaryFrame
+import app.anicanon.kumikae.as3.simulator.FrameFeed
 import app.anicanon.kumikae.as3.simulator.Geometry
 import app.anicanon.kumikae.as3.simulator.Pixel
 import com.google.gson.JsonElement
@@ -16,6 +18,10 @@ internal interface SimulatorService : AutoCloseable {
 
     /** Not a protocol method: only the owner, in the panel, switches private input on. */
     fun enableInput(): Boolean
+
+    fun screenshot(device: String): BinaryFrame? = null
+
+    fun openFrames(device: String): FrameFeed = error("Live pictures are unavailable")
 }
 
 /** The only place that maps protocol JSON to domain values. */
@@ -42,7 +48,30 @@ internal class ApiSimulatorRepository(private val service: SimulatorService) : S
         service.call("launch", mapOf("device" to device, "bundle" to bundle))
     }
 
+    override fun openFrames(device: String): SimulatorFrames {
+        val feed = service.openFrames(device)
+        return object : SimulatorFrames {
+            override val failure: Throwable? get() = feed.failure
+            override val ended: Boolean get() = feed.ended
+            override fun poll(): SimulatorFrame? = feed.poll()?.let {
+                SimulatorFrame(
+                    it.device,
+                    it.generation,
+                    it.image,
+                    (it.decodedNanos - it.receivedNanos) / 1_000_000,
+                    it.receivedNanos,
+                )
+            }
+            override fun close() = feed.close()
+        }
+    }
+
     override fun screenshot(device: String): SimulatorFrame {
+        service.screenshot(device)?.let { frame ->
+            val image = ImageIO.read(ByteArrayInputStream(frame.picture.bytes))
+                ?: error("The Simulator returned an invalid picture.")
+            return SimulatorFrame(frame.device, frame.generation, image, frame.picture.captureMs)
+        }
         val frame = service.call("screenshot", mapOf("device" to device, "format" to "jpeg")).asJsonObject
         val bytes = Base64.getDecoder().decode(frame["data"].asString)
         val image = ImageIO.read(ByteArrayInputStream(bytes)) ?: error("The Simulator returned an invalid picture.")

@@ -15,6 +15,8 @@ internal class SimulatorWindowController(
     private val inputAllowed: () -> Boolean = { false },
     private val rememberInput: (Boolean) -> Unit = {},
     private val installer: IdbInstaller = IdbInstaller { throw IdbInstallFailed("No installer was given.", "") },
+    streams: BackgroundTasks = polling,
+    clock: () -> Long = { System.nanoTime() / 1_000_000 },
 ) : Disposable {
     var status by mutableStateOf("Starting the local Simulator service…")
         private set
@@ -43,6 +45,28 @@ internal class SimulatorWindowController(
     var console by mutableStateOf("")
         private set
 
+    private var tabShown = true
+    private var pictureChanging = false
+    private val live = PictureStreamController(repository, streams, clock, {
+        frame = it
+        capture = if (it == null) "" else "Live"
+    }, { status = it })
+
+    fun frameTick() {
+        live.tick(
+            selected?.id.takeIf {
+                !disposed && visible && tabShown && connected && inputEnabled && selected?.state == BOOTED &&
+                    !pictureChanging
+            },
+        )
+    }
+
+    fun deviceTabShown(shown: Boolean) {
+        if (tabShown == shown) return
+        tabShown = shown
+        if (!shown) clearPicture()
+    }
+
     private var connected = false
     private var visible = false
     private var disposed = false
@@ -62,6 +86,7 @@ internal class SimulatorWindowController(
 
     fun hidden() {
         visible = false
+        clearPicture()
     }
 
     fun refreshDevices() {
@@ -200,13 +225,14 @@ internal class SimulatorWindowController(
         if (disposed || !visible || !connected || actions.isBusy || polling.isBusy) return
         val epoch = pictureEpoch
         val from = cursor
+        val pictureWanted = tabShown
         // A device started or stopped elsewhere shows up here: the list is cheap, but not free.
         val list = ++polls % LIST_EVERY == 0
-        polling.submit({ readState(from, list) }) { result ->
+        polling.submit({ readState(from, list, pictureWanted) }) { result ->
             if (disposed) return@submit
             val state = result.getOrElse { Polled(failure = it) }
             state.page?.let(::showPage)
-            if (epoch != pictureEpoch) return@submit
+            if (!visible || epoch != pictureEpoch) return@submit
             state.devices?.let(::listDevices)
             state.status?.let { showStatus(it, fresh = false) }
             state.frame?.takeIf { it.device == selected?.id }?.let {
@@ -228,6 +254,7 @@ internal class SimulatorWindowController(
     override fun dispose() {
         if (disposed) return
         disposed = true
+        live.dispose()
         actions.dispose()
         polling.dispose()
         repository.close()
@@ -242,12 +269,14 @@ internal class SimulatorWindowController(
     )
 
     /** Runs on the polling worker. One failing read must not hide the others, so each is caught separately. */
-    private fun readState(from: Long, list: Boolean): Polled {
+    private fun readState(from: Long, list: Boolean, pictureWanted: Boolean): Polled {
         var failure: Throwable? = null
         val found = if (list) runCatching { repository.devices() }.onFailure { failure = it }.getOrNull() else null
         val status = runCatching { repository.status() }.onFailure { failure = it }.getOrNull()
         // A device that is not running has no screen; asking would only fail twice a second.
-        val frame = status?.device?.takeIf { it.state == BOOTED }?.let { device ->
+        val frame = status?.device?.takeIf {
+            pictureWanted && !status.inputEnabled && it.state == BOOTED
+        }?.let { device ->
             runCatching { repository.screenshot(device.id) }.onFailure { failure = it }.getOrNull()
         }
         val page = runCatching { repository.consolePage(from) }.onFailure { failure = failure ?: it }.getOrNull()
@@ -291,6 +320,7 @@ internal class SimulatorWindowController(
         }
         val started = actions.submit(work) { result ->
             working = false
+            pictureChanging = false
             if (!disposed) result.fold(success, ::showFailure)
         }
         if (!started) {
@@ -301,7 +331,10 @@ internal class SimulatorWindowController(
         status = "$label…"
         pollFailed = false
         lastError = null
-        if (clearsPicture) clearPicture()
+        if (clearsPicture) {
+            pictureChanging = true
+            clearPicture()
+        }
         return true
     }
 
@@ -352,6 +385,7 @@ internal class SimulatorWindowController(
 
     private fun clearPicture() {
         pictureEpoch++
+        live.stop()
         frame = null
         capture = ""
     }

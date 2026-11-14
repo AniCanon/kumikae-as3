@@ -57,6 +57,7 @@ internal class IdePrompts(private val project: Project) : SimulatorPrompts {
         project,
         "Taps, typing, Home, Lock and Rotate are sent with idb, a tool from Meta that drives the Simulator " +
             "through private Apple interfaces. Apple can change those without notice.\n\n" +
+            "This also switches the picture from snapshots to live video. " +
             "Nothing is installed by this: idb must already be on this Mac.",
         "Switch Simulator Input On?",
         "Switch On",

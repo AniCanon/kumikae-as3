@@ -26,8 +26,14 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
     Scrollable {
     var frame: SimulatorFrame? = null
         set(value) {
+            val previous = field
+            if (previous === value) return
             field = value
-            repaint()
+            if (previous != null && value != null && previous.geometry == value.geometry) {
+                repaint(device(value.image.width, value.image.height).screen.bounds)
+            } else {
+                repaint()
+            }
         }
 
     /** Two lines shown on the dark screen while there is no picture: what is missing, and what to do. */
@@ -38,6 +44,8 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
             repaint()
         }
     var inputEnabled = false
+    var onFramePresented: (SimulatorFrame, Long) -> Unit = { _, _ -> }
+    private var presented: SimulatorFrame? = null
 
     /** The device's name: which models have a camera housing over the screen is known only by it. */
     var deviceName = ""
@@ -145,7 +153,7 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
         try {
             canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             canvas.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
-            canvas.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+            canvas.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
             canvas.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
             val image = frame?.image
             val device = device(image?.width ?: EMPTY_WIDTH, image?.height ?: EMPTY_HEIGHT)
@@ -158,6 +166,10 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
                 place.scale(device.scale, device.scale)
                 canvas.drawImage(image, place, null)
                 device.paintIsland(canvas)
+                frame?.takeIf { it !== presented }?.let {
+                    presented = it
+                    onFramePresented(it, System.nanoTime())
+                }
             }
         } finally {
             canvas.dispose()

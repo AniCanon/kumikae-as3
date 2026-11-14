@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -37,6 +38,7 @@ internal fun SimulatorView(
     val device = controller.selected
     val open = openDevices(controller)
     val list = state.listShown || device == null || open.none { it.id == device.id }
+    SideEffect { controller.deviceTabShown(!list) }
     Panel(PanelLayout.Border()) {
         Tabs(controller, state, open, list, SwingModifier.north())
         val shown = device.takeUnless { list }
