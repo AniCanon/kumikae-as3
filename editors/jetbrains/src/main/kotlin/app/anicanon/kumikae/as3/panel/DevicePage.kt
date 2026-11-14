@@ -15,11 +15,9 @@ import org.jetbrains.compose.swing.components.button.Button
 import org.jetbrains.compose.swing.components.layout.Panel
 import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.components.layout.ScrollPane
-import org.jetbrains.compose.swing.components.layout.SplitPane
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
 import java.awt.FlowLayout
-import javax.swing.JSplitPane
 import javax.swing.JTextArea
 
 /** One device: a bar of what the panel does, the device itself, and a floating bar of what is done to it. */
@@ -44,6 +42,8 @@ internal fun DevicePage(
         screen.deviceName = device.name
         screen.placeholder = waiting
         screen.zoom = zoom
+        screen.onZoom = { state.zoom = it }
+        screen.onInputWanted = { wantInput(controller, prompts) }
     }
     LaunchedEffect(controller.console) {
         console.text = controller.console
@@ -51,20 +51,17 @@ internal fun DevicePage(
     }
     Panel(PanelLayout.Border(), modifier = modifier) {
         ToolBar(controller, state, prompts, device, SwingModifier.north())
-        SplitPane(
-            modifier = SwingModifier.center().emptyBorder(JBUI.emptyInsets()),
-            orientation = JSplitPane.VERTICAL_SPLIT,
-            resizeWeight = SCREEN_SHARE,
-        ) {
-            Panel(PanelLayout.Border(), modifier = SwingModifier.first()) {
-                ScrollPane(modifier = SwingModifier.center().emptyBorder(JBUI.emptyInsets())) {
-                    Native(screen, SwingModifier.viewport())
-                }
-                Panel(PanelLayout.Flow(FlowLayout.CENTER, 0, JBUI.scale(6)), modifier = SwingModifier.south()) {
-                    DeviceBar(controller, state, prompts, device)
-                }
+        Panel(PanelLayout.Border(), modifier = SwingModifier.center()) {
+            ScrollPane(modifier = SwingModifier.center().emptyBorder(JBUI.emptyInsets())) {
+                Native(screen, SwingModifier.viewport())
             }
-            NativeScrollPane(console, SwingModifier.second(), visible = state.consoleShown)
+            Panel(PanelLayout.Flow(FlowLayout.CENTER, 0, JBUI.scale(6)), modifier = SwingModifier.south()) {
+                DeviceBar(controller, state, prompts, device)
+            }
+        }
+        // A drawer, not a split: closed, it takes no room and leaves no divider behind.
+        if (state.consoleShown) {
+            NativeScrollPane(console, SwingModifier.south(), height = JBUI.scale(CONSOLE_HEIGHT))
         }
     }
 }
@@ -101,7 +98,7 @@ private fun ToolBar(
                 "Zoom in",
                 { state.zoom = step(state.zoom, 1) },
                 enabled =
-                state.zoom < ZOOMS.last(),
+                state.zoom < SimulatorScreen.MAX_ZOOM,
             )
             BarSeparator()
             IconButton(AllIcons.Actions.More, "More", { under ->
@@ -123,19 +120,17 @@ private fun DeviceBar(
         if (!controller.working) Button("Boot", onClick = { controller.boot() })
         return
     }
-    val input = controller.inputEnabled
-    val why = if (input) "" else " (switch input on in the menu)"
+    // Always pressable: while input is off, a press asks to switch it on instead of doing nothing.
+    val send: (SimulatorInput) -> Unit = { what ->
+        if (controller.inputEnabled) controller.send(what) else wantInput(controller, prompts)
+    }
     Pill {
-        IconButton(AllIcons.Nodes.HomeFolder, "Home$why", {
-            controller.send(SimulatorInput.Press(HardwareButton.HOME))
-        }, enabled = input)
-        IconButton(AllIcons.Diff.Lock, "Lock$why", {
-            controller.send(SimulatorInput.Press(HardwareButton.LOCK))
-        }, enabled = input)
-        IconButton(AllIcons.Actions.Refresh, "Rotate$why", {
-            state.turns++
-            controller.send(SimulatorInput.Rotate(Orientation.entries[state.turns % Orientation.entries.size]))
-        }, enabled = input)
+        IconButton(AllIcons.Nodes.HomeFolder, "Home", { send(SimulatorInput.Press(HardwareButton.HOME)) })
+        IconButton(AllIcons.Diff.Lock, "Lock", { send(SimulatorInput.Press(HardwareButton.LOCK)) })
+        IconButton(AllIcons.Actions.Refresh, "Rotate", {
+            if (controller.inputEnabled) state.turns++
+            send(SimulatorInput.Rotate(Orientation.entries[state.turns % Orientation.entries.size]))
+        })
         BarSeparator()
         IconButton(
             AllIcons.Actions.Dump,
@@ -143,12 +138,13 @@ private fun DeviceBar(
             { controller.frame?.let { prompts.copy(it.image) } },
             enabled = controller.frame != null,
         )
-        IconButton(
-            AllIcons.Actions.Edit,
-            "Type text$why",
-            { prompts.textToType()?.let { controller.send(SimulatorInput.Text(it)) } },
-            enabled = input,
-        )
+        IconButton(AllIcons.Actions.Edit, "Type text", {
+            if (controller.inputEnabled) {
+                prompts.textToType()?.let { controller.send(SimulatorInput.Text(it)) }
+            } else {
+                wantInput(controller, prompts)
+            }
+        })
     }
 }
 
@@ -182,8 +178,17 @@ private fun placeholder(device: SimulatorDevice, controller: SimulatorWindowCont
     else -> "${device.name} is not running" to "Press Boot to start it"
 }
 
-private fun step(zoom: Double, by: Int): Double =
-    ZOOMS[(ZOOMS.indexOf(zoom).coerceAtLeast(0) + by).coerceIn(ZOOMS.indices)]
+/** The next zoom a button goes to. Close to fitting snaps to fitting, so that the scroll bars go away. */
+private fun step(zoom: Double, by: Int): Double {
+    val next = if (by > 0) zoom * ZOOM_STEP else zoom / ZOOM_STEP
+    return if (next < 1.0 + ZOOM_SNAP) 1.0 else next.coerceAtMost(SimulatorScreen.MAX_ZOOM)
+}
 
-private val ZOOMS = listOf(1.0, 1.5, 2.0, 3.0)
-private const val SCREEN_SHARE = 0.72
+/** Input was asked for while it is off: the owner is asked once, and a yes switches it on. */
+private fun wantInput(controller: SimulatorWindowController, prompts: SimulatorPrompts) {
+    if (prompts.confirmInput()) controller.enableInput()
+}
+
+private const val ZOOM_STEP = 1.25
+private const val ZOOM_SNAP = 0.02
+private const val CONSOLE_HEIGHT = 190

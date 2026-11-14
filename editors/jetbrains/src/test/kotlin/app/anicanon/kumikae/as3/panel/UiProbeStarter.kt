@@ -97,12 +97,6 @@ class UiProbeStarter : ApplicationStarter {
             press(view, "Launch org.kumikae.as3test")
             await("Launch") { shows(view, "Launch requested") }
             check("launch probe-phone org.kumikae.as3test" in repository.calls) { "Launch sent ${repository.calls}" }
-            check(
-                !icon(view, "Home (switch input on in the menu)").isEnabled &&
-                    !icon(view, "Type text (switch input on in the menu)").isEnabled,
-            ) {
-                "Input is on in viewer mode"
-            }
             await("a picture and the console") {
                 controller.poll()
                 screen(view).frame != null && console.text.contains("test 40 of 40 passed")
@@ -114,18 +108,15 @@ class UiProbeStarter : ApplicationStarter {
             render(view.component, NARROW, TALL, destination.resolve("$prefix-5-zoomed.png"))
             press(view, "Fit to the panel")
             press(view, "Show console")
-            await("the console to open") { console.parent?.parent?.isVisible == true }
+            await("the console to open") { console.parent?.parent?.parent != null }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-6-console.png"))
             press(view, "Copy screenshot")
             check(prompts.copiedImages == 1) { "The screenshot was not copied" }
-            onEdt { menu(moreEntries(controller, view.state, prompts), "Switch input on") }
-            await("input controls") {
-                controller.poll()
-                descendants(view.component).filterIsInstance<IconButtonControl>().any {
-                    it.name == "Home" &&
-                        it.isEnabled
-                }
-            }
+            check(!controller.inputEnabled) { "Input is on before the owner agreed" }
+            press(view, "Home")
+            await("input after the owner's yes") { controller.inputEnabled }
+            press(view, "Home")
+            await("Home to be sent") { repository.calls.any { it.startsWith("input probe-phone") } }
             repository.installFailure = "An application bundle was not found at the provided path. " +
                 "Provide a valid path to the desired application bundle and try again."
             onEdt { menu(moreEntries(controller, view.state, prompts), "Install app") }

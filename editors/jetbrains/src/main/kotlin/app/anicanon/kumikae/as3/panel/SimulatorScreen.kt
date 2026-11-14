@@ -7,15 +7,18 @@ import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Graphics2D
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.RenderingHints
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.awt.event.MouseWheelEvent
 import java.awt.geom.AffineTransform
 import javax.swing.JPanel
 import javax.swing.JViewport
 import javax.swing.Scrollable
 import javax.swing.SwingConstants
+import javax.swing.SwingUtilities
 
 /** Paints the device around the latest picture, and turns mouse presses on its screen into gestures. */
 internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixel, Long) -> Unit) :
@@ -48,10 +51,30 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
     var zoom = 1.0
         set(value) {
             if (field == value) return
+            // What was in the middle of the view stays there.
+            val seen = visibleRect
+            val middle = if (width > 0 && height > 0) seen.centerX / width to seen.centerY / height else null
             field = value
             revalidate()
             repaint()
+            val view = parent as? JViewport ?: return
+            if (middle != null) {
+                SwingUtilities.invokeLater {
+                    val x = (middle.first * width - view.extentSize.width / 2.0).toInt()
+                    val y = (middle.second * height - view.extentSize.height / 2.0).toInt()
+                    view.viewPosition = Point(
+                        x.coerceIn(0, maxOf(0, width - view.extentSize.width)),
+                        y.coerceIn(0, maxOf(0, height - view.extentSize.height)),
+                    )
+                }
+            }
         }
+
+    /** The wheel with Command or Control held asks for another zoom. */
+    var onZoom: (Double) -> Unit = {}
+
+    /** A click on the screen while input is off. */
+    var onInputWanted: () -> Unit = {}
     private var pressed: Press? = null
 
     private class Press(val frame: SimulatorFrame, val at: Pixel, val nanos: Long)
@@ -59,7 +82,17 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
     init {
         isOpaque = false
         minimumSize = Dimension(0, 0)
+        addMouseWheelListener(::wheel)
         addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(event: MouseEvent) {
+                val current = frame ?: return
+                if (!inputEnabled && event.button == MouseEvent.BUTTON1 &&
+                    pixel(current, event) != null
+                ) {
+                    onInputWanted()
+                }
+            }
+
             override fun mousePressed(event: MouseEvent) {
                 pressed = null
                 if (!inputEnabled || event.button != MouseEvent.BUTTON1) return
@@ -80,6 +113,17 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
                 )
             }
         })
+    }
+
+    private fun wheel(event: MouseWheelEvent) {
+        if (event.isMetaDown || event.isControlDown) {
+            val next = zoom * Math.pow(WHEEL_STEP, -event.preciseWheelRotation)
+            onZoom(next.coerceIn(1.0, MAX_ZOOM))
+            event.consume()
+        } else {
+            // Listening to the wheel takes it from the scroll pane; give back what is not a zoom.
+            parent?.dispatchEvent(SwingUtilities.convertMouseEvent(this, event, parent))
+        }
     }
 
     private fun device(screenWidth: Int, screenHeight: Int) = DeviceFrame(
@@ -157,6 +201,8 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
 
     companion object {
         private const val NANOS_PER_MILLI = 1_000_000
+        const val MAX_ZOOM = 4.0
+        private const val WHEEL_STEP = 1.08
         private const val MARGIN = 18
         private const val SCROLL_STEP = 24
 

@@ -9,9 +9,11 @@ import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.PopupStep
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep
 import java.awt.Image
+import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
+import java.awt.datatransfer.UnsupportedFlavorException
 import java.awt.image.BufferedImage
 import javax.swing.JComponent
 
@@ -100,11 +102,18 @@ internal class IdePrompts(private val project: Project) : SimulatorPrompts {
 
     override fun copy(text: String) = CopyPasteManager.getInstance().setContents(StringSelection(text))
 
-    override fun copy(image: BufferedImage) = CopyPasteManager.getInstance().setContents(object : Transferable {
-        override fun getTransferDataFlavors() = arrayOf(DataFlavor.imageFlavor)
+    // Not the IDE's clipboard manager: its history keeps text only, and it throws on a picture.
+    override fun copy(image: BufferedImage) = Toolkit.getDefaultToolkit().systemClipboard.setContents(
+        object : Transferable {
+            override fun getTransferDataFlavors() = arrayOf(DataFlavor.imageFlavor)
 
-        override fun isDataFlavorSupported(flavor: DataFlavor) = flavor == DataFlavor.imageFlavor
+            override fun isDataFlavorSupported(flavor: DataFlavor) = flavor == DataFlavor.imageFlavor
 
-        override fun getTransferData(flavor: DataFlavor): Image = image
-    })
+            override fun getTransferData(flavor: DataFlavor): Image {
+                if (flavor != DataFlavor.imageFlavor) throw UnsupportedFlavorException(flavor)
+                return image
+            }
+        },
+        null,
+    )
 }

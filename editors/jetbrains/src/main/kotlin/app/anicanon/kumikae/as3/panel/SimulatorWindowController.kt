@@ -76,7 +76,7 @@ internal class SimulatorWindowController(
         if (disposed || device.id == selected?.id) return
         run("Selecting ${device.name}", { repository.select(device.id) }, clearsPicture = true) {
             showStatus(it, fresh = true)
-            status = "Selected ${device.name}. Boot it if it is not running."
+            status = if (it.device?.state == BOOTED) "Showing ${device.name}." else "${device.name} is not running."
         }
         // The list already shows this device, so the state follows it even when the request was refused:
         // an action must never name a device the user cannot see. The service's own choice returns with

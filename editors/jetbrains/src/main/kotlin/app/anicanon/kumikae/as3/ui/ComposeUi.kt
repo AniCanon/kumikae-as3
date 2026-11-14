@@ -9,6 +9,7 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.node.SwingNode
+import java.awt.Dimension
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import javax.swing.Icon
@@ -138,18 +139,15 @@ internal fun StatusLine(text: String, modifier: SwingModifier = SwingModifier, t
 
 /** Attach caller-owned controls only while applying the composition, never inside remember. */
 @Composable
-internal fun NativeScrollPane(component: JComponent, modifier: SwingModifier = SwingModifier, visible: Boolean = true) {
+internal fun NativeScrollPane(component: JComponent, modifier: SwingModifier = SwingModifier, height: Int? = null) {
     SwingNode(
         factory = {
-            JBScrollPane().apply {
-                border =
-                    JBUI.Borders.customLineTop(JBUI.CurrentTheme.ToolWindow.borderColor())
-            }
+            JBScrollPane().apply { border = JBUI.Borders.customLineTop(JBUI.CurrentTheme.ToolWindow.borderColor()) }
         },
         modifier = modifier,
         update = {
             set(component) { setViewportView(it) }
-            set(visible) { isVisible = it }
+            set(height) { preferredSize = it?.let { rows -> Dimension(0, rows) } }
         },
     )
 }
