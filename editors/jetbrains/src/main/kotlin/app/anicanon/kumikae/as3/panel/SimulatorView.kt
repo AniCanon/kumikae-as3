@@ -80,18 +80,19 @@ internal fun SimulatorView(controller: SimulatorWindowController, screen: Simula
 
 @Composable
 private fun DeviceRow(controller: SimulatorWindowController) {
-    FormRow("Device", action = {
-        Panel(PanelLayout.Flow(FlowLayout.LEFT, JBUI.scale(4), 0)) {
-            Button("Refresh", onClick = { controller.refreshDevices() })
-            Button("Boot", onClick = { controller.boot() })
-        }
-    }) { place ->
+    FormRow("Device") { place ->
         ComboBox(
             controller.devices.map(::DeviceChoice),
             controller.selected?.let(::DeviceChoice),
             onSelectionChange = { choice -> choice?.let { controller.selectDevice(it.device) } },
             modifier = place,
         )
+    }
+    FormRow("") { place ->
+        Panel(buttons, modifier = place) {
+            Button("Refresh", onClick = { controller.refreshDevices() })
+            Button("Boot", onClick = { controller.boot() })
+        }
     }
 }
 
@@ -129,11 +130,16 @@ private fun InputRows(controller: SimulatorWindowController) {
             modifier = place.enabled(controller.inputEnabled),
         )
     }
-    Panel(PanelLayout.Flow(FlowLayout.LEFT, JBUI.scale(4), 0)) {
-        Button("Home", onClick = { controller.send(SimulatorInput.Press(HardwareButton.HOME)) }, modifier = allowed)
-        Button("Lock", onClick = { controller.send(SimulatorInput.Press(HardwareButton.LOCK)) }, modifier = allowed)
+    FormRow("Buttons") { place ->
+        Panel(buttons, modifier = place) {
+            Button("Home", onClick = { controller.send(SimulatorInput.Press(HardwareButton.HOME)) }, modifier = allowed)
+            Button("Lock", onClick = { controller.send(SimulatorInput.Press(HardwareButton.LOCK)) }, modifier = allowed)
+        }
     }
 }
+
+// IDE buttons carry their own outer margin, so no extra gap keeps them in line with the fields above.
+private val buttons = PanelLayout.Flow(FlowLayout.LEFT, 0, 0)
 
 private const val DEFAULT_BUNDLE = "org.kumikae.as3test"
 private const val FIELD_COLUMNS = 12

@@ -91,6 +91,7 @@ internal fun ReadOnlyField(text: String, modifier: SwingModifier = SwingModifier
     }, modifier = modifier, update = {
         set(text) {
             this.text = it
+            toolTipText = it.ifEmpty { null }
             caretPosition = 0
         }
     })
@@ -114,4 +115,4 @@ internal fun NativeScrollPane(
 }
 
 private const val NOTE_COLUMNS = 24
-private const val LABEL_WIDTH = 52
+private const val LABEL_WIDTH = 56

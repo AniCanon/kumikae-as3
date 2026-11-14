@@ -1,3 +1,6 @@
+import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
+import java.time.Duration
+
 plugins {
     kotlin("jvm") version "2.4.10"
     kotlin("plugin.compose") version "2.4.10"
@@ -54,3 +57,27 @@ intellijPlatform {
 }
 
 tasks.test { useJUnitPlatform() }
+
+// Opt-in UI probe is a second plugin, never part of the distributable plugin ZIP.
+val uiProbeJar = tasks.register<Jar>("uiProbeJar") {
+    dependsOn(tasks.testClasses)
+    archiveBaseName = "kumikae-as3-ui-probe"
+    from(sourceSets.test.get().output) { include("**/UiProbe*.class") }
+    from("src/uiProbe/plugin.xml") { into("META-INF") }
+}
+if (providers.gradleProperty("uiProbe").isPresent) {
+    tasks.withType<PrepareSandboxTask>().configureEach {
+        if (name == "prepareSandbox_runIde") from(uiProbeJar) { into("kumikae-as3-ui-probe/lib") }
+    }
+    tasks.runIde {
+        val report = layout.buildDirectory.dir("reports/ui").get().asFile
+        args("kumikae-as3-ui-check", report.absolutePath)
+        timeout = Duration.ofMinutes(2)
+        doFirst { report.resolve("result.txt").delete() }
+        doLast {
+            check(report.resolve("result.txt").takeIf { it.isFile }?.readText()?.trim() == "passed") {
+                "UI probe did not pass. See build/reports/ui/result.txt and the sandbox log."
+            }
+        }
+    }
+}

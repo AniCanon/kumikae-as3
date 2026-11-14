@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.panel
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.components.JBTextArea
+import com.intellij.util.ui.JBUI
 import javax.swing.JPanel
 import javax.swing.Timer
 
@@ -13,6 +14,7 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController) {
     private val console = JBTextArea().apply {
         isEditable = false
         lineWrap = true
+        margin = JBUI.insets(4)
     }
     private val timer = Timer(POLL_MILLIS) { controller.poll() }
 
