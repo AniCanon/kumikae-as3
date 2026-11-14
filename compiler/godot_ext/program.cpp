@@ -5,7 +5,9 @@
 #include "lower.h"
 #include "names.h"
 
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/window.hpp>
@@ -14,7 +16,6 @@
 
 #include <algorithm>
 #include <thread>
-#include <filesystem>
 #include <vector>
 
 using namespace godot;
@@ -39,6 +40,25 @@ static void before_shutdown() {
 	}
 }
 
+// Every .as file of the project, by its place in it ("res://game/Player.as"). Folders and files whose
+// name starts with a dot are not part of a project.
+static void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) {
+	const Ref<DirAccess> folder = DirAccess::open(p_folder);
+	if (folder.is_null()) {
+		return;
+	}
+	for (const String &name : folder->get_files()) {
+		if (name.ends_with(".as") && !name.begins_with(".")) {
+			r_files.push_back(p_folder.path_join(name).utf8().get_data());
+		}
+	}
+	for (const String &name : folder->get_directories()) {
+		if (!name.begins_with(".")) {
+			collect_scripts(p_folder.path_join(name), r_files);
+		}
+	}
+}
+
 Project &Project::get() {
 	if (!program) {
 		program = new Project();
@@ -48,32 +68,16 @@ Project &Project::get() {
 	}
 	program->loaded_ = true;
 	loads++;
-	std::string root = ProjectSettings::get_singleton()->globalize_path("res://").utf8().get_data();
-	// Every .as file under the project, in a fixed order; folders whose name starts with a dot are not
-	// part of a project.
 	std::vector<std::string> files;
-	std::error_code error;
-	std::filesystem::recursive_directory_iterator at(root, std::filesystem::directory_options::skip_permission_denied, error);
-	const std::filesystem::recursive_directory_iterator end;
-	for (; !error && at != end; at.increment(error)) {
-		std::string name = at->path().filename().string();
-		if (at->is_directory(error)) {
-			if (!name.empty() && name[0] == '.') {
-				at.disable_recursion_pending();
-			}
-		} else if (at->path().extension() == ".as" && !name.empty() && name[0] != '.') {
-			files.push_back(at->path().string());
-		}
-	}
+	collect_scripts("res://", files);
 	std::sort(files.begin(), files.end());
 
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	for (const std::string &path : files) {
-		std::string source;
-		if (read_file(path, &source)) {
-			compilation.add(path, std::move(source));
-		}
+		// Read through Godot: in an exported game the project is inside a pack, not in a folder.
+		const CharString source = FileAccess::get_file_as_string(String::utf8(path.c_str())).utf8();
+		compilation.add(path, std::string(source.get_data(), (size_t)source.length()));
 	}
 	compilation.check();
 	bool lowered = !compilation.has_errors() && ir::lower(compilation, &program->module_, ir::LowerMode::Library);
@@ -106,17 +110,18 @@ void Project::unload() {
 
 uint32_t Project::class_of_file(const std::string &p_path) const {
 	// The class named after the file and declared in it: two folders may each have a Thing.as.
-	std::error_code error;
-	std::filesystem::path wanted = std::filesystem::weakly_canonical(p_path, error);
-	std::string stem = std::filesystem::path(p_path).stem().string();
+	const size_t slash = p_path.find_last_of('/');
+	const size_t start = slash == std::string::npos ? 0 : slash + 1;
+	const size_t end = p_path.rfind('.');
+	const std::string stem = p_path.substr(start, end == std::string::npos || end < start ? std::string::npos : end - start);
 	for (size_t i = 0; i < module_.classes.size(); i++) {
 		const ir::Class &klass = module_.classes[i];
-		size_t dot = klass.name.rfind('.');
+		const size_t dot = klass.name.rfind('.');
 		if ((dot == std::string::npos ? klass.name : klass.name.substr(dot + 1)) != stem || klass.constructor == ir::NONE) {
 			continue;
 		}
-		uint32_t file = module_.functions[klass.constructor].file;
-		if (file < module_.files.size() && std::filesystem::weakly_canonical(module_.files[file], error) == wanted) {
+		const uint32_t file = module_.functions[klass.constructor].file;
+		if (file < module_.files.size() && module_.files[file] == p_path) {
 			return (uint32_t)i;
 		}
 	}

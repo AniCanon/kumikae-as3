@@ -11,7 +11,7 @@ using namespace godot;
 using kas3::Project;
 
 void AS3Script::set_file(const String &p_resource_path) {
-	file_ = ProjectSettings::get_singleton()->globalize_path(p_resource_path).utf8().get_data();
+	file_ = p_resource_path.utf8().get_data();
 	source_ = FileAccess::get_file_as_string(p_resource_path);
 	Project &program = Project::get();
 	class_ = program.valid() ? program.class_of_file(file_) : kas3::ir::NONE;

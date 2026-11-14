@@ -208,6 +208,20 @@ check("wide.gd: a wide value for an integer vector is a RangeError, eight times"
 check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError: 9007199254740993 does not fit a Number exactly." in output,
       output[-1200:])
 
+# An exported game keeps its files in a pack, not in a folder: the scripts must be found and read there.
+import tempfile
+with tempfile.TemporaryDirectory() as packed:
+    subprocess.run([godot, "--headless", "--path", project, "-s", "pack.gd", "--", os.path.join(packed, "game.pck")],
+                   capture_output=True, text=True, timeout=300)
+    shutil.copytree(os.path.join(project, "bin"), os.path.join(packed, "bin"))
+    for driver, wanted in (("driver.gd", "RESULT steps=30"), ("statics.gd", "VALUE cleared local=true|true"),
+                           ("signals.gd", None), ("wide.gd", "VALUE heard=5000000000|5000000000")):
+        run = subprocess.run([godot, "--headless", "--main-pack", "game.pck", "-s", driver], capture_output=True, text=True,
+                             timeout=300, cwd=packed)
+        output = run.stdout + run.stderr
+        check("from a pack: %s runs" % driver, run.returncode == 0 and "were not loaded" not in output and "no script" not in output and
+              (wanted is None or wanted in output), output[-700:])
+
 for failure in failures:
     print("FAIL " + failure)
 print("godot: %s" % ("OK" if not failures else "%d failed" % len(failures)))
