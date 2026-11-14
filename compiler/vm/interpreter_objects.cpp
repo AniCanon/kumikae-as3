@@ -1,0 +1,196 @@
+#include "interpreter.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include "interpreter_internal.h"
+
+namespace kas3 {
+namespace vm {
+
+using ir::Function;
+using ir::Instruction;
+using ir::Kind;
+using ir::NONE;
+using ir::Op;
+
+// Gives up the reference a slot holds.
+void Interpreter::drop(Kind p_kind, Slot &p_slot) {
+	if (p_kind == Kind::Str) {
+		Str *string = static_cast<Str *>(p_slot.p);
+		if (release(string)) {
+			free_string(string);
+		}
+	} else if (p_kind == Kind::Obj) {
+		Object *object = static_cast<Object *>(p_slot.p);
+		if (release(object)) {
+			drop_object(object);
+		}
+	} else if (ir::is_engine(p_kind) && p_slot.p) {
+		// Letting go of an engine value can run engine code that calls back in and moves the registers:
+		// the slot is emptied first and not touched again.
+		void *handle = p_slot.p;
+		p_slot.bits = 0;
+		host_.values.drop(handle);
+		return;
+	}
+	p_slot.bits = 0;
+}
+
+Slot Interpreter::share(Kind p_kind, Slot p_value) {
+	if (ir::is_reference(p_kind)) {
+		retain(static_cast<Counted *>(p_value.p));
+	} else if (ir::is_engine(p_kind) && p_value.p) {
+		p_value.p = host_.values.copy(p_value.p);
+	}
+	return p_value;
+}
+
+void Interpreter::put(Kind p_kind, Slot &p_target, Slot p_owned) {
+	Slot old = p_target;
+	p_target = p_owned;
+	if (held(p_kind)) {
+		drop(p_kind, old);
+	}
+}
+
+// Frees an object whose last reference is gone, and whatever that in turn leaves unreferenced. A list
+// rather than recursion: a long chain of objects must not overflow the C++ stack.
+void Interpreter::drop_object(Object *p_object) {
+	std::vector<Object *> dead;
+	dead.push_back(p_object);
+	while (!dead.empty()) {
+		Object *object = dead.back();
+		dead.pop_back();
+		const ir::Class &klass = module_.classes[object->klass];
+		for (size_t i = 0; i < klass.fields.size(); i++) {
+			Slot &field = object->fields()[i];
+			if (klass.fields[i].kind == Kind::Str) {
+				Str *string = static_cast<Str *>(field.p);
+				if (release(string)) {
+					free_string(string);
+				}
+			} else if (klass.fields[i].kind == Kind::Obj) {
+				Object *other = static_cast<Object *>(field.p);
+				if (release(other)) {
+					dead.push_back(other);
+				}
+			} else if (ir::is_engine(klass.fields[i].kind) && field.p) {
+				void *handle = field.p;
+				field.p = nullptr;
+				host_.values.drop(handle);
+			}
+		}
+		free_object(object);
+	}
+}
+
+void Interpreter::assign(Kind p_kind, Slot &p_slot, void *p_value) {
+	Slot old = p_slot;
+	p_slot.bits = 0;
+	p_slot.p = p_value;
+	drop(p_kind, old);
+}
+
+Str *Interpreter::text(const std::string &p_text) {
+	return new_string(p_text);
+}
+
+bool Interpreter::is_class(const Object *p_object, uint32_t p_class) const {
+	if (!p_object) {
+		return false;
+	}
+	for (uint32_t at = p_object->klass; at != NONE; at = module_.classes[at].base) {
+		if (at == p_class) {
+			return true;
+		}
+	}
+	return false;
+}
+
+std::string Interpreter::object_text(Object *p_object) const {
+	if (!p_object) {
+		return "null";
+	}
+	const std::string &name = module_.classes[p_object->klass].name;
+	std::string simple = name.substr(name.rfind('.') == std::string::npos ? 0 : name.rfind('.') + 1);
+	if (module_.error_class != NONE && is_class(p_object, module_.error_class)) {
+		// An Error reads as its class and its message.
+		Str *message = static_cast<Str *>(p_object->fields()[0].p);
+		return message && message->size ? simple + ": " + std::string(message->view()) : simple;
+	}
+	return "[object " + simple + "]";
+}
+
+bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_value, Kind *r_kind) const {
+	if (!p_object) {
+		return false;
+	}
+	const ir::Class &klass = module_.classes[p_object->klass];
+	// The class's own field hides a base's of the same name: the last one wins.
+	for (size_t i = klass.fields.size(); i-- > 0;) {
+		if (klass.fields[i].name == p_name) {
+			*r_value = p_object->fields()[i];
+			if (r_kind) {
+				*r_kind = klass.fields[i].kind;
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
+	if (p_class >= module_.classes.size()) {
+		return nullptr;
+	}
+	const ir::Class &klass = module_.classes[p_class];
+	if (!use_class_now(p_class)) {
+		if (p_owner) {
+			host_.values.drop(p_owner);
+		}
+		return nullptr;
+	}
+	Object *object = new_object(p_class, klass.fields.size());
+	if (!object) {
+		if (p_owner) {
+			host_.values.drop(p_owner);
+		}
+		return nullptr;
+	}
+	for (size_t i = 0; i < klass.fields.size(); i++) {
+		if (klass.fields[i].kind == Kind::F64) {
+			object->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
+		}
+	}
+	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref && p_owner) {
+		object->fields()[0].p = p_owner; // The object's own from here on.
+	} else if (p_owner) {
+		host_.values.drop(p_owner);
+	}
+	Slot self;
+	self.bits = 0;
+	self.p = object;
+	if (klass.constructor != NONE && !call(klass.constructor, &self, 1)) {
+		release_object(object);
+		return nullptr;
+	}
+	return object;
+}
+
+uint32_t Interpreter::find_method(uint32_t p_class, std::string_view p_name) const {
+	if (p_class >= methods_.size()) {
+		return NONE;
+	}
+	auto found = methods_[p_class].find(std::string(p_name));
+	return found == methods_[p_class].end() ? NONE : found->second;
+}
+
+void Interpreter::release_object(Object *p_object) {
+	if (release(p_object)) {
+		drop_object(p_object);
+	}
+}
+
+} // namespace vm
+} // namespace kas3

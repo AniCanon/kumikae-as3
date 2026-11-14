@@ -18,8 +18,7 @@ src/names_link.cpp: banner comments
 src/parser.h: banner comments
 src/parser_stmt.cpp: Parser::parse_statement_inner() is over 120 lines
 src/typer_expressions.cpp: Typer::compute() is over 120 lines
-vm/interpreter.cpp: Interpreter::host_op() is over 120 lines
-vm/interpreter.cpp: Interpreter::run() is over 120 lines
-vm/interpreter.cpp: the file is over 800 lines
 vm/interpreter.h: banner comments
+vm/interpreter_host.cpp: Interpreter::host_op() is over 120 lines
+vm/interpreter_run.cpp: Interpreter::run() is over 120 lines
 vm/runtime.h: banner comments
