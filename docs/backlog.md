@@ -248,6 +248,9 @@ any Godot value passing as a condition):
 - Scripts are looked at five times a second by their time and size; two saves of the same size within
   one second are seen as one. **2d**
 - A reload is refused when a class with a live object was removed or renamed. **2d**
+- A game on a simulator reloads from the folder it is told of (`KAS3_SOURCE_DIR`); only scripts are read
+  there, so an edited scene or picture needs a new build. A real phone or tablet cannot see that folder:
+  it needs the edits sent to it. **2d**
 - Not tried: a reload while a debugger is stopped, in the Godot editor's own play mode with the editor
   attached, or with more than a few hundred scripts. **2d**
 
