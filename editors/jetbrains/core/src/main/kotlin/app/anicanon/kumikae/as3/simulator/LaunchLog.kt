@@ -4,18 +4,30 @@ import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
-class LaunchLog(private val start: (List<String>) -> Process = { ProcessBuilder(it).start() }) : AutoCloseable {
+class LaunchLog(
+    private val start: (List<String>, Map<String, String>) -> Process = { command, environment ->
+        ProcessBuilder(command).apply { environment().putAll(environment) }.start()
+    },
+) : AutoCloseable {
     val buffer = LogBuffer()
     private var process: Process? = null
     private var bundle: String? = null
     private val readers = mutableListOf<Thread>()
 
-    fun launch(device: String, app: String): Map<String, Any?> {
+    /**
+     * `sources` is the folder the game's scripts are edited in, if there is one: the game reads them
+     * there and takes a save while it runs. simctl gives the app the variables of its own that start
+     * with SIMCTL_CHILD_.
+     */
+    fun launch(device: String, app: String, sources: String = ""): Map<String, Any?> {
         close()
         bundle = app
         buffer.append("session", "Launching $app\n")
         val child = try {
-            start(Commands.launch(device, app))
+            start(
+                Commands.launch(device, app),
+                if (sources.isEmpty()) emptyMap() else mapOf("SIMCTL_CHILD_KAS3_SOURCE_DIR" to sources),
+            )
         } catch (
             e: java.io.IOException,
         ) {

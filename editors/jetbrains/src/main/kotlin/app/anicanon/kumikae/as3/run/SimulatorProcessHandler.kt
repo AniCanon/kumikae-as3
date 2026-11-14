@@ -12,6 +12,7 @@ internal class SimulatorProcessHandler(
     private val bundle: String,
     appPath: String,
     build: (((String, Boolean) -> Unit) -> String)? = null,
+    sources: String = "",
 ) : ProcessHandler() {
     private val stopping = AtomicBoolean()
     private val run = SimulatorRun(
@@ -21,6 +22,7 @@ internal class SimulatorProcessHandler(
         { text, error ->
             notifyTextAvailable(text, if (error) ProcessOutputTypes.STDERR else ProcessOutputTypes.STDOUT)
         },
+        sources,
         build,
     )
     private val worker = Thread(::follow, "Kumikae AS3 Simulator run").apply { isDaemon = true }

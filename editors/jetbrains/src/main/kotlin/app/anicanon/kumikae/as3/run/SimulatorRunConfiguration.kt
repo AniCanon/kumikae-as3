@@ -23,6 +23,7 @@ import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NotNullLazyValue
 import com.intellij.openapi.wm.ToolWindowManager
+import java.nio.file.Files
 import java.nio.file.Path
 
 /** "iOS Simulator (AS3)" in Run > Edit Configurations: an app's bundle, and optionally the app to install. */
@@ -66,8 +67,13 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
         val appPath = options.appPath
         return object : RunProfileState {
             override fun execute(executor: Executor?, runner: ProgramRunner<*>): ExecutionResult {
-                val handler =
-                    SimulatorProcessHandler(project.service<SimulatorHost>().repository, bundle, appPath, builder())
+                val handler = SimulatorProcessHandler(
+                    project.service<SimulatorHost>().repository,
+                    bundle,
+                    appPath,
+                    builder(),
+                    sources(),
+                )
                 val console = TextConsoleBuilderFactory.getInstance().createBuilder(project).console
                 console.attachToProcess(handler)
                 // The app appears in the panel, so the panel comes forward with it.
@@ -76,6 +82,10 @@ class SimulatorRunConfiguration(project: Project, factory: ConfigurationFactory,
             }
         }
     }
+
+    /** The game's own folder, where its scripts are edited: empty where the project is not a Godot game. */
+    private fun sources(): String =
+        project.basePath?.takeIf { Files.isRegularFile(Path.of(it, "project.godot")) }.orEmpty()
 
     /**
      * How the game is built for the Simulator when no app is named: from the project's own iOS export

@@ -124,6 +124,13 @@ class SimulatorRunTest {
         assertEquals(listOf("connect", "status", "install A /games/Game.app", "launch A org.example.game"), asked)
     }
 
+    @Test fun `the game is told where its scripts are edited, so that it takes a save while it runs`() {
+        repository.select("A")
+        repository.calls.clear()
+        SimulatorRun(repository, "org.example.game", "", { _, _ -> }, sources = "/games/mine").start()
+        assertEquals(listOf("connect", "status", "launch A org.example.game from /games/mine"), asked)
+    }
+
     @Test fun `stopping ends the app`() {
         repository.select("A")
         val run = run().also { it.start() }

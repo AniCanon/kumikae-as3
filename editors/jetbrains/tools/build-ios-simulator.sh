@@ -22,14 +22,22 @@ fail() { echo "$1" >&2; exit 1; }
 [ -f "$template" ] || fail "The Simulator export template was not found at $template. See this script's first lines."
 command -v xcodebuild >/dev/null || fail "Xcode is needed to build for the Simulator."
 
-# The extension, built for iOS. A project made by the wizard does not have it until its first iOS build.
-if [ ! -d "$project/bin/ios/kas3_godot.xcframework" ]; then
-    [ -n "$library" ] && [ -d "$library/kas3_godot.xcframework" ] ||
-        fail "The AS3 extension for iOS (kas3_godot.xcframework) is missing from $project/bin/ios."
-    mkdir -p "$project/bin/ios"
-    cp -R "$library/kas3_godot.xcframework" "$project/bin/ios/"
-    echo "Copied the AS3 extension for iOS into bin/ios."
+# The extension, built for iOS. A project made by the wizard does not have it until its first iOS build,
+# and one that has it is given the plugin's again when that one is different: a newer plugin, a newer
+# extension.
+mine="$project/bin/ios/kas3_godot.xcframework"
+if [ -n "$library" ] && [ -d "$library/kas3_godot.xcframework" ]; then
+    if [ ! -d "$mine" ]; then
+        mkdir -p "$project/bin/ios"
+        cp -R "$library/kas3_godot.xcframework" "$project/bin/ios/"
+        echo "Copied the AS3 extension for iOS into bin/ios."
+    elif ! diff -rq "$library/kas3_godot.xcframework" "$mine" >/dev/null 2>&1; then
+        rm -rf "$mine"
+        cp -R "$library/kas3_godot.xcframework" "$project/bin/ios/"
+        echo "Updated the AS3 extension for iOS in bin/ios."
+    fi
 fi
+[ -d "$mine" ] || fail "The AS3 extension for iOS (kas3_godot.xcframework) is missing from $project/bin/ios."
 
 # Godot takes the template's place from the preset, nowhere else. It is set in the iOS preset's options,
 # and only there; a line of the person's own that already names a template is left alone.

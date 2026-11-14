@@ -11,6 +11,8 @@ internal class SimulatorRun(
     bundle: String,
     appPath: String,
     private val output: (text: String, error: Boolean) -> Unit,
+    // The folder the game's scripts are edited in: the game reads them there, and takes a save while it runs.
+    private val sources: String = "",
     // Builds the game for the Simulator and returns the .app, saying what it does as it goes. Null where
     // there is nothing to build from.
     private val build: (((String, Boolean) -> Unit) -> String)? = null,
@@ -34,7 +36,7 @@ internal class SimulatorRun(
         if (app.isNotEmpty()) repository.install(chosen.id, app)
         // Output from before this launch belongs to another run.
         cursor = repository.consolePage(0).nextCursor
-        repository.launch(chosen.id, bundle)
+        repository.launch(chosen.id, bundle, sources)
     }
 
     /** Reads what was printed since the last call. Returns the app's exit code once it has ended. */

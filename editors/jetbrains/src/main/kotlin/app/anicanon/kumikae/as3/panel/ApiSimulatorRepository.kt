@@ -44,8 +44,9 @@ internal class ApiSimulatorRepository(private val service: SimulatorService) : S
         service.call("install", mapOf("device" to device, "path" to appPath))
     }
 
-    override fun launch(device: String, bundle: String) {
-        service.call("launch", mapOf("device" to device, "bundle" to bundle))
+    override fun launch(device: String, bundle: String, sources: String) {
+        val folder = if (sources.isEmpty()) emptyMap() else mapOf("sources" to sources)
+        service.call("launch", mapOf("device" to device, "bundle" to bundle) + folder)
     }
 
     override fun openFrames(device: String): SimulatorFrames {

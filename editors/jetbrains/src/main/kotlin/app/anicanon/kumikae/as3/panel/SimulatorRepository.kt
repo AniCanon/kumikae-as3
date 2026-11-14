@@ -20,7 +20,7 @@ internal interface SimulatorRepository : AutoCloseable {
 
     fun install(device: String, appPath: String)
 
-    fun launch(device: String, bundle: String)
+    fun launch(device: String, bundle: String, sources: String = "")
 
     /** Ends the app that was launched. */
     fun terminate(device: String, bundle: String)
