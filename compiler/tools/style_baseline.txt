@@ -1,1 +1,0 @@
-godot_ext/callable.cpp: sweep_listeners() is over 120 lines
