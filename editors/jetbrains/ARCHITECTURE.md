@@ -58,6 +58,13 @@ Swing component, so its tests need no IDE and no window.
   also dropped when it is for a device other than the selected one. This epoch
   is the controller's own; the `generation` inside a frame is the service's
   geometry counter, which input must quote back.
+- **Selection.** The device list and `selected` always agree, even when a
+  selection is refused because an action is running: an action must never name
+  a device the user cannot see. The service's own choice comes back with the
+  running action's result or the next poll, and the service refuses any request
+  for a device it has not selected. A poll's status repeats the device as it
+  was when selected, so a poll follows only its identity; the replies to select
+  and boot, and Refresh, carry the newer device state.
 - **Console.** The log cursor advances with every page, independent of the
   epoch, so no output is lost or shown twice. A page that lost history is
   marked. The text is capped at 128 Ki characters.
@@ -104,6 +111,7 @@ tried on. `ui/ComposeUi.kt` holds the few shared composables: `Column`,
   delivery after disposal and overlapping actions without sleeping.
 - `LocalSimulatorServiceTest` starts the real local service in a temporary
   directory. It needs no Simulator.
+- `./gradlew verifyPlugin` checks the built plugin against the installed IDE.
 - The UI probe (`./gradlew runIde -PuiProbe`) is a second plugin that exists only
   in the sandbox. It mounts the production view with a synthetic repository,
   presses the real buttons, and renders the light and dark themes to pictures.

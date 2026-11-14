@@ -29,6 +29,7 @@ dependencies {
     implementation("org.jetbrains.compose.swing:swing-ui:0.1.0-alpha06")
     intellijPlatform {
         local(riderHome.get())
+        pluginVerifier()
     }
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
@@ -53,6 +54,9 @@ intellijPlatform {
             sinceBuild = "262.10968.170"
             untilBuild = "262.10968.170"
         }
+    }
+    pluginVerification {
+        ides { local(riderHome.get()) }
     }
 }
 

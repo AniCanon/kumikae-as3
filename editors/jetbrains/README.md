@@ -8,9 +8,11 @@ panel inside a real Rider window**, and idb input has never been tried.
 |---|---|---|
 | Compilation, style check and plugin zip | Automated build, 2026-11-14 | `./gradlew check buildPlugin` succeeds. |
 | Service tests (`core`) | Automated build | 18 pass. |
-| Panel tests (repository, controller, service adapter) | Automated build | 32 pass. |
+| Panel tests (repository, controller, service adapter) | Automated build | 34 pass. |
+| Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
 | Agent client tests | `python3 -m unittest` | 7 pass. |
 | Service and agent client against a booted Simulator | Run by hand through `simulator.py` | Devices, select, launch of `org.kumikae.as3test`, a 2622x1206 PNG screenshot, console log, and the test report "14 passed, 0 failed". |
+| The panel's own repository against a booted Simulator | One throwaway test, read-only | Select, a decoded 1206x2622 JPEG picture in 403 ms, an empty console page and status. |
 | Panel layout and buttons | UI probe in a sandbox Rider, with a synthetic service | Light and dark pictures under `build/reports/ui/`; Refresh, Boot and Launch pressed through the real buttons. |
 | The panel in a Rider window, by a person | Nobody | **Not done.** |
 | idb input | Nobody | **Not done.** idb is not installed. |
@@ -29,7 +31,8 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   preview, not smooth video. Hidden panels stop requesting pictures.
 - One action at a time. A button pressed while another action runs is refused
   with a message, never queued. A picture that arrives after the device changed,
-  or after a boot, launch or rotation, is thrown away.
+  or after a boot, launch or rotation, is thrown away. A device picked while an
+  action runs is refused too; the list returns to the service's device.
 - An agent command-line client that talks to the same service as the panel.
   It saves PNG screenshots, reads logs and the test report, and offers input.
 - Optional idb input: click to tap, drag and release to swipe, a text field, home,
@@ -67,6 +70,7 @@ python3 -m unittest discover -s tests -v
 `check` runs the style check and the Kotlin tests of both modules. `buildPlugin`
 refuses to build while the style check fails, and puts a zip in
 `build/distributions/`. `./gradlew ktlintFormat` fixes most style findings.
+`./gradlew verifyPlugin` runs JetBrains' plugin verifier against the installed Rider.
 
 Rider is found through the `RIDER_HOME` environment variable, or at
 `/Applications/Rider.app` when it is not set. The wrapper uses your normal Gradle
@@ -81,7 +85,7 @@ downloaded: without a JDK 25 the build stops.
 ```
 
 This starts the installed Rider with separate settings and plugin files under
-`.intellijPlatform/`. It does not touch your own Rider settings. Open this
+`.intellijPlatform/sandbox/`. It does not touch your own Rider settings. Open this
 worktree or the Godot test project, then **View > Tool Windows > iOS Simulator**.
 
 ## Check the panel without a person

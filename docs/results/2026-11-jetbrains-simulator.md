@@ -20,20 +20,23 @@ the panel in Rider.
 | Missing dependency | Downloaded with the owner's permission | `error_prone_annotations` 2.41.0 resolved; `:core:test buildPlugin` succeeded for the first time. |
 | Service against a real Simulator, before the rework | Standalone service and `simulator.py`, by hand | Devices listed; a booted iPhone on iOS 26.4 selected; `org.kumikae.as3test` (the Godot test app) launched; PNG screenshot 2622x1206, captured in 435 ms; console log read; test report read: "14 passed, 0 failed". |
 | Rework onto the owner's JetBrains plugin stack | This branch | Gradle wrapper 9.8.1, Kotlin 2.4.10 with Compose, ktlint 1.8.0, Compose Swing UI 0.1.0-alpha06, Java 25. Packages moved to `app.anicanon.kumikae.as3`. The single Swing class became a repository, a controller, a composed view and a composition root. |
-| `./gradlew check buildPlugin` | Gradle, offline, JDK 25 | Succeeded. Style check clean in both modules. 18 service tests and 32 panel tests ran, none failed or skipped. Plugin zip produced. |
-| Tests written first | This branch | The 10 repository tests, 18 controller tests and 3 of the 4 service-adapter tests were each seen failing before the code existed, then passing. |
+| `./gradlew --offline check buildPlugin` | Gradle 9.8.1 from the wrapper, JDK 25, normal Gradle home | Succeeded. Style check clean in both modules. 18 service tests and 34 panel tests ran, none failed or skipped. Plugin zip produced. Every run was offline. The one artifact the normal Gradle home lacks, `error_prone_annotations` 2.41.0, was read from the earlier project-local cache by setting `GRADLE_RO_DEP_CACHE` to `.gradle-home/caches`. A plain run on this Mac therefore still has to fetch that one artifact into the normal home; that has not been done. |
+| `./gradlew --offline verifyPlugin` | JetBrains' plugin verifier, already cached | Compatible with RD-262.10968.170. Its deprecated and experimental notes all concern members that Kotlin copies from the `ToolWindowFactory` interface, not calls made by this code. |
+| Tests written first | This branch | The 10 repository tests, 20 controller tests and 3 of the 4 service-adapter tests were each seen failing before the code existed, then passing. |
 | `python3 -m unittest discover -s tests` | Python | 7 passed. The wire protocol did not change. |
 | Service against the same Simulator, after the rework | Rebuilt standalone service on Java 25 and `simulator.py`, by hand | Same sequence again: devices, select, launch of `org.kumikae.as3test`, PNG 2622x1206 captured in 565 ms, console log, report "14 passed, 0 failed". The service was stopped afterwards; the Simulator was left booted and nothing was installed on it. |
-| `./gradlew runIde -PuiProbe` | Sandbox Rider 262.10968.170, synthetic service, no window shown | `passed`. The production view was mounted in the light and dark themes; Refresh, Boot, Launch and a failing Install were pressed through the real buttons; input controls followed the service's permission; closing released the composition and closed the service. Eight pictures were written and looked at. Two layout faults were found and fixed: the device list was cut to a few characters at tool-window width, and the Home and Lock buttons were out of line. |
+| The panel's own repository against the same Simulator | One throwaway test over `LocalSimulatorService` and `ApiSimulatorRepository`, not kept | Select, a JPEG picture decoded to 1206x2622 with a 403 ms capture, an empty console page and status all worked. Read-only: nothing launched or installed. |
+| `./gradlew --offline runIde -PuiProbe` | Sandbox Rider 262.10968.170, synthetic service, no window shown | `passed`. The production view was mounted in the light and dark themes; Refresh, Boot, Launch and a failing Install were pressed through the real buttons; a device picked during a running boot was refused and the list returned to the booted device; input controls followed the service's permission; closing released the composition and closed the service. Eight pictures were written and looked at. Two layout faults were found and fixed: the device list was cut to a few characters at tool-window width, and the Home and Lock buttons were out of line. One is left: in a wide, short window the form takes most of the height and the picture is thumbnail-sized. |
 
 Still not verified:
 
 - **The panel in a real Rider window, used by a person.** The probe draws the
   panel off screen with a made-up service. Nobody has resized it, hidden it,
   watched it follow a live Simulator or closed a project with it open.
-- **The panel's own path to a real Simulator.** The real runs went through the
-  command-line client. The panel asks for JPEG pictures and decodes them; that
-  was tested with a generated JPEG, not one from `simctl`.
+- **The panel's controller and view against a real Simulator.** The repository
+  under them was run once against the booted device. Polling, the picture on
+  screen and the console inside the window have only been seen with the
+  synthetic service.
 - **idb input**: taps, swipes, text, buttons and rotation. idb is not installed.
 - Any other JetBrains IDE, any other platform build, and the absence of the
   tool window on Windows and Linux.
