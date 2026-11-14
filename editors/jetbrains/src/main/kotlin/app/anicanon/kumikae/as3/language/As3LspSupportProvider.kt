@@ -5,7 +5,9 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspIntegrationProvider
 import com.intellij.platform.lsp.api.ProjectWideLspClientDescriptor
@@ -39,6 +41,17 @@ class As3LspSupportProvider : LspIntegrationProvider {
             if (warned.add(base)) warn(project)
         } else {
             clientStarter.ensureClientStarted(As3LspClientDescriptor(project, compiler))
+            // The file Godot's declarations are kept in, so that the first go to declaration finds it.
+            ApplicationManager.getApplication().executeOnPooledThread {
+                repeat(DECLARATION_LOOKS) {
+                    if (LocalFileSystem.getInstance().refreshAndFindFileByNioFile(DECLARATIONS) !=
+                        null
+                    ) {
+                        return@executeOnPooledThread
+                    }
+                    Thread.sleep(DECLARATION_WAIT_MILLIS)
+                }
+            }
         }
     }
 
@@ -54,6 +67,11 @@ class As3LspSupportProvider : LspIntegrationProvider {
     private companion object {
         const val COMPILER_PATH = "kumikae.as3.compilerPath"
         const val NOTIFICATIONS = "Kumikae AS3"
+        const val DECLARATION_LOOKS = 20
+        const val DECLARATION_WAIT_MILLIS = 500L
+
+        // Where `kas3c lsp` writes Godot's API as AS3, for an editor to open.
+        val DECLARATIONS: Path = Path.of(System.getProperty("java.io.tmpdir"), "kas3c-declarations", "godot.as")
     }
 }
 
@@ -62,4 +80,21 @@ private class As3LspClientDescriptor(project: Project, private val compiler: Pat
     override fun isSupportedFile(file: VirtualFile) = file.extension == EXTENSION
 
     override fun createCommandLine() = GeneralCommandLine(compiler.toString(), "lsp")
+
+    /**
+     * A definition in Godot's API is in a file the server keeps outside the project, which the IDE has
+     * never seen: looked up as the IDE does by default, without a refresh, it is not found, and go to
+     * declaration says there is none. A refresh is not allowed while the caller holds the read lock, so
+     * there it is started and the lookup answers from what is known; the next one finds the file.
+     */
+    override fun findLocalFileByPath(path: String): VirtualFile? {
+        val files = LocalFileSystem.getInstance()
+        files.findFileByPath(path)?.let { return it }
+        val application = ApplicationManager.getApplication()
+        if (application.isReadAccessAllowed && !application.isDispatchThread) {
+            application.executeOnPooledThread { files.refreshAndFindFileByPath(path) }
+            return null
+        }
+        return files.refreshAndFindFileByPath(path)
+    }
 }
