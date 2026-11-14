@@ -29,6 +29,8 @@ dependencies {
     implementation("org.jetbrains.compose.swing:swing-ui:0.1.0-alpha06")
     intellijPlatform {
         local(riderHome.get())
+        bundledPlugin("org.jetbrains.plugins.textmate")
+        bundledModule("intellij.platform.lsp")
         pluginVerifier()
     }
     testImplementation(kotlin("test"))
@@ -85,5 +87,13 @@ if (providers.gradleProperty("uiProbe").isPresent) {
                 "UI probe did not pass. See build/reports/ui/result.txt and the sandbox log."
             }
         }
+    }
+}
+
+// One grammar: the VS Code client's, copied into the plugin's folder for the IDE's TextMate support.
+tasks.withType<PrepareSandboxTask>().configureEach {
+    from("../vscode") {
+        include("package.json", "language-configuration.json", "syntaxes/**")
+        into("${intellijPlatform.projectName.get()}/textmate/actionscript")
     }
 }

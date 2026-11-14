@@ -2,9 +2,14 @@
     <id>app.anicanon.kumikae.as3</id>
     <name>Kumikae AS3</name>
     <vendor>AniCanon</vendor>
-    <description>View an iOS Simulator, launch apps and read console output. Input needs an explicitly enabled idb installation. AS3 breakpoints and the language server client are planned.</description>
+    <description>ActionScript 3 for Godot: colours, errors as you type, go to definition, find usages and hover from kas3c, and an iOS Simulator panel. AS3 breakpoints are planned.</description>
     <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.textmate</depends>
+    <depends>com.intellij.modules.lsp</depends>
     <extensions defaultExtensionNs="com.intellij">
+        <platform.lsp.integrationProvider implementation="app.anicanon.kumikae.as3.language.As3LspSupportProvider"/>
+        <textmate.bundleProvider implementation="app.anicanon.kumikae.as3.language.As3Grammar"/>
+        <notificationGroup id="Kumikae AS3" displayType="BALLOON"/>
         <toolWindow id="iOS Simulator" anchor="right"
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
