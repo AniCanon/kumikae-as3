@@ -12,6 +12,9 @@ library, `kas3lsp` (`lsp/`), and both are in `kas3c`.
 The C++ follows [docs/cpp-guidelines.md](../docs/cpp-guidelines.md); `tools/check_style.py`, which runs with
 the tests, enforces the limits on size.
 
+Each folder has its own README, with what it may depend on and where a new thing goes; the rules for
+anyone changing the repository are in [AGENTS.md](../AGENTS.md).
+
 | Folder | Holds | Files |
 |---|---|---|
 | `src/` | The front end: source text to a checked syntax tree | `lexer`, `parser*` (one file per kind of syntax), `names*` (packages, scopes, links), `typer.h` and `typer_*.cpp` (the type of every expression and what fits where), `type_table.cpp`, `whole_numbers` (rules the checker and the lowerer share), `query` (what the language server asks) |
