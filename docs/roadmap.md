@@ -14,9 +14,14 @@ on its math types, and reports its errors to an editor through a language server
 complete. The language server's first slice is built and passes its tests; it works in VS Code and is
 not yet tried in Rider.
 
-**Stage 2 is under way.** `kas3c run` executes AS3 on the command line (classes, inheritance, numbers,
-strings, loops), and a first AS3 script attached to a `CharacterBody2D` moves the body in headless Godot
-4.7.2. Signals, `Input`, operators on Godot's values and the rest of the language come next.
+**Stage 2 is under way: four of its nine slices are done.** `kas3c run` executes AS3 on the command line
+(classes, inheritance, numbers, strings, loops). In headless Godot 4.7.2 an AS3 script attached to a
+`CharacterBody2D` moves the body, does arithmetic on Godot's values and listens to signals. Singletons
+such as `Input`, constants, global functions and the `Int64` type come next (stage 2b-3), then the rest of
+the language.
+
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 61 items; each
+is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -100,9 +105,11 @@ properties, signals and hot reload.
 | 2b-1. In Godot, first slice | The extension: a `.as` file is a script; Godot calls its methods; it reads and writes properties, calls methods and makes `Vector2`s | An AS3 script on a `CharacterBody2D` moves the body, in headless Godot 4.7.2. | Done |
 | 2b-2, part A. Godot's values | Operators and comparison on Godot's values, their text, `position.x = 5`, elements by index, defaults Godot fills in, a script's `toString()` shown by Godot | Each has a test in Godot that compares the result with GDScript's. | Done |
 | 2b-2, part B. Signals | A method as a listener; `add`, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`; `timer[name].add(f)` | Each has a test in Godot. | Done |
-| 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the `Int64` type | The test programs that need no unsupported language feature run in Godot. | Next |
-| 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library. With them, what stage 1 promised that needs them: AS3 collections converting when handed to Godot, `object[name]` in general, and elements of Godot's untyped collections | The corpus programs run. | Planned |
-| 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game. | Planned |
+| 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the `Int64` type | The test programs that need no unsupported language feature run in Godot, and the 12 backlog items marked 2b-3 are closed. | Next |
+| 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library. With them, what stage 1 promised that needs them: AS3 collections converting when handed to Godot, `object[name]` in general, and elements of Godot's untyped collections | The corpus programs run, and the 13 backlog items marked 2c are closed. | Planned |
+| Language server, second slice | Completion, Windows, Rider, and the 9 backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Planned |
+| 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the 13 backlog items marked 2d are closed. | Planned |
+| Clean-up pass | The 12 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
 
@@ -155,6 +162,7 @@ The design keeps each of these possible. No stage above delivers them.
 
 | Step | What it does |
 |---|---|
+| 0. Backlog | The 12 items marked 2b-3 in the [backlog](backlog.md) are tasks of this stage's plan. |
 | 1. `Int64` design | A short design for the 64-bit integer type the owner approved: one rule in the generator, conversions that check the range. |
 | 2. Singletons | `Input.isActionPressed("jump")`, and a singleton's signals. |
 | 3. Constants and statics | `Vector2.ZERO`, `Color.RED`, `Key.ESCAPE`, static methods. |
@@ -190,7 +198,10 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) pass is done** and merged. What remains is listed there.
+- **The [backlog](backlog.md) gives every deferred item a stage:** 12 in 2b-3, 13 in 2c, 9 in the language
+  server's second slice, 13 in 2d, 12 in a clean-up pass that closes stage 2, and 2 that wait on the owner.
+- **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
+  waits for the cycle collector (2d).
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
 - **Language server:** Rider is not yet tried (the plugin is installed); Windows is not supported.
@@ -212,6 +223,8 @@ Open items:
 
 | Decision | Why it matters |
 |---|---|
+| 60 Godot methods that take raw pointers are left out | AS3 has nothing to pass them. The proposal is that this stands. |
+| What `"" + this` reads in a script without `toString()` | Today AS3's `[object Values]`; Godot's own text for the node is `<Node2D#123>`. |
 | When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
 
 ## How to follow progress
