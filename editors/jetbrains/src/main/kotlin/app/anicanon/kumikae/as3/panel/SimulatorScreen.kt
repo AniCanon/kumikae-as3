@@ -1,57 +1,68 @@
 package app.anicanon.kumikae.as3.panel
 
-import app.anicanon.kumikae.as3.simulator.Geometry
 import app.anicanon.kumikae.as3.simulator.Pixel
+import com.intellij.ui.JBColor
 import java.awt.Color
+import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.awt.image.BufferedImage
+import java.awt.geom.AffineTransform
 import javax.swing.JPanel
 
-data class ScreenFrame(val device: String, val generation: Long, val image: BufferedImage) {
-    val geometry = Geometry(image.width, image.height)
-}
-
-class SimulatorScreen(private val gesture: (ScreenFrame, Pixel, Pixel, Long) -> Unit) : JPanel() {
-    var frame: ScreenFrame? = null
-        set(value) { field = value; repaint() }
+/** Paints the latest picture, fitted without stretching, and turns mouse presses into gestures on that picture. */
+internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixel, Long) -> Unit) : JPanel() {
+    var frame: SimulatorFrame? = null
+        set(value) {
+            field = value
+            repaint()
+        }
     var inputEnabled = false
-    private var down: Triple<ScreenFrame, Pixel, Long>? = null
+    private var pressed: Press? = null
+
+    private class Press(val frame: SimulatorFrame, val at: Pixel, val nanos: Long)
 
     init {
-        background = Color(30, 30, 30)
+        background = JBColor(Color(0xE6E6E6), Color(0x1E1E1E))
+        minimumSize = Dimension(0, 0)
         toolTipText = "Click to tap. Drag and release to swipe. Input requires idb."
         addMouseListener(object : MouseAdapter() {
-            override fun mousePressed(e: MouseEvent) {
-                down = null
-                if (!inputEnabled || e.button != MouseEvent.BUTTON1) return
+            override fun mousePressed(event: MouseEvent) {
+                pressed = null
+                if (!inputEnabled || event.button != MouseEvent.BUTTON1) return
                 val current = frame ?: return
-                val point = current.geometry.fromView(e.x.toDouble(), e.y.toDouble(), width, height) ?: return
-                down = Triple(current, point, System.nanoTime())
+                val at = current.geometry.fromView(event.x.toDouble(), event.y.toDouble(), width, height) ?: return
+                pressed = Press(current, at, System.nanoTime())
             }
 
-            override fun mouseReleased(e: MouseEvent) {
-                val start = down.also { down = null } ?: return
+            override fun mouseReleased(event: MouseEvent) {
+                val start = pressed.also { pressed = null } ?: return
                 val current = frame ?: return
-                if (current.device != start.first.device || current.generation != start.first.generation) return
-                val end = current.geometry.fromView(e.x.toDouble(), e.y.toDouble(), width, height) ?: return
-                gesture(current, start.second, end, (System.nanoTime() - start.third) / 1_000_000)
+                // A picture replaced during the drag may show another screen; its coordinates no longer apply.
+                if (current.device != start.frame.device || current.generation != start.frame.generation) return
+                val end = current.geometry.fromView(event.x.toDouble(), event.y.toDouble(), width, height) ?: return
+                gesture(current, start.at, end, (System.nanoTime() - start.nanos) / NANOS_PER_MILLI)
             }
         })
     }
 
     override fun paintComponent(graphics: Graphics) {
         super.paintComponent(graphics)
-        val current = frame ?: return
-        val scale = minOf(width.toDouble() / current.image.width, height.toDouble() / current.image.height)
-        val w = current.image.width * scale
-        val h = current.image.height * scale
-        (graphics as Graphics2D).setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-        val transform = java.awt.geom.AffineTransform.getTranslateInstance((width - w) / 2, (height - h) / 2)
+        val image = frame?.image ?: return
+        val scale = minOf(width.toDouble() / image.width, height.toDouble() / image.height)
+        val transform = AffineTransform.getTranslateInstance(
+            (width - image.width * scale) / 2,
+            (height - image.height * scale) / 2,
+        )
         transform.scale(scale, scale)
-        graphics.drawImage(current.image, transform, null)
+        val canvas = graphics as Graphics2D
+        canvas.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+        canvas.drawImage(image, transform, null)
+    }
+
+    private companion object {
+        const val NANOS_PER_MILLI = 1_000_000
     }
 }
