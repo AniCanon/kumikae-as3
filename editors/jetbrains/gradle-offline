@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")"
+if [ -z "${GRADLE_BIN:-}" ]; then
+    for candidate in "$HOME"/.gradle/wrapper/dists/gradle-9.8.1-bin/*/gradle-9.8.1/bin/gradle; do
+        if [ -x "$candidate" ]; then GRADLE_BIN=$candidate; break; fi
+    done
+fi
+if [ -z "${GRADLE_BIN:-}" ]; then
+    echo 'Gradle 9.8.1 is not cached. Set GRADLE_BIN to an installed Gradle 9 executable.' >&2
+    exit 1
+fi
+export GRADLE_USER_HOME="$PWD/.gradle-home"
+export GRADLE_RO_DEP_CACHE="${GRADLE_RO_DEP_CACHE:-$HOME/.gradle/caches}"
+exec "$GRADLE_BIN" --offline --no-daemon "$@"

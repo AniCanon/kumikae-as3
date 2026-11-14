@@ -93,7 +93,9 @@ The local protocol uses screenshot pixels, top left as origin. Each gesture name
 the selected device and the dimensions of the picture it used. Reject stale
 geometry, out-of-bounds coordinates and non-finite numbers. idb takes points, not
 pixels. Require an explicit pixels-per-point scale when enabling it; do not infer
-scale from an iPhone model name. After rotation discard the old geometry and take
+scale from an iPhone model name. Bind that scale to an explicit device identifier
+in the local environment, so selecting another device cannot silently reuse it.
+After rotation discard the old geometry and take
 a new screenshot. Only a single main display is in scope. No multi-touch or live
 finger tracking: a drag is sent as one swipe when the mouse is released.
 
@@ -116,12 +118,14 @@ Install an explicit absolute `.app` path with `simctl install`. Default bundle i
 export. `build_ios.sh` builds the extension slices, not that app. The custom Godot
 template is being built elsewhere. Do not build it here or claim this app runs.
 
-Launch with `simctl launch --terminate-running-process --stdout=<file>
---stderr=<file> <id> <bundle>`. The explicit launch action restarts that app. Read
-those two files through a bounded log buffer. Report which stream each chunk came
-from and return a cursor, so an agent can ask for only new output. Stop collecting
-when changing device, relaunching or closing the session. Bound both retained
-memory and file growth; end collection visibly if a limit is reached.
+Launch with `simctl launch --terminate-running-process --console <id> <bundle>`.
+The explicit launch action restarts that app. Drain the launcher's stdout and stderr
+into a bounded memory buffer. Return a cursor so an agent can ask for new output.
+The stream labels identify the launcher pipes; simctl may combine app streams.
+Keep draining after old entries are discarded. Do not use growing log files.
+Changing device, relaunching or closing the session stops the console launcher.
+As the local help states, simctl forwards signals to the app: this may stop the
+launched app too. This lifecycle is deliberate and must be visible in the README.
 
 Console output is not every iOS log. Unified logging is a different source and is
 not in the first version. A quiet console is not proof of success. The earlier
@@ -144,7 +148,7 @@ builds Simulator commands. JSON requests carry `version: 1`, `id`, `method` and
 Document exact fields and examples beside the CLI. Methods: `devices`, `select`,
 `status`, `boot`, `screenshot`, `tap`, `swipe`, `text`, `button`, `rotate`, `install`,
 `launch`, `log`, and `report`. Configuration of private input is local startup
-configuration, not something an unauthenticated remote caller can switch on.
+configuration, not a protocol operation.
 
 Serialize session operations, including agent and mouse gestures. Use timeouts,
 bounded request sizes and bounded queues. No arbitrary shell execution or general
@@ -152,7 +156,8 @@ file-reading method. Reject unknown methods, fields, wrong versions and bad type
 before starting a process. Errors must distinguish bad requests, missing input
 support, process failures and closed sessions. A timeout must stop its process.
 Closing the project stops the server, polling and log readers, and removes the
-endpoint and temporary files. It leaves the Simulator and launched app running.
+endpoint and temporary files. It leaves the Simulator booted. It stops the console
+launcher and may stop the app it launched; an app started elsewhere is untouched.
 
 ## Plugin fit and scope
 

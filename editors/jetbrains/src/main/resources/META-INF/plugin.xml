@@ -1,0 +1,11 @@
+<idea-plugin>
+    <id>org.kumikae.as3</id>
+    <name>Kumikae AS3</name>
+    <vendor>Kumikae</vendor>
+    <description>View an iOS Simulator, launch apps and read console output. Input needs an explicitly enabled idb installation. AS3 breakpoints and the language server client are planned.</description>
+    <depends>com.intellij.modules.platform</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="iOS Simulator" anchor="right"
+                    factoryClass="org.kumikae.jetbrains.SimulatorToolWindowFactory"/>
+    </extensions>
+</idea-plugin>

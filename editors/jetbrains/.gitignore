@@ -1,0 +1,7 @@
+.gradle/
+.gradle-home/
+.intellijPlatform/
+build/
+core/build/
+*.iml
+.idea/
