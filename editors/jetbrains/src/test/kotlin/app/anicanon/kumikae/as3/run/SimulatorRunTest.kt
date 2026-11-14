@@ -17,7 +17,7 @@ class SimulatorRunTest {
     private val asked get() = repository.calls.filterNot { it.startsWith("console") }
 
     private fun run(bundle: String = "org.example.game", app: String = "") =
-        SimulatorRun(repository, bundle, app) { text, error -> said += text to error }
+        SimulatorRun(repository, bundle, app, { text, error -> said += text to error })
 
     @Test fun `the app is launched on the device the panel shows`() {
         repository.select("A")
@@ -90,6 +90,38 @@ class SimulatorRunTest {
         val hints = said.filter { it.first.contains("is not installed on this simulator") }
         assertEquals(1, hints.size)
         assertTrue(hints.single().first.contains("org.example.game") && hints.single().first.contains("Export"))
+    }
+
+    @Test fun `with no app named, the game is built first and what was built is installed`() {
+        repository.select("A")
+        repository.calls.clear()
+        val built = mutableListOf<String>()
+        val run = SimulatorRun(repository, "org.example.game", "", { text, error -> said += text to error }) { say ->
+            say("Exporting…\n", false)
+            built += "build"
+            "/games/out/Game.app"
+        }
+        run.start()
+        assertEquals(listOf("build"), built)
+        assertEquals(listOf("connect", "status", "install A /games/out/Game.app", "launch A org.example.game"), asked)
+        assertEquals("Exporting…\n" to false, said.first())
+    }
+
+    @Test fun `a build that fails stops the run before anything is installed or launched`() {
+        repository.select("A")
+        repository.calls.clear()
+        val run =
+            SimulatorRun(repository, "org.example.game", "", { _, _ -> }) { error("The build stopped with status 65.") }
+        val failure = assertFailsWith<IllegalStateException> { run.start() }
+        assertEquals("The build stopped with status 65.", failure.message)
+        assertTrue(asked.none { it.startsWith("install") || it.startsWith("launch") })
+    }
+
+    @Test fun `an app that is named is used as it is and nothing is built`() {
+        repository.select("A")
+        repository.calls.clear()
+        SimulatorRun(repository, "org.example.game", "/games/Game.app", { _, _ -> }) { error("must not build") }.start()
+        assertEquals(listOf("connect", "status", "install A /games/Game.app", "launch A org.example.game"), asked)
     }
 
     @Test fun `stopping ends the app`() {

@@ -19,6 +19,7 @@ class ProjectTemplateTest {
                 "main.tscn",
                 "Main.as",
                 "Hello.as",
+                "icon.svg",
                 "kas3.gdextension",
                 ".gitignore",
                 "README.md",
@@ -35,6 +36,9 @@ class ProjectTemplateTest {
         assertTrue(files.getValue("Hello.as").contains("text = \"Hello from ActionScript 3"))
         // Godot loads the extension from this list: without it the scripts have no loader until an import.
         assertEquals("res://kas3.gdextension\n", files.getValue(".godot/extension_list.cfg"))
+        // Godot refuses to export for a phone without an icon.
+        assertTrue(files.getValue("project.godot").contains("config/icon=\"res://icon.svg\""))
+        assertTrue(files.getValue("icon.svg").startsWith("<svg"))
         assertFalse(files.getValue("README.md").contains("iOS"))
     }
 
@@ -45,6 +49,8 @@ class ProjectTemplateTest {
         assertTrue(presets.contains("platform=\"iOS\""))
         assertTrue(presets.contains("application/bundle_identifier=\"org.example.starhopper2\""))
         assertTrue(presets.contains("include_filter=\"*.as\""))
+        // Godot will not write the Xcode project without a team: a stand-in is enough for the Simulator.
+        assertTrue(presets.contains("application/app_store_team_id=\"ABCDE12345\""))
         assertTrue(template.files().getValue("README.md").contains("## iOS"))
     }
 

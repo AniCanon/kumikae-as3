@@ -104,6 +104,10 @@ tasks.withType<PrepareSandboxTask>().configureEach {
         include("libkas3_godot.*")
         into("${intellijPlatform.projectName.get()}/native")
     }
+    // The extension for iOS, when it has been built (compiler/tests/build_ios.sh).
+    from(root.resolve("compiler/tests/godot_project/bin/ios")) {
+        into("${intellijPlatform.projectName.get()}/native/ios")
+    }
 }
 
 // One grammar: the VS Code client's, copied into the plugin's folder for the IDE's TextMate support.

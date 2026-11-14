@@ -29,8 +29,15 @@
                                        implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
         <treeStructureProvider implementation="app.anicanon.kumikae.as3.project.GameProjectView"/>
         <projectViewPane implementation="app.anicanon.kumikae.as3.project.GamePane"/>
+        <internalFileTemplate name="AS3 Node Script"/>
+        <internalFileTemplate name="AS3 Class"/>
         <newProjectWizard.generator implementation="app.anicanon.kumikae.as3.project.As3ProjectWizard"/>
         <toolWindow id="iOS Simulator" anchor="right" icon="/META-INF/brandMark.svg"
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
+    <actions>
+        <action id="KumikaeAs3.NewClass" class="app.anicanon.kumikae.as3.project.NewAs3FileAction">
+            <add-to-group group-id="NewGroup" anchor="first"/>
+        </action>
+    </actions>
 </idea-plugin>
