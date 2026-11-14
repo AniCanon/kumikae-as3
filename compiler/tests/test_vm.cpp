@@ -598,6 +598,8 @@ static void test_engine_statics() {
 						 "  public function up():Number { return Vector2.UP.y; }\n"
 						 "  public function made(a:Number, b:Number):Vector2 { return Vector2.fromAngle(a + b); }\n"
 						 "  public function shown():void { Node.printOrphanNodes(); }\n"
+						 "  public function mixed(a:Number):Number { return lerpf(a, 2, 0.5); }\n"
+						 "  public function told(n:int):void { print(\"n is \", n); }\n"
 						 "  public function start():int { return ticks; }\n"
 						 "  public function unset():Vector2 { var v:Vector2; return v; }\n"
 						 "  public function twice():String { var out:String = \"\"; for (var i:int = 0; i < 2; i++) { var v:Vector2; out += v; v = null; } return out; }\n"
@@ -674,6 +676,16 @@ static void test_engine_statics() {
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "shown", nullptr, 0, nullptr));
 		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes()\n"));
+		// A global function is called on no class, with its signature for the engine's side.
+		engine.log.clear();
+		arguments[0].d = 1;
+		CHECK(interpreter.call_method(object, "mixed", arguments, 1, &result));
+		CHECK_EQ(engine.log, std::string("static .lerpf 998901048 float float,float,float(1, 2, 0.5)\n"));
+		engine.log.clear();
+		arguments[0].bits = 0;
+		arguments[0].i = 7;
+		CHECK(interpreter.call_method(object, "told", arguments, 1, nullptr));
+		CHECK_EQ(engine.log, std::string("static .print 2648703342 void Variant varargs(\"n is \", 7)\n"));
 		// A local of a Godot value with parts starts at its zero, once: the declaration is not run again.
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "unset", nullptr, 0, &result));
@@ -1006,7 +1018,8 @@ static void test_engine_calls() {
 		"function f():void { Vector2.ZERO.x++; }",
 		"function f():void { treeEntered.add(function():void {}); }",
 		"function f(n:Node):void { var x:int = n[\"name\"].length; }",
-		"function f():void { print(\"hello\"); }",
+		"function f(n:Node):void { n.setMeta(\"a\", lerp(1, 2, 0.5)); }",
+		"function f():void { var v:Vector2 = lerp(position, position, 0.5); }",
 		"function f():void { position.normalized().x = 5; }",
 		"function f():void { position.normalized()[0] = 5; }",
 		"function f(a:GodotArray):void { var x:int = a[0]; }",

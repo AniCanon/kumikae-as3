@@ -119,8 +119,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 	}
 }
 
-// What Godot gave, as the interpreter asked for it; refused if it is something else.
-static bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error) {
+bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error) {
 	if (!r_result || p_wanted.kind == ir::Kind::Void) {
 		return true;
 	}
@@ -256,7 +255,7 @@ void GodotHost::error(std::string_view p_text) {
 }
 
 // One of Godot's value types by its name ("Vector2"), or -1. The names are listed once.
-static int value_type(std::string_view p_name) {
+int value_type(std::string_view p_name) {
 	static const std::unordered_map<std::string, int> types = [] {
 		std::unordered_map<std::string, int> found;
 		for (int i = 1; i < Variant::VARIANT_MAX; i++) {
@@ -299,6 +298,9 @@ bool GodotHost::constant(std::string_view p_class, std::string_view p_name, cons
 
 bool GodotHost::call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 		const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	if (p_class.empty()) {
+		return call_utility(p_method, p_arguments, p_count, p_result, r_result, r_error);
+	}
 	// For a class, the call goes through Godot's list of classes, which takes the two names first.
 	const StringName &class_name = name(p_class);
 	const StringName &method_name = name(p_method);

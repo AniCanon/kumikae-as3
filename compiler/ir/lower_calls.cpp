@@ -154,6 +154,40 @@ uint32_t Lowerer::godot_call(Call *p_call, Symbol *p_method) {
 	return kind == Kind::Void ? 0 : default_value(kind, position);
 }
 
+// One of Godot's global functions: `lerpf(a, b, t)`, `print(...)`. The call carries the function's
+// signature, which the engine's entry for such functions needs.
+uint32_t Lowerer::global_call(Call *p_call, Symbol *p_function, Kind p_want) {
+	uint32_t position = p_call->offset;
+	std::string signature;
+	if (!godot_name("@global", p_function->name, &signature)) {
+		refuse(p_call->callee->offset, "calling '" + std::string(p_function->name) + "'");
+		return default_value(p_want, position);
+	}
+	const Type *type = p_function->type ? compilation_.type_of(p_function->type) : nullptr;
+	Kind kind = Kind::Void;
+	if (type && type->kind == Type::Any) {
+		// It gives back anything. Where the program says what it expects (a number, a Boolean, text), that
+		// is asked for and checked when it arrives. Anything else waits for AS3's untyped value.
+		const bool said = p_want == Kind::F64 || p_want == Kind::I32 || p_want == Kind::U32 || p_want == Kind::I64 || p_want == Kind::Bool ||
+				p_want == Kind::Str;
+		if (!said) {
+			refuse(position, "'" + std::string(p_function->name) + "', which can give back anything, used where nothing says what is expected");
+			return default_value(p_want, position);
+		}
+		kind = p_want;
+		type = nullptr;
+	} else if (type && !kind_of(type, &kind)) {
+		refuse(position, "a call to a Godot function that returns '" + compilation_.type_name(type) + "'");
+	}
+	std::vector<uint32_t> list;
+	FunctionDecl *decl = p_function->node && p_function->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_function->node) : nullptr;
+	engine_arguments(decl, p_call->arguments, position, list);
+	uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, type);
+	// No class before the dot: the engine's side reads that as a global function.
+	emit(Op::HostCallStatic, position, out, string("." + signature), arguments(std::move(list)));
+	return out == NONE ? 0 : out;
+}
+
 // A function or method of the program itself.
 uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function) {
 	Expr *callee = p_call->callee;
@@ -219,6 +253,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	}
 	if (is_godot(symbol) && symbol->kind == SymbolKind::Method) {
 		return godot_call(p_call, symbol);
+	}
+	if (is_godot(symbol) && symbol->kind == SymbolKind::Function) {
+		return global_call(p_call, symbol, p_want);
 	}
 	auto function = functions_.find(symbol);
 	if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {

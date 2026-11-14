@@ -242,7 +242,7 @@ Branch `feat/godot-functions`.
 1. **A global function is called through Godot's own entry for it,** which takes arguments of exact
    types, not boxed values. So the call needs the function's signature. The generator writes it into the
    name table (`@global.lerpf=lerpf 4776452 float float,float,float`: Godot's name, the hash Godot asks
-   for, the result, the arguments, and `...` for one that takes any number). The lowerer puts that text in
+   for, the result, the arguments, and `varargs` for one that takes any number). The lowerer puts that text in
    the `HostCallStatic` it emits, with no class; the host reads it, finds the function once and keeps it.
 2. **An argument is converted to the type the function declares,** by Godot's own conversion, after the
    same check as any value going to Godot. A function that takes any number of arguments takes them as

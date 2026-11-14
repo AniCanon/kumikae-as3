@@ -208,6 +208,17 @@ check("wide.gd: a wide value for an integer vector is a RangeError, eight times"
 check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError: 9007199254740993 does not fit a Number exactly." in output,
       output[-1200:])
 
+# Godot's global functions, as GDScript works them out.
+output = compare("functions.gd", [
+    "lerpf", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
+    "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
+    "lerp as a number", "max of three", "wrong argument", "in a loop",
+])
+check("functions.gd: print, printerr and pushWarning reach Godot's output",
+      "said 4 (1.0, 2.0)" in output and "to the error output" in output and "a warning from AS3" in output, output[-1200:])
+check("functions.gd: a wrong argument is an AS3 error that names the function", "at Functions/wrong()" in output and "lerp" in output,
+      output[-1200:])
+
 # An exported game keeps its files in a pack, not in a folder: the scripts must be found and read there.
 import tempfile
 with tempfile.TemporaryDirectory() as packed:

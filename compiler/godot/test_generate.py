@@ -523,6 +523,12 @@ class RealApi(unittest.TestCase):
         # AS3 name, which loses information (getNode3d).
         names = dict(line.split("=") for line in self.generator.names_text().split("\n") if line)
         self.assertEqual(names["Input.singleton"], "@singleton")
+        # A global function's signature, for the entry that takes exact types.
+        self.assertEqual(names["@global.lerpf"], "lerpf 998901048 float float,float,float")
+        self.assertEqual(names["@global.randf"], "randf 2086227845 float -")
+        self.assertEqual(names["@global.print"], "print 2648703342 void Variant varargs")
+        self.assertEqual(names["@global.degToRad"].split(" ")[0], "deg_to_rad")
+        self.assertNotIn("@global.typeof", names)
         self.assertEqual(names["CharacterBody2D.moveAndSlide"], "move_and_slide")
         self.assertEqual(names["Node._physicsProcess"], "_physics_process")
         self.assertEqual(names["Node2D.position"], "position")

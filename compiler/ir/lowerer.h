@@ -252,6 +252,7 @@ class Lowerer {
 	uint32_t trace_call(Call *p_call);
 	uint32_t engine_text(Call *p_call);
 	uint32_t godot_call(Call *p_call, Symbol *p_method);
+	uint32_t global_call(Call *p_call, Symbol *p_function, Kind p_want);
 	uint32_t script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function);
 	uint32_t call(Call *p_call, Kind p_want);
 
