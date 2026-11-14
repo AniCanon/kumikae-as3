@@ -1,0 +1,43 @@
+<idea-plugin>
+    <id>app.anicanon.kumikae.as3</id>
+    <name>Kumikae AS3</name>
+    <vendor>AniCanon</vendor>
+    <description>ActionScript 3 for Godot: colours, errors as you type, go to definition, find usages and hover from kas3c, and an iOS Simulator panel. AS3 breakpoints are planned.</description>
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.textmate</depends>
+    <depends>com.intellij.modules.lsp</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <platform.lsp.integrationProvider implementation="app.anicanon.kumikae.as3.language.As3LspSupportProvider"/>
+        <textmate.bundleProvider implementation="app.anicanon.kumikae.as3.language.As3Grammar"/>
+        <notificationGroup id="Kumikae AS3" displayType="BALLOON"/>
+        <configurationType implementation="app.anicanon.kumikae.as3.run.SimulatorConfigurationType"/>
+        <configurationType implementation="app.anicanon.kumikae.as3.run.GodotConfigurationType"/>
+        <postStartupActivity implementation="app.anicanon.kumikae.as3.run.GodotProjectStartup"/>
+        <projectViewNestingRulesProvider implementation="app.anicanon.kumikae.as3.project.UidNesting"/>
+        <fileType name="ActionScript 3" implementationClass="app.anicanon.kumikae.as3.language.As3FileType"
+                  fieldName="INSTANCE" language="KumikaeAS3" extensions="as"/>
+        <lang.parserDefinition language="KumikaeAS3"
+                               implementationClass="app.anicanon.kumikae.as3.language.As3ParserDefinition"/>
+        <gotoDeclarationHandler implementation="app.anicanon.kumikae.as3.language.As3GotoDeclaration"/>
+        <lang.commenter language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.language.As3Commenter"/>
+        <lang.braceMatcher language="KumikaeAS3"
+                           implementationClass="app.anicanon.kumikae.as3.language.As3BraceMatcher"/>
+        <!-- Colours still come from the grammar: the file type is ours, the highlighter is TextMate's. -->
+        <editorHighlighterProvider filetype="ActionScript 3"
+                                   implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateEditorHighlighterProvider"/>
+        <lang.syntaxHighlighterFactory language="KumikaeAS3"
+                                       implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
+        <treeStructureProvider implementation="app.anicanon.kumikae.as3.project.GameProjectView"/>
+        <projectViewPane implementation="app.anicanon.kumikae.as3.project.GamePane"/>
+        <internalFileTemplate name="AS3 Node Script"/>
+        <internalFileTemplate name="AS3 Class"/>
+        <newProjectWizard.generator implementation="app.anicanon.kumikae.as3.project.As3ProjectWizard"/>
+        <toolWindow id="iOS Simulator" anchor="right" icon="/META-INF/brandMark.svg"
+                    factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
+    </extensions>
+    <actions>
+        <action id="KumikaeAs3.NewClass" class="app.anicanon.kumikae.as3.project.NewAs3FileAction">
+            <add-to-group group-id="NewGroup" anchor="first"/>
+        </action>
+    </actions>
+</idea-plugin>

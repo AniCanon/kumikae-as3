@@ -1,0 +1,11 @@
+<idea-plugin>
+    <id>app.anicanon.kumikae.as3.uiprobe</id>
+    <name>Kumikae AS3 UI Probe</name>
+    <version>0.1.0</version>
+    <vendor>AniCanon</vendor>
+    <depends>com.intellij.modules.platform</depends>
+    <depends>app.anicanon.kumikae.as3</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <appStarter id="kumikae-as3-ui-check" implementation="app.anicanon.kumikae.as3.panel.UiProbeStarter"/>
+    </extensions>
+</idea-plugin>

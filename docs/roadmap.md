@@ -138,6 +138,8 @@ touches console vendor material stays out of this repository.
 
 ### Stage 6: tooling
 
+An early [Simulator panel and agent interface](../editors/jetbrains/) builds, passes its tests and has driven a real Simulator through its service; the panel has not yet been used in a Rider window by a person, and idb input is untried. This does not deliver AS3 breakpoints or stepping.
+
 **Delivers:** the rest of the language server (Godot's documentation, code actions, rename), the debug
 adapter, and one JetBrains plugin that covers Rider and the other IDEs.
 

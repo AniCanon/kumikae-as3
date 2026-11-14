@@ -1,0 +1,80 @@
+# Kotlin and Compose conventions
+
+Follow [JetBrains' Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html).
+The `.editorconfig` here selects IntelliJ's Kotlin style, four-space indentation,
+120-column lines and trailing commas. Prefer explicit imports, immutable local
+values, named arguments for ambiguous calls and related declarations grouped by
+responsibility. UI-emitting `@Composable` functions use PascalCase; other
+functions use camelCase.
+
+Run `./gradlew ktlintFormat` to format, and `./gradlew check` to run the style
+check and the tests. `buildPlugin` also requires the style check. It covers
+production Kotlin, tests and Gradle Kotlin scripts, in both modules. Do not add
+blanket suppressions or a baseline to get a new finding past it.
+
+Keep files small and single-purpose: aim for under 300 lines. No banner
+comments. A comment says why, not what.
+
+## Tests first
+
+Write the test, watch it fail for the reason you expect, then make it pass.
+State changes belong in `SimulatorWindowControllerTest`, with
+`ManualBackgroundTasks` deciding when work runs and when its result arrives.
+JSON mapping belongs in `ApiSimulatorRepositoryTest`. Anything in `core` is
+tested there with JUnit 4; both modules run on the JUnit Platform, so either
+style of test is picked up. Read the test count after a build change: a missing
+engine gives a green build that ran nothing.
+
+The wire protocol is shared with `simulator.py`. Keep its seven Python tests
+green, and change `protocol.md`, the service and both clients together.
+
+## Dependency injection
+
+Resolve IDE services and paths at plugin entry points, then pass dependencies to
+ordinary controllers and views. `SimulatorToolWindowFactory` is the entry point;
+`SimulatorComposition` chooses the concrete services. Do not create a live
+repository in a default argument of a view or controller. Views receive a
+controller and forward user actions; controllers own requests and state
+changes. Put file, process and IDE-service access behind injected interfaces.
+Workers belong to the window that disposes them.
+
+IDE light services are a platform exception: JetBrains [does not support
+constructor injection of other services](https://plugins.jetbrains.com/docs/intellij/plugin-services.html#constructor).
+Resolve those when a method needs them. Do not introduce a second DI container
+or look up services inside composables.
+
+## Compose Runtime over Swing
+
+Apply Google's [state ownership](https://developer.android.com/develop/ui/compose/state-hoisting),
+[composition model](https://developer.android.com/develop/ui/compose/mental-model) and
+[side-effect guidance](https://developer.android.com/develop/ui/compose/side-effects)
+to Compose Swing and the IDE's lifecycle:
+
+- Keep a draft form value at the nearest composition that uses it. State that
+  the controller shares with the view lives in the controller as observable
+  state; pass values and callbacks to composables. Text, selections and button
+  availability belong in observable state, not in retained Swing controls.
+- Keep composable bodies free of I/O and of changes visible outside the
+  composition. Requests stay in the controller. Use an effect only when the
+  work belongs to the composition, such as pushing a new picture into the
+  native screen.
+- `remember` may cache a value; it is not an effect and not a safe place to
+  attach a retained Swing control to a new parent. Use `SwingNode`'s factory
+  and update phases for that. `NativeScrollPane` sets its viewport there.
+- Key retained native nodes by component identity, as `Native` does, so that
+  replacing the control replaces the node. Apply changing text and sizes
+  through `SwingNode.update`, not only in the factory.
+- A reusable composable takes a default `SwingModifier` as its first optional
+  parameter and forwards it to its root. Do not apply a caller's modifier to
+  several children.
+- Dispose compositions through their owning disposable on the UI thread;
+  `composePanel` does this.
+- Do not mark mutable Swing components `@Stable` or `@Immutable`, add
+  `derivedStateOf` without a measured need, or bring Android `ViewModel` or
+  Activity APIs into this plugin.
+
+Run `./gradlew runIde -PuiProbe` after any change to presentation or lifecycle,
+and look at the pictures in `build/reports/ui/`. Text that is cut off,
+controls that overlap and unreadable colours are defects.
+
+For other languages and documentation, follow the repository's own guides.
