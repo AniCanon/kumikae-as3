@@ -1,21 +1,23 @@
 # Kumikae AS3 for JetBrains IDEs
 
-The first piece is an iOS Simulator panel. It compiles, its tests pass and its
-local service has been run against a real Simulator. **Nobody has yet used the
-panel inside a real Rider window**, and idb input has never been tried.
+The first piece is an iOS Simulator panel. The owner has tried it in Rider and
+reported that the snapshot preview was slow. The live-picture implementation and
+its measurements are described in the results below.
 
 | Checked | By | Result |
 |---|---|---|
 | Compilation, style check and plugin zip | Automated build, 2026-11-14 | `./gradlew check buildPlugin` succeeds. |
-| Service tests (`core`) | Automated build | 18 pass. |
-| Panel tests (repository, controller, service adapter) | Automated build | 34 pass. |
+| Service tests (`core`) | Automated build | 46 pass. |
+| Panel tests (repository, controller, service adapter) | Automated build | 75 pass. |
 | Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
 | Agent client tests | `python3 -m unittest` | 7 pass. |
 | Service and agent client against a booted Simulator | Run by hand through `simulator.py` | Devices, select, launch of `org.kumikae.as3test`, a 2622x1206 PNG screenshot, console log, and the test report "14 passed, 0 failed". |
 | The panel's own repository against a booted Simulator | One throwaway test, read-only | Select, a decoded 1206x2622 JPEG picture in 403 ms, an empty console page and status. |
 | Panel layout and buttons | UI probe in a sandbox Rider, with a synthetic service | Light and dark pictures under `build/reports/ui/`; Refresh, Boot and Launch pressed through the real buttons. |
-| The panel in a Rider window, by a person | Nobody | **Not done.** |
-| idb input against a booted Simulator | Run by hand through `simulator.py`, idb client with companion 1.7.8, Xcode 27.0, iOS 26.4 | With only the switch set, the service found idb and read 3 pixels per point; Home, a tap that opened Settings (confirmed from idb's accessibility listing), text, a swipe, Lock and Rotate were accepted. Not tried from the panel's own buttons in a Rider window. |
+| The panel in a Rider window, by a person | Owner | Snapshot version was slow; live version still needs the owner's acceptance. |
+| Live panel against a booted Simulator | Automated visible sandbox probe | 25.30 painted frames/s; warm mouse release to input acknowledgment 88–104 ms; no new paints while still or hidden. Cold first-touch handoff remains about 489 ms. |
+| Ten-minute stream and input | Production service in a small harness | Mean 26.42 frames/s consumed; retained heap 5.655 MiB at one minute and 5.706 MiB at ten minutes. Owned children exited. This was not a ten-minute Rider heap measurement. |
+| idb input against a booted Simulator | `simulator.py` and the sandbox panel probe | Density 3; Home, taps and Settings swipes observed. Earlier text, Lock and Rotate commands were accepted, without a separate visual confirmation. |
 
 The [design](../../docs/superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md)
 compares screen and input options. The [results](../../docs/results/2026-11-jetbrains-simulator.md)
@@ -29,24 +31,27 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   drawn device body (with the camera housing on the models that have one) are in the device's tab.
 - A macOS-only **iOS Simulator** tool window. Select a device, boot it, view its
   screen, install an explicit `.app`, launch a bundle, and read console output.
-- JPEG snapshots, capped at two requests per second. One capture is in flight at
-  a time. Capture alone took about half a second on this Mac. This is a slow
-  preview, not smooth video. Hidden panels stop requesting pictures.
+- Live MJPEG after the owner's idb switch, using binary frames and retaining only
+  the newest picture. A private companion and persistent input shell belong to
+  the session. With input off, the panel retains JPEG snapshots, capped at two
+  requests per second. Hidden windows and the Simulators list stop pictures.
+  Failed live streams report a retry with bounded backoff.
 - One action at a time. A button pressed while another action runs is refused
   with a message, never queued. A picture that arrives after the device changed,
   or after a boot, launch or rotation, is thrown away. A device picked while an
   action runs is refused too; the list returns to the service's device.
 - An agent command-line client that talks to the same service as the panel.
   It saves PNG screenshots, reads logs and the test report, and offers input.
-- Optional idb input: click to tap, drag and release to swipe, a text field, home,
-  lock and rotation. It is off until the owner switches it on in the panel's menu.
+- Optional idb input and live video: click to tap, drag and release to swipe,
+  type text, Home, Lock and Rotate. Both are off until the owner's existing switch
+  is enabled. Input keeps one idb connection warm instead of starting Python per event.
 - Tests for protocol validation, geometry, device parsing, command construction,
   log limits, process timeouts, session cleanup and HTTP authentication, and for
   the panel's state: stale pictures, refused actions, failures, the console
   cursor, input permission, hidden windows and late results after closing.
 
 Without idb, use Apple's Device Hub window for input. No private framework is
-loaded by this plugin itself. Switching input on runs idb, which uses them.
+loaded by this plugin itself. Switching input on runs idb for input and live video, which use those interfaces.
 The plugin installs idb only when you choose Install idb… and agree to its dialog.
 
 This is the beginning of the one plugin planned in roadmap stage 6. It does not
@@ -174,7 +179,7 @@ The exact wire format is in [protocol.md](protocol.md).
 
 ## Input: the owner's switch
 
-Taps, swipes, typing, Home, Lock and Rotate are sent with idb, a tool from Meta that drives the
+Live pictures, taps, swipes, typing, Home, Lock and Rotate use idb, a tool from Meta that drives the
 Simulator through Apple's private input services. Apple can change those without notice. Nothing
 here installs it or turns it on by itself:
 
@@ -185,8 +190,8 @@ here installs it or turns it on by itself:
    switches input on. The same script can be run by hand. It needs Homebrew.
 
 The service finds idb in `~/.local/bin`, Homebrew's folder or along `PATH`, and reads each device's
-pixels per point from idb's own description of it, so every device has input and nothing is typed
-in by hand. A device idb cannot describe stays in viewer mode and says why.
+pixels per point from idb's description. It starts a private companion, input shell and video
+child, and stops them on session closure. It leaves companions started by other tools alone. A device idb cannot describe stays in viewer mode and says why.
 
 The standalone service has no panel to ask, so the owner's switch is an environment variable:
 
