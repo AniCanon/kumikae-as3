@@ -118,4 +118,5 @@ tasks.withType<PrepareSandboxTask>().configureEach {
 // does not work in the editor, the log shows whether it was asked for and what came back.
 tasks.runIde {
     systemProperty("idea.log.debug.categories", "#com.intellij.platform.lsp")
+    providers.gradleProperty("lspTrace").orNull?.let { environment("KUMIKAE_AS3_LSP_TRACE", it) }
 }
