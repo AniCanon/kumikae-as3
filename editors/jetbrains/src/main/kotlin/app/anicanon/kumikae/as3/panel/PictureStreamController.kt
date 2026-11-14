@@ -1,5 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
+import com.intellij.openapi.diagnostic.Logger
+
 /** The window controller's live-picture lifetime. All methods and deliveries run on the EDT. */
 internal class PictureStreamController(
     private val repository: SimulatorRepository,
@@ -67,6 +69,7 @@ internal class PictureStreamController(
         feed?.close()
         feed = null
         // What a person needs to know is that the picture will come back, not when to the millisecond.
+        LOG.info("The Simulator's live picture stopped; retrying in $retryMs ms", error)
         say("Reconnecting to the simulator's screen…")
         retryAt = clock() + retryMs
         retryMs = (retryMs * 2).coerceAtMost(MAX_RETRY_MS)
@@ -75,5 +78,6 @@ internal class PictureStreamController(
     private companion object {
         const val FIRST_RETRY_MS = 500L
         const val MAX_RETRY_MS = 8000L
+        val LOG = Logger.getInstance(PictureStreamController::class.java)
     }
 }

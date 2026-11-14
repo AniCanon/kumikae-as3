@@ -3,6 +3,7 @@ package app.anicanon.kumikae.as3.panel
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.test.assertEquals
 
 class LiveControllerTest {
     private val repository = FakeSimulatorRepository()
@@ -87,8 +88,8 @@ class LiveControllerTest {
         streams.finish()
         repository.feeds.last().failure = IllegalStateException("lost video")
         controller.frameTick()
-        assertTrue(controller.status.contains("lost video"))
-        assertTrue(controller.status.startsWith("Reconnecting"))
+        // The status says what is happening; the cause goes to the IDE's log, for whoever looks into it.
+        assertEquals("Reconnecting to the simulator's screen…", controller.status)
         now = 499
         controller.frameTick()
         assertFalse(streams.isBusy)
