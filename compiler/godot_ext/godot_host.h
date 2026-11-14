@@ -6,12 +6,35 @@
 
 #include <godot_cpp/variant/variant.hpp>
 
+#include <godot_cpp/variant/string_name.hpp>
+
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace kas3 {
 
 class GodotHost final : public vm::Output, public vm::EngineValues, public vm::EngineObjects {
 	std::unordered_set<void *> borrowed_; // Handles made by borrow().
+
+	// Godot's form of a name the interpreter passes on every call ("move_and_slide"), made once. The
+	// interpreter's names are its module's own text, which stays put while the program is loaded, so the
+	// place the text sits is the key; the text is kept beside it and checked, so that a different name at
+	// the same place is never mistaken for it.
+	struct Name {
+		std::string text;
+		godot::StringName godot;
+	};
+	struct Place {
+		const char *data;
+		size_t size;
+		bool operator==(const Place &p_other) const { return data == p_other.data && size == p_other.size; }
+	};
+	struct PlaceHash {
+		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
+	};
+	std::unordered_map<Place, Name, PlaceHash> names_;
+	const godot::StringName &name(std::string_view p_text);
 
 public:
 	// A handle on an object that does not keep it alive, for a script's hold on what it is attached to: a
