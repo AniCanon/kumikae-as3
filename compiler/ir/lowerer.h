@@ -253,6 +253,7 @@ class Lowerer {
 	uint32_t trace_call(Call *p_call);
 	uint32_t engine_text(Call *p_call);
 	uint32_t godot_call(Call *p_call, Symbol *p_method);
+	std::string defaults_key(const Symbol *p_method) const;
 	uint32_t global_call(Call *p_call, Symbol *p_function, Kind p_want);
 	uint32_t script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function);
 	uint32_t call(Call *p_call, Kind p_want);
@@ -269,7 +270,9 @@ class Lowerer {
 	uint32_t signal_by_name(Expr *p_expression, Expr *p_later, uint32_t *r_object, uint32_t *r_name);
 
 	// Arguments for the engine: each as its parameter says, or as it comes where the parameter takes anything.
-	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list);
+	// p_defaults: "Class.method" in Godot's names, for a method whose defaults Godot's description gives.
+	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
+			const std::string &p_defaults = std::string());
 
 	uint32_t engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver = NONE, const std::function<void()> &p_before = nullptr);
 

@@ -130,6 +130,11 @@ Outcome singleton(Request &p_request) {
 	return p_request.done(p_request.result.p != nullptr);
 }
 
+Outcome evaluate(Request &p_request) {
+	p_request.into(p_request.in.a);
+	return p_request.done(p_request.host.source.evaluate(p_request.text(p_request.in.b), p_request.wanted(), &p_request.result, &p_request.error));
+}
+
 Outcome constant(Request &p_request) {
 	p_request.into(p_request.in.a);
 	return p_request.done(p_request.host.source.constant(p_request.text(p_request.in.b), p_request.text(p_request.in.c), p_request.wanted(),
@@ -274,6 +279,8 @@ Outcome perform(Request &p_request) {
 			return singleton(p_request);
 		case Op::HostConstant:
 			return constant(p_request);
+		case Op::HostDefault:
+			return evaluate(p_request);
 		case Op::HostCallStatic:
 			return call_static(p_request);
 		case Op::HostToStr:

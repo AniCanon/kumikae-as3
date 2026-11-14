@@ -36,6 +36,7 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
+	std::unordered_map<std::string, godot::Variant> evaluated_; // What evaluate() worked out, by its text.
 	const godot::StringName &name(std::string_view p_text);
 
 	// One of Godot's global functions, found once: see godot_utility.cpp.
@@ -66,6 +67,7 @@ public:
 	bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) override;
 	void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	void *singleton(std::string_view p_class, std::string *r_error) override;
 	bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,

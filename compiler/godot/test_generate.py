@@ -529,6 +529,14 @@ class RealApi(unittest.TestCase):
         self.assertEqual(names["@global.print"], "print 2648703342 void Variant varargs")
         self.assertEqual(names["@global.degToRad"].split(" ")[0], "deg_to_rad")
         self.assertNotIn("@global.typeof", names)
+        # A default AS3 can't write is declared `= null`; Godot's own text for it is kept for the binding.
+        self.assertEqual(names["@default.Color.clamp.0"], "Color(0, 0, 0, 0)")
+        self.assertEqual(names["@default.Color.clamp.1"], "Color(1, 1, 1, 1)")
+        self.assertNotIn("@default.Node.add_child.1", names)
+        defaults = {value for key, value in names.items() if key.startswith("@default.")}
+        self.assertIn("Transform2D()", defaults)
+        self.assertNotIn("Transform2D(1, 0, 0, 1, 0, 0)", defaults)
+        self.assertFalse([value for value in defaults if value.startswith("Array[")])
         self.assertEqual(names["CharacterBody2D.moveAndSlide"], "move_and_slide")
         self.assertEqual(names["Node._physicsProcess"], "_physics_process")
         self.assertEqual(names["Node2D.position"], "position")

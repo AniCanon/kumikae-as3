@@ -147,7 +147,8 @@ output = compare("values.gd", [
     "looking null", "whole numbers", "to string", "to string in AS3", "no to string", "no to string in AS3",
     "negative cells", "cells plus", "cells compound", "plain order", "compound order", "mixed", "big hash", "decode",
 ])
-check("a null that is not the last argument is an AS3 error", "at Values/clampMiddleNull()" in output, output[-800:])
+check("a null that is not the last argument takes Godot's default, with no error", "at Values/clampMiddleNull()" not in output,
+      output[-800:])
 check("a member of a freed object is AS3's null error, and says the object was freed",
       all(re.search(r"TypeError: Error #1009[^\n]*Godot has freed the object\.\n\s+at Values/%s\(\)" % name, output) for name in
           ("keptName", "keptRename", "keptChildren")), output[-1500:])
@@ -227,6 +228,13 @@ check("functions.gd: print, printerr and pushWarning reach Godot's output",
       "said 4 (1.0, 2.0)" in output and "to the error output" in output and "a warning from AS3" in output, output[-1200:])
 check("functions.gd: a wrong argument is an AS3 error that names the function", "at Functions/wrong()" in output and "lerp" in output,
       output[-1200:])
+
+# Every default the name table records must be one Godot can read back.
+run = subprocess.run([godot, "--headless", "--path", project, "-s", "defaults.gd", "--",
+                      os.path.join(tests, "..", "godot", "godot_names.txt")], capture_output=True, text=True, timeout=300)
+read = re.search(r"DEFAULTS read=(\d+) failed=(.*)", run.stdout)
+check("Godot reads every recorded default", read is not None and int(read.group(1)) > 10 and read.group(2) == "[]",
+      (run.stdout + run.stderr)[-600:])
 
 # An exported game keeps its files in a pack, not in a folder: the scripts must be found and read there.
 import tempfile

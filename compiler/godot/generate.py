@@ -111,6 +111,23 @@ INT_WIDTHS = {None: "Int64", "int8": "int", "int16": "int", "int32": "int", "cha
               "required": "Int64"}
 
 
+# Godot's description writes a few defaults in a way Godot's own expression reader does not take. These
+# are the same values in a way it does. A test (tests/godot_project/defaults.gd) has Godot read every
+# default that is recorded, so a new shape cannot slip by.
+IDENTITIES = {
+    "Transform2D(1, 0, 0, 1, 0, 0)": "Transform2D()",
+    "Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)": "Transform3D()",
+}
+
+
+def evaluable(default):
+    if default in IDENTITIES:
+        return IDENTITIES[default]
+    if re.match(r"Array\[[\w.]+\]\(\[\]\)$", default):
+        return "[]"  # An empty array of a declared element type: an empty array is taken for it.
+    return default
+
+
 def narrow_classes(api):
     """The built-in types that store 32-bit integers: every member is one, or is such a type."""
     members = {}
@@ -286,7 +303,12 @@ class Generator:
                 notes.append('%s="%s"' % (name, note))
             text = "%s:%s" % (name, as3)
             if "default_value" in argument:
-                text += " = " + self.default(argument["default_value"], as3, where)
+                written_default = self.default(argument["default_value"], as3, where)
+                text += " = " + written_default
+                if written_default == "null" and argument["default_value"] != "null" and as3 != "*" and "." in where:
+                    # AS3 can't write this default. Godot's own text for it is kept, so that a `null`
+                    # written in its place, with arguments after it, can be given the real value.
+                    self.godot_names["@default.%s.%d" % (where, len(written))] = evaluable(argument["default_value"])
             written.append(text)
         if vararg:
             written.append("...args" if "rest" in seen else "...rest")

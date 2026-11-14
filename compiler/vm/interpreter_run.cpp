@@ -541,6 +541,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostToStr:
 			case Op::HostPresent:
 			case Op::HostSingleton:
+			case Op::HostDefault:
 			case Op::HostConstant:
 			case Op::HostCallStatic:
 			case Op::HostBind:

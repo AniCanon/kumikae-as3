@@ -5,6 +5,7 @@
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/expression.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/callable.hpp>
@@ -295,6 +296,26 @@ int value_type(std::string_view p_name) {
 	}();
 	auto found = types.find(std::string(p_name));
 	return found == types.end() ? -1 : found->second;
+}
+
+bool GodotHost::evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	const std::string text(p_expression);
+	auto found = evaluated_.find(text);
+	if (found == evaluated_.end()) {
+		// Godot reads its own way of writing a value.
+		Ref<Expression> expression;
+		expression.instantiate();
+		Variant value;
+		if (expression->parse(to_godot(p_expression)) == OK) {
+			value = expression->execute(Array(), nullptr, false);
+		}
+		if (value.get_type() == Variant::NIL || expression->has_execute_failed()) {
+			*r_error = "Godot could not work out its default '" + text + "'";
+			return false;
+		}
+		found = evaluated_.emplace(text, value).first;
+	}
+	return take(p_result, found->second, p_expression, r_result, r_error);
 }
 
 void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {

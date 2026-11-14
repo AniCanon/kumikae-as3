@@ -334,7 +334,8 @@ uint32_t Lowerer::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t *r_
 	return out;
 }
 
-void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
+void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
+		const std::string &p_defaults) {
 	uint32_t count = p_function ? p_function->parameters.count : 0;
 	// A default that AS3 can't write is declared `= null`, and Godot fills in the real one when the
 	// argument is left out. A `null` written last for such a parameter is the same as leaving it out.
@@ -356,6 +357,18 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 				r_list.push_back(settled(bound_method(p_arguments[i]), later, p_position));
 				continue;
 			}
+			std::string godot_default;
+			if (is_null(p_arguments[i]) && !p_defaults.empty() && p_function->parameters[i].default_value &&
+					is_null(p_function->parameters[i].default_value) && kind_of(type, &kind) && kind == Kind::Val &&
+					godot_name("@default", p_defaults + "." + std::to_string(i), &godot_default)) {
+				// `null` where the default is one AS3 can't write, with arguments after it: Godot's own
+				// default, from Godot's text for it.
+				uint32_t value = engine_reg(Kind::Val, type);
+				emit(Op::HostDefault, p_arguments[i]->offset, value, string(godot_default));
+				r_list.push_back(value);
+				continue;
+			}
+			kind = Kind::Void;
 			if (type && type->kind != Type::Any && !kind_of(type, &kind)) {
 				refuse(p_arguments[i]->offset, "passing a value of type '" + compilation_.type_name(type) + "' to Godot");
 				kind = Kind::Void;
@@ -374,6 +387,16 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 		}
 		r_list.push_back(settled(value, later, p_position));
 	}
+}
+
+// "Class.method" in Godot's names: where the name table keeps a method's defaults that AS3 can't write.
+std::string Lowerer::defaults_key(const Symbol *p_method) const {
+	std::string klass, method;
+	if (!p_method->owner || !godot_name(p_method->owner->name, std::string_view(), &klass) ||
+			!godot_name(p_method->owner->name, p_method->name, &method)) {
+		return std::string();
+	}
+	return klass + "." + method;
 }
 
 uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver, const std::function<void()> &p_before) {
@@ -399,7 +422,7 @@ uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receive
 		list.push_back(settled(receiver, writer(p_call->arguments), position));
 	}
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
-	engine_arguments(decl, p_call->arguments, position, list);
+	engine_arguments(decl, p_call->arguments, position, list, defaults_key(p_method));
 	if (script_object != NONE) {
 		owner_of(script_object, receiver, object->offset);
 	}
@@ -425,7 +448,7 @@ uint32_t Lowerer::static_call(Call *p_call, Symbol *p_method) {
 	}
 	std::vector<uint32_t> list;
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
-	engine_arguments(decl, p_call->arguments, position, list);
+	engine_arguments(decl, p_call->arguments, position, list, klass + "." + method);
 	uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
 	emit(Op::HostCallStatic, position, out, string(klass + "." + method), arguments(std::move(list)));
 	return out == NONE ? 0 : out;

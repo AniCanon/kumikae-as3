@@ -407,6 +407,11 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		return true;
 	}
 	std::string missing; // A singleton, constant or static method the engine does not have.
+	bool evaluate(std::string_view p_expression, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+		log += "evaluate " + std::string(p_expression) + " as " + std::string(p_wanted.type) + "\n";
+		give(p_wanted.kind, r_result, 0, "");
+		return true;
+	}
 	void *singleton(std::string_view p_class, std::string *r_error) override {
 		if (p_class == missing) {
 			*r_error = "Godot has no '" + missing + "' here";

@@ -19,6 +19,9 @@ struct EngineSource {
 	// A constant the engine keeps for one of its types: Vector2's ZERO.
 	[[nodiscard]] virtual bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, Slot *r_result,
 			std::string *r_error) = 0;
+	// The value of an expression in the engine's own words, as it writes a parameter's default:
+	// "Color(0, 0, 0, 0)".
+	[[nodiscard]] virtual bool evaluate(std::string_view p_expression, const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	// One of the engine's singletons, by Godot's name for its class.
 	[[nodiscard]] virtual void *singleton(std::string_view p_class, std::string *r_error) = 0;
 	// A method called on no object: one of a value type (Vector2's from_angle) or of a class.

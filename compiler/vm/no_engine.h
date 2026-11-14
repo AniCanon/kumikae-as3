@@ -36,6 +36,7 @@ public:
 	bool get(void *, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 	bool set(void *, std::string_view, const Argument &, std::string *r_error) override { return refuse(r_error); }
 	bool member(void *, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
+	bool evaluate(std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 	void *singleton(std::string_view, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;
