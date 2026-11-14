@@ -16,7 +16,7 @@ dependencies {
 
 kotlin { jvmToolchain(25) }
 application {
-    mainClass = "org.kumikae.simulator.MainKt"
+    mainClass = "app.anicanon.kumikae.as3.simulator.MainKt"
     applicationName = "kumikae-simulator"
 }
 
