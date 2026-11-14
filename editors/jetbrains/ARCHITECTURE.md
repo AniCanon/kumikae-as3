@@ -131,6 +131,9 @@ The view schedules metadata polling at 500 ms and checks the newest decoded fram
 slot every 8 ms while showing. An empty slot changes no state and causes no repaint.
 The controller owns picture state. Normal frame replacement repaints only
 `DeviceFrame.screen`; geometry and layout changes repaint the whole native control.
+`DeviceBodyCache` retains one decoration image at the current display density;
+geometry or density changes replace it, so live frames do not rasterize the static bezel.
+The cache is capped at 16 MiB; larger zoomed views paint decoration directly.
 A settled native screen still has cheap seed polls, but no pixel copy or repaint.
 The idb fallback asks its source for changes dynamically.
 

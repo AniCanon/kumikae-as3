@@ -59,6 +59,7 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
     var onTouch: (SimulatorFrame, String, Pixel) -> Unit = { _, _, _ -> }
     var onFramePresented: (SimulatorFrame, Long) -> Unit = { _, _ -> }
     private var presented: SimulatorFrame? = null
+    private val bodyCache = DeviceBodyCache()
 
     /** The device's name: which models have a camera housing over the screen is known only by it. */
     var deviceName = ""
@@ -197,7 +198,22 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
             canvas.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
             val image = frame?.image
             val device = device(image?.width ?: EMPTY_WIDTH, image?.height ?: EMPTY_HEIGHT)
-            device.paintBody(canvas)
+            val body = bodyCache.image(
+                DeviceBodySize(
+                    image?.width ?: EMPTY_WIDTH,
+                    image?.height ?: EMPTY_HEIGHT,
+                    width,
+                    height,
+                    JBUI.scale(MARGIN),
+                    canvas.transform.scaleX,
+                    canvas.transform.scaleY,
+                ),
+            )
+            if (body == null) {
+                device.paintBody(canvas)
+            } else {
+                canvas.drawImage(body, 0, 0, width, height, null)
+            }
             canvas.clip(device.screenShape)
             if (image == null) {
                 paintPlaceholder(canvas, device)
