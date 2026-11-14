@@ -165,7 +165,7 @@ The design keeps each of these possible. No stage above delivers them.
 |---|---|---|
 | A. Singletons, constants, static methods | `Input.isActionPressed("jump")`, a singleton's signals, `Vector2.ZERO`, `Key.ESCAPE`, `Vector2.fromAngle(a)`. A Godot value with parts starts at its zero. Closes 3 backlog items. | Built and reviewed |
 | B. `Int64` | The 64-bit integer type the owner approved. The [design](superpowers/specs/2026-11-14-int64-design.md) was approved on 2026-11-14. A Godot integer is an `Int64` unless Godot says it is narrower; 1,059 declarations changed and none became narrower; the table kept by hand is gone. | Built; in review |
-| C++ clean-up | Asked for by the owner on 2026-11-14: split the oversized files, remove duplication, drop banner and redundant comments, use C++17 well, and measure that nothing got slower. No change in behaviour: every test stays as it is. | Next |
+| C++ clean-up | Asked for by the owner on 2026-11-14: split the oversized files, remove duplication, drop banner and redundant comments, use C++17 well, and measure that nothing got slower. No change in behaviour: every test stays as it is. See the [guidelines](cpp-guidelines.md) and the [plan](superpowers/plans/2026-11-14-cpp-cleanup.md). | Next |
 | C. Global functions and errors | `print`, `lerp`, `randf` and the rest; an AS3 error shown the way Godot shows its own. Closes 6 backlog items. | After the clean-up |
 
 Read more: [stage 2b-3 plan](superpowers/plans/2026-11-14-stage-2b3-rest-of-godot-api.md).
@@ -213,6 +213,8 @@ Open items:
 | Decision | Outcome |
 |---|---|
 | Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
+| Royale's language extensions | The owner said on 2026-11-14 to support them as well: abstract classes, arrow functions, import aliases, `?.`, `??`, private constructors, strict function types, type inference, verbatim strings. With Royale's spelling, after stage 2c. See [language additions](superpowers/specs/2026-11-12-language-additions.md). |
+| C++ guidelines | The owner asked on 2026-11-14 for best practices and a clean-up "for scalability before we keep going". The rules are in [C++ guidelines](cpp-guidelines.md); a check in the test suite enforces the ones a script can judge. |
 | `async`/`await` | The owner wants it first-class, not limited to the main thread, efficient, and with a proper debugger. Research first, after stage 2; no syntax chosen yet. |
 | Deferred review findings | The owner said on 2026-11-12 that all of them are to be fixed. They are listed in the [backlog](backlog.md) and stay there until fixed or ruled on. |
 | Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the [language additions](superpowers/specs/2026-11-12-language-additions.md) list. |
