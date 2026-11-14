@@ -29,7 +29,10 @@ class UiProbeStarter : ApplicationStarter {
     override fun main(args: List<String>) {
         val destination = Path.of(args[1])
         Files.createDirectories(destination)
-        val failure = runCatching { checkThemes(destination) }.exceptionOrNull()
+        val failure = runCatching {
+            checkThemes(destination)
+            if (System.getenv("KUMIKAE_SIMULATOR_LIVE_PROBE") == "1") UiProbeLive.run(destination)
+        }.exceptionOrNull()
         Files.writeString(destination.resolve("result.txt"), failure?.stackTraceToString() ?: "passed\n")
         val application = ApplicationManager.getApplication()
         application.invokeLater { (application as ApplicationEx).exit(true, true, if (failure == null) 0 else 1) }

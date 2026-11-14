@@ -54,6 +54,15 @@ internal class LocalSimulatorService(
         return checkNotNull(current) { "The local Simulator service is still starting." }.enableInput()
     }
 
+    override fun screenshot(device: String) = currentSession().screenshot(device)
+
+    override fun openFrames(device: String) = currentSession().openFrames(device)
+
+    private fun currentSession(): LocalSession = synchronized(lock) {
+        check(!closed) { CLOSED }
+        checkNotNull(session) { "The local Simulator service is still starting." }
+    }
+
     override fun close() {
         val opened = synchronized(lock) {
             closed = true

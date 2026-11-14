@@ -10,6 +10,7 @@ internal object SimulatorComposition {
         repository,
         actions = BackgroundWorker("Kumikae AS3 Simulator actions"),
         polling = BackgroundWorker("Kumikae AS3 Simulator polling"),
+        streams = BackgroundWorker("Kumikae AS3 Simulator stream startup"),
         inputAllowed = inputAllowed,
         rememberInput = rememberInput,
         installer = ScriptIdbInstaller(),

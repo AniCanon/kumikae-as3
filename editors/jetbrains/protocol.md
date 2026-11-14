@@ -1,6 +1,7 @@
 # Simulator protocol, version 1
 
-The panel and `simulator.py` both use this interface. It is local HTTP with JSON
+The panel uses this interface for commands; `simulator.py` uses it for every
+operation. It is local HTTP with JSON
 (text objects made of named fields). It has no connection to the language server
 or the later AS3 debug adapter.
 
@@ -11,6 +12,11 @@ Read it from the path shown by the panel or standalone service. Never commit it.
 Send `POST http://127.0.0.1:<port>/v1` with `Content-Type: application/json` and
 `Authorization: Bearer <token>`. Do not send an `Origin` header. Browser-origin
 requests are refused. There is no remote host option, proxy, redirect or download.
+
+The panel also uses its in-process session for binary pictures. This is an internal
+subscription, not an unauthenticated HTTP endpoint. It shares selection and geometry
+with this API. Agent screenshots and all version 1 requests and replies are unchanged.
+Live video requires the same owner-controlled idb switch as input.
 
 ```json
 {"version":1,"id":"request-1","method":"devices","params":{}}
@@ -40,7 +46,8 @@ There is no arbitrary process or arbitrary file-read operation.
 
 All listed fields are required unless marked optional. `device` is an exact id
 returned by `devices`, never the `booted` alias. Except for `select`, it must match
-the currently selected device. A session serializes operations. Other agents may
+the currently selected device. A session admits one input or slow operation at a
+time; status, logs and pictures can proceed independently. Other agents may
 change its selection; a stale device request fails instead of reaching a new one.
 
 | Method | `params` | Result |
@@ -81,10 +88,13 @@ dimension change invalidates old geometry. Changes made outside this service are
 detected on the next capture; take a fresh screenshot before an agent gesture.
 
 The panel fits the image without stretching and ignores clicks in empty margins.
-The idb adapter divides image pixels by the explicitly configured device scale,
-rounding down to whole points. One scale is bound to one device. There is one
-display and one pointer gesture at a time. `sent:true` means the input command
-exited successfully, not that the application reached an expected state. Check
+The idb adapter reads the device's pixel density. Full-size screenshot coordinates
+are divided by that density and rounded down to whole points. Internal live pictures
+are scaled; their dimensions and generation are validated before coordinates are
+mapped to native pixels and then points. Both presentations share the same geometry
+generation, so an agent screenshot does not invalidate a live picture. There is one
+display and one pointer gesture at a time. `sent:true` means idb acknowledged the
+input command, not that the application reached an expected state. Check
 the next screenshot or log.
 
 ## Logs and shutdown
@@ -102,7 +112,8 @@ They describe the console launcher. Inspect its output and the app's test report
 before concluding that the app started or passed its checks.
 
 Closing the IDE project or standalone service removes the endpoint and temporary
-files, stops the HTTP listener, and stops its console process. `simctl` forwards
+files, stops the HTTP listener, and stops its console process and every idb child
+it started. `simctl` forwards
 signals and may stop that app. The Simulator stays booted. After a crash, an old
 descriptor may remain; it is not a live session and must not be reused.
 

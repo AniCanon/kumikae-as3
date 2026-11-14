@@ -57,6 +57,12 @@ class SessionTest {
             assertThrows(SimulatorException::class.java) {
                 call("tap", """{"device":"other","generation":1,"width":120,"height":240,"x":60,"y":120}""")
             }
+            assertThrows(IllegalArgumentException::class.java) {
+                call(
+                    "tap",
+                    """{"device":"phone","generation":${frame.generation},"width":4294967416,"height":240,"x":60,"y":120}""",
+                )
+            }
             geometry = Geometry(240, 120)
             call("screenshot", """{"device":"phone","format":"png"}""")
             assertThrows(SimulatorException::class.java) {

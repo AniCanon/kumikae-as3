@@ -27,7 +27,16 @@ internal interface SimulatorRepository : AutoCloseable {
 
     fun screenshot(device: String): SimulatorFrame
 
+    fun openFrames(device: String): SimulatorFrames = error("Live pictures are unavailable")
+
     fun consolePage(cursor: Long): ConsolePage
 
     fun input(device: String, input: SimulatorInput)
+}
+
+/** Polling this slot never performs I/O or decodes; the service workers own that work. */
+internal interface SimulatorFrames : AutoCloseable {
+    fun poll(): SimulatorFrame?
+    val failure: Throwable?
+    val ended: Boolean
 }

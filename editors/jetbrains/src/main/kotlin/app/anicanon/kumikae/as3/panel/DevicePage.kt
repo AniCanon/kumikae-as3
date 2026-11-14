@@ -154,7 +154,7 @@ internal fun moreEntries(
 ): List<MenuEntry> = listOfNotNull(
     MenuEntry("Install app…") { prompts.appToInstall()?.let(controller::install) },
     MenuEntry(
-        if (controller.inputEnabled) "Input is on (idb)" else "Switch input on…",
+        if (controller.inputEnabled) "Live picture and input are on (idb)" else "Switch input on for live picture…",
         enabled = !controller.inputEnabled,
     ) {
         if (prompts.confirmInput()) controller.enableInput()

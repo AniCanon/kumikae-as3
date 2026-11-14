@@ -11,7 +11,13 @@ internal data class SimulatorDevice(val id: String, val name: String, val runtim
 internal data class SimulatorStatus(val device: SimulatorDevice?, val inputEnabled: Boolean, val notice: String)
 
 /** One decoded picture. `generation` is the service's geometry counter that input must quote back. */
-internal class SimulatorFrame(val device: String, val generation: Long, val image: BufferedImage, val captureMs: Long) {
+internal class SimulatorFrame(
+    val device: String,
+    val generation: Long,
+    val image: BufferedImage,
+    val captureMs: Long,
+    val receivedNanos: Long = 0,
+) {
     val geometry = Geometry(image.width, image.height)
 }
 

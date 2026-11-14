@@ -15,6 +15,22 @@ internal class FakeSimulatorRepository : SimulatorRepository {
     var failure: String? = null
     var closed = false
     var idbInstalled = true
+    val feeds = mutableListOf<FakeFrames>()
+
+    class FakeFrames : SimulatorFrames {
+        var closed = false
+        override val ended: Boolean get() = closed
+        override var failure: Throwable? = null
+        override fun poll(): SimulatorFrame? = null
+        override fun close() {
+            closed = true
+        }
+    }
+
+    override fun openFrames(device: String): SimulatorFrames {
+        record("stream $device")
+        return FakeFrames().also { feeds += it }
+    }
 
     private fun record(call: String) {
         calls += call

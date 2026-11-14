@@ -6,7 +6,10 @@ The [design](../superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md)
 was committed before the implementation. Code and build instructions are in
 [`editors/jetbrains/`](../../editors/jetbrains/).
 
-## Where it stands now
+## Earlier snapshot verification
+
+For the current live-picture implementation, see
+[the speed measurements below](#live-picture-and-input-measurements-2026-11-14).
 
 The first pass below was written when the build could not resolve one
 dependency, so nothing had compiled. That is no longer true. A second pass on
@@ -141,3 +144,171 @@ describe; a second device; input delay.
 | The install script run with the bare environment an IDE gives a process | Exit 0 on a Mac that already had idb: Homebrew and the client each reported it installed. A first install from nothing was done by hand earlier the same day with the same commands, not through this script. |
 | The script inside the built plugin | Present in the plugin's jar; a test reads it back. |
 | The panel's flow (ask, run, show output, switch input on; failure; retry) | Controller tests with a stand-in installer, and installer tests with small scripts. Not pressed in a Rider window. |
+
+## Live picture and input measurements, 2026-11-14
+
+Branch: `feat/simulator-speed`. This section supersedes the snapshot performance and
+unverified-input statements above. The owner had tried the snapshot panel in Rider
+and reported that it was slow. The measurements below were automated on this Mac,
+against the already booted **Glass Dock Demo**, using Home and Settings only. No
+Simulator was created, shut down or erased; no app was installed. Xcode 27.0,
+iOS 26.4, idb companion 1.7.8, native picture 1206 by 2622, density 3.
+
+### Before and after
+
+| Measurement | Observed |
+|---|---|
+| Existing screenshot command, six sequential JPEG captures | 1383.81 ms first capture; then 395.05, 458.89, 409.91, 457.84, 379.08 ms. This is capture-command time, not painting. The old panel requested at most two pictures per second. |
+| Existing per-event Python input, twelve taps | 340.86–361.36 ms from process start to completion. |
+| Raw dynamic MJPEG, quality 0.6, scale 0.33 | 57.73 frames/s during Settings swipes; first complete JPEG after 401.34 ms; mean JPEG 41,923 bytes. |
+| Raw MJPEG with `--fps 30` | 30.04 frames/s while changing, but 113 frames in the first four seconds on a still screen. Dynamic mode was selected to avoid forced duplicate pictures. |
+| **Actual panel painting**, visible 420 by 900 sandbox window | **25.30 distinct pictures/s** during sixteen alternating Settings swipes. The source pictures were 398 by 866. |
+| JPEG fully received to actual panel paint | Median **21.50 ms**, p95 **29.92 ms**. This includes decode, newest-frame delivery and painting; it excludes Simulator capture/encoding before receipt. |
+| Actual panel mouse release to acknowledged warm tap | Twelve samples: 95.17, 98.16, 94.55, 90.21, 92.71, 95.69, 94.16, 99.01, 100.98, 103.86, 88.33, 89.39 ms. Acknowledgment follows delivery, so this is an upper bound on handoff latency. |
+| Still and hidden panel | Zero new paints during five seconds after Home settled; zero during 1.5 seconds after hiding. The dynamic stream waits for changes; the empty newest-frame timer does not decode or repaint. Visible metadata still polls every 500 ms. |
+| Settings launch request to next paint | 246.96 ms. The next paint is not proven to be a Settings frame; this is not an end-to-end display-latency claim. |
+| Cold private-companion input | First tap took 574 ms to acknowledge. Companion logs placed touch-down about **489 ms** after request; the next tap reached touch-down in about **2 ms** and acknowledged in 91 ms. **The first-tap target is not met.** |
+
+The panel uses the same in-process session as the authenticated HTTP agent service.
+Binary pictures avoid base64 JSON, including in screenshot fallback. HTTP commands
+and the Python client's protocol remain unchanged. idb runs only after the existing
+input switch. A private companion and persistent `idb shell --no-prompt` avoid Python
+startup per gesture and avoid attaching to the owner's existing companion. No new
+dependency, codec, Python helper or download was added.
+
+The live source omits `--fps`, uses quality 0.6 and scale 0.33, and keeps one newest
+encoded picture and one newest decoded picture. The UI samples at 33 ms. Stream
+failures revoke geometry and retry after 0.5, 1, 2, 4 and at most 8 seconds. Input
+acknowledgments and screenshots run outside the session monitor.
+
+### Ten-minute streaming run
+
+A temporary Java harness called the production Kotlin `LocalSession`, consumed its
+newest decoded frame every 33 ms, and sent alternating 700 ms Settings swipes with
+100 ms between them. It ran for 610 seconds with `-Xmx256m`. This measures the service
+and decoding path; it does not measure ten minutes of Rider's entire heap. The
+separate sandbox probe above measured actual panel painting. The service hot path
+was the same; later changes strengthened close/error invalidation and cleanup.
+
+Across sixty complete ten-second windows: **15,881 frames**, mean **26.42 frames/s**,
+range **24.07–27.53**. Per-window receipt-to-consume p95 was 18.26–30.85 ms;
+decode p95 was 2.28–8.93 ms. A forced GC once a minute measured retained JVM heap:
+5.655, 5.864, 5.652, 5.650, 5.517, 6.527, 5.493, 5.496, 5.709, **5.706 MiB**.
+There was no monotonic retained-heap growth. Allocation between collections is
+expected and was not counted as retained growth.
+
+`ps -axo pid,ppid,pcpu,rss,time,command` sampled the harness and its owned descendants
+every ten seconds. CPU below is cumulative process CPU time divided by elapsed wall
+time, where 100% means one core. RSS is resident memory, in MiB.
+
+| Process | Mean CPU | First RSS | Last RSS | Peak RSS |
+|---|---:|---:|---:|---:|
+| JVM service and decoder harness | 17.78% | 222.41 | 227.55 | 334.94 |
+| Owned idb companion | 9.16% | 60.73 | 61.64 | 61.69 |
+| Persistent idb input shell | 0.09% | 54.16 | 54.28 | 54.33 |
+| idb video-stream client | 2.49% | 55.20 | 55.34 | 55.39 |
+
+The JVM's retained heap returned close to its initial value; resident memory ended
+5.14 MiB above the first sample after a higher temporary peak. These observations
+support bounded memory in this run, not a claim of byte-for-byte constant RSS.
+After closing the harness, `pgrep -lf 'idb|SimulatorSpeed|kumikae-simulator'` showed
+only the companion that existed before this task. It was left untouched.
+
+A final 25-second Home run on the rebuilt distribution consumed 3.60 and 3.99
+frames/s in its complete ten-second windows. This screen was not completely still:
+a subsequent 15-second pixel-comparison probe found differences within the top 65
+rows of the 398-by-866 pictures, near the status bar. It did not find identical
+decoded pictures being repainted. Over seconds 5–20 of the uninstrumented Home run,
+cumulative CPU cost was 2.4% for the service, 0.8% for the companion, 0% for the input
+shell and 0.33% for video. Thus the earlier five-second zero-paint observation does
+not imply that Home always stops producing pictures.
+
+### Commands and verification
+
+All Gradle commands used the existing JDK at `/opt/homebrew/opt/openjdk@25` and
+`GRADLE_RO_DEP_CACHE=<cache-worktree>/editors/jetbrains/.gradle-home/caches`.
+`<worktree>` is this branch's worktree; `<id>` replaces the booted device identifier.
+Nothing was downloaded. Local socket/process checks needed execution outside the
+filesystem sandbox.
+
+```sh
+cd <worktree>/editors/jetbrains
+./gradlew --offline check buildPlugin verifyPlugin
+./gradlew --offline -q :core:installDist
+KUMIKAE_SIMULATOR_LIVE_PROBE=1 ./gradlew --offline runIde -PuiProbe
+./gradlew --offline runIde -PuiProbe
+python3 -m unittest discover -s tests
+```
+
+| Check | Result read from the output |
+|---|---|
+| Full offline check, build and verification | `BUILD SUCCESSFUL`; 46 core and 75 panel tests, zero failures, errors or skips. Compatible with RD-262.10968.170; four deprecated and six experimental `ToolWindowFactory` API notes remain. |
+| Ordinary UI probe | `BUILD SUCCESSFUL`; `build/reports/ui/result.txt` contained `passed`. Representative narrow, wide and error-state PNGs were inspected in light and dark. |
+| Opt-in live UI probe | `BUILD SUCCESSFUL in 52s`; `passed`, with the painting and input results above. |
+| Python client suite | Final run: `Ran 7 tests in 3.529s`, `OK`. The first sandboxed attempt could not bind its loopback test server; the allowed unsandboxed rerun passed. |
+| Regression cycles | Parsing/shell APIs initially failed compilation before implementation. Concurrency, closed-shell reuse and oversized dimensions produced three failing tests before fixes. Closing a live feed produced one failing test before geometry revocation. A forked JVM left its owned child alive before the shutdown-hook fix. Some controller tests were added alongside implementation, so a failing-first run is not claimed for every test. |
+| Independent review | Reviewed lifecycle, geometry, input concurrency and process cleanup. Findings were addressed; the final close-time binding fix was reviewed again. |
+
+The process owner registers a JVM shutdown hook when it first starts a child and
+unregisters it after normal close. This prevents IDE exit from cutting short the
+panel's asynchronous cleanup. A forked-JVM test checks this with an owned process
+that ignores graceful termination. Project-close cleanup in the owner's Rider is
+still not a manual observation.
+
+The opt-in live probe runs the ordinary synthetic light/dark probe first, then mounts
+the production controller, repository and screen in a visible sandbox JFrame. It
+uses real mouse press/release events and counts distinct frames in `paintComponent`.
+Its sources are `UiProbeLive.kt` and `UiProbeStarter.kt`; reports are generated under
+`build/reports/ui/`. It closes its own window and session, not the owner's Rider.
+
+The temporary command probes and harness were run as follows (temporary source and
+logs were not committed):
+
+```sh
+python3 -I /tmp/kumikae-speed-baseline.py
+python3 -I /tmp/kumikae-shell-probe.py
+python3 -I /tmp/kumikae-private-warm.py
+python3 -I /tmp/kumikae-hid-handoff.py
+javac -cp 'core/build/install/kumikae-simulator/lib/*' /tmp/SimulatorSpeed.java
+KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT=1 java -Xmx256m \
+  -cp '/tmp:core/build/install/kumikae-simulator/lib/*' SimulatorSpeed 610 swipes
+python3 -I /tmp/kumikae-monitor.py
+KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT=1 java -Xmx256m \
+  -cp '/tmp:core/build/install/kumikae-simulator/lib/*' SimulatorSpeed 25
+javac -cp 'core/build/install/kumikae-simulator/lib/*' /tmp/SimulatorStill.java
+KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT=1 java -Xmx256m \
+  -cp '/tmp:core/build/install/kumikae-simulator/lib/*' SimulatorStill 15
+```
+
+`SimulatorStill` was a temporary copy of the harness with per-pixel comparison
+between consecutive decoded pictures. Its timing includes that comparison and is
+not used as a production latency measurement. A final `simctl` JPEG was inspected
+to locate the changing region; temporary pictures were not committed.
+
+The baseline scripts ran `xcrun simctl io <id> screenshot --type=jpeg <temporary-file>`,
+`idb ui tap --udid <id> <x> <y>`, and `idb video-stream --udid <id> --format mjpeg
+--compression-quality 0.6 --scale-factor 0.33`, with and without `--fps 30`.
+The private-companion probes started a companion with `--udid <id> --grpc-domain-sock
+<private-directory>/companion.sock --only simulator`, then `idb --companion <socket>
+shell --no-prompt`. Empty text returned `SUCCESS=0` and did not initialize touch.
+Every probe stopped the children it started.
+
+### Limits and decisions still open
+
+- Cold first-touch delivery exceeds 150 ms. A helper using the already installed
+  Python client to initialize HID without a touch was proposed to the owner; it is
+  not included. Starting a connection is not sufficient to initialize HID.
+- Receipt-to-paint timing excludes source capture and encoding. No synchronized
+  source timestamp or optical end-to-end measurement was available.
+- The ten-minute memory run covers streaming and input in a standalone harness,
+  not the entire Rider process. Manual acceptance of the live panel, project-close
+  behavior in the owner's Rider, other devices and other IDE builds remain unverified.
+- Swipes still dispatch on mouse release; there is no continuous finger tracking.
+- Fixed quality 0.6, scale 0.33, a 33 ms UI timer, a private companion per session,
+  and the in-process-only live transport are deliberate choices the owner may change.
+- Existing faults found and fixed: screenshot capture held the session monitor;
+  input acknowledgment held it during swipes; dimension narrowing could wrap a
+  large integer. Review of the new streaming implementation also caught failed
+  shell reuse, a closed stream appearing healthy, late geometry binding after
+  close, and cleanup that did not await children at service or JVM exit. These
+  findings were fixed before the final build.

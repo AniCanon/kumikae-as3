@@ -5,7 +5,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 
-interface InputBackend {
+interface InputBackend : AutoCloseable {
     val enabled: Boolean
 
     /** Screenshot pixels for one of the device's points: input is sent in points. */
@@ -14,6 +14,11 @@ interface InputBackend {
     fun supports(device: String): Boolean = enabled
 
     fun send(device: String, operation: String, args: List<String>)
+
+    fun video(device: String): Pair<StreamProcess, Geometry> =
+        throw SimulatorException("INPUT_DISABLED", "Live picture needs the owner's idb switch")
+
+    override fun close() = Unit
 }
 
 object NoInput : InputBackend {
@@ -31,7 +36,11 @@ object NoInput : InputBackend {
  * Input through Meta's idb, which drives the Simulator through private Apple interfaces. It is used only
  * after the owner switches it on: in the panel, or with an environment variable for the standalone service.
  */
-class IdbInput(private val executable: String, private val runner: CommandRunner) : InputBackend {
+class IdbInput(
+    private val executable: String,
+    private val runner: CommandRunner,
+    private val persistent: IdbDevices? = null,
+) : InputBackend {
     private val scales = ConcurrentHashMap<String, Double>()
 
     init {
@@ -42,7 +51,7 @@ class IdbInput(private val executable: String, private val runner: CommandRunner
 
     override val enabled = true
 
-    override fun scale(device: String): Double = scales.computeIfAbsent(device) {
+    override fun scale(device: String): Double = persistent?.device(device)?.density ?: scales.computeIfAbsent(device) {
         val density = runCatching {
             JsonParser.parseString(runner.run(Commands.describe(executable, device), TIMEOUT_MILLIS))
                 .asJsonObject.getAsJsonObject("screen_dimensions")["density"].asDouble
@@ -54,7 +63,21 @@ class IdbInput(private val executable: String, private val runner: CommandRunner
     }
 
     override fun send(device: String, operation: String, args: List<String>) {
-        runner.run(Commands.input(executable, device, operation, args), TIMEOUT_MILLIS)
+        if (persistent != null) {
+            persistent.device(device).send(operation, args)
+        } else {
+            runner.run(Commands.input(executable, device, operation, args), TIMEOUT_MILLIS)
+        }
+    }
+
+    override fun video(device: String): Pair<StreamProcess, Geometry> {
+        val connection = persistent?.device(device)
+            ?: throw SimulatorException("INPUT_UNAVAILABLE", "Live idb connection is unavailable")
+        return connection.video() to connection.geometry
+    }
+
+    override fun close() {
+        persistent?.close()
     }
 
     companion object {
@@ -78,7 +101,7 @@ class IdbInput(private val executable: String, private val runner: CommandRunner
             if (env[SWITCH] != "1") return NoInput
             val executable =
                 env[PATH] ?: find() ?: error("idb was not found. Install it, or set $PATH to its full path.")
-            return IdbInput(executable, runner)
+            return IdbInput(executable, runner, IdbDevices(executable))
         }
     }
 }
