@@ -144,7 +144,7 @@ python3 compiler/tests/run_godot.py compiler/tests   # runs the project in headl
 To use it in a project of your own, copy `tests/godot_project/kas3.gdextension` and the `bin` folder into
 it.
 
-**What works so far (stages 2b-1, 2b-2 and the first part of 2b-3):**
+**What works so far (stages 2b-1 to 2b-3):**
 
 ```actionscript
 package {
@@ -198,12 +198,19 @@ package {
   One converts to an `int`, a `uint` or a `Number` where that is expected, and a `RangeError` says so if
   the value does not fit; `int(x)` written out cuts it, as in Flash. Arithmetic on it wraps at 64 bits,
   `/` gives a `Number`, and a comparison with a `Number` is exact.
+- Godot's global functions: `print("x", n)`, `lerpf(a, b, t)`, `clampi(v, 0, 10)`, `randf()`, `str(...)`.
+  One that can give back anything (`lerp`, `max`) is used where the program says what it expects:
+  `var x:Number = lerp(a, b, 0.5)`.
+- A Godot object that has been freed is `null` to a script: `node == null` is true, `if (node)` is
+  false, and a member reached on it is AS3's null error, which says the object was freed.
+- `null` written for a default AS3 can't write takes Godot's own default, wherever it is in the call:
+  `color.clamp(null, max)`.
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,
   never taken as if it fitted.
-- An AS3 error inside a call from the engine is reported in Godot's own error output, with the AS3 stack
-  trace, and the engine carries on.
+- An AS3 error inside a call from the engine is reported as Godot reports a script's own error, with the
+  `.as` file and line as its source and the AS3 stack trace, and the engine carries on.
 
-**Refused by name until the next slices:** `print` and the other global functions, elements of Godot's untyped collections, creating
+**Refused by name until the next slices:** elements of Godot's untyped collections, creating
 Godot objects with `new`, passing a script object to Godot, and everything `kas3c run` refuses.
 
 How it works:

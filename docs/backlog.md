@@ -21,12 +21,12 @@ it stands.
 
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
-| **2b-3** | The rest of Godot's API (under way) | 6 | `Int64` and what waits on it, singletons, freed objects, how errors reach Godot |
-| **2c** | The rest of the language | 16 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
+| **2c** | The rest of the language | 17 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
 | **2d** | Editor features | 14 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 34 | What is left |
-| **decision** | The owner | 4 | See each item |
+| **clean-up** | A pass that closes stage 2 | 37 | What is left |
+| **decision** | The owner | 5 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -80,8 +80,6 @@ Found by the review of the clean-up pass itself.
 - A document that starts with a byte-order mark: a changed range on its first line lands one character
   early. **LS-2**
 - In UTF-8 position mode, a position inside a multi-byte character splits the character. **LS-2**
-- A Godot member reached through a missing script object (`other.getChild(note())`) is reported before the
-  call's arguments are evaluated; for AS3's own members the arguments come first. **2b-3**
 - A static call's arguments are evaluated before the class's static fields are set, and `x is C` does not
   set up `C`. Whether Flash does the same is unchecked. **clean-up**
 - Find references does not link an interface's method to the methods that implement it. **LS-2**
@@ -90,19 +88,13 @@ Found by the review of the clean-up pass itself.
 
 ## Stage 2b-2, part A: Godot's values
 
-- A `null` that is not the last argument, for a parameter whose default AS3 can't write
-  (`color.clamp(null, max)`), is an error when the line runs. Giving it Godot's real default needs the
-  defaults in the name table. **2b-3**
 - A `Number` used as an index is cut to a whole number by Godot: `v[1.5]` reads element 1, and `v[NaN]`
   element 0. **2c**
 - One part of a value that is stored nowhere (`a.normalized().x = 5`) is refused. So is `points[0].x = 5`
   on a packed array of vectors, though there the value is stored. **2c**
 - A local that the right-hand side reassigns is read after it: `a.position.x = (a = b, 5)` writes to `b`.
   (A whole property behaves the same: `a.visible = (a = b, false)`.) **clean-up**
-- A freed node is not `null` in `kept == null`, but equals a variable that holds null. **2b-3**
 - `x >>>= vector` passes the checker and fails when it runs. **clean-up**
-- Reading or writing a property of a freed node says Godot has no such property, not that the node is
-  freed. A freed node passed as an argument gets Godot's own error, and no AS3 error. **2b-3**
 - **decision** `"" + this` in a script without `toString()` reads `[object Values]` (AS3's), while Godot's
   text for the same node reads `<Node2D#123>`. And a `toString()` that raises an error ends the caller
   through `"" + this`, but through Godot's text it is reported and Godot's text stands.
@@ -127,8 +119,6 @@ Found by the review of the clean-up pass itself.
 - `other[name].add(f)` on another script object reaches only the Godot object's signals, not a signal the
   other script keeps in a public field. `this[name]` finds a subclass's field before a base class's
   private one of the same name. **2c**
-- A listener given arguments that don't fit reports its AS3 error and tells Godot the call went well, so
-  `callv` and `filter` see no failure. **2b-3**
 - When the scene tree is taken down, static fields are emptied and listeners stop working, so that Godot
   objects are let go while they can still be freed. A script that runs after that sees null statics. If
   the main loop is not a scene tree, an object held by a static field with a GDScript listener on it
@@ -200,6 +190,19 @@ the review of the clean-up put off.
 - The interpreter makes a new handle for every value Godot gives back, which is most of what a call into
   Godot now costs. A design change, for the native backend's stage. **clean-up**
 
+## Stage 2b-3, part C: global functions and errors
+
+- A global function that gives back anything (`lerp`, `max`, `clamp`: 26 of them) is refused where the
+  program does not say what it expects, and for one of Godot's values. Each has a typed twin. **2c**
+- Godot's message for a listener that was not called names it `Node(Signals.as)::`, without the method.
+  **clean-up**
+- A default is read by Godot each time a program is loaded, not once when the declarations are made.
+  **clean-up**
+- A freed Godot object still reads as `<Freed Object>` as text, as in GDScript, though it is `null` in
+  every test. **decision**
+- An iOS library built before a script used something new does not load the project, and the test scene
+  then never finishes, without reporting why. **clean-up**
+
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
@@ -221,7 +224,5 @@ the review of the clean-up put off.
 - A method that returns a script object can't hand it to Godot: the caller gets null, and an error says
   so. **2c**
 - A script's private methods and fields can be reached from GDScript. **2d**
-- A handle on a Godot object that has since been freed still counts as not null. Its text is Godot's
-  `<Freed Object>`. **2b-3**
 - `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions
   but skips a virtual that a C++ extension class implements. **clean-up**
