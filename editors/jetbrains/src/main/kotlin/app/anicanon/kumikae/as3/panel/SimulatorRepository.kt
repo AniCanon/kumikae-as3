@@ -22,6 +22,9 @@ internal interface SimulatorRepository : AutoCloseable {
 
     fun launch(device: String, bundle: String)
 
+    /** Ends the app that was launched. */
+    fun terminate(device: String, bundle: String)
+
     fun screenshot(device: String): SimulatorFrame
 
     fun consolePage(cursor: Long): ConsolePage

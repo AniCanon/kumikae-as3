@@ -62,6 +62,8 @@ internal class UiProbeRepository : SimulatorRepository {
         return true
     }
 
+    override fun terminate(device: String, bundle: String) = record("terminate $device $bundle")
+
     override fun shutdown(device: String): SimulatorStatus {
         record("shutdown $device")
         selected = selected?.copy(state = "Shutdown")

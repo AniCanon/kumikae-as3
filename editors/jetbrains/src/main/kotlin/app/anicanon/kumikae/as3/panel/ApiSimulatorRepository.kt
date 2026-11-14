@@ -49,13 +49,26 @@ internal class ApiSimulatorRepository(private val service: SimulatorService) : S
         return SimulatorFrame(frame["device"].asString, frame["generation"].asLong, image, frame["captureMs"].asLong)
     }
 
+    override fun terminate(device: String, bundle: String) {
+        service.call("terminate", mapOf("device" to device, "bundle" to bundle))
+    }
+
     override fun consolePage(cursor: Long): ConsolePage {
-        val page = service.call("log", mapOf("cursor" to cursor)).asJsonObject.getAsJsonObject("page")
+        val reply = service.call("log", mapOf("cursor" to cursor)).asJsonObject
+        val page = reply.getAsJsonObject("page")
+        val launch = reply["launch"]?.takeIf { it.isJsonObject }?.asJsonObject
         val entries = page.getAsJsonArray("entries").map {
             val entry = it.asJsonObject
             ConsoleEntry(entry["stream"].asString, entry["text"].asString)
         }
-        return ConsolePage(entries, page["nextCursor"].asLong, page["truncated"].asBoolean)
+        return ConsolePage(
+            entries,
+            page["nextCursor"].asLong,
+            page["truncated"].asBoolean,
+            // A reply that leaves the launch out says nothing about it: that is not "ended".
+            running = launch?.get("running")?.takeUnless { it.isJsonNull }?.asBoolean ?: true,
+            exitCode = launch?.get("exitCode")?.takeUnless { it.isJsonNull }?.asInt,
+        )
     }
 
     override fun input(device: String, input: SimulatorInput) {

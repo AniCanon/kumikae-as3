@@ -72,6 +72,13 @@ class SimulatorSession(
                 launchLog.launch(device, bundle(params))
             }
 
+            "terminate" -> {
+                launchLog.close()
+                // An app that already ended is not an error for someone pressing Stop.
+                runCatching { runner.run(Commands.terminate(device, bundle(params)), LIST_MILLIS) }
+                mapOf("terminated" to true)
+            }
+
             "report" -> report(device, bundle(params))
 
             "tap", "swipe", "text", "button", "rotate" -> input(device, method, params)

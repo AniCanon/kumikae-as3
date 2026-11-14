@@ -58,6 +58,7 @@ change its selection; a stale device request fails instead of reaching a new one
 | `rotate` | `device`, `orientation`: `portrait`, `portrait_upside_down`, `landscape_left`, `landscape_right` | `{sent:true}`. Invalidates geometry even if input fails. |
 | `install` | `device`, `path`: absolute existing `.app` directory | `{installed:true}` after `simctl` succeeds. 120-second limit. |
 | `launch` | `device`, `bundle`: bundle identifier | Console status plus `state:"starting"`. This acknowledges process creation, not successful app startup. |
+| `terminate` | `device`, `bundle` | `{terminated:true}`. Closes the console and ends the app; an app that already ended is not an error. |
 | `log` | `cursor`: integer, initially 0 | `{page:{entries,nextCursor,truncated},launch}`. |
 | `report` | `device`, `bundle` | `{text}` from only `Documents/as3test.txt` in that app's data container, at most 1 MiB. |
 

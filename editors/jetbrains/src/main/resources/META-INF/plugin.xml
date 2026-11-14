@@ -10,6 +10,7 @@
         <platform.lsp.integrationProvider implementation="app.anicanon.kumikae.as3.language.As3LspSupportProvider"/>
         <textmate.bundleProvider implementation="app.anicanon.kumikae.as3.language.As3Grammar"/>
         <notificationGroup id="Kumikae AS3" displayType="BALLOON"/>
+        <configurationType implementation="app.anicanon.kumikae.as3.run.SimulatorConfigurationType"/>
         <toolWindow id="iOS Simulator" anchor="right"
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>

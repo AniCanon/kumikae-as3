@@ -17,17 +17,12 @@ import javax.swing.JTextArea
 
 /** What the person has set in the panel itself: none of it is the Simulator's state. */
 internal class SimulatorPanelState {
-    var bundle by mutableStateOf(DEFAULT_BUNDLE)
     var consoleShown by mutableStateOf(false)
     var turns by mutableStateOf(0)
 
     /** The list of simulators is in front, not a device. */
     var listShown by mutableStateOf(true)
     var zoom by mutableStateOf(1.0)
-
-    private companion object {
-        const val DEFAULT_BUNDLE = "org.kumikae.as3test"
-    }
 }
 
 /** A tab for the list of simulators and one for each that is running; under them, whichever is chosen. */

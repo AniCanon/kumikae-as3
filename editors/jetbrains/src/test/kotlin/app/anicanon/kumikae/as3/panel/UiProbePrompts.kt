@@ -8,8 +8,6 @@ internal class UiProbePrompts : SimulatorPrompts {
     var copiedImages = 0
         private set
 
-    override fun bundle(current: String): String? = null
-
     override fun appToInstall(): String = "/probe/Missing.app"
 
     override fun textToType(): String? = null

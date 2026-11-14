@@ -114,6 +114,17 @@ class SessionStateTest {
         assertTrue(synchronized(calls) { calls.any { it.takeLast(2) == listOf("shutdown", "phone") } })
     }
 
+    @Test fun `terminate stops the app that was launched`() = session { session ->
+        state = "Booted"
+        session.call("select", """{"device":"phone"}""")
+        session.call("terminate", """{"device":"phone","bundle":"org.example.game"}""")
+        assertTrue(
+            synchronized(calls) {
+                calls.any { it.takeLast(3) == listOf("terminate", "phone", "org.example.game") }
+            },
+        )
+    }
+
     @Test fun `an unknown method is still refused`() = session { session ->
         session.call("select", """{"device":"phone"}""")
         assertThrows(IllegalArgumentException::class.java) {

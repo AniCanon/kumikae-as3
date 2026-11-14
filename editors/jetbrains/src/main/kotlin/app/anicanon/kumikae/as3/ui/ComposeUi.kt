@@ -7,7 +7,12 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import org.jetbrains.compose.swing.components.Label
+import org.jetbrains.compose.swing.components.layout.Panel
+import org.jetbrains.compose.swing.components.layout.PanelLayout
+import org.jetbrains.compose.swing.components.text.TextField
 import org.jetbrains.compose.swing.modifier.SwingModifier
+import org.jetbrains.compose.swing.modifier.appearance.emptyBorder
 import org.jetbrains.compose.swing.node.SwingNode
 import java.awt.Dimension
 import java.awt.GridBagConstraints
@@ -108,6 +113,20 @@ internal fun Column(modifier: SwingModifier = SwingModifier, content: @Composabl
     }, modifier = modifier, content = content)
 }
 
+/** A label over the text field it names. */
+@Composable
+internal fun LabelledField(
+    label: String,
+    value: String,
+    onChange: (String) -> Unit,
+    modifier: SwingModifier = SwingModifier,
+) {
+    Panel(PanelLayout.Border(0, JBUI.scale(2)), modifier = modifier.emptyBorder(JBUI.insets(0, 0, 8, 0))) {
+        Label(label, SwingModifier.north())
+        TextField(value, onChange, modifier = SwingModifier.center(), columns = FIELD_COLUMNS)
+    }
+}
+
 /** A rounded bar of controls that floats over the panel. */
 @Composable
 internal fun Pill(modifier: SwingModifier = SwingModifier, content: @Composable () -> Unit) {
@@ -151,3 +170,5 @@ internal fun NativeScrollPane(component: JComponent, modifier: SwingModifier = S
         },
     )
 }
+
+private const val FIELD_COLUMNS = 30

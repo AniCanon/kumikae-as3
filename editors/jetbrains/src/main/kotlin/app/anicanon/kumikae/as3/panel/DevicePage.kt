@@ -77,7 +77,6 @@ private fun ToolBar(
     Panel(PanelLayout.Border(), modifier = modifier.emptyBorder(JBUI.insets(0, 4, 0, 6))) {
         StatusLine("${device.runtime} · ${device.state}", SwingModifier.center())
         Panel(PanelLayout.Flow(FlowLayout.RIGHT, JBUI.scale(2), 0), modifier = SwingModifier.east()) {
-            IconButton(AllIcons.Actions.Execute, "Launch ${state.bundle}", { controller.launch(state.bundle) })
             IconButton(
                 AllIcons.Debugger.Console,
                 if (state.consoleShown) "Hide console" else "Show console",
@@ -153,7 +152,6 @@ internal fun moreEntries(
     state: SimulatorPanelState,
     prompts: SimulatorPrompts,
 ): List<MenuEntry> = listOfNotNull(
-    MenuEntry("App to launch… (${state.bundle})") { prompts.bundle(state.bundle)?.let { state.bundle = it } },
     MenuEntry("Install app…") { prompts.appToInstall()?.let(controller::install) },
     MenuEntry(
         if (controller.inputEnabled) "Input is on (idb)" else "Switch input on…",

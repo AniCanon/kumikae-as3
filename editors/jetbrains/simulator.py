@@ -87,7 +87,7 @@ def parser():
         methods.add_parser(method)
     log = methods.add_parser("log")
     log.add_argument("--cursor", type=int, default=0)
-    for method in ("select", "boot", "shutdown", "screenshot", "install", "launch", "report", "text", "button", "rotate"):
+    for method in ("select", "boot", "shutdown", "screenshot", "install", "launch", "terminate", "report", "text", "button", "rotate"):
         command = methods.add_parser(method)
         command.add_argument("--device", required=True, help="An id returned by devices; never the booted alias")
         if method == "screenshot":
@@ -95,7 +95,7 @@ def parser():
             command.add_argument("--format", choices=("png", "jpeg"), default="png")
         elif method == "install":
             command.add_argument("path", type=lambda value: str(Path(value).absolute()))
-        elif method in ("launch", "report"):
+        elif method in ("launch", "terminate", "report"):
             command.add_argument("--bundle", default="org.kumikae.as3test")
         elif method == "text":
             command.add_argument("text")

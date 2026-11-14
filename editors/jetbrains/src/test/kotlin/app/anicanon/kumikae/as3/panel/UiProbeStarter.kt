@@ -94,9 +94,6 @@ class UiProbeStarter : ApplicationStarter {
             gate.countDown()
             check(repository.calls.none { it.startsWith("select probe-tablet") }) { "A refused boot was sent" }
             await("Boot") { shows(view, "Booted.") && chosen(view, "Probe Phone 17 Pro") }
-            press(view, "Launch org.kumikae.as3test")
-            await("Launch") { shows(view, "Launch requested") }
-            check("launch probe-phone org.kumikae.as3test" in repository.calls) { "Launch sent ${repository.calls}" }
             await("a picture and the console") {
                 controller.poll()
                 screen(view).frame != null && console.text.contains("test 40 of 40 passed")

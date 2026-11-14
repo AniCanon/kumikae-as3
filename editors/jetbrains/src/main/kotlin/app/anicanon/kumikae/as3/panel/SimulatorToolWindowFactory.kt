@@ -1,14 +1,13 @@
 package app.anicanon.kumikae.as3.panel
 
 import com.intellij.ide.util.PropertiesComponent
-import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
-import java.nio.file.Path
 
 class SimulatorToolWindowFactory :
     ToolWindowFactory,
@@ -19,7 +18,7 @@ class SimulatorToolWindowFactory :
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val settings = PropertiesComponent.getInstance()
         val controller = SimulatorComposition.controller(
-            Path.of(PathManager.getSystemPath(), "kumikae-as3"),
+            project.service<SimulatorHost>().repository,
             inputAllowed = { settings.getBoolean(INPUT_ALLOWED) },
             rememberInput = { settings.setValue(INPUT_ALLOWED, it) },
         )

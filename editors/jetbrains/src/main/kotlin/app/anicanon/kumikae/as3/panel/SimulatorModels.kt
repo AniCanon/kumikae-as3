@@ -17,7 +17,14 @@ internal class SimulatorFrame(val device: String, val generation: Long, val imag
 
 internal data class ConsoleEntry(val stream: String, val text: String)
 
-internal data class ConsolePage(val entries: List<ConsoleEntry>, val nextCursor: Long, val truncated: Boolean)
+/** `running` and `exitCode` are the launched app's: a page read after it ended says so. */
+internal data class ConsolePage(
+    val entries: List<ConsoleEntry>,
+    val nextCursor: Long,
+    val truncated: Boolean,
+    val running: Boolean = true,
+    val exitCode: Int? = null,
+)
 
 internal enum class HardwareButton { HOME, LOCK }
 

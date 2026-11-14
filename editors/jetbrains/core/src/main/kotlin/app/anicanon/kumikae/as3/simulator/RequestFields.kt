@@ -11,7 +11,7 @@ object RequestFields {
         "screenshot" to "$device format?:s", "tap" to geometry,
         "swipe" to "$geometry endX:n endY:n durationMs:i", "text" to "$device text:s",
         "button" to "$device button:s", "rotate" to "$device orientation:s",
-        "install" to "$device path:s", "launch" to "$device bundle:s",
+        "install" to "$device path:s", "launch" to "$device bundle:s", "terminate" to "$device bundle:s",
         "report" to "$device bundle:s", "log" to "cursor:i",
     ).mapValues { (_, spec) -> spec.split(' ').filter(String::isNotEmpty).map { it.split(':') } }
 

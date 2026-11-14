@@ -22,8 +22,6 @@ internal class MenuEntry(val text: String, val enabled: Boolean = true, val acti
 
 /** What the panel asks of the person and the IDE around it. The view never opens a dialog itself. */
 internal interface SimulatorPrompts {
-    fun bundle(current: String): String?
-
     fun appToInstall(): String?
 
     fun textToType(): String?
@@ -42,15 +40,6 @@ internal interface SimulatorPrompts {
 }
 
 internal class IdePrompts(private val project: Project) : SimulatorPrompts {
-    override fun bundle(current: String): String? = Messages.showInputDialog(
-        project,
-        "Bundle identifier of the app to launch:",
-        "App to Launch",
-        null,
-        current,
-        null,
-    )?.trim()?.takeIf { it.isNotEmpty() }
-
     override fun appToInstall(): String? {
         // An .app is a folder; the chooser must offer folders and stop at one.
         val descriptor = FileChooserDescriptor(false, true, false, false, false, false)

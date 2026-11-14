@@ -63,6 +63,8 @@ internal class FakeSimulatorRepository : SimulatorRepository {
         return SimulatorStatus(selected, inputEnabled, notice)
     }
 
+    override fun terminate(device: String, bundle: String) = record("terminate $device $bundle")
+
     override fun install(device: String, appPath: String) = record("install $device $appPath")
 
     override fun launch(device: String, bundle: String) = record("launch $device $bundle")

@@ -126,6 +126,18 @@ class ApiSimulatorRepositoryTest {
         assertEquals(mapOf<String, Any>("cursor" to 5L), service.calls.single().second)
     }
 
+    @Test fun `a console page says whether the launched app is still running, and how it ended`() {
+        val page = """{"entries":[],"nextCursor":2,"truncated":false}"""
+        val (_, running) = repository(
+            "log" to """{"page":$page,"launch":{"bundle":"a.b","running":true,"exitCode":null}}""",
+        )
+        assertEquals(true to null, running.consolePage(0).let { it.running to it.exitCode })
+        val (_, ended) = repository(
+            "log" to """{"page":$page,"launch":{"bundle":"a.b","running":false,"exitCode":3}}""",
+        )
+        assertEquals(false to 3, ended.consolePage(0).let { it.running to it.exitCode })
+    }
+
     @Test fun `gestures quote the frame geometry and clamp a swipe to the protocol limits`() {
         val (service, repository) = repository("tap" to """{"sent":true}""", "swipe" to """{"sent":true}""")
         val geometry = Geometry(100, 200)
