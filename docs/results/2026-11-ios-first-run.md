@@ -29,10 +29,43 @@ the iOS 26.4 Simulator refuses to run an Intel app. The ways round it:
 | An older Simulator runtime that still runs Intel apps | A download of several gigabytes |
 | A Godot iOS template built from source for the Apple-silicon Simulator | Godot's source and a long build |
 
+## It runs on an iPhone
+
+On 2026-11-14 the app was signed with the owner's development team, installed on an iPhone 17 Pro Max
+and launched. The test scene reported, from the phone:
+
+```
+iOS
+14 passed, 0 failed
+PASS  an AS3 script is attached to a CharacterBody2D
+PASS  Godot called its _physicsProcess 30 times
+PASS  it moved the body 100 units
+PASS  singleton: Input.isActionPressed
+PASS  singleton: OS.getName
+PASS  constant: Vector2.UP
+PASS  constant: Color.RED
+PASS  static method: Vector2.fromAngle
+PASS  operators: Vector2.UP * 2 + Vector2.ONE
+PASS  signal: a listener on Input.joyConnectionChanged
+PASS  Int64: an object's id survives the trip
+PASS  Int64: the largest value
+PASS  Int64: a wide value for a Vector2i is refused
+PASS  an AS3 error is reported and the engine carries on
+```
+
+These are the same scripts, unchanged, that the desktop tests run. They run in the interpreter, which is
+what a debug build uses on every platform. A release build as native code, and the speed gate on a
+device, are stage 4.
+
+The report is read back from the phone as a file the scene writes in the app's own folder
+(`user://as3test.txt`): the app's console did not carry Godot's printed lines.
+
 ## Not yet done
 
-The app has not run on iOS: not in the Simulator, for the reason above, and not on a device, which waits
-on the owner's signing team and go-ahead. Until it has, "runs on iOS" is not claimed anywhere.
+- The Simulator, for the reason above. The fix is a Godot export template built from Godot's source with
+  an Apple-silicon Simulator library, set as a custom template in the export preset.
+- Android, and anything beyond the 14 checks: the full Godot test drivers run from the command line
+  with `-s`, which an installed app does not take.
 
 ## To repeat it
 
@@ -41,5 +74,7 @@ compiler/tests/build_ios.sh <godot-cpp checkout>
 godot --headless --path compiler/tests/godot_project --export-debug "iOS" <folder>/kas3test.ipa
 ```
 
-The export preset holds a placeholder team id. With a real one, open the Xcode project the export writes
-and run it on a device.
+The export preset holds a placeholder team id. Build the Xcode project the export writes with a real
+one (`xcodebuild ... DEVELOPMENT_TEAM=<team> -allowProvisioningUpdates`), install it with
+`xcrun devicectl device install app`, launch it, and copy `as3test.txt` back with
+`xcrun devicectl device copy from --domain-type appDataContainer`.

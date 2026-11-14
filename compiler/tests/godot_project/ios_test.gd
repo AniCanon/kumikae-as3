@@ -55,3 +55,7 @@ func _physics_process(_delta: float) -> void:
 	check("an AS3 error is reported and the engine carries on", true, true)
 	label.text = "ActionScript 3 in Godot on %s\n%d passed, %d failed\n\n%s" % [OS.get_name(), passed, failed, "\n".join(report)]
 	print("AS3TEST DONE passed=%d failed=%d" % [passed, failed])
+	# On a phone the log is not always in reach: the same report as a file in the app's own folder.
+	var file := FileAccess.open("user://as3test.txt", FileAccess.WRITE)
+	if file:
+		file.store_string("%s\n%d passed, %d failed\n%s\n" % [OS.get_name(), passed, failed, "\n".join(report)])

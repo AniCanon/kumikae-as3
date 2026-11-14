@@ -18,7 +18,7 @@ not yet tried in Rider.
 (classes, inheritance, numbers, strings, loops). In headless Godot 4.7.2 an AS3 script attached to a
 `CharacterBody2D` moves the body, does arithmetic on Godot's values, listens to signals, and uses
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
-type, `Int64`. A clean-up of the C++ comes next, then global functions (the rest of stage 2b-3), then the
+type, `Int64`. The same scripts have run on an iPhone. A clean-up of the C++ comes next, then global functions (the rest of stage 2b-3), then the
 rest of the language.
 
 **Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 83 items; each
@@ -166,7 +166,7 @@ The design keeps each of these possible. No stage above delivers them.
 | A. Singletons, constants, static methods | `Input.isActionPressed("jump")`, a singleton's signals, `Vector2.ZERO`, `Key.ESCAPE`, `Vector2.fromAngle(a)`. A Godot value with parts starts at its zero. Closes 3 backlog items. | Built and reviewed |
 | B. `Int64` | The 64-bit integer type the owner approved. The [design](superpowers/specs/2026-11-14-int64-design.md) was approved on 2026-11-14. A Godot integer is an `Int64` unless Godot says it is narrower; 1,059 declarations changed and none became narrower; the table kept by hand is gone. | Built and reviewed |
 | C++ clean-up | Asked for by the owner on 2026-11-14. Done: no file is over 800 lines (the largest was 3,087 and is now 723), no function is over 120 except three dispatch switches, no banner comments, rules that were written twice are written once, `vm::Host` is three interfaces, and calls into Godot are about 16% faster. No test changed, and an independent comparison of over 33,000 programs against `main` found no difference in what the compiler produces. See the [guidelines](cpp-guidelines.md), the [plan](superpowers/plans/2026-11-14-cpp-cleanup.md) and the [figures](results/2026-11-cpp-cleanup.md). | Built and reviewed |
-| Early iOS test | Decided by the owner on 2026-11-14, ahead of stage 4. Done so far: everything builds for iOS, Godot's export works, and the app builds for a device. It found that an exported game could not find its scripts on any platform, now fixed. Not yet run on iOS: the Simulator can't be used with Godot's official template on Apple silicon, and a device needs the owner's signing. See the [first run](results/2026-11-ios-first-run.md). | Waiting on the owner |
+| Early iOS test | Decided by the owner on 2026-11-14, ahead of stage 4. **AS3 runs on an iPhone:** the test scene passed 14 of 14 checks on an iPhone 17 Pro Max, with the same scripts as on desktop, in the interpreter. It found that an exported game could not find its scripts on any platform, now fixed. The Simulator needs a Godot template built for Apple silicon. See the [first run](results/2026-11-ios-first-run.md). | Done on a device |
 | C. Global functions and errors | `print`, `lerp`, `randf` and the rest; an AS3 error shown the way Godot shows its own. Closes 6 backlog items. | After the clean-up |
 
 Read more: [stage 2b-3 plan](superpowers/plans/2026-11-14-stage-2b3-rest-of-godot-api.md).
