@@ -259,6 +259,12 @@ class Lowerer {
 	void constructor_arguments(Symbol *p_class, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list);
 
 	uint32_t evaluate(Expr *p_expression, Kind p_want);
+	uint32_t number_literal(Expr *p_expression, Kind p_want);
+	uint32_t name_value(Expr *p_expression);
+	uint32_t member_value(Expr *p_expression);
+	uint32_t new_value(Expr *p_expression);
+	uint32_t postfix(Expr *p_expression);
+	uint32_t conditional(Expr *p_expression, Kind p_want);
 
 	uint32_t unary(Unary *p_unary, Kind p_want);
 
@@ -290,12 +296,24 @@ class Lowerer {
 	bool is_string_type(const Type *p_type) const;
 
 	uint32_t binary(Binary *p_binary, Kind p_want);
+	uint32_t logical(Binary *p_binary, Kind p_want);
+	uint32_t type_test(Binary *p_binary);
+	uint32_t comparison(Binary *p_binary);
+	uint32_t equality(Binary *p_binary);
+	uint32_t arithmetic(Binary *p_binary, Kind p_want);
 
 	uint32_t assign(Assign *p_assign);
 
 	void declare_locals(Node *p_body);
 
 	void statement(Stmt *p_statement);
+	void if_statement(Stmt *p_statement);
+	void while_loop(Stmt *p_statement);
+	void do_while_loop(Stmt *p_statement);
+	void for_loop(Stmt *p_statement);
+	void break_or_continue(Stmt *p_statement);
+	void return_statement(Stmt *p_statement);
+	void throw_statement(Stmt *p_statement);
 
 	void finish_loop(uint32_t p_continue_at);
 

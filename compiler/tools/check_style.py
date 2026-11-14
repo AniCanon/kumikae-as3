@@ -21,7 +21,7 @@ LIMITS = {".cpp": 800, ".h": 500}
 FUNCTION_LIMIT = 120
 # A dispatch switch whose cases each call a named function (guidelines, section 1).
 DISPATCH = {
-    "run",  # vm/interpreter_run.cpp: the interpreter's loop, one case per operation.
+    "Interpreter::run",  # The interpreter's loop, one case per operation.
 }
 
 BANNER = re.compile(r"^\s*//\s*-{3,}")
@@ -63,7 +63,7 @@ def faults(root):
             if any(BANNER.match(line) for line in lines):
                 result.add("%s: banner comments" % path)
             for function, _, length in functions(lines):
-                if length > FUNCTION_LIMIT and function.split("::")[-1] not in DISPATCH:
+                if length > FUNCTION_LIMIT and function not in DISPATCH:
                     result.add("%s: %s() is over %d lines" % (path, function, FUNCTION_LIMIT))
     return result
 

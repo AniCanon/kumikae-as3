@@ -49,6 +49,112 @@ void Lowerer::declare_locals(Node *p_body) {
 	});
 }
 
+void Lowerer::if_statement(Stmt *p_statement) {
+	uint32_t position = p_statement->offset;
+	If *branch = static_cast<If *>(p_statement);
+	uint32_t test = expression(branch->condition, Kind::Bool);
+	uint32_t to_else = emit(Op::JumpIfNot, position, test, 0);
+	statement(branch->then_branch);
+	if (branch->else_branch) {
+		uint32_t to_end = emit(Op::Jump, position, 0);
+		patch(to_else, here());
+		statement(branch->else_branch);
+		patch(to_end, here());
+	} else {
+		patch(to_else, here());
+	}
+}
+
+void Lowerer::while_loop(Stmt *p_statement) {
+	uint32_t position = p_statement->offset;
+	While *loop = static_cast<While *>(p_statement);
+	uint32_t top = here();
+	emit(Op::Stmt, position);
+	uint32_t test = expression(loop->condition, Kind::Bool);
+	uint32_t out = emit(Op::JumpIfNot, position, test, 0);
+	loops_.emplace_back();
+	statement(loop->body);
+	emit(Op::Jump, position, top);
+	patch(out, here());
+	finish_loop(top);
+}
+
+void Lowerer::do_while_loop(Stmt *p_statement) {
+	uint32_t position = p_statement->offset;
+	DoWhile *loop = static_cast<DoWhile *>(p_statement);
+	uint32_t top = here();
+	loops_.emplace_back();
+	statement(loop->body);
+	uint32_t test_at = here();
+	emit(Op::Stmt, loop->condition ? loop->condition->offset : position);
+	uint32_t test = expression(loop->condition, Kind::Bool);
+	emit(Op::JumpIf, position, test, top);
+	finish_loop(test_at);
+}
+
+void Lowerer::for_loop(Stmt *p_statement) {
+	uint32_t position = p_statement->offset;
+	For *loop = static_cast<For *>(p_statement);
+	statement(loop->init);
+	uint32_t top = here();
+	uint32_t out = NONE;
+	if (!loop->condition) {
+		emit(Op::Stmt, position);
+	}
+	if (loop->condition) {
+		emit(Op::Stmt, loop->condition->offset);
+		uint32_t test = expression(loop->condition, Kind::Bool);
+		out = emit(Op::JumpIfNot, position, test, 0);
+	}
+	loops_.emplace_back();
+	statement(loop->body);
+	uint32_t update_at = here();
+	if (loop->update) {
+		expression(loop->update, Kind::Void);
+	}
+	emit(Op::Jump, position, top);
+	if (out != NONE) {
+		patch(out, here());
+	}
+	finish_loop(update_at);
+}
+
+void Lowerer::break_or_continue(Stmt *p_statement) {
+	uint32_t position = p_statement->offset;
+	bool is_break = p_statement->kind == NodeKind::Break;
+	std::string_view label = is_break ? static_cast<Break *>(p_statement)->label : static_cast<Continue *>(p_statement)->label;
+	if (!label.empty()) {
+		refuse(position, "a labelled 'break' or 'continue'");
+	} else if (!loops_.empty()) {
+		uint32_t jump = emit(Op::Jump, position, 0);
+		(is_break ? loops_.back().breaks : loops_.back().continues).push_back(jump);
+	}
+}
+
+void Lowerer::return_statement(Stmt *p_statement) {
+	uint32_t position = p_statement->offset;
+	Return *result = static_cast<Return *>(p_statement);
+	if (constructor_ || fn().result == Kind::Void) {
+		if (result->value) {
+			expression(result->value, Kind::Void);
+		}
+		emit(Op::ReturnVoid, position);
+	} else {
+		uint32_t value = result->value ? expression(result->value, fn().result) : default_value(fn().result, position);
+		emit(Op::Return, position, value);
+	}
+}
+
+void Lowerer::throw_statement(Stmt *p_statement) {
+	uint32_t position = p_statement->offset;
+	uint32_t value = expression(static_cast<Throw *>(p_statement)->value, Kind::Void);
+	if (kind_at(value) != Kind::Obj) {
+		refuse(position, "throwing a value that is not an object");
+	} else {
+		emit(Op::Throw, position, value);
+	}
+}
+
 void Lowerer::statement(Stmt *p_statement) {
 	if (!p_statement) {
 		return;
@@ -73,106 +179,28 @@ void Lowerer::statement(Stmt *p_statement) {
 		case NodeKind::VarStmt:
 			variables(static_cast<VarStmt *>(p_statement)->decl);
 			break;
-		case NodeKind::If: {
-			If *branch = static_cast<If *>(p_statement);
-			uint32_t test = expression(branch->condition, Kind::Bool);
-			uint32_t to_else = emit(Op::JumpIfNot, position, test, 0);
-			statement(branch->then_branch);
-			if (branch->else_branch) {
-				uint32_t to_end = emit(Op::Jump, position, 0);
-				patch(to_else, here());
-				statement(branch->else_branch);
-				patch(to_end, here());
-			} else {
-				patch(to_else, here());
-			}
+		case NodeKind::If:
+			if_statement(p_statement);
 			break;
-		}
-		case NodeKind::While: {
-			While *loop = static_cast<While *>(p_statement);
-			uint32_t top = here();
-			emit(Op::Stmt, position);
-			uint32_t test = expression(loop->condition, Kind::Bool);
-			uint32_t out = emit(Op::JumpIfNot, position, test, 0);
-			loops_.emplace_back();
-			statement(loop->body);
-			emit(Op::Jump, position, top);
-			patch(out, here());
-			finish_loop(top);
+		case NodeKind::While:
+			while_loop(p_statement);
 			break;
-		}
-		case NodeKind::DoWhile: {
-			DoWhile *loop = static_cast<DoWhile *>(p_statement);
-			uint32_t top = here();
-			loops_.emplace_back();
-			statement(loop->body);
-			uint32_t test_at = here();
-			emit(Op::Stmt, loop->condition ? loop->condition->offset : position);
-			uint32_t test = expression(loop->condition, Kind::Bool);
-			emit(Op::JumpIf, position, test, top);
-			finish_loop(test_at);
+		case NodeKind::DoWhile:
+			do_while_loop(p_statement);
 			break;
-		}
-		case NodeKind::For: {
-			For *loop = static_cast<For *>(p_statement);
-			statement(loop->init);
-			uint32_t top = here();
-			uint32_t out = NONE;
-			if (!loop->condition) {
-				emit(Op::Stmt, position);
-			}
-			if (loop->condition) {
-				emit(Op::Stmt, loop->condition->offset);
-				uint32_t test = expression(loop->condition, Kind::Bool);
-				out = emit(Op::JumpIfNot, position, test, 0);
-			}
-			loops_.emplace_back();
-			statement(loop->body);
-			uint32_t update_at = here();
-			if (loop->update) {
-				expression(loop->update, Kind::Void);
-			}
-			emit(Op::Jump, position, top);
-			if (out != NONE) {
-				patch(out, here());
-			}
-			finish_loop(update_at);
+		case NodeKind::For:
+			for_loop(p_statement);
 			break;
-		}
 		case NodeKind::Break:
-		case NodeKind::Continue: {
-			bool is_break = p_statement->kind == NodeKind::Break;
-			std::string_view label = is_break ? static_cast<Break *>(p_statement)->label : static_cast<Continue *>(p_statement)->label;
-			if (!label.empty()) {
-				refuse(position, "a labelled 'break' or 'continue'");
-			} else if (!loops_.empty()) {
-				uint32_t jump = emit(Op::Jump, position, 0);
-				(is_break ? loops_.back().breaks : loops_.back().continues).push_back(jump);
-			}
+		case NodeKind::Continue:
+			break_or_continue(p_statement);
 			break;
-		}
-		case NodeKind::Return: {
-			Return *result = static_cast<Return *>(p_statement);
-			if (constructor_ || fn().result == Kind::Void) {
-				if (result->value) {
-					expression(result->value, Kind::Void);
-				}
-				emit(Op::ReturnVoid, position);
-			} else {
-				uint32_t value = result->value ? expression(result->value, fn().result) : default_value(fn().result, position);
-				emit(Op::Return, position, value);
-			}
+		case NodeKind::Return:
+			return_statement(p_statement);
 			break;
-		}
-		case NodeKind::Throw: {
-			uint32_t value = expression(static_cast<Throw *>(p_statement)->value, Kind::Void);
-			if (kind_at(value) != Kind::Obj) {
-				refuse(position, "throwing a value that is not an object");
-			} else {
-				emit(Op::Throw, position, value);
-			}
+		case NodeKind::Throw:
+			throw_statement(p_statement);
 			break;
-		}
 		case NodeKind::Switch:
 			refuse(position, "'switch'");
 			break;

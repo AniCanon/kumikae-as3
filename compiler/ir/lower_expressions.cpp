@@ -212,34 +212,159 @@ Symbol * Lowerer::named_class(Expr *p_expression) {
 	return symbol && symbol->is_type() ? symbol : nullptr;
 }
 
+uint32_t Lowerer::number_literal(Expr *p_expression, Kind p_want) {
+	uint32_t position = p_expression->offset;
+	int64_t exact = 0;
+	if (p_want == Kind::I64 && wide_literal(p_expression, &exact)) {
+		// Digit by digit: a Number would lose the last digits of a large one.
+		uint32_t out = reg(Kind::I64);
+		emit(Op::ConstI64, position, out, wide(exact));
+		return out;
+	}
+	double value = literal_value(static_cast<NumberLit *>(p_expression));
+	Kind kind = natural(p_expression);
+	// A literal is written straight into the kind that is wanted, when it fits exactly.
+	if ((p_want == Kind::F64 || p_want == Kind::I32 || p_want == Kind::U32) && kind != p_want) {
+		bool fits = p_want == Kind::F64 || (value == std::floor(value) && (p_want == Kind::I32 ? value >= -2147483648.0 && value <= 2147483647.0 : value >= 0 && value <= 4294967295.0));
+		kind = fits ? p_want : kind;
+	}
+	uint32_t out = reg(kind);
+	if (kind == Kind::I32) {
+		emit(Op::ConstI32, position, out, (uint32_t)(int32_t)value);
+	} else if (kind == Kind::U32) {
+		emit(Op::ConstU32, position, out, (uint32_t)value);
+	} else {
+		emit(Op::ConstF64, position, out, number(value));
+	}
+	return out;
+}
+
+uint32_t Lowerer::name_value(Expr *p_expression) {
+	uint32_t position = p_expression->offset;
+	Name *name = static_cast<Name *>(p_expression);
+	uint32_t constant = 0;
+	if (builtin_constant(name->symbol, position, &constant)) {
+		return constant;
+	}
+	natural(p_expression);
+	return load(place_of(name), position);
+}
+
+uint32_t Lowerer::member_value(Expr *p_expression) {
+	uint32_t position = p_expression->offset;
+	Member *member = static_cast<Member *>(p_expression);
+	Symbol *symbol = member->symbol ? member->symbol : member->member;
+	// The one member of a built-in value so far: a string's length.
+	if (symbol && symbol->owner == string_ && symbol->name == "length") {
+		uint32_t text = expression(member->object, Kind::Str);
+		emit(Op::NullCheck, member->object->offset, text);
+		uint32_t out = reg(Kind::I32);
+		emit(Op::StrLength, position, out, text);
+		return out;
+	}
+	uint32_t constant = 0;
+	if (builtin_constant(symbol, position, &constant)) {
+		return constant;
+	}
+	natural(p_expression);
+	return load(place_of(member), member->name_offset);
+}
+
+uint32_t Lowerer::new_value(Expr *p_expression) {
+	uint32_t position = p_expression->offset;
+	New *made = static_cast<New *>(p_expression);
+	Symbol *symbol = named_class(made->callee);
+	uint32_t index = 0;
+	uint32_t type_name = 0;
+	if (symbol && is_godot(symbol) && !is_godot_object(symbol) && engine_name(symbol, std::string_view(), &type_name)) {
+		// One of Godot's value types: the engine makes it.
+		Symbol *constructor = symbol->klass ? symbol->klass->constructor : nullptr;
+		FunctionDecl *decl = constructor && constructor->node && constructor->node->kind == NodeKind::FunctionDecl
+				? static_cast<FunctionDecl *>(constructor->node)
+				: nullptr;
+		std::vector<uint32_t> list;
+		engine_arguments(decl, made->arguments, position, list);
+		if (stores_int32(made->type)) {
+			// Its constructor takes anything in its first places, so the width is checked here.
+			for (size_t i = 0; i < list.size() && i < made->arguments.count; i++) {
+				if (is_integral(kind_at(list[i])) || whole(made->arguments[i])) {
+					list[i] = as_int32(list[i], made->arguments[i]->offset);
+				}
+			}
+		}
+		uint32_t value = reg(Kind::Val);
+		emit(Op::HostNew, position, value, type_name, arguments(std::move(list)));
+		return value;
+	}
+	if (!symbol || !class_index(symbol, &index)) {
+		refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
+		return default_value(Kind::Obj, position);
+	}
+	if (!module_.classes[index].native_base.empty()) {
+		// It would have no Godot object behind it: a script comes to life attached to one.
+		refuse(made->callee->offset, "creating a script class with 'new'");
+		return default_value(Kind::Obj, position);
+	}
+	touch(symbol, position);
+	uint32_t out = reg(Kind::Obj);
+	emit(Op::New, position, out, index);
+	std::vector<uint32_t> list = { out };
+	constructor_arguments(symbol, made->arguments, position, list);
+	emit(Op::Call, position, NONE, module_.classes[index].constructor, arguments(std::move(list)));
+	return out;
+}
+
+uint32_t Lowerer::postfix(Expr *p_expression) {
+	uint32_t position = p_expression->offset;
+	Postfix *postfix = static_cast<Postfix *>(p_expression);
+	Place place = place_of(postfix->operand);
+	if (place.kind == Kind::I64) {
+		uint32_t old = reg(Kind::I64);
+		emit(Op::Move, position, old, load(place, position));
+		uint32_t one = reg(Kind::I64);
+		emit(Op::ConstI64, position, one, wide(1));
+		uint32_t next = reg(Kind::I64);
+		emit(postfix->op == TokenKind::PlusPlus ? Op::AddI64 : Op::SubI64, position, next, old, one);
+		store(place, next, position);
+		return old;
+	}
+	// The value is the old one, as a number.
+	uint32_t old = convert(load(place, position), Kind::F64, position);
+	if (old == place.index && place.where == Place::Register) {
+		uint32_t copy = reg(Kind::F64);
+		emit(Op::Move, position, copy, old);
+		old = copy;
+	}
+	uint32_t one = reg(Kind::F64);
+	emit(Op::ConstF64, position, one, number(1));
+	uint32_t next = reg(Kind::F64);
+	emit(postfix->op == TokenKind::PlusPlus ? Op::AddF64 : Op::SubF64, position, next, old, one);
+	store(place, convert(next, place.kind, position), position);
+	return old;
+}
+
+uint32_t Lowerer::conditional(Expr *p_expression, Kind p_want) {
+	uint32_t position = p_expression->offset;
+	Conditional *conditional = static_cast<Conditional *>(p_expression);
+	Kind kind = p_want != Kind::Void ? p_want : natural(p_expression);
+	uint32_t out = reg(kind);
+	uint32_t test = expression(conditional->condition, Kind::Bool);
+	uint32_t to_else = emit(Op::JumpIfNot, position, test, 0);
+	uint32_t then_value = expression(conditional->then_value, kind);
+	emit(Op::Move, position, out, then_value);
+	uint32_t to_end = emit(Op::Jump, position, 0);
+	patch(to_else, here());
+	uint32_t else_value = expression(conditional->else_value, kind);
+	emit(Op::Move, position, out, else_value);
+	patch(to_end, here());
+	return out;
+}
+
 uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 	uint32_t position = p_expression->offset;
 	switch (p_expression->kind) {
-		case NodeKind::NumberLit: {
-			int64_t exact = 0;
-			if (p_want == Kind::I64 && wide_literal(p_expression, &exact)) {
-				// Digit by digit: a Number would lose the last digits of a large one.
-				uint32_t out = reg(Kind::I64);
-				emit(Op::ConstI64, position, out, wide(exact));
-				return out;
-			}
-			double value = literal_value(static_cast<NumberLit *>(p_expression));
-			Kind kind = natural(p_expression);
-			// A literal is written straight into the kind that is wanted, when it fits exactly.
-			if ((p_want == Kind::F64 || p_want == Kind::I32 || p_want == Kind::U32) && kind != p_want) {
-				bool fits = p_want == Kind::F64 || (value == std::floor(value) && (p_want == Kind::I32 ? value >= -2147483648.0 && value <= 2147483647.0 : value >= 0 && value <= 4294967295.0));
-				kind = fits ? p_want : kind;
-			}
-			uint32_t out = reg(kind);
-			if (kind == Kind::I32) {
-				emit(Op::ConstI32, position, out, (uint32_t)(int32_t)value);
-			} else if (kind == Kind::U32) {
-				emit(Op::ConstU32, position, out, (uint32_t)value);
-			} else {
-				emit(Op::ConstF64, position, out, number(value));
-			}
-			return out;
-		}
+		case NodeKind::NumberLit:
+			return number_literal(p_expression, p_want);
 		case NodeKind::StringLit: {
 			uint32_t out = reg(Kind::Str);
 			emit(Op::ConstStr, position, out, string(unescape(static_cast<StringLit *>(p_expression)->text)));
@@ -256,125 +381,24 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 				return default_value(Kind::Obj, position);
 			}
 			return 0;
-		case NodeKind::Name: {
-			Name *name = static_cast<Name *>(p_expression);
-			uint32_t constant = 0;
-			if (builtin_constant(name->symbol, position, &constant)) {
-				return constant;
-			}
-			natural(p_expression);
-			return load(place_of(name), position);
-		}
-		case NodeKind::Member: {
-			Member *member = static_cast<Member *>(p_expression);
-			Symbol *symbol = member->symbol ? member->symbol : member->member;
-			// The one member of a built-in value so far: a string's length.
-			if (symbol && symbol->owner == string_ && symbol->name == "length") {
-				uint32_t text = expression(member->object, Kind::Str);
-				emit(Op::NullCheck, member->object->offset, text);
-				uint32_t out = reg(Kind::I32);
-				emit(Op::StrLength, position, out, text);
-				return out;
-			}
-			uint32_t constant = 0;
-			if (builtin_constant(symbol, position, &constant)) {
-				return constant;
-			}
-			natural(p_expression);
-			return load(place_of(member), member->name_offset);
-		}
+		case NodeKind::Name:
+			return name_value(p_expression);
+		case NodeKind::Member:
+			return member_value(p_expression);
 		case NodeKind::Call:
 			return call(static_cast<Call *>(p_expression), p_want);
-		case NodeKind::New: {
-			New *made = static_cast<New *>(p_expression);
-			Symbol *symbol = named_class(made->callee);
-			uint32_t index = 0;
-			uint32_t type_name = 0;
-			if (symbol && is_godot(symbol) && !is_godot_object(symbol) && engine_name(symbol, std::string_view(), &type_name)) {
-				// One of Godot's value types: the engine makes it.
-				Symbol *constructor = symbol->klass ? symbol->klass->constructor : nullptr;
-				FunctionDecl *decl = constructor && constructor->node && constructor->node->kind == NodeKind::FunctionDecl
-						? static_cast<FunctionDecl *>(constructor->node)
-						: nullptr;
-				std::vector<uint32_t> list;
-				engine_arguments(decl, made->arguments, position, list);
-				if (stores_int32(made->type)) {
-					// Its constructor takes anything in its first places, so the width is checked here.
-					for (size_t i = 0; i < list.size() && i < made->arguments.count; i++) {
-						if (is_integral(kind_at(list[i])) || whole(made->arguments[i])) {
-							list[i] = as_int32(list[i], made->arguments[i]->offset);
-						}
-					}
-				}
-				uint32_t value = reg(Kind::Val);
-				emit(Op::HostNew, position, value, type_name, arguments(std::move(list)));
-				return value;
-			}
-			if (!symbol || !class_index(symbol, &index)) {
-				refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
-				return default_value(Kind::Obj, position);
-			}
-			if (!module_.classes[index].native_base.empty()) {
-				// It would have no Godot object behind it: a script comes to life attached to one.
-				refuse(made->callee->offset, "creating a script class with 'new'");
-				return default_value(Kind::Obj, position);
-			}
-			touch(symbol, position);
-			uint32_t out = reg(Kind::Obj);
-			emit(Op::New, position, out, index);
-			std::vector<uint32_t> list = { out };
-			constructor_arguments(symbol, made->arguments, position, list);
-			emit(Op::Call, position, NONE, module_.classes[index].constructor, arguments(std::move(list)));
-			return out;
-		}
+		case NodeKind::New:
+			return new_value(p_expression);
 		case NodeKind::Unary:
 			return unary(static_cast<Unary *>(p_expression), p_want);
-		case NodeKind::Postfix: {
-			Postfix *postfix = static_cast<Postfix *>(p_expression);
-			Place place = place_of(postfix->operand);
-			if (place.kind == Kind::I64) {
-				uint32_t old = reg(Kind::I64);
-				emit(Op::Move, position, old, load(place, position));
-				uint32_t one = reg(Kind::I64);
-				emit(Op::ConstI64, position, one, wide(1));
-				uint32_t next = reg(Kind::I64);
-				emit(postfix->op == TokenKind::PlusPlus ? Op::AddI64 : Op::SubI64, position, next, old, one);
-				store(place, next, position);
-				return old;
-			}
-			// The value is the old one, as a number.
-			uint32_t old = convert(load(place, position), Kind::F64, position);
-			if (old == place.index && place.where == Place::Register) {
-				uint32_t copy = reg(Kind::F64);
-				emit(Op::Move, position, copy, old);
-				old = copy;
-			}
-			uint32_t one = reg(Kind::F64);
-			emit(Op::ConstF64, position, one, number(1));
-			uint32_t next = reg(Kind::F64);
-			emit(postfix->op == TokenKind::PlusPlus ? Op::AddF64 : Op::SubF64, position, next, old, one);
-			store(place, convert(next, place.kind, position), position);
-			return old;
-		}
+		case NodeKind::Postfix:
+			return postfix(p_expression);
 		case NodeKind::Binary:
 			return binary(static_cast<Binary *>(p_expression), p_want);
 		case NodeKind::Assign:
 			return assign(static_cast<Assign *>(p_expression));
-		case NodeKind::Conditional: {
-			Conditional *conditional = static_cast<Conditional *>(p_expression);
-			Kind kind = p_want != Kind::Void ? p_want : natural(p_expression);
-			uint32_t out = reg(kind);
-			uint32_t test = expression(conditional->condition, Kind::Bool);
-			uint32_t to_else = emit(Op::JumpIfNot, position, test, 0);
-			uint32_t then_value = expression(conditional->then_value, kind);
-			emit(Op::Move, position, out, then_value);
-			uint32_t to_end = emit(Op::Jump, position, 0);
-			patch(to_else, here());
-			uint32_t else_value = expression(conditional->else_value, kind);
-			emit(Op::Move, position, out, else_value);
-			patch(to_end, here());
-			return out;
-		}
+		case NodeKind::Conditional:
+			return conditional(p_expression, p_want);
 		case NodeKind::SuperExpr:
 			refuse(position, "'super' used as a value");
 			break;

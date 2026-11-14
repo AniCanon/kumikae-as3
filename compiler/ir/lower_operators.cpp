@@ -191,211 +191,241 @@ uint32_t Lowerer::operate(TokenKind p_op, uint32_t p_left, uint32_t p_right, boo
 	return out;
 }
 
+uint32_t Lowerer::logical(Binary *p_binary, Kind p_want) {
+	uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	Expr *right = p_binary->right;
+	// As a condition it is a Boolean; otherwise it is one of its operands, which must then be
+	// of one kind.
+	Kind kind = Kind::Bool;
+	if (p_want != Kind::Bool) {
+		Kind a = is_null(left) ? Kind::Void : natural(left);
+		Kind b = is_null(right) ? Kind::Void : natural(right);
+		if (a != b && is_integral(a) && is_integral(b) && (a == Kind::I64 || b == Kind::I64)) {
+			a = b = Kind::I64; // An Int64 holds both, as the checker took it.
+		}
+		kind = a == Kind::Void ? b : a;
+		if (kind == Kind::Void || (a != Kind::Void && b != Kind::Void && a != b)) {
+			refuse(position, "'&&' or '||' between values of different types");
+			kind = Kind::Bool;
+		}
+	}
+	uint32_t out = reg(kind);
+	emit(Op::Move, position, out, expression(left, kind));
+	uint32_t test = convert(out, Kind::Bool, position);
+	uint32_t skip = emit(p_binary->op == TokenKind::AmpAmp ? Op::JumpIfNot : Op::JumpIf, position, test, 0);
+	emit(Op::Move, position, out, expression(right, kind));
+	patch(skip, here());
+	return out;
+}
+
+uint32_t Lowerer::type_test(Binary *p_binary) {
+	uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	Expr *right = p_binary->right;
+	Symbol *symbol = named_class(right);
+	uint32_t index = 0;
+	if (!symbol || !class_index(symbol, &index)) {
+		refuse(right->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " with this type");
+		return default_value(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj, position);
+	}
+	uint32_t object = expression(left, Kind::Void);
+	if (kind_at(object) != Kind::Obj) {
+		refuse(left->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " on a value that is not an object");
+		return default_value(Kind::Bool, position);
+	}
+	uint32_t out = reg(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj);
+	emit(p_binary->op == TokenKind::KwIs ? Op::IsClass : Op::AsClass, position, out, object, index);
+	return out;
+}
+
+uint32_t Lowerer::comparison(Binary *p_binary) {
+	uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	Expr *right = p_binary->right;
+	if (is_engine(natural(left)) || is_engine(natural(right))) {
+		uint32_t a = settled(operand(left), right, position);
+		uint32_t b = operand(right);
+		return engine_operate(p_binary->op, { a, b }, Kind::Bool, nullptr, position);
+	}
+	bool swap_sides = p_binary->op == TokenKind::Greater || p_binary->op == TokenKind::GreaterEqual;
+	bool with_equal = p_binary->op == TokenKind::LessEqual || p_binary->op == TokenKind::GreaterEqual;
+	Kind left_kind = operand_kind(left, right), right_kind = operand_kind(right, left);
+	if ((left_kind == Kind::I64 || right_kind == Kind::I64) && is_integral(left_kind) && is_integral(right_kind)) {
+		uint32_t a = settled(convert(wide_operand(left, right_kind), Kind::I64, position), right, position);
+		uint32_t b = convert(wide_operand(right, left_kind), Kind::I64, position);
+		uint32_t out = reg(Kind::Bool);
+		emit(with_equal ? Op::LeI64 : Op::LtI64, position, out, swap_sides ? b : a, swap_sides ? a : b);
+		return out;
+	}
+	if ((left_kind == Kind::I64 && right_kind == Kind::F64) || (left_kind == Kind::F64 && right_kind == Kind::I64)) {
+		// Exactly: neither side is converted to the other's type.
+		uint32_t a = settled(expression(left, Kind::Void), right, position);
+		uint32_t b = expression(right, Kind::Void);
+		bool wide_first = left_kind == Kind::I64;
+		uint32_t order = reg(Kind::F64);
+		emit(Op::CmpI64F64, position, order, wide_first ? a : b, wide_first ? b : a);
+		uint32_t zero = reg(Kind::F64);
+		emit(Op::ConstF64, position, zero, number(0));
+		// `order` places the Int64 against the Number. Not-a-number makes every comparison false.
+		bool wide_is_less = wide_first != swap_sides; // The question is "Int64 < Number" (or <=).
+		uint32_t out = reg(Kind::Bool);
+		emit(with_equal ? Op::LeF64 : Op::LtF64, position, out, wide_is_less ? order : zero, wide_is_less ? zero : order);
+		return out;
+	}
+	bool strings = is_string_type(left->type) && is_string_type(right->type);
+	Kind kind = strings ? Kind::Str : Kind::F64;
+	uint32_t a = settled(expression(left, kind), right, position);
+	uint32_t b = expression(right, kind);
+	bool swap = p_binary->op == TokenKind::Greater || p_binary->op == TokenKind::GreaterEqual;
+	bool or_equal = p_binary->op == TokenKind::LessEqual || p_binary->op == TokenKind::GreaterEqual;
+	uint32_t out = reg(Kind::Bool);
+	emit(strings ? (or_equal ? Op::LeStr : Op::LtStr) : (or_equal ? Op::LeF64 : Op::LtF64), position, out, swap ? b : a,
+			swap ? a : b);
+	return out;
+}
+
+uint32_t Lowerer::equality(Binary *p_binary) {
+	uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	Expr *right = p_binary->right;
+	Kind a = is_null(left) ? Kind::Void : natural(left);
+	Kind b = is_null(right) ? Kind::Void : natural(right);
+	bool strict = p_binary->op == TokenKind::StrictEqual || p_binary->op == TokenKind::StrictNotEqual;
+	Kind kind = Kind::F64;
+	Op op = Op::EqF64;
+	if (a == Kind::Void && b == Kind::Void) {
+		kind = Kind::Obj;
+		op = Op::EqRef;
+	} else if (a == Kind::Void || b == Kind::Void) {
+		// Against null: a reference is compared; a number or a Boolean is never null.
+		kind = a == Kind::Void ? b : a;
+		if (is_engine(kind)) {
+			// A Godot object or value against null: is there one?
+			uint32_t object = expression(a == Kind::Void ? right : left, kind);
+			uint32_t present = reg(Kind::Bool);
+			emit(Op::ObjToBool, position, present, object);
+			if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
+				return present;
+			}
+			uint32_t absent = reg(Kind::Bool);
+			emit(Op::Not, position, absent, present);
+			return absent;
+		}
+		if (!is_reference(kind)) {
+			refuse(position, "comparing a number or a Boolean with null");
+		}
+		op = kind == Kind::Str ? Op::EqStr : Op::EqRef;
+	} else if (is_engine(a) || is_engine(b)) {
+		// Godot's own equality: the same object, or equal values.
+		uint32_t x = settled(operand(left), right, position);
+		uint32_t y = operand(right);
+		return engine_operate(p_binary->op, { x, y }, Kind::Bool, nullptr, position);
+	} else if (a == Kind::Str && b == Kind::Str) {
+		kind = Kind::Str;
+		op = Op::EqStr;
+	} else if (a == Kind::Obj && b == Kind::Obj) {
+		kind = Kind::Obj;
+		op = Op::EqRef;
+	} else if (a == Kind::Bool && b == Kind::Bool) {
+		kind = Kind::Bool;
+		op = Op::EqBool;
+	} else if ((operand_kind(left, right) == Kind::I64 || operand_kind(right, left) == Kind::I64) &&
+			is_numeric(operand_kind(left, right)) && is_numeric(operand_kind(right, left))) {
+		Kind x_kind = operand_kind(left, right), y_kind = operand_kind(right, left);
+		uint32_t out = reg(Kind::Bool);
+		if (is_integral(x_kind) && is_integral(y_kind)) {
+			uint32_t x = settled(convert(wide_operand(left, y_kind), Kind::I64, position), right, position);
+			uint32_t y = convert(wide_operand(right, x_kind), Kind::I64, position);
+			emit(Op::EqI64, position, out, x, y);
+		} else {
+			// An Int64 and a Number, exactly.
+			uint32_t x = settled(expression(left, Kind::Void), right, position);
+			uint32_t y = expression(right, Kind::Void);
+			uint32_t order = reg(Kind::F64);
+			emit(Op::CmpI64F64, position, order, x_kind == Kind::I64 ? x : y, x_kind == Kind::I64 ? y : x);
+			uint32_t zero = reg(Kind::F64);
+			emit(Op::ConstF64, position, zero, number(0));
+			emit(Op::EqF64, position, out, order, zero);
+		}
+		if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
+			uint32_t negated = reg(Kind::Bool);
+			emit(Op::Not, position, negated, out);
+			return negated;
+		}
+		return out;
+	} else if ((is_numeric(a) && is_numeric(b)) || (!strict && (is_numeric(a) || a == Kind::Bool) && (is_numeric(b) || b == Kind::Bool))) {
+		kind = Kind::F64;
+	} else {
+		refuse(position, "comparing values of these two types");
+	}
+	uint32_t x = settled(expression(left, kind), right, position);
+	uint32_t y = expression(right, kind);
+	uint32_t out = reg(Kind::Bool);
+	emit(op, position, out, x, y);
+	if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
+		uint32_t negated = reg(Kind::Bool);
+		emit(Op::Not, position, negated, out);
+		return negated;
+	}
+	return out;
+}
+
+uint32_t Lowerer::arithmetic(Binary *p_binary, Kind p_want) {
+	uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	Expr *right = p_binary->right;
+	Kind left_kind = Kind::Void, right_kind = Kind::Void;
+	kind_of(left->type, &left_kind);
+	kind_of(right->type, &right_kind);
+	bool strings = p_binary->op == TokenKind::Plus && is_string_type(p_binary->type);
+	if (!strings && (is_engine(left_kind) || is_engine(right_kind))) {
+		Kind result = Kind::Void;
+		if (!kind_of(p_binary->type, &result) || result == Kind::Void) {
+			refuse(position, "this operator on a Godot value");
+			return default_value(p_want, position);
+		}
+		uint32_t a = settled(operand(left, right->type), right, position);
+		uint32_t b = operand(right, left->type);
+		return engine_operate(p_binary->op, { a, b }, result, p_binary->type, position);
+	}
+	// Division is done in Numbers, so a literal beside an Int64 stays the Number it is written as.
+	bool exact = !strings && p_binary->op != TokenKind::Slash;
+	uint32_t a = settled(wide_operand(left, exact ? right_kind : Kind::Void), right, position);
+	uint32_t b = wide_operand(right, exact ? left_kind : Kind::Void);
+	return operate(p_binary->op, a, b, strings, position);
+}
+
 uint32_t Lowerer::binary(Binary *p_binary, Kind p_want) {
 	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
 	switch (p_binary->op) {
 		case TokenKind::AmpAmp:
-		case TokenKind::PipePipe: {
-			// As a condition it is a Boolean; otherwise it is one of its operands, which must then be
-			// of one kind.
-			Kind kind = Kind::Bool;
-			if (p_want != Kind::Bool) {
-				Kind a = is_null(left) ? Kind::Void : natural(left);
-				Kind b = is_null(right) ? Kind::Void : natural(right);
-				if (a != b && is_integral(a) && is_integral(b) && (a == Kind::I64 || b == Kind::I64)) {
-					a = b = Kind::I64; // An Int64 holds both, as the checker took it.
-				}
-				kind = a == Kind::Void ? b : a;
-				if (kind == Kind::Void || (a != Kind::Void && b != Kind::Void && a != b)) {
-					refuse(position, "'&&' or '||' between values of different types");
-					kind = Kind::Bool;
-				}
-			}
-			uint32_t out = reg(kind);
-			emit(Op::Move, position, out, expression(left, kind));
-			uint32_t test = convert(out, Kind::Bool, position);
-			uint32_t skip = emit(p_binary->op == TokenKind::AmpAmp ? Op::JumpIfNot : Op::JumpIf, position, test, 0);
-			emit(Op::Move, position, out, expression(right, kind));
-			patch(skip, here());
-			return out;
-		}
+		case TokenKind::PipePipe:
+			return logical(p_binary, p_want);
 		case TokenKind::Comma:
 			expression(left, Kind::Void);
 			return expression(right, p_want);
 		case TokenKind::KwIs:
-		case TokenKind::KwAs: {
-			Symbol *symbol = named_class(right);
-			uint32_t index = 0;
-			if (!symbol || !class_index(symbol, &index)) {
-				refuse(right->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " with this type");
-				return default_value(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj, position);
-			}
-			uint32_t object = expression(left, Kind::Void);
-			if (kind_at(object) != Kind::Obj) {
-				refuse(left->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " on a value that is not an object");
-				return default_value(Kind::Bool, position);
-			}
-			uint32_t out = reg(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj);
-			emit(p_binary->op == TokenKind::KwIs ? Op::IsClass : Op::AsClass, position, out, object, index);
-			return out;
-		}
+		case TokenKind::KwAs:
+			return type_test(p_binary);
 		case TokenKind::Less:
 		case TokenKind::Greater:
 		case TokenKind::LessEqual:
-		case TokenKind::GreaterEqual: {
-			if (is_engine(natural(left)) || is_engine(natural(right))) {
-				uint32_t a = settled(operand(left), right, position);
-				uint32_t b = operand(right);
-				return engine_operate(p_binary->op, { a, b }, Kind::Bool, nullptr, position);
-			}
-			bool swap_sides = p_binary->op == TokenKind::Greater || p_binary->op == TokenKind::GreaterEqual;
-			bool with_equal = p_binary->op == TokenKind::LessEqual || p_binary->op == TokenKind::GreaterEqual;
-			Kind left_kind = operand_kind(left, right), right_kind = operand_kind(right, left);
-			if ((left_kind == Kind::I64 || right_kind == Kind::I64) && is_integral(left_kind) && is_integral(right_kind)) {
-				uint32_t a = settled(convert(wide_operand(left, right_kind), Kind::I64, position), right, position);
-				uint32_t b = convert(wide_operand(right, left_kind), Kind::I64, position);
-				uint32_t out = reg(Kind::Bool);
-				emit(with_equal ? Op::LeI64 : Op::LtI64, position, out, swap_sides ? b : a, swap_sides ? a : b);
-				return out;
-			}
-			if ((left_kind == Kind::I64 && right_kind == Kind::F64) || (left_kind == Kind::F64 && right_kind == Kind::I64)) {
-				// Exactly: neither side is converted to the other's type.
-				uint32_t a = settled(expression(left, Kind::Void), right, position);
-				uint32_t b = expression(right, Kind::Void);
-				bool wide_first = left_kind == Kind::I64;
-				uint32_t order = reg(Kind::F64);
-				emit(Op::CmpI64F64, position, order, wide_first ? a : b, wide_first ? b : a);
-				uint32_t zero = reg(Kind::F64);
-				emit(Op::ConstF64, position, zero, number(0));
-				// `order` places the Int64 against the Number. Not-a-number makes every comparison false.
-				bool wide_is_less = wide_first != swap_sides; // The question is "Int64 < Number" (or <=).
-				uint32_t out = reg(Kind::Bool);
-				emit(with_equal ? Op::LeF64 : Op::LtF64, position, out, wide_is_less ? order : zero, wide_is_less ? zero : order);
-				return out;
-			}
-			bool strings = is_string_type(left->type) && is_string_type(right->type);
-			Kind kind = strings ? Kind::Str : Kind::F64;
-			uint32_t a = settled(expression(left, kind), right, position);
-			uint32_t b = expression(right, kind);
-			bool swap = p_binary->op == TokenKind::Greater || p_binary->op == TokenKind::GreaterEqual;
-			bool or_equal = p_binary->op == TokenKind::LessEqual || p_binary->op == TokenKind::GreaterEqual;
-			uint32_t out = reg(Kind::Bool);
-			emit(strings ? (or_equal ? Op::LeStr : Op::LtStr) : (or_equal ? Op::LeF64 : Op::LtF64), position, out, swap ? b : a,
-					swap ? a : b);
-			return out;
-		}
+		case TokenKind::GreaterEqual:
+			return comparison(p_binary);
 		case TokenKind::Equal:
 		case TokenKind::NotEqual:
 		case TokenKind::StrictEqual:
-		case TokenKind::StrictNotEqual: {
-			Kind a = is_null(left) ? Kind::Void : natural(left);
-			Kind b = is_null(right) ? Kind::Void : natural(right);
-			bool strict = p_binary->op == TokenKind::StrictEqual || p_binary->op == TokenKind::StrictNotEqual;
-			Kind kind = Kind::F64;
-			Op op = Op::EqF64;
-			if (a == Kind::Void && b == Kind::Void) {
-				kind = Kind::Obj;
-				op = Op::EqRef;
-			} else if (a == Kind::Void || b == Kind::Void) {
-				// Against null: a reference is compared; a number or a Boolean is never null.
-				kind = a == Kind::Void ? b : a;
-				if (is_engine(kind)) {
-					// A Godot object or value against null: is there one?
-					uint32_t object = expression(a == Kind::Void ? right : left, kind);
-					uint32_t present = reg(Kind::Bool);
-					emit(Op::ObjToBool, position, present, object);
-					if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
-						return present;
-					}
-					uint32_t absent = reg(Kind::Bool);
-					emit(Op::Not, position, absent, present);
-					return absent;
-				}
-				if (!is_reference(kind)) {
-					refuse(position, "comparing a number or a Boolean with null");
-				}
-				op = kind == Kind::Str ? Op::EqStr : Op::EqRef;
-			} else if (is_engine(a) || is_engine(b)) {
-				// Godot's own equality: the same object, or equal values.
-				uint32_t x = settled(operand(left), right, position);
-				uint32_t y = operand(right);
-				return engine_operate(p_binary->op, { x, y }, Kind::Bool, nullptr, position);
-			} else if (a == Kind::Str && b == Kind::Str) {
-				kind = Kind::Str;
-				op = Op::EqStr;
-			} else if (a == Kind::Obj && b == Kind::Obj) {
-				kind = Kind::Obj;
-				op = Op::EqRef;
-			} else if (a == Kind::Bool && b == Kind::Bool) {
-				kind = Kind::Bool;
-				op = Op::EqBool;
-			} else if ((operand_kind(left, right) == Kind::I64 || operand_kind(right, left) == Kind::I64) &&
-					is_numeric(operand_kind(left, right)) && is_numeric(operand_kind(right, left))) {
-				Kind x_kind = operand_kind(left, right), y_kind = operand_kind(right, left);
-				uint32_t out = reg(Kind::Bool);
-				if (is_integral(x_kind) && is_integral(y_kind)) {
-					uint32_t x = settled(convert(wide_operand(left, y_kind), Kind::I64, position), right, position);
-					uint32_t y = convert(wide_operand(right, x_kind), Kind::I64, position);
-					emit(Op::EqI64, position, out, x, y);
-				} else {
-					// An Int64 and a Number, exactly.
-					uint32_t x = settled(expression(left, Kind::Void), right, position);
-					uint32_t y = expression(right, Kind::Void);
-					uint32_t order = reg(Kind::F64);
-					emit(Op::CmpI64F64, position, order, x_kind == Kind::I64 ? x : y, x_kind == Kind::I64 ? y : x);
-					uint32_t zero = reg(Kind::F64);
-					emit(Op::ConstF64, position, zero, number(0));
-					emit(Op::EqF64, position, out, order, zero);
-				}
-				if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
-					uint32_t negated = reg(Kind::Bool);
-					emit(Op::Not, position, negated, out);
-					return negated;
-				}
-				return out;
-			} else if ((is_numeric(a) && is_numeric(b)) || (!strict && (is_numeric(a) || a == Kind::Bool) && (is_numeric(b) || b == Kind::Bool))) {
-				kind = Kind::F64;
-			} else {
-				refuse(position, "comparing values of these two types");
-			}
-			uint32_t x = settled(expression(left, kind), right, position);
-			uint32_t y = expression(right, kind);
-			uint32_t out = reg(Kind::Bool);
-			emit(op, position, out, x, y);
-			if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
-				uint32_t negated = reg(Kind::Bool);
-				emit(Op::Not, position, negated, out);
-				return negated;
-			}
-			return out;
-		}
+		case TokenKind::StrictNotEqual:
+			return equality(p_binary);
 		case TokenKind::KwIn:
 		case TokenKind::KwInstanceof:
 			refuse(position, p_binary->op == TokenKind::KwIn ? "'in'" : "'instanceof'");
 			return default_value(Kind::Bool, position);
-		default: {
-			Kind left_kind = Kind::Void, right_kind = Kind::Void;
-			kind_of(left->type, &left_kind);
-			kind_of(right->type, &right_kind);
-			bool strings = p_binary->op == TokenKind::Plus && is_string_type(p_binary->type);
-			if (!strings && (is_engine(left_kind) || is_engine(right_kind))) {
-				Kind result = Kind::Void;
-				if (!kind_of(p_binary->type, &result) || result == Kind::Void) {
-					refuse(position, "this operator on a Godot value");
-					return default_value(p_want, position);
-				}
-				uint32_t a = settled(operand(left, right->type), right, position);
-				uint32_t b = operand(right, left->type);
-				return engine_operate(p_binary->op, { a, b }, result, p_binary->type, position);
-			}
-			// Division is done in Numbers, so a literal beside an Int64 stays the Number it is written as.
-			bool exact = !strings && p_binary->op != TokenKind::Slash;
-			uint32_t a = settled(wide_operand(left, exact ? right_kind : Kind::Void), right, position);
-			uint32_t b = wide_operand(right, exact ? left_kind : Kind::Void);
-			return operate(p_binary->op, a, b, strings, position);
-		}
+		default:
+			return arithmetic(p_binary, p_want);
 	}
 }
 
