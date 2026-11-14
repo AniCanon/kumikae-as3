@@ -191,6 +191,18 @@ check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not
       output[-900:])
 
 
+# Int64 at Godot's edge, as GDScript works it out.
+output = compare("wide.gd", [
+    "counted id", "node id", "same id", "rgba64", "rgba32", "count", "frames", "element", "negative element", "plus one",
+    "stored", "narrow fits", "narrow refused", "echo most", "echo least", "wraps", "whole float", "fraction refused",
+    "text refused", "int refused", "number exact", "number refused", "to number", "to number refused", "field", "flags",
+    "product", "heard",
+])
+check("wide.gd: a wide value for a 32-bit array is a RangeError before Godot sees it",
+      "RangeError: 5000000000 does not fit an int." in output and "at Wide/narrow()" in output, output[-1200:])
+check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError: 9007199254740993 does not fit a Number exactly." in output,
+      output[-1200:])
+
 for failure in failures:
     print("FAIL " + failure)
 print("godot: %s" % ("OK" if not failures else "%d failed" % len(failures)))
