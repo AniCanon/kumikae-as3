@@ -42,20 +42,17 @@ internal enum class Platform(val label: String) {
 }
 
 /** The files of a new AS3 game for Godot. Nothing here touches the IDE. */
-internal class ProjectTemplate(private val name: String, private val platforms: Set<Platform>) {
-    /** Made from the name: lower-case letters and digits, starting with a letter. A placeholder to change. */
-    val bundle: String = name.lowercase().filter { it in 'a'..'z' || it in '0'..'9' }.let {
-        "org.example." + when {
-            it.isEmpty() -> "game"
-            it.first().isDigit() -> "g$it"
-            else -> it
-        }
-    }
+internal class ProjectTemplate(private val name: String, private val platforms: Set<Platform>, bundle: String = "") {
+    /** The app's identifier on a phone or a console: the one given, or one made from the name to be changed. */
+    val bundle: String = bundle.trim().ifEmpty { defaultBundle(name) }
 
     fun files(): Map<String, String> = buildMap {
         put("project.godot", PROJECT.replace("{name}", name.replace("\"", "'")))
         put("main.tscn", SCENE)
         put("Main.as", SCRIPT)
+        put("Hello.as", HELLO)
+        // What Godot's editor writes on its first import: with it, the game runs before the editor ever opens.
+        put(".godot/extension_list.cfg", "res://kas3.gdextension\n")
         put("kas3.gdextension", EXTENSION)
         put(".gitignore", ".godot/\nbin\n")
         put("README.md", readme())
@@ -64,22 +61,34 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
 
     /**
      * Writes what is not there yet and returns what it wrote. `library` is the folder that holds the
-     * extension's built library: the project's `bin` becomes a link to it, so a rebuild reaches the game.
+     * extension's built library. From a build of the compiler's own repository it is linked, so that a
+     * rebuild reaches the game; from the plugin it is copied, because the plugin's folder is replaced
+     * when the plugin is updated.
      */
-    fun write(folder: Path, library: Path?): List<String> {
+    fun write(folder: Path, library: Path?, link: Boolean = true): List<String> {
         Files.createDirectories(folder)
         val written = files().filter { (file, text) ->
             val target = folder.resolve(file)
             if (Files.exists(target)) {
                 false
             } else {
+                Files.createDirectories(target.parent)
                 Files.writeString(target, text)
                 true
             }
         }.keys.toMutableList()
         val bin = folder.resolve("bin")
         if (library != null && !Files.exists(bin) && !Files.isSymbolicLink(bin)) {
-            Files.createSymbolicLink(bin, library)
+            if (link) {
+                Files.createSymbolicLink(bin, library)
+            } else {
+                Files.createDirectories(bin)
+                Files.list(library).use { files ->
+                    files.filter {
+                        it.fileName.toString().startsWith(LIBRARY)
+                    }.forEach { Files.copy(it, bin.resolve(it.fileName)) }
+                }
+            }
             written += "bin"
         }
         return written
@@ -104,14 +113,27 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
     }
 
     companion object {
-        /** The extension's library, where a build of the compiler's repository leaves it beside `kas3c`. */
-        fun libraryBeside(compiler: Path?): Path? {
-            val folder = compiler?.parent?.parent?.resolve("tests/godot_project/bin") ?: return null
-            val built = Files.isDirectory(folder) && Files.list(folder).use { files ->
-                files.anyMatch { it.fileName.toString().startsWith("libkas3_godot") }
+        private const val LIBRARY = "libkas3_godot"
+
+        /** Made from the name: lower-case letters and digits, starting with a letter. */
+        fun defaultBundle(name: String): String = name.lowercase().filter { it in 'a'..'z' || it in '0'..'9' }.let {
+            "org.example." + when {
+                it.isEmpty() -> "game"
+                it.first().isDigit() -> "g$it"
+                else -> it
             }
-            return folder.takeIf { built }
         }
+
+        /** Whether it reads as an identifier: words of letters, digits and hyphens joined by dots, at least two. */
+        fun isBundle(text: String): Boolean = Regex("[A-Za-z][A-Za-z0-9-]*(\\.[A-Za-z0-9][A-Za-z0-9-]*)+").matches(text)
+
+        /** Whether the folder holds the extension's library. */
+        fun hasLibrary(folder: Path?): Boolean = folder != null && Files.isDirectory(folder) &&
+            Files.list(folder).use { files -> files.anyMatch { it.fileName.toString().startsWith(LIBRARY) } }
+
+        /** The extension's library, where a build of the compiler's repository leaves it beside `kas3c`. */
+        fun libraryBeside(compiler: Path?): Path? =
+            compiler?.parent?.parent?.resolve("tests/godot_project/bin")?.takeIf(::hasLibrary)
 
         private const val PROJECT = """config_version=5
 
@@ -134,19 +156,47 @@ renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
 """
 
-        private const val SCENE = """[gd_scene load_steps=2 format=3]
+        private const val SCENE = """[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Main.as" id="1"]
+[ext_resource type="Script" path="res://Hello.as" id="2"]
 
 [node name="Main" type="Node2D"]
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 960.0
+offset_bottom = 540.0
+color = Color(0.09, 0.1, 0.14, 1)
+
+[node name="Hello" type="Label" parent="."]
+offset_left = 24.0
+offset_top = 16.0
+offset_right = 936.0
+offset_bottom = 60.0
+theme_override_font_sizes/font_size = 28
+script = ExtResource("2")
+
+[node name="Disc" type="Node2D" parent="."]
 position = Vector2(480, 270)
 script = ExtResource("1")
+"""
+
+        private const val HELLO = """package {
+	import godot.*;
+
+	// The words at the top of the screen.
+	public class Hello extends Label {
+		override public function _ready():void {
+			text = "Hello from ActionScript 3. Move the disc with the arrow keys.";
+		}
+	}
+}
 """
 
         private const val SCRIPT = """package {
 	import godot.*;
 
-	// The game's first scene: a disc that follows the arrow keys.
+	// A disc that follows the arrow keys.
 	public class Main extends Node2D {
 		override public function _process(delta:Number):void {
 			// Change the speed while the game runs, and save: it takes effect at once.

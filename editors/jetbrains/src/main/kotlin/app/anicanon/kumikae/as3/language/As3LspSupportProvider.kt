@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.language
 
+import app.anicanon.kumikae.as3.PluginFiles
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.notification.NotificationGroupManager
@@ -32,6 +33,7 @@ class As3LspSupportProvider : LspIntegrationProvider {
             PropertiesComponent.getInstance().getValue(COMPILER_PATH).orEmpty(),
             System.getenv("PATH").orEmpty(),
             Path.of(System.getProperty("user.home")),
+            PluginFiles.native(),
         )
         if (compiler == null) {
             if (warned.add(base)) warn(project)

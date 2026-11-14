@@ -26,7 +26,7 @@ internal class SimulatorRun(
         device = chosen.id
         if (appPath.isNotEmpty()) repository.install(chosen.id, appPath)
         // Output from before this launch belongs to another run.
-        cursor = repository.consolePage(Long.MAX_VALUE).nextCursor
+        cursor = repository.consolePage(0).nextCursor
         repository.launch(chosen.id, bundle)
     }
 

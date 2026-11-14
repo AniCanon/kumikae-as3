@@ -90,10 +90,32 @@ if (providers.gradleProperty("uiProbe").isPresent) {
     }
 }
 
+// The compiler and the Godot extension, from a build of this repository's compiler (or of the checkout
+// named with -Pkas3Root=...), so that a new project runs without anything else being set up. Without a
+// build the plugin is made without them and looks for them on the computer.
+val kas3Root = providers.gradleProperty("kas3Root").orElse(rootDir.resolve("../..").path)
+tasks.withType<PrepareSandboxTask>().configureEach {
+    val root = file(kas3Root.get())
+    from(root.resolve("compiler/build")) {
+        include("kas3c")
+        into("${intellijPlatform.projectName.get()}/native")
+    }
+    from(root.resolve("compiler/tests/godot_project/bin")) {
+        include("libkas3_godot.*")
+        into("${intellijPlatform.projectName.get()}/native")
+    }
+}
+
 // One grammar: the VS Code client's, copied into the plugin's folder for the IDE's TextMate support.
 tasks.withType<PrepareSandboxTask>().configureEach {
     from("../vscode") {
         include("package.json", "language-configuration.json", "syntaxes/**")
         into("${intellijPlatform.projectName.get()}/textmate/actionscript")
     }
+}
+
+// What the IDE and the language server say to each other goes to the sandbox's log: when a feature
+// does not work in the editor, the log shows whether it was asked for and what came back.
+tasks.runIde {
+    systemProperty("idea.log.debug.categories", "#com.intellij.platform.lsp")
 }

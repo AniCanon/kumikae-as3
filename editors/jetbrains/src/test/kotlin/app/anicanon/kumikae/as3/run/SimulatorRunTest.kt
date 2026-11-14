@@ -68,6 +68,19 @@ class SimulatorRunTest {
         assertTrue("console 3" in repository.calls)
     }
 
+    @Test fun `only what is printed after the launch is passed on`() {
+        repository.select("A")
+        repository.page =
+            ConsolePage(listOf(ConsoleEntry("stdout", "an earlier run\n")), nextCursor = 9, truncated = false)
+        val run = run().also { it.start() }
+        // The end of the log is asked for from its start: a place past its end is refused by the service.
+        assertTrue("console 0" in repository.calls)
+        repository.page = ConsolePage(emptyList(), 9, truncated = false)
+        run.pump()
+        assertTrue("console 9" in repository.calls)
+        assertTrue(said.isEmpty())
+    }
+
     @Test fun `stopping ends the app`() {
         repository.select("A")
         val run = run().also { it.start() }

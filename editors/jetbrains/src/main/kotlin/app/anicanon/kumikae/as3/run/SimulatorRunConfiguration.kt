@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.run
 
+import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.panel.SimulatorHost
 import com.intellij.execution.DefaultExecutionResult
 import com.intellij.execution.ExecutionResult
@@ -14,7 +15,6 @@ import com.intellij.execution.configurations.SimpleConfigurationType
 import com.intellij.execution.filters.TextConsoleBuilderFactory
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ProgramRunner
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.components.service
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
@@ -27,7 +27,7 @@ class SimulatorConfigurationType :
         "KumikaeAs3Simulator",
         "iOS Simulator (AS3)",
         "Install and launch an app on a running iOS Simulator",
-        NotNullLazyValue.createValue { AllIcons.Actions.Execute },
+        NotNullLazyValue.createValue { PluginFiles.mark },
     ) {
     override fun createTemplateConfiguration(project: Project): RunConfiguration =
         SimulatorRunConfiguration(project, this, "iOS Simulator")

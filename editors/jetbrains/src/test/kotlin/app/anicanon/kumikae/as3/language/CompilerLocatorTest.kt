@@ -53,4 +53,17 @@ class CompilerLocatorTest {
         val onPath = executable(root.resolve("other/kas3c"))
         assertEquals(onPath, find(project, searchPath = "relative:${root.resolve("other")}"))
     }
+
+    @Test fun `the compiler the plugin carries is used when the project has none of its own`() {
+        val project = Files.createDirectories(root.resolve("game3"))
+        val carried = executable(root.resolve("plugin/native/kas3c"))
+        executable(root.resolve("elsewhere/kas3c"))
+        val bundled = root.resolve("plugin/native")
+        assertEquals(
+            carried,
+            CompilerLocator.find(project, "", root.resolve("elsewhere").toString(), root.resolve("home"), bundled),
+        )
+        val own = executable(root.resolve("game3/compiler/build/kas3c"))
+        assertEquals(own, CompilerLocator.find(project, "", "", root.resolve("home"), bundled))
+    }
 }

@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.run
 
+import app.anicanon.kumikae.as3.PluginFiles
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.CommandLineState
@@ -15,7 +16,6 @@ import com.intellij.execution.process.KillableColoredProcessHandler
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.process.ProcessTerminatedListener
 import com.intellij.execution.runners.ExecutionEnvironment
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NotNullLazyValue
@@ -27,7 +27,7 @@ class GodotConfigurationType :
         ID,
         "Godot (AS3)",
         "Run the project's game with Godot",
-        NotNullLazyValue.createValue { AllIcons.Actions.Execute },
+        NotNullLazyValue.createValue { PluginFiles.mark },
     ) {
     override fun createTemplateConfiguration(project: Project): RunConfiguration =
         GodotRunConfiguration(project, this, "Game")

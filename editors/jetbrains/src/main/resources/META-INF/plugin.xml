@@ -14,7 +14,7 @@
         <configurationType implementation="app.anicanon.kumikae.as3.run.GodotConfigurationType"/>
         <postStartupActivity implementation="app.anicanon.kumikae.as3.run.GodotProjectStartup"/>
         <newProjectWizard.generator implementation="app.anicanon.kumikae.as3.project.As3ProjectWizard"/>
-        <toolWindow id="iOS Simulator" anchor="right"
+        <toolWindow id="iOS Simulator" anchor="right" icon="/META-INF/brandMark.svg"
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
 </idea-plugin>
