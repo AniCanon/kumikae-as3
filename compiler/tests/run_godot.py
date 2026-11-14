@@ -239,6 +239,15 @@ read = re.search(r"DEFAULTS read=(\d+) failed=(.*)", run.stdout)
 check("Godot reads every recorded default", read is not None and int(read.group(1)) > 10 and read.group(2) == "[]",
       (run.stdout + run.stderr)[-600:])
 
+# AS3's vectors handed to Godot: packed arrays by the element's type, arrays for the rest.
+output = compare("vectors.gd", [
+    "points", "points type", "hull", "bytes", "empty", "too big for a byte", "below a byte", "offsets", "colors", "filters",
+    "polygons", "whole", "whole are integers", "fractions", "fractions are floats", "words", "flags", "nodes", "wide",
+    "keep", "spread", "moved", "words of values", "forget",
+])
+check("vectors.gd: a value that does not fit a byte is an AS3 error that says so",
+      output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
+
 import tempfile
 
 # Scripts edited while the game runs. In a copy of the project: the test rewrites a script.

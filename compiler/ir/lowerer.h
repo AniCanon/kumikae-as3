@@ -171,6 +171,9 @@ class Lowerer {
 	uint32_t vector_new(New *p_made);
 	uint32_t vector_literal(VectorLit *p_literal);
 	uint32_t vector_call(Call *p_call);
+	// A vector where Godot takes one of its own collections: converted, element by element, to the type
+	// wanted (an Array where Godot takes anything). Nothing if the value is not a vector.
+	std::optional<uint32_t> vector_to_engine(Expr *p_value, const Type *p_wanted);
 	void vector_loop(ForIn *p_loop);
 	// What `===` can find equal: a number with a number, otherwise two values of one kind, and null with
 	// anything that can be null.

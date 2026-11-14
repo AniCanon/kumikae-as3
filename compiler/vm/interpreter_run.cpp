@@ -583,6 +583,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostDefault:
 			case Op::HostConstant:
 			case Op::HostCallStatic:
+			case Op::HostCollection:
 			case Op::HostBind:
 			case Op::HostMember:
 			case Op::HostIndexGet:

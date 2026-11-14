@@ -370,6 +370,11 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
+	void *collection(std::string_view p_type, const vm::Argument *p_elements, size_t p_count, std::string *) override {
+		void *made = box();
+		log += "collection " + std::string(p_type) + "[" + list(p_elements, p_count) + "] -> #" + std::to_string((intptr_t)made) + "\n";
+		return made;
+	}
 	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted,
 			vm::Slot *r_result, std::string *r_error) override {
 		ir::Kind p_kind = p_wanted.kind;

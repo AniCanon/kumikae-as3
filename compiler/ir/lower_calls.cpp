@@ -361,8 +361,9 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 	}
 	for (uint32_t i = 0; i < written; i++) {
 		Kind kind = Kind::Void;
+		const Type *type = nullptr;
 		if (i < count && !p_function->parameters[i].is_rest && p_function->parameters[i].type) {
-			const Type *type = compilation_.type_of(p_function->parameters[i].type);
+			type = compilation_.type_of(p_function->parameters[i].type);
 			if (type && type->kind == Type::Instance && type->symbol == function_ && function_) {
 				// Godot takes a function here: a method goes bound to its object.
 				Expr *later = nullptr;
@@ -400,7 +401,8 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 		if (kind == Kind::Void && kind_of(p_arguments[i]->type, &own) && is_numeric(own) && whole(p_arguments[i])) {
 			kind = Kind::I64; // Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
 		}
-		uint32_t value = expression(p_arguments[i], kind);
+		const std::optional<uint32_t> collection = vector_to_engine(p_arguments[i], type);
+		uint32_t value = collection ? *collection : expression(p_arguments[i], kind);
 		if (kind_at(value) == Kind::Obj) {
 			refuse(p_arguments[i]->offset, "passing a script object to Godot");
 		}

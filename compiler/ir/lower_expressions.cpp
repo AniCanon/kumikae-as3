@@ -507,7 +507,8 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 	Place place = place_of(p_assign->target, p_assign->value);
 	uint32_t value = 0;
 	if (p_assign->op == TokenKind::Assign) {
-		value = expression(p_assign->value, place.kind);
+		const std::optional<uint32_t> collection = place.where == Place::Engine ? vector_to_engine(p_assign->value, place.type) : std::nullopt;
+		value = collection ? *collection : expression(p_assign->value, place.kind);
 	} else if (p_assign->op == TokenKind::AmpAmpAssign || p_assign->op == TokenKind::PipePipeAssign) {
 		refuse(position, "'&&=' or '||='");
 		value = default_value(place.kind, position);

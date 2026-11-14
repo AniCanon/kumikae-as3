@@ -95,6 +95,8 @@ inline bool is_engine(Kind p_kind) {
 	X(HostSingleton, "RS-") /* One of the engine's singletons (Input), by Godot's name for it. */ \
 	X(HostConstant, "RSS") /* A constant Godot keeps: out, the type, the constant (Vector2, ZERO). */ \
 	X(HostCallStatic, "rSA") /* A method called on no object: "Vector2.from_angle", and its arguments. */ \
+	/* A vector as one of Godot's collections: out, the vector, Godot's name for the type wanted. */ \
+	X(HostCollection, "RRS") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") X(Trace, "A--")
 

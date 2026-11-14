@@ -95,6 +95,24 @@ Outcome construct(Request &p_request) {
 	return p_request.done(p_request.result.p != nullptr);
 }
 
+// A vector handed to the engine: its elements, as they are held, become one of Godot's collections.
+// No vector gives nothing: Godot's null.
+Outcome collection(Request &p_request) {
+	const Vector *vector = static_cast<const Vector *>(p_request.handle(p_request.in.b));
+	p_request.target = p_request.in.a;
+	p_request.kind = Kind::Val;
+	if (!vector) {
+		return Outcome::Done;
+	}
+	const Kind element = p_request.module.classes[vector->klass].element;
+	std::vector<Argument> elements(vector->length);
+	for (uint32_t i = 0; i < vector->length; i++) {
+		elements[i] = Argument{ element, vector->data[i] };
+	}
+	p_request.result.p = p_request.host.source.collection(p_request.text(p_request.in.c), elements.data(), elements.size(), &p_request.error);
+	return p_request.done(p_request.result.p != nullptr);
+}
+
 Outcome call(Request &p_request) {
 	const std::vector<uint32_t> &list = p_request.function.argument_lists[p_request.in.c];
 	void *receiver = list.empty() ? nullptr : p_request.handle(list[0]);
@@ -271,6 +289,8 @@ Outcome perform(Request &p_request) {
 	switch (p_request.in.op) {
 		case Op::HostNew:
 			return construct(p_request);
+		case Op::HostCollection:
+			return collection(p_request);
 		case Op::HostCall:
 			return call(p_request);
 		case Op::HostOperate:
@@ -315,8 +335,11 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 		case Outcome::Refused: {
 			// The engine's side may say that an error is AS3's TypeError: see engine_handles.h.
 			static const std::string_view type_error = "TypeError: ";
+			static const std::string_view range_error = "RangeError: ";
 			if (request.error.compare(0, type_error.size(), type_error) == 0) {
 				raise(module_.type_error_class, request.error.substr(type_error.size()));
+			} else if (request.error.compare(0, range_error.size(), range_error) == 0) {
+				raise(module_.range_error_class, request.error.substr(range_error.size()));
 			} else {
 				raise(module_.error_class, request.error.empty() ? "the engine refused" : request.error);
 			}

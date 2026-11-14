@@ -312,5 +312,29 @@ void Lowerer::vector_loop(ForIn *p_loop) {
 	finish_loop(next_at);
 }
 
+auto Lowerer::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::optional<uint32_t> {
+	if (!is_vector(p_value->type)) {
+		return std::nullopt;
+	}
+	const uint32_t position = p_value->offset;
+	const std::optional<uint32_t> klass = vector_class(p_value->type);
+	if (!klass || module_.classes[*klass].element == Kind::Obj) {
+		// Elements that are script objects, or vectors themselves, have no form Godot can hold yet.
+		refuse(position, "passing a Vector of script objects or of Vectors to Godot");
+		return default_value(Kind::Val, position);
+	}
+	// Godot's name for what it takes here: a packed array, or an Array where it takes that or anything.
+	std::string wanted = "Array";
+	const bool named = p_wanted && p_wanted->kind == Type::Instance && is_godot(p_wanted->symbol) &&
+			godot_name(p_wanted->symbol->name, std::string_view(), &wanted);
+	if (p_wanted && p_wanted->kind != Type::Any && !named) {
+		refuse(position, "passing a Vector where '" + compilation_.type_name(p_wanted) + "' is expected");
+		return default_value(Kind::Val, position);
+	}
+	const uint32_t out = named ? engine_reg(Kind::Val, p_wanted) : reg(Kind::Val);
+	emit(Op::HostCollection, position, out, expression(p_value, Kind::Obj), string(wanted));
+	return out;
+}
+
 } // namespace ir
 } // namespace kas3
