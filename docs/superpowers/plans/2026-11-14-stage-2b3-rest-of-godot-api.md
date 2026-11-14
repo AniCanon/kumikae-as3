@@ -198,9 +198,8 @@ tests in `compiler/tests/run/` (programs with expected output), `test_vm.cpp`, `
 `Module::wide_constants`.
 
 - [ ] Tests first, as programs run by `kas3c run` with their expected trace: arithmetic at the ends
-  (Review Focus 2); each checked conversion in range and out of range (the out-of-range one traces the
-  caught... there is no `try` yet, so each is its own program whose expected output is the `RangeError`
-  and its stack); each written conversion; text; comparison with every numeric kind; `Int64` fields,
+  (Review Focus 2); each checked conversion in range and out of range (there is no `try` yet, so each
+  out-of-range case is its own program whose expected output is the `RangeError` and its stack); each written conversion; text; comparison with every numeric kind; `Int64` fields,
   statics, parameters, defaults and returns; `++` and compound assignment.
 - [ ] Run, fail; implement; pass in the normal and sanitizer builds; commit.
 
