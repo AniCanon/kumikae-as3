@@ -5,7 +5,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.imageio.ImageIO
 
 data class Frame(
     val device: String,
@@ -26,14 +25,17 @@ class SimulatorSession(
 ) : AutoCloseable {
     @Volatile private var input: InputBackend = input
     private var selected: Device? = null
-    private var geometry: Geometry? = null
-    private var generation = 0L
+    private val geometry = FrameGeometry()
+    private val snapshots = SnapshotCapture(directory, runner)
+    private var streamSerial = 0L
+    private var streaming: FrameFeed? = null
 
     @Volatile private var closed = false
 
     // Held by the one boot, install or shutdown that is running. They take up to two minutes, so they run
     // outside the session's lock: status, the list, the log and pictures still answer meanwhile.
     private val slow = AtomicBoolean()
+    private var sendingInput = false
 
     fun dispatch(method: String, params: JsonObject): Any {
         if (closed) throw SimulatorException("CLOSED", "Session is closed")
@@ -41,6 +43,21 @@ class SimulatorSession(
             "devices" -> devices()
 
             "select" -> select(params["device"].asString)
+
+            "screenshot" -> {
+                val frame = screenshot(params["device"].asString, params["format"]?.asString ?: "png")
+                val picture = frame.picture
+                Frame(
+                    frame.device,
+                    picture.size.width,
+                    picture.size.height,
+                    frame.generation,
+                    frame.format,
+                    Base64.getEncoder().encodeToString(picture.bytes),
+                    picture.capturedAt,
+                    picture.captureMs,
+                )
+            }
 
             "boot" -> slowly(params) { device ->
                 runner.run(Commands.boot(device), SLOW_MILLIS)
@@ -54,19 +71,21 @@ class SimulatorSession(
 
             "install" -> slowly(params) { device -> install(device, params["path"].asString) }
 
+            "tap", "swipe", "text", "button", "rotate" -> sendInput(method, params)
+
             else -> synchronized(this) { quickly(method, params) }
         }
     }
 
     private fun quickly(method: String, params: JsonObject): Any {
+        ensureOpen()
         if (method == "status") return status()
         if (method == "log") {
             return mapOf("page" to launchLog.buffer.read(params["cursor"].asLong), "launch" to launchLog.status())
         }
+        requireInputIdle()
         val device = chosen(params)
         return when (method) {
-            "screenshot" -> capture(device, params["format"]?.asString ?: "png")
-
             "launch" -> {
                 invalidate()
                 launchLog.launch(device, bundle(params))
@@ -81,8 +100,6 @@ class SimulatorSession(
 
             "report" -> report(device, bundle(params))
 
-            "tap", "swipe", "text", "button", "rotate" -> input(device, method, params)
-
             else -> throw IllegalArgumentException("Unknown method")
         }
     }
@@ -96,9 +113,15 @@ class SimulatorSession(
     }
 
     private fun slowly(params: JsonObject, work: (String) -> Any): Any {
-        val device = synchronized(this) { chosen(params).also { invalidate() } }
-        if (!slow.compareAndSet(false, true)) {
-            throw SimulatorException("BUSY", "Another boot, shutdown or install is still running")
+        val device = synchronized(this) {
+            ensureOpen()
+            requireInputIdle()
+            val chosen = chosen(params)
+            if (!slow.compareAndSet(false, true)) {
+                throw SimulatorException("BUSY", "Another boot, shutdown or install is still running")
+            }
+            invalidate()
+            chosen
         }
         try {
             return work(device)
@@ -108,6 +131,7 @@ class SimulatorSession(
     }
 
     @Synchronized private fun settle(device: String, state: String): Any {
+        ensureOpen()
         if (selected?.id == device) selected = selected?.copy(state = state)
         invalidate()
         return status()
@@ -116,12 +140,19 @@ class SimulatorSession(
     /** The list is read outside the lock, and what it says of the selected device replaces what was known. */
     private fun devices(): List<Device> {
         val found = Devices.parse(runner.run(Commands.list(), LIST_MILLIS))
-        synchronized(this) { selected = selected?.let { current -> found.find { it.id == current.id } ?: current } }
+        synchronized(this) {
+            ensureOpen()
+            selected = selected?.let { current -> found.find { it.id == current.id } ?: current }
+        }
         return found
     }
 
     /** Switches input on or off while the session runs: the owner decides in the panel, at any time. */
-    fun useInput(backend: InputBackend) {
+    @Synchronized fun useInput(backend: InputBackend) {
+        ensureOpen()
+        requireInputIdle()
+        invalidate()
+        input.close()
         input = backend
     }
 
@@ -131,13 +162,17 @@ class SimulatorSession(
         val scale = device?.takeIf { input.enabled }?.let { runCatching { input.scale(it) } }
         return mapOf(
             "device" to selected,
-            "generation" to generation,
+            "generation" to geometry.generation,
             "inputEnabled" to (scale?.isSuccess == true),
             "pixelsPerPoint" to (scale?.getOrNull() ?: 1.0),
             "inputNotice" to when {
-                !input.enabled -> "Viewer mode. Input can be switched on in the menu; it needs idb."
+                !input.enabled ->
+                    "Viewer mode. Switch input on in the menu for a live picture and controls; " +
+                        "it needs idb."
+
                 scale?.isFailure == true -> "Viewer mode. ${scale.exceptionOrNull()?.message}"
-                else -> "Input is on, through idb."
+
+                else -> "Live picture and input are on, through idb."
             },
             "launch" to launchLog.status(),
         )
@@ -147,6 +182,8 @@ class SimulatorSession(
         val device = devices().find { it.id == id }
             ?: throw SimulatorException("NO_DEVICE", "That available iOS device was not found")
         synchronized(this) {
+            ensureOpen()
+            requireInputIdle()
             if (selected?.id != id) {
                 launchLog.close()
                 invalidate()
@@ -156,95 +193,109 @@ class SimulatorSession(
         }
     }
 
-    private fun capture(device: String, format: String): Frame {
-        require(format in setOf("png", "jpeg")) { "format must be png or jpeg" }
-        val file = Files.createTempFile(directory, "frame-", ".$format")
-        val started = System.nanoTime()
+    fun screenshot(device: String, format: String = "jpeg"): BinaryFrame {
+        val stamp = synchronized(this) {
+            checkDevice(device)
+            geometry.generation
+        }
         try {
-            runner.run(Commands.screenshot(device, file.toString(), format), 15_000)
-            require(Files.size(file) in 1..32L * 1024 * 1024) { "Invalid screenshot size" }
-            val size = ImageIO.createImageInputStream(file.toFile()).use { stream ->
-                val readers = ImageIO.getImageReaders(stream)
-                require(readers.hasNext()) { "Screenshot is not an image" }
-                val reader = readers.next()
-                try {
-                    reader.input = stream
-                    Geometry(reader.getWidth(0), reader.getHeight(0)).also {
-                        require(it.width.toLong() * it.height <= 40_000_000) { "Screenshot is too large" }
-                    }
-                } finally {
-                    reader.dispose()
+            val picture = snapshots.capture(device, format)
+            return synchronized(this) {
+                checkDevice(device)
+                if (stamp !=
+                    geometry.generation
+                ) {
+                    throw SimulatorException("STALE_FRAME", "Screen changed during capture")
                 }
+                BinaryFrame(device, geometry.record(picture.size), format, picture)
             }
-            if (geometry != size) {
-                generation++
-                geometry = size
-            }
-            return Frame(
-                device,
-                size.width,
-                size.height,
-                generation,
-                format,
-                Base64.getEncoder().encodeToString(Files.readAllBytes(file)),
-                System.currentTimeMillis(),
-                (System.nanoTime() - started) / 1_000_000,
-            )
-        } catch (e: Exception) {
-            invalidate()
-            throw e
-        } finally {
-            Files.deleteIfExists(file)
+        } catch (failure: Exception) {
+            synchronized(this) { if (selected?.id == device && stamp == geometry.generation) invalidate() }
+            throw failure
         }
     }
 
-    private fun input(device: String, method: String, p: JsonObject): Any {
-        if (!input.enabled) NoInput.send(device, method, emptyList())
-        val args = when (method) {
-            "tap", "swipe" -> gesture(device, method, p)
-
-            "text" -> listOf(
-                p["text"].asString.also { text ->
-                    require(text.isNotEmpty() && text.all { it.code in 32..126 }) { "Text must be printable ASCII" }
-                },
-            )
-
-            "button" -> listOf(p["button"].asString.also { require(it in setOf("home", "lock")) }.uppercase())
-
-            "rotate" -> listOf(
-                p["orientation"].asString.also {
-                    require(it in setOf("portrait", "portrait_upside_down", "landscape_left", "landscape_right"))
-                }.uppercase(),
-            )
-
-            else -> error("Unknown input operation")
+    fun openFrames(device: String): FrameFeed {
+        val (serial, backend) = synchronized(this) {
+            checkDevice(device)
+            if (!input.enabled) throw SimulatorException("INPUT_DISABLED", "Live picture needs the owner's idb switch")
+            stopFrames()
+            streamSerial to input
         }
-        // Invalidate even if rotation fails: its outcome can be uncertain after a timeout.
-        if (method == "rotate") invalidate()
-        input.send(device, method, args)
-        return mapOf("sent" to true)
+        val (child, native) = backend.video(device)
+        synchronized(this) {
+            if (closed || selected?.id != device || streamSerial != serial) {
+                child.close()
+                throw SimulatorException("DEVICE_CHANGED", "Device changed while opening video")
+            }
+            val feed = LiveFrames(device, child, bind = { displayed ->
+                synchronized(this) {
+                    if (closed || streamSerial != serial || selected?.id != device) {
+                        null
+                    } else {
+                        val size = if ((displayed.width > displayed.height) == (native.width > native.height)) {
+                            native
+                        } else {
+                            Geometry(native.height, native.width)
+                        }
+                        geometry.record(size, displayed)
+                    }
+                }
+            }, stopped = {
+                synchronized(this) {
+                    if (!closed && streamSerial == serial) {
+                        geometry.invalidate()
+                        streamSerial++
+                    }
+                }
+            })
+            streaming = feed
+            feed.start()
+            return feed
+        }
     }
 
-    private fun gesture(device: String, method: String, p: JsonObject): List<String> {
-        val current = geometry ?: throw SimulatorException("STALE_FRAME", "Take a new screenshot before input")
-        if (p["generation"].asLong != generation || p["width"].asLong != current.width.toLong() ||
-            p["height"].asLong != current.height.toLong()
+    private fun ensureOpen() {
+        if (closed) throw SimulatorException("CLOSED", "Session is closed")
+    }
+
+    private fun checkDevice(device: String) {
+        ensureOpen()
+        if (selected?.id !=
+            device
         ) {
-            throw SimulatorException("STALE_FRAME", "Screen geometry changed; take a new screenshot")
+            throw SimulatorException("DEVICE_CHANGED", "The session selected a different device")
         }
-        val scale = input.scale(device)
-        val start = current.point(p["x"].asDouble, p["y"].asDouble, scale)
-        if (method == "tap") return listOf(start.x.toString(), start.y.toString())
-        val end = current.point(p["endX"].asDouble, p["endY"].asDouble, scale)
-        val duration = p["durationMs"].asLong.also { require(it in 50..5000) { "Swipe duration must be 50–5000ms" } }
-        return listOf(
-            start.x.toString(),
-            start.y.toString(),
-            end.x.toString(),
-            end.y.toString(),
-            "--duration",
-            (duration / 1000.0).toString(),
-        )
+    }
+
+    private fun stopFrames() {
+        streamSerial++
+        streaming?.close()
+        streaming = null
+    }
+
+    private fun sendInput(method: String, params: JsonObject): Any {
+        val (device, backend, args) = synchronized(this) {
+            if (closed) throw SimulatorException("CLOSED", "Session is closed")
+            requireInputIdle()
+            if (slow.get()) throw SimulatorException("BUSY", "Another Simulator operation is still running")
+            val device = chosen(params)
+            if (!input.enabled) NoInput.send(device, method, emptyList())
+            val args = InputArguments.prepare(method, params, geometry, input.scale(device))
+            if (method == "rotate") invalidate()
+            sendingInput = true
+            Triple(device, input, args)
+        }
+        try {
+            backend.send(device, method, args)
+            return mapOf("sent" to true)
+        } finally {
+            synchronized(this) { sendingInput = false }
+        }
+    }
+
+    private fun requireInputIdle() {
+        if (sendingInput) throw SimulatorException("BUSY", "Simulator input is still running")
     }
 
     private fun install(device: String, app: String): Any {
@@ -268,8 +319,8 @@ class SimulatorSession(
     }
 
     private fun invalidate() {
-        geometry = null
-        generation++
+        geometry.invalidate()
+        stopFrames()
     }
 
     override fun close() {
@@ -277,7 +328,9 @@ class SimulatorSession(
         synchronized(this) {
             invalidate()
             launchLog.close()
+            input.close()
         }
+        snapshots.close()
     }
 
     private companion object {

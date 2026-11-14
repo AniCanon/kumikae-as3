@@ -23,9 +23,13 @@ class LocalSession(parent: Path) : AutoCloseable {
     /** Switches idb input on if idb is installed. Returns whether it was found. */
     fun enableInput(): Boolean {
         val executable = IdbInput.find() ?: return false
-        session.useInput(IdbInput(executable, runner))
+        session.useInput(IdbInput(executable, runner, IdbDevices(executable)))
         return true
     }
+
+    fun openFrames(device: String): FrameFeed = session.openFrames(device)
+
+    fun screenshot(device: String): BinaryFrame = session.screenshot(device)
 
     override fun close() {
         try {
