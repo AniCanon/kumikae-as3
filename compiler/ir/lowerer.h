@@ -35,6 +35,7 @@ class Lowerer {
 	Symbol *uint_ = nullptr;
 	Symbol *int64_ = nullptr;
 	Symbol *number_ = nullptr;
+	Symbol *math_ = nullptr;
 	Symbol *boolean_ = nullptr;
 	Symbol *string_ = nullptr;
 	Symbol *object_ = nullptr;
@@ -162,6 +163,9 @@ class Lowerer {
 
 	// NaN, Infinity, and the limits of the number types: constants of the built-in library.
 	bool builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg);
+	// Math's constants and functions. Nothing if the symbol is not one of them.
+	std::optional<double> math_constant(const Symbol *p_symbol) const;
+	std::optional<uint32_t> math_call(Call *p_call, const Symbol *p_function);
 
 	Symbol * callee_symbol(Expr *p_callee);
 

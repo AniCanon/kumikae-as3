@@ -54,6 +54,8 @@ inline bool is_engine(Kind p_kind) {
 	X(LtF64, "RRR") X(LeF64, "RRR") X(EqF64, "RRR") X(LtStr, "RRR") X(LeStr, "RRR") X(EqStr, "RRR") \
 	X(EqBool, "RRR") X(EqRef, "RRR") X(Not, "RR-") \
 	X(Concat, "RRR") X(StrLength, "RR-") \
+	/* Math. MathUnary: out, the Number, and which function (a MathFunction). */ \
+	X(MathUnary, "RRI") X(Atan2, "RRR") X(Pow, "RRR") X(MinF64, "RRR") X(MaxF64, "RRR") X(Random, "R--") \
 	X(Jump, "L--") X(JumpIf, "RL-") X(JumpIfNot, "RL-") \
 	X(GetField, "RRD") X(SetField, "RDR") X(GetGlobal, "RG-") X(SetGlobal, "GR-") \
 	X(InitClass, "C--") /* The class is used: give its static fields their values, if this is the first time. */ \
@@ -95,6 +97,9 @@ enum class Op : uint8_t {
 	KAS3_IR_OPS(X)
 #undef X
 };
+
+// The functions of Math that take one Number, in MathUnary's third operand.
+enum class MathFunction : uint8_t { Abs, Acos, Asin, Atan, Ceil, Cos, Exp, Floor, Log, Round, Sin, Sqrt, Tan };
 
 const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.

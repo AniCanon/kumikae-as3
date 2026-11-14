@@ -151,6 +151,11 @@ bool Lowerer::builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint
 		emit(Op::ConstF64, p_position, *r_reg, number(value));
 		return true;
 	}
+	if (const std::optional<double> constant = math_constant(p_symbol)) {
+		*r_reg = reg(Kind::F64);
+		emit(Op::ConstF64, p_position, *r_reg, number(*constant));
+		return true;
+	}
 	if (owner == int_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
 		*r_reg = reg(Kind::I32);
 		emit(Op::ConstI32, p_position, *r_reg, name == "MAX_VALUE" ? 0x7FFFFFFFu : 0x80000000u);

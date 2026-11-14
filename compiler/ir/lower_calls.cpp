@@ -259,6 +259,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	if (is_godot(symbol) && symbol->kind == SymbolKind::Function) {
 		return global_call(p_call, symbol, p_want);
 	}
+	if (const std::optional<uint32_t> math = math_call(p_call, symbol)) {
+		return *math;
+	}
 	auto function = functions_.find(symbol);
 	if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
 		refuse(callee->offset, "calling '" + std::string(symbol->name) + "'");

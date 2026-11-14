@@ -393,6 +393,24 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::NegF64:
 				r[in.a].d = -r[in.b].d;
 				break;
+			case Op::MathUnary:
+				r[in.a].d = math_unary(static_cast<ir::MathFunction>(in.c), r[in.b].d);
+				break;
+			case Op::Atan2:
+				r[in.a].d = std::atan2(r[in.b].d, r[in.c].d);
+				break;
+			case Op::Pow:
+				r[in.a].d = math_pow(r[in.b].d, r[in.c].d);
+				break;
+			case Op::MinF64:
+				r[in.a].d = math_min(r[in.b].d, r[in.c].d);
+				break;
+			case Op::MaxF64:
+				r[in.a].d = math_max(r[in.b].d, r[in.c].d);
+				break;
+			case Op::Random:
+				r[in.a].d = math_random();
+				break;
 			case Op::BitAnd:
 				r[in.a].i = r[in.b].i & r[in.c].i;
 				break;

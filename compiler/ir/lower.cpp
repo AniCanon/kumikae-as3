@@ -103,6 +103,7 @@ Lowerer::Lowerer(Compilation &p_compilation, Module &p_module) :
 	uint_ = compilation_.builtin("uint");
 	int64_ = compilation_.builtin("Int64");
 	number_ = compilation_.builtin("Number");
+	math_ = compilation_.builtin("Math");
 	boolean_ = compilation_.builtin("Boolean");
 	string_ = compilation_.builtin("String");
 	object_ = compilation_.builtin("Object");
