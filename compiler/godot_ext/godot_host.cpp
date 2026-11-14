@@ -383,8 +383,19 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) {
 	int type = value_type(p_type);
 	if (type < 0) {
-		*r_error = "Godot has no value type '" + std::string(p_type) + "'";
-		return nullptr;
+		// Not a value type: one of Godot's classes, made as `ClassName.new()` makes it.
+		const StringName &klass = name(p_type);
+		ClassDBSingleton *classes = ClassDBSingleton::get_singleton();
+		if (p_count != 0 || !classes->class_exists(klass)) {
+			*r_error = "Godot has no value type '" + std::string(p_type) + "'";
+			return nullptr;
+		}
+		Variant object = classes->can_instantiate(klass) ? classes->instantiate(klass) : Variant();
+		if (object.get_type() != Variant::OBJECT) {
+			*r_error = "Godot can't make a '" + std::string(p_type) + "': it is a class to extend, not one to create";
+			return nullptr;
+		}
+		return new Variant(object);
 	}
 	Arguments arguments(p_arguments, p_count);
 	Variant *made = new Variant();

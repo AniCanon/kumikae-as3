@@ -1,0 +1,2 @@
+Probe [Signal] on a field, which declares a signal (2d)
+SignalTraffic [Signal] on a field, which declares a signal (2d)

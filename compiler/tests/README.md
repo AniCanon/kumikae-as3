@@ -9,7 +9,7 @@ Every group runs under `ctest`. What each is, in more words, is in the
 | `golden/` (`ok`, `errors`, `names`, `types`) | The front end: a `.as` file and the exact output expected | A new pair; `run_golden.py` finds it |
 | `run/` | Whole programs under `kas3c run`: `.as`, `.out`, and `.ir` where the IR is pinned | A new pair; `err_*` files expect an error |
 | `godot_project/` | AS3 inside Godot, compared with GDScript | A method in a `.as` script, a `show(name, ask(...), <what GDScript gives>)` line in its `.gd` driver, the name in `run_godot.py` |
-| `corpus/`, `external/` | Real AS3 from elsewhere must still parse (`external/` is fetched, not committed) | |
+| `corpus/`, `external/` | Real AS3 from elsewhere must still parse (`external/` is fetched, not committed). `run_corpus.py` says which corpus programs the interpreter takes and what stops the others; `run_godot.py` runs the ones in `corpus/runs.txt` inside Godot | A program that starts to run: its name in `corpus/runs.txt`, or in `corpus/waits.txt` with what it waits for |
 | `bench/` | Timings, not pass or fail | `run_bench.py <build> [--godot tests] [--against <other build>]` |
 | `test_cli.py`, `test_lsp_stdio.py` | `kas3c` as a program | |
 | `build_ios.sh`, `build_ios_simulator_template.sh` | The extension for iOS, and a Simulator template from Godot's source | |

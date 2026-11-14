@@ -53,6 +53,24 @@ package {
 			held.length = 0;
 			return held.length;
 		}
+		// Godot's own objects made with `new`: a node, which the tree then owns, and a resource, which is
+		// counted and goes when nothing holds it.
+		public function make():int {
+			var child:Node2D = new Node2D();
+			child.name = "made";
+			child.position = new Vector2(3, 4);
+			addChild(child);
+			var drawn:Line2D = new Line2D();
+			drawn.points = new <Vector2>[new Vector2(0, 0), new Vector2(1, 1)];
+			child.addChild(drawn);
+			held.push(child);
+			return getChildCount() * 10 + drawn.getPointCount();
+		}
+		public function blend():int {
+			var ramp:Gradient = new Gradient();
+			ramp.offsets = new <Number>[0, 0.5, 0.75, 1];
+			return ramp.getPointCount();
+		}
 		public function words():String {
 			var all:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];
 			return all.join(" ") + "/" + all + "/" + held.length;

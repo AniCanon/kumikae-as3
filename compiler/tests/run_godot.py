@@ -243,12 +243,27 @@ check("Godot reads every recorded default", read is not None and int(read.group(
 output = compare("vectors.gd", [
     "points", "points type", "hull", "bytes", "empty", "too big for a byte", "below a byte", "offsets", "colors", "filters",
     "polygons", "whole", "whole are integers", "fractions", "fractions are floats", "words", "flags", "nodes", "wide",
-    "keep", "spread", "moved", "words of values", "forget",
+    "keep", "spread", "moved", "words of values", "forget", "made a node", "the node is in the tree", "made a resource",
 ])
 check("vectors.gd: a value that does not fit a byte is an AS3 error that says so",
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
 
 import tempfile
+
+# The corpus programs that are said to run (corpus/runs.txt) do run, in Godot, for some frames.
+with open(os.path.join(tests, "corpus", "runs.txt")) as listed:
+    runs = listed.read().split()
+with tempfile.TemporaryDirectory() as folder:
+    copy = os.path.join(folder, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", "*.as", "*.as.uid"))
+    for name in runs:
+        shutil.copy(os.path.join(tests, "corpus", name + ".as"), copy)
+    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "corpus.gd", "--", *runs], capture_output=True, text=True, timeout=600)
+    output = run.stdout + run.stderr
+    check("corpus.gd: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
+    for name in runs:
+        check("corpus.gd: %s ran" % name, "RAN %s\n" % name in output, output[-800:])
+    check("corpus.gd: no AS3 error", "Error" not in output and "ERROR" not in output and "ActionScript:" not in output, output[-1500:])
 
 # Scripts edited while the game runs. In a copy of the project: the test rewrites a script.
 HOT = """package { import godot.*; public class Hot extends Node2D {

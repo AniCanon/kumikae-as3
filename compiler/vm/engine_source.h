@@ -14,7 +14,7 @@ namespace vm {
 
 struct EngineSource {
 	virtual ~EngineSource() {}
-	// A new value of one of Godot's value types.
+	// A new value of one of Godot's value types, or (with no arguments) a new object of one of its classes.
 	[[nodiscard]] virtual void *construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) = 0;
 	// One of Godot's collections made from a vector's elements, each as it is held: a packed array of the
 	// type named ("PackedVector2Array"), or an Array for any other name. An element that does not fit the

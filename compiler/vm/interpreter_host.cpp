@@ -89,8 +89,7 @@ public:
 
 Outcome construct(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
-	p_request.target = p_request.in.a;
-	p_request.kind = Kind::Val;
+	p_request.into(p_request.in.a); // One of Godot's values, or one of its objects.
 	p_request.result.p = p_request.host.source.construct(p_request.text(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }

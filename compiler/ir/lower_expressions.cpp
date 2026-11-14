@@ -276,6 +276,13 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 		emit(Op::HostNew, position, value, type_name, arguments(std::move(list)));
 		return value;
 	}
+	if (symbol && is_godot(symbol) && is_godot_object(symbol) && made->arguments.count == 0 && engine_name(symbol, std::string_view(), &type_name)) {
+		// One of Godot's own objects: the engine makes it, as GDScript's `Node2D.new()` does. A node is
+		// then the program's to put in the tree or free; a counted object goes when nothing holds it.
+		uint32_t value = engine_reg(Kind::Ref, made->type);
+		emit(Op::HostNew, position, value, type_name, arguments({}));
+		return value;
+	}
 	if (!symbol || !class_index(symbol, &index)) {
 		refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
 		return default_value(Kind::Obj, position);

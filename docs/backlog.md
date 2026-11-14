@@ -22,11 +22,11 @@ it stands.
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 18 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2c** | The rest of the language | 21 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 13 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
-| **2d** | Editor features | 19 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 44 | What is left |
-| **decision** | The owner | 7 | See each item |
+| **2d** | Editor features | 21 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
+| **clean-up** | A pass that closes stage 2 | 47 | What is left |
+| **decision** | The owner | 8 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -54,8 +54,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Stage 1e: Godot's math types
 
-- `cell * Math.floor(x)` now checks as a `Vector2i` (so do `Math.round`, `Math.ceil`, `Math.abs`, `Math.max`,
-  `Math.min` and `parseInt` of whole numbers), but `Math` itself does not run yet. **2c**
 - A malformed tag in a declaration file (both `left` and `right`, two rules for one operator) is resolved
   silently. **clean-up**
 - `for each` over a packed array does not check the variable's type. **2c**
@@ -254,11 +252,28 @@ any Godot value passing as a condition):
 - Not tried: a reload while a debugger is stopped, in the Godot editor's own play mode with the editor
   attached, or with more than a few hundred scripts. **2d**
 
+## Stage 2c-1: vectors, `switch` and `Math`
+
+- A vector's methods that take a function (`forEach`, `map`, `filter`, `some`, `every`, `sort`) are refused:
+  they wait for closures. **2c**
+- A vector of script objects, or of vectors, is not converted when it is handed to Godot: it is refused. **2c**
+- `indexOf` and `lastIndexOf` are refused on a vector of Godot's values or objects, and when the value
+  looked for is of another type than the elements (AS3 answers -1). **2c**
+- `new` of a script class that extends a Godot class is refused: the object needs a Godot object made
+  and the script attached to it. `new Node2D()` and the rest of Godot's own classes work. **2c**
+- `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
+- A reload is refused when a vector that is alive has a type the new program no longer mentions, even if
+  the vector is empty. **2d**
+- The interpreter converts a vector's index to a Number on every access. **clean-up**
+- Handing a vector to Godot copies its elements into a list first, then into Godot's array. **clean-up**
+- `test_json` times a large parse and fails when the machine is busy. **clean-up**
+
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
 - A string of 4 GiB or more is truncated; running out of memory while building a string aborts. **clean-up**
-- No existing corpus program runs yet: each stops in the checker or is refused. **2c**
+- 6 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
+  the six are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
 - There is one IR golden file; the plan called for more. **2c**
 - A string's `length` counts characters, not UTF-16 units, and strings compare by character. **2c**
 - An endless loop has no stop. **2d**
