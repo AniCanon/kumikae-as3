@@ -222,6 +222,12 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 		emit(Op::HostToStr, p_position, out, p_reg);
 		return out;
 	}
+	if (is_engine(from) && p_to == Kind::Bool) {
+		// As a condition: is there one?
+		uint32_t out = reg(Kind::Bool);
+		emit(Op::HostPresent, p_position, out, p_reg);
+		return out;
+	}
 	if (is_engine(from) || is_engine(p_to)) {
 		refuse(p_position, is_engine(from) ? "converting a Godot value" : "passing this value where a Godot value is expected");
 		return default_value(p_to, p_position);

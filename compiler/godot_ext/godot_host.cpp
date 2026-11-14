@@ -29,6 +29,13 @@ namespace kas3 {
 // A handle on a reference-counted object that is gone. Copying it would count a reference on freed
 // memory. (Only a script's hold on its own owner can be one: any other handle keeps its object alive.) A
 // handle on any other freed object is safe to copy, and Godot knows it as a freed object.
+// An object Godot has freed. To a script it is null.
+static bool is_freed(const Variant &p_value) {
+	return p_value.get_type() == Variant::OBJECT && !((ObjectID)p_value).is_null() && !p_value.get_validated_object();
+}
+
+static const char *const FREED = "TypeError: Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.";
+
 static bool is_dangling(const Variant &p_value) {
 	return p_value.get_type() == Variant::OBJECT && ((ObjectID)p_value).is_ref_counted() && !p_value.get_validated_object();
 }
@@ -56,7 +63,8 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 		case ir::Kind::Val:
 		case ir::Kind::Ref: {
 			const Variant *value = static_cast<const Variant *>(p_slot.p);
-			if (!value || is_dangling(*value)) {
+			// A freed object goes to Godot as what it is to the script: null.
+			if (!value || is_freed(*value)) {
 				return Variant();
 			}
 			return *value;
@@ -460,7 +468,7 @@ bool GodotHost::call(void *p_receiver, std::string_view p_method, const vm::Argu
 	// there before anything touches it.
 	// (A handle copied after the object went is empty: see copy().)
 	if (receiver->get_type() == Variant::NIL || (receiver->get_type() == Variant::OBJECT && !receiver->get_validated_object())) {
-		*r_error = "'" + std::string(p_method) + "' was called on an object Godot has freed";
+		*r_error = FREED;
 		return false;
 	}
 	Arguments arguments(p_arguments, p_count);
@@ -537,6 +545,10 @@ bool GodotHost::get(void *p_receiver, std::string_view p_property, const vm::Wan
 	if (!p_property.empty() && p_property[0] == '@') {
 		return signal_verb(*static_cast<Variant *>(p_receiver), p_property, nullptr, 0, p_result, r_result, r_error);
 	}
+	if (is_freed(*static_cast<Variant *>(p_receiver))) {
+		*r_error = FREED;
+		return false;
+	}
 	bool valid = false;
 	Variant value = static_cast<Variant *>(p_receiver)->get_named(name(p_property), valid);
 	if (!valid) {
@@ -547,6 +559,10 @@ bool GodotHost::get(void *p_receiver, std::string_view p_property, const vm::Wan
 }
 
 bool GodotHost::set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) {
+	if (is_freed(*static_cast<Variant *>(p_receiver))) {
+		*r_error = FREED;
+		return false;
+	}
 	bool valid = false;
 	static_cast<Variant *>(p_receiver)->set_named(name(p_property), to_variant(p_value.kind, p_value.slot), valid);
 	if (!valid) {
@@ -623,6 +639,11 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 		return false;
 	}
 	return take(p_result, value, p_name, r_result, r_error);
+}
+
+bool GodotHost::present(void *p_value) {
+	const Variant *value = static_cast<const Variant *>(p_value);
+	return value && value->get_type() != Variant::NIL && !is_freed(*value);
 }
 
 vm::Str *GodotHost::text(void *p_value) {

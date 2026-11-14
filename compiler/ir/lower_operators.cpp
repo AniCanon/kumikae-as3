@@ -195,10 +195,10 @@ uint32_t Lowerer::equality(Binary *p_binary) {
 		// Against null: a reference is compared; a number or a Boolean is never null.
 		kind = a == Kind::Void ? b : a;
 		if (is_engine(kind)) {
-			// A Godot object or value against null: is there one?
+			// A Godot object or value against null: is there one? An object Godot has freed is not there.
 			uint32_t object = expression(a == Kind::Void ? right : left, kind);
 			uint32_t present = reg(Kind::Bool);
-			emit(Op::ObjToBool, position, present, object);
+			emit(Op::HostPresent, position, present, object);
 			if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
 				return present;
 			}

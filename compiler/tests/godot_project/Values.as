@@ -44,6 +44,15 @@ package {
 		public function traced(v:Vector2):void { trace(v, v.x); }
 		public function keep(n:Node):void { kept = n; }
 		public function keptText():String { return "kept " + kept; }
+		// A Godot object that has been freed is null to a script.
+		public function keptIsNull():Boolean { return kept == null; }
+		public function keptIsSet():Boolean { return kept != null; }
+		public function keptCounts():Boolean { return kept ? true : false; }
+		public function keptNot():Boolean { return !kept; }
+		public function keptName():String { return kept.name; }
+		public function keptRename():void { kept.name = "renamed"; }
+		public function keptChildren():int { return kept.getChildCount(); }
+		public function keptUnder(parent:Node):Boolean { return parent.isAncestorOf(kept); }
 
 		// One part of a value: read, change, write back.
 		private var held:Vector2 = new Vector2(1, 2);

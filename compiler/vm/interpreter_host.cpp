@@ -146,6 +146,14 @@ Outcome call_static(Request &p_request) {
 			p_request.wanted(), p_request.result_or_none(), &p_request.error));
 }
 
+Outcome present(Request &p_request) {
+	p_request.target = p_request.in.a;
+	p_request.kind = Kind::Bool;
+	void *value = p_request.handle(p_request.in.b);
+	p_request.result.b = value != nullptr && p_request.host.handles.present(value);
+	return Outcome::Done;
+}
+
 // Godot's text for a value or an object; "null" for a missing one.
 Outcome to_text(Request &p_request) {
 	p_request.target = p_request.in.a;
@@ -270,6 +278,8 @@ Outcome perform(Request &p_request) {
 			return call_static(p_request);
 		case Op::HostToStr:
 			return to_text(p_request);
+		case Op::HostPresent:
+			return present(p_request);
 		case Op::HostGet:
 			return get(p_request);
 		case Op::HostBind:
@@ -295,9 +305,16 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 		case Outcome::Missing:
 			raise_null();
 			return;
-		case Outcome::Refused:
-			raise(module_.error_class, request.error.empty() ? "the engine refused" : request.error);
+		case Outcome::Refused: {
+			// The engine's side may say that an error is AS3's TypeError: see engine_handles.h.
+			static const std::string_view type_error = "TypeError: ";
+			if (request.error.compare(0, type_error.size(), type_error) == 0) {
+				raise(module_.type_error_class, request.error.substr(type_error.size()));
+			} else {
+				raise(module_.error_class, request.error.empty() ? "the engine refused" : request.error);
+			}
 			return;
+		}
 		case Outcome::Done:
 			break;
 	}

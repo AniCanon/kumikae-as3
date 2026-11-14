@@ -138,7 +138,8 @@ output = compare("values.gd", [
     "tint", "same", "not same", "differs", "same node", "not same node", "other node", "chain", "compound", "moved",
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
-    "freed text",
+    "freed text", "freed text after", "alive is not null", "alive is set", "alive counts", "freed is null", "freed is not set", "freed does not count",
+    "not freed", "freed name", "freed children", "freed as an argument",
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
     "first", "color part", "set second", "add element", "position element", "packed", "set packed",
     "packed out of range", "out of range",
@@ -147,6 +148,9 @@ output = compare("values.gd", [
     "negative cells", "cells plus", "cells compound", "plain order", "compound order", "mixed", "big hash", "decode",
 ])
 check("a null that is not the last argument is an AS3 error", "at Values/clampMiddleNull()" in output, output[-800:])
+check("a member of a freed object is AS3's null error, and says the object was freed",
+      all(re.search(r"TypeError: Error #1009[^\n]*Godot has freed the object\.\n\s+at Values/%s\(\)" % name, output) for name in
+          ("keptName", "keptRename", "keptChildren")), output[-1500:])
 check("an index out of range is an AS3 error", "at Values/outOfRange()" in output and "at Values/packed()" in output, output[-800:])
 traced = re.search(r"EXPECT TRACE (.*)", output)
 check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])
@@ -169,6 +173,8 @@ check("a listener given the wrong kind of argument is an AS3 error that names it
 check("a listener given too many arguments is an AS3 error that names it",
       "ArgumentError: Error #1063: Argument count mismatch on Signals/onHit(). Expected 1, got 2." in output, output[-1200:])
 check("a listener's argument error says where the listener is", re.search(r"Error #1063[^\n]*\n\s*at Signals/onHit\(\)\[.*Signals\.as:\d+\]", output) is not None, output[-1200:])
+check("Godot is told that a listener given arguments that don't fit was not called",
+      output.count("Error calling from signal 'hit' to callable") == 2, output[-1500:])
 check("a field that is not a signal, by name, is an AS3 error", "'count' is not a signal" in output, output[-1200:])
 check("an error inside a listener is reported", "at Signals/fails()" in output, output[-800:])
 check("a wrong signal name is an AS3 error", output.count("at Signals/listenByName()") == 2, output[-800:])

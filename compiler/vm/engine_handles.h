@@ -3,7 +3,8 @@
 //
 // On failure an entry returns false (or null) and says why in r_error; the interpreter turns that into an
 // AS3 error. A string that comes back is a new Str, and a handle is a new handle: both the caller's.
-// r_result is null when the result is not wanted.
+// r_result is null when the result is not wanted. A message that starts with "TypeError: " is raised as
+// AS3's TypeError, which is how a member reached on a freed object is reported.
 #pragma once
 
 #include "engine_types.h"
@@ -18,6 +19,9 @@ struct EngineHandles {
 	// Another handle for the same value (for a value type, a copy of it), and giving one up.
 	[[nodiscard]] virtual void *copy(void *p_value) = 0;
 	virtual void drop(void *p_value) = 0;
+	// Whether a handle still has something behind it: not if it is null, or an object the engine has freed.
+	// A freed object is null to a script.
+	[[nodiscard]] virtual bool present(void *p_value) = 0;
 	// The engine's own text for a value or an object.
 	[[nodiscard]] virtual Str *text(void *p_value) = 0;
 

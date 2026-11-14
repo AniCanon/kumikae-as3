@@ -435,6 +435,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_wanted.kind, r_result, 0.5, "text");
 		return true;
 	}
+	bool present(void *p_value) override { return p_value != nullptr; }
 	vm::Str *text(void *p_value) override {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
