@@ -1,12 +1,24 @@
 # Kumikae AS3 for JetBrains IDEs
 
-The first Simulator panel is written, but **has not compiled or run in Rider yet**.
-The offline build stops on a missing dependency before Kotlin compilation. No
-plugin zip was produced. The Python agent client has passed its seven tests.
+The first piece is an iOS Simulator panel. It compiles, its tests pass and its
+local service has been run against a real Simulator. **Nobody has yet used the
+panel inside a real Rider window**, and idb input has never been tried.
+
+| Checked | By | Result |
+|---|---|---|
+| Compilation, style check and plugin zip | Automated build, 2026-11-14 | `./gradlew check buildPlugin` succeeds. |
+| Service tests (`core`) | Automated build | 18 pass. |
+| Panel tests (repository, controller, service adapter) | Automated build | 32 pass. |
+| Agent client tests | `python3 -m unittest` | 7 pass. |
+| Service and agent client against a booted Simulator | Run by hand through `simulator.py` | Devices, select, launch of `org.kumikae.as3test`, a 2622x1206 PNG screenshot, console log, and the test report "14 passed, 0 failed". |
+| Panel layout and buttons | UI probe in a sandbox Rider, with a synthetic service | Light and dark pictures under `build/reports/ui/`; Refresh, Boot and Launch pressed through the real buttons. |
+| The panel in a Rider window, by a person | Nobody | **Not done.** |
+| idb input | Nobody | **Not done.** idb is not installed. |
 
 The [design](../../docs/superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md)
 compares screen and input options. The [results](../../docs/results/2026-11-jetbrains-simulator.md)
-separate what was run from what is only implemented.
+give the detail behind this table. [ARCHITECTURE.md](ARCHITECTURE.md) describes the
+parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 
 ## What is implemented
 
@@ -15,12 +27,17 @@ separate what was run from what is only implemented.
 - JPEG snapshots, capped at two requests per second. One capture is in flight at
   a time. Capture alone took about half a second on this Mac. This is a slow
   preview, not smooth video. Hidden panels stop requesting pictures.
+- One action at a time. A button pressed while another action runs is refused
+  with a message, never queued. A picture that arrives after the device changed,
+  or after a boot, launch or rotation, is thrown away.
 - An agent command-line client that talks to the same service as the panel.
   It saves PNG screenshots, reads logs and the test report, and offers input.
 - Optional idb input: click to tap, drag and release to swipe, a text field, home,
   lock and rotation. **It is off by default and has not been tested with idb.**
 - Tests for protocol validation, geometry, device parsing, command construction,
-  log limits, process timeouts, session cleanup and HTTP authentication.
+  log limits, process timeouts, session cleanup and HTTP authentication, and for
+  the panel's state: stale pictures, refused actions, failures, the console
+  cursor, input permission, hidden windows and late results after closing.
 
 Without idb, use Apple's Device Hub window for input. No private framework is
 loaded by this plugin. Enabling idb introduces its private Apple dependencies.
@@ -29,57 +46,59 @@ There is no automatic download or installation path.
 This is the beginning of the one plugin planned in roadmap stage 6. It does not
 yet connect `kas3c lsp`, set AS3 breakpoints or step through scripts. Keep using
 the [LSP4IJ setup](../README.md#rider-and-other-jetbrains-ides). The Simulator panel
-is absent on Windows and Linux. The descriptor targets platform build 262 and
-later; other IDEs and operating systems have not been tested.
+is absent on Windows and Linux. The descriptor accepts only platform build
+262.10968.170; other IDEs, builds and operating systems have not been tested.
 
-## Build without downloads
+## Build
 
-Use Java 21 and an installed Gradle 9.8.1. This project uses Kotlin 2.4.10 and the
-IntelliJ Platform Gradle Plugin 2.20.0. It compiles against an installed IDE, with
-Rider at `/Applications/Rider.app` as the default. It does not request an IDE SDK
-download.
+The build needs JDK 25 and an installed Rider 2026.2 (build 262.10968.170). It uses
+the Gradle wrapper (Gradle 9.8.1), Kotlin 2.4.10 with the Compose compiler plugin,
+the IntelliJ Platform Gradle Plugin 2.20.0, ktlint 1.8.0 and Compose Swing UI
+0.1.0-alpha06. It compiles against the installed IDE and never downloads one.
+Rider's own runtime is a JDK 25, so the plugin needs nothing extra at run time.
 
-From this directory:
+From this directory, with `JAVA_HOME` set to a JDK 25:
 
 ```sh
-./gradle-offline :core:test buildPlugin
+./gradlew check buildPlugin
 python3 -m unittest discover -s tests -v
 ```
 
-`gradle-offline` finds the cached Gradle 9.8.1 distribution. You can instead set
-`GRADLE_BIN` to a full path to an installed Gradle executable. The script always
-passes `--offline`. Its writable Gradle home is `.gradle-home/` here. It reads the
-existing dependency cache under `~/.gradle/caches` without modifying it. Override
-that cache root with `GRADLE_RO_DEP_CACHE` if needed.
+`check` runs the style check and the Kotlin tests of both modules. `buildPlugin`
+refuses to build while the style check fails, and puts a zip in
+`build/distributions/`. `./gradlew ktlintFormat` fixes most style findings.
 
-The known missing artifact on this Mac is:
-
-```text
-com.google.errorprone:error_prone_annotations:2.41.0
-```
-
-Gson 2.13.2 requires it. Its JAR and dependency metadata must be made available
-through an approved dependency download before this build can proceed. The
-Gradle and Kotlin plugins, Gson, JUnit 4.13.2, Hamcrest 1.3 and Kotlin standard
-library were present. The offline dependency report names no other missing item
-on the core test runtime path. Further build stages have not run and may expose
-other requirements. No dependency was substituted or fetched to bypass this.
-
-A successful `buildPlugin` puts a zip in `build/distributions/`. Until then,
-compilation, the Kotlin tests, packaging and IDE compatibility remain unverified.
+Rider is found through the `RIDER_HOME` environment variable, or at
+`/Applications/Rider.app` when it is not set. The wrapper uses your normal Gradle
+home. On a machine that has not built this before, it downloads Gradle 9.8.1 and
+the dependencies named above; add `--offline` once they are cached. No JDK is
+downloaded: without a JDK 25 the build stops.
 
 ## Run a sandbox IDE
 
-Once the build dependencies are available:
-
 ```sh
-./gradle-offline runIde -PidePath=/Applications/Rider.app
+./gradlew runIde
 ```
 
 This starts the installed Rider with separate settings and plugin files under
-`build/idea-sandbox/`. Open this worktree or the Godot test project. Open **View >
-Tool Windows > iOS Simulator**. Use another installed compatible IDE by changing
-`idePath`. That path is a local installation, not a product version to download.
+`.intellijPlatform/`. It does not touch your own Rider settings. Open this
+worktree or the Godot test project, then **View > Tool Windows > iOS Simulator**.
+
+## Check the panel without a person
+
+```sh
+./gradlew runIde -PuiProbe
+```
+
+This adds a second, test-only plugin to the sandbox. It mounts the real panel
+with a synthetic service, in the light and the dark theme, without showing a
+window. It presses Refresh, Boot, Launch and Install through the real buttons,
+checks what the panel then displays, and writes pictures and `result.txt` to
+`build/reports/ui/`. The task fails unless the result is `passed`. Look at the
+pictures after any change to the layout. The probe never talks to a Simulator
+and is never part of the plugin zip.
+
+## Use the panel
 
 Choose an available iOS device. Boot does not erase or create one. Type an absolute
 path to a Simulator `.app` into **App**, then press **Install**. The default bundle
@@ -89,7 +108,7 @@ is separate work; this plugin does not build it.
 
 For a check without the Godot app, select the booted device and launch
 `com.apple.Preferences`. The underlying Xcode commands were tested with Settings.
-The panel itself has not been seen in an IDE.
+The panel itself has been drawn by the UI probe, not yet used by a person.
 
 The console belongs to the session. Changing device, relaunching, closing the
 project or stopping the standalone service closes its console process. Xcode
@@ -102,7 +121,7 @@ panel retains 128 Ki characters. Older output is discarded with a flag. No growi
 log files are created. These are the launcher's console pipes, not all iOS unified
 logs. App streams may be combined by `simctl`. An empty console is not a passing
 test. The `report` command reads `Documents/as3test.txt` from the app's data
-container; that path remains to be checked with the actual Simulator export.
+container. That path was read from the actual Simulator export: 14 passed, 0 failed.
 
 ## Use the same session from an agent
 
@@ -137,11 +156,12 @@ input blindly after a timeout: it may already have reached the device.
 To run the same service without an IDE:
 
 ```sh
-./gradle-offline :core:installDist
+./gradlew :core:installDist
 core/build/install/kumikae-simulator/bin/kumikae-simulator --state-dir "$PWD/build/agent"
 ```
 
-It prints an endpoint file path. Keep that process running and point the client
+The launcher needs a Java 25 on `JAVA_HOME` or the `PATH`, because the service is
+compiled for the same Java as the plugin. It prints an endpoint file path. Keep that process running and point the client
 at that file. Ctrl+C closes it. All session files go under the supplied directory.
 The exact wire format is in [protocol.md](protocol.md).
 
@@ -176,11 +196,31 @@ release. No multi-touch, audio, Unicode paste or live finger tracking is provide
 
 | Path | Job |
 |---|---|
-| `core/` | Kotlin service, Xcode commands, optional input adapter, protocol and tests. No IDE imports. |
-| `src/main/kotlin/` | Tool window and painting. Calls the service through HTTP. |
-| `src/main/resources/META-INF/plugin.xml` | One plugin id, with a macOS tool-window condition in its factory. |
+| `core/` | Kotlin service, Xcode commands, optional input adapter, protocol and tests. No IDE imports. Also the standalone service. |
+| `src/main/kotlin/.../panel/` | The tool window: repository, controller, composed view, the painted screen. |
+| `src/main/kotlin/.../ui/` | The Compose host and the small shared composables. |
+| `src/main/resources/META-INF/plugin.xml` | One plugin id; the tool window is offered on macOS only. |
+| `src/test/kotlin/` | Panel tests, the manual scheduler, and the UI probe. |
+| `src/uiProbe/plugin.xml` | Descriptor of the test-only probe plugin. |
 | `simulator.py` | Python standard-library agent client. Builds no Simulator commands. |
 | `tests/` | Client tests with a fake local service. No IDE or Simulator needed. |
 
 Android is out of scope. The protocol and input interface leave room for another
 backend without duplicating the panel or client.
+
+## Names and compatibility: the owner's to change
+
+These were decided when the plugin moved to the same build and structure as the
+owner's other JetBrains plugin. They are recorded here so they are easy to revisit.
+
+- Plugin id and package root: `app.anicanon.kumikae.as3`. The service's package is
+  `app.anicanon.kumikae.as3.simulator`. Vendor: AniCanon. Name: Kumikae AS3.
+- The plugin depends on `com.intellij.modules.platform` only, not on a Rider
+  module. It is meant for every JetBrains IDE, Rider first.
+- It installs only into platform build 262.10968.170, the installed Rider. The
+  Compose Swing library is an alpha and is only known to work there. Widening
+  the range means trying the panel in each other IDE or build first.
+- The Simulator tool window is offered on macOS only.
+- The service and the plugin both target Java 25.
+- The default bundle in the panel stays `org.kumikae.as3test`, the test app's
+  identifier. It is not the plugin's identity.

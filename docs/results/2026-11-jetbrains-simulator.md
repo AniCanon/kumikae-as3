@@ -6,7 +6,44 @@ The [design](../superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md)
 was committed before the implementation. Code and build instructions are in
 [`editors/jetbrains/`](../../editors/jetbrains/).
 
-## What was run
+## Where it stands now
+
+The first pass below was written when the build could not resolve one
+dependency, so nothing had compiled. That is no longer true. A second pass on
+the same day made the build work, checked the service against a real Simulator
+and then rebuilt the panel. No person has taken part in any check: everything
+here was run by the agent maintaining this branch. The owner has not yet opened
+the panel in Rider.
+
+| Check | Who and how | Observed result |
+|---|---|---|
+| Missing dependency | Downloaded with the owner's permission | `error_prone_annotations` 2.41.0 resolved; `:core:test buildPlugin` succeeded for the first time. |
+| Service against a real Simulator, before the rework | Standalone service and `simulator.py`, by hand | Devices listed; a booted iPhone on iOS 26.4 selected; `org.kumikae.as3test` (the Godot test app) launched; PNG screenshot 2622x1206, captured in 435 ms; console log read; test report read: "14 passed, 0 failed". |
+| Rework onto the owner's JetBrains plugin stack | This branch | Gradle wrapper 9.8.1, Kotlin 2.4.10 with Compose, ktlint 1.8.0, Compose Swing UI 0.1.0-alpha06, Java 25. Packages moved to `app.anicanon.kumikae.as3`. The single Swing class became a repository, a controller, a composed view and a composition root. |
+| `./gradlew check buildPlugin` | Gradle, offline, JDK 25 | Succeeded. Style check clean in both modules. 18 service tests and 32 panel tests ran, none failed or skipped. Plugin zip produced. |
+| Tests written first | This branch | The 10 repository tests, 18 controller tests and 3 of the 4 service-adapter tests were each seen failing before the code existed, then passing. |
+| `python3 -m unittest discover -s tests` | Python | 7 passed. The wire protocol did not change. |
+| Service against the same Simulator, after the rework | Rebuilt standalone service on Java 25 and `simulator.py`, by hand | Same sequence again: devices, select, launch of `org.kumikae.as3test`, PNG 2622x1206 captured in 565 ms, console log, report "14 passed, 0 failed". The service was stopped afterwards; the Simulator was left booted and nothing was installed on it. |
+| `./gradlew runIde -PuiProbe` | Sandbox Rider 262.10968.170, synthetic service, no window shown | `passed`. The production view was mounted in the light and dark themes; Refresh, Boot, Launch and a failing Install were pressed through the real buttons; input controls followed the service's permission; closing released the composition and closed the service. Eight pictures were written and looked at. Two layout faults were found and fixed: the device list was cut to a few characters at tool-window width, and the Home and Lock buttons were out of line. |
+
+Still not verified:
+
+- **The panel in a real Rider window, used by a person.** The probe draws the
+  panel off screen with a made-up service. Nobody has resized it, hidden it,
+  watched it follow a live Simulator or closed a project with it open.
+- **The panel's own path to a real Simulator.** The real runs went through the
+  command-line client. The panel asks for JPEG pictures and decodes them; that
+  was tested with a generated JPEG, not one from `simctl`.
+- **idb input**: taps, swipes, text, buttons and rotation. idb is not installed.
+- Any other JetBrains IDE, any other platform build, and the absence of the
+  tool window on Windows and Linux.
+- A cold boot from the panel, and installing an app from the panel.
+
+The sections below are the first pass, kept as the record of what was measured
+then. Where they say the build is blocked or the Kotlin tests have not run, the
+table above replaces them.
+
+## What was run in the first pass
 
 | Check | Observed result |
 |---|---|
@@ -44,7 +81,7 @@ This measures the command path, not IDE painting or input-to-picture delay.
 These results justify a snapshot viewer, not a claim of smooth video. End-to-end
 frame rate and delay inside Rider are unmeasured.
 
-## What has not been verified
+## What had not been verified after the first pass
 
 - Kotlin compilation and the 18 Kotlin tests. The first core tests were written
   against stubs, but dependency resolution failed before an assertion could run.
@@ -64,17 +101,16 @@ frame rate and delay inside Rider are unmeasured.
 
 ## Next verification
 
-First supply the missing annotation artifact and its metadata through an approved
-dependency download. Run the Kotlin tests and plugin build. Fix any compiler or
-test failures before calling the first version usable. Start the sandbox Rider
-and inspect the panel against the home screen and Settings, including resizing,
-hidden-panel polling, agent/IDE device changes, errors and project close.
+Start the sandbox Rider with `./gradlew runIde` and use the panel against the
+booted Simulator: the home screen, Settings and the Godot test app, including
+resizing, hidden-panel polling, agent and IDE device changes, errors and
+closing the project.
 
 Then decide whether to adopt idb's private interfaces. A compatible client and
 companion must be selected, installed and tried together. Check tap targets at
 each edge, a swipe, text, home, lock and both landscape rotations. Check that the
 agent and panel operate the same device. Until then, use Device Hub for input.
 
-When the Godot Simulator export is ready, install it explicitly, launch
-`org.kumikae.as3test`, inspect its screen and logs, and confirm the report path.
+The Godot Simulator export has been launched and its report read through the
+service. Installing it from the panel is still to be tried.
 This work does not complete the roadmap's AS3 debugger gate.
