@@ -29,6 +29,16 @@ package {
 			h.next = far;
 			r.changed.add(h.heard);
 		}
+		// A listener that was removed again, while a list of the signal's listeners is still kept: the
+		// callable in that list can still be called, so its object and what it holds must stay whole.
+		private var keptList:GodotArray;
+		public function removedButKept(r:Resource):void {
+			var h:Holder = new Holder();
+			h.res = r;
+			r.changed.add(h.heard);
+			keptList = r.getSignalConnectionList("changed");
+			r.changed.remove(h.heard);
+		}
 		public function unheld(other:Node):void { other.renamed.add(new Listener().heard); }
 		public function total():int { return Listener.total; }
 		public function byOwnField(name:String):void { mine = renamed; this[name].add(onRenamed); }

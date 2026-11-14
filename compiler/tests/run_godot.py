@@ -157,6 +157,7 @@ output = compare("signals.gd", [
     "after a failing listener", "another object's signal", "by name", "by a wrong name", "user signal", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed", "own signal field by name", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
+    "a removed listener that is still held keeps what it holds",
     "a loop whose callable is held stays", "a loop goes when its callable is let go",
     "an unheld listener stays",
 ])

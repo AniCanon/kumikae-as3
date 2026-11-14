@@ -8,6 +8,7 @@ var looped: WeakRef
 var looped_far: WeakRef
 var looped_kept: WeakRef
 var kept_listener: Callable
+var removed_kept: WeakRef
 var frames := 0
 
 func show(name: String, got, want) -> void:
@@ -37,20 +38,21 @@ func _physics_process(_delta: float) -> bool:
 		# Its owner was freed before the frame ended: nothing ran, nothing crashed.
 		show("deferred with its owner freed", is_instance_valid(late), false)
 		return false
-	if frames > 3 and frames < 40:
+	if frames > 3 and frames < 90:
 		return false # Whole frames pass: listeners are looked over once in each.
-	if frames > 40 and frames < 80:
+	if frames > 90 and frames < 180:
 		return false
-	if frames == 80:
+	if frames == 180:
 		# Once nothing holds the listener's callable either, that loop goes too.
 		show("a loop goes when its callable is let go", looped_kept.get_ref() == null, true)
 		node.queue_free()
 		other.queue_free()
 		return true
-	if frames == 40:
+	if frames == 90:
 		# A listener and the object it listens to, held only by each other, are both gone.
 		show("a loop is freed", looped.get_ref() == null, true)
 		show("a longer loop is freed", looped_far.get_ref() == null, true)
+		show("a removed listener that is still held keeps what it holds", removed_kept.get_ref() != null, true)
 		# While GDScript holds the listener's callable, the listener stays where it was.
 		var still = looped_kept.get_ref()
 		show("a loop whose callable is held stays", [still != null, still.changed.get_connections().size() if still != null else -1, kept_listener.is_valid()], [true, 1, true])
@@ -61,7 +63,7 @@ func _physics_process(_delta: float) -> bool:
 		rename(other)
 		show("an unheld listener stays", node.total() - before, 1)
 		return false
-	if frames > 80:
+	if frames > 180:
 		return true
 	# add: the listener hears the signal.
 	node.listen()
@@ -197,9 +199,16 @@ func _physics_process(_delta: float) -> bool:
 	looped_kept = weakref(resource)
 	node.loop(resource)
 	kept_listener = resource.changed.get_connections()[0].callable
+	resource = Resource.new()
+	removed_kept = weakref(resource)
+	node.removedButKept(resource)
 	resource = null
 	other.renamed.get_connections().map(func(c): other.renamed.disconnect(c.callable))
 	node.unheld(other)
-	node.keepPlain(Resource.new()) # Still held when Godot shuts down: nothing may crash then.
+	# Still held when Godot shuts down, with a GDScript listener on it too: nothing may crash then.
+	var at_exit := Resource.new()
+	at_exit.changed.connect(func(): pass)
+	node.keepPlain(at_exit)
+	at_exit = null
 	late.free()
 	return false

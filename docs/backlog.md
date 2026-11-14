@@ -99,8 +99,22 @@ Found by the review of the clean-up pass itself.
 - Objects that hold each other in a loop are freed only when a listener is part of the loop, or reaches
   it. A loop of script objects with no listener in it stays (the cycle collector, 2d). So does a loop
   that passes through a Godot collection.
-- The look for such loops runs once a frame while any listener without a Godot object of its own exists,
-  over everything those listeners reach. Its cost on a large program is not measured.
+- The look for such loops walks everything the listeners without a Godot object of their own can reach.
+  It is paced by its own cost (at most four times a second, about a fiftieth of the time), but one look
+  over 100,000 objects takes about 30 ms in one go. The cycle collector (2d) should work in steps.
+- When GDScript holds a copy of a listener's callable, the look moves that listener behind listeners added
+  after it.
+- A loop whose own field holds its listener's callable (in a Godot collection), or whose one callable is
+  in two signals, is never freed.
+- `other[name].add(f)` on another script object reaches only the Godot object's signals, not a signal the
+  other script keeps in a public field. `this[name]` finds a subclass's field before a base class's
+  private one of the same name.
+- A listener given arguments that don't fit reports its AS3 error and tells Godot the call went well, so
+  `callv` and `filter` see no failure.
+- When the scene tree is taken down, static fields are emptied and listeners stop working, so that Godot
+  objects are let go while they can still be freed. A script that runs after that sees null statics. If
+  the main loop is not a scene tree, an object held by a static field with a GDScript listener on it
+  still aborts Godot at exit.
 
 ## Stage 2a: interpreter core
 

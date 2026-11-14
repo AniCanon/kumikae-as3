@@ -5,7 +5,11 @@
 #include "lower.h"
 #include "names.h"
 
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/window.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
@@ -21,6 +25,17 @@ static uint64_t loads = 0;
 
 uint64_t Project::generation() {
 	return loads;
+}
+
+// The scene tree is being taken down: Godot is closing. What the program holds beyond the tree (in static
+// fields, and through listeners) is let go now. Later, when this library is unloaded, other scripting
+// languages are already gone, and a Godot object that one of their listeners is attached to can no longer
+// be freed safely.
+static void before_shutdown() {
+	if (program && program->valid()) {
+		release_listeners();
+		program->interpreter().clear_globals();
+	}
 }
 
 Project &Project::get() {
@@ -68,6 +83,12 @@ Project &Project::get() {
 	}
 	program->interpreter_ = std::make_unique<vm::Interpreter>(program->module_, program->host_);
 	program->valid_ = program->interpreter_->start();
+	static bool watching = false;
+	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
+	if (!watching && tree && tree->get_root()) {
+		watching = true;
+		tree->get_root()->connect("tree_exiting", callable_mp_static(&before_shutdown));
+	}
 	return *program;
 }
 

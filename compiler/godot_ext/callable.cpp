@@ -12,6 +12,8 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <algorithm>
+#include <chrono>
 #include <map>
 #include <unordered_set>
 #include <vector>
@@ -47,12 +49,13 @@ class BoundMethod : public CallableCustom {
 
 	// Lets go of the script object. After this the callable refuses to run.
 	void let_go() {
-		if (object_ && Project::generation() == program_) {
-			vm::Object *object = object_;
-			object_ = nullptr;
+		// Releasing the object may free what holds this callable, and so this callable: nothing of it is
+		// touched afterwards.
+		vm::Object *object = object_;
+		object_ = nullptr;
+		if (object && Project::generation() == program_) {
 			Project::get().interpreter().release_object(object);
 		}
-		object_ = nullptr;
 	}
 
 	// Whether the script object can still be used: its program is the one loaded, and its owner lives.
@@ -197,8 +200,40 @@ void sweep_listeners() {
 	if (!any) {
 		return;
 	}
+	// The look takes time in proportion to what the listeners reach, so it is paced by its own cost: at
+	// most four times a second, and never more than about a fiftieth of the time.
+	using Clock = std::chrono::steady_clock;
+	static Clock::time_point next;
+	const Clock::time_point started = Clock::now();
+	if (started < next) {
+		return;
+	}
+	struct Pace {
+		Clock::time_point started;
+		~Pace() {
+			Clock::duration took = Clock::now() - started;
+			next = Clock::now() + std::max<Clock::duration>(std::chrono::milliseconds(250), took * 50);
+		}
+	} pace{ started };
 	const ir::Module &module = Project::get().module();
 	vm::Interpreter &interpreter = Project::get().interpreter();
+	// A listener counts as one only while it really is in the signal it was added to. One that has been
+	// removed since (remove(), a once-only listener that ran, GDScript disconnecting it) and is still
+	// alive is held by something else, and is a reference from outside like any other.
+	for (BoundMethod *bound : bound_methods()) {
+		if (!bound->listener_ || bound->program_ != Project::generation()) {
+			continue;
+		}
+		bool connected = false;
+		if (ObjectDB::get_instance(bound->listening_to_.get_object_id())) {
+			Array connections = bound->listening_to_.get_connections();
+			for (int64_t i = 0; i < connections.size() && !connected; i++) {
+				Callable callable = Dictionary(connections[i])["callable"];
+				connected = callable.is_custom() && callable.get_custom() == bound;
+			}
+		}
+		bound->listener_ = connected;
+	}
 
 	struct Thing {
 		int64_t references = 0; // What it says of itself.

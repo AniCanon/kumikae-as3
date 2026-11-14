@@ -57,6 +57,14 @@ Interpreter::~Interpreter() {
 	}
 }
 
+void Interpreter::clear_globals() {
+	for (size_t i = 0; i < globals_.size(); i++) {
+		Slot value = globals_[i];
+		globals_[i].bits = 0;
+		drop(module_.globals[i].kind, value);
+	}
+}
+
 // Gives up the reference a slot holds.
 void Interpreter::drop(Kind p_kind, Slot &p_slot) {
 	if (p_kind == Kind::Str) {

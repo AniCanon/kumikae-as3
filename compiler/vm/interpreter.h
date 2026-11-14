@@ -82,6 +82,9 @@ private:
 public:
 	Interpreter(const ir::Module &p_module, Host &p_host);
 	~Interpreter();
+	// Empties every static field and package variable: what they held is let go. For a host that is
+	// shutting down and must let go of the engine's objects while the engine can still free them.
+	void clear_globals();
 	Interpreter(const Interpreter &) = delete;
 	Interpreter &operator=(const Interpreter &) = delete;
 

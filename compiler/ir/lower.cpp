@@ -1323,10 +1323,12 @@ class Lowerer {
 		if (object != Kind::Ref && !script) {
 			return NONE;
 		}
-		// A script object goes as itself: the name may be one of its own fields that holds a signal.
+		// `this` goes as itself: the name may be one of the script's own fields that holds a signal.
+		// Another script object goes as the Godot object behind it: its fields are its own business.
 		bool of_value = false;
-		uint32_t object_reg = script ? (index->object->kind == NodeKind::ThisExpr ? 0u : receiver(index->object))
-									 : engine_receiver(index->object, p_expression->offset, &of_value);
+		uint32_t object_reg = script && index->object->kind == NodeKind::ThisExpr && !fn().is_static
+				? 0u
+				: engine_receiver(index->object, p_expression->offset, &of_value);
 		*r_object = settled(object_reg, index->index, p_expression->offset);
 		*r_object = settled(*r_object, p_later, p_expression->offset);
 		*r_name = settled(expression(index->index, Kind::Str), p_later, p_expression->offset);
