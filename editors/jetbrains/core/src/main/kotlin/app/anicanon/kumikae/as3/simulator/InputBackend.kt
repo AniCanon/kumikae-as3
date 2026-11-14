@@ -13,20 +13,33 @@ interface InputBackend {
 object NoInput : InputBackend {
     override val enabled = false
     override val scale = 1.0
-    override fun send(device: String, operation: String, args: List<String>): Nothing =
-        throw SimulatorException("INPUT_DISABLED", "Input needs an explicitly enabled idb installation. Use Device Hub for input.")
+    override fun send(device: String, operation: String, args: List<String>): Nothing = throw SimulatorException(
+        "INPUT_DISABLED",
+        "Input needs an explicitly enabled idb installation. Use Device Hub for input.",
+    )
 }
 
-class IdbInput(private val executable: String, private val targetDevice: String, override val scale: Double,
-               private val runner: CommandRunner) : InputBackend {
+class IdbInput(
+    private val executable: String,
+    private val targetDevice: String,
+    override val scale: Double,
+    private val runner: CommandRunner,
+) : InputBackend {
     init {
-        require(Path.of(executable).isAbsolute && Files.isExecutable(Path.of(executable))) { "idb must be an absolute executable path" }
+        require(Path.of(executable).isAbsolute && Files.isExecutable(Path.of(executable))) {
+            "idb must be an absolute executable path"
+        }
         require(scale.isFinite() && scale in 1.0..10.0) { "Set the selected device's pixels per point (1–10)" }
     }
     override val enabled = true
     override fun supports(device: String) = device == targetDevice
     override fun send(device: String, operation: String, args: List<String>) {
-        if (!supports(device)) throw SimulatorException("INPUT_DEVICE_MISMATCH", "idb scale is configured for a different device")
+        if (!supports(
+                device,
+            )
+        ) {
+            throw SimulatorException("INPUT_DEVICE_MISMATCH", "idb scale is configured for a different device")
+        }
         runner.run(Commands.input(executable, device, operation, args), 15_000)
     }
 

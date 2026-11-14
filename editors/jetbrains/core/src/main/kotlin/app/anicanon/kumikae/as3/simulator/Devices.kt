@@ -11,8 +11,12 @@ object Devices {
             .flatMap { (runtime, entries) ->
                 entries.asJsonArray.filter { it.asJsonObject["isAvailable"]?.asBoolean == true }.map {
                     val d = it.asJsonObject
-                    Device(d["udid"].asString, d["name"].asString,
-                        "iOS " + runtime.substringAfter(".iOS-").replace('-', '.'), d["state"].asString)
+                    Device(
+                        d["udid"].asString,
+                        d["name"].asString,
+                        "iOS " + runtime.substringAfter(".iOS-").replace('-', '.'),
+                        d["state"].asString,
+                    )
                 }
             }.sortedWith(compareBy(Device::runtime, Device::name, Device::id))
     } catch (e: RuntimeException) {

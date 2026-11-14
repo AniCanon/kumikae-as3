@@ -20,30 +20,50 @@ data class Endpoint(val version: Int, val port: Int, val token: String)
 object SessionDirectory {
     fun create(parent: Path): Path {
         Files.createDirectories(parent)
-        return Files.createTempDirectory(parent, "simulator-",
-            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")))
+        return Files.createTempDirectory(
+            parent,
+            "simulator-",
+            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")),
+        )
     }
 }
 
 class LocalServer(private val directory: Path, private val protocol: Protocol) : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 8)
-    private val executor = ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS, ArrayBlockingQueue(4),
-        { work -> Thread(work, "kumikae-simulator-api").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
-    val endpoint = Endpoint(1, server.address.port,
-        Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) }))
+    private val executor = ThreadPoolExecutor(
+        2,
+        2,
+        0,
+        TimeUnit.SECONDS,
+        ArrayBlockingQueue(4),
+        { work -> Thread(work, "kumikae-simulator-api").apply { isDaemon = true } },
+        ThreadPoolExecutor.AbortPolicy(),
+    )
+    val endpoint = Endpoint(
+        1,
+        server.address.port,
+        Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) }),
+    )
     val endpointFile: Path = directory.resolve("session.json")
 
     init {
         try {
             server.executor = executor
             server.createContext("/v1", ::handle)
-            Files.newByteChannel(endpointFile, setOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE),
-                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))).use {
+            Files.newByteChannel(
+                endpointFile,
+                setOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE),
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")),
+            ).use {
                 val bytes = java.nio.ByteBuffer.wrap(Gson().toJson(endpoint).toByteArray(Charsets.UTF_8))
                 while (bytes.hasRemaining()) it.write(bytes)
             }
             server.start()
-        } catch (e: Exception) { server.stop(0); executor.shutdownNow(); throw e }
+        } catch (e: Exception) {
+            server.stop(0)
+            executor.shutdownNow()
+            throw e
+        }
     }
 
     private fun handle(exchange: HttpExchange) {
@@ -51,12 +71,22 @@ class LocalServer(private val directory: Path, private val protocol: Protocol) :
             val expected = "Bearer ${endpoint.token}".toByteArray(Charsets.UTF_8)
             val supplied = (it.requestHeaders.getFirst("Authorization") ?: "").toByteArray(Charsets.UTF_8)
             if (!MessageDigest.isEqual(expected, supplied) || it.requestHeaders.containsKey("Origin")) {
-                reply(it, 401, "{\"error\":\"Unauthorized\"}"); return
+                reply(it, 401, "{\"error\":\"Unauthorized\"}")
+                return
             }
-            if (it.requestURI.toString() != "/v1") { reply(it, 404, "{}"); return }
-            if (it.requestMethod != "POST") { reply(it, 405, "{}"); return }
+            if (it.requestURI.toString() != "/v1") {
+                reply(it, 404, "{}")
+                return
+            }
+            if (it.requestMethod != "POST") {
+                reply(it, 405, "{}")
+                return
+            }
             val body = it.requestBody.readNBytes(Protocol.MAX_REQUEST + 1)
-            if (body.size > Protocol.MAX_REQUEST) { reply(it, 413, "{}"); return }
+            if (body.size > Protocol.MAX_REQUEST) {
+                reply(it, 413, "{}")
+                return
+            }
             reply(it, 200, protocol.respond(body.toString(Charsets.UTF_8)))
         }
     }

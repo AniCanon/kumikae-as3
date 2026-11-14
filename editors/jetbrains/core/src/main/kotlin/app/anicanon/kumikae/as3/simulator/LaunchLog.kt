@@ -14,8 +14,13 @@ class LaunchLog(private val start: (List<String>) -> Process = { ProcessBuilder(
         close()
         bundle = app
         buffer.append("session", "Launching $app\n")
-        val child = try { start(Commands.launch(device, app)) }
-        catch (e: java.io.IOException) { throw SimulatorException("PROCESS_FAILED", "Cannot start console launcher: ${e.message}") }
+        val child = try {
+            start(Commands.launch(device, app))
+        } catch (
+            e: java.io.IOException,
+        ) {
+            throw SimulatorException("PROCESS_FAILED", "Cannot start console launcher: ${e.message}")
+        }
         process = child
         child.outputStream.close()
         pump(child.inputStream, "stdout")
@@ -23,25 +28,29 @@ class LaunchLog(private val start: (List<String>) -> Process = { ProcessBuilder(
         return status() + ("state" to "starting")
     }
 
-    fun status(): Map<String, Any?> = mapOf("bundle" to bundle,
+    fun status(): Map<String, Any?> = mapOf(
+        "bundle" to bundle,
         "running" to (process?.isAlive == true),
-        "exitCode" to process?.let { if (it.isAlive) null else it.exitValue() })
+        "exitCode" to process?.let { if (it.isAlive) null else it.exitValue() },
+    )
 
     private fun pump(stream: InputStream, label: String) {
-        readers.add(thread(name = "kumikae-simulator-$label", isDaemon = true) {
-            try {
-                stream.reader(Charsets.UTF_8).use { reader ->
-                    val chars = CharArray(4096)
-                    while (true) {
-                        val count = reader.read(chars)
-                        if (count < 0) break
-                        buffer.append(label, String(chars, 0, count))
+        readers.add(
+            thread(name = "kumikae-simulator-$label", isDaemon = true) {
+                try {
+                    stream.reader(Charsets.UTF_8).use { reader ->
+                        val chars = CharArray(4096)
+                        while (true) {
+                            val count = reader.read(chars)
+                            if (count < 0) break
+                            buffer.append(label, String(chars, 0, count))
+                        }
                     }
+                } catch (_: java.io.IOException) {
+                    // Closing the session interrupts a pipe read.
                 }
-            } catch (_: java.io.IOException) {
-                // Closing the session interrupts a pipe read.
-            }
-        })
+            },
+        )
     }
 
     override fun close() {

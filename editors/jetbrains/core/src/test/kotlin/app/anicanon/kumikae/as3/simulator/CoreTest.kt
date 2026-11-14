@@ -1,6 +1,8 @@
 package app.anicanon.kumikae.as3.simulator
 
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class CoreTest {
@@ -46,14 +48,29 @@ class CoreTest {
     @Test fun `commands target one device and keep paths and text as single arguments`() {
         assertEquals(listOf("/usr/bin/xcrun", "simctl", "list", "-j", "devices", "available"), Commands.list())
         assertEquals(listOf("/usr/bin/xcrun", "simctl", "bootstatus", "test-phone", "-b"), Commands.boot("test-phone"))
-        assertEquals(listOf("/usr/bin/xcrun", "simctl", "io", "test-phone", "screenshot", "--type=png", "/tmp/a b.png"),
-            Commands.screenshot("test-phone", "/tmp/a b.png", "png"))
-        assertEquals(listOf("/usr/bin/xcrun", "simctl", "install", "test-phone", "/tmp/a b.app"),
-            Commands.install("test-phone", "/tmp/a b.app"))
-        assertEquals(listOf("/usr/bin/xcrun", "simctl", "launch", "--terminate-running-process",
-            "--console", "test-phone", "org.kumikae.as3test"),
-            Commands.launch("test-phone", "org.kumikae.as3test"))
-        assertEquals(listOf("/tools/idb", "ui", "text", "--udid", "test-phone", "--", "hello; $(false)"),
-            Commands.input("/tools/idb", "test-phone", "text", listOf("hello; $(false)")))
+        assertEquals(
+            listOf("/usr/bin/xcrun", "simctl", "io", "test-phone", "screenshot", "--type=png", "/tmp/a b.png"),
+            Commands.screenshot("test-phone", "/tmp/a b.png", "png"),
+        )
+        assertEquals(
+            listOf("/usr/bin/xcrun", "simctl", "install", "test-phone", "/tmp/a b.app"),
+            Commands.install("test-phone", "/tmp/a b.app"),
+        )
+        assertEquals(
+            listOf(
+                "/usr/bin/xcrun",
+                "simctl",
+                "launch",
+                "--terminate-running-process",
+                "--console",
+                "test-phone",
+                "org.kumikae.as3test",
+            ),
+            Commands.launch("test-phone", "org.kumikae.as3test"),
+        )
+        assertEquals(
+            listOf("/tools/idb", "ui", "text", "--udid", "test-phone", "--", "hello; $(false)"),
+            Commands.input("/tools/idb", "test-phone", "text", listOf("hello; $(false)")),
+        )
     }
 }

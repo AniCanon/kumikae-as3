@@ -8,9 +8,15 @@ fun main(args: Array<String>) {
     require(args.size == 2 && args[0] == "--state-dir") { "Usage: kumikae-simulator --state-dir <local directory>" }
     val session = LocalSession(Path.of(args[1]).toAbsolutePath())
     val stopped = CountDownLatch(1)
-    Runtime.getRuntime().addShutdownHook(Thread {
-        try { session.close() } finally { stopped.countDown() }
-    })
+    Runtime.getRuntime().addShutdownHook(
+        Thread {
+            try {
+                session.close()
+            } finally {
+                stopped.countDown()
+            }
+        },
+    )
     println("Endpoint file: ${session.server.endpointFile}")
     stopped.await()
 }

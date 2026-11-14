@@ -2,7 +2,9 @@ package app.anicanon.kumikae.as3.simulator
 
 data class Pixel(val x: Int, val y: Int)
 data class Geometry(val width: Int, val height: Int) {
-    init { require(width > 0 && height > 0) { "Image dimensions must be positive" } }
+    init {
+        require(width > 0 && height > 0) { "Image dimensions must be positive" }
+    }
 
     fun point(x: Double, y: Double, scale: Double): Pixel {
         require(x.isFinite() && y.isFinite() && x >= 0 && y >= 0 && x < width && y < height) {

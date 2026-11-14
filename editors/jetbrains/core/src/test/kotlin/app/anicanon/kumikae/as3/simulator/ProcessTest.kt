@@ -1,6 +1,9 @@
 package app.anicanon.kumikae.as3.simulator
 
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -28,7 +31,9 @@ class ProcessTest {
         var child: Process? = null
         val logs = LaunchLog { command ->
             assertEquals(Commands.launch("phone", "org.test.app"), command)
-            ProcessBuilder("/bin/sh", "-c", "echo output; echo diagnostic >&2; exec sleep 30").start().also { child = it }
+            ProcessBuilder("/bin/sh", "-c", "echo output; echo diagnostic >&2; exec sleep 30").start().also {
+                child = it
+            }
         }
         logs.launch("phone", "org.test.app")
         val deadline = System.nanoTime() + 2_000_000_000
@@ -43,14 +48,29 @@ class ProcessTest {
     @Test fun `private input cannot reuse a scale for another device`() {
         val executable = Path.of(System.getProperty("java.home"), "bin", "java").toString()
         val calls = mutableListOf<List<String>>()
-        val input = IdbInput(executable, "phone", 3.0, CommandRunner { command, _ -> calls.add(command); "" })
+        val input = IdbInput(
+            executable,
+            "phone",
+            3.0,
+            CommandRunner { command, _ ->
+                calls.add(command)
+                ""
+            },
+        )
         input.send("phone", "swipe", listOf("0", "10", "50", "20", "--duration", "0.4"))
-        assertEquals(listOf(executable, "ui", "swipe", "--udid", "phone", "0", "10", "50", "20", "--duration", "0.4"), calls.single())
+        assertEquals(
+            listOf(executable, "ui", "swipe", "--udid", "phone", "0", "10", "50", "20", "--duration", "0.4"),
+            calls.single(),
+        )
         assertThrows(SimulatorException::class.java) { input.send("other", "button", listOf("HOME")) }
         assertEquals(1, calls.size)
-        assertEquals(listOf(executable, "ui", "rotate", "--udid", "phone", "LANDSCAPE_LEFT"),
-            Commands.input(executable, "phone", "rotate", listOf("LANDSCAPE_LEFT")))
-        assertEquals(listOf(executable, "ui", "button", "--udid", "phone", "LOCK"),
-            Commands.input(executable, "phone", "button", listOf("LOCK")))
+        assertEquals(
+            listOf(executable, "ui", "rotate", "--udid", "phone", "LANDSCAPE_LEFT"),
+            Commands.input(executable, "phone", "rotate", listOf("LANDSCAPE_LEFT")),
+        )
+        assertEquals(
+            listOf(executable, "ui", "button", "--udid", "phone", "LOCK"),
+            Commands.input(executable, "phone", "button", listOf("LOCK")),
+        )
     }
 }

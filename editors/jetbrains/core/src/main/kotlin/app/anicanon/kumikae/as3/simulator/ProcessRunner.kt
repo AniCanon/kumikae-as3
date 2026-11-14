@@ -10,8 +10,13 @@ fun interface CommandRunner {
 
 class ProcessRunner : CommandRunner {
     override fun run(command: List<String>, timeoutMs: Long): String {
-        val process = try { ProcessBuilder(command).start() }
-        catch (e: java.io.IOException) { throw SimulatorException("PROCESS_FAILED", "Cannot start ${command.first()}: ${e.message}") }
+        val process = try {
+            ProcessBuilder(command).start()
+        } catch (
+            e: java.io.IOException,
+        ) {
+            throw SimulatorException("PROCESS_FAILED", "Cannot start ${command.first()}: ${e.message}")
+        }
         process.outputStream.close()
         val out = drain(process.inputStream)
         val err = drain(process.errorStream)
@@ -22,8 +27,11 @@ class ProcessRunner : CommandRunner {
             val output = out.get(2, TimeUnit.SECONDS)
             val errors = err.get(2, TimeUnit.SECONDS)
             if (process.exitValue() != 0) {
-                throw SimulatorException("PROCESS_FAILED", errors.take(4096).ifBlank { output.take(4096) }
-                    .ifBlank { "Command exited ${process.exitValue()}" })
+                throw SimulatorException(
+                    "PROCESS_FAILED",
+                    errors.take(4096).ifBlank { output.take(4096) }
+                        .ifBlank { "Command exited ${process.exitValue()}" },
+                )
             }
             return output
         } finally {

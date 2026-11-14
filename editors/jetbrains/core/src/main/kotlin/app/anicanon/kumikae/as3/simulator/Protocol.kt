@@ -1,6 +1,13 @@
 package app.anicanon.kumikae.as3.simulator
 
-import com.google.gson.*
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
+import com.google.gson.JsonNull
+import com.google.gson.JsonObject
+import com.google.gson.JsonParseException
+import com.google.gson.JsonPrimitive
+import com.google.gson.Strictness
 import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonToken
 import java.io.StringReader
@@ -43,8 +50,8 @@ class Protocol(private val dispatch: (String, JsonObject) -> Any) {
         }
     }
 
-    private fun error(id: String?, code: String, message: String) = gson.toJson(
-        mapOf("version" to 1, "id" to id, "error" to mapOf("code" to code, "message" to message)))
+    private fun error(id: String?, code: String, message: String) =
+        gson.toJson(mapOf("version" to 1, "id" to id, "error" to mapOf("code" to code, "message" to message)))
 
     private fun readValue(reader: JsonReader, depth: Int): JsonElement {
         require(depth <= 8) { "JSON is nested too deeply" }
@@ -58,18 +65,29 @@ class Protocol(private val dispatch: (String, JsonObject) -> Any) {
                 }
                 reader.endObject()
             }
+
             JsonToken.BEGIN_ARRAY -> JsonArray().also { array ->
                 reader.beginArray()
                 while (reader.hasNext()) array.add(readValue(reader, depth + 1))
                 reader.endArray()
             }
+
             JsonToken.STRING -> JsonPrimitive(reader.nextString())
+
             JsonToken.NUMBER -> JsonPrimitive(BigDecimal(reader.nextString()))
+
             JsonToken.BOOLEAN -> JsonPrimitive(reader.nextBoolean())
-            JsonToken.NULL -> { reader.nextNull(); JsonNull.INSTANCE }
+
+            JsonToken.NULL -> {
+                reader.nextNull()
+                JsonNull.INSTANCE
+            }
+
             else -> throw IllegalArgumentException("Invalid JSON value")
         }
     }
 
-    companion object { const val MAX_REQUEST = 65536 }
+    companion object {
+        const val MAX_REQUEST = 65536
+    }
 }

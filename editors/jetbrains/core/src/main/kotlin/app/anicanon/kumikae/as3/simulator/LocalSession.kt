@@ -21,10 +21,14 @@ class LocalSession(parent: Path) : AutoCloseable {
     }
 
     override fun close() {
-        try { server.close() }
-        finally {
-            try { session.close() }
-            finally { Files.deleteIfExists(directory) }
+        try {
+            server.close()
+        } finally {
+            try {
+                session.close()
+            } finally {
+                Files.deleteIfExists(directory)
+            }
         }
     }
 }

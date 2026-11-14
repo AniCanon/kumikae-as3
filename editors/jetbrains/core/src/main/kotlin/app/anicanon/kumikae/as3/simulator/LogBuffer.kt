@@ -4,7 +4,9 @@ data class LogEntry(val cursor: Long, val stream: String, val text: String)
 data class LogPage(val entries: List<LogEntry>, val nextCursor: Long, val truncated: Boolean)
 
 class LogBuffer(private val maxCharacters: Int = 256 * 1024) {
-    init { require(maxCharacters > 0) }
+    init {
+        require(maxCharacters > 0)
+    }
     private val entries = ArrayDeque<LogEntry>()
     private var characters = 0
     private var cursor = 0L

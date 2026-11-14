@@ -1,6 +1,8 @@
 package app.anicanon.kumikae.as3.simulator
 
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.HttpURLConnection
 import java.net.URI
@@ -16,8 +18,12 @@ class ServerTest {
         assertEquals(401, connection.responseCode)
         connection.disconnect()
         assertTrue(ApiClient(descriptor).call("devices").asJsonObject["ok"].asBoolean)
-        assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(
-            Files.getPosixFilePermissions(dir.resolve("session.json"))))
+        assertEquals(
+            "rw-------",
+            java.nio.file.attribute.PosixFilePermissions.toString(
+                Files.getPosixFilePermissions(dir.resolve("session.json")),
+            ),
+        )
         server.close()
         assertFalse(Files.exists(dir.resolve("session.json")))
         Files.delete(dir)
