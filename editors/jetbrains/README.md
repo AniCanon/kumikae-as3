@@ -7,19 +7,21 @@ its measurements are described in the results below.
 | Checked | By | Result |
 |---|---|---|
 | Compilation, style check and plugin zip | Automated build, 2026-11-14 | `./gradlew check buildPlugin` succeeds. |
-| Service tests (`core`) | Automated build | 46 pass. |
-| Panel tests (repository, controller, service adapter) | Automated build | 75 pass. |
+| Service tests (`core`) | Automated build | 62 pass. |
+| Panel tests (repository, controller, service adapter) | Automated build | 105 pass. |
 | Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
+| Native Swift tests | `swift test` | 16 pass. |
 | Agent client tests | `python3 -m unittest` | 7 pass. |
 | Service and agent client against a booted Simulator | Run by hand through `simulator.py` | Devices, select, launch of `org.kumikae.as3test`, a 2622x1206 PNG screenshot, console log, and the test report "14 passed, 0 failed". |
 | The panel's own repository against a booted Simulator | One throwaway test, read-only | Select, a decoded 1206x2622 JPEG picture in 403 ms, an empty console page and status. |
 | Panel layout and buttons | UI probe in a sandbox Rider, with a synthetic service | Light and dark pictures under `build/reports/ui/`; Refresh, Boot and Launch pressed through the real buttons. |
 | The panel in a Rider window, by a person | Owner | Snapshot version was slow; live version still needs the owner's acceptance. |
-| Live panel against a booted Simulator | Automated visible sandbox probe | 25.30 painted frames/s; warm mouse release to input acknowledgment 88–104 ms; no new paints while still or hidden. Cold first-touch handoff remains about 489 ms. |
-| Ten-minute stream and input | Production service in a small harness | Mean 26.42 frames/s consumed; retained heap 5.655 MiB at one minute and 5.706 MiB at ten minutes. Owned children exited. This was not a ten-minute Rider heap measurement. |
+| Native panel against a booted Simulator | Automated visible sandbox probe | 63.45 distinct frames painted/s at 1206×2622; observation-to-paint p50 21.48 ms, p95 32.13 ms; press-to-input barrier acknowledgment 3.95–18.70 ms. These are not optical presentation or application-response timings. |
+| Native ten-minute visible panel | Automated sandbox probe | Mean 58.92 frames/s, minute windows 46.39–64.23; helper RSS 41.78–53.94 MiB. IDE heap samples were bounded but ended higher; absence of IDE memory growth is not established. |
+| Earlier idb ten-minute stream and input | Production service in a small harness | Mean 26.42 frames/s consumed; retained heap 5.655 MiB at one minute and 5.706 MiB at ten minutes. Owned children exited. This was not a ten-minute Rider heap measurement. |
 | idb input against a booted Simulator | `simulator.py` and the sandbox panel probe | Density 3; Home, taps and Settings swipes observed. Earlier text, Lock and Rotate commands were accepted, without a separate visual confirmation. |
 
-The [design](../../docs/superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md)
+The [native design](../../docs/superpowers/specs/2026-11-14-simulator-native-design.md)
 compares screen and input options. The [results](../../docs/results/2026-11-jetbrains-simulator.md)
 give the detail behind this table. [ARCHITECTURE.md](ARCHITECTURE.md) describes the
 parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
@@ -31,10 +33,13 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   drawn device body (with the camera housing on the models that have one) are in the device's tab.
 - A macOS-only **iOS Simulator** tool window. Select a device, boot it, view its
   screen, install an explicit `.app`, launch a bundle, and read console output.
-- Live MJPEG after the owner's idb switch, using binary frames and retaining only
-  the newest picture. A private companion and persistent input shell belong to
-  the session. With input off, the panel retains JPEG snapshots, capped at two
-  requests per second. Hidden windows and the Simulators list stop pictures.
+- Full-resolution native pictures after the owner's private-input switch. A
+  service-owned Swift helper reads the Simulator framebuffer into one mapped slot.
+  Copies happen off the UI thread; only the newest picture survives. Static device
+  decoration is cached at display density, with a 16 MiB allocation limit. If the
+  helper cannot start, the panel tries installed idb MJPEG, then public screenshots
+  and names the route in its status line. With input off, the panel retains JPEG
+  snapshots, capped at two requests per second. Hidden windows and the Simulators list stop pictures.
   Failed live streams report a retry with bounded backoff.
 - One action at a time. A button pressed while another action runs is refused
   with a message, never queued. A picture that arrives after the device changed,
@@ -42,17 +47,19 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   action runs is refused too; the list returns to the service's device.
 - An agent command-line client that talks to the same service as the panel.
   It saves PNG screenshots, reads logs and the test report, and offers input.
-- Optional idb input and live video: click to tap, drag and release to swipe,
-  type text, Home, Lock and Rotate. Both are off until the owner's existing switch
-  is enabled. Input keeps one idb connection warm instead of starting Python per event.
+- Native input tracks press, movement and release live; pending moves coalesce.
+  Taps, printable ASCII text, Home and Lock use the same persistent helper. Native
+  rotation returns an explicit unsupported error. The idb fallback retains its
+  release-time swipe and rotation behavior. Both routes require the owner's switch.
 - Tests for protocol validation, geometry, device parsing, command construction,
   log limits, process timeouts, session cleanup and HTTP authentication, and for
   the panel's state: stale pictures, refused actions, failures, the console
   cursor, input permission, hidden windows and late results after closing.
 
-Without idb, use Apple's Device Hub window for input. No private framework is
-loaded by this plugin itself. Switching input on runs idb for input and live video, which use those interfaces.
-The plugin installs idb only when you choose Install idb… and agree to its dialog.
+The bundled helper needs no idb at runtime. It loads private Apple interfaces only
+after the existing opt-in. It currently accepts the measured Apple-silicon Xcode
+27.0 build 27A266a and iPhone devices. Other builds/devices fall back. The plugin
+installs idb only when you explicitly choose Install idb… and agree to its dialog.
 
 This is the beginning of the one plugin planned in roadmap stage 6. It does not
 yet connect `kas3c lsp`, set AS3 breakpoints or step through scripts. Keep using
@@ -66,7 +73,11 @@ The build needs JDK 25 and an installed Rider 2026.2 (build 262.10968.170). It u
 the Gradle wrapper (Gradle 9.8.1), Kotlin 2.4.10 with the Compose compiler plugin,
 the IntelliJ Platform Gradle Plugin 2.20.0, ktlint 1.8.0 and Compose Swing UI
 0.1.0-alpha06. It compiles against the installed IDE and never downloads one.
-Rider's own runtime is a JDK 25, so the plugin needs nothing extra at run time.
+Rider's own runtime is a JDK 25. Building the native helper also needs installed
+Swift 6; `buildSimulatorBridge` runs `swift build -c release` and bundles the
+executable and its resource bundle in `native/`. Without installed Swift on macOS
+that task logs a skip. It downloads nothing. Run `swift test` in
+`native/SimulatorBridge` for the helper tests.
 
 From this directory, with `JAVA_HOME` set to a JDK 25:
 
@@ -107,8 +118,13 @@ with a synthetic service, in the light and the dark theme, without showing a
 window. It presses Refresh, Boot, Launch and Install through the real buttons,
 checks what the panel then displays, and writes pictures and `result.txt` to
 `build/reports/ui/`. The task fails unless the result is `passed`. Look at the
-pictures after any change to the layout. The probe never talks to a Simulator
-and is never part of the plugin zip.
+pictures after any change to the layout. The default probe never talks to a
+Simulator and is never part of the plugin zip.
+An explicitly enabled `KUMIKAE_SIMULATOR_LIVE_PROBE=1` run uses the already booted
+demo device's Home and Settings, real Swing pointer phases and native input. Adding
+`KUMIKAE_SIMULATOR_ENDURANCE_PROBE=1` extends that run by ten minutes, sampling CPU,
+heap and RSS. The live run requires the native route, checks that hiding the panel
+releases its helper, and reports measurements without asserting performance targets.
 
 ## Use the panel
 
@@ -179,34 +195,39 @@ The exact wire format is in [protocol.md](protocol.md).
 
 ## Input: the owner's switch
 
-Live pictures, taps, swipes, typing, Home, Lock and Rotate use idb, a tool from Meta that drives the
-Simulator through Apple's private input services. Apple can change those without notice. Nothing
-here installs it or turns it on by itself:
+The existing **⋮ > Switch input on…** confirmation permits private Apple interfaces
+for pictures and input and remembers the choice. The native helper is tried first;
+installed idb is the fallback. With the switch off, pictures use public `simctl`.
+Missing frameworks, symbols, unsupported Xcode builds or startup failures select
+the next route and display a reason. Input already submitted is never replayed.
 
-1. In the panel, choose **⋮ > Switch input on…** and agree. The choice is remembered.
-2. If idb is not on this Mac, the menu then offers **Install idb…**. It says what will be installed
-   and from where, asks, runs `tools/install-idb.sh` (its companion from Meta's Homebrew tap, its
-   client in its own Python environment), shows what the script printed in the console, and
-   switches input on. The same script can be run by hand. It needs Homebrew.
+The helper's private surface and Xcode guard are documented in
+[native/SimulatorBridge/README.md](native/SimulatorBridge/README.md). It owns no
+Simulator window and needs no Screen Recording permission. Hiding the panel stops
+its frame subscription and helper. Reopening creates a fresh connection.
 
-The service finds idb in `~/.local/bin`, Homebrew's folder or along `PATH`, and reads each device's
-pixels per point from idb's description. It starts a private companion, input shell and video
-child, and stops them on session closure. It leaves companions started by other tools alone. A device idb cannot describe stays in viewer mode and says why.
+The optional **Install idb…** dialog explains and asks before running
+`tools/install-idb.sh`. Existing idb is found in
+`~/.local/bin`, Homebrew's folder or `PATH`. The fallback owns its companion, input
+shell and video child and leaves other tools' companions alone.
 
-The standalone service has no panel to ask, so the owner's switch is an environment variable:
+The standalone service has no panel to ask. Set its explicit opt-in and helper path:
 
 ```sh
 export KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT=1
-export KUMIKAE_SIMULATOR_IDB=/absolute/path/to/idb   # only if idb is somewhere unusual
+export KUMIKAE_SIMULATOR_NATIVE=/absolute/path/to/simulator-bridge
+export KUMIKAE_SIMULATOR_IDB=/absolute/path/to/idb   # optional fallback override
 ```
 
-Text is printable ASCII only. A drag is one swipe, sent when the mouse is released. There is no
-multi-touch, audio, Unicode paste or live finger tracking.
+Text is printable ASCII using US keyboard usages. Native drags follow the pointer
+live. There is no multi-touch, audio or Unicode paste. Lock is implemented but has
+not been visually verified on the shared device; native rotation is unsupported.
 
 ## Layout of the code
 
 | Path | Job |
 |---|---|
+| `native/SimulatorBridge/` | Swift library, thin executable, shared frame layout and native tests. |
 | `core/` | Kotlin service, Xcode commands, optional input adapter, protocol and tests. No IDE imports. Also the standalone service. |
 | `src/main/kotlin/.../panel/` | The tool window: repository, controller, composed view, the painted screen. |
 | `src/main/kotlin/.../ui/` | The Compose host and the small shared composables. |

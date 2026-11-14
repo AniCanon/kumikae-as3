@@ -312,3 +312,306 @@ Every probe stopped the children it started.
   shell reuse, a closed stream appearing healthy, late geometry binding after
   close, and cleanup that did not await children at service or JVM exit. These
   findings were fixed before the final build.
+
+## Native framebuffer and input measurements — 2026-11-14
+
+Work on `feat/simulator-native`, in its own worktree. The installed tools reported
+Xcode 27.0 build 27A266a, Swift 6.4, macOS 27.2.1, iOS 26.4 and JDK 25. No downloads,
+app installs, simulator creation, erasure, intentional shutdown or reboot were
+performed. Only the already booted demo device's Home and Settings were driven.
+The helper and all sandbox probes owned their own processes; other tools' processes
+and the owner's windows were left alone.
+
+### Decision and the rejected routes
+
+Choose the CoreSimulator main-display IOSurface and a single mapped BGRA frame
+slot. The surface was **1206×2622**, stride **4864**, payload **12,753,408 bytes**.
+A read-only lock/copy/unlock probe recorded 39 copies: most were 0.2–0.3 ms, maximum
+2.63 ms. That is copying cost, not presentation latency. The final helper polls
+seeds every 8 ms and skips unchanged or concurrently changing surfaces. It registers
+no private display callbacks and captures no window chrome.
+
+Screen Recording preflight (`CGPreflightScreenCaptureAccess`) returned false.
+ScreenCaptureKit was therefore unavailable without asking for another permission;
+no permission prompt or timing run was attempted. It also needs a visible source
+window. There is **no measured ScreenCaptureKit performance comparison**, and
+headless operation of the chosen route was not separately tested by closing the
+owner's windows.
+
+A Python transport comparison used identical 12.75 MB payloads, ten warmups and
+100 measured request/write/read cycles. Pipe median/p95 were **1.630/1.977 ms**;
+mapped-slot median/p95 were **0.470/0.589 ms**. The mapping used record locks. These
+numbers exclude Simulator capture, Kotlin conversion and painting; they motivated
+the mapped transport, not an end-to-end latency claim.
+
+Input uses the guest **DTUHID XPC service**, not the older legacy HID client. The
+legacy path acknowledged sends but a 40-move Settings drag produced zero changed
+frames and an unchanged screenshot. An initial live-probe run on that broken path
+reported only 5.53 painted frames/s. Its fast acknowledgments were not evidence of
+delivered input. Read-only inspection of installed Apple receiver code established
+the new message schema. With DTUHID, the same gesture changed 79 frames in 1.323 s,
+and a screenshot visibly confirmed scrolling. Home was confirmed; native text
+`Display` visibly appeared in Settings search. Lock was not visually checked.
+
+**Exploration incident:** an early private screen-callback probe with nil optional
+callbacks coincided with two SimRenderServer crashes and dependent backboardd and
+test-app failures. The server fault dereferenced a null callback, making the probe
+the likely cause; causation was not completely established. The owner was informed,
+live probing stopped while the ABI was inspected, and that registration path was
+removed from the implementation. The helper uses seed polling only. No deliberate
+Simulator restart was used to recover or test it.
+
+### Actual panel, short run before the decoration cache
+
+The production controller/repository/screen ran in a visible sandbox Rider. Real
+mouse press/release events exercised touch, then sixteen alternating 700 ms
+Settings swipes drove animation. Distinct new frames were counted inside
+`paintComponent`. This measures paint callbacks, not physical monitor scanout.
+
+| Metric | Earlier idb panel | Native panel, 13.58 s animation window |
+|---|---:|---:|
+| Distinct frames painted per second | 25.30 | **74.88** |
+| Delivered resolution | 398×866 | **1206×2622** |
+| Measured pipeline delay, p50 | JPEG receipt → paint: 21.50 ms | Surface observation → paint: **18.13 ms** |
+| Measured pipeline delay, p95 | JPEG receipt → paint: 29.92 ms | Surface observation → paint: **23.38 ms** |
+| Warm pointer acknowledgment | Release → acknowledgment: 88–104 ms | Press → up/barrier acknowledgment: **2.97–6.71 ms** |
+| First gesture after the picture was ready | About 489 ms | **17.22 ms** |
+| New paints during five seconds still / 1.5 seconds hidden | 0 / 0 | **0 / 0** |
+
+The timing origins differ between routes. Native observation is the first seed
+poll that notices a changed surface, before copying. Swift/JVM monotonic clocks
+are aligned by a startup ping midpoint; half its round-trip is the uncertainty
+bound, which this report did not record separately. Observation excludes up to a
+poll interval and any earlier Simulator work. **Under 50 ms from actual Simulator
+presentation to panel paint is not verified.** The launch-request-to-next-paint
+measurement was 180.38 ms and is not an application launch-completion measurement.
+
+The twelve native gesture acknowledgment values were 17.218, 3.051, 5.229, 5.460,
+6.171, 6.207, 2.974, 5.510, 4.294, 6.706, 5.401 and 3.484 ms. Each acknowledgment
+follows a separate DTUHID barrier reply, establishing receive-queue progress in
+the guest input service. It does not prove application handling or visual response.
+Helper startup precedes frame readiness and is excluded from this first-gesture
+number. A fresh helper's seven-character text command acknowledged in 2.013 ms;
+the resulting Settings search was inspected separately.
+
+The EDT consumed **6.174 CPU seconds in 13.582 wall seconds**, or **45.45% of one
+core**. This includes all EDT work, not just `drawImage`; painting CPU was not
+isolated from layout/event processing. The short run alone does not establish a
+sustained frame rate on a busy shared Mac.
+
+### Ten-minute helper run
+
+A Python harness launched Settings publicly, opened one release helper and sent
+alternating 40-move drags (17 ms between moves, 150 ms between gestures) for at least
+600 seconds. It sampled `ps` every thirty seconds. **24,024 input phases** completed;
+acknowledgment p95 was **4.376 ms**, maximum **82.000 ms**. Thus the 30 ms target was
+not met for every event under this workload. EOF produced exit **0**, empty stderr,
+and no surviving owned helper.
+
+From the first to last sample (570.54 s), helper CPU was **21.02% of one core**.
+RSS started at **53.016 MiB**, peaked at **53.688 MiB**, and ended at **48.453 MiB**;
+the last several samples stayed there. There was no monotonic RSS growth. This
+harness did not map/copy pixels in a JVM. Its unlocked sequence sampling sometimes
+saw the deliberately invalidated zero header; those samples are not frame counts.
+Kotlin's production reader takes the record lock. Some builds overlapped the run.
+
+### Ten-minute visible panel run
+
+The first completed visible-panel run lasted **600.74 s** before the static device
+body was cached. It painted a weighted mean **30.86 frames/s**; one-minute windows
+ranged from **23.46 to 42.78 frames/s**, with observation-to-paint p95 between
+**51.02 and 70.15 ms**. Its preceding short run was 37.74 frames/s, with the first
+two gesture acknowledgments at 62.46 and 32.09 ms. The faster short run above was
+therefore not representative of every run.
+
+| Sampled quantity | Start | Minimum | Maximum | End |
+|---|---:|---:|---:|---:|
+| Helper RSS, MiB | 53.97 | 37.91 | 53.98 | 37.91 |
+| IDE RSS, MiB | 2677.36 | 1493.73 | 2677.36 | 2262.72 |
+| JVM used heap after requested GC, MiB | 163.78 | 143.34 | 210.03 | 210.03 |
+
+Mean CPU over those samples was **27.29% of one core for the helper**, **45.48%
+for the EDT**, and **92.84% for the whole IDE**. These are CPU-time deltas divided
+by elapsed time; EDT time includes event processing and layout, not only painting.
+There was no monotonic helper RSS increase. IDE samples fluctuated; the higher last
+heap sample means this run alone does **not prove an absence of IDE memory growth**.
+
+The test-only extension samples JVM heap after requesting GC once per minute,
+IDE/helper RSS and cumulative CPU from `ps`, and EDT CPU from the thread management
+bean. It clears numeric per-frame timing samples each minute. GC and measurement
+work are included in the windows. Numerous unrelated CPU-heavy test workers were
+running on this shared Mac; they were left alone. A 30-second JFR profile and a
+small offline build also overlapped part of this first run. It is not an isolated
+benchmark.
+
+Earlier endurance attempts exposed an unsupported `ProcessHandle` CPU counter,
+the existing two-minute probe timeout, and an IDE evaluation-feedback modal that
+blocked default-modality test dispatch. The probe now reads cumulative CPU from
+`ps`, permits twelve minutes only for the explicit endurance flag, and dispatches
+its own test actions with `ModalityState.any()`. The stalled owned probe IDE was
+stopped and its shutdown hook reaped its helper. The owner's IDE was untouched.
+
+The JFR profile sampled mostly Java2D shape rasterization on the EDT. The screen
+redrew its unchanged shadows and bezel for every frame. A Retina-density cache
+now renders that decoration only when geometry or display density changes; a
+pixel-equivalence, reuse and invalidation test failed before the cache was
+implemented. Independent review caught an unbounded cache allocation at high zoom
+on large Retina views. A second failing-first test now checks the 16 MiB cap and
+direct-paint fallback. The focused re-review reported no remaining findings.
+
+The first short cached-body run painted **47.51 frames/s**, with
+observation-to-paint p50/p95 **29.62/42.78 ms**, and **54.50% of one core** on the
+EDT. A real Swing drag painted **52 frames before release**, demonstrating live
+tracking rather than a gesture sent only on release. Both zero idle paints and
+zero hidden paints were retained. Conditions differed between runs, so this is
+not a controlled attribution of speedup solely to the cache.
+
+The final cached-body run completed **600.41 s** of visible streaming with no
+builds or JFR profiling during the run. Weighted mean painted rate was
+**58.92 frames/s**, with minute windows **46.39–64.23 frames/s**. Their
+observation-to-paint p95 values ranged from **26.18 to 42.10 ms**. Thus the route
+gets close to the 60 fps target on this Mac, but did **not sustain 60 fps in every
+window**. Other work on the shared Mac continued.
+
+| Minute | Painted frames/s | Observation → paint p95, ms | JVM heap, MiB | Helper RSS, MiB |
+|---:|---:|---:|---:|---:|
+| 0 | — | — | 181.04 | 53.73 |
+| 1 | 62.14 | 29.85 | 172.05 | 53.91 |
+| 2 | 60.21 | 31.97 | 171.85 | 53.92 |
+| 3 | 50.35 | 39.79 | 151.84 | 53.94 |
+| 4 | 46.39 | 42.10 | 169.75 | 53.94 |
+| 5 | 55.74 | 38.95 | 152.18 | 53.94 |
+| 6 | 61.59 | 32.20 | 139.24 | 53.94 |
+| 7 | 64.10 | 26.18 | 169.31 | 53.94 |
+| 8 | 62.04 | 30.31 | 152.35 | 53.94 |
+| 9 | 64.23 | 26.92 | 152.36 | 41.78 |
+| 10 | 62.47 | 28.92 | 210.62 | 53.94 |
+
+Mean CPU was **26.40% of one core for the helper**, **46.13% for the EDT** and
+**89.64% for the whole IDE**. Helper RSS settled at 53.94 MiB after the first few
+samples, dipped once, then returned; there was no continuing increase. IDE RSS
+went from **2835.78 to 2025.47 MiB**, range **2025.47–2850.08 MiB**. Requested-GC
+heap samples ranged **139.24–210.62 MiB**, ending above their 181.04 MiB start.
+They are nonmonotonic and include the rest of Rider; this does **not establish
+absence of IDE memory growth**. The test measures bounded samples, not leak freedom.
+
+Its preceding short measurement painted **63.45 frames/s** for **13.175 s** at
+1206×2622, with observation-to-paint p50/p95 **21.48/32.13 ms**. The EDT consumed
+**6.615 CPU seconds** (**50.21% of one core**). Press-to-up/barrier acknowledgments
+were **18.705, 5.187, 6.313, 6.156, 7.155, 5.747, 3.955, 6.162, 5.262, 4.874,
+4.590 and 4.376 ms**. A real Swing drag painted **60 changing frames before release**.
+Launch-request-to-next-paint was **247.01 ms**, with the same non-launch-completion
+qualification as above.
+
+After Home settled, there were **zero new paints in five seconds**. Hiding the
+panel produced **zero paints and zero owned native helper processes after 1.5 s**.
+The complete UI probe printed **`passed`**, and Gradle reported
+**`BUILD SUCCESSFUL in 10m 42s`**, 18 tasks (5 executed, 13 up-to-date). The final
+light/dark, narrow/wide and zoomed probe images were visually inspected. The owned
+probe IDE, helper and Gradle processes exited; the owner's processes were untouched.
+
+### Commands, tests and review
+
+Commands below ran from `<worktree>/editors/jetbrains`, with
+`JAVA_HOME=/opt/homebrew/opt/openjdk@25` and
+`GRADLE_RO_DEP_CACHE=<cache-worktree>/editors/jetbrains/.gradle-home/caches`.
+Placeholders remove personal paths and device identifiers. Socket/process checks
+used the approved execution context outside the filesystem sandbox. No command
+below fetched a dependency.
+
+```sh
+./gradlew --offline check buildPlugin verifyPlugin
+./gradlew --offline runIde -PuiProbe
+KUMIKAE_SIMULATOR_LIVE_PROBE=1 ./gradlew --offline runIde -PuiProbe
+KUMIKAE_SIMULATOR_LIVE_PROBE=1 KUMIKAE_SIMULATOR_ENDURANCE_PROBE=1 \
+  ./gradlew --offline runIde -PuiProbe
+python3 -m unittest discover -s tests
+cd native/SimulatorBridge
+xcrun swift-format format --in-place --recursive Sources Tests
+swift build -c release
+swift test
+```
+
+The final full offline build printed **`BUILD SUCCESSFUL in 31s`** (37 tasks:
+14 executed, 23 up-to-date). XML reports contain **105 panel tests and 62 core
+tests**, zero failures, errors or skips. The verifier reports compatibility with
+**RD-262.10968.170**, with four deprecated-API and six experimental-API notices
+for existing IntelliJ integrations; it reports **0 B downloaded**. Python printed
+**`Ran 7 tests in 3.552s`**, **`OK`**. Swift release printed
+**`Build complete! (0.40 sec)`**; Swift Testing printed
+**`Test run with 16 tests in 8 suites passed after 0.011 seconds`**. The earlier
+XCTest compatibility runner's zero-test line is not the Swift Testing result.
+
+Exploratory scripts and their outputs stayed in ignored `build/native-probes/`:
+
+```sh
+python3 -I build/native-probes/transport.py
+python3 -I build/native-probes/gesture.py
+python3 -I build/native-probes/endurance-dtu.py
+xcrun dyld_info -disassemble /usr/lib/system/libxpc.dylib
+jcmd <owned-probe-pid> JFR.start name=paint settings=profile duration=30s \
+  filename=<temporary-recording>
+jfr print --json --events jdk.ExecutionSample,jdk.NativeMethodSample <temporary-recording>
+xcrun simctl launch <id> com.apple.Preferences
+xcrun simctl io <id> screenshot <temporary-file>
+```
+
+Local Swift runtime-introspection probes inspected CoreSimulator/SimulatorKit and
+IOSurface properties, tested Screen Recording preflight and timed the copies
+reported above. The rejected callback probe is unsafe to rerun and is not shipped.
+No captured screens, Apple headers, Apple binaries or exploratory disassemblies
+are committed. The packaged executable/resource bundle was extracted to a temporary
+folder and `simulator-bridge --version` printed
+`SimulatorBridge 1; frame header 64 bytes`, confirming relocatable resources.
+
+Failing-first assertions were observed for shared header validation, mapped-reader
+newest sequence, native ownership, fallback ordering, touch coalescing, session
+geometry, missing-symbol guard, stdin lifetime (including active input), DTUHID
+message shape, first-frame readiness, startup/input exclusion, transient reconnect,
+concurrent fallback status, cancelled startup, late resource disposal, nonblocking
+feed close, cancellation during ready/ping waits, static device-body caching and
+its allocation bound. Some early attempts failed compilation before the assertion
+runs. **Swift mapped-sink tests, ASCII keyboard
+mapping tests, and shared-repository touch delegation were not seen assertion-fail
+first**; those are verification tests added with or after implementation. Live
+measurement instrumentation was also added alongside its use.
+
+Independent review inspected private ABI/ownership, cleanup, concurrency and error
+paths. Reproduced findings were fixed and rechecked: an optional first frame before
+ready; wrong endpoint assumptions; adapter reuse; permanent fallback after a
+transient stop; a status-index race; a resource returned after worker disposal;
+synchronous session callbacks during feed close; interruption masked by reply
+readers; and the static-decoration cache allocation bound. The reviewer used no
+live device actions.
+
+### Compatibility and remaining limits
+
+The complete private symbol/protocol list and absence handling are in the
+[native package README](../../editors/jetbrains/native/SimulatorBridge/README.md#runtime-boundary).
+One actor owns those names, with small extensions; frame source/sink, input sink
+and device lookup are protocols. Runtime loads, symbol checks, Objective-C ABI
+checks and a strict measured-Xcode-build guard fail with actionable errors. The
+final helper loads CoreSimulator and libxpc, not SimulatorKit, and needs no idb
+at runtime. Its startup fallback is native → installed idb → public screenshots;
+unknown input is never replayed. `DEVICE_UNAVAILABLE` preserves the native route
+for a later reconnect. The existing private-input switch controls both routes.
+
+Actual Simulator shutdown/reboot recovery was **not run**, because the shared-device
+rules explicitly forbid it. Fake process/device failures cover teardown, revoked
+geometry and subsequent retry. Other Xcode builds, Intel Macs, iPad devices,
+manual owner acceptance, optical latency and application input-response time
+remain unverified. Native rotation is explicitly unsupported; text is printable
+US ASCII and touch is single-finger. These, the strict Xcode guard, full-resolution
+copies and 8 ms seed polling are decisions the owner may want changed.
+
+Existing problems found while integrating were the low-resolution idb/33 ms UI
+path, status calls starting input while hidden, stream opening competing with
+input, worker cancellation dropping late resources, reply readers masking
+interruption, and repeated rasterization of unchanged device decoration. Native
+integration fixes those paths. Remaining synchronous legacy
+session actions can still hold the session lock; native feed closure now signals
+its worker and does not wait for that lock on the EDT.
+
+The root Gradle change is one separate native-helper/probe block; the core build
+adds the shared frame resources. No language/project/run source folder or
+`plugin.xml` was changed.
