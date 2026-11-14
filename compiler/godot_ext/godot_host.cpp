@@ -4,6 +4,7 @@
 #include "callable.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/callable.hpp>
@@ -185,15 +186,80 @@ void GodotHost::error(std::string_view p_text) {
 	UtilityFunctions::push_error(to_godot(p_text));
 }
 
-void *GodotHost::construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) {
-	String wanted = to_godot(p_type);
-	int type = -1;
-	for (int i = 0; i < Variant::VARIANT_MAX; i++) {
-		if (Variant::get_type_name((Variant::Type)i) == wanted) {
-			type = i;
-			break;
+// One of Godot's value types by its name ("Vector2"), or -1.
+static int value_type(std::string_view p_name) {
+	String wanted = to_godot(p_name);
+	for (int i = 1; i < Variant::VARIANT_MAX; i++) {
+		if (i != Variant::OBJECT && Variant::get_type_name((Variant::Type)i) == wanted) {
+			return i;
 		}
 	}
+	return -1;
+}
+
+void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {
+	StringName name(to_godot(p_class));
+	Engine *engine = Engine::get_singleton();
+	Object *object = engine && engine->has_singleton(name) ? engine->get_singleton(name) : nullptr;
+	if (!object) {
+		// Some exist only in the editor, or only on one platform.
+		*r_error = "Godot has no '" + std::string(p_class) + "' here";
+		return nullptr;
+	}
+	return new Variant(object);
+}
+
+bool GodotHost::constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	int type = value_type(p_class);
+	Variant value;
+	if (type >= 0) {
+		StringName name(to_godot(p_name));
+		gdextension_interface::variant_get_constant_value((GDExtensionVariantType)type, name._native_ptr(), value._native_ptr());
+	}
+	if (value.get_type() == Variant::NIL) {
+		*r_error = "Godot has no constant '" + std::string(p_name) + "' in '" + std::string(p_class) + "'";
+		return false;
+	}
+	return take(p_result, value, p_name, r_result, r_error);
+}
+
+bool GodotHost::call_static(std::string_view p_class, std::string_view p_method, const Argument *p_arguments, size_t p_count,
+		const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	std::vector<Variant> values;
+	std::vector<const Variant *> pointers;
+	// For a class, the call goes through Godot's list of classes, which takes the two names first.
+	values.reserve(p_count + 2);
+	values.push_back(StringName(to_godot(p_class)));
+	values.push_back(StringName(to_godot(p_method)));
+	for (size_t i = 0; i < p_count; i++) {
+		values.push_back(to_variant(p_arguments[i].kind, p_arguments[i].slot));
+	}
+	for (size_t i = 0; i < values.size(); i++) {
+		pointers.push_back(&values[i]);
+	}
+	Variant result;
+	GDExtensionCallError error;
+	error.error = GDEXTENSION_CALL_OK;
+	int type = value_type(p_class);
+	if (type >= 0) {
+		Variant::callp_static((Variant::Type)type, StringName(to_godot(p_method)), pointers.data() + 2, (int)p_count, result, error);
+	} else {
+		ClassDBSingleton *classes = ClassDBSingleton::get_singleton();
+		if (!classes || !classes->class_exists(values[0]) || !classes->class_has_method(values[0], values[1])) {
+			*r_error = "Godot has no '" + std::string(p_method) + "' in '" + std::string(p_class) + "'";
+			return false;
+		}
+		Variant(classes).callp(StringName("class_call_static"), pointers.data(), (int)pointers.size(), result, error);
+	}
+	if (error.error != GDEXTENSION_CALL_OK) {
+		*r_error = describe(error, std::string(p_class) + "." + std::string(p_method));
+		return false;
+	}
+	return take(p_result, result, p_method, r_result, r_error);
+}
+
+void *GodotHost::construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) {
+	int type = value_type(p_type);
 	if (type < 0) {
 		*r_error = "Godot has no value type '" + std::string(p_type) + "'";
 		return nullptr;

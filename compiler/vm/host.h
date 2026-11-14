@@ -95,6 +95,25 @@ struct Host {
 		*r_error = "there is no engine here";
 		return false;
 	}
+	// One of the engine's singletons, by Godot's name for its class. The handle is the caller's to drop.
+	virtual void *singleton(std::string_view p_class, std::string *r_error) {
+		(void)p_class;
+		*r_error = "there is no engine here";
+		return nullptr;
+	}
+	// A constant the engine keeps for one of its types: Vector2's ZERO.
+	virtual bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, Slot *r_result, std::string *r_error) {
+		(void)p_class, (void)p_name, (void)p_result, (void)r_result;
+		*r_error = "there is no engine here";
+		return false;
+	}
+	// A method called on no object: one of a value type (Vector2's from_angle) or of a class.
+	virtual bool call_static(std::string_view p_class, std::string_view p_method, const Argument *p_arguments, size_t p_count,
+			const Wanted &p_result, Slot *r_result, std::string *r_error) {
+		(void)p_class, (void)p_method, (void)p_arguments, (void)p_count, (void)p_result, (void)r_result;
+		*r_error = "there is no engine here";
+		return false;
+	}
 	// The engine's own text for a value or an object, as a new Str that is the caller's.
 	virtual Str *text(void *p_value) {
 		(void)p_value;

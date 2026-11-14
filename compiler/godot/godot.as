@@ -2376,6 +2376,7 @@ package godot {
 	[GodotEnum(name="AccessibilityLiveMode", values="LIVE_OFF,LIVE_POLITE,LIVE_ASSERTIVE")]
 	[GodotEnum(name="AccessibilityScrollUnit", values="SCROLL_UNIT_ITEM,SCROLL_UNIT_PAGE")]
 	[GodotEnum(name="AccessibilityScrollHint", values="SCROLL_HINT_TOP_LEFT,SCROLL_HINT_BOTTOM_RIGHT,SCROLL_HINT_TOP_EDGE,SCROLL_HINT_BOTTOM_EDGE,SCROLL_HINT_LEFT_EDGE,SCROLL_HINT_RIGHT_EDGE")]
+	[Singleton]
 	[Abstract]
 	public native class AccessibilityServer extends GodotObject {
 		public static const ROLE_UNKNOWN:int = 0;
@@ -2474,6 +2475,7 @@ package godot {
 		public static const SCROLL_HINT_BOTTOM_EDGE:int = 3;
 		public static const SCROLL_HINT_LEFT_EDGE:int = 4;
 		public static const SCROLL_HINT_RIGHT_EDGE:int = 5;
+		public static native function get singleton():AccessibilityServer;
 		public static native function isSupported():Boolean;
 		[Godot(role="enum:AccessibilityServer.AccessibilityRole")]
 		public static native function createElement(windowId:int, role:int):RID;
@@ -5129,6 +5131,7 @@ package godot {
 	}
 	[GodotEnum(name="SpeakerMode", values="SPEAKER_MODE_STEREO,SPEAKER_SURROUND_31,SPEAKER_SURROUND_51,SPEAKER_SURROUND_71")]
 	[GodotEnum(name="PlaybackType", values="PLAYBACK_TYPE_DEFAULT,PLAYBACK_TYPE_STREAM,PLAYBACK_TYPE_SAMPLE,PLAYBACK_TYPE_MAX")]
+	[Singleton]
 	public native class AudioServer extends GodotObject {
 		public static const SPEAKER_MODE_STEREO:int = 0;
 		public static const SPEAKER_SURROUND_31:int = 1;
@@ -5149,6 +5152,7 @@ package godot {
 		public static native function set playbackSpeedScale(value:Number):void;
 		public static native function get busLayoutChanged():Signal;
 		public static native function get busRenamed():Signal;
+		public static native function get singleton():AudioServer;
 		public static native function removeBus(index:int):void;
 		public static native function addBus(atPosition:int = -1):void;
 		public static native function moveBus(index:int, toIndex:int):void;
@@ -7367,6 +7371,7 @@ package godot {
 		public final native function setFormat(index:int, parameters:GodotDictionary):Boolean;
 	}
 	[GodotEnum(name="FeedImage", values="FEED_RGBA_IMAGE,FEED_YCBCR_IMAGE,FEED_Y_IMAGE,FEED_CBCR_IMAGE")]
+	[Singleton]
 	public native class CameraServer extends GodotObject {
 		public static const FEED_RGBA_IMAGE:int = 0;
 		public static const FEED_YCBCR_IMAGE:int = 0;
@@ -7378,6 +7383,7 @@ package godot {
 		public static native function get cameraFeedAdded():Signal;
 		public static native function get cameraFeedRemoved():Signal;
 		public static native function get cameraFeedsUpdated():Signal;
+		public static native function get singleton():CameraServer;
 		public static native function getFeed(index:int):CameraFeed;
 		public static native function getFeedCount():int;
 		[Godot(returns="Array[CameraFeed]")]
@@ -7688,6 +7694,7 @@ package godot {
 		public final native function set radius(value:Number):void;
 	}
 	[GodotEnum(name="APIType", values="API_CORE,API_EDITOR,API_EXTENSION,API_EDITOR_EXTENSION,API_NONE")]
+	[Singleton]
 	public native class ClassDB extends GodotObject {
 		public static const API_CORE:int = 0;
 		public static const API_EDITOR:int = 1;
@@ -7695,6 +7702,7 @@ package godot {
 		public static const API_EDITOR_EXTENSION:int = 3;
 		public static const API_NONE:int = 4;
 		public native function ClassDB();
+		public static native function get singleton():ClassDB;
 		public static native function getClassList():PackedStringArray;
 		public static native function getInheritersFromClass(class_:String):PackedStringArray;
 		public static native function getParentClass(class_:String):String;
@@ -9124,6 +9132,7 @@ package godot {
 	[GodotEnum(name="VSyncMode", values="VSYNC_DISABLED,VSYNC_ENABLED,VSYNC_ADAPTIVE,VSYNC_MAILBOX")]
 	[GodotEnum(name="HandleType", values="DISPLAY_HANDLE,WINDOW_HANDLE,WINDOW_VIEW,OPENGL_CONTEXT,EGL_DISPLAY,EGL_CONFIG,GLX_VISUALID,GLX_FBCONFIG")]
 	[GodotEnum(name="TTSUtteranceEvent", values="TTS_UTTERANCE_STARTED,TTS_UTTERANCE_ENDED,TTS_UTTERANCE_CANCELED,TTS_UTTERANCE_BOUNDARY")]
+	[Singleton]
 	[Abstract]
 	public native class DisplayServer extends GodotObject {
 		public static const FEATURE_GLOBAL_MENU:int = 0;
@@ -9370,6 +9379,7 @@ package godot {
 		public static const INVALID_WINDOW_ID:int = -1;
 		public static const INVALID_INDICATOR_ID:int = -1;
 		public static native function get orientationChanged():Signal;
+		public static native function get singleton():DisplayServer;
 		[Godot(feature="enum:DisplayServer.Feature")]
 		public static native function hasFeature(feature:int):Boolean;
 		public static native function getName():String;
@@ -10503,12 +10513,14 @@ package godot {
 		public final native function addPropertyEditor(property:String, editor:Control, addToEnd:Boolean = false, label:String = ""):void;
 		public final native function addPropertyEditorForMultipleProperties(label:String, properties:PackedStringArray, editor:Control):void;
 	}
+	[Singleton]
 	[Abstract]
 	public native class EditorInterface extends GodotObject {
 		public static native function get distractionFreeMode():Boolean;
 		public static native function set distractionFreeMode(value:Boolean):void;
 		public static native function get movieMakerEnabled():Boolean;
 		public static native function set movieMakerEnabled(value:Boolean):void;
+		public static native function get singleton():EditorInterface;
 		public static native function restartEditor(save:Boolean = true):void;
 		public static native function getCommandPalette():EditorCommandPalette;
 		public static native function getResourceFilesystem():EditorFileSystem;
@@ -11152,6 +11164,7 @@ package godot {
 		public final native function get objectId():Number;
 		public final native function set objectId(value:Number):void;
 	}
+	[Singleton]
 	public native class Engine extends GodotObject {
 		public native function Engine();
 		public static native function get printErrorMessages():Boolean;
@@ -11168,6 +11181,7 @@ package godot {
 		public static native function set timeScale(value:Number):void;
 		public static native function get physicsJitterFix():Number;
 		public static native function set physicsJitterFix(value:Number):void;
+		public static native function get singleton():Engine;
 		public static native function getPhysicsInterpolationFraction():Number;
 		public static native function getFramesDrawn():int;
 		public static native function getFramesPerSecond():Number;
@@ -11200,8 +11214,10 @@ package godot {
 		public static native function isEmbeddedInEditor():Boolean;
 		public static native function getWriteMoviePath():String;
 	}
+	[Singleton]
 	public native class EngineDebugger extends GodotObject {
 		public native function EngineDebugger();
+		public static native function get singleton():EngineDebugger;
 		public static native function isActive():Boolean;
 		public static native function registerProfiler(name:String, profiler:EngineProfiler):void;
 		public static native function unregisterProfiler(name:String):void;
@@ -12178,6 +12194,7 @@ package godot {
 		public final native function getMinimumLibraryInitializationLevel():int;
 	}
 	[GodotEnum(name="LoadStatus", values="LOAD_STATUS_OK,LOAD_STATUS_FAILED,LOAD_STATUS_ALREADY_LOADED,LOAD_STATUS_NOT_LOADED,LOAD_STATUS_NEEDS_RESTART")]
+	[Singleton]
 	[Abstract]
 	public native class GDExtensionManager extends GodotObject {
 		public static const LOAD_STATUS_OK:int = 0;
@@ -12188,6 +12205,7 @@ package godot {
 		public static native function get extensionsReloaded():Signal;
 		public static native function get extensionLoaded():Signal;
 		public static native function get extensionUnloading():Signal;
+		public static native function get singleton():GDExtensionManager;
 		[Godot(returns="enum:GDExtensionManager.LoadStatus")]
 		public static native function loadExtension(path:String):int;
 		[Godot(returns="enum:GDExtensionManager.LoadStatus")]
@@ -12244,8 +12262,10 @@ package godot {
 		public final native function makeNotification(method:String, params:*):GodotDictionary;
 		public final native function makeResponseError(code:int, message:String, id:* = null):GodotDictionary;
 	}
+	[Singleton]
 	public native class GDScriptLanguageProtocol extends JSONRPC {
 		public native function GDScriptLanguageProtocol();
+		public static native function get singleton():GDScriptLanguageProtocol;
 		public static native function getTextDocument():GDScriptTextDocument;
 		public static native function getWorkspace():GDScriptWorkspace;
 		public static native function isSmartResolveEnabled():Boolean;
@@ -12998,6 +13018,7 @@ package godot {
 	[GodotEnum(name="PolyBooleanOperation", values="OPERATION_UNION,OPERATION_DIFFERENCE,OPERATION_INTERSECTION,OPERATION_XOR")]
 	[GodotEnum(name="PolyJoinType", values="JOIN_SQUARE,JOIN_ROUND,JOIN_MITER")]
 	[GodotEnum(name="PolyEndType", values="END_POLYGON,END_JOINED,END_BUTT,END_SQUARE,END_ROUND")]
+	[Singleton]
 	public native class Geometry2D extends GodotObject {
 		public static const OPERATION_UNION:int = 0;
 		public static const OPERATION_DIFFERENCE:int = 1;
@@ -13012,6 +13033,7 @@ package godot {
 		public static const END_SQUARE:int = 3;
 		public static const END_ROUND:int = 4;
 		public native function Geometry2D();
+		public static native function get singleton():Geometry2D;
 		public static native function isPointInCircle(point:Vector2, circlePosition:Vector2, circleRadius:Number):Boolean;
 		public static native function segmentIntersectsCircle(segmentFrom:Vector2, segmentTo:Vector2, circlePosition:Vector2, circleRadius:Number):Number;
 		public static native function segmentIntersectsSegment(fromA:Vector2, toA:Vector2, fromB:Vector2, toB:Vector2):*;
@@ -13047,8 +13069,10 @@ package godot {
 		[Godot(returns="Array[Vector2i]")]
 		public static native function bresenhamLine(from:Vector2i, to:Vector2i):GodotArray;
 	}
+	[Singleton]
 	public native class Geometry3D extends GodotObject {
 		public native function Geometry3D();
+		public static native function get singleton():Geometry3D;
 		[Godot(planes="Array[Plane]")]
 		public static native function computeConvexMeshPoints(planes:GodotArray):PackedVector3Array;
 		[Godot(returns="Array[Plane]")]
@@ -13752,6 +13776,7 @@ package godot {
 	}
 	[GodotEnum(name="ResolverStatus", values="RESOLVER_STATUS_NONE,RESOLVER_STATUS_WAITING,RESOLVER_STATUS_DONE,RESOLVER_STATUS_ERROR")]
 	[GodotEnum(name="Type", values="TYPE_NONE,TYPE_IPV4,TYPE_IPV6,TYPE_ANY")]
+	[Singleton]
 	[Abstract]
 	public native class IP extends GodotObject {
 		public static const RESOLVER_STATUS_NONE:int = 0;
@@ -13764,6 +13789,7 @@ package godot {
 		public static const TYPE_ANY:int = 3;
 		public static const RESOLVER_MAX_QUERIES:int = 256;
 		public static const RESOLVER_INVALID_ID:int = -1;
+		public static native function get singleton():IP;
 		[Godot(ipType="enum:IP.Type")]
 		public static native function resolveHostname(host:String, ipType:int = 3):String;
 		[Godot(ipType="enum:IP.Type")]
@@ -14079,6 +14105,7 @@ package godot {
 	}
 	[GodotEnum(name="MouseMode", values="MOUSE_MODE_VISIBLE,MOUSE_MODE_HIDDEN,MOUSE_MODE_CAPTURED,MOUSE_MODE_CONFINED,MOUSE_MODE_CONFINED_HIDDEN,MOUSE_MODE_MAX")]
 	[GodotEnum(name="CursorShape", values="CURSOR_ARROW,CURSOR_IBEAM,CURSOR_POINTING_HAND,CURSOR_CROSS,CURSOR_WAIT,CURSOR_BUSY,CURSOR_DRAG,CURSOR_CAN_DROP,CURSOR_FORBIDDEN,CURSOR_VSIZE,CURSOR_HSIZE,CURSOR_BDIAGSIZE,CURSOR_FDIAGSIZE,CURSOR_MOVE,CURSOR_VSPLIT,CURSOR_HSPLIT,CURSOR_HELP")]
+	[Singleton]
 	[Abstract]
 	public native class Input extends GodotObject {
 		public static const MOUSE_MODE_VISIBLE:int = 0;
@@ -14116,6 +14143,7 @@ package godot {
 		public static native function get ignoreJoypadOnUnfocusedApplication():Boolean;
 		public static native function set ignoreJoypadOnUnfocusedApplication(value:Boolean):void;
 		public static native function get joyConnectionChanged():Signal;
+		public static native function get singleton():Input;
 		public static native function isAnythingPressed():Boolean;
 		[Godot(keycode="enum:Key")]
 		public static native function isKeyPressed(keycode:int):Boolean;
@@ -14412,9 +14440,11 @@ package godot {
 		public final native function get shortcut():Shortcut;
 		public final native function set shortcut(value:Shortcut):void;
 	}
+	[Singleton]
 	public native class InputMap extends GodotObject {
 		public native function InputMap();
 		public static native function get projectSettingsLoaded():Signal;
+		public static native function get singleton():InputMap;
 		public static native function hasAction(action:String):Boolean;
 		[Godot(returns="Array[String]")]
 		public static native function getActions():GodotArray;
@@ -14583,8 +14613,10 @@ package godot {
 		public final native function getJavaParentClass():JavaClass;
 		public final native function hasJavaMethod(method:String):Boolean;
 	}
+	[Singleton]
 	public native class JavaClassWrapper extends GodotObject {
 		public native function JavaClassWrapper();
+		public static native function get singleton():JavaClassWrapper;
 		public static native function wrap(name:String):JavaClass;
 		public static native function getException():JavaObject;
 		public static native function createSamCallback(samInterface:String, callable:Function):JavaObject;
@@ -14595,9 +14627,11 @@ package godot {
 		public final native function getJavaClass():JavaClass;
 		public final native function hasJavaMethod(method:String):Boolean;
 	}
+	[Singleton]
 	[Abstract]
 	public native class JavaScriptBridge extends GodotObject {
 		public static native function get pwaUpdateAvailable():Signal;
+		public static native function get singleton():JavaScriptBridge;
 		public static native function eval(code:String, useGlobalExecutionContext:Boolean = false):*;
 		public static native function getInterface(interface_:String):JavaScriptObject;
 		public static native function createCallback(callable:Function):JavaScriptObject;
@@ -15352,8 +15386,10 @@ package godot {
 		public final native function get gizmoExtents():Number;
 		public final native function set gizmoExtents(value:Number):void;
 	}
+	[Singleton]
 	public native class Marshalls extends GodotObject {
 		public native function Marshalls();
+		public static native function get singleton():Marshalls;
 		public static native function variantToBase64(variant:*, fullObjects:Boolean = false):String;
 		public static native function base64ToVariant(base64Str:String, allowObjects:Boolean = false):*;
 		public static native function rawToBase64(array:PackedByteArray):String;
@@ -15869,6 +15905,7 @@ package godot {
 	}
 	[GodotEnum(name="Feature", values="FEATURE_GLOBAL_MENU,FEATURE_POPUP_MENU,FEATURE_OPEN_CLOSE_CALLBACK,FEATURE_HOVER_CALLBACK,FEATURE_KEY_CALLBACK")]
 	[GodotEnum(name="SystemMenus", values="INVALID_MENU_ID,MAIN_MENU_ID,APPLICATION_MENU_ID,WINDOW_MENU_ID,HELP_MENU_ID,DOCK_MENU_ID")]
+	[Singleton]
 	public native class NativeMenu extends GodotObject {
 		public static const FEATURE_GLOBAL_MENU:int = 0;
 		public static const FEATURE_POPUP_MENU:int = 1;
@@ -15882,6 +15919,7 @@ package godot {
 		public static const HELP_MENU_ID:int = 4;
 		public static const DOCK_MENU_ID:int = 5;
 		public native function NativeMenu();
+		public static native function get singleton():NativeMenu;
 		[Godot(feature="enum:NativeMenu.Feature")]
 		public static native function hasFeature(feature:int):Boolean;
 		[Godot(menuId="enum:NativeMenu.SystemMenus")]
@@ -16290,8 +16328,10 @@ package godot {
 		public final native function createFromMesh(mesh:Mesh):void;
 		public final native function clear():void;
 	}
+	[Singleton]
 	public native class NavigationMeshGenerator extends GodotObject {
 		public native function NavigationMeshGenerator();
+		public static native function get singleton():NavigationMeshGenerator;
 		public static native function bake(navigationMesh:NavigationMesh, rootNode:Node):void;
 		public static native function clear(navigationMesh:NavigationMesh):void;
 		public static native function parseSourceGeometryData(navigationMesh:NavigationMesh, sourceGeometryData:NavigationMeshSourceGeometryData3D, rootNode:Node, callback:Function = null):void;
@@ -16638,6 +16678,7 @@ package godot {
 		public final native function getBounds():AABB;
 	}
 	[GodotEnum(name="ProcessInfo", values="INFO_ACTIVE_MAPS,INFO_REGION_COUNT,INFO_AGENT_COUNT,INFO_LINK_COUNT,INFO_POLYGON_COUNT,INFO_EDGE_COUNT,INFO_EDGE_MERGE_COUNT,INFO_EDGE_CONNECTION_COUNT,INFO_EDGE_FREE_COUNT,INFO_OBSTACLE_COUNT")]
+	[Singleton]
 	[Abstract]
 	public native class NavigationServer2D extends GodotObject {
 		public static const INFO_ACTIVE_MAPS:int = 0;
@@ -16653,6 +16694,7 @@ package godot {
 		public static native function get mapChanged():Signal;
 		public static native function get navigationDebugChanged():Signal;
 		public static native function get avoidanceDebugChanged():Signal;
+		public static native function get singleton():NavigationServer2D;
 		[Godot(returns="Array[RID]")]
 		public static native function getMaps():GodotArray;
 		public static native function mapCreate():RID;
@@ -16797,12 +16839,15 @@ package godot {
 		[Godot(processInfo="enum:NavigationServer2D.ProcessInfo")]
 		public static native function getProcessInfo(processInfo:int):int;
 	}
+	[Singleton]
 	public native class NavigationServer2DManager extends GodotObject {
 		public native function NavigationServer2DManager();
+		public static native function get singleton():NavigationServer2DManager;
 		public static native function registerServer(name:String, createCallback:Function):void;
 		public static native function setDefaultServer(name:String, priority:int):void;
 	}
 	[GodotEnum(name="ProcessInfo", values="INFO_ACTIVE_MAPS,INFO_REGION_COUNT,INFO_AGENT_COUNT,INFO_LINK_COUNT,INFO_POLYGON_COUNT,INFO_EDGE_COUNT,INFO_EDGE_MERGE_COUNT,INFO_EDGE_CONNECTION_COUNT,INFO_EDGE_FREE_COUNT,INFO_OBSTACLE_COUNT")]
+	[Singleton]
 	[Abstract]
 	public native class NavigationServer3D extends GodotObject {
 		public static const INFO_ACTIVE_MAPS:int = 0;
@@ -16818,6 +16863,7 @@ package godot {
 		public static native function get mapChanged():Signal;
 		public static native function get navigationDebugChanged():Signal;
 		public static native function get avoidanceDebugChanged():Signal;
+		public static native function get singleton():NavigationServer3D;
 		[Godot(returns="Array[RID]")]
 		public static native function getMaps():GodotArray;
 		public static native function mapCreate():RID;
@@ -16979,8 +17025,10 @@ package godot {
 		[Godot(processInfo="enum:NavigationServer3D.ProcessInfo")]
 		public static native function getProcessInfo(processInfo:int):int;
 	}
+	[Singleton]
 	public native class NavigationServer3DManager extends GodotObject {
 		public native function NavigationServer3DManager();
+		public static native function get singleton():NavigationServer3DManager;
 		public static native function registerServer(name:String, createCallback:Function):void;
 		public static native function setDefaultServer(name:String, priority:int):void;
 	}
@@ -17070,6 +17118,7 @@ package godot {
 	[GodotEnum(name="RenderingDriver", values="RENDERING_DRIVER_VULKAN,RENDERING_DRIVER_OPENGL3,RENDERING_DRIVER_D3D12,RENDERING_DRIVER_METAL")]
 	[GodotEnum(name="SystemDir", values="SYSTEM_DIR_DESKTOP,SYSTEM_DIR_DCIM,SYSTEM_DIR_DOCUMENTS,SYSTEM_DIR_DOWNLOADS,SYSTEM_DIR_MOVIES,SYSTEM_DIR_MUSIC,SYSTEM_DIR_PICTURES,SYSTEM_DIR_RINGTONES")]
 	[GodotEnum(name="StdHandleType", values="STD_HANDLE_INVALID,STD_HANDLE_CONSOLE,STD_HANDLE_FILE,STD_HANDLE_PIPE,STD_HANDLE_UNKNOWN")]
+	[Singleton]
 	public native class OS extends GodotObject {
 		public static const RENDERING_DRIVER_VULKAN:int = 0;
 		public static const RENDERING_DRIVER_OPENGL3:int = 1;
@@ -17095,6 +17144,7 @@ package godot {
 		public static native function set lowProcessorUsageModeSleepUsec(value:int):void;
 		public static native function get deltaSmoothing():Boolean;
 		public static native function set deltaSmoothing(value:Boolean):void;
+		public static native function get singleton():OS;
 		public static native function getEntropy(size:int):PackedByteArray;
 		public static native function getSystemCaCertificates():String;
 		public static native function getConnectedMidiInputs():PackedStringArray;
@@ -18809,6 +18859,7 @@ package godot {
 	}
 	[GodotEnum(name="Monitor", values="TIME_FPS,TIME_PROCESS,TIME_PHYSICS_PROCESS,TIME_NAVIGATION_PROCESS,MEMORY_STATIC,MEMORY_STATIC_MAX,MEMORY_MESSAGE_BUFFER_MAX,OBJECT_COUNT,OBJECT_RESOURCE_COUNT,OBJECT_NODE_COUNT,OBJECT_ORPHAN_NODE_COUNT,RENDER_TOTAL_OBJECTS_IN_FRAME,RENDER_TOTAL_PRIMITIVES_IN_FRAME,RENDER_TOTAL_DRAW_CALLS_IN_FRAME,RENDER_VIDEO_MEM_USED,RENDER_TEXTURE_MEM_USED,RENDER_BUFFER_MEM_USED,PHYSICS_2D_ACTIVE_OBJECTS,PHYSICS_2D_COLLISION_PAIRS,PHYSICS_2D_ISLAND_COUNT,PHYSICS_3D_ACTIVE_OBJECTS,PHYSICS_3D_COLLISION_PAIRS,PHYSICS_3D_ISLAND_COUNT,AUDIO_OUTPUT_LATENCY,NAVIGATION_ACTIVE_MAPS,NAVIGATION_REGION_COUNT,NAVIGATION_AGENT_COUNT,NAVIGATION_LINK_COUNT,NAVIGATION_POLYGON_COUNT,NAVIGATION_EDGE_COUNT,NAVIGATION_EDGE_MERGE_COUNT,NAVIGATION_EDGE_CONNECTION_COUNT,NAVIGATION_EDGE_FREE_COUNT,NAVIGATION_OBSTACLE_COUNT,PIPELINE_COMPILATIONS_CANVAS,PIPELINE_COMPILATIONS_MESH,PIPELINE_COMPILATIONS_SURFACE,PIPELINE_COMPILATIONS_DRAW,PIPELINE_COMPILATIONS_SPECIALIZATION,NAVIGATION_2D_ACTIVE_MAPS,NAVIGATION_2D_REGION_COUNT,NAVIGATION_2D_AGENT_COUNT,NAVIGATION_2D_LINK_COUNT,NAVIGATION_2D_POLYGON_COUNT,NAVIGATION_2D_EDGE_COUNT,NAVIGATION_2D_EDGE_MERGE_COUNT,NAVIGATION_2D_EDGE_CONNECTION_COUNT,NAVIGATION_2D_EDGE_FREE_COUNT,NAVIGATION_2D_OBSTACLE_COUNT,NAVIGATION_3D_ACTIVE_MAPS,NAVIGATION_3D_REGION_COUNT,NAVIGATION_3D_AGENT_COUNT,NAVIGATION_3D_LINK_COUNT,NAVIGATION_3D_POLYGON_COUNT,NAVIGATION_3D_EDGE_COUNT,NAVIGATION_3D_EDGE_MERGE_COUNT,NAVIGATION_3D_EDGE_CONNECTION_COUNT,NAVIGATION_3D_EDGE_FREE_COUNT,NAVIGATION_3D_OBSTACLE_COUNT,MONITOR_MAX")]
 	[GodotEnum(name="MonitorType", values="MONITOR_TYPE_QUANTITY,MONITOR_TYPE_MEMORY,MONITOR_TYPE_TIME,MONITOR_TYPE_PERCENTAGE")]
+	[Singleton]
 	public native class Performance extends GodotObject {
 		public static const TIME_FPS:int = 0;
 		public static const TIME_PROCESS:int = 1;
@@ -18875,6 +18926,7 @@ package godot {
 		public static const MONITOR_TYPE_TIME:int = 2;
 		public static const MONITOR_TYPE_PERCENTAGE:int = 3;
 		public native function Performance();
+		public static native function get singleton():Performance;
 		[Godot(monitor="enum:Performance.Monitor")]
 		public static native function getMonitor(monitor:int):Number;
 		[Godot(type="enum:Performance.MonitorType")]
@@ -19416,6 +19468,7 @@ package godot {
 	[GodotEnum(name="CCDMode", values="CCD_MODE_DISABLED,CCD_MODE_CAST_RAY,CCD_MODE_CAST_SHAPE")]
 	[GodotEnum(name="AreaBodyStatus", values="AREA_BODY_ADDED,AREA_BODY_REMOVED")]
 	[GodotEnum(name="ProcessInfo", values="INFO_ACTIVE_OBJECTS,INFO_COLLISION_PAIRS,INFO_ISLAND_COUNT")]
+	[Singleton]
 	[Abstract]
 	public native class PhysicsServer2D extends GodotObject {
 		public static const SPACE_PARAM_CONTACT_RECYCLE_RADIUS:int = 0;
@@ -19497,6 +19550,7 @@ package godot {
 		public static const INFO_ACTIVE_OBJECTS:int = 0;
 		public static const INFO_COLLISION_PAIRS:int = 1;
 		public static const INFO_ISLAND_COUNT:int = 2;
+		public static native function get singleton():PhysicsServer2D;
 		public static native function worldBoundaryShapeCreate():RID;
 		public static native function separationRayShapeCreate():RID;
 		public static native function segmentShapeCreate():RID;
@@ -19804,8 +19858,10 @@ package godot {
 		public final native function bodyTestMotionIsExcludingBody(body:RID):Boolean;
 		public final native function bodyTestMotionIsExcludingObject(object:Number):Boolean;
 	}
+	[Singleton]
 	public native class PhysicsServer2DManager extends GodotObject {
 		public native function PhysicsServer2DManager();
+		public static native function get singleton():PhysicsServer2DManager;
 		public static native function registerServer(name:String, createCallback:Function):void;
 		public static native function setDefaultServer(name:String, priority:int):void;
 	}
@@ -19828,6 +19884,7 @@ package godot {
 	[GodotEnum(name="ProcessInfo", values="INFO_ACTIVE_OBJECTS,INFO_COLLISION_PAIRS,INFO_ISLAND_COUNT")]
 	[GodotEnum(name="SpaceParameter", values="SPACE_PARAM_CONTACT_RECYCLE_RADIUS,SPACE_PARAM_CONTACT_MAX_SEPARATION,SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION,SPACE_PARAM_CONTACT_DEFAULT_BIAS,SPACE_PARAM_BODY_LINEAR_VELOCITY_SLEEP_THRESHOLD,SPACE_PARAM_BODY_ANGULAR_VELOCITY_SLEEP_THRESHOLD,SPACE_PARAM_BODY_TIME_TO_SLEEP,SPACE_PARAM_SOLVER_ITERATIONS")]
 	[GodotEnum(name="BodyAxis", values="BODY_AXIS_LINEAR_X,BODY_AXIS_LINEAR_Y,BODY_AXIS_LINEAR_Z,BODY_AXIS_ANGULAR_X,BODY_AXIS_ANGULAR_Y,BODY_AXIS_ANGULAR_Z")]
+	[Singleton]
 	[Abstract]
 	public native class PhysicsServer3D extends GodotObject {
 		public static const JOINT_TYPE_PIN:int = 0;
@@ -19978,6 +20035,7 @@ package godot {
 		public static const BODY_AXIS_ANGULAR_X:int = 8;
 		public static const BODY_AXIS_ANGULAR_Y:int = 16;
 		public static const BODY_AXIS_ANGULAR_Z:int = 32;
+		public static native function get singleton():PhysicsServer3D;
 		public static native function worldBoundaryShapeCreate():RID;
 		public static native function separationRayShapeCreate():RID;
 		public static native function sphereShapeCreate():RID;
@@ -20416,8 +20474,10 @@ package godot {
 		public final native function bodyTestMotionIsExcludingBody(body:RID):Boolean;
 		public final native function bodyTestMotionIsExcludingObject(object:Number):Boolean;
 	}
+	[Singleton]
 	public native class PhysicsServer3DManager extends GodotObject {
 		public native function PhysicsServer3DManager();
+		public static native function get singleton():PhysicsServer3DManager;
 		public static native function registerServer(name:String, createCallback:Function):void;
 		public static native function setDefaultServer(name:String, priority:int):void;
 	}
@@ -20912,9 +20972,11 @@ package godot {
 		public final native function get editorPreviewIndeterminate():Boolean;
 		public final native function set editorPreviewIndeterminate(value:Boolean):void;
 	}
+	[Singleton]
 	public native class ProjectSettings extends GodotObject {
 		public native function ProjectSettings();
 		public static native function get settingsChanged():Signal;
+		public static native function get singleton():ProjectSettings;
 		public static native function hasSetting(name:String):Boolean;
 		public static native function setSetting(name:String, value:*):void;
 		public static native function getSetting(name:String, defaultValue:* = null):*;
@@ -22590,6 +22652,7 @@ package godot {
 	[GodotEnum(name="PipelineSource", values="PIPELINE_SOURCE_CANVAS,PIPELINE_SOURCE_MESH,PIPELINE_SOURCE_SURFACE,PIPELINE_SOURCE_DRAW,PIPELINE_SOURCE_SPECIALIZATION,PIPELINE_SOURCE_MAX")]
 	[GodotEnum(name="SplashStretchMode", values="SPLASH_STRETCH_MODE_DISABLED,SPLASH_STRETCH_MODE_KEEP,SPLASH_STRETCH_MODE_KEEP_WIDTH,SPLASH_STRETCH_MODE_KEEP_HEIGHT,SPLASH_STRETCH_MODE_COVER,SPLASH_STRETCH_MODE_IGNORE")]
 	[GodotEnum(name="Features", values="FEATURE_SHADERS,FEATURE_MULTITHREADED")]
+	[Singleton]
 	[Abstract]
 	public native class RenderingServer extends GodotObject {
 		public static const TEXTURE_TYPE_2D:int = 0;
@@ -23111,6 +23174,7 @@ package godot {
 		public static native function set renderLoopEnabled(value:Boolean):void;
 		public static native function get framePreDraw():Signal;
 		public static native function get framePostDraw():Signal;
+		public static native function get singleton():RenderingServer;
 		public static native function texture2dCreate(image:Image):RID;
 		[Godot(layers="Array[Image]", layeredType="enum:RenderingServer.TextureLayeredType")]
 		public static native function texture2dLayeredCreate(layers:GodotArray, layeredType:int):RID;
@@ -23835,6 +23899,7 @@ package godot {
 	}
 	[GodotEnum(name="ThreadLoadStatus", values="THREAD_LOAD_INVALID_RESOURCE,THREAD_LOAD_IN_PROGRESS,THREAD_LOAD_FAILED,THREAD_LOAD_LOADED")]
 	[GodotEnum(name="CacheMode", values="CACHE_MODE_IGNORE,CACHE_MODE_REUSE,CACHE_MODE_REPLACE,CACHE_MODE_IGNORE_DEEP,CACHE_MODE_REPLACE_DEEP")]
+	[Singleton]
 	public native class ResourceLoader extends GodotObject {
 		public static const THREAD_LOAD_INVALID_RESOURCE:int = 0;
 		public static const THREAD_LOAD_IN_PROGRESS:int = 1;
@@ -23846,6 +23911,7 @@ package godot {
 		public static const CACHE_MODE_IGNORE_DEEP:int = 3;
 		public static const CACHE_MODE_REPLACE_DEEP:int = 4;
 		public native function ResourceLoader();
+		public static native function get singleton():ResourceLoader;
 		[Godot(cacheMode="enum:ResourceLoader.CacheMode", returns="enum:GodotError")]
 		public static native function loadThreadedRequest(path:String, typeHint:String = "", useSubThreads:Boolean = false, cacheMode:int = 1):int;
 		[Godot(returns="enum:ResourceLoader.ThreadLoadStatus")]
@@ -23876,6 +23942,7 @@ package godot {
 		public final native function getResourceList():PackedStringArray;
 	}
 	[GodotEnum(name="SaverFlags", values="FLAG_NONE,FLAG_RELATIVE_PATHS,FLAG_BUNDLE_RESOURCES,FLAG_CHANGE_PATH,FLAG_OMIT_EDITOR_PROPERTIES,FLAG_SAVE_BIG_ENDIAN,FLAG_COMPRESS,FLAG_REPLACE_SUBRESOURCE_PATHS")]
+	[Singleton]
 	public native class ResourceSaver extends GodotObject {
 		public static const FLAG_NONE:int = 0;
 		public static const FLAG_RELATIVE_PATHS:int = 1;
@@ -23886,6 +23953,7 @@ package godot {
 		public static const FLAG_COMPRESS:int = 32;
 		public static const FLAG_REPLACE_SUBRESOURCE_PATHS:int = 64;
 		public native function ResourceSaver();
+		public static native function get singleton():ResourceSaver;
 		[Godot(flags="bitfield:ResourceSaver.SaverFlags", returns="enum:GodotError")]
 		public static native function save(resource:Resource, path:String = "", flags:int = 0):int;
 		[Godot(returns="enum:GodotError")]
@@ -23895,9 +23963,11 @@ package godot {
 		public static native function removeResourceFormatSaver(formatSaver:ResourceFormatSaver):void;
 		public static native function getResourceIdForPath(path:String, generate:Boolean = false):Number;
 	}
+	[Singleton]
 	[Abstract]
 	public native class ResourceUID extends GodotObject {
 		public static const INVALID_ID:int = -1;
+		public static native function get singleton():ResourceUID;
 		public static native function idToText(id:Number):String;
 		public static native function textToId(textId:String):Number;
 		public static native function createId():Number;
@@ -26980,10 +27050,12 @@ package godot {
 	public native class TextServerDummy extends TextServerExtension {
 		public native function TextServerDummy();
 	}
+	[Singleton]
 	public native class TextServerManager extends GodotObject {
 		public native function TextServerManager();
 		public static native function get interfaceAdded():Signal;
 		public static native function get interfaceRemoved():Signal;
+		public static native function get singleton():TextServerManager;
 		public static native function addInterface(interface_:TextServer):void;
 		public static native function getInterfaceCount():int;
 		public static native function removeInterface(interface_:TextServer):void;
@@ -27220,6 +27292,7 @@ package godot {
 		public final native function mergeWith(other:Theme):void;
 		public final native function clear():void;
 	}
+	[Singleton]
 	public native class ThemeDB extends GodotObject {
 		public native function ThemeDB();
 		public static native function get fallbackBaseScale():Number;
@@ -27233,6 +27306,7 @@ package godot {
 		public static native function get fallbackStylebox():StyleBox;
 		public static native function set fallbackStylebox(value:StyleBox):void;
 		public static native function get fallbackChanged():Signal;
+		public static native function get singleton():ThemeDB;
 		public static native function getDefaultTheme():Theme;
 		public static native function getProjectTheme():Theme;
 	}
@@ -27696,6 +27770,7 @@ package godot {
 	}
 	[GodotEnum(name="Month", values="MONTH_JANUARY,MONTH_FEBRUARY,MONTH_MARCH,MONTH_APRIL,MONTH_MAY,MONTH_JUNE,MONTH_JULY,MONTH_AUGUST,MONTH_SEPTEMBER,MONTH_OCTOBER,MONTH_NOVEMBER,MONTH_DECEMBER")]
 	[GodotEnum(name="Weekday", values="WEEKDAY_SUNDAY,WEEKDAY_MONDAY,WEEKDAY_TUESDAY,WEEKDAY_WEDNESDAY,WEEKDAY_THURSDAY,WEEKDAY_FRIDAY,WEEKDAY_SATURDAY")]
+	[Singleton]
 	public native class Time extends GodotObject {
 		public static const MONTH_JANUARY:int = 1;
 		public static const MONTH_FEBRUARY:int = 2;
@@ -27717,6 +27792,7 @@ package godot {
 		public static const WEEKDAY_FRIDAY:int = 5;
 		public static const WEEKDAY_SATURDAY:int = 6;
 		public native function Time();
+		public static native function get singleton():Time;
 		public static native function getDatetimeDictFromUnixTime(unixTimeVal:Number):GodotDictionary;
 		public static native function getDateDictFromUnixTime(unixTimeVal:Number):GodotDictionary;
 		public static native function getTimeDictFromUnixTime(unixTimeVal:Number):GodotDictionary;
@@ -27840,10 +27916,12 @@ package godot {
 		public final native function setLocaleOverride(locale:String):void;
 		public final native function pseudolocalize(message:String):String;
 	}
+	[Singleton]
 	public native class TranslationServer extends GodotObject {
 		public native function TranslationServer();
 		public static native function get pseudolocalizationEnabled():Boolean;
 		public static native function set pseudolocalizationEnabled(value:Boolean):void;
+		public static native function get singleton():TranslationServer;
 		public static native function setLocale(locale:String):void;
 		public static native function getLocale():String;
 		public static native function getToolLocale():String;
@@ -30037,8 +30115,10 @@ package godot {
 		public final native function setDisplayRefreshRate(refreshRate:Number):void;
 		public final native function getAvailableDisplayRefreshRates():GodotArray;
 	}
+	[Singleton]
 	[Abstract]
 	public native class WorkerThreadPool extends GodotObject {
+		public static native function get singleton():WorkerThreadPool;
 		public static native function addTask(action:Function, highPriority:Boolean = false, description:String = ""):Number;
 		public static native function isTaskCompleted(taskId:Number):Boolean;
 		[Godot(returns="enum:GodotError")]
@@ -30623,6 +30703,7 @@ package godot {
 	}
 	[GodotEnum(name="TrackerType", values="TRACKER_HEAD,TRACKER_CONTROLLER,TRACKER_BASESTATION,TRACKER_ANCHOR,TRACKER_HAND,TRACKER_BODY,TRACKER_FACE,TRACKER_ANY_KNOWN,TRACKER_UNKNOWN,TRACKER_ANY")]
 	[GodotEnum(name="RotationMode", values="RESET_FULL_ROTATION,RESET_BUT_KEEP_TILT,DONT_RESET_ROTATION")]
+	[Singleton]
 	public native class XRServer extends GodotObject {
 		public static const TRACKER_HEAD:int = 1;
 		public static const TRACKER_CONTROLLER:int = 2;
@@ -30653,6 +30734,7 @@ package godot {
 		public static native function get trackerUpdated():Signal;
 		public static native function get trackerRemoved():Signal;
 		public static native function get worldOriginChanged():Signal;
+		public static native function get singleton():XRServer;
 		public static native function getReferenceFrame():Transform3D;
 		public static native function clearReferenceFrame():void;
 		[Godot(rotationMode="enum:XRServer.RotationMode")]

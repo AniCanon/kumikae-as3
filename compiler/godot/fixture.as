@@ -132,11 +132,13 @@ package godot {
 	public native class Color extends GodotObject {
 		public native function Color();
 	}
+	[Singleton]
 	[Abstract]
 	public native class Input extends GodotObject {
 		public static native function get mouseMode():int;
 		public static native function set mouseMode(value:int):void;
 		public static native function get joyConnectionChanged():Signal;
+		public static native function get singleton():Input;
 		public static native function isActionPressed(action:String, exactMatch:Boolean = false):Boolean;
 		public static native function getTicks():Number;
 		[Godot(flags="bitfield:Wide")]

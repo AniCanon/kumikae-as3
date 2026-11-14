@@ -173,6 +173,19 @@ check("add after addOnce, and the reverse, are AS3 errors", "at Signals/mixed()"
       output[-800:])
 check("an empty signal says so", "the signal is empty" in output and "at Signals/empty()" in output, output[-800:])
 
+# Singletons, constants and static methods, as GDScript works them out.
+output = compare("statics.gd", [
+    "pressed", "strength", "stick", "system", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
+    "listening", "heard", "cleared", "others still listen", "not listening", "input class", "same singleton",
+    "singleton object",
+    "escape", "captured", "ready notice", "axis", "zero", "up", "red", "forward", "identity", "sum", "up y",
+    "default key", "given key",
+    "from angle", "hsv", "html", "euler", "image", "after orphans",
+    "unset", "unset tint", "unset spot", "unset list", "cleared local",
+])
+check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not in output, output[-900:])
+
+
 for failure in failures:
     print("FAIL " + failure)
 print("godot: %s" % ("OK" if not failures else "%d failed" % len(failures)))

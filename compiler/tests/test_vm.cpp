@@ -400,6 +400,35 @@ struct FakeEngine : vm::Host {
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
 	}
+	std::string missing; // A singleton, constant or static method the engine does not have.
+	void *singleton(std::string_view p_class, std::string *r_error) override {
+		if (p_class == missing) {
+			*r_error = "Godot has no '" + missing + "' here";
+			return nullptr;
+		}
+		void *made = box();
+		log += "singleton " + std::string(p_class) + " -> #" + std::to_string((intptr_t)made) + "\n";
+		return made;
+	}
+	bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
+		log += "constant " + std::string(p_class) + "." + std::string(p_name) + " as " + std::string(p_wanted.type) + "\n";
+		if (p_name == missing) {
+			*r_error = "Godot has no constant '" + missing + "'";
+			return false;
+		}
+		give(p_wanted.kind, r_result, 0, "");
+		return true;
+	}
+	bool call_static(std::string_view p_class, std::string_view p_method, const Argument *p_arguments, size_t p_count,
+			const Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
+		log += "static " + std::string(p_class) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
+		if (p_method == missing) {
+			*r_error = "Godot has no '" + missing + "'";
+			return false;
+		}
+		give(p_wanted.kind, r_result, 0.5, "text");
+		return true;
+	}
 	vm::Str *text(void *p_value) override {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
@@ -509,6 +538,136 @@ static void test_engine_listeners() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// A singleton is an object the engine looks up; a constant and a static method are the engine's to answer.
+static void test_engine_statics() {
+	const char *source = "package { import godot.*; public class Pad extends Node {\n"
+						 "  private static var ticks:int = Engine.physicsTicksPerSecond;\n"
+						 "  private var spot:Vector2;\n"
+						 "  private var items:GodotArray;\n"
+						 "  private var held:Vector2 = null;\n"
+						 "  public function pressed(action:String):Boolean { return Input.isActionPressed(action, true); }\n"
+						 "  public function slow(n:Number):void { Engine.timeScale = n; Engine.timeScale += n; }\n"
+						 "  public function listen():void { Input.joyConnectionChanged.add(onJoy); }\n"
+						 "  private function onJoy(device:int, connected:Boolean):void {}\n"
+						 "  public function itself():GodotObject { return Input.singleton; }\n"
+						 "  public function numbers():Number { return Key.ESCAPE + NOTIFICATION_READY + Input.MOUSE_MODE_CAPTURED; }\n"
+						 "  public function up():Number { return Vector2.UP.y; }\n"
+						 "  public function made(a:Number, b:Number):Vector2 { return Vector2.fromAngle(a + b); }\n"
+						 "  public function shown():void { Node.printOrphanNodes(); }\n"
+						 "  public function start():int { return ticks; }\n"
+						 "  public function unset():Vector2 { var v:Vector2; return v; }\n"
+						 "  public function twice():String { var out:String = \"\"; for (var i:int = 0; i < 2; i++) { var v:Vector2; out += v; v = null; } return out; }\n"
+						 "  public function field():Vector2 { return spot; }\n"
+						 "  public function nothing():Boolean { return items == null && held == null; }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Pad.as", source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		uint32_t pad = 0;
+		for (size_t i = 0; i < module.classes.size(); i++) {
+			pad = module.classes[i].name == "Pad" ? (uint32_t)i : pad;
+		}
+		engine.log.clear();
+		vm::Object *object = interpreter.construct(pad, engine.box()); // #1
+		CHECK(object != nullptr);
+		// The class is used for the first time: its static field is set from the singleton. Then the object's
+		// field of a Godot value with parts starts at its zero.
+		CHECK_EQ(engine.log, std::string("singleton Engine -> #2\nget #2.physics_ticks_per_second\nconstruct Vector2() -> #3\n"));
+		engine.log.clear();
+		vm::Slot result;
+		result.bits = 0;
+		CHECK(interpreter.call_method(object, "start", nullptr, 0, &result));
+		CHECK_EQ(engine.log, std::string());
+		CHECK_EQ(result.i, 7);
+		// A singleton's method, property and signal are the object's.
+		engine.log.clear();
+		vm::Slot arguments[2];
+		arguments[0].bits = 0;
+		arguments[0].p = vm::new_string("jump");
+		CHECK(interpreter.call_method(object, "pressed", arguments, 1, &result));
+		CHECK_EQ(engine.log, std::string("singleton Input -> #4\ncall #4.is_action_pressed(\"jump\", true)\n"));
+		vm::free_string(static_cast<vm::Str *>(arguments[0].p));
+		engine.log.clear();
+		arguments[0].bits = 0;
+		arguments[0].d = 0.5;
+		CHECK(interpreter.call_method(object, "slow", arguments, 1, nullptr));
+		CHECK_EQ(engine.log, std::string("singleton Engine -> #5\nset #5.time_scale = 0.5\n"
+										 "singleton Engine -> #6\nget #6.time_scale\nset #6.time_scale = 8\n"));
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "listen", nullptr, 0, nullptr));
+		CHECK_EQ(engine.log, std::string("singleton Input -> #7\nget #7.joy_connection_changed\nbind Pad/onJoy of Pad owner #1 -> #9\ncall #8.@add(#9)\n"));
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "itself", nullptr, 0, &result));
+		CHECK_EQ(engine.log, std::string("singleton Input -> #10\n"));
+		CHECK_EQ((intptr_t)result.p, (intptr_t)10);
+		engine.drop(result.p);
+		// A constant with a value in the declarations asks the engine nothing.
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "numbers", nullptr, 0, &result));
+		CHECK_EQ(engine.log, std::string());
+		CHECK_EQ(result.d, 4194305.0 + 13.0 + 2.0);
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "up", nullptr, 0, &result));
+		CHECK_EQ(engine.log, std::string("constant Vector2.UP as Vector2\nget #11.y\n"));
+		// A static method is called on no object.
+		engine.log.clear();
+		arguments[0].d = 1;
+		arguments[1].bits = 0;
+		arguments[1].d = 2;
+		CHECK(interpreter.call_method(object, "made", arguments, 2, &result));
+		CHECK_EQ(engine.log, std::string("static Vector2.from_angle(3)\n"));
+		engine.drop(result.p);
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "shown", nullptr, 0, nullptr));
+		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes()\n"));
+		// A local of a Godot value with parts starts at its zero, once: the declaration is not run again.
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "unset", nullptr, 0, &result));
+		CHECK_EQ(engine.log, std::string("construct Vector2() -> #13\n"));
+		engine.drop(result.p);
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "twice", nullptr, 0, &result));
+		CHECK_EQ(engine.log, std::string("construct Vector2() -> #14\ntext #14\n"));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("<#14>null"));
+		vm::free_string(static_cast<vm::Str *>(result.p));
+		CHECK(interpreter.call_method(object, "field", nullptr, 0, &result));
+		CHECK_EQ((intptr_t)result.p, (intptr_t)3);
+		engine.drop(result.p);
+		// A Godot value without parts, and one set to null, are missing.
+		CHECK(interpreter.call_method(object, "nothing", nullptr, 0, &result));
+		CHECK(result.b);
+		CHECK_EQ(engine.boxes, 2); // The owner and the field.
+		// What the engine does not have is an AS3 error, and nothing is left behind.
+		CHECK_EQ(engine.errors, std::string());
+		engine.missing = "Input";
+		CHECK(!interpreter.call_method(object, "listen", nullptr, 0, nullptr));
+		CHECK(engine.errors.find("Error: Godot has no 'Input' here") == 0);
+		engine.errors.clear();
+		engine.missing = "UP";
+		CHECK(!interpreter.call_method(object, "up", nullptr, 0, &result));
+		CHECK(engine.errors.find("Error: Godot has no constant 'UP'") == 0);
+		engine.errors.clear();
+		engine.missing = "from_angle";
+		CHECK(!interpreter.call_method(object, "made", arguments, 2, &result));
+		CHECK(engine.errors.find("Error: Godot has no 'from_angle'") == 0);
+		CHECK_EQ(engine.boxes, 2);
+		interpreter.release_object(object);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // Operators on Godot's values are the engine's to carry out.
 static void test_engine_operators() {
 	const char *source = "package { import godot.*; public class Mover extends Node2D {\n"
@@ -517,10 +676,10 @@ static void test_engine_operators() {
 						 "    v -= by;\n"
 						 "    return -v == by;\n"
 						 "  }\n"
-						 "  public function nobody():Vector2 { var v:Vector2; return v + v; }\n"
+						 "  public function nobody():Vector2 { var v:Vector2 = null; return v + v; }\n"
 						 "  public function isNobody(n:Node):Boolean { return n == this.getParent() || n != null; }\n"
 						 "  public function say(v:Vector2, n:Node):String { trace(v); return \"v=\" + v + n.toString() + String(n); }\n"
-						 "  public function sayNothing():String { var n:Node; var v:Vector2; trace(n); return v + \"\"; }\n"
+						 "  public function sayNothing():String { var n:Node; var v:Vector2 = null; trace(n); return v + \"\"; }\n"
 						 "  public function sayNobody():String { var n:Node; return n.toString(); }\n"
 						 "  public function nudge(n:Number):void { position.x = n; }\n"
 						 "  public function nudgeMore(n:Number):void { transform.origin.x += n; }\n"
@@ -798,7 +957,9 @@ static void test_engine_calls() {
 		return std::string(checked.empty() ? "" : "CHECK ") + (lowered ? "LOWERED " : "") + text;
 	};
 	const char *bodies[] = {
-		"function f():void { if (Input.isActionPressed(\"jump\")) {} }",
+		"function f():void { Vector2.ZERO.x = 5; }",
+		"function f():void { Vector2.ZERO[0] = 5; }",
+		"function f():void { Vector2.ZERO.x++; }",
 		"function f():void { treeEntered.add(function():void {}); }",
 		"function f(n:Node):void { var x:int = n[\"name\"].length; }",
 		"function f():void { print(\"hello\"); }",
@@ -904,6 +1065,7 @@ int main() {
 	test_engine_calls();
 	test_engine_operators();
 	test_engine_listeners();
+	test_engine_statics();
 	test_entry_points();
 	test_statement_hook();
 	test_refused_program();

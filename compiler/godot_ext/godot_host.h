@@ -32,6 +32,10 @@ public:
 	bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) override;
 	void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	bool member(void *p_receiver, std::string_view p_name, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	void *singleton(std::string_view p_class, std::string *r_error) override;
+	bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool call_static(std::string_view p_class, std::string_view p_method, const Argument *p_arguments, size_t p_count,
+			const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	vm::Str *text(void *p_value) override;
 	void *copy(void *p_value) override;
 	void drop(void *p_value) override;

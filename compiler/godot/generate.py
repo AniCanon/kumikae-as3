@@ -442,6 +442,11 @@ class Generator:
             self.claim(owner, name, "the signal " + signal["name"], inherited)
             out.append("public %snative function get %s():Signal;" % (sealed, name))
 
+        if static:
+            # The singleton itself, for the places that want an object. The name is AS3's only.
+            self.claim(owner, "singleton", "the property @singleton", inherited)
+            out.append("public static native function get singleton():%s;" % as3_name)
+
         for method in methods:
             if method["name"] in hidden or (owner, method["name"]) in AS3_HAS_METHOD | LISTEN_BY_NAME:
                 continue
@@ -462,6 +467,8 @@ class Generator:
             out.extend(lines)
 
         self.lines.extend(self.enum_lines(entry))
+        if static:
+            self.lines.append("\t[Singleton]")
         if not entry["is_instantiable"]:
             self.lines.append("\t[Abstract]")
         extends = " extends " + naming.class_name(entry["inherits"]) if entry.get("inherits") else ""

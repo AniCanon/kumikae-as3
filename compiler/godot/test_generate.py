@@ -172,6 +172,12 @@ class Fixture(unittest.TestCase):
         self.assertIn("public static native function set mouseMode(value:int):void;", input_)
         self.assertIn("public static native function get joyConnectionChanged():Signal;", input_)
 
+    def test_singleton_is_tagged_and_gives_itself(self):
+        self.assertIn("public static native function get singleton():Input;", self.members("Input"))
+        at = self.text.index("\tpublic native class Input ")
+        self.assertIn("\t[Singleton]\n", self.text[at - 60:at])
+        self.assertNotIn("singleton", " ".join(self.members("Node")))
+
     def test_wide_bitfield_is_a_number(self):
         self.assertIn("public static native function setFlags(flags:Number):void;", self.members("Input"))
         self.assertIn("public static const HIGH:Number = 34359738368;", self.members("Wide"))
@@ -514,6 +520,7 @@ class RealApi(unittest.TestCase):
         # The Godot spelling of everything declared, for the bindings: never worked out backwards from the
         # AS3 name, which loses information (getNode3d).
         names = dict(line.split("=") for line in self.generator.names_text().split("\n") if line)
+        self.assertEqual(names["Input.singleton"], "@singleton")
         self.assertEqual(names["CharacterBody2D.moveAndSlide"], "move_and_slide")
         self.assertEqual(names["Node._physicsProcess"], "_physics_process")
         self.assertEqual(names["Node2D.position"], "position")

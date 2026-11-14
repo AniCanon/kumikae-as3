@@ -38,7 +38,7 @@ package {
 		public function colorText(c:Color):String { return String(c); }
 		public function nodeText(n:Node):String { return n.toString(); }
 		public function nodeJoined(n:Node):String { return "node " + n; }
-		public function nullText():String { var v:Vector2; return "v=" + v; }
+		public function nullText():String { var v:Vector2 = null; return "v=" + v; }
 		public function nullNode(n:Node):String { return String(n); }
 		public function nullOwn(n:Node):String { return n.toString(); }
 		public function traced(v:Vector2):void { trace(v, v.x); }

@@ -423,6 +423,29 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			ok = host_.operate(op, values, count, wanted(target), &result, &error);
 			break;
 		}
+		case Op::HostSingleton: {
+			target = p_in.a;
+			kind = Kind::Ref;
+			result.p = host_.singleton(module_.strings[p_in.b], &error);
+			ok = result.p != nullptr;
+			break;
+		}
+		case Op::HostConstant: {
+			target = p_in.a;
+			kind = p_function.registers[target];
+			ok = host_.constant(module_.strings[p_in.b], module_.strings[p_in.c], wanted(target), &result, &error);
+			break;
+		}
+		case Op::HostCallStatic: {
+			gather(p_function.argument_lists[p_in.c], 0);
+			// "Vector2.from_angle": the type, and the method.
+			std::string_view name = module_.strings[p_in.b];
+			size_t dot = name.rfind('.');
+			target = p_in.a;
+			kind = target == NONE ? Kind::Void : p_function.registers[target];
+			ok = host_.call_static(name.substr(0, dot), name.substr(dot + 1), values, count, wanted(target), target == NONE ? nullptr : &result, &error);
+			break;
+		}
 		case Op::HostToStr: {
 			target = p_in.a;
 			kind = Kind::Str;
@@ -1097,6 +1120,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostGet:
 			case Op::HostOperate:
 			case Op::HostToStr:
+			case Op::HostSingleton:
+			case Op::HostConstant:
+			case Op::HostCallStatic:
 			case Op::HostBind:
 			case Op::HostMember:
 			case Op::HostIndexGet:

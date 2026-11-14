@@ -806,6 +806,7 @@ class Lowerer {
 		bool of_value = false; // For Engine: a member of a value type, which is a copy.
 		const Type *type = nullptr; // For Engine: what the member is declared to be.
 		uint32_t key = NONE; // For Engine: the place is an element (`value[key]`); the register holding the key.
+		bool constant = false; // One of Godot's constants: read from a register, and never written.
 		// For Engine: the member is one part of a Godot value that is itself stored somewhere
 		// (`position.x`). Godot's values are copies, so writing the part is: read the whole value, change
 		// the part, write the whole value back.
@@ -859,12 +860,104 @@ class Lowerer {
 		return default_value(Kind::Ref, p_position);
 	}
 
+	// One of Godot's values that is made of parts (a Vector2's x and y, a Color's r, g, b and a) is never
+	// missing unless a program says so: a variable of it with no value written starts at the type's zero,
+	// as it does in GDScript. This gives that zero in a new register, or NONE for any other type (an array,
+	// a signal, a function), which starts missing as an object does.
+	uint32_t zero_value(TypeRef *p_written, uint32_t p_position) {
+		const Type *type = p_written ? compilation_.type_of(p_written) : nullptr;
+		Kind kind = Kind::Void;
+		uint32_t name = 0;
+		if (!type || type->kind != Type::Instance || !type->symbol || !type->symbol->klass || !kind_of(type, &kind) || kind != Kind::Val ||
+				!engine_name(type->symbol, std::string_view(), &name)) {
+			return NONE;
+		}
+		bool parts = false;
+		for (const auto &member : type->symbol->klass->members) {
+			parts = parts || member.second->kind == SymbolKind::Field;
+		}
+		if (!parts) {
+			return NONE;
+		}
+		uint32_t out = reg(Kind::Val);
+		emit(Op::HostNew, p_position, out, name, arguments({}));
+		return out;
+	}
+
+	// A class Godot keeps one object of (Input): tagged [Singleton] in the declarations.
+	static bool is_singleton(const Symbol *p_class) {
+		if (!p_class || p_class->kind != SymbolKind::Class || !p_class->unit || !p_class->unit->is_declaration || !p_class->node ||
+				p_class->node->kind != NodeKind::ClassDecl) {
+			return false;
+		}
+		for (const Metadata &tag : static_cast<ClassDecl *>(p_class->node)->metadata) {
+			if (tag.name == "Singleton") {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// The engine's one object of a singleton class. Everything written `Input.x` is then a member of it.
+	uint32_t singleton(const Symbol *p_class, uint32_t p_position) {
+		uint32_t name = 0;
+		if (!engine_name(p_class, std::string_view(), &name)) {
+			refuse(p_position, "this use of a Godot member");
+			return default_value(Kind::Ref, p_position);
+		}
+		uint32_t out = reg(Kind::Ref);
+		emit(Op::HostSingleton, p_position, out, name);
+		return out;
+	}
+
+	// One of Godot's constants. One with a value in the declarations (`Key.ESCAPE`) is that value; any
+	// other (`Vector2.ZERO`) is asked of the engine.
+	Place constant_place(Symbol *p_symbol, uint32_t p_position) {
+		Place place;
+		Kind kind = Kind::Void;
+		const Type *type = p_symbol->type ? compilation_.type_of(p_symbol->type) : nullptr;
+		uint32_t klass = 0, name = 0;
+		Expr *value = nullptr;
+		if (p_symbol->node && p_symbol->node->kind == NodeKind::VarDecl) {
+			for (const Declarator &declarator : static_cast<VarDecl *>(p_symbol->node)->declarators) {
+				value = declarator.symbol == p_symbol ? declarator.initializer : value;
+			}
+		}
+		if (p_symbol->kind != SymbolKind::Field || !type || !kind_of(type, &kind) || kind == Kind::Void ||
+				(!value && (!engine_name(p_symbol->owner, std::string_view(), &klass) || !engine_name(p_symbol->owner, p_symbol->name, &name)))) {
+			refuse(p_position, "'" + std::string(p_symbol->name) + "' of Godot's " + std::string(p_symbol->owner ? p_symbol->owner->name : "API"));
+			return place;
+		}
+		place.where = Place::Register;
+		place.kind = kind;
+		place.constant = true;
+		if (value) {
+			place.index = expression(value, kind);
+		} else {
+			place.index = engine_reg(kind, type);
+			emit(Op::HostConstant, p_position, place.index, klass, name);
+		}
+		return place;
+	}
+
 	// A property or field of an engine object.
 	Place engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position) {
 		Place place;
 		uint32_t name = 0;
 		Kind kind = Kind::F64;
-		if (p_symbol->is_static() || !engine_name(p_symbol->owner, p_symbol->name, &name)) {
+		bool of_singleton = p_symbol->is_static() && p_symbol->kind == SymbolKind::Property && is_singleton(p_symbol->owner);
+		if (of_singleton && p_symbol->name == "singleton") {
+			// The singleton itself.
+			place.where = Place::Register;
+			place.index = singleton(p_symbol->owner, p_position);
+			place.kind = Kind::Ref;
+			place.constant = true;
+			return place;
+		}
+		if (p_symbol->is_static() && !of_singleton) {
+			return constant_place(p_symbol, p_position);
+		}
+		if (!engine_name(p_symbol->owner, p_symbol->name, &name)) {
 			refuse(p_position, "'" + std::string(p_symbol->name) + "' of Godot's " + std::string(p_symbol->owner ? p_symbol->owner->name : "API"));
 			return place;
 		}
@@ -883,6 +976,10 @@ class Lowerer {
 		place.index = name;
 		place.kind = kind;
 		place.type = compilation_.type_of(type);
+		if (of_singleton) {
+			place.object = singleton(p_symbol->owner, p_position);
+			return place;
+		}
 		Kind whole = Kind::Void;
 		if (p_object && (p_object->kind == NodeKind::Name || p_object->kind == NodeKind::Member) && kind_of(p_object->type, &whole) &&
 				whole == Kind::Val) {
@@ -1032,6 +1129,10 @@ class Lowerer {
 	void store(const Place &p_place, uint32_t p_value, uint32_t p_position) {
 		switch (p_place.where) {
 			case Place::Register:
+				if (p_place.constant) {
+					refuse(p_position, "changing a constant of Godot's");
+					break;
+				}
 				if (p_place.index != p_value) {
 					emit(Op::Move, p_position, p_place.index, p_value);
 				}
@@ -1045,6 +1146,10 @@ class Lowerer {
 			case Place::Engine:
 				if (p_place.part) {
 					uint32_t whole = whole_of(p_place, p_position);
+					if (p_place.part->whole.constant) {
+						refuse(p_position, "changing one part of a constant of Godot's");
+						break;
+					}
 					if (p_place.key != NONE) {
 						emit(Op::HostIndexSet, p_position, whole, p_place.key, p_value);
 					} else {
@@ -1207,6 +1312,10 @@ class Lowerer {
 			uint32_t out = reg(Kind::Str);
 			emit(Op::HostToStr, position, out, value);
 			return out;
+		}
+		if (is_godot(symbol) && symbol->kind == SymbolKind::Method && symbol->is_static()) {
+			// `Input.isActionPressed(...)`: a method of the engine's one Input. Any other is called on no object.
+			return is_singleton(symbol->owner) ? engine_call(p_call, symbol, singleton(symbol->owner, position)) : static_call(p_call, symbol);
 		}
 		if (is_godot(symbol) && symbol->kind == SymbolKind::Method && !symbol->is_static()) {
 			bool through_super = callee->kind == NodeKind::Member && static_cast<Member *>(callee)->object->kind == NodeKind::SuperExpr;
@@ -1405,6 +1514,27 @@ class Lowerer {
 		}
 		uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
 		emit(Op::HostCall, position, out, name, arguments(std::move(list)));
+		return out == NONE ? 0 : out;
+	}
+
+	// A method of Godot's that is called on no object: `Vector2.fromAngle(a)`.
+	uint32_t static_call(Call *p_call, Symbol *p_method) {
+		uint32_t position = p_call->offset;
+		std::string klass, method;
+		if (!p_method->owner || !godot_name(p_method->owner->name, std::string_view(), &klass) ||
+				!godot_name(p_method->owner->name, p_method->name, &method)) {
+			refuse(p_call->callee->offset, "calling '" + std::string(p_method->name) + "'");
+			return 0;
+		}
+		Kind kind = Kind::Void;
+		if (p_method->type && !kind_of(compilation_.type_of(p_method->type), &kind)) {
+			refuse(position, "a call to a Godot method that returns '" + compilation_.type_name(compilation_.type_of(p_method->type)) + "'");
+		}
+		std::vector<uint32_t> list;
+		FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
+		engine_arguments(decl, p_call->arguments, position, list);
+		uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
+		emit(Op::HostCallStatic, position, out, string(klass + "." + method), arguments(std::move(list)));
 		return out == NONE ? 0 : out;
 	}
 
@@ -1993,6 +2123,12 @@ class Lowerer {
 				// A Number starts as NaN. The rest start as zero, which is what a fresh register holds.
 				if (kind == Kind::F64) {
 					emit(Op::ConstF64, declarator.offset, local, number(std::numeric_limits<double>::quiet_NaN()));
+				} else if (kind == Kind::Val && !declarator.initializer) {
+					// One of Godot's values with parts starts at its zero.
+					uint32_t zero = zero_value(declarator.type, declarator.offset);
+					if (zero != NONE) {
+						emit(Op::Move, declarator.offset, local, zero);
+					}
 				}
 			}
 		});
@@ -2291,6 +2427,11 @@ class Lowerer {
 				if (field != fields_.end() && declarator.initializer) {
 					Kind kind = module_.classes[index].fields[field->second].kind;
 					emit(Op::SetField, declarator.offset, 0, field->second, expression(declarator.initializer, kind));
+				} else if (field != fields_.end()) {
+					uint32_t zero = zero_value(declarator.type, declarator.offset);
+					if (zero != NONE) {
+						emit(Op::SetField, declarator.offset, 0, field->second, zero);
+					}
 				}
 			}
 		}
@@ -2315,7 +2456,7 @@ class Lowerer {
 		for (Node *member : p_class->members) {
 			if (member->kind == NodeKind::VarDecl && (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
 				for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
-					any = any || (declarator.initializer && globals_.count(declarator.symbol));
+					any = any || globals_.count(declarator.symbol); // One without a value may still start at a zero.
 				}
 			}
 		}
@@ -2342,6 +2483,11 @@ class Lowerer {
 					emit(Op::Stmt, declarator.offset);
 					emit(Op::SetGlobal, declarator.offset, global->second,
 							expression(declarator.initializer, module_.globals[global->second].kind));
+				} else if (global != globals_.end()) {
+					uint32_t zero = zero_value(declarator.type, declarator.offset);
+					if (zero != NONE) {
+						emit(Op::SetGlobal, declarator.offset, global->second, zero);
+					}
 				}
 			}
 		}
