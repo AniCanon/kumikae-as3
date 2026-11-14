@@ -18,7 +18,7 @@ WideLiteral read_wide_literal(const Expr *p_expression) {
 		return result;
 	}
 	result.digits = text;
-	result.state = WideLiteral::TooLarge;
+	result.state = WideLiteral::State::TooLarge;
 	const uint64_t base = hex ? 16 : 10;
 	uint64_t value = 0;
 	for (size_t i = hex ? 2 : 0; i < text.size(); i++) {
@@ -35,32 +35,31 @@ WideLiteral read_wide_literal(const Expr *p_expression) {
 	if (value > (result.negative ? (uint64_t)1 << 63 : (uint64_t)INT64_MAX)) {
 		return result;
 	}
-	result.state = WideLiteral::Fits;
+	result.state = WideLiteral::State::Fits;
 	result.value = result.negative ? (int64_t)(0 - value) : (int64_t)value;
 	return result;
 }
 
-bool gives_whole_number(const Call *p_call, bool *r_of_arguments) {
-	*r_of_arguments = false;
+WholeResult gives_whole_number(const Call *p_call) {
 	const Expr *callee = p_call->callee;
 	const Symbol *symbol = !callee ? nullptr
 			: callee->kind == NodeKind::Member ? static_cast<const Member *>(callee)->resolved()
 			: callee->kind == NodeKind::Name ? static_cast<const Name *>(callee)->symbol
 											 : nullptr;
 	if (!symbol || !symbol->unit || !symbol->unit->is_builtin) {
-		return false;
+		return WholeResult::No;
 	}
 	if (!symbol->owner) {
-		return symbol->kind == SymbolKind::Function && symbol->name == "parseInt";
+		return symbol->kind == SymbolKind::Function && symbol->name == "parseInt" ? WholeResult::Always : WholeResult::No;
 	}
 	if (symbol->owner->name != "Math" || symbol->kind != SymbolKind::Method) {
-		return false;
+		return WholeResult::No;
 	}
 	if (symbol->name == "floor" || symbol->name == "round" || symbol->name == "ceil") {
-		return true;
+		return WholeResult::Always;
 	}
-	*r_of_arguments = (symbol->name == "abs" || symbol->name == "max" || symbol->name == "min") && p_call->arguments.count > 0;
-	return *r_of_arguments;
+	const bool by_arguments = (symbol->name == "abs" || symbol->name == "max" || symbol->name == "min") && p_call->arguments.count > 0;
+	return by_arguments ? WholeResult::IfArgumentsAre : WholeResult::No;
 }
 
 bool has_tag(const Symbol *p_class, std::string_view p_tag) {

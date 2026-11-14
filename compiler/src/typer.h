@@ -12,13 +12,6 @@
 
 namespace kas3 {
 
-inline std::string quoted(std::string_view p_name) {
-	std::string result = "'";
-	result += p_name;
-	result += '\'';
-	return result;
-}
-
 inline Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_table, std::string_view p_name) {
 	auto found = p_table.find(p_name);
 	return found == p_table.end() ? nullptr : found->second;

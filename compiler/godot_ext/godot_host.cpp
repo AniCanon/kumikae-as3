@@ -239,9 +239,10 @@ static std::string describe(const GDExtensionCallError &p_error, std::string_vie
 
 const StringName &GodotHost::name(std::string_view p_text) {
 	Name &entry = names_[Place{ p_text.data(), p_text.size() }];
-	if (entry.text != p_text || entry.godot == StringName()) {
+	if (!entry.made || entry.text != p_text) {
 		entry.text.assign(p_text.data(), p_text.size());
 		entry.godot = StringName(to_godot(p_text));
+		entry.made = true;
 	}
 	return entry.godot;
 }
@@ -314,8 +315,8 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 			*r_error = "Godot has no '" + std::string(p_method) + "' in '" + std::string(p_class) + "'";
 			return false;
 		}
-		static const StringName call_static_name("class_call_static");
-		Variant(classes).callp(call_static_name, arguments.pointers(), (int)arguments.count(), result, error);
+		// The name is kept with the others, and so is let go when the program is unloaded.
+		Variant(classes).callp(name("class_call_static"), arguments.pointers(), (int)arguments.count(), result, error);
 	}
 	if (error.error != GDEXTENSION_CALL_OK) {
 		*r_error = describe(error, std::string(p_class) + "." + std::string(p_method));

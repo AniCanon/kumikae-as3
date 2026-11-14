@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 namespace kas3 {
 namespace vm {
@@ -90,7 +91,7 @@ Outcome construct(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Val;
-	p_request.result.p = p_request.host.values.construct(p_request.text(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
+	p_request.result.p = p_request.host.source.construct(p_request.text(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -102,7 +103,7 @@ Outcome call(Request &p_request) {
 	}
 	const Gathered arguments(p_request, p_request.in.c, 1);
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.objects.call(receiver, p_request.text(p_request.in.b), arguments.values(), arguments.count(),
+	return p_request.done(p_request.host.handles.call(receiver, p_request.text(p_request.in.b), arguments.values(), arguments.count(),
 			p_request.wanted(), p_request.result_or_none(), &p_request.error));
 }
 
@@ -118,20 +119,20 @@ Outcome operate(Request &p_request) {
 		}
 	}
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.values.operate(op, arguments.values(), arguments.count(), p_request.wanted(), &p_request.result,
+	return p_request.done(p_request.host.handles.operate(op, arguments.values(), arguments.count(), p_request.wanted(), &p_request.result,
 			&p_request.error));
 }
 
 Outcome singleton(Request &p_request) {
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Ref;
-	p_request.result.p = p_request.host.objects.singleton(p_request.text(p_request.in.b), &p_request.error);
+	p_request.result.p = p_request.host.source.singleton(p_request.text(p_request.in.b), &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
 Outcome constant(Request &p_request) {
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.values.constant(p_request.text(p_request.in.b), p_request.text(p_request.in.c), p_request.wanted(),
+	return p_request.done(p_request.host.source.constant(p_request.text(p_request.in.b), p_request.text(p_request.in.c), p_request.wanted(),
 			&p_request.result, &p_request.error));
 }
 
@@ -141,7 +142,7 @@ Outcome call_static(Request &p_request) {
 	const std::string_view name = p_request.text(p_request.in.b);
 	const size_t dot = name.rfind('.');
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.objects.call_static(name.substr(0, dot), name.substr(dot + 1), arguments.values(), arguments.count(),
+	return p_request.done(p_request.host.source.call_static(name.substr(0, dot), name.substr(dot + 1), arguments.values(), arguments.count(),
 			p_request.wanted(), p_request.result_or_none(), &p_request.error));
 }
 
@@ -150,7 +151,7 @@ Outcome to_text(Request &p_request) {
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Str;
 	void *value = p_request.handle(p_request.in.b);
-	p_request.result.p = value ? p_request.host.values.text(value) : nullptr;
+	p_request.result.p = value ? p_request.host.handles.text(value) : nullptr;
 	if (!p_request.result.p) {
 		retain(p_request.null_text);
 		p_request.result.p = p_request.null_text;
@@ -164,7 +165,7 @@ Outcome get(Request &p_request) {
 		return Outcome::Missing;
 	}
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.objects.get(receiver, p_request.text(p_request.in.c), p_request.wanted(), &p_request.result,
+	return p_request.done(p_request.host.handles.get(receiver, p_request.text(p_request.in.c), p_request.wanted(), &p_request.result,
 			&p_request.error));
 }
 
@@ -173,7 +174,7 @@ Outcome set(Request &p_request) {
 	if (!receiver) {
 		return Outcome::Missing;
 	}
-	return p_request.done(p_request.host.objects.set(receiver, p_request.text(p_request.in.b), p_request.argument(p_request.in.c), &p_request.error));
+	return p_request.done(p_request.host.handles.set(receiver, p_request.text(p_request.in.b), p_request.argument(p_request.in.c), &p_request.error));
 }
 
 Outcome bind(Request &p_request) {
@@ -186,28 +187,30 @@ Outcome bind(Request &p_request) {
 	const uint32_t function = (operand & ir::BIND_SLOT) ? klass.methods[operand & ~ir::BIND_SLOT] : operand;
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Val;
-	p_request.result.p = p_request.host.objects.bind(object, function, klass.native_base.empty() ? nullptr : object->fields()[0].p, &p_request.error);
+	p_request.result.p = p_request.host.source.bind(object, function, klass.native_base.empty() ? nullptr : object->fields()[0].p, &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
-// `object[name]` on a script object: one of its own fields by that name, which must hold a signal. Says
-// whether there is such a field; if not, the Godot object behind the script object is asked.
-bool own_member(Request &p_request, Object *p_object, std::string_view p_name, Outcome *r_outcome) {
+std::string not_a_signal(std::string_view p_name) {
+	return "'" + std::string(p_name) + "' is not a signal";
+}
+
+// `object[name]` on a script object: one of its own fields by that name, which must hold a signal.
+// Nothing if it has no such field: the Godot object behind the script object is then asked.
+std::optional<Outcome> own_member(Request &p_request, Object *p_object, std::string_view p_name) {
 	const ir::Class &klass = p_request.module.classes[p_object->klass];
 	for (size_t i = klass.fields.size(); i-- > 0;) {
 		if (klass.fields[i].name != p_name) {
 			continue;
 		}
 		if (klass.fields[i].kind != Kind::Val) {
-			p_request.error = "'" + std::string(p_name) + "' is not a signal";
-			*r_outcome = Outcome::Refused;
-		} else {
-			p_request.result.p = p_request.host.values.copy(p_object->fields()[i].p);
-			*r_outcome = Outcome::Done;
+			p_request.error = not_a_signal(p_name);
+			return Outcome::Refused;
 		}
-		return true;
+		p_request.result.p = p_request.host.handles.copy(p_object->fields()[i].p);
+		return Outcome::Done;
 	}
-	return false;
+	return std::nullopt;
 }
 
 Outcome member(Request &p_request) {
@@ -219,18 +222,17 @@ Outcome member(Request &p_request) {
 	p_request.into(p_request.in.a);
 	if (p_request.function.registers[p_request.in.b] == Kind::Obj) {
 		Object *object = static_cast<Object *>(receiver);
-		Outcome outcome = Outcome::Done;
-		if (own_member(p_request, object, name->view(), &outcome)) {
-			return outcome;
+		if (const std::optional<Outcome> own = own_member(p_request, object, name->view())) {
+			return *own;
 		}
 		const ir::Class &klass = p_request.module.classes[object->klass];
 		receiver = klass.native_base.empty() ? nullptr : object->fields()[0].p;
 		if (!receiver) {
-			p_request.error = "'" + std::string(name->view()) + "' is not a signal";
+			p_request.error = not_a_signal(name->view());
 			return Outcome::Refused;
 		}
 	}
-	return p_request.done(p_request.host.objects.member(receiver, name->view(), p_request.wanted(), &p_request.result, &p_request.error));
+	return p_request.done(p_request.host.handles.member(receiver, name->view(), p_request.wanted(), &p_request.result, &p_request.error));
 }
 
 Outcome index_get(Request &p_request) {
@@ -239,7 +241,7 @@ Outcome index_get(Request &p_request) {
 		return Outcome::Missing;
 	}
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.values.index_get(receiver, p_request.argument(p_request.in.c), p_request.wanted(), &p_request.result,
+	return p_request.done(p_request.host.handles.index_get(receiver, p_request.argument(p_request.in.c), p_request.wanted(), &p_request.result,
 			&p_request.error));
 }
 
@@ -248,7 +250,7 @@ Outcome index_set(Request &p_request) {
 	if (!receiver) {
 		return Outcome::Missing;
 	}
-	return p_request.done(p_request.host.values.index_set(receiver, p_request.argument(p_request.in.b), p_request.argument(p_request.in.c),
+	return p_request.done(p_request.host.handles.index_set(receiver, p_request.argument(p_request.in.b), p_request.argument(p_request.in.c),
 			&p_request.error));
 }
 

@@ -297,7 +297,7 @@ static const char *const PLAYER =
 		"}\n";
 
 // Stands in for the engine: every value it hands out is a numbered box, and it writes down each request.
-struct FakeEngine : vm::Output, vm::EngineValues, vm::EngineObjects {
+struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	std::string log, errors;
 	int boxes = 0; // Handed out and not yet dropped.
 	int next = 1;
@@ -476,8 +476,8 @@ struct FakeEngine : vm::Output, vm::EngineValues, vm::EngineObjects {
 
 // A host that only prints implements Output alone, and a program that asks for the engine is told
 // there is none.
-static_assert(!std::is_base_of<vm::EngineValues, vm::StandaloneOutput>::value, "the stand-alone host answers no engine entry");
-static_assert(!std::is_base_of<vm::EngineObjects, Recorder>::value, "nor does the tests' recorder");
+static_assert(!std::is_base_of<vm::EngineHandles, vm::StandaloneOutput>::value, "the stand-alone host answers no engine entry");
+static_assert(!std::is_base_of<vm::EngineSource, Recorder>::value, "nor does the tests' recorder");
 
 static void test_no_engine() {
 	const char *source = "package { import godot.*; public class Maker extends Node {\n"

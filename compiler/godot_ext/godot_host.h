@@ -14,7 +14,7 @@
 
 namespace kas3 {
 
-class GodotHost final : public vm::Output, public vm::EngineValues, public vm::EngineObjects {
+class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::EngineSource {
 	std::unordered_set<void *> borrowed_; // Handles made by borrow().
 
 	// Godot's form of a name the interpreter passes on every call ("move_and_slide"), made once. The
@@ -24,6 +24,7 @@ class GodotHost final : public vm::Output, public vm::EngineValues, public vm::E
 	struct Name {
 		std::string text;
 		godot::StringName godot;
+		bool made = false;
 	};
 	struct Place {
 		const char *data;

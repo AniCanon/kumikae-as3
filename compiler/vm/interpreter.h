@@ -75,6 +75,8 @@ private:
 	void make(uint32_t p_class, Slot &r_out);
 	void enter(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers);
 	void trace(const std::vector<uint32_t> &p_list, const Slot *p_registers);
+	void leave(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result);
+	void object_to_text(const ir::Instruction &p_in, Slot *p_registers);
 	void unwind(size_t p_depth);
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);

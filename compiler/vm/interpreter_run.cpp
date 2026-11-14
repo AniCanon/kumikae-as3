@@ -132,6 +132,41 @@ void Interpreter::enter(const Function &p_function, const Instruction &p_in, con
 	push(target, values, list.size(), p_in.a);
 }
 
+// A function is done. Its value, if it gives one, goes to the caller's register, or to whoever called in
+// from outside, or nowhere.
+void Interpreter::leave(const Function &p_function, const Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result) {
+	Slot value;
+	value.bits = 0;
+	const Kind kind = p_function.result;
+	const bool gives = p_in.op == Op::Return;
+	if (gives) {
+		value = share(kind, p_registers[p_in.a]);
+	}
+	const uint32_t result = frames_.back().result;
+	pop();
+	if (gives && result != NONE && frames_.size() > p_depth) {
+		const Frame &caller = frames_.back();
+		put(kind, stack_[caller.base + result], value);
+	} else if (gives && frames_.size() == p_depth && r_result) {
+		*r_result = value; // The caller from outside takes it, with its reference.
+	} else if (gives && held(kind)) {
+		drop(kind, value); // Nobody wants it.
+	}
+}
+
+// An object as text. A class that says how it reads has its toString() called, whose result lands in
+// the register.
+void Interpreter::object_to_text(const Instruction &p_in, Slot *p_registers) {
+	Object *object = static_cast<Object *>(p_registers[p_in.b].p);
+	const uint32_t own = object ? module_.classes[object->klass].to_string : NONE;
+	if (own != NONE) {
+		Slot self = p_registers[p_in.b];
+		push(own, &self, 1, p_in.a);
+	} else {
+		assign(Kind::Str, p_registers[p_in.a], text(object_text(object)));
+	}
+}
+
 void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_registers) {
 	std::string line;
 	for (size_t i = 0; i < p_list.size(); i++) {
@@ -152,6 +187,12 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 		const Function &function = module_.functions[frame.function];
 		Slot *r = stack_.data() + frame.base;
 		const Instruction &in = function.code[frame.pc++];
+		// A Boolean result: the whole register is cleared, then the flag set. (Written here, not as a
+		// function in a header: measured, that form makes the loop about 3% slower.)
+		const auto flag = [&](bool p_value) {
+			r[in.a].bits = 0;
+			r[in.a].b = p_value;
+		};
 		switch (in.op) {
 			case Op::Stmt:
 				at_statement();
@@ -166,7 +207,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				r[in.a].d = module_.numbers[in.b];
 				break;
 			case Op::ConstBool:
-				set_bool(r[in.a], in.b != 0);
+				flag(in.b != 0);
 				break;
 			case Op::ConstStr:
 				retain(strings_[in.b]);
@@ -241,13 +282,13 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				r[in.a].l = (int64_t)((uint64_t)r[in.b].l >> ((uint64_t)r[in.c].l & 63));
 				break;
 			case Op::LtI64:
-				set_bool(r[in.a], r[in.b].l < r[in.c].l);
+				flag(r[in.b].l < r[in.c].l);
 				break;
 			case Op::LeI64:
-				set_bool(r[in.a], r[in.b].l <= r[in.c].l);
+				flag(r[in.b].l <= r[in.c].l);
 				break;
 			case Op::EqI64:
-				set_bool(r[in.a], r[in.b].l == r[in.c].l);
+				flag(r[in.b].l == r[in.c].l);
 				break;
 			case Op::CmpI64F64:
 				r[in.a].d = compare_wide(r[in.b].l, r[in.c].d);
@@ -259,7 +300,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				r[in.a].l = r[in.b].u;
 				break;
 			case Op::I64ToBool:
-				set_bool(r[in.a], r[in.b].l != 0);
+				flag(r[in.b].l != 0);
 				break;
 			case Op::I64ToStr:
 				assign(Kind::Str, r[in.a], text(std::to_string(r[in.b].l)));
@@ -297,21 +338,21 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				r[in.a].i = (int32_t)r[in.b].u;
 				break;
 			case Op::I32ToBool:
-				set_bool(r[in.a], r[in.b].i != 0);
+				flag(r[in.b].i != 0);
 				break;
 			case Op::U32ToBool:
-				set_bool(r[in.a], r[in.b].u != 0);
+				flag(r[in.b].u != 0);
 				break;
 			case Op::F64ToBool:
-				set_bool(r[in.a], !(r[in.b].d == 0 || std::isnan(r[in.b].d)));
+				flag(!(r[in.b].d == 0 || std::isnan(r[in.b].d)));
 				break;
 			case Op::StrToBool: {
 				Str *string = static_cast<Str *>(r[in.b].p);
-				set_bool(r[in.a], string && string->size > 0);
+				flag(string && string->size > 0);
 				break;
 			}
 			case Op::ObjToBool:
-				set_bool(r[in.a], r[in.b].p != nullptr);
+				flag(r[in.b].p != nullptr);
 				break;
 			case Op::I32ToStr:
 				assign(Kind::Str, r[in.a], text(std::to_string(r[in.b].i)));
@@ -325,18 +366,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::BoolToStr:
 				assign(Kind::Str, r[in.a], text(r[in.b].b ? "true" : "false"));
 				break;
-			case Op::ObjToStr: {
-				Object *object = static_cast<Object *>(r[in.b].p);
-				uint32_t own = object ? module_.classes[object->klass].to_string : NONE;
-				if (own != NONE) {
-					// The class says how it reads: call its toString(), whose result lands in the register.
-					Slot self = r[in.b];
-					push(own, &self, 1, in.a); // `frame` and `r` are stale after this.
-				} else {
-					assign(Kind::Str, r[in.a], text(object_text(object)));
-				}
+			case Op::ObjToStr:
+				object_to_text(in, r); // `frame` and `r` may be stale after this.
 				break;
-			}
 			case Op::StrToStr: {
 				Str *string = r[in.b].p ? static_cast<Str *>(r[in.b].p) : null_text_;
 				retain(string);
@@ -383,27 +415,27 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				r[in.a].i = ~r[in.b].i;
 				break;
 			case Op::LtF64:
-				set_bool(r[in.a], r[in.b].d < r[in.c].d);
+				flag(r[in.b].d < r[in.c].d);
 				break;
 			case Op::LeF64:
-				set_bool(r[in.a], r[in.b].d <= r[in.c].d);
+				flag(r[in.b].d <= r[in.c].d);
 				break;
 			case Op::EqF64:
-				set_bool(r[in.a], r[in.b].d == r[in.c].d);
+				flag(r[in.b].d == r[in.c].d);
 				break;
 			case Op::LtStr:
 			case Op::LeStr:
 			case Op::EqStr:
-				set_bool(r[in.a], compare_strings(in.op, static_cast<Str *>(r[in.b].p), static_cast<Str *>(r[in.c].p)));
+				flag(compare_strings(in.op, static_cast<Str *>(r[in.b].p), static_cast<Str *>(r[in.c].p)));
 				break;
 			case Op::EqBool:
-				set_bool(r[in.a], r[in.b].b == r[in.c].b);
+				flag(r[in.b].b == r[in.c].b);
 				break;
 			case Op::EqRef:
-				set_bool(r[in.a], r[in.b].p == r[in.c].p);
+				flag(r[in.b].p == r[in.c].p);
 				break;
 			case Op::Not:
-				set_bool(r[in.a], !r[in.b].b);
+				flag(!r[in.b].b);
 				break;
 			case Op::Concat:
 				assign(Kind::Str, r[in.a], text(joined(static_cast<Str *>(r[in.b].p), static_cast<Str *>(r[in.c].p))));
@@ -457,7 +489,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			}
 			case Op::ArgMissing:
-				set_bool(r[in.a], in.b >= frame.arguments);
+				flag(in.b >= frame.arguments);
 				break;
 			case Op::InitClass:
 				if (!class_used_[in.a]) {
@@ -477,7 +509,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				enter(function, in, r); // `frame` and `r` are stale after this.
 				break;
 			case Op::IsClass:
-				set_bool(r[in.a], is_class(static_cast<Object *>(r[in.b].p), in.c));
+				flag(is_class(static_cast<Object *>(r[in.b].p), in.c));
 				break;
 			case Op::AsClass: {
 				Object *object = static_cast<Object *>(r[in.b].p);
@@ -489,25 +521,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			}
 			case Op::Return:
-			case Op::ReturnVoid: {
-				Slot value;
-				value.bits = 0;
-				Kind kind = function.result;
-				if (in.op == Op::Return) {
-					value = share(kind, r[in.a]);
-				}
-				uint32_t result = frame.result;
-				pop();
-				if (in.op == Op::Return && result != NONE && frames_.size() > p_depth) {
-					const Frame &caller = frames_.back();
-					put(kind, stack_[caller.base + result], value);
-				} else if (in.op == Op::Return && frames_.size() == p_depth && r_result) {
-					*r_result = value; // The caller from outside takes it, with its reference.
-				} else if (in.op == Op::Return && held(kind)) {
-					drop(kind, value); // Nobody wants it.
-				}
+			case Op::ReturnVoid:
+				leave(function, in, r, p_depth, r_result); // `frame` and `r` are stale after this.
 				break;
-			}
 			case Op::Throw: {
 				Object *thrown = static_cast<Object *>(r[in.a].p);
 				if (!thrown) {

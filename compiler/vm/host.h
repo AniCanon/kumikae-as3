@@ -3,8 +3,8 @@
 // then NoEngine. Nothing else in vm/ may name the engine.
 #pragma once
 
-#include "engine_objects.h"
-#include "engine_values.h"
+#include "engine_handles.h"
+#include "engine_source.h"
 #include "no_engine.h"
 #include "output.h"
 
@@ -16,19 +16,30 @@ namespace vm {
 // The three are references: a host always has each.
 struct Host {
 	Output &output;
-	EngineValues &values;
-	EngineObjects &objects;
+	EngineHandles &handles;
+	EngineSource &source;
 
-	// No engine.
-	Host(Output &p_output) :
-			output(p_output), values(NoEngine::instance()), objects(NoEngine::instance()) {}
-	Host(Output &p_output, EngineValues &p_values, EngineObjects &p_objects) :
-			output(p_output), values(p_values), objects(p_objects) {}
-	// One object that is all three.
-	template <typename T, typename = std::enable_if_t<std::is_base_of<Output, T>::value && std::is_base_of<EngineValues, T>::value &&
-															 std::is_base_of<EngineObjects, T>::value>>
-	Host(T &p_all) :
-			output(p_all), values(p_all), objects(p_all) {}
+	Host(Output &p_output, EngineHandles &p_handles, EngineSource &p_source) :
+			output(p_output), handles(p_handles), source(p_source) {}
+
+	// One object that is the whole host, or one that only prints. An object that is half an engine is a
+	// mistake, and does not compile.
+	template <typename T, typename = std::enable_if_t<std::is_base_of<Output, T>::value>>
+	Host(T &p_host) :
+			output(p_host), handles(engine<EngineHandles>(p_host)), source(engine<EngineSource>(p_host)) {
+		static_assert(std::is_base_of<EngineHandles, T>::value == std::is_base_of<EngineSource, T>::value,
+				"a host implements both engine interfaces or neither");
+	}
+
+private:
+	template <typename Interface, typename T>
+	static Interface &engine(T &p_host) {
+		if constexpr (std::is_base_of<Interface, T>::value) {
+			return p_host;
+		} else {
+			return NoEngine::instance();
+		}
+	}
 };
 
 // Writes traces to standard output and errors to standard error.

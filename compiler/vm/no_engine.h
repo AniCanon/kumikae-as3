@@ -1,13 +1,13 @@
 // The engine where there is none (`kas3c run`, a test that only prints): every entry fails and says so.
 #pragma once
 
-#include "engine_objects.h"
-#include "engine_values.h"
+#include "engine_handles.h"
+#include "engine_source.h"
 
 namespace kas3 {
 namespace vm {
 
-class NoEngine final : public EngineValues, public EngineObjects {
+class NoEngine final : public EngineHandles, public EngineSource {
 	static bool refuse(std::string *r_error) {
 		*r_error = "there is no engine here";
 		return false;

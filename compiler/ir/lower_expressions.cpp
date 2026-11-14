@@ -3,10 +3,9 @@
 namespace kas3 {
 namespace ir {
 
-bool Lowerer::wide_literal(const Expr *p_expression, int64_t *r_value) {
+std::optional<int64_t> Lowerer::wide_literal(const Expr *p_expression) {
 	const WideLiteral literal = read_wide_literal(p_expression);
-	*r_value = literal.value;
-	return literal.state == WideLiteral::Fits;
+	return literal.state == WideLiteral::State::Fits ? std::optional<int64_t>(literal.value) : std::nullopt;
 }
 
 bool Lowerer::is_null(const Expr *p_expression) {
@@ -188,11 +187,10 @@ Symbol *Lowerer::named_class(Expr *p_expression) {
 
 uint32_t Lowerer::number_literal(Expr *p_expression, Kind p_want) {
 	uint32_t position = p_expression->offset;
-	int64_t exact = 0;
-	if (p_want == Kind::I64 && wide_literal(p_expression, &exact)) {
+	if (const std::optional<int64_t> exact = wide_literal(p_expression); exact && p_want == Kind::I64) {
 		// Digit by digit: a Number would lose the last digits of a large one.
 		uint32_t out = reg(Kind::I64);
-		emit(Op::ConstI64, position, out, wide(exact));
+		emit(Op::ConstI64, position, out, wide(*exact));
 		return out;
 	}
 	double value = literal_value(static_cast<NumberLit *>(p_expression));
@@ -413,10 +411,9 @@ uint32_t Lowerer::unary(Unary *p_unary, Kind p_want) {
 			if (is_engine(natural(p_unary->operand)) && kind_of(p_unary->type, &result) && result != Kind::Void) {
 				return engine_operate(p_unary->op, { operand(p_unary->operand) }, result, p_unary->type, position);
 			}
-			int64_t exact = 0;
-			if (p_want == Kind::I64 && wide_literal(p_unary, &exact)) {
+			if (const std::optional<int64_t> exact = wide_literal(p_unary); exact && p_want == Kind::I64) {
 				uint32_t out = reg(Kind::I64);
-				emit(Op::ConstI64, position, out, wide(exact)); // The least Int64 has no positive to negate.
+				emit(Op::ConstI64, position, out, wide(*exact)); // The least Int64 has no positive to negate.
 				return out;
 			}
 			if (kind_of(p_unary->operand->type, &result) && result == Kind::I64) {
@@ -478,10 +475,9 @@ uint32_t Lowerer::unary(Unary *p_unary, Kind p_want) {
 }
 
 uint32_t Lowerer::wide_operand(Expr *p_expression, Kind p_beside) {
-	int64_t exact = 0;
-	if (p_beside == Kind::I64 && wide_literal(p_expression, &exact)) {
+	if (const std::optional<int64_t> exact = wide_literal(p_expression); exact && p_beside == Kind::I64) {
 		uint32_t out = reg(Kind::I64);
-		emit(Op::ConstI64, p_expression->offset, out, wide(exact));
+		emit(Op::ConstI64, p_expression->offset, out, wide(*exact));
 		return out;
 	}
 	return expression(p_expression, Kind::Void);
@@ -490,8 +486,7 @@ uint32_t Lowerer::wide_operand(Expr *p_expression, Kind p_beside) {
 Kind Lowerer::operand_kind(Expr *p_expression, Expr *p_other) {
 	Kind kind = Kind::Void, other = Kind::Void;
 	kind_of(p_expression->type, &kind);
-	int64_t exact = 0;
-	if (kind_of(p_other->type, &other) && other == Kind::I64 && wide_literal(p_expression, &exact)) {
+	if (kind_of(p_other->type, &other) && other == Kind::I64 && wide_literal(p_expression)) {
 		return Kind::I64;
 	}
 	return kind;

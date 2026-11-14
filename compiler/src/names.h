@@ -302,6 +302,14 @@ public:
 	std::string ambiguous_message(std::string_view p_name, const Found &p_found) const;
 };
 
+// A name as it is shown in a message: 'name'.
+inline std::string quoted(std::string_view p_name) {
+	std::string result = "'";
+	result += p_name;
+	result += '\'';
+	return result;
+}
+
 // Whether a class written in a declaration file carries a tag: [Abstract], [Singleton].
 bool has_tag(const Symbol *p_class, std::string_view p_tag);
 

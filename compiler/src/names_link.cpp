@@ -14,13 +14,6 @@ static std::string join(const List<std::string_view> &p_parts, uint32_t p_count)
 	return result;
 }
 
-static std::string quoted(std::string_view p_name) {
-	std::string result = "'";
-	result += p_name;
-	result += '\'';
-	return result;
-}
-
 Context Compilation::context_of(Unit &p_unit, bool p_in_block) {
 	Context context;
 	context.unit = &p_unit;

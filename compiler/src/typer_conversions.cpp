@@ -175,7 +175,7 @@ void Typer::store(Expr *p_value, const Type *p_to) {
 	if (p_to == int64_) {
 		// A whole number written out is taken digit by digit, so it must be one an Int64 can hold.
 		const WideLiteral literal = read_wide_literal(p_value);
-		if (literal.state == WideLiteral::TooLarge) {
+		if (literal.state == WideLiteral::State::TooLarge) {
 			error(p_value->offset, std::string(literal.negative ? "-" : "") + std::string(literal.digits) + " does not fit an Int64");
 			return;
 		}

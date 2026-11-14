@@ -72,7 +72,7 @@ class Lowerer {
 
 	// A whole number written out (`12`, `0xFF`, `-5`) that an Int64 holds: its exact value. The checker
 	// has refused one that is written where an Int64 is expected and does not fit.
-	static bool wide_literal(const Expr *p_expression, int64_t *r_value);
+	static std::optional<int64_t> wide_literal(const Expr *p_expression);
 
 	uint32_t number(double p_value);
 

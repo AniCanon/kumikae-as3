@@ -10,22 +10,27 @@ namespace kas3 {
 
 // A whole number written out, with any signs before it: `12`, `0xFF`, `-5`, `- -5`.
 struct WideLiteral {
-	enum State {
+	enum class State {
 		NotWhole, // Not a literal, or one with a fraction or an exponent.
 		Fits, // An Int64 holds it: `value` is it, exactly.
 		TooLarge, // A whole number no Int64 holds.
 	};
-	State state = NotWhole;
+	State state = State::NotWhole;
 	int64_t value = 0;
 	bool negative = false;
 	std::string_view digits; // As written, without the signs.
 };
 WideLiteral read_wide_literal(const Expr *p_expression);
 
-// One of AS3's own functions whose result is a whole number though it comes back in a Number:
+// Whether a call to one of AS3's own functions gives a whole number, though it comes back in a Number:
 // Math.floor, Math.round, Math.ceil and parseInt always; Math.abs, Math.max and Math.min when every
-// argument is whole (r_of_arguments is then set, and the caller looks at them).
-bool gives_whole_number(const Call *p_call, bool *r_of_arguments);
+// argument is whole.
+enum class WholeResult {
+	No,
+	Always,
+	IfArgumentsAre,
+};
+WholeResult gives_whole_number(const Call *p_call);
 
 // Whether an expression's value is a whole number: one of a whole-number type (p_integral says which
 // expressions have one), or a sum, difference, product or remainder of such, a choice between two such,
@@ -57,11 +62,11 @@ bool is_whole_number(const Expr *p_expression, const IsIntegral &p_integral) {
 		}
 		case NodeKind::Call: {
 			const Call *call = static_cast<const Call *>(p_expression);
-			bool of_arguments = false;
-			if (gives_whole_number(call, &of_arguments)) {
-				if (!of_arguments) {
-					return true;
-				}
+			const WholeResult result = gives_whole_number(call);
+			if (result == WholeResult::Always) {
+				return true;
+			}
+			if (result == WholeResult::IfArgumentsAre) {
 				for (const Expr *argument : call->arguments) {
 					if (!is_whole_number(argument, p_integral)) {
 						return false;

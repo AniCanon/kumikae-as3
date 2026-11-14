@@ -2,6 +2,10 @@
 """Times the compiler and the interpreter, to compare before and after a change.
 
     python3 run_bench.py <build dir> [--godot <tests dir>] [--runs N]
+    python3 run_bench.py <build dir> --against <other build dir> [--runs N]
+
+With --against, `check` and `run` are timed for both builds turn and turn about, which is the only way
+to see a difference of a few per cent: runs made one build after the other drift by more than that.
 
 Prints one line per benchmark: the median of the runs in milliseconds, and the spread between the
 fastest and the slowest. A change is slower only if its median moved by more than the spread.
@@ -31,8 +35,28 @@ def timed(command, cwd=None):
 
 
 def report(name, samples):
-    print("%-8s %9.1f ms   spread %6.1f ms   (%d runs)" % (name, statistics.median(samples), max(samples) - min(samples),
+    print("%-28s %9.1f ms   spread %6.1f ms   (%d runs)" % (name, statistics.median(samples), max(samples) - min(samples),
                                                           len(samples)))
+
+
+def against(build, other, runs):
+    """`check` and `run` for two builds, one run of each in turn."""
+    with tempfile.TemporaryDirectory() as project:
+        subprocess.run([sys.executable, os.path.join(HERE, "generate_project.py"), project, "100000"], check=True,
+                       capture_output=True)
+        files = sorted(glob.glob(os.path.join(project, "**", "*.as"), recursive=True))
+        for name, command, cwd in (("check", ["check", *files], None), ("run", ["run", "loop.as"], HERE)):
+            samples = {build: [], other: []}
+            for _ in range(runs):
+                for which in (build, other):
+                    elapsed, done = timed([os.path.join(which, "kas3c"), *command], cwd=cwd)
+                    if done.returncode != 0:
+                        sys.exit("%s failed:\n%s" % (name, done.stderr[-600:]))
+                    samples[which].append(elapsed)
+            for which in (build, other):
+                report("%s %s" % (name, os.path.relpath(which)), samples[which])
+            first, second = statistics.median(samples[build]), statistics.median(samples[other])
+            print("%-8s the first is %+.1f%% against the second" % (name, (first - second) / second * 100.0))
 
 
 def main():
@@ -40,6 +64,10 @@ def main():
     if not arguments:
         sys.exit(__doc__)
     build = os.path.abspath(arguments[0])
+    if "--against" in arguments:
+        runs = int(arguments[arguments.index("--runs") + 1]) if "--runs" in arguments else 21
+        against(build, os.path.abspath(arguments[arguments.index("--against") + 1]), runs)
+        return
     runs = int(arguments[arguments.index("--runs") + 1]) if "--runs" in arguments else 7
     godot_tests = os.path.abspath(arguments[arguments.index("--godot") + 1]) if "--godot" in arguments else None
     kas3c = os.path.join(build, "kas3c")

@@ -53,13 +53,6 @@ static std::string join(const List<std::string_view> &p_parts) {
 	return result;
 }
 
-static std::string quoted(std::string_view p_name) {
-	std::string result = "'";
-	result += p_name;
-	result += '\'';
-	return result;
-}
-
 // "Player" for "src/game/Player.as".
 static std::string_view file_stem(const std::string &p_path) {
 	std::string_view stem = p_path;

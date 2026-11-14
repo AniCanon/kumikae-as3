@@ -30,7 +30,7 @@ void Interpreter::drop(Kind p_kind, Slot &p_slot) {
 		// the slot is emptied first and not touched again.
 		void *handle = p_slot.p;
 		p_slot.bits = 0;
-		host_.values.drop(handle);
+		host_.handles.drop(handle);
 		return;
 	}
 	p_slot.bits = 0;
@@ -40,7 +40,7 @@ Slot Interpreter::share(Kind p_kind, Slot p_value) {
 	if (ir::is_reference(p_kind)) {
 		retain(static_cast<Counted *>(p_value.p));
 	} else if (ir::is_engine(p_kind) && p_value.p) {
-		p_value.p = host_.values.copy(p_value.p);
+		p_value.p = host_.handles.copy(p_value.p);
 	}
 	return p_value;
 }
@@ -77,7 +77,7 @@ void Interpreter::drop_object(Object *p_object) {
 			} else if (ir::is_engine(klass.fields[i].kind) && field.p) {
 				void *handle = field.p;
 				field.p = nullptr;
-				host_.values.drop(handle);
+				host_.handles.drop(handle);
 			}
 		}
 		free_object(object);
@@ -146,14 +146,14 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 	const ir::Class &klass = module_.classes[p_class];
 	if (!use_class_now(p_class)) {
 		if (p_owner) {
-			host_.values.drop(p_owner);
+			host_.handles.drop(p_owner);
 		}
 		return nullptr;
 	}
 	Object *object = new_object(p_class, klass.fields.size());
 	if (!object) {
 		if (p_owner) {
-			host_.values.drop(p_owner);
+			host_.handles.drop(p_owner);
 		}
 		return nullptr;
 	}
@@ -165,7 +165,7 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref && p_owner) {
 		object->fields()[0].p = p_owner; // The object's own from here on.
 	} else if (p_owner) {
-		host_.values.drop(p_owner);
+		host_.handles.drop(p_owner);
 	}
 	Slot self;
 	self.bits = 0;
