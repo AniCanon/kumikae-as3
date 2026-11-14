@@ -129,7 +129,7 @@ container. That path was read from the actual Simulator export: 14 passed, 0 fai
 
 ## Use the same session from an agent
 
-Copy the **Agent endpoint file** path from the panel. It holds a local port and a
+Copy the endpoint file's path with **⋮ > Copy agent endpoint path** in the panel. It holds a local port and a
 secret token. Keep it private. The client refuses a descriptor readable by other
 users. The server listens only on `127.0.0.1`. There is one selected device per
 session, shared by the IDE and every connected agent.

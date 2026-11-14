@@ -1,5 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.ui.IconButtonControl
+import app.anicanon.kumikae.as3.ui.TitleButtonControl
 import com.intellij.ide.ui.LafManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationStarter
@@ -14,9 +16,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import javax.swing.JButton
-import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JFrame
+import javax.swing.JLabel
 import javax.swing.JTextArea
 
 /** Separate sandbox-only plugin. Never included in the distribution. */
@@ -59,6 +61,7 @@ class UiProbeStarter : ApplicationStarter {
     /** Drives the production view through its real buttons against the synthetic repository. */
     private fun checkWindow(destination: Path, prefix: String) {
         val repository = UiProbeRepository()
+        val prompts = UiProbePrompts()
         lateinit var controller: SimulatorWindowController
         lateinit var view: SimulatorToolWindow
         lateinit var host: JFrame
@@ -68,45 +71,55 @@ class UiProbeStarter : ApplicationStarter {
                 BackgroundWorker("UI probe actions"),
                 BackgroundWorker("UI probe polling"),
             )
-            view = SimulatorToolWindow(controller)
+            view = SimulatorToolWindow(controller, prompts)
             // Compose mounts when its host reaches a window, even one that is never shown.
             host = JFrame().apply { contentPane.add(view.component) }
             controller.shown()
         }
         try {
-            await("the device list") { devices(view).itemCount == 2 }
+            await("the device list") { controller.devices.size == 2 && shows(view, "Choose a simulator") }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-1-opened.png"))
-            onEdt { devices(view).selectedIndex = 0 }
+            onEdt { menu(deviceEntries(controller), "Probe Phone") }
             await("the selection") { shows(view, "Selected Probe Phone") }
-            click(view, "Refresh")
+            onEdt { menu(moreEntries(controller, view.state, prompts), "Refresh devices") }
             await("Refresh") { repository.calls.count { it == "devices" } == 2 && !controller.status.endsWith("…") }
             val gate = CountDownLatch(1)
             repository.bootGate = gate
             click(view, "Boot")
-            onEdt { devices(view).selectedIndex = 1 }
+            onEdt { menu(deviceEntries(controller), "Probe Tablet") }
             await("the refusal") { shows(view, "Another Simulator action is still running") }
             gate.countDown()
-            await("the list to return to the booted device") { devices(view).selectedIndex == 0 }
+            await("the heading to return to the booted device") { title(view).title.startsWith("Probe Phone") }
             check(repository.calls.none { it.startsWith("select probe-tablet") }) { "A refused selection was sent" }
-            await("Boot") { shows(view, "Booted.") && devices(view).selectedItem.toString().endsWith("Booted") }
-            click(view, "Launch")
+            await("Boot") { shows(view, "Booted.") && title(view).subtitle.endsWith("Booted") }
+            press(view, "Launch org.kumikae.as3test")
             await("Launch") { shows(view, "Launch requested") }
             check("launch probe-phone org.kumikae.as3test" in repository.calls) { "Launch sent ${repository.calls}" }
-            check(!button(view, "Home").isEnabled && !button(view, "Type").isEnabled) { "Input is on in viewer mode" }
+            check(!icon(view, "Home (needs idb)").isEnabled && !icon(view, "Type text (needs idb)").isEnabled) {
+                "Input is on in viewer mode"
+            }
             await("a picture and the console") {
                 controller.poll()
                 screen(view).frame != null && console(view).text.contains("test 40 of 40 passed")
             }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-2-running-narrow.png"))
             render(view.component, WIDE, SHORT, destination.resolve("$prefix-3-running-wide.png"))
+            press(view, "Show console")
+            await("the console to open") { console(view).isShowing || console(view).parent.parent.isVisible }
+            render(view.component, NARROW, TALL, destination.resolve("$prefix-5-console.png"))
+            press(view, "Copy screenshot")
+            check(prompts.copiedImages == 1) { "The screenshot was not copied" }
             repository.inputEnabled = true
             await("input controls") {
                 controller.poll()
-                button(view, "Home").isEnabled && button(view, "Type").isEnabled
+                descendants(view.component).filterIsInstance<IconButtonControl>().any {
+                    it.name == "Home" &&
+                        it.isEnabled
+                }
             }
             repository.installFailure = "An application bundle was not found at the provided path. " +
                 "Provide a valid path to the desired application bundle and try again."
-            click(view, "Install")
+            onEdt { menu(moreEntries(controller, view.state, prompts), "Install app") }
             await("the failure") { shows(view, "An application bundle was not found") && screen(view).frame == null }
             check(console(view).text.contains("[Error] An application bundle")) {
                 "The failure is missing from the console"
@@ -122,23 +135,33 @@ class UiProbeStarter : ApplicationStarter {
         await("the composition to be released") { view.component.componentCount == 0 }
     }
 
-    private fun devices(view: SimulatorToolWindow) =
-        descendants(view.component).filterIsInstance<JComboBox<*>>().first()
+    private fun title(view: SimulatorToolWindow) =
+        descendants(view.component).filterIsInstance<TitleButtonControl>().single()
 
-    private fun console(view: SimulatorToolWindow) =
-        descendants(view.component).filterIsInstance<JTextArea>().first { it.lineWrap && !it.wrapStyleWord }
+    private fun console(view: SimulatorToolWindow) = descendants(view.component).filterIsInstance<JTextArea>().single()
 
     private fun screen(view: SimulatorToolWindow) =
         descendants(view.component).filterIsInstance<SimulatorScreen>().single()
 
     /** What the composed view displays, which can lag behind the controller's state by one recomposition. */
     private fun shows(view: SimulatorToolWindow, text: String) =
-        descendants(view.component).filterIsInstance<JTextArea>().any { it.text.startsWith(text) }
+        descendants(view.component).filterIsInstance<JLabel>().any { it.text.startsWith(text) } ||
+            title(view).title.startsWith(text)
 
-    private fun button(view: SimulatorToolWindow, text: String) =
-        descendants(view.component).filterIsInstance<JButton>().single { it.text == text }
+    private fun icon(view: SimulatorToolWindow, name: String) =
+        descendants(view.component).filterIsInstance<IconButtonControl>().single { it.name == name }
 
-    private fun click(view: SimulatorToolWindow, text: String) = onEdt { button(view, text).doClick() }
+    private fun press(view: SimulatorToolWindow, name: String) = onEdt { icon(view, name).doClick() }
+
+    private fun click(view: SimulatorToolWindow, text: String) = onEdt {
+        descendants(view.component).filterIsInstance<JButton>().single { it.text == text }.doClick()
+    }
+
+    private fun menu(entries: List<MenuEntry>, text: String) {
+        val entry = entries.single { it.text.startsWith(text) }
+        check(entry.enabled) { "'$text' is disabled" }
+        entry.action()
+    }
 
     private fun descendants(component: Component): Sequence<Component> = sequence {
         yield(component)

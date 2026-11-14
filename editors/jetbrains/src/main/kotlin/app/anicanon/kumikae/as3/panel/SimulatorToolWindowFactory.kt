@@ -17,7 +17,7 @@ class SimulatorToolWindowFactory :
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val controller = SimulatorComposition.controller(Path.of(PathManager.getSystemPath(), "kumikae-as3"))
-        val view = SimulatorToolWindow(controller)
+        val view = SimulatorToolWindow(controller, IdePrompts(project))
         val content = ContentFactory.getInstance().createContent(view.component, "", false)
         content.setDisposer(view.controller)
         toolWindow.contentManager.addContent(content)

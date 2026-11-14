@@ -8,8 +8,9 @@ import javax.swing.JPanel
 import javax.swing.Timer
 
 /** Mounts the composed view, keeps the two native controls and schedules polling while the window shows. */
-internal class SimulatorToolWindow(val controller: SimulatorWindowController) {
+internal class SimulatorToolWindow(val controller: SimulatorWindowController, val prompts: SimulatorPrompts) {
     val component: JPanel
+    val state = SimulatorPanelState()
     private val screen = SimulatorScreen(controller::gesture)
     private val console = JBTextArea().apply {
         isEditable = false
@@ -19,7 +20,7 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController) {
     private val timer = Timer(POLL_MILLIS) { controller.poll() }
 
     init {
-        component = composePanel(controller) { SimulatorView(controller, screen, console) }
+        component = composePanel(controller) { SimulatorView(controller, state, prompts, screen, console) }
         Disposer.register(controller) { timer.stop() }
         component.addHierarchyListener {
             if (component.isShowing) {

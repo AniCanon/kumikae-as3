@@ -12,7 +12,7 @@ SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window
     BackgroundWorker (x2)    one for actions, one for polling
   SimulatorWindowController  all requests and all state
   SimulatorToolWindow        mounts the view, owns the two native controls, the timer
-    SimulatorView            Compose: layout, form drafts, button availability
+    SimulatorView            Compose: heading, framed device, floating bar, menus
     SimulatorScreen          native: paints the picture, mouse to gesture
 ```
 
@@ -83,7 +83,10 @@ Swing component, so its tests need no IDE and no window.
 
 `SimulatorToolWindow` mounts `SimulatorView` through `ui/ComposeHost.kt`, which
 ties the composition to the controller's disposal on the UI thread. Compose owns
-the layout, the draft values of the form fields and whether buttons are enabled.
+the layout and whether buttons are enabled. What the person set in the panel itself
+(the app to launch, whether the console shows) is `SimulatorPanelState`. Dialogs,
+menus and the clipboard are behind `SimulatorPrompts`, injected, so that the view
+opens nothing itself and the probe can answer for a person.
 Two controls stay native and are mounted through `Native` and
 `NativeScrollPane`: `SimulatorScreen`, which paints the fitted picture and turns
 mouse presses into gestures, and the console text area. The view pushes the
@@ -98,8 +101,11 @@ Compose Swing UI is pinned to 0.1.0-alpha06 from JetBrains' Compose Maven
 repository; the Compose compiler matches the Kotlin compiler. It is Compose
 Runtime driving Swing components, with no separate renderer. Because the
 library is an alpha, the plugin accepts only the platform build it has been
-tried on. `ui/ComposeUi.kt` holds the few shared composables: `Column`,
-`FormRow`, `Note`, `ReadOnlyField`, `Native` and `NativeScrollPane`.
+tried on. `ui/ComposeUi.kt` holds the few shared composables (`IconButton`,
+`TitleButton`, `Pill`, `StatusLine`, `Native`, `NativeScrollPane`) and
+`ui/Controls.kt` the small painted controls behind them. `DeviceFrame` works out
+where the device and its screen sit in the view and draws the body around the
+picture; a pointer position is measured against the screen it reports.
 
 ## Validation
 

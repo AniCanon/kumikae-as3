@@ -121,7 +121,7 @@ internal class SimulatorWindowController(
             state.status?.let { showStatus(it, fresh = false) }
             state.frame?.takeIf { it.device == selected?.id }?.let {
                 frame = it
-                capture = "Snapshot · ${it.captureMs} ms capture · up to 2 a second"
+                capture = "${it.captureMs} ms"
             }
             val failure = state.failure
             if (failure != null) {

@@ -44,7 +44,7 @@ class SimulatorWindowControllerTest {
         pollOnce()
         assertEquals(listOf("status", "screenshot A", "console 0"), repository.calls)
         assertEquals("A", controller.frame?.device)
-        assertEquals("Snapshot · 435 ms capture · up to 2 a second", controller.capture)
+        assertEquals("435 ms", controller.capture)
     }
 
     @Test fun `a screenshot that arrives after the device changed is dropped`() {
