@@ -208,6 +208,28 @@ class SimulatorWindowControllerTest {
         assertEquals("B", controller.frame?.device)
     }
 
+    @Test fun `a device chosen while an action runs is refused and the service's choice comes back`() {
+        open()
+        controller.boot()
+        controller.selectDevice(repository.tablet)
+        assertEquals("Another Simulator action is still running. Try again when it finishes.", controller.status)
+        // The list and the state must agree, or the next action would name a device the user cannot see.
+        assertEquals(repository.tablet, controller.selected)
+        actions.finish()
+        assertEquals("A", controller.selected?.id)
+        assertEquals(listOf("boot A"), repository.calls)
+    }
+
+    @Test fun `a poll keeps the device state that Refresh just read`() {
+        open(select = repository.tablet)
+        repository.listed = listOf(repository.phone, repository.tablet.copy(state = "Booted"))
+        controller.refreshDevices()
+        actions.finish()
+        pollOnce()
+        assertEquals("Booted", controller.selected?.state)
+        assertEquals("Booted", controller.devices.first { it.id == "B" }.state)
+    }
+
     @Test fun `an action without a device asks for one`() {
         open(select = null)
         controller.boot()

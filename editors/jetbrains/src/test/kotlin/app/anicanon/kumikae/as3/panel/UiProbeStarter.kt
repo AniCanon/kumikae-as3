@@ -10,6 +10,7 @@ import java.awt.Container
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import javax.swing.JButton
@@ -79,7 +80,14 @@ class UiProbeStarter : ApplicationStarter {
             await("the selection") { shows(view, "Selected Probe Phone") }
             click(view, "Refresh")
             await("Refresh") { repository.calls.count { it == "devices" } == 2 && !controller.status.endsWith("…") }
+            val gate = CountDownLatch(1)
+            repository.bootGate = gate
             click(view, "Boot")
+            onEdt { devices(view).selectedIndex = 1 }
+            await("the refusal") { shows(view, "Another Simulator action is still running") }
+            gate.countDown()
+            await("the list to return to the booted device") { devices(view).selectedIndex == 0 }
+            check(repository.calls.none { it.startsWith("select probe-tablet") }) { "A refused selection was sent" }
             await("Boot") { shows(view, "Booted.") && devices(view).selectedItem.toString().endsWith("Booted") }
             click(view, "Launch")
             await("Launch") { shows(view, "Launch requested") }

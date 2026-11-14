@@ -6,6 +6,7 @@ import java.awt.image.BufferedImage
 internal class FakeSimulatorRepository : SimulatorRepository {
     val phone = SimulatorDevice("A", "Phone", "iOS 26.4", "Booted")
     val tablet = SimulatorDevice("B", "Tablet", "iOS 26.4", "Shutdown")
+    var listed = listOf(phone, tablet)
     val calls = mutableListOf<String>()
     var selected: SimulatorDevice? = null
     var inputEnabled = false
@@ -29,7 +30,7 @@ internal class FakeSimulatorRepository : SimulatorRepository {
 
     override fun devices(): List<SimulatorDevice> {
         record("devices")
-        return listOf(phone, tablet)
+        return listed
     }
 
     override fun status(): SimulatorStatus {
@@ -39,7 +40,7 @@ internal class FakeSimulatorRepository : SimulatorRepository {
 
     override fun select(device: String): SimulatorStatus {
         record("select $device")
-        selected = listOf(phone, tablet).first { it.id == device }
+        selected = listed.first { it.id == device }
         return SimulatorStatus(selected, inputEnabled, notice)
     }
 

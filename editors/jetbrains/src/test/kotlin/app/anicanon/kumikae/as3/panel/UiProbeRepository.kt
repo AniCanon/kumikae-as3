@@ -17,6 +17,9 @@ internal class UiProbeRepository : SimulatorRepository {
     @Volatile var installFailure: String? = null
 
     @Volatile var closed = false
+
+    /** While set, a boot waits on it, so the probe can act during a running action. */
+    @Volatile var bootGate: java.util.concurrent.CountDownLatch? = null
     private val log = java.util.concurrent.CopyOnWriteArrayList<String>()
     private var selected: SimulatorDevice? = null
 
@@ -55,6 +58,7 @@ internal class UiProbeRepository : SimulatorRepository {
 
     override fun boot(device: String): SimulatorStatus {
         record("boot $device")
+        bootGate?.await()
         selected = selected?.copy(state = "Booted")
         return current()
     }

@@ -62,16 +62,18 @@ internal class SimulatorWindowController(
 
     fun selectDevice(device: SimulatorDevice) {
         if (disposed || device.id == selected?.id) return
-        val started = run("Selecting ${device.name}", { repository.select(device.id) }, clearsPicture = true) {
-            showStatus(it)
+        run("Selecting ${device.name}", { repository.select(device.id) }, clearsPicture = true) {
+            showStatus(it, fresh = true)
             status = "Selected ${device.name}. Boot it if it is not running."
         }
-        // Shown at once so the list and the state agree; the next poll restores the service's choice if this failed.
-        if (started) selected = device
+        // The list already shows this device, so the state follows it even when the request was refused:
+        // an action must never name a device the user cannot see. The service's own choice returns with
+        // the running action's result or the next poll.
+        selected = device
     }
 
     fun boot() = onDevice("Booting", clearsPicture = true, work = repository::boot) {
-        showStatus(it)
+        showStatus(it, fresh = true)
         status = "Booted."
     }
 
@@ -116,7 +118,7 @@ internal class SimulatorWindowController(
             val state = result.getOrElse { Polled(failure = it) }
             state.page?.let(::showPage)
             if (epoch != pictureEpoch) return@submit
-            state.status?.let(::showStatus)
+            state.status?.let { showStatus(it, fresh = false) }
             state.frame?.takeIf { it.device == selected?.id }?.let {
                 frame = it
                 capture = "Snapshot · ${it.captureMs} ms capture · up to 2 a second"
@@ -183,24 +185,23 @@ internal class SimulatorWindowController(
         }
     }
 
-    private fun <T> run(label: String, work: () -> T, clearsPicture: Boolean = false, success: (T) -> Unit): Boolean {
-        if (disposed) return false
+    private fun <T> run(label: String, work: () -> T, clearsPicture: Boolean = false, success: (T) -> Unit) {
+        if (disposed) return
         if (!connected) {
             status = "The local Simulator service is still starting."
-            return false
+            return
         }
         val started = actions.submit(work) { result ->
             if (!disposed) result.fold(success, ::showFailure)
         }
         if (!started) {
             status = BUSY
-            return false
+            return
         }
         status = "$label…"
         pollFailed = false
         lastError = null
         if (clearsPicture) clearPicture()
-        return true
     }
 
     private fun showDevices(found: List<SimulatorDevice>) {
@@ -214,13 +215,17 @@ internal class SimulatorWindowController(
         }
     }
 
-    private fun showStatus(value: SimulatorStatus) {
+    /**
+     * A poll's status repeats the device as it was when it was selected, so only its identity is followed.
+     * The reply to a select or boot is `fresh`: its device state is newer than the list's.
+     */
+    private fun showStatus(value: SimulatorStatus, fresh: Boolean) {
         inputEnabled = value.inputEnabled
         notice = value.notice
         val device = value.device
         if (device?.id != selected?.id) clearPicture()
-        selected = device
-        if (device != null) devices = devices.map { if (it.id == device.id) device else it }
+        if (device != null && fresh) devices = devices.map { if (it.id == device.id) device else it }
+        selected = device?.let { reported -> devices.firstOrNull { it.id == reported.id } ?: reported }
     }
 
     private fun showPage(page: ConsolePage) {
