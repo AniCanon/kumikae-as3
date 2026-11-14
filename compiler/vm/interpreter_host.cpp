@@ -65,7 +65,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 			void *receiver = list.empty() ? nullptr : r[list[0]].p;
 			if (!receiver) {
-				raise(module_.type_error_class, NULL_ERROR);
+				raise_null();
 				return NULL_ERROR;
 			}
 			gather(list, 1);
@@ -81,7 +81,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			if (op != "==" && op != "!=") {
 				for (size_t i = 0; i < count; i++) {
 					if (ir::is_engine(values[i].kind) && !values[i].slot.p) {
-						raise(module_.type_error_class, NULL_ERROR);
+						raise_null();
 						return NULL_ERROR;
 					}
 				}
@@ -128,7 +128,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 		case Op::HostGet: {
 			void *receiver = r[p_in.b].p;
 			if (!receiver) {
-				raise(module_.type_error_class, NULL_ERROR);
+				raise_null();
 				return NULL_ERROR;
 			}
 			target = p_in.a;
@@ -139,7 +139,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 		case Op::HostBind: {
 			Object *object = static_cast<Object *>(r[p_in.b].p);
 			if (!object) {
-				raise(module_.type_error_class, NULL_ERROR);
+				raise_null();
 				return NULL_ERROR;
 			}
 			const ir::Class &klass = module_.classes[object->klass];
@@ -154,7 +154,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			void *receiver = r[p_in.b].p;
 			const Str *name = static_cast<const Str *>(r[p_in.c].p);
 			if (!receiver || !name) {
-				raise(module_.type_error_class, NULL_ERROR);
+				raise_null();
 				return NULL_ERROR;
 			}
 			target = p_in.a;
@@ -190,7 +190,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 		case Op::HostIndexGet: {
 			void *receiver = r[p_in.b].p;
 			if (!receiver) {
-				raise(module_.type_error_class, NULL_ERROR);
+				raise_null();
 				return NULL_ERROR;
 			}
 			Argument key;
@@ -204,7 +204,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 		case Op::HostIndexSet: {
 			void *receiver = r[p_in.a].p;
 			if (!receiver) {
-				raise(module_.type_error_class, NULL_ERROR);
+				raise_null();
 				return NULL_ERROR;
 			}
 			Argument key, value;
@@ -218,7 +218,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 		default: {
 			void *receiver = r[p_in.a].p;
 			if (!receiver) {
-				raise(module_.type_error_class, NULL_ERROR);
+				raise_null();
 				return NULL_ERROR;
 			}
 			Argument value;

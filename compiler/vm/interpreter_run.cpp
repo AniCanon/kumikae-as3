@@ -15,6 +15,68 @@ using ir::NONE;
 using ir::Op;
 
 // Runs until the frame above p_depth returns. False if an error left it instead.
+// Two strings in order, or equal, as AS3 compares them. With a missing string the two are compared as
+// numbers: null is 0.
+static bool compare_strings(Op p_op, const Str *p_left, const Str *p_right) {
+	if (p_op == Op::EqStr) {
+		return p_left == p_right || (p_left && p_right && p_left->view() == p_right->view());
+	}
+	if (p_left && p_right) {
+		return p_op == Op::LtStr ? p_left->view() < p_right->view() : p_left->view() <= p_right->view();
+	}
+	const double left = p_left ? string_to_number(p_left->view()) : 0;
+	const double right = p_right ? string_to_number(p_right->view()) : 0;
+	return p_op == Op::LtStr ? left < right : left <= right;
+}
+
+// One string after the other. A missing one reads "null".
+static std::string joined(const Str *p_left, const Str *p_right) {
+	const std::string_view left = p_left ? p_left->view() : std::string_view("null");
+	const std::string_view right = p_right ? p_right->view() : std::string_view("null");
+	std::string result;
+	result.reserve(left.size() + right.size());
+	result += left;
+	result += right;
+	return result;
+}
+
+// An Int64 where an int, a uint or a Number is expected, or a Number where an Int64 is, when the
+// program did not write the conversion: the value, or a RangeError that names it.
+void Interpreter::convert_checked(const Instruction &p_in, Slot *p_registers) {
+	Slot &out = p_registers[p_in.a];
+	const Slot &from = p_registers[p_in.b];
+	switch (p_in.op) {
+		case Op::I64ToI32:
+			if (const std::optional<int32_t> fitted = wide_to_int32(from.l)) {
+				set_int32(out, *fitted);
+			} else {
+				raise(module_.range_error_class, std::to_string(from.l) + " does not fit an int.");
+			}
+			break;
+		case Op::I64ToU32:
+			if (const std::optional<uint32_t> fitted = wide_to_uint32(from.l)) {
+				set_uint32(out, *fitted);
+			} else {
+				raise(module_.range_error_class, std::to_string(from.l) + " does not fit a uint.");
+			}
+			break;
+		case Op::I64ToF64:
+			if (const std::optional<double> fitted = wide_to_number(from.l)) {
+				out.d = *fitted;
+			} else {
+				raise(module_.range_error_class, std::to_string(from.l) + " does not fit a Number exactly.");
+			}
+			break;
+		default:
+			if (const std::optional<int64_t> fitted = number_to_wide(from.d)) {
+				out.l = *fitted;
+			} else {
+				raise(module_.range_error_class, number_to_string(from.d) + " does not fit an Int64.");
+			}
+			break;
+	}
+}
+
 bool Interpreter::run(size_t p_depth, Slot *r_result) {
 	while (frames_.size() > p_depth) {
 		if (pending_ || stopped_) {
@@ -47,8 +109,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				r[in.a].d = module_.numbers[in.b];
 				break;
 			case Op::ConstBool:
-				r[in.a].bits = 0;
-				r[in.a].b = in.b != 0;
+				set_bool(r[in.a], in.b != 0);
 				break;
 			case Op::ConstStr:
 				retain(strings_[in.b]);
@@ -116,37 +177,21 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::ShlI64:
 				r[in.a].l = (int64_t)((uint64_t)r[in.b].l << ((uint64_t)r[in.c].l & 63));
 				break;
-			case Op::ShrI64: {
-				// Written out, so that the sign is carried whatever the compiler does with >> on a negative.
-				uint64_t count = (uint64_t)r[in.c].l & 63;
-				uint64_t bits = (uint64_t)r[in.b].l >> count;
-				if (r[in.b].l < 0 && count > 0) {
-					bits |= ~(uint64_t)0 << (64 - count);
-				}
-				r[in.a].l = (int64_t)bits;
+			case Op::ShrI64:
+				r[in.a].l = shift_right_wide(r[in.b].l, r[in.c].l);
 				break;
-			}
 			case Op::UShrI64:
 				r[in.a].l = (int64_t)((uint64_t)r[in.b].l >> ((uint64_t)r[in.c].l & 63));
 				break;
-			case Op::LtI64: {
-				bool value = r[in.b].l < r[in.c].l;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::LtI64:
+				set_bool(r[in.a], r[in.b].l < r[in.c].l);
 				break;
-			}
-			case Op::LeI64: {
-				bool value = r[in.b].l <= r[in.c].l;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::LeI64:
+				set_bool(r[in.a], r[in.b].l <= r[in.c].l);
 				break;
-			}
-			case Op::EqI64: {
-				bool value = r[in.b].l == r[in.c].l;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::EqI64:
+				set_bool(r[in.a], r[in.b].l == r[in.c].l);
 				break;
-			}
 			case Op::CmpI64F64:
 				r[in.a].d = compare_wide(r[in.b].l, r[in.c].d);
 				break;
@@ -156,67 +201,24 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::U32ToI64:
 				r[in.a].l = r[in.b].u;
 				break;
-			case Op::I64ToBool: {
-				bool value = r[in.b].l != 0;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::I64ToBool:
+				set_bool(r[in.a], r[in.b].l != 0);
 				break;
-			}
 			case Op::I64ToStr:
 				assign(Kind::Str, r[in.a], text(std::to_string(r[in.b].l)));
 				break;
-			case Op::I64ToI32: {
-				int64_t value = r[in.b].l;
-				if (value < INT32_MIN || value > INT32_MAX) {
-					raise(module_.range_error_class, std::to_string(value) + " does not fit an int.");
-				} else {
-					r[in.a].bits = 0;
-					r[in.a].i = (int32_t)value;
-				}
+			case Op::I64ToI32:
+			case Op::I64ToU32:
+			case Op::I64ToF64:
+			case Op::F64ToI64:
+				convert_checked(in, r);
 				break;
-			}
-			case Op::I64ToU32: {
-				int64_t value = r[in.b].l;
-				if (value < 0 || value > (int64_t)UINT32_MAX) {
-					raise(module_.range_error_class, std::to_string(value) + " does not fit a uint.");
-				} else {
-					r[in.a].bits = 0;
-					r[in.a].u = (uint32_t)value;
-				}
+			case Op::I64WrapI32:
+				set_int32(r[in.a], (int32_t)(uint32_t)(uint64_t)r[in.b].l);
 				break;
-			}
-			case Op::I64ToF64: {
-				int64_t value = r[in.b].l;
-				double number = (double)value;
-				// The Number must hold the very same value. 2^63 is checked first: converting it back is undefined.
-				if (number >= 9223372036854775808.0 || (int64_t)number != value) {
-					raise(module_.range_error_class, std::to_string(value) + " does not fit a Number exactly.");
-				} else {
-					r[in.a].d = number;
-				}
+			case Op::I64WrapU32:
+				set_uint32(r[in.a], (uint32_t)(uint64_t)r[in.b].l);
 				break;
-			}
-			case Op::F64ToI64: {
-				double number = r[in.b].d;
-				if (!(number >= -9223372036854775808.0 && number < 9223372036854775808.0)) {
-					raise(module_.range_error_class, number_to_string(number) + " does not fit an Int64.");
-				} else {
-					r[in.a].l = (int64_t)number; // The fraction is dropped, as for an int.
-				}
-				break;
-			}
-			case Op::I64WrapI32: {
-				int64_t value = r[in.b].l;
-				r[in.a].bits = 0;
-				r[in.a].i = (int32_t)(uint32_t)(uint64_t)value;
-				break;
-			}
-			case Op::I64WrapU32: {
-				int64_t value = r[in.b].l;
-				r[in.a].bits = 0;
-				r[in.a].u = (uint32_t)(uint64_t)value;
-				break;
-			}
 			case Op::I64RoundF64:
 				r[in.a].d = (double)r[in.b].l;
 				break;
@@ -237,37 +239,23 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::U32ToI32:
 				r[in.a].i = (int32_t)r[in.b].u;
 				break;
-			case Op::I32ToBool: {
-				bool value = r[in.b].i != 0;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::I32ToBool:
+				set_bool(r[in.a], r[in.b].i != 0);
 				break;
-			}
-			case Op::U32ToBool: {
-				bool value = r[in.b].u != 0;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::U32ToBool:
+				set_bool(r[in.a], r[in.b].u != 0);
 				break;
-			}
-			case Op::F64ToBool: {
-				double number = r[in.b].d;
-				r[in.a].bits = 0;
-				r[in.a].b = !(number == 0 || std::isnan(number));
+			case Op::F64ToBool:
+				set_bool(r[in.a], !(r[in.b].d == 0 || std::isnan(r[in.b].d)));
 				break;
-			}
 			case Op::StrToBool: {
 				Str *string = static_cast<Str *>(r[in.b].p);
-				bool value = string && string->size > 0;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+				set_bool(r[in.a], string && string->size > 0);
 				break;
 			}
-			case Op::ObjToBool: {
-				bool value = r[in.b].p != nullptr;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::ObjToBool:
+				set_bool(r[in.a], r[in.b].p != nullptr);
 				break;
-			}
 			case Op::I32ToStr:
 				assign(Kind::Str, r[in.a], text(std::to_string(r[in.b].i)));
 				break;
@@ -337,72 +325,32 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::BitNot:
 				r[in.a].i = ~r[in.b].i;
 				break;
-			case Op::LtF64: {
-				bool value = r[in.b].d < r[in.c].d;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::LtF64:
+				set_bool(r[in.a], r[in.b].d < r[in.c].d);
 				break;
-			}
-			case Op::LeF64: {
-				bool value = r[in.b].d <= r[in.c].d;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::LeF64:
+				set_bool(r[in.a], r[in.b].d <= r[in.c].d);
 				break;
-			}
-			case Op::EqF64: {
-				bool value = r[in.b].d == r[in.c].d;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::EqF64:
+				set_bool(r[in.a], r[in.b].d == r[in.c].d);
 				break;
-			}
 			case Op::LtStr:
 			case Op::LeStr:
-			case Op::EqStr: {
-				Str *left = static_cast<Str *>(r[in.b].p);
-				Str *right = static_cast<Str *>(r[in.c].p);
-				bool value;
-				if (in.op == Op::EqStr) {
-					value = left == right || (left && right && left->view() == right->view());
-				} else if (left && right) {
-					value = in.op == Op::LtStr ? left->view() < right->view() : left->view() <= right->view();
-				} else {
-					// With a missing string the two are compared as numbers: null is 0.
-					double a = left ? string_to_number(left->view()) : 0;
-					double b = right ? string_to_number(right->view()) : 0;
-					value = in.op == Op::LtStr ? a < b : a <= b;
-				}
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::EqStr:
+				set_bool(r[in.a], compare_strings(in.op, static_cast<Str *>(r[in.b].p), static_cast<Str *>(r[in.c].p)));
 				break;
-			}
-			case Op::EqBool: {
-				bool value = r[in.b].b == r[in.c].b;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::EqBool:
+				set_bool(r[in.a], r[in.b].b == r[in.c].b);
 				break;
-			}
-			case Op::EqRef: {
-				bool value = r[in.b].p == r[in.c].p;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::EqRef:
+				set_bool(r[in.a], r[in.b].p == r[in.c].p);
 				break;
-			}
-			case Op::Not: {
-				bool value = !r[in.b].b;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::Not:
+				set_bool(r[in.a], !r[in.b].b);
 				break;
-			}
-			case Op::Concat: {
-				Str *left = static_cast<Str *>(r[in.b].p);
-				Str *right = static_cast<Str *>(r[in.c].p);
-				std::string joined;
-				joined.reserve((left ? left->size : 4) + (right ? right->size : 4));
-				joined += left ? left->view() : std::string_view("null");
-				joined += right ? right->view() : std::string_view("null");
-				assign(Kind::Str, r[in.a], text(joined));
+			case Op::Concat:
+				assign(Kind::Str, r[in.a], text(joined(static_cast<Str *>(r[in.b].p), static_cast<Str *>(r[in.c].p))));
 				break;
-			}
 			case Op::StrLength: {
 				Str *string = static_cast<Str *>(r[in.b].p);
 				r[in.a].i = string ? character_count(string->view()) : 0;
@@ -424,7 +372,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::GetField: {
 				Object *object = static_cast<Object *>(r[in.b].p);
 				if (!object) {
-					raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
+					raise_null();
 					break;
 				}
 				Kind kind = function.registers[in.a];
@@ -434,7 +382,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::SetField: {
 				Object *object = static_cast<Object *>(r[in.a].p);
 				if (!object) {
-					raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
+					raise_null();
 					break;
 				}
 				Kind kind = module_.classes[object->klass].fields[in.b].kind;
@@ -451,12 +399,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				put(kind, globals_[in.a], share(kind, r[in.b]));
 				break;
 			}
-			case Op::ArgMissing: {
-				bool value = in.b >= frame.arguments;
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::ArgMissing:
+				set_bool(r[in.a], in.b >= frame.arguments);
 				break;
-			}
 			case Op::InitClass:
 				if (!class_used_[in.a]) {
 					use_class(in.a); // What it pushes runs before the next instruction of this frame.
@@ -464,7 +409,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::NullCheck:
 				if (!r[in.a].p) {
-					raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
+					raise_null();
 				}
 				break;
 			case Op::New: {
@@ -489,7 +434,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				if (in.op == Op::CallVirtual) {
 					Object *object = list.empty() ? nullptr : static_cast<Object *>(r[list[0]].p);
 					if (!object) {
-						raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
+						raise_null();
 						break;
 					}
 					target = module_.classes[object->klass].methods[in.b];
@@ -507,12 +452,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				push(target, values, list.size(), in.a); // `frame` and `r` are stale after this.
 				break;
 			}
-			case Op::IsClass: {
-				bool value = is_class(static_cast<Object *>(r[in.b].p), in.c);
-				r[in.a].bits = 0;
-				r[in.a].b = value;
+			case Op::IsClass:
+				set_bool(r[in.a], is_class(static_cast<Object *>(r[in.b].p), in.c));
 				break;
-			}
 			case Op::AsClass: {
 				Object *object = static_cast<Object *>(r[in.b].p);
 				if (!is_class(object, in.c)) {
@@ -545,7 +487,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::Throw: {
 				Object *thrown = static_cast<Object *>(r[in.a].p);
 				if (!thrown) {
-					raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
+					raise_null();
 					break;
 				}
 				retain(thrown);

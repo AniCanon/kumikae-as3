@@ -142,6 +142,10 @@ void Interpreter::pop() {
 }
 
 // Starts an error on its way out: an object of the class with the message.
+void Interpreter::raise_null() {
+	raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
+}
+
 void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
 	if (pending_) {
 		return;

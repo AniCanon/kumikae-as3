@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace kas3 {
@@ -15,6 +16,35 @@ int64_t clamp_wide(double p_number);
 int64_t string_to_wide(std::string_view p_text);
 // An Int64 against a Number, exactly: below, equal or above as -1, 0 or 1, and not-a-number for one.
 double compare_wide(int64_t p_wide, double p_number);
+
+// An Int64 as an int, a uint or a Number, and a Number as an Int64, where the value survives the trip;
+// nothing where it does not. A Number keeps an Int64 only if it holds the very same value, and gives one
+// by dropping its fraction, as for an int.
+inline std::optional<int32_t> wide_to_int32(int64_t p_value) {
+	return p_value < INT32_MIN || p_value > INT32_MAX ? std::nullopt : std::optional<int32_t>((int32_t)p_value);
+}
+inline std::optional<uint32_t> wide_to_uint32(int64_t p_value) {
+	return p_value < 0 || p_value > (int64_t)UINT32_MAX ? std::nullopt : std::optional<uint32_t>((uint32_t)p_value);
+}
+inline std::optional<double> wide_to_number(int64_t p_value) {
+	const double number = (double)p_value;
+	// 2^63 is checked first: converting it back is undefined.
+	return number >= 9223372036854775808.0 || (int64_t)number != p_value ? std::nullopt : std::optional<double>(number);
+}
+inline std::optional<int64_t> number_to_wide(double p_number) {
+	return p_number >= -9223372036854775808.0 && p_number < 9223372036854775808.0 ? std::optional<int64_t>((int64_t)p_number) : std::nullopt;
+}
+
+// `>>` on an Int64, with the sign carried whatever the compiler does with >> on a negative. The count is
+// taken in 0 to 63.
+inline int64_t shift_right_wide(int64_t p_value, int64_t p_count) {
+	const uint64_t count = (uint64_t)p_count & 63;
+	uint64_t bits = (uint64_t)p_value >> count;
+	if (p_value < 0 && count > 0) {
+		bits |= ~(uint64_t)0 << (64 - count);
+	}
+	return (int64_t)bits;
+}
 
 } // namespace vm
 } // namespace kas3

@@ -67,6 +67,9 @@ private:
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
+	// A member of nothing was asked for: AS3's TypeError #1009.
+	void raise_null();
+	void convert_checked(const ir::Instruction &p_in, Slot *p_registers);
 	void unwind(size_t p_depth);
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);
