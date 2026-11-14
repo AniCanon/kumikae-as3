@@ -300,7 +300,13 @@ Json Server::initialize(const Json &p_params) {
 Json Server::definition(const Json &p_params) {
 	Unit *unit = nullptr;
 	const Occurrence *found = occurrence_at(p_params, &unit);
-	return found ? location(workspace_.queries().declaration(found->symbol)) : Json();
+	if (!found) {
+		return Json();
+	}
+	Json where = location(workspace_.queries().declaration(found->symbol));
+	// A list of one. The protocol allows a place on its own, and VS Code reads it, but the client
+	// library JetBrains' IDEs use reads only a list: with a bare place, go to definition does nothing.
+	return where.is_null() ? Json() : Json::array().push(std::move(where));
 }
 
 Json Server::references(const Json &p_params) {

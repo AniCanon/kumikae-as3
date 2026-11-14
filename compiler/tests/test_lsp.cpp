@@ -388,17 +388,22 @@ static void test_navigation() {
 	session.settle();
 	CHECK_EQ(session.published(), std::string());
 
-	// Go to definition: a field, a method in another file, a class.
-	CHECK_EQ(spot(session.request("textDocument/definition", Session::at(player, 7, 16)).get("result")),
-			std::string("Player.as 4:13-4:18"));
-	Json hurt = session.request("textDocument/definition", Session::at(player, 7, 10)).get("result");
+	// Go to definition: a field, a method in another file, a class. The answer is a list of one place:
+	// the protocol also allows a place on its own, but not every editor's client reads that.
+	auto defined = [&](int p_line, int p_character) {
+		Json answer = session.request("textDocument/definition", Session::at(player, p_line, p_character)).get("result");
+		CHECK(answer.is_array());
+		CHECK_EQ(answer.items().size(), (size_t)1);
+		return answer.items().empty() ? Json() : answer.items()[0];
+	};
+	CHECK_EQ(spot(defined(7, 16)), std::string("Player.as 4:13-4:18"));
+	Json hurt = defined(7, 10);
 	CHECK_EQ(spot(hurt), std::string("Enemy.as 2:17-2:21"));
 	CHECK_EQ(hurt.get("uri").string(), enemy);
-	CHECK_EQ(spot(session.request("textDocument/definition", Session::at(player, 5, 20)).get("result")),
-			std::string("Enemy.as 1:13-1:18"));
+	CHECK_EQ(spot(defined(5, 20)), std::string("Enemy.as 1:13-1:18"));
 	CHECK(session.request("textDocument/definition", Session::at(player, 0, 3)).get("result").is_null());
 	// Into Godot's API: a file that exists, and that the server answers questions about.
-	Json move = session.request("textDocument/definition", Session::at(player, 8, 5)).get("result");
+	Json move = defined(8, 5);
 	std::string godot_uri = move.get("uri").string();
 	std::string godot_path = path_from_uri(godot_uri);
 	CHECK(fs::exists(godot_path));
