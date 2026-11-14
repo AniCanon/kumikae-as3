@@ -80,9 +80,8 @@ conditional operator (`?.`), the nullish coalescing operator (`??`), private con
 types, type inference, and verbatim strings. Its documentation warns that other AS3 compilers do not
 accept them. Source: <https://apache.github.io/royale-docs/features/as3>.
 
-**Owner, 2026-11-14:** "we should add to support the version as well." Read as: this compiler is to
-support Royale's version of the language, these nine extensions, as well as Adobe's. (If the owner meant
-something else by "the version", this entry is wrong and is to be corrected.) Each takes Royale's spelling
+**Decided by the owner on 2026-11-14:** this compiler supports Royale's version of the language, these
+nine extensions, as well as Adobe's. Each takes Royale's spelling
 and Royale's meaning, so that AS3 written for one compiler reads the same in the other. They are built
 after stage 2c, when the rest of Adobe's language runs, each with its own short design; whether each sits
 behind a flag, as in Royale, is decided there.
