@@ -84,16 +84,7 @@ uint32_t Lowerer::as_int32(uint32_t p_reg, uint32_t p_position) {
 }
 
 bool Lowerer::is_singleton(const Symbol *p_class) {
-	if (!p_class || p_class->kind != SymbolKind::Class || !p_class->unit || !p_class->unit->is_declaration || !p_class->node ||
-			p_class->node->kind != NodeKind::ClassDecl) {
-		return false;
-	}
-	for (const Metadata &tag : static_cast<ClassDecl *>(p_class->node)->metadata) {
-		if (tag.name == "Singleton") {
-			return true;
-		}
-	}
-	return false;
+	return has_tag(p_class, "Singleton");
 }
 
 uint32_t Lowerer::singleton(const Symbol *p_class, uint32_t p_position) {

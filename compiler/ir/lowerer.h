@@ -6,6 +6,7 @@
 
 #include "ast_walk.h"
 #include "builtins.h"
+#include "whole_numbers.h"
 #include <cmath>
 #include <cstdlib>
 #include <cstring>

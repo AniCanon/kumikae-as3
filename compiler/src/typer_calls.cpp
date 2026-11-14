@@ -46,17 +46,7 @@ void Typer::arguments(FunctionDecl *p_function, std::string_view p_name, const L
 }
 
 bool Typer::abstract(const Type *p_instance) {
-	Symbol *symbol = p_instance->kind == Type::Instance ? p_instance->symbol : nullptr;
-	if (!symbol || symbol->kind != SymbolKind::Class || !symbol->unit || !symbol->unit->is_declaration ||
-			!symbol->node || symbol->node->kind != NodeKind::ClassDecl) {
-		return false;
-	}
-	for (const Metadata &tag : static_cast<ClassDecl *>(symbol->node)->metadata) {
-		if (tag.name == "Abstract") {
-			return true;
-		}
-	}
-	return false;
+	return p_instance->kind == Type::Instance && has_tag(p_instance->symbol, "Abstract");
 }
 
 void Typer::construct(const Type *p_instance, const List<Expr *> &p_arguments, uint32_t p_offset) {
@@ -100,7 +90,7 @@ const Type *Typer::call(Call *p_call) {
 		symbol = static_cast<Name *>(callee)->symbol;
 	} else if (callee->kind == NodeKind::Member) {
 		Member *member = static_cast<Member *>(callee);
-		symbol = member->symbol ? member->symbol : member->member;
+		symbol = member->resolved();
 		if (member->member && member->object && member->object->type && member->object->type->kind == Type::Vector) {
 			element = member->object->type->element;
 		}

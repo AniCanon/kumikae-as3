@@ -193,6 +193,8 @@ struct Member : Expr { // `a.b`
 	// below is then a package path, not a value.
 	Symbol *symbol = nullptr;
 	Symbol *member = nullptr; // The member of the object's type that this names, when it is known.
+	// What `a.b` names, either way.
+	Symbol *resolved() const { return symbol ? symbol : member; }
 };
 struct Index : Expr { // `a[b]`
 	static const NodeKind KIND = NodeKind::Index;

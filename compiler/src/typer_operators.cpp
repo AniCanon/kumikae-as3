@@ -128,9 +128,9 @@ const Type *Typer::binary(Binary *p_binary) {
 	const Type *right = expression(p_binary->right);
 	// A whole number written out beside an Int64 is an Int64 too, read digit by digit.
 	// Not under `/`: division is done in Numbers.
-	if (p_binary->op != TokenKind::Slash && left == int64_ && wide_whole(p_binary->right)) {
+	if (p_binary->op != TokenKind::Slash && left == int64_ && read_wide_literal(p_binary->right).state == WideLiteral::Fits) {
 		right = int64_;
-	} else if (p_binary->op != TokenKind::Slash && right == int64_ && wide_whole(p_binary->left)) {
+	} else if (p_binary->op != TokenKind::Slash && right == int64_ && read_wide_literal(p_binary->left).state == WideLiteral::Fits) {
 		left = int64_;
 	}
 	switch (p_binary->op) {

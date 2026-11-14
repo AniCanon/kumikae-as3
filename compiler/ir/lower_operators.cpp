@@ -4,55 +4,10 @@ namespace kas3 {
 namespace ir {
 
 bool Lowerer::whole(const Expr *p_expression) {
-	if (!p_expression || !p_expression->type) {
-		return false;
-	}
-	if (p_expression->kind == NodeKind::Binary) {
-		const Binary *binary = static_cast<const Binary *>(p_expression);
-		switch (binary->op) {
-			case TokenKind::Plus:
-			case TokenKind::Minus:
-			case TokenKind::Star:
-			case TokenKind::Percent:
-				return whole(binary->left) && whole(binary->right);
-			default:
-				break;
-		}
-	}
-	if (p_expression->kind == NodeKind::Unary) {
-		const Unary *unary = static_cast<const Unary *>(p_expression);
-		if (unary->op == TokenKind::Minus || unary->op == TokenKind::Plus) {
-			return whole(unary->operand);
-		}
-	}
-	if (p_expression->kind == NodeKind::Conditional) {
-		const Conditional *choice = static_cast<const Conditional *>(p_expression);
-		return whole(choice->then_value) && whole(choice->else_value);
-	}
-	if (p_expression->kind == NodeKind::Call) {
-		const Call *call = static_cast<const Call *>(p_expression);
-		const Symbol *symbol = call->callee && call->callee->kind == NodeKind::Member
-				? (static_cast<const Member *>(call->callee)->symbol ? static_cast<const Member *>(call->callee)->symbol : static_cast<const Member *>(call->callee)->member)
-				: call->callee && call->callee->kind == NodeKind::Name ? static_cast<const Name *>(call->callee)->symbol
-																		: nullptr;
-		if (symbol && symbol->unit && symbol->unit->is_builtin) {
-			bool math = symbol->owner && symbol->owner->name == "Math" && symbol->kind == SymbolKind::Method;
-			if ((math && (symbol->name == "floor" || symbol->name == "round" || symbol->name == "ceil")) ||
-					(!symbol->owner && symbol->kind == SymbolKind::Function && symbol->name == "parseInt")) {
-				return true;
-			}
-			if (math && (symbol->name == "abs" || symbol->name == "max" || symbol->name == "min") && call->arguments.count > 0) {
-				for (const Expr *argument : call->arguments) {
-					if (!whole(argument)) {
-						return false;
-					}
-				}
-				return true;
-			}
-		}
-	}
-	Kind kind = Kind::Void;
-	return kind_of(p_expression->type, &kind) && is_integral(kind);
+	return is_whole_number(p_expression, [this](const Expr *p_operand) {
+		Kind kind = Kind::Void;
+		return kind_of(p_operand->type, &kind) && is_integral(kind);
+	});
 }
 
 namespace {

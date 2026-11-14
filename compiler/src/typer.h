@@ -4,6 +4,7 @@
 #pragma once
 
 #include "names.h"
+#include "whole_numbers.h"
 #include <map>
 #include <unordered_set>
 #include <algorithm>
@@ -51,12 +52,7 @@ class Typer {
 
 	void error(uint32_t p_offset, std::string p_message) { unit_.diagnostics.error(p_offset, std::move(p_message)); }
 
-	// A whole number written out, with or without a minus, that an Int64 holds.
-	static bool wide_whole(const Expr *p_expression);
 
-	// A literal written as a whole number, in decimal or hex: its value, or false if it is past 64 bits.
-	// *r_whole says whether it is written as a whole number at all.
-	static bool wide_literal(std::string_view p_text, uint64_t *r_value, bool *r_whole);
 
 	bool numeric(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == number_ || p_type == int64_; }
 	// The types that hold whole numbers only.

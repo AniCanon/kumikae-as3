@@ -202,7 +202,7 @@ const std::vector<Occurrence> &Queries::occurrences(const Unit &p_unit) {
 			}
 			case NodeKind::Member: {
 				Member *member = static_cast<Member *>(p_node);
-				add(member->name_offset, member->name, member->symbol ? member->symbol : member->member, false);
+				add(member->name_offset, member->name, member->resolved(), false);
 				break;
 			}
 			case NodeKind::Call: {

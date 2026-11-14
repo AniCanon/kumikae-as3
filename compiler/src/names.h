@@ -302,4 +302,7 @@ public:
 	std::string ambiguous_message(std::string_view p_name, const Found &p_found) const;
 };
 
+// Whether a class written in a declaration file carries a tag: [Abstract], [Singleton].
+bool has_tag(const Symbol *p_class, std::string_view p_tag);
+
 } // namespace kas3

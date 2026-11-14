@@ -174,25 +174,10 @@ void Typer::store(Expr *p_value, const Type *p_to) {
 	}
 	if (p_to == int64_) {
 		// A whole number written out is taken digit by digit, so it must be one an Int64 can hold.
-		const Expr *digits = p_value;
-		bool negative = false;
-		while (digits && digits->kind == NodeKind::Unary &&
-				(static_cast<const Unary *>(digits)->op == TokenKind::Minus || static_cast<const Unary *>(digits)->op == TokenKind::Plus)) {
-			negative = negative != (static_cast<const Unary *>(digits)->op == TokenKind::Minus);
-			digits = static_cast<const Unary *>(digits)->operand;
-		}
-		if (digits && digits->kind == NodeKind::NumberLit) {
-			std::string_view text = static_cast<const NumberLit *>(digits)->text;
-			uint64_t value = 0;
-			bool whole_number = false;
-			if (!wide_literal(text, &value, &whole_number) && whole_number) {
-				error(p_value->offset, std::string(negative ? "-" : "") + std::string(text) + " does not fit an Int64");
-				return;
-			}
-			if (whole_number && value > (negative ? 9223372036854775808ull : 9223372036854775807ull)) {
-				error(p_value->offset, std::string(negative ? "-" : "") + std::string(text) + " does not fit an Int64");
-				return;
-			}
+		const WideLiteral literal = read_wide_literal(p_value);
+		if (literal.state == WideLiteral::TooLarge) {
+			error(p_value->offset, std::string(literal.negative ? "-" : "") + std::string(literal.digits) + " does not fit an Int64");
+			return;
 		}
 	}
 	switch (fits(p_value->type, p_to)) {
@@ -221,7 +206,7 @@ void Typer::written(Expr *p_target) {
 		symbol = static_cast<Name *>(p_target)->symbol;
 	} else if (p_target->kind == NodeKind::Member) {
 		Member *member = static_cast<Member *>(p_target);
-		symbol = member->symbol ? member->symbol : member->member;
+		symbol = member->resolved();
 		offset = member->name_offset;
 		own_object = member->object && member->object->kind == NodeKind::ThisExpr;
 	}

@@ -4,35 +4,9 @@ namespace kas3 {
 namespace ir {
 
 bool Lowerer::wide_literal(const Expr *p_expression, int64_t *r_value) {
-	bool negative = false;
-	while (p_expression && p_expression->kind == NodeKind::Unary &&
-			(static_cast<const Unary *>(p_expression)->op == TokenKind::Minus || static_cast<const Unary *>(p_expression)->op == TokenKind::Plus)) {
-		negative = negative != (static_cast<const Unary *>(p_expression)->op == TokenKind::Minus);
-		p_expression = static_cast<const Unary *>(p_expression)->operand;
-	}
-	if (!p_expression || p_expression->kind != NodeKind::NumberLit) {
-		return false;
-	}
-	std::string_view text = static_cast<const NumberLit *>(p_expression)->text;
-	bool hex = text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
-	if (!hex && text.find_first_of(".eE") != std::string_view::npos) {
-		return false;
-	}
-	uint64_t value = 0;
-	const uint64_t base = hex ? 16 : 10;
-	for (size_t i = hex ? 2 : 0; i < text.size(); i++) {
-		char c = text[i];
-		uint64_t digit = c >= '0' && c <= '9' ? (uint64_t)(c - '0') : c >= 'a' && c <= 'f' ? (uint64_t)(c - 'a' + 10) : c >= 'A' && c <= 'F' ? (uint64_t)(c - 'A' + 10) : 99;
-		if (digit >= base || value > (UINT64_MAX - digit) / base) {
-			return false;
-		}
-		value = value * base + digit;
-	}
-	if (value > (negative ? (uint64_t)1 << 63 : (uint64_t)INT64_MAX)) {
-		return false;
-	}
-	*r_value = negative ? (int64_t)(0 - value) : (int64_t)value;
-	return true;
+	const WideLiteral literal = read_wide_literal(p_expression);
+	*r_value = literal.value;
+	return literal.state == WideLiteral::Fits;
 }
 
 bool Lowerer::is_null(const Expr *p_expression) {
@@ -202,7 +176,7 @@ Symbol *Lowerer::callee_symbol(Expr *p_callee) {
 	}
 	if (p_callee->kind == NodeKind::Member) {
 		Member *member = static_cast<Member *>(p_callee);
-		return member->symbol ? member->symbol : member->member;
+		return member->resolved();
 	}
 	return nullptr;
 }
@@ -253,7 +227,7 @@ uint32_t Lowerer::name_value(Expr *p_expression) {
 uint32_t Lowerer::member_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	Member *member = static_cast<Member *>(p_expression);
-	Symbol *symbol = member->symbol ? member->symbol : member->member;
+	Symbol *symbol = member->resolved();
 	// The one member of a built-in value so far: a string's length.
 	if (symbol && symbol->owner == string_ && symbol->name == "length") {
 		uint32_t text = expression(member->object, Kind::Str);
