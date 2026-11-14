@@ -130,13 +130,108 @@ Wanted &p_result, Slot *r_result, std::string *r_error)`.
 
 ## Part B: `Int64`
 
-Planned in detail when the owner has answered the design's open question. Outline:
+**Spec:** `docs/superpowers/specs/2026-11-14-int64-design.md`, approved 2026-11-14. Branch `feat/int64`.
 
-- B1. The type in the checker: conversions, operators, literals, the whole-number rule.
-- B2. The `I64` register kind in the IR and the interpreter; the checks of section 4 of the design.
-- B3. The generator's rule; the table deleted; a test that no integer is declared narrower than before.
-- B4. At Godot's edge: arguments, results, listeners, virtual methods, fields read by GDScript.
-- B5. Documents, review, fix pass.
+**What changes on purpose:** `kas3c check` output and hover text change wherever a Godot integer is now
+`Int64` (688 marked sites that were `Number`, and the unmarked ones that were `int` or `uint`). The goldens
+that show such a type are updated in the task that changes them, and the commit says which.
+
+### Design decisions for part B (rulings made while planning)
+
+1. **`Int64` is a fourth numeric type in the checker,** beside `int`, `uint` and `Number`: declared in
+   `builtins/toplevel.as`, held as `int64_` in `names_types.cpp`, and counted by `numeric()` and `whole()`.
+2. **Result types.** With both operands whole and at least one an `Int64`: `+ - * %`, the bitwise
+   operators and the shifts give `Int64`; `/` gives `Number`. With a `Number` operand: `Number`.
+3. **The interpreter computes `Int64` in 64-bit integers,** not through `Number` as it does for `int`: new
+   ops `AddI64`, `SubI64`, `MulI64`, `ModI64`, `NegI64`, `BitAndI64`, `BitOrI64`, `BitXorI64`, `BitNotI64`,
+   `ShlI64`, `ShrI64`, `UShrI64`, `LtI64`, `LeI64`, `EqI64`, and `ConstI64` (the value in the module's
+   table of 64-bit constants). A comparison of an `Int64` with a `Number` is `CmpI64F64` with the operator
+   as its third operand, exact for every value.
+4. **Two families of conversion ops.** Checked, for a conversion the script did not write: `I64ToI32`,
+   `I64ToU32`, `I64ToF64`, `F64ToI64`, each raising `RangeError` as section 4 of the design says. As
+   written, for `int(x)`, `uint(x)`, `Number(x)`, `Int64(x)`: `I64WrapI32`, `I64WrapU32`, `I64RoundF64`,
+   `F64ClampI64`, `StrToI64`. Widening is `I32ToI64` and `U32ToI64`. `convert()` in the lowerer takes a flag
+   that says which family; only a cast written as a call sets it.
+5. **`RangeError` is a class of the built-in declarations** that the interpreter can raise, as it raises
+   `TypeError` today (`module_.range_error_class`).
+6. **A whole-number literal where an `Int64` is expected is read from its text,** so `9223372036854775807`
+   is exact; one that does not fit 64 bits is a checker error. A leading minus is part of it, so
+   `-9223372036854775808` can be written.
+7. **The generator's rule:** an integer is `Int64` unless its width mark is below 64 bits, or its class
+   stores 32-bit integers (members marked `int32` in the description's member offsets, a class made only
+   of such classes, and the two names `PackedInt32Array` and `PackedByteArray`). `WIDTHS` and
+   `_INT64_ELEMENT` are deleted. Wide flag enums become `Int64`.
+8. **At the edge:** `Kind::I64` goes to Godot as its integer and comes back from any Godot integer.
+   `arrives` keeps the range check for `I32` and `U32`.
+9. **Text:** `I64ToStr`; `toString(radix)` waits for the standard library (2c) and is refused by name.
+
+### Review Focus (part B)
+
+1. A conversion that loses a value silently: every pair of numeric kinds, in assignment, argument, return,
+   compound assignment, `++`, a default parameter, a field initialiser, and at Godot's edge both ways.
+2. The ends: `Int64.MIN_VALUE`, `MAX_VALUE`, `-MIN_VALUE`, `MIN_VALUE % -1`, `MIN_VALUE / -1`, shifts by 64
+   or more and by a negative count, 2^53 and 2^53 + 1 to `Number`, `NaN` and the infinities to `Int64`.
+3. Comparison of an `Int64` with a `Number` near 2^53 and 2^63, and with `NaN`.
+4. A generated declaration that became narrower than before, or an integer parameter Godot cuts off
+   inside (measured in the design: `Vector2i`, `PackedInt32Array`).
+5. Existing programs: every corpus and test program still checks, and nothing that ran now refuses.
+
+### Task B1: the type in the checker
+
+**Files:** `compiler/builtins/toplevel.as`, `compiler/src/names_types.cpp`; tests in
+`compiler/tests/test_types.cpp`, `test_type_errors.cpp`, `test_godot_math.cpp`.
+
+- [ ] Tests first: `var a:Int64 = 5;` checks; `var i:int = a;`, `var n:Number = a;`, `var u:uint = a;`
+  check (the range is checked when it runs); `var s:String = a;` and `var a:Int64 = "5";` are errors, as
+  for `int`; the type of `a + 1`, `a * a`, `a % 2`, `a & 1`, `a << 2`, `a >>> 1`, `-a`, `a++` is `Int64`;
+  of `a / 2` and `a + 1.5` is `Number`; `a < 1.5` is `Boolean`; `var big:Int64 = 9223372036854775807;`
+  checks and `= 9223372036854775808` is an error; `cell * a` is a `Vector2i`; `Int64.MAX_VALUE` is an
+  `Int64`; `Int64("12")` and `int(a)` check.
+- [ ] Run, fail; implement; pass; commit.
+
+### Task B2: the kind, its arithmetic and its conversions
+
+**Files:** `compiler/ir/ir.h`, `ir_print.cpp`, `lower.cpp`; `compiler/vm/interpreter.cpp`, `runtime.h/.cpp`;
+tests in `compiler/tests/run/` (programs with expected output), `test_vm.cpp`, `test_ir.cpp`.
+
+**Produces:** `Kind::I64`; the ops of decisions 3 and 4; `ir::Module::range_error_class`;
+`Module::wide_constants`.
+
+- [ ] Tests first, as programs run by `kas3c run` with their expected trace: arithmetic at the ends
+  (Review Focus 2); each checked conversion in range and out of range (the out-of-range one traces the
+  caught... there is no `try` yet, so each is its own program whose expected output is the `RangeError`
+  and its stack); each written conversion; text; comparison with every numeric kind; `Int64` fields,
+  statics, parameters, defaults and returns; `++` and compound assignment.
+- [ ] Run, fail; implement; pass in the normal and sanitizer builds; commit.
+
+### Task B3: the generator's rule
+
+**Files:** `compiler/godot/generate.py`, `test_generate.py`, `fixture_api.json`, `fixture.as`, `godot.as`.
+
+- [ ] Tests first: a method marked `int64` and one marked `uint64` are `Int64`; an unmarked integer of a
+  built-in type and of a global function is `Int64`; every integer of `Vector2i`, `Rect2i`,
+  `PackedInt32Array` and `PackedByteArray` is `int`; a wide flag enum is `Int64`; `WIDTHS` is gone; and,
+  against the real description, no integer is declared narrower than the commit before declared it.
+- [ ] Run, fail; implement; regenerate; update the goldens that show a changed type; commit.
+
+### Task B4: at Godot's edge
+
+**Files:** `compiler/godot_ext/godot_host.cpp`, `instance.cpp`, `callable.cpp`; tests in
+`compiler/tests/godot_project/Wide.as`, `wide.gd`, `run_godot.py`.
+
+- [ ] Tests first, each beside GDScript's answer: `RefCounted`'s `getInstanceId()` round-trips through
+  `instanceFromId` (it does not today); `Color.toRgba64()`; `randi()` assigned to `uint`; `items.size()`
+  assigned to `int`; a `PackedInt64Array` element past 2^53; `PackedInt32Array.append` of a wide `Int64`
+  is a `RangeError` before Godot sees it; GDScript calling a method with an `Int64` parameter with
+  `9223372036854775807`, and one with an `int` parameter with `5000000000` (refused, as today); a listener
+  with an `Int64` parameter; an `Int64` field read by GDScript; `cell * (a * b)` with a product past 2^31.
+- [ ] Run, fail; implement; pass; commit.
+
+### Task B5: documents, review, fix pass
+
+- [ ] As A5. The backlog's three items of this part are removed, each by the test that closes it:
+  the wide flag enum (B3), the 32-bit wrap of whole products (B4), and `Math.floor` and its relatives
+  counted as fractions (B1: their results are whole numbers held in a `Number`; the fix is in `whole()`).
 
 ## Part C: global functions and errors
 
