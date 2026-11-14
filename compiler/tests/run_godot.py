@@ -255,27 +255,45 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 } }
 """
 ADDED = "\n\tpublic function added():String { return \"new\"; }"
-with tempfile.TemporaryDirectory() as edited:
-    copy = os.path.join(edited, "project")
-    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
-    versions = {
-        "Hot.as": HOT % ("", "1", "1", ""),
-        "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
-        "hot_broken.txt": HOT % ("", "2 +", "10", ADDED),
-        "hot_v3.txt": HOT % (" private var extra:String = \"x\";", "3", "10", ADDED),
-    }
-    for name, text in versions.items():
-        with open(os.path.join(copy, name), "w") as file:
-            file.write(text)
-    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "reload.gd"], capture_output=True, text=True, timeout=300)
-    output = run.stdout + run.stderr
-    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("reload.gd ran to its end", run.returncode == 0 and len(values) == 11, output[-1500:])
-    for name, got, want in values:
-        check("reload.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
-    check("reload.gd: Godot is told the scripts were reloaded", output.count("ActionScript: reloaded") == 2, output[-1500:])
-    check("reload.gd: a script with an error is reported and not loaded",
-          "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
+
+def reload_test(label, elsewhere):
+    """Runs reload.gd in a copy of the project. With `elsewhere`, the scripts a person edits are in a
+    folder outside the project, which the game is told of: what the project itself holds is stale."""
+    with tempfile.TemporaryDirectory() as edited:
+        copy = os.path.join(edited, "project")
+        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+        versions = {
+            "Hot.as": HOT % ("", "1", "1", ""),
+            "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
+            "hot_broken.txt": HOT % ("", "2 +", "10", ADDED),
+            "hot_v3.txt": HOT % (" private var extra:String = \"x\";", "3", "10", ADDED),
+        }
+        for name, text in versions.items():
+            with open(os.path.join(copy, name), "w") as file:
+                file.write(text)
+        environment = dict(os.environ)
+        environment.pop("KAS3_SOURCE_DIR", None)
+        if elsewhere:
+            sources = os.path.join(edited, "sources")
+            shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
+            with open(os.path.join(copy, "Hot.as"), "w") as file:
+                file.write(HOT % ("", "99", "1", ""))
+            environment["KAS3_SOURCE_DIR"] = sources
+        run = subprocess.run([godot, "--headless", "--path", copy, "-s", "reload.gd"], capture_output=True, text=True,
+                             timeout=300, env=environment)
+        output = run.stdout + run.stderr
+        values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 11, output[-1500:])
+        for name, got, want in values:
+            check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
+        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 2, output[-1500:])
+        check("%s: a script with an error is reported and not loaded" % label,
+              "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
+
+
+reload_test("reload.gd", False)
+# On a simulator the game runs from a pack, and is told where on this computer its scripts are edited.
+reload_test("reload.gd, scripts in a folder elsewhere", True)
 
 # An exported game keeps its files in a pack, not in a folder: the scripts must be found and read there.
 import tempfile

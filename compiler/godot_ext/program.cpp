@@ -44,8 +44,26 @@ static void before_shutdown() {
 	}
 }
 
-// Every .as file of the project, by its place in it ("res://game/Player.as"). Folders and files whose
-// name starts with a dot are not part of a project.
+// Where the project's scripts are read from. The project itself, unless the game was told that a person
+// edits them in a folder elsewhere: on a simulator the game runs from a pack inside the app, and the
+// folder the scripts are written in is on the computer the simulator runs on.
+static String scripts_root() {
+	if (OS::get_singleton()->is_debug_build()) {
+		const String elsewhere = OS::get_singleton()->get_environment("KAS3_SOURCE_DIR");
+		if (!elsewhere.is_empty() && DirAccess::dir_exists_absolute(elsewhere)) {
+			return elsewhere.ends_with("/") ? elsewhere : elsewhere + String("/");
+		}
+	}
+	return "res://";
+}
+
+// A script by its place in the project ("res://game/Player.as"), wherever it is read from.
+static std::string project_path(const std::string &p_file, const String &p_root) {
+	return "res://" + p_file.substr((size_t)p_root.utf8().length());
+}
+
+// Every .as file under a folder, by where it is. Folders and files whose name starts with a dot are not
+// part of a project.
 static void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) {
 	const Ref<DirAccess> folder = DirAccess::open(p_folder);
 	if (folder.is_null()) {
@@ -65,8 +83,9 @@ static void collect_scripts(const String &p_folder, std::vector<std::string> &r_
 
 // Compiles every script of the project. False, with what is wrong, if they do not compile.
 static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t *r_count = nullptr) {
+	const String root = scripts_root();
 	std::vector<std::string> files;
-	collect_scripts("res://", files);
+	collect_scripts(root, files);
 	std::sort(files.begin(), files.end());
 	if (r_count) {
 		*r_count = files.size();
@@ -76,7 +95,7 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 	for (const std::string &path : files) {
 		// Read through Godot: in an exported game the project is inside a pack, not in a folder.
 		const CharString source = FileAccess::get_file_as_string(String::utf8(path.c_str())).utf8();
-		compilation.add(path, std::string(source.get_data(), (size_t)source.length()));
+		compilation.add(project_path(path, root), std::string(source.get_data(), (size_t)source.length()));
 	}
 	compilation.check();
 	const bool lowered = !compilation.has_errors() && ir::lower(compilation, r_module, ir::LowerMode::Library);
@@ -87,40 +106,10 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 	return true;
 }
 
-Project &Project::get() {
-	if (!program) {
-		program = new Project();
-	}
-	if (program->loaded_) {
-		return *program;
-	}
-	program->loaded_ = true;
-	loads++;
-	std::string errors;
-	if (!compile_project(program->module_.get(), &errors)) {
-		UtilityFunctions::push_error(String("ActionScript: the project's scripts have errors and were not loaded.\n") +
-				String::utf8(errors.c_str()));
-		return *program;
-	}
-	program->interpreter_ = std::make_unique<vm::Interpreter>(*program->module_, program->host_);
-	program->valid_ = program->interpreter_->start();
-	static bool watching = false;
-	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
-	if (!watching && tree && tree->get_root()) {
-		watching = true;
-		tree->get_root()->connect("tree_exiting", callable_mp_static(&before_shutdown));
-		// Scripts are watched where a person can edit them: a project in a folder, run for development.
-		if (OS::get_singleton()->is_debug_build() && DirAccess::dir_exists_absolute(ProjectSettings::get_singleton()->globalize_path("res://"))) {
-			tree->connect("process_frame", callable_mp_static(&Project::watch));
-		}
-	}
-	return *program;
-}
-
 // What the project's scripts are now: every file and when it was last written.
 static uint64_t scripts_signature() {
 	std::vector<std::string> files;
-	collect_scripts("res://", files);
+	collect_scripts(scripts_root(), files);
 	std::sort(files.begin(), files.end());
 	uint64_t mixed = 1469598103934665603ull;
 	for (const std::string &path : files) {
@@ -135,28 +124,56 @@ static uint64_t scripts_signature() {
 	return mixed;
 }
 
+// What the running scripts were compiled from, and what was found at the last look.
+static uint64_t watch_loaded = 0;
+static uint64_t watch_seen = 0;
+
+Project &Project::get() {
+	if (!program) {
+		program = new Project();
+	}
+	if (program->loaded_) {
+		return *program;
+	}
+	program->loaded_ = true;
+	loads++;
+	// Taken before the scripts are read: an edit made from here on is one the game has not seen.
+	watch_loaded = watch_seen = scripts_signature();
+	std::string errors;
+	if (!compile_project(program->module_.get(), &errors)) {
+		UtilityFunctions::push_error(String("ActionScript: the project's scripts have errors and were not loaded.\n") +
+				String::utf8(errors.c_str()));
+		return *program;
+	}
+	program->interpreter_ = std::make_unique<vm::Interpreter>(*program->module_, program->host_);
+	program->valid_ = program->interpreter_->start();
+	static bool watching = false;
+	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
+	if (!watching && tree && tree->get_root()) {
+		watching = true;
+		tree->get_root()->connect("tree_exiting", callable_mp_static(&before_shutdown));
+		// Scripts are watched where a person can edit them: a project in a folder, run for development.
+		if (OS::get_singleton()->is_debug_build() && DirAccess::dir_exists_absolute(ProjectSettings::get_singleton()->globalize_path(scripts_root()))) {
+			tree->connect("process_frame", callable_mp_static(&Project::watch));
+		}
+	}
+	return *program;
+}
+
 void Project::watch() {
 	static uint64_t looked = 0; // When, in milliseconds.
-	static uint64_t loaded = 0; // What the running scripts were compiled from.
-	static uint64_t seen = 0; // What was found at the last look.
-	static bool first = true;
 	const uint64_t time = Time::get_singleton()->get_ticks_msec();
 	if (time - looked < WATCH_MILLIS) {
 		return;
 	}
 	looked = time;
 	const uint64_t now = scripts_signature();
-	if (first) {
-		first = false;
-		loaded = seen = now;
-		return;
-	}
 	// An editor writes a file in steps. A change is acted on once it has stayed the same for one look.
-	if (now != loaded && now == seen) {
-		loaded = now;
+	if (now != watch_loaded && now == watch_seen) {
+		watch_loaded = now;
 		reload();
 	}
-	seen = now;
+	watch_seen = now;
 }
 
 void Project::reload() {

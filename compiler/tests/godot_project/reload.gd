@@ -16,7 +16,9 @@ func ask(method: String, arguments: Array = []):
 
 func put(version: String) -> void:
 	var text := FileAccess.get_file_as_string("res://hot_%s.txt" % version)
-	var file := FileAccess.open("res://Hot.as", FileAccess.WRITE)
+	# Where a person edits the scripts: the project, or the folder the game was told they are in.
+	var folder := OS.get_environment("KAS3_SOURCE_DIR")
+	var file := FileAccess.open(("res://" if folder.is_empty() else folder + "/") + "Hot.as", FileAccess.WRITE)
 	file.store_string(text)
 	file.close()
 	since = Time.get_ticks_msec()

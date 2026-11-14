@@ -11,6 +11,7 @@ called by the engine.
 | `godot_host` | The interpreter's three interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_utility.cpp` | Godot's global functions |
 | `program` (reload) | Watches the scripts, compiles them again, and moves instances, listeners and script resources onto the new program (`vm/reload`) |
+| `program` (`KAS3_SOURCE_DIR`) | In a debug build, a folder outside the project to read and watch the scripts in: a game on a simulator runs from a pack, and is told where on the computer its scripts are edited |
 | `callable` | A method as a Godot function; the look for listener loops |
 
 ## Rules
