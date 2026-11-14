@@ -46,6 +46,14 @@ internal class LocalSimulatorService(
         return checkNotNull(current) { "The local Simulator service is still starting." }.call(method, params)
     }
 
+    override fun enableInput(): Boolean {
+        val current = synchronized(lock) {
+            check(!closed) { CLOSED }
+            session
+        }
+        return checkNotNull(current) { "The local Simulator service is still starting." }.enableInput()
+    }
+
     override fun close() {
         val opened = synchronized(lock) {
             closed = true

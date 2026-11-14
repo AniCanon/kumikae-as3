@@ -35,12 +35,15 @@ internal fun DevicePage(
 ) {
     // The picture and the console text are pushed into their native controls only when they change.
     LaunchedEffect(controller.frame) { screen.frame = controller.frame }
-    // Cheap to set and wanted in the same frame as the layout they belong to.
+    // Read here, not inside the effect: only what composition reads brings the page back when it changes.
+    val input = controller.inputEnabled
+    val waiting = placeholder(device, controller)
+    val zoom = state.zoom
     SideEffect {
-        screen.inputEnabled = controller.inputEnabled
+        screen.inputEnabled = input
         screen.deviceName = device.name
-        screen.placeholder = placeholder(device, controller)
-        screen.zoom = state.zoom
+        screen.placeholder = waiting
+        screen.zoom = zoom
     }
     LaunchedEffect(controller.console) {
         console.text = controller.console
@@ -121,7 +124,7 @@ private fun DeviceBar(
         return
     }
     val input = controller.inputEnabled
-    val why = if (input) "" else " (needs idb)"
+    val why = if (input) "" else " (switch input on in the menu)"
     Pill {
         IconButton(AllIcons.Nodes.HomeFolder, "Home$why", {
             controller.send(SimulatorInput.Press(HardwareButton.HOME))
@@ -156,6 +159,12 @@ internal fun moreEntries(
 ): List<MenuEntry> = listOf(
     MenuEntry("App to launch… (${state.bundle})") { prompts.bundle(state.bundle)?.let { state.bundle = it } },
     MenuEntry("Install app…") { prompts.appToInstall()?.let(controller::install) },
+    MenuEntry(
+        if (controller.inputEnabled) "Input is on (idb)" else "Switch input on…",
+        enabled = !controller.inputEnabled,
+    ) {
+        if (prompts.confirmInput()) controller.enableInput()
+    },
     MenuEntry("Copy agent endpoint path", enabled = controller.endpointFile.isNotEmpty()) {
         prompts.copy(controller.endpointFile)
     },

@@ -15,6 +15,9 @@ internal interface SimulatorRepository : AutoCloseable {
 
     fun shutdown(device: String): SimulatorStatus
 
+    /** Switches input through idb on. False when idb is not installed. */
+    fun enableInput(): Boolean
+
     fun install(device: String, appPath: String)
 
     fun launch(device: String, bundle: String)

@@ -1,56 +1,84 @@
 package app.anicanon.kumikae.as3.simulator
 
+import com.google.gson.JsonParser
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 
 interface InputBackend {
     val enabled: Boolean
-    val scale: Double
+
+    /** Screenshot pixels for one of the device's points: input is sent in points. */
+    fun scale(device: String): Double
+
     fun supports(device: String): Boolean = enabled
+
     fun send(device: String, operation: String, args: List<String>)
 }
 
 object NoInput : InputBackend {
     override val enabled = false
-    override val scale = 1.0
+
+    override fun scale(device: String) = 1.0
+
     override fun send(device: String, operation: String, args: List<String>): Nothing = throw SimulatorException(
         "INPUT_DISABLED",
-        "Input needs an explicitly enabled idb installation. Use Device Hub for input.",
+        "Input is off. Switch it on in the panel's menu; it needs idb.",
     )
 }
 
-class IdbInput(
-    private val executable: String,
-    private val targetDevice: String,
-    override val scale: Double,
-    private val runner: CommandRunner,
-) : InputBackend {
+/**
+ * Input through Meta's idb, which drives the Simulator through private Apple interfaces. It is used only
+ * after the owner switches it on: in the panel, or with an environment variable for the standalone service.
+ */
+class IdbInput(private val executable: String, private val runner: CommandRunner) : InputBackend {
+    private val scales = ConcurrentHashMap<String, Double>()
+
     init {
         require(Path.of(executable).isAbsolute && Files.isExecutable(Path.of(executable))) {
             "idb must be an absolute executable path"
         }
-        require(scale.isFinite() && scale in 1.0..10.0) { "Set the selected device's pixels per point (1–10)" }
     }
+
     override val enabled = true
-    override fun supports(device: String) = device == targetDevice
-    override fun send(device: String, operation: String, args: List<String>) {
-        if (!supports(
-                device,
-            )
-        ) {
-            throw SimulatorException("INPUT_DEVICE_MISMATCH", "idb scale is configured for a different device")
+
+    override fun scale(device: String): Double = scales.computeIfAbsent(device) {
+        val density = runCatching {
+            JsonParser.parseString(runner.run(Commands.describe(executable, device), TIMEOUT_MILLIS))
+                .asJsonObject.getAsJsonObject("screen_dimensions")["density"].asDouble
+        }.getOrNull()
+        if (density == null || !density.isFinite() || density !in 1.0..10.0) {
+            throw SimulatorException("INPUT_UNAVAILABLE", "idb could not describe this device's screen")
         }
-        runner.run(Commands.input(executable, device, operation, args), 15_000)
+        density
+    }
+
+    override fun send(device: String, operation: String, args: List<String>) {
+        runner.run(Commands.input(executable, device, operation, args), TIMEOUT_MILLIS)
     }
 
     companion object {
+        private const val TIMEOUT_MILLIS = 15_000L
+        private const val SWITCH = "KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT"
+        private const val PATH = "KUMIKAE_SIMULATOR_IDB"
+
+        /** Where idb is, looking where its installers put it and then along the search path. */
+        fun find(
+            home: Path = Path.of(System.getProperty("user.home")),
+            pathVariable: String = System.getenv("PATH").orEmpty(),
+        ): String? {
+            val known =
+                listOf(home.resolve(".local/bin/idb"), Path.of("/opt/homebrew/bin/idb"), Path.of("/usr/local/bin/idb"))
+            val searched = pathVariable.split(':').filter { it.startsWith("/") }.map { Path.of(it, "idb") }
+            return (known + searched).firstOrNull { Files.isExecutable(it) && !Files.isDirectory(it) }?.toString()
+        }
+
+        /** For the standalone service, which has no panel to ask: the owner's switch, and a path if idb is elsewhere. */
         fun fromEnvironment(runner: CommandRunner, env: Map<String, String> = System.getenv()): InputBackend {
-            if (env["KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT"] != "1") return NoInput
-            val executable = env["KUMIKAE_SIMULATOR_IDB"] ?: error("Set KUMIKAE_SIMULATOR_IDB")
-            val scale = env["KUMIKAE_SIMULATOR_SCALE"]?.toDoubleOrNull() ?: error("Set KUMIKAE_SIMULATOR_SCALE")
-            val device = env["KUMIKAE_SIMULATOR_INPUT_DEVICE"]?.takeIf { it.isNotBlank() }
-                ?: error("Set KUMIKAE_SIMULATOR_INPUT_DEVICE to the device for that scale")
-            return IdbInput(executable, device, scale, runner)
+            if (env[SWITCH] != "1") return NoInput
+            val executable =
+                env[PATH] ?: find() ?: error("idb was not found. Install it, or set $PATH to its full path.")
+            return IdbInput(executable, runner)
         }
     }
 }

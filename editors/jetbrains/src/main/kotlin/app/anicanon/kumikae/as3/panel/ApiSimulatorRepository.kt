@@ -13,11 +13,16 @@ internal interface SimulatorService : AutoCloseable {
     fun start(): String
 
     fun call(method: String, params: Map<String, Any> = emptyMap()): JsonElement
+
+    /** Not a protocol method: only the owner, in the panel, switches private input on. */
+    fun enableInput(): Boolean
 }
 
 /** The only place that maps protocol JSON to domain values. */
 internal class ApiSimulatorRepository(private val service: SimulatorService) : SimulatorRepository {
     override fun connect(): String = service.start()
+
+    override fun enableInput(): Boolean = service.enableInput()
 
     override fun devices(): List<SimulatorDevice> = service.call("devices").asJsonArray.map { device(it.asJsonObject) }
 

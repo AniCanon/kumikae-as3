@@ -12,6 +12,8 @@ internal class SimulatorWindowController(
     private val repository: SimulatorRepository,
     private val actions: BackgroundTasks,
     private val polling: BackgroundTasks,
+    private val inputAllowed: () -> Boolean = { false },
+    private val rememberInput: (Boolean) -> Unit = {},
 ) : Disposable {
     var status by mutableStateOf("Starting the local Simulator service…")
         private set
@@ -120,6 +122,20 @@ internal class SimulatorWindowController(
         status = "Booted."
     }
 
+    /** Called after the owner agreed to input through idb. */
+    fun enableInput() {
+        val work = { repository.enableInput() to repository.status() }
+        run("Switching input on", work) { (found, state) ->
+            if (found) {
+                rememberInput(true)
+                showStatus(state, fresh = false)
+                status = "Input is on."
+            } else {
+                status = NO_IDB
+            }
+        }
+    }
+
     fun install(appPath: String) = onDevice("Installing", work = { repository.install(it, appPath.trim()) }) {
         status = "Installed."
     }
@@ -210,7 +226,12 @@ internal class SimulatorWindowController(
         return Polled(status, frame, page, found, failure)
     }
 
-    private fun connect(): Boolean = actions.submit({ repository.connect() to repository.devices() }) { result ->
+    private fun connect(): Boolean = actions.submit({
+        val file = repository.connect()
+        // The owner switched input on in an earlier session; a missing idb only leaves it off.
+        if (inputAllowed()) repository.enableInput()
+        file to repository.devices()
+    }) { result ->
         if (disposed) return@submit
         result.fold({ (file, found) ->
             connected = true
@@ -314,6 +335,8 @@ internal class SimulatorWindowController(
     private companion object {
         const val BOOTED = "Booted"
         const val LIST_EVERY = 6
+        const val NO_IDB = "idb is not installed. Run editors/jetbrains/tools/install-idb.sh, " +
+            "then switch input on again."
         const val BUSY = "Another Simulator action is still running. Try again when it finishes."
         const val TAP_SLOP = 6
         const val MAX_STATUS = 300

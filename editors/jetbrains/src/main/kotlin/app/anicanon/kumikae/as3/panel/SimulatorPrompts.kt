@@ -26,6 +26,9 @@ internal interface SimulatorPrompts {
 
     fun textToType(): String?
 
+    /** The owner's yes to input through idb. */
+    fun confirmInput(): Boolean
+
     fun choose(under: JComponent, entries: List<MenuEntry>)
 
     fun copy(text: String)
@@ -55,6 +58,17 @@ internal class IdePrompts(private val project: Project) : SimulatorPrompts {
         Messages.showInputDialog(project, "Text to type into the Simulator:", "Type Text", null)?.takeIf {
             it.isNotEmpty()
         }
+
+    override fun confirmInput(): Boolean = Messages.showYesNoDialog(
+        project,
+        "Taps, typing, Home, Lock and Rotate are sent with idb, a tool from Meta that drives the Simulator " +
+            "through private Apple interfaces. Apple can change those without notice.\n\n" +
+            "Nothing is installed by this: idb must already be on this Mac.",
+        "Switch Simulator Input On?",
+        "Switch On",
+        "Cancel",
+        Messages.getQuestionIcon(),
+    ) == Messages.YES
 
     override fun choose(under: JComponent, entries: List<MenuEntry>) {
         val step = object : BaseListPopupStep<MenuEntry>(null, entries) {

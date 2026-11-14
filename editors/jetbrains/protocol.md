@@ -24,7 +24,7 @@ and `id`, plus either `result` or `error`. An invalid envelope can have a null i
 ```
 
 ```json
-{"version":1,"id":"request-2","error":{"code":"INPUT_DISABLED","message":"Input needs an explicitly enabled idb installation. Use Device Hub for input."}}
+{"version":1,"id":"request-2","error":{"code":"INPUT_DISABLED","message":"Input is off. Switch it on in the panel's menu; it needs idb."}}
 ```
 
 HTTP 401 means missing or wrong authentication, 404 a wrong path, 405 a wrong
@@ -106,7 +106,7 @@ signals and may stop that app. The Simulator stays booted. After a crash, an old
 descriptor may remain; it is not a live session and must not be reused.
 
 Service error codes include `BAD_REQUEST`, `NO_DEVICE`, `DEVICE_CHANGED`,
-`STALE_FRAME`, `INPUT_DISABLED`, `INPUT_DEVICE_MISMATCH`, `PROCESS_FAILED`,
+`STALE_FRAME`, `INPUT_DISABLED`, `INPUT_UNAVAILABLE`, `BUSY`, `PROCESS_FAILED`,
 `TIMEOUT`, `CLOSED` and `INTERNAL_ERROR`. A missing report currently reports an
 internal I/O failure; it is not an empty or passing report. Input cannot be enabled
 through this protocol. The local process must have been started with the explicit

@@ -36,7 +36,7 @@ class SessionTest {
         }
         val input = object : InputBackend {
             override val enabled = true
-            override val scale = 3.0
+            override fun scale(device: String) = 3.0
             override fun send(device: String, operation: String, args: List<String>) {
                 calls.add(listOf(device, operation) + args)
             }
@@ -70,14 +70,7 @@ class SessionTest {
         Files.delete(dir)
     }
 
-    @Test fun `input is off unless the owner explicitly enables it`() {
-        assertSame(
-            NoInput,
-            IdbInput.fromEnvironment(
-                CommandRunner { _, _ -> error("Must not execute") },
-                mapOf("KUMIKAE_SIMULATOR_IDB" to "/tools/idb"),
-            ),
-        )
+    @Test fun `without the owner's switch every input is refused`() {
         assertThrows(SimulatorException::class.java) { NoInput.send("phone", "tap", listOf("1", "2")) }
     }
 

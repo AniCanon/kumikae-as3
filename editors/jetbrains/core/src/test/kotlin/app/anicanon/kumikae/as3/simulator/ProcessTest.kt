@@ -44,33 +44,4 @@ class ProcessTest {
         logs.close()
         assertFalse(child!!.isAlive)
     }
-
-    @Test fun `private input cannot reuse a scale for another device`() {
-        val executable = Path.of(System.getProperty("java.home"), "bin", "java").toString()
-        val calls = mutableListOf<List<String>>()
-        val input = IdbInput(
-            executable,
-            "phone",
-            3.0,
-            CommandRunner { command, _ ->
-                calls.add(command)
-                ""
-            },
-        )
-        input.send("phone", "swipe", listOf("0", "10", "50", "20", "--duration", "0.4"))
-        assertEquals(
-            listOf(executable, "ui", "swipe", "--udid", "phone", "0", "10", "50", "20", "--duration", "0.4"),
-            calls.single(),
-        )
-        assertThrows(SimulatorException::class.java) { input.send("other", "button", listOf("HOME")) }
-        assertEquals(1, calls.size)
-        assertEquals(
-            listOf(executable, "ui", "rotate", "--udid", "phone", "LANDSCAPE_LEFT"),
-            Commands.input(executable, "phone", "rotate", listOf("LANDSCAPE_LEFT")),
-        )
-        assertEquals(
-            listOf(executable, "ui", "button", "--udid", "phone", "LOCK"),
-            Commands.input(executable, "phone", "button", listOf("LOCK")),
-        )
-    }
 }

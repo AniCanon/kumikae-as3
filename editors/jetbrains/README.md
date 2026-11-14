@@ -15,7 +15,7 @@ panel inside a real Rider window**, and idb input has never been tried.
 | The panel's own repository against a booted Simulator | One throwaway test, read-only | Select, a decoded 1206x2622 JPEG picture in 403 ms, an empty console page and status. |
 | Panel layout and buttons | UI probe in a sandbox Rider, with a synthetic service | Light and dark pictures under `build/reports/ui/`; Refresh, Boot and Launch pressed through the real buttons. |
 | The panel in a Rider window, by a person | Nobody | **Not done.** |
-| idb input | Nobody | **Not done.** idb is not installed. |
+| idb input against a booted Simulator | Run by hand through `simulator.py`, idb client with companion 1.7.8, Xcode 27.0, iOS 26.4 | With only the switch set, the service found idb and read 3 pixels per point; Home, a tap that opened Settings (confirmed from idb's accessibility listing), text, a swipe, Lock and Rotate were accepted. Not tried from the panel's own buttons in a Rider window. |
 
 The [design](../../docs/superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md)
 compares screen and input options. The [results](../../docs/results/2026-11-jetbrains-simulator.md)
@@ -39,15 +39,15 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 - An agent command-line client that talks to the same service as the panel.
   It saves PNG screenshots, reads logs and the test report, and offers input.
 - Optional idb input: click to tap, drag and release to swipe, a text field, home,
-  lock and rotation. **It is off by default and has not been tested with idb.**
+  lock and rotation. It is off until the owner switches it on in the panel's menu.
 - Tests for protocol validation, geometry, device parsing, command construction,
   log limits, process timeouts, session cleanup and HTTP authentication, and for
   the panel's state: stale pictures, refused actions, failures, the console
   cursor, input permission, hidden windows and late results after closing.
 
 Without idb, use Apple's Device Hub window for input. No private framework is
-loaded by this plugin. Enabling idb introduces its private Apple dependencies.
-There is no automatic download or installation path.
+loaded by this plugin itself. Switching input on runs idb, which uses them.
+The plugin does not download or install idb: `tools/install-idb.sh` does, when you run it.
 
 This is the beginning of the one plugin planned in roadmap stage 6. It does not
 yet connect `kas3c lsp`, set AS3 breakpoints or step through scripts. Keep using
@@ -172,32 +172,29 @@ compiled for the same Java as the plugin. It prints an endpoint file path. Keep 
 at that file. Ctrl+C closes it. All session files go under the supplied directory.
 The exact wire format is in [protocol.md](protocol.md).
 
-## Optional input: an owner decision
+## Input: the owner's switch
 
-idb and its matching macOS companion are not installed here. Neither is bundled.
-They use Apple's private input services. Older versions may not work with Xcode
-27; current idb source describes a different input transport for that Xcode.
-No version is claimed compatible until tested on this Mac. Choosing and installing
-that pair needs the owner's agreement to the dependency and private-interface risk.
+Taps, swipes, typing, Home, Lock and Rotate are sent with idb, a tool from Meta that drives the
+Simulator through Apple's private input services. Apple can change those without notice. Nothing
+here installs it or turns it on by itself:
 
-After that decision and installation, start the IDE or standalone service with:
+1. Install idb once: `tools/install-idb.sh` (its companion from Meta's Homebrew tap, its client
+   in its own Python environment).
+2. In the panel, choose **⋮ > Switch input on…** and agree. The choice is remembered.
+
+The service finds idb in `~/.local/bin`, Homebrew's folder or along `PATH`, and reads each device's
+pixels per point from idb's own description of it, so every device has input and nothing is typed
+in by hand. A device idb cannot describe stays in viewer mode and says why.
+
+The standalone service has no panel to ask, so the owner's switch is an environment variable:
 
 ```sh
 export KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT=1
-export KUMIKAE_SIMULATOR_IDB=/absolute/path/to/idb
-export KUMIKAE_SIMULATOR_INPUT_DEVICE='<id from devices>'
-export KUMIKAE_SIMULATOR_SCALE=3
+export KUMIKAE_SIMULATOR_IDB=/absolute/path/to/idb   # only if idb is somewhere unusual
 ```
 
-`3` is only an example. Set the selected Simulator display's actual pixels per
-point, using idb's device description. The scale is bound to that exact device.
-Other devices stay in viewer mode. Configure idb and its companion locally first;
-the adapter invokes its CLI and does not manage installation or companion cleanup.
-The service does not silently enable input just because `idb` is on PATH.
-
-The adapter uses the documented CLI argument shapes, including `ui rotate` from
-current idb source. Text is printable ASCII only. Drags are one swipe after mouse
-release. No multi-touch, audio, Unicode paste or live finger tracking is provided.
+Text is printable ASCII only. A drag is one swipe, sent when the mouse is released. There is no
+multi-touch, audio, Unicode paste or live finger tracking.
 
 ## Layout of the code
 

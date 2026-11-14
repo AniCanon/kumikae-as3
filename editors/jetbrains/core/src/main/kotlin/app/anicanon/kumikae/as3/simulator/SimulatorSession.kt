@@ -21,9 +21,10 @@ data class Frame(
 class SimulatorSession(
     private val directory: Path,
     private val runner: CommandRunner,
-    private val input: InputBackend = NoInput,
+    input: InputBackend = NoInput,
     private val launchLog: LaunchLog = LaunchLog(),
 ) : AutoCloseable {
+    @Volatile private var input: InputBackend = input
     private var selected: Device? = null
     private var geometry: Geometry? = null
     private var generation = 0L
@@ -112,22 +113,28 @@ class SimulatorSession(
         return found
     }
 
-    private fun status() = mapOf(
-        "device" to selected,
-        "generation" to generation,
-        "inputEnabled" to (selected?.let { input.supports(it.id) } ?: false),
-        "pixelsPerPoint" to input.scale,
-        "inputNotice" to when {
-            !input.enabled -> "Viewer mode. Use Device Hub for input, or explicitly enable idb."
+    /** Switches input on or off while the session runs: the owner decides in the panel, at any time. */
+    fun useInput(backend: InputBackend) {
+        input = backend
+    }
 
-            selected?.let {
-                input.supports(it.id)
-            } != true -> "Viewer mode. The configured idb scale belongs to another device."
-
-            else -> "idb input uses private Apple interfaces; compatibility is unverified"
-        },
-        "launch" to launchLog.status(),
-    )
+    private fun status(): Map<String, Any?> {
+        val device = selected?.id
+        // A device idb cannot describe stays in viewer mode, with the reason shown.
+        val scale = device?.takeIf { input.enabled }?.let { runCatching { input.scale(it) } }
+        return mapOf(
+            "device" to selected,
+            "generation" to generation,
+            "inputEnabled" to (scale?.isSuccess == true),
+            "pixelsPerPoint" to (scale?.getOrNull() ?: 1.0),
+            "inputNotice" to when {
+                !input.enabled -> "Viewer mode. Input can be switched on in the menu; it needs idb."
+                scale?.isFailure == true -> "Viewer mode. ${scale.exceptionOrNull()?.message}"
+                else -> "Input is on, through idb."
+            },
+            "launch" to launchLog.status(),
+        )
+    }
 
     private fun select(id: String): Any {
         val device = devices().find { it.id == id }
@@ -186,14 +193,8 @@ class SimulatorSession(
 
     private fun input(device: String, method: String, p: JsonObject): Any {
         if (!input.enabled) NoInput.send(device, method, emptyList())
-        if (!input.supports(
-                device,
-            )
-        ) {
-            throw SimulatorException("INPUT_DEVICE_MISMATCH", "idb scale is configured for a different device")
-        }
         val args = when (method) {
-            "tap", "swipe" -> gesture(method, p)
+            "tap", "swipe" -> gesture(device, method, p)
 
             "text" -> listOf(
                 p["text"].asString.also { text ->
@@ -217,16 +218,17 @@ class SimulatorSession(
         return mapOf("sent" to true)
     }
 
-    private fun gesture(method: String, p: JsonObject): List<String> {
+    private fun gesture(device: String, method: String, p: JsonObject): List<String> {
         val current = geometry ?: throw SimulatorException("STALE_FRAME", "Take a new screenshot before input")
         if (p["generation"].asLong != generation || p["width"].asLong != current.width.toLong() ||
             p["height"].asLong != current.height.toLong()
         ) {
             throw SimulatorException("STALE_FRAME", "Screen geometry changed; take a new screenshot")
         }
-        val start = current.point(p["x"].asDouble, p["y"].asDouble, input.scale)
+        val scale = input.scale(device)
+        val start = current.point(p["x"].asDouble, p["y"].asDouble, scale)
         if (method == "tap") return listOf(start.x.toString(), start.y.toString())
-        val end = current.point(p["endX"].asDouble, p["endY"].asDouble, input.scale)
+        val end = current.point(p["endX"].asDouble, p["endY"].asDouble, scale)
         val duration = p["durationMs"].asLong.also { require(it in 50..5000) { "Swipe duration must be 50–5000ms" } }
         return listOf(
             start.x.toString(),

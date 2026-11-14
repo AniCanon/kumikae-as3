@@ -117,3 +117,19 @@ agent and panel operate the same device. Until then, use Device Hub for input.
 The Godot Simulator export has been launched and its report read through the
 service. Installing it from the panel is still to be tried.
 This work does not complete the roadmap's AS3 debugger gate.
+
+## idb input, 2026-11-14
+
+Installed with the owner's agreement: idb's companion 1.7.8 from Meta's Homebrew tap (that one
+formula marked trusted) and the `fb-idb` client in its own environment. Xcode 27.0, a booted
+iPhone-class Simulator on iOS 26.4.
+
+| Check | Observed |
+|---|---|
+| `idb describe --json` | Density 3.0, 402 by 874 points for a 1206 by 2622 screenshot. |
+| The standalone service with only `KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT=1` | Status: input enabled, 3.0 pixels per point, found without a path or a scale being given. |
+| `simulator.py button home`, then `tap` at screenshot pixel 1017, 1302 (the Settings icon) | Both accepted. idb's accessibility listing then began with "Settings": the tap landed where the picture showed the icon. |
+| `text`, `swipe`, `button lock`, `rotate landscape_left`, `rotate portrait` | All accepted. Their effect on screen was not separately confirmed. |
+
+Not run: input from the panel's own buttons and mouse in a Rider window; a device idb cannot
+describe; a second device; input delay.

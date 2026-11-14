@@ -12,7 +12,9 @@ class SimulatorWindowControllerTest {
     private val repository = FakeSimulatorRepository()
     private val actions = ManualBackgroundTasks()
     private val polling = ManualBackgroundTasks()
-    private val controller = SimulatorWindowController(repository, actions, polling)
+    private var allowed = false
+    private val remembered = mutableListOf<Boolean>()
+    private val controller = SimulatorWindowController(repository, actions, polling, { allowed }, { remembered += it })
 
     private fun open(select: SimulatorDevice? = repository.phone) {
         controller.shown()
@@ -310,6 +312,33 @@ class SimulatorWindowControllerTest {
         pollOnce()
         assertEquals(listOf("status", "console 0"), repository.calls)
         assertNull(controller.frame)
+    }
+
+    @Test fun `switching input on asks the service, says so and remembers the choice`() {
+        open()
+        controller.enableInput()
+        actions.finish()
+        assertEquals(listOf("enableInput", "status"), repository.calls)
+        assertTrue(controller.inputEnabled)
+        assertEquals("Input is on.", controller.status)
+        assertEquals(listOf(true), remembered)
+    }
+
+    @Test fun `switching input on without idb says how to get it and remembers nothing`() {
+        open()
+        repository.idbInstalled = false
+        controller.enableInput()
+        actions.finish()
+        assertFalse(controller.inputEnabled)
+        assertTrue(controller.status.startsWith("idb is not installed."), controller.status)
+        assertTrue(remembered.isEmpty())
+    }
+
+    @Test fun `input that was switched on before is on again when the window opens`() {
+        allowed = true
+        controller.shown()
+        actions.finish()
+        assertEquals(listOf("connect", "enableInput", "devices"), repository.calls)
     }
 
     private companion object {

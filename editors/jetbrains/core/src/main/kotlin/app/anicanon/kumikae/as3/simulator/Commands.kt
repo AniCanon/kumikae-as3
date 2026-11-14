@@ -11,6 +11,7 @@ object Commands {
     fun launch(device: String, bundle: String) =
         simctl("launch", "--terminate-running-process", "--console", device, bundle)
     fun container(device: String, bundle: String) = simctl("get_app_container", device, bundle, "data")
+    fun describe(executable: String, device: String) = listOf(executable, "describe", "--udid", device, "--json")
     fun input(executable: String, device: String, operation: String, args: List<String>): List<String> =
         listOf(executable, "ui", operation, "--udid", device) +
             (if (operation == "text") listOf("--") else emptyList()) + args

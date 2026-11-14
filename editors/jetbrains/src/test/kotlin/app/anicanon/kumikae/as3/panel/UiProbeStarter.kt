@@ -97,7 +97,10 @@ class UiProbeStarter : ApplicationStarter {
             press(view, "Launch org.kumikae.as3test")
             await("Launch") { shows(view, "Launch requested") }
             check("launch probe-phone org.kumikae.as3test" in repository.calls) { "Launch sent ${repository.calls}" }
-            check(!icon(view, "Home (needs idb)").isEnabled && !icon(view, "Type text (needs idb)").isEnabled) {
+            check(
+                !icon(view, "Home (switch input on in the menu)").isEnabled &&
+                    !icon(view, "Type text (switch input on in the menu)").isEnabled,
+            ) {
                 "Input is on in viewer mode"
             }
             await("a picture and the console") {
@@ -115,7 +118,7 @@ class UiProbeStarter : ApplicationStarter {
             render(view.component, NARROW, TALL, destination.resolve("$prefix-6-console.png"))
             press(view, "Copy screenshot")
             check(prompts.copiedImages == 1) { "The screenshot was not copied" }
-            repository.inputEnabled = true
+            onEdt { menu(moreEntries(controller, view.state, prompts), "Switch input on") }
             await("input controls") {
                 controller.poll()
                 descendants(view.component).filterIsInstance<IconButtonControl>().any {

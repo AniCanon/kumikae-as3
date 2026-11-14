@@ -16,6 +16,8 @@ import kotlin.test.assertTrue
 
 class ApiSimulatorRepositoryTest {
     private class FakeService(private val replies: Map<String, String>) : SimulatorService {
+        override fun enableInput() = true
+
         val calls = mutableListOf<Pair<String, Map<String, Any>>>()
         var closed = false
 

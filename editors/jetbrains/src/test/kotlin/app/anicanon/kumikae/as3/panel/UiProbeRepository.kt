@@ -56,6 +56,12 @@ internal class UiProbeRepository : SimulatorRepository {
         return current()
     }
 
+    override fun enableInput(): Boolean {
+        record("enableInput")
+        inputEnabled = true
+        return true
+    }
+
     override fun shutdown(device: String): SimulatorStatus {
         record("shutdown $device")
         selected = selected?.copy(state = "Shutdown")

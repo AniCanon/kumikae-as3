@@ -14,6 +14,7 @@ internal class FakeSimulatorRepository : SimulatorRepository {
     var page = ConsolePage(emptyList(), 0, false)
     var failure: String? = null
     var closed = false
+    var idbInstalled = true
 
     private fun record(call: String) {
         calls += call
@@ -48,6 +49,12 @@ internal class FakeSimulatorRepository : SimulatorRepository {
         record("boot $device")
         selected = selected?.copy(state = "Booted")
         return SimulatorStatus(selected, inputEnabled, notice)
+    }
+
+    override fun enableInput(): Boolean {
+        record("enableInput")
+        inputEnabled = idbInstalled
+        return idbInstalled
     }
 
     override fun shutdown(device: String): SimulatorStatus {
