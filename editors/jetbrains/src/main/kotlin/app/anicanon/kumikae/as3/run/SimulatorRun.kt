@@ -16,6 +16,7 @@ internal class SimulatorRun(
     private val appPath = appPath.trim()
     private var device: String? = null
     private var cursor = 0L
+    private var explained = false
 
     fun start() {
         check(bundle.isNotEmpty()) { "Set the app's bundle identifier in the run configuration." }
@@ -34,7 +35,14 @@ internal class SimulatorRun(
     fun pump(): Int? {
         val page = repository.consolePage(cursor)
         cursor = page.nextCursor
-        for (entry in page.entries) output(entry.text, entry.stream == "stderr")
+        for (entry in page.entries) {
+            output(entry.text, entry.stream == "stderr")
+            // The Simulator's own words for this say nothing a person can act on.
+            if (!explained && entry.text.contains("The request to open") && entry.text.contains("failed")) {
+                explained = true
+                output(NOT_INSTALLED.replace("{bundle}", bundle), true)
+            }
+        }
         return if (page.running) null else page.exitCode ?: 0
     }
 
@@ -44,5 +52,8 @@ internal class SimulatorRun(
 
     private companion object {
         const val BOOTED = "Booted"
+        const val NOT_INSTALLED = "{bundle} is not installed on this simulator. Export the game for iOS from Godot, " +
+            "build it for the Simulator, and name the built .app in this run configuration: it is installed before " +
+            "the launch.\n"
     }
 }

@@ -81,6 +81,17 @@ class SimulatorRunTest {
         assertTrue(said.isEmpty())
     }
 
+    @Test fun `an app that is not on the simulator is said so, once, with what to do`() {
+        repository.select("A")
+        val run = run().also { it.start() }
+        val refused = ConsoleEntry("stderr", "The request to open \"org.example.game\" failed.\n")
+        repository.page = ConsolePage(listOf(refused, refused), nextCursor = 2, truncated = false)
+        run.pump()
+        val hints = said.filter { it.first.contains("is not installed on this simulator") }
+        assertEquals(1, hints.size)
+        assertTrue(hints.single().first.contains("org.example.game") && hints.single().first.contains("Export"))
+    }
+
     @Test fun `stopping ends the app`() {
         repository.select("A")
         val run = run().also { it.start() }

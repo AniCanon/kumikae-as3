@@ -66,7 +66,8 @@ internal class PictureStreamController(
         show(null)
         feed?.close()
         feed = null
-        say("Live picture stopped: ${error.message.orEmpty().take(180)}. Retry in $retryMs ms.")
+        // What a person needs to know is that the picture will come back, not when to the millisecond.
+        say("Reconnecting to the simulator's screen…")
         retryAt = clock() + retryMs
         retryMs = (retryMs * 2).coerceAtMost(MAX_RETRY_MS)
     }

@@ -76,7 +76,7 @@ class LiveControllerTest {
         streams.finish()
         repository.feeds.last().close()
         controller.frameTick()
-        assertTrue(controller.status.contains("Retry"))
+        assertTrue(controller.status.startsWith("Reconnecting"))
         now = 500
         controller.frameTick()
         assertTrue(streams.isBusy)
@@ -88,7 +88,7 @@ class LiveControllerTest {
         repository.feeds.last().failure = IllegalStateException("lost video")
         controller.frameTick()
         assertTrue(controller.status.contains("lost video"))
-        assertTrue(controller.status.contains("Retry"))
+        assertTrue(controller.status.startsWith("Reconnecting"))
         now = 499
         controller.frameTick()
         assertFalse(streams.isBusy)
