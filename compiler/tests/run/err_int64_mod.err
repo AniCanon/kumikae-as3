@@ -1,0 +1,2 @@
+Error: the remainder of an Int64 by zero is not a number.
+	at err_int64_mod()[err_int64_mod.as:7]

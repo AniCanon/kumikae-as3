@@ -1,0 +1,2 @@
+RangeError: -1 does not fit a uint.
+	at err_int64_uint()[err_int64_uint.as:6]

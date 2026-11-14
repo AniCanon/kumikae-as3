@@ -1,0 +1,2 @@
+RangeError: 9007199254740993 does not fit a Number exactly.
+	at err_int64_number()[err_int64_number.as:6]

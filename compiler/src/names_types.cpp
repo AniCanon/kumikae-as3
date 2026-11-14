@@ -186,6 +186,22 @@ class Typer {
 
 	void error(uint32_t p_offset, std::string p_message) { unit_.diagnostics.error(p_offset, std::move(p_message)); }
 
+	// A whole number written out, with or without a minus, that an Int64 holds.
+	static bool wide_whole(const Expr *p_expression) {
+		bool negative = false;
+		if (p_expression && p_expression->kind == NodeKind::Unary && static_cast<const Unary *>(p_expression)->op == TokenKind::Minus) {
+			negative = true;
+			p_expression = static_cast<const Unary *>(p_expression)->operand;
+		}
+		if (!p_expression || p_expression->kind != NodeKind::NumberLit) {
+			return false;
+		}
+		uint64_t value = 0;
+		bool whole_number = false;
+		return wide_literal(static_cast<const NumberLit *>(p_expression)->text, &value, &whole_number) &&
+				value <= (negative ? 9223372036854775808ull : 9223372036854775807ull);
+	}
+
 	// A literal written as a whole number, in decimal or hex: its value, or false if it is past 64 bits.
 	// *r_whole says whether it is written as a whole number at all.
 	static bool wide_literal(std::string_view p_text, uint64_t *r_value, bool *r_whole) {
@@ -1263,6 +1279,12 @@ class Typer {
 	const Type *binary(Binary *p_binary) {
 		const Type *left = expression(p_binary->left);
 		const Type *right = expression(p_binary->right);
+		// A whole number written out beside an Int64 is an Int64 too, read digit by digit.
+		if (left == int64_ && wide_whole(p_binary->right)) {
+			right = int64_;
+		} else if (right == int64_ && wide_whole(p_binary->left)) {
+			left = int64_;
+		}
 		switch (p_binary->op) {
 			case TokenKind::Less:
 			case TokenKind::Greater:

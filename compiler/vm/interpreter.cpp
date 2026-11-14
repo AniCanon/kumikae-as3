@@ -88,6 +88,74 @@ void Interpreter::drop(Kind p_kind, Slot &p_slot) {
 	p_slot.bits = 0;
 }
 
+// A Number as an Int64, the way a conversion the program wrote does it: not-a-number is 0, and a value
+// past either end is held at that end.
+static int64_t clamp_wide(double p_number) {
+	if (p_number != p_number) {
+		return 0;
+	}
+	if (p_number >= 9223372036854775808.0) {
+		return INT64_MAX;
+	}
+	if (p_number < -9223372036854775808.0) {
+		return INT64_MIN;
+	}
+	return (int64_t)p_number;
+}
+
+// Text as an Int64: digits are read exactly, so that every Int64 can be written; anything else is read
+// as a Number first, as int("12.7") is.
+static int64_t string_to_wide(std::string_view p_text) {
+	size_t start = 0, end = p_text.size();
+	while (start < end && (p_text[start] == ' ' || p_text[start] == '\t' || p_text[start] == '\n' || p_text[start] == '\r')) {
+		start++;
+	}
+	while (end > start && (p_text[end - 1] == ' ' || p_text[end - 1] == '\t' || p_text[end - 1] == '\n' || p_text[end - 1] == '\r')) {
+		end--;
+	}
+	size_t at = start;
+	bool negative = at < end && p_text[at] == '-';
+	if (at < end && (p_text[at] == '-' || p_text[at] == '+')) {
+		at++;
+	}
+	bool digits = at < end;
+	uint64_t value = 0;
+	const uint64_t limit = negative ? (uint64_t)1 << 63 : (uint64_t)INT64_MAX;
+	bool past = false;
+	for (size_t i = at; i < end && digits; i++) {
+		if (p_text[i] < '0' || p_text[i] > '9') {
+			digits = false;
+		} else if (!past) {
+			uint64_t digit = (uint64_t)(p_text[i] - '0');
+			past = value > (limit - digit) / 10;
+			value = past ? limit : value * 10 + digit;
+		}
+	}
+	if (!digits) {
+		return clamp_wide(string_to_number(p_text));
+	}
+	return negative ? (int64_t)(0 - value) : (int64_t)value;
+}
+
+// An Int64 against a Number, exactly: below, equal or above as -1, 0 or 1, and not-a-number for one.
+static double compare_wide(int64_t p_wide, double p_number) {
+	if (p_number != p_number) {
+		return p_number;
+	}
+	if (p_number >= 9223372036854775808.0) {
+		return -1;
+	}
+	if (p_number < -9223372036854775808.0) {
+		return 1;
+	}
+	int64_t whole = (int64_t)p_number; // Towards zero.
+	if (p_wide != whole) {
+		return p_wide < whole ? -1 : 1;
+	}
+	double fraction = p_number - (double)whole;
+	return fraction > 0 ? -1 : (fraction < 0 ? 1 : 0);
+}
+
 static bool held(Kind p_kind) {
 	return ir::is_reference(p_kind) || ir::is_engine(p_kind);
 }
@@ -791,6 +859,155 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::F64ToI32:
 				r[in.a].i = to_int32(r[in.b].d);
 				break;
+			case Op::ConstI64:
+				r[in.a].l = module_.wides[in.b];
+				break;
+			case Op::AddI64:
+				r[in.a].l = (int64_t)((uint64_t)r[in.b].l + (uint64_t)r[in.c].l);
+				break;
+			case Op::SubI64:
+				r[in.a].l = (int64_t)((uint64_t)r[in.b].l - (uint64_t)r[in.c].l);
+				break;
+			case Op::MulI64:
+				r[in.a].l = (int64_t)((uint64_t)r[in.b].l * (uint64_t)r[in.c].l);
+				break;
+			case Op::ModI64:
+				if (r[in.c].l == 0) {
+					raise(module_.error_class, "the remainder of an Int64 by zero is not a number.");
+				} else {
+					r[in.a].l = r[in.c].l == -1 ? 0 : r[in.b].l % r[in.c].l; // The least Int64 by -1 would trap.
+				}
+				break;
+			case Op::NegI64:
+				r[in.a].l = (int64_t)(0 - (uint64_t)r[in.b].l);
+				break;
+			case Op::BitAndI64:
+				r[in.a].l = r[in.b].l & r[in.c].l;
+				break;
+			case Op::BitOrI64:
+				r[in.a].l = r[in.b].l | r[in.c].l;
+				break;
+			case Op::BitXorI64:
+				r[in.a].l = r[in.b].l ^ r[in.c].l;
+				break;
+			case Op::BitNotI64:
+				r[in.a].l = ~r[in.b].l;
+				break;
+			case Op::ShlI64:
+				r[in.a].l = (int64_t)((uint64_t)r[in.b].l << ((uint64_t)r[in.c].l & 63));
+				break;
+			case Op::ShrI64: {
+				// Written out, so that the sign is carried whatever the compiler does with >> on a negative.
+				uint64_t count = (uint64_t)r[in.c].l & 63;
+				uint64_t bits = (uint64_t)r[in.b].l >> count;
+				if (r[in.b].l < 0 && count > 0) {
+					bits |= ~(uint64_t)0 << (64 - count);
+				}
+				r[in.a].l = (int64_t)bits;
+				break;
+			}
+			case Op::UShrI64:
+				r[in.a].l = (int64_t)((uint64_t)r[in.b].l >> ((uint64_t)r[in.c].l & 63));
+				break;
+			case Op::LtI64: {
+				bool value = r[in.b].l < r[in.c].l;
+				r[in.a].bits = 0;
+				r[in.a].b = value;
+				break;
+			}
+			case Op::LeI64: {
+				bool value = r[in.b].l <= r[in.c].l;
+				r[in.a].bits = 0;
+				r[in.a].b = value;
+				break;
+			}
+			case Op::EqI64: {
+				bool value = r[in.b].l == r[in.c].l;
+				r[in.a].bits = 0;
+				r[in.a].b = value;
+				break;
+			}
+			case Op::CmpI64F64:
+				r[in.a].d = compare_wide(r[in.b].l, r[in.c].d);
+				break;
+			case Op::I32ToI64:
+				r[in.a].l = r[in.b].i;
+				break;
+			case Op::U32ToI64:
+				r[in.a].l = r[in.b].u;
+				break;
+			case Op::I64ToBool: {
+				bool value = r[in.b].l != 0;
+				r[in.a].bits = 0;
+				r[in.a].b = value;
+				break;
+			}
+			case Op::I64ToStr:
+				assign(Kind::Str, r[in.a], text(std::to_string(r[in.b].l)));
+				break;
+			case Op::I64ToI32: {
+				int64_t value = r[in.b].l;
+				if (value < INT32_MIN || value > INT32_MAX) {
+					raise(module_.range_error_class, std::to_string(value) + " does not fit an int.");
+				} else {
+					r[in.a].bits = 0;
+					r[in.a].i = (int32_t)value;
+				}
+				break;
+			}
+			case Op::I64ToU32: {
+				int64_t value = r[in.b].l;
+				if (value < 0 || value > (int64_t)UINT32_MAX) {
+					raise(module_.range_error_class, std::to_string(value) + " does not fit a uint.");
+				} else {
+					r[in.a].bits = 0;
+					r[in.a].u = (uint32_t)value;
+				}
+				break;
+			}
+			case Op::I64ToF64: {
+				int64_t value = r[in.b].l;
+				double number = (double)value;
+				// The Number must hold the very same value. 2^63 is checked first: converting it back is undefined.
+				if (number >= 9223372036854775808.0 || (int64_t)number != value) {
+					raise(module_.range_error_class, std::to_string(value) + " does not fit a Number exactly.");
+				} else {
+					r[in.a].d = number;
+				}
+				break;
+			}
+			case Op::F64ToI64: {
+				double number = r[in.b].d;
+				if (!(number >= -9223372036854775808.0 && number < 9223372036854775808.0)) {
+					raise(module_.range_error_class, number_to_string(number) + " does not fit an Int64.");
+				} else {
+					r[in.a].l = (int64_t)number; // The fraction is dropped, as for an int.
+				}
+				break;
+			}
+			case Op::I64WrapI32: {
+				int64_t value = r[in.b].l;
+				r[in.a].bits = 0;
+				r[in.a].i = (int32_t)(uint32_t)(uint64_t)value;
+				break;
+			}
+			case Op::I64WrapU32: {
+				int64_t value = r[in.b].l;
+				r[in.a].bits = 0;
+				r[in.a].u = (uint32_t)(uint64_t)value;
+				break;
+			}
+			case Op::I64RoundF64:
+				r[in.a].d = (double)r[in.b].l;
+				break;
+			case Op::F64ClampI64:
+				r[in.a].l = clamp_wide(r[in.b].d);
+				break;
+			case Op::StrToI64: {
+				Str *string = static_cast<Str *>(r[in.b].p);
+				r[in.a].l = string ? string_to_wide(string->view()) : 0;
+				break;
+			}
 			case Op::F64ToU32:
 				r[in.a].u = to_uint32(r[in.b].d);
 				break;

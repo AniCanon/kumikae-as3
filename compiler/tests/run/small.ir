@@ -4,6 +4,9 @@ class Error
 class TypeError extends Error
   .0 message:String
   new TypeError
+class RangeError extends Error
+  .0 message:String
+  new RangeError
 class small
   .0 total:Number
   #0 small/twice
@@ -13,6 +16,9 @@ function Error(r0:Object, r1:String):void
   @0 SetField r0 .0 r1
   @1 ReturnVoid
 function TypeError(r0:Object, r1:String):void
+  @0 SetField r0 .0 r1
+  @1 ReturnVoid
+function RangeError(r0:Object, r1:String):void
   @0 SetField r0 .0 r1
   @1 ReturnVoid
 function small(r0:Object):void

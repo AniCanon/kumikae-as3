@@ -310,6 +310,8 @@ struct FakeEngine : vm::Host {
 				return vm::number_to_string(p_argument.slot.d);
 			case ir::Kind::I32:
 				return std::to_string(p_argument.slot.i);
+			case ir::Kind::I64:
+				return std::to_string(p_argument.slot.l);
 			case ir::Kind::Bool:
 				return p_argument.slot.b ? "true" : "false";
 			case ir::Kind::Str:
@@ -340,6 +342,9 @@ struct FakeEngine : vm::Host {
 				break;
 			case ir::Kind::I32:
 				r_result->i = (int32_t)p_number;
+				break;
+			case ir::Kind::I64:
+				r_result->l = (int64_t)p_number;
 				break;
 			case ir::Kind::Bool:
 				r_result->b = p_number != 0;

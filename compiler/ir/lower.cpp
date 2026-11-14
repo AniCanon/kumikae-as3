@@ -29,6 +29,7 @@ class Lowerer {
 
 	Symbol *int_ = nullptr;
 	Symbol *uint_ = nullptr;
+	Symbol *int64_ = nullptr;
 	Symbol *number_ = nullptr;
 	Symbol *boolean_ = nullptr;
 	Symbol *string_ = nullptr;
@@ -76,6 +77,49 @@ class Lowerer {
 		}
 		module_.strings.push_back(p_text);
 		return strings_[p_text] = (uint32_t)module_.strings.size() - 1;
+	}
+
+	uint32_t wide(int64_t p_value) {
+		for (size_t i = 0; i < module_.wides.size(); i++) {
+			if (module_.wides[i] == p_value) {
+				return (uint32_t)i;
+			}
+		}
+		module_.wides.push_back(p_value);
+		return (uint32_t)module_.wides.size() - 1;
+	}
+
+	// A whole number written out (`12`, `0xFF`, `-5`) that an Int64 holds: its exact value. The checker
+	// has refused one that is written where an Int64 is expected and does not fit.
+	static bool wide_literal(const Expr *p_expression, int64_t *r_value) {
+		bool negative = false;
+		if (p_expression && p_expression->kind == NodeKind::Unary && static_cast<const Unary *>(p_expression)->op == TokenKind::Minus) {
+			negative = true;
+			p_expression = static_cast<const Unary *>(p_expression)->operand;
+		}
+		if (!p_expression || p_expression->kind != NodeKind::NumberLit) {
+			return false;
+		}
+		std::string_view text = static_cast<const NumberLit *>(p_expression)->text;
+		bool hex = text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
+		if (!hex && text.find_first_of(".eE") != std::string_view::npos) {
+			return false;
+		}
+		uint64_t value = 0;
+		const uint64_t base = hex ? 16 : 10;
+		for (size_t i = hex ? 2 : 0; i < text.size(); i++) {
+			char c = text[i];
+			uint64_t digit = c >= '0' && c <= '9' ? (uint64_t)(c - '0') : c >= 'a' && c <= 'f' ? (uint64_t)(c - 'a' + 10) : c >= 'A' && c <= 'F' ? (uint64_t)(c - 'A' + 10) : 99;
+			if (digit >= base || value > (UINT64_MAX - digit) / base) {
+				return false;
+			}
+			value = value * base + digit;
+		}
+		if (value > (negative ? (uint64_t)1 << 63 : (uint64_t)INT64_MAX)) {
+			return false;
+		}
+		*r_value = negative ? (int64_t)(0 - value) : (int64_t)value;
+		return true;
 	}
 
 	uint32_t number(double p_value) {
@@ -126,6 +170,8 @@ class Lowerer {
 			*r_kind = Kind::I32;
 		} else if (symbol == uint_) {
 			*r_kind = Kind::U32;
+		} else if (symbol == int64_) {
+			*r_kind = Kind::I64;
 		} else if (symbol == number_) {
 			*r_kind = Kind::F64;
 		} else if (symbol == boolean_) {
@@ -462,6 +508,9 @@ class Lowerer {
 			case Kind::Bool:
 				emit(Op::ConstBool, p_position, out, 0);
 				break;
+			case Kind::I64:
+				emit(Op::ConstI64, p_position, out, wide(0));
+				break;
 			case Kind::Str:
 			case Kind::Obj:
 			case Kind::Val:
@@ -476,10 +525,52 @@ class Lowerer {
 	}
 
 	// The value in p_reg as p_to, in a new register unless it is that kind already.
-	uint32_t convert(uint32_t p_reg, Kind p_to, uint32_t p_position) {
+	// p_written: the program wrote the conversion itself (`int(x)`). That matters for an Int64 only: a
+	// conversion that is not written raises a RangeError when the value does not fit, and one that is
+	// written is AS3's own, which cuts, rounds or holds at the end.
+	uint32_t convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p_written = false) {
 		Kind from = kind_at(p_reg);
 		if (from == p_to || p_to == Kind::Void) {
 			return p_reg;
+		}
+		if (from == Kind::I64 || p_to == Kind::I64) {
+			auto step = [&](Op p_op, Kind p_kind, uint32_t p_source) {
+				uint32_t out = reg(p_kind);
+				emit(p_op, p_position, out, p_source);
+				return out;
+			};
+			if (from == Kind::I64) {
+				switch (p_to) {
+					case Kind::I32:
+						return step(p_written ? Op::I64WrapI32 : Op::I64ToI32, Kind::I32, p_reg);
+					case Kind::U32:
+						return step(p_written ? Op::I64WrapU32 : Op::I64ToU32, Kind::U32, p_reg);
+					case Kind::F64:
+						return step(p_written ? Op::I64RoundF64 : Op::I64ToF64, Kind::F64, p_reg);
+					case Kind::Bool:
+						return step(Op::I64ToBool, Kind::Bool, p_reg);
+					case Kind::Str:
+						return step(Op::I64ToStr, Kind::Str, p_reg);
+					default:
+						refuse(p_position, is_engine(p_to) ? "passing this value where a Godot value is expected" : "converting a value to an object");
+						return default_value(p_to, p_position);
+				}
+			}
+			switch (from) {
+				case Kind::I32:
+					return step(Op::I32ToI64, Kind::I64, p_reg);
+				case Kind::U32:
+					return step(Op::U32ToI64, Kind::I64, p_reg);
+				case Kind::F64:
+					return step(p_written ? Op::F64ClampI64 : Op::F64ToI64, Kind::I64, p_reg);
+				case Kind::Bool:
+					return step(Op::F64ClampI64, Kind::I64, step(Op::BoolToF64, Kind::F64, p_reg));
+				case Kind::Str:
+					return step(Op::StrToI64, Kind::I64, p_reg);
+				default:
+					refuse(p_position, is_engine(from) ? "converting a Godot value" : "converting an object to a number");
+					return default_value(Kind::I64, p_position);
+			}
 		}
 		if (is_engine(from) && p_to == Kind::Str) {
 			uint32_t out = reg(Kind::Str);
@@ -752,6 +843,11 @@ class Lowerer {
 		if (owner == int_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
 			*r_reg = reg(Kind::I32);
 			emit(Op::ConstI32, p_position, *r_reg, name == "MAX_VALUE" ? 0x7FFFFFFFu : 0x80000000u);
+			return true;
+		}
+		if (owner == int64_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
+			*r_reg = reg(Kind::I64);
+			emit(Op::ConstI64, p_position, *r_reg, wide(name == "MAX_VALUE" ? INT64_MAX : INT64_MIN));
 			return true;
 		}
 		if (owner == uint_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
@@ -1180,6 +1276,8 @@ class Lowerer {
 			*r_kind = Kind::I32;
 		} else if (p_class == uint_) {
 			*r_kind = Kind::U32;
+		} else if (p_class == int64_) {
+			*r_kind = Kind::I64;
 		} else if (p_class == number_) {
 			*r_kind = Kind::F64;
 		} else if (p_class == boolean_) {
@@ -1277,7 +1375,12 @@ class Lowerer {
 		Kind conversion = Kind::Void;
 		if (symbol->is_type()) {
 			if (kind_of_class(symbol, &conversion) && p_call->arguments.count == 1) {
-				uint32_t value = expression(p_call->arguments[0], conversion);
+				Kind given = Kind::Void;
+				bool known = kind_of(p_call->arguments[0]->type, &given);
+				// To or from an Int64, a conversion that is written out is AS3's own: see convert().
+				uint32_t value = known && (given == Kind::I64 || conversion == Kind::I64) && !is_null(p_call->arguments[0])
+						? convert(wide_operand(p_call->arguments[0], conversion), conversion, position, true)
+						: expression(p_call->arguments[0], conversion);
 				if (conversion == Kind::Str) {
 					// The conversion written out always gives a string: a missing one becomes "null".
 					uint32_t text = reg(Kind::Str);
@@ -1565,6 +1668,13 @@ class Lowerer {
 		uint32_t position = p_expression->offset;
 		switch (p_expression->kind) {
 			case NodeKind::NumberLit: {
+				int64_t exact = 0;
+				if (p_want == Kind::I64 && wide_literal(p_expression, &exact)) {
+					// Digit by digit: a Number would lose the last digits of a large one.
+					uint32_t out = reg(Kind::I64);
+					emit(Op::ConstI64, position, out, wide(exact));
+					return out;
+				}
 				double value = literal_value(static_cast<NumberLit *>(p_expression));
 				Kind kind = natural(p_expression);
 				// A literal is written straight into the kind that is wanted, when it fits exactly.
@@ -1666,6 +1776,16 @@ class Lowerer {
 			case NodeKind::Postfix: {
 				Postfix *postfix = static_cast<Postfix *>(p_expression);
 				Place place = place_of(postfix->operand);
+				if (place.kind == Kind::I64) {
+					uint32_t old = reg(Kind::I64);
+					emit(Op::Move, position, old, load(place, position));
+					uint32_t one = reg(Kind::I64);
+					emit(Op::ConstI64, position, one, wide(1));
+					uint32_t next = reg(Kind::I64);
+					emit(postfix->op == TokenKind::PlusPlus ? Op::AddI64 : Op::SubI64, position, next, old, one);
+					store(place, next, position);
+					return old;
+				}
 				// The value is the old one, as a number.
 				uint32_t old = convert(load(place, position), Kind::F64, position);
 				if (old == place.index && place.where == Place::Register) {
@@ -1739,6 +1859,21 @@ class Lowerer {
 				if (is_engine(natural(p_unary->operand)) && kind_of(p_unary->type, &result) && result != Kind::Void) {
 					return engine_operate(p_unary->op, { operand(p_unary->operand) }, result, p_unary->type, position);
 				}
+				int64_t exact = 0;
+				if (p_want == Kind::I64 && wide_literal(p_unary, &exact)) {
+					uint32_t out = reg(Kind::I64);
+					emit(Op::ConstI64, position, out, wide(exact)); // The least Int64 has no positive to negate.
+					return out;
+				}
+				if (kind_of(p_unary->operand->type, &result) && result == Kind::I64) {
+					uint32_t value = expression(p_unary->operand, Kind::I64);
+					if (p_unary->op == TokenKind::Plus) {
+						return value;
+					}
+					uint32_t out = reg(Kind::I64);
+					emit(Op::NegI64, position, out, value);
+					return out;
+				}
 				if (p_unary->op == TokenKind::Plus) {
 					return expression(p_unary->operand, Kind::F64);
 				}
@@ -1752,6 +1887,12 @@ class Lowerer {
 				return out;
 			}
 			case TokenKind::Tilde: {
+				Kind operand_kind = Kind::Void;
+				if (kind_of(p_unary->operand->type, &operand_kind) && operand_kind == Kind::I64) {
+					uint32_t out = reg(Kind::I64);
+					emit(Op::BitNotI64, position, out, expression(p_unary->operand, Kind::I64));
+					return out;
+				}
 				uint32_t out = reg(Kind::I32);
 				emit(Op::BitNot, position, out, expression(p_unary->operand, Kind::I32));
 				return out;
@@ -1759,6 +1900,14 @@ class Lowerer {
 			case TokenKind::PlusPlus:
 			case TokenKind::MinusMinus: {
 				Place place = place_of(p_unary->operand);
+				if (place.kind == Kind::I64) {
+					uint32_t one = reg(Kind::I64);
+					emit(Op::ConstI64, position, one, wide(1));
+					uint32_t next = reg(Kind::I64);
+					emit(p_unary->op == TokenKind::PlusPlus ? Op::AddI64 : Op::SubI64, position, next, load(place, position), one);
+					store(place, next, position);
+					return next;
+				}
 				uint32_t old = convert(load(place, position), Kind::F64, position);
 				uint32_t one = reg(Kind::F64);
 				emit(Op::ConstF64, position, one, number(1));
@@ -1775,7 +1924,32 @@ class Lowerer {
 	}
 
 	static bool is_numeric(Kind p_kind) {
-		return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::F64;
+		return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::F64 || p_kind == Kind::I64;
+	}
+	static bool is_integral(Kind p_kind) {
+		return p_kind == Kind::I32 || p_kind == Kind::U32 || p_kind == Kind::I64;
+	}
+
+	// An operand beside an Int64 (p_beside). A whole number written out is then an Int64 too, read digit
+	// by digit, as the checker took it: `w == 9223372036854775807` compares with that very number.
+	uint32_t wide_operand(Expr *p_expression, Kind p_beside) {
+		int64_t exact = 0;
+		if (p_beside == Kind::I64 && wide_literal(p_expression, &exact)) {
+			uint32_t out = reg(Kind::I64);
+			emit(Op::ConstI64, p_expression->offset, out, wide(exact));
+			return out;
+		}
+		return expression(p_expression, Kind::Void);
+	}
+	// The kind an operand has for an operator: an Int64 for a whole number written beside one.
+	Kind operand_kind(Expr *p_expression, Expr *p_other) {
+		Kind kind = Kind::Void, other = Kind::Void;
+		kind_of(p_expression->type, &kind);
+		int64_t exact = 0;
+		if (kind_of(p_other->type, &other) && other == Kind::I64 && wide_literal(p_expression, &exact)) {
+			return Kind::I64;
+		}
+		return kind;
 	}
 
 	// An operand for the engine, as the checker typed it: Godot tells a whole number from a fraction
@@ -1785,7 +1959,7 @@ class Lowerer {
 		if (!kind_of(p_expression->type, &kind) || !is_numeric(kind)) {
 			kind = Kind::Void;
 		} else if (kind == Kind::F64 && whole(p_expression)) {
-			kind = Kind::I32;
+			kind = Kind::I64; // A whole number worked out as a Number: Godot's integer holds every one.
 		}
 		return expression(p_expression, kind);
 	}
@@ -1815,8 +1989,34 @@ class Lowerer {
 				return whole(unary->operand);
 			}
 		}
+		if (p_expression->kind == NodeKind::Conditional) {
+			const Conditional *choice = static_cast<const Conditional *>(p_expression);
+			return whole(choice->then_value) && whole(choice->else_value);
+		}
+		if (p_expression->kind == NodeKind::Call) {
+			const Call *call = static_cast<const Call *>(p_expression);
+			const Symbol *symbol = call->callee && call->callee->kind == NodeKind::Member
+					? (static_cast<const Member *>(call->callee)->symbol ? static_cast<const Member *>(call->callee)->symbol : static_cast<const Member *>(call->callee)->member)
+					: call->callee && call->callee->kind == NodeKind::Name ? static_cast<const Name *>(call->callee)->symbol
+																			: nullptr;
+			if (symbol && symbol->unit && symbol->unit->is_builtin) {
+				bool math = symbol->owner && symbol->owner->name == "Math" && symbol->kind == SymbolKind::Method;
+				if ((math && (symbol->name == "floor" || symbol->name == "round" || symbol->name == "ceil")) ||
+						(!symbol->owner && symbol->kind == SymbolKind::Function && symbol->name == "parseInt")) {
+					return true;
+				}
+				if (math && (symbol->name == "abs" || symbol->name == "max" || symbol->name == "min") && call->arguments.count > 0) {
+					for (const Expr *argument : call->arguments) {
+						if (!whole(argument)) {
+							return false;
+						}
+					}
+					return true;
+				}
+			}
+		}
 		Kind kind = Kind::Void;
-		return kind_of(p_expression->type, &kind) && (kind == Kind::I32 || kind == Kind::U32);
+		return kind_of(p_expression->type, &kind) && is_integral(kind);
 	}
 
 	// An operator that Godot carries out, because an operand is one of its values. The operator goes as
@@ -1856,6 +2056,69 @@ class Lowerer {
 			emit(Op::StrToStr, p_position, right, convert(p_right, Kind::Str, p_position));
 			emit(Op::Concat, p_position, out, left, right);
 			return out;
+		}
+		if (kind_at(p_left) == Kind::I64 || kind_at(p_right) == Kind::I64) {
+			// With an Int64, whole-number arithmetic stays in 64 bits. Division, and anything with a
+			// Number, falls through to Numbers: the Int64 converts, and says so if it does not fit.
+			Op wide_op = Op::Stmt;
+			bool whole_only = true;
+			switch (p_op) {
+				case TokenKind::Plus:
+				case TokenKind::PlusAssign:
+					wide_op = Op::AddI64;
+					break;
+				case TokenKind::Minus:
+				case TokenKind::MinusAssign:
+					wide_op = Op::SubI64;
+					break;
+				case TokenKind::Star:
+				case TokenKind::StarAssign:
+					wide_op = Op::MulI64;
+					break;
+				case TokenKind::Percent:
+				case TokenKind::PercentAssign:
+					wide_op = Op::ModI64;
+					break;
+				case TokenKind::Amp:
+				case TokenKind::AmpAssign:
+					wide_op = Op::BitAndI64;
+					whole_only = false;
+					break;
+				case TokenKind::Pipe:
+				case TokenKind::PipeAssign:
+					wide_op = Op::BitOrI64;
+					whole_only = false;
+					break;
+				case TokenKind::Caret:
+				case TokenKind::CaretAssign:
+					wide_op = Op::BitXorI64;
+					whole_only = false;
+					break;
+				case TokenKind::ShiftLeft:
+				case TokenKind::ShiftLeftAssign:
+					wide_op = Op::ShlI64;
+					whole_only = false;
+					break;
+				case TokenKind::ShiftRight:
+				case TokenKind::ShiftRightAssign:
+					wide_op = Op::ShrI64;
+					whole_only = false;
+					break;
+				case TokenKind::ShiftRightUnsigned:
+				case TokenKind::ShiftRightUnsignedAssign:
+					wide_op = Op::UShrI64;
+					whole_only = false;
+					break;
+				default:
+					break;
+			}
+			if (wide_op != Op::Stmt && (!whole_only || (is_integral(kind_at(p_left)) && is_integral(kind_at(p_right))))) {
+				uint32_t left = convert(p_left, Kind::I64, p_position);
+				uint32_t right = convert(p_right, Kind::I64, p_position);
+				uint32_t out = reg(Kind::I64);
+				emit(wide_op, p_position, out, left, right);
+				return out;
+			}
 		}
 		Op op = Op::AddF64;
 		Kind operands = Kind::F64;
@@ -1982,6 +2245,31 @@ class Lowerer {
 					uint32_t b = operand(right);
 					return engine_operate(p_binary->op, { a, b }, Kind::Bool, nullptr, position);
 				}
+				bool swap_sides = p_binary->op == TokenKind::Greater || p_binary->op == TokenKind::GreaterEqual;
+				bool with_equal = p_binary->op == TokenKind::LessEqual || p_binary->op == TokenKind::GreaterEqual;
+				Kind left_kind = operand_kind(left, right), right_kind = operand_kind(right, left);
+				if ((left_kind == Kind::I64 || right_kind == Kind::I64) && is_integral(left_kind) && is_integral(right_kind)) {
+					uint32_t a = settled(convert(wide_operand(left, right_kind), Kind::I64, position), right, position);
+					uint32_t b = convert(wide_operand(right, left_kind), Kind::I64, position);
+					uint32_t out = reg(Kind::Bool);
+					emit(with_equal ? Op::LeI64 : Op::LtI64, position, out, swap_sides ? b : a, swap_sides ? a : b);
+					return out;
+				}
+				if ((left_kind == Kind::I64 && right_kind == Kind::F64) || (left_kind == Kind::F64 && right_kind == Kind::I64)) {
+					// Exactly: neither side is converted to the other's type.
+					uint32_t a = settled(expression(left, Kind::Void), right, position);
+					uint32_t b = expression(right, Kind::Void);
+					bool wide_first = left_kind == Kind::I64;
+					uint32_t order = reg(Kind::F64);
+					emit(Op::CmpI64F64, position, order, wide_first ? a : b, wide_first ? b : a);
+					uint32_t zero = reg(Kind::F64);
+					emit(Op::ConstF64, position, zero, number(0));
+					// `order` places the Int64 against the Number. Not-a-number makes every comparison false.
+					bool wide_is_less = wide_first != swap_sides; // The question is "Int64 < Number" (or <=).
+					uint32_t out = reg(Kind::Bool);
+					emit(with_equal ? Op::LeF64 : Op::LtF64, position, out, wide_is_less ? order : zero, wide_is_less ? zero : order);
+					return out;
+				}
 				bool strings = is_string_type(left->type) && is_string_type(right->type);
 				Kind kind = strings ? Kind::Str : Kind::F64;
 				uint32_t a = settled(expression(left, kind), right, position);
@@ -2038,6 +2326,30 @@ class Lowerer {
 				} else if (a == Kind::Bool && b == Kind::Bool) {
 					kind = Kind::Bool;
 					op = Op::EqBool;
+				} else if ((operand_kind(left, right) == Kind::I64 || operand_kind(right, left) == Kind::I64) &&
+						is_numeric(operand_kind(left, right)) && is_numeric(operand_kind(right, left))) {
+					Kind x_kind = operand_kind(left, right), y_kind = operand_kind(right, left);
+					uint32_t out = reg(Kind::Bool);
+					if (is_integral(x_kind) && is_integral(y_kind)) {
+						uint32_t x = settled(convert(wide_operand(left, y_kind), Kind::I64, position), right, position);
+						uint32_t y = convert(wide_operand(right, x_kind), Kind::I64, position);
+						emit(Op::EqI64, position, out, x, y);
+					} else {
+						// An Int64 and a Number, exactly.
+						uint32_t x = settled(expression(left, Kind::Void), right, position);
+						uint32_t y = expression(right, Kind::Void);
+						uint32_t order = reg(Kind::F64);
+						emit(Op::CmpI64F64, position, order, x_kind == Kind::I64 ? x : y, x_kind == Kind::I64 ? y : x);
+						uint32_t zero = reg(Kind::F64);
+						emit(Op::ConstF64, position, zero, number(0));
+						emit(Op::EqF64, position, out, order, zero);
+					}
+					if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
+						uint32_t negated = reg(Kind::Bool);
+						emit(Op::Not, position, negated, out);
+						return negated;
+					}
+					return out;
 				} else if ((is_numeric(a) && is_numeric(b)) || (!strict && (is_numeric(a) || a == Kind::Bool) && (is_numeric(b) || b == Kind::Bool))) {
 					kind = Kind::F64;
 				} else {
@@ -2073,8 +2385,8 @@ class Lowerer {
 					uint32_t b = operand(right);
 					return engine_operate(p_binary->op, { a, b }, result, p_binary->type, position);
 				}
-				uint32_t a = settled(expression(left, Kind::Void), right, position);
-				uint32_t b = expression(right, Kind::Void);
+				uint32_t a = settled(wide_operand(left, strings ? Kind::Void : right_kind), right, position);
+				uint32_t b = wide_operand(right, strings ? Kind::Void : left_kind);
 				return operate(p_binary->op, a, b, strings, position);
 			}
 		}
@@ -2095,7 +2407,7 @@ class Lowerer {
 			Kind right_kind = Kind::Void;
 			kind_of(p_assign->value->type, &right_kind);
 			bool engine = !strings && (is_engine(kind_at(old)) || is_engine(right_kind));
-			uint32_t right = engine ? operand(p_assign->value) : expression(p_assign->value, Kind::Void);
+			uint32_t right = engine ? operand(p_assign->value) : wide_operand(p_assign->value, strings ? Kind::Void : place.kind);
 			if (engine) {
 				value = convert(engine_operate(p_assign->op, { old, right }, place.kind, p_assign->target->type, position), place.kind, position);
 			} else {
@@ -2607,6 +2919,7 @@ public:
 			compilation_(p_compilation), module_(p_module) {
 		int_ = compilation_.builtin("int");
 		uint_ = compilation_.builtin("uint");
+		int64_ = compilation_.builtin("Int64");
 		number_ = compilation_.builtin("Number");
 		boolean_ = compilation_.builtin("Boolean");
 		string_ = compilation_.builtin("String");
@@ -2635,6 +2948,9 @@ public:
 		class_index(error_, &module_.error_class);
 		if (Symbol *type_error = compilation_.builtin("TypeError")) {
 			class_index(type_error, &module_.type_error_class);
+		}
+		if (Symbol *range_error = compilation_.builtin("RangeError")) {
+			class_index(range_error, &module_.range_error_class);
 		}
 		// Classes first, each after its base, so that field slots and method tables can be inherited.
 		std::vector<std::pair<Unit *, ClassDecl *>> classes;

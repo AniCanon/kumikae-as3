@@ -1,0 +1,2 @@
+RangeError: 10000000000000000000 does not fit an Int64.
+	at err_int64_far()[err_int64_far.as:6]

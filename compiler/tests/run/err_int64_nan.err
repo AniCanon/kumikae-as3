@@ -1,0 +1,2 @@
+RangeError: NaN does not fit an Int64.
+	at err_int64_nan()[err_int64_nan.as:6]

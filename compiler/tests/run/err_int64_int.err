@@ -1,0 +1,2 @@
+RangeError: 5000000000 does not fit an int.
+	at err_int64_int()[err_int64_int.as:6]

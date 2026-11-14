@@ -22,6 +22,7 @@ enum class Kind : uint8_t {
 	Obj, // An object of a class, or null
 	Val, // A value of one of Godot's value types (Vector2, Color, Signal, ...): copied when assigned
 	Ref, // A Godot object (a node, a resource), or null
+	I64, // Int64: Godot's own integer
 };
 
 const char *kind_name(Kind p_kind);
@@ -59,6 +60,18 @@ inline bool is_engine(Kind p_kind) {
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
 	X(IsClass, "RRC") X(AsClass, "RRC") \
 	/* The engine. Names are Godot's own. In HostCall the first argument is what the method is called on. */ \
+	/* Int64. The constant is an index into the module's wide numbers. Arithmetic wraps at 64 bits. */ \
+	X(ConstI64, "RI-") \
+	X(AddI64, "RRR") X(SubI64, "RRR") X(MulI64, "RRR") X(ModI64, "RRR") X(NegI64, "RR-") \
+	X(BitAndI64, "RRR") X(BitOrI64, "RRR") X(BitXorI64, "RRR") X(BitNotI64, "RR-") X(ShlI64, "RRR") X(ShrI64, "RRR") X(UShrI64, "RRR") \
+	X(LtI64, "RRR") X(LeI64, "RRR") X(EqI64, "RRR") \
+	/* An Int64 against a Number, exactly: -1, 0 or 1 as a Number, or NaN when the Number is NaN. */ \
+	X(CmpI64F64, "RRR") \
+	X(I32ToI64, "RR-") X(U32ToI64, "RR-") X(I64ToBool, "RR-") X(I64ToStr, "RR-") \
+	/* Conversions the program did not write: a RangeError if the value does not fit. */ \
+	X(I64ToI32, "RR-") X(I64ToU32, "RR-") X(I64ToF64, "RR-") X(F64ToI64, "RR-") \
+	/* Conversions the program wrote, int(x) and the rest: AS3's own, which cut, round or hold at the end. */ \
+	X(I64WrapI32, "RR-") X(I64WrapU32, "RR-") X(I64RoundF64, "RR-") X(F64ClampI64, "RR-") X(StrToI64, "RR-") \
 	X(HostNew, "RSA") X(HostCall, "rSA") X(HostGet, "RRS") X(HostSet, "RSR") \
 	/* An operator on Godot values: the operator as AS3 writes it ("+", "=="), and one or two operands. */ \
 	X(HostOperate, "RSA") \
@@ -153,12 +166,14 @@ struct Module {
 	std::vector<Global> globals; // Static fields and package-level variables.
 	std::vector<std::string> strings;
 	std::vector<double> numbers;
+	std::vector<int64_t> wides; // Int64 constants.
 	// Functions run once, in order, before anything else: package-level variables. (A class's static fields
 	// are set on the class's first use: Class::static_init.)
 	std::vector<uint32_t> initializers;
 	uint32_t entry_class = NONE; // Constructed with no arguments to start the program.
 	uint32_t error_class = NONE; // Error, and TypeError: the classes of the errors the interpreter raises.
 	uint32_t type_error_class = NONE;
+	uint32_t range_error_class = NONE;
 };
 
 // The module as text, for tests and for reading.

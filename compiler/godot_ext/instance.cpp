@@ -26,6 +26,7 @@ static GDExtensionVariantType expected_type(ir::Kind p_kind) {
 			return GDEXTENSION_VARIANT_TYPE_FLOAT;
 		case ir::Kind::I32:
 		case ir::Kind::U32:
+		case ir::Kind::I64:
 			return GDEXTENSION_VARIANT_TYPE_INT;
 		case ir::Kind::Bool:
 			return GDEXTENSION_VARIANT_TYPE_BOOL;

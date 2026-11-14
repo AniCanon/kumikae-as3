@@ -15,6 +15,7 @@ union Slot {
 	int32_t i;
 	uint32_t u;
 	double d;
+	int64_t l;
 	bool b;
 	void *p;
 	uint64_t bits;
