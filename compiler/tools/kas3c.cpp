@@ -193,8 +193,8 @@ static int run_run(int p_argc, char **p_argv) {
 	}
 	bool ok = false;
 	{
-		kas3::vm::StandaloneHost host;
-		kas3::vm::Interpreter interpreter(module, host);
+		kas3::vm::StandaloneOutput output;
+		kas3::vm::Interpreter interpreter(module, output);
 		ok = interpreter.run_program();
 	}
 	std::fflush(stdout);

@@ -1,131 +1,38 @@
-// What the interpreter needs from where it runs. Inside Godot the engine supplies it; `kas3c run` and the
-// tests use the stand-in in standalone_host.cpp. Nothing else in vm/ may name the engine.
+// What the interpreter needs from where it runs: somewhere to print, and the engine. Inside Godot the
+// extension supplies all three; `kas3c run` and tests that only print supply an Output, and the engine is
+// then NoEngine. Nothing else in vm/ may name the engine.
 #pragma once
 
-#include "ir.h"
-#include "runtime.h"
+#include "engine_objects.h"
+#include "engine_values.h"
+#include "no_engine.h"
+#include "output.h"
 
-#include <string>
-#include <string_view>
+#include <type_traits>
 
 namespace kas3 {
 namespace vm {
 
-// Everything here is defined in this header, so that a host may be built with or without run-time type
-// information whatever the interpreter was built with.
+// The three are references: a host always has each.
 struct Host {
-	virtual ~Host() {}
-	// One traced line, without its line break.
-	virtual void print(std::string_view p_text) = 0;
-	// An error nothing caught: its text and stack trace, several lines.
-	virtual void error(std::string_view p_text) = 0;
+	Output &output;
+	EngineValues &values;
+	EngineObjects &objects;
 
-	// ---- the engine ----
-	//
-	// An engine value (a Vector2, a node) is a handle only the host understands. The interpreter copies
-	// and drops handles through the host and never looks inside one. A null handle is null.
-	// Names are Godot's own. On failure these return false (or null) and say why in r_error; the
-	// interpreter turns that into an AS3 error. Without an engine, every one of them fails.
-
-	// A value going to the engine: a number, a Boolean, a string (a Str *, or null), or a handle.
-	struct Argument {
-		ir::Kind kind;
-		Slot slot;
-	};
-	// A new value of one of Godot's value types. The handle is the caller's to drop.
-	virtual void *construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) {
-		(void)p_type, (void)p_arguments, (void)p_count;
-		*r_error = "there is no engine here";
-		return nullptr;
-	}
-	// Calls a method. The result arrives as p_result kind: a string as a new Str, an engine value as a
-	// handle, both the caller's. r_result is null when the result is not wanted.
-	// What the interpreter wants back: the kind, and for an engine value Godot's name for its type
-	// ("Vector2", "Node"; empty when it is not known). The host refuses what does not fit.
-	struct Wanted {
-		ir::Kind kind = ir::Kind::Void;
-		std::string_view type;
-	};
-	virtual bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count,
-			const Wanted &p_result, Slot *r_result, std::string *r_error) {
-		(void)p_receiver, (void)p_method, (void)p_arguments, (void)p_count, (void)p_result, (void)r_result;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	virtual bool get(void *p_receiver, std::string_view p_property, const Wanted &p_result, Slot *r_result, std::string *r_error) {
-		(void)p_receiver, (void)p_property, (void)p_result, (void)r_result;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	// An operator as AS3 writes it ("+", "==", "<"), on one operand or two, at least one of them an engine
-	// value. A null handle is null.
-	virtual bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
-			Slot *r_result, std::string *r_error) {
-		(void)p_operator, (void)p_arguments, (void)p_count, (void)p_result, (void)r_result;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	virtual bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) {
-		(void)p_receiver, (void)p_property, (void)p_value;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	// An element of an engine value, by a number or another key: `vector[0]`.
-	virtual bool index_get(void *p_receiver, const Argument &p_key, const Wanted &p_result, Slot *r_result, std::string *r_error) {
-		(void)p_receiver, (void)p_key, (void)p_result, (void)r_result;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	virtual bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) {
-		(void)p_receiver, (void)p_key, (void)p_value;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	// A method bound to its object, as a function the engine can call: a handle on an engine value. The
-	// host keeps the object alive for as long as that value lives (retain, and release through the
-	// interpreter). p_owner is the engine object the script object is attached to, or null.
-	virtual void *bind(Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) {
-		(void)p_object, (void)p_function, (void)p_owner;
-		*r_error = "there is no engine here";
-		return nullptr;
-	}
-	// A member of an engine object by its AS3 name, known only as the program runs: `timer[name]`.
-	virtual bool member(void *p_receiver, std::string_view p_name, const Wanted &p_result, Slot *r_result, std::string *r_error) {
-		(void)p_receiver, (void)p_name, (void)p_result, (void)r_result;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	// One of the engine's singletons, by Godot's name for its class. The handle is the caller's to drop.
-	virtual void *singleton(std::string_view p_class, std::string *r_error) {
-		(void)p_class;
-		*r_error = "there is no engine here";
-		return nullptr;
-	}
-	// A constant the engine keeps for one of its types: Vector2's ZERO.
-	virtual bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, Slot *r_result, std::string *r_error) {
-		(void)p_class, (void)p_name, (void)p_result, (void)r_result;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	// A method called on no object: one of a value type (Vector2's from_angle) or of a class.
-	virtual bool call_static(std::string_view p_class, std::string_view p_method, const Argument *p_arguments, size_t p_count,
-			const Wanted &p_result, Slot *r_result, std::string *r_error) {
-		(void)p_class, (void)p_method, (void)p_arguments, (void)p_count, (void)p_result, (void)r_result;
-		*r_error = "there is no engine here";
-		return false;
-	}
-	// The engine's own text for a value or an object, as a new Str that is the caller's.
-	virtual Str *text(void *p_value) {
-		(void)p_value;
-		return nullptr;
-	}
-	// Another handle for the same value (for a value type, a copy of it), and giving one up.
-	virtual void *copy(void *p_value) { return p_value; }
-	virtual void drop(void *p_value) { (void)p_value; }
+	// No engine.
+	Host(Output &p_output) :
+			output(p_output), values(NoEngine::instance()), objects(NoEngine::instance()) {}
+	Host(Output &p_output, EngineValues &p_values, EngineObjects &p_objects) :
+			output(p_output), values(p_values), objects(p_objects) {}
+	// One object that is all three.
+	template <typename T, typename = std::enable_if_t<std::is_base_of<Output, T>::value && std::is_base_of<EngineValues, T>::value &&
+															 std::is_base_of<EngineObjects, T>::value>>
+	Host(T &p_all) :
+			output(p_all), values(p_all), objects(p_all) {}
 };
 
 // Writes traces to standard output and errors to standard error.
-struct StandaloneHost final : Host {
+struct StandaloneOutput final : Output {
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;
 };

@@ -10,7 +10,7 @@
 
 namespace kas3 {
 
-class GodotHost final : public vm::Host {
+class GodotHost final : public vm::Output, public vm::EngineValues, public vm::EngineObjects {
 	std::unordered_set<void *> borrowed_; // Handles made by borrow().
 
 public:
@@ -21,21 +21,21 @@ public:
 
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;
-	void *construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) override;
-	bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
+	void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) override;
+	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 			vm::Slot *r_result, std::string *r_error) override;
-	bool get(void *p_receiver, std::string_view p_property, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result, vm::Slot *r_result,
+	bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error) override;
-	bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) override;
-	bool index_get(void *p_receiver, const Argument &p_key, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) override;
+	bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override;
+	bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) override;
 	void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
-	bool member(void *p_receiver, std::string_view p_name, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	void *singleton(std::string_view p_class, std::string *r_error) override;
-	bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	bool call_static(std::string_view p_class, std::string_view p_method, const Argument *p_arguments, size_t p_count,
-			const Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
+			const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	vm::Str *text(void *p_value) override;
 	void *copy(void *p_value) override;
 	void drop(void *p_value) override;

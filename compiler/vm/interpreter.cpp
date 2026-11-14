@@ -13,7 +13,7 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-Interpreter::Interpreter(const ir::Module &p_module, Host &p_host) :
+Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 		module_(p_module), host_(p_host) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
@@ -82,7 +82,7 @@ void Interpreter::drop(Kind p_kind, Slot &p_slot) {
 		// the slot is emptied first and not touched again.
 		void *handle = p_slot.p;
 		p_slot.bits = 0;
-		host_.drop(handle);
+		host_.values.drop(handle);
 		return;
 	}
 	p_slot.bits = 0;
@@ -172,7 +172,7 @@ Slot Interpreter::share(Kind p_kind, Slot p_value) {
 	if (ir::is_reference(p_kind)) {
 		retain(static_cast<Counted *>(p_value.p));
 	} else if (ir::is_engine(p_kind) && p_value.p) {
-		p_value.p = host_.copy(p_value.p);
+		p_value.p = host_.values.copy(p_value.p);
 	}
 	return p_value;
 }
@@ -209,7 +209,7 @@ void Interpreter::drop_object(Object *p_object) {
 			} else if (ir::is_engine(klass.fields[i].kind) && field.p) {
 				void *handle = field.p;
 				field.p = nullptr;
-				host_.drop(handle);
+				host_.values.drop(handle);
 			}
 		}
 		free_object(object);
@@ -412,7 +412,7 @@ void Interpreter::report() {
 		while (!text.empty() && text.back() == '\n') {
 			text.pop_back();
 		}
-		host_.error(text);
+		host_.output.error(text);
 	}
 	if (pending_ && release(pending_)) {
 		drop_object(pending_);
@@ -436,7 +436,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 	uint32_t target = NONE;
 	// What the engine gives must be what the register was declared to hold.
 	auto wanted = [&](uint32_t p_target) {
-		Host::Wanted want;
+		Wanted want;
 		if (p_target != NONE) {
 			want.kind = p_function.registers[p_target];
 			if (p_target < p_function.engine_types.size()) {
@@ -445,9 +445,9 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 		}
 		return want;
 	};
-	Host::Argument arguments[16];
-	std::vector<Host::Argument> many;
-	Host::Argument *values = arguments;
+	Argument arguments[16];
+	std::vector<Argument> many;
+	Argument *values = arguments;
 	size_t count = 0;
 	auto gather = [&](const std::vector<uint32_t> &p_list, size_t p_from) {
 		count = p_list.size() - p_from;
@@ -465,7 +465,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			gather(p_function.argument_lists[p_in.c], 0);
 			target = p_in.a;
 			kind = Kind::Val;
-			result.p = host_.construct(module_.strings[p_in.b], values, count, &error);
+			result.p = host_.values.construct(module_.strings[p_in.b], values, count, &error);
 			ok = result.p != nullptr;
 			break;
 		}
@@ -479,7 +479,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			gather(list, 1);
 			target = p_in.a;
 			kind = target == NONE ? Kind::Void : p_function.registers[target];
-			ok = host_.call(receiver, module_.strings[p_in.b], values, count, wanted(target), target == NONE ? nullptr : &result, &error);
+			ok = host_.objects.call(receiver, module_.strings[p_in.b], values, count, wanted(target), target == NONE ? nullptr : &result, &error);
 			break;
 		}
 		case Op::HostOperate: {
@@ -496,20 +496,20 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			}
 			target = p_in.a;
 			kind = p_function.registers[target];
-			ok = host_.operate(op, values, count, wanted(target), &result, &error);
+			ok = host_.values.operate(op, values, count, wanted(target), &result, &error);
 			break;
 		}
 		case Op::HostSingleton: {
 			target = p_in.a;
 			kind = Kind::Ref;
-			result.p = host_.singleton(module_.strings[p_in.b], &error);
+			result.p = host_.objects.singleton(module_.strings[p_in.b], &error);
 			ok = result.p != nullptr;
 			break;
 		}
 		case Op::HostConstant: {
 			target = p_in.a;
 			kind = p_function.registers[target];
-			ok = host_.constant(module_.strings[p_in.b], module_.strings[p_in.c], wanted(target), &result, &error);
+			ok = host_.values.constant(module_.strings[p_in.b], module_.strings[p_in.c], wanted(target), &result, &error);
 			break;
 		}
 		case Op::HostCallStatic: {
@@ -519,13 +519,13 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			size_t dot = name.rfind('.');
 			target = p_in.a;
 			kind = target == NONE ? Kind::Void : p_function.registers[target];
-			ok = host_.call_static(name.substr(0, dot), name.substr(dot + 1), values, count, wanted(target), target == NONE ? nullptr : &result, &error);
+			ok = host_.objects.call_static(name.substr(0, dot), name.substr(dot + 1), values, count, wanted(target), target == NONE ? nullptr : &result, &error);
 			break;
 		}
 		case Op::HostToStr: {
 			target = p_in.a;
 			kind = Kind::Str;
-			result.p = r[p_in.b].p ? host_.text(r[p_in.b].p) : nullptr;
+			result.p = r[p_in.b].p ? host_.values.text(r[p_in.b].p) : nullptr;
 			if (!result.p) {
 				retain(null_text_);
 				result.p = null_text_;
@@ -541,7 +541,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			}
 			target = p_in.a;
 			kind = p_function.registers[target];
-			ok = host_.get(receiver, module_.strings[p_in.c], wanted(target), &result, &error);
+			ok = host_.objects.get(receiver, module_.strings[p_in.c], wanted(target), &result, &error);
 			break;
 		}
 		case Op::HostBind: {
@@ -554,7 +554,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 			uint32_t function = (p_in.c & ir::BIND_SLOT) ? klass.methods[p_in.c & ~ir::BIND_SLOT] : p_in.c;
 			target = p_in.a;
 			kind = Kind::Val;
-			result.p = host_.bind(object, function, klass.native_base.empty() ? nullptr : object->fields()[0].p, &error);
+			result.p = host_.objects.bind(object, function, klass.native_base.empty() ? nullptr : object->fields()[0].p, &error);
 			ok = result.p != nullptr;
 			break;
 		}
@@ -578,7 +578,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 						if (klass.fields[i].kind != Kind::Val) {
 							error = "'" + std::string(name->view()) + "' is not a signal";
 						} else {
-							result.p = host_.copy(object->fields()[i].p);
+							result.p = host_.values.copy(object->fields()[i].p);
 							ok = true;
 						}
 					}
@@ -592,7 +592,7 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 					break;
 				}
 			}
-			ok = host_.member(receiver, name->view(), wanted(target), &result, &error);
+			ok = host_.objects.member(receiver, name->view(), wanted(target), &result, &error);
 			break;
 		}
 		case Op::HostIndexGet: {
@@ -601,12 +601,12 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 				raise(module_.type_error_class, NULL_ERROR);
 				return NULL_ERROR;
 			}
-			Host::Argument key;
+			Argument key;
 			key.kind = p_function.registers[p_in.c];
 			key.slot = r[p_in.c];
 			target = p_in.a;
 			kind = p_function.registers[target];
-			ok = host_.index_get(receiver, key, wanted(target), &result, &error);
+			ok = host_.values.index_get(receiver, key, wanted(target), &result, &error);
 			break;
 		}
 		case Op::HostIndexSet: {
@@ -615,12 +615,12 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 				raise(module_.type_error_class, NULL_ERROR);
 				return NULL_ERROR;
 			}
-			Host::Argument key, value;
+			Argument key, value;
 			key.kind = p_function.registers[p_in.b];
 			key.slot = r[p_in.b];
 			value.kind = p_function.registers[p_in.c];
 			value.slot = r[p_in.c];
-			ok = host_.index_set(receiver, key, value, &error);
+			ok = host_.values.index_set(receiver, key, value, &error);
 			break;
 		}
 		default: {
@@ -629,10 +629,10 @@ const char *Interpreter::host_op(const Function &p_function, const Instruction &
 				raise(module_.type_error_class, NULL_ERROR);
 				return NULL_ERROR;
 			}
-			Host::Argument value;
+			Argument value;
 			value.kind = p_function.registers[p_in.c];
 			value.slot = r[p_in.c];
-			ok = host_.set(receiver, module_.strings[p_in.b], value, &error);
+			ok = host_.objects.set(receiver, module_.strings[p_in.b], value, &error);
 			break;
 		}
 	}
@@ -743,14 +743,14 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 	const ir::Class &klass = module_.classes[p_class];
 	if (!use_class_now(p_class)) {
 		if (p_owner) {
-			host_.drop(p_owner);
+			host_.values.drop(p_owner);
 		}
 		return nullptr;
 	}
 	Object *object = new_object(p_class, klass.fields.size());
 	if (!object) {
 		if (p_owner) {
-			host_.drop(p_owner);
+			host_.values.drop(p_owner);
 		}
 		return nullptr;
 	}
@@ -762,7 +762,7 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref && p_owner) {
 		object->fields()[0].p = p_owner; // The object's own from here on.
 	} else if (p_owner) {
-		host_.drop(p_owner);
+		host_.values.drop(p_owner);
 	}
 	Slot self;
 	self.bits = 0;
@@ -1367,7 +1367,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					line += i ? " " : "";
 					line += string ? string->view() : std::string_view("null");
 				}
-				host_.print(line);
+				host_.output.print(line);
 				break;
 			}
 		}

@@ -120,7 +120,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 }
 
 // What Godot gave, as the interpreter asked for it; refused if it is something else.
-static bool take(const vm::Host::Wanted &p_wanted, const Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error) {
+static bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error) {
 	if (!r_result || p_wanted.kind == ir::Kind::Void) {
 		return true;
 	}
@@ -228,7 +228,7 @@ void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {
 	return new Variant(object);
 }
 
-bool GodotHost::constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+bool GodotHost::constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	int type = value_type(p_class);
 	Variant value;
 	if (type >= 0) {
@@ -244,8 +244,8 @@ bool GodotHost::constant(std::string_view p_class, std::string_view p_name, cons
 	return take(p_result, value, p_name, r_result, r_error);
 }
 
-bool GodotHost::call_static(std::string_view p_class, std::string_view p_method, const Argument *p_arguments, size_t p_count,
-		const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+bool GodotHost::call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
+		const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	std::vector<Variant> values;
 	std::vector<const Variant *> pointers;
 	// For a class, the call goes through Godot's list of classes, which takes the two names first.
@@ -279,7 +279,7 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 	return take(p_result, result, p_method, r_result, r_error);
 }
 
-void *GodotHost::construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) {
+void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) {
 	int type = value_type(p_type);
 	if (type < 0) {
 		*r_error = "Godot has no value type '" + std::string(p_type) + "'";
@@ -308,8 +308,8 @@ void *GodotHost::construct(std::string_view p_type, const Argument *p_arguments,
 
 // The AS3 way of listening to a signal, made from Godot's own calls. p_verb is "@add" and so on: the
 // names the generator gives members that Godot has no one method for.
-static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, const vm::Host::Argument *p_arguments, size_t p_count,
-		const vm::Host::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, const vm::Argument *p_arguments, size_t p_count,
+		const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	if (p_receiver.get_type() != Variant::SIGNAL) {
 		*r_error = "this value is not a signal";
 		return false;
@@ -389,7 +389,7 @@ static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, cons
 	return false;
 }
 
-bool GodotHost::call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
+bool GodotHost::call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
 	Variant *receiver = static_cast<Variant *>(p_receiver);
 	if (!p_method.empty() && p_method[0] == '@') {
@@ -453,7 +453,7 @@ static bool operator_of(std::string_view p_operator, size_t p_count, Variant::Op
 	return false;
 }
 
-bool GodotHost::operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
+bool GodotHost::operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
 	Variant::Operator op = Variant::OP_ADD;
 	if (p_count < 1 || p_count > 2 || !operator_of(p_operator, p_count, &op)) {
@@ -480,7 +480,7 @@ bool GodotHost::operate(std::string_view p_operator, const Argument *p_arguments
 	return take(p_result, result, p_operator, r_result, r_error);
 }
 
-bool GodotHost::get(void *p_receiver, std::string_view p_property, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+bool GodotHost::get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	if (!p_property.empty() && p_property[0] == '@') {
 		return signal_verb(*static_cast<Variant *>(p_receiver), p_property, nullptr, 0, p_result, r_result, r_error);
 	}
@@ -493,7 +493,7 @@ bool GodotHost::get(void *p_receiver, std::string_view p_property, const Wanted 
 	return take(p_result, value, p_property, r_result, r_error);
 }
 
-bool GodotHost::set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) {
+bool GodotHost::set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) {
 	bool valid = false;
 	static_cast<Variant *>(p_receiver)->set_named(StringName(to_godot(p_property)), to_variant(p_value.kind, p_value.slot), valid);
 	if (!valid) {
@@ -510,7 +510,7 @@ static std::string element(const Variant &p_key, const Variant &p_of) {
 	return "element " + std::string(key.get_data()) + " of this " + std::string(type.get_data());
 }
 
-bool GodotHost::index_get(void *p_receiver, const Argument &p_key, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+bool GodotHost::index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	const Variant *receiver = static_cast<Variant *>(p_receiver);
 	Variant key = to_variant(p_key.kind, p_key.slot);
 	bool valid = false;
@@ -522,7 +522,7 @@ bool GodotHost::index_get(void *p_receiver, const Argument &p_key, const Wanted 
 	return take(p_result, value, "[]", r_result, r_error);
 }
 
-bool GodotHost::index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) {
+bool GodotHost::index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) {
 	Variant *receiver = static_cast<Variant *>(p_receiver);
 	Variant key = to_variant(p_key.kind, p_key.slot);
 	bool valid = false;
@@ -546,7 +546,7 @@ void *GodotHost::bind(vm::Object *p_object, uint32_t p_function, void *p_owner, 
 	return make_callable(p_object, p_function, owner);
 }
 
-bool GodotHost::member(void *p_receiver, std::string_view p_name, const Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	Object *object = static_cast<Variant *>(p_receiver)->get_validated_object();
 	if (!object) {
 		*r_error = "'" + std::string(p_name) + "' was asked of an object Godot has freed";

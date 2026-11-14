@@ -40,7 +40,7 @@ private:
 	};
 
 	const ir::Module &module_;
-	Host &host_;
+	Host host_;
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
 	std::vector<Slot> globals_;
@@ -80,7 +80,7 @@ private:
 	Str *text(const std::string &p_text);
 
 public:
-	Interpreter(const ir::Module &p_module, Host &p_host);
+	Interpreter(const ir::Module &p_module, Host p_host);
 	~Interpreter();
 	// Empties every static field and package variable: what they held is let go. For a host that is
 	// shutting down and must let go of the engine's objects while the engine can still free them.

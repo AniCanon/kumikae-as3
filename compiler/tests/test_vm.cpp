@@ -7,11 +7,12 @@
 #include "names.h"
 
 #include <string>
+#include <type_traits>
 #include <vector>
 
 using namespace kas3;
 
-struct Recorder : vm::Host {
+struct Recorder : vm::Output {
 	std::string printed, errors;
 	void print(std::string_view p_text) override { printed += std::string(p_text) + "\n"; }
 	void error(std::string_view p_text) override { errors += std::string(p_text) + "\n"; }
@@ -134,7 +135,7 @@ static const char *const LIBRARY =
 		"}\n"
 		"}\n";
 
-struct Reentrant : vm::Host {
+struct Reentrant : vm::Output {
 	vm::Interpreter *interpreter = nullptr;
 	vm::Object *object = nullptr;
 	std::string printed, errors;
@@ -296,7 +297,7 @@ static const char *const PLAYER =
 		"}\n";
 
 // Stands in for the engine: every value it hands out is a numbered box, and it writes down each request.
-struct FakeEngine : vm::Host {
+struct FakeEngine : vm::Output, vm::EngineValues, vm::EngineObjects {
 	std::string log, errors;
 	int boxes = 0; // Handed out and not yet dropped.
 	int next = 1;
@@ -304,7 +305,7 @@ struct FakeEngine : vm::Host {
 	bool fail_sets = false;
 	std::string name = "Player";
 
-	static std::string show(const vm::Host::Argument &p_argument) {
+	static std::string show(const vm::Argument &p_argument) {
 		switch (p_argument.kind) {
 			case ir::Kind::F64:
 				return vm::number_to_string(p_argument.slot.d);
@@ -320,7 +321,7 @@ struct FakeEngine : vm::Host {
 				return "#" + std::to_string((intptr_t)p_argument.slot.p);
 		}
 	}
-	static std::string list(const Argument *p_arguments, size_t p_count) {
+	static std::string list(const vm::Argument *p_arguments, size_t p_count) {
 		std::string out;
 		for (size_t i = 0; i < p_count; i++) {
 			out += (i ? ", " : "") + show(p_arguments[i]);
@@ -362,12 +363,12 @@ struct FakeEngine : vm::Host {
 	}
 	void print(std::string_view p_text) override { log += "print " + std::string(p_text) + "\n"; }
 	void error(std::string_view p_text) override { errors += std::string(p_text) + "\n"; }
-	void *construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *) override {
+	void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *) override {
 		void *made = box();
 		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted,
+	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted,
 			vm::Slot *r_result, std::string *r_error) override {
 		ir::Kind p_kind = p_wanted.kind;
 		log += "call #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
@@ -378,17 +379,17 @@ struct FakeEngine : vm::Host {
 		give(p_kind, r_result, 0.25, "text");
 		return true;
 	}
-	bool get(void *p_receiver, std::string_view p_property, const Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "get #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + "\n";
 		give(p_wanted.kind, r_result, 7.5, name);
 		return true;
 	}
-	bool index_get(void *p_receiver, const Argument &p_key, const Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "get #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "]\n";
 		give(p_wanted.kind, r_result, 2.5, "text");
 		return true;
 	}
-	bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *) override {
+	bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *) override {
 		log += "set #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "] = " + show(p_value) + "\n";
 		return true;
 	}
@@ -400,7 +401,7 @@ struct FakeEngine : vm::Host {
 				std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool member(void *p_receiver, std::string_view p_name, const Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "member #" + std::to_string((intptr_t)p_receiver) + "[" + std::string(p_name) + "] as " + std::string(p_wanted.type) + "\n";
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
@@ -415,7 +416,7 @@ struct FakeEngine : vm::Host {
 		log += "singleton " + std::string(p_class) + " -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
+	bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
 		log += "constant " + std::string(p_class) + "." + std::string(p_name) + " as " + std::string(p_wanted.type) + "\n";
 		if (p_name == missing) {
 			*r_error = "Godot has no constant '" + missing + "'";
@@ -424,8 +425,8 @@ struct FakeEngine : vm::Host {
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
 	}
-	bool call_static(std::string_view p_class, std::string_view p_method, const Argument *p_arguments, size_t p_count,
-			const Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
+	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
+			const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
 		log += "static " + std::string(p_class) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
 		if (p_method == missing) {
 			*r_error = "Godot has no '" + missing + "'";
@@ -438,7 +439,7 @@ struct FakeEngine : vm::Host {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
 	}
-	bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_wanted, vm::Slot *r_result,
+	bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
 			std::string *r_error) override {
 		log += "operate " + std::string(p_operator) + " (" + list(p_arguments, p_count) + ") as " + ir::kind_name(p_wanted.kind) +
 				(p_wanted.type.empty() ? "" : " " + std::string(p_wanted.type)) + "\n";
@@ -449,7 +450,7 @@ struct FakeEngine : vm::Host {
 		give(p_wanted.kind, r_result, 1, "text");
 		return true;
 	}
-	bool set(void *p_receiver, std::string_view p_property, const Argument &p_value, std::string *r_error) override {
+	bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override {
 		log += "set #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + " = " + show(p_value) + "\n";
 		if (fail_sets) {
 			*r_error = "the engine refused to set " + std::string(p_property);
@@ -472,6 +473,44 @@ struct FakeEngine : vm::Host {
 		}
 	}
 };
+
+// A host that only prints implements Output alone, and a program that asks for the engine is told
+// there is none.
+static_assert(!std::is_base_of<vm::EngineValues, vm::StandaloneOutput>::value, "the stand-alone host answers no engine entry");
+static_assert(!std::is_base_of<vm::EngineObjects, Recorder>::value, "nor does the tests' recorder");
+
+static void test_no_engine() {
+	const char *source = "package { import godot.*; public class Maker extends Node {\n"
+						 "  public function make():Vector2 { return new Vector2(1, 2); }\n"
+						 "  public function ask():Boolean { return Input.isActionPressed(\"jump\"); }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Maker.as", source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	{
+		Recorder recorder;
+		vm::Interpreter interpreter(module, recorder);
+		CHECK(interpreter.start());
+		uint32_t maker = 0;
+		for (size_t i = 0; i < module.classes.size(); i++) {
+			maker = module.classes[i].name == "Maker" ? (uint32_t)i : maker;
+		}
+		vm::Object *object = interpreter.construct(maker, nullptr);
+		CHECK(object != nullptr);
+		vm::Slot result;
+		CHECK(!interpreter.call_method(object, "make", nullptr, 0, &result));
+		CHECK(recorder.errors.find("Error: there is no engine here") == 0);
+		recorder.errors.clear();
+		CHECK(!interpreter.call_method(object, "ask", nullptr, 0, &result));
+		CHECK(recorder.errors.find("Error: there is no engine here") == 0);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
 
 // A method where Godot takes a function goes bound to its object; a signal by name is the engine's to find.
 static void test_engine_listeners() {
@@ -1069,6 +1108,7 @@ int main() {
 	test_loop_markers();
 	test_engine_calls();
 	test_engine_operators();
+	test_no_engine();
 	test_engine_listeners();
 	test_engine_statics();
 	test_entry_points();
