@@ -20,24 +20,22 @@ uint32_t Lowerer::string(const std::string &p_text) {
 }
 
 uint32_t Lowerer::wide(int64_t p_value) {
-	for (size_t i = 0; i < module_.wides.size(); i++) {
-		if (module_.wides[i] == p_value) {
-			return (uint32_t)i;
-		}
+	const auto [found, added] = wides_.try_emplace(p_value, (uint32_t)module_.wides.size());
+	if (added) {
+		module_.wides.push_back(p_value);
 	}
-	module_.wides.push_back(p_value);
-	return (uint32_t)module_.wides.size() - 1;
+	return found->second;
 }
 
 uint32_t Lowerer::number(double p_value) {
-	for (size_t i = 0; i < module_.numbers.size(); i++) {
-		// Bit-for-bit: 0 and -0 are different constants, and NaN is itself.
-		if (std::memcmp(&module_.numbers[i], &p_value, sizeof(double)) == 0) {
-			return (uint32_t)i;
-		}
+	// By its bits: 0 and -0 are different constants, and NaN is itself.
+	uint64_t bits = 0;
+	std::memcpy(&bits, &p_value, sizeof(bits));
+	const auto [found, added] = numbers_.try_emplace(bits, (uint32_t)module_.numbers.size());
+	if (added) {
+		module_.numbers.push_back(p_value);
 	}
-	module_.numbers.push_back(p_value);
-	return (uint32_t)module_.numbers.size() - 1;
+	return found->second;
 }
 
 uint32_t Lowerer::file(const Unit *p_unit) {

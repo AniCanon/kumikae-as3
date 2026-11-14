@@ -7,6 +7,22 @@ It is a static library (`kas3front`) built without exceptions or RTTI, so that t
 command-line tool, inside the Godot editor, and in the language server. The language server is a second
 library, `kas3lsp` (`lsp/`), and both are in `kas3c`.
 
+## Where things are
+
+The C++ follows [docs/cpp-guidelines.md](../docs/cpp-guidelines.md); `tools/check_style.py`, which runs with
+the tests, enforces the limits on size.
+
+| Folder | Holds | Files |
+|---|---|---|
+| `src/` | The front end: source text to a checked syntax tree | `lexer`, `parser*` (one file per kind of syntax), `names*` (packages, scopes, links), `typer.h` and `typer_*.cpp` (the type of every expression and what fits where), `type_table.cpp`, `whole_numbers` (rules the checker and the lowerer share), `query` (what the language server asks) |
+| `ir/` | The typed IR and the lowerer that produces it | `ir.h`, `ir_print.cpp`, `lowerer.h` and `lower_*.cpp`, by what each lowers: types, places, Godot's members, expressions, operators, calls, statements, classes |
+| `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
+| `vm/` host | What the interpreter needs from where it runs | `host.h` holds three interfaces: `output.h`, `engine_values.h`, `engine_objects.h`. `no_engine.h` answers where there is no engine |
+| `godot_ext/` | The GDExtension | `godot_host` (the three interfaces, with Godot's calls), `callable` (a method as a Godot function, and the look for listener loops), `instance`, `script`, `program`, `language`, `register` |
+| `lsp/` | The language server | `server`, `workspace`, `json` |
+| `godot/` | The generator of Godot's API as AS3 declarations | `generate.py`, `naming.py`, the generated `godot.as` and `godot_names.txt` |
+| `tests/` | Tests, and `bench/` for the timings | See [Tests](#tests) |
+
 ## Build and test
 
 ```sh
@@ -101,7 +117,7 @@ How it works:
 - **A missing object** is reported where it is used, after a call's arguments have been evaluated, as in
   Flash.
 - **Memory** is reference-counted. Objects that refer to each other in a loop are not freed yet.
-- **Nothing in `vm/` or `ir/` names Godot.** What the engine will supply goes through `vm/host.h`.
+- **Nothing in `vm/` or `ir/` names Godot.** What the engine will supply goes through the interfaces in `vm/host.h`.
 
 Differences from Flash so far: a string's `length` counts characters, not UTF-16 units, and strings compare
 by character.
@@ -194,7 +210,7 @@ How it works:
 
 - **One program per project.** Every `.as` file under the project is compiled together when the first
   script loads. A script that fails to compile is reported once, and no script loads.
-- **The interpreter does not know Godot.** `vm/host.h` is the whole boundary. The extension implements it
+- **The interpreter does not know Godot.** `vm/host.h` is the whole boundary: three small interfaces. The extension implements them
   with Godot's own calls; the tests implement it with a recorder.
 - **Godot's names come from Godot.** `godot/godot_names.txt` (21,519 names, written by the generator from
   Godot's API description) says that `moveAndSlide` is `move_and_slide`. Nothing is worked out backwards

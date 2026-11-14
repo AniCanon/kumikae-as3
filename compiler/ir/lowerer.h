@@ -48,6 +48,8 @@ class Lowerer {
 	std::unordered_map<const Symbol *, uint32_t> globals_; // Static fields and package variables.
 	std::unordered_map<const Symbol *, uint32_t> slots_; // Instance methods: the method-table slot.
 	std::unordered_map<std::string, uint32_t> strings_;
+	std::unordered_map<uint64_t, uint32_t> numbers_; // A Number constant by its bits.
+	std::unordered_map<int64_t, uint32_t> wides_;
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint32_t>> slot_names_; // Per class.
 	std::unordered_map<const Unit *, uint32_t> files_;
 

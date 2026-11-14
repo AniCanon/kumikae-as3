@@ -16,7 +16,7 @@ enum class LowerMode {
 	Library, // No entry: a host constructs objects and calls their methods.
 };
 
-bool lower(Compilation &p_compilation, Module *r_module, LowerMode p_mode = LowerMode::Program);
+[[nodiscard]] bool lower(Compilation &p_compilation, Module *r_module, LowerMode p_mode = LowerMode::Program);
 
 } // namespace ir
 } // namespace kas3
