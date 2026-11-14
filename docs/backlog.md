@@ -22,11 +22,11 @@ it stands.
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 17 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2c** | The rest of the language | 18 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
-| **2d** | Editor features | 14 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 37 | What is left |
-| **decision** | The owner | 5 | See each item |
+| **2d** | Editor features | 15 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
+| **clean-up** | A pass that closes stage 2 | 44 | What is left |
+| **decision** | The owner | 7 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -202,6 +202,34 @@ the review of the clean-up put off.
   every test. **decision**
 - An iOS library built before a script used something new does not load the project, and the test scene
   then never finishes, without reporting why. **clean-up**
+
+From the review of part C (its five important findings were fixed with it: `print()` with no arguments, a
+default `[]` shared between calls, a null answer taken silently as text, `-5` reaching Godot as `-5.0`, and
+any Godot value passing as a condition):
+
+- A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
+  `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
+  **decision**
+- Three messages for a freed receiver keep their old wording and are a plain `Error`, not #1009
+  (a signal by name, a signal's owner, a call's description). **clean-up**
+- The source of a reported error is read from the first `\tat ` and the first `]`: a path with `]` in it,
+  or a message that itself contains a stack line, is reported with the wrong source. **clean-up**
+- A property written through a missing script object is refused before the value is worked out; a call's
+  arguments are worked out first. **clean-up**
+- `int(lerp(a, b, t))` raises for a fraction instead of cutting it, and `Boolean(max(a, b))` is refused.
+  **2c**
+- A wide integer into a Number from a function that gives back anything says "gave a int where Number
+  was expected", not the range error its typed twin gives. **clean-up**
+- In the global functions' host: a branch for fractions that can't be reached, an unknown type name read
+  as "anything", "takes 1 arguments". **clean-up**
+- A freed object arriving from Godot for a `Node` parameter of a script's method is refused, not null.
+  **2d**
+- A Number variable that holds a whole value reaches a parameter that takes anything as a float
+  (`str(x)` gives `2.0`, as GDScript does for a float). Only expressions that are whole by their form are
+  sent as integers. **decision**
+- New code that the guide would write otherwise: an empty string and an out-parameter where it asks for
+  `std::optional`, `const std::string &` for `std::string_view`, two comments out of place. **clean-up**
+- `var c:Color = null; x.clamp(c, hi)` is an error where the literal `null` takes the default. **clean-up**
 
 ## Stage 2a: interpreter core
 

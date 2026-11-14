@@ -315,7 +315,11 @@ bool GodotHost::evaluate(std::string_view p_expression, const vm::Wanted &p_resu
 		}
 		found = evaluated_.emplace(text, value).first;
 	}
-	return take(p_result, found->second, p_expression, r_result, r_error);
+	// Godot shares an Array or a Dictionary between everything that holds it, and may write into one it is
+	// given: each call gets its own.
+	const Variant::Type type = found->second.get_type();
+	const Variant value = type == Variant::ARRAY || type == Variant::DICTIONARY ? found->second.duplicate() : found->second;
+	return take(p_result, value, p_expression, r_result, r_error);
 }
 
 void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {

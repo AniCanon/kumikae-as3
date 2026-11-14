@@ -72,6 +72,7 @@ struct GodotHost::Utility {
 	int result = NOTHING;
 	std::vector<int> parameters;
 	bool any_number = false;
+	bool reads_a_value = false; // Null is a proper answer from it.
 };
 
 GodotHost::GodotHost() = default;
@@ -98,6 +99,8 @@ const GodotHost::Utility *GodotHost::utility(std::string_view p_signature, std::
 	made->name = std::string(parts[0]);
 	made->result = type_of_name(parts[2]);
 	made->any_number = parts.size() > 4 && parts[4] == "varargs";
+	// str_to_var, bytes_to_var and type_convert read a value out of their argument, and null is one.
+	made->reads_a_value = made->name.find("_to_var") != std::string::npos || made->name == "type_convert";
 	for (size_t at = 0; parts[3] != "-" && at <= parts[3].size();) {
 		const size_t comma = std::min(parts[3].find(',', at), parts[3].size());
 		made->parameters.push_back(type_of_name(parts[3].substr(at, comma - at)));
@@ -164,6 +167,11 @@ bool GodotHost::call_utility(std::string_view p_signature, const vm::Argument *p
 		if (GDExtensionPtrDestructor destroy = gdextension_interface::variant_get_ptr_destructor((GDExtensionVariantType)type)) {
 			destroy(bare[(size_t)index].bytes);
 		}
+	}
+	if (ok && function->result == ANYTHING && result.get_type() == Variant::NIL && p_result.kind != ir::Kind::Void && !function->reads_a_value) {
+		// Godot's own check of the arguments has nowhere to report through this entry: it gives back nothing.
+		*r_error = "Godot's '" + function->name + "' could not work with the arguments it was given";
+		return false;
 	}
 	return ok && take(p_result, result, function->name, r_result, r_error);
 }

@@ -222,8 +222,8 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 		emit(Op::HostToStr, p_position, out, p_reg);
 		return out;
 	}
-	if (is_engine(from) && p_to == Kind::Bool) {
-		// As a condition: is there one?
+	if (from == Kind::Ref && p_to == Kind::Bool) {
+		// A Godot object as a condition: is there one? (A value is not asked: is Vector2.ZERO false?)
 		uint32_t out = reg(Kind::Bool);
 		emit(Op::HostPresent, p_position, out, p_reg);
 		return out;

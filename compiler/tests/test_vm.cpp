@@ -693,7 +693,7 @@ static void test_engine_statics() {
 		arguments[0].bits = 0;
 		arguments[0].i = 7;
 		CHECK(interpreter.call_method(object, "told", arguments, 1, nullptr));
-		CHECK_EQ(engine.log, std::string("static .print 2648703342 void Variant varargs(\"n is \", 7)\n"));
+		CHECK_EQ(engine.log, std::string("static .print 2648703342 void - varargs(\"n is \", 7)\n"));
 		// A Godot member of a missing script object: the arguments are worked out first, as for one of
 		// AS3's own members, and then the missing object is reported.
 		engine.log.clear();
@@ -1040,6 +1040,9 @@ static void test_engine_calls() {
 		"function f():void { position.normalized()[0] = 5; }",
 		"function f(a:GodotArray):void { var x:int = a[0]; }",
 		"function f():void { addChild(this); }",
+		"function f(v:Vector2):int { return v ? 1 : 0; }",
+		"function f(a:GodotArray):void { if (a) { trace(1); } }",
+		"function f():void { if (max(1, 2)) { trace(1); } }",
 		"function f():void { var other:Player = new Player(); }",
 	};
 	for (const char *body : bodies) {

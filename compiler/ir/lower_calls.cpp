@@ -168,13 +168,12 @@ uint32_t Lowerer::global_call(Call *p_call, Symbol *p_function, Kind p_want) {
 	if (type && type->kind == Type::Any) {
 		// It gives back anything. Where the program says what it expects (a number, a Boolean, text), that
 		// is asked for and checked when it arrives. Anything else waits for AS3's untyped value.
-		const bool said = p_want == Kind::F64 || p_want == Kind::I32 || p_want == Kind::U32 || p_want == Kind::I64 || p_want == Kind::Bool ||
-				p_want == Kind::Str;
-		if (!said) {
+		// Text is Godot's text for whatever came. A condition says nothing: is 0 false, or only null?
+		if (!is_numeric(p_want) && p_want != Kind::Str) {
 			refuse(position, "'" + std::string(p_function->name) + "', which can give back anything, used where nothing says what is expected");
 			return default_value(p_want, position);
 		}
-		kind = p_want;
+		kind = p_want == Kind::Str ? Kind::Val : p_want;
 		type = nullptr;
 	} else if (type && !kind_of(type, &kind)) {
 		refuse(position, "a call to a Godot function that returns '" + compilation_.type_name(type) + "'");
@@ -185,6 +184,9 @@ uint32_t Lowerer::global_call(Call *p_call, Symbol *p_function, Kind p_want) {
 	uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, type);
 	// No class before the dot: the engine's side reads that as a global function.
 	emit(Op::HostCallStatic, position, out, string("." + signature), arguments(std::move(list)));
+	if (out != NONE && kind == Kind::Val && p_want == Kind::Str) {
+		return convert(out, Kind::Str, position);
+	}
 	return out == NONE ? 0 : out;
 }
 
@@ -380,6 +382,10 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 		}
 		if (kind == Kind::Void && is_null(p_arguments[i])) {
 			kind = Kind::Ref; // `null` where Godot takes anything: nothing.
+		}
+		Kind own = Kind::Void;
+		if (kind == Kind::Void && kind_of(p_arguments[i]->type, &own) && is_numeric(own) && whole(p_arguments[i])) {
+			kind = Kind::I64; // Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
 		}
 		uint32_t value = expression(p_arguments[i], kind);
 		if (kind_at(value) == Kind::Obj) {

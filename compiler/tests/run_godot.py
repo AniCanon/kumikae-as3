@@ -222,8 +222,11 @@ check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError:
 output = compare("functions.gd", [
     "lerpf", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
     "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
-    "lerp as a number", "max of three", "wrong argument", "in a loop",
+    "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
+    "anything as text", "a default is not shared",
 ])
+check("functions.gd: a function that could not answer is an AS3 error", "at Functions/noAnswer()" in output and "'max'" in output,
+      output[-1200:])
 check("functions.gd: print, printerr and pushWarning reach Godot's output",
       "said 4 (1.0, 2.0)" in output and "to the error output" in output and "a warning from AS3" in output, output[-1200:])
 check("functions.gd: a wrong argument is an AS3 error that names the function", "at Functions/wrong()" in output and "lerp" in output,

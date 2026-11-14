@@ -526,7 +526,7 @@ class RealApi(unittest.TestCase):
         # A global function's signature, for the entry that takes exact types.
         self.assertEqual(names["@global.lerpf"], "lerpf 998901048 float float,float,float")
         self.assertEqual(names["@global.randf"], "randf 2086227845 float -")
-        self.assertEqual(names["@global.print"], "print 2648703342 void Variant varargs")
+        self.assertEqual(names["@global.print"], "print 2648703342 void - varargs")
         self.assertEqual(names["@global.degToRad"].split(" ")[0], "deg_to_rad")
         self.assertNotIn("@global.typeof", names)
         # A default AS3 can't write is declared `= null`; Godot's own text for it is kept for the binding.

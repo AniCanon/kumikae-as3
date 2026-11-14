@@ -584,11 +584,11 @@ class Generator:
         if (entry["is_vararg"] and len(arguments) == 1 and arguments[0]["type"] == "Variant" and
                 entry.get("return_type") is None):
             arguments = []
+        described = arguments
         # A global function is called through an entry that takes arguments of exact types, so the binding
         # needs its signature: Godot's name, the hash Godot asks for, the result, the arguments, and
         # "varargs" for one that takes any number. (No dot anywhere: the interpreter splits a static call's
         # text at its last dot.)
-        described = entry.get("arguments", [])
         self.godot_names["@global.%s" % name] = " ".join(
             [entry["name"], str(entry["hash"]), entry.get("return_type", "void"),
              ",".join(argument["type"] for argument in described) or "-"] + (["varargs"] if entry["is_vararg"] else []))

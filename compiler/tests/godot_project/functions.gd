@@ -46,5 +46,12 @@ func _physics_process(_delta: float) -> bool:
 	show("max of three", ask("largest", [3, 9, 7]), max(3, 9, 7))
 	show("wrong argument", ask("wrong", ["one"]), null)
 	show("in a loop", ask("count", [10]), 3 + 3 + 3 + 3 + 4 + 5 + 6 + 7 + 8 + 9)
+	show("no arguments", ask("nothing"), true)
+	show("whole numbers", ask("wholes", [3]), str(-5, " ", 5, " ", -5 + 2, " ", 0x10, " ", 2 * 3, " ", 3 * 2, " ", 1.5, " ", 3 / 2.0))
+	show("no answer", ask("noAnswer"), null)
+	show("anything as text", ask("shown", [1.0, 2.0, 0.5]), str(lerp(1.0, 2.0, 0.5)))
+	ask("run")
+	ask("run")
+	show("a default is not shared", ask("reached"), 1)
 	node.free()
 	return false

@@ -26,5 +26,14 @@ package {
 		public function largest(a:int, b:int, c:int):int { var n:int = max(a, b, c); return n; }
 		public function wrong(text:String):Number { var x:Number = lerp(text, 2, 0.5); return x; }
 		public function count(n:int):int { var total:int = 0; for (var i:int = 0; i < n; i++) { total += maxi(i, 3); } return total; }
+		// Review of part C.
+		public function nothing():Boolean { print(); printerr(); pushWarning(); return true; }
+		public function wholes(i:int):String { return str(-5, " ", 5, " ", -5 + 2, " ", 0x10, " ", 2 * 3, " ", i * 2, " ", 1.5, " ", i / 2); }
+		public function noAnswer():String { var s:String = max("a", "b"); return s; }
+		public function shown(a:Number, b:Number, t:Number):String { var s:String = lerp(a, b, t); return s; }
+		public var pings:int = 0;
+		public function ping():void { pings++; }
+		public function run():int { var a:PackedStringArray = new PackedStringArray(); a.append("hello"); return OS.execute("echo", a, null, true); }
+		public function reached():int { pings = 0; propagateCall("ping", null, true); return pings; }
 	}
 }
