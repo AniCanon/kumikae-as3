@@ -99,7 +99,8 @@ class IdbInputTest {
                 assertEquals(false, status()["inputEnabled"])
                 session.useInput(IdbInput(java, both))
                 assertEquals(true, status()["inputEnabled"])
-                assertEquals(3.0, status()["pixelsPerPoint"])
+                // Status alone must not start private processes while the picture is hidden.
+                assertEquals(1.0, status()["pixelsPerPoint"])
             }
         } finally {
             Files.delete(dir)
