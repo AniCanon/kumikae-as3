@@ -17,7 +17,7 @@ static std::string program(const std::string &p_body) {
 		   "public var a:Vector2; public var b:Vector2; public var vi:Vector2i; public var wi:Vector2i;\n"
 		   "public var v3:Vector3; public var c:Color; public var d:Color; public var t:Transform2D;\n"
 		   "public var rect:Rect2; public var rid:RID; public var q:Quaternion; public var basis:Basis;\n"
-		   "public var i:int; public var u:uint; public var n:Number; public var s:String; public var any:*;\n"
+		   "public var i:int; public var u:uint; public var n:Number; public var s:String; public var any:*; public var w:Int64;\n"
 		   "public var obj:Object; public var node:Node; public var list:Array; public var mine:Mine;\n"
 		   "public var points:PackedVector2Array; public var wide:PackedInt64Array; public var bytes:PackedByteArray; public var names:PackedStringArray;\n"
 		   "public var ga:GodotArray; public var gd:GodotDictionary; public function run(delta:Number):void {\n" +
@@ -297,7 +297,72 @@ static void test_indexing() {
 					UNRELATED("Vector2", "Vector3"), UNRELATED("Vector2", "String"), UNRELATED("String", "Vector2") });
 }
 
+// Int64: Godot's 64-bit integer as an AS3 type.
+static void test_int64() {
+	types({
+			{ "w + 1", "Int64" },
+			{ "1 + w", "Int64" },
+			{ "w - u", "Int64" },
+			{ "w * w", "Int64" },
+			{ "w % 2", "Int64" },
+			{ "w & 1", "Int64" },
+			{ "i | w", "Int64" },
+			{ "w ^ w", "Int64" },
+			{ "w << 2", "Int64" },
+			{ "w >> 2", "Int64" },
+			{ "w >>> 1", "Int64" },
+			{ "~w", "Int64" },
+			{ "-w", "Int64" },
+			{ "w++", "Int64" },
+			{ "--w", "Int64" },
+			{ "w / 2", "Number" },
+			{ "w + 1.5", "Number" },
+			{ "w * n", "Number" },
+			{ "w < 1.5", "Boolean" },
+			{ "w == i", "Boolean" },
+			{ "w += 1", "Int64" },
+			{ "w &= 3", "Int64" },
+			{ "w = i", "Int64" },
+			{ "i = w", "int" },
+			{ "n = w", "Number" },
+			{ "u = w", "uint" },
+			{ "Int64.MAX_VALUE", "Int64" },
+			{ "Int64(\"12\")", "Int64" },
+			{ "Int64(n)", "Int64" },
+			{ "int(w)", "int" },
+			{ "Number(w)", "Number" },
+			{ "String(w)", "String" },
+			{ "\"\" + w", "String" },
+			{ "w = 9223372036854775807", "Int64" },
+			{ "w = -9223372036854775808", "Int64" },
+			{ "w = 0x7FFFFFFFFFFFFFFF", "Int64" },
+			{ "i > 0 ? w : i", "Int64" },
+			{ "i > 0 ? w : n", "Number" },
+			// A whole number keeps an integer vector on its grid.
+			{ "vi * w", "Vector2i" },
+			{ "vi * (w + 1)", "Vector2i" },
+			{ "vi * (w / 2)", "Vector2" },
+			// Whole numbers that AS3 holds in a Number.
+			{ "vi * Math.floor(n)", "Vector2i" },
+			{ "vi * Math.round(n)", "Vector2i" },
+			{ "vi * Math.ceil(n)", "Vector2i" },
+			{ "vi * Math.abs(i)", "Vector2i" },
+			{ "vi * Math.max(i, u)", "Vector2i" },
+			{ "vi * Math.min(i, 2)", "Vector2i" },
+			{ "vi * parseInt(s)", "Vector2i" },
+			{ "vi * (i > 0 ? i : u)", "Vector2i" },
+			{ "vi * Math.abs(n)", "Vector2" },
+			{ "vi * Math.max(i, n)", "Vector2" },
+	});
+	expect("s = /*!*/w; w = /*!*/s; w = /*!*/true; w = /*!*/9223372036854775808; w = /*!*/-9223372036854775809;\n"
+		   "w = /*!*/0x10000000000000000; var x:Int64 = /*!*/18446744073709551616; w = 1.5; w = n; w = null;",
+			{ UNRELATED("Int64", "String"), UNRELATED("String", "Int64"), UNRELATED("Boolean", "Int64"),
+					"9223372036854775808 does not fit an Int64", "-9223372036854775809 does not fit an Int64",
+					"0x10000000000000000 does not fit an Int64", "18446744073709551616 does not fit an Int64" });
+}
+
 int main() {
+	test_int64();
 	test_arithmetic();
 	test_operators_that_are_not_symmetric();
 	test_whole_and_fractional_numbers();

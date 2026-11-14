@@ -173,6 +173,7 @@ class Typer {
 	const Type *int_;
 	const Type *uint_;
 	const Type *number_;
+	const Type *int64_;
 	const Type *boolean_;
 	const Type *string_;
 	const Type *array_;
@@ -185,7 +186,31 @@ class Typer {
 
 	void error(uint32_t p_offset, std::string p_message) { unit_.diagnostics.error(p_offset, std::move(p_message)); }
 
-	bool numeric(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == number_; }
+	// A literal written as a whole number, in decimal or hex: its value, or false if it is past 64 bits.
+	// *r_whole says whether it is written as a whole number at all.
+	static bool wide_literal(std::string_view p_text, uint64_t *r_value, bool *r_whole) {
+		bool hex = p_text.size() > 2 && p_text[0] == '0' && (p_text[1] == 'x' || p_text[1] == 'X');
+		*r_whole = hex || p_text.find_first_of(".eE") == std::string_view::npos;
+		if (!*r_whole) {
+			return false;
+		}
+		uint64_t value = 0;
+		for (size_t i = hex ? 2 : 0; i < p_text.size(); i++) {
+			char c = p_text[i];
+			int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 99;
+			uint64_t base = hex ? 16 : 10;
+			if (digit >= (int)base || value > (UINT64_MAX - (uint64_t)digit) / base) {
+				return false;
+			}
+			value = value * base + (uint64_t)digit;
+		}
+		*r_value = value;
+		return true;
+	}
+
+	bool numeric(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == number_ || p_type == int64_; }
+	// The types that hold whole numbers only.
+	bool integral(const Type *p_type) const { return p_type == int_ || p_type == uint_ || p_type == int64_; }
 	// The types that AS3's arithmetic is defined on without calling into a class.
 	bool primitive(const Type *p_type) const {
 		return numeric(p_type) || p_type == boolean_ || p_type == string_ || p_type->kind == Type::Any ||
@@ -201,7 +226,8 @@ class Typer {
 			return unknown_;
 		}
 		if (numeric(p_a) && numeric(p_b)) {
-			return number_;
+			// An Int64 and another whole number: the Int64 holds both.
+			return (p_a == int64_ || p_b == int64_) && integral(p_a) && integral(p_b) ? int64_ : number_;
 		}
 		auto nullable = [&](const Type *p_type) {
 			return (p_type->kind == Type::Instance && !numeric(p_type) && p_type != boolean_) ||
@@ -372,6 +398,28 @@ class Typer {
 		// Which type Adobe's compiler gives `a = b` used as a value is not known, so it is not judged.
 		if (!p_value || !p_value->type || !p_to || p_value->kind == NodeKind::Assign) {
 			return;
+		}
+		if (p_to == int64_) {
+			// A whole number written out is taken digit by digit, so it must be one an Int64 can hold.
+			const Expr *digits = p_value;
+			bool negative = false;
+			if (digits->kind == NodeKind::Unary && static_cast<const Unary *>(digits)->op == TokenKind::Minus) {
+				negative = true;
+				digits = static_cast<const Unary *>(digits)->operand;
+			}
+			if (digits && digits->kind == NodeKind::NumberLit) {
+				std::string_view text = static_cast<const NumberLit *>(digits)->text;
+				uint64_t value = 0;
+				bool whole_number = false;
+				if (!wide_literal(text, &value, &whole_number) && whole_number) {
+					error(p_value->offset, std::string(negative ? "-" : "") + std::string(text) + " does not fit an Int64");
+					return;
+				}
+				if (whole_number && value > (negative ? 9223372036854775808ull : 9223372036854775807ull)) {
+					error(p_value->offset, std::string(negative ? "-" : "") + std::string(text) + " does not fit an Int64");
+					return;
+				}
+			}
 		}
 		switch (fits(p_value->type, p_to)) {
 			case Fit::Yes:
@@ -949,7 +997,33 @@ class Typer {
 				return whole(unary->operand);
 			}
 		}
-		return p_expression->type == int_ || p_expression->type == uint_;
+		if (p_expression->kind == NodeKind::Conditional) {
+			const Conditional *choice = static_cast<const Conditional *>(p_expression);
+			return whole(choice->then_value) && whole(choice->else_value);
+		}
+		if (p_expression->kind == NodeKind::Call) {
+			// What AS3's own functions give that is whole, though they hand it back in a Number.
+			const Call *call = static_cast<const Call *>(p_expression);
+			const Symbol *symbol = call->callee && call->callee->kind == NodeKind::Member ? (static_cast<const Member *>(call->callee)->symbol ? static_cast<const Member *>(call->callee)->symbol : static_cast<const Member *>(call->callee)->member)
+					: call->callee && call->callee->kind == NodeKind::Name ? static_cast<const Name *>(call->callee)->symbol
+																			: nullptr;
+			if (symbol && symbol->unit && symbol->unit->is_builtin) {
+				bool math = symbol->owner && symbol->owner->name == "Math" && symbol->kind == SymbolKind::Method;
+				if ((math && (symbol->name == "floor" || symbol->name == "round" || symbol->name == "ceil")) ||
+						(!symbol->owner && symbol->kind == SymbolKind::Function && symbol->name == "parseInt")) {
+					return true;
+				}
+				if (math && (symbol->name == "abs" || symbol->name == "max" || symbol->name == "min") && call->arguments.count > 0) {
+					for (const Expr *argument : call->arguments) {
+						if (!whole(argument)) {
+							return false;
+						}
+					}
+					return true;
+				}
+			}
+		}
+		return integral(p_expression->type);
 	}
 
 	// Whether an operand of type p_type is what a rule asks for. *r_exact is cleared when a whole number
@@ -1084,7 +1158,7 @@ class Typer {
 				if (never_operator(p_unary->op, operand, p_unary->offset)) {
 					return unknown_;
 				}
-				return primitive(operand) ? int_ : unknown_;
+				return operand == int64_ ? int64_ : (primitive(operand) ? int_ : unknown_);
 			case TokenKind::PlusPlus:
 			case TokenKind::MinusMinus:
 				if (never_operator(p_unary->op, operand, p_unary->offset)) {
@@ -1102,9 +1176,9 @@ class Typer {
 						return int_;
 					}
 				}
-				return primitive(operand) ? number_ : unknown_;
+				return operand == int64_ ? int64_ : (primitive(operand) ? number_ : unknown_);
 			case TokenKind::Plus:
-				return primitive(operand) ? number_ : unknown_;
+				return operand == int64_ ? int64_ : (primitive(operand) ? number_ : unknown_);
 			default:
 				return unknown_;
 		}
@@ -1122,6 +1196,39 @@ class Typer {
 		// rules in a later stage; until then the type is unknown.
 		if (!primitive(p_left) || !primitive(p_right)) {
 			return unknown_;
+		}
+		if (p_left == int64_ || p_right == int64_) {
+			// An Int64 keeps its 64 bits through whole-number arithmetic. Division gives a Number, as it
+			// always does in AS3, and so does anything with a Number on the other side.
+			switch (p_op) {
+				case TokenKind::Amp:
+				case TokenKind::Pipe:
+				case TokenKind::Caret:
+				case TokenKind::ShiftLeft:
+				case TokenKind::ShiftRight:
+				case TokenKind::ShiftRightUnsigned:
+				case TokenKind::AmpAssign:
+				case TokenKind::PipeAssign:
+				case TokenKind::CaretAssign:
+				case TokenKind::ShiftLeftAssign:
+				case TokenKind::ShiftRightAssign:
+				case TokenKind::ShiftRightUnsignedAssign:
+					return int64_;
+				case TokenKind::Plus:
+				case TokenKind::PlusAssign:
+				case TokenKind::Minus:
+				case TokenKind::MinusAssign:
+				case TokenKind::Star:
+				case TokenKind::StarAssign:
+				case TokenKind::Percent:
+				case TokenKind::PercentAssign:
+					if (integral(p_left) && integral(p_right)) {
+						return int64_;
+					}
+					break;
+				default:
+					break;
+			}
 		}
 		switch (p_op) {
 			case TokenKind::Plus:
@@ -1564,6 +1671,7 @@ public:
 		int_ = builtin("int");
 		uint_ = builtin("uint");
 		number_ = builtin("Number");
+		int64_ = builtin("Int64");
 		boolean_ = builtin("Boolean");
 		string_ = builtin("String");
 		array_ = builtin("Array");

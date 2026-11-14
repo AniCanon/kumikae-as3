@@ -58,6 +58,16 @@ package {
 		public native function valueOf():uint;
 	}
 
+	// A 64-bit integer: what Godot's own integer is. An int or a uint always fits one. One converts to an
+	// int, a uint or a Number where that is expected, and a RangeError says so if its value does not fit.
+	public final native class Int64 {
+		public static const MAX_VALUE:Int64;
+		public static const MIN_VALUE:Int64;
+		public native function Int64(num:Object = 0);
+		public native function toString(radix:uint = 10):String;
+		public native function valueOf():Int64;
+	}
+
 	public final native class Number {
 		public static const MAX_VALUE:Number;
 		public static const MIN_VALUE:Number;
