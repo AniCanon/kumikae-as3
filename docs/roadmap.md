@@ -20,7 +20,7 @@ not yet tried in Rider.
 singletons such as `Input`, Godot's constants and its static methods. The `Int64` type and global
 functions come next (the rest of stage 2b-3), then the rest of the language.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 61 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 68 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -162,9 +162,9 @@ The design keeps each of these possible. No stage above delivers them.
 
 | Part | What it does | Status |
 |---|---|---|
-| A. Singletons, constants, static methods | `Input.isActionPressed("jump")`, a singleton's signals, `Vector2.ZERO`, `Key.ESCAPE`, `Vector2.fromAngle(a)`. A Godot value with parts starts at its zero. Closes 3 backlog items. | Built; in review |
-| B. `Int64` | The 64-bit integer type the owner approved. The [design](superpowers/specs/2026-11-14-int64-design.md) is written; one question in it waits on the owner. Closes 3 backlog items. | Waiting on the owner |
-| C. Global functions and errors | `print`, `lerp`, `randf` and the rest; an AS3 error shown the way Godot shows its own. Closes 6 backlog items. | Next |
+| A. Singletons, constants, static methods | `Input.isActionPressed("jump")`, a singleton's signals, `Vector2.ZERO`, `Key.ESCAPE`, `Vector2.fromAngle(a)`. A Godot value with parts starts at its zero. Closes 3 backlog items. | Built and reviewed |
+| B. `Int64` | The 64-bit integer type the owner approved. The [design](superpowers/specs/2026-11-14-int64-design.md) was approved on 2026-11-14. Closes 3 backlog items. | Next |
+| C. Global functions and errors | `print`, `lerp`, `randf` and the rest; an AS3 error shown the way Godot shows its own. Closes 6 backlog items. | After B |
 
 Read more: [stage 2b-3 plan](superpowers/plans/2026-11-14-stage-2b3-rest-of-godot-api.md).
 
@@ -198,7 +198,7 @@ and the elements of Godot's untyped collections.
 Open items:
 
 - **The [backlog](backlog.md) gives every deferred item a stage:** 9 left in 2b-3, 13 in 2c, 9 in the
-  language server's second slice, 13 in 2d, 15 in a clean-up pass that closes stage 2, and 2 that wait on
+  language server's second slice, 14 in 2d, 20 in a clean-up pass that closes stage 2, and 3 that wait on
   the owner.
 - **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
   waits for the cycle collector (2d).
@@ -214,6 +214,7 @@ Open items:
 | `async`/`await` | The owner wants it first-class, not limited to the main thread, efficient, and with a proper debugger. Research first, after stage 2; no syntax chosen yet. |
 | Deferred review findings | The owner said on 2026-11-12 that all of them are to be fixed. They are listed in the [backlog](backlog.md) and stay there until fixed or ruled on. |
 | Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the [language additions](superpowers/specs/2026-11-12-language-additions.md) list. |
+| Which Godot integers are `Int64` | Decided on 2026-11-14: every Godot integer is an `Int64` unless Godot's description says it is narrower. `array.size()` and `randi()` are `Int64`; the table kept by hand goes. |
 | 64-bit integers | Decided on 2026-11-12: supported, in the way that is easiest to maintain. A real `Int64` type, given by one rule from Godot's description with no hand-kept table, converting to `int` or `Number` with a range check and never silently. Built in stage 2b-3; until then such values are declared `Number`. |
 | Static fields and null calls | Decided on 2026-11-12, and built: both follow Flash. A class's static fields are set on its first use, and a call on a null object evaluates its arguments before raising the error. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
@@ -225,7 +226,7 @@ Open items:
 |---|---|
 | 60 Godot methods that take raw pointers are left out | AS3 has nothing to pass them. The proposal is that this stands. |
 | What `"" + this` reads in a script without `toString()` | Today AS3's `[object Values]`; Godot's own text for the node is `<Node2D#123>`. |
-| Which Godot integers are `Int64` | Godot's description gives no width for 643 integers, among them `array.size()` and `randi()`. The [design](superpowers/specs/2026-11-14-int64-design.md) proposes that they are `Int64`, which changes their declared type and almost never the script. The other choice keeps a table by hand. |
+| `removeAll()` on a singleton's signal | It removes every script's listeners on that signal, not only the caller's, as on any signal. On a singleton that reaches across the whole game. |
 | When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
 
 ## How to follow progress

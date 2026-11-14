@@ -17,6 +17,7 @@ static void initialize(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+	kas3::note_main_thread();
 	GDREGISTER_CLASS(AS3Language);
 	GDREGISTER_CLASS(AS3Script);
 	GDREGISTER_CLASS(AS3ScriptLoader);

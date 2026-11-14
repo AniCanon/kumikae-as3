@@ -113,6 +113,11 @@ public:
 	ObjectID get_object() const override { return owner_; }
 
 	void call(const Variant **p_arguments, int p_argcount, Variant &r_return_value, GDExtensionCallError &r_call_error) const override {
+		if (!on_main_thread()) {
+			refuse_thread(function_);
+			r_call_error.error = GDEXTENSION_CALL_OK;
+			return;
+		}
 		if (!alive()) {
 			// The tombstone: the object this method belongs to is gone.
 			r_call_error.error = GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL;

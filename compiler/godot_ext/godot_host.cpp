@@ -216,7 +216,9 @@ bool GodotHost::constant(std::string_view p_class, std::string_view p_name, cons
 		StringName name(to_godot(p_name));
 		gdextension_interface::variant_get_constant_value((GDExtensionVariantType)type, name._native_ptr(), value._native_ptr());
 	}
-	if (value.get_type() == Variant::NIL) {
+	// Godot answers an unknown name with the integer -1. No constant asked for here is a number (those have
+	// their values in the declarations), so a number where a Godot value is wanted means there is none.
+	if (value.get_type() == Variant::NIL || (value.get_type() == Variant::INT && ir::is_engine(p_result.kind))) {
 		*r_error = "Godot has no constant '" + std::string(p_name) + "' in '" + std::string(p_class) + "'";
 		return false;
 	}

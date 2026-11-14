@@ -182,8 +182,13 @@ output = compare("statics.gd", [
     "default key", "given key",
     "from angle", "hsv", "html", "euler", "image", "after orphans",
     "unset", "unset tint", "unset spot", "unset list", "cleared local",
+    "declared twice", "declared twice, value first", "declared twice, other order", "declaration skipped",
+    "field read early", "static read early", "race",
 ])
-check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not in output, output[-900:])
+check("statics.gd: a call from a worker thread is refused and says so",
+      "Statics/spin() was called by Godot from another thread" in output, output[-900:])
+check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not in output and "Godot has no" not in output,
+      output[-900:])
 
 
 for failure in failures:

@@ -37,6 +37,13 @@ public:
 	uint32_t class_of_file(const std::string &p_path) const;
 };
 
+// AS3 runs on one thread, the one the extension was started on. Godot can call a script from another (a
+// task given to its worker threads): such a call is refused, and said so, before it touches anything.
+void note_main_thread();
+bool on_main_thread();
+// Reports the refusal: the function Godot tried to call.
+void refuse_thread(uint32_t p_function);
+
 // Godot calling a function of a script object, from a method call or through a bound method: the arguments
 // in as the parameters expect them (refused, never bent to fit), the result out. An AS3 error ends here:
 // the interpreter has reported it, and the engine carries on.

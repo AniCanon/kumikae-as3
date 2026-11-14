@@ -13,6 +13,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
+#include <thread>
 #include <filesystem>
 #include <vector>
 
@@ -120,6 +121,23 @@ uint32_t Project::class_of_file(const std::string &p_path) const {
 		}
 	}
 	return ir::NONE;
+}
+
+static std::thread::id main_thread;
+
+void note_main_thread() {
+	main_thread = std::this_thread::get_id();
+}
+
+bool on_main_thread() {
+	return std::this_thread::get_id() == main_thread;
+}
+
+void refuse_thread(uint32_t p_function) {
+	// The names are only read, and the program is not replaced while the game's threads run.
+	const ir::Module &module = Project::get().module();
+	std::string name = p_function < module.functions.size() ? module.functions[p_function].name : std::string("a method");
+	UtilityFunctions::push_error(String::utf8(("Error: " + name + "() was called by Godot from another thread. AS3 runs on the main thread only: the call was not made.").c_str()));
 }
 
 } // namespace kas3

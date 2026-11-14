@@ -88,6 +88,11 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 		r_error->error = GDEXTENSION_CALL_ERROR_INVALID_METHOD;
 		return;
 	}
+	if (!kas3::on_main_thread()) {
+		kas3::refuse_thread(method);
+		r_error->error = GDEXTENSION_CALL_ERROR_INVALID_METHOD;
+		return;
+	}
 	kas3::call_script(instance->object, method, reinterpret_cast<const Variant *const *>(p_args), p_argc,
 			reinterpret_cast<Variant *>(r_return), r_error);
 }

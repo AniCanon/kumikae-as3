@@ -83,5 +83,13 @@ func _physics_process(_delta: float) -> bool:
 	show("unset spot", ask("unsetSpot"), str(Vector2()))
 	show("unset list", ask("unsetList"), true)
 	show("cleared local", ask("cleared"), true)
+	show("declared twice", ask("twice", [false]), Vector2())
+	show("declared twice, value first", ask("twice", [true]), Vector2.ONE)
+	show("declared twice, other order", ask("twiceBack", [true]), Vector2())
+	show("declaration skipped", ask("skipped", [false]), Vector2())
+	show("field read early", ask("earlyField"), Vector2())
+	show("static read early", ask("earlyStaticField"), Vector2())
+	# Worker threads.
+	show("race", ask("race"), 200000)
 	node.free()
 	return false

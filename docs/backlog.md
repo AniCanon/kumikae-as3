@@ -24,9 +24,9 @@ it stands.
 | **2b-3** | The rest of Godot's API (under way) | 9 | `Int64` and what waits on it, singletons, freed objects, how errors reach Godot |
 | **2c** | The rest of the language | 13 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
-| **2d** | Editor features | 13 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 15 | What is left |
-| **decision** | The owner | 2 | See each item |
+| **2d** | Editor features | 14 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
+| **clean-up** | A pass that closes stage 2 | 20 | What is left |
+| **decision** | The owner | 3 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -137,8 +137,23 @@ Found by the review of the clean-up pass itself.
 
 ## Stage 2b-3, part A: singletons, constants, static methods
 
-- A local with a value written (`var v:Vector2 = position;`) that is read above that line is null there,
-  not the type's zero. So is a variable declared at package level. **clean-up**
+- A local, a field or a static field with a value written (`var v:Vector2 = position;`) that is read
+  above that line is null there, not the type's zero. So is a variable declared at package level.
+  **clean-up**
+- Godot calling a script from another thread (a method given to `WorkerThreadPool.addTask`) is refused
+  with an error. Running AS3 off the main thread waits for the `async` research. Only method calls are
+  guarded: a property read or a notification from another thread is not. **2d**
+- The singleton the engine gives is not checked against the class the script names. Right today, since
+  every singleton's name is its class. **clean-up**
+- A constant with a negative value is worked out when the line runs (three instructions), not written
+  as one number. **clean-up**
+- An editor-only singleton used in a game is reported twice: by Godot, then as an AS3 error. **clean-up**
+- A variable typed as a singleton class (`var i:Input = Input.singleton`) reaches only `GodotObject`'s
+  members: the class's own are static. **clean-up**
+- `removeAll()` on a singleton's signal removes every script's listeners, not only the caller's.
+  **decision**
+- Tests are missing for: a static call's arguments worked out left to right, a static call that gives
+  the wrong type, and a failing `Node.printOrphanNodes()`. The review ran the first two by hand. **clean-up**
 - A class's static method that fails inside Godot (wrong arguments) is reported by Godot only: the script
   carries on with nothing. **clean-up**
 - A singleton is looked up each time its name is written. **clean-up**

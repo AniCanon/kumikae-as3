@@ -10,6 +10,7 @@
 #include <limits>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace kas3 {
 namespace ir {
@@ -864,7 +865,7 @@ class Lowerer {
 	// missing unless a program says so: a variable of it with no value written starts at the type's zero,
 	// as it does in GDScript. This gives that zero in a new register, or NONE for any other type (an array,
 	// a signal, a function), which starts missing as an object does.
-	uint32_t zero_value(TypeRef *p_written, uint32_t p_position) {
+	uint32_t zero_value(TypeRef *p_written, uint32_t p_position, uint32_t p_into = NONE) {
 		const Type *type = p_written ? compilation_.type_of(p_written) : nullptr;
 		Kind kind = Kind::Void;
 		uint32_t name = 0;
@@ -874,12 +875,12 @@ class Lowerer {
 		}
 		bool parts = false;
 		for (const auto &member : type->symbol->klass->members) {
-			parts = parts || member.second->kind == SymbolKind::Field;
+			parts = parts || (member.second->kind == SymbolKind::Field && !member.second->is_static());
 		}
 		if (!parts) {
 			return NONE;
 		}
-		uint32_t out = reg(Kind::Val);
+		uint32_t out = p_into != NONE ? p_into : reg(Kind::Val);
 		emit(Op::HostNew, p_position, out, name, arguments({}));
 		return out;
 	}
@@ -2108,6 +2109,28 @@ class Lowerer {
 	// ---- statements ----
 
 	void declare_locals(Node *p_body) {
+		// A local that is given a value by its one declaration, written straight in the function's body,
+		// needs no starting value of its own: nothing below that line can see it without one.
+		std::unordered_map<const Symbol *, int> declared;
+		std::unordered_set<const Symbol *> valued;
+		walk(p_body, [&](Node *p_node) {
+			if (p_node->kind == NodeKind::VarDecl) {
+				for (Declarator &declarator : static_cast<VarDecl *>(p_node)->declarators) {
+					declared[declarator.symbol]++;
+				}
+			}
+		});
+		if (p_body && p_body->kind == NodeKind::Block) {
+			for (Stmt *statement : static_cast<Block *>(p_body)->statements) {
+				if (statement && statement->kind == NodeKind::VarStmt && static_cast<VarStmt *>(statement)->decl) {
+					for (Declarator &declarator : static_cast<VarStmt *>(statement)->decl->declarators) {
+						if (declarator.initializer && declared[declarator.symbol] == 1) {
+							valued.insert(declarator.symbol);
+						}
+					}
+				}
+			}
+		}
 		walk(p_body, [&](Node *p_node) {
 			if (p_node->kind != NodeKind::VarDecl) {
 				return;
@@ -2123,12 +2146,9 @@ class Lowerer {
 				// A Number starts as NaN. The rest start as zero, which is what a fresh register holds.
 				if (kind == Kind::F64) {
 					emit(Op::ConstF64, declarator.offset, local, number(std::numeric_limits<double>::quiet_NaN()));
-				} else if (kind == Kind::Val && !declarator.initializer) {
+				} else if (kind == Kind::Val && !valued.count(declarator.symbol)) {
 					// One of Godot's values with parts starts at its zero.
-					uint32_t zero = zero_value(declarator.type, declarator.offset);
-					if (zero != NONE) {
-						emit(Op::Move, declarator.offset, local, zero);
-					}
+					zero_value(declarator.type, declarator.offset, local);
 				}
 			}
 		});
@@ -2417,7 +2437,23 @@ class Lowerer {
 		if (decl && decl->body) {
 			declare_locals(decl->body);
 		}
-		// The class's own fields get their values first, before any constructor body runs.
+		// The class's own fields get their values first, before any constructor body runs. One of Godot's
+		// values with parts starts at its zero, and does so before any written value is worked out, since
+		// that may read it.
+		for (Node *member : p_class->members) {
+			if (member->kind != NodeKind::VarDecl || (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
+				continue;
+			}
+			for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
+				auto field = fields_.find(declarator.symbol);
+				if (field != fields_.end() && !declarator.initializer && module_.classes[index].fields[field->second].kind == Kind::Val) {
+					uint32_t zero = zero_value(declarator.type, declarator.offset);
+					if (zero != NONE) {
+						emit(Op::SetField, declarator.offset, 0, field->second, zero);
+					}
+				}
+			}
+		}
 		for (Node *member : p_class->members) {
 			if (member->kind != NodeKind::VarDecl || (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
 				continue;
@@ -2427,11 +2463,6 @@ class Lowerer {
 				if (field != fields_.end() && declarator.initializer) {
 					Kind kind = module_.classes[index].fields[field->second].kind;
 					emit(Op::SetField, declarator.offset, 0, field->second, expression(declarator.initializer, kind));
-				} else if (field != fields_.end()) {
-					uint32_t zero = zero_value(declarator.type, declarator.offset);
-					if (zero != NONE) {
-						emit(Op::SetField, declarator.offset, 0, field->second, zero);
-					}
 				}
 			}
 		}
@@ -2456,7 +2487,8 @@ class Lowerer {
 		for (Node *member : p_class->members) {
 			if (member->kind == NodeKind::VarDecl && (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
 				for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
-					any = any || globals_.count(declarator.symbol); // One without a value may still start at a zero.
+					auto global = globals_.find(declarator.symbol);
+					any = any || (global != globals_.end() && (declarator.initializer || module_.globals[global->second].kind == Kind::Val));
 				}
 			}
 		}
@@ -2479,15 +2511,24 @@ class Lowerer {
 			}
 			for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
 				auto global = globals_.find(declarator.symbol);
-				if (global != globals_.end() && declarator.initializer) {
-					emit(Op::Stmt, declarator.offset);
-					emit(Op::SetGlobal, declarator.offset, global->second,
-							expression(declarator.initializer, module_.globals[global->second].kind));
-				} else if (global != globals_.end()) {
+				if (global != globals_.end() && !declarator.initializer && module_.globals[global->second].kind == Kind::Val) {
 					uint32_t zero = zero_value(declarator.type, declarator.offset);
 					if (zero != NONE) {
 						emit(Op::SetGlobal, declarator.offset, global->second, zero);
 					}
+				}
+			}
+		}
+		for (Node *member : p_class->members) {
+			if (member->kind != NodeKind::VarDecl || !(static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
+				continue;
+			}
+			for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
+				auto global = globals_.find(declarator.symbol);
+				if (global != globals_.end() && declarator.initializer) {
+					emit(Op::Stmt, declarator.offset);
+					emit(Op::SetGlobal, declarator.offset, global->second,
+							expression(declarator.initializer, module_.globals[global->second].kind));
 				}
 			}
 		}

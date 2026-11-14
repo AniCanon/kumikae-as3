@@ -25,8 +25,8 @@ that works on an object (methods, properties, signals) works on it unchanged.
 | **B. `Int64`** | `feat/int64` | The type, its conversions and arithmetic, the generator's one rule; the table of widths deleted | The wide flag enum; the 32-bit wrap of whole products; `Math.floor` and its relatives counted as fractions |
 | **C. Global functions and errors** | `feat/godot-functions` | `print`, `lerp`, `randf` and the rest; an AS3 error shown as Godot shows its own | The middle `null` default; a freed node and `null`; messages on a freed node; a freed handle counted as not null; a listener's argument error reported to Godot as success; the order of the null check on a Godot member |
 
-Part B waits on the owner's answer to the one open question in the `Int64` design. Parts A and C do not
-depend on it, except that C's functions with wide integers change type when B lands.
+The owner approved the `Int64` design's rule on 2026-11-14, so part B comes before part C: C's functions
+with wide integers then get their final types at once.
 
 ## Global Constraints
 
@@ -54,8 +54,12 @@ depend on it, except that C's functions with wide integers change type when B la
 5. **A constant with a value in the declarations is folded** by the lowerer (`Key.ESCAPE` is a number in
    the IR). **A constant without one** (`Vector2.ZERO`, `Color.RED`) is `HostConstant out, class, name`,
    which the host answers from Godot and checks against the declared type.
-6. **A local or field of a Godot value type with no initializer is that type's zero value,** made by the
-   type's constructor with no arguments, as GDScript's typed variables are. `null` can still be assigned.
+6. **A local or field of a Godot value type that has parts** (`Vector2`, `Color`: a class that declares
+   variables) **with no value written is that type's zero value,** made by the type's constructor with no
+   arguments, as GDScript's typed variables are. `null` can still be assigned. A Godot value without
+   parts (an array, a signal) starts missing, as an AS3 object does.
+7. **AS3 runs on the main thread.** A call Godot makes from another thread is refused with an error
+   (found by the review: a method given to `WorkerThreadPool.addTask` crashed Godot).
 
 ## Review Focus (part A)
 

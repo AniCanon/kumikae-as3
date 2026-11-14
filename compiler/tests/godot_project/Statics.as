@@ -53,6 +53,27 @@ package {
 		}
 		public function orphans():void { Node.printOrphanNodes(); }
 
+		// Godot calling a method from one of its worker threads is refused: AS3 runs on the main thread.
+		private var total:int = 0;
+		private var text:String = "";
+		public function race():int {
+			for (var i:int = 0; i < 64; i++) { WorkerThreadPool.addTask(spin); }
+			for (var j:int = 0; j < 200000; j++) { text = "m" + j; total++; }
+			return total;
+		}
+		private function spin():void { for (var k:int = 0; k < 20000; k++) { text = "w" + k; total++; } }
+
+		// A Godot value with parts starts at its zero wherever it is read.
+		public function twice(first:Boolean):Vector2 { if (first) { var v:Vector2 = Vector2.ONE; } else { var v:Vector2; } return v; }
+		public function twiceBack(first:Boolean):Vector2 { if (first) { var v:Vector2; } else { var v:Vector2 = Vector2.ONE; } return v; }
+		public function skipped(run:Boolean):Vector2 { if (run) { var v:Vector2 = Vector2.ONE; } return v; }
+		private var early:Vector2 = late;
+		private var late:Vector2;
+		private static var earlyStatic:Vector2 = lateStatic;
+		private static var lateStatic:Vector2;
+		public function earlyField():Vector2 { return early; }
+		public function earlyStaticField():Vector2 { return earlyStatic; }
+
 		// A Godot value with parts starts at its zero; anything else starts missing.
 		public function unset():Vector2 { var v:Vector2; return v; }
 		public function unsetTint():Color { return tint; }
