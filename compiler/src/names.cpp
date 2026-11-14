@@ -250,8 +250,6 @@ std::string Compilation::where(const Unit &p_from, const Symbol *p_symbol) const
 			std::to_string(position.column);
 }
 
-// ---- declare ----
-
 void Compilation::declare_unit(Unit &p_unit) {
 	Program *tree = p_unit.tree;
 	p_unit.package = package(tree->package ? join(tree->package->name) : std::string());

@@ -96,7 +96,7 @@ public:
 	// the host has been given it.
 	bool run_program();
 
-	// ---- for a host that keeps the interpreter and calls into it ----
+	// For a host that keeps the interpreter and calls into it.
 	//
 	// Each of these is an entry from outside. An error that nothing catches ends that entry only: the host
 	// is given it, and the interpreter is fit for the next call. An entry may be made while another is in

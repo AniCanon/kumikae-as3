@@ -70,7 +70,7 @@ private:
 	bool no_in_ = false; // Inside a `for` header's first clause, where `in` is not an operator.
 	bool bracket_ends_initializer_ = false; // In member and top-level initialisers: a `[` on a new line is metadata.
 
-	// ---- tokens (parser.cpp) ----
+	// Tokens. In parser.cpp.
 	const Token &peek() const { return current_; }
 	const Token &peek2();
 	bool at_namespace_attribute();
@@ -116,7 +116,7 @@ private:
 		return list;
 	}
 
-	// ---- expressions and types (parser_expr.cpp) ----
+	// Expressions and types. In parser_expr.cpp.
 	Expr *parse_expression();
 	Expr *parse_assignment();
 	Expr *parse_conditional();
@@ -136,7 +136,7 @@ private:
 	std::string_view parse_property_name(const char *p_what);
 	List<std::string_view> parse_dotted_name(const char *p_what, bool *r_wildcard, List<uint32_t> *r_offsets);
 
-	// ---- statements (parser_stmt.cpp) ----
+	// Statements. In parser_stmt.cpp.
 	Stmt *parse_statement();
 	Stmt *parse_statement_inner();
 	Block *parse_block();
@@ -153,7 +153,7 @@ private:
 	void end_statement();
 	static bool begins_statement(TokenKind p_kind);
 
-	// ---- declarations (parser_decl.cpp) ----
+	// Declarations. In parser_decl.cpp.
 	void parse_definitions(bool p_in_package, std::vector<Import *> &r_imports, std::vector<Node *> &r_definitions,
 			PackageDecl **r_package);
 	List<Metadata> parse_metadata_tags();

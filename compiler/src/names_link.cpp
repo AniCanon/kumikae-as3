@@ -21,8 +21,6 @@ static std::string quoted(std::string_view p_name) {
 	return result;
 }
 
-// ---- lookup ----
-
 Context Compilation::context_of(Unit &p_unit, bool p_in_block) {
 	Context context;
 	context.unit = &p_unit;
@@ -176,8 +174,6 @@ Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
 	return found.first;
 }
 
-// ---- imports ----
-
 void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports, ImportScope &r_scope) {
 	for (Import *import : p_imports) {
 		if (import->name.count == 0) {
@@ -253,8 +249,6 @@ void Compilation::link_imports(Unit &p_unit) {
 	}
 	link_definitions(tree->definitions, p_unit.outer_imports);
 }
-
-// ---- hierarchy ----
 
 void Compilation::link_class(Symbol *p_class) {
 	ClassDecl *decl = static_cast<ClassDecl *>(p_class->node);

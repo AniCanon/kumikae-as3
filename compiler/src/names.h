@@ -262,7 +262,7 @@ public:
 	// A top-level built-in class by name, or null.
 	Symbol *builtin(std::string_view p_name) const;
 
-	// ---- used by the passes ----
+	// For the passes.
 
 	Symbol *new_symbol(SymbolKind p_kind, std::string_view p_name, Unit *p_unit, uint32_t p_offset);
 	Package *package(const std::string &p_name); // Created if missing.

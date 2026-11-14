@@ -51,8 +51,6 @@ struct Expr : Node {
 };
 struct Stmt : Node {};
 
-// ---- types ----
-
 struct TypeRef : Node {
 	static const NodeKind KIND = NodeKind::TypeRef;
 	enum Form : uint8_t { Any, Void, Named, Applied }; // `*`, `void`, `a.b.C`, `Vector.<T>`
@@ -63,7 +61,7 @@ struct TypeRef : Node {
 	Symbol *symbol = nullptr; // The class or interface, for Named and Applied.
 };
 
-// ---- declarations (declared early: expressions and statements refer to them) ----
+// Declared early: expressions and statements refer to them.
 
 struct MetadataArg {
 	std::string_view key; // Empty if positional.
@@ -131,8 +129,6 @@ struct FunctionDecl : Node {
 	Block *body = nullptr; // Null for interface methods and `native` functions.
 	Symbol *symbol = nullptr; // Null for an anonymous function expression.
 };
-
-// ---- expressions ----
 
 struct NumberLit : Expr {
 	static const NodeKind KIND = NodeKind::NumberLit;
@@ -248,8 +244,6 @@ struct Conditional : Expr {
 	Expr *else_value = nullptr;
 };
 
-// ---- statements ----
-
 struct Block : Stmt {
 	static const NodeKind KIND = NodeKind::Block;
 	List<Stmt *> statements;
@@ -355,8 +349,6 @@ struct ImportStmt : Stmt { // An import inside a function body.
 	static const NodeKind KIND = NodeKind::ImportStmt;
 	Import *import = nullptr;
 };
-
-// ---- larger declarations ----
 
 struct ClassDecl : Node {
 	static const NodeKind KIND = NodeKind::ClassDecl;

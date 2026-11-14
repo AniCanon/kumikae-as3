@@ -91,8 +91,6 @@ class Resolver {
 		return std::to_string(unit_.source.position(p_symbol->offset).line);
 	}
 
-	// ---- lookup ----
-
 	Symbol *lookup(std::string_view p_name, uint32_t p_offset, bool p_report) {
 		for (Scope *scope = scope_; scope; scope = scope->parent) {
 			auto found = scope->names.find(p_name);
@@ -136,8 +134,6 @@ class Resolver {
 	}
 
 	void type(TypeRef *p_type) { compilation_.resolve_type(context_, p_type); }
-
-	// ---- declarations inside a function ----
 
 	void declare_locals(VarDecl *p_decl) {
 		for (Declarator &declarator : p_decl->declarators) {
@@ -263,8 +259,6 @@ class Resolver {
 		}
 	}
 
-	// ---- functions ----
-
 	void function(FunctionDecl *p_function, bool p_expression) {
 		// A named function expression can call itself by its name. The name sits just outside the body, so a
 		// parameter or local may reuse it.
@@ -339,8 +333,6 @@ class Resolver {
 		loops_ = outer_loops;
 		switches_ = outer_switches;
 	}
-
-	// ---- statements ----
 
 	const Label *find_label(std::string_view p_name) const {
 		for (size_t i = labels_.size(); i-- > 0;) {
@@ -483,8 +475,6 @@ class Resolver {
 				break;
 		}
 	}
-
-	// ---- expressions ----
 
 	void assignable(Expr *p_target) {
 		if (!p_target) {
@@ -645,8 +635,6 @@ class Resolver {
 				break;
 		}
 	}
-
-	// ---- definitions ----
 
 	void variables(VarDecl *p_decl) {
 		for (Declarator &declarator : p_decl->declarators) {

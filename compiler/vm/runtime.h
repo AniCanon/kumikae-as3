@@ -58,7 +58,7 @@ void free_string(Str *p_string);
 Object *new_object(uint32_t p_class, size_t p_fields); // One reference; fields zeroed. Null if out of memory.
 void free_object(Object *p_object); // The fields must have been released.
 
-// ---- conversions, as ECMAScript and AS3 define them ----
+// Conversions, as ECMAScript and AS3 define them.
 
 int32_t to_int32(double p_value);
 uint32_t to_uint32(double p_value);
