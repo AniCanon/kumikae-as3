@@ -1,0 +1,42 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://Player.as" id="1"]
+[ext_resource type="Script" path="res://Coin.as" id="2"]
+[ext_resource type="Script" path="res://Hud.as" id="3"]
+
+[sub_resource type="CircleShape2D" id="player"]
+radius = 22.0
+
+[sub_resource type="CircleShape2D" id="coin"]
+radius = 16.0
+
+[node name="Main" type="Node2D"]
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 960.0
+offset_bottom = 540.0
+color = Color(0.09, 0.1, 0.14, 1)
+
+[node name="Coin" type="Area2D" parent="."]
+position = Vector2(700, 200)
+script = ExtResource("2")
+
+[node name="Shape" type="CollisionShape2D" parent="Coin"]
+shape = SubResource("coin")
+
+[node name="Player" type="CharacterBody2D" parent="."]
+position = Vector2(480, 270)
+motion_mode = 1
+script = ExtResource("1")
+
+[node name="Shape" type="CollisionShape2D" parent="Player"]
+shape = SubResource("player")
+
+[node name="Hud" type="Label" parent="."]
+offset_left = 24.0
+offset_top = 16.0
+offset_right = 420.0
+offset_bottom = 60.0
+theme_override_font_sizes/font_size = 28
+text = "Coins: 0"
+script = ExtResource("3")
