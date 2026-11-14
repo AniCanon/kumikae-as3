@@ -137,7 +137,7 @@ public:
 		if (r_call_error.error != GDEXTENSION_CALL_OK) {
 			// The listener was not called: what it was given does not fit its parameters. Godot's own
 			// report can't name the method of a callable like this one, so the report is made here, in
-			// AS3's words, and Godot is told all is well.
+			// AS3's words.
 			const ir::Function &callee = Project::get().module().functions[function];
 			std::string text;
 			if (r_call_error.error == GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT && r_call_error.argument >= 0 && r_call_error.argument < p_argcount) {
@@ -162,8 +162,9 @@ public:
 				}
 				text += "\n\tat " + callee.name + "()[" + module.files[callee.file] + ":" + std::to_string(line) + "]";
 			}
-			UtilityFunctions::push_error(String::utf8(text.c_str()));
-			r_call_error.error = GDEXTENSION_CALL_OK;
+			// Reported in AS3's words, and Godot is told the call failed, so that whatever made it (a
+			// signal, callv, filter) knows.
+			Project::get().host().error(text);
 		}
 		Project::get().interpreter().release_object(object);
 	}

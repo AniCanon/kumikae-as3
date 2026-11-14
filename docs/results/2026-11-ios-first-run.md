@@ -60,19 +60,39 @@ device, are stage 4.
 The report is read back from the phone as a file the scene writes in the app's own folder
 (`user://as3test.txt`): the app's console did not carry Godot's printed lines.
 
+## It runs in the Simulator, with a template built from Godot's source
+
+The same day the Simulator was made to work, without a fork of Godot. Godot's unmodified 4.7.2 source
+(the commit of the official release) was built for the Apple-silicon Simulator, and the result was put
+beside the Intel library in a copy of the published template. `compiler/tests/build_ios_simulator_template.sh`
+does it; the build takes about ten minutes. With that file as the preset's custom debug template, the
+export built for the Simulator and ran: the same 14 checks passed, on screen and in the report file.
+
+Two things to know:
+
+- The Simulator draws OpenGL in software, so the app is slow to draw there. The checks do not depend on
+  it.
+- An iOS library built before a script used something new must be rebuilt (`build_ios.sh`): the app
+  holds its own copy of the compiler. With a stale one the project's scripts did not load, and the test
+  scene never finished. Why it hung and did not report failures is not yet known.
+
 ## Not yet done
 
-- The Simulator, for the reason above. The fix is a Godot export template built from Godot's source with
-  an Apple-silicon Simulator library, set as a custom template in the export preset.
 - Android, and anything beyond the 14 checks: the full Godot test drivers run from the command line
   with `-s`, which an installed app does not take.
+- A run of the Simulator test as part of the test suite. It needs the custom template, which is not in
+  the repository.
 
 ## To repeat it
 
 ```sh
 compiler/tests/build_ios.sh <godot-cpp checkout>
+compiler/tests/build_ios_simulator_template.sh <godot source at the release's tag> <template.zip>   # for the Simulator
 godot --headless --path compiler/tests/godot_project --export-debug "iOS" <folder>/kas3test.ipa
 ```
+
+For the Simulator, set `custom_template/debug` in the preset to the template made above, build the Xcode
+project for `iphonesimulator`, and use `xcrun simctl install` and `launch`.
 
 The export preset holds a placeholder team id. Build the Xcode project the export writes with a real
 one (`xcodebuild ... DEVELOPMENT_TEAM=<team> -allowProvisioningUpdates`), install it with

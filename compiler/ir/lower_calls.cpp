@@ -154,6 +154,42 @@ uint32_t Lowerer::godot_call(Call *p_call, Symbol *p_method) {
 	return kind == Kind::Void ? 0 : default_value(kind, position);
 }
 
+// One of Godot's global functions: `lerpf(a, b, t)`, `print(...)`. The call carries the function's
+// signature, which the engine's entry for such functions needs.
+uint32_t Lowerer::global_call(Call *p_call, Symbol *p_function, Kind p_want) {
+	uint32_t position = p_call->offset;
+	std::string signature;
+	if (!godot_name("@global", p_function->name, &signature)) {
+		refuse(p_call->callee->offset, "calling '" + std::string(p_function->name) + "'");
+		return default_value(p_want, position);
+	}
+	const Type *type = p_function->type ? compilation_.type_of(p_function->type) : nullptr;
+	Kind kind = Kind::Void;
+	if (type && type->kind == Type::Any) {
+		// It gives back anything. Where the program says what it expects (a number, a Boolean, text), that
+		// is asked for and checked when it arrives. Anything else waits for AS3's untyped value.
+		// Text is Godot's text for whatever came. A condition says nothing: is 0 false, or only null?
+		if (!is_numeric(p_want) && p_want != Kind::Str) {
+			refuse(position, "'" + std::string(p_function->name) + "', which can give back anything, used where nothing says what is expected");
+			return default_value(p_want, position);
+		}
+		kind = p_want == Kind::Str ? Kind::Val : p_want;
+		type = nullptr;
+	} else if (type && !kind_of(type, &kind)) {
+		refuse(position, "a call to a Godot function that returns '" + compilation_.type_name(type) + "'");
+	}
+	std::vector<uint32_t> list;
+	FunctionDecl *decl = p_function->node && p_function->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_function->node) : nullptr;
+	engine_arguments(decl, p_call->arguments, position, list);
+	uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, type);
+	// No class before the dot: the engine's side reads that as a global function.
+	emit(Op::HostCallStatic, position, out, string("." + signature), arguments(std::move(list)));
+	if (out != NONE && kind == Kind::Val && p_want == Kind::Str) {
+		return convert(out, Kind::Str, position);
+	}
+	return out == NONE ? 0 : out;
+}
+
 // A function or method of the program itself.
 uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function) {
 	Expr *callee = p_call->callee;
@@ -219,6 +255,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	}
 	if (is_godot(symbol) && symbol->kind == SymbolKind::Method) {
 		return godot_call(p_call, symbol);
+	}
+	if (is_godot(symbol) && symbol->kind == SymbolKind::Function) {
+		return global_call(p_call, symbol, p_want);
 	}
 	auto function = functions_.find(symbol);
 	if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
@@ -297,7 +336,8 @@ uint32_t Lowerer::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t *r_
 	return out;
 }
 
-void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
+void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
+		const std::string &p_defaults) {
 	uint32_t count = p_function ? p_function->parameters.count : 0;
 	// A default that AS3 can't write is declared `= null`, and Godot fills in the real one when the
 	// argument is left out. A `null` written last for such a parameter is the same as leaving it out.
@@ -319,6 +359,18 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 				r_list.push_back(settled(bound_method(p_arguments[i]), later, p_position));
 				continue;
 			}
+			std::string godot_default;
+			if (is_null(p_arguments[i]) && !p_defaults.empty() && p_function->parameters[i].default_value &&
+					is_null(p_function->parameters[i].default_value) && kind_of(type, &kind) && kind == Kind::Val &&
+					godot_name("@default", p_defaults + "." + std::to_string(i), &godot_default)) {
+				// `null` where the default is one AS3 can't write, with arguments after it: Godot's own
+				// default, from Godot's text for it.
+				uint32_t value = engine_reg(Kind::Val, type);
+				emit(Op::HostDefault, p_arguments[i]->offset, value, string(godot_default));
+				r_list.push_back(value);
+				continue;
+			}
+			kind = Kind::Void;
 			if (type && type->kind != Type::Any && !kind_of(type, &kind)) {
 				refuse(p_arguments[i]->offset, "passing a value of type '" + compilation_.type_name(type) + "' to Godot");
 				kind = Kind::Void;
@@ -331,12 +383,26 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 		if (kind == Kind::Void && is_null(p_arguments[i])) {
 			kind = Kind::Ref; // `null` where Godot takes anything: nothing.
 		}
+		Kind own = Kind::Void;
+		if (kind == Kind::Void && kind_of(p_arguments[i]->type, &own) && is_numeric(own) && whole(p_arguments[i])) {
+			kind = Kind::I64; // Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
+		}
 		uint32_t value = expression(p_arguments[i], kind);
 		if (kind_at(value) == Kind::Obj) {
 			refuse(p_arguments[i]->offset, "passing a script object to Godot");
 		}
 		r_list.push_back(settled(value, later, p_position));
 	}
+}
+
+// "Class.method" in Godot's names: where the name table keeps a method's defaults that AS3 can't write.
+std::string Lowerer::defaults_key(const Symbol *p_method) const {
+	std::string klass, method;
+	if (!p_method->owner || !godot_name(p_method->owner->name, std::string_view(), &klass) ||
+			!godot_name(p_method->owner->name, p_method->name, &method)) {
+		return std::string();
+	}
+	return klass + "." + method;
 }
 
 uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver, const std::function<void()> &p_before) {
@@ -353,9 +419,19 @@ uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receive
 	bool of_value = false;
 	Expr *object = p_call->callee->kind == NodeKind::Member ? static_cast<Member *>(p_call->callee)->object : nullptr;
 	std::vector<uint32_t> list;
-	list.push_back(settled(p_receiver != NONE ? p_receiver : engine_receiver(object, position, &of_value), writer(p_call->arguments), position));
+	uint32_t script_object = NONE; // Set if the member is reached through another script object.
+	const uint32_t receiver = p_receiver != NONE ? p_receiver : engine_receiver(object, position, &of_value, &script_object);
+	if (script_object != NONE) {
+		script_object = settled(script_object, writer(p_call->arguments), position);
+		list.push_back(receiver); // Filled in below, after the arguments.
+	} else {
+		list.push_back(settled(receiver, writer(p_call->arguments), position));
+	}
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
-	engine_arguments(decl, p_call->arguments, position, list);
+	engine_arguments(decl, p_call->arguments, position, list, defaults_key(p_method));
+	if (script_object != NONE) {
+		owner_of(script_object, receiver, object->offset);
+	}
 	if (p_before) {
 		p_before(); // What the receiver still needs, now that the arguments are worked out.
 	}
@@ -378,7 +454,7 @@ uint32_t Lowerer::static_call(Call *p_call, Symbol *p_method) {
 	}
 	std::vector<uint32_t> list;
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
-	engine_arguments(decl, p_call->arguments, position, list);
+	engine_arguments(decl, p_call->arguments, position, list, klass + "." + method);
 	uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
 	emit(Op::HostCallStatic, position, out, string(klass + "." + method), arguments(std::move(list)));
 	return out == NONE ? 0 : out;

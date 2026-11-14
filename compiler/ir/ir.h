@@ -82,6 +82,8 @@ inline bool is_engine(Kind p_kind) {
 	X(HostBind, "RRI") \
 	X(HostMember, "RRR") /* object[name], the name being AS3's and known only now: out, object, name. */ \
 	X(HostToStr, "RR-") /* Godot's text for one of its values or objects; "null" for a missing one. */ \
+	X(HostPresent, "RR-") /* Is there an engine value here? Not if it is null, or an object Godot has freed. */ \
+	X(HostDefault, "RS-") /* The value of a default Godot declares, from Godot's own text for it. */ \
 	X(HostSingleton, "RS-") /* One of the engine's singletons (Input), by Godot's name for it. */ \
 	X(HostConstant, "RSS") /* A constant Godot keeps: out, the type, the constant (Vector2, ZERO). */ \
 	X(HostCallStatic, "rSA") /* A method called on no object: "Vector2.from_angle", and its arguments. */ \

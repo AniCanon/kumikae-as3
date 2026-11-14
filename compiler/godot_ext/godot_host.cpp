@@ -5,6 +5,7 @@
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/expression.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/callable.hpp>
@@ -18,6 +19,7 @@
 
 #include <godot_cpp/classes/ref_counted.hpp>
 
+#include <cstdlib>
 #include <new>
 #include <vector>
 
@@ -28,6 +30,13 @@ namespace kas3 {
 // A handle on a reference-counted object that is gone. Copying it would count a reference on freed
 // memory. (Only a script's hold on its own owner can be one: any other handle keeps its object alive.) A
 // handle on any other freed object is safe to copy, and Godot knows it as a freed object.
+// An object Godot has freed. To a script it is null.
+static bool is_freed(const Variant &p_value) {
+	return p_value.get_type() == Variant::OBJECT && !((ObjectID)p_value).is_null() && !p_value.get_validated_object();
+}
+
+static const char *const FREED = "TypeError: Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.";
+
 static bool is_dangling(const Variant &p_value) {
 	return p_value.get_type() == Variant::OBJECT && ((ObjectID)p_value).is_ref_counted() && !p_value.get_validated_object();
 }
@@ -55,7 +64,8 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 		case ir::Kind::Val:
 		case ir::Kind::Ref: {
 			const Variant *value = static_cast<const Variant *>(p_slot.p);
-			if (!value || is_dangling(*value)) {
+			// A freed object goes to Godot as what it is to the script: null.
+			if (!value || is_freed(*value)) {
 				return Variant();
 			}
 			return *value;
@@ -119,8 +129,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 	}
 }
 
-// What Godot gave, as the interpreter asked for it; refused if it is something else.
-static bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error) {
+bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error) {
 	if (!r_result || p_wanted.kind == ir::Kind::Void) {
 		return true;
 	}
@@ -251,12 +260,31 @@ void GodotHost::print(std::string_view p_text) {
 	UtilityFunctions::print(to_godot(p_text));
 }
 
+// An uncaught AS3 error, shown as Godot shows a script's own: the place it was raised is given as the
+// error's source, so that the editor can open the line. The text is the error and its AS3 stack, whose
+// first line reads "\tat Class/method()[file:line]".
 void GodotHost::error(std::string_view p_text) {
-	UtilityFunctions::push_error(to_godot(p_text));
+	const std::string text(p_text);
+	std::string function, file;
+	int32_t line = 0;
+	const size_t at = text.find("\tat ");
+	const size_t open = at == std::string::npos ? at : text.find('[', at);
+	const size_t close = open == std::string::npos ? open : text.find(']', open);
+	const size_t colon = close == std::string::npos ? close : text.rfind(':', close);
+	if (colon != std::string::npos && colon > open) {
+		function = text.substr(at + 4, open - at - 4);
+		file = text.substr(open + 1, colon - open - 1);
+		line = (int32_t)std::strtol(text.substr(colon + 1, close - colon - 1).c_str(), nullptr, 10);
+	}
+	if (file.empty()) {
+		UtilityFunctions::push_error(to_godot(p_text)); // An error with no stack: nothing to point at.
+		return;
+	}
+	gdextension_interface::print_script_error(text.c_str(), function.c_str(), file.c_str(), line, false);
 }
 
 // One of Godot's value types by its name ("Vector2"), or -1. The names are listed once.
-static int value_type(std::string_view p_name) {
+int value_type(std::string_view p_name) {
 	static const std::unordered_map<std::string, int> types = [] {
 		std::unordered_map<std::string, int> found;
 		for (int i = 1; i < Variant::VARIANT_MAX; i++) {
@@ -268,6 +296,30 @@ static int value_type(std::string_view p_name) {
 	}();
 	auto found = types.find(std::string(p_name));
 	return found == types.end() ? -1 : found->second;
+}
+
+bool GodotHost::evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	const std::string text(p_expression);
+	auto found = evaluated_.find(text);
+	if (found == evaluated_.end()) {
+		// Godot reads its own way of writing a value.
+		Ref<Expression> expression;
+		expression.instantiate();
+		Variant value;
+		if (expression->parse(to_godot(p_expression)) == OK) {
+			value = expression->execute(Array(), nullptr, false);
+		}
+		if (value.get_type() == Variant::NIL || expression->has_execute_failed()) {
+			*r_error = "Godot could not work out its default '" + text + "'";
+			return false;
+		}
+		found = evaluated_.emplace(text, value).first;
+	}
+	// Godot shares an Array or a Dictionary between everything that holds it, and may write into one it is
+	// given: each call gets its own.
+	const Variant::Type type = found->second.get_type();
+	const Variant value = type == Variant::ARRAY || type == Variant::DICTIONARY ? found->second.duplicate() : found->second;
+	return take(p_result, value, p_expression, r_result, r_error);
 }
 
 void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {
@@ -299,6 +351,9 @@ bool GodotHost::constant(std::string_view p_class, std::string_view p_name, cons
 
 bool GodotHost::call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 		const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
+	if (p_class.empty()) {
+		return call_utility(p_method, p_arguments, p_count, p_result, r_result, r_error);
+	}
 	// For a class, the call goes through Godot's list of classes, which takes the two names first.
 	const StringName &class_name = name(p_class);
 	const StringName &method_name = name(p_method);
@@ -438,7 +493,7 @@ bool GodotHost::call(void *p_receiver, std::string_view p_method, const vm::Argu
 	// there before anything touches it.
 	// (A handle copied after the object went is empty: see copy().)
 	if (receiver->get_type() == Variant::NIL || (receiver->get_type() == Variant::OBJECT && !receiver->get_validated_object())) {
-		*r_error = "'" + std::string(p_method) + "' was called on an object Godot has freed";
+		*r_error = FREED;
 		return false;
 	}
 	Arguments arguments(p_arguments, p_count);
@@ -515,6 +570,10 @@ bool GodotHost::get(void *p_receiver, std::string_view p_property, const vm::Wan
 	if (!p_property.empty() && p_property[0] == '@') {
 		return signal_verb(*static_cast<Variant *>(p_receiver), p_property, nullptr, 0, p_result, r_result, r_error);
 	}
+	if (is_freed(*static_cast<Variant *>(p_receiver))) {
+		*r_error = FREED;
+		return false;
+	}
 	bool valid = false;
 	Variant value = static_cast<Variant *>(p_receiver)->get_named(name(p_property), valid);
 	if (!valid) {
@@ -525,6 +584,10 @@ bool GodotHost::get(void *p_receiver, std::string_view p_property, const vm::Wan
 }
 
 bool GodotHost::set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) {
+	if (is_freed(*static_cast<Variant *>(p_receiver))) {
+		*r_error = FREED;
+		return false;
+	}
 	bool valid = false;
 	static_cast<Variant *>(p_receiver)->set_named(name(p_property), to_variant(p_value.kind, p_value.slot), valid);
 	if (!valid) {
@@ -601,6 +664,11 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 		return false;
 	}
 	return take(p_result, value, p_name, r_result, r_error);
+}
+
+bool GodotHost::present(void *p_value) {
+	const Variant *value = static_cast<const Variant *>(p_value);
+	return value && value->get_type() != Variant::NIL && !is_freed(*value);
 }
 
 vm::Str *GodotHost::text(void *p_value) {

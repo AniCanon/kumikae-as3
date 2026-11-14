@@ -62,6 +62,9 @@ if moved:
     check("no sideways movement", abs(float(moved.group(3))) < 0.001, moved.group(3))
     check("a string came back", moved.group(4).strip() == "moved after 30 steps", moved.group(4))
 check("the AS3 error was reported", "TypeError: Error #1009" in output and "at Player/fail()" in output, output[-600:])
+check("the AS3 error is shown as Godot shows a script's own: with the script's file and line as its source",
+      re.search(r"SCRIPT ERROR: TypeError: Error #1009[^\n]*\n(\s+at [^\n]+\n)*\s+at: Player/fail\(\) \(res://Player\.as:\d+\)", output) is not None,
+      output[-900:])
 check("the engine carried on", "RESULT after error steps=30" in output, output[-600:])
 check("no crash", run.returncode == 0, "exit %d" % run.returncode)
 
@@ -135,7 +138,8 @@ output = compare("values.gd", [
     "tint", "same", "not same", "differs", "same node", "not same node", "other node", "chain", "compound", "moved",
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
-    "freed text",
+    "freed text", "freed text after", "alive is not null", "alive is set", "alive counts", "freed is null", "freed is not set", "freed does not count",
+    "not freed", "freed name", "freed children", "freed as an argument",
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
     "first", "color part", "set second", "add element", "position element", "packed", "set packed",
     "packed out of range", "out of range",
@@ -143,7 +147,11 @@ output = compare("values.gd", [
     "looking null", "whole numbers", "to string", "to string in AS3", "no to string", "no to string in AS3",
     "negative cells", "cells plus", "cells compound", "plain order", "compound order", "mixed", "big hash", "decode",
 ])
-check("a null that is not the last argument is an AS3 error", "at Values/clampMiddleNull()" in output, output[-800:])
+check("a null that is not the last argument takes Godot's default, with no error", "at Values/clampMiddleNull()" not in output,
+      output[-800:])
+check("a member of a freed object is AS3's null error, and says the object was freed",
+      all(re.search(r"TypeError: Error #1009[^\n]*Godot has freed the object\.\n\s+at Values/%s\(\)" % name, output) for name in
+          ("keptName", "keptRename", "keptChildren")), output[-1500:])
 check("an index out of range is an AS3 error", "at Values/outOfRange()" in output and "at Values/packed()" in output, output[-800:])
 traced = re.search(r"EXPECT TRACE (.*)", output)
 check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])
@@ -166,6 +174,8 @@ check("a listener given the wrong kind of argument is an AS3 error that names it
 check("a listener given too many arguments is an AS3 error that names it",
       "ArgumentError: Error #1063: Argument count mismatch on Signals/onHit(). Expected 1, got 2." in output, output[-1200:])
 check("a listener's argument error says where the listener is", re.search(r"Error #1063[^\n]*\n\s*at Signals/onHit\(\)\[.*Signals\.as:\d+\]", output) is not None, output[-1200:])
+check("Godot is told that a listener given arguments that don't fit was not called",
+      output.count("Error calling from signal 'hit' to callable") == 2, output[-1500:])
 check("a field that is not a signal, by name, is an AS3 error", "'count' is not a signal" in output, output[-1200:])
 check("an error inside a listener is reported", "at Signals/fails()" in output, output[-800:])
 check("a wrong signal name is an AS3 error", output.count("at Signals/listenByName()") == 2, output[-800:])
@@ -207,6 +217,27 @@ check("wide.gd: a wide value for an integer vector is a RangeError, eight times"
       output[-1500:])
 check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError: 9007199254740993 does not fit a Number exactly." in output,
       output[-1200:])
+
+# Godot's global functions, as GDScript works them out.
+output = compare("functions.gd", [
+    "lerpf", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
+    "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
+    "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
+    "anything as text", "a default is not shared",
+])
+check("functions.gd: a function that could not answer is an AS3 error", "at Functions/noAnswer()" in output and "'max'" in output,
+      output[-1200:])
+check("functions.gd: print, printerr and pushWarning reach Godot's output",
+      "said 4 (1.0, 2.0)" in output and "to the error output" in output and "a warning from AS3" in output, output[-1200:])
+check("functions.gd: a wrong argument is an AS3 error that names the function", "at Functions/wrong()" in output and "lerp" in output,
+      output[-1200:])
+
+# Every default the name table records must be one Godot can read back.
+run = subprocess.run([godot, "--headless", "--path", project, "-s", "defaults.gd", "--",
+                      os.path.join(tests, "..", "godot", "godot_names.txt")], capture_output=True, text=True, timeout=300)
+read = re.search(r"DEFAULTS read=(\d+) failed=(.*)", run.stdout)
+check("Godot reads every recorded default", read is not None and int(read.group(1)) > 10 and read.group(2) == "[]",
+      (run.stdout + run.stderr)[-600:])
 
 # An exported game keeps its files in a pack, not in a folder: the scripts must be found and read there.
 import tempfile

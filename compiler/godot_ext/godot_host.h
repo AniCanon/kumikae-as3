@@ -8,6 +8,7 @@
 
 #include <godot_cpp/variant/string_name.hpp>
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -35,9 +36,19 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
+	std::unordered_map<std::string, godot::Variant> evaluated_; // What evaluate() worked out, by its text.
 	const godot::StringName &name(std::string_view p_text);
 
+	// One of Godot's global functions, found once: see godot_utility.cpp.
+	struct Utility;
+	std::unordered_map<std::string_view, std::unique_ptr<Utility>> utilities_;
+	const Utility *utility(std::string_view p_signature, std::string *r_error);
+	bool call_utility(std::string_view p_signature, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
+			vm::Slot *r_result, std::string *r_error);
+
 public:
+	GodotHost();
+	~GodotHost() override;
 	// A handle on an object that does not keep it alive, for a script's hold on what it is attached to: a
 	// script on a reference-counted object must not keep that object from being freed. Dropped like any
 	// other handle. Copies of it are ordinary handles.
@@ -56,10 +67,12 @@ public:
 	bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) override;
 	void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
 	bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	void *singleton(std::string_view p_class, std::string *r_error) override;
 	bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	bool present(void *p_value) override;
 	vm::Str *text(void *p_value) override;
 	void *copy(void *p_value) override;
 	void drop(void *p_value) override;
@@ -73,5 +86,10 @@ vm::Slot from_variant(ir::Kind p_kind, const godot::Variant &p_value);
 // this name ("Vector2", "Node"; empty for any). Numbers are taken as GDScript itself would take them, but
 // one that does not fit an int or a uint is refused, never wrapped.
 bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const godot::Variant &p_value);
+// What Godot gave, as the interpreter asked for it; refused, with a message that names p_from, if it is
+// something else.
+bool take(const vm::Wanted &p_wanted, const godot::Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error);
+// One of Godot's value types by its name ("Vector2"), or -1.
+int value_type(std::string_view p_name);
 
 } // namespace kas3
