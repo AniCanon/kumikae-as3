@@ -7,7 +7,7 @@ object RequestFields {
     private val device = "device:s"
     private val geometry = "$device generation:i width:i height:i x:n y:n"
     private val fields = mapOf(
-        "devices" to "", "status" to "", "select" to device, "boot" to device,
+        "devices" to "", "status" to "", "select" to device, "boot" to device, "shutdown" to device,
         "screenshot" to "$device format?:s", "tap" to geometry,
         "swipe" to "$geometry endX:n endY:n durationMs:i", "text" to "$device text:s",
         "button" to "$device button:s", "rotate" to "$device orientation:s",

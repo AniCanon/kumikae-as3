@@ -4,6 +4,7 @@ import com.google.gson.JsonObject
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.imageio.ImageIO
 
 data class Frame(
@@ -29,29 +30,41 @@ class SimulatorSession(
 
     @Volatile private var closed = false
 
-    @Synchronized fun dispatch(method: String, params: JsonObject): Any {
+    // Held by the one boot, install or shutdown that is running. They take up to two minutes, so they run
+    // outside the session's lock: status, the list, the log and pictures still answer meanwhile.
+    private val slow = AtomicBoolean()
+
+    fun dispatch(method: String, params: JsonObject): Any {
         if (closed) throw SimulatorException("CLOSED", "Session is closed")
-        if (method == "devices") return Devices.parse(runner.run(Commands.list(), 15_000))
+        return when (method) {
+            "devices" -> devices()
+
+            "select" -> select(params["device"].asString)
+
+            "boot" -> slowly(params) { device ->
+                runner.run(Commands.boot(device), SLOW_MILLIS)
+                settle(device, "Booted")
+            }
+
+            "shutdown" -> slowly(params) { device ->
+                runner.run(Commands.shutdown(device), SLOW_MILLIS)
+                settle(device, "Shutdown")
+            }
+
+            "install" -> slowly(params) { device -> install(device, params["path"].asString) }
+
+            else -> synchronized(this) { quickly(method, params) }
+        }
+    }
+
+    private fun quickly(method: String, params: JsonObject): Any {
         if (method == "status") return status()
         if (method == "log") {
             return mapOf("page" to launchLog.buffer.read(params["cursor"].asLong), "launch" to launchLog.status())
         }
-        if (method == "select") return select(params["device"].asString)
-        val device = selected?.id ?: throw SimulatorException("NO_DEVICE", "Select a device first")
-        if (params["device"].asString != device) {
-            throw SimulatorException("DEVICE_CHANGED", "The session selected a different device")
-        }
+        val device = chosen(params)
         return when (method) {
-            "boot" -> {
-                invalidate()
-                runner.run(Commands.boot(device), 120_000)
-                selected = selected?.copy(state = "Booted")
-                status()
-            }
-
             "screenshot" -> capture(device, params["format"]?.asString ?: "png")
-
-            "install" -> install(device, params["path"].asString)
 
             "launch" -> {
                 invalidate()
@@ -64,6 +77,39 @@ class SimulatorSession(
 
             else -> throw IllegalArgumentException("Unknown method")
         }
+    }
+
+    private fun chosen(params: JsonObject): String {
+        val device = selected?.id ?: throw SimulatorException("NO_DEVICE", "Select a device first")
+        if (params["device"].asString != device) {
+            throw SimulatorException("DEVICE_CHANGED", "The session selected a different device")
+        }
+        return device
+    }
+
+    private fun slowly(params: JsonObject, work: (String) -> Any): Any {
+        val device = synchronized(this) { chosen(params).also { invalidate() } }
+        if (!slow.compareAndSet(false, true)) {
+            throw SimulatorException("BUSY", "Another boot, shutdown or install is still running")
+        }
+        try {
+            return work(device)
+        } finally {
+            slow.set(false)
+        }
+    }
+
+    @Synchronized private fun settle(device: String, state: String): Any {
+        if (selected?.id == device) selected = selected?.copy(state = state)
+        invalidate()
+        return status()
+    }
+
+    /** The list is read outside the lock, and what it says of the selected device replaces what was known. */
+    private fun devices(): List<Device> {
+        val found = Devices.parse(runner.run(Commands.list(), LIST_MILLIS))
+        synchronized(this) { selected = selected?.let { current -> found.find { it.id == current.id } ?: current } }
+        return found
     }
 
     private fun status() = mapOf(
@@ -84,14 +130,16 @@ class SimulatorSession(
     )
 
     private fun select(id: String): Any {
-        val device = Devices.parse(runner.run(Commands.list(), 15_000)).find { it.id == id }
+        val device = devices().find { it.id == id }
             ?: throw SimulatorException("NO_DEVICE", "That available iOS device was not found")
-        if (selected?.id != id) {
-            launchLog.close()
-            invalidate()
+        synchronized(this) {
+            if (selected?.id != id) {
+                launchLog.close()
+                invalidate()
+            }
+            selected = device
+            return status()
         }
-        selected = device
-        return status()
     }
 
     private fun capture(device: String, format: String): Frame {
@@ -195,7 +243,7 @@ class SimulatorSession(
         require(path.isAbsolute && app.endsWith(".app") && Files.isDirectory(path)) {
             "Choose an existing absolute .app directory"
         }
-        runner.run(Commands.install(device, path.toString()), 120_000)
+        runner.run(Commands.install(device, path.toString()), SLOW_MILLIS)
         return mapOf("installed" to true)
     }
 
@@ -221,5 +269,10 @@ class SimulatorSession(
             invalidate()
             launchLog.close()
         }
+    }
+
+    private companion object {
+        const val SLOW_MILLIS = 120_000L
+        const val LIST_MILLIS = 15_000L
     }
 }

@@ -48,13 +48,15 @@ class SimulatorWindowControllerTest {
     }
 
     @Test fun `a screenshot that arrives after the device changed is dropped`() {
+        val tablet = repository.tablet.copy(state = "Booted")
+        repository.listed = listOf(repository.phone, tablet)
         open()
         controller.poll()
         polling.runWork()
-        controller.selectDevice(repository.tablet)
+        controller.selectDevice(tablet)
         polling.deliver()
         assertNull(controller.frame)
-        assertEquals(repository.tablet, controller.selected)
+        assertEquals(tablet, controller.selected)
         actions.finish()
         assertNull(controller.frame)
         pollOnce()
@@ -201,10 +203,12 @@ class SimulatorWindowControllerTest {
     }
 
     @Test fun `a selection made by another client is followed`() {
+        val tablet = repository.tablet.copy(state = "Booted")
+        repository.listed = listOf(repository.phone, tablet)
         open()
-        repository.selected = repository.tablet
+        repository.selected = tablet
         pollOnce()
-        assertEquals(repository.tablet, controller.selected)
+        assertEquals(tablet, controller.selected)
         assertEquals("B", controller.frame?.device)
     }
 
@@ -254,5 +258,59 @@ class SimulatorWindowControllerTest {
         controller.refreshDevices()
         actions.finish()
         assertEquals(2, controller.devices.size)
+    }
+
+    @Test fun `opening a device that is shut down selects it and boots it`() {
+        open(select = null)
+        controller.open(repository.tablet)
+        assertEquals("Booting Tablet…", controller.status)
+        actions.finish()
+        assertEquals(listOf("select B", "boot B"), repository.calls)
+        assertEquals("Booted", controller.selected?.state)
+        assertEquals(listOf("A", "B"), controller.running.map { it.id })
+    }
+
+    @Test fun `opening a device that is running only selects it`() {
+        open(select = null)
+        controller.open(repository.phone)
+        actions.finish()
+        assertEquals(listOf("select A"), repository.calls)
+        assertEquals(repository.phone, controller.selected)
+    }
+
+    @Test fun `shutting a device down stops it, lists it as shut down and drops its picture`() {
+        open()
+        pollOnce()
+        repository.calls.clear()
+        controller.shutdown(repository.phone)
+        assertNull(controller.frame)
+        actions.finish()
+        assertEquals(listOf("select A", "shutdown A"), repository.calls)
+        assertEquals("Shutdown", controller.devices.first { it.id == "A" }.state)
+        assertTrue(controller.running.isEmpty())
+        assertEquals("Phone is shut down.", controller.status)
+    }
+
+    @Test fun `the list is read again every few polls, without a word in the status line`() {
+        open()
+        controller.launch("org.example.game")
+        actions.finish()
+        val said = controller.status
+        repository.listed = listOf(repository.phone, repository.tablet.copy(state = "Booted"))
+        repeat(LIST_EVERY) { pollOnce() }
+        assertEquals(1, repository.calls.count { it == "devices" })
+        assertEquals(listOf("A", "B"), controller.running.map { it.id })
+        assertEquals(said, controller.status)
+    }
+
+    @Test fun `a device that is not running is not asked for its picture`() {
+        open(select = repository.tablet)
+        pollOnce()
+        assertEquals(listOf("status", "console 0"), repository.calls)
+        assertNull(controller.frame)
+    }
+
+    private companion object {
+        const val LIST_EVERY = 6
     }
 }

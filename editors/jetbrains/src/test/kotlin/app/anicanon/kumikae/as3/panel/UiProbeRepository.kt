@@ -56,6 +56,12 @@ internal class UiProbeRepository : SimulatorRepository {
         return current()
     }
 
+    override fun shutdown(device: String): SimulatorStatus {
+        record("shutdown $device")
+        selected = selected?.copy(state = "Shutdown")
+        return current()
+    }
+
     override fun boot(device: String): SimulatorStatus {
         record("boot $device")
         bootGate?.await()

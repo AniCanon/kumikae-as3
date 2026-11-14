@@ -40,6 +40,7 @@ internal class SimulatorWindowController(
     // Counts every change that makes an in-flight picture out of date. It is not the service's geometry generation.
     private var pictureEpoch = 0L
     private var pollFailed = false
+    private var polls = 0
     private var lastError: String? = null
 
     fun shown() {
@@ -70,6 +71,44 @@ internal class SimulatorWindowController(
         // an action must never name a device the user cannot see. The service's own choice returns with
         // the running action's result or the next poll.
         selected = device
+    }
+
+    /** The devices that are running: each has a tab. */
+    val running: List<SimulatorDevice> get() = devices.filter { it.state == BOOTED }
+
+    /** Shows a device, starting it first if it is not running. */
+    fun open(device: SimulatorDevice) {
+        if (device.state == BOOTED) {
+            selectDevice(device)
+            return
+        }
+        if (disposed) return
+        val work = {
+            repository.select(device.id)
+            repository.boot(device.id)
+        }
+        if (run("Booting ${device.name}", work, clearsPicture = true) {
+                showStatus(it, fresh = true)
+                status = "Booted."
+            }
+        ) {
+            selected = device
+        }
+    }
+
+    fun shutdown(device: SimulatorDevice) {
+        if (disposed) return
+        val work = {
+            repository.select(device.id)
+            repository.shutdown(device.id)
+        }
+        if (run("Shutting down ${device.name}", work, clearsPicture = true) {
+                showStatus(it, fresh = true)
+                status = "${device.name} is shut down."
+            }
+        ) {
+            selected = device
+        }
     }
 
     fun boot() = onDevice("Booting", clearsPicture = true, work = repository::boot) {
@@ -113,11 +152,14 @@ internal class SimulatorWindowController(
         if (disposed || !visible || !connected || actions.isBusy || polling.isBusy) return
         val epoch = pictureEpoch
         val from = cursor
-        polling.submit({ readState(from) }) { result ->
+        // A device started or stopped elsewhere shows up here: the list is cheap, but not free.
+        val list = ++polls % LIST_EVERY == 0
+        polling.submit({ readState(from, list) }) { result ->
             if (disposed) return@submit
             val state = result.getOrElse { Polled(failure = it) }
             state.page?.let(::showPage)
             if (epoch != pictureEpoch) return@submit
+            state.devices?.let(::listDevices)
             state.status?.let { showStatus(it, fresh = false) }
             state.frame?.takeIf { it.device == selected?.id }?.let {
                 frame = it
@@ -147,18 +189,21 @@ internal class SimulatorWindowController(
         val status: SimulatorStatus? = null,
         val frame: SimulatorFrame? = null,
         val page: ConsolePage? = null,
+        val devices: List<SimulatorDevice>? = null,
         val failure: Throwable? = null,
     )
 
     /** Runs on the polling worker. One failing read must not hide the others, so each is caught separately. */
-    private fun readState(from: Long): Polled {
+    private fun readState(from: Long, list: Boolean): Polled {
         var failure: Throwable? = null
+        val found = if (list) runCatching { repository.devices() }.onFailure { failure = it }.getOrNull() else null
         val status = runCatching { repository.status() }.onFailure { failure = it }.getOrNull()
-        val frame = status?.device?.let { device ->
+        // A device that is not running has no screen; asking would only fail twice a second.
+        val frame = status?.device?.takeIf { it.state == BOOTED }?.let { device ->
             runCatching { repository.screenshot(device.id) }.onFailure { failure = it }.getOrNull()
         }
         val page = runCatching { repository.consolePage(from) }.onFailure { failure = failure ?: it }.getOrNull()
-        return Polled(status, frame, page, failure)
+        return Polled(status, frame, page, found, failure)
     }
 
     private fun connect(): Boolean = actions.submit({ repository.connect() to repository.devices() }) { result ->
@@ -185,29 +230,35 @@ internal class SimulatorWindowController(
         }
     }
 
-    private fun <T> run(label: String, work: () -> T, clearsPicture: Boolean = false, success: (T) -> Unit) {
-        if (disposed) return
+    private fun <T> run(label: String, work: () -> T, clearsPicture: Boolean = false, success: (T) -> Unit): Boolean {
+        if (disposed) return false
         if (!connected) {
             status = "The local Simulator service is still starting."
-            return
+            return false
         }
         val started = actions.submit(work) { result ->
             if (!disposed) result.fold(success, ::showFailure)
         }
         if (!started) {
             status = BUSY
-            return
+            return false
         }
         status = "$label…"
         pollFailed = false
         lastError = null
         if (clearsPicture) clearPicture()
+        return true
+    }
+
+    private fun listDevices(found: List<SimulatorDevice>) {
+        devices = found
+        val current = selected ?: return
+        selected = found.firstOrNull { it.id == current.id }
+        if (selected?.state != BOOTED) clearPicture()
     }
 
     private fun showDevices(found: List<SimulatorDevice>) {
-        devices = found
-        selected = selected?.let { current -> found.firstOrNull { it.id == current.id } }
-        if (selected == null) clearPicture()
+        listDevices(found)
         status = if (found.isEmpty()) {
             "No available iOS devices. Add one in Xcode."
         } else {
@@ -255,6 +306,8 @@ internal class SimulatorWindowController(
     }
 
     private companion object {
+        const val BOOTED = "Booted"
+        const val LIST_EVERY = 6
         const val BUSY = "Another Simulator action is still running. Try again when it finishes."
         const val TAP_SLOP = 6
         const val MAX_STATUS = 300

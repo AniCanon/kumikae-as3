@@ -13,6 +13,8 @@ internal interface SimulatorRepository : AutoCloseable {
 
     fun boot(device: String): SimulatorStatus
 
+    fun shutdown(device: String): SimulatorStatus
+
     fun install(device: String, appPath: String)
 
     fun launch(device: String, bundle: String)

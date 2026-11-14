@@ -49,6 +49,7 @@ change its selection; a stale device request fails instead of reaching a new one
 | `select` | `device`: string | Status. A different selection closes the current console. |
 | `status` | `{}` | `device` object or null, `generation`, `inputEnabled`, `pixelsPerPoint`, `inputNotice`, `launch`. |
 | `boot` | `device` | Status after `bootstatus -b`, with a 120-second limit. |
+| `shutdown` | `device` | Status after `simctl shutdown`, with a 120-second limit. |
 | `screenshot` | `device`, optional `format`: `png` or `jpeg` (default `png`) | Frame described below. |
 | `tap` | `device`, `generation`, `width`, `height`, `x`, `y` | `{sent:true}`. |
 | `swipe` | Tap fields plus `endX`, `endY`, `durationMs` | `{sent:true}`. Duration 50–5,000 ms. |

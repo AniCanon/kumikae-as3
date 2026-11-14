@@ -31,8 +31,8 @@ object SessionDirectory {
 class LocalServer(private val directory: Path, private val protocol: Protocol) : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 8)
     private val executor = ThreadPoolExecutor(
-        2,
-        2,
+        API_THREADS,
+        API_THREADS,
         0,
         TimeUnit.SECONDS,
         ArrayBlockingQueue(4),
@@ -103,5 +103,10 @@ class LocalServer(private val directory: Path, private val protocol: Protocol) :
         server.stop(0)
         executor.shutdownNow()
         Files.deleteIfExists(endpointFile)
+    }
+
+    private companion object {
+        // One may be held for two minutes by a boot; the panel and an agent each still need one or two.
+        const val API_THREADS = 4
     }
 }

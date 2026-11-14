@@ -50,6 +50,12 @@ internal class FakeSimulatorRepository : SimulatorRepository {
         return SimulatorStatus(selected, inputEnabled, notice)
     }
 
+    override fun shutdown(device: String): SimulatorStatus {
+        record("shutdown $device")
+        selected = selected?.copy(state = "Shutdown")
+        return SimulatorStatus(selected, inputEnabled, notice)
+    }
+
     override fun install(device: String, appPath: String) = record("install $device $appPath")
 
     override fun launch(device: String, bundle: String) = record("launch $device $bundle")

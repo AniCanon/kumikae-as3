@@ -27,6 +27,8 @@ internal class ApiSimulatorRepository(private val service: SimulatorService) : S
 
     override fun boot(device: String): SimulatorStatus = status(service.call("boot", mapOf("device" to device)))
 
+    override fun shutdown(device: String): SimulatorStatus = status(service.call("shutdown", mapOf("device" to device)))
+
     override fun install(device: String, appPath: String) {
         service.call("install", mapOf("device" to device, "path" to appPath))
     }
