@@ -1082,6 +1082,83 @@ static void compile(const char *p_source, ir::Module *r_module, const char *p_fi
 }
 
 // A running program's objects are moved onto a newer build of it: what they hold stays, what they do is new.
+// Vectors across a reload: one is moved with its elements, and the objects in it are moved too.
+static void test_reload_vectors() {
+	const char *before = "package { public class Bag {\n"
+						 "  public var numbers:Vector.<int> = new <int>[1, 2]; public var words:Vector.<String> = new <String>[\"a\"];\n"
+						 "  public var things:Vector.<Thing> = new Vector.<Thing>(); public var locked:Vector.<Number> = new Vector.<Number>(2, true);\n"
+						 "  public function fill():int { things.push(new Thing(7), new Thing(8)); things.push(things[0]); numbers.push(3); return things.length; }\n"
+						 "} }\n"
+						 "class Thing { public var n:int; public function Thing(n:int) { this.n = n; } }\n";
+	const char *after = "package { public class Bag {\n"
+						"  public var numbers:Vector.<int> = new <int>[9]; public var words:Vector.<String> = new <String>[\"z\"];\n"
+						"  public var things:Vector.<Thing> = new Vector.<Thing>(); public var locked:Vector.<Number> = new Vector.<Number>();\n"
+						"  public function sum():int { var t:int = 0; for each (var n:int in numbers) { t += n; } return t; }\n"
+						"  public function tell():String { return numbers + \"|\" + words + \"|\" + things.length + \"|\" + locked.fixed + locked.length; }\n"
+						"  public function same():Boolean { return things[0] == things[2] && things[0] != things[1]; }\n"
+						"  public function worth():int { things[0].n += 100; return things[2].worth() + things[1].worth(); }\n"
+						"} }\n"
+						"class Thing { public var n:int; public function Thing(n:int) { this.n = n; } public function worth():int { return n * 2; } }\n";
+	ir::Module old_module, new_module;
+	compile(before, &old_module, "Bag.as");
+	compile(after, &new_module, "Bag.as");
+	{
+		Recorder recorder;
+		auto running = std::make_unique<vm::Interpreter>(old_module, recorder);
+		CHECK(running->start());
+		vm::Object *bag = running->construct(class_named(old_module, "Bag"), nullptr);
+		vm::Slot result;
+		CHECK(running->call_method(bag, "fill", nullptr, 0, &result));
+		CHECK_EQ(result.i, 3);
+		vm::Interpreter fresh(new_module, recorder);
+		vm::Reload reload(*running, fresh);
+		vm::Object *moved = reload.object(bag);
+		CHECK(moved != nullptr);
+		CHECK_EQ(reload.missing(), std::string());
+		reload.globals();
+		running->release_object(bag);
+		running.reset();
+		if (moved) {
+			CHECK(fresh.call_method(moved, "sum", nullptr, 0, &result));
+			CHECK_EQ(result.i, 6);
+			CHECK(fresh.call_method(moved, "tell", nullptr, 0, &result));
+			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("1,2,3|a|3|true2"));
+			fresh.discard(ir::Kind::Str, result);
+			// The same object twice in the vector is still one object.
+			CHECK(fresh.call_method(moved, "same", nullptr, 0, &result));
+			CHECK(result.b);
+			CHECK(fresh.call_method(moved, "worth", nullptr, 0, &result));
+			CHECK_EQ(result.i, 214 + 16);
+			fresh.release_object(moved);
+		}
+		CHECK_EQ(recorder.errors, std::string());
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+
+	// A vector whose type the new program no longer has, or has with other elements, can't be moved.
+	ir::Module without;
+	compile("package { public class Bag { public var numbers:Vector.<Number> = new Vector.<Number>(); } }", &without, "Bag.as");
+	{
+		Recorder recorder;
+		vm::Interpreter running(old_module, recorder);
+		CHECK(running.start());
+		vm::Object *bag = running.construct(class_named(old_module, "Bag"), nullptr);
+		vm::Interpreter fresh(without, recorder);
+		{
+			vm::Reload reload(running, fresh);
+			vm::Object *moved = reload.object(bag);
+			CHECK_EQ(reload.missing(), std::string("Vector.<int>"));
+			if (moved) {
+				fresh.release_object(moved);
+			}
+		}
+		running.release_object(bag);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 static void test_reload() {
 	const char *before = "package { public class Counter {\n"
 						 "  public var count:int; public var label:String = \"first\"; public var other:Counter;\n"
@@ -1271,6 +1348,7 @@ static void test_failed_static_initializer() {
 
 int main() {
 	test_reload();
+	test_reload_vectors();
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();

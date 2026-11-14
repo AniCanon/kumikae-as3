@@ -64,6 +64,24 @@ Object *Reload::object(Object *p_old) {
 		return nullptr;
 	}
 	const ir::Class &new_class = to_.module_.classes[named->second];
+	if (old_class.element != Kind::Void || new_class.element != Kind::Void) {
+		// A vector: the same length, and each element carried as a field is. Its type must still hold
+		// elements of the same kind.
+		const Vector *old = static_cast<const Vector *>(p_old);
+		Vector *vector = old_class.element == new_class.element ? new_vector(named->second, old->length, old->fixed) : nullptr;
+		if (!vector) {
+			if (missing_.empty()) {
+				missing_ = old_class.name;
+			}
+			return nullptr;
+		}
+		moved_.emplace(p_old, vector);
+		retain(vector);
+		for (uint32_t i = 0; i < old->length; i++) {
+			vector->data[i] = carry(new_class.element, old->data[i]);
+		}
+		return vector;
+	}
 	Object *fresh = new_object(named->second, new_class.fields.size());
 	if (!fresh) {
 		return nullptr;
