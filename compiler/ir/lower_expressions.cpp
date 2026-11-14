@@ -334,6 +334,9 @@ uint32_t Lowerer::conditional(Expr *p_expression, Kind p_want) {
 
 uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 	uint32_t position = p_expression->offset;
+	if (const auto held = evaluated_.find(p_expression); held != evaluated_.end()) {
+		return held->second;
+	}
 	switch (p_expression->kind) {
 		case NodeKind::NumberLit:
 			return number_literal(p_expression, p_want);

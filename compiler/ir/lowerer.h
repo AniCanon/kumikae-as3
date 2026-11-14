@@ -23,6 +23,7 @@ namespace ir {
 struct Loop {
 	std::vector<uint32_t> breaks; // Jumps to patch to the loop's end.
 	std::vector<uint32_t> continues; // Jumps to patch to where the loop continues.
+	bool is_switch = false; // A `switch`: `break` leaves it, `continue` belongs to the loop around it.
 };
 
 class Lowerer {
@@ -60,6 +61,9 @@ class Lowerer {
 	bool constructor_ = false;
 	std::unordered_map<const Symbol *, uint32_t> locals_;
 	std::vector<Loop> loops_;
+	// Expressions whose value is already in a register and must not be worked out again: the subject of
+	// a `switch`, which every `case` is compared with.
+	std::unordered_map<const Expr *, uint32_t> evaluated_;
 
 	Function &fn() { return module_.functions[function_index_]; }
 	const Function &fn() const { return module_.functions[function_index_]; }
@@ -335,6 +339,7 @@ class Lowerer {
 	void while_loop(Stmt *p_statement);
 	void do_while_loop(Stmt *p_statement);
 	void for_loop(Stmt *p_statement);
+	void switch_statement(Stmt *p_statement);
 	void break_or_continue(Stmt *p_statement);
 	void return_statement(Stmt *p_statement);
 	void throw_statement(Stmt *p_statement);
