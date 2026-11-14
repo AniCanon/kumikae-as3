@@ -2,6 +2,8 @@ package app.anicanon.kumikae.as3.project
 
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.run.GodotLaunch
+import com.intellij.ide.SelectInTarget
+import com.intellij.ide.impl.ProjectViewSelectInTarget
 import com.intellij.ide.projectView.impl.ProjectViewPane
 import com.intellij.openapi.project.Project
 import java.nio.file.Path
@@ -22,10 +24,20 @@ class GamePane(project: Project) : ProjectViewPane(project) {
     // Before the IDE's own views, so that it is the first in the list.
     override fun getWeight() = -10
 
+    // The standard view's target names the standard view: the IDE refuses it for a view of another name.
+    override fun createSelectInTarget(): SelectInTarget = object : ProjectViewSelectInTarget(myProject) {
+        override fun toString() = "Game"
+
+        override fun getMinorViewId() = ID
+
+        override fun getWeight() = SELECT_WEIGHT
+    }
+
     override fun isInitiallyVisible(): Boolean =
         myProject.basePath?.let { runCatching { GodotLaunch.isAs3Game(Path.of(it)) }.getOrDefault(false) } ?: false
 
     companion object {
         const val ID = "KumikaeAs3Game"
+        private const val SELECT_WEIGHT = 0.5f
     }
 }
