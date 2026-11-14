@@ -4,6 +4,3 @@ ir/lower_calls.cpp: Lowerer::call() is over 120 lines
 ir/lower_classes.cpp: Lowerer::declare_class() is over 120 lines
 ir/lower_operators.cpp: Lowerer::operate() is over 120 lines
 ir/lower_types.cpp: Lowerer::convert() is over 120 lines
-src/ast_printer.cpp: node() is over 120 lines
-src/ast_walk.h: walk() is over 120 lines
-src/names_bodies.cpp: statement() is over 120 lines

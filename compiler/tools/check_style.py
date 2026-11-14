@@ -22,6 +22,8 @@ FUNCTION_LIMIT = 120
 # A dispatch switch whose cases each call a named function (guidelines, section 1).
 DISPATCH = {
     "Interpreter::run",  # The interpreter's loop, one case per operation.
+    "walk",  # src/ast_walk.h: the children of each kind of node.
+    "node",  # src/ast_printer.cpp: the text of each kind of node.
 }
 
 BANNER = re.compile(r"^\s*//\s*-{3,}")

@@ -349,6 +349,26 @@ class Resolver {
 		loops_--;
 	}
 
+	// Each `catch` has a scope of its own, holding the variable it catches into.
+	void try_statement(Try *p_try) {
+		statement(p_try->body);
+		for (CatchClause &clause : p_try->catches) {
+			type(clause.type);
+			Scope scope;
+			scope.parent = scope_;
+			if (!clause.name.empty()) {
+				Symbol *symbol = compilation_.new_symbol(SymbolKind::CatchVariable, clause.name, &unit_, clause.name_offset);
+				symbol->type = clause.type;
+				clause.symbol = symbol;
+				scope.names.emplace(clause.name, symbol);
+			}
+			scope_ = &scope;
+			statement(clause.body);
+			scope_ = scope.parent;
+		}
+		statement(p_try->finally_block);
+	}
+
 	void statement(Stmt *p_statement) {
 		if (!p_statement) {
 			return;
@@ -442,26 +462,9 @@ class Resolver {
 			case NodeKind::Throw:
 				expression(static_cast<Throw *>(p_statement)->value);
 				break;
-			case NodeKind::Try: {
-				Try *attempt = static_cast<Try *>(p_statement);
-				statement(attempt->body);
-				for (CatchClause &clause : attempt->catches) {
-					type(clause.type);
-					Scope scope;
-					scope.parent = scope_;
-					if (!clause.name.empty()) {
-						Symbol *symbol = compilation_.new_symbol(SymbolKind::CatchVariable, clause.name, &unit_,
-								clause.name_offset);
-						symbol->type = clause.type;
-						clause.symbol = symbol;
-						scope.names.emplace(clause.name, symbol);
-					}
-					scope_ = &scope;
-					statement(clause.body);
-					scope_ = scope.parent;
-				}
-				statement(attempt->finally_block);
-			} break;
+			case NodeKind::Try:
+				try_statement(static_cast<Try *>(p_statement));
+				break;
 			case NodeKind::Labeled: {
 				Labeled *labeled = static_cast<Labeled *>(p_statement);
 				labels_.push_back({ labeled->label, labeled->body && is_loop(labeled->body) });
