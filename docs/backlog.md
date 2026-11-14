@@ -6,6 +6,8 @@ An item leaves this page only when it is fixed, with a test, or when the owner d
 
 The [roadmap](roadmap.md) says what is being built now. This page says what is owed, and when.
 
+- **Stage 6, Simulator:** unblock and verify the [JetBrains build](../editors/jetbrains/), choose whether to adopt idb's private input interfaces, and check the panel, input and Godot report end to end; see the [results](results/2026-11-jetbrains-simulator.md).
+
 ## How this page is kept
 
 - When a stage's review defers a finding, it is added here in the same branch, with the stage that fixes it.

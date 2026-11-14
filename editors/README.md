@@ -52,6 +52,8 @@ The colouring is a small grammar: keywords, strings, comments and numbers.
 
 ## Rider and other JetBrains IDEs
 
+The first [Kumikae JetBrains plugin](jetbrains/) adds source for a macOS Simulator panel and an agent interface. Its build is blocked on an uncached dependency; it has not run in Rider. It does not yet replace the language-server setup below.
+
 JetBrains IDEs take a language server through a plugin. Until this project has its own plugin, the
 [LSP4IJ](https://github.com/redhat-developer/lsp4ij) plugin connects any language server without one:
 

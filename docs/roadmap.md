@@ -139,6 +139,8 @@ touches console vendor material stays out of this repository.
 
 ### Stage 6: tooling
 
+An early [Simulator panel and agent interface](../editors/jetbrains/) is written; the offline build is blocked and Rider input remains unverified. This does not deliver AS3 breakpoints or stepping.
+
 **Delivers:** the rest of the language server (Godot's documentation, code actions, rename), the debug
 adapter, and one JetBrains plugin that covers Rider and the other IDEs.
 

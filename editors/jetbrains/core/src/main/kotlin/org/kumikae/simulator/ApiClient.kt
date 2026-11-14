@@ -16,6 +16,7 @@ class ApiClient(private val endpoint: Endpoint) {
         try {
             connection.connectTimeout = 2000
             connection.readTimeout = 130_000
+            connection.instanceFollowRedirects = false
             connection.requestMethod = "POST"
             connection.setRequestProperty("Authorization", "Bearer ${endpoint.token}")
             connection.setRequestProperty("Content-Type", "application/json")

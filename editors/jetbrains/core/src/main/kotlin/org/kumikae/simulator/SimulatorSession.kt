@@ -38,8 +38,11 @@ class SimulatorSession(private val directory: Path, private val runner: CommandR
 
     private fun status() = mapOf("device" to selected, "generation" to generation,
         "inputEnabled" to (selected?.let { input.supports(it.id) } ?: false), "pixelsPerPoint" to input.scale,
-        "inputNotice" to if (input.enabled) "idb input uses private Apple interfaces; compatibility is unverified"
-            else "Viewer mode. Use Device Hub for input, or explicitly enable idb.",
+        "inputNotice" to when {
+            !input.enabled -> "Viewer mode. Use Device Hub for input, or explicitly enable idb."
+            selected?.let { input.supports(it.id) } != true -> "Viewer mode. The configured idb scale belongs to another device."
+            else -> "idb input uses private Apple interfaces; compatibility is unverified"
+        },
         "launch" to launchLog.status())
 
     private fun select(id: String): Any {
