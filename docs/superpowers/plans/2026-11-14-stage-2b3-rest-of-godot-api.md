@@ -235,9 +235,67 @@ tests in `compiler/tests/run/` (programs with expected output), `test_vm.cpp`, `
 
 ## Part C: global functions and errors
 
-Planned in detail after part A's review, which will show what the static call path can carry. Outline:
+Branch `feat/godot-functions`.
 
-- C1. Global functions as `HostCallStatic` with no class: `print`, `lerp`, `randf`, `clampi`.
-- C2. An uncaught AS3 error shown as Godot shows its own, with the script's file and line.
-- C3. The six backlog items of this part, each with a failing test first.
-- C4. Documents, review, fix pass.
+### Design decisions for part C (rulings made while planning)
+
+1. **A global function is called through Godot's own entry for it,** which takes arguments of exact
+   types, not boxed values. So the call needs the function's signature. The generator writes it into the
+   name table (`@global.lerpf=lerpf 4776452 float float,float,float`: Godot's name, the hash Godot asks
+   for, the result, the arguments, and `...` for one that takes any number). The lowerer puts that text in
+   the `HostCallStatic` it emits, with no class; the host reads it, finds the function once and keeps it.
+2. **An argument is converted to the type the function declares,** by Godot's own conversion, after the
+   same check as any value going to Godot. A function that takes any number of arguments takes them as
+   they are.
+3. **A function that gives back "anything" (`lerp`, `max`, `clamp`: 26 of them) can be used where the
+   program says what it expects,** a number, a Boolean or text: `var x:Number = lerp(a, b, 0.5)`. What
+   arrives is checked. Used where nothing says (`var x = ...`, an argument of type `*`), or for one of
+   Godot's values, it waits for AS3's untyped value (2c) and is refused by name. Each has a typed twin
+   (`lerpf`, `maxf`, `clampi`) that needs none of this.
+4. **`print` is Godot's,** and `trace` stays AS3's: both write to Godot's output.
+5. **An uncaught AS3 error is reported as a script error,** through the entry Godot gives extensions for
+   that, with the script's file and line as its source, so that the editor shows it where it shows a
+   GDScript error and can open the line. The AS3 stack follows as the message.
+6. **A listener given arguments that don't fit tells Godot so** (the call fails with Godot's own error
+   code) after the AS3 error is reported, so that `callv` and `filter` see the failure.
+7. **A freed Godot object is `null` to a script,** wherever it is looked at: compared, tested, used. A
+   member reached on one is AS3's null error, saying that the object was freed.
+
+### Review Focus (part C)
+
+1. An argument of the wrong type at each kind of parameter of a global function: text where a number is
+   declared, a fraction where a whole number is, an object where a value is, `null`.
+2. A global function's result into each kind of register, and a wide whole number into an `int`.
+3. Memory: a `String` or packed array argument or result that is not let go; a call that fails half way.
+4. An error raised inside a call made by a global function (a callable passed to one).
+5. The six backlog items, each from both sides: the case the item names, and the nearest case that
+   must not change.
+
+### Task C1: global functions
+
+**Files:** `compiler/godot/generate.py`, `test_generate.py`, `godot_names.txt`; `compiler/ir/lower_calls.cpp`;
+`compiler/godot_ext/godot_host.cpp` (and a new `godot_utility.cpp`); tests in `tests/test_vm.cpp`,
+`tests/godot_project/Functions.as`, `functions.gd`, `run_godot.py`.
+
+- [ ] Tests first, each beside GDScript's answer: `lerpf`, `clampf`, `clampi`, `absi`, `maxi`, `sin`,
+  `degToRad`, `snappedf`, `wrapi`, `posmod`, `isEqualApprox`, `randf` within its range, `randiRange`,
+  `hash("abc")`, `str(1, "a", v)`, `isInstanceValid(node)`, `instanceFromId(id)`, `print` and `printerr`
+  seen in the output, `pushWarning`; `var x:Number = lerp(1, 2, 0.5)` and `var n:int = max(3, 7)`;
+  `var x = lerp(...)` refused by name; text where a number is declared is an AS3 error.
+- [ ] Run, fail; implement; pass in the normal and sanitizer builds; commit.
+
+### Task C2: errors as Godot shows its own
+
+- [ ] Tests first: an uncaught error in `_physicsProcess` and in a called method is reported once, as a
+  script error whose source is the `.as` file and line, with the AS3 stack; the engine carries on.
+- [ ] Run, fail; implement; pass; commit.
+
+### Task C3: the six backlog items
+
+- [ ] One failing test and one fix per item: the middle `null` default; a freed node and `null`; the
+  message on a freed node; a freed handle counted as not null; a listener's argument error reported as
+  success; the order of the null check on a Godot member.
+
+### Task C4: documents, review, fix pass
+
+- [ ] As A5.
