@@ -24,7 +24,7 @@ it stands.
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
 | **2c** | The rest of the language | 18 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 13 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
-| **2d** | Editor features | 15 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
+| **2d** | Editor features | 19 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 44 | What is left |
 | **decision** | The owner | 7 | See each item |
 
@@ -240,6 +240,16 @@ any Godot value passing as a condition):
 - A local of a nested function is offered in the function around it, and the reverse. **LS-2**
 - Whether a `name:` is a type's place is read from the text before it, not from the tree, when the type
   has not been started (`var a:`). **LS-2**
+
+## Reload while running
+
+- An object alive before a reload is not constructed again: a field added by the edit starts empty on
+  it, and a changed first value does not reach it. **2d**
+- Scripts are looked at five times a second by their time and size; two saves of the same size within
+  one second are seen as one. **2d**
+- A reload is refused when a class with a live object was removed or renamed. **2d**
+- Not tried: a reload while a debugger is stopped, in the Godot editor's own play mode with the editor
+  attached, or with more than a few hundred scripts. **2d**
 
 ## Stage 2a: interpreter core
 

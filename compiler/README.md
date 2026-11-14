@@ -234,6 +234,21 @@ Known fault: the first time Godot's editor scans a project that has the extensio
 `godot --headless --import`), Godot crashes as it exits, after the scan has done its work. Later runs are
 clean. The speed spike's extension does the same; the cause is not yet known.
 
+## Editing a script while the game runs
+
+When a project is run from its folder in a debug build, the extension looks at its `.as` files five
+times a second. When one changes, every script is compiled again:
+
+- **If they compile,** every script object alive is moved onto the new code. A field that kept its name
+  and kind keeps its value, static fields too, and listeners added before keep listening and run the
+  new code. Godot prints `ActionScript: reloaded N scripts.`
+- **If they do not,** the errors are printed and the game carries on with the scripts it had.
+
+What to expect of an object that already exists: a field that is new, or whose type changed, starts
+empty (0, `NaN`, `null`), because the object is not constructed again; a new first value for a field
+shows on objects made afterwards. A class that was removed while one of its objects is alive stops the
+reload, and Godot says to restart. An exported game does not watch its scripts.
+
 ## Language server
 
 `kas3c lsp` serves an editor over standard input and output with the Language Server Protocol. To connect an

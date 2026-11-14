@@ -37,11 +37,19 @@ class BoundMethod : public CallableCustom {
 	friend void kas3::sweep_listeners();
 	friend class ListenerSweep;
 	friend void kas3::release_listeners();
+	friend bool kas3::listeners_can_move(vm::Reload &);
+	friend void kas3::move_listeners(vm::Interpreter &, vm::Reload &, uint64_t);
 
 	vm::Object *object_;
 	uint32_t function_;
 	ObjectID owner_; // Null for a class with no Godot object behind it.
 	uint64_t program_; // Which load of the project's scripts the object belongs to.
+	// What makes two of these the same listener, and what Godot files them under. It must not change
+	// while a signal holds the callable, so it is not the object and function above: those are replaced
+	// when the scripts are reloaded. It is what they were when the method was first bound.
+	const vm::Object *key_object_;
+	uint32_t key_function_;
+	uint64_t key_program_;
 	// Set when the one thing done with this callable was to add it to a signal as a listener: the signal.
 	Signal listening_to_;
 	bool listener_ = false;
@@ -67,9 +75,18 @@ class BoundMethod : public CallableCustom {
 
 public:
 	BoundMethod(vm::Object *p_object, uint32_t p_function, Object *p_owner) :
-			object_(p_object), function_(p_function), program_(Project::generation()) {
+			object_(p_object), function_(p_function), program_(Project::generation()), key_object_(p_object), key_function_(p_function), key_program_(program_) {
 		if (p_owner) {
 			owner_ = ObjectID(p_owner->get_instance_id());
+		}
+		// The same method bound before a reload is the same listener: it is found by what it is now.
+		for (const BoundMethod *other : bound_methods()) {
+			if (other->object_ == object_ && other->function_ == function_ && other->program_ == program_) {
+				key_object_ = other->key_object_;
+				key_function_ = other->key_function_;
+				key_program_ = other->key_program_;
+				break;
+			}
 		}
 		vm::retain(object_);
 		bound_methods().insert(this);
@@ -91,16 +108,16 @@ public:
 	static bool equal(const CallableCustom *p_a, const CallableCustom *p_b) {
 		const BoundMethod *a = static_cast<const BoundMethod *>(p_a);
 		const BoundMethod *b = static_cast<const BoundMethod *>(p_b);
-		return a->object_ == b->object_ && a->function_ == b->function_ && a->program_ == b->program_;
+		return a->key_object_ == b->key_object_ && a->key_function_ == b->key_function_ && a->key_program_ == b->key_program_;
 	}
 	static bool less(const CallableCustom *p_a, const CallableCustom *p_b) {
 		const BoundMethod *a = static_cast<const BoundMethod *>(p_a);
 		const BoundMethod *b = static_cast<const BoundMethod *>(p_b);
-		return a->object_ != b->object_ ? a->object_ < b->object_ : a->function_ < b->function_;
+		return a->key_object_ != b->key_object_ ? a->key_object_ < b->key_object_ : a->key_function_ < b->key_function_;
 	}
 
 	uint32_t hash() const override {
-		uint64_t mixed = (uint64_t)(uintptr_t)object_ * 0x9E3779B97F4A7C15ull + function_;
+		uint64_t mixed = (uint64_t)(uintptr_t)key_object_ * 0x9E3779B97F4A7C15ull + key_function_;
 		return (uint32_t)(mixed ^ (mixed >> 32));
 	}
 	String get_as_text() const override {
@@ -176,6 +193,37 @@ void listener_added(const Callable &p_callable, const Signal &p_signal) {
 	if (BoundMethod *bound = p_callable.is_custom() ? dynamic_cast<BoundMethod *>(p_callable.get_custom()) : nullptr) {
 		bound->listening_to_ = p_signal;
 		bound->listener_ = true;
+	}
+}
+
+bool listeners_can_move(vm::Reload &p_reload) {
+	const uint64_t current = Project::generation();
+	for (const BoundMethod *bound : bound_methods()) {
+		if (bound->object_ && bound->program_ == current) {
+			vm::Object *moved = p_reload.object(bound->object_);
+			if (!moved) {
+				return false;
+			}
+			vm::release(moved); // The reload keeps its own until it is done.
+		}
+	}
+	return true;
+}
+
+void move_listeners(vm::Interpreter &p_old, vm::Reload &p_reload, uint64_t p_generation) {
+	const uint64_t current = Project::generation();
+	const std::vector<BoundMethod *> all(bound_methods().begin(), bound_methods().end());
+	for (BoundMethod *bound : all) {
+		if (!bound_methods().count(bound) || !bound->object_ || bound->program_ != current) {
+			continue;
+		}
+		vm::Object *old = bound->object_;
+		const uint32_t function = p_reload.function(bound->function_);
+		// A method that is gone from the new scripts: the listener stays where it is and refuses to run.
+		bound->object_ = function == ir::NONE ? nullptr : p_reload.object(old);
+		bound->function_ = function == ir::NONE ? bound->function_ : function;
+		bound->program_ = p_generation;
+		p_old.release_object(old); // May destroy other bound methods: hence the check above.
 	}
 }
 

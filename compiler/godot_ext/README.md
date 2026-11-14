@@ -10,6 +10,7 @@ called by the engine.
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
 | `godot_host` | The interpreter's three interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_utility.cpp` | Godot's global functions |
+| `program` (reload) | Watches the scripts, compiles them again, and moves instances, listeners and script resources onto the new program (`vm/reload`) |
 | `callable` | A method as a Godot function; the look for listener loops |
 
 ## Rules

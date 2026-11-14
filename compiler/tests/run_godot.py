@@ -239,6 +239,44 @@ read = re.search(r"DEFAULTS read=(\d+) failed=(.*)", run.stdout)
 check("Godot reads every recorded default", read is not None and int(read.group(1)) > 10 and read.group(2) == "[]",
       (run.stdout + run.stderr)[-600:])
 
+import tempfile
+
+# Scripts edited while the game runs. In a copy of the project: the test rewrites a script.
+HOT = """package { import godot.*; public class Hot extends Node2D {
+	private var n:int = 0; private var h:int = 0; public static var made:int = 0;%s
+	public function value():int { return %s; }
+	public function bump():int { n++; made++; return n; }
+	public function count():int { return n; }
+	public function heard():int { return h; }
+	public function total():int { return made; }
+	public function listen(other:Node):void { other.renamed.add(onRenamed); }
+	public function unlisten(other:Node):void { other.renamed.remove(onRenamed); }
+	private function onRenamed():void { h += %s; }%s
+} }
+"""
+ADDED = "\n\tpublic function added():String { return \"new\"; }"
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    versions = {
+        "Hot.as": HOT % ("", "1", "1", ""),
+        "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
+        "hot_broken.txt": HOT % ("", "2 +", "10", ADDED),
+        "hot_v3.txt": HOT % (" private var extra:String = \"x\";", "3", "10", ADDED),
+    }
+    for name, text in versions.items():
+        with open(os.path.join(copy, name), "w") as file:
+            file.write(text)
+    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "reload.gd"], capture_output=True, text=True, timeout=300)
+    output = run.stdout + run.stderr
+    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+    check("reload.gd ran to its end", run.returncode == 0 and len(values) == 11, output[-1500:])
+    for name, got, want in values:
+        check("reload.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+    check("reload.gd: Godot is told the scripts were reloaded", output.count("ActionScript: reloaded") == 2, output[-1500:])
+    check("reload.gd: a script with an error is reported and not loaded",
+          "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
+
 # An exported game keeps its files in a pack, not in a folder: the scripts must be found and read there.
 import tempfile
 with tempfile.TemporaryDirectory() as packed:

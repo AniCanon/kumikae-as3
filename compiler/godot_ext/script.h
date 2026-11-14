@@ -19,7 +19,11 @@ protected:
 	static void _bind_methods() {}
 
 public:
+	AS3Script();
+	~AS3Script() override;
 	void set_file(const godot::String &p_resource_path);
+	// After the scripts were loaded afresh: the file's class is looked up again in the new program.
+	static void refresh_all();
 	uint32_t get_class_index() const { return class_; }
 
 	bool _editor_can_reload_from_file() override { return false; }
