@@ -16,7 +16,7 @@ principle does.
 | **S**ingle responsibility | A file, a class and a function each have one job, and one reason to change. | Sections 1 and 2 |
 | **O**pen for extension, closed for change | A new Godot feature or a new backend is added beside what is there, not by editing every layer. The interpreter knows the engine only as `vm::Host`; a new IR operation is one line in one table plus its case. | Section 2 |
 | **L**iskov substitution | Anything that implements `vm::Host` can stand in for any other: Godot, the stand-alone host, the recorder the tests use. A host never needs to know which interpreter called it. | Section 2 |
-| **I**nterface segregation | A function asks for the narrowest thing it needs. An interface that grows past what one caller uses is split: a host that only prints implements `Output`, not the engine's entries. | Section 2 |
+| **I**nterface segregation | A function asks for the narrowest thing it needs. An interface that grows past what one caller uses is split: a host that only prints implements `Output`, not the engine's entries. A split follows a real difference in who implements what, not a name. | Section 2 |
 | **D**ependency inversion | Layers depend on an interface the lower layer owns, never on the layer above: `vm/` and `ir/` include no Godot header. | Section 2 |
 | **DRY** | Every rule, constant and message is written once. Two layers that must agree read the same source. | Section 3 |
 
@@ -34,10 +34,12 @@ between 40 and 100 for a function. These are ours:
 
 - A file has one job, and its name says what the job is. When a file needs a heading inside it to find
   your way, it is two files.
-- The one exception to the function limit is a dispatch `switch` (the interpreter's loop, the lowerer's
-  `evaluate`). Each of its cases is then a few lines that call a named function. Such functions are
-  listed by name in the check.
-- Generated files (`godot_data.cpp` and its relatives) are not checked.
+- The one exception to the function limit is a dispatch `switch` with one short case per kind of thing:
+  the interpreter's loop (one case per operation), the syntax tree's walker and its printer (one case
+  per kind of node). A case there is a few lines; anything longer is a named function that the case
+  calls. Such functions are listed in the check by file and name.
+- Generated files (`godot_data.cpp` and its relatives) are not checked. Test files are not held to the
+  size limits: a test file is a list of cases, and reads from top to bottom.
 
 ## 2. One job each
 
@@ -91,7 +93,8 @@ Use what C++17 gives, where it makes the code say what it means:
 | `static_cast` and the other named casts | C casts on pointers and classes |
 
 Not used: exceptions, RTTI, `dynamic_cast`, `std::any`, iostreams in the libraries, `using namespace` in
-a header, macros where a function or a constant does the job.
+a header, macros where a function or a constant does the job. (`godot_ext/` is built with RTTI, because
+godot-cpp needs it.)
 
 Names follow what is there: `snake_case` functions and variables, `PascalCase` types, `p_` for a
 parameter, `r_` for a result written through a pointer, a trailing `_` for a member.
@@ -109,6 +112,10 @@ The compiler is used in an editor on every keystroke, and the interpreter runs a
   two words by `const &`.
 - **Measure.** A change made for speed comes with its numbers from `compiler/tests/bench/`, before and
   after. A clean-up must not make any of them worse by more than the noise between runs.
+- **Measure turn and turn about.** `run_bench.py <build> --against <other build>` runs the two builds
+  alternately. Timing one build after the other hides a difference of a few per cent, which is what a
+  tidy-up of the interpreter's loop can cost: a helper in a header for a two-line register write made the
+  loop 3% slower, and the same two lines as a local function inside the loop did not.
 
 ## 7. Changing code
 

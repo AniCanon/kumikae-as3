@@ -21,29 +21,98 @@ LIMITS = {".cpp": 800, ".h": 500}
 FUNCTION_LIMIT = 120
 # A dispatch switch whose cases each call a named function (guidelines, section 1).
 DISPATCH = {
-    "Interpreter::run",  # The interpreter's loop, one case per operation.
-    "walk",  # src/ast_walk.h: the children of each kind of node.
-    "node",  # src/ast_printer.cpp: the text of each kind of node.
+    "vm/interpreter_run.cpp: Interpreter::run",  # The interpreter's loop, one case per operation.
+    "src/ast_walk.h: walk",  # The children of each kind of node.
+    "src/ast_printer.cpp: node",  # The text of each kind of node.
 }
 
-BANNER = re.compile(r"^\s*//\s*-{3,}")
-HEAD = re.compile(r"^(\t?)(?!\t)(?:[\w:<>,*&~ ]+?[ *&])?~?(?P<name>[A-Za-z_][\w:]*)\((?:[^;{}]*)\)\s*(?:const\s*)?(?:noexcept\s*)?"
-                  r"(?:override\s*)?(?:final\s*)?(?::[^;{}]*)?\{$")
-NOT_FUNCTIONS = {"if", "for", "while", "switch", "else", "return", "do", "catch"}
+BANNER = re.compile(r"^\s*//\s*[-=*#]{3,}")
+SCOPES = re.compile(r"^(?:template\s*<[^{]*>\s*)?(?:typedef\s+)?(?:namespace|class|struct|union|enum|extern)\b")
+NOT_FUNCTIONS = re.compile(r"^(?:if|for|while|switch|else|do|try|catch|return|case|default)\b")
+NAME = re.compile(r"((?:\w+::)*(?:operator\s*(?:\(\)|[^\s(]+)|~?\w+))\s*$")
+
+
+def name_of(head):
+    """The name a function's head gives it: `Class::method`, `operator==`, or what a lambda is assigned to."""
+    pointer = re.search(r"\(\s*\*\s*(\w+)\s*\(", head)  # A function that returns a pointer to a function.
+    if pointer:
+        return pointer.group(1)
+    before = head[:head.index("(")].rstrip()
+    if before.endswith("]") and "=" in before:  # A lambda.
+        before = before[:before.rindex("=")].rstrip()
+    found = NAME.search(before)
+    return re.sub(r"\s+", "", found.group(1)) if found else "?"
+
+
+def blank(text):
+    """The text with comments and the insides of strings blanked out, line for line."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        two = text[i:i + 2]
+        if two == "//":
+            end = text.find("\n", i)
+            end = n if end < 0 else end
+            out.append(" " * (end - i))
+            i = end
+        elif two == "/*":
+            end = text.find("*/", i + 2)
+            end = n if end < 0 else end + 2
+            out.append("".join(c if c == "\n" else " " for c in text[i:end]))
+            i = end
+        elif text[i] in "\"'":
+            quote, start = text[i], i
+            i += 1
+            while i < n and text[i] != quote and text[i] != "\n":
+                i += 2 if text[i] == "\\" else 1
+            i = min(i + 1, n)
+            out.append(quote + " " * (i - start - 2) + quote if i - start >= 2 else text[start:i])
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
 
 
 def functions(lines):
-    """(name, first line, length) of each function defined at the top of a file or of a class in it."""
+    """(name, first line, length) of every function that is not inside another: in a namespace, a class
+    or a nested class, whatever its head looks like."""
+    # A preprocessor line is not part of any head.
+    text = blank("\n".join("" if line.lstrip().startswith("#") else line for line in lines))
     found = []
-    open_at = None
-    for number, line in enumerate(lines, 1):
-        if open_at is None:
-            head = HEAD.match(line)
-            if head and head.group("name").split("::")[-1] not in NOT_FUNCTIONS:
-                open_at = (head.group("name"), number, head.group(1))
-        elif line == open_at[2] + "}":
-            found.append((open_at[0], open_at[1], number - open_at[1] + 1))
-            open_at = None
+    stack = []  # One entry per open brace: "scope", ("function", name, first line) or "other".
+    head_start = 0
+    parentheses = 0
+    line = 1
+    for i, c in enumerate(text):
+        if c == "\n":
+            line += 1
+        elif c == "(":
+            parentheses += 1
+        elif c == ")":
+            parentheses = max(0, parentheses - 1)
+        elif c == ";" and parentheses == 0:
+            head_start = i + 1
+        elif c == "{":
+            if parentheses:
+                stack.append("other")  # Braces in a default argument.
+                continue
+            head = text[head_start:i].strip()
+            inside_function = any(entry != "scope" for entry in stack)
+            if not inside_function and SCOPES.match(head) and "(" not in head.split("{")[0].split(":")[0]:
+                stack.append("scope")
+            elif not inside_function and "(" in head and not NOT_FUNCTIONS.match(head):
+                first = line - text[head_start:i].lstrip().count("\n")
+                stack.append(("function", name_of(head), first))
+            else:
+                stack.append("other")
+            head_start = i + 1
+        elif c == "}":
+            if parentheses and stack and stack[-1] == "other":
+                stack.pop()
+                continue
+            entry = stack.pop() if stack else "other"
+            if isinstance(entry, tuple):
+                found.append((entry[1], entry[2], line - entry[2] + 1))
+            head_start = i + 1
     return found
 
 
@@ -65,7 +134,7 @@ def faults(root):
             if any(BANNER.match(line) for line in lines):
                 result.add("%s: banner comments" % path)
             for function, _, length in functions(lines):
-                if length > FUNCTION_LIMIT and function not in DISPATCH:
+                if length > FUNCTION_LIMIT and "%s: %s" % (path, function) not in DISPATCH:
                     result.add("%s: %s() is over %d lines" % (path, function, FUNCTION_LIMIT))
     return result
 
@@ -98,13 +167,35 @@ def self_test():
             handle.write("struct Fine {\n\tint get() const {\n\t\treturn 1;\n\t}\n};\n")
         with open(os.path.join(root, "src", "wide.h"), "w") as handle:
             handle.write("int declared;\n" * 501)
+        shapes = [
+            "auto Thing::place(int p_a,\n\t\tint p_b) -> Thing::Place {",
+            "[[nodiscard]] bool marked(int p_value) {",
+            "bool Thing::operator==(const Thing &p_other) const {",
+            "Thing::~Thing() {",
+            "Thing::Thing(int p_a) :\n\t\ta_(p_a) {",
+            "void defaults(std::vector<int> p_list = {}, char p_end = ';') { // a comment {",
+            "int (*pick(int p_which))(int) {",
+            "static const auto at_file_scope = [](int p_value) {",
+            "template <typename T>\nvoid generic(T &&p_value) {",
+        ]
+        text = "#include <vector>\n\nnamespace kas3 {\nclass Outer {\n\tstruct Inner {\n\t\tvoid nested() {\n" + body + "\t\t}\n\t};\n};\n"
+        for shape in shapes:
+            text += shape + "\n" + body + ("};\n" if "= [" in shape else "}\n")
+        text += "} // namespace kas3\n"
+        with open(os.path.join(root, "src", "shapes.cpp"), "w") as handle:
+            handle.write(text)
+        names = ["Thing::place", "marked", "Thing::operator==", "Thing::~Thing", "Thing::Thing", "defaults", "pick",
+                 "at_file_scope", "generic", "nested"]
         expected = {"src/long.cpp: the file is over 800 lines", "src/long.cpp: banner comments",
-                    "src/long.cpp: big() is over 120 lines", "src/wide.h: the file is over 500 lines"}
+                    "src/long.cpp: big() is over 120 lines", "src/wide.h: the file is over 500 lines",
+                    "src/shapes.cpp: the file is over 800 lines"}
+        expected |= {"src/shapes.cpp: %s() is over 120 lines" % name for name in names}
         found = faults(root)
         assert found == expected, found
         assert check(root) == ["new: " + fault for fault in sorted(expected)]
         check(root, update=True)
         assert check(root) == []
+        assert [name for name, _, length in functions(open(os.path.join(root, "src", "long.cpp")).read().split("\n"))] == ["big", "Thing::small"]
         os.remove(os.path.join(root, "src", "wide.h"))
         assert check(root) == ["fixed, so take it out of tools/style_baseline.txt: src/wide.h: the file is over 500 lines"]
     print("check_style: self-test OK")

@@ -21,7 +21,7 @@ singletons such as `Input`, Godot's constants and its static methods. Godot's 64
 type, `Int64`. A clean-up of the C++ comes next, then global functions (the rest of stage 2b-3), then the
 rest of the language.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 77 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 83 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -110,7 +110,7 @@ properties, signals and hot reload.
 | 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library. With them, what stage 1 promised that needs them: AS3 collections converting when handed to Godot, `object[name]` in general, and elements of Godot's untyped collections | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
 | Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Planned |
 | 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Planned |
-| Clean-up pass | The 28 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
+| Clean-up pass | The 34 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
 
@@ -165,7 +165,7 @@ The design keeps each of these possible. No stage above delivers them.
 |---|---|---|
 | A. Singletons, constants, static methods | `Input.isActionPressed("jump")`, a singleton's signals, `Vector2.ZERO`, `Key.ESCAPE`, `Vector2.fromAngle(a)`. A Godot value with parts starts at its zero. Closes 3 backlog items. | Built and reviewed |
 | B. `Int64` | The 64-bit integer type the owner approved. The [design](superpowers/specs/2026-11-14-int64-design.md) was approved on 2026-11-14. A Godot integer is an `Int64` unless Godot says it is narrower; 1,059 declarations changed and none became narrower; the table kept by hand is gone. | Built and reviewed |
-| C++ clean-up | Asked for by the owner on 2026-11-14. Done: no file is over 800 lines (the largest was 3,087 and is now 723), no function is over 120 except three dispatch switches, no banner comments, rules that were written twice are written once, `vm::Host` is three interfaces, and calls into Godot are about 16% faster. No test changed. See the [guidelines](cpp-guidelines.md), the [plan](superpowers/plans/2026-11-14-cpp-cleanup.md) and the [figures](results/2026-11-cpp-cleanup.md). | Built; in review |
+| C++ clean-up | Asked for by the owner on 2026-11-14. Done: no file is over 800 lines (the largest was 3,087 and is now 723), no function is over 120 except three dispatch switches, no banner comments, rules that were written twice are written once, `vm::Host` is three interfaces, and calls into Godot are about 16% faster. No test changed, and an independent comparison of over 33,000 programs against `main` found no difference in what the compiler produces. See the [guidelines](cpp-guidelines.md), the [plan](superpowers/plans/2026-11-14-cpp-cleanup.md) and the [figures](results/2026-11-cpp-cleanup.md). | Built and reviewed |
 | Early iOS test | Decided by the owner on 2026-11-14: right after the clean-up, ahead of stage 4. The extension built for iOS and the test project exported, first on the iOS Simulator, then on a device. It proves that the scripts that run on desktop run there in the interpreter. Release builds and the speed gate on a device stay in stage 4. | After the clean-up |
 | C. Global functions and errors | `print`, `lerp`, `randf` and the rest; an AS3 error shown the way Godot shows its own. Closes 6 backlog items. | After the clean-up |
 
@@ -201,7 +201,7 @@ and the elements of Godot's untyped collections.
 Open items:
 
 - **The [backlog](backlog.md) gives every deferred item a stage:** 6 left in 2b-3, 16 in 2c, 9 in the
-  language server's second slice, 14 in 2d, 28 in a clean-up pass that closes stage 2, and 4 that wait on
+  language server's second slice, 14 in 2d, 34 in a clean-up pass that closes stage 2, and 4 that wait on
   the owner.
 - **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
   waits for the cycle collector (2d).

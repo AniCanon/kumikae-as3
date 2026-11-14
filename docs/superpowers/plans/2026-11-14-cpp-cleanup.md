@@ -147,13 +147,16 @@ with "there is no engine here". It becomes three interfaces in `vm/`, each in it
 | Interface | Entries | Who implements it |
 |---|---|---|
 | `Output` (`output.h`) | `print`, `error` | Every host |
-| `EngineValues` (`engine_values.h`) | `construct`, `copy`, `drop`, `text`, `operate`, `index_get`, `index_set`, `constant` | Godot, the tests' recorder |
-| `EngineObjects` (`engine_objects.h`) | `call`, `get`, `set`, `member`, `singleton`, `call_static`, `bind` | Godot, the tests' recorder |
+| `EngineHandles` (`engine_handles.h`) | What is done to a value the interpreter holds, whether one of Godot's values or objects: `copy`, `drop`, `text`, `call`, `get`, `set`, `member`, `index_get`, `index_set`, `operate` | Godot, the tests' recorder |
+| `EngineSource` (`engine_source.h`) | Where values come from when none is held: `construct`, `constant`, `singleton`, `call_static`, `bind` | Godot, the tests' recorder |
+
+(The first cut was by "values" and "objects". The review showed that it separated nothing: a property
+read and a method call work on both. This one follows whether the interpreter holds a handle.)
 
 `vm::Host` stays as the one thing the interpreter is given: a small struct holding an `Output &` and the
 two engine interfaces. Where there is no engine it holds `NoEngine`, one class in `vm/no_engine.h` that
-answers every engine entry with the same message, so that the message is written once and
-`StandaloneHost` implements `Output` alone. `Argument` and `Wanted` move to `vm/engine_types.h`.
+answers every engine entry with the same message. A host that implements one engine interface and not
+the other does not compile. `Argument` and `Wanted` are in `vm/engine_types.h`.
 
 - [ ] Tests first: `StandaloneHost` compiles implementing `Output` only; a program that uses a Godot
   value under `kas3c run` still fails with "there is no engine here"; the tests' recorder implements the

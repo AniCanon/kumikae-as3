@@ -25,7 +25,7 @@ it stands.
 | **2c** | The rest of the language | 16 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
 | **2d** | Editor features | 14 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 28 | What is left |
+| **clean-up** | A pass that closes stage 2 | 34 | What is left |
 | **decision** | The owner | 4 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
@@ -181,6 +181,24 @@ Found by the review of the clean-up pass itself.
 - `x.toString(radix)` on an `Int64` waits for the standard library. **2c**
 - `Vector.<Int64>` and an `Int64` in an `Array` or `Object` wait for those types. **2c**
 - Every program's IR now carries the `RangeError` class, used or not. **clean-up**
+
+## C++ clean-up, November 2026
+
+The limits of [the C++ guidelines](cpp-guidelines.md) hold and are checked. These are its aims, and what
+the review of the clean-up put off.
+
+- 38 functions are over the 60-line aim (none over 120 but the three dispatch switches). The longest:
+  `Lexer::lex_punctuation` 120, the resolver's `statement` 109, `Parser::parse_primary` 99. **clean-up**
+- Ten files are over the 500-line aim (`names_bodies.cpp` 714, `parser_expr.cpp` 673, `lsp/server.cpp`
+  671, `godot_host.cpp` 647) and three headers over 300 (`ast.h`, `lowerer.h`, `names.h`). **clean-up**
+- Planned and not done: the listener sweep in a file of its own, `godot_values.cpp`, a table of handlers
+  in the language server. **clean-up**
+- The syntax-tree printer's cases print inline; 28 of its 48 are over five lines. **clean-up**
+- `Place::part` is a `std::shared_ptr` and `engine_call` takes a `std::function`; `join()` is written in
+  two files of the front end; `[[nodiscard]]` is on the host interfaces but not on their overrides.
+  **clean-up**
+- The interpreter makes a new handle for every value Godot gives back, which is most of what a call into
+  Godot now costs. A design change, for the native backend's stage. **clean-up**
 
 ## Stage 2a: interpreter core
 

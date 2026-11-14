@@ -21,16 +21,24 @@ the fastest. A change counts only if the median moved by more than the spread.
 - **Gathering a call's arguments on the stack changed nothing measurable** (42.3 ms before and after). It
   stays because it replaced three copies of the same code with one.
 
-## The whole clean-up, measured again at its end
+## What the review caught, and the final figures
 
-| Benchmark | Before (`main`, a7ef7be) | After |
-|---|---|---|
-| `check` | 64.7 ms (spread 12.1) | 66.0 ms (3.1) |
-| `recheck` | 20.3 ms (0.8) | 20.2 ms (1.0) |
-| `run` | 209.9 ms (6.6) | 211.0 ms (3.9) |
-| `engine` | 50.3 ms (0.9) | 42.1 ms (4.0) |
+The table above was made by timing one build after the other. The independent review timed `main` and
+the branch turn and turn about and found the interpreter's loop 3 to 4% slower, from one tidy-up commit:
+a helper in a header for writing a Boolean result. The difference was inside the spread of the runs
+above, so those runs could not see it. The helper is now a local function inside the loop, and
+`run_bench.py --against` makes the turn-about comparison.
 
-Only `engine` moved by more than its spread.
+Branch against `main` (a7ef7be), 21 runs of each in turn, medians:
+
+| Benchmark | `main` | Branch | Difference |
+|---|---|---|---|
+| `check` (41 runs) | 89.9 ms | 90.5 ms | +0.6%, inside the spread of 7.8 ms |
+| `run` | 301.4 ms | 299.2 ms | -0.7%, inside the spread of 8.4 ms |
+| `engine` (one after the other; 7 runs) | 50.3 ms | 42.1 ms | 16% faster |
+
+(The machine was busier for these runs than for the first table, which is why the same benchmarks read
+higher. Only figures taken together compare.)
 
 ## What the clean-up did not do
 
