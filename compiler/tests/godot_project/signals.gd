@@ -5,6 +5,9 @@ var node: Node
 var other: Node
 var late: Node
 var looped: WeakRef
+var looped_far: WeakRef
+var looped_kept: WeakRef
+var kept_listener: Callable
 var frames := 0
 
 func show(name: String, got, want) -> void:
@@ -34,19 +37,31 @@ func _physics_process(_delta: float) -> bool:
 		# Its owner was freed before the frame ended: nothing ran, nothing crashed.
 		show("deferred with its owner freed", is_instance_valid(late), false)
 		return false
-	if frames > 3 and frames < 10:
+	if frames > 3 and frames < 40:
 		return false # Whole frames pass: listeners are looked over once in each.
-	if frames == 10:
+	if frames > 40 and frames < 80:
+		return false
+	if frames == 80:
+		# Once nothing holds the listener's callable either, that loop goes too.
+		show("a loop goes when its callable is let go", looped_kept.get_ref() == null, true)
+		node.queue_free()
+		other.queue_free()
+		return true
+	if frames == 40:
 		# A listener and the object it listens to, held only by each other, are both gone.
 		show("a loop is freed", looped.get_ref() == null, true)
+		show("a longer loop is freed", looped_far.get_ref() == null, true)
+		# While GDScript holds the listener's callable, the listener stays where it was.
+		var still = looped_kept.get_ref()
+		show("a loop whose callable is held stays", [still != null, still.changed.get_connections().size() if still != null else -1, kept_listener.is_valid()], [true, 1, true])
+		still = null
+		kept_listener = Callable()
 		# A listener that only its signal holds is still there, and still hears.
 		var before: int = node.total()
 		rename(other)
 		show("an unheld listener stays", node.total() - before, 1)
-		node.queue_free()
-		other.queue_free()
-		return true
-	if frames > 10:
+		return false
+	if frames > 80:
 		return true
 	# add: the listener hears the signal.
 	node.listen()
@@ -175,6 +190,14 @@ func _physics_process(_delta: float) -> bool:
 	node.loop(resource)
 	resource = null
 	show("a loop lives until the frame ends", looped.get_ref() != null, true)
+	resource = Resource.new()
+	looped_far = weakref(resource)
+	node.loopFar(resource)
+	resource = Resource.new()
+	looped_kept = weakref(resource)
+	node.loop(resource)
+	kept_listener = resource.changed.get_connections()[0].callable
+	resource = null
 	other.renamed.get_connections().map(func(c): other.renamed.disconnect(c.callable))
 	node.unheld(other)
 	node.keepPlain(Resource.new()) # Still held when Godot shuts down: nothing may crash then.

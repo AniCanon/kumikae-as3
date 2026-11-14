@@ -96,12 +96,11 @@ Found by the review of the clean-up pass itself.
   methods can (`timer[name].add(f)`).
 - A singleton's signals (`Input.joyConnectionChanged`) wait for singletons (2b-3); a script's own signals
   wait for `[Signal]` (2d).
-- A listener and the object it listens to are freed when only each other holds them, but only in the
-  direct case: the listener's own field holds a reference-counted object. Held through another object, or
-  a callable given to something other than a signal, the loop stays (the cycle collector, 2d).
-- If GDScript keeps a copy of a plain AS3 listener's callable and nothing else refers to the listener or
-  to the object it listens to, the listener is removed from the signal all the same.
-- An AS3 error raised for a listener's arguments has no stack trace: the listener was never entered.
+- Objects that hold each other in a loop are freed only when a listener is part of the loop, or reaches
+  it. A loop of script objects with no listener in it stays (the cycle collector, 2d). So does a loop
+  that passes through a Godot collection.
+- The look for such loops runs once a frame while any listener without a Godot object of its own exists,
+  over everything those listeners reach. Its cost on a large program is not measured.
 
 ## Stage 2a: interpreter core
 

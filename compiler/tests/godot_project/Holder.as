@@ -5,6 +5,7 @@ package {
 	// two of them are part of. Both must go when nothing else refers to either.
 	public class Holder {
 		public var res:Resource;
+		public var next:Holder;
 		public function heard():void {}
 	}
 }

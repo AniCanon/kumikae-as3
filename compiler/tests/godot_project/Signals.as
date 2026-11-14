@@ -20,6 +20,15 @@ package {
 		// A loop of a listener and what it listens to; a listener nothing else holds; a signal in a field.
 		private var mine:Signal;
 		public function loop(r:Resource):void { var h:Holder = new Holder(); h.res = r; r.changed.add(h.heard); }
+		// The same, with the object held two steps away, and the two holders holding each other.
+		public function loopFar(r:Resource):void {
+			var h:Holder = new Holder();
+			var far:Holder = new Holder();
+			far.res = r;
+			far.next = h;
+			h.next = far;
+			r.changed.add(h.heard);
+		}
 		public function unheld(other:Node):void { other.renamed.add(new Listener().heard); }
 		public function total():int { return Listener.total; }
 		public function byOwnField(name:String):void { mine = renamed; this[name].add(onRenamed); }

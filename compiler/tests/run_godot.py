@@ -156,13 +156,15 @@ output = compare("signals.gd", [
     "null argument and order", "arguments", "removes itself",
     "after a failing listener", "another object's signal", "by name", "by a wrong name", "user signal", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
-    "deferred with its owner freed", "own signal field by name", "a loop lives until the frame ends", "a loop is freed",
+    "deferred with its owner freed", "own signal field by name", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
+    "a loop whose callable is held stays", "a loop goes when its callable is let go",
     "an unheld listener stays",
 ])
 check("a listener given the wrong kind of argument is an AS3 error that names it",
       "TypeError: Error #1034" in output and "Signals/onHit" in output, output[-1200:])
 check("a listener given too many arguments is an AS3 error that names it",
       "ArgumentError: Error #1063: Argument count mismatch on Signals/onHit(). Expected 1, got 2." in output, output[-1200:])
+check("a listener's argument error says where the listener is", re.search(r"Error #1063[^\n]*\n\s*at Signals/onHit\(\)\[.*Signals\.as:\d+\]", output) is not None, output[-1200:])
 check("a field that is not a signal, by name, is an AS3 error", "'count' is not a signal" in output, output[-1200:])
 check("an error inside a listener is reported", "at Signals/fails()" in output, output[-800:])
 check("a wrong signal name is an AS3 error", output.count("at Signals/listenByName()") == 2, output[-800:])
