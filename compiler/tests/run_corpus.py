@@ -17,7 +17,7 @@ CORPUS = os.path.join(TESTS, "corpus")
 
 # A program and the other files it is compiled with.
 WITH = {"PerNodeProcess": ["PerNodeChild"]}
-RUNS = {"Empty", "PerNodeChild", "Probe", "SignalTraffic"}
+RUNS = {"Alloc", "Empty", "PerNodeChild", "Probe", "Saxpy", "Sieve", "SignalTraffic"}
 
 failures = []
 stopped_by = collections.Counter()

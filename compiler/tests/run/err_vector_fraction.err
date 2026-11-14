@@ -1,0 +1,2 @@
+RangeError: Error #1125: The index 1.5 is out of range 3.
+	at err_vector_fraction()[err_vector_fraction.as:7]

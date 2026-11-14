@@ -61,6 +61,10 @@ inline bool is_engine(Kind p_kind) {
 	X(InitClass, "C--") /* The class is used: give its static fields their values, if this is the first time. */ \
 	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
+	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is a Number; what is read or \
+	   written is of the class's element kind. */ \
+	X(VecNew, "RCA") X(VecGet, "RRR") X(VecSet, "RRR") \
+	X(VecLength, "RR-") X(VecSetLength, "RR-") X(VecFixed, "RR-") X(VecSetFixed, "RR-") \
 	X(IsClass, "RRC") X(AsClass, "RRC") \
 	/* The engine. Names are Godot's own. In HostCall the first argument is what the method is called on. */ \
 	/* Int64. The constant is an index into the module's wide numbers. Arithmetic wraps at 64 bits. */ \
@@ -149,6 +153,9 @@ struct Field {
 struct Class {
 	std::string name; // "game.Player"
 	uint32_t base = NONE;
+	// For a Vector.<T>, what its elements are; Void for every other class. A vector class has no fields,
+	// no methods and no base, and its objects are vm::Vector.
+	Kind element = Kind::Void;
 	std::vector<Field> fields; // The base's first: a field keeps its slot in every subclass.
 	std::vector<uint32_t> methods; // The method table: function indices, the base's slots first.
 	uint32_t constructor = NONE;

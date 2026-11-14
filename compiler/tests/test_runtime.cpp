@@ -135,7 +135,38 @@ static void test_math() {
 	}
 }
 
+// A vector's memory: its length, its room, and that it is counted among the objects alive.
+static void test_vectors() {
+	const size_t objects = live_objects();
+	Vector *vector = new_vector(7, 3, false);
+	CHECK(vector != nullptr);
+	CHECK_EQ(vector->klass, 7u);
+	CHECK_EQ(vector->references, 1u);
+	CHECK_EQ(vector->length, 3u);
+	CHECK(!vector->fixed);
+	CHECK(vector->capacity >= 3);
+	for (uint32_t i = 0; i < 3; i++) {
+		CHECK_EQ(vector->data[i].bits, (uint64_t)0);
+		vector->data[i].i = (int32_t)i + 1;
+	}
+	CHECK(vector_reserve(vector, 1000));
+	CHECK(vector->capacity >= 1000);
+	CHECK_EQ(vector->length, 3u);
+	CHECK_EQ(vector->data[2].i, 3);
+	CHECK_EQ(vector->data[999].bits, (uint64_t)0); // Room that was added is empty.
+	CHECK(vector_reserve(vector, 2)); // Never shrinks.
+	CHECK(vector->capacity >= 1000);
+	CHECK_EQ(live_objects(), objects + 1);
+	free_vector(vector);
+	CHECK_EQ(live_objects(), objects);
+	Vector *empty = new_vector(7, 0, true);
+	CHECK(empty && empty->length == 0 && empty->fixed);
+	free_vector(empty);
+	CHECK_EQ(live_objects(), objects);
+}
+
 int main() {
+	test_vectors();
 	test_math();
 	test_integers();
 	test_number_text();

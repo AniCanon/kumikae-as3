@@ -159,7 +159,16 @@ void Interpreter::leave(const Function &p_function, const Instruction &p_in, con
 void Interpreter::object_to_text(const Instruction &p_in, Slot *p_registers) {
 	Object *object = static_cast<Object *>(p_registers[p_in.b].p);
 	const uint32_t own = object ? module_.classes[object->klass].to_string : NONE;
-	if (own != NONE) {
+	if (object && module_.classes[object->klass].element != Kind::Void) {
+		// A vector's elements, each in its own words: that may run the program and move the registers.
+		retain(object);
+		std::string all;
+		const bool done = vector_text(static_cast<Vector *>(object), ",", &all);
+		if (done) {
+			assign(Kind::Str, stack_[frames_.back().base + p_in.a], text(all));
+		}
+		release_object(object);
+	} else if (own != NONE) {
 		Slot self = p_registers[p_in.b];
 		push(own, &self, 1, p_in.a);
 	} else {
@@ -521,6 +530,15 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::New:
 				make(in.b, r[in.a]);
+				break;
+			case Op::VecNew:
+			case Op::VecGet:
+			case Op::VecSet:
+			case Op::VecLength:
+			case Op::VecSetLength:
+			case Op::VecFixed:
+			case Op::VecSetFixed:
+				vector_op(function, in, r);
 				break;
 			case Op::Call:
 			case Op::CallVirtual:

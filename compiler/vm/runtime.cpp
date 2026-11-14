@@ -57,6 +57,50 @@ void free_object(Object *p_object) {
 	std::free(p_object);
 }
 
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed) {
+	void *memory = std::calloc(1, sizeof(Vector));
+	if (!memory) {
+		return nullptr;
+	}
+	Vector *vector = new (memory) Vector();
+	vector->references = 1;
+	vector->klass = p_class;
+	vector->fixed = p_fixed;
+	objects_alive++;
+	if (!vector_reserve(vector, p_length)) {
+		free_vector(vector);
+		return nullptr;
+	}
+	vector->length = p_length;
+	return vector;
+}
+
+bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
+	if (p_capacity <= p_vector->capacity) {
+		return true;
+	}
+	// Half as much again, so that a run of pushes copies each element a bounded number of times.
+	const uint64_t grown = (uint64_t)p_vector->capacity + p_vector->capacity / 2;
+	const uint64_t capacity = grown > p_capacity ? grown : (uint64_t)p_capacity;
+	if (capacity > UINT32_MAX) {
+		return false;
+	}
+	void *memory = std::realloc(p_vector->data, capacity * sizeof(Slot));
+	if (!memory) {
+		return false;
+	}
+	p_vector->data = static_cast<Slot *>(memory);
+	std::memset(static_cast<void *>(p_vector->data + p_vector->capacity), 0, (capacity - p_vector->capacity) * sizeof(Slot));
+	p_vector->capacity = (uint32_t)capacity;
+	return true;
+}
+
+void free_vector(Vector *p_vector) {
+	std::free(p_vector->data);
+	objects_alive--;
+	std::free(p_vector);
+}
+
 uint32_t to_uint32(double p_value) {
 	if (!std::isfinite(p_value)) {
 		return 0;

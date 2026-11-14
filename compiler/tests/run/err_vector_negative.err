@@ -1,0 +1,2 @@
+RangeError: Error #1125: The index -1 is out of range 3.
+	at err_vector_negative()[err_vector_negative.as:7]

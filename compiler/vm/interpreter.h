@@ -79,6 +79,12 @@ private:
 	void trace(const std::vector<uint32_t> &p_list, const Slot *p_registers);
 	void leave(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result);
 	void object_to_text(const ir::Instruction &p_in, Slot *p_registers);
+	// Vectors. An index outside the vector is AS3's RangeError #1125.
+	void raise_range(double p_index, uint32_t p_length);
+	bool resize_vector(Vector *p_vector, uint32_t p_length);
+	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
+	bool object_as_text(Object *p_object, std::string *r_text);
 	void unwind(size_t p_depth);
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);

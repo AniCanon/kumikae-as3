@@ -134,6 +134,9 @@ std::string print(const Module &p_module) {
 		if (!klass.native_base.empty()) {
 			out += " on Godot's " + klass.native_base;
 		}
+		if (klass.element != Kind::Void) {
+			out += std::string(" of ") + kind_name(klass.element);
+		}
 		out += "\n";
 		for (size_t i = 0; i < klass.fields.size(); i++) {
 			out += "  ." + std::to_string(i) + " " + klass.fields[i].name + ":" + kind_name(klass.fields[i].kind) + "\n";

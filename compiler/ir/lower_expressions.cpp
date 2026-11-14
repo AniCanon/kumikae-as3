@@ -250,6 +250,9 @@ uint32_t Lowerer::member_value(Expr *p_expression) {
 uint32_t Lowerer::new_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	New *made = static_cast<New *>(p_expression);
+	if (is_vector(made->type)) {
+		return vector_new(made);
+	}
 	Symbol *symbol = named_class(made->callee);
 	uint32_t index = 0;
 	uint32_t type_name = 0;
@@ -392,8 +395,7 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 			refuse(position, "an Object literal");
 			break;
 		case NodeKind::VectorLit:
-			refuse(position, "a Vector");
-			break;
+			return vector_literal(static_cast<VectorLit *>(p_expression));
 		case NodeKind::FunctionExpr:
 			refuse(position, "a function used as a value");
 			break;

@@ -45,6 +45,7 @@ class Lowerer {
 	Symbol *function_ = nullptr; // Function
 
 	std::unordered_map<const Symbol *, uint32_t> classes_;
+	std::unordered_map<const Type *, uint32_t> vector_classes_; // The class made for each Vector.<T> met.
 	std::unordered_map<const Symbol *, uint32_t> functions_; // Methods, constructors, package functions.
 	std::unordered_map<const Symbol *, uint32_t> fields_; // Instance fields: the slot.
 	std::unordered_map<const Symbol *, uint32_t> globals_; // Static fields and package variables.
@@ -163,6 +164,12 @@ class Lowerer {
 
 	// NaN, Infinity, and the limits of the number types: constants of the built-in library.
 	bool builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg);
+	// Vectors. The class of a Vector.<T>, made the first time the type is met; nothing if its elements
+	// are of a type the interpreter does not hold yet.
+	static bool is_vector(const Type *p_type) { return p_type && p_type->kind == Type::Vector; }
+	std::optional<uint32_t> vector_class(const Type *p_type);
+	uint32_t vector_new(New *p_made);
+	uint32_t vector_literal(VectorLit *p_literal);
 	// Math's constants and functions. Nothing if the symbol is not one of them.
 	std::optional<double> math_constant(const Symbol *p_symbol) const;
 	std::optional<uint32_t> math_call(Call *p_call, const Symbol *p_function);
@@ -179,7 +186,8 @@ class Lowerer {
 	struct Part;
 	// A place a value can be stored: a local, a field of an object, or a global.
 	struct Place {
-		enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine } where = Nowhere;
+		// Element, Length and Fixed are of a Vector: `object` holds it, and for Element `key` the index.
+		enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine, Element, Length, Fixed } where = Nowhere;
 		uint32_t index = 0; // The register, the field slot, the global, or the string of Godot's name.
 		uint32_t object = 0; // For FieldOf and Engine: the register holding the object.
 		Kind kind = Kind::F64;
@@ -200,6 +208,8 @@ class Lowerer {
 	// The value a part belongs to. It is read where the place is worked out, before anything to the right
 	// of it runs, as GDScript does: `position.x = f()` keeps the `y` that `position` had before `f()`.
 	uint32_t whole_of(const Place &p_place, uint32_t p_position);
+	// An element of a vector, or its length or `fixed`, as a place. Nothing if the target is none of those.
+	std::optional<Place> vector_place(Expr *p_target, Expr *p_later);
 
 	// The engine object a Godot member is reached through: the script's own owner when nothing is
 	// written before the name, or the value of what is written.

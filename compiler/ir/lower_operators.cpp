@@ -119,7 +119,11 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 	Expr *right = p_binary->right;
 	Symbol *symbol = named_class(right);
 	uint32_t index = 0;
-	if (!symbol || !class_index(symbol, &index)) {
+	// `v is Vector.<int>`: the type written is the class itself, and its instances are the vector.
+	const Type *written = right->type && right->type->kind == Type::ClassObject ? right->type->element : nullptr;
+	if (const std::optional<uint32_t> of_vector = is_vector(written) ? vector_class(written) : std::nullopt) {
+		index = *of_vector;
+	} else if (!symbol || !class_index(symbol, &index)) {
 		refuse(right->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " with this type");
 		return default_value(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj, position);
 	}
