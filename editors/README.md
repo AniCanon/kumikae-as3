@@ -81,7 +81,9 @@ output, for files ending in `.as`.
 | Outline | The classes and members of a file. |
 | Symbol search | The project's own classes, functions and members. |
 
-Not yet: completion, signature help, rename, Godot's documentation in hover.
+Completion is offered after a dot, where a type is written, and for the names in reach.
+
+Not yet: signature help, rename, Godot's documentation in hover, completion of an import's path.
 
 Going to the definition of something in Godot's API opens a read-only copy of the declarations, which the
 server writes to the system's temporary folder.

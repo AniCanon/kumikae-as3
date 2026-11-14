@@ -23,7 +23,7 @@ it stands.
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
 | **2c** | The rest of the language | 18 | Closures as listeners, `object[name]` in general, collections, strings |
-| **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
+| **LS-2** | Language server, second slice (after 2c) | 13 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 15 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 44 | What is left |
 | **decision** | The owner | 7 | See each item |
@@ -230,6 +230,16 @@ any Godot value passing as a condition):
 - New code that the guide would write otherwise: an empty string and an out-parameter where it asks for
   `std::optional`, `const std::string &` for `std::string_view`, two comments out of place. **clean-up**
 - `var c:Color = null; x.clamp(c, hi)` is an error where the literal `null` takes the default. **clean-up**
+
+## Completion, brought forward
+
+- Completion after a dot needs the value's type: nothing is offered for `*`, for a value whose type could
+  not be worked out, or for a package path (`flash.utils.`). **LS-2**
+- No completion of an import's path, of a parameter's name in a call, or of an override's signature.
+  **LS-2**
+- A local of a nested function is offered in the function around it, and the reverse. **LS-2**
+- Whether a `name:` is a type's place is read from the text before it, not from the tree, when the type
+  has not been started (`var a:`). **LS-2**
 
 ## Stage 2a: interpreter core
 

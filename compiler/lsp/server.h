@@ -40,6 +40,7 @@ class Server {
 	Json definition(const Json &p_params);
 	Json references(const Json &p_params);
 	Json hover(const Json &p_params);
+	Json completion(const Json &p_params);
 	Json document_symbols(const Json &p_params);
 	Json workspace_symbols(const Json &p_params);
 	void notification(const std::string &p_method, const Json &p_params, std::vector<std::string> &r_out);

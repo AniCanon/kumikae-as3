@@ -174,7 +174,7 @@ static void test_lifecycle() {
 	CHECK(capabilities.get("hoverProvider").boolean());
 	CHECK(capabilities.get("documentSymbolProvider").boolean());
 	CHECK(capabilities.get("workspaceSymbolProvider").boolean());
-	CHECK(!capabilities.has("completionProvider"));
+	CHECK(capabilities.get("completionProvider").is_object());
 	CHECK_EQ(answer.get("result").get("serverInfo").get("name").string(), std::string("kas3c"));
 	session.notify("initialized", Json::object());
 	CHECK_EQ(session.received.size(), (size_t)0); // The editor did not offer file watching: nothing to ask.
@@ -652,6 +652,48 @@ static void test_agreement() {
 // Prefixes of every corpus file, and the file with one byte missing, as an editor would send them while
 // someone types: about 200 edits a file. Nothing may crash, and every request must be answered.
 // (test_query runs every prefix and every deletion through the checker and the queries.)
+static void test_completion() {
+	Session session;
+	Json hello = session.request("initialize", Json::object().set("capabilities", Json::object()));
+	const Json &provider = hello.get("result").get("capabilities").get("completionProvider");
+	CHECK(provider.is_object());
+	CHECK_EQ(provider.get("triggerCharacters").items().size(), (size_t)1);
+	session.notify("initialized", Json::object());
+
+	// The text as it is while a member is being typed: the answer is for that text, not the last good one.
+	session.open(MAIN, "package {\npublic class Main {\n\tpublic var speed:Number;\n\tpublic function run():void {\n\t\tthis.\n\t}\n} }");
+	Json answer = session.request("textDocument/completion", Session::at(MAIN, 4, 7));
+	const Json &items = answer.get("result").get("items");
+	CHECK(!answer.get("result").get("isIncomplete").boolean());
+	std::string names;
+	for (const Json &item : items.items()) {
+		names += item.get("label").string() + ":" + std::to_string(item.get("kind").integer(0)) + " ";
+	}
+	CHECK(names.find("speed:5 ") != std::string::npos);
+	CHECK(names.find("run:2 ") != std::string::npos);
+	for (const Json &item : items.items()) {
+		if (item.get("label").string() == "run") {
+			CHECK_EQ(item.get("detail").string(), std::string("function run():void"));
+		}
+	}
+
+	// A keyword has its own kind and no detail.
+	session.change(MAIN, "package {\npublic class Main {\n\tpublic function run():void {\n\t\tret\n\t}\n} }");
+	answer = session.request("textDocument/completion", Session::at(MAIN, 3, 5));
+	const Json &words = answer.get("result").get("items");
+	CHECK_EQ(words.items().size(), (size_t)1);
+	CHECK_EQ(words.items()[0].get("label").string(), std::string("return"));
+	CHECK_EQ(words.items()[0].get("kind").integer(0), 14);
+	CHECK(!words.items()[0].has("detail"));
+
+	// A place with nothing to offer, and a file that is not the program's: an empty list, never an error.
+	answer = session.request("textDocument/completion", Session::at(MAIN, 0, 3));
+	CHECK(answer.get("result").get("items").is_array());
+	answer = session.request("textDocument/completion", Session::at("file:///work/Unknown.as", 0, 0));
+	CHECK(answer.get("result").get("items").items().empty());
+	CHECK(!answer.has("error"));
+}
+
 static void test_typing() {
 	int files = 0;
 	for (const auto &entry : fs::directory_iterator(std::string(KAS3_TESTS_DIR) + "/corpus")) {
@@ -708,6 +750,7 @@ static void test_typing() {
 }
 
 int main() {
+	test_completion();
 	test_lifecycle();
 	test_diagnostics();
 	test_positions();
