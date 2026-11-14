@@ -125,6 +125,30 @@ class SessionStateTest {
         )
     }
 
+    @Test fun `a launch that names the scripts' folder gives it to the app, so that the game reloads on save`() {
+        var given: Map<String, String>? = null
+        val logs = LaunchLog { _, environment ->
+            given = environment
+            ProcessBuilder("/usr/bin/true").start()
+        }
+        val params = """{"device":"phone","bundle":"org.example.game","sources":"/games/mine"}"""
+        RequestFields.validate("launch", JsonParser.parseString(params).asJsonObject)
+        val dir = Files.createTempDirectory("simulator-test")
+        try {
+            SimulatorSession(dir, runner, launchLog = logs).use { session ->
+                state = "Booted"
+                session.call("select", """{"device":"phone"}""")
+                session.call("launch", params)
+                assertEquals(mapOf("SIMCTL_CHILD_KAS3_SOURCE_DIR" to "/games/mine"), given)
+                assertThrows(IllegalArgumentException::class.java) {
+                    session.call("launch", """{"device":"phone","bundle":"org.example.game","sources":"games"}""")
+                }
+            }
+        } finally {
+            Files.delete(dir)
+        }
+    }
+
     @Test fun `an unknown method is still refused`() = session { session ->
         session.call("select", """{"device":"phone"}""")
         assertThrows(IllegalArgumentException::class.java) {
