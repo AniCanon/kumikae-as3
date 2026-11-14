@@ -44,6 +44,8 @@ allprojects {
 }
 
 kotlin { jvmToolchain(25) }
+// One install script: the one a person runs from tools/ is the one the plugin carries.
+sourceSets.main { resources.srcDir("tools") }
 tasks.buildPlugin { dependsOn(tasks.ktlintCheck, project(":core").tasks.named("ktlintCheck")) }
 intellijPlatform {
     buildSearchableOptions = false

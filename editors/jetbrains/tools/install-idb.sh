@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs Meta's idb for input in the Simulator panel: the companion that talks to the Simulator, and
 # the client the panel runs. idb uses private Apple interfaces; this is the owner's choice, and nothing
-# in the plugin runs this for you.
+# is run without the owner's yes: the panel asks before it runs this, and it can be run by hand.
 set -eu
 
 command -v brew >/dev/null || { echo "Homebrew is needed for idb's companion: https://brew.sh" >&2; exit 1; }

@@ -14,7 +14,23 @@ class SimulatorWindowControllerTest {
     private val polling = ManualBackgroundTasks()
     private var allowed = false
     private val remembered = mutableListOf<Boolean>()
-    private val controller = SimulatorWindowController(repository, actions, polling, { allowed }, { remembered += it })
+    private val installer = FakeInstaller()
+    private val controller =
+        SimulatorWindowController(repository, actions, polling, { allowed }, { remembered += it }, installer)
+
+    private class FakeInstaller : IdbInstaller {
+        var output = ""
+        var failure: IdbInstallFailed? = null
+        var then: () -> Unit = {}
+        var runs = 0
+
+        override fun install(): String {
+            runs++
+            failure?.let { throw it }
+            then()
+            return output
+        }
+    }
 
     private fun open(select: SimulatorDevice? = repository.phone) {
         controller.shown()
@@ -339,6 +355,47 @@ class SimulatorWindowControllerTest {
         controller.shown()
         actions.finish()
         assertEquals(listOf("connect", "enableInput", "devices"), repository.calls)
+    }
+
+    @Test fun `input that finds no idb offers to install it`() {
+        open()
+        repository.idbInstalled = false
+        assertFalse(controller.idbMissing)
+        controller.enableInput()
+        actions.finish()
+        assertTrue(controller.idbMissing)
+    }
+
+    @Test fun `installing idb shows what the install said, then switches input on`() {
+        open()
+        repository.idbInstalled = false
+        controller.enableInput()
+        actions.finish()
+        repository.calls.clear()
+        installer.output = "==> Installing idb-companion\nInstalled 1 executable: idb\n"
+        installer.then = { repository.idbInstalled = true }
+        controller.installIdb()
+        assertEquals("Installing idb…", controller.status)
+        actions.finish()
+        assertEquals(1, installer.runs)
+        assertEquals(listOf("enableInput", "status"), repository.calls)
+        assertTrue(controller.console.contains("Installed 1 executable: idb"))
+        assertTrue(controller.inputEnabled)
+        assertFalse(controller.idbMissing)
+        assertEquals("idb is installed. Input is on.", controller.status)
+        assertEquals(listOf(true), remembered)
+    }
+
+    @Test fun `an install that fails says so, shows its output and can be tried again`() {
+        open()
+        installer.failure =
+            IdbInstallFailed("The install stopped with status 1.", "Homebrew is needed for idb's companion")
+        controller.installIdb()
+        actions.finish()
+        assertEquals("The install stopped with status 1.", controller.status)
+        assertTrue(controller.console.contains("Homebrew is needed"))
+        assertTrue(controller.idbMissing)
+        assertTrue(repository.calls.none { it == "enableInput" })
     }
 
     private companion object {

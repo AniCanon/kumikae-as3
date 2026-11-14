@@ -14,6 +14,7 @@ internal class SimulatorWindowController(
     private val polling: BackgroundTasks,
     private val inputAllowed: () -> Boolean = { false },
     private val rememberInput: (Boolean) -> Unit = {},
+    private val installer: IdbInstaller = IdbInstaller { throw IdbInstallFailed("No installer was given.", "") },
 ) : Disposable {
     var status by mutableStateOf("Starting the local Simulator service…")
         private set
@@ -30,6 +31,10 @@ internal class SimulatorWindowController(
     var capture by mutableStateOf("")
         private set
     var inputEnabled by mutableStateOf(false)
+        private set
+
+    /** Input was asked for and idb is not on this Mac: the menu then offers to install it. */
+    var idbMissing by mutableStateOf(false)
         private set
 
     /** An action the person started is running: a boot, a launch, an install. */
@@ -124,16 +129,39 @@ internal class SimulatorWindowController(
 
     /** Called after the owner agreed to input through idb. */
     fun enableInput() {
-        val work = { repository.enableInput() to repository.status() }
-        run("Switching input on", work) { (found, state) ->
-            if (found) {
-                rememberInput(true)
-                showStatus(state, fresh = false)
-                status = "Input is on."
-            } else {
-                status = NO_IDB
+        run("Switching input on", { repository.enableInput() to repository.status() }) { (found, state) ->
+            if (found) inputIsOn(state, "Input is on.") else idbIsMissing(NO_IDB)
+        }
+    }
+
+    /** Called after the owner agreed to what the install puts on this Mac. Its output goes to the console. */
+    fun installIdb() {
+        val work = {
+            val said = runCatching { installer.install() }
+            val found = said.isSuccess && repository.enableInput()
+            Triple(said, found, if (found) repository.status() else null)
+        }
+        run("Installing idb", work) { (said, found, state) ->
+            val failure = said.exceptionOrNull()
+            append("\n[idb install]\n" + (said.getOrNull() ?: (failure as? IdbInstallFailed)?.output.orEmpty()) + "\n")
+            when {
+                failure != null -> idbIsMissing(failure.message ?: "The install failed.")
+                state != null && found -> inputIsOn(state, "idb is installed. Input is on.")
+                else -> idbIsMissing("The install finished, but idb was not found afterwards. See the console.")
             }
         }
+    }
+
+    private fun inputIsOn(state: SimulatorStatus, say: String) {
+        idbMissing = false
+        rememberInput(true)
+        showStatus(state, fresh = false)
+        status = say
+    }
+
+    private fun idbIsMissing(say: String) {
+        idbMissing = true
+        status = say
     }
 
     fun install(appPath: String) = onDevice("Installing", work = { repository.install(it, appPath.trim()) }) {
@@ -335,8 +363,7 @@ internal class SimulatorWindowController(
     private companion object {
         const val BOOTED = "Booted"
         const val LIST_EVERY = 6
-        const val NO_IDB = "idb is not installed. Run editors/jetbrains/tools/install-idb.sh, " +
-            "then switch input on again."
+        const val NO_IDB = "idb is not installed. Choose Install idb… in the menu."
         const val BUSY = "Another Simulator action is still running. Try again when it finishes."
         const val TAP_SLOP = 6
         const val MAX_STATUS = 300

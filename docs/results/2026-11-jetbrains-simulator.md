@@ -133,3 +133,11 @@ iPhone-class Simulator on iOS 26.4.
 
 Not run: input from the panel's own buttons and mouse in a Rider window; a device idb cannot
 describe; a second device; input delay.
+
+## Install idb from the panel, 2026-11-14
+
+| Check | Observed |
+|---|---|
+| The install script run with the bare environment an IDE gives a process | Exit 0 on a Mac that already had idb: Homebrew and the client each reported it installed. A first install from nothing was done by hand earlier the same day with the same commands, not through this script. |
+| The script inside the built plugin | Present in the plugin's jar; a test reads it back. |
+| The panel's flow (ask, run, show output, switch input on; failure; retry) | Controller tests with a stand-in installer, and installer tests with small scripts. Not pressed in a Rider window. |

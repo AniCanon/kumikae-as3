@@ -14,5 +14,6 @@ internal object SimulatorComposition {
         polling = BackgroundWorker("Kumikae AS3 Simulator polling"),
         inputAllowed = inputAllowed,
         rememberInput = rememberInput,
+        installer = ScriptIdbInstaller(),
     )
 }

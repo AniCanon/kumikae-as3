@@ -156,7 +156,7 @@ internal fun moreEntries(
     controller: SimulatorWindowController,
     state: SimulatorPanelState,
     prompts: SimulatorPrompts,
-): List<MenuEntry> = listOf(
+): List<MenuEntry> = listOfNotNull(
     MenuEntry("App to launch… (${state.bundle})") { prompts.bundle(state.bundle)?.let { state.bundle = it } },
     MenuEntry("Install app…") { prompts.appToInstall()?.let(controller::install) },
     MenuEntry(
@@ -165,6 +165,12 @@ internal fun moreEntries(
     ) {
         if (prompts.confirmInput()) controller.enableInput()
     },
+    MenuEntry("Install idb…") {
+        if (prompts.confirmInstall()) {
+            state.consoleShown = true
+            controller.installIdb()
+        }
+    }.takeIf { controller.idbMissing },
     MenuEntry("Copy agent endpoint path", enabled = controller.endpointFile.isNotEmpty()) {
         prompts.copy(controller.endpointFile)
     },

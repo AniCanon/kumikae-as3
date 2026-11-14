@@ -47,7 +47,7 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 
 Without idb, use Apple's Device Hub window for input. No private framework is
 loaded by this plugin itself. Switching input on runs idb, which uses them.
-The plugin does not download or install idb: `tools/install-idb.sh` does, when you run it.
+The plugin installs idb only when you choose Install idb… and agree to its dialog.
 
 This is the beginning of the one plugin planned in roadmap stage 6. It does not
 yet connect `kas3c lsp`, set AS3 breakpoints or step through scripts. Keep using
@@ -178,9 +178,11 @@ Taps, swipes, typing, Home, Lock and Rotate are sent with idb, a tool from Meta 
 Simulator through Apple's private input services. Apple can change those without notice. Nothing
 here installs it or turns it on by itself:
 
-1. Install idb once: `tools/install-idb.sh` (its companion from Meta's Homebrew tap, its client
-   in its own Python environment).
-2. In the panel, choose **⋮ > Switch input on…** and agree. The choice is remembered.
+1. In the panel, choose **⋮ > Switch input on…** and agree. The choice is remembered.
+2. If idb is not on this Mac, the menu then offers **Install idb…**. It says what will be installed
+   and from where, asks, runs `tools/install-idb.sh` (its companion from Meta's Homebrew tap, its
+   client in its own Python environment), shows what the script printed in the console, and
+   switches input on. The same script can be run by hand. It needs Homebrew.
 
 The service finds idb in `~/.local/bin`, Homebrew's folder or along `PATH`, and reads each device's
 pixels per point from idb's own description of it, so every device has input and nothing is typed
