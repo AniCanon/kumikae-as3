@@ -1,0 +1,30 @@
+godot_ext/callable.cpp: sweep_listeners() is over 120 lines
+ir/lower.cpp: banner comments
+ir/lower.cpp: binary() is over 120 lines
+ir/lower.cpp: call() is over 120 lines
+ir/lower.cpp: convert() is over 120 lines
+ir/lower.cpp: declare_class() is over 120 lines
+ir/lower.cpp: evaluate() is over 120 lines
+ir/lower.cpp: operate() is over 120 lines
+ir/lower.cpp: run() is over 120 lines
+ir/lower.cpp: statement() is over 120 lines
+ir/lower.cpp: the file is over 800 lines
+src/ast.h: banner comments
+src/ast_printer.cpp: node() is over 120 lines
+src/ast_walk.h: walk() is over 120 lines
+src/names.cpp: banner comments
+src/names.h: banner comments
+src/names_bodies.cpp: banner comments
+src/names_bodies.cpp: statement() is over 120 lines
+src/names_link.cpp: banner comments
+src/names_types.cpp: banner comments
+src/names_types.cpp: compute() is over 120 lines
+src/names_types.cpp: the file is over 800 lines
+src/parser.h: banner comments
+src/parser_stmt.cpp: Parser::parse_statement_inner() is over 120 lines
+vm/host.h: banner comments
+vm/interpreter.cpp: Interpreter::host_op() is over 120 lines
+vm/interpreter.cpp: Interpreter::run() is over 120 lines
+vm/interpreter.cpp: the file is over 800 lines
+vm/interpreter.h: banner comments
+vm/runtime.h: banner comments

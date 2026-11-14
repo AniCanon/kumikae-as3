@@ -125,5 +125,8 @@ add_test(NAME godot_extension COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOUR
     ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME golden COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_golden.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+# The rules of docs/cpp-guidelines.md that a script can judge.
+add_test(NAME style COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_style.py ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME style_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_style.py --self-test)
 add_test(NAME godot COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/godot -p "test_*.py")
 set_tests_properties(godot PROPERTIES ENVIRONMENT "KAS3C=$<TARGET_FILE:kas3c>")
