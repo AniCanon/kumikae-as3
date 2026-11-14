@@ -16,7 +16,7 @@ principle does.
 | **S**ingle responsibility | A file, a class and a function each have one job, and one reason to change. | Sections 1 and 2 |
 | **O**pen for extension, closed for change | A new Godot feature or a new backend is added beside what is there, not by editing every layer. The interpreter knows the engine only as `vm::Host`; a new IR operation is one line in one table plus its case. | Section 2 |
 | **L**iskov substitution | Anything that implements `vm::Host` can stand in for any other: Godot, the stand-alone host, the recorder the tests use. A host never needs to know which interpreter called it. | Section 2 |
-| **I**nterface segregation | A function asks for the narrowest thing it needs. An interface that grows past what one caller uses is split. | Section 2 |
+| **I**nterface segregation | A function asks for the narrowest thing it needs. An interface that grows past what one caller uses is split: a host that only prints implements `Output`, not the engine's entries. | Section 2 |
 | **D**ependency inversion | Layers depend on an interface the lower layer owns, never on the layer above: `vm/` and `ir/` include no Godot header. | Section 2 |
 | **DRY** | Every rule, constant and message is written once. Two layers that must agree read the same source. | Section 3 |
 

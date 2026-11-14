@@ -52,6 +52,8 @@ times).
 3. A cache added for speed that outlives what it caches: a `StringName` kept past extension shutdown, a
    singleton handle kept across a hot reload, a map keyed by a `string_view` whose text is freed.
 4. An `std::optional` or structured binding that copies where the old code referred.
+6. The split of `vm::Host`: an entry placed in the wrong interface (one that a values-only host would
+   need from the objects interface), and a host that can be built with a null engine interface.
 5. The style check itself: a rule it enforces that the guide does not state, or the reverse.
 
 ---
@@ -136,6 +138,29 @@ step of the sweep. `godot_host.cpp` is split into `godot_host.cpp` (calls) and `
 of method names to handlers.
 
 - [ ] As task 4.
+
+### Task 7a: Split `vm::Host` (added by the owner, 2026-11-14)
+
+`vm::Host` has about 15 entries, and every host must answer all of them: the stand-alone host answers 13
+with "there is no engine here". It becomes three interfaces in `vm/`, each in its own header:
+
+| Interface | Entries | Who implements it |
+|---|---|---|
+| `Output` (`output.h`) | `print`, `error` | Every host |
+| `EngineValues` (`engine_values.h`) | `construct`, `copy`, `drop`, `text`, `operate`, `index_get`, `index_set`, `constant` | Godot, the tests' recorder |
+| `EngineObjects` (`engine_objects.h`) | `call`, `get`, `set`, `member`, `singleton`, `call_static`, `bind` | Godot, the tests' recorder |
+
+`vm::Host` stays as the one thing the interpreter is given: a small struct holding an `Output &` and the
+two engine interfaces. Where there is no engine it holds `NoEngine`, one class in `vm/no_engine.h` that
+answers every engine entry with the same message, so that the message is written once and
+`StandaloneHost` implements `Output` alone. `Argument` and `Wanted` move to `vm/engine_types.h`.
+
+- [ ] Tests first: `StandaloneHost` compiles implementing `Output` only; a program that uses a Godot
+  value under `kas3c run` still fails with "there is no engine here"; the tests' recorder implements the
+  two engine interfaces.
+- [ ] Split; the interpreter's `host_op` calls through the interface each operation belongs to. The
+  engine benchmark is run before and after: one more pointer hop per call must not show.
+- [ ] Suite green in both builds; commit.
 
 ### Task 8: C++17 and speed
 
