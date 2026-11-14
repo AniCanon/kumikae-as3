@@ -42,7 +42,8 @@ FUNCTIONS_LEFT_OUT = {"typeof", "is_finite"}
 # gains one of them.
 def _extra(name, arguments=(), result=None, virtual=True):
     entry = {"name": name, "is_const": False, "is_vararg": False, "is_static": False, "is_virtual": virtual,
-             "arguments": [{"name": argument, "type": kind} for argument, kind in arguments]}
+             "arguments": [dict({"name": argument, "type": kind}, **({"meta": "int32"} if kind == "int" else {}))
+                           for argument, kind in arguments]}
     if result:
         entry["return_value"] = {"type": result}
     return entry
@@ -87,51 +88,13 @@ AS3_HAS_METHOD = {("Object", "to_string")}
 # (`timer.timeout.add(f)`), so these are not declared: one way to do it.
 LISTEN_BY_NAME = {("Object", "connect"), ("Object", "disconnect"), ("Object", "is_connected")}
 
-# Integers that need more than AS3's 32-bit int, where the description gives no width: it gives one only
-# for the methods of classes. Keyed by (built-in class or "" for a global function, method); the value
-# maps a parameter name, or "return", to the AS3 type. A test checks that every entry is still used.
-_INT64_ELEMENT = {"value": "Number"}
-WIDTHS = {
-    ("", "instance_from_id"): {"instance_id": "Number"},
-    ("", "is_instance_id_valid"): {"id": "Number"},
-    ("", "rid_allocate_id"): {"return": "Number"},
-    ("", "rid_from_int64"): {"base": "Number"},
-    ("", "seed"): {"base": "Number"},
-    ("", "rand_from_seed"): {"seed": "Number"},
-    ("", "randi"): {"return": "uint"},
-    ("", "hash"): {"return": "uint"},
-    ("Signal", "get_object_id"): {"return": "Number"},
-    ("Array", "hash"): {"return": "uint"},
-    ("Dictionary", "hash"): {"return": "uint"},
-    ("PackedByteArray", "decode_u32"): {"return": "uint"},
-    ("PackedByteArray", "decode_u64"): {"return": "Number"},
-    ("PackedByteArray", "decode_s64"): {"return": "Number"},
-    ("PackedByteArray", "encode_u32"): {"value": "uint"},
-    ("PackedByteArray", "encode_u64"): {"value": "Number"},
-    ("PackedByteArray", "encode_s64"): {"value": "Number"},
-    ("RID", "get_id"): {"return": "Number"},
-    ("Color", "to_argb64"): {"return": "Number"},
-    ("Color", "to_abgr64"): {"return": "Number"},
-    ("Color", "to_rgba64"): {"return": "Number"},
-    ("Color", "hex64"): {"hex": "Number"},
-    ("Color", "to_argb32"): {"return": "uint"},
-    ("Color", "to_abgr32"): {"return": "uint"},
-    ("Color", "to_rgba32"): {"return": "uint"},
-    ("Color", "hex"): {"hex": "uint"},
-    ("Color", "from_rgbe9995"): {"rgbe": "uint"},
-    ("PackedInt64Array", "get"): {"return": "Number"},
-    ("PackedInt64Array", "set"): _INT64_ELEMENT,
-    ("PackedInt64Array", "push_back"): _INT64_ELEMENT,
-    ("PackedInt64Array", "append"): _INT64_ELEMENT,
-    ("PackedInt64Array", "insert"): _INT64_ELEMENT,
-    ("PackedInt64Array", "fill"): _INT64_ELEMENT,
-    ("PackedInt64Array", "has"): _INT64_ELEMENT,
-    ("PackedInt64Array", "bsearch"): _INT64_ELEMENT,
-    ("PackedInt64Array", "find"): _INT64_ELEMENT,
-    ("PackedInt64Array", "rfind"): _INT64_ELEMENT,
-    ("PackedInt64Array", "count"): _INT64_ELEMENT,
-    ("PackedInt64Array", "erase"): _INT64_ELEMENT,
-}
+# Godot's integer has 64 bits, and so does every integer of its API unless the description says it is
+# narrower: by a width mark, or by belonging to a built-in type that stores 32-bit integers. The
+# description says which those are for the vectors (their members are marked int32); this one says it only
+# in its name. Godot cuts a wide value off inside such a type without an error, so its integers stay
+# `int` and a wide value never reaches it. A test checks that it still exists.
+# (PackedByteArray is not one: it also reads and writes 64-bit integers, decode_s64 and the like.)
+NARROW_BY_NAME = {"PackedInt32Array"}
 
 # Godot's operators that AS3 writes the same way. A unary one is described as "unary-".
 OPERATORS = {"+", "-", "*", "/", "%", "<", ">", "<=", ">="}
@@ -142,10 +105,27 @@ OPERATORS_LEFT_OUT = {"==", "!=", "not", "in", "and", "or", "xor", "**", "~", "<
 
 NUMBER = re.compile(r"-?\d+(\.\d+)?(e[-+]?\d+)?$")
 NAME = re.compile(r"[A-Za-z_]\w*$")
-NUMERIC = {"int", "uint", "Number"}
-INT_WIDTHS = {None: "int", "int8": "int", "int16": "int", "int32": "int", "char16": "int", "char32": "int",
-              "uint8": "uint", "uint16": "uint", "uint32": "uint", "int64": "Number", "uint64": "Number",
-              "required": "int"}
+NUMERIC = {"int", "uint", "Number", "Int64"}
+INT_WIDTHS = {None: "Int64", "int8": "int", "int16": "int", "int32": "int", "char16": "int", "char32": "int",
+              "uint8": "uint", "uint16": "uint", "uint32": "uint", "int64": "Int64", "uint64": "Int64",
+              "required": "Int64"}
+
+
+def narrow_classes(api):
+    """The built-in types that store 32-bit integers: every member is one, or is such a type."""
+    members = {}
+    for layout in api.get("builtin_class_member_offsets", [])[:1]:
+        for entry in layout["classes"]:
+            members[entry["name"]] = [member["meta"] for member in entry["members"]]
+    narrow = set(NARROW_BY_NAME)
+    changed = True
+    while changed:
+        changed = False
+        for name, metas in members.items():
+            if name not in narrow and metas and all(meta == "int32" or meta in narrow for meta in metas):
+                narrow.add(name)
+                changed = True
+    return narrow
 
 
 def is_int32(value):
@@ -197,7 +177,8 @@ class Generator:
                     if operator["name"] in OPERATORS and operator.get("right_type") in self.builtins:
                         self.number_on_left.setdefault(operator["right_type"], []).append(
                             (operator["name"], entry["name"], operator["return_type"]))
-        self.used_widths = set()
+        self.narrow = narrow_classes(api) & {entry["name"] for entry in api["builtin_classes"]}
+        self.in_narrow = False  # Writing a type that stores 32-bit integers.
         # Every enum, by the name type strings use, with whether it needs more than 32 bits.
         self.enums = {}
         for entry in api["global_enums"]:
@@ -232,7 +213,7 @@ class Generator:
         if separator:
             if prefix in ("enum", "bitfield"):
                 note = self.enum_note(prefix, rest, where)
-                return ("Number" if self.enums[rest] else "int"), note
+                return ("Int64" if self.enums[rest] else "int"), note
             if prefix == "typedarray":
                 return "GodotArray", "Array[%s]" % self.element(rest, text, where)
             if prefix == "typeddictionary":
@@ -245,6 +226,8 @@ class Generator:
         if text == "int":
             if meta not in INT_WIDTHS:
                 raise Refused("unknown width '%s' in %s" % (meta, where))
+            if meta is None and self.in_narrow:
+                return "int", None
             return INT_WIDTHS[meta], None
         result = self.known(text)
         if result is None:
@@ -290,7 +273,7 @@ class Generator:
             raise Refused("%s: '%s' is not a name" % (owner, name))
         return name
 
-    def parameters(self, arguments, vararg, where, notes, widths):
+    def parameters(self, arguments, vararg, where, notes):
         written = []
         seen = set()
         for argument in arguments:
@@ -299,8 +282,6 @@ class Generator:
                 raise Refused("%s: two parameters named '%s'" % (where, name))
             seen.add(name)
             as3, note = self.type(argument["type"], argument.get("meta"), where)
-            if as3 == "int" and argument["name"] in widths:
-                as3 = widths[argument["name"]]
             if note:
                 notes.append('%s="%s"' % (name, note))
             text = "%s:%s" % (name, as3)
@@ -311,21 +292,13 @@ class Generator:
             written.append("...args" if "rest" in seen else "...rest")
         return ", ".join(written)
 
-    def function(self, where, name, arguments, result, result_meta, vararg, modifiers, width_key=None):
+    def function(self, where, name, arguments, result, result_meta, vararg, modifiers):
         """The lines of one function declaration, or raises Pointer."""
         notes = []
-        widths = WIDTHS.get(width_key, {})
-        if widths:
-            self.used_widths.add(width_key)
-            unknown = set(widths) - {argument["name"] for argument in arguments} - {"return"}
-            if unknown or ("return" in widths and result != "int"):
-                raise Refused("%s: the width table names something it does not have" % where)
-        parameters = self.parameters(arguments, vararg, where, notes, widths)
+        parameters = self.parameters(arguments, vararg, where, notes)
         returns = "void"
         if result is not None:
             returns, note = self.type(result, result_meta, where)
-            if returns == "int" and "return" in widths:
-                returns = widths["return"]
             if note:
                 notes.append('returns="%s"' % note)
         lines = ["[Godot(%s)]" % ", ".join(notes)] if notes else []
@@ -353,7 +326,7 @@ class Generator:
         for enum in entry.get("enums", []):
             for value in enum["values"]:
                 self.integer(value["value"], "%s.%s" % (owner, value["name"]))
-            kind = "Number" if wide(enum["values"]) else "int"
+            kind = "Int64" if wide(enum["values"]) else "int"
             for value in enum["values"]:
                 self.claim(owner, value["name"], "the constant " + value["name"], inherited)
                 out.append("public static const %s:%s = %d;" % (value["name"], kind, value["value"]))
@@ -361,11 +334,13 @@ class Generator:
             self.claim(owner, constant["name"], "the constant " + constant["name"], inherited)
             if "type" not in constant:  # A class's constants are integers.
                 self.integer(constant["value"], "%s.%s" % (owner, constant["name"]))
-                kind = "int" if is_int32(constant["value"]) else "Number"
+                kind = "int" if is_int32(constant["value"]) else "Int64"
                 out.append("public static const %s:%s = %d;" % (constant["name"], kind, constant["value"]))
                 continue
             as3, _ = self.type(constant["type"], None, owner + "." + constant["name"])
             value = " = " + constant["value"] if as3 in NUMERIC and NUMBER.match(constant["value"]) else ""
+            if as3 == "Int64" and value and is_int32(int(constant["value"])):
+                as3 = "int"  # Its value is written here, and fits.
             out.append("public static const %s:%s%s;" % (constant["name"], as3, value))
 
     def enum_lines(self, entry):
@@ -524,8 +499,6 @@ class Generator:
                 lines.append('\t[Operator(op="%s", left="%s", returns="%s")]' % (name, self.operand(left), returns))
         if entry.get("indexing_return_type"):
             element = self.type(entry["indexing_return_type"], None, owner + " indexing")[0]
-            if element == "int":
-                element = WIDTHS.get((owner, "get"), {}).get("return", element)
             lines.append('\t[Indexed(element="%s"%s)]' % (element, ', keyed="true"' if entry["is_keyed"] else ""))
         return lines
 
@@ -534,6 +507,7 @@ class Generator:
         as3_name = naming.class_name(owner)
         self.define(as3_name)
         self.names[owner] = {}
+        self.in_narrow = owner in self.narrow
         out = []
         self.constants(entry, owner, {}, out)
         for member in entry.get("members", []):
@@ -548,8 +522,7 @@ class Generator:
             name = naming.member(method["name"])
             self.claim(owner, name, "the method " + method["name"], {})
             out.extend(self.function(where, name, method.get("arguments", []), method.get("return_type"), None,
-                                     method["is_vararg"], "static " if method["is_static"] else "",
-                                     (owner, method["name"])))
+                                     method["is_vararg"], "static " if method["is_static"] else ""))
         if owner == "Signal":
             for name, line in SIGNAL_EXTRAS:
                 self.claim(owner, name, "AS3's " + name, {})
@@ -559,13 +532,14 @@ class Generator:
         self.lines.extend(self.enum_lines(entry))
         self.lines.extend(self.operator_lines(entry))
         self.block("public final native class %s" % as3_name, out)
+        self.in_narrow = False
 
     def global_enum(self, entry):
         as3_name = naming.class_name(entry["name"])
         self.define(as3_name)
         for value in entry["values"]:
             self.integer(value["value"], "%s.%s" % (entry["name"], value["name"]))
-        kind = "Number" if wide(entry["values"]) else "int"
+        kind = "Int64" if wide(entry["values"]) else "int"
         names = naming.enum_values([value["name"] for value in entry["values"]])
         if len(set(names)) != len(names):
             raise Refused("%s: two values with one name" % entry["name"])
@@ -589,7 +563,7 @@ class Generator:
                 entry.get("return_type") is None):
             arguments = []
         for line in self.function(entry["name"], name, arguments, entry.get("return_type"),
-                                  None, entry["is_vararg"], "", ("", entry["name"])):
+                                  None, entry["is_vararg"], ""):
             self.lines.append("\t" + line)
 
     def block(self, head, members):
@@ -597,11 +571,12 @@ class Generator:
         self.lines.extend("\t\t" + member for member in members)
         self.lines.append("\t}")
 
-    def unused_widths(self):
-        """Entries of the hand-kept tables that matched nothing in the description."""
+    def unused_entries(self):
+        """Entries of the hand-kept lists that matched nothing in the description."""
         described = {(entry["name"], method["name"]) for entry in self.api["classes"]
                      for method in entry.get("methods", [])}
-        return sorted((set(WIDTHS) - self.used_widths) | ((AS3_HAS_METHOD | LISTEN_BY_NAME) - described))
+        builtins = {entry["name"] for entry in self.api["builtin_classes"]}
+        return sorted(((AS3_HAS_METHOD | LISTEN_BY_NAME) - described) | {("", name) for name in NARROW_BY_NAME - builtins})
 
     def names_text(self):
         """One "AS3 name=Godot name" line per declared class and member, sorted. Call after run()."""

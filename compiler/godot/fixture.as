@@ -29,7 +29,7 @@ package godot {
 	public final native class Signal {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function emit(...rest):void;
-		public native function getObjectId():Number;
+		public native function getObjectId():Int64;
 		public native function add(listener:Function, deferred:Boolean = false):void;
 		public native function addOnce(listener:Function, deferred:Boolean = false):void;
 		public native function remove(listener:Function):void;
@@ -41,7 +41,7 @@ package godot {
 	[Indexed(element="*")]
 	public final native class GodotArray {
 		public native function GodotArray();
-		public native function size():int;
+		public native function size():Int64;
 	}
 	[Operators]
 	[Indexed(element="*", keyed="true")]
@@ -50,10 +50,10 @@ package godot {
 		public native function isEmpty():Boolean;
 	}
 	[Operators]
-	[Indexed(element="Number")]
+	[Indexed(element="Int64")]
 	public final native class PackedInt64Array {
 		public native function PackedInt64Array();
-		public native function get(index:int):Number;
+		public native function get(index:Int64):Int64;
 	}
 	[GodotEnum(name="ConnectFlags", values="CONNECT_DEFERRED,CONNECT_ONE_SHOT")]
 	public native class GodotObject {
@@ -66,7 +66,7 @@ package godot {
 		public final native function get(property:String):*;
 		public final native function set(property:String, value:*):void;
 		public final native function call(method:String, ...rest):*;
-		public final native function getInstanceId():Number;
+		public final native function getInstanceId():Int64;
 		public final native function isClass(class_:String):Boolean;
 		public native function _notification(what:int):void;
 		public native function _get(property:String):*;
@@ -135,14 +135,14 @@ package godot {
 	[Singleton]
 	[Abstract]
 	public native class Input extends GodotObject {
-		public static native function get mouseMode():int;
-		public static native function set mouseMode(value:int):void;
+		public static native function get mouseMode():Int64;
+		public static native function set mouseMode(value:Int64):void;
 		public static native function get joyConnectionChanged():Signal;
 		public static native function get singleton():Input;
 		public static native function isActionPressed(action:String, exactMatch:Boolean = false):Boolean;
-		public static native function getTicks():Number;
+		public static native function getTicks():Int64;
 		[Godot(flags="bitfield:Wide")]
-		public static native function setFlags(flags:Number):void;
+		public static native function setFlags(flags:Int64):void;
 	}
 	public native class GodotJSON extends GodotObject {
 		public native function GodotJSON();
@@ -173,12 +173,12 @@ package godot {
 	}
 	[Abstract]
 	public final native class Wide {
-		public static const LOW:Number = 1;
-		public static const HIGH:Number = 34359738368;
+		public static const LOW:Int64 = 1;
+		public static const HIGH:Int64 = 34359738368;
 	}
 	public native function print(...rest):void;
 	public native function lerp(from:*, to:*, weight:*):*;
 	public native function degToRad(deg:Number):Number;
-	public native function instanceFromId(instanceId:Number):GodotObject;
-	public native function randi():uint;
+	public native function instanceFromId(instanceId:Int64):GodotObject;
+	public native function randi():Int64;
 }

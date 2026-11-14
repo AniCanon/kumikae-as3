@@ -101,9 +101,9 @@ class Fixture(unittest.TestCase):
     def test_pointer_methods_are_left_out(self):
         self.assertNotIn("setOwnerPtr", self.text)
 
-    def test_wide_integers_are_numbers(self):
-        self.assertIn("public final native function getInstanceId():Number;", self.members("GodotObject"))
-        self.assertIn("public static native function getTicks():Number;", self.members("Input"))
+    def test_wide_integers_are_int64(self):
+        self.assertIn("public final native function getInstanceId():Int64;", self.members("GodotObject"))
+        self.assertIn("public static native function getTicks():Int64;", self.members("Input"))
 
     def test_defaults(self):
         self.assertIn(
@@ -168,8 +168,8 @@ class Fixture(unittest.TestCase):
         input_ = self.members("Input")
         self.assertIn("public static native function isActionPressed(action:String, exactMatch:Boolean = false)"
                       ":Boolean;", input_)
-        self.assertIn("public static native function get mouseMode():int;", input_)
-        self.assertIn("public static native function set mouseMode(value:int):void;", input_)
+        self.assertIn("public static native function get mouseMode():Int64;", input_)
+        self.assertIn("public static native function set mouseMode(value:Int64):void;", input_)
         self.assertIn("public static native function get joyConnectionChanged():Signal;", input_)
 
     def test_singleton_is_tagged_and_gives_itself(self):
@@ -178,10 +178,10 @@ class Fixture(unittest.TestCase):
         self.assertIn("\t[Singleton]\n", self.text[at - 60:at])
         self.assertNotIn("singleton", " ".join(self.members("Node")))
 
-    def test_wide_bitfield_is_a_number(self):
-        self.assertIn("public static native function setFlags(flags:Number):void;", self.members("Input"))
-        self.assertIn("public static const HIGH:Number = 34359738368;", self.members("Wide"))
-        self.assertIn("public static const LOW:Number = 1;", self.members("Wide"))
+    def test_wide_bitfield_is_an_int64(self):
+        self.assertIn("public static native function setFlags(flags:Int64):void;", self.members("Input"))
+        self.assertIn("public static const HIGH:Int64 = 34359738368;", self.members("Wide"))
+        self.assertIn("public static const LOW:Int64 = 1;", self.members("Wide"))
 
     def test_global_enums(self):
         self.assertIn("\tpublic final native class Key {", self.text)
@@ -256,10 +256,12 @@ class Fixture(unittest.TestCase):
         self.assertIn("\t[Abstract]\n\tpublic final native class Key {", self.text)
         self.assertNotIn("\t[Abstract]\n\tpublic native class Node ", self.text)
 
-    def test_wide_integers_the_description_does_not_mark(self):
-        self.assertIn("\tpublic native function instanceFromId(instanceId:Number):GodotObject;\n", self.text)
-        self.assertIn("\tpublic native function randi():uint;\n", self.text)
-        self.assertIn("public native function getObjectId():Number;", self.members("Signal"))
+    def test_an_integer_the_description_gives_no_width_is_an_int64(self):
+        # A global function, a built-in type's method, and a signal's argument.
+        self.assertIn("\tpublic native function instanceFromId(instanceId:Int64):GodotObject;\n", self.text)
+        self.assertIn("\tpublic native function randi():Int64;\n", self.text)
+        self.assertIn("public native function getObjectId():Int64;", self.members("Signal"))
+        self.assertIn("public native function size():Int64;", self.members("GodotArray"))
 
     def test_to_string_is_as3s(self):
         # AS3's Object already has toString(). A script overrides that, and the binding answers Godot's
@@ -312,7 +314,7 @@ class Fixture(unittest.TestCase):
         self.assertNotIn("[Operators]", self.tags("Node"))
 
     def test_indexing_a_wide_integer(self):
-        self.assertIn('[Indexed(element="Number")]', self.tags("PackedInt64Array"))
+        self.assertIn('[Indexed(element="Int64")]', self.tags("PackedInt64Array"))
 
     def test_global_constants_are_left_out(self):
         self.assertNotIn("INT32_MAX", self.text)
@@ -575,7 +577,29 @@ class RealApi(unittest.TestCase):
         self.assertEqual([line for line in signal if "Connections" in line], [])
 
     def test_every_hand_kept_entry_is_used(self):
-        self.assertEqual(self.generator.unused_widths(), [])
+        self.assertEqual(self.generator.unused_entries(), [])
+
+    def test_no_table_of_widths(self):
+        self.assertFalse(hasattr(generate, "WIDTHS"))
+
+    def test_a_type_that_stores_32_bit_integers_keeps_int(self):
+        # Godot cuts a wide value off inside these without an error, so a wide one must not reach it.
+        for name in ("Vector2i", "Vector3i", "Vector4i", "Rect2i", "PackedInt32Array"):
+            members = " ".join(lines_of(self.text, name))
+            self.assertNotIn(":Int64", members, name)
+        self.assertIn("public var x:int;", lines_of(self.text, "Vector2i"))
+        self.assertIn('\t[Indexed(element="int")]\n\tpublic final native class PackedInt32Array', self.text)
+        self.assertEqual(sorted(self.generator.narrow), ["PackedInt32Array", "Rect2i", "Vector2i", "Vector3i", "Vector4i"])
+        self.assertIn("public native function decodeS64(byteOffset:Int64):Int64;", lines_of(self.text, "PackedByteArray"))
+
+    def test_wide_integers_of_the_real_api(self):
+        self.assertIn("public native function append(value:Int64):Boolean;", lines_of(self.text, "PackedInt64Array"))
+        self.assertIn("public native function toRgba64():Int64;", lines_of(self.text, "Color"))
+        self.assertIn("public native function toRgba32():Int64;", lines_of(self.text, "Color"))
+        self.assertIn("public native function getId():Int64;", lines_of(self.text, "RID"))
+        self.assertIn("\tpublic native function randi():Int64;\n", self.text)
+        self.assertIn("\tpublic native function clampi(value:Int64, min:Int64, max:Int64):Int64;\n", self.text)
+        self.assertNotIn(":Number = 34359738368", self.text)
 
     def test_what_is_left_out(self):
         self.assertEqual(len(self.generator.left_out), 60)

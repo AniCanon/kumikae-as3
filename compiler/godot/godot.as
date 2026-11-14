@@ -60,8 +60,8 @@ package godot {
 		public native function cubicInterpolateInTime(b:Vector2, preA:Vector2, postB:Vector2, weight:Number, bT:Number, preAT:Number, postBT:Number):Vector2;
 		public native function bezierInterpolate(control1:Vector2, control2:Vector2, end:Vector2, t:Number):Vector2;
 		public native function bezierDerivative(control1:Vector2, control2:Vector2, end:Vector2, t:Number):Vector2;
-		public native function maxAxisIndex():int;
-		public native function minAxisIndex():int;
+		public native function maxAxisIndex():Int64;
+		public native function minAxisIndex():Int64;
 		public native function moveToward(to:Vector2, delta:Number):Vector2;
 		public native function rotated(angle:Number):Vector2;
 		public native function orthogonal():Vector2;
@@ -159,7 +159,7 @@ package godot {
 		public native function expand(to:Vector2):Rect2;
 		public native function getSupport(direction:Vector2):Vector2;
 		public native function grow(amount:Number):Rect2;
-		public native function growSide(side:int, amount:Number):Rect2;
+		public native function growSide(side:Int64, amount:Number):Rect2;
 		public native function growIndividual(left:Number, top:Number, right:Number, bottom:Number):Rect2;
 		public native function abs():Rect2;
 	}
@@ -228,8 +228,8 @@ package godot {
 		public var y:Number;
 		public var z:Number;
 		public native function Vector3(x:* = null, y:Number = 0, z:Number = 0);
-		public native function minAxisIndex():int;
-		public native function maxAxisIndex():int;
+		public native function minAxisIndex():Int64;
+		public native function maxAxisIndex():Int64;
 		public native function angleTo(to:Vector3):Number;
 		public native function signedAngleTo(to:Vector3, axis:Vector3):Number;
 		public native function directionTo(to:Vector3):Vector3;
@@ -406,8 +406,8 @@ package godot {
 		public var z:Number;
 		public var w:Number;
 		public native function Vector4(x:* = null, y:Number = 0, z:Number = 0, w:Number = 0);
-		public native function minAxisIndex():int;
-		public native function maxAxisIndex():int;
+		public native function minAxisIndex():Int64;
+		public native function maxAxisIndex():Int64;
 		public native function length():Number;
 		public native function lengthSquared():Number;
 		public native function abs():Vector4;
@@ -553,7 +553,7 @@ package godot {
 		public native function slerpni(to:Quaternion, weight:Number):Quaternion;
 		public native function sphericalCubicInterpolate(b:Quaternion, preA:Quaternion, postB:Quaternion, weight:Number):Quaternion;
 		public native function sphericalCubicInterpolateInTime(b:Quaternion, preA:Quaternion, postB:Quaternion, weight:Number, bT:Number, preAT:Number, postBT:Number):Quaternion;
-		public native function getEuler(order:int = 2):Vector3;
+		public native function getEuler(order:Int64 = 2):Vector3;
 		public static native function fromEuler(euler:Vector3):Quaternion;
 		public native function getAxis():Vector3;
 		public native function getAngle():Number;
@@ -582,12 +582,12 @@ package godot {
 		public native function grow(by:Number):AABB;
 		public native function getSupport(direction:Vector3):Vector3;
 		public native function getLongestAxis():Vector3;
-		public native function getLongestAxisIndex():int;
+		public native function getLongestAxisIndex():Int64;
 		public native function getLongestAxisSize():Number;
 		public native function getShortestAxis():Vector3;
-		public native function getShortestAxisIndex():int;
+		public native function getShortestAxisIndex():Int64;
 		public native function getShortestAxisSize():Number;
-		public native function getEndpoint(idx:int):Vector3;
+		public native function getEndpoint(idx:Int64):Vector3;
 		public native function intersectsSegment(from:Vector3, to:Vector3):*;
 		public native function intersectsRay(from:Vector3, dir:Vector3):*;
 	}
@@ -616,7 +616,7 @@ package godot {
 		public native function scaled(scale:Vector3):Basis;
 		public native function scaledLocal(scale:Vector3):Basis;
 		public native function getScale():Vector3;
-		public native function getEuler(order:int = 2):Vector3;
+		public native function getEuler(order:Int64 = 2):Vector3;
 		public native function tdotx(with_:Vector3):Number;
 		public native function tdoty(with_:Vector3):Number;
 		public native function tdotz(with_:Vector3):Number;
@@ -628,7 +628,7 @@ package godot {
 		public native function getRotationQuaternion():Quaternion;
 		public static native function lookingAt(target:Vector3, up:Vector3 = null, useModelFront:Boolean = false):Basis;
 		public static native function fromScale(scale:Vector3):Basis;
-		public static native function fromEuler(euler:Vector3, order:int = 2):Basis;
+		public static native function fromEuler(euler:Vector3, order:Int64 = 2):Basis;
 	}
 	[Operators]
 	[Operator(op="*", right="int", returns="Transform3D")]
@@ -684,8 +684,8 @@ package godot {
 		public static native function createDepthCorrection(flipY:Boolean):Projection;
 		public static native function createLightAtlasRect(rect:Rect2):Projection;
 		public static native function createPerspective(fovy:Number, aspect:Number, zNear:Number, zFar:Number, flipFov:Boolean = false):Projection;
-		public static native function createPerspectiveHmd(fovy:Number, aspect:Number, zNear:Number, zFar:Number, flipFov:Boolean, eye:int, intraocularDist:Number, convergenceDist:Number):Projection;
-		public static native function createForHmd(eye:int, aspect:Number, intraocularDist:Number, displayWidth:Number, displayToLens:Number, oversample:Number, zNear:Number, zFar:Number):Projection;
+		public static native function createPerspectiveHmd(fovy:Number, aspect:Number, zNear:Number, zFar:Number, flipFov:Boolean, eye:Int64, intraocularDist:Number, convergenceDist:Number):Projection;
+		public static native function createForHmd(eye:Int64, aspect:Number, intraocularDist:Number, displayWidth:Number, displayToLens:Number, oversample:Number, zNear:Number, zFar:Number):Projection;
 		public static native function createOrthogonal(left:Number, right:Number, bottom:Number, top:Number, zNear:Number, zFar:Number):Projection;
 		public static native function createOrthogonalAspect(size:Number, aspect:Number, zNear:Number, zFar:Number, flipFov:Boolean = false):Projection;
 		public static native function createFrustum(left:Number, right:Number, bottom:Number, top:Number, zNear:Number, zFar:Number):Projection;
@@ -693,7 +693,7 @@ package godot {
 		public static native function createFitAabb(aabb:AABB):Projection;
 		public native function determinant():Number;
 		public native function perspectiveZnearAdjusted(newZnear:Number):Projection;
-		public native function getProjectionPlane(plane:int):Plane;
+		public native function getProjectionPlane(plane:Int64):Plane;
 		public native function flippedY():Projection;
 		public native function jitterOffseted(offset:Vector2):Projection;
 		public static native function getFovy(fovx:Number, aspect:Number):Number;
@@ -705,7 +705,7 @@ package godot {
 		public native function getViewportHalfExtents():Vector2;
 		public native function getFarPlaneHalfExtents():Vector2;
 		public native function inverse():Projection;
-		public native function getPixelsPerMeter(forPixelWidth:int):int;
+		public native function getPixelsPerMeter(forPixelWidth:Int64):Int64;
 		public native function getLodMultiplier():Number;
 	}
 	[Operators]
@@ -873,10 +873,10 @@ package godot {
 		public var g:Number;
 		public var b:Number;
 		public var a:Number;
-		public var r8:int;
-		public var g8:int;
-		public var b8:int;
-		public var a8:int;
+		public var r8:Int64;
+		public var g8:Int64;
+		public var b8:Int64;
+		public var a8:Int64;
 		public var h:Number;
 		public var s:Number;
 		public var v:Number;
@@ -884,12 +884,12 @@ package godot {
 		public var okHslS:Number;
 		public var okHslL:Number;
 		public native function Color(r:* = null, g:Number = 0, b:Number = 0, a:Number = 0);
-		public native function toArgb32():uint;
-		public native function toAbgr32():uint;
-		public native function toRgba32():uint;
-		public native function toArgb64():Number;
-		public native function toAbgr64():Number;
-		public native function toRgba64():Number;
+		public native function toArgb32():Int64;
+		public native function toAbgr32():Int64;
+		public native function toRgba32():Int64;
+		public native function toArgb64():Int64;
+		public native function toAbgr64():Int64;
+		public native function toRgba64():Int64;
 		public native function toHtml(withAlpha:Boolean = true):String;
 		public native function clamp(min:Color = null, max:Color = null):Color;
 		public native function inverted():Color;
@@ -901,15 +901,15 @@ package godot {
 		public native function srgbToLinear():Color;
 		public native function linearToSrgb():Color;
 		public native function isEqualApprox(to:Color):Boolean;
-		public static native function hex(hex:uint):Color;
-		public static native function hex64(hex:Number):Color;
+		public static native function hex(hex:Int64):Color;
+		public static native function hex64(hex:Int64):Color;
 		public static native function html(rgba:String):Color;
 		public static native function htmlIsValid(color:String):Boolean;
 		public static native function fromString(str:String, default_:Color):Color;
 		public static native function fromHsv(h:Number, s:Number, v:Number, alpha:Number = 1.0):Color;
 		public static native function fromOkHsl(h:Number, s:Number, l:Number, alpha:Number = 1.0):Color;
-		public static native function fromRgbe9995(rgbe:uint):Color;
-		public static native function fromRgba8(r8:int, g8:int, b8:int, a8:int = 255):Color;
+		public static native function fromRgbe9995(rgbe:Int64):Color;
+		public static native function fromRgba8(r8:Int64, g8:Int64, b8:Int64, a8:Int64 = 255):Color;
 	}
 	[Operators]
 	[Operator(op="<", right="RID", returns="Boolean")]
@@ -919,14 +919,14 @@ package godot {
 	public final native class RID {
 		public native function RID(from:RID = null);
 		public native function isValid():Boolean;
-		public native function getId():Number;
+		public native function getId():Int64;
 	}
 	[Operators]
 	public final native class Signal {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function isNull():Boolean;
 		public native function getObject():GodotObject;
-		public native function getObjectId():Number;
+		public native function getObjectId():Int64;
 		public native function getName():String;
 		public native function emit(...rest):void;
 		public native function add(listener:Function, deferred:Boolean = false):void;
@@ -939,8 +939,8 @@ package godot {
 	[Operators]
 	[Indexed(element="*", keyed="true")]
 	public final native class GodotDictionary {
-		public native function GodotDictionary(base:GodotDictionary = null, keyType:int = 0, keyClassName:String = null, keyScript:* = null, valueType:int = 0, valueClassName:String = null, valueScript:* = null);
-		public native function size():int;
+		public native function GodotDictionary(base:GodotDictionary = null, keyType:Int64 = 0, keyClassName:String = null, keyScript:* = null, valueType:Int64 = 0, valueClassName:String = null, valueScript:* = null);
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function clear():void;
 		public native function assign(dictionary:GodotDictionary):void;
@@ -951,11 +951,11 @@ package godot {
 		public native function hasAll(keys:GodotArray):Boolean;
 		public native function findKey(value:*):*;
 		public native function erase(key:*):Boolean;
-		public native function hash():uint;
+		public native function hash():Int64;
 		public native function keys():GodotArray;
 		public native function values():GodotArray;
 		public native function duplicate(deep:Boolean = false):GodotDictionary;
-		public native function duplicateDeep(deepSubresourcesMode:int = 1):GodotDictionary;
+		public native function duplicateDeep(deepSubresourcesMode:Int64 = 1):GodotDictionary;
 		public native function get(key:*, default_:* = null):*;
 		public native function getOrAdd(key:*, default_:* = null):*;
 		public native function set(key:*, value:*):Boolean;
@@ -965,15 +965,15 @@ package godot {
 		public native function isSameTyped(dictionary:GodotDictionary):Boolean;
 		public native function isSameTypedKey(dictionary:GodotDictionary):Boolean;
 		public native function isSameTypedValue(dictionary:GodotDictionary):Boolean;
-		public native function getTypedKeyBuiltin():int;
-		public native function getTypedValueBuiltin():int;
+		public native function getTypedKeyBuiltin():Int64;
+		public native function getTypedValueBuiltin():Int64;
 		public native function getTypedKeyClassName():String;
 		public native function getTypedValueClassName():String;
 		public native function getTypedKeyScript():*;
 		public native function getTypedValueScript():*;
 		public native function makeReadOnly():void;
 		public native function isReadOnly():Boolean;
-		public native function recursiveEqual(dictionary:GodotDictionary, recursionCount:int):Boolean;
+		public native function recursiveEqual(dictionary:GodotDictionary, recursionCount:Int64):Boolean;
 	}
 	[Operators]
 	[Operator(op="<", right="GodotArray", returns="Boolean")]
@@ -983,44 +983,44 @@ package godot {
 	[Operator(op="+", right="GodotArray", returns="GodotArray")]
 	[Indexed(element="*")]
 	public final native class GodotArray {
-		public native function GodotArray(base:* = null, type:int = 0, className:String = null, script:* = null);
-		public native function size():int;
+		public native function GodotArray(base:* = null, type:Int64 = 0, className:String = null, script:* = null);
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function clear():void;
-		public native function hash():uint;
+		public native function hash():Int64;
 		public native function assign(array:GodotArray):void;
-		public native function get(index:int):*;
-		public native function set(index:int, value:*):void;
+		public native function get(index:Int64):*;
+		public native function set(index:Int64, value:*):void;
 		public native function pushBack(value:*):void;
 		public native function pushFront(value:*):void;
 		public native function append(value:*):void;
 		public native function appendArray(array:GodotArray):void;
-		public native function resize(size:int):int;
-		public native function insert(position:int, value:*):int;
-		public native function removeAt(position:int):void;
+		public native function resize(size:Int64):Int64;
+		public native function insert(position:Int64, value:*):Int64;
+		public native function removeAt(position:Int64):void;
 		public native function fill(value:*):void;
 		public native function erase(value:*):void;
 		public native function front():*;
 		public native function back():*;
 		public native function pickRandom():*;
-		public native function find(what:*, from:int = 0):int;
-		public native function findCustom(method:Function, from:int = 0):int;
-		public native function rfind(what:*, from:int = -1):int;
-		public native function rfindCustom(method:Function, from:int = -1):int;
-		public native function count(value:*):int;
+		public native function find(what:*, from:Int64 = 0):Int64;
+		public native function findCustom(method:Function, from:Int64 = 0):Int64;
+		public native function rfind(what:*, from:Int64 = -1):Int64;
+		public native function rfindCustom(method:Function, from:Int64 = -1):Int64;
+		public native function count(value:*):Int64;
 		public native function has(value:*):Boolean;
 		public native function popBack():*;
 		public native function popFront():*;
-		public native function popAt(position:int):*;
+		public native function popAt(position:Int64):*;
 		public native function sort():void;
 		public native function sortCustom(func:Function):void;
 		public native function shuffle():void;
-		public native function bsearch(value:*, before:Boolean = true):int;
-		public native function bsearchCustom(value:*, func:Function, before:Boolean = true):int;
+		public native function bsearch(value:*, before:Boolean = true):Int64;
+		public native function bsearchCustom(value:*, func:Function, before:Boolean = true):Int64;
 		public native function reverse():void;
 		public native function duplicate(deep:Boolean = false):GodotArray;
-		public native function duplicateDeep(deepSubresourcesMode:int = 1):GodotArray;
-		public native function slice(begin:int, end:int = 2147483647, step:int = 1, deep:Boolean = false):GodotArray;
+		public native function duplicateDeep(deepSubresourcesMode:Int64 = 1):GodotArray;
+		public native function slice(begin:Int64, end:Int64 = 2147483647, step:Int64 = 1, deep:Boolean = false):GodotArray;
 		public native function filter(method:Function):GodotArray;
 		public native function map(method:Function):GodotArray;
 		public native function reduce(method:Function, accum:* = null):*;
@@ -1030,7 +1030,7 @@ package godot {
 		public native function min():*;
 		public native function isTyped():Boolean;
 		public native function isSameTyped(array:GodotArray):Boolean;
-		public native function getTypedBuiltin():int;
+		public native function getTypedBuiltin():Int64;
 		public native function getTypedClassName():String;
 		public native function getTypedScript():*;
 		public native function makeReadOnly():void;
@@ -1038,31 +1038,31 @@ package godot {
 	}
 	[Operators]
 	[Operator(op="+", right="PackedByteArray", returns="PackedByteArray")]
-	[Indexed(element="int")]
+	[Indexed(element="Int64")]
 	public final native class PackedByteArray {
 		public native function PackedByteArray(from:* = null);
-		public native function get(index:int):int;
-		public native function set(index:int, value:int):void;
-		public native function size():int;
+		public native function get(index:Int64):Int64;
+		public native function set(index:Int64, value:Int64):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
-		public native function pushBack(value:int):Boolean;
-		public native function append(value:int):Boolean;
+		public native function pushBack(value:Int64):Boolean;
+		public native function append(value:Int64):Boolean;
 		public native function appendArray(array:PackedByteArray):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:int):int;
-		public native function fill(value:int):void;
-		public native function resize(newSize:int):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:Int64):Int64;
+		public native function fill(value:Int64):void;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
-		public native function has(value:int):Boolean;
+		public native function has(value:Int64):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedByteArray;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:int, before:Boolean = true):int;
+		public native function bsearch(value:Int64, before:Boolean = true):Int64;
 		public native function duplicate():PackedByteArray;
-		public native function find(value:int, from:int = 0):int;
-		public native function rfind(value:int, from:int = -1):int;
-		public native function count(value:int):int;
-		public native function erase(value:int):Boolean;
+		public native function find(value:Int64, from:Int64 = 0):Int64;
+		public native function rfind(value:Int64, from:Int64 = -1):Int64;
+		public native function count(value:Int64):Int64;
+		public native function erase(value:Int64):Boolean;
 		public native function getStringFromAscii():String;
 		public native function getStringFromUtf8():String;
 		public native function getStringFromUtf16():String;
@@ -1070,23 +1070,23 @@ package godot {
 		public native function getStringFromWchar():String;
 		public native function getStringFromMultibyteChar(encoding:String = ""):String;
 		public native function hexEncode():String;
-		public native function compress(compressionMode:int = 0):PackedByteArray;
-		public native function decompress(bufferSize:int, compressionMode:int = 0):PackedByteArray;
-		public native function decompressDynamic(maxOutputSize:int, compressionMode:int = 0):PackedByteArray;
-		public native function decodeU8(byteOffset:int):int;
-		public native function decodeS8(byteOffset:int):int;
-		public native function decodeU16(byteOffset:int):int;
-		public native function decodeS16(byteOffset:int):int;
-		public native function decodeU32(byteOffset:int):uint;
-		public native function decodeS32(byteOffset:int):int;
-		public native function decodeU64(byteOffset:int):Number;
-		public native function decodeS64(byteOffset:int):Number;
-		public native function decodeHalf(byteOffset:int):Number;
-		public native function decodeFloat(byteOffset:int):Number;
-		public native function decodeDouble(byteOffset:int):Number;
-		public native function hasEncodedVar(byteOffset:int, allowObjects:Boolean = false):Boolean;
-		public native function decodeVar(byteOffset:int, allowObjects:Boolean = false):*;
-		public native function decodeVarSize(byteOffset:int, allowObjects:Boolean = false):int;
+		public native function compress(compressionMode:Int64 = 0):PackedByteArray;
+		public native function decompress(bufferSize:Int64, compressionMode:Int64 = 0):PackedByteArray;
+		public native function decompressDynamic(maxOutputSize:Int64, compressionMode:Int64 = 0):PackedByteArray;
+		public native function decodeU8(byteOffset:Int64):Int64;
+		public native function decodeS8(byteOffset:Int64):Int64;
+		public native function decodeU16(byteOffset:Int64):Int64;
+		public native function decodeS16(byteOffset:Int64):Int64;
+		public native function decodeU32(byteOffset:Int64):Int64;
+		public native function decodeS32(byteOffset:Int64):Int64;
+		public native function decodeU64(byteOffset:Int64):Int64;
+		public native function decodeS64(byteOffset:Int64):Int64;
+		public native function decodeHalf(byteOffset:Int64):Number;
+		public native function decodeFloat(byteOffset:Int64):Number;
+		public native function decodeDouble(byteOffset:Int64):Number;
+		public native function hasEncodedVar(byteOffset:Int64, allowObjects:Boolean = false):Boolean;
+		public native function decodeVar(byteOffset:Int64, allowObjects:Boolean = false):*;
+		public native function decodeVarSize(byteOffset:Int64, allowObjects:Boolean = false):Int64;
 		public native function toInt32Array():PackedInt32Array;
 		public native function toInt64Array():PackedInt64Array;
 		public native function toFloat32Array():PackedFloat32Array;
@@ -1095,21 +1095,21 @@ package godot {
 		public native function toVector3Array():PackedVector3Array;
 		public native function toVector4Array():PackedVector4Array;
 		public native function toColorArray():PackedColorArray;
-		public native function bswap16(offset:int = 0, count:int = -1):void;
-		public native function bswap32(offset:int = 0, count:int = -1):void;
-		public native function bswap64(offset:int = 0, count:int = -1):void;
-		public native function encodeU8(byteOffset:int, value:int):void;
-		public native function encodeS8(byteOffset:int, value:int):void;
-		public native function encodeU16(byteOffset:int, value:int):void;
-		public native function encodeS16(byteOffset:int, value:int):void;
-		public native function encodeU32(byteOffset:int, value:uint):void;
-		public native function encodeS32(byteOffset:int, value:int):void;
-		public native function encodeU64(byteOffset:int, value:Number):void;
-		public native function encodeS64(byteOffset:int, value:Number):void;
-		public native function encodeHalf(byteOffset:int, value:Number):void;
-		public native function encodeFloat(byteOffset:int, value:Number):void;
-		public native function encodeDouble(byteOffset:int, value:Number):void;
-		public native function encodeVar(byteOffset:int, value:*, allowObjects:Boolean = false):int;
+		public native function bswap16(offset:Int64 = 0, count:Int64 = -1):void;
+		public native function bswap32(offset:Int64 = 0, count:Int64 = -1):void;
+		public native function bswap64(offset:Int64 = 0, count:Int64 = -1):void;
+		public native function encodeU8(byteOffset:Int64, value:Int64):void;
+		public native function encodeS8(byteOffset:Int64, value:Int64):void;
+		public native function encodeU16(byteOffset:Int64, value:Int64):void;
+		public native function encodeS16(byteOffset:Int64, value:Int64):void;
+		public native function encodeU32(byteOffset:Int64, value:Int64):void;
+		public native function encodeS32(byteOffset:Int64, value:Int64):void;
+		public native function encodeU64(byteOffset:Int64, value:Int64):void;
+		public native function encodeS64(byteOffset:Int64, value:Int64):void;
+		public native function encodeHalf(byteOffset:Int64, value:Number):void;
+		public native function encodeFloat(byteOffset:Int64, value:Number):void;
+		public native function encodeDouble(byteOffset:Int64, value:Number):void;
+		public native function encodeVar(byteOffset:Int64, value:*, allowObjects:Boolean = false):Int64;
 	}
 	[Operators]
 	[Operator(op="+", right="PackedInt32Array", returns="PackedInt32Array")]
@@ -1142,60 +1142,60 @@ package godot {
 	}
 	[Operators]
 	[Operator(op="+", right="PackedInt64Array", returns="PackedInt64Array")]
-	[Indexed(element="Number")]
+	[Indexed(element="Int64")]
 	public final native class PackedInt64Array {
 		public native function PackedInt64Array(from:* = null);
-		public native function get(index:int):Number;
-		public native function set(index:int, value:Number):void;
-		public native function size():int;
+		public native function get(index:Int64):Int64;
+		public native function set(index:Int64, value:Int64):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
-		public native function pushBack(value:Number):Boolean;
-		public native function append(value:Number):Boolean;
+		public native function pushBack(value:Int64):Boolean;
+		public native function append(value:Int64):Boolean;
 		public native function appendArray(array:PackedInt64Array):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:Number):int;
-		public native function fill(value:Number):void;
-		public native function resize(newSize:int):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:Int64):Int64;
+		public native function fill(value:Int64):void;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
-		public native function has(value:Number):Boolean;
+		public native function has(value:Int64):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedInt64Array;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedInt64Array;
 		public native function toByteArray():PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:Number, before:Boolean = true):int;
+		public native function bsearch(value:Int64, before:Boolean = true):Int64;
 		public native function duplicate():PackedInt64Array;
-		public native function find(value:Number, from:int = 0):int;
-		public native function rfind(value:Number, from:int = -1):int;
-		public native function count(value:Number):int;
-		public native function erase(value:Number):Boolean;
+		public native function find(value:Int64, from:Int64 = 0):Int64;
+		public native function rfind(value:Int64, from:Int64 = -1):Int64;
+		public native function count(value:Int64):Int64;
+		public native function erase(value:Int64):Boolean;
 	}
 	[Operators]
 	[Operator(op="+", right="PackedFloat32Array", returns="PackedFloat32Array")]
 	[Indexed(element="Number")]
 	public final native class PackedFloat32Array {
 		public native function PackedFloat32Array(from:* = null);
-		public native function get(index:int):Number;
-		public native function set(index:int, value:Number):void;
-		public native function size():int;
+		public native function get(index:Int64):Number;
+		public native function set(index:Int64, value:Number):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function pushBack(value:Number):Boolean;
 		public native function append(value:Number):Boolean;
 		public native function appendArray(array:PackedFloat32Array):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:Number):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:Number):Int64;
 		public native function fill(value:Number):void;
-		public native function resize(newSize:int):int;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
 		public native function has(value:Number):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedFloat32Array;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedFloat32Array;
 		public native function toByteArray():PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:Number, before:Boolean = true):int;
+		public native function bsearch(value:Number, before:Boolean = true):Int64;
 		public native function duplicate():PackedFloat32Array;
-		public native function find(value:Number, from:int = 0):int;
-		public native function rfind(value:Number, from:int = -1):int;
-		public native function count(value:Number):int;
+		public native function find(value:Number, from:Int64 = 0):Int64;
+		public native function rfind(value:Number, from:Int64 = -1):Int64;
+		public native function count(value:Number):Int64;
 		public native function erase(value:Number):Boolean;
 	}
 	[Operators]
@@ -1203,28 +1203,28 @@ package godot {
 	[Indexed(element="Number")]
 	public final native class PackedFloat64Array {
 		public native function PackedFloat64Array(from:* = null);
-		public native function get(index:int):Number;
-		public native function set(index:int, value:Number):void;
-		public native function size():int;
+		public native function get(index:Int64):Number;
+		public native function set(index:Int64, value:Number):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function pushBack(value:Number):Boolean;
 		public native function append(value:Number):Boolean;
 		public native function appendArray(array:PackedFloat64Array):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:Number):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:Number):Int64;
 		public native function fill(value:Number):void;
-		public native function resize(newSize:int):int;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
 		public native function has(value:Number):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedFloat64Array;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedFloat64Array;
 		public native function toByteArray():PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:Number, before:Boolean = true):int;
+		public native function bsearch(value:Number, before:Boolean = true):Int64;
 		public native function duplicate():PackedFloat64Array;
-		public native function find(value:Number, from:int = 0):int;
-		public native function rfind(value:Number, from:int = -1):int;
-		public native function count(value:Number):int;
+		public native function find(value:Number, from:Int64 = 0):Int64;
+		public native function rfind(value:Number, from:Int64 = -1):Int64;
+		public native function count(value:Number):Int64;
 		public native function erase(value:Number):Boolean;
 	}
 	[Operators]
@@ -1232,28 +1232,28 @@ package godot {
 	[Indexed(element="String")]
 	public final native class PackedStringArray {
 		public native function PackedStringArray(from:* = null);
-		public native function get(index:int):String;
-		public native function set(index:int, value:String):void;
-		public native function size():int;
+		public native function get(index:Int64):String;
+		public native function set(index:Int64, value:String):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function pushBack(value:String):Boolean;
 		public native function append(value:String):Boolean;
 		public native function appendArray(array:PackedStringArray):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:String):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:String):Int64;
 		public native function fill(value:String):void;
-		public native function resize(newSize:int):int;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
 		public native function has(value:String):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedStringArray;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedStringArray;
 		public native function toByteArray():PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:String, before:Boolean = true):int;
+		public native function bsearch(value:String, before:Boolean = true):Int64;
 		public native function duplicate():PackedStringArray;
-		public native function find(value:String, from:int = 0):int;
-		public native function rfind(value:String, from:int = -1):int;
-		public native function count(value:String):int;
+		public native function find(value:String, from:Int64 = 0):Int64;
+		public native function rfind(value:String, from:Int64 = -1):Int64;
+		public native function count(value:String):Int64;
 		public native function erase(value:String):Boolean;
 	}
 	[Operators]
@@ -1262,28 +1262,28 @@ package godot {
 	[Indexed(element="Vector2")]
 	public final native class PackedVector2Array {
 		public native function PackedVector2Array(from:* = null);
-		public native function get(index:int):Vector2;
-		public native function set(index:int, value:Vector2):void;
-		public native function size():int;
+		public native function get(index:Int64):Vector2;
+		public native function set(index:Int64, value:Vector2):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function pushBack(value:Vector2):Boolean;
 		public native function append(value:Vector2):Boolean;
 		public native function appendArray(array:PackedVector2Array):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:Vector2):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:Vector2):Int64;
 		public native function fill(value:Vector2):void;
-		public native function resize(newSize:int):int;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
 		public native function has(value:Vector2):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedVector2Array;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedVector2Array;
 		public native function toByteArray():PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:Vector2, before:Boolean = true):int;
+		public native function bsearch(value:Vector2, before:Boolean = true):Int64;
 		public native function duplicate():PackedVector2Array;
-		public native function find(value:Vector2, from:int = 0):int;
-		public native function rfind(value:Vector2, from:int = -1):int;
-		public native function count(value:Vector2):int;
+		public native function find(value:Vector2, from:Int64 = 0):Int64;
+		public native function rfind(value:Vector2, from:Int64 = -1):Int64;
+		public native function count(value:Vector2):Int64;
 		public native function erase(value:Vector2):Boolean;
 	}
 	[Operators]
@@ -1292,28 +1292,28 @@ package godot {
 	[Indexed(element="Vector3")]
 	public final native class PackedVector3Array {
 		public native function PackedVector3Array(from:* = null);
-		public native function get(index:int):Vector3;
-		public native function set(index:int, value:Vector3):void;
-		public native function size():int;
+		public native function get(index:Int64):Vector3;
+		public native function set(index:Int64, value:Vector3):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function pushBack(value:Vector3):Boolean;
 		public native function append(value:Vector3):Boolean;
 		public native function appendArray(array:PackedVector3Array):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:Vector3):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:Vector3):Int64;
 		public native function fill(value:Vector3):void;
-		public native function resize(newSize:int):int;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
 		public native function has(value:Vector3):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedVector3Array;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedVector3Array;
 		public native function toByteArray():PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:Vector3, before:Boolean = true):int;
+		public native function bsearch(value:Vector3, before:Boolean = true):Int64;
 		public native function duplicate():PackedVector3Array;
-		public native function find(value:Vector3, from:int = 0):int;
-		public native function rfind(value:Vector3, from:int = -1):int;
-		public native function count(value:Vector3):int;
+		public native function find(value:Vector3, from:Int64 = 0):Int64;
+		public native function rfind(value:Vector3, from:Int64 = -1):Int64;
+		public native function count(value:Vector3):Int64;
 		public native function erase(value:Vector3):Boolean;
 	}
 	[Operators]
@@ -1321,28 +1321,28 @@ package godot {
 	[Indexed(element="Color")]
 	public final native class PackedColorArray {
 		public native function PackedColorArray(from:* = null);
-		public native function get(index:int):Color;
-		public native function set(index:int, value:Color):void;
-		public native function size():int;
+		public native function get(index:Int64):Color;
+		public native function set(index:Int64, value:Color):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function pushBack(value:Color):Boolean;
 		public native function append(value:Color):Boolean;
 		public native function appendArray(array:PackedColorArray):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:Color):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:Color):Int64;
 		public native function fill(value:Color):void;
-		public native function resize(newSize:int):int;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
 		public native function has(value:Color):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedColorArray;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedColorArray;
 		public native function toByteArray():PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:Color, before:Boolean = true):int;
+		public native function bsearch(value:Color, before:Boolean = true):Int64;
 		public native function duplicate():PackedColorArray;
-		public native function find(value:Color, from:int = 0):int;
-		public native function rfind(value:Color, from:int = -1):int;
-		public native function count(value:Color):int;
+		public native function find(value:Color, from:Int64 = 0):Int64;
+		public native function rfind(value:Color, from:Int64 = -1):Int64;
+		public native function count(value:Color):Int64;
 		public native function erase(value:Color):Boolean;
 	}
 	[Operators]
@@ -1350,28 +1350,28 @@ package godot {
 	[Indexed(element="Vector4")]
 	public final native class PackedVector4Array {
 		public native function PackedVector4Array(from:* = null);
-		public native function get(index:int):Vector4;
-		public native function set(index:int, value:Vector4):void;
-		public native function size():int;
+		public native function get(index:Int64):Vector4;
+		public native function set(index:Int64, value:Vector4):void;
+		public native function size():Int64;
 		public native function isEmpty():Boolean;
 		public native function pushBack(value:Vector4):Boolean;
 		public native function append(value:Vector4):Boolean;
 		public native function appendArray(array:PackedVector4Array):void;
-		public native function removeAt(index:int):void;
-		public native function insert(atIndex:int, value:Vector4):int;
+		public native function removeAt(index:Int64):void;
+		public native function insert(atIndex:Int64, value:Vector4):Int64;
 		public native function fill(value:Vector4):void;
-		public native function resize(newSize:int):int;
+		public native function resize(newSize:Int64):Int64;
 		public native function clear():void;
 		public native function has(value:Vector4):Boolean;
 		public native function reverse():void;
-		public native function slice(begin:int, end:int = 2147483647):PackedVector4Array;
+		public native function slice(begin:Int64, end:Int64 = 2147483647):PackedVector4Array;
 		public native function toByteArray():PackedByteArray;
 		public native function sort():void;
-		public native function bsearch(value:Vector4, before:Boolean = true):int;
+		public native function bsearch(value:Vector4, before:Boolean = true):Int64;
 		public native function duplicate():PackedVector4Array;
-		public native function find(value:Vector4, from:int = 0):int;
-		public native function rfind(value:Vector4, from:int = -1):int;
-		public native function count(value:Vector4):int;
+		public native function find(value:Vector4, from:Int64 = 0):Int64;
+		public native function rfind(value:Vector4, from:Int64 = -1):Int64;
+		public native function count(value:Vector4):Int64;
 		public native function erase(value:Vector4):Boolean;
 	}
 	[GodotEnum(name="ConnectFlags", values="CONNECT_DEFERRED,CONNECT_PERSIST,CONNECT_ONE_SHOT,CONNECT_REFERENCE_COUNTED,CONNECT_APPEND_SOURCE_OBJECT")]
@@ -1400,7 +1400,7 @@ package godot {
 		public final native function propertyCanRevert(property:String):Boolean;
 		public final native function propertyGetRevert(property:String):*;
 		public final native function notification(what:int, reversed:Boolean = false):void;
-		public final native function getInstanceId():Number;
+		public final native function getInstanceId():Int64;
 		public final native function setScript(script:*):void;
 		public final native function getScript():*;
 		public final native function setMeta(name:String, value:*):void;
@@ -1474,63 +1474,63 @@ package godot {
 		public native function AStar2D();
 		public final native function get neighborFilterEnabled():Boolean;
 		public final native function set neighborFilterEnabled(value:Boolean):void;
-		public native function _filterNeighbor(fromId:Number, neighborId:Number):Boolean;
-		public native function _estimateCost(fromId:Number, endId:Number):Number;
-		public native function _computeCost(fromId:Number, toId:Number):Number;
-		public final native function getAvailablePointId():Number;
-		public final native function addPoint(id:Number, position:Vector2, weightScale:Number = 1.0):void;
-		public final native function getPointPosition(id:Number):Vector2;
-		public final native function setPointPosition(id:Number, position:Vector2):void;
-		public final native function getPointWeightScale(id:Number):Number;
-		public final native function setPointWeightScale(id:Number, weightScale:Number):void;
-		public final native function removePoint(id:Number):void;
-		public final native function hasPoint(id:Number):Boolean;
-		public final native function getPointConnections(id:Number):PackedInt64Array;
+		public native function _filterNeighbor(fromId:Int64, neighborId:Int64):Boolean;
+		public native function _estimateCost(fromId:Int64, endId:Int64):Number;
+		public native function _computeCost(fromId:Int64, toId:Int64):Number;
+		public final native function getAvailablePointId():Int64;
+		public final native function addPoint(id:Int64, position:Vector2, weightScale:Number = 1.0):void;
+		public final native function getPointPosition(id:Int64):Vector2;
+		public final native function setPointPosition(id:Int64, position:Vector2):void;
+		public final native function getPointWeightScale(id:Int64):Number;
+		public final native function setPointWeightScale(id:Int64, weightScale:Number):void;
+		public final native function removePoint(id:Int64):void;
+		public final native function hasPoint(id:Int64):Boolean;
+		public final native function getPointConnections(id:Int64):PackedInt64Array;
 		public final native function getPointIds():PackedInt64Array;
-		public final native function setPointDisabled(id:Number, disabled:Boolean = true):void;
-		public final native function isPointDisabled(id:Number):Boolean;
-		public final native function connectPoints(id:Number, toId:Number, bidirectional:Boolean = true):void;
-		public final native function disconnectPoints(id:Number, toId:Number, bidirectional:Boolean = true):void;
-		public final native function arePointsConnected(id:Number, toId:Number, bidirectional:Boolean = true):Boolean;
-		public final native function getPointCount():Number;
-		public final native function getPointCapacity():Number;
-		public final native function reserveSpace(numNodes:Number):void;
+		public final native function setPointDisabled(id:Int64, disabled:Boolean = true):void;
+		public final native function isPointDisabled(id:Int64):Boolean;
+		public final native function connectPoints(id:Int64, toId:Int64, bidirectional:Boolean = true):void;
+		public final native function disconnectPoints(id:Int64, toId:Int64, bidirectional:Boolean = true):void;
+		public final native function arePointsConnected(id:Int64, toId:Int64, bidirectional:Boolean = true):Boolean;
+		public final native function getPointCount():Int64;
+		public final native function getPointCapacity():Int64;
+		public final native function reserveSpace(numNodes:Int64):void;
 		public final native function clear():void;
-		public final native function getClosestPoint(toPosition:Vector2, includeDisabled:Boolean = false):Number;
+		public final native function getClosestPoint(toPosition:Vector2, includeDisabled:Boolean = false):Int64;
 		public final native function getClosestPositionInSegment(toPosition:Vector2):Vector2;
-		public final native function getPointPath(fromId:Number, toId:Number, allowPartialPath:Boolean = false):PackedVector2Array;
-		public final native function getIdPath(fromId:Number, toId:Number, allowPartialPath:Boolean = false):PackedInt64Array;
+		public final native function getPointPath(fromId:Int64, toId:Int64, allowPartialPath:Boolean = false):PackedVector2Array;
+		public final native function getIdPath(fromId:Int64, toId:Int64, allowPartialPath:Boolean = false):PackedInt64Array;
 	}
 	public native class AStar3D extends RefCounted {
 		public native function AStar3D();
 		public final native function get neighborFilterEnabled():Boolean;
 		public final native function set neighborFilterEnabled(value:Boolean):void;
-		public native function _filterNeighbor(fromId:Number, neighborId:Number):Boolean;
-		public native function _estimateCost(fromId:Number, endId:Number):Number;
-		public native function _computeCost(fromId:Number, toId:Number):Number;
-		public final native function getAvailablePointId():Number;
-		public final native function addPoint(id:Number, position:Vector3, weightScale:Number = 1.0):void;
-		public final native function getPointPosition(id:Number):Vector3;
-		public final native function setPointPosition(id:Number, position:Vector3):void;
-		public final native function getPointWeightScale(id:Number):Number;
-		public final native function setPointWeightScale(id:Number, weightScale:Number):void;
-		public final native function removePoint(id:Number):void;
-		public final native function hasPoint(id:Number):Boolean;
-		public final native function getPointConnections(id:Number):PackedInt64Array;
+		public native function _filterNeighbor(fromId:Int64, neighborId:Int64):Boolean;
+		public native function _estimateCost(fromId:Int64, endId:Int64):Number;
+		public native function _computeCost(fromId:Int64, toId:Int64):Number;
+		public final native function getAvailablePointId():Int64;
+		public final native function addPoint(id:Int64, position:Vector3, weightScale:Number = 1.0):void;
+		public final native function getPointPosition(id:Int64):Vector3;
+		public final native function setPointPosition(id:Int64, position:Vector3):void;
+		public final native function getPointWeightScale(id:Int64):Number;
+		public final native function setPointWeightScale(id:Int64, weightScale:Number):void;
+		public final native function removePoint(id:Int64):void;
+		public final native function hasPoint(id:Int64):Boolean;
+		public final native function getPointConnections(id:Int64):PackedInt64Array;
 		public final native function getPointIds():PackedInt64Array;
-		public final native function setPointDisabled(id:Number, disabled:Boolean = true):void;
-		public final native function isPointDisabled(id:Number):Boolean;
-		public final native function connectPoints(id:Number, toId:Number, bidirectional:Boolean = true):void;
-		public final native function disconnectPoints(id:Number, toId:Number, bidirectional:Boolean = true):void;
-		public final native function arePointsConnected(id:Number, toId:Number, bidirectional:Boolean = true):Boolean;
-		public final native function getPointCount():Number;
-		public final native function getPointCapacity():Number;
-		public final native function reserveSpace(numNodes:Number):void;
+		public final native function setPointDisabled(id:Int64, disabled:Boolean = true):void;
+		public final native function isPointDisabled(id:Int64):Boolean;
+		public final native function connectPoints(id:Int64, toId:Int64, bidirectional:Boolean = true):void;
+		public final native function disconnectPoints(id:Int64, toId:Int64, bidirectional:Boolean = true):void;
+		public final native function arePointsConnected(id:Int64, toId:Int64, bidirectional:Boolean = true):Boolean;
+		public final native function getPointCount():Int64;
+		public final native function getPointCapacity():Int64;
+		public final native function reserveSpace(numNodes:Int64):void;
 		public final native function clear():void;
-		public final native function getClosestPoint(toPosition:Vector3, includeDisabled:Boolean = false):Number;
+		public final native function getClosestPoint(toPosition:Vector3, includeDisabled:Boolean = false):Int64;
 		public final native function getClosestPositionInSegment(toPosition:Vector3):Vector3;
-		public final native function getPointPath(fromId:Number, toId:Number, allowPartialPath:Boolean = false):PackedVector3Array;
-		public final native function getIdPath(fromId:Number, toId:Number, allowPartialPath:Boolean = false):PackedInt64Array;
+		public final native function getPointPath(fromId:Int64, toId:Int64, allowPartialPath:Boolean = false):PackedVector3Array;
+		public final native function getIdPath(fromId:Int64, toId:Int64, allowPartialPath:Boolean = false):PackedInt64Array;
 	}
 	[GodotEnum(name="Heuristic", values="HEURISTIC_EUCLIDEAN,HEURISTIC_MANHATTAN,HEURISTIC_OCTILE,HEURISTIC_CHEBYSHEV,HEURISTIC_MAX")]
 	[GodotEnum(name="DiagonalMode", values="DIAGONAL_MODE_ALWAYS,DIAGONAL_MODE_NEVER,DIAGONAL_MODE_AT_LEAST_ONE_WALKABLE,DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES,DIAGONAL_MODE_MAX")]
@@ -1825,7 +1825,7 @@ package godot {
 		[Godot(returns="enum:GodotError")]
 		public final native function rpc(method:String, ...rest):int;
 		[Godot(returns="enum:GodotError")]
-		public final native function rpcId(peerId:int, method:String, ...rest):int;
+		public final native function rpcId(peerId:Int64, method:String, ...rest):int;
 		public final native function updateConfigurationWarnings():void;
 		public final native function callDeferredThreadGroup(method:String, ...rest):*;
 		public final native function setDeferredThreadGroup(property:String, value:*):void;
@@ -3555,7 +3555,7 @@ package godot {
 		public final native function get cachesCleared():Signal;
 		public final native function get mixerApplied():Signal;
 		public final native function get mixerUpdated():Signal;
-		public native function _postProcessKeyValue(animation:Animation, track:int, value:*, objectId:Number, objectSubIdx:int):*;
+		public native function _postProcessKeyValue(animation:Animation, track:int, value:*, objectId:Int64, objectSubIdx:int):*;
 		[Godot(returns="enum:GodotError")]
 		public final native function addAnimationLibrary(name:String, library:AnimationLibrary):int;
 		public final native function removeAnimationLibrary(name:String):void;
@@ -3611,7 +3611,7 @@ package godot {
 		public final native function findInput(name:String):int;
 		public final native function setFilterPath(path:String, enable:Boolean):void;
 		public final native function isPathFiltered(path:String):Boolean;
-		public final native function getProcessingAnimationTreeInstanceId():Number;
+		public final native function getProcessingAnimationTreeInstanceId():Int64;
 		public final native function isProcessTesting():Boolean;
 		[Godot(loopedFlag="enum:Animation.LoopedFlag")]
 		public final native function blendAnimation(animation:String, time:Number, delta:Number, seeked:Boolean, isExternalSeeking:Boolean, blend:Number, loopedFlag:int = 0):void;
@@ -4510,10 +4510,10 @@ package godot {
 		public final native function set propagateMaximumSize(value:Boolean):void;
 		public final native function get clipContents():Boolean;
 		public final native function set clipContents(value:Boolean):void;
-		public final native function get layoutMode():int;
-		public final native function set layoutMode(value:int):void;
-		public final native function get anchorsPreset():int;
-		public final native function set anchorsPreset(value:int):void;
+		public final native function get layoutMode():Int64;
+		public final native function set layoutMode(value:Int64):void;
+		public final native function get anchorsPreset():Int64;
+		public final native function set anchorsPreset(value:Int64):void;
 		public final native function get anchorLeft():Number;
 		public final native function set anchorLeft(value:Number):void;
 		public final native function get anchorTop():Number;
@@ -4863,9 +4863,9 @@ package godot {
 		public final native function getBuffer(frames:int):PackedVector2Array;
 		public final native function clearBuffer():void;
 		public final native function getFramesAvailable():int;
-		public final native function getDiscardedFrames():Number;
+		public final native function getDiscardedFrames():Int64;
 		public final native function getBufferLengthFrames():int;
-		public final native function getPushedFrames():Number;
+		public final native function getPushedFrames():Int64;
 	}
 	public native class AudioEffectChorus extends AudioEffect {
 		public native function AudioEffectChorus();
@@ -5383,11 +5383,11 @@ package godot {
 	public native class AudioStreamPlaybackPolyphonic extends AudioStreamPlayback {
 		public static const INVALID_ID:int = -1;
 		[Godot(playbackType="enum:AudioServer.PlaybackType")]
-		public final native function playStream(stream:AudioStream, fromOffset:Number = 0, volumeDb:Number = 0, pitchScale:Number = 1.0, playbackType:int = 0, bus:String = "Master"):Number;
-		public final native function setStreamVolume(stream:Number, volumeDb:Number):void;
-		public final native function setStreamPitchScale(stream:Number, pitchScale:Number):void;
-		public final native function isStreamPlaying(stream:Number):Boolean;
-		public final native function stopStream(stream:Number):void;
+		public final native function playStream(stream:AudioStream, fromOffset:Number = 0, volumeDb:Number = 0, pitchScale:Number = 1.0, playbackType:int = 0, bus:String = "Master"):Int64;
+		public final native function setStreamVolume(stream:Int64, volumeDb:Number):void;
+		public final native function setStreamPitchScale(stream:Int64, pitchScale:Number):void;
+		public final native function isStreamPlaying(stream:Int64):Boolean;
+		public final native function stopStream(stream:Int64):void;
 	}
 	[Abstract]
 	public native class AudioStreamPlaybackSynchronized extends AudioStreamPlayback {
@@ -7365,7 +7365,7 @@ package godot {
 		public final native function setYcbcrImages(yImage:Image, cbcrImage:Image):void;
 		public final native function setExternal(width:int, height:int):void;
 		[Godot(feedImageType="enum:CameraServer.FeedImage")]
-		public final native function getTextureTexId(feedImageType:int):Number;
+		public final native function getTextureTexId(feedImageType:int):Int64;
 		[Godot(returns="enum:CameraFeed.FeedDataType")]
 		public final native function getDatatype():int;
 		public final native function setFormat(index:int, parameters:GodotDictionary):Boolean;
@@ -7731,7 +7731,7 @@ package godot {
 		public static native function classCallStatic(class_:String, method:String, ...rest):*;
 		public static native function classGetIntegerConstantList(class_:String, noInheritance:Boolean = false):PackedStringArray;
 		public static native function classHasIntegerConstant(class_:String, name:String):Boolean;
-		public static native function classGetIntegerConstant(class_:String, name:String):Number;
+		public static native function classGetIntegerConstant(class_:String, name:String):Int64;
 		public static native function classHasEnum(class_:String, name:String, noInheritance:Boolean = false):Boolean;
 		public static native function classGetEnumList(class_:String, noInheritance:Boolean = false):PackedStringArray;
 		public static native function classGetEnumConstants(class_:String, enum:String, noInheritance:Boolean = false):PackedStringArray;
@@ -9006,7 +9006,7 @@ package godot {
 		public final native function fileExists(path:String):Boolean;
 		public final native function dirExists(path:String):Boolean;
 		public static native function dirExistsAbsolute(path:String):Boolean;
-		public final native function getSpaceLeft():Number;
+		public final native function getSpaceLeft():Int64;
 		[Godot(returns="enum:GodotError")]
 		public final native function copy(from:String, to:String, chmodFlags:int = -1):int;
 		[Godot(returns="enum:GodotError")]
@@ -9447,7 +9447,7 @@ package godot {
 		[Godot(returns="Array[GodotDictionary]")]
 		public static native function ttsGetVoices():GodotArray;
 		public static native function ttsGetVoicesForLanguage(language:String):PackedStringArray;
-		public static native function ttsSpeak(text:String, voice:String, volume:int = 50, pitch:Number = 1.0, rate:Number = 1.0, utteranceId:Number = 0, interrupt:Boolean = false):void;
+		public static native function ttsSpeak(text:String, voice:String, volume:int = 50, pitch:Number = 1.0, rate:Number = 1.0, utteranceId:Int64 = 0, interrupt:Boolean = false):void;
 		public static native function ttsPause():void;
 		public static native function ttsResume():void;
 		public static native function ttsStop():void;
@@ -9500,7 +9500,7 @@ package godot {
 		public static native function getWindowList():PackedInt32Array;
 		public static native function getWindowAtScreenPosition(position:Vector2i):int;
 		[Godot(handleType="enum:DisplayServer.HandleType")]
-		public static native function windowGetNativeHandle(handleType:int, windowId:int = 0):Number;
+		public static native function windowGetNativeHandle(handleType:int, windowId:int = 0):Int64;
 		public static native function windowGetActivePopup():int;
 		public static native function windowSetPopupSafeRect(window:int, rect:Rect2i):void;
 		public static native function windowGetPopupSafeRect(window:int):Rect2i;
@@ -9519,7 +9519,7 @@ package godot {
 		public static native function windowSetInputEventCallback(callback:Function, windowId:int = 0):void;
 		public static native function windowSetInputTextCallback(callback:Function, windowId:int = 0):void;
 		public static native function windowSetDropFilesCallback(callback:Function, windowId:int = 0):void;
-		public static native function windowGetAttachedInstanceId(windowId:int = 0):Number;
+		public static native function windowGetAttachedInstanceId(windowId:int = 0):Int64;
 		public static native function windowGetMaxSize(windowId:int = 0):Vector2i;
 		public static native function windowSetMaxSize(maxSize:Vector2i, windowId:int = 0):void;
 		public static native function windowGetMinSize(windowId:int = 0):Vector2i;
@@ -9668,7 +9668,7 @@ package godot {
 		[Godot(shape="enum:DisplayServer.CursorShape")]
 		public static native function cursorSetCustomImage(cursor:Resource, shape:int = 0, hotspot:Vector2 = null):void;
 		public static native function getSwapCancelOk():Boolean;
-		public static native function enableForStealingFocus(processId:Number):void;
+		public static native function enableForStealingFocus(processId:Int64):void;
 		[Godot(returns="enum:GodotError")]
 		public static native function dialogShow(title:String, description:String, buttons:PackedStringArray, callback:Function):int;
 		[Godot(returns="enum:GodotError")]
@@ -10046,7 +10046,7 @@ package godot {
 		public final native function getWorstMessageType():int;
 		[Godot(returns="enum:GodotError")]
 		public final native function sshRunOnRemote(host:String, port:String, sshArg:PackedStringArray, cmdArgs:String, output:GodotArray = null, portFwd:int = -1):int;
-		public final native function sshRunOnRemoteNoWait(host:String, port:String, sshArgs:PackedStringArray, cmdArgs:String, portFwd:int = -1):Number;
+		public final native function sshRunOnRemoteNoWait(host:String, port:String, sshArgs:PackedStringArray, cmdArgs:String, portFwd:int = -1):Int64;
 		[Godot(returns="enum:GodotError")]
 		public final native function sshPushToRemote(host:String, port:String, scpArgs:PackedStringArray, srcFile:String, dstFile:String):int;
 		public final native function getInternalExportFiles(preset:EditorExportPreset, debug:Boolean):GodotDictionary;
@@ -10134,7 +10134,7 @@ package godot {
 		public native function _customizeResource(resource:Resource, path:String):Resource;
 		public native function _beginCustomizeScenes(platform:EditorExportPlatform, features:PackedStringArray):Boolean;
 		public native function _customizeScene(scene:Node, path:String):Node;
-		public native function _getCustomizationConfigurationHash():Number;
+		public native function _getCustomizationConfigurationHash():Int64;
 		public native function _endCustomizeScenes():void;
 		public native function _endCustomizeResources():void;
 		[Godot(returns="Array[GodotDictionary]")]
@@ -11150,7 +11150,7 @@ package godot {
 		public final native function createDiffLine(newLineNo:int, oldLineNo:int, content:String, status:String):GodotDictionary;
 		public final native function createDiffHunk(oldStart:int, newStart:int, oldLines:int, newLines:int):GodotDictionary;
 		public final native function createDiffFile(newFile:String, oldFile:String):GodotDictionary;
-		public final native function createCommit(msg:String, author:String, id:String, unixTimestamp:Number, offsetMinutes:Number):GodotDictionary;
+		public final native function createCommit(msg:String, author:String, id:String, unixTimestamp:Int64, offsetMinutes:Int64):GodotDictionary;
 		[Godot(changeType="enum:EditorVCSInterface.ChangeType", area="enum:EditorVCSInterface.TreeArea")]
 		public final native function createStatusFile(filePath:String, changeType:int, area:int):GodotDictionary;
 		[Godot(diffHunks="Array[GodotDictionary]")]
@@ -11161,8 +11161,8 @@ package godot {
 	}
 	public native class EncodedObjectAsID extends RefCounted {
 		public native function EncodedObjectAsID();
-		public final native function get objectId():Number;
-		public final native function set objectId(value:Number):void;
+		public final native function get objectId():Int64;
+		public final native function set objectId(value:Int64):void;
 	}
 	[Singleton]
 	public native class Engine extends GodotObject {
@@ -11185,8 +11185,8 @@ package godot {
 		public static native function getPhysicsInterpolationFraction():Number;
 		public static native function getFramesDrawn():int;
 		public static native function getFramesPerSecond():Number;
-		public static native function getPhysicsFrames():Number;
-		public static native function getProcessFrames():Number;
+		public static native function getPhysicsFrames():Int64;
+		public static native function getProcessFrames():Int64;
 		public static native function getMainLoop():MainLoop;
 		public static native function getVersionInfo():GodotDictionary;
 		public static native function getAuthorInfo():GodotDictionary;
@@ -11494,8 +11494,8 @@ package godot {
 		public native function ExternalTexture();
 		public final native function get size():Vector2;
 		public final native function set size(value:Vector2):void;
-		public final native function getExternalTextureId():Number;
-		public final native function setExternalBufferId(externalBufferId:Number):void;
+		public final native function getExternalTextureId():Int64;
+		public final native function setExternalBufferId(externalBufferId:Int64):void;
 	}
 	public native class FABRIK3D extends IterateIK3D {
 		public native function FABRIK3D();
@@ -11800,25 +11800,25 @@ package godot {
 		public static native function getFileAsBytes(path:String):PackedByteArray;
 		public static native function getFileAsString(path:String):String;
 		[Godot(returns="enum:GodotError")]
-		public final native function resize(length:Number):int;
+		public final native function resize(length:Int64):int;
 		public final native function flush():void;
 		public final native function getPath():String;
 		public final native function getPathAbsolute():String;
 		public final native function isOpen():Boolean;
-		public final native function seek(position:Number):void;
-		public final native function seekEnd(position:Number = 0):void;
-		public final native function getPosition():Number;
-		public final native function getLength():Number;
+		public final native function seek(position:Int64):void;
+		public final native function seekEnd(position:Int64 = 0):void;
+		public final native function getPosition():Int64;
+		public final native function getLength():Int64;
 		public final native function eofReached():Boolean;
 		public final native function get8():uint;
 		public final native function get16():uint;
 		public final native function get32():uint;
-		public final native function get64():Number;
+		public final native function get64():Int64;
 		public final native function getHalf():Number;
 		public final native function getFloat():Number;
 		public final native function getDouble():Number;
 		public final native function getReal():Number;
-		public final native function getBuffer(length:Number):PackedByteArray;
+		public final native function getBuffer(length:Int64):PackedByteArray;
 		public final native function getLine():String;
 		public final native function getCsvLine(delim:String = ","):PackedStringArray;
 		public final native function getAsText():String;
@@ -11830,7 +11830,7 @@ package godot {
 		public final native function store8(value:uint):Boolean;
 		public final native function store16(value:uint):Boolean;
 		public final native function store32(value:uint):Boolean;
-		public final native function store64(value:Number):Boolean;
+		public final native function store64(value:Int64):Boolean;
 		public final native function storeHalf(value:Number):Boolean;
 		public final native function storeFloat(value:Number):Boolean;
 		public final native function storeDouble(value:Number):Boolean;
@@ -11844,9 +11844,9 @@ package godot {
 		public final native function getPascalString():String;
 		public final native function close():void;
 		public static native function fileExists(path:String):Boolean;
-		public static native function getModifiedTime(file:String):Number;
-		public static native function getAccessTime(file:String):Number;
-		public static native function getSize(file:String):Number;
+		public static native function getModifiedTime(file:String):Int64;
+		public static native function getAccessTime(file:String):Int64;
+		public static native function getSize(file:String):Int64;
 		[Godot(returns="bitfield:FileAccess.UnixPermissionFlags")]
 		public static native function getUnixPermissions(file:String):int;
 		[Godot(permissions="bitfield:FileAccess.UnixPermissionFlags", returns="enum:GodotError")]
@@ -11976,7 +11976,7 @@ package godot {
 		[Godot(returns="Array[Font]")]
 		public final native function get fallbacks():GodotArray;
 		public final native function set fallbacks(value:GodotArray):void;
-		public final native function findVariation(variationCoordinates:GodotDictionary, faceIndex:int = 0, strength:Number = 0.0, transform:Transform2D = null, spacingTop:int = 0, spacingBottom:int = 0, spacingSpace:int = 0, spacingGlyph:int = 0, baselineOffset:Number = 0.0, paletteIndex:Number = 0, customColors:PackedColorArray = null):RID;
+		public final native function findVariation(variationCoordinates:GodotDictionary, faceIndex:int = 0, strength:Number = 0.0, transform:Transform2D = null, spacingTop:int = 0, spacingBottom:int = 0, spacingSpace:int = 0, spacingGlyph:int = 0, baselineOffset:Number = 0.0, paletteIndex:Int64 = 0, customColors:PackedColorArray = null):RID;
 		[Godot(returns="Array[RID]")]
 		public final native function getRids():GodotArray;
 		public final native function getHeight(fontSize:int = 16):Number;
@@ -11991,9 +11991,9 @@ package godot {
 		public final native function getFontStyle():int;
 		public final native function getFontWeight():int;
 		public final native function getFontStretch():int;
-		public final native function getPaletteCount():Number;
-		public final native function getPaletteName(index:Number):String;
-		public final native function getPaletteColors(index:Number):PackedColorArray;
+		public final native function getPaletteCount():Int64;
+		public final native function getPaletteName(index:Int64):String;
+		public final native function getPaletteColors(index:Int64):PackedColorArray;
 		[Godot(spacing="enum:TextServer.SpacingType")]
 		public final native function getSpacing(spacing:int):int;
 		public final native function getOpentypeFeatures():GodotDictionary;
@@ -12019,7 +12019,7 @@ package godot {
 		public final native function isScriptSupported(script:String):Boolean;
 		public final native function getSupportedFeatureList():GodotDictionary;
 		public final native function getSupportedVariationList():GodotDictionary;
-		public final native function getFaceCount():Number;
+		public final native function getFaceCount():Int64;
 	}
 	public native class FontFile extends Font {
 		public native function FontFile();
@@ -12090,13 +12090,13 @@ package godot {
 		public final native function setTransform(cacheIndex:int, transform:Transform2D):void;
 		public final native function getTransform(cacheIndex:int):Transform2D;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public final native function setExtraSpacing(cacheIndex:int, spacing:int, value:Number):void;
+		public final native function setExtraSpacing(cacheIndex:int, spacing:int, value:Int64):void;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public final native function getExtraSpacing(cacheIndex:int, spacing:int):Number;
+		public final native function getExtraSpacing(cacheIndex:int, spacing:int):Int64;
 		public final native function setExtraBaselineOffset(cacheIndex:int, baselineOffset:Number):void;
 		public final native function getExtraBaselineOffset(cacheIndex:int):Number;
-		public final native function setFaceIndex(cacheIndex:int, faceIndex:Number):void;
-		public final native function getFaceIndex(cacheIndex:int):Number;
+		public final native function setFaceIndex(cacheIndex:int, faceIndex:Int64):void;
+		public final native function getFaceIndex(cacheIndex:int):Int64;
 		public final native function setCacheAscent(cacheIndex:int, size:int, ascent:Number):void;
 		public final native function getCacheAscent(cacheIndex:int, size:int):Number;
 		public final native function setCacheDescent(cacheIndex:int, size:int, descent:Number):void;
@@ -12170,8 +12170,8 @@ package godot {
 		public final native function set spacingBottom(value:int):void;
 		public final native function get baselineOffset():Number;
 		public final native function set baselineOffset(value:Number):void;
-		public final native function get paletteIndex():Number;
-		public final native function set paletteIndex(value:Number):void;
+		public final native function get paletteIndex():Int64;
+		public final native function set paletteIndex(value:Int64):void;
 		public final native function get paletteCustomColors():PackedColorArray;
 		public final native function set paletteCustomColors(value:PackedColorArray):void;
 		[Godot(spacing="enum:TextServer.SpacingType")]
@@ -12342,15 +12342,15 @@ package godot {
 		public native function GLTFAccessor();
 		public final native function get bufferView():int;
 		public final native function set bufferView(value:int):void;
-		public final native function get byteOffset():Number;
-		public final native function set byteOffset(value:Number):void;
+		public final native function get byteOffset():Int64;
+		public final native function set byteOffset(value:Int64):void;
 		[Godot(returns="enum:GLTFAccessor.GLTFComponentType")]
 		public final native function get componentType():int;
 		public final native function set componentType(value:int):void;
 		public final native function get normalized():Boolean;
 		public final native function set normalized(value:Boolean):void;
-		public final native function get count():Number;
-		public final native function set count(value:Number):void;
+		public final native function get count():Int64;
+		public final native function set count(value:Int64):void;
 		[Godot(returns="enum:GLTFAccessor.GLTFAccessorType")]
 		public final native function get accessorType():int;
 		public final native function set accessorType(value:int):void;
@@ -12360,19 +12360,19 @@ package godot {
 		public final native function set min(value:PackedFloat64Array):void;
 		public final native function get max():PackedFloat64Array;
 		public final native function set max(value:PackedFloat64Array):void;
-		public final native function get sparseCount():Number;
-		public final native function set sparseCount(value:Number):void;
+		public final native function get sparseCount():Int64;
+		public final native function set sparseCount(value:Int64):void;
 		public final native function get sparseIndicesBufferView():int;
 		public final native function set sparseIndicesBufferView(value:int):void;
-		public final native function get sparseIndicesByteOffset():Number;
-		public final native function set sparseIndicesByteOffset(value:Number):void;
+		public final native function get sparseIndicesByteOffset():Int64;
+		public final native function set sparseIndicesByteOffset(value:Int64):void;
 		[Godot(returns="enum:GLTFAccessor.GLTFComponentType")]
 		public final native function get sparseIndicesComponentType():int;
 		public final native function set sparseIndicesComponentType(value:int):void;
 		public final native function get sparseValuesBufferView():int;
 		public final native function set sparseValuesBufferView(value:int):void;
-		public final native function get sparseValuesByteOffset():Number;
-		public final native function set sparseValuesByteOffset(value:Number):void;
+		public final native function get sparseValuesByteOffset():Int64;
+		public final native function set sparseValuesByteOffset(value:Int64):void;
 		public static native function fromDictionary(dictionary:GodotDictionary):GLTFAccessor;
 		public final native function toDictionary():GodotDictionary;
 	}
@@ -12389,12 +12389,12 @@ package godot {
 		public native function GLTFBufferView();
 		public final native function get buffer():int;
 		public final native function set buffer(value:int):void;
-		public final native function get byteOffset():Number;
-		public final native function set byteOffset(value:Number):void;
-		public final native function get byteLength():Number;
-		public final native function set byteLength(value:Number):void;
-		public final native function get byteStride():Number;
-		public final native function set byteStride(value:Number):void;
+		public final native function get byteOffset():Int64;
+		public final native function set byteOffset(value:Int64):void;
+		public final native function get byteLength():Int64;
+		public final native function set byteLength(value:Int64):void;
+		public final native function get byteStride():Int64;
+		public final native function set byteStride(value:Int64):void;
 		public final native function get indices():Boolean;
 		public final native function set indices(value:Boolean):void;
 		public final native function get vertexAttributes():Boolean;
@@ -13670,7 +13670,7 @@ package godot {
 		public final native function getResponseCode():int;
 		public final native function getResponseHeaders():PackedStringArray;
 		public final native function getResponseHeadersAsDictionary():GodotDictionary;
-		public final native function getResponseBodyLength():Number;
+		public final native function getResponseBodyLength():Int64;
 		public final native function readResponseBodyChunk():PackedByteArray;
 		[Godot(returns="enum:HTTPClient.Status")]
 		public final native function getStatus():int;
@@ -13899,11 +13899,11 @@ package godot {
 		[Godot(returns="enum:Image.Format")]
 		public final native function getFormat():int;
 		public final native function getData():PackedByteArray;
-		public final native function getDataSize():Number;
+		public final native function getDataSize():Int64;
 		[Godot(format="enum:Image.Format")]
 		public final native function convert(format:int):void;
 		public final native function getMipmapCount():int;
-		public final native function getMipmapOffset(mipmap:int):Number;
+		public final native function getMipmapOffset(mipmap:int):Int64;
 		[Godot(interpolation="enum:Image.Interpolation")]
 		public final native function resizeToPo2(square:Boolean = false, interpolation:int = 1):void;
 		[Godot(interpolation="enum:Image.Interpolation")]
@@ -14057,7 +14057,7 @@ package godot {
 		[Godot(returns="enum:Mesh.BlendShapeMode")]
 		public final native function getBlendShapeMode():int;
 		[Godot(primitive="enum:Mesh.PrimitiveType", blendShapes="Array[GodotArray]")]
-		public final native function addSurface(primitive:int, arrays:GodotArray, blendShapes:GodotArray = null, lods:GodotDictionary = null, material:Material = null, name:String = "", flags:Number = 0):void;
+		public final native function addSurface(primitive:int, arrays:GodotArray, blendShapes:GodotArray = null, lods:GodotDictionary = null, material:Material = null, name:String = "", flags:Int64 = 0):void;
 		public final native function getSurfaceCount():int;
 		[Godot(returns="enum:Mesh.PrimitiveType")]
 		public final native function getSurfacePrimitiveType(surfaceIdx:int):int;
@@ -14068,7 +14068,7 @@ package godot {
 		public final native function getSurfaceLodSize(surfaceIdx:int, lodIdx:int):Number;
 		public final native function getSurfaceLodIndices(surfaceIdx:int, lodIdx:int):PackedInt32Array;
 		public final native function getSurfaceMaterial(surfaceIdx:int):Material;
-		public final native function getSurfaceFormat(surfaceIdx:int):Number;
+		public final native function getSurfaceFormat(surfaceIdx:int):Int64;
 		public final native function setSurfaceName(surfaceIdx:int, name:String):void;
 		public final native function setSurfaceMaterial(surfaceIdx:int, material:Material):void;
 		public final native function generateLods(normalMergeAngle:Number, normalSplitAngle:Number, boneTransformArray:GodotArray):void;
@@ -14257,8 +14257,8 @@ package godot {
 	}
 	[Abstract]
 	public native class InputEventFromWindow extends InputEvent {
-		public final native function get windowId():Number;
-		public final native function set windowId(value:Number):void;
+		public final native function get windowId():Int64;
+		public final native function set windowId(value:Int64):void;
 	}
 	[Abstract]
 	public native class InputEventWithModifiers extends InputEventFromWindow {
@@ -14665,7 +14665,7 @@ package godot {
 		public final native function getDepth():Number;
 		public final native function getLocalShape():GodotObject;
 		public final native function getCollider():GodotObject;
-		public final native function getColliderId():Number;
+		public final native function getColliderId():Int64;
 		public final native function getColliderRid():RID;
 		public final native function getColliderShape():GodotObject;
 		public final native function getColliderShapeIndex():int;
@@ -14682,7 +14682,7 @@ package godot {
 		public final native function getAngle(collisionIndex:int = 0, upDirection:Vector3 = null):Number;
 		public final native function getLocalShape(collisionIndex:int = 0):GodotObject;
 		public final native function getCollider(collisionIndex:int = 0):GodotObject;
-		public final native function getColliderId(collisionIndex:int = 0):Number;
+		public final native function getColliderId(collisionIndex:int = 0):Int64;
 		public final native function getColliderRid(collisionIndex:int = 0):RID;
 		public final native function getColliderShape(collisionIndex:int = 0):GodotObject;
 		public final native function getColliderShapeIndex(collisionIndex:int = 0):int;
@@ -15021,7 +15021,7 @@ package godot {
 		public final native function set exclude(value:Boolean):void;
 		public final native function get chainCount():int;
 		public final native function set chainCount(value:int):void;
-		public final native function get jointCount():int;
+		public final native function get jointCount():Int64;
 		public final native function setRootBoneName(index:int, boneName:String):void;
 		public final native function getRootBoneName(index:int):String;
 		public final native function setRootBone(index:int, bone:int):void;
@@ -15475,8 +15475,8 @@ package godot {
 		[Godot(returns="enum:GodotError")]
 		public final native function createFromSurface(mesh:ArrayMesh, surface:int):int;
 		[Godot(returns="enum:GodotError")]
-		public final native function commitToSurface(mesh:ArrayMesh, compressionFlags:Number = 0):int;
-		public final native function getFormat():Number;
+		public final native function commitToSurface(mesh:ArrayMesh, compressionFlags:Int64 = 0):int;
+		public final native function getFormat():Int64;
 		public final native function getVertexCount():int;
 		public final native function getEdgeCount():int;
 		public final native function getFaceCount():int;
@@ -16739,8 +16739,8 @@ package godot {
 		public static native function regionGetEnterCost(region:RID):Number;
 		public static native function regionSetTravelCost(region:RID, travelCost:Number):void;
 		public static native function regionGetTravelCost(region:RID):Number;
-		public static native function regionSetOwnerId(region:RID, ownerId:Number):void;
-		public static native function regionGetOwnerId(region:RID):Number;
+		public static native function regionSetOwnerId(region:RID, ownerId:Int64):void;
+		public static native function regionGetOwnerId(region:RID):Int64;
 		public static native function regionOwnsPoint(region:RID, point:Vector2):Boolean;
 		public static native function regionSetMap(region:RID, map:RID):void;
 		public static native function regionGetMap(region:RID):RID;
@@ -16773,8 +16773,8 @@ package godot {
 		public static native function linkGetEnterCost(link:RID):Number;
 		public static native function linkSetTravelCost(link:RID, travelCost:Number):void;
 		public static native function linkGetTravelCost(link:RID):Number;
-		public static native function linkSetOwnerId(link:RID, ownerId:Number):void;
-		public static native function linkGetOwnerId(link:RID):Number;
+		public static native function linkSetOwnerId(link:RID, ownerId:Int64):void;
+		public static native function linkGetOwnerId(link:RID):Int64;
 		public static native function agentCreate():RID;
 		public static native function agentSetAvoidanceEnabled(agent:RID, enabled:Boolean):void;
 		public static native function agentGetAvoidanceEnabled(agent:RID):Boolean;
@@ -16914,8 +16914,8 @@ package godot {
 		public static native function regionGetEnterCost(region:RID):Number;
 		public static native function regionSetTravelCost(region:RID, travelCost:Number):void;
 		public static native function regionGetTravelCost(region:RID):Number;
-		public static native function regionSetOwnerId(region:RID, ownerId:Number):void;
-		public static native function regionGetOwnerId(region:RID):Number;
+		public static native function regionSetOwnerId(region:RID, ownerId:Int64):void;
+		public static native function regionGetOwnerId(region:RID):Int64;
 		public static native function regionOwnsPoint(region:RID, point:Vector3):Boolean;
 		public static native function regionSetMap(region:RID, map:RID):void;
 		public static native function regionGetMap(region:RID):RID;
@@ -16951,8 +16951,8 @@ package godot {
 		public static native function linkGetEnterCost(link:RID):Number;
 		public static native function linkSetTravelCost(link:RID, travelCost:Number):void;
 		public static native function linkGetTravelCost(link:RID):Number;
-		public static native function linkSetOwnerId(link:RID, ownerId:Number):void;
-		public static native function linkGetOwnerId(link:RID):Number;
+		public static native function linkSetOwnerId(link:RID, ownerId:Int64):void;
+		public static native function linkGetOwnerId(link:RID):Int64;
 		public static native function agentCreate():RID;
 		public static native function agentSetAvoidanceEnabled(agent:RID, enabled:Boolean):void;
 		public static native function agentGetAvoidanceEnabled(agent:RID):Boolean;
@@ -17158,8 +17158,8 @@ package godot {
 		public static native function getSystemFontPath(fontName:String, weight:int = 400, stretch:int = 100, italic:Boolean = false):String;
 		public static native function getSystemFontPathForText(fontName:String, text:String, locale:String = "", script:String = "", weight:int = 400, stretch:int = 100, italic:Boolean = false):PackedStringArray;
 		public static native function getExecutablePath():String;
-		public static native function readStringFromStdin(bufferSize:Number = 1024):String;
-		public static native function readBufferFromStdin(bufferSize:Number = 1024):PackedByteArray;
+		public static native function readStringFromStdin(bufferSize:Int64 = 1024):String;
+		public static native function readBufferFromStdin(bufferSize:Int64 = 1024):PackedByteArray;
 		[Godot(returns="enum:OS.StdHandleType")]
 		public static native function getStdinType():int;
 		[Godot(returns="enum:OS.StdHandleType")]
@@ -17203,8 +17203,8 @@ package godot {
 		public static native function isUserfsPersistent():Boolean;
 		public static native function isStdoutVerbose():Boolean;
 		public static native function isDebugBuild():Boolean;
-		public static native function getStaticMemoryUsage():Number;
-		public static native function getStaticMemoryPeakUsage():Number;
+		public static native function getStaticMemoryUsage():Int64;
+		public static native function getStaticMemoryPeakUsage():Int64;
 		public static native function getMemoryInfo():GodotDictionary;
 		[Godot(returns="enum:GodotError")]
 		public static native function moveToTrash(path:String):int;
@@ -17224,8 +17224,8 @@ package godot {
 		public static native function setUseFileAccessSaveAndSwap(enabled:Boolean):void;
 		[Godot(returns="enum:GodotError")]
 		public static native function setThreadName(name:String):int;
-		public static native function getThreadCallerId():Number;
-		public static native function getMainThreadId():Number;
+		public static native function getThreadCallerId():Int64;
+		public static native function getMainThreadId():Int64;
 		public static native function hasFeature(tagName:String):Boolean;
 		public static native function isSandboxed():Boolean;
 		public static native function requestPermission(name:String):Boolean;
@@ -17296,30 +17296,30 @@ package godot {
 		public static const OPENXR_ALPHA_BLEND_MODE_SUPPORT_REAL:int = 1;
 		public static const OPENXR_ALPHA_BLEND_MODE_SUPPORT_EMULATING:int = 2;
 		public native function OpenXRAPIExtension();
-		public final native function getOpenxrVersion():Number;
-		public final native function getInstance():Number;
-		public final native function getSystemId():Number;
-		public final native function getSession():Number;
-		public final native function xrResult(result:Number, format:String, args:GodotArray):Boolean;
+		public final native function getOpenxrVersion():Int64;
+		public final native function getInstance():Int64;
+		public final native function getSystemId():Int64;
+		public final native function getSession():Int64;
+		public final native function xrResult(result:Int64, format:String, args:GodotArray):Boolean;
 		public static native function openxrIsEnabled(checkRunInEditor:Boolean):Boolean;
-		public final native function getInstanceProcAddr(name:String):Number;
-		public final native function getErrorString(result:Number):String;
-		public final native function getSwapchainFormatName(swapchainFormat:Number):String;
-		public final native function setObjectName(objectType:Number, objectHandle:Number, objectName:String):void;
+		public final native function getInstanceProcAddr(name:String):Int64;
+		public final native function getErrorString(result:Int64):String;
+		public final native function getSwapchainFormatName(swapchainFormat:Int64):String;
+		public final native function setObjectName(objectType:Int64, objectHandle:Int64, objectName:String):void;
 		public final native function beginDebugLabelRegion(labelName:String):void;
 		public final native function endDebugLabelRegion():void;
 		public final native function insertDebugLabel(labelName:String):void;
 		public final native function getViewCount():uint;
-		public final native function getViewConfiguration():Number;
+		public final native function getViewConfiguration():Int64;
 		public final native function isInitialized():Boolean;
 		public final native function isRunning():Boolean;
-		public final native function getPlaySpace():Number;
-		public final native function getPredictedDisplayTime():Number;
-		public final native function getNextFrameTime():Number;
+		public final native function getPlaySpace():Int64;
+		public final native function getPredictedDisplayTime():Int64;
+		public final native function getNextFrameTime():Int64;
 		public final native function canRender():Boolean;
 		public final native function findAction(name:String, actionSet:RID):RID;
-		public final native function actionGetHandle(action:RID):Number;
-		public final native function getHandTracker(handIndex:int):Number;
+		public final native function actionGetHandle(action:RID):Int64;
+		public final native function getHandTracker(handIndex:int):Int64;
 		public final native function registerCompositionLayerProvider(extension:OpenXRExtensionWrapper):void;
 		public final native function unregisterCompositionLayerProvider(extension:OpenXRExtensionWrapper):void;
 		public final native function registerProjectionViewsExtension(extension:OpenXRExtensionWrapper):void;
@@ -17334,13 +17334,13 @@ package godot {
 		public final native function setVelocityDepthTexture(renderTarget:RID):void;
 		public final native function setVelocityTargetSize(targetSize:Vector2i):void;
 		public final native function getSupportedSwapchainFormats():PackedInt64Array;
-		public final native function openxrSwapchainCreate(createFlags:Number, usageFlags:Number, swapchainFormat:Number, width:uint, height:uint, sampleCount:uint, arraySize:uint):Number;
-		public final native function openxrSwapchainFree(swapchain:Number):void;
-		public final native function openxrSwapchainGetSwapchain(swapchain:Number):Number;
-		public final native function openxrSwapchainAcquire(swapchain:Number):void;
-		public final native function openxrSwapchainGetImage(swapchain:Number):RID;
-		public final native function openxrSwapchainRelease(swapchain:Number):void;
-		public final native function getProjectionLayer():Number;
+		public final native function openxrSwapchainCreate(createFlags:Int64, usageFlags:Int64, swapchainFormat:Int64, width:uint, height:uint, sampleCount:uint, arraySize:uint):Int64;
+		public final native function openxrSwapchainFree(swapchain:Int64):void;
+		public final native function openxrSwapchainGetSwapchain(swapchain:Int64):Int64;
+		public final native function openxrSwapchainAcquire(swapchain:Int64):void;
+		public final native function openxrSwapchainGetImage(swapchain:Int64):RID;
+		public final native function openxrSwapchainRelease(swapchain:Int64):void;
+		public final native function getProjectionLayer():Int64;
 		public final native function setRenderRegion(renderRegion:Rect2i):void;
 		public final native function setEmulateEnvironmentBlendModeAlphaBlend(enabled:Boolean):void;
 		[Godot(returns="enum:OpenXRAPIExtension.OpenXRAlphaBlendModeSupport")]
@@ -17476,18 +17476,18 @@ package godot {
 	}
 	public native class OpenXRExtensionWrapper extends GodotObject {
 		public native function OpenXRExtensionWrapper();
-		public native function _getRequestedExtensions(xrVersion:Number):GodotDictionary;
+		public native function _getRequestedExtensions(xrVersion:Int64):GodotDictionary;
 		public native function _prepareViewConfiguration(viewCount:int):void;
 		public native function _printViewConfigurationInfo(view:int):void;
 		public native function _getCompositionLayerCount():int;
-		public native function _getCompositionLayer(index:int):Number;
+		public native function _getCompositionLayer(index:int):Int64;
 		public native function _getCompositionLayerOrder(index:int):int;
 		public native function _getSuggestedTrackerNames():PackedStringArray;
 		public native function _onRegisterMetadata(interactionProfileMetadata:OpenXRInteractionProfileMetadata):void;
 		public native function _onBeforeInstanceCreated():void;
-		public native function _onInstanceCreated(instance:Number):void;
+		public native function _onInstanceCreated(instance:Int64):void;
 		public native function _onInstanceDestroyed():void;
-		public native function _onSessionCreated(session:Number):void;
+		public native function _onSessionCreated(session:Int64):void;
 		public native function _onProcess():void;
 		public native function _onSyncActions():void;
 		public native function _onPreRender():void;
@@ -17675,8 +17675,8 @@ package godot {
 	public native class OpenXRFutureExtension extends OpenXRExtensionWrapper {
 		public native function OpenXRFutureExtension();
 		public final native function isActive():Boolean;
-		public final native function registerFuture(future:Number, onSuccess:Function = null):OpenXRFutureResult;
-		public final native function cancelFuture(future:Number):void;
+		public final native function registerFuture(future:Int64, onSuccess:Function = null):OpenXRFutureResult;
+		public final native function cancelFuture(future:Int64):void;
 	}
 	[GodotEnum(name="ResultStatus", values="RESULT_RUNNING,RESULT_FINISHED,RESULT_CANCELLED")]
 	[Abstract]
@@ -17687,7 +17687,7 @@ package godot {
 		public final native function get completed():Signal;
 		[Godot(returns="enum:OpenXRFutureResult.ResultStatus")]
 		public final native function getStatus():int;
-		public final native function getFuture():Number;
+		public final native function getFuture():Int64;
 		public final native function cancelFuture():void;
 		public final native function setResultValue(resultValue:*):void;
 		public final native function getResultValue():*;
@@ -17730,8 +17730,8 @@ package godot {
 	}
 	public native class OpenXRHapticVibration extends OpenXRHapticBase {
 		public native function OpenXRHapticVibration();
-		public final native function get duration():Number;
-		public final native function set duration(value:Number):void;
+		public final native function get duration():Int64;
+		public final native function set duration(value:Int64):void;
 		public final native function get frequency():Number;
 		public final native function set frequency(value:Number):void;
 		public final native function get amplitude():Number;
@@ -17959,7 +17959,7 @@ package godot {
 		public final native function get renderModelRemoved():Signal;
 		public final native function get renderModelTopLevelPathChanged():Signal;
 		public final native function isActive():Boolean;
-		public final native function renderModelCreate(renderModelId:Number):RID;
+		public final native function renderModelCreate(renderModelId:Int64):RID;
 		public final native function renderModelDestroy(renderModel:RID):void;
 		[Godot(returns="Array[RID]")]
 		public final native function renderModelGetAll():GodotArray;
@@ -18001,7 +18001,7 @@ package godot {
 		public final native function createDefaultPersistenceContext(userCallback:Function = null):OpenXRFutureResult;
 		[Godot(scope="enum:OpenXRSpatialAnchorCapability.PersistenceScope")]
 		public final native function createPersistenceContext(scope:int, userCallback:Function = null):OpenXRFutureResult;
-		public final native function getPersistenceContextHandle(persistenceContext:RID):Number;
+		public final native function getPersistenceContextHandle(persistenceContext:RID):Int64;
 		public final native function freePersistenceContext(persistenceContext:RID):void;
 		public final native function createNewAnchor(transform:Transform3D, spatialContext:RID = null, next:OpenXRStructureBase = null):OpenXRAnchorTracker;
 		public final native function removeAnchor(anchorTracker:OpenXRAnchorTracker):void;
@@ -18015,9 +18015,9 @@ package godot {
 	public native class OpenXRSpatialCapabilityConfigurationBaseHeader extends RefCounted {
 		public native function OpenXRSpatialCapabilityConfigurationBaseHeader();
 		public native function _hasValidConfiguration():Boolean;
-		public native function _getConfiguration():Number;
+		public native function _getConfiguration():Int64;
 		public final native function hasValidConfiguration():Boolean;
-		public final native function getConfiguration():Number;
+		public final native function getConfiguration():Int64;
 	}
 	public native class OpenXRSpatialCapabilityConfigurationAnchor extends OpenXRSpatialCapabilityConfigurationBaseHeader {
 		public native function OpenXRSpatialCapabilityConfigurationAnchor();
@@ -18077,24 +18077,24 @@ package godot {
 	public native class OpenXRSpatialComponentData extends RefCounted {
 		public native function OpenXRSpatialComponentData();
 		public native function _setCapacity(capacity:uint):void;
-		public native function _getComponentType():Number;
-		public native function _getStructureData(next:Number):Number;
+		public native function _getComponentType():Int64;
+		public native function _getStructureData(next:Int64):Int64;
 		public final native function setCapacity(capacity:uint):void;
-		public final native function getComponentType():Number;
+		public final native function getComponentType():Int64;
 	}
 	public native class OpenXRSpatialComponentAnchorList extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialComponentAnchorList();
-		public final native function getEntityPose(index:Number):Transform3D;
+		public final native function getEntityPose(index:Int64):Transform3D;
 	}
 	public native class OpenXRSpatialComponentBounded2DList extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialComponentBounded2DList();
-		public final native function getCenterPose(index:Number):Transform3D;
-		public final native function getSize(index:Number):Vector2;
+		public final native function getCenterPose(index:Int64):Transform3D;
+		public final native function getSize(index:Int64):Vector2;
 	}
 	public native class OpenXRSpatialComponentBounded3DList extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialComponentBounded3DList();
-		public final native function getCenterPose(index:Number):Transform3D;
-		public final native function getSize(index:Number):Vector3;
+		public final native function getCenterPose(index:Int64):Transform3D;
+		public final native function getSize(index:Int64):Vector3;
 	}
 	[GodotEnum(name="MarkerType", values="MARKER_TYPE_UNKNOWN,MARKER_TYPE_QRCODE,MARKER_TYPE_MICRO_QRCODE,MARKER_TYPE_ARUCO,MARKER_TYPE_APRIL_TAG,MARKER_TYPE_MAX")]
 	public native class OpenXRSpatialComponentMarkerList extends OpenXRSpatialComponentData {
@@ -18106,29 +18106,29 @@ package godot {
 		public static const MARKER_TYPE_MAX:int = 5;
 		public native function OpenXRSpatialComponentMarkerList();
 		[Godot(returns="enum:OpenXRSpatialComponentMarkerList.MarkerType")]
-		public final native function getMarkerType(index:Number):int;
-		public final native function getMarkerId(index:Number):uint;
-		public final native function getMarkerData(snapshot:RID, index:Number):*;
+		public final native function getMarkerType(index:Int64):int;
+		public final native function getMarkerId(index:Int64):uint;
+		public final native function getMarkerData(snapshot:RID, index:Int64):*;
 	}
 	public native class OpenXRSpatialComponentMesh2DList extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialComponentMesh2DList();
-		public final native function getTransform(index:Number):Transform3D;
-		public final native function getVertices(snapshot:RID, index:Number):PackedVector2Array;
-		public final native function getIndices(snapshot:RID, index:Number):PackedInt32Array;
+		public final native function getTransform(index:Int64):Transform3D;
+		public final native function getVertices(snapshot:RID, index:Int64):PackedVector2Array;
+		public final native function getIndices(snapshot:RID, index:Int64):PackedInt32Array;
 	}
 	public native class OpenXRSpatialComponentMesh3DList extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialComponentMesh3DList();
-		public final native function getTransform(index:Number):Transform3D;
-		public final native function getMesh(index:Number):Mesh;
+		public final native function getTransform(index:Int64):Transform3D;
+		public final native function getMesh(index:Int64):Mesh;
 	}
 	public native class OpenXRSpatialComponentParentList extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialComponentParentList();
-		public final native function getParent(index:Number):RID;
+		public final native function getParent(index:Int64):RID;
 	}
 	public native class OpenXRSpatialComponentPersistenceList extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialComponentPersistenceList();
-		public final native function getPersistentUuid(index:Number):String;
-		public final native function getPersistentState(index:Number):Number;
+		public final native function getPersistentUuid(index:Int64):String;
+		public final native function getPersistentState(index:Int64):Int64;
 	}
 	[GodotEnum(name="PlaneAlignment", values="PLANE_ALIGNMENT_HORIZONTAL_UPWARD,PLANE_ALIGNMENT_HORIZONTAL_DOWNWARD,PLANE_ALIGNMENT_VERTICAL,PLANE_ALIGNMENT_ARBITRARY")]
 	public native class OpenXRSpatialComponentPlaneAlignmentList extends OpenXRSpatialComponentData {
@@ -18138,7 +18138,7 @@ package godot {
 		public static const PLANE_ALIGNMENT_ARBITRARY:int = 3;
 		public native function OpenXRSpatialComponentPlaneAlignmentList();
 		[Godot(returns="enum:OpenXRSpatialComponentPlaneAlignmentList.PlaneAlignment")]
-		public final native function getPlaneAlignment(index:Number):int;
+		public final native function getPlaneAlignment(index:Int64):int;
 	}
 	[GodotEnum(name="PlaneSemanticLabel", values="PLANE_SEMANTIC_LABEL_UNCATEGORIZED,PLANE_SEMANTIC_LABEL_FLOOR,PLANE_SEMANTIC_LABEL_WALL,PLANE_SEMANTIC_LABEL_CEILING,PLANE_SEMANTIC_LABEL_TABLE")]
 	public native class OpenXRSpatialComponentPlaneSemanticLabelList extends OpenXRSpatialComponentData {
@@ -18149,19 +18149,19 @@ package godot {
 		public static const PLANE_SEMANTIC_LABEL_TABLE:int = 5;
 		public native function OpenXRSpatialComponentPlaneSemanticLabelList();
 		[Godot(returns="enum:OpenXRSpatialComponentPlaneSemanticLabelList.PlaneSemanticLabel")]
-		public final native function getPlaneSemanticLabel(index:Number):int;
+		public final native function getPlaneSemanticLabel(index:Int64):int;
 	}
 	public native class OpenXRSpatialComponentPolygon2DList extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialComponentPolygon2DList();
-		public final native function getTransform(index:Number):Transform3D;
-		public final native function getVertices(snapshot:RID, index:Number):PackedVector2Array;
+		public final native function getTransform(index:Int64):Transform3D;
+		public final native function getVertices(snapshot:RID, index:Int64):PackedVector2Array;
 	}
 	public native class OpenXRStructureBase extends RefCounted {
 		public native function OpenXRStructureBase();
 		public final native function get next():OpenXRStructureBase;
 		public final native function set next(value:OpenXRStructureBase):void;
-		public native function _getHeader(next:Number):Number;
-		public final native function getStructureType():Number;
+		public native function _getHeader(next:Int64):Int64;
+		public final native function getStructureType():Int64;
 	}
 	public native class OpenXRSpatialContextPersistenceConfig extends OpenXRStructureBase {
 		public native function OpenXRSpatialContextPersistenceConfig();
@@ -18199,28 +18199,28 @@ package godot {
 		public final native function createSpatialContext(capabilityConfigurations:GodotArray, next:OpenXRStructureBase = null, userCallback:Function = null):OpenXRFutureResult;
 		public final native function getSpatialContextReady(spatialContext:RID):Boolean;
 		public final native function freeSpatialContext(spatialContext:RID):void;
-		public final native function getSpatialContextHandle(spatialContext:RID):Number;
+		public final native function getSpatialContextHandle(spatialContext:RID):Int64;
 		[Godot(componentData="Array[OpenXRSpatialComponentData]")]
 		public final native function discoverSpatialEntitiesWithComponentData(spatialContext:RID, componentData:GodotArray, next:OpenXRStructureBase = null, userCallback:Function = null):OpenXRFutureResult;
 		public final native function discoverSpatialEntities(spatialContext:RID, componentTypes:PackedInt64Array, next:OpenXRStructureBase = null, userCallback:Function = null):OpenXRFutureResult;
 		[Godot(entities="Array[RID]")]
 		public final native function updateSpatialEntities(spatialContext:RID, entities:GodotArray, componentTypes:PackedInt64Array, next:OpenXRStructureBase = null):RID;
 		public final native function freeSpatialSnapshot(spatialSnapshot:RID):void;
-		public final native function getSpatialSnapshotHandle(spatialSnapshot:RID):Number;
+		public final native function getSpatialSnapshotHandle(spatialSnapshot:RID):Int64;
 		public final native function getSpatialSnapshotContext(spatialSnapshot:RID):RID;
 		[Godot(componentData="Array[OpenXRSpatialComponentData]")]
 		public final native function querySnapshot(spatialSnapshot:RID, componentData:GodotArray, next:OpenXRStructureBase = null):Boolean;
-		public final native function getString(spatialSnapshot:RID, bufferId:Number):String;
-		public final native function getUint8Buffer(spatialSnapshot:RID, bufferId:Number):PackedByteArray;
-		public final native function getUint16Buffer(spatialSnapshot:RID, bufferId:Number):PackedInt32Array;
-		public final native function getUint32Buffer(spatialSnapshot:RID, bufferId:Number):PackedInt32Array;
-		public final native function getFloatBuffer(spatialSnapshot:RID, bufferId:Number):PackedFloat32Array;
-		public final native function getVector2Buffer(spatialSnapshot:RID, bufferId:Number):PackedVector2Array;
-		public final native function getVector3Buffer(spatialSnapshot:RID, bufferId:Number):PackedVector3Array;
-		public final native function findSpatialEntity(entityId:Number):RID;
-		public final native function addSpatialEntity(spatialContext:RID, entityId:Number, entity:Number):RID;
-		public final native function makeSpatialEntity(spatialContext:RID, entityId:Number):RID;
-		public final native function getSpatialEntityId(entity:RID):Number;
+		public final native function getString(spatialSnapshot:RID, bufferId:Int64):String;
+		public final native function getUint8Buffer(spatialSnapshot:RID, bufferId:Int64):PackedByteArray;
+		public final native function getUint16Buffer(spatialSnapshot:RID, bufferId:Int64):PackedInt32Array;
+		public final native function getUint32Buffer(spatialSnapshot:RID, bufferId:Int64):PackedInt32Array;
+		public final native function getFloatBuffer(spatialSnapshot:RID, bufferId:Int64):PackedFloat32Array;
+		public final native function getVector2Buffer(spatialSnapshot:RID, bufferId:Int64):PackedVector2Array;
+		public final native function getVector3Buffer(spatialSnapshot:RID, bufferId:Int64):PackedVector3Array;
+		public final native function findSpatialEntity(entityId:Int64):RID;
+		public final native function addSpatialEntity(spatialContext:RID, entityId:Int64, entity:Int64):RID;
+		public final native function makeSpatialEntity(spatialContext:RID, entityId:Int64):RID;
+		public final native function getSpatialEntityId(entity:RID):Int64;
 		public final native function getSpatialEntityContext(entity:RID):RID;
 		public final native function freeSpatialEntity(entity:RID):void;
 	}
@@ -18243,10 +18243,10 @@ package godot {
 	}
 	public native class OpenXRSpatialQueryResultData extends OpenXRSpatialComponentData {
 		public native function OpenXRSpatialQueryResultData();
-		public final native function getCapacity():Number;
-		public final native function getEntityId(index:Number):Number;
+		public final native function getCapacity():Int64;
+		public final native function getEntityId(index:Int64):Int64;
 		[Godot(returns="enum:OpenXRSpatialEntityTracker.EntityTrackingState")]
-		public final native function getEntityState(index:Number):int;
+		public final native function getEntityState(index:Int64):int;
 	}
 	public native class OpenXRVisibilityMask extends VisualInstance3D {
 		public native function OpenXRVisibilityMask();
@@ -18934,7 +18934,7 @@ package godot {
 		public static native function removeCustomMonitor(id:String):void;
 		public static native function hasCustomMonitor(id:String):Boolean;
 		public static native function getCustomMonitor(id:String):*;
-		public static native function getMonitorModificationTime():Number;
+		public static native function getMonitorModificationTime():Int64;
 		[Godot(returns="Array[String]")]
 		public static native function getCustomMonitorNames():GodotArray;
 		public static native function getCustomMonitorTypes():PackedInt32Array;
@@ -19171,7 +19171,7 @@ package godot {
 		public final native function getContactLocalVelocityAtPosition(contactIdx:int):Vector2;
 		public final native function getContactCollider(contactIdx:int):RID;
 		public final native function getContactColliderPosition(contactIdx:int):Vector2;
-		public final native function getContactColliderId(contactIdx:int):Number;
+		public final native function getContactColliderId(contactIdx:int):Int64;
 		public final native function getContactColliderObject(contactIdx:int):GodotObject;
 		public final native function getContactColliderShape(contactIdx:int):int;
 		public final native function getContactColliderVelocityAtPosition(contactIdx:int):Vector2;
@@ -19221,7 +19221,7 @@ package godot {
 		public native function _getContactLocalVelocityAtPosition(contactIdx:int):Vector2;
 		public native function _getContactCollider(contactIdx:int):RID;
 		public native function _getContactColliderPosition(contactIdx:int):Vector2;
-		public native function _getContactColliderId(contactIdx:int):Number;
+		public native function _getContactColliderId(contactIdx:int):Int64;
 		public native function _getContactColliderObject(contactIdx:int):GodotObject;
 		public native function _getContactColliderShape(contactIdx:int):int;
 		public native function _getContactColliderVelocityAtPosition(contactIdx:int):Vector2;
@@ -19276,7 +19276,7 @@ package godot {
 		public final native function getContactLocalVelocityAtPosition(contactIdx:int):Vector3;
 		public final native function getContactCollider(contactIdx:int):RID;
 		public final native function getContactColliderPosition(contactIdx:int):Vector3;
-		public final native function getContactColliderId(contactIdx:int):Number;
+		public final native function getContactColliderId(contactIdx:int):Int64;
 		public final native function getContactColliderObject(contactIdx:int):GodotObject;
 		public final native function getContactColliderShape(contactIdx:int):int;
 		public final native function getContactColliderVelocityAtPosition(contactIdx:int):Vector3;
@@ -19328,7 +19328,7 @@ package godot {
 		public native function _getContactLocalVelocityAtPosition(contactIdx:int):Vector3;
 		public native function _getContactCollider(contactIdx:int):RID;
 		public native function _getContactColliderPosition(contactIdx:int):Vector3;
-		public native function _getContactColliderId(contactIdx:int):Number;
+		public native function _getContactColliderId(contactIdx:int):Int64;
 		public native function _getContactColliderObject(contactIdx:int):GodotObject;
 		public native function _getContactColliderShape(contactIdx:int):int;
 		public native function _getContactColliderVelocityAtPosition(contactIdx:int):Vector3;
@@ -19384,8 +19384,8 @@ package godot {
 		public native function PhysicsPointQueryParameters2D();
 		public final native function get position():Vector2;
 		public final native function set position(value:Vector2):void;
-		public final native function get canvasInstanceId():Number;
-		public final native function set canvasInstanceId(value:Number):void;
+		public final native function get canvasInstanceId():Int64;
+		public final native function set canvasInstanceId(value:Int64):void;
 		public final native function get collisionMask():uint;
 		public final native function set collisionMask(value:uint):void;
 		[Godot(returns="Array[RID]")]
@@ -19593,10 +19593,10 @@ package godot {
 		[Godot(param="enum:PhysicsServer2D.AreaParameter")]
 		public static native function areaGetParam(area:RID, param:int):*;
 		public static native function areaGetTransform(area:RID):Transform2D;
-		public static native function areaAttachObjectInstanceId(area:RID, id:Number):void;
-		public static native function areaGetObjectInstanceId(area:RID):Number;
-		public static native function areaAttachCanvasInstanceId(area:RID, id:Number):void;
-		public static native function areaGetCanvasInstanceId(area:RID):Number;
+		public static native function areaAttachObjectInstanceId(area:RID, id:Int64):void;
+		public static native function areaGetObjectInstanceId(area:RID):Int64;
+		public static native function areaAttachCanvasInstanceId(area:RID, id:Int64):void;
+		public static native function areaGetCanvasInstanceId(area:RID):Int64;
 		public static native function areaSetMonitorCallback(area:RID, callback:Function):void;
 		public static native function areaSetAreaMonitorCallback(area:RID, callback:Function):void;
 		public static native function areaSetMonitorable(area:RID, monitorable:Boolean):void;
@@ -19617,10 +19617,10 @@ package godot {
 		public static native function bodyClearShapes(body:RID):void;
 		public static native function bodySetShapeDisabled(body:RID, shapeIdx:int, disabled:Boolean):void;
 		public static native function bodySetShapeAsOneWayCollision(body:RID, shapeIdx:int, enable:Boolean, margin:Number, direction:Vector2 = null):void;
-		public static native function bodyAttachObjectInstanceId(body:RID, id:Number):void;
-		public static native function bodyGetObjectInstanceId(body:RID):Number;
-		public static native function bodyAttachCanvasInstanceId(body:RID, id:Number):void;
-		public static native function bodyGetCanvasInstanceId(body:RID):Number;
+		public static native function bodyAttachObjectInstanceId(body:RID, id:Int64):void;
+		public static native function bodyGetObjectInstanceId(body:RID):Int64;
+		public static native function bodyAttachCanvasInstanceId(body:RID, id:Int64):void;
+		public static native function bodyGetCanvasInstanceId(body:RID):Int64;
 		[Godot(mode="enum:PhysicsServer2D.CCDMode")]
 		public static native function bodySetContinuousCollisionDetectionMode(body:RID, mode:int):void;
 		[Godot(returns="enum:PhysicsServer2D.CCDMode")]
@@ -19733,10 +19733,10 @@ package godot {
 		public native function _areaGetShapeTransform(area:RID, shapeIdx:int):Transform2D;
 		public native function _areaRemoveShape(area:RID, shapeIdx:int):void;
 		public native function _areaClearShapes(area:RID):void;
-		public native function _areaAttachObjectInstanceId(area:RID, id:Number):void;
-		public native function _areaGetObjectInstanceId(area:RID):Number;
-		public native function _areaAttachCanvasInstanceId(area:RID, id:Number):void;
-		public native function _areaGetCanvasInstanceId(area:RID):Number;
+		public native function _areaAttachObjectInstanceId(area:RID, id:Int64):void;
+		public native function _areaGetObjectInstanceId(area:RID):Int64;
+		public native function _areaAttachCanvasInstanceId(area:RID, id:Int64):void;
+		public native function _areaGetCanvasInstanceId(area:RID):Int64;
 		[Godot(param="enum:PhysicsServer2D.AreaParameter")]
 		public native function _areaSetParam(area:RID, param:int, value:*):void;
 		public native function _areaSetTransform(area:RID, transform:Transform2D):void;
@@ -19768,10 +19768,10 @@ package godot {
 		public native function _bodySetShapeAsOneWayCollision(body:RID, shapeIdx:int, enable:Boolean, margin:Number, direction:Vector2):void;
 		public native function _bodyRemoveShape(body:RID, shapeIdx:int):void;
 		public native function _bodyClearShapes(body:RID):void;
-		public native function _bodyAttachObjectInstanceId(body:RID, id:Number):void;
-		public native function _bodyGetObjectInstanceId(body:RID):Number;
-		public native function _bodyAttachCanvasInstanceId(body:RID, id:Number):void;
-		public native function _bodyGetCanvasInstanceId(body:RID):Number;
+		public native function _bodyAttachObjectInstanceId(body:RID, id:Int64):void;
+		public native function _bodyGetObjectInstanceId(body:RID):Int64;
+		public native function _bodyAttachCanvasInstanceId(body:RID, id:Int64):void;
+		public native function _bodyGetCanvasInstanceId(body:RID):Int64;
 		[Godot(mode="enum:PhysicsServer2D.CCDMode")]
 		public native function _bodySetContinuousCollisionDetectionMode(body:RID, mode:int):void;
 		[Godot(returns="enum:PhysicsServer2D.CCDMode")]
@@ -19856,7 +19856,7 @@ package godot {
 		[Godot(processInfo="enum:PhysicsServer2D.ProcessInfo")]
 		public native function _getProcessInfo(processInfo:int):int;
 		public final native function bodyTestMotionIsExcludingBody(body:RID):Boolean;
-		public final native function bodyTestMotionIsExcludingObject(object:Number):Boolean;
+		public final native function bodyTestMotionIsExcludingObject(object:Int64):Boolean;
 	}
 	[Singleton]
 	public native class PhysicsServer2DManager extends GodotObject {
@@ -20082,8 +20082,8 @@ package godot {
 		[Godot(param="enum:PhysicsServer3D.AreaParameter")]
 		public static native function areaGetParam(area:RID, param:int):*;
 		public static native function areaGetTransform(area:RID):Transform3D;
-		public static native function areaAttachObjectInstanceId(area:RID, id:Number):void;
-		public static native function areaGetObjectInstanceId(area:RID):Number;
+		public static native function areaAttachObjectInstanceId(area:RID, id:Int64):void;
+		public static native function areaGetObjectInstanceId(area:RID):Int64;
 		public static native function areaSetMonitorCallback(area:RID, callback:Function):void;
 		public static native function areaSetAreaMonitorCallback(area:RID, callback:Function):void;
 		public static native function areaSetMonitorable(area:RID, monitorable:Boolean):void;
@@ -20110,8 +20110,8 @@ package godot {
 		public static native function bodyGetShapeTransform(body:RID, shapeIdx:int):Transform3D;
 		public static native function bodyRemoveShape(body:RID, shapeIdx:int):void;
 		public static native function bodyClearShapes(body:RID):void;
-		public static native function bodyAttachObjectInstanceId(body:RID, id:Number):void;
-		public static native function bodyGetObjectInstanceId(body:RID):Number;
+		public static native function bodyAttachObjectInstanceId(body:RID, id:Int64):void;
+		public static native function bodyGetObjectInstanceId(body:RID):Int64;
 		public static native function bodySetEnableContinuousCollisionDetection(body:RID, enable:Boolean):void;
 		public static native function bodyIsContinuousCollisionDetectionEnabled(body:RID):Boolean;
 		[Godot(param="enum:PhysicsServer3D.BodyParameter")]
@@ -20286,8 +20286,8 @@ package godot {
 		public native function _areaGetShapeTransform(area:RID, shapeIdx:int):Transform3D;
 		public native function _areaRemoveShape(area:RID, shapeIdx:int):void;
 		public native function _areaClearShapes(area:RID):void;
-		public native function _areaAttachObjectInstanceId(area:RID, id:Number):void;
-		public native function _areaGetObjectInstanceId(area:RID):Number;
+		public native function _areaAttachObjectInstanceId(area:RID, id:Int64):void;
+		public native function _areaGetObjectInstanceId(area:RID):Int64;
 		[Godot(param="enum:PhysicsServer3D.AreaParameter")]
 		public native function _areaSetParam(area:RID, param:int, value:*):void;
 		public native function _areaSetTransform(area:RID, transform:Transform3D):void;
@@ -20318,8 +20318,8 @@ package godot {
 		public native function _bodyGetShapeTransform(body:RID, shapeIdx:int):Transform3D;
 		public native function _bodyRemoveShape(body:RID, shapeIdx:int):void;
 		public native function _bodyClearShapes(body:RID):void;
-		public native function _bodyAttachObjectInstanceId(body:RID, id:Number):void;
-		public native function _bodyGetObjectInstanceId(body:RID):Number;
+		public native function _bodyAttachObjectInstanceId(body:RID, id:Int64):void;
+		public native function _bodyGetObjectInstanceId(body:RID):Int64;
 		public native function _bodySetEnableContinuousCollisionDetection(body:RID, enable:Boolean):void;
 		public native function _bodyIsContinuousCollisionDetectionEnabled(body:RID):Boolean;
 		public native function _bodySetCollisionLayer(body:RID, layer:uint):void;
@@ -20472,7 +20472,7 @@ package godot {
 		[Godot(processInfo="enum:PhysicsServer3D.ProcessInfo")]
 		public native function _getProcessInfo(processInfo:int):int;
 		public final native function bodyTestMotionIsExcludingBody(body:RID):Boolean;
-		public final native function bodyTestMotionIsExcludingObject(object:Number):Boolean;
+		public final native function bodyTestMotionIsExcludingObject(object:Int64):Boolean;
 	}
 	[Singleton]
 	public native class PhysicsServer3DManager extends GodotObject {
@@ -20581,7 +20581,7 @@ package godot {
 		public final native function getCollisionPoint():Vector2;
 		public final native function getCollisionNormal():Vector2;
 		public final native function getColliderVelocity():Vector2;
-		public final native function getColliderId():Number;
+		public final native function getColliderId():Int64;
 		public final native function getColliderRid():RID;
 		public final native function getCollider():GodotObject;
 		public final native function getColliderShape():int;
@@ -20600,7 +20600,7 @@ package godot {
 		public final native function getCollisionPoint(collisionIndex:int = 0):Vector3;
 		public final native function getCollisionNormal(collisionIndex:int = 0):Vector3;
 		public final native function getColliderVelocity(collisionIndex:int = 0):Vector3;
-		public final native function getColliderId(collisionIndex:int = 0):Number;
+		public final native function getColliderId(collisionIndex:int = 0):Int64;
 		public final native function getColliderRid(collisionIndex:int = 0):RID;
 		public final native function getCollider(collisionIndex:int = 0):GodotObject;
 		public final native function getColliderShape(collisionIndex:int = 0):int;
@@ -21053,8 +21053,8 @@ package godot {
 		public final native function set id(value:uint):void;
 		public final native function get mask():uint;
 		public final native function set mask(value:uint):void;
-		public final native function get hitSbtRange():Number;
-		public final native function set hitSbtRange(value:Number):void;
+		public final native function get hitSbtRange():Int64;
+		public final native function set hitSbtRange(value:Int64):void;
 		[Godot(returns="bitfield:RenderingDevice.AccelerationStructureInstanceFlagBits")]
 		public final native function get flags():int;
 		public final native function set flags(value:int):void;
@@ -21466,16 +21466,16 @@ package godot {
 	}
 	public native class RandomNumberGenerator extends RefCounted {
 		public native function RandomNumberGenerator();
-		public final native function get seed():Number;
-		public final native function set seed(value:Number):void;
-		public final native function get state():Number;
-		public final native function set state(value:Number):void;
+		public final native function get seed():Int64;
+		public final native function set seed(value:Int64):void;
+		public final native function get state():Int64;
+		public final native function set state(value:Int64):void;
 		public final native function randi():uint;
 		public final native function randf():Number;
 		public final native function randfn(mean:Number = 0.0, deviation:Number = 1.0):Number;
 		public final native function randfRange(from:Number, to:Number):Number;
 		public final native function randiRange(from:int, to:int):int;
-		public final native function randWeighted(weights:PackedFloat32Array):Number;
+		public final native function randWeighted(weights:PackedFloat32Array):Int64;
 		public final native function randomize():void;
 	}
 	public native class RayCast2D extends Node2D {
@@ -22389,7 +22389,7 @@ package godot {
 		[Godot(sliceType="enum:RenderingDevice.TextureSliceType")]
 		public final native function textureCreateSharedFromSlice(view:RDTextureView, withTexture:RID, layer:uint, mipmap:uint, mipmaps:uint = 1, sliceType:int = 0):RID;
 		[Godot(type="enum:RenderingDevice.TextureType", format="enum:RenderingDevice.DataFormat", samples="enum:RenderingDevice.TextureSamples", usageFlags="bitfield:RenderingDevice.TextureUsageBits")]
-		public final native function textureCreateFromExtension(type:int, format:int, samples:int, usageFlags:int, image:Number, width:Number, height:Number, depth:Number, layers:Number, mipmaps:Number = 1):RID;
+		public final native function textureCreateFromExtension(type:int, format:int, samples:int, usageFlags:int, image:Int64, width:Int64, height:Int64, depth:Int64, layers:Int64, mipmaps:Int64 = 1):RID;
 		[Godot(returns="enum:GodotError")]
 		public final native function textureUpdate(texture:RID, layer:uint, data:PackedByteArray):int;
 		public final native function textureGetData(texture:RID, layer:uint):PackedByteArray;
@@ -22408,22 +22408,22 @@ package godot {
 		[Godot(returns="enum:GodotError")]
 		public final native function textureResolveMultisample(fromTexture:RID, toTexture:RID):int;
 		public final native function textureGetFormat(texture:RID):RDTextureFormat;
-		public final native function textureGetNativeHandle(texture:RID):Number;
+		public final native function textureGetNativeHandle(texture:RID):Int64;
 		[Godot(attachments="Array[RDAttachmentFormat]")]
-		public final native function framebufferFormatCreate(attachments:GodotArray, viewCount:uint = 1):Number;
+		public final native function framebufferFormatCreate(attachments:GodotArray, viewCount:uint = 1):Int64;
 		[Godot(attachments="Array[RDAttachmentFormat]", passes="Array[RDFramebufferPass]")]
-		public final native function framebufferFormatCreateMultipass(attachments:GodotArray, passes:GodotArray, viewCount:uint = 1):Number;
+		public final native function framebufferFormatCreateMultipass(attachments:GodotArray, passes:GodotArray, viewCount:uint = 1):Int64;
 		[Godot(samples="enum:RenderingDevice.TextureSamples")]
-		public final native function framebufferFormatCreateEmpty(samples:int = 0):Number;
+		public final native function framebufferFormatCreateEmpty(samples:int = 0):Int64;
 		[Godot(returns="enum:RenderingDevice.TextureSamples")]
-		public final native function framebufferFormatGetTextureSamples(format:Number, renderPass:uint = 0):int;
+		public final native function framebufferFormatGetTextureSamples(format:Int64, renderPass:uint = 0):int;
 		[Godot(textures="Array[RID]")]
-		public final native function framebufferCreate(textures:GodotArray, validateWithFormat:Number = -1, viewCount:uint = 1):RID;
+		public final native function framebufferCreate(textures:GodotArray, validateWithFormat:Int64 = -1, viewCount:uint = 1):RID;
 		[Godot(textures="Array[RID]", passes="Array[RDFramebufferPass]")]
-		public final native function framebufferCreateMultipass(textures:GodotArray, passes:GodotArray, validateWithFormat:Number = -1, viewCount:uint = 1):RID;
+		public final native function framebufferCreateMultipass(textures:GodotArray, passes:GodotArray, validateWithFormat:Int64 = -1, viewCount:uint = 1):RID;
 		[Godot(samples="enum:RenderingDevice.TextureSamples")]
-		public final native function framebufferCreateEmpty(size:Vector2i, samples:int = 0, validateWithFormat:Number = -1):RID;
-		public final native function framebufferGetFormat(framebuffer:RID):Number;
+		public final native function framebufferCreateEmpty(size:Vector2i, samples:int = 0, validateWithFormat:Int64 = -1):RID;
+		public final native function framebufferGetFormat(framebuffer:RID):Int64;
 		public final native function framebufferIsValid(framebuffer:RID):Boolean;
 		public final native function samplerCreate(state:RDSamplerState):RID;
 		[Godot(format="enum:RenderingDevice.DataFormat", samplerFilter="enum:RenderingDevice.SamplerFilter")]
@@ -22431,9 +22431,9 @@ package godot {
 		[Godot(creationBits="bitfield:RenderingDevice.BufferCreationBits")]
 		public final native function vertexBufferCreate(sizeBytes:uint, data:PackedByteArray = null, creationBits:int = 0):RID;
 		[Godot(vertexDescriptions="Array[RDVertexAttribute]")]
-		public final native function vertexFormatCreate(vertexDescriptions:GodotArray):Number;
+		public final native function vertexFormatCreate(vertexDescriptions:GodotArray):Int64;
 		[Godot(srcBuffers="Array[RID]")]
-		public final native function vertexArrayCreate(vertexCount:uint, vertexFormat:Number, srcBuffers:GodotArray, offsets:PackedInt64Array = null):RID;
+		public final native function vertexArrayCreate(vertexCount:uint, vertexFormat:Int64, srcBuffers:GodotArray, offsets:PackedInt64Array = null):RID;
 		[Godot(format="enum:RenderingDevice.IndexBufferFormat", creationBits="bitfield:RenderingDevice.BufferCreationBits")]
 		public final native function indexBufferCreate(sizeIndices:uint, format:int, data:PackedByteArray = null, useRestartIndices:Boolean = false, creationBits:int = 0):RID;
 		public final native function indexArrayCreate(indexBuffer:RID, indexOffset:uint, indexCount:uint):RID;
@@ -22442,7 +22442,7 @@ package godot {
 		public final native function shaderCreateFromSpirv(spirvData:RDShaderSPIRV, name:String = ""):RID;
 		public final native function shaderCreateFromBytecode(binaryData:PackedByteArray, placeholderRid:RID = null):RID;
 		public final native function shaderCreatePlaceholder():RID;
-		public final native function shaderGetVertexInputAttributeMask(shader:RID):Number;
+		public final native function shaderGetVertexInputAttributeMask(shader:RID):Int64;
 		[Godot(creationBits="bitfield:RenderingDevice.BufferCreationBits")]
 		public final native function uniformBufferCreate(sizeBytes:uint, data:PackedByteArray = null, creationBits:int = 0):RID;
 		[Godot(usage="bitfield:RenderingDevice.StorageBufferUsage", creationBits="bitfield:RenderingDevice.BufferCreationBits")]
@@ -22461,9 +22461,9 @@ package godot {
 		public final native function bufferGetData(buffer:RID, offsetBytes:uint = 0, sizeBytes:uint = 0):PackedByteArray;
 		[Godot(returns="enum:GodotError")]
 		public final native function bufferGetDataAsync(buffer:RID, callback:Function, offsetBytes:uint = 0, sizeBytes:uint = 0):int;
-		public final native function bufferGetDeviceAddress(buffer:RID):Number;
+		public final native function bufferGetDeviceAddress(buffer:RID):Int64;
 		[Godot(primitive="enum:RenderingDevice.RenderPrimitive", dynamicStateFlags="bitfield:RenderingDevice.PipelineDynamicStateFlags", specializationConstants="Array[RDPipelineSpecializationConstant]")]
-		public final native function renderPipelineCreate(shader:RID, framebufferFormat:Number, vertexFormat:Number, primitive:int, rasterizationState:RDPipelineRasterizationState, multisampleState:RDPipelineMultisampleState, stencilState:RDPipelineDepthStencilState, colorBlendState:RDPipelineColorBlendState, dynamicStateFlags:int = 0, forRenderPass:uint = 0, specializationConstants:GodotArray = null):RID;
+		public final native function renderPipelineCreate(shader:RID, framebufferFormat:Int64, vertexFormat:Int64, primitive:int, rasterizationState:RDPipelineRasterizationState, multisampleState:RDPipelineMultisampleState, stencilState:RDPipelineDepthStencilState, colorBlendState:RDPipelineColorBlendState, dynamicStateFlags:int = 0, forRenderPass:uint = 0, specializationConstants:GodotArray = null):RID;
 		public final native function renderPipelineIsValid(renderPipeline:RID):Boolean;
 		[Godot(specializationConstants="Array[RDPipelineSpecializationConstant]")]
 		public final native function computePipelineCreate(shader:RID, specializationConstants:GodotArray = null):RID;
@@ -22482,59 +22482,59 @@ package godot {
 		public final native function hitSbtCreate(raytracingPipeline:RID, initialHitGroupCapacity:uint):RID;
 		[Godot(returns="enum:GodotError")]
 		public final native function hitSbtSetPipeline(hitSbt:RID, raytracingPipeline:RID):int;
-		public final native function hitSbtRangeAlloc(hitSbt:RID, hitGroupCount:uint):Number;
+		public final native function hitSbtRangeAlloc(hitSbt:RID, hitGroupCount:uint):Int64;
 		[Godot(returns="enum:GodotError")]
-		public final native function hitSbtRangeFree(hitSbt:RID, range:Number):int;
+		public final native function hitSbtRangeFree(hitSbt:RID, range:Int64):int;
 		[Godot(returns="enum:GodotError")]
-		public final native function hitSbtRangeUpdate(hitSbt:RID, range:Number, offset:uint, hitGroupIndices:PackedInt32Array):int;
+		public final native function hitSbtRangeUpdate(hitSbt:RID, range:Int64, offset:uint, hitGroupIndices:PackedInt32Array):int;
 		public final native function screenGetWidth(screen:int = 0):int;
 		public final native function screenGetHeight(screen:int = 0):int;
-		public final native function screenGetFramebufferFormat(screen:int = 0):Number;
-		public final native function drawListBeginForScreen(screen:int = 0, clearColor:Color = null):Number;
+		public final native function screenGetFramebufferFormat(screen:int = 0):Int64;
+		public final native function drawListBeginForScreen(screen:int = 0, clearColor:Color = null):Int64;
 		[Godot(drawFlags="bitfield:RenderingDevice.DrawFlags")]
-		public final native function drawListBegin(framebuffer:RID, drawFlags:int = 0, clearColorValues:PackedColorArray = null, clearDepthValue:Number = 1.0, clearStencilValue:uint = 0, region:Rect2 = null, breadcrumb:uint = 0):Number;
+		public final native function drawListBegin(framebuffer:RID, drawFlags:int = 0, clearColorValues:PackedColorArray = null, clearDepthValue:Number = 1.0, clearStencilValue:uint = 0, region:Rect2 = null, breadcrumb:uint = 0):Int64;
 		[Godot(initialColorAction="enum:RenderingDevice.InitialAction", finalColorAction="enum:RenderingDevice.FinalAction", initialDepthAction="enum:RenderingDevice.InitialAction", finalDepthAction="enum:RenderingDevice.FinalAction", storageTextures="Array[RID]")]
 		public final native function drawListBeginSplit(framebuffer:RID, splits:uint, initialColorAction:int, finalColorAction:int, initialDepthAction:int, finalDepthAction:int, clearColorValues:PackedColorArray = null, clearDepth:Number = 1.0, clearStencil:uint = 0, region:Rect2 = null, storageTextures:GodotArray = null):PackedInt64Array;
-		public final native function drawListSetBlendConstants(drawList:Number, color:Color):void;
-		public final native function drawListBindRenderPipeline(drawList:Number, renderPipeline:RID):void;
-		public final native function drawListBindUniformSet(drawList:Number, uniformSet:RID, setIndex:uint):void;
-		public final native function drawListBindVertexArray(drawList:Number, vertexArray:RID):void;
+		public final native function drawListSetBlendConstants(drawList:Int64, color:Color):void;
+		public final native function drawListBindRenderPipeline(drawList:Int64, renderPipeline:RID):void;
+		public final native function drawListBindUniformSet(drawList:Int64, uniformSet:RID, setIndex:uint):void;
+		public final native function drawListBindVertexArray(drawList:Int64, vertexArray:RID):void;
 		[Godot(vertexBuffers="Array[RID]")]
-		public final native function drawListBindVertexBuffersFormat(drawList:Number, vertexFormat:Number, vertexCount:uint, vertexBuffers:GodotArray, offsets:PackedInt64Array = null):void;
-		public final native function drawListBindIndexArray(drawList:Number, indexArray:RID):void;
-		public final native function drawListSetPushConstant(drawList:Number, buffer:PackedByteArray, sizeBytes:uint):void;
-		public final native function drawListDraw(drawList:Number, useIndices:Boolean, instances:uint, proceduralVertexCount:uint = 0):void;
-		public final native function drawListDrawIndirect(drawList:Number, useIndices:Boolean, buffer:RID, offset:uint = 0, drawCount:uint = 1, stride:uint = 0):void;
-		public final native function drawListEnableScissor(drawList:Number, rect:Rect2 = null):void;
-		public final native function drawListDisableScissor(drawList:Number):void;
-		public final native function drawListSwitchToNextPass():Number;
+		public final native function drawListBindVertexBuffersFormat(drawList:Int64, vertexFormat:Int64, vertexCount:uint, vertexBuffers:GodotArray, offsets:PackedInt64Array = null):void;
+		public final native function drawListBindIndexArray(drawList:Int64, indexArray:RID):void;
+		public final native function drawListSetPushConstant(drawList:Int64, buffer:PackedByteArray, sizeBytes:uint):void;
+		public final native function drawListDraw(drawList:Int64, useIndices:Boolean, instances:uint, proceduralVertexCount:uint = 0):void;
+		public final native function drawListDrawIndirect(drawList:Int64, useIndices:Boolean, buffer:RID, offset:uint = 0, drawCount:uint = 1, stride:uint = 0):void;
+		public final native function drawListEnableScissor(drawList:Int64, rect:Rect2 = null):void;
+		public final native function drawListDisableScissor(drawList:Int64):void;
+		public final native function drawListSwitchToNextPass():Int64;
 		public final native function drawListSwitchToNextPassSplit(splits:uint):PackedInt64Array;
 		public final native function drawListEnd():void;
-		public final native function computeListBegin():Number;
-		public final native function computeListBindComputePipeline(computeList:Number, computePipeline:RID):void;
-		public final native function computeListSetPushConstant(computeList:Number, buffer:PackedByteArray, sizeBytes:uint):void;
-		public final native function computeListBindUniformSet(computeList:Number, uniformSet:RID, setIndex:uint):void;
-		public final native function computeListDispatch(computeList:Number, xGroups:uint, yGroups:uint, zGroups:uint):void;
-		public final native function computeListDispatchIndirect(computeList:Number, buffer:RID, offset:uint):void;
-		public final native function computeListAddBarrier(computeList:Number):void;
+		public final native function computeListBegin():Int64;
+		public final native function computeListBindComputePipeline(computeList:Int64, computePipeline:RID):void;
+		public final native function computeListSetPushConstant(computeList:Int64, buffer:PackedByteArray, sizeBytes:uint):void;
+		public final native function computeListBindUniformSet(computeList:Int64, uniformSet:RID, setIndex:uint):void;
+		public final native function computeListDispatch(computeList:Int64, xGroups:uint, yGroups:uint, zGroups:uint):void;
+		public final native function computeListDispatchIndirect(computeList:Int64, buffer:RID, offset:uint):void;
+		public final native function computeListAddBarrier(computeList:Int64):void;
 		public final native function computeListEnd():void;
-		public final native function raytracingListBegin():Number;
-		public final native function raytracingListBindRaytracingPipeline(raytracingList:Number, raytracingPipeline:RID):void;
-		public final native function raytracingListSetPushConstant(raytracingList:Number, buffer:PackedByteArray, sizeBytes:uint):void;
-		public final native function raytracingListBindUniformSet(raytracingList:Number, uniformSet:RID, setIndex:uint):void;
-		public final native function raytracingListTraceRays(raytracingList:Number, raygenShaderIndex:uint, hitSbt:RID, width:uint, height:uint, depth:uint):void;
+		public final native function raytracingListBegin():Int64;
+		public final native function raytracingListBindRaytracingPipeline(raytracingList:Int64, raytracingPipeline:RID):void;
+		public final native function raytracingListSetPushConstant(raytracingList:Int64, buffer:PackedByteArray, sizeBytes:uint):void;
+		public final native function raytracingListBindUniformSet(raytracingList:Int64, uniformSet:RID, setIndex:uint):void;
+		public final native function raytracingListTraceRays(raytracingList:Int64, raygenShaderIndex:uint, hitSbt:RID, width:uint, height:uint, depth:uint):void;
 		public final native function raytracingListEnd():void;
 		public final native function freeRid(rid:RID):void;
 		public final native function captureTimestamp(name:String):void;
 		public final native function getCapturedTimestampsCount():uint;
-		public final native function getCapturedTimestampsFrame():Number;
-		public final native function getCapturedTimestampGpuTime(index:uint):Number;
-		public final native function getCapturedTimestampCpuTime(index:uint):Number;
+		public final native function getCapturedTimestampsFrame():Int64;
+		public final native function getCapturedTimestampGpuTime(index:uint):Int64;
+		public final native function getCapturedTimestampCpuTime(index:uint):Int64;
 		public final native function getCapturedTimestampName(index:uint):String;
 		[Godot(feature="enum:RenderingDevice.Features")]
 		public final native function hasFeature(feature:int):Boolean;
 		[Godot(limit="enum:RenderingDevice.Limit")]
-		public final native function limitGet(limit:int):Number;
+		public final native function limitGet(limit:int):Int64;
 		public final native function getFrameDelay():uint;
 		public final native function submit():void;
 		public final native function sync():void;
@@ -22550,21 +22550,21 @@ package godot {
 		public final native function getDeviceName():String;
 		public final native function getDevicePipelineCacheUuid():String;
 		[Godot(type="enum:RenderingDevice.MemoryType")]
-		public final native function getMemoryUsage(type:int):Number;
+		public final native function getMemoryUsage(type:int):Int64;
 		[Godot(resource="enum:RenderingDevice.DriverResource")]
-		public final native function getDriverResource(resource:int, rid:RID, index:Number):Number;
+		public final native function getDriverResource(resource:int, rid:RID, index:Int64):Int64;
 		public final native function getPerfReport():String;
 		public final native function getDriverAndDeviceMemoryReport():String;
 		public final native function getTrackedObjectName(typeIndex:uint):String;
-		public final native function getTrackedObjectTypeCount():Number;
-		public final native function getDriverTotalMemory():Number;
-		public final native function getDriverAllocationCount():Number;
-		public final native function getDriverMemoryByObjectType(type:uint):Number;
-		public final native function getDriverAllocsByObjectType(type:uint):Number;
-		public final native function getDeviceTotalMemory():Number;
-		public final native function getDeviceAllocationCount():Number;
-		public final native function getDeviceMemoryByObjectType(type:uint):Number;
-		public final native function getDeviceAllocsByObjectType(type:uint):Number;
+		public final native function getTrackedObjectTypeCount():Int64;
+		public final native function getDriverTotalMemory():Int64;
+		public final native function getDriverAllocationCount():Int64;
+		public final native function getDriverMemoryByObjectType(type:uint):Int64;
+		public final native function getDriverAllocsByObjectType(type:uint):Int64;
+		public final native function getDeviceTotalMemory():Int64;
+		public final native function getDeviceAllocationCount():Int64;
+		public final native function getDeviceMemoryByObjectType(type:uint):Int64;
+		public final native function getDeviceAllocsByObjectType(type:uint):Int64;
 	}
 	[GodotEnum(name="TextureType", values="TEXTURE_TYPE_2D,TEXTURE_TYPE_LAYERED,TEXTURE_TYPE_3D")]
 	[GodotEnum(name="TextureLayeredType", values="TEXTURE_LAYERED_2D_ARRAY,TEXTURE_LAYERED_CUBEMAP,TEXTURE_LAYERED_CUBEMAP_ARRAY")]
@@ -22701,39 +22701,39 @@ package godot {
 		public static const ARRAY_CUSTOM_RGB_FLOAT:int = 6;
 		public static const ARRAY_CUSTOM_RGBA_FLOAT:int = 7;
 		public static const ARRAY_CUSTOM_MAX:int = 8;
-		public static const ARRAY_FORMAT_VERTEX:Number = 1;
-		public static const ARRAY_FORMAT_NORMAL:Number = 2;
-		public static const ARRAY_FORMAT_TANGENT:Number = 4;
-		public static const ARRAY_FORMAT_COLOR:Number = 8;
-		public static const ARRAY_FORMAT_TEX_UV:Number = 16;
-		public static const ARRAY_FORMAT_TEX_UV2:Number = 32;
-		public static const ARRAY_FORMAT_CUSTOM0:Number = 64;
-		public static const ARRAY_FORMAT_CUSTOM1:Number = 128;
-		public static const ARRAY_FORMAT_CUSTOM2:Number = 256;
-		public static const ARRAY_FORMAT_CUSTOM3:Number = 512;
-		public static const ARRAY_FORMAT_BONES:Number = 1024;
-		public static const ARRAY_FORMAT_WEIGHTS:Number = 2048;
-		public static const ARRAY_FORMAT_INDEX:Number = 4096;
-		public static const ARRAY_FORMAT_BLEND_SHAPE_MASK:Number = 7;
-		public static const ARRAY_FORMAT_CUSTOM_BASE:Number = 13;
-		public static const ARRAY_FORMAT_CUSTOM_BITS:Number = 3;
-		public static const ARRAY_FORMAT_CUSTOM0_SHIFT:Number = 13;
-		public static const ARRAY_FORMAT_CUSTOM1_SHIFT:Number = 16;
-		public static const ARRAY_FORMAT_CUSTOM2_SHIFT:Number = 19;
-		public static const ARRAY_FORMAT_CUSTOM3_SHIFT:Number = 22;
-		public static const ARRAY_FORMAT_CUSTOM_MASK:Number = 7;
-		public static const ARRAY_COMPRESS_FLAGS_BASE:Number = 25;
-		public static const ARRAY_FLAG_USE_2D_VERTICES:Number = 33554432;
-		public static const ARRAY_FLAG_USE_DYNAMIC_UPDATE:Number = 67108864;
-		public static const ARRAY_FLAG_USE_8_BONE_WEIGHTS:Number = 134217728;
-		public static const ARRAY_FLAG_USES_EMPTY_VERTEX_ARRAY:Number = 268435456;
-		public static const ARRAY_FLAG_COMPRESS_ATTRIBUTES:Number = 536870912;
-		public static const ARRAY_FLAG_FORMAT_VERSION_BASE:Number = 35;
-		public static const ARRAY_FLAG_FORMAT_VERSION_SHIFT:Number = 35;
-		public static const ARRAY_FLAG_FORMAT_VERSION_1:Number = 0;
-		public static const ARRAY_FLAG_FORMAT_VERSION_2:Number = 34359738368;
-		public static const ARRAY_FLAG_FORMAT_CURRENT_VERSION:Number = 34359738368;
-		public static const ARRAY_FLAG_FORMAT_VERSION_MASK:Number = 255;
+		public static const ARRAY_FORMAT_VERTEX:Int64 = 1;
+		public static const ARRAY_FORMAT_NORMAL:Int64 = 2;
+		public static const ARRAY_FORMAT_TANGENT:Int64 = 4;
+		public static const ARRAY_FORMAT_COLOR:Int64 = 8;
+		public static const ARRAY_FORMAT_TEX_UV:Int64 = 16;
+		public static const ARRAY_FORMAT_TEX_UV2:Int64 = 32;
+		public static const ARRAY_FORMAT_CUSTOM0:Int64 = 64;
+		public static const ARRAY_FORMAT_CUSTOM1:Int64 = 128;
+		public static const ARRAY_FORMAT_CUSTOM2:Int64 = 256;
+		public static const ARRAY_FORMAT_CUSTOM3:Int64 = 512;
+		public static const ARRAY_FORMAT_BONES:Int64 = 1024;
+		public static const ARRAY_FORMAT_WEIGHTS:Int64 = 2048;
+		public static const ARRAY_FORMAT_INDEX:Int64 = 4096;
+		public static const ARRAY_FORMAT_BLEND_SHAPE_MASK:Int64 = 7;
+		public static const ARRAY_FORMAT_CUSTOM_BASE:Int64 = 13;
+		public static const ARRAY_FORMAT_CUSTOM_BITS:Int64 = 3;
+		public static const ARRAY_FORMAT_CUSTOM0_SHIFT:Int64 = 13;
+		public static const ARRAY_FORMAT_CUSTOM1_SHIFT:Int64 = 16;
+		public static const ARRAY_FORMAT_CUSTOM2_SHIFT:Int64 = 19;
+		public static const ARRAY_FORMAT_CUSTOM3_SHIFT:Int64 = 22;
+		public static const ARRAY_FORMAT_CUSTOM_MASK:Int64 = 7;
+		public static const ARRAY_COMPRESS_FLAGS_BASE:Int64 = 25;
+		public static const ARRAY_FLAG_USE_2D_VERTICES:Int64 = 33554432;
+		public static const ARRAY_FLAG_USE_DYNAMIC_UPDATE:Int64 = 67108864;
+		public static const ARRAY_FLAG_USE_8_BONE_WEIGHTS:Int64 = 134217728;
+		public static const ARRAY_FLAG_USES_EMPTY_VERTEX_ARRAY:Int64 = 268435456;
+		public static const ARRAY_FLAG_COMPRESS_ATTRIBUTES:Int64 = 536870912;
+		public static const ARRAY_FLAG_FORMAT_VERSION_BASE:Int64 = 35;
+		public static const ARRAY_FLAG_FORMAT_VERSION_SHIFT:Int64 = 35;
+		public static const ARRAY_FLAG_FORMAT_VERSION_1:Int64 = 0;
+		public static const ARRAY_FLAG_FORMAT_VERSION_2:Int64 = 34359738368;
+		public static const ARRAY_FLAG_FORMAT_CURRENT_VERSION:Int64 = 34359738368;
+		public static const ARRAY_FLAG_FORMAT_VERSION_MASK:Int64 = 255;
 		public static const PRIMITIVE_POINTS:int = 0;
 		public static const PRIMITIVE_LINES:int = 1;
 		public static const PRIMITIVE_LINE_STRIP:int = 2;
@@ -23182,7 +23182,7 @@ package godot {
 		public static native function texture3dCreate(format:int, width:int, height:int, depth:int, mipmaps:Boolean, data:GodotArray):RID;
 		public static native function textureProxyCreate(base:RID):RID;
 		[Godot(type="enum:RenderingServer.TextureType", format="enum:Image.Format", layeredType="enum:RenderingServer.TextureLayeredType")]
-		public static native function textureCreateFromNativeHandle(type:int, format:int, nativeHandle:Number, width:int, height:int, depth:int, layers:int = 1, layeredType:int = 0):RID;
+		public static native function textureCreateFromNativeHandle(type:int, format:int, nativeHandle:Int64, width:int, height:int, depth:int, layers:int = 1, layeredType:int = 0):RID;
 		[Godot(format="enum:RenderingServer.TextureDrawableFormat")]
 		public static native function textureDrawableCreate(width:int, height:int, format:int, color:Color = null, withMipmaps:Boolean = false):RID;
 		public static native function texture2dUpdate(texture:RID, image:Image, layer:int):void;
@@ -23211,7 +23211,7 @@ package godot {
 		[Godot(layerType="enum:RenderingServer.TextureLayeredType")]
 		public static native function textureRdCreate(rdTexture:RID, layerType:int = 0):RID;
 		public static native function textureGetRdTexture(texture:RID, srgb:Boolean = false):RID;
-		public static native function textureGetNativeHandle(texture:RID, srgb:Boolean = false):Number;
+		public static native function textureGetNativeHandle(texture:RID, srgb:Boolean = false):Int64;
 		public static native function shaderCreate():RID;
 		public static native function shaderSetCode(shader:RID, code:String):void;
 		public static native function shaderSetPathHint(shader:RID, path:String):void;
@@ -23232,20 +23232,20 @@ package godot {
 		public static native function meshCreateFromSurfaces(surfaces:GodotArray, blendShapeCount:int = 0):RID;
 		public static native function meshCreate():RID;
 		[Godot(format="bitfield:RenderingServer.ArrayFormat")]
-		public static native function meshSurfaceGetFormatOffset(format:Number, vertexCount:int, arrayIndex:int):uint;
+		public static native function meshSurfaceGetFormatOffset(format:Int64, vertexCount:int, arrayIndex:int):uint;
 		[Godot(format="bitfield:RenderingServer.ArrayFormat")]
-		public static native function meshSurfaceGetFormatVertexStride(format:Number, vertexCount:int):uint;
+		public static native function meshSurfaceGetFormatVertexStride(format:Int64, vertexCount:int):uint;
 		[Godot(format="bitfield:RenderingServer.ArrayFormat")]
-		public static native function meshSurfaceGetFormatNormalTangentStride(format:Number, vertexCount:int):uint;
+		public static native function meshSurfaceGetFormatNormalTangentStride(format:Int64, vertexCount:int):uint;
 		[Godot(format="bitfield:RenderingServer.ArrayFormat")]
-		public static native function meshSurfaceGetFormatAttributeStride(format:Number, vertexCount:int):uint;
+		public static native function meshSurfaceGetFormatAttributeStride(format:Int64, vertexCount:int):uint;
 		[Godot(format="bitfield:RenderingServer.ArrayFormat")]
-		public static native function meshSurfaceGetFormatSkinStride(format:Number, vertexCount:int):uint;
+		public static native function meshSurfaceGetFormatSkinStride(format:Int64, vertexCount:int):uint;
 		[Godot(format="bitfield:RenderingServer.ArrayFormat")]
-		public static native function meshSurfaceGetFormatIndexStride(format:Number, vertexCount:int):uint;
+		public static native function meshSurfaceGetFormatIndexStride(format:Int64, vertexCount:int):uint;
 		public static native function meshAddSurface(mesh:RID, surface:GodotDictionary):void;
 		[Godot(primitive="enum:RenderingServer.PrimitiveType", compressFormat="bitfield:RenderingServer.ArrayFormat")]
-		public static native function meshAddSurfaceFromArrays(mesh:RID, primitive:int, arrays:GodotArray, blendShapes:GodotArray = null, lods:GodotDictionary = null, compressFormat:Number = 0):void;
+		public static native function meshAddSurfaceFromArrays(mesh:RID, primitive:int, arrays:GodotArray, blendShapes:GodotArray = null, lods:GodotDictionary = null, compressFormat:Int64 = 0):void;
 		public static native function meshGetBlendShapeCount(mesh:RID):int;
 		[Godot(mode="enum:RenderingServer.BlendShapeMode")]
 		public static native function meshSetBlendShapeMode(mesh:RID, mode:int):void;
@@ -23629,7 +23629,7 @@ package godot {
 		public static native function instanceSetLayerMask(instance:RID, mask:uint):void;
 		public static native function instanceSetPivotData(instance:RID, sortingOffset:Number, useAabbCenter:Boolean):void;
 		public static native function instanceSetTransform(instance:RID, transform:Transform3D):void;
-		public static native function instanceAttachObjectInstanceId(instance:RID, id:Number):void;
+		public static native function instanceAttachObjectInstanceId(instance:RID, id:Int64):void;
 		public static native function instanceSetBlendShapeWeight(instance:RID, shape:int, weight:Number):void;
 		public static native function instanceSetSurfaceOverrideMaterial(instance:RID, surface:int, material:RID):void;
 		public static native function instanceSetVisible(instance:RID, visible:Boolean):void;
@@ -23787,7 +23787,7 @@ package godot {
 		public static native function requestFrameDrawnCallback(callable:Function):void;
 		public static native function hasChanged():Boolean;
 		[Godot(info="enum:RenderingServer.RenderingInfo")]
-		public static native function getRenderingInfo(info:int):Number;
+		public static native function getRenderingInfo(info:int):Int64;
 		public static native function getVideoAdapterName():String;
 		public static native function getVideoAdapterVendor():String;
 		[Godot(returns="enum:RenderingDevice.DeviceType")]
@@ -23829,7 +23829,7 @@ package godot {
 		public native function _handlesType(type:String):Boolean;
 		public native function _getResourceType(path:String):String;
 		public native function _getResourceScriptClass(path:String):String;
-		public native function _getResourceUid(path:String):Number;
+		public native function _getResourceUid(path:String):Int64;
 		public native function _getDependencies(path:String, addTypes:Boolean):PackedStringArray;
 		[Godot(returns="enum:GodotError")]
 		public native function _renameDependencies(path:String, renames:GodotDictionary):int;
@@ -23842,7 +23842,7 @@ package godot {
 		[Godot(returns="enum:GodotError")]
 		public native function _save(resource:Resource, path:String, flags:uint):int;
 		[Godot(returns="enum:GodotError")]
-		public native function _setUid(path:String, uid:Number):int;
+		public native function _setUid(path:String, uid:Int64):int;
 		public native function _recognize(resource:Resource):Boolean;
 		public native function _getRecognizedExtensions(resource:Resource):PackedStringArray;
 		public native function _recognizePath(resource:Resource, path:String):Boolean;
@@ -23927,7 +23927,7 @@ package godot {
 		public static native function hasCached(path:String):Boolean;
 		public static native function getCachedRef(path:String):Resource;
 		public static native function exists(path:String, typeHint:String = ""):Boolean;
-		public static native function getResourceUid(path:String):Number;
+		public static native function getResourceUid(path:String):Int64;
 		public static native function listDirectory(directoryPath:String):PackedStringArray;
 	}
 	public native class ResourcePreloader extends Node {
@@ -23957,26 +23957,26 @@ package godot {
 		[Godot(flags="bitfield:ResourceSaver.SaverFlags", returns="enum:GodotError")]
 		public static native function save(resource:Resource, path:String = "", flags:int = 0):int;
 		[Godot(returns="enum:GodotError")]
-		public static native function setUid(resource:String, uid:Number):int;
+		public static native function setUid(resource:String, uid:Int64):int;
 		public static native function getRecognizedExtensions(type:Resource):PackedStringArray;
 		public static native function addResourceFormatSaver(formatSaver:ResourceFormatSaver, atFront:Boolean = false):void;
 		public static native function removeResourceFormatSaver(formatSaver:ResourceFormatSaver):void;
-		public static native function getResourceIdForPath(path:String, generate:Boolean = false):Number;
+		public static native function getResourceIdForPath(path:String, generate:Boolean = false):Int64;
 	}
 	[Singleton]
 	[Abstract]
 	public native class ResourceUID extends GodotObject {
 		public static const INVALID_ID:int = -1;
 		public static native function get singleton():ResourceUID;
-		public static native function idToText(id:Number):String;
-		public static native function textToId(textId:String):Number;
-		public static native function createId():Number;
-		public static native function createIdForPath(path:String):Number;
-		public static native function hasId(id:Number):Boolean;
-		public static native function addId(id:Number, path:String):void;
-		public static native function setId(id:Number, path:String):void;
-		public static native function getIdPath(id:Number):String;
-		public static native function removeId(id:Number):void;
+		public static native function idToText(id:Int64):String;
+		public static native function textToId(textId:String):Int64;
+		public static native function createId():Int64;
+		public static native function createIdForPath(path:String):Int64;
+		public static native function hasId(id:Int64):Boolean;
+		public static native function addId(id:Int64, path:String):void;
+		public static native function setId(id:Int64, path:String):void;
+		public static native function getIdPath(id:Int64):String;
+		public static native function removeId(id:Int64):void;
 		public static native function uidToPath(uid:String):String;
 		public static native function pathToUid(path:String):String;
 		public static native function ensurePath(pathOrUid:String):String;
@@ -24436,10 +24436,10 @@ package godot {
 		[Godot(returns="Array[Tween]")]
 		public final native function getProcessedTweens():GodotArray;
 		public final native function getNodeCount():int;
-		public final native function getFrame():Number;
+		public final native function getFrame():Int64;
 		public final native function quit(exitCode:int = 0):void;
 		public final native function queueDelete(obj:GodotObject):void;
-		public final native function callGroupFlags(flags:int, group:String, method:String, ...rest):void;
+		public final native function callGroupFlags(flags:Int64, group:String, method:String, ...rest):void;
 		public final native function notifyGroupFlags(callFlags:uint, group:String, notification:int):void;
 		public final native function setGroupFlags(callFlags:uint, group:String, property:String, value:*):void;
 		public final native function callGroup(group:String, method:String, ...rest):void;
@@ -24881,7 +24881,7 @@ package godot {
 		public final native function getBoneParent(boneIdx:int):int;
 		public final native function setBoneParent(boneIdx:int, parentIdx:int):void;
 		public final native function getBoneCount():int;
-		public final native function getVersion():Number;
+		public final native function getVersion():Int64;
 		public final native function unparentBoneAndRest(boneIdx:int):void;
 		public final native function getBoneChildren(boneIdx:int):PackedInt32Array;
 		public final native function getParentlessBones():PackedInt32Array;
@@ -25610,8 +25610,8 @@ package godot {
 		public final native function putU16(value:uint):void;
 		public final native function put32(value:int):void;
 		public final native function putU32(value:uint):void;
-		public final native function put64(value:Number):void;
-		public final native function putU64(value:Number):void;
+		public final native function put64(value:Int64):void;
+		public final native function putU64(value:Int64):void;
 		public final native function putHalf(value:Number):void;
 		public final native function putFloat(value:Number):void;
 		public final native function putDouble(value:Number):void;
@@ -25624,8 +25624,8 @@ package godot {
 		public final native function getU16():uint;
 		public final native function get32():int;
 		public final native function getU32():uint;
-		public final native function get64():Number;
-		public final native function getU64():Number;
+		public final native function get64():Int64;
+		public final native function getU64():Int64;
 		public final native function getHalf():Number;
 		public final native function getFloat():Number;
 		public final native function getDouble():Number;
@@ -25958,7 +25958,7 @@ package godot {
 		public final native function createFromArrays(arrays:GodotArray, primitiveType:int = 3):void;
 		public final native function createFromBlendShape(existing:Mesh, surface:int, blendShape:String):void;
 		public final native function appendFrom(existing:Mesh, surface:int, transform:Transform3D):void;
-		public final native function commit(existing:ArrayMesh = null, flags:Number = 0):ArrayMesh;
+		public final native function commit(existing:ArrayMesh = null, flags:Int64 = 0):ArrayMesh;
 		public final native function commitToArrays():GodotArray;
 	}
 	public native class SystemFont extends Font {
@@ -26481,7 +26481,7 @@ package godot {
 		[Godot(feature="enum:TextServer.Feature")]
 		public final native function hasFeature(feature:int):Boolean;
 		public final native function getName():String;
-		public final native function getFeatures():Number;
+		public final native function getFeatures():Int64;
 		public final native function loadSupportData(filename:String):Boolean;
 		public final native function getSupportDataFilename():String;
 		public final native function getSupportDataInfo():String;
@@ -26489,16 +26489,16 @@ package godot {
 		public final native function getSupportData():PackedByteArray;
 		public final native function isLocaleUsingSupportData(locale:String):Boolean;
 		public final native function isLocaleRightToLeft(locale:String):Boolean;
-		public final native function nameToTag(name:String):Number;
-		public final native function tagToName(tag:Number):String;
+		public final native function nameToTag(name:String):Int64;
+		public final native function tagToName(tag:Int64):String;
 		public final native function has(rid:RID):Boolean;
 		public final native function freeRid(rid:RID):void;
 		public final native function createFont():RID;
 		public final native function createFontLinkedVariation(fontRid:RID):RID;
 		public final native function fontSetData(fontRid:RID, data:PackedByteArray):void;
-		public final native function fontSetFaceIndex(fontRid:RID, faceIndex:Number):void;
-		public final native function fontGetFaceIndex(fontRid:RID):Number;
-		public final native function fontGetFaceCount(fontRid:RID):Number;
+		public final native function fontSetFaceIndex(fontRid:RID, faceIndex:Int64):void;
+		public final native function fontGetFaceIndex(fontRid:RID):Int64;
+		public final native function fontGetFaceCount(fontRid:RID):Int64;
 		[Godot(style="bitfield:TextServer.FontStyle")]
 		public final native function fontSetStyle(fontRid:RID, style:int):void;
 		[Godot(returns="bitfield:TextServer.FontStyle")]
@@ -26508,10 +26508,10 @@ package godot {
 		public final native function fontGetOtNameStrings(fontRid:RID):GodotDictionary;
 		public final native function fontSetStyleName(fontRid:RID, name:String):void;
 		public final native function fontGetStyleName(fontRid:RID):String;
-		public final native function fontSetWeight(fontRid:RID, weight:Number):void;
-		public final native function fontGetWeight(fontRid:RID):Number;
-		public final native function fontSetStretch(fontRid:RID, weight:Number):void;
-		public final native function fontGetStretch(fontRid:RID):Number;
+		public final native function fontSetWeight(fontRid:RID, weight:Int64):void;
+		public final native function fontGetWeight(fontRid:RID):Int64;
+		public final native function fontSetStretch(fontRid:RID, weight:Int64):void;
+		public final native function fontGetStretch(fontRid:RID):Int64;
 		[Godot(antialiasing="enum:TextServer.FontAntialiasing")]
 		public final native function fontSetAntialiasing(fontRid:RID, antialiasing:int):void;
 		[Godot(returns="enum:TextServer.FontAntialiasing")]
@@ -26522,12 +26522,12 @@ package godot {
 		public final native function fontGetGenerateMipmaps(fontRid:RID):Boolean;
 		public final native function fontSetMultichannelSignedDistanceField(fontRid:RID, msdf:Boolean):void;
 		public final native function fontIsMultichannelSignedDistanceField(fontRid:RID):Boolean;
-		public final native function fontSetMsdfPixelRange(fontRid:RID, msdfPixelRange:Number):void;
-		public final native function fontGetMsdfPixelRange(fontRid:RID):Number;
-		public final native function fontSetMsdfSize(fontRid:RID, msdfSize:Number):void;
-		public final native function fontGetMsdfSize(fontRid:RID):Number;
-		public final native function fontSetFixedSize(fontRid:RID, fixedSize:Number):void;
-		public final native function fontGetFixedSize(fontRid:RID):Number;
+		public final native function fontSetMsdfPixelRange(fontRid:RID, msdfPixelRange:Int64):void;
+		public final native function fontGetMsdfPixelRange(fontRid:RID):Int64;
+		public final native function fontSetMsdfSize(fontRid:RID, msdfSize:Int64):void;
+		public final native function fontGetMsdfSize(fontRid:RID):Int64;
+		public final native function fontSetFixedSize(fontRid:RID, fixedSize:Int64):void;
+		public final native function fontGetFixedSize(fontRid:RID):Int64;
 		[Godot(fixedSizeScaleMode="enum:TextServer.FixedSizeScaleMode")]
 		public final native function fontSetFixedSizeScaleMode(fontRid:RID, fixedSizeScaleMode:int):void;
 		[Godot(returns="enum:TextServer.FixedSizeScaleMode")]
@@ -26539,13 +26539,13 @@ package godot {
 		public final native function fontIsForceAutohinter(fontRid:RID):Boolean;
 		public final native function fontSetModulateColorGlyphs(fontRid:RID, modulate:Boolean):void;
 		public final native function fontIsModulateColorGlyphs(fontRid:RID):Boolean;
-		public final native function fontGetPaletteCount(fontRid:RID):Number;
-		public final native function fontGetPaletteName(fontRid:RID, index:Number):String;
-		public final native function fontGetPaletteColors(fontRid:RID, index:Number):PackedColorArray;
+		public final native function fontGetPaletteCount(fontRid:RID):Int64;
+		public final native function fontGetPaletteName(fontRid:RID, index:Int64):String;
+		public final native function fontGetPaletteColors(fontRid:RID, index:Int64):PackedColorArray;
 		public final native function fontSetPaletteCustomColors(fontRid:RID, colors:PackedColorArray):void;
 		public final native function fontGetPaletteCustomColors(fontRid:RID):PackedColorArray;
-		public final native function fontGetUsedPalette(fontRid:RID):Number;
-		public final native function fontSetUsedPalette(fontRid:RID, index:Number):void;
+		public final native function fontGetUsedPalette(fontRid:RID):Int64;
+		public final native function fontSetUsedPalette(fontRid:RID, index:Int64):void;
 		[Godot(hinting="enum:TextServer.Hinting")]
 		public final native function fontSetHinting(fontRid:RID, hinting:int):void;
 		[Godot(returns="enum:TextServer.Hinting")]
@@ -26559,9 +26559,9 @@ package godot {
 		public final native function fontSetEmbolden(fontRid:RID, strength:Number):void;
 		public final native function fontGetEmbolden(fontRid:RID):Number;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public final native function fontSetSpacing(fontRid:RID, spacing:int, value:Number):void;
+		public final native function fontSetSpacing(fontRid:RID, spacing:int, value:Int64):void;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public final native function fontGetSpacing(fontRid:RID, spacing:int):Number;
+		public final native function fontGetSpacing(fontRid:RID, spacing:int):Int64;
 		public final native function fontSetBaselineOffset(fontRid:RID, baselineOffset:Number):void;
 		public final native function fontGetBaselineOffset(fontRid:RID):Number;
 		public final native function fontSetTransform(fontRid:RID, transform:Transform2D):void;
@@ -26576,54 +26576,54 @@ package godot {
 		public final native function fontRemoveSizeCache(fontRid:RID, size:Vector2i):void;
 		[Godot(returns="Array[GodotDictionary]")]
 		public final native function fontGetSizeCacheInfo(fontRid:RID):GodotArray;
-		public final native function fontSetAscent(fontRid:RID, size:Number, ascent:Number):void;
-		public final native function fontGetAscent(fontRid:RID, size:Number):Number;
-		public final native function fontSetDescent(fontRid:RID, size:Number, descent:Number):void;
-		public final native function fontGetDescent(fontRid:RID, size:Number):Number;
-		public final native function fontSetUnderlinePosition(fontRid:RID, size:Number, underlinePosition:Number):void;
-		public final native function fontGetUnderlinePosition(fontRid:RID, size:Number):Number;
-		public final native function fontSetUnderlineThickness(fontRid:RID, size:Number, underlineThickness:Number):void;
-		public final native function fontGetUnderlineThickness(fontRid:RID, size:Number):Number;
-		public final native function fontSetScale(fontRid:RID, size:Number, scale:Number):void;
-		public final native function fontGetScale(fontRid:RID, size:Number):Number;
-		public final native function fontGetTextureCount(fontRid:RID, size:Vector2i):Number;
+		public final native function fontSetAscent(fontRid:RID, size:Int64, ascent:Number):void;
+		public final native function fontGetAscent(fontRid:RID, size:Int64):Number;
+		public final native function fontSetDescent(fontRid:RID, size:Int64, descent:Number):void;
+		public final native function fontGetDescent(fontRid:RID, size:Int64):Number;
+		public final native function fontSetUnderlinePosition(fontRid:RID, size:Int64, underlinePosition:Number):void;
+		public final native function fontGetUnderlinePosition(fontRid:RID, size:Int64):Number;
+		public final native function fontSetUnderlineThickness(fontRid:RID, size:Int64, underlineThickness:Number):void;
+		public final native function fontGetUnderlineThickness(fontRid:RID, size:Int64):Number;
+		public final native function fontSetScale(fontRid:RID, size:Int64, scale:Number):void;
+		public final native function fontGetScale(fontRid:RID, size:Int64):Number;
+		public final native function fontGetTextureCount(fontRid:RID, size:Vector2i):Int64;
 		public final native function fontClearTextures(fontRid:RID, size:Vector2i):void;
-		public final native function fontRemoveTexture(fontRid:RID, size:Vector2i, textureIndex:Number):void;
-		public final native function fontSetTextureImage(fontRid:RID, size:Vector2i, textureIndex:Number, image:Image):void;
-		public final native function fontGetTextureImage(fontRid:RID, size:Vector2i, textureIndex:Number):Image;
-		public final native function fontSetTextureOffsets(fontRid:RID, size:Vector2i, textureIndex:Number, offset:PackedInt32Array):void;
-		public final native function fontGetTextureOffsets(fontRid:RID, size:Vector2i, textureIndex:Number):PackedInt32Array;
+		public final native function fontRemoveTexture(fontRid:RID, size:Vector2i, textureIndex:Int64):void;
+		public final native function fontSetTextureImage(fontRid:RID, size:Vector2i, textureIndex:Int64, image:Image):void;
+		public final native function fontGetTextureImage(fontRid:RID, size:Vector2i, textureIndex:Int64):Image;
+		public final native function fontSetTextureOffsets(fontRid:RID, size:Vector2i, textureIndex:Int64, offset:PackedInt32Array):void;
+		public final native function fontGetTextureOffsets(fontRid:RID, size:Vector2i, textureIndex:Int64):PackedInt32Array;
 		public final native function fontGetGlyphList(fontRid:RID, size:Vector2i):PackedInt32Array;
 		public final native function fontClearGlyphs(fontRid:RID, size:Vector2i):void;
-		public final native function fontRemoveGlyph(fontRid:RID, size:Vector2i, glyph:Number):void;
-		public final native function fontGetGlyphAdvance(fontRid:RID, size:Number, glyph:Number):Vector2;
-		public final native function fontSetGlyphAdvance(fontRid:RID, size:Number, glyph:Number, advance:Vector2):void;
-		public final native function fontGetGlyphOffset(fontRid:RID, size:Vector2i, glyph:Number):Vector2;
-		public final native function fontSetGlyphOffset(fontRid:RID, size:Vector2i, glyph:Number, offset:Vector2):void;
-		public final native function fontGetGlyphSize(fontRid:RID, size:Vector2i, glyph:Number):Vector2;
-		public final native function fontSetGlyphSize(fontRid:RID, size:Vector2i, glyph:Number, glSize:Vector2):void;
-		public final native function fontGetGlyphUvRect(fontRid:RID, size:Vector2i, glyph:Number):Rect2;
-		public final native function fontSetGlyphUvRect(fontRid:RID, size:Vector2i, glyph:Number, uvRect:Rect2):void;
-		public final native function fontGetGlyphTextureIdx(fontRid:RID, size:Vector2i, glyph:Number):Number;
-		public final native function fontSetGlyphTextureIdx(fontRid:RID, size:Vector2i, glyph:Number, textureIdx:Number):void;
-		public final native function fontGetGlyphTextureRid(fontRid:RID, size:Vector2i, glyph:Number):RID;
-		public final native function fontGetGlyphTextureSize(fontRid:RID, size:Vector2i, glyph:Number):Vector2;
-		public final native function fontGetGlyphContours(font:RID, size:Number, index:Number):GodotDictionary;
+		public final native function fontRemoveGlyph(fontRid:RID, size:Vector2i, glyph:Int64):void;
+		public final native function fontGetGlyphAdvance(fontRid:RID, size:Int64, glyph:Int64):Vector2;
+		public final native function fontSetGlyphAdvance(fontRid:RID, size:Int64, glyph:Int64, advance:Vector2):void;
+		public final native function fontGetGlyphOffset(fontRid:RID, size:Vector2i, glyph:Int64):Vector2;
+		public final native function fontSetGlyphOffset(fontRid:RID, size:Vector2i, glyph:Int64, offset:Vector2):void;
+		public final native function fontGetGlyphSize(fontRid:RID, size:Vector2i, glyph:Int64):Vector2;
+		public final native function fontSetGlyphSize(fontRid:RID, size:Vector2i, glyph:Int64, glSize:Vector2):void;
+		public final native function fontGetGlyphUvRect(fontRid:RID, size:Vector2i, glyph:Int64):Rect2;
+		public final native function fontSetGlyphUvRect(fontRid:RID, size:Vector2i, glyph:Int64, uvRect:Rect2):void;
+		public final native function fontGetGlyphTextureIdx(fontRid:RID, size:Vector2i, glyph:Int64):Int64;
+		public final native function fontSetGlyphTextureIdx(fontRid:RID, size:Vector2i, glyph:Int64, textureIdx:Int64):void;
+		public final native function fontGetGlyphTextureRid(fontRid:RID, size:Vector2i, glyph:Int64):RID;
+		public final native function fontGetGlyphTextureSize(fontRid:RID, size:Vector2i, glyph:Int64):Vector2;
+		public final native function fontGetGlyphContours(font:RID, size:Int64, index:Int64):GodotDictionary;
 		[Godot(returns="Array[Vector2i]")]
-		public final native function fontGetKerningList(fontRid:RID, size:Number):GodotArray;
-		public final native function fontClearKerningMap(fontRid:RID, size:Number):void;
-		public final native function fontRemoveKerning(fontRid:RID, size:Number, glyphPair:Vector2i):void;
-		public final native function fontSetKerning(fontRid:RID, size:Number, glyphPair:Vector2i, kerning:Vector2):void;
-		public final native function fontGetKerning(fontRid:RID, size:Number, glyphPair:Vector2i):Vector2;
-		public final native function fontGetGlyphIndex(fontRid:RID, size:Number, char:Number, variationSelector:Number):Number;
-		public final native function fontGetCharFromGlyphIndex(fontRid:RID, size:Number, glyphIndex:Number):Number;
-		public final native function fontHasChar(fontRid:RID, char:Number):Boolean;
+		public final native function fontGetKerningList(fontRid:RID, size:Int64):GodotArray;
+		public final native function fontClearKerningMap(fontRid:RID, size:Int64):void;
+		public final native function fontRemoveKerning(fontRid:RID, size:Int64, glyphPair:Vector2i):void;
+		public final native function fontSetKerning(fontRid:RID, size:Int64, glyphPair:Vector2i, kerning:Vector2):void;
+		public final native function fontGetKerning(fontRid:RID, size:Int64, glyphPair:Vector2i):Vector2;
+		public final native function fontGetGlyphIndex(fontRid:RID, size:Int64, char:Int64, variationSelector:Int64):Int64;
+		public final native function fontGetCharFromGlyphIndex(fontRid:RID, size:Int64, glyphIndex:Int64):Int64;
+		public final native function fontHasChar(fontRid:RID, char:Int64):Boolean;
 		public final native function fontGetSupportedChars(fontRid:RID):String;
 		public final native function fontGetSupportedGlyphs(fontRid:RID):PackedInt32Array;
-		public final native function fontRenderRange(fontRid:RID, size:Vector2i, start:Number, end:Number):void;
-		public final native function fontRenderGlyph(fontRid:RID, size:Vector2i, index:Number):void;
-		public final native function fontDrawGlyph(fontRid:RID, canvas:RID, size:Number, pos:Vector2, index:Number, color:Color = null, oversampling:Number = 0.0):void;
-		public final native function fontDrawGlyphOutline(fontRid:RID, canvas:RID, size:Number, outlineSize:Number, pos:Vector2, index:Number, color:Color = null, oversampling:Number = 0.0):void;
+		public final native function fontRenderRange(fontRid:RID, size:Vector2i, start:Int64, end:Int64):void;
+		public final native function fontRenderGlyph(fontRid:RID, size:Vector2i, index:Int64):void;
+		public final native function fontDrawGlyph(fontRid:RID, canvas:RID, size:Int64, pos:Vector2, index:Int64, color:Color = null, oversampling:Number = 0.0):void;
+		public final native function fontDrawGlyphOutline(fontRid:RID, canvas:RID, size:Int64, outlineSize:Int64, pos:Vector2, index:Int64, color:Color = null, oversampling:Number = 0.0):void;
 		public final native function fontIsLanguageSupported(fontRid:RID, language:String):Boolean;
 		public final native function fontSetLanguageSupportOverride(fontRid:RID, language:String, supported:Boolean):void;
 		public final native function fontGetLanguageSupportOverride(fontRid:RID, language:String):Boolean;
@@ -26640,8 +26640,8 @@ package godot {
 		public final native function fontSupportedVariationList(fontRid:RID):GodotDictionary;
 		public final native function fontGetGlobalOversampling():Number;
 		public final native function fontSetGlobalOversampling(oversampling:Number):void;
-		public final native function getHexCodeBoxSize(size:Number, index:Number):Vector2;
-		public final native function drawHexCodeBox(canvas:RID, size:Number, pos:Vector2, index:Number, color:Color):void;
+		public final native function getHexCodeBoxSize(size:Int64, index:Int64):Vector2;
+		public final native function drawHexCodeBox(canvas:RID, size:Int64, pos:Vector2, index:Int64, color:Color):void;
 		[Godot(direction="enum:TextServer.Direction", orientation="enum:TextServer.Orientation")]
 		public final native function createShapedText(direction:int = 0, orientation:int = 0):RID;
 		public final native function shapedTextClear(rid:RID):void;
@@ -26655,8 +26655,8 @@ package godot {
 		public final native function shapedTextSetBidiOverride(shaped:RID, override:GodotArray):void;
 		public final native function shapedTextSetCustomPunctuation(shaped:RID, punct:String):void;
 		public final native function shapedTextGetCustomPunctuation(shaped:RID):String;
-		public final native function shapedTextSetCustomEllipsis(shaped:RID, char:Number):void;
-		public final native function shapedTextGetCustomEllipsis(shaped:RID):Number;
+		public final native function shapedTextSetCustomEllipsis(shaped:RID, char:Int64):void;
+		public final native function shapedTextGetCustomEllipsis(shaped:RID):Int64;
 		[Godot(orientation="enum:TextServer.Orientation")]
 		public final native function shapedTextSetOrientation(shaped:RID, orientation:int = 0):void;
 		[Godot(returns="enum:TextServer.Orientation")]
@@ -26666,35 +26666,35 @@ package godot {
 		public final native function shapedTextSetPreserveControl(shaped:RID, enabled:Boolean):void;
 		public final native function shapedTextGetPreserveControl(shaped:RID):Boolean;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public final native function shapedTextSetSpacing(shaped:RID, spacing:int, value:Number):void;
+		public final native function shapedTextSetSpacing(shaped:RID, spacing:int, value:Int64):void;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public final native function shapedTextGetSpacing(shaped:RID, spacing:int):Number;
+		public final native function shapedTextGetSpacing(shaped:RID, spacing:int):Int64;
 		[Godot(fonts="Array[RID]")]
-		public final native function shapedTextAddString(shaped:RID, text:String, fonts:GodotArray, size:Number, opentypeFeatures:GodotDictionary = null, language:String = "", meta:* = null):Boolean;
+		public final native function shapedTextAddString(shaped:RID, text:String, fonts:GodotArray, size:Int64, opentypeFeatures:GodotDictionary = null, language:String = "", meta:* = null):Boolean;
 		[Godot(inlineAlign="enum:InlineAlignment")]
-		public final native function shapedTextAddObject(shaped:RID, key:*, size:Vector2, inlineAlign:int = 5, length:Number = 1, baseline:Number = 0.0):Boolean;
+		public final native function shapedTextAddObject(shaped:RID, key:*, size:Vector2, inlineAlign:int = 5, length:Int64 = 1, baseline:Number = 0.0):Boolean;
 		[Godot(inlineAlign="enum:InlineAlignment")]
 		public final native function shapedTextResizeObject(shaped:RID, key:*, size:Vector2, inlineAlign:int = 5, baseline:Number = 0.0):Boolean;
 		public final native function shapedTextHasObject(shaped:RID, key:*):Boolean;
 		public final native function shapedGetText(shaped:RID):String;
-		public final native function shapedGetSpanCount(shaped:RID):Number;
-		public final native function shapedGetSpanMeta(shaped:RID, index:Number):*;
-		public final native function shapedGetSpanEmbeddedObject(shaped:RID, index:Number):*;
-		public final native function shapedGetSpanText(shaped:RID, index:Number):String;
-		public final native function shapedGetSpanObject(shaped:RID, index:Number):*;
+		public final native function shapedGetSpanCount(shaped:RID):Int64;
+		public final native function shapedGetSpanMeta(shaped:RID, index:Int64):*;
+		public final native function shapedGetSpanEmbeddedObject(shaped:RID, index:Int64):*;
+		public final native function shapedGetSpanText(shaped:RID, index:Int64):String;
+		public final native function shapedGetSpanObject(shaped:RID, index:Int64):*;
 		[Godot(fonts="Array[RID]")]
-		public final native function shapedSetSpanUpdateFont(shaped:RID, index:Number, fonts:GodotArray, size:Number, opentypeFeatures:GodotDictionary = null):void;
-		public final native function shapedGetRunCount(shaped:RID):Number;
-		public final native function shapedGetRunText(shaped:RID, index:Number):String;
-		public final native function shapedGetRunRange(shaped:RID, index:Number):Vector2i;
-		public final native function shapedGetRunGlyphRange(shaped:RID, index:Number):Vector2i;
-		public final native function shapedGetRunFontRid(shaped:RID, index:Number):RID;
-		public final native function shapedGetRunFontSize(shaped:RID, index:Number):int;
-		public final native function shapedGetRunLanguage(shaped:RID, index:Number):String;
+		public final native function shapedSetSpanUpdateFont(shaped:RID, index:Int64, fonts:GodotArray, size:Int64, opentypeFeatures:GodotDictionary = null):void;
+		public final native function shapedGetRunCount(shaped:RID):Int64;
+		public final native function shapedGetRunText(shaped:RID, index:Int64):String;
+		public final native function shapedGetRunRange(shaped:RID, index:Int64):Vector2i;
+		public final native function shapedGetRunGlyphRange(shaped:RID, index:Int64):Vector2i;
+		public final native function shapedGetRunFontRid(shaped:RID, index:Int64):RID;
+		public final native function shapedGetRunFontSize(shaped:RID, index:Int64):int;
+		public final native function shapedGetRunLanguage(shaped:RID, index:Int64):String;
 		[Godot(returns="enum:TextServer.Direction")]
-		public final native function shapedGetRunDirection(shaped:RID, index:Number):int;
-		public final native function shapedGetRunObject(shaped:RID, index:Number):*;
-		public final native function shapedTextSubstr(shaped:RID, start:Number, length:Number):RID;
+		public final native function shapedGetRunDirection(shaped:RID, index:Int64):int;
+		public final native function shapedGetRunObject(shaped:RID, index:Int64):*;
+		public final native function shapedTextSubstr(shaped:RID, start:Int64, length:Int64):RID;
 		public final native function shapedTextGetParent(shaped:RID):RID;
 		[Godot(justificationFlags="bitfield:TextServer.JustificationFlag")]
 		public final native function shapedTextFitToWidth(shaped:RID, width:Number, justificationFlags:int = 3):Number;
@@ -26706,56 +26706,56 @@ package godot {
 		public final native function shapedTextGetGlyphs(shaped:RID):GodotArray;
 		[Godot(returns="Array[GodotDictionary]")]
 		public final native function shapedTextSortLogical(shaped:RID):GodotArray;
-		public final native function shapedTextGetGlyphCount(shaped:RID):Number;
+		public final native function shapedTextGetGlyphCount(shaped:RID):Int64;
 		public final native function shapedTextGetRange(shaped:RID):Vector2i;
 		[Godot(breakFlags="bitfield:TextServer.LineBreakFlag")]
-		public final native function shapedTextGetLineBreaksAdv(shaped:RID, width:PackedFloat32Array, start:Number = 0, once:Boolean = true, breakFlags:int = 3):PackedInt32Array;
+		public final native function shapedTextGetLineBreaksAdv(shaped:RID, width:PackedFloat32Array, start:Int64 = 0, once:Boolean = true, breakFlags:int = 3):PackedInt32Array;
 		[Godot(breakFlags="bitfield:TextServer.LineBreakFlag")]
-		public final native function shapedTextGetLineBreaks(shaped:RID, width:Number, start:Number = 0, breakFlags:int = 3):PackedInt32Array;
+		public final native function shapedTextGetLineBreaks(shaped:RID, width:Number, start:Int64 = 0, breakFlags:int = 3):PackedInt32Array;
 		[Godot(graphemeFlags="bitfield:TextServer.GraphemeFlag", skipGraphemeFlags="bitfield:TextServer.GraphemeFlag")]
 		public final native function shapedTextGetWordBreaks(shaped:RID, graphemeFlags:int = 264, skipGraphemeFlags:int = 4):PackedInt32Array;
-		public final native function shapedTextGetTrimPos(shaped:RID):Number;
-		public final native function shapedTextGetEllipsisPos(shaped:RID):Number;
+		public final native function shapedTextGetTrimPos(shaped:RID):Int64;
+		public final native function shapedTextGetEllipsisPos(shaped:RID):Int64;
 		[Godot(returns="Array[GodotDictionary]")]
 		public final native function shapedTextGetEllipsisGlyphs(shaped:RID):GodotArray;
-		public final native function shapedTextGetEllipsisGlyphCount(shaped:RID):Number;
+		public final native function shapedTextGetEllipsisGlyphCount(shaped:RID):Int64;
 		[Godot(overrunTrimFlags="bitfield:TextServer.TextOverrunFlag")]
 		public final native function shapedTextOverrunTrimToWidth(shaped:RID, width:Number = 0, overrunTrimFlags:int = 0):void;
 		public final native function shapedTextGetObjects(shaped:RID):GodotArray;
 		public final native function shapedTextGetObjectRect(shaped:RID, key:*):Rect2;
 		public final native function shapedTextGetObjectRange(shaped:RID, key:*):Vector2i;
-		public final native function shapedTextGetObjectGlyph(shaped:RID, key:*):Number;
+		public final native function shapedTextGetObjectGlyph(shaped:RID, key:*):Int64;
 		public final native function shapedTextGetSize(shaped:RID):Vector2;
 		public final native function shapedTextGetAscent(shaped:RID):Number;
 		public final native function shapedTextGetDescent(shaped:RID):Number;
 		public final native function shapedTextGetWidth(shaped:RID):Number;
 		public final native function shapedTextGetUnderlinePosition(shaped:RID):Number;
 		public final native function shapedTextGetUnderlineThickness(shaped:RID):Number;
-		public final native function shapedTextGetCarets(shaped:RID, position:Number):GodotDictionary;
-		public final native function shapedTextGetSelection(shaped:RID, start:Number, end:Number):PackedVector2Array;
-		public final native function shapedTextHitTestGrapheme(shaped:RID, coords:Number):Number;
-		public final native function shapedTextHitTestPosition(shaped:RID, coords:Number):Number;
-		public final native function shapedTextGetGraphemeBounds(shaped:RID, pos:Number):Vector2;
-		public final native function shapedTextNextGraphemePos(shaped:RID, pos:Number):Number;
-		public final native function shapedTextPrevGraphemePos(shaped:RID, pos:Number):Number;
+		public final native function shapedTextGetCarets(shaped:RID, position:Int64):GodotDictionary;
+		public final native function shapedTextGetSelection(shaped:RID, start:Int64, end:Int64):PackedVector2Array;
+		public final native function shapedTextHitTestGrapheme(shaped:RID, coords:Number):Int64;
+		public final native function shapedTextHitTestPosition(shaped:RID, coords:Number):Int64;
+		public final native function shapedTextGetGraphemeBounds(shaped:RID, pos:Int64):Vector2;
+		public final native function shapedTextNextGraphemePos(shaped:RID, pos:Int64):Int64;
+		public final native function shapedTextPrevGraphemePos(shaped:RID, pos:Int64):Int64;
 		public final native function shapedTextGetCharacterBreaks(shaped:RID):PackedInt32Array;
-		public final native function shapedTextNextCharacterPos(shaped:RID, pos:Number):Number;
-		public final native function shapedTextPrevCharacterPos(shaped:RID, pos:Number):Number;
-		public final native function shapedTextClosestCharacterPos(shaped:RID, pos:Number):Number;
+		public final native function shapedTextNextCharacterPos(shaped:RID, pos:Int64):Int64;
+		public final native function shapedTextPrevCharacterPos(shaped:RID, pos:Int64):Int64;
+		public final native function shapedTextClosestCharacterPos(shaped:RID, pos:Int64):Int64;
 		public final native function shapedTextDraw(shaped:RID, canvas:RID, pos:Vector2, clipL:Number = -1, clipR:Number = -1, color:Color = null, oversampling:Number = 0.0):void;
-		public final native function shapedTextDrawOutline(shaped:RID, canvas:RID, pos:Vector2, clipL:Number = -1, clipR:Number = -1, outlineSize:Number = 1, color:Color = null, oversampling:Number = 0.0):void;
+		public final native function shapedTextDrawOutline(shaped:RID, canvas:RID, pos:Vector2, clipL:Number = -1, clipR:Number = -1, outlineSize:Int64 = 1, color:Color = null, oversampling:Number = 0.0):void;
 		[Godot(returns="enum:TextServer.Direction")]
-		public final native function shapedTextGetDominantDirectionInRange(shaped:RID, start:Number, end:Number):int;
+		public final native function shapedTextGetDominantDirectionInRange(shaped:RID, start:Int64, end:Int64):int;
 		public final native function formatNumber(number:String, language:String = ""):String;
 		public final native function parseNumber(number:String, language:String = ""):String;
 		public final native function percentSign(language:String = ""):String;
-		public final native function stringGetWordBreaks(string:String, language:String = "", charsPerLine:Number = 0):PackedInt32Array;
+		public final native function stringGetWordBreaks(string:String, language:String = "", charsPerLine:Int64 = 0):PackedInt32Array;
 		public final native function stringGetCharacterBreaks(string:String, language:String = ""):PackedInt32Array;
-		public final native function isConfusable(string:String, dict:PackedStringArray):Number;
+		public final native function isConfusable(string:String, dict:PackedStringArray):Int64;
 		public final native function spoofCheck(string:String):Boolean;
 		public final native function stripDiacritics(string:String):String;
 		public final native function isValidIdentifier(string:String):Boolean;
-		public final native function isValidLetter(unicode:Number):Boolean;
+		public final native function isValidLetter(unicode:Int64):Boolean;
 		public final native function stringToUpper(string:String, language:String = ""):String;
 		public final native function stringToLower(string:String, language:String = ""):String;
 		public final native function stringToTitle(string:String, language:String = ""):String;
@@ -26767,7 +26767,7 @@ package godot {
 		[Godot(feature="enum:TextServer.Feature")]
 		public native function _hasFeature(feature:int):Boolean;
 		public native function _getName():String;
-		public native function _getFeatures():Number;
+		public native function _getFeatures():Int64;
 		public native function _freeRid(rid:RID):void;
 		public native function _has(rid:RID):Boolean;
 		public native function _loadSupportData(filename:String):Boolean;
@@ -26777,14 +26777,14 @@ package godot {
 		public native function _getSupportData():PackedByteArray;
 		public native function _isLocaleUsingSupportData(locale:String):Boolean;
 		public native function _isLocaleRightToLeft(locale:String):Boolean;
-		public native function _nameToTag(name:String):Number;
-		public native function _tagToName(tag:Number):String;
+		public native function _nameToTag(name:String):Int64;
+		public native function _tagToName(tag:Int64):String;
 		public native function _createFont():RID;
 		public native function _createFontLinkedVariation(fontRid:RID):RID;
 		public native function _fontSetData(fontRid:RID, data:PackedByteArray):void;
-		public native function _fontSetFaceIndex(fontRid:RID, faceIndex:Number):void;
-		public native function _fontGetFaceIndex(fontRid:RID):Number;
-		public native function _fontGetFaceCount(fontRid:RID):Number;
+		public native function _fontSetFaceIndex(fontRid:RID, faceIndex:Int64):void;
+		public native function _fontGetFaceIndex(fontRid:RID):Int64;
+		public native function _fontGetFaceCount(fontRid:RID):Int64;
 		[Godot(style="bitfield:TextServer.FontStyle")]
 		public native function _fontSetStyle(fontRid:RID, style:int):void;
 		[Godot(returns="bitfield:TextServer.FontStyle")]
@@ -26794,10 +26794,10 @@ package godot {
 		public native function _fontGetOtNameStrings(fontRid:RID):GodotDictionary;
 		public native function _fontSetStyleName(fontRid:RID, nameStyle:String):void;
 		public native function _fontGetStyleName(fontRid:RID):String;
-		public native function _fontSetWeight(fontRid:RID, weight:Number):void;
-		public native function _fontGetWeight(fontRid:RID):Number;
-		public native function _fontSetStretch(fontRid:RID, stretch:Number):void;
-		public native function _fontGetStretch(fontRid:RID):Number;
+		public native function _fontSetWeight(fontRid:RID, weight:Int64):void;
+		public native function _fontGetWeight(fontRid:RID):Int64;
+		public native function _fontSetStretch(fontRid:RID, stretch:Int64):void;
+		public native function _fontGetStretch(fontRid:RID):Int64;
 		[Godot(antialiasing="enum:TextServer.FontAntialiasing")]
 		public native function _fontSetAntialiasing(fontRid:RID, antialiasing:int):void;
 		[Godot(returns="enum:TextServer.FontAntialiasing")]
@@ -26808,12 +26808,12 @@ package godot {
 		public native function _fontGetGenerateMipmaps(fontRid:RID):Boolean;
 		public native function _fontSetMultichannelSignedDistanceField(fontRid:RID, msdf:Boolean):void;
 		public native function _fontIsMultichannelSignedDistanceField(fontRid:RID):Boolean;
-		public native function _fontSetMsdfPixelRange(fontRid:RID, msdfPixelRange:Number):void;
-		public native function _fontGetMsdfPixelRange(fontRid:RID):Number;
-		public native function _fontSetMsdfSize(fontRid:RID, msdfSize:Number):void;
-		public native function _fontGetMsdfSize(fontRid:RID):Number;
-		public native function _fontSetFixedSize(fontRid:RID, fixedSize:Number):void;
-		public native function _fontGetFixedSize(fontRid:RID):Number;
+		public native function _fontSetMsdfPixelRange(fontRid:RID, msdfPixelRange:Int64):void;
+		public native function _fontGetMsdfPixelRange(fontRid:RID):Int64;
+		public native function _fontSetMsdfSize(fontRid:RID, msdfSize:Int64):void;
+		public native function _fontGetMsdfSize(fontRid:RID):Int64;
+		public native function _fontSetFixedSize(fontRid:RID, fixedSize:Int64):void;
+		public native function _fontGetFixedSize(fontRid:RID):Int64;
 		[Godot(fixedSizeScaleMode="enum:TextServer.FixedSizeScaleMode")]
 		public native function _fontSetFixedSizeScaleMode(fontRid:RID, fixedSizeScaleMode:int):void;
 		[Godot(returns="enum:TextServer.FixedSizeScaleMode")]
@@ -26825,13 +26825,13 @@ package godot {
 		public native function _fontIsForceAutohinter(fontRid:RID):Boolean;
 		public native function _fontSetModulateColorGlyphs(fontRid:RID, modulate:Boolean):void;
 		public native function _fontIsModulateColorGlyphs(fontRid:RID):Boolean;
-		public native function _fontGetPaletteCount(fontRid:RID):Number;
-		public native function _fontGetPaletteName(fontRid:RID, index:Number):String;
-		public native function _fontGetPaletteColors(fontRid:RID, index:Number):PackedColorArray;
+		public native function _fontGetPaletteCount(fontRid:RID):Int64;
+		public native function _fontGetPaletteName(fontRid:RID, index:Int64):String;
+		public native function _fontGetPaletteColors(fontRid:RID, index:Int64):PackedColorArray;
 		public native function _fontSetPaletteCustomColors(fontRid:RID, colors:PackedColorArray):void;
 		public native function _fontGetPaletteCustomColors(fontRid:RID):PackedColorArray;
-		public native function _fontGetUsedPalette(fontRid:RID):Number;
-		public native function _fontSetUsedPalette(fontRid:RID, index:Number):void;
+		public native function _fontGetUsedPalette(fontRid:RID):Int64;
+		public native function _fontSetUsedPalette(fontRid:RID, index:Int64):void;
 		[Godot(hinting="enum:TextServer.Hinting")]
 		public native function _fontSetHinting(fontRid:RID, hinting:int):void;
 		[Godot(returns="enum:TextServer.Hinting")]
@@ -26845,9 +26845,9 @@ package godot {
 		public native function _fontSetEmbolden(fontRid:RID, strength:Number):void;
 		public native function _fontGetEmbolden(fontRid:RID):Number;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public native function _fontSetSpacing(fontRid:RID, spacing:int, value:Number):void;
+		public native function _fontSetSpacing(fontRid:RID, spacing:int, value:Int64):void;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public native function _fontGetSpacing(fontRid:RID, spacing:int):Number;
+		public native function _fontGetSpacing(fontRid:RID, spacing:int):Int64;
 		public native function _fontSetBaselineOffset(fontRid:RID, baselineOffset:Number):void;
 		public native function _fontGetBaselineOffset(fontRid:RID):Number;
 		public native function _fontSetTransform(fontRid:RID, transform:Transform2D):void;
@@ -26862,54 +26862,54 @@ package godot {
 		public native function _fontRemoveSizeCache(fontRid:RID, size:Vector2i):void;
 		[Godot(returns="Array[GodotDictionary]")]
 		public native function _fontGetSizeCacheInfo(fontRid:RID):GodotArray;
-		public native function _fontSetAscent(fontRid:RID, size:Number, ascent:Number):void;
-		public native function _fontGetAscent(fontRid:RID, size:Number):Number;
-		public native function _fontSetDescent(fontRid:RID, size:Number, descent:Number):void;
-		public native function _fontGetDescent(fontRid:RID, size:Number):Number;
-		public native function _fontSetUnderlinePosition(fontRid:RID, size:Number, underlinePosition:Number):void;
-		public native function _fontGetUnderlinePosition(fontRid:RID, size:Number):Number;
-		public native function _fontSetUnderlineThickness(fontRid:RID, size:Number, underlineThickness:Number):void;
-		public native function _fontGetUnderlineThickness(fontRid:RID, size:Number):Number;
-		public native function _fontSetScale(fontRid:RID, size:Number, scale:Number):void;
-		public native function _fontGetScale(fontRid:RID, size:Number):Number;
-		public native function _fontGetTextureCount(fontRid:RID, size:Vector2i):Number;
+		public native function _fontSetAscent(fontRid:RID, size:Int64, ascent:Number):void;
+		public native function _fontGetAscent(fontRid:RID, size:Int64):Number;
+		public native function _fontSetDescent(fontRid:RID, size:Int64, descent:Number):void;
+		public native function _fontGetDescent(fontRid:RID, size:Int64):Number;
+		public native function _fontSetUnderlinePosition(fontRid:RID, size:Int64, underlinePosition:Number):void;
+		public native function _fontGetUnderlinePosition(fontRid:RID, size:Int64):Number;
+		public native function _fontSetUnderlineThickness(fontRid:RID, size:Int64, underlineThickness:Number):void;
+		public native function _fontGetUnderlineThickness(fontRid:RID, size:Int64):Number;
+		public native function _fontSetScale(fontRid:RID, size:Int64, scale:Number):void;
+		public native function _fontGetScale(fontRid:RID, size:Int64):Number;
+		public native function _fontGetTextureCount(fontRid:RID, size:Vector2i):Int64;
 		public native function _fontClearTextures(fontRid:RID, size:Vector2i):void;
-		public native function _fontRemoveTexture(fontRid:RID, size:Vector2i, textureIndex:Number):void;
-		public native function _fontSetTextureImage(fontRid:RID, size:Vector2i, textureIndex:Number, image:Image):void;
-		public native function _fontGetTextureImage(fontRid:RID, size:Vector2i, textureIndex:Number):Image;
-		public native function _fontSetTextureOffsets(fontRid:RID, size:Vector2i, textureIndex:Number, offset:PackedInt32Array):void;
-		public native function _fontGetTextureOffsets(fontRid:RID, size:Vector2i, textureIndex:Number):PackedInt32Array;
+		public native function _fontRemoveTexture(fontRid:RID, size:Vector2i, textureIndex:Int64):void;
+		public native function _fontSetTextureImage(fontRid:RID, size:Vector2i, textureIndex:Int64, image:Image):void;
+		public native function _fontGetTextureImage(fontRid:RID, size:Vector2i, textureIndex:Int64):Image;
+		public native function _fontSetTextureOffsets(fontRid:RID, size:Vector2i, textureIndex:Int64, offset:PackedInt32Array):void;
+		public native function _fontGetTextureOffsets(fontRid:RID, size:Vector2i, textureIndex:Int64):PackedInt32Array;
 		public native function _fontGetGlyphList(fontRid:RID, size:Vector2i):PackedInt32Array;
 		public native function _fontClearGlyphs(fontRid:RID, size:Vector2i):void;
-		public native function _fontRemoveGlyph(fontRid:RID, size:Vector2i, glyph:Number):void;
-		public native function _fontGetGlyphAdvance(fontRid:RID, size:Number, glyph:Number):Vector2;
-		public native function _fontSetGlyphAdvance(fontRid:RID, size:Number, glyph:Number, advance:Vector2):void;
-		public native function _fontGetGlyphOffset(fontRid:RID, size:Vector2i, glyph:Number):Vector2;
-		public native function _fontSetGlyphOffset(fontRid:RID, size:Vector2i, glyph:Number, offset:Vector2):void;
-		public native function _fontGetGlyphSize(fontRid:RID, size:Vector2i, glyph:Number):Vector2;
-		public native function _fontSetGlyphSize(fontRid:RID, size:Vector2i, glyph:Number, glSize:Vector2):void;
-		public native function _fontGetGlyphUvRect(fontRid:RID, size:Vector2i, glyph:Number):Rect2;
-		public native function _fontSetGlyphUvRect(fontRid:RID, size:Vector2i, glyph:Number, uvRect:Rect2):void;
-		public native function _fontGetGlyphTextureIdx(fontRid:RID, size:Vector2i, glyph:Number):Number;
-		public native function _fontSetGlyphTextureIdx(fontRid:RID, size:Vector2i, glyph:Number, textureIdx:Number):void;
-		public native function _fontGetGlyphTextureRid(fontRid:RID, size:Vector2i, glyph:Number):RID;
-		public native function _fontGetGlyphTextureSize(fontRid:RID, size:Vector2i, glyph:Number):Vector2;
-		public native function _fontGetGlyphContours(fontRid:RID, size:Number, index:Number):GodotDictionary;
+		public native function _fontRemoveGlyph(fontRid:RID, size:Vector2i, glyph:Int64):void;
+		public native function _fontGetGlyphAdvance(fontRid:RID, size:Int64, glyph:Int64):Vector2;
+		public native function _fontSetGlyphAdvance(fontRid:RID, size:Int64, glyph:Int64, advance:Vector2):void;
+		public native function _fontGetGlyphOffset(fontRid:RID, size:Vector2i, glyph:Int64):Vector2;
+		public native function _fontSetGlyphOffset(fontRid:RID, size:Vector2i, glyph:Int64, offset:Vector2):void;
+		public native function _fontGetGlyphSize(fontRid:RID, size:Vector2i, glyph:Int64):Vector2;
+		public native function _fontSetGlyphSize(fontRid:RID, size:Vector2i, glyph:Int64, glSize:Vector2):void;
+		public native function _fontGetGlyphUvRect(fontRid:RID, size:Vector2i, glyph:Int64):Rect2;
+		public native function _fontSetGlyphUvRect(fontRid:RID, size:Vector2i, glyph:Int64, uvRect:Rect2):void;
+		public native function _fontGetGlyphTextureIdx(fontRid:RID, size:Vector2i, glyph:Int64):Int64;
+		public native function _fontSetGlyphTextureIdx(fontRid:RID, size:Vector2i, glyph:Int64, textureIdx:Int64):void;
+		public native function _fontGetGlyphTextureRid(fontRid:RID, size:Vector2i, glyph:Int64):RID;
+		public native function _fontGetGlyphTextureSize(fontRid:RID, size:Vector2i, glyph:Int64):Vector2;
+		public native function _fontGetGlyphContours(fontRid:RID, size:Int64, index:Int64):GodotDictionary;
 		[Godot(returns="Array[Vector2i]")]
-		public native function _fontGetKerningList(fontRid:RID, size:Number):GodotArray;
-		public native function _fontClearKerningMap(fontRid:RID, size:Number):void;
-		public native function _fontRemoveKerning(fontRid:RID, size:Number, glyphPair:Vector2i):void;
-		public native function _fontSetKerning(fontRid:RID, size:Number, glyphPair:Vector2i, kerning:Vector2):void;
-		public native function _fontGetKerning(fontRid:RID, size:Number, glyphPair:Vector2i):Vector2;
-		public native function _fontGetGlyphIndex(fontRid:RID, size:Number, char:Number, variationSelector:Number):Number;
-		public native function _fontGetCharFromGlyphIndex(fontRid:RID, size:Number, glyphIndex:Number):Number;
-		public native function _fontHasChar(fontRid:RID, char:Number):Boolean;
+		public native function _fontGetKerningList(fontRid:RID, size:Int64):GodotArray;
+		public native function _fontClearKerningMap(fontRid:RID, size:Int64):void;
+		public native function _fontRemoveKerning(fontRid:RID, size:Int64, glyphPair:Vector2i):void;
+		public native function _fontSetKerning(fontRid:RID, size:Int64, glyphPair:Vector2i, kerning:Vector2):void;
+		public native function _fontGetKerning(fontRid:RID, size:Int64, glyphPair:Vector2i):Vector2;
+		public native function _fontGetGlyphIndex(fontRid:RID, size:Int64, char:Int64, variationSelector:Int64):Int64;
+		public native function _fontGetCharFromGlyphIndex(fontRid:RID, size:Int64, glyphIndex:Int64):Int64;
+		public native function _fontHasChar(fontRid:RID, char:Int64):Boolean;
 		public native function _fontGetSupportedChars(fontRid:RID):String;
 		public native function _fontGetSupportedGlyphs(fontRid:RID):PackedInt32Array;
-		public native function _fontRenderRange(fontRid:RID, size:Vector2i, start:Number, end:Number):void;
-		public native function _fontRenderGlyph(fontRid:RID, size:Vector2i, index:Number):void;
-		public native function _fontDrawGlyph(fontRid:RID, canvas:RID, size:Number, pos:Vector2, index:Number, color:Color, oversampling:Number):void;
-		public native function _fontDrawGlyphOutline(fontRid:RID, canvas:RID, size:Number, outlineSize:Number, pos:Vector2, index:Number, color:Color, oversampling:Number):void;
+		public native function _fontRenderRange(fontRid:RID, size:Vector2i, start:Int64, end:Int64):void;
+		public native function _fontRenderGlyph(fontRid:RID, size:Vector2i, index:Int64):void;
+		public native function _fontDrawGlyph(fontRid:RID, canvas:RID, size:Int64, pos:Vector2, index:Int64, color:Color, oversampling:Number):void;
+		public native function _fontDrawGlyphOutline(fontRid:RID, canvas:RID, size:Int64, outlineSize:Int64, pos:Vector2, index:Int64, color:Color, oversampling:Number):void;
 		public native function _fontIsLanguageSupported(fontRid:RID, language:String):Boolean;
 		public native function _fontSetLanguageSupportOverride(fontRid:RID, language:String, supported:Boolean):void;
 		public native function _fontGetLanguageSupportOverride(fontRid:RID, language:String):Boolean;
@@ -26928,8 +26928,8 @@ package godot {
 		public native function _fontSetGlobalOversampling(oversampling:Number):void;
 		public native function _referenceOversamplingLevel(oversampling:Number):void;
 		public native function _unreferenceOversamplingLevel(oversampling:Number):void;
-		public native function _getHexCodeBoxSize(size:Number, index:Number):Vector2;
-		public native function _drawHexCodeBox(canvas:RID, size:Number, pos:Vector2, index:Number, color:Color):void;
+		public native function _getHexCodeBoxSize(size:Int64, index:Int64):Vector2;
+		public native function _drawHexCodeBox(canvas:RID, size:Int64, pos:Vector2, index:Int64, color:Color):void;
 		[Godot(direction="enum:TextServer.Direction", orientation="enum:TextServer.Orientation")]
 		public native function _createShapedText(direction:int, orientation:int):RID;
 		public native function _shapedTextClear(shaped:RID):void;
@@ -26943,8 +26943,8 @@ package godot {
 		public native function _shapedTextSetBidiOverride(shaped:RID, override:GodotArray):void;
 		public native function _shapedTextSetCustomPunctuation(shaped:RID, punct:String):void;
 		public native function _shapedTextGetCustomPunctuation(shaped:RID):String;
-		public native function _shapedTextSetCustomEllipsis(shaped:RID, char:Number):void;
-		public native function _shapedTextGetCustomEllipsis(shaped:RID):Number;
+		public native function _shapedTextSetCustomEllipsis(shaped:RID, char:Int64):void;
+		public native function _shapedTextGetCustomEllipsis(shaped:RID):Int64;
 		[Godot(orientation="enum:TextServer.Orientation")]
 		public native function _shapedTextSetOrientation(shaped:RID, orientation:int):void;
 		[Godot(returns="enum:TextServer.Orientation")]
@@ -26954,35 +26954,35 @@ package godot {
 		public native function _shapedTextSetPreserveControl(shaped:RID, enabled:Boolean):void;
 		public native function _shapedTextGetPreserveControl(shaped:RID):Boolean;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public native function _shapedTextSetSpacing(shaped:RID, spacing:int, value:Number):void;
+		public native function _shapedTextSetSpacing(shaped:RID, spacing:int, value:Int64):void;
 		[Godot(spacing="enum:TextServer.SpacingType")]
-		public native function _shapedTextGetSpacing(shaped:RID, spacing:int):Number;
+		public native function _shapedTextGetSpacing(shaped:RID, spacing:int):Int64;
 		[Godot(fonts="Array[RID]")]
-		public native function _shapedTextAddString(shaped:RID, text:String, fonts:GodotArray, size:Number, opentypeFeatures:GodotDictionary, language:String, meta:*):Boolean;
+		public native function _shapedTextAddString(shaped:RID, text:String, fonts:GodotArray, size:Int64, opentypeFeatures:GodotDictionary, language:String, meta:*):Boolean;
 		[Godot(inlineAlign="enum:InlineAlignment")]
-		public native function _shapedTextAddObject(shaped:RID, key:*, size:Vector2, inlineAlign:int, length:Number, baseline:Number):Boolean;
+		public native function _shapedTextAddObject(shaped:RID, key:*, size:Vector2, inlineAlign:int, length:Int64, baseline:Number):Boolean;
 		[Godot(inlineAlign="enum:InlineAlignment")]
 		public native function _shapedTextResizeObject(shaped:RID, key:*, size:Vector2, inlineAlign:int, baseline:Number):Boolean;
 		public native function _shapedTextHasObject(shaped:RID, key:*):Boolean;
 		public native function _shapedGetText(shaped:RID):String;
-		public native function _shapedGetSpanCount(shaped:RID):Number;
-		public native function _shapedGetSpanMeta(shaped:RID, index:Number):*;
-		public native function _shapedGetSpanEmbeddedObject(shaped:RID, index:Number):*;
-		public native function _shapedGetSpanText(shaped:RID, index:Number):String;
-		public native function _shapedGetSpanObject(shaped:RID, index:Number):*;
+		public native function _shapedGetSpanCount(shaped:RID):Int64;
+		public native function _shapedGetSpanMeta(shaped:RID, index:Int64):*;
+		public native function _shapedGetSpanEmbeddedObject(shaped:RID, index:Int64):*;
+		public native function _shapedGetSpanText(shaped:RID, index:Int64):String;
+		public native function _shapedGetSpanObject(shaped:RID, index:Int64):*;
 		[Godot(fonts="Array[RID]")]
-		public native function _shapedSetSpanUpdateFont(shaped:RID, index:Number, fonts:GodotArray, size:Number, opentypeFeatures:GodotDictionary):void;
-		public native function _shapedGetRunCount(shaped:RID):Number;
-		public native function _shapedGetRunText(shaped:RID, index:Number):String;
-		public native function _shapedGetRunRange(shaped:RID, index:Number):Vector2i;
-		public native function _shapedGetRunGlyphRange(shaped:RID, index:Number):Vector2i;
-		public native function _shapedGetRunFontRid(shaped:RID, index:Number):RID;
-		public native function _shapedGetRunFontSize(shaped:RID, index:Number):int;
-		public native function _shapedGetRunLanguage(shaped:RID, index:Number):String;
+		public native function _shapedSetSpanUpdateFont(shaped:RID, index:Int64, fonts:GodotArray, size:Int64, opentypeFeatures:GodotDictionary):void;
+		public native function _shapedGetRunCount(shaped:RID):Int64;
+		public native function _shapedGetRunText(shaped:RID, index:Int64):String;
+		public native function _shapedGetRunRange(shaped:RID, index:Int64):Vector2i;
+		public native function _shapedGetRunGlyphRange(shaped:RID, index:Int64):Vector2i;
+		public native function _shapedGetRunFontRid(shaped:RID, index:Int64):RID;
+		public native function _shapedGetRunFontSize(shaped:RID, index:Int64):int;
+		public native function _shapedGetRunLanguage(shaped:RID, index:Int64):String;
 		[Godot(returns="enum:TextServer.Direction")]
-		public native function _shapedGetRunDirection(shaped:RID, index:Number):int;
-		public native function _shapedGetRunObject(shaped:RID, index:Number):*;
-		public native function _shapedTextSubstr(shaped:RID, start:Number, length:Number):RID;
+		public native function _shapedGetRunDirection(shaped:RID, index:Int64):int;
+		public native function _shapedGetRunObject(shaped:RID, index:Int64):*;
+		public native function _shapedTextSubstr(shaped:RID, start:Int64, length:Int64):RID;
 		public native function _shapedTextGetParent(shaped:RID):RID;
 		[Godot(justificationFlags="bitfield:TextServer.JustificationFlag")]
 		public native function _shapedTextFitToWidth(shaped:RID, width:Number, justificationFlags:int):Number;
@@ -26991,51 +26991,51 @@ package godot {
 		public native function _shapedTextUpdateBreaks(shaped:RID):Boolean;
 		public native function _shapedTextUpdateJustificationOps(shaped:RID):Boolean;
 		public native function _shapedTextIsReady(shaped:RID):Boolean;
-		public native function _shapedTextGetGlyphCount(shaped:RID):Number;
+		public native function _shapedTextGetGlyphCount(shaped:RID):Int64;
 		public native function _shapedTextGetRange(shaped:RID):Vector2i;
 		[Godot(breakFlags="bitfield:TextServer.LineBreakFlag")]
-		public native function _shapedTextGetLineBreaksAdv(shaped:RID, width:PackedFloat32Array, start:Number, once:Boolean, breakFlags:int):PackedInt32Array;
+		public native function _shapedTextGetLineBreaksAdv(shaped:RID, width:PackedFloat32Array, start:Int64, once:Boolean, breakFlags:int):PackedInt32Array;
 		[Godot(breakFlags="bitfield:TextServer.LineBreakFlag")]
-		public native function _shapedTextGetLineBreaks(shaped:RID, width:Number, start:Number, breakFlags:int):PackedInt32Array;
+		public native function _shapedTextGetLineBreaks(shaped:RID, width:Number, start:Int64, breakFlags:int):PackedInt32Array;
 		[Godot(graphemeFlags="bitfield:TextServer.GraphemeFlag", skipGraphemeFlags="bitfield:TextServer.GraphemeFlag")]
 		public native function _shapedTextGetWordBreaks(shaped:RID, graphemeFlags:int, skipGraphemeFlags:int):PackedInt32Array;
-		public native function _shapedTextGetTrimPos(shaped:RID):Number;
-		public native function _shapedTextGetEllipsisPos(shaped:RID):Number;
-		public native function _shapedTextGetEllipsisGlyphCount(shaped:RID):Number;
+		public native function _shapedTextGetTrimPos(shaped:RID):Int64;
+		public native function _shapedTextGetEllipsisPos(shaped:RID):Int64;
+		public native function _shapedTextGetEllipsisGlyphCount(shaped:RID):Int64;
 		[Godot(trimFlags="bitfield:TextServer.TextOverrunFlag")]
 		public native function _shapedTextOverrunTrimToWidth(shaped:RID, width:Number, trimFlags:int):void;
 		public native function _shapedTextGetObjects(shaped:RID):GodotArray;
 		public native function _shapedTextGetObjectRect(shaped:RID, key:*):Rect2;
 		public native function _shapedTextGetObjectRange(shaped:RID, key:*):Vector2i;
-		public native function _shapedTextGetObjectGlyph(shaped:RID, key:*):Number;
+		public native function _shapedTextGetObjectGlyph(shaped:RID, key:*):Int64;
 		public native function _shapedTextGetSize(shaped:RID):Vector2;
 		public native function _shapedTextGetAscent(shaped:RID):Number;
 		public native function _shapedTextGetDescent(shaped:RID):Number;
 		public native function _shapedTextGetWidth(shaped:RID):Number;
 		public native function _shapedTextGetUnderlinePosition(shaped:RID):Number;
 		public native function _shapedTextGetUnderlineThickness(shaped:RID):Number;
-		public native function _shapedTextGetDominantDirectionInRange(shaped:RID, start:Number, end:Number):Number;
-		public native function _shapedTextGetSelection(shaped:RID, start:Number, end:Number):PackedVector2Array;
-		public native function _shapedTextHitTestGrapheme(shaped:RID, coord:Number):Number;
-		public native function _shapedTextHitTestPosition(shaped:RID, coord:Number):Number;
+		public native function _shapedTextGetDominantDirectionInRange(shaped:RID, start:Int64, end:Int64):Int64;
+		public native function _shapedTextGetSelection(shaped:RID, start:Int64, end:Int64):PackedVector2Array;
+		public native function _shapedTextHitTestGrapheme(shaped:RID, coord:Number):Int64;
+		public native function _shapedTextHitTestPosition(shaped:RID, coord:Number):Int64;
 		public native function _shapedTextDraw(shaped:RID, canvas:RID, pos:Vector2, clipL:Number, clipR:Number, color:Color, oversampling:Number):void;
-		public native function _shapedTextDrawOutline(shaped:RID, canvas:RID, pos:Vector2, clipL:Number, clipR:Number, outlineSize:Number, color:Color, oversampling:Number):void;
-		public native function _shapedTextGetGraphemeBounds(shaped:RID, pos:Number):Vector2;
-		public native function _shapedTextNextGraphemePos(shaped:RID, pos:Number):Number;
-		public native function _shapedTextPrevGraphemePos(shaped:RID, pos:Number):Number;
+		public native function _shapedTextDrawOutline(shaped:RID, canvas:RID, pos:Vector2, clipL:Number, clipR:Number, outlineSize:Int64, color:Color, oversampling:Number):void;
+		public native function _shapedTextGetGraphemeBounds(shaped:RID, pos:Int64):Vector2;
+		public native function _shapedTextNextGraphemePos(shaped:RID, pos:Int64):Int64;
+		public native function _shapedTextPrevGraphemePos(shaped:RID, pos:Int64):Int64;
 		public native function _shapedTextGetCharacterBreaks(shaped:RID):PackedInt32Array;
-		public native function _shapedTextNextCharacterPos(shaped:RID, pos:Number):Number;
-		public native function _shapedTextPrevCharacterPos(shaped:RID, pos:Number):Number;
-		public native function _shapedTextClosestCharacterPos(shaped:RID, pos:Number):Number;
+		public native function _shapedTextNextCharacterPos(shaped:RID, pos:Int64):Int64;
+		public native function _shapedTextPrevCharacterPos(shaped:RID, pos:Int64):Int64;
+		public native function _shapedTextClosestCharacterPos(shaped:RID, pos:Int64):Int64;
 		public native function _formatNumber(number:String, language:String):String;
 		public native function _parseNumber(number:String, language:String):String;
 		public native function _percentSign(language:String):String;
 		public native function _stripDiacritics(string:String):String;
 		public native function _isValidIdentifier(string:String):Boolean;
-		public native function _isValidLetter(unicode:Number):Boolean;
-		public native function _stringGetWordBreaks(string:String, language:String, charsPerLine:Number):PackedInt32Array;
+		public native function _isValidLetter(unicode:Int64):Boolean;
+		public native function _stringGetWordBreaks(string:String, language:String, charsPerLine:Int64):PackedInt32Array;
 		public native function _stringGetCharacterBreaks(string:String, language:String):PackedInt32Array;
-		public native function _isConfusable(string:String, dict:PackedStringArray):Number;
+		public native function _isConfusable(string:String, dict:PackedStringArray):Int64;
 		public native function _spoofCheck(string:String):Boolean;
 		public native function _stringToUpper(string:String, language:String):String;
 		public native function _stringToLower(string:String, language:String):String;
@@ -27793,17 +27793,17 @@ package godot {
 		public static const WEEKDAY_SATURDAY:int = 6;
 		public native function Time();
 		public static native function get singleton():Time;
-		public static native function getDatetimeDictFromUnixTime(unixTimeVal:Number):GodotDictionary;
-		public static native function getDateDictFromUnixTime(unixTimeVal:Number):GodotDictionary;
-		public static native function getTimeDictFromUnixTime(unixTimeVal:Number):GodotDictionary;
-		public static native function getDatetimeStringFromUnixTime(unixTimeVal:Number, useSpace:Boolean = false):String;
-		public static native function getDateStringFromUnixTime(unixTimeVal:Number):String;
-		public static native function getTimeStringFromUnixTime(unixTimeVal:Number):String;
+		public static native function getDatetimeDictFromUnixTime(unixTimeVal:Int64):GodotDictionary;
+		public static native function getDateDictFromUnixTime(unixTimeVal:Int64):GodotDictionary;
+		public static native function getTimeDictFromUnixTime(unixTimeVal:Int64):GodotDictionary;
+		public static native function getDatetimeStringFromUnixTime(unixTimeVal:Int64, useSpace:Boolean = false):String;
+		public static native function getDateStringFromUnixTime(unixTimeVal:Int64):String;
+		public static native function getTimeStringFromUnixTime(unixTimeVal:Int64):String;
 		public static native function getDatetimeDictFromDatetimeString(datetime:String, weekday:Boolean):GodotDictionary;
 		public static native function getDatetimeStringFromDatetimeDict(datetime:GodotDictionary, useSpace:Boolean):String;
-		public static native function getUnixTimeFromDatetimeDict(datetime:GodotDictionary):Number;
-		public static native function getUnixTimeFromDatetimeString(datetime:String):Number;
-		public static native function getOffsetStringFromOffsetMinutes(offsetMinutes:Number):String;
+		public static native function getUnixTimeFromDatetimeDict(datetime:GodotDictionary):Int64;
+		public static native function getUnixTimeFromDatetimeString(datetime:String):Int64;
+		public static native function getOffsetStringFromOffsetMinutes(offsetMinutes:Int64):String;
 		public static native function getDatetimeDictFromSystem(utc:Boolean = false):GodotDictionary;
 		public static native function getDateDictFromSystem(utc:Boolean = false):GodotDictionary;
 		public static native function getTimeDictFromSystem(utc:Boolean = false):GodotDictionary;
@@ -27812,8 +27812,8 @@ package godot {
 		public static native function getTimeStringFromSystem(utc:Boolean = false):String;
 		public static native function getTimeZoneFromSystem():GodotDictionary;
 		public static native function getUnixTimeFromSystem():Number;
-		public static native function getTicksMsec():Number;
-		public static native function getTicksUsec():Number;
+		public static native function getTicksMsec():Int64;
+		public static native function getTicksUsec():Int64;
 	}
 	[GodotEnum(name="TimerProcessCallback", values="TIMER_PROCESS_PHYSICS,TIMER_PROCESS_IDLE")]
 	public native class Timer extends Node {
@@ -28473,7 +28473,7 @@ package godot {
 		public final native function getCurrentActionName():String;
 		public final native function hasUndo():Boolean;
 		public final native function hasRedo():Boolean;
-		public final native function getVersion():Number;
+		public final native function getVersion():Int64;
 		public final native function redo():Boolean;
 		public final native function undo():Boolean;
 	}
@@ -29360,8 +29360,8 @@ package godot {
 		public native function VisualShaderNodeParameterRef();
 		public final native function get parameterName():String;
 		public final native function set parameterName(value:String):void;
-		public final native function get paramType():int;
-		public final native function set paramType(value:int):void;
+		public final native function get paramType():Int64;
+		public final native function set paramType(value:Int64):void;
 	}
 	[GodotEnum(name="Mode", values="MODE_LINEAR,MODE_RADIAL,MODE_TANGENTIAL,MODE_MAX")]
 	public native class VisualShaderNodeParticleAccelerator extends VisualShaderNode {
@@ -30119,16 +30119,16 @@ package godot {
 	[Abstract]
 	public native class WorkerThreadPool extends GodotObject {
 		public static native function get singleton():WorkerThreadPool;
-		public static native function addTask(action:Function, highPriority:Boolean = false, description:String = ""):Number;
-		public static native function isTaskCompleted(taskId:Number):Boolean;
+		public static native function addTask(action:Function, highPriority:Boolean = false, description:String = ""):Int64;
+		public static native function isTaskCompleted(taskId:Int64):Boolean;
 		[Godot(returns="enum:GodotError")]
-		public static native function waitForTaskCompletion(taskId:Number):int;
-		public static native function getCallerTaskId():Number;
-		public static native function addGroupTask(action:Function, elements:int, tasksNeeded:int = -1, highPriority:Boolean = false, description:String = ""):Number;
-		public static native function isGroupTaskCompleted(groupId:Number):Boolean;
-		public static native function getGroupProcessedElementCount(groupId:Number):uint;
-		public static native function waitForGroupTaskCompletion(groupId:Number):void;
-		public static native function getCallerGroupId():Number;
+		public static native function waitForTaskCompletion(taskId:Int64):int;
+		public static native function getCallerTaskId():Int64;
+		public static native function addGroupTask(action:Function, elements:int, tasksNeeded:int = -1, highPriority:Boolean = false, description:String = ""):Int64;
+		public static native function isGroupTaskCompleted(groupId:Int64):Boolean;
+		public static native function getGroupProcessedElementCount(groupId:Int64):uint;
+		public static native function waitForGroupTaskCompletion(groupId:Int64):void;
+		public static native function getCallerGroupId():Int64;
 	}
 	public native class World2D extends Resource {
 		public native function World2D();
@@ -30197,7 +30197,7 @@ package godot {
 		public final native function getNodeType():int;
 		public final native function getNodeName():String;
 		public final native function getNodeData():String;
-		public final native function getNodeOffset():Number;
+		public final native function getNodeOffset():Int64;
 		public final native function getAttributeCount():int;
 		public final native function getAttributeName(idx:int):String;
 		public final native function getAttributeValue(idx:int):String;
@@ -30208,7 +30208,7 @@ package godot {
 		public final native function getCurrentLine():int;
 		public final native function skipSection():void;
 		[Godot(returns="enum:GodotError")]
-		public final native function seek(position:Number):int;
+		public final native function seek(position:Int64):int;
 		[Godot(returns="enum:GodotError")]
 		public final native function open(file:String):int;
 		[Godot(returns="enum:GodotError")]
@@ -30778,9 +30778,9 @@ package godot {
 		[Godot(append="enum:ZIPPacker.ZipAppend", returns="enum:GodotError")]
 		public final native function open(path:String, append:int = 0):int;
 		[Godot(permissions="bitfield:FileAccess.UnixPermissionFlags", returns="enum:GodotError")]
-		public final native function addDirectory(path:String, permissions:int = 493, modifiedTime:Number = 0):int;
+		public final native function addDirectory(path:String, permissions:int = 493, modifiedTime:Int64 = 0):int;
 		[Godot(permissions="bitfield:FileAccess.UnixPermissionFlags", returns="enum:GodotError")]
-		public final native function startFile(path:String, permissions:int = 420, modifiedTime:Number = 0):int;
+		public final native function startFile(path:String, permissions:int = 420, modifiedTime:Int64 = 0):int;
 		[Godot(returns="enum:GodotError")]
 		public final native function writeFile(data:PackedByteArray):int;
 		[Godot(returns="enum:GodotError")]
@@ -31398,25 +31398,25 @@ package godot {
 	public native function sqrt(x:Number):Number;
 	public native function fmod(x:Number, y:Number):Number;
 	public native function fposmod(x:Number, y:Number):Number;
-	public native function posmod(x:int, y:int):int;
+	public native function posmod(x:Int64, y:Int64):Int64;
 	public native function floor(x:*):*;
 	public native function floorf(x:Number):Number;
-	public native function floori(x:Number):int;
+	public native function floori(x:Number):Int64;
 	public native function ceil(x:*):*;
 	public native function ceilf(x:Number):Number;
-	public native function ceili(x:Number):int;
+	public native function ceili(x:Number):Int64;
 	public native function round(x:*):*;
 	public native function roundf(x:Number):Number;
-	public native function roundi(x:Number):int;
+	public native function roundi(x:Number):Int64;
 	public native function abs(x:*):*;
 	public native function absf(x:Number):Number;
-	public native function absi(x:int):int;
+	public native function absi(x:Int64):Int64;
 	public native function sign(x:*):*;
 	public native function signf(x:Number):Number;
-	public native function signi(x:int):int;
+	public native function signi(x:Int64):Int64;
 	public native function snapped(x:*, step:*):*;
 	public native function snappedf(x:Number, step:Number):Number;
-	public native function snappedi(x:Number, step:int):int;
+	public native function snappedi(x:Number, step:Int64):Int64;
 	public native function pow(base:Number, exp:Number):Number;
 	public native function log(x:Number):Number;
 	public native function exp(x:Number):Number;
@@ -31425,7 +31425,7 @@ package godot {
 	public native function isEqualApprox(a:Number, b:Number):Boolean;
 	public native function isZeroApprox(x:Number):Boolean;
 	public native function ease(x:Number, curve:Number):Number;
-	public native function stepDecimals(x:Number):int;
+	public native function stepDecimals(x:Number):Int64;
 	public native function lerp(from:*, to:*, weight:*):*;
 	public native function lerpf(from:Number, to:Number, weight:Number):Number;
 	public native function cubicInterpolate(from:Number, to:Number, pre:Number, post:Number, weight:Number):Number;
@@ -31446,32 +31446,32 @@ package godot {
 	public native function linearToDb(lin:Number):Number;
 	public native function dbToLinear(db:Number):Number;
 	public native function wrap(value:*, min:*, max:*):*;
-	public native function wrapi(value:int, min:int, max:int):int;
+	public native function wrapi(value:Int64, min:Int64, max:Int64):Int64;
 	public native function wrapf(value:Number, min:Number, max:Number):Number;
 	public native function max(arg1:*, arg2:*, ...rest):*;
-	public native function maxi(a:int, b:int):int;
+	public native function maxi(a:Int64, b:Int64):Int64;
 	public native function maxf(a:Number, b:Number):Number;
 	public native function min(arg1:*, arg2:*, ...rest):*;
-	public native function mini(a:int, b:int):int;
+	public native function mini(a:Int64, b:Int64):Int64;
 	public native function minf(a:Number, b:Number):Number;
 	public native function clamp(value:*, min:*, max:*):*;
-	public native function clampi(value:int, min:int, max:int):int;
+	public native function clampi(value:Int64, min:Int64, max:Int64):Int64;
 	public native function clampf(value:Number, min:Number, max:Number):Number;
-	public native function nearestPo2(value:int):int;
+	public native function nearestPo2(value:Int64):Int64;
 	public native function pingpong(value:Number, length:Number):Number;
 	public native function randomize():void;
-	public native function randi():uint;
+	public native function randi():Int64;
 	public native function randf():Number;
-	public native function randiRange(from:int, to:int):int;
+	public native function randiRange(from:Int64, to:Int64):Int64;
 	public native function randfRange(from:Number, to:Number):Number;
 	public native function randfn(mean:Number, deviation:Number):Number;
-	public native function seed(base:Number):void;
-	public native function randFromSeed(seed:Number):PackedInt64Array;
+	public native function seed(base:Int64):void;
+	public native function randFromSeed(seed:Int64):PackedInt64Array;
 	public native function weakref(obj:*):*;
-	public native function typeConvert(variant:*, type:int):*;
+	public native function typeConvert(variant:*, type:Int64):*;
 	public native function str(arg1:*, ...rest):String;
-	public native function errorString(error:int):String;
-	public native function typeString(type:int):String;
+	public native function errorString(error:Int64):String;
+	public native function typeString(type:Int64):String;
 	public native function print(...rest):void;
 	public native function printRich(...rest):void;
 	public native function printerr(...rest):void;
@@ -31487,11 +31487,11 @@ package godot {
 	public native function bytesToVar(bytes:PackedByteArray):*;
 	public native function varToBytesWithObjects(variable:*):PackedByteArray;
 	public native function bytesToVarWithObjects(bytes:PackedByteArray):*;
-	public native function hash(variable:*):uint;
-	public native function instanceFromId(instanceId:Number):GodotObject;
-	public native function isInstanceIdValid(id:Number):Boolean;
+	public native function hash(variable:*):Int64;
+	public native function instanceFromId(instanceId:Int64):GodotObject;
+	public native function isInstanceIdValid(id:Int64):Boolean;
 	public native function isInstanceValid(instance:*):Boolean;
-	public native function ridAllocateId():Number;
-	public native function ridFromInt64(base:Number):RID;
+	public native function ridAllocateId():Int64;
+	public native function ridFromInt64(base:Int64):RID;
 	public native function isSame(a:*, b:*):Boolean;
 }
