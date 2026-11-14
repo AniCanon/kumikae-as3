@@ -21,7 +21,7 @@ singletons such as `Input`, Godot's constants and its static methods. Godot's 64
 type, `Int64`. A clean-up of the C++ comes next, then global functions (the rest of stage 2b-3), then the
 rest of the language.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 72 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 77 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -110,7 +110,7 @@ properties, signals and hot reload.
 | 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library. With them, what stage 1 promised that needs them: AS3 collections converting when handed to Godot, `object[name]` in general, and elements of Godot's untyped collections | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
 | Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Planned |
 | 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Planned |
-| Clean-up pass | The 24 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
+| Clean-up pass | The 28 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
 
@@ -164,7 +164,7 @@ The design keeps each of these possible. No stage above delivers them.
 | Part | What it does | Status |
 |---|---|---|
 | A. Singletons, constants, static methods | `Input.isActionPressed("jump")`, a singleton's signals, `Vector2.ZERO`, `Key.ESCAPE`, `Vector2.fromAngle(a)`. A Godot value with parts starts at its zero. Closes 3 backlog items. | Built and reviewed |
-| B. `Int64` | The 64-bit integer type the owner approved. The [design](superpowers/specs/2026-11-14-int64-design.md) was approved on 2026-11-14. A Godot integer is an `Int64` unless Godot says it is narrower; 1,059 declarations changed and none became narrower; the table kept by hand is gone. | Built; in review |
+| B. `Int64` | The 64-bit integer type the owner approved. The [design](superpowers/specs/2026-11-14-int64-design.md) was approved on 2026-11-14. A Godot integer is an `Int64` unless Godot says it is narrower; 1,059 declarations changed and none became narrower; the table kept by hand is gone. | Built and reviewed |
 | C++ clean-up | Asked for by the owner on 2026-11-14: split the oversized files, remove duplication, drop banner and redundant comments, use C++17 well, and measure that nothing got slower. No change in behaviour: every test stays as it is. See the [guidelines](cpp-guidelines.md) and the [plan](superpowers/plans/2026-11-14-cpp-cleanup.md). | Next |
 | C. Global functions and errors | `print`, `lerp`, `randf` and the rest; an AS3 error shown the way Godot shows its own. Closes 6 backlog items. | After the clean-up |
 
@@ -200,7 +200,7 @@ and the elements of Godot's untyped collections.
 Open items:
 
 - **The [backlog](backlog.md) gives every deferred item a stage:** 6 left in 2b-3, 16 in 2c, 9 in the
-  language server's second slice, 14 in 2d, 24 in a clean-up pass that closes stage 2, and 3 that wait on
+  language server's second slice, 14 in 2d, 28 in a clean-up pass that closes stage 2, and 4 that wait on
   the owner.
 - **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
   waits for the cycle collector (2d).
@@ -231,6 +231,7 @@ Open items:
 | 60 Godot methods that take raw pointers are left out | AS3 has nothing to pass them. The proposal is that this stands. |
 | What `"" + this` reads in a script without `toString()` | Today AS3's `[object Values]`; Godot's own text for the node is `<Node2D#123>`. |
 | `removeAll()` on a singleton's signal | It removes every script's listeners on that signal, not only the caller's, as on any signal. On a singleton that reaches across the whole game. |
+| Wide integers Godot cuts inside its other built-in types | `items.insert(4294967297, x)` inserts at 1 and `Color.hex` keeps 32 bits, without an error, as in GDScript. The integer vectors and `PackedInt32Array` are guarded; guarding the rest needs a short list kept by hand. See the [backlog](backlog.md). |
 | When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
 
 ## How to follow progress

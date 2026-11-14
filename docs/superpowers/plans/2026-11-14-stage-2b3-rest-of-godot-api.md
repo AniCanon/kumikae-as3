@@ -159,7 +159,8 @@ that show such a type are updated in the task that changes them, and the commit 
    `-9223372036854775808` can be written.
 7. **The generator's rule:** an integer is `Int64` unless its width mark is below 64 bits, or its class
    stores 32-bit integers (members marked `int32` in the description's member offsets, a class made only
-   of such classes, and the two names `PackedInt32Array` and `PackedByteArray`). `WIDTHS` and
+   of such classes, and the one name `PackedInt32Array`; `PackedByteArray` came off the list while
+   building, since it also reads 64-bit integers). `WIDTHS` and
    `_INT64_ELEMENT` are deleted. Wide flag enums become `Int64`.
 8. **At the edge:** `Kind::I64` goes to Godot as its integer and comes back from any Godot integer.
    `arrives` keeps the range check for `I32` and `U32`.

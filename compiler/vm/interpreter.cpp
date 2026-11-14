@@ -118,17 +118,25 @@ static int64_t string_to_wide(std::string_view p_text) {
 	if (at < end && (p_text[at] == '-' || p_text[at] == '+')) {
 		at++;
 	}
+	// Hex, as AS3 reads "0x10".
+	const bool hex = at + 1 < end && p_text[at] == '0' && (p_text[at + 1] == 'x' || p_text[at + 1] == 'X');
+	const uint64_t base = hex ? 16 : 10;
+	at += hex ? 2 : 0;
 	bool digits = at < end;
 	uint64_t value = 0;
 	const uint64_t limit = negative ? (uint64_t)1 << 63 : (uint64_t)INT64_MAX;
 	bool past = false;
 	for (size_t i = at; i < end && digits; i++) {
-		if (p_text[i] < '0' || p_text[i] > '9') {
+		const char c = p_text[i];
+		const uint64_t digit = c >= '0' && c <= '9' ? (uint64_t)(c - '0')
+				: hex && c >= 'a' && c <= 'f' ? (uint64_t)(c - 'a' + 10)
+				: hex && c >= 'A' && c <= 'F' ? (uint64_t)(c - 'A' + 10)
+											  : base;
+		if (digit >= base) {
 			digits = false;
 		} else if (!past) {
-			uint64_t digit = (uint64_t)(p_text[i] - '0');
-			past = value > (limit - digit) / 10;
-			value = past ? limit : value * 10 + digit;
+			past = value > (limit - digit) / base;
+			value = past ? limit : value * base + digit;
 		}
 	}
 	if (!digits) {

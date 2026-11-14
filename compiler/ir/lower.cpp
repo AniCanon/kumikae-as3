@@ -93,8 +93,9 @@ class Lowerer {
 	// has refused one that is written where an Int64 is expected and does not fit.
 	static bool wide_literal(const Expr *p_expression, int64_t *r_value) {
 		bool negative = false;
-		if (p_expression && p_expression->kind == NodeKind::Unary && static_cast<const Unary *>(p_expression)->op == TokenKind::Minus) {
-			negative = true;
+		while (p_expression && p_expression->kind == NodeKind::Unary &&
+				(static_cast<const Unary *>(p_expression)->op == TokenKind::Minus || static_cast<const Unary *>(p_expression)->op == TokenKind::Plus)) {
+			negative = negative != (static_cast<const Unary *>(p_expression)->op == TokenKind::Minus);
 			p_expression = static_cast<const Unary *>(p_expression)->operand;
 		}
 		if (!p_expression || p_expression->kind != NodeKind::NumberLit) {
@@ -981,6 +982,38 @@ class Lowerer {
 		return out;
 	}
 
+	// One of Godot's values that stores 32-bit integers: every part of it is an `int`, or is such a value
+	// (Vector2i; Rect2i, which is two of them). Godot cuts a wider integer off inside these without a
+	// word, so a whole number on its way into one goes as an `int`, and says so if it does not fit.
+	bool stores_int32(const Type *p_type) const {
+		if (!p_type || p_type->kind != Type::Instance || !p_type->symbol || !p_type->symbol->klass || !is_godot(p_type->symbol) ||
+				is_godot_object(p_type->symbol)) {
+			return false;
+		}
+		bool any = false;
+		for (const auto &member : p_type->symbol->klass->members) {
+			if (member.second->kind != SymbolKind::Field || member.second->is_static()) {
+				continue;
+			}
+			const Type *part = member.second->type ? compilation_.type_of(member.second->type) : nullptr;
+			Kind kind = Kind::Void;
+			if (!part || part == p_type || !((kind_of(part, &kind) && kind == Kind::I32) || stores_int32(part))) {
+				return false;
+			}
+			any = true;
+		}
+		return any;
+	}
+
+	// A whole number in p_reg, as the `int` a 32-bit value takes: checked, never cut.
+	uint32_t as_int32(uint32_t p_reg, uint32_t p_position) {
+		Kind kind = kind_at(p_reg);
+		if (kind == Kind::I32 || !is_numeric(kind)) {
+			return p_reg;
+		}
+		return convert(convert(p_reg, Kind::I64, p_position), Kind::I32, p_position);
+	}
+
 	// A class Godot keeps one object of (Input): tagged [Singleton] in the declarations.
 	static bool is_singleton(const Symbol *p_class) {
 		if (!p_class || p_class->kind != SymbolKind::Class || !p_class->unit || !p_class->unit->is_declaration || !p_class->node ||
@@ -1750,6 +1783,14 @@ class Lowerer {
 							: nullptr;
 					std::vector<uint32_t> list;
 					engine_arguments(decl, made->arguments, position, list);
+					if (stores_int32(made->type)) {
+						// Its constructor takes anything in its first places, so the width is checked here.
+						for (size_t i = 0; i < list.size() && i < made->arguments.count; i++) {
+							if (is_integral(kind_at(list[i])) || whole(made->arguments[i])) {
+								list[i] = as_int32(list[i], made->arguments[i]->offset);
+							}
+						}
+					}
 					uint32_t value = reg(Kind::Val);
 					emit(Op::HostNew, position, value, type_name, arguments(std::move(list)));
 					return value;
@@ -1954,7 +1995,11 @@ class Lowerer {
 
 	// An operand for the engine, as the checker typed it: Godot tells a whole number from a fraction
 	// (`Vector2i * 2` is a Vector2i), and the interpreter's own arithmetic is all in fractions.
-	uint32_t operand(Expr *p_expression) {
+	uint32_t operand(Expr *p_expression, const Type *p_beside = nullptr) {
+		if (stores_int32(p_beside) && (whole(p_expression))) {
+			// Beside a value of 32-bit integers (`cell * n`): Godot would cut a wider one off.
+			return as_int32(expression(p_expression, Kind::Void), p_expression->offset);
+		}
 		Kind kind = Kind::Void;
 		if (!kind_of(p_expression->type, &kind) || !is_numeric(kind)) {
 			kind = Kind::Void;
@@ -2202,6 +2247,9 @@ class Lowerer {
 				if (p_want != Kind::Bool) {
 					Kind a = is_null(left) ? Kind::Void : natural(left);
 					Kind b = is_null(right) ? Kind::Void : natural(right);
+					if (a != b && is_integral(a) && is_integral(b) && (a == Kind::I64 || b == Kind::I64)) {
+						a = b = Kind::I64; // An Int64 holds both, as the checker took it.
+					}
 					kind = a == Kind::Void ? b : a;
 					if (kind == Kind::Void || (a != Kind::Void && b != Kind::Void && a != b)) {
 						refuse(position, "'&&' or '||' between values of different types");
@@ -2381,12 +2429,14 @@ class Lowerer {
 						refuse(position, "this operator on a Godot value");
 						return default_value(p_want, position);
 					}
-					uint32_t a = settled(operand(left), right, position);
-					uint32_t b = operand(right);
+					uint32_t a = settled(operand(left, right->type), right, position);
+					uint32_t b = operand(right, left->type);
 					return engine_operate(p_binary->op, { a, b }, result, p_binary->type, position);
 				}
-				uint32_t a = settled(wide_operand(left, strings ? Kind::Void : right_kind), right, position);
-				uint32_t b = wide_operand(right, strings ? Kind::Void : left_kind);
+				// Division is done in Numbers, so a literal beside an Int64 stays the Number it is written as.
+				bool exact = !strings && p_binary->op != TokenKind::Slash;
+				uint32_t a = settled(wide_operand(left, exact ? right_kind : Kind::Void), right, position);
+				uint32_t b = wide_operand(right, exact ? left_kind : Kind::Void);
 				return operate(p_binary->op, a, b, strings, position);
 			}
 		}
@@ -2407,7 +2457,7 @@ class Lowerer {
 			Kind right_kind = Kind::Void;
 			kind_of(p_assign->value->type, &right_kind);
 			bool engine = !strings && (is_engine(kind_at(old)) || is_engine(right_kind));
-			uint32_t right = engine ? operand(p_assign->value) : wide_operand(p_assign->value, strings ? Kind::Void : place.kind);
+			uint32_t right = engine ? operand(p_assign->value, p_assign->target->type) : wide_operand(p_assign->value, strings || p_assign->op == TokenKind::SlashAssign ? Kind::Void : place.kind);
 			if (engine) {
 				value = convert(engine_operate(p_assign->op, { old, right }, place.kind, p_assign->target->type, position), place.kind, position);
 			} else {

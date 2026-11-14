@@ -56,6 +56,24 @@ func _physics_process(_delta: float) -> bool:
 	show("flags", ask("flags"), RenderingServer.ARRAY_FLAG_COMPRESS_ATTRIBUTES)
 	# Whole numbers worked out in AS3 reach Godot whole.
 	show("product", ask("product", [Vector2i(1, 2), 3, 5]), Vector2i(1, 2) * 15)
+	show("product past int", ask("product", [Vector2i(1, 1), 50000, 60000]), null)
+	# A type that stores 32-bit integers never sees a wide one.
+	var past := 4294967299
+	show("cell", ask("cell", [7]), Vector2i(7, 0))
+	show("cell refused", ask("cell", [past]), null)
+	show("cell3 refused", ask("cell3", [past]), null)
+	show("box", ask("box", [3]), Rect2i(3, 3, 5, 5))
+	show("box refused", ask("box", [past]), null)
+	show("over", ask("over", [Vector2i(100, 100), 4]), Vector2i(100, 100) / 4)
+	show("over refused", ask("over", [Vector2i(100, 100), past]), null)
+	show("remainder", ask("remainder", [Vector2i(100, 100), 7]), Vector2i(100, 100) % 7)
+	show("remainder refused", ask("remainder", [Vector2i(100, 100), past]), null)
+	show("times", ask("times", [Vector2i(1, 2), 3]), Vector2i(1, 2) * 3)
+	show("times refused", ask("times", [Vector2i(1, 2), past]), null)
+	show("times left refused", ask("timesLeft", [Vector2i(1, 2), past]), null)
+	show("grow refused", ask("grow", [Vector2i(1, 2), past]), null)
+	show("at least one", ask("atLeastOne", [[]]), 1)
+	show("at least its size", ask("atLeastOne", [[4, 5]]), 2)
 	# A listener's argument.
 	ask("listen")
 	Input.joy_connection_changed.emit(5000000000, true)

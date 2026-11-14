@@ -37,6 +37,7 @@ inline bool is_engine(Kind p_kind) {
 // How an instruction uses its three operands.
 //   R  a register          r  a register, or NONE
 //   I  a 32-bit integer    N  an index into the module's numbers     S  into its strings
+//   W  an index into the module's wide numbers (Int64 constants)
 //   L  an instruction index in the same function                     A  into the function's argument lists
 //   F  a function index    C  a class index    D  a field slot       G  a global slot    V  a method-table slot
 //   -  unused
@@ -61,7 +62,7 @@ inline bool is_engine(Kind p_kind) {
 	X(IsClass, "RRC") X(AsClass, "RRC") \
 	/* The engine. Names are Godot's own. In HostCall the first argument is what the method is called on. */ \
 	/* Int64. The constant is an index into the module's wide numbers. Arithmetic wraps at 64 bits. */ \
-	X(ConstI64, "RI-") \
+	X(ConstI64, "RW-") \
 	X(AddI64, "RRR") X(SubI64, "RRR") X(MulI64, "RRR") X(ModI64, "RRR") X(NegI64, "RR-") \
 	X(BitAndI64, "RRR") X(BitOrI64, "RRR") X(BitXorI64, "RRR") X(BitNotI64, "RR-") X(ShlI64, "RRR") X(ShrI64, "RRR") X(UShrI64, "RRR") \
 	X(LtI64, "RRR") X(LeI64, "RRR") X(EqI64, "RRR") \

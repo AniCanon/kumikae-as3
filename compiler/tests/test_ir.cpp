@@ -15,7 +15,7 @@ static void test_ops() {
 	CHECK_EQ(std::string(op_name(Op::name)), std::string(#name)); \
 	CHECK_EQ(std::strlen(op_shape(Op::name)), (size_t)3); \
 	for (const char *c = op_shape(Op::name); *c; c++) { \
-		CHECK(std::strchr("RrINSLAFCDGV-", *c) != nullptr); \
+		CHECK(std::strchr("RrINWSLAFCDGV-", *c) != nullptr); \
 	} \
 	count++;
 	KAS3_IR_OPS(X)

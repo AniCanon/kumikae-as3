@@ -1,0 +1,30 @@
+class Error
+  .0 message:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  new RangeError
+class wide_const
+  new wide_const
+entry wide_const
+function Error(r0:Object, r1:String):void
+  @0 SetField r0 .0 r1
+  @1 ReturnVoid
+function TypeError(r0:Object, r1:String):void
+  @0 SetField r0 .0 r1
+  @1 ReturnVoid
+function RangeError(r0:Object, r1:String):void
+  @0 SetField r0 .0 r1
+  @1 ReturnVoid
+function wide_const(r0:Object):void
+  @1 ConstI64 r2 9007199254740993
+  @2 Move r1 r2
+  @4 ConstI64 r3 1
+  @5 AddI64 r4 r1 r3
+  @6 I64ToStr r5 r4
+  @7 StrToStr r6 r5
+  @8 Trace (r6)
+  @9 ReturnVoid

@@ -189,8 +189,9 @@ class Typer {
 	// A whole number written out, with or without a minus, that an Int64 holds.
 	static bool wide_whole(const Expr *p_expression) {
 		bool negative = false;
-		if (p_expression && p_expression->kind == NodeKind::Unary && static_cast<const Unary *>(p_expression)->op == TokenKind::Minus) {
-			negative = true;
+		while (p_expression && p_expression->kind == NodeKind::Unary &&
+				(static_cast<const Unary *>(p_expression)->op == TokenKind::Minus || static_cast<const Unary *>(p_expression)->op == TokenKind::Plus)) {
+			negative = negative != (static_cast<const Unary *>(p_expression)->op == TokenKind::Minus);
 			p_expression = static_cast<const Unary *>(p_expression)->operand;
 		}
 		if (!p_expression || p_expression->kind != NodeKind::NumberLit) {
@@ -419,8 +420,9 @@ class Typer {
 			// A whole number written out is taken digit by digit, so it must be one an Int64 can hold.
 			const Expr *digits = p_value;
 			bool negative = false;
-			if (digits->kind == NodeKind::Unary && static_cast<const Unary *>(digits)->op == TokenKind::Minus) {
-				negative = true;
+			while (digits && digits->kind == NodeKind::Unary &&
+					(static_cast<const Unary *>(digits)->op == TokenKind::Minus || static_cast<const Unary *>(digits)->op == TokenKind::Plus)) {
+				negative = negative != (static_cast<const Unary *>(digits)->op == TokenKind::Minus);
 				digits = static_cast<const Unary *>(digits)->operand;
 			}
 			if (digits && digits->kind == NodeKind::NumberLit) {
@@ -1280,9 +1282,10 @@ class Typer {
 		const Type *left = expression(p_binary->left);
 		const Type *right = expression(p_binary->right);
 		// A whole number written out beside an Int64 is an Int64 too, read digit by digit.
-		if (left == int64_ && wide_whole(p_binary->right)) {
+		// Not under `/`: division is done in Numbers.
+		if (p_binary->op != TokenKind::Slash && left == int64_ && wide_whole(p_binary->right)) {
 			right = int64_;
-		} else if (right == int64_ && wide_whole(p_binary->left)) {
+		} else if (p_binary->op != TokenKind::Slash && right == int64_ && wide_whole(p_binary->left)) {
 			left = int64_;
 		}
 		switch (p_binary->op) {

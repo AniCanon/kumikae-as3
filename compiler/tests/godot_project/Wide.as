@@ -22,6 +22,15 @@ package {
 		public function asNumber(value:Number):Number { return value; }
 		public function toNumber(value:Int64):Number { return value; }
 		public function product(cell:Vector2i, a:int, b:int):Vector2i { return cell * (a * b); }
+		public function cell(x:Int64):Vector2i { return new Vector2i(x, 0); }
+		public function cell3(x:Int64):Vector3i { return new Vector3i(x, 1, 2); }
+		public function box(x:Int64):Rect2i { return new Rect2i(x, x, 5, 5); }
+		public function over(a:Vector2i, by:Int64):Vector2i { return a / by; }
+		public function remainder(a:Vector2i, by:Int64):Vector2i { return a % by; }
+		public function times(a:Vector2i, by:Int64):Vector2i { return a * by; }
+		public function timesLeft(a:Vector2i, by:Int64):Vector2i { return by * a; }
+		public function grow(a:Vector2i, by:Int64):Vector2i { var v:Vector2i = a; v *= by; return v; }
+		public function atLeastOne(items:GodotArray):int { return items.size() || 1; }
 		public function listen():void { Input.joyConnectionChanged.add(onJoy); }
 		public function unlisten():void { Input.joyConnectionChanged.remove(onJoy); }
 		private function onJoy(device:Int64, connected:Boolean):void { heard = device; }

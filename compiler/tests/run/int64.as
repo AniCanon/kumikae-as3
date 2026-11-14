@@ -64,6 +64,11 @@ package {
 			trace(i, n);
 			var chosen:Int64 = one > 0 ? big : one;
 			trace(chosen, one < 0 ? big : one, w ? "set" : "zero", !unset, unset ? "set" : "zero");
+			// `||` and `&&` as values, a sign written before a literal, hex text, a literal under `/`.
+			trace(w || 5, unset || one, unset && w, one && big);
+			var plus:Int64 = +9007199254740993;
+			var doubled:Int64 = - -9007199254740993;
+			trace(plus, doubled, Int64("0x20000000000001"), Int64("-0x10"), w / 9007199254740993);
 			for (var count:Int64 = 0; count < 3; count++) {
 				trace(count);
 			}

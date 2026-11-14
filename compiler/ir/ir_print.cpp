@@ -87,6 +87,8 @@ std::string operand(const Module &p_module, const Function &p_function, char p_s
 			return p_value == NONE ? "_" : "r" + std::to_string(p_value);
 		case 'I':
 			return std::to_string((int32_t)p_value);
+		case 'W':
+			return p_value < p_module.wides.size() ? std::to_string(p_module.wides[p_value]) : "?wide";
 		case 'N':
 			return p_value < p_module.numbers.size() ? number(p_module.numbers[p_value]) : "?number";
 		case 'S':

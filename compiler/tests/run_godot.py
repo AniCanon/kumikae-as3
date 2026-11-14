@@ -196,10 +196,15 @@ output = compare("wide.gd", [
     "counted id", "node id", "same id", "rgba64", "rgba32", "count", "frames", "element", "negative element", "plus one",
     "stored", "narrow fits", "narrow refused", "echo most", "echo least", "wraps", "whole float", "fraction refused",
     "text refused", "int refused", "number exact", "number refused", "to number", "to number refused", "field", "flags",
-    "product", "heard",
+    "product", "heard", "product past int", "cell", "cell refused", "cell3 refused", "box", "box refused", "over", "over refused",
+    "remainder", "remainder refused", "times", "times refused", "times left refused", "grow refused", "at least one",
+    "at least its size",
 ])
 check("wide.gd: a wide value for a 32-bit array is a RangeError before Godot sees it",
       "RangeError: 5000000000 does not fit an int." in output and "at Wide/narrow()" in output, output[-1200:])
+check("wide.gd: a wide value for an integer vector is a RangeError, eight times",
+      output.count("RangeError: 4294967299 does not fit an int.") == 8 and "RangeError: 3000000000 does not fit an int." in output,
+      output[-1500:])
 check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError: 9007199254740993 does not fit a Number exactly." in output,
       output[-1200:])
 

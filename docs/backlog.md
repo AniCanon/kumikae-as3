@@ -25,8 +25,8 @@ it stands.
 | **2c** | The rest of the language | 16 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
 | **2d** | Editor features | 14 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 24 | What is left |
-| **decision** | The owner | 3 | See each item |
+| **clean-up** | A pass that closes stage 2 | 28 | What is left |
+| **decision** | The owner | 4 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -159,8 +159,23 @@ Found by the review of the clean-up pass itself.
 
 ## Stage 2b-3, part B: `Int64`
 
-- `PackedByteArray` takes an `Int64` for a byte, and Godot keeps its low 8 bits without an error:
-  `bytes.append(300)` stores 44, as in GDScript. Its elements read as `Int64`. **clean-up**
+- **decision** Godot cuts a wide integer off, without an error, inside more of its built-in types than
+  the integer vectors and `PackedInt32Array`, which are guarded. The description gives these no width, so
+  they are `Int64`, and a script gets what GDScript gets:
+  `bytes.append(300)` stores 44; `items.insert(4294967297, 99)` inserts at 1; `Color.hex` keeps the low 32
+  bits (it was a `uint` before); `PackedByteArray.encodeU32`, `encodeS32`, `encodeU16` and `encodeU8` cut
+  their value; `Array`'s `removeAt`, `popAt`, `slice` and `find` cut an index; `Basis.getEuler` and
+  `Quaternion.getEuler` cut the order; `Callable.unbind` its count. Guarding each needs a list kept by
+  hand, which the owner chose against; the choice is whether a short one is worth it.
+- A written cast of a `?:` that mixes an `Int64` and a `Number` checks where it should cut:
+  `int(c ? w : 1.5)` raises a `RangeError` for a wide `w`. **clean-up**
+- An `Int64` against a Boolean or a String is compared through a `Number`, so one past 2^53 raises
+  (`w == true`). `w & "99999999999999999999"` holds the text at the largest `Int64`. **clean-up**
+- A whole number worked out as not-a-number (`v * (5 % 0)`) on its way to Godot is a `RangeError`. Before
+  `Int64` it went as 0. **clean-up**
+- Godot refusing a value says "cannot convert argument 1 ..., a int, to int", not that the value does not
+  fit. **clean-up**
+- An `Int64` shift count widens an `int` on its left: `i >>> c` is worked out in 64 bits. **clean-up**
 - A whole number written out is an `Int64` only where one is expected or beside one. Elsewhere it is a
   `Number`, as in Flash: `var n:Number = 9007199254740993` rounds. **clean-up**
 - `x.toString(radix)` on an `Int64` waits for the standard library. **2c**
