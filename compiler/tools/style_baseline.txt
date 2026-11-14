@@ -1,14 +1,12 @@
 godot_ext/callable.cpp: sweep_listeners() is over 120 lines
-ir/lower.cpp: banner comments
-ir/lower.cpp: binary() is over 120 lines
-ir/lower.cpp: call() is over 120 lines
-ir/lower.cpp: convert() is over 120 lines
-ir/lower.cpp: declare_class() is over 120 lines
-ir/lower.cpp: evaluate() is over 120 lines
-ir/lower.cpp: operate() is over 120 lines
-ir/lower.cpp: run() is over 120 lines
-ir/lower.cpp: statement() is over 120 lines
-ir/lower.cpp: the file is over 800 lines
+ir/lower.cpp: Lowerer::run() is over 120 lines
+ir/lower_calls.cpp: Lowerer::call() is over 120 lines
+ir/lower_classes.cpp: Lowerer::declare_class() is over 120 lines
+ir/lower_expressions.cpp: Lowerer::evaluate() is over 120 lines
+ir/lower_operators.cpp: Lowerer::binary() is over 120 lines
+ir/lower_operators.cpp: Lowerer::operate() is over 120 lines
+ir/lower_statements.cpp: Lowerer::statement() is over 120 lines
+ir/lower_types.cpp: Lowerer::convert() is over 120 lines
 src/ast.h: banner comments
 src/ast_printer.cpp: node() is over 120 lines
 src/ast_walk.h: walk() is over 120 lines
