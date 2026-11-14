@@ -18,7 +18,9 @@ internal object CompilerLocator {
         }
         val searched = searchPath.split(':').filter { it.startsWith("/") }.map { Path.of(it, NAME) }
         val known = listOf(Path.of("/opt/homebrew/bin", NAME), Path.of("/usr/local/bin", NAME))
-        val candidates = sequenceOf(set).filterNotNull() + above + searched + known + home.resolve(".local/bin/$NAME")
+        // A Path is itself a list of its parts: it is wrapped, or `+` would add "home", ".local", "bin".
+        val last = sequenceOf(home.resolve(".local/bin/$NAME"))
+        val candidates = sequenceOf(set).filterNotNull() + above + searched + known + last
         return candidates.firstOrNull { Files.isExecutable(it) && !Files.isDirectory(it) }
     }
 }

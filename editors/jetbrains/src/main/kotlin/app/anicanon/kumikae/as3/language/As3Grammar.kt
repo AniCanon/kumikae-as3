@@ -1,8 +1,9 @@
 package app.anicanon.kumikae.as3.language
 
-import com.intellij.ide.plugins.PluginManager
+import com.intellij.openapi.application.PathManager
 import org.jetbrains.plugins.textmate.api.TextMateBundleProvider
 import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Colours `.as` files with the same grammar the VS Code client uses. The build copies it from
@@ -10,7 +11,10 @@ import java.nio.file.Files
  */
 class As3Grammar : TextMateBundleProvider {
     override fun getBundles(): List<TextMateBundleProvider.PluginBundle> {
-        val folder = PluginManager.getPluginByClass(As3Grammar::class.java)?.pluginPath?.resolve(BUNDLE)
+        // The plugin's folder holds lib/<this jar>; the grammar is beside lib.
+        val folder = PathManager.getJarPathForClass(
+            As3Grammar::class.java,
+        )?.let(Path::of)?.parent?.parent?.resolve(BUNDLE)
         return if (folder != null && Files.isDirectory(folder)) {
             listOf(TextMateBundleProvider.PluginBundle("ActionScript 3", folder))
         } else {
