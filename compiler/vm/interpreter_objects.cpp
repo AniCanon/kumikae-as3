@@ -1,9 +1,8 @@
-#include "interpreter.h"
+#include "interpreter_internal.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include "interpreter_internal.h"
 
 namespace kas3 {
 namespace vm {

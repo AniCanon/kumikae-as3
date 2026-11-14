@@ -20,7 +20,9 @@ FOLDERS = ["src", "ir", "vm", "godot_ext", "lsp", "tools"]
 LIMITS = {".cpp": 800, ".h": 500}
 FUNCTION_LIMIT = 120
 # A dispatch switch whose cases each call a named function (guidelines, section 1).
-DISPATCH = set()
+DISPATCH = {
+    "run",  # vm/interpreter_run.cpp: the interpreter's loop, one case per operation.
+}
 
 BANNER = re.compile(r"^\s*//\s*-{3,}")
 HEAD = re.compile(r"^(\t?)(?!\t)(?:[\w:<>,*&~ ]+?[ *&])?~?(?P<name>[A-Za-z_][\w:]*)\((?:[^;{}]*)\)\s*(?:const\s*)?(?:noexcept\s*)?"

@@ -63,13 +63,18 @@ private:
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value); // Takes over one reference.
 	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.
-	const char *host_op(const ir::Function &p_function, const ir::Instruction &p_instruction);
+	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
 	// A member of nothing was asked for: AS3's TypeError #1009.
 	void raise_null();
 	void convert_checked(const ir::Instruction &p_in, Slot *p_registers);
+	// Parts of the loop in run() that are more than a line or two.
+	void at_statement();
+	void make(uint32_t p_class, Slot &r_out);
+	void enter(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers);
+	void trace(const std::vector<uint32_t> &p_list, const Slot *p_registers);
 	void unwind(size_t p_depth);
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);

@@ -1,9 +1,8 @@
-#include "interpreter.h"
+#include "interpreter_internal.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include "interpreter_internal.h"
 
 namespace kas3 {
 namespace vm {
@@ -77,6 +76,72 @@ void Interpreter::convert_checked(const Instruction &p_in, Slot *p_registers) {
 	}
 }
 
+// A statement is about to run: the debugger's hook, if there is one, sees it and may stop the program.
+void Interpreter::at_statement() {
+	if (!hook_) {
+		return;
+	}
+	frames_.back().pc--; // The hook sees the statement about to run.
+	const bool carry_on = hook_(*this, hook_data_);
+	frames_.back().pc++;
+	if (!carry_on) {
+		stopped_ = true;
+		halted_ = true;
+	}
+}
+
+// A new object of a class, its Number fields not yet a number.
+void Interpreter::make(uint32_t p_class, Slot &r_out) {
+	const ir::Class &klass = module_.classes[p_class];
+	Object *object = new_object(p_class, klass.fields.size());
+	if (!object) {
+		raise(module_.error_class, "Error #1000: The system is out of memory.");
+		return;
+	}
+	for (size_t i = 0; i < klass.fields.size(); i++) {
+		if (klass.fields[i].kind == Kind::F64) {
+			object->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
+		}
+	}
+	assign(Kind::Obj, r_out, object);
+}
+
+// A call: the function named, or for a virtual call the one the object's own class has in that slot.
+// The arguments are copied out of their registers first, since the new frame may move the stack.
+void Interpreter::enter(const Function &p_function, const Instruction &p_in, const Slot *p_registers) {
+	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	uint32_t target = p_in.b;
+	if (p_in.op == Op::CallVirtual) {
+		const Object *object = list.empty() ? nullptr : static_cast<const Object *>(p_registers[list[0]].p);
+		if (!object) {
+			raise_null();
+			return;
+		}
+		target = module_.classes[object->klass].methods[p_in.b];
+	}
+	Slot few[16];
+	std::vector<Slot> many;
+	Slot *values = few;
+	if (list.size() > 16) {
+		many.resize(list.size());
+		values = many.data();
+	}
+	for (size_t i = 0; i < list.size(); i++) {
+		values[i] = p_registers[list[i]];
+	}
+	push(target, values, list.size(), p_in.a);
+}
+
+void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_registers) {
+	std::string line;
+	for (size_t i = 0; i < p_list.size(); i++) {
+		const Str *string = static_cast<const Str *>(p_registers[p_list[i]].p);
+		line += i ? " " : "";
+		line += string ? string->view() : std::string_view("null");
+	}
+	host_.output.print(line);
+}
+
 bool Interpreter::run(size_t p_depth, Slot *r_result) {
 	while (frames_.size() > p_depth) {
 		if (pending_ || stopped_) {
@@ -89,15 +154,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 		const Instruction &in = function.code[frame.pc++];
 		switch (in.op) {
 			case Op::Stmt:
-				if (hook_) {
-					frame.pc--; // The hook sees the statement about to run.
-					bool carry_on = hook_(*this, hook_data_);
-					frames_.back().pc++;
-					if (!carry_on) {
-						stopped_ = true;
-						halted_ = true;
-					}
-				}
+				at_statement();
 				break;
 			case Op::ConstI32:
 				r[in.a].i = (int32_t)in.b;
@@ -412,46 +469,13 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					raise_null();
 				}
 				break;
-			case Op::New: {
-				const ir::Class &klass = module_.classes[in.b];
-				Object *object = new_object(in.b, klass.fields.size());
-				if (!object) {
-					raise(module_.error_class, "Error #1000: The system is out of memory.");
-					break;
-				}
-				for (size_t i = 0; i < klass.fields.size(); i++) {
-					if (klass.fields[i].kind == Kind::F64) {
-						object->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
-					}
-				}
-				assign(Kind::Obj, r[in.a], object);
+			case Op::New:
+				make(in.b, r[in.a]);
 				break;
-			}
 			case Op::Call:
-			case Op::CallVirtual: {
-				const std::vector<uint32_t> &list = function.argument_lists[in.c];
-				uint32_t target = in.b;
-				if (in.op == Op::CallVirtual) {
-					Object *object = list.empty() ? nullptr : static_cast<Object *>(r[list[0]].p);
-					if (!object) {
-						raise_null();
-						break;
-					}
-					target = module_.classes[object->klass].methods[in.b];
-				}
-				Slot arguments[16];
-				std::vector<Slot> many;
-				Slot *values = arguments;
-				if (list.size() > 16) {
-					many.resize(list.size());
-					values = many.data();
-				}
-				for (size_t i = 0; i < list.size(); i++) {
-					values[i] = r[list[i]];
-				}
-				push(target, values, list.size(), in.a); // `frame` and `r` are stale after this.
+			case Op::CallVirtual:
+				enter(function, in, r); // `frame` and `r` are stale after this.
 				break;
-			}
 			case Op::IsClass:
 				set_bool(r[in.a], is_class(static_cast<Object *>(r[in.b].p), in.c));
 				break;
@@ -509,21 +533,12 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostSet: {
 				// The engine may call back into AS3 before it answers, which can move the registers: nothing
 				// read before the call is used after it.
-				const char *failure = host_op(function, in);
-				(void)failure;
+				host_op(function, in);
 				break;
 			}
-			case Op::Trace: {
-				const std::vector<uint32_t> &list = function.argument_lists[in.a];
-				std::string line;
-				for (size_t i = 0; i < list.size(); i++) {
-					Str *string = static_cast<Str *>(r[list[i]].p);
-					line += i ? " " : "";
-					line += string ? string->view() : std::string_view("null");
-				}
-				host_.output.print(line);
+			case Op::Trace:
+				trace(function.argument_lists[in.a], r);
 				break;
-			}
 		}
 		if (pending_ || stopped_) {
 			// The instruction that failed is the one before pc: point the frame back at it for the trace.

@@ -1,5 +1,4 @@
 godot_ext/callable.cpp: sweep_listeners() is over 120 lines
-ir/lower.cpp: Lowerer::run() is over 120 lines
 ir/lower_calls.cpp: Lowerer::call() is over 120 lines
 ir/lower_classes.cpp: Lowerer::declare_class() is over 120 lines
 ir/lower_expressions.cpp: Lowerer::evaluate() is over 120 lines
@@ -12,5 +11,3 @@ src/ast_walk.h: walk() is over 120 lines
 src/names_bodies.cpp: statement() is over 120 lines
 src/parser_stmt.cpp: Parser::parse_statement_inner() is over 120 lines
 src/typer_expressions.cpp: Typer::compute() is over 120 lines
-vm/interpreter_host.cpp: Interpreter::host_op() is over 120 lines
-vm/interpreter_run.cpp: Interpreter::run() is over 120 lines
