@@ -21,11 +21,11 @@ it stands.
 
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
-| **2b-3** | The rest of Godot's API (next) | 12 | `Int64` and what waits on it, singletons, freed objects, how errors reach Godot |
+| **2b-3** | The rest of Godot's API (under way) | 9 | `Int64` and what waits on it, singletons, freed objects, how errors reach Godot |
 | **2c** | The rest of the language | 13 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
 | **2d** | Editor features | 13 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 12 | What is left |
+| **clean-up** | A pass that closes stage 2 | 15 | What is left |
 | **decision** | The owner | 2 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
@@ -48,7 +48,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - The corpus prefix test loads Godot's API for one prefix in 293 only. **clean-up**
 - Loading Godot's API costs about 30 ms on every `kas3c check`. **clean-up**
 - The merged constructors accept calls no overload has: `new Vector3(1, 2)`. **clean-up**
-- A singleton can't be passed as an object. **2b-3**
 - **decision** 60 methods that take raw pointers are left out. AS3 has nothing to pass them, so the
   proposal is that this stands.
 
@@ -115,7 +114,6 @@ Found by the review of the clean-up pass itself.
   a static method wait for closures. **2c**
 - A signal's own `numListeners` and `emit` can't follow `object[name]` as a property read: only its
   methods can (`timer[name].add(f)`). **2c**
-- A singleton's signals (`Input.joyConnectionChanged`) wait for singletons. **2b-3**
 - A script's own signals wait for `[Signal]`. **2d**
 - Objects that hold each other in a loop are freed only when a listener is part of the loop, or reaches
   it. A loop of script objects with no listener in it stays (the cycle collector). So does a loop
@@ -137,6 +135,14 @@ Found by the review of the clean-up pass itself.
   the main loop is not a scene tree, an object held by a static field with a GDScript listener on it
   still aborts Godot at exit. **2d**
 
+## Stage 2b-3, part A: singletons, constants, static methods
+
+- A local with a value written (`var v:Vector2 = position;`) that is read above that line is null there,
+  not the type's zero. So is a variable declared at package level. **clean-up**
+- A class's static method that fails inside Godot (wrong arguments) is reported by Godot only: the script
+  carries on with nothing. **clean-up**
+- A singleton is looked up each time its name is written. **clean-up**
+
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
@@ -151,7 +157,6 @@ Found by the review of the clean-up pass itself.
 
 - **The first editor scan of a project with the extension crashes as Godot exits,** after the scan has done
   its work. The speed spike's extension does the same. Cause unknown. **2d**
-- A local of a Godot value type with no initializer is null, not a zero value. **2b-3**
 - A script attached to a reference-counted Godot object would keep it alive for ever. **2d**
 - godot-cpp is built as `template_release` and loaded by the editor binary; whether editor features need a
   debug build is unchecked. **2d**

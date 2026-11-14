@@ -128,7 +128,7 @@ python3 compiler/tests/run_godot.py compiler/tests   # runs the project in headl
 To use it in a project of your own, copy `tests/godot_project/kas3.gdextension` and the `bin` folder into
 it.
 
-**What works so far (stages 2b-1 and 2b-2):**
+**What works so far (stages 2b-1, 2b-2 and the first part of 2b-3):**
 
 ```actionscript
 package {
@@ -170,13 +170,20 @@ package {
   listener goes when its object is freed.
 - A method is a function wherever Godot takes one: `array.filter(isBig)`.
 - `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs.
+- A singleton is used by its class name: `Input.isActionPressed("jump")`, `Engine.timeScale = 0.5`,
+  `Input.joyConnectionChanged.add(onJoy)`. `Input.singleton` is the object itself, where one is wanted.
+- Godot's constants: `Key.ESCAPE`, `Node.NOTIFICATION_READY`, `Vector2.ZERO`, `Color.RED`. One that has a
+  number in the declarations costs nothing when the program runs.
+- Static methods: `Vector2.fromAngle(a)`, `Color.html("#ff8000")`, `Image.createEmpty(...)`.
+- A variable of a Godot value that has parts (`Vector2`, `Color`, `Transform2D`) starts at the type's zero
+  when no value is written, as in GDScript. `null` can still be assigned. Any other Godot value (an array,
+  a signal) starts missing.
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,
   never taken as if it fitted.
 - An AS3 error inside a call from the engine is reported in Godot's own error output, with the AS3 stack
   trace, and the engine carries on.
 
-**Refused by name until the next slices:** singletons (`Input`), constants and static members of
-Godot classes, `print` and the other global functions, elements of Godot's untyped collections, creating
+**Refused by name until the next slices:** `print` and the other global functions, elements of Godot's untyped collections, creating
 Godot objects with `new`, passing a script object to Godot, and everything `kas3c run` refuses.
 
 How it works:
@@ -185,7 +192,7 @@ How it works:
   script loads. A script that fails to compile is reported once, and no script loads.
 - **The interpreter does not know Godot.** `vm/host.h` is the whole boundary. The extension implements it
   with Godot's own calls; the tests implement it with a recorder.
-- **Godot's names come from Godot.** `godot/godot_names.txt` (21,472 names, written by the generator from
+- **Godot's names come from Godot.** `godot/godot_names.txt` (21,519 names, written by the generator from
   Godot's API description) says that `moveAndSlide` is `move_and_slide`. Nothing is worked out backwards
   from the AS3 name.
 - **In the interpreter a Godot value is boxed** and calls go by name. That is the simple, slow path, in
