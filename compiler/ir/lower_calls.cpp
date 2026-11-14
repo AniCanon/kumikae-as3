@@ -390,9 +390,19 @@ uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receive
 	bool of_value = false;
 	Expr *object = p_call->callee->kind == NodeKind::Member ? static_cast<Member *>(p_call->callee)->object : nullptr;
 	std::vector<uint32_t> list;
-	list.push_back(settled(p_receiver != NONE ? p_receiver : engine_receiver(object, position, &of_value), writer(p_call->arguments), position));
+	uint32_t script_object = NONE; // Set if the member is reached through another script object.
+	const uint32_t receiver = p_receiver != NONE ? p_receiver : engine_receiver(object, position, &of_value, &script_object);
+	if (script_object != NONE) {
+		script_object = settled(script_object, writer(p_call->arguments), position);
+		list.push_back(receiver); // Filled in below, after the arguments.
+	} else {
+		list.push_back(settled(receiver, writer(p_call->arguments), position));
+	}
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
 	engine_arguments(decl, p_call->arguments, position, list);
+	if (script_object != NONE) {
+		owner_of(script_object, receiver, object->offset);
+	}
 	if (p_before) {
 		p_before(); // What the receiver still needs, now that the arguments are worked out.
 	}

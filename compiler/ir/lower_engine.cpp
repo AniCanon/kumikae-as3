@@ -3,7 +3,7 @@
 namespace kas3 {
 namespace ir {
 
-uint32_t Lowerer::engine_receiver(Expr *p_object, uint32_t p_position, bool *r_of_value) {
+uint32_t Lowerer::engine_receiver(Expr *p_object, uint32_t p_position, bool *r_of_value, uint32_t *r_script_object) {
 	*r_of_value = false;
 	if (!p_object || p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr) {
 		uint32_t klass = 0;
@@ -26,13 +26,24 @@ uint32_t Lowerer::engine_receiver(Expr *p_object, uint32_t p_position, bool *r_o
 	const Type *type = p_object->type;
 	if (kind == Kind::Obj && type && type->kind == Type::Instance && class_index(type->symbol, &klass) &&
 			!module_.classes[klass].native_base.empty()) {
-		emit(Op::NullCheck, p_object->offset, object);
 		uint32_t owner = reg(Kind::Ref);
-		emit(Op::GetField, p_position, owner, object, 0);
+		if (r_script_object) {
+			// A call: the owner is fetched once the arguments are worked out (owner_of), so that a
+			// missing script object is reported after them, as it is for one of AS3's own members.
+			*r_script_object = object;
+			return owner;
+		}
+		owner_of(object, owner, p_object->offset);
 		return owner;
 	}
 	refuse(p_position, "this use of a Godot member");
 	return default_value(Kind::Ref, p_position);
+}
+
+// The Godot object a script object is attached to, into p_owner. A missing script object is an error here.
+void Lowerer::owner_of(uint32_t p_script_object, uint32_t p_owner, uint32_t p_position) {
+	emit(Op::NullCheck, p_position, p_script_object);
+	emit(Op::GetField, p_position, p_owner, p_script_object, 0);
 }
 
 uint32_t Lowerer::zero_value(TypeRef *p_written, uint32_t p_position, uint32_t p_into) {

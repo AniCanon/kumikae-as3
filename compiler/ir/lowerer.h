@@ -195,7 +195,8 @@ class Lowerer {
 
 	// The engine object a Godot member is reached through: the script's own owner when nothing is
 	// written before the name, or the value of what is written.
-	uint32_t engine_receiver(Expr *p_object, uint32_t p_position, bool *r_of_value);
+	uint32_t engine_receiver(Expr *p_object, uint32_t p_position, bool *r_of_value, uint32_t *r_script_object = nullptr);
+	void owner_of(uint32_t p_script_object, uint32_t p_owner, uint32_t p_position);
 
 	// One of Godot's values that is made of parts (a Vector2's x and y, a Color's r, g, b and a) is never
 	// missing unless a program says so: a variable of it with no value written starts at the type's zero,

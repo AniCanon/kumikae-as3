@@ -600,6 +600,8 @@ static void test_engine_statics() {
 						 "  public function made(a:Number, b:Number):Vector2 { return Vector2.fromAngle(a + b); }\n"
 						 "  public function shown():void { Node.printOrphanNodes(); }\n"
 						 "  public function mixed(a:Number):Number { return lerpf(a, 2, 0.5); }\n"
+						 "  private function note():int { trace(\"note\"); return 0; }\n"
+						 "  public function order(other:Pad):Node { return other.getChild(note()); }\n"
 						 "  public function told(n:int):void { print(\"n is \", n); }\n"
 						 "  public function start():int { return ticks; }\n"
 						 "  public function unset():Vector2 { var v:Vector2; return v; }\n"
@@ -687,6 +689,14 @@ static void test_engine_statics() {
 		arguments[0].i = 7;
 		CHECK(interpreter.call_method(object, "told", arguments, 1, nullptr));
 		CHECK_EQ(engine.log, std::string("static .print 2648703342 void Variant varargs(\"n is \", 7)\n"));
+		// A Godot member of a missing script object: the arguments are worked out first, as for one of
+		// AS3's own members, and then the missing object is reported.
+		engine.log.clear();
+		arguments[0].bits = 0;
+		CHECK(!interpreter.call_method(object, "order", arguments, 1, &result));
+		CHECK_EQ(engine.log, std::string("print note\n"));
+		CHECK(engine.errors.find("TypeError: Error #1009") == 0);
+		engine.errors.clear();
 		// A local of a Godot value with parts starts at its zero, once: the declaration is not run again.
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "unset", nullptr, 0, &result));
