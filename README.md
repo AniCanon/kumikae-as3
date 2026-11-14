@@ -49,7 +49,7 @@ package game {
 - `[Export]` shows the field in the inspector. Metadata tags are already AS3 syntax.
 - **Godot's API reads as AS3.** Methods are lowerCamel (`moveAndSlide`), Godot's properties are AS3
   properties (`velocity`, `visible`), and a signal is a property you connect to (`bodyEntered.connect`).
-  The [naming design](docs/superpowers/specs/2026-11-12-godot-naming-design.md) has every rule.
+  The naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`) has every rule.
 - `velocity.x = ...` changes the body's velocity. The compiler writes the changed vector back.
 
 ## Why AS3
@@ -195,22 +195,22 @@ For what each stage delivers and what is being built now, see the [roadmap](docs
 | `docs/roadmap.md` | The plan: stages, what each delivers, and current progress. |
 | `docs/backlog.md` | What reviews put off: every deferred item, owed until fixed. |
 | `docs/diagrams/` | The diagrams on this page, and the script that generates them. |
-| `docs/superpowers/specs/` | The design, and the performance redesign that amends it. |
-| `docs/superpowers/plans/` | The step-by-step plan for each stage. |
+| `docs/superpowers/specs/` | The design, and the performance redesign that amends it. Kept on the owner's machine, not in the repository. |
+| `docs/superpowers/plans/` | The step-by-step plan for each stage. Kept on the owner's machine, not in the repository. |
 | `docs/results/` | Benchmark results, with the raw data. |
 
 The throwaway speed spike is kept on the `spike/stage-0b` branch.
 
 ## Design documents
 
-- [Design](docs/superpowers/specs/2026-11-11-kumikae-as3-design.md): goals, shape, language scope and stages.
-- [Performance redesign](docs/superpowers/specs/2026-11-11-performance-redesign.md): the rules that generated
+- Design (`docs/superpowers/specs/2026-11-11-kumikae-as3-design.md`): goals, shape, language scope and stages.
+- Performance redesign (`docs/superpowers/specs/2026-11-11-performance-redesign.md`): the rules that generated
   code follows, and the owner's decision on the speed goal. Where the two documents disagree, this one wins.
-- [Language server](docs/superpowers/specs/2026-11-12-language-server-design.md): the plan for editor
+- Language server (`docs/superpowers/specs/2026-11-12-language-server-design.md`): the plan for editor
   support. Its first slice is built.
-- [Godot naming](docs/superpowers/specs/2026-11-12-godot-naming-design.md): how Godot's API is named in AS3.
+- Godot naming (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`): how Godot's API is named in AS3.
   Approved.
-- [Language additions](docs/superpowers/specs/2026-11-12-language-additions.md): candidates for going beyond
+- Language additions (`docs/superpowers/specs/2026-11-12-language-additions.md`): candidates for going beyond
   AS3. Parked: no new syntax until scripts run.
 
 ## Licence

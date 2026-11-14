@@ -7,8 +7,31 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <unordered_set>
+
 using namespace godot;
 using kas3::Project;
+
+static std::unordered_set<AS3Script *> &scripts() {
+	static std::unordered_set<AS3Script *> all;
+	return all;
+}
+
+AS3Script::AS3Script() {
+	scripts().insert(this);
+}
+
+AS3Script::~AS3Script() {
+	scripts().erase(this);
+}
+
+void AS3Script::refresh_all() {
+	for (AS3Script *script : scripts()) {
+		if (!script->file_.empty()) {
+			script->set_file(String::utf8(script->file_.c_str()));
+		}
+	}
+}
 
 void AS3Script::set_file(const String &p_resource_path) {
 	file_ = p_resource_path.utf8().get_data();

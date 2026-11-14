@@ -37,7 +37,8 @@ one for the group you are changing before the first edit.
 4. **Say it once.** A rule, a constant or a message two places need is written in one and read by both.
 5. **Small files with one job.** The limits are in each group's guide and are checked by the tests.
 6. **Design before code** for anything larger than a fix: a short design in `docs/superpowers/specs/`, a plan
-   in `docs/superpowers/plans/`, then the work, then one independent review.
+   in `docs/superpowers/plans/`, then the work, then one independent review. That folder is ignored by git:
+   never commit a design or a plan.
 
 ## Rules about what goes in the repository
 

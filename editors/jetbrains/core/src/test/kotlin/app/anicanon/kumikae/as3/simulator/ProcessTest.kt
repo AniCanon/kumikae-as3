@@ -26,11 +26,25 @@ class ProcessTest {
         assertTrue((System.nanoTime() - start) / 1_000_000 < 4000)
     }
 
+    @Test fun `a launch with a scripts folder hands it to the app through the launcher's environment`() {
+        assumeTrue(Files.isExecutable(Path.of("/bin/sh")))
+        var given: Map<String, String>? = null
+        val logs = LaunchLog { _, environment ->
+            given = environment
+            ProcessBuilder("/bin/sh", "-c", "true").start()
+        }
+        logs.launch("phone", "org.test.app", "/games/mine")
+        logs.close()
+        // simctl gives the app every variable of its own whose name starts with SIMCTL_CHILD_, without that start.
+        assertEquals(mapOf("SIMCTL_CHILD_KAS3_SOURCE_DIR" to "/games/mine"), given)
+    }
+
     @Test fun `closing the console stops its process and captures both pipes`() {
         assumeTrue(Files.isExecutable(Path.of("/bin/sh")))
         var child: Process? = null
-        val logs = LaunchLog { command ->
+        val logs = LaunchLog { command, environment ->
             assertEquals(Commands.launch("phone", "org.test.app"), command)
+            assertEquals(emptyMap<String, String>(), environment)
             ProcessBuilder("/bin/sh", "-c", "echo output; echo diagnostic >&2; exec sleep 30").start().also {
                 child = it
             }

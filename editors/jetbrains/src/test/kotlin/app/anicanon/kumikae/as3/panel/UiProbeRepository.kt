@@ -82,7 +82,8 @@ internal class UiProbeRepository : SimulatorRepository {
         installFailure?.let { error(it) }
     }
 
-    override fun launch(device: String, bundle: String) = record("launch $device $bundle")
+    override fun launch(device: String, bundle: String, sources: String) =
+        record("launch $device $bundle" + if (sources.isEmpty()) "" else " from $sources")
 
     override fun screenshot(device: String): SimulatorFrame {
         record("screenshot $device")

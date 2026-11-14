@@ -2,6 +2,7 @@
 // `timer.timeout.add(onTimeout)`.
 #pragma once
 
+#include "reload.h"
 #include "runtime.h"
 
 #include <godot_cpp/variant/callable.hpp>
@@ -21,6 +22,11 @@ void listener_added(const godot::Callable &p_callable, const godot::Signal &p_si
 void sweep_listeners();
 // Before the program is unloaded: every callable lets go of its script object, and refuses to run after.
 void release_listeners();
+// For a reload of the scripts. First, whether every callable's script object has a place in the new
+// program; then, each callable is given its object's counterpart and its method's new place. One whose
+// method is gone refuses to run from then on.
+bool listeners_can_move(vm::Reload &p_reload);
+void move_listeners(vm::Interpreter &p_old, vm::Reload &p_reload, uint64_t p_generation);
 // Whether the callable is one of those: a listener that a script added.
 bool is_script_listener(const godot::Callable &p_callable);
 

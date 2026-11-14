@@ -51,6 +51,8 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
         put("main.tscn", SCENE)
         put("Main.as", SCRIPT)
         put("Hello.as", HELLO)
+        // Godot will not export for a phone without an icon.
+        put("icon.svg", icon())
         // What Godot's editor writes on its first import: with it, the game runs before the editor ever opens.
         put(".godot/extension_list.cfg", "res://kas3.gdextension\n")
         put("kas3.gdextension", EXTENSION)
@@ -101,7 +103,9 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
         append("`bin` must hold the AS3 extension's library (`libkas3_godot`). ")
         append("The wizard links it to where the extension was built, when it finds it.\n")
         if (Platform.IOS in platforms) {
-            append("\n## iOS\n\n`export_presets.cfg` has an iOS preset. Before the first export, set your team ")
+            append(
+                "\n## iOS\n\n`export_presets.cfg` has an iOS preset. The team id in it is a stand-in, enough for the Simulator: set your own ",
+            )
             append("and change the bundle identifier (`$bundle` is a placeholder). The \"iOS Simulator\" run ")
             append("configuration launches that bundle on the simulator shown in the iOS Simulator panel; ")
             append("the app has to be exported with Godot and installed first.\n")
@@ -114,6 +118,11 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
 
     companion object {
         private const val LIBRARY = "libkas3_godot"
+
+        /** The project's icon: the Kumikae mark, to be replaced by the game's own. */
+        fun icon(): String = checkNotNull(ProjectTemplate::class.java.getResourceAsStream("/projectIcon.svg")) {
+            "The plugin was built without its project icon."
+        }.bufferedReader().use { it.readText() }
 
         /** Made from the name: lower-case letters and digits, starting with a letter. */
         fun defaultBundle(name: String): String = name.lowercase().filter { it in 'a'..'z' || it in '0'..'9' }.let {
@@ -141,6 +150,7 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
 
 config/name="{name}"
 run/main_scene="res://main.tscn"
+config/icon="res://icon.svg"
 config/features=PackedStringArray("4.7")
 
 [display]
@@ -239,7 +249,7 @@ script_export_mode=0
 
 [preset.0.options]
 
-application/app_store_team_id=""
+application/app_store_team_id="ABCDE12345"
 application/bundle_identifier="{bundle}"
 application/export_project_only=true
 application/short_version="1.0"

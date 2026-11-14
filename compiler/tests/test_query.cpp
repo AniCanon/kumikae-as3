@@ -30,6 +30,125 @@ static const Reference *reference(const Unit *p_unit, std::string_view p_name) {
 	return nullptr;
 }
 
+// What completion offers at the `|` in the text, by name.
+struct Offered {
+	std::vector<Completion> items;
+	bool has(std::string_view p_name) const { return find(p_name) != nullptr; }
+	const Completion *find(std::string_view p_name) const {
+		for (const Completion &item : items) {
+			if (item.name == p_name) {
+				return &item;
+			}
+		}
+		return nullptr;
+	}
+	size_t count(std::string_view p_name) const {
+		size_t found = 0;
+		for (const Completion &item : items) {
+			found += item.name == p_name;
+		}
+		return found;
+	}
+};
+
+static Offered complete(std::string p_text, const char *p_other = nullptr) {
+	size_t at = p_text.find('|');
+	CHECK(at != std::string::npos);
+	p_text.erase(at, 1);
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	Unit *unit = compilation.add("Player.as", p_text);
+	if (p_other) {
+		compilation.add("Other.as", p_other);
+	}
+	compilation.check(true);
+	Queries queries(compilation);
+	return Offered{ queries.complete(*unit, (uint32_t)at) };
+}
+
+static std::string player(const char *p_body) {
+	return std::string("package { import godot.*; public class Player extends Node2D {\n"
+					   "public var speed:Number = 1;\n"
+					   "private var secret:int;\n"
+					   "public static var count:int;\n"
+					   "public function run(n:int):void {\n") +
+			p_body + "\n}\npublic function later():void { var elsewhere:int; }\n} }";
+}
+
+static void test_completion() {
+	// After a dot: what the value has, with what its bases have.
+	Offered members = complete(player("var v:Vector2 = position; v.|"));
+	CHECK(members.has("x") && members.has("y") && members.has("normalized") && members.has("length"));
+	CHECK(!members.has("speed") && !members.has("Vector2") && !members.has("var") && !members.has("ZERO"));
+	const Completion *method = members.find("normalized");
+	CHECK(method && method->kind == SymbolKind::Method);
+	CHECK_EQ(method ? method->detail : std::string(), std::string("function normalized():Vector2"));
+
+	// What is typed so far narrows it, whatever the case.
+	Offered narrowed = complete(player("var v:Vector2 = position; v.NO|"));
+	CHECK(narrowed.has("normalized") && !narrowed.has("x") && !narrowed.has("length"));
+
+	// A script object: its own members, inherited ones, and private ones only from inside the class.
+	Offered own = complete(player("var other:Player; other.|"));
+	CHECK(own.has("speed") && own.has("run") && own.has("position") && own.has("addChild") && own.has("secret"));
+	CHECK(!own.has("count")); // Static: the class has it, not its objects.
+	CHECK_EQ(own.count("position"), (size_t)1);
+	Offered outside = complete("package { public class Main { function f(p:Player):void { p.| } } }",
+			"package { public class Player { public var speed:Number; private var secret:int; } }");
+	CHECK(outside.has("speed") && !outside.has("secret"));
+
+	// `this.` and a call's result.
+	CHECK(complete(player("this.|")).has("speed"));
+	CHECK(complete(player("getParent().|")).has("addChild"));
+
+	// A class before the dot: what the class itself has.
+	Offered statics = complete(player("Vector2.|"));
+	CHECK(statics.has("ZERO") && statics.has("fromAngle") && !statics.has("x") && !statics.has("normalized"));
+	CHECK(complete(player("Player.|")).has("count"));
+
+	// Nothing is known of an untyped value, so nothing is offered: not everything.
+	CHECK(complete(player("var a:* = 1; a.|")).items.empty());
+
+	// Not after a dot: what a name here could mean.
+	Offered scope = complete(player("var local:int = 1; |"));
+	CHECK(scope.has("local") && scope.has("n") && scope.has("speed") && scope.has("secret") && scope.has("count"));
+	CHECK(scope.has("position") && scope.has("run") && scope.has("later") && scope.has("addChild"));
+	CHECK(scope.has("Node2D") && scope.has("Vector2") && scope.has("Player") && scope.has("lerpf") && scope.has("trace"));
+	CHECK(scope.has("var") && scope.has("return") && scope.has("this"));
+	CHECK(!scope.has("elsewhere") && !scope.has("x") && !scope.has("normalized"));
+	CHECK_EQ(scope.count("speed"), (size_t)1);
+	const Completion *local = scope.find("local");
+	CHECK(local && local->kind == SymbolKind::Local);
+	CHECK_EQ(local ? local->detail : std::string(), std::string("var local:int"));
+
+	// A variable declared further down the function is the function's all the same.
+	CHECK(complete(player("|; var after:int;")).has("after"));
+
+	// What is typed so far narrows that too.
+	Offered typed = complete(player("var local:int; sp|"));
+	CHECK(typed.has("speed") && !typed.has("local") && !typed.has("Vector2"));
+
+	// In a static method the class's objects' members are not in reach.
+	Offered in_static = complete("package { import godot.*; public class Player extends Node2D {\n"
+								 "public var speed:Number; public static var count:int;\n"
+								 "public static function make():void { | } } }");
+	CHECK(in_static.has("count") && !in_static.has("speed") && !in_static.has("position") && !in_static.has("this"));
+
+	// Where a type is written, only types.
+	Offered types = complete(player("var a:Vec|"));
+	CHECK(types.has("Vector2") && types.has("Vector3") && !types.has("lerpf") && !types.has("var"));
+	Offered created = complete(player("var a:Node = new Sprite|"));
+	CHECK(created.has("Sprite2D") && !created.has("speed"));
+
+	// Inside a comment or a string there is nothing to complete.
+	CHECK(complete(player("// sp|")).items.empty());
+	CHECK(complete(player("trace(\"sp|\");")).items.empty());
+
+	// A class with no members written yet, outside any function: names for a declaration.
+	Offered in_class = complete("package { import godot.*; public class Player extends Node2D {\n| } }");
+	CHECK(in_class.has("function") && in_class.has("override") && in_class.has("public") && !in_class.has("position"));
+}
+
 static const char *const BROKEN =
 		"package { import flash.utils.Dictionary; public class Main {\n"
 		"var count:int;\n"
@@ -604,6 +723,7 @@ static void test_typing() {
 }
 
 int main() {
+	test_completion();
 	test_typing();
 	test_index();
 	test_super_and_overrides();

@@ -50,6 +50,15 @@ struct FoundSymbol {
 	uint32_t length = 0;
 };
 
+// One thing completion offers.
+struct Completion {
+	std::string name;
+	SymbolKind kind = SymbolKind::Local; // Not meaningful for a keyword.
+	bool is_keyword = false;
+	bool is_const = false;
+	std::string detail; // The declaration as one line of AS3. Empty for a keyword.
+};
+
 // Built over a Compilation after check(). It reads the trees the passes wrote onto, so it is good for as
 // long as that Compilation is the one using them.
 class Queries {
@@ -57,6 +66,7 @@ class Queries {
 	std::unordered_map<const Unit *, std::vector<Occurrence>> occurrences_;
 
 	const std::vector<Occurrence> &occurrences(const Unit &p_unit);
+	friend class Completer;
 
 public:
 	explicit Queries(Compilation &p_compilation) :
@@ -77,6 +87,11 @@ public:
 	// Definitions in the program's files whose name contains the query, whatever the case. An empty
 	// query matches everything.
 	std::vector<FoundSymbol> find(std::string_view p_query, size_t p_limit);
+	// What could be written at the offset, narrowed by the letters already there, whatever their case.
+	// After a dot: what the value before it has. Where a type is written: types. Otherwise the names in
+	// reach (locals, members, definitions, keywords). Nothing inside a comment or a string, and nothing
+	// after a dot whose value has no known type.
+	std::vector<Completion> complete(const Unit &p_unit, uint32_t p_offset);
 };
 
 } // namespace kas3

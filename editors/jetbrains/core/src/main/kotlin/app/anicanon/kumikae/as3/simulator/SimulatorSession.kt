@@ -123,7 +123,7 @@ class SimulatorSession(
         return when (method) {
             "launch" -> {
                 invalidate()
-                launchLog.launch(device, bundle(params))
+                launchLog.launch(device, bundle(params), sources(params))
             }
 
             "terminate" -> {
@@ -364,6 +364,10 @@ class SimulatorSession(
         }
         runner.run(Commands.install(device, path.toString()), SLOW_MILLIS)
         return mapOf("installed" to true)
+    }
+
+    private fun sources(params: JsonObject) = params["sources"]?.asString.orEmpty().also {
+        require(it.isEmpty() || it.startsWith("/")) { "sources must be an absolute folder" }
     }
 
     private fun bundle(params: JsonObject) = params["bundle"].asString.also {

@@ -3,9 +3,11 @@
 
 #include "builtins.h"
 #include "interpreter.h"
+#include "reload.h"
 #include "lower.h"
 #include "names.h"
 
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -1057,6 +1059,133 @@ static void test_engine_calls() {
 }
 
 // A loop's condition is somewhere a debugger can stop on every pass.
+static uint32_t class_named(const ir::Module &p_module, const char *p_name) {
+	for (size_t i = 0; i < p_module.classes.size(); i++) {
+		if (p_module.classes[i].name == p_name) {
+			return (uint32_t)i;
+		}
+	}
+	return ir::NONE;
+}
+
+static void compile(const char *p_source, ir::Module *r_module, const char *p_file = "Counter.as") {
+	Compilation compilation;
+	compilation.add(p_file, p_source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK(ir::lower(compilation, r_module, ir::LowerMode::Library));
+}
+
+// A running program's objects are moved onto a newer build of it: what they hold stays, what they do is new.
+static void test_reload() {
+	const char *before = "package { public class Counter {\n"
+						 "  public var count:int; public var label:String = \"first\"; public var other:Counter;\n"
+						 "  public var gone:int = 5; public var kind:int = 3;\n"
+						 "  public static var total:int = 100;\n"
+						 "  public function bump():int { count++; total++; return count; }\n"
+						 "  public function sum():int { return total; }\n"
+						 "  public function link(to:Counter):void { other = to; }\n"
+						 "} }\n";
+	const char *after = "package { public class Counter {\n"
+						"  public var added:Number = 1.5; public var kind:String = \"text\"; public var other:Counter;\n"
+						"  public var label:String = \"second\"; public var count:int;\n"
+						"  public static var total:int = 100; public static var fresh:int = 7;\n"
+						"  public function extra():int { return fresh; }\n"
+						"  public function bump():int { count += 10; total++; return count; }\n"
+						"  public function sum():int { return total; }\n"
+						"  public function partner():int { return other.count; }\n"
+						"  public function link(to:Counter):void { other = to; }\n"
+						"  public function text():String { return label + (kind == null ? \"-\" : kind); }\n"
+						"} }\n";
+	ir::Module old_module, new_module;
+	compile(before, &old_module);
+	compile(after, &new_module);
+	{
+		Recorder recorder;
+		auto running = std::make_unique<vm::Interpreter>(old_module, recorder);
+		CHECK(running->start());
+		const uint32_t klass = class_named(old_module, "Counter");
+		vm::Object *first = running->construct(klass, nullptr);
+		vm::Object *second = running->construct(klass, nullptr);
+		vm::Slot result;
+		CHECK(running->call_method(first, "bump", nullptr, 0, &result));
+		CHECK(running->call_method(first, "bump", nullptr, 0, &result));
+		CHECK_EQ(result.i, 2);
+		// Two objects that point at each other: each is moved once.
+		vm::Slot argument;
+		argument.p = second;
+		CHECK(running->call_method(first, "link", &argument, 1, &result));
+		argument.p = first;
+		CHECK(running->call_method(second, "link", &argument, 1, &result));
+
+		vm::Interpreter fresh(new_module, recorder);
+		vm::Reload reload(*running, fresh);
+		vm::Object *moved = reload.object(first);
+		vm::Object *moved_second = reload.object(second);
+		CHECK(moved != nullptr && moved_second != nullptr && moved != first);
+		vm::Object *again = reload.object(first);
+		CHECK_EQ(again, moved); // The same one, not another: with a reference of the caller's own.
+		fresh.release_object(again);
+		reload.globals();
+		// A method's place in the new program, by its name. One that is gone has none.
+		const uint32_t old_bump = running->find_method(klass, "bump");
+		CHECK_EQ(reload.function(old_bump), fresh.find_method(class_named(new_module, "Counter"), "bump"));
+		// The two refer to each other, which counting alone never frees: the test undoes it by hand.
+		argument.p = nullptr;
+		CHECK(running->call_method(first, "link", &argument, 1, &result));
+		running->release_object(first);
+		running->release_object(second);
+		running.reset(); // The old program is gone: nothing of it may be needed from here on.
+
+		// What the object held is still there; the code is the new one.
+		CHECK(fresh.call_method(moved, "bump", nullptr, 0, &result));
+		CHECK_EQ(result.i, 12);
+		CHECK(fresh.call_method(moved, "partner", nullptr, 0, &result));
+		CHECK_EQ(result.i, 0);
+		CHECK(fresh.call_method(moved_second, "partner", nullptr, 0, &result));
+		CHECK_EQ(result.i, 12);
+		// A static field keeps its value, and is not given its first value again.
+		CHECK(fresh.call_method(moved, "sum", nullptr, 0, &result));
+		CHECK_EQ(result.i, 103);
+		// A static field that is new starts empty: its class's static fields are not given their first
+		// values a second time, or `total` would go back to 100.
+		CHECK(fresh.call_method(moved, "extra", nullptr, 0, &result));
+		CHECK_EQ(result.i, 0);
+		// A field that kept its name and kind kept its value, not the new first value. One whose kind
+		// changed starts empty, and so does one that is new: the object was not constructed again.
+		CHECK(fresh.call_method(moved, "text", nullptr, 0, &result));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("first-"));
+		fresh.discard(ir::Kind::Str, result);
+		vm::Slot added;
+		ir::Kind kind = ir::Kind::Void;
+		CHECK(fresh.get_field(moved, "added", &added, &kind));
+		CHECK(kind == ir::Kind::F64 && added.d != added.d);
+		CHECK(!fresh.get_field(moved, "gone", &added));
+		CHECK(fresh.call_method(moved, "link", &argument, 1, &result));
+		fresh.release_object(moved);
+		fresh.release_object(moved_second);
+		CHECK_EQ(recorder.errors, std::string());
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+
+	// A class that is gone from the new program: its objects can't be moved, and that is said.
+	ir::Module without;
+	compile("package { public class Other { public var x:int; } }", &without, "Other.as");
+	{
+		Recorder recorder;
+		vm::Interpreter running(old_module, recorder);
+		CHECK(running.start());
+		vm::Object *object = running.construct(class_named(old_module, "Counter"), nullptr);
+		vm::Interpreter fresh(without, recorder);
+		vm::Reload reload(running, fresh);
+		CHECK(reload.object(object) == nullptr);
+		CHECK_EQ(reload.missing(), std::string("Counter"));
+		running.release_object(object);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 static void test_loop_markers() {
 	Compilation compilation;
 	compilation.add("Main.as", "package { public class Main { public function Main() {\n"
@@ -1136,6 +1265,7 @@ static void test_failed_static_initializer() {
 }
 
 int main() {
+	test_reload();
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();

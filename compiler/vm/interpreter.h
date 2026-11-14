@@ -18,6 +18,8 @@ namespace kas3 {
 namespace vm {
 
 class Interpreter {
+	friend class Reload; // Moves a running program's objects onto a newer build.
+
 public:
 	// Calls may nest this deep. One more is an AS3 error.
 	static const size_t MAX_FRAMES = 10000;

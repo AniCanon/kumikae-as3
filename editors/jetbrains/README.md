@@ -21,8 +21,9 @@ its measurements are described in the results below.
 | Earlier idb ten-minute stream and input | Production service in a small harness | Mean 26.42 frames/s consumed; retained heap 5.655 MiB at one minute and 5.706 MiB at ten minutes. Owned children exited. This was not a ten-minute Rider heap measurement. |
 | idb input against a booted Simulator | `simulator.py` and the sandbox panel probe | Density 3; Home, taps and Settings swipes observed. Earlier text, Lock and Rotate commands were accepted, without a separate visual confirmation. |
 
-The [native design](../../docs/superpowers/specs/2026-11-14-simulator-native-design.md)
-compares screen and input options. The [results](../../docs/results/2026-11-jetbrains-simulator.md)
+The designs (`docs/superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md` and
+`2026-11-14-simulator-native-design.md`, kept out of the repository)
+compare screen and input options. The [results](../../docs/results/2026-11-jetbrains-simulator.md)
 give the detail behind this table. [ARCHITECTURE.md](ARCHITECTURE.md) describes the
 parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 

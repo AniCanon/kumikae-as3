@@ -9,6 +9,7 @@ host differs.
 | `interpreter_run.cpp` | The loop: one case per operation |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
 | `interpreter_objects.cpp`, `runtime` | Lifetime of objects and strings |
+| `reload` | Moves a running program's objects and static fields onto a newer build, by name |
 | `numeric` | Conversions C++ alone would leave undefined |
 | `host.h` | What the interpreter is given: `Output`, `EngineHandles`, `EngineSource` |
 | `output.h`, `engine_handles.h`, `engine_source.h`, `engine_types.h` | The three interfaces and the values they pass |

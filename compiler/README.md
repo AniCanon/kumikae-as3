@@ -234,6 +234,21 @@ Known fault: the first time Godot's editor scans a project that has the extensio
 `godot --headless --import`), Godot crashes as it exits, after the scan has done its work. Later runs are
 clean. The speed spike's extension does the same; the cause is not yet known.
 
+## Editing a script while the game runs
+
+When a project is run from its folder in a debug build, the extension looks at its `.as` files five
+times a second. When one changes, every script is compiled again:
+
+- **If they compile,** every script object alive is moved onto the new code. A field that kept its name
+  and kind keeps its value, static fields too, and listeners added before keep listening and run the
+  new code. Godot prints `ActionScript: reloaded N scripts.`
+- **If they do not,** the errors are printed and the game carries on with the scripts it had.
+
+What to expect of an object that already exists: a field that is new, or whose type changed, starts
+empty (0, `NaN`, `null`), because the object is not constructed again; a new first value for a field
+shows on objects made afterwards. A class that was removed while one of its objects is alive stops the
+reload, and Godot says to restart. An exported game does not watch its scripts.
+
 ## Language server
 
 `kas3c lsp` serves an editor over standard input and output with the Language Server Protocol. To connect an
@@ -251,6 +266,7 @@ compiler/build/kas3c lsp --declarations lib.as  # lib.as declares what exists el
 | A file opening or changing | The file's errors: what `kas3c check` prints for the project. |
 | Go to definition | Where the name under the cursor is declared, in the project, the built-in library or Godot's API. |
 | Find references | Every use of it in the project's files. |
+| Completion | After a dot, what the value before it has, with what its bases have; where a type is written, types; otherwise the names in reach: locals, members, definitions, keywords. Narrowed by what is typed so far, whatever its case. Nothing after a dot whose value has no known type, and nothing in a comment or a string. |
 | Hover | Its declaration, and the class or package it belongs to. |
 | Document symbols | The classes and members of the file. |
 | Workspace symbols | The project's definitions whose name contains the query. |
@@ -315,7 +331,7 @@ its names mean: inside it, names resolve only to other declarations, and its own
 
 `godot/godot.as` declares all of Godot 4.7's API for AS3: 1,036 classes, 30 value and collection types, 22
 global enums and 112 global functions. `godot/generate.py` writes it from Godot's own API description under
-the [naming design](../docs/superpowers/specs/2026-11-12-godot-naming-design.md), and the build embeds it.
+the naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`), and the build embeds it.
 
 | Godot | AS3 |
 |---|---|

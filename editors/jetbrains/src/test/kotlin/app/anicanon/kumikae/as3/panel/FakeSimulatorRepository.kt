@@ -83,7 +83,8 @@ internal class FakeSimulatorRepository : SimulatorRepository {
 
     override fun install(device: String, appPath: String) = record("install $device $appPath")
 
-    override fun launch(device: String, bundle: String) = record("launch $device $bundle")
+    override fun launch(device: String, bundle: String, sources: String) =
+        record("launch $device $bundle" + if (sources.isEmpty()) "" else " from $sources")
 
     override fun screenshot(device: String): SimulatorFrame {
         record("screenshot $device")

@@ -5,6 +5,7 @@ spike/out/
 spike/api/
 __pycache__/
 .superpowers/
+docs/superpowers/
 .DS_Store
 /compiler/build*/
 compiler/tests/external/

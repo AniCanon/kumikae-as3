@@ -290,6 +290,7 @@ Json Server::initialize(const Json &p_params) {
 	provided.set("definitionProvider", true);
 	provided.set("referencesProvider", true);
 	provided.set("hoverProvider", true);
+	provided.set("completionProvider", Json::object().set("triggerCharacters", Json::array().push(".")));
 	provided.set("documentSymbolProvider", true);
 	provided.set("workspaceSymbolProvider", true);
 	return Json::object().set("capabilities", provided).set("serverInfo",
@@ -299,7 +300,13 @@ Json Server::initialize(const Json &p_params) {
 Json Server::definition(const Json &p_params) {
 	Unit *unit = nullptr;
 	const Occurrence *found = occurrence_at(p_params, &unit);
-	return found ? location(workspace_.queries().declaration(found->symbol)) : Json();
+	if (!found) {
+		return Json();
+	}
+	Json where = location(workspace_.queries().declaration(found->symbol));
+	// A list of one. The protocol allows a place on its own, and VS Code reads it, but the client
+	// library JetBrains' IDEs use reads only a list: with a bare place, go to definition does nothing.
+	return where.is_null() ? Json() : Json::array().push(std::move(where));
 }
 
 Json Server::references(const Json &p_params) {
@@ -330,6 +337,46 @@ Json Server::hover(const Json &p_params) {
 	return Json::object()
 			.set("contents", Json::object().set("kind", "markdown").set("value", text))
 			.set("range", range(*unit, found->offset, found->length));
+}
+
+// The protocol's CompletionItemKind for what is offered.
+static int completion_kind(const Completion &p_item) {
+	if (p_item.is_keyword) {
+		return 14;
+	}
+	switch (p_item.kind) {
+		case SymbolKind::Class:
+			return 7;
+		case SymbolKind::Interface:
+			return 8;
+		case SymbolKind::Method:
+			return 2;
+		case SymbolKind::Function:
+		case SymbolKind::LocalFunction:
+			return 3;
+		case SymbolKind::Property:
+			return 10;
+		case SymbolKind::Field:
+			return p_item.is_const ? 21 : 5;
+		default:
+			return p_item.is_const ? 21 : 6;
+	}
+}
+
+Json Server::completion(const Json &p_params) {
+	Json items = Json::array();
+	Unit *unit = unit_of(p_params);
+	if (unit && p_params.get("position").is_object()) {
+		for (const Completion &found : workspace_.queries().complete(*unit, offset_at(*unit, p_params.get("position")))) {
+			Json item = Json::object().set("label", found.name).set("kind", completion_kind(found));
+			if (!found.detail.empty()) {
+				item.set("detail", found.detail);
+			}
+			items.push(std::move(item));
+		}
+	}
+	// The whole list for what is typed so far: the editor narrows it as more is typed.
+	return Json::object().set("isIncomplete", false).set("items", std::move(items));
 }
 
 Json Server::document_symbols(const Json &p_params) {
@@ -513,6 +560,8 @@ void Server::handle(std::string_view p_message, std::vector<std::string> &r_out)
 		result = references(params);
 	} else if (method == "textDocument/hover") {
 		result = hover(params);
+	} else if (method == "textDocument/completion") {
+		result = completion(params);
 	} else if (method == "textDocument/documentSymbol") {
 		result = document_symbols(params);
 	} else if (method == "workspace/symbol") {

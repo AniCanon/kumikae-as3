@@ -75,6 +75,17 @@ class ApiSimulatorRepositoryTest {
         assertEquals(listOf("select" to named, "boot" to named), service.calls)
     }
 
+    @Test fun `a launch names the folder the scripts are edited in, when there is one`() {
+        val (service, repository) = repository("launch" to """{"state":"starting"}""")
+        repository.launch("A", "org.example.game", "/games/mine")
+        assertEquals(
+            listOf<Pair<String, Map<String, Any>>>(
+                "launch" to mapOf("device" to "A", "bundle" to "org.example.game", "sources" to "/games/mine"),
+            ),
+            service.calls,
+        )
+    }
+
     @Test fun `install and launch send the path and the bundle`() {
         val (service, repository) = repository(
             "install" to """{"installed":true}""",

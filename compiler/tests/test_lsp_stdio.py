@@ -181,7 +181,8 @@ with tempfile.TemporaryDirectory() as folder:
     if messages:
         check("project clean", diagnostics(messages) == [], repr(diagnostics(messages)))
         found = [m for m in messages if m.get("id") == 2]
-        target = found[0]["result"]["uri"] if found and found[0].get("result") else ""
+        places = found[0].get("result") if found else None
+        target = places[0]["uri"] if isinstance(places, list) and len(places) == 1 else ""
         check("godot definition", target.startswith("file://") and target.endswith("godot.as") and
               os.path.exists(target[len("file://"):].replace("%20", " ")), repr(found))
         symbols = [m for m in messages if m.get("id") == 3]

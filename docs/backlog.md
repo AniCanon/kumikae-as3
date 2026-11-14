@@ -25,8 +25,8 @@ it stands.
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
 | **2c** | The rest of the language | 18 | Closures as listeners, `object[name]` in general, collections, strings |
-| **LS-2** | Language server, second slice (after 2c) | 9 | Windows, Rider, positions, references. Completion is built in the same slice |
-| **2d** | Editor features | 15 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
+| **LS-2** | Language server, second slice (after 2c) | 13 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
+| **2d** | Editor features | 19 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 44 | What is left |
 | **decision** | The owner | 7 | See each item |
 
@@ -39,7 +39,7 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 | Decision | What to build | When |
 |---|---|---|
-| **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | Built in stage 2b-3, part B: the `Int64` type, by one rule in the generator (approved 2026-11-14). See the [design](superpowers/specs/2026-11-14-int64-design.md). | Done |
+| **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | Built in stage 2b-3, part B: the `Int64` type, by one rule in the generator (approved 2026-11-14). See the design (`docs/superpowers/specs/2026-11-14-int64-design.md`). | Done |
 
 ## Stage 1d: Godot's API in AS3
 
@@ -232,6 +232,29 @@ any Godot value passing as a condition):
 - New code that the guide would write otherwise: an empty string and an out-parameter where it asks for
   `std::optional`, `const std::string &` for `std::string_view`, two comments out of place. **clean-up**
 - `var c:Color = null; x.clamp(c, hi)` is an error where the literal `null` takes the default. **clean-up**
+
+## Completion, brought forward
+
+- Completion after a dot needs the value's type: nothing is offered for `*`, for a value whose type could
+  not be worked out, or for a package path (`flash.utils.`). **LS-2**
+- No completion of an import's path, of a parameter's name in a call, or of an override's signature.
+  **LS-2**
+- A local of a nested function is offered in the function around it, and the reverse. **LS-2**
+- Whether a `name:` is a type's place is read from the text before it, not from the tree, when the type
+  has not been started (`var a:`). **LS-2**
+
+## Reload while running
+
+- An object alive before a reload is not constructed again: a field added by the edit starts empty on
+  it, and a changed first value does not reach it. **2d**
+- Scripts are looked at five times a second by their time and size; two saves of the same size within
+  one second are seen as one. **2d**
+- A reload is refused when a class with a live object was removed or renamed. **2d**
+- A game on a simulator reloads from the folder it is told of (`KAS3_SOURCE_DIR`); only scripts are read
+  there, so an edited scene or picture needs a new build. A real phone or tablet cannot see that folder:
+  it needs the edits sent to it. **2d**
+- Not tried: a reload while a debugger is stopped, in the Godot editor's own play mode with the editor
+  attached, or with more than a few hundred scripts. **2d**
 
 ## Stage 2a: interpreter core
 

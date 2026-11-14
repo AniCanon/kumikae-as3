@@ -7,6 +7,7 @@
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <unordered_set>
 #include <vector>
 
 using namespace godot;
@@ -19,6 +20,31 @@ struct ScriptInstance {
 	Object *owner;
 	Ref<AS3Script> script; // Kept alive for as long as anything runs it.
 };
+
+// Every script instance there is: a reload gives each its object's counterpart in the new program.
+static std::unordered_set<ScriptInstance *> &instances() {
+	static std::unordered_set<ScriptInstance *> all;
+	return all;
+}
+
+bool kas3::instances_can_move(vm::Reload &p_reload) {
+	for (const ScriptInstance *instance : instances()) {
+		vm::Object *moved = p_reload.object(instance->object);
+		if (!moved) {
+			return false;
+		}
+		vm::release(moved); // The reload keeps its own until it is done.
+	}
+	return true;
+}
+
+void kas3::move_instances(vm::Interpreter &p_old, vm::Reload &p_reload) {
+	for (ScriptInstance *instance : instances()) {
+		vm::Object *old = instance->object;
+		instance->object = p_reload.object(old);
+		p_old.release_object(old);
+	}
+}
 
 static GDExtensionVariantType expected_type(ir::Kind p_kind) {
 	switch (p_kind) {
@@ -199,6 +225,7 @@ static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDa
 
 static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+	instances().erase(instance);
 	Project::get().interpreter().release_object(instance->object);
 	delete instance;
 }
@@ -239,5 +266,6 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	instance->object = object;
 	instance->owner = p_owner;
 	instance->script = Ref<AS3Script>(const_cast<AS3Script *>(p_script));
+	instances().insert(instance);
 	return gdextension_interface::script_instance_create3(&info, instance);
 }
