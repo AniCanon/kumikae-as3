@@ -7,3 +7,4 @@ compatibility_minimum = "4.7"
 
 macos = "res://bin/libkas3_godot.dylib"
 linux = "res://bin/libkas3_godot.so"
+ios = "res://bin/ios/kas3_godot.xcframework"

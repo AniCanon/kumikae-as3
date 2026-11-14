@@ -91,8 +91,15 @@ if(KAS3_GODOT_CPP)
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
     target_compile_options(kas3_godot PRIVATE -fno-exceptions)
     target_link_libraries(kas3_godot PRIVATE godot-cpp kas3vm)
+    # On this machine's own system the library goes beside the test project, which loads it. Built for
+    # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
+    if(CMAKE_CROSSCOMPILING)
+        set(KAS3_GODOT_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/out)
+    else()
+        set(KAS3_GODOT_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/tests/godot_project/bin)
+    endif()
     set_target_properties(kas3_godot PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/godot_project/bin
+        LIBRARY_OUTPUT_DIRECTORY ${KAS3_GODOT_OUTPUT}
         OUTPUT_NAME kas3_godot)
 endif()
 

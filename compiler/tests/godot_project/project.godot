@@ -4,4 +4,12 @@ config_version=5
 [application]
 
 config/name="kas3 test"
+config/icon="res://icon.png"
 config/features=PackedStringArray("4.7")
+run/main_scene="res://ios_test.tscn"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
