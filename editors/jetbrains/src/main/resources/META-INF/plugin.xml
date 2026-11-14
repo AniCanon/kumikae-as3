@@ -13,6 +13,7 @@
         <configurationType implementation="app.anicanon.kumikae.as3.run.SimulatorConfigurationType"/>
         <configurationType implementation="app.anicanon.kumikae.as3.run.GodotConfigurationType"/>
         <postStartupActivity implementation="app.anicanon.kumikae.as3.run.GodotProjectStartup"/>
+        <newProjectWizard.generator implementation="app.anicanon.kumikae.as3.project.As3ProjectWizard"/>
         <toolWindow id="iOS Simulator" anchor="right"
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
