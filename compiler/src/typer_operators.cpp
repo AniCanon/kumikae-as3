@@ -2,7 +2,7 @@
 
 namespace kas3 {
 
-const Type * Typer::unary(Unary *p_unary) {
+const Type *Typer::unary(Unary *p_unary) {
 	const Type *operand = expression(p_unary->operand);
 	if (p_unary->op == TokenKind::Minus || p_unary->op == TokenKind::Plus) {
 		if (const Type *result = described_unary(p_unary->op, operand, p_unary->offset)) {
@@ -47,7 +47,7 @@ const Type * Typer::unary(Unary *p_unary) {
 	}
 }
 
-const Type * Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right) {
+const Type *Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right) {
 	if (p_left->kind == Type::Unknown || p_right->kind == Type::Unknown) {
 		return unknown_;
 	}
@@ -123,7 +123,7 @@ const Type * Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p
 	}
 }
 
-const Type * Typer::binary(Binary *p_binary) {
+const Type *Typer::binary(Binary *p_binary) {
 	const Type *left = expression(p_binary->left);
 	const Type *right = expression(p_binary->right);
 	// A whole number written out beside an Int64 is an Int64 too, read digit by digit.

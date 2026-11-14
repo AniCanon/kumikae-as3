@@ -139,6 +139,13 @@ private:
 	// Statements. In parser_stmt.cpp.
 	Stmt *parse_statement();
 	Stmt *parse_statement_inner();
+	Stmt *parse_while();
+	Stmt *parse_do_while();
+	Stmt *parse_break();
+	Stmt *parse_continue();
+	Stmt *parse_return();
+	Stmt *parse_throw();
+	Stmt *parse_with();
 	Block *parse_block();
 	Block *parse_function_body();
 	Stmt *parse_if();

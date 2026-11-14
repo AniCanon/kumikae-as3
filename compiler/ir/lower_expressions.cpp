@@ -196,7 +196,7 @@ bool Lowerer::builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint
 	return false;
 }
 
-Symbol * Lowerer::callee_symbol(Expr *p_callee) {
+Symbol *Lowerer::callee_symbol(Expr *p_callee) {
 	if (p_callee->kind == NodeKind::Name) {
 		return static_cast<Name *>(p_callee)->symbol;
 	}
@@ -207,7 +207,7 @@ Symbol * Lowerer::callee_symbol(Expr *p_callee) {
 	return nullptr;
 }
 
-Symbol * Lowerer::named_class(Expr *p_expression) {
+Symbol *Lowerer::named_class(Expr *p_expression) {
 	Symbol *symbol = callee_symbol(p_expression);
 	return symbol && symbol->is_type() ? symbol : nullptr;
 }

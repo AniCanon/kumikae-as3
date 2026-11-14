@@ -80,7 +80,7 @@ uint32_t Typer::name_offset(const Expr *p_callee) {
 	return p_callee->kind == NodeKind::Member ? static_cast<const Member *>(p_callee)->name_offset : p_callee->offset;
 }
 
-const Type * Typer::call(Call *p_call) {
+const Type *Typer::call(Call *p_call) {
 	list(p_call->arguments);
 	Expr *callee = p_call->callee;
 	if (!callee) {

@@ -179,7 +179,7 @@ void Typer::definition(Node *p_node) {
 	}
 }
 
-const Type * Typer::builtin(const char *p_name) {
+const Type *Typer::builtin(const char *p_name) {
 	Symbol *symbol = compilation_.builtin(p_name);
 	return symbol ? compilation_.instance_type(symbol) : compilation_.unknown_type();
 }

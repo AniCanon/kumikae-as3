@@ -38,7 +38,7 @@ bool Typer::wide_literal(std::string_view p_text, uint64_t *r_value, bool *r_who
 	return true;
 }
 
-const Type * Typer::number_literal(const NumberLit *p_literal) const {
+const Type *Typer::number_literal(const NumberLit *p_literal) const {
 	unsigned long long value = 0;
 	if (!whole_value(p_literal, &value)) {
 		return number_;

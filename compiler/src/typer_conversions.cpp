@@ -7,7 +7,7 @@ bool Typer::primitive(const Type *p_type) const {
 			p_type->kind == Type::Null;
 }
 
-const Type * Typer::join(const Type *p_a, const Type *p_b) const {
+const Type *Typer::join(const Type *p_a, const Type *p_b) const {
 	if (p_a == p_b) {
 		return p_a;
 	}

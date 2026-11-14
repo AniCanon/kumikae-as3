@@ -2,7 +2,7 @@
 
 namespace kas3 {
 
-const Type * Typer::tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name) {
+const Type *Typer::tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name) {
 	if (p_name == "*") {
 		return any_;
 	}
@@ -171,7 +171,7 @@ bool Typer::open_ended(const Type *p_type) const {
 			p_type == object_;
 }
 
-const Type * Typer::described_binary(TokenKind p_op, Expr *p_left, Expr *p_right, uint32_t p_offset) {
+const Type *Typer::described_binary(TokenKind p_op, Expr *p_left, Expr *p_right, uint32_t p_offset) {
 	const Type *left = p_left ? p_left->type : nullptr;
 	const Type *right = p_right ? p_right->type : nullptr;
 	if (!left || !right || (!has_operators(left) && !has_operators(right))) {
@@ -211,7 +211,7 @@ const Type * Typer::described_binary(TokenKind p_op, Expr *p_left, Expr *p_right
 	return unknown_;
 }
 
-const Type * Typer::described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset) {
+const Type *Typer::described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset) {
 	const Described *rules = has_operators(p_operand) ? described(p_operand) : nullptr;
 	if (!rules) {
 		return nullptr;

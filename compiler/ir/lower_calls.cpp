@@ -31,7 +31,7 @@ void Lowerer::call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arg
 	}
 }
 
-Expr * Lowerer::writer(const List<Expr *> &p_expressions) {
+Expr *Lowerer::writer(const List<Expr *> &p_expressions) {
 	for (Expr *expression : p_expressions) {
 		if (writes_locals(expression)) {
 			return expression;

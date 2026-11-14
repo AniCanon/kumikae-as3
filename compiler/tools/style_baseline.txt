@@ -7,5 +7,3 @@ ir/lower_types.cpp: Lowerer::convert() is over 120 lines
 src/ast_printer.cpp: node() is over 120 lines
 src/ast_walk.h: walk() is over 120 lines
 src/names_bodies.cpp: statement() is over 120 lines
-src/parser_stmt.cpp: Parser::parse_statement_inner() is over 120 lines
-src/typer_expressions.cpp: Typer::compute() is over 120 lines

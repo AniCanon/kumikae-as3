@@ -2,7 +2,7 @@
 
 namespace kas3 {
 
-const Type * Typer::symbol_type(Symbol *p_symbol, const Type *p_element) {
+const Type *Typer::symbol_type(Symbol *p_symbol, const Type *p_element) {
 	if (!p_symbol) {
 		return unknown_;
 	}
@@ -70,7 +70,7 @@ bool Typer::accessible(Symbol *p_member, uint32_t p_offset) {
 	return false;
 }
 
-Symbol * Typer::instance_member(Symbol *p_class, std::string_view p_name) {
+Symbol *Typer::instance_member(Symbol *p_class, std::string_view p_name) {
 	if (p_class->kind == SymbolKind::Class) {
 		for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
 			if (Symbol *member = find_in(owner->klass->members, p_name)) {
@@ -127,7 +127,7 @@ bool Typer::members_known(Symbol *p_class) {
 	return true;
 }
 
-const Type * Typer::member_type(const Type *p_object, Member *p_member) {
+const Type *Typer::member_type(const Type *p_object, Member *p_member) {
 	switch (p_object->kind) {
 		case Type::Any:
 			return any_;

@@ -65,7 +65,7 @@ class Typer {
 	bool primitive(const Type *p_type) const;
 
 	// The one type that both fit, for `a ? b : c`, `a || b` and `a && b`.
-	const Type * join(const Type *p_a, const Type *p_b) const;
+	const Type *join(const Type *p_a, const Type *p_b) const;
 
 	enum class Fit {
 		Yes,
@@ -96,7 +96,7 @@ class Typer {
 	// Reports a write to something that can't be written: `x = ...`, `x += ...`, `x++`.
 	void written(Expr *p_target);
 
-	const Type * symbol_type(Symbol *p_symbol, const Type *p_element);
+	const Type *symbol_type(Symbol *p_symbol, const Type *p_element);
 
 	bool derives_from(Symbol *p_class, Symbol *p_base) const;
 
@@ -104,13 +104,13 @@ class Typer {
 	bool accessible(Symbol *p_member, uint32_t p_offset);
 
 	// The member of that name that an object of the class or interface has, whatever its visibility.
-	Symbol * instance_member(Symbol *p_class, std::string_view p_name);
+	Symbol *instance_member(Symbol *p_class, std::string_view p_name);
 
 	bool members_known(Symbol *p_class);
 
-	const Type * member_type(const Type *p_object, Member *p_member);
+	const Type *member_type(const Type *p_object, Member *p_member);
 
-	const Type * number_literal(const NumberLit *p_literal) const;
+	const Type *number_literal(const NumberLit *p_literal) const;
 
 	// The value of a literal written as a whole number, if it is small enough to matter here.
 	bool whole_value(const NumberLit *p_literal, unsigned long long *r_value) const;
@@ -131,7 +131,7 @@ class Typer {
 	// Where the name of what is being called or constructed is written.
 	static uint32_t name_offset(const Expr *p_callee);
 
-	const Type * call(Call *p_call);
+	const Type *call(Call *p_call);
 
 	// A value that may be a function or a class, known only when the program runs.
 	bool dynamic_value(const Type *p_type) const;
@@ -157,10 +157,10 @@ class Typer {
 
 	// The type a tag names: `*`, or a class or interface in the tagged class's package, in the top-level
 	// package, or written with its package. An unknown name is reported where the tag is.
-	const Type * tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name);
+	const Type *tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name);
 
 	// What the class's declaration says about operators and indexing, or null if it says nothing.
-	const Described * described(const Type *p_type);
+	const Described *described(const Type *p_type);
 
 	// Whether the class's declaration lists its operators, so that one it does not list is an error.
 	bool has_operators(const Type *p_type);
@@ -180,10 +180,10 @@ class Typer {
 	// The type of `left op right` where a declaration describes operators for one of the operands. Null
 	// if neither class describes any: the caller then does what it did before. Reports an operator that
 	// the classes don't have.
-	const Type * described_binary(TokenKind p_op, Expr *p_left, Expr *p_right, uint32_t p_offset);
+	const Type *described_binary(TokenKind p_op, Expr *p_left, Expr *p_right, uint32_t p_offset);
 
 	// The same for `-x` and `+x`.
-	const Type * described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset);
+	const Type *described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset);
 
 	// For the operators no class describes (`++`, `--`, `~`, and the bit assignments): a type whose
 	// operators are all known has none of them. True if that was reported.
@@ -192,15 +192,19 @@ class Typer {
 	// The plain operator of a compound assignment, or Error if it has none that a class could describe.
 	static TokenKind compound_operator(TokenKind p_op);
 
-	const Type * unary(Unary *p_unary);
+	const Type *unary(Unary *p_unary);
 
-	const Type * arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
+	const Type *arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
 
-	const Type * binary(Binary *p_binary);
+	const Type *binary(Binary *p_binary);
 
-	const Type * compute(Expr *p_expression);
+	const Type *compute(Expr *p_expression);
+	const Type *member_expression_type(Expr *p_expression);
+	const Type *index_type(Expr *p_expression);
+	const Type *new_type(Expr *p_expression);
+	const Type *assign_type(Expr *p_expression);
 
-	const Type * expression(Expr *p_expression);
+	const Type *expression(Expr *p_expression);
 
 	// An expression whose type `--dump-types` shows.
 	void shown(Expr *p_expression);
@@ -215,7 +219,7 @@ class Typer {
 
 	void definition(Node *p_node);
 
-	const Type * builtin(const char *p_name);
+	const Type *builtin(const char *p_name);
 
 public:
 	Typer(Compilation &p_compilation, Unit &p_unit);

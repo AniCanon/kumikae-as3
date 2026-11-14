@@ -128,6 +128,83 @@ Import *Parser::parse_import() {
 	return finish(import);
 }
 
+Stmt *Parser::parse_while() {
+	While *loop = node<While>(advance().offset);
+	Token open = expect(TokenKind::LParen, "'('");
+	loop->condition = parse_expression();
+	expect_close(TokenKind::RParen, open);
+	loop->body = parse_statement();
+	return finish(loop);
+}
+
+Stmt *Parser::parse_do_while() {
+	DoWhile *loop = node<DoWhile>(advance().offset);
+	loop->body = parse_statement();
+	expect(TokenKind::KwWhile, "'while'");
+	Token open = expect(TokenKind::LParen, "'('");
+	loop->condition = parse_expression();
+	expect_close(TokenKind::RParen, open);
+	end_statement();
+	return finish(loop);
+}
+
+Stmt *Parser::parse_break() {
+	Break *jump = node<Break>(advance().offset);
+	if (at(TokenKind::Identifier) && !current_.newline_before) {
+		jump->label_offset = current_.offset;
+		jump->label = text(advance());
+	}
+	end_statement();
+	return finish(jump);
+}
+
+Stmt *Parser::parse_continue() {
+	Continue *jump = node<Continue>(advance().offset);
+	if (at(TokenKind::Identifier) && !current_.newline_before) {
+		jump->label_offset = current_.offset;
+		jump->label = text(advance());
+	}
+	end_statement();
+	return finish(jump);
+}
+
+Stmt *Parser::parse_return() {
+	Return *result = node<Return>(advance().offset);
+	// A value is taken only from the same line: `return` then a line break returns nothing.
+	if (!at(TokenKind::Semicolon) && !at(TokenKind::RBrace) && !at(TokenKind::EndOfFile) &&
+			!current_.newline_before) {
+		result->value = parse_expression();
+	}
+	end_statement();
+	return finish(result);
+}
+
+Stmt *Parser::parse_throw() {
+	uint32_t start = current_.offset;
+	Throw *raise = node<Throw>(advance().offset);
+	if (at(TokenKind::Semicolon) || at(TokenKind::RBrace) || at(TokenKind::EndOfFile) ||
+			current_.newline_before) {
+		error_at(start, "expected an expression after 'throw'", false);
+	} else {
+		raise->value = parse_expression();
+	}
+	end_statement();
+	return finish(raise);
+}
+
+Stmt *Parser::parse_with() {
+	uint32_t start = current_.offset;
+	error_at(start, "the 'with' statement is not supported", false);
+	advance();
+	if (at(TokenKind::LParen)) {
+		Token open = advance();
+		parse_expression();
+		expect_close(TokenKind::RParen, open);
+	}
+	parse_statement();
+	return finish(node<Empty>(start));
+}
+
 Stmt *Parser::parse_statement_inner() {
 	uint32_t start = current_.offset;
 	switch (current_.kind) {
@@ -147,65 +224,20 @@ Stmt *Parser::parse_statement_inner() {
 			return parse_if();
 		case TokenKind::KwFor:
 			return parse_for();
-		case TokenKind::KwWhile: {
-			While *loop = node<While>(advance().offset);
-			Token open = expect(TokenKind::LParen, "'('");
-			loop->condition = parse_expression();
-			expect_close(TokenKind::RParen, open);
-			loop->body = parse_statement();
-			return finish(loop);
-		}
-		case TokenKind::KwDo: {
-			DoWhile *loop = node<DoWhile>(advance().offset);
-			loop->body = parse_statement();
-			expect(TokenKind::KwWhile, "'while'");
-			Token open = expect(TokenKind::LParen, "'('");
-			loop->condition = parse_expression();
-			expect_close(TokenKind::RParen, open);
-			end_statement();
-			return finish(loop);
-		}
+		case TokenKind::KwWhile:
+			return parse_while();
+		case TokenKind::KwDo:
+			return parse_do_while();
 		case TokenKind::KwSwitch:
 			return parse_switch();
-		case TokenKind::KwBreak: {
-			Break *jump = node<Break>(advance().offset);
-			if (at(TokenKind::Identifier) && !current_.newline_before) {
-				jump->label_offset = current_.offset;
-				jump->label = text(advance());
-			}
-			end_statement();
-			return finish(jump);
-		}
-		case TokenKind::KwContinue: {
-			Continue *jump = node<Continue>(advance().offset);
-			if (at(TokenKind::Identifier) && !current_.newline_before) {
-				jump->label_offset = current_.offset;
-				jump->label = text(advance());
-			}
-			end_statement();
-			return finish(jump);
-		}
-		case TokenKind::KwReturn: {
-			Return *result = node<Return>(advance().offset);
-			// A value is taken only from the same line: `return` then a line break returns nothing.
-			if (!at(TokenKind::Semicolon) && !at(TokenKind::RBrace) && !at(TokenKind::EndOfFile) &&
-					!current_.newline_before) {
-				result->value = parse_expression();
-			}
-			end_statement();
-			return finish(result);
-		}
-		case TokenKind::KwThrow: {
-			Throw *raise = node<Throw>(advance().offset);
-			if (at(TokenKind::Semicolon) || at(TokenKind::RBrace) || at(TokenKind::EndOfFile) ||
-					current_.newline_before) {
-				error_at(start, "expected an expression after 'throw'", false);
-			} else {
-				raise->value = parse_expression();
-			}
-			end_statement();
-			return finish(raise);
-		}
+		case TokenKind::KwBreak:
+			return parse_break();
+		case TokenKind::KwContinue:
+			return parse_continue();
+		case TokenKind::KwReturn:
+			return parse_return();
+		case TokenKind::KwThrow:
+			return parse_throw();
 		case TokenKind::KwTry:
 			return parse_try();
 		case TokenKind::KwFunction:
@@ -219,17 +251,8 @@ Stmt *Parser::parse_statement_inner() {
 				return finish(statement);
 			}
 			break;
-		case TokenKind::KwWith: {
-			error_at(start, "the 'with' statement is not supported", false);
-			advance();
-			if (at(TokenKind::LParen)) {
-				Token open = advance();
-				parse_expression();
-				expect_close(TokenKind::RParen, open);
-			}
-			parse_statement();
-			return finish(node<Empty>(start));
-		}
+		case TokenKind::KwWith:
+			return parse_with();
 		case TokenKind::KwImport: {
 			ImportStmt *statement = node<ImportStmt>(start);
 			statement->import = parse_import();
