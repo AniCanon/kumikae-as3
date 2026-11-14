@@ -18,6 +18,7 @@
                   fieldName="INSTANCE" language="KumikaeAS3" extensions="as"/>
         <lang.parserDefinition language="KumikaeAS3"
                                implementationClass="app.anicanon.kumikae.as3.language.As3ParserDefinition"/>
+        <gotoDeclarationHandler implementation="app.anicanon.kumikae.as3.language.As3GotoDeclaration"/>
         <lang.commenter language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.language.As3Commenter"/>
         <lang.braceMatcher language="KumikaeAS3"
                            implementationClass="app.anicanon.kumikae.as3.language.As3BraceMatcher"/>
