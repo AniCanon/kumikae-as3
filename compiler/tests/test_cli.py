@@ -207,6 +207,13 @@ with tempfile.TemporaryDirectory() as folder:
           result.stderr == "%s:2:15: error: 'Node' is already defined in Godot's API\n" % clash,
           repr(result.stderr[:300]))
 
+# A script for Godot is lowered with Godot's API in reach, as the extension does it.
+empty = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus", "Empty.as")
+result = run("ir", empty)
+check("ir without godot", result.returncode == 1 and "can't find 'godot.Node2D'" in result.stderr, repr(result.stderr[:200]))
+result = run("ir", "--godot", empty)
+check("ir --godot", result.returncode == 0 and "Empty" in result.stdout and result.stderr == "", repr(result.stderr[:200]))
+
 for failure in failures:
     print("FAIL " + failure)
 print("cli: %s" % ("OK" if not failures else "%d failed" % len(failures)))

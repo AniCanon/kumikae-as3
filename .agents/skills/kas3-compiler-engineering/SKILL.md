@@ -61,7 +61,7 @@ lower layer owns.
 3. Before saying done, all of these, with the output read:
 
 ```sh
-cmake --build compiler/build -j8 && ctest --test-dir compiler/build -j8          # 23 groups
+cmake --build compiler/build -j8 && ctest --test-dir compiler/build -j8          # 24 groups
 cmake --build compiler/build-godot -j8 && python3 compiler/tests/run_godot.py compiler/tests
 cmake --build compiler/build-san -j8 && ctest --test-dir compiler/build-san -j4  # before a merge
 ```
