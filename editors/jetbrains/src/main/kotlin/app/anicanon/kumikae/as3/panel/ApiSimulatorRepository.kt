@@ -22,10 +22,15 @@ internal interface SimulatorService : AutoCloseable {
     fun screenshot(device: String): BinaryFrame? = null
 
     fun openFrames(device: String): FrameFeed = error("Live pictures are unavailable")
+
+    fun touch(device: String, stamp: Long, displayed: Geometry, phase: String, at: Pixel): Unit =
+        error("Continuous touch is unavailable")
 }
 
 /** The only place that maps protocol JSON to domain values. */
 internal class ApiSimulatorRepository(private val service: SimulatorService) : SimulatorRepository {
+    override fun touch(on: SimulatorFrame, phase: String, at: Pixel) =
+        service.touch(on.device, on.generation, on.geometry, phase, at)
     override fun connect(): String = service.start()
 
     override fun enableInput(): Boolean = service.enableInput()
@@ -136,7 +141,12 @@ internal class ApiSimulatorRepository(private val service: SimulatorService) : S
     private fun status(result: JsonElement): SimulatorStatus {
         val state = result.asJsonObject
         val selected = state["device"]?.takeUnless { it.isJsonNull }?.asJsonObject
-        return SimulatorStatus(selected?.let(::device), state["inputEnabled"].asBoolean, state["inputNotice"].asString)
+        return SimulatorStatus(
+            selected?.let(::device),
+            state["inputEnabled"].asBoolean,
+            state["inputNotice"].asString,
+            state["continuousTouch"]?.asBoolean ?: false,
+        )
     }
 
     private fun device(value: JsonObject) = SimulatorDevice(

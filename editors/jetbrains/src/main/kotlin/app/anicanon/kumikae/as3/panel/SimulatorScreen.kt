@@ -10,6 +10,8 @@ import java.awt.Graphics2D
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.RenderingHints
+import java.awt.event.FocusAdapter
+import java.awt.event.FocusEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseWheelEvent
@@ -28,6 +30,11 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
         set(value) {
             val previous = field
             if (previous === value) return
+            if (value == null || previous?.device != value.device ||
+                previous?.generation != value.generation
+            ) {
+                cancelTouch()
+            }
             field = value
             if (previous != null && value != null && previous.geometry == value.geometry) {
                 repaint(device(value.image.width, value.image.height).screen.bounds)
@@ -44,6 +51,12 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
             repaint()
         }
     var inputEnabled = false
+        set(value) {
+            if (!value) cancelTouch()
+            field = value
+        }
+    var continuousTouch = false
+    var onTouch: (SimulatorFrame, String, Pixel) -> Unit = { _, _, _ -> }
     var onFramePresented: (SimulatorFrame, Long) -> Unit = { _, _ -> }
     private var presented: SimulatorFrame? = null
 
@@ -85,12 +98,32 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
     var onInputWanted: () -> Unit = {}
     private var pressed: Press? = null
 
-    private class Press(val frame: SimulatorFrame, val at: Pixel, val nanos: Long)
+    private class Press(val frame: SimulatorFrame, val at: Pixel, val nanos: Long, val live: Boolean) {
+        var latest = at
+    }
+
+    fun cancelTouch() {
+        val start = pressed.also { pressed = null } ?: return
+        if (start.live) onTouch(start.frame, "up", start.latest)
+    }
 
     init {
         isOpaque = false
         minimumSize = Dimension(0, 0)
+        isFocusable = true
+        addFocusListener(object : FocusAdapter() {
+            override fun focusLost(event: FocusEvent) = cancelTouch()
+        })
+        addHierarchyListener { if (!isShowing) cancelTouch() }
         addMouseWheelListener(::wheel)
+        addMouseMotionListener(object : MouseAdapter() {
+            override fun mouseDragged(event: MouseEvent) {
+                val start = pressed ?: return
+                if (!start.live) return
+                pixel(start.frame, event)?.let { start.latest = it }
+                onTouch(start.frame, "move", start.latest)
+            }
+        })
         addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(event: MouseEvent) {
                 val current = frame ?: return
@@ -102,14 +135,21 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
             }
 
             override fun mousePressed(event: MouseEvent) {
-                pressed = null
+                cancelTouch()
                 if (!inputEnabled || event.button != MouseEvent.BUTTON1) return
                 val current = frame ?: return
-                pressed = Press(current, pixel(current, event) ?: return, System.nanoTime())
+                val at = pixel(current, event) ?: return
+                requestFocusInWindow()
+                pressed = Press(current, at, System.nanoTime(), continuousTouch)
+                if (continuousTouch) onTouch(current, "down", at)
             }
 
             override fun mouseReleased(event: MouseEvent) {
                 val start = pressed.also { pressed = null } ?: return
+                if (start.live) {
+                    onTouch(start.frame, "up", pixel(start.frame, event) ?: start.latest)
+                    return
+                }
                 val current = frame ?: return
                 // A picture replaced during the drag may show another screen; its coordinates no longer apply.
                 if (current.device != start.frame.device || current.generation != start.frame.generation) return

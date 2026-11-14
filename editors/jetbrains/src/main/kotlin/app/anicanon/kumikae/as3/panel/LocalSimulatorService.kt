@@ -1,7 +1,9 @@
 package app.anicanon.kumikae.as3.panel
 
 import app.anicanon.kumikae.as3.simulator.ApiClient
+import app.anicanon.kumikae.as3.simulator.Geometry
 import app.anicanon.kumikae.as3.simulator.LocalSession
+import app.anicanon.kumikae.as3.simulator.Pixel
 import com.google.gson.JsonElement
 import java.nio.file.Path
 
@@ -11,6 +13,7 @@ import java.nio.file.Path
  */
 internal class LocalSimulatorService(
     private val stateDirectory: Path,
+    private val nativeExecutable: Path? = null,
     private val closeLater: (() -> Unit) -> Unit = { work ->
         Thread(work, "Kumikae AS3 Simulator shutdown").apply { isDaemon = true }.start()
     },
@@ -25,7 +28,7 @@ internal class LocalSimulatorService(
             check(!closed) { CLOSED }
             session?.let { return it.server.endpointFile.toString() }
         }
-        val opened = LocalSession(stateDirectory)
+        val opened = LocalSession(stateDirectory, nativeExecutable)
         synchronized(lock) {
             // The window may close while the session is still being created on the worker.
             if (closed) {
@@ -57,6 +60,9 @@ internal class LocalSimulatorService(
     override fun screenshot(device: String) = currentSession().screenshot(device)
 
     override fun openFrames(device: String) = currentSession().openFrames(device)
+
+    override fun touch(device: String, stamp: Long, displayed: Geometry, phase: String, at: Pixel) =
+        currentSession().touch(device, stamp, displayed, phase, at)
 
     private fun currentSession(): LocalSession = synchronized(lock) {
         check(!closed) { CLOSED }

@@ -18,7 +18,7 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
         margin = JBUI.insets(4)
     }
     private val timer = Timer(POLL_MILLIS) { controller.poll() }
-    private val frames = Timer(33) { controller.frameTick() }
+    private val frames = Timer(8) { controller.frameTick() }
 
     init {
         component = composePanel(controller) { SimulatorView(controller, state, prompts, screen, console) }

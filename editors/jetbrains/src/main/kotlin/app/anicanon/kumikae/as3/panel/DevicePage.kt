@@ -35,10 +35,13 @@ internal fun DevicePage(
     LaunchedEffect(controller.frame) { screen.frame = controller.frame }
     // Read here, not inside the effect: only what composition reads brings the page back when it changes.
     val input = controller.inputEnabled
+    val continuousTouch = controller.continuousTouch
     val waiting = placeholder(device, controller)
     val zoom = state.zoom
     SideEffect {
         screen.inputEnabled = input
+        screen.continuousTouch = continuousTouch
+        screen.onTouch = controller::touch
         screen.deviceName = device.name
         screen.placeholder = waiting
         screen.zoom = zoom
@@ -154,7 +157,7 @@ internal fun moreEntries(
 ): List<MenuEntry> = listOfNotNull(
     MenuEntry("Install app…") { prompts.appToInstall()?.let(controller::install) },
     MenuEntry(
-        if (controller.inputEnabled) "Live picture and input are on (idb)" else "Switch input on for live picture…",
+        if (controller.inputEnabled) "Live picture and input are on" else "Switch input on for live picture…",
         enabled = !controller.inputEnabled,
     ) {
         if (prompts.confirmInput()) controller.enableInput()

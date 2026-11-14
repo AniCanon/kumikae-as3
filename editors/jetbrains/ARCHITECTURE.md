@@ -9,7 +9,7 @@ SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window
   SimulatorComposition       chooses the concrete services
     LocalSimulatorService    starts the shared session; commands over HTTP, binary pictures directly
     ApiSimulatorRepository   typed commands, binary pictures and decoded frames
-    BackgroundWorker (x3)    actions, polling, stream startup
+    BackgroundWorker (x4)    actions, polling, stream startup, continuous touch
   SimulatorWindowController  all requests and all state
   SimulatorToolWindow        mounts the view, owns the two native controls and visibility-scoped timers
     SimulatorView            Compose: a tab for the list and one per running device
@@ -31,7 +31,25 @@ same `LocalSession` directly, avoiding base64, JSON and loopback copies for imag
 There is still one selection, one geometry authority and one console. The agent
 protocol is unchanged; no extra unauthenticated image endpoint is exposed.
 
-`IdbDevices` owns a private companion socket and a persistent `idb shell` for the
+`FallbackInput` chooses the bundled native helper, installed idb, then public screenshots.
+`NativeInput` owns a helper and a private temporary frame slot. `NativeBridgeConnection`
+validates readiness, calibrates clocks and serializes small control messages.
+`NativeFrameReader` maps the shared slot and copies a new sequence into a matching
+`BufferedImage` under a shared file lock. `NativeFrameFeed` does that work off the EDT
+and exposes one replaceable latest frame. Closing signals the worker; it reaps the
+helper and removes the mapping. No image crosses JSON and no image copy runs on the EDT.
+
+The Swift library has device, frame source, frame sink and input protocols. Its
+`AppleSimulator` actor alone knows private Apple names, with separate extensions
+for the input connection and messages. It runtime-loads CoreSimulator and checks
+Objective-C signatures and private XPC exports. Capture polls the IOSurface seed
+at 8 ms and only copies changes. DTUHID sends down/move/up and waits for a separate
+guest-service barrier reply. The actor is single-use; reconnection creates another
+helper. Stdin EOF cancels active work and releases input and device references.
+See [the native package](native/SimulatorBridge/README.md) for the complete private
+surface and [protocol.md](protocol.md) for the shared frame layout.
+
+`IdbDevices` is the fallback. It owns a private companion socket and a persistent `idb shell` for the
 selected device. Input waits for the shell's acknowledgment, never replays a failed
 command, and rebuilds a failed connection on a later request. `OwnedStreamProcesses`
 reaps only its own children; session shutdown waits for forced cleanup if needed.
@@ -49,8 +67,8 @@ install, launch, screenshot, console page and input, in terms of
 `SimulatorDevice`, `SimulatorStatus`, `SimulatorFrame`, `ConsolePage` and
 `SimulatorInput`. Requests may block; reading a live frame slot never blocks or
 decodes. `ApiSimulatorRepository` is the only panel class that reads or writes
-protocol JSON. It decodes fallback snapshots on a worker; the core decodes live
-JPEGs. Nothing above the repository sees JSON, HTTP or a process.
+protocol JSON. It decodes fallback snapshots on a worker; the core copies native frames or decodes
+fallback live JPEGs. Nothing above the repository sees JSON, HTTP or a process.
 
 ## Controller
 
@@ -59,7 +77,9 @@ window shows, as Compose observable state. It never constructs or touches a
 Swing component, so its tests need no IDE and no window.
 
 - **Independent workers.** Actions and polling each use a `BackgroundTasks`;
-  opening a stream uses a third. Live frame decoding belongs to the service.
+  opening a stream uses a third, and continuous touch a fourth. Live frame copying
+  and decoding belong to the service. `TouchController` preserves press/release
+  order and replaces unsent moves with the newest point.
   `PictureStreamController`, owned by the window controller, manages the stream
   lifetime and 500 ms to 8 s capped retry backoff. A stopped stream clears the
   picture and reports its retry. Input does not stop or wait for live video.
@@ -108,10 +128,11 @@ mouse presses into gestures, and the console text area. The view pushes the
 picture and the console text into them when the state changes.
 
 The view schedules metadata polling at 500 ms and checks the newest decoded frame
-slot every 33 ms while showing. An empty slot changes no state and causes no repaint.
+slot every 8 ms while showing. An empty slot changes no state and causes no repaint.
 The controller owns picture state. Normal frame replacement repaints only
 `DeviceFrame.screen`; geometry and layout changes repaint the whole native control.
-The source runs dynamically, so a settled screen does not trigger capture or decode.
+A settled native screen still has cheap seed polls, but no pixel copy or repaint.
+The idb fallback asks its source for changes dynamically.
 
 ## Compose Swing
 
@@ -130,8 +151,8 @@ picture; a pointer position is measured against the screen it reports.
 Boot, shutdown and install can take two minutes. They run outside the session's lock, one at a
 time (a second is refused with `BUSY`), so status, the list, the log and pictures still answer.
 Screenshot capture and input acknowledgment also run outside the geometry lock.
-Input is validated and admitted under that lock; competing input and selection are
-refused until it completes. Stream publication continues during swipes. Native and
+Input and stream startup are admitted under that lock; competing input and selection
+are refused until they complete. Status remains available while a helper starts. Stream publication continues during swipes. Native and
 scaled geometry share a generation, and stream failures invalidate that generation.
 Reading the list replaces what the session knows of the selected device, and the panel reads it
 every sixth poll: a device started or stopped elsewhere shows within about three seconds. A
