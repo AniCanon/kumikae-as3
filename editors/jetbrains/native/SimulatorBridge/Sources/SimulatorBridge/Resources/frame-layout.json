@@ -1,0 +1,14 @@
+{
+  "headerBytes": 64,
+  "maxPayloadBytes": 67108864,
+  "maxDimension": 4096,
+  "magic": 827151179,
+  "version": 1,
+  "pixelFormat": 1111970369,
+  "fields": {
+    "magic": [0, 4], "version": [4, 4], "sequence": [8, 8],
+    "width": [16, 4], "height": [20, 4], "stride": [24, 4], "pixelFormat": [28, 4],
+    "observedNanos": [32, 8], "writtenNanos": [40, 8],
+    "nativeWidth": [48, 4], "nativeHeight": [52, 4], "densityMilli": [56, 4], "flags": [60, 4]
+  }
+}
