@@ -10,6 +10,9 @@
 | `results/` | What was measured or run, on what, on which date. Only what was observed: a thing not run is listed as not run |
 | `diagrams/` | `build.py` draws the `.svg` files; edit the script, not the picture |
 
+`superpowers/` is ignored by git: designs and plans are working papers, kept where they are written and never
+committed. What a design decided that others must know goes into the roadmap, the backlog or a README.
+
 ## Rules
 
 - Plain words, short sentences. A document says what is true now; history is in git.

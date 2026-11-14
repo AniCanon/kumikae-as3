@@ -29,7 +29,7 @@ is marked with its stage, and stage 3 does not start while one of them is open.
 
 - **Each stage ends in something you can run.** A stage isn't done because code exists. It's done when the
   "done when" line is true.
-- **Each stage gets its own step-by-step plan** in [`docs/superpowers/plans/`](superpowers/plans/), written
+- **Each stage gets its own step-by-step plan** in `docs/superpowers/plans/` (`docs/superpowers/plans/`), written
   just before the stage starts.
 - **Each stage is reviewed independently before it merges.** The reviewer's findings are fixed, each with a
   test that failed first.
@@ -51,7 +51,7 @@ and measured against C# and GDScript on desktop.
 3. The second measurement was ahead of C# on seven of nine benchmarks and level on two, with steadier frames.
 4. The owner accepted that result on 2026-11-11.
 
-Read more: [performance redesign](superpowers/specs/2026-11-11-performance-redesign.md),
+Read more: performance redesign (`docs/superpowers/specs/2026-11-11-performance-redesign.md`),
 [results](results/2026-11-stage-0b-desktop.md).
 
 ### Stage 1: front end (in progress)
@@ -65,7 +65,7 @@ column.
 | 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | Done |
 | 1c-1. Expression types | `kas3c check --dump-types` | Every expression has a type, and `a.b` resolves to a member with AS3's access rules. | Done |
 | 1c-2. Type errors | Type checking in `kas3c check` | A value that doesn't fit where it is used is reported: assignments, arguments, returns, overrides, interfaces, `const`. | Done |
-| 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the [naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | `moveAndSlide()`, `position`, `timer.timeout.add(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | Done |
+| 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`) | `moveAndSlide()`, `position`, `timer.timeout.add(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | Done |
 | 1e. Godot's math types | Operators and indexing on `Vector2` and its relatives | `position + velocity * delta` has a type, and a wrong operand is reported. | Done |
 
 ### Language server, first slice (built; editor check pending)
@@ -89,7 +89,7 @@ locals, classes, imports, inherited members and Godot's API.
 stage faster to build. The owner left the order to the builder. Completion follows in a second slice; the
 JetBrains plugin and Godot's documentation in hover stay in stage 6.
 
-Read more: [language server design](superpowers/specs/2026-11-12-language-server-design.md),
+Read more: language server design (`docs/superpowers/specs/2026-11-12-language-server-design.md`),
 [how the server works](../compiler/README.md#language-server).
 
 ### Stage 2: interpreter in Godot (in progress)
@@ -113,7 +113,7 @@ properties, signals and hot reload.
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
 
-Read more: [stage 2a plan](superpowers/plans/2026-11-12-stage-2a-interpreter-core.md), which also lists what
+Read more: stage 2a plan (`docs/superpowers/plans/2026-11-12-stage-2a-interpreter-core.md`), which also lists what
 earlier stages promised to this one.
 
 ### Stage 3: native export on desktop
@@ -149,7 +149,7 @@ Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 - `async` and `await` as a first-class part of the language, with work off the main thread and debugger
   support. A research document comes first: how far to go beyond main-thread-only, what it costs, and what
-  the debugger needs. See [language additions](superpowers/specs/2026-11-12-language-additions.md#async-and-await-research-before-design).
+  the debugger needs. See language additions (`docs/superpowers/specs/2026-11-12-language-additions.md#async-and-await-research-before-design`).
 - The Flash API (`flash.display.Sprite`, `MovieClip`) as a library on top of Godot nodes.
 - Loading `.swf` files.
 - Web export.
@@ -163,12 +163,12 @@ The design keeps each of these possible. No stage above delivers them.
 | Part | What it does | Status |
 |---|---|---|
 | A. Singletons, constants, static methods | `Input.isActionPressed("jump")`, a singleton's signals, `Vector2.ZERO`, `Key.ESCAPE`, `Vector2.fromAngle(a)`. A Godot value with parts starts at its zero. Closes 3 backlog items. | Built and reviewed |
-| B. `Int64` | The 64-bit integer type the owner approved. The [design](superpowers/specs/2026-11-14-int64-design.md) was approved on 2026-11-14. A Godot integer is an `Int64` unless Godot says it is narrower; 1,059 declarations changed and none became narrower; the table kept by hand is gone. | Built and reviewed |
-| C++ clean-up | Asked for by the owner on 2026-11-14. Done: no file is over 800 lines (the largest was 3,087 and is now 723), no function is over 120 except three dispatch switches, no banner comments, rules that were written twice are written once, `vm::Host` is three interfaces, and calls into Godot are about 16% faster. No test changed, and an independent comparison of over 33,000 programs against `main` found no difference in what the compiler produces. See the [guidelines](cpp-guidelines.md), the [plan](superpowers/plans/2026-11-14-cpp-cleanup.md) and the [figures](results/2026-11-cpp-cleanup.md). | Built and reviewed |
+| B. `Int64` | The 64-bit integer type the owner approved. The design (`docs/superpowers/specs/2026-11-14-int64-design.md`) was approved on 2026-11-14. A Godot integer is an `Int64` unless Godot says it is narrower; 1,059 declarations changed and none became narrower; the table kept by hand is gone. | Built and reviewed |
+| C++ clean-up | Asked for by the owner on 2026-11-14. Done: no file is over 800 lines (the largest was 3,087 and is now 723), no function is over 120 except three dispatch switches, no banner comments, rules that were written twice are written once, `vm::Host` is three interfaces, and calls into Godot are about 16% faster. No test changed, and an independent comparison of over 33,000 programs against `main` found no difference in what the compiler produces. See the [guidelines](cpp-guidelines.md), the plan (`docs/superpowers/plans/2026-11-14-cpp-cleanup.md`) and the [figures](results/2026-11-cpp-cleanup.md). | Built and reviewed |
 | Early iOS test | Decided by the owner on 2026-11-14, ahead of stage 4. **AS3 runs on an iPhone and in the iOS Simulator:** the test scene passed 14 of 14 checks on both, with the same scripts as on desktop, in the interpreter. It found that an exported game could not find its scripts on any platform, now fixed. The Simulator uses an export template built from Godot's unmodified source for Apple silicon; no fork. See the [first run](results/2026-11-ios-first-run.md). | Done |
 | C. Global functions and errors | `print`, `lerpf`, `clampi`, `randf` and the rest of Godot's 112 global functions; an uncaught AS3 error shown as a Godot script error, with the `.as` file and line as its source; a freed Godot object is `null` to a script; a `null` in the middle of a call takes Godot's own default. Closes the last 6 backlog items of the stage. | Built; in review |
 
-Read more: [stage 2b-3 plan](superpowers/plans/2026-11-14-stage-2b3-rest-of-godot-api.md).
+Read more: stage 2b-3 plan (`docs/superpowers/plans/2026-11-14-stage-2b3-rest-of-godot-api.md`).
 
 **Stage 2b-2 is done, both parts.** Signals, which run now:
 
@@ -181,7 +181,7 @@ Read more: [stage 2b-3 plan](superpowers/plans/2026-11-14-stage-2b3-rest-of-godo
 - `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs.
 - A method fits anywhere Godot takes a function: `array.filter(isBig)`.
 
-Read more: [stage 2b-2 plan](superpowers/plans/2026-11-13-stage-2b2-values-and-signals.md).
+Read more: stage 2b-2 plan (`docs/superpowers/plans/2026-11-13-stage-2b2-values-and-signals.md`).
 
 Godot's values, which run now:
 
@@ -213,16 +213,16 @@ Open items:
 | Decision | Outcome |
 |---|---|
 | Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
-| Royale's language extensions | The owner said on 2026-11-14 to support them as well: abstract classes, arrow functions, import aliases, `?.`, `??`, private constructors, strict function types, type inference, verbatim strings. With Royale's spelling, after stage 2c. See [language additions](superpowers/specs/2026-11-12-language-additions.md). |
+| Royale's language extensions | The owner said on 2026-11-14 to support them as well: abstract classes, arrow functions, import aliases, `?.`, `??`, private constructors, strict function types, type inference, verbatim strings. With Royale's spelling, after stage 2c. See language additions (`docs/superpowers/specs/2026-11-12-language-additions.md`). |
 | C++ guidelines | The owner asked on 2026-11-14 for best practices and a clean-up "for scalability before we keep going". The rules are in [C++ guidelines](cpp-guidelines.md); a check in the test suite enforces the ones a script can judge. |
 | `async`/`await` | The owner wants it first-class, not limited to the main thread, efficient, and with a proper debugger. Research first, after stage 2; no syntax chosen yet. |
 | Deferred review findings | The owner said on 2026-11-12 that all of them are to be fixed. They are listed in the [backlog](backlog.md) and stay there until fixed or ruled on. |
-| Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the [language additions](superpowers/specs/2026-11-12-language-additions.md) list. |
+| Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the language additions (`docs/superpowers/specs/2026-11-12-language-additions.md`) list. |
 | Which Godot integers are `Int64` | Decided on 2026-11-14: every Godot integer is an `Int64` unless Godot's description says it is narrower. `array.size()` and `randi()` are `Int64`; the table kept by hand goes. |
 | 64-bit integers | Decided on 2026-11-12: supported, in the way that is easiest to maintain. A real `Int64` type, given by one rule from Godot's description with no hand-kept table, converting to `int` or `Number` with a range check and never silently. Built in stage 2b-3; until then such values are declared `Number`. |
 | Static fields and null calls | Decided on 2026-11-12, and built: both follow Flash. A class's static fields are set on its first use, and a call on a null object evaluates its arguments before raising the error. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
-| [Godot naming design](superpowers/specs/2026-11-12-godot-naming-design.md) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
+| Godot naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
 
 ## Decisions waiting on the owner
 

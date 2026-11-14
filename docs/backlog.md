@@ -37,7 +37,7 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 | Decision | What to build | When |
 |---|---|---|
-| **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | Built in stage 2b-3, part B: the `Int64` type, by one rule in the generator (approved 2026-11-14). See the [design](superpowers/specs/2026-11-14-int64-design.md). | Done |
+| **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | Built in stage 2b-3, part B: the `Int64` type, by one rule in the generator (approved 2026-11-14). See the design (`docs/superpowers/specs/2026-11-14-int64-design.md`). | Done |
 
 ## Stage 1d: Godot's API in AS3
 

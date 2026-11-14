@@ -7,7 +7,7 @@ extension need that AS3 declarations cannot say: Godot's own names, hashes, defa
 | Files | Job |
 |---|---|
 | `generate.py` | The rules, one per kind of thing Godot describes |
-| `naming.py` | Godot's names to AS3's (`get_node` to `getNode`), by the [naming design](../../docs/superpowers/specs/2026-11-12-godot-naming-design.md) |
+| `naming.py` | Godot's names to AS3's (`get_node` to `getNode`), by the naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`) |
 | `godot.as`, `godot_names.txt` | **Generated. Never edited by hand** |
 | `embed.py` | Puts the two files inside `kas3c` |
 | `fixture_api.json`, `fixture.as`, `test_*.py` | A small API for the tests |
