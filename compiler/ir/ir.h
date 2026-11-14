@@ -65,6 +65,8 @@ inline bool is_engine(Kind p_kind) {
 	   written is of the class's element kind. */ \
 	X(VecNew, "RCA") X(VecGet, "RRR") X(VecSet, "RRR") \
 	X(VecLength, "RR-") X(VecSetLength, "RR-") X(VecFixed, "RR-") X(VecSetFixed, "RR-") \
+	/* A method of a vector: out, which one (a VectorMethod), [the vector, then what the method takes]. */ \
+	X(VecCall, "rIA") \
 	X(IsClass, "RRC") X(AsClass, "RRC") \
 	/* The engine. Names are Godot's own. In HostCall the first argument is what the method is called on. */ \
 	/* Int64. The constant is an index into the module's wide numbers. Arithmetic wraps at 64 bits. */ \
@@ -104,6 +106,19 @@ enum class Op : uint8_t {
 
 // The functions of Math that take one Number, in MathUnary's third operand.
 enum class MathFunction : uint8_t { Abs, Acos, Asin, Atan, Ceil, Cos, Exp, Floor, Log, Round, Sin, Sqrt, Tan };
+
+// A vector's methods, in VecCall's second operand. After the vector, the arguments are:
+//   Push, Unshift   elements                         -> the new length (uint)
+//   Pop, Shift      nothing                          -> the element
+//   IndexOf, LastIndexOf   an element, where to start (int)   -> the index (int), or -1
+//   Reverse         nothing                          -> the vector itself
+//   Slice           start, end (int)                 -> a new vector
+//   Concat          vectors of the same class        -> a new vector
+//   Join            the separator (String)           -> a String
+//   InsertAt        index (int), an element          -> nothing
+//   RemoveAt        index (int)                      -> the element
+//   Splice          start (int), how many (uint), elements to put in   -> a new vector of what was removed
+enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice };
 
 const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.

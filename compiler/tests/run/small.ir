@@ -38,14 +38,14 @@ function small(r0:Object):void
   @16 LtF64 r12 r11 r10
   @17 JumpIfNot r12 @28
   @19 ConstStr r13 "total"
-  @20 StrToStr r14 r13
-  @21 GetField r15 r0 .0
-  @22 F64ToStr r16 r15
-  @23 StrToStr r17 r16
-  @24 Call r18 small/twice (r0, r1)
-  @25 I32ToStr r19 r18
-  @26 StrToStr r20 r19
-  @27 Trace (r14, r17, r20)
+  @20 GetField r14 r0 .0
+  @21 F64ToStr r15 r14
+  @22 Call r16 small/twice (r0, r1)
+  @23 I32ToStr r17 r16
+  @24 StrToStr r18 r13
+  @25 StrToStr r19 r15
+  @26 StrToStr r20 r17
+  @27 Trace (r18, r19, r20)
   @28 ReturnVoid
 function small/twice(r0:Object, r1:int):int
   @1 ConstI32 r2 2

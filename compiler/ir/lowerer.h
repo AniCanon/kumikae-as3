@@ -170,6 +170,11 @@ class Lowerer {
 	std::optional<uint32_t> vector_class(const Type *p_type);
 	uint32_t vector_new(New *p_made);
 	uint32_t vector_literal(VectorLit *p_literal);
+	uint32_t vector_call(Call *p_call);
+	void vector_loop(ForIn *p_loop);
+	// What `===` can find equal: a number with a number, otherwise two values of one kind, and null with
+	// anything that can be null.
+	static bool can_be_equal(Kind p_a, Kind p_b);
 	// Math's constants and functions. Nothing if the symbol is not one of them.
 	std::optional<double> math_constant(const Symbol *p_symbol) const;
 	std::optional<uint32_t> math_call(Call *p_call, const Symbol *p_function);

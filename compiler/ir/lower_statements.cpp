@@ -137,9 +137,7 @@ void Lowerer::break_or_continue(Stmt *p_statement) {
 	}
 }
 
-// What `===` can find equal: a number with a number, otherwise two values of one kind, and null with
-// anything that can be null.
-static bool can_be_equal(Kind p_a, Kind p_b) {
+bool Lowerer::can_be_equal(Kind p_a, Kind p_b) {
 	const auto family = [](Kind p_kind) {
 		switch (p_kind) {
 			case Kind::I32:
@@ -248,7 +246,8 @@ void Lowerer::statement(Stmt *p_statement) {
 		return;
 	}
 	uint32_t position = p_statement->offset;
-	bool loop = p_statement->kind == NodeKind::While || p_statement->kind == NodeKind::DoWhile || p_statement->kind == NodeKind::For;
+	bool loop = p_statement->kind == NodeKind::While || p_statement->kind == NodeKind::DoWhile || p_statement->kind == NodeKind::For ||
+			p_statement->kind == NodeKind::ForIn;
 	if (p_statement->kind != NodeKind::Block && p_statement->kind != NodeKind::Empty && !loop) {
 		emit(Op::Stmt, position); // A loop marks its condition instead, once for each pass.
 	}
@@ -296,7 +295,11 @@ void Lowerer::statement(Stmt *p_statement) {
 			refuse(position, "'try'");
 			break;
 		case NodeKind::ForIn:
-			refuse(position, static_cast<ForIn *>(p_statement)->each ? "'for each'" : "'for in'");
+			if (is_vector(static_cast<ForIn *>(p_statement)->collection->type)) {
+				vector_loop(static_cast<ForIn *>(p_statement));
+			} else {
+				refuse(position, static_cast<ForIn *>(p_statement)->each ? "'for each'" : "'for in'");
+			}
 			break;
 		case NodeKind::Labeled:
 			refuse(position, "a label");

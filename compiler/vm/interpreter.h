@@ -83,6 +83,25 @@ private:
 	void raise_range(double p_index, uint32_t p_length);
 	bool resize_vector(Vector *p_vector, uint32_t p_length);
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	// A call of one of a vector's methods: its arguments (the vector first) by register, where the
+	// frame's registers start, and the register for what it gives back, or NONE.
+	struct VectorCall {
+		const std::vector<uint32_t> &list;
+		size_t base;
+		uint32_t out;
+		ir::VectorMethod method;
+	};
+	// Looked up each time it is wanted: putting an element into words can run the program, which may
+	// move the registers.
+	Slot &argument(const VectorCall &p_call, size_t p_index) { return stack_[p_call.base + p_call.list[p_index]]; }
+	void give(const VectorCall &p_call, ir::Kind p_kind, Slot p_owned);
+	bool length_is_fixed(const Vector *p_vector);
+	Vector *fresh_vector(uint32_t p_class, uint64_t p_length);
+	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	void vector_add(Vector *p_vector, const VectorCall &p_call);
+	void vector_take(Vector *p_vector, const VectorCall &p_call);
+	void vector_copy(Vector *p_vector, const VectorCall &p_call);
+	void splice(Vector *p_vector, const VectorCall &p_call);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
 	void unwind(size_t p_depth);

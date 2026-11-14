@@ -1,0 +1,2 @@
+RangeError: Error #1126: Cannot change the length of a fixed Vector.
+	at err_vector_fixed_pop()[err_vector_fixed_pop.as:6]

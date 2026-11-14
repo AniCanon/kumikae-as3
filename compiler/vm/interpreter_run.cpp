@@ -540,6 +540,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::VecSetFixed:
 				vector_op(function, in, r);
 				break;
+			case Op::VecCall:
+				vector_call(function, in); // `frame` and `r` may be stale after this.
+				break;
 			case Op::Call:
 			case Op::CallVirtual:
 				enter(function, in, r); // `frame` and `r` are stale after this.

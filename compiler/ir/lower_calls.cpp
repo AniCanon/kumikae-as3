@@ -105,17 +105,24 @@ uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 }
 
 uint32_t Lowerer::trace_call(Call *p_call) {
-	std::vector<uint32_t> list;
+	// Every argument is worked out first, and only then is each put into words, as in Flash: a vector
+	// that a later argument changes is traced as it is after the change.
+	std::vector<uint32_t> values;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		Expr *later = nullptr;
 		for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
 			later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
 		}
-		uint32_t value = expression(p_call->arguments[i], Kind::Str);
+		Kind kind = Kind::Void;
+		const bool spoken_later = !is_null(p_call->arguments[i]) && kind_of(p_call->arguments[i]->type, &kind) && kind == Kind::Obj;
+		values.push_back(settled(expression(p_call->arguments[i], spoken_later ? Kind::Obj : Kind::Str), later, p_call->offset));
+	}
+	std::vector<uint32_t> list;
+	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		// A null string traces as "null".
 		uint32_t text = reg(Kind::Str);
-		emit(Op::StrToStr, p_call->arguments[i]->offset, text, value);
-		list.push_back(settled(text, later, p_call->offset));
+		emit(Op::StrToStr, p_call->arguments[i]->offset, text, convert(values[i], Kind::Str, p_call->arguments[i]->offset));
+		list.push_back(text);
 	}
 	emit(Op::Trace, p_call->offset, arguments(std::move(list)));
 	return 0;
@@ -234,6 +241,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	uint32_t position = p_call->offset;
 	if (callee->kind == NodeKind::SuperExpr) {
 		return super_call(p_call);
+	}
+	if (callee->kind == NodeKind::Member && is_vector(static_cast<Member *>(callee)->object->type)) {
+		return vector_call(p_call);
 	}
 	Symbol *symbol = callee_symbol(callee);
 	if (!symbol) {
