@@ -101,6 +101,12 @@ class Lowerer {
 	// declared later.
 	void reserve_class(ClassDecl *p_decl);
 
+	Class inherited_class(ClassDecl *p_decl);
+	uint32_t add_function(uint32_t p_class, const std::string &p_name, uint32_t p_position, bool p_static);
+	void declare_fields(uint32_t p_class, VarDecl *p_decl);
+	void record_godot_virtual(uint32_t p_class, const Symbol *p_symbol, FunctionDecl *p_function, uint32_t p_made);
+	void give_method_slot(uint32_t p_class, FunctionDecl *p_function, uint32_t p_made);
+	void declare_method(uint32_t p_class, const Symbol *p_symbol, FunctionDecl *p_function);
 	void declare_class(Unit &p_unit, ClassDecl *p_decl);
 
 	uint32_t emit(Op p_op, uint32_t p_position, uint32_t p_a = 0, uint32_t p_b = 0, uint32_t p_c = 0);
@@ -126,6 +132,7 @@ class Lowerer {
 	// conversion that is not written raises a RangeError when the value does not fit, and one that is
 	// written is AS3's own, which cuts, rounds or holds at the end.
 	uint32_t convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p_written = false);
+	uint32_t convert_wide(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p_written);
 
 	Kind natural(Expr *p_expression);
 
@@ -299,6 +306,7 @@ class Lowerer {
 	uint32_t engine_operate(TokenKind p_op, std::vector<uint32_t> p_operands, Kind p_result, const Type *p_type, uint32_t p_position);
 
 	// An arithmetic, bitwise or string operation on two values already evaluated.
+	uint32_t concatenate(uint32_t p_left, uint32_t p_right, uint32_t p_position);
 	uint32_t operate(TokenKind p_op, uint32_t p_left, uint32_t p_right, bool p_string, uint32_t p_position);
 
 	bool is_string_type(const Type *p_type) const;

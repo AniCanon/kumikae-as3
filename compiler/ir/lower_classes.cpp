@@ -14,15 +14,9 @@ void Lowerer::reserve_class(ClassDecl *p_decl) {
 	module_.classes.push_back(std::move(klass));
 }
 
-void Lowerer::declare_class(Unit &p_unit, ClassDecl *p_decl) {
-	Symbol *symbol = p_decl->symbol;
-	if (!symbol || !symbol->klass) {
-		return;
-	}
-	unit_ = &p_unit;
-	if (p_decl->implements.count > 0) {
-		refuse(p_decl->implements[0]->offset, "'implements'");
-	}
+// What a class starts with: a script's hold on its Godot object, or what its base class has.
+Class Lowerer::inherited_class(ClassDecl *p_decl) {
+	const Symbol *symbol = p_decl->symbol;
 	Class klass;
 	klass.name = class_name(symbol);
 	Symbol *base = symbol->klass->base;
@@ -33,126 +27,151 @@ void Lowerer::declare_class(Unit &p_unit, ClassDecl *p_decl) {
 		klass.fields.push_back({ "$owner", Kind::Ref });
 	} else if (base && base != object_) {
 		if (!class_index(base, &klass.base)) {
-			refuse(p_decl->extends ? p_decl->extends->offset : p_decl->name_offset,
-					"extending '" + std::string(base->name) + "'");
+			refuse(p_decl->extends ? p_decl->extends->offset : p_decl->name_offset, "extending '" + std::string(base->name) + "'");
 		} else {
-			klass.fields = module_.classes[klass.base].fields;
-			klass.methods = module_.classes[klass.base].methods;
-			klass.to_string = module_.classes[klass.base].to_string;
-			klass.native_base = module_.classes[klass.base].native_base;
-			klass.virtuals = module_.classes[klass.base].virtuals;
+			const Class &from = module_.classes[klass.base];
+			klass.fields = from.fields;
+			klass.methods = from.methods;
+			klass.to_string = from.to_string;
+			klass.native_base = from.native_base;
+			klass.virtuals = from.virtuals;
 		}
 	}
+	return klass;
+}
+
+uint32_t Lowerer::add_function(uint32_t p_class, const std::string &p_name, uint32_t p_position, bool p_static) {
+	Function function;
+	function.name = p_name;
+	function.file = file(unit_);
+	function.position = p_position;
+	function.owner = p_class;
+	function.is_static = p_static;
+	module_.functions.push_back(std::move(function));
+	return (uint32_t)module_.functions.size() - 1;
+}
+
+// A static field is a global named after its class; any other takes the next slot of the object.
+void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
+	for (Declarator &declarator : p_decl->declarators) {
+		if (!declarator.symbol) {
+			continue;
+		}
+		Kind kind = written_kind(declarator.type, declarator.offset, Kind::F64);
+		if (p_decl->modifiers.bits & Modifiers::Static) {
+			globals_[declarator.symbol] = (uint32_t)module_.globals.size();
+			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind });
+		} else {
+			fields_[declarator.symbol] = (uint32_t)module_.classes[p_class].fields.size();
+			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind });
+		}
+	}
+}
+
+// A method that overrides one of Godot's is what the engine calls under Godot's name.
+void Lowerer::record_godot_virtual(uint32_t p_class, const Symbol *p_symbol, FunctionDecl *p_function, uint32_t p_made) {
+	for (Symbol *at = p_symbol->klass->base; at && at->klass; at = at->klass->base) {
+		auto inherited = at->klass->members.find(p_function->name);
+		if (inherited == at->klass->members.end() || !is_godot(inherited->second)) {
+			continue; // Not here, or a script class's override of it: Godot's declaration is further up.
+		}
+		std::string godot;
+		if (godot_name(at->name, p_function->name, &godot)) {
+			bool replaced = false;
+			for (auto &entry : module_.classes[p_class].virtuals) {
+				if (entry.first == godot) {
+					entry.second = p_made;
+					replaced = true;
+				}
+			}
+			if (!replaced) {
+				module_.classes[p_class].virtuals.push_back({ godot, p_made });
+			}
+		}
+		return;
+	}
+}
+
+// A method's place in the class's table. An override takes the slot of what it overrides.
+void Lowerer::give_method_slot(uint32_t p_class, FunctionDecl *p_function, uint32_t p_made) {
+	std::unordered_map<std::string, uint32_t> &names = slot_names_[p_class];
+	std::string key(p_function->name);
+	auto slot = names.find(key);
+	if (slot != names.end() && (p_function->modifiers.bits & Modifiers::Override)) {
+		module_.classes[p_class].methods[slot->second] = p_made;
+		slots_[p_function->symbol] = slot->second;
+		return;
+	}
+	uint32_t added = (uint32_t)module_.classes[p_class].methods.size();
+	module_.classes[p_class].methods.push_back(p_made);
+	// A private method is not seen by subclasses, so its name is not recorded for them.
+	if (!(p_function->modifiers.bits & Modifiers::Private)) {
+		names[key] = added;
+	}
+	slots_[p_function->symbol] = added;
+}
+
+// One function of a class: its constructor, a static function, or a method.
+void Lowerer::declare_method(uint32_t p_class, const Symbol *p_symbol, FunctionDecl *p_function) {
+	if (!p_function->symbol) {
+		return;
+	}
+	if (p_function->accessor != FunctionDecl::None) {
+		refuse(p_function->name_offset, "a getter or setter");
+		return;
+	}
+	const std::string name = module_.classes[p_class].name;
+	if (p_symbol->klass->constructor == p_function->symbol) {
+		uint32_t made = add_function(p_class, name, p_function->name_offset, false);
+		module_.classes[p_class].constructor = made;
+		functions_[p_function->symbol] = made;
+		return;
+	}
+	bool is_static = (p_function->modifiers.bits & Modifiers::Static) != 0;
+	uint32_t made = add_function(p_class, name + "/" + std::string(p_function->name), p_function->name_offset, is_static);
+	functions_[p_function->symbol] = made;
+	if (p_function->name == "toString" && !is_static) {
+		const Type *result = p_function->return_type ? compilation_.type_of(p_function->return_type) : nullptr;
+		if (p_function->parameters.count == 0 && result && result->kind == Type::Instance && result->symbol == string_) {
+			module_.classes[p_class].to_string = made;
+		} else {
+			refuse(p_function->name_offset, "a toString() that takes arguments or does not return a String");
+		}
+	}
+	if (is_static) {
+		return;
+	}
+	if (p_function->modifiers.bits & Modifiers::Override) {
+		record_godot_virtual(p_class, p_symbol, p_function, made);
+	}
+	give_method_slot(p_class, p_function, made);
+}
+
+void Lowerer::declare_class(Unit &p_unit, ClassDecl *p_decl) {
+	Symbol *symbol = p_decl->symbol;
+	if (!symbol || !symbol->klass) {
+		return;
+	}
+	unit_ = &p_unit;
+	if (p_decl->implements.count > 0) {
+		refuse(p_decl->implements[0]->offset, "'implements'");
+	}
+	Class klass = inherited_class(p_decl);
 	uint32_t index = classes_[symbol];
 	if (klass.base != NONE) {
 		slot_names_[index] = slot_names_[klass.base];
 	}
 	module_.classes[index] = std::move(klass);
-
-	auto new_function = [&](FunctionDecl *p_function, const std::string &p_name, bool p_static) {
-		Function function;
-		function.name = p_name;
-		function.file = file(&p_unit);
-		function.position = p_function ? p_function->name_offset : p_decl->name_offset;
-		function.owner = index;
-		function.is_static = p_static;
-		module_.functions.push_back(std::move(function));
-		return (uint32_t)module_.functions.size() - 1;
-	};
-	const std::string name = module_.classes[index].name;
-	bool has_constructor = false;
 	for (Node *member : p_decl->members) {
 		if (member->kind == NodeKind::VarDecl) {
-			VarDecl *decl = static_cast<VarDecl *>(member);
-			for (Declarator &declarator : decl->declarators) {
-				if (!declarator.symbol) {
-					continue;
-				}
-				Kind kind = written_kind(declarator.type, declarator.offset, Kind::F64);
-				if (decl->modifiers.bits & Modifiers::Static) {
-					globals_[declarator.symbol] = (uint32_t)module_.globals.size();
-					module_.globals.push_back({ name + "." + std::string(declarator.name), kind });
-				} else {
-					fields_[declarator.symbol] = (uint32_t)module_.classes[index].fields.size();
-					module_.classes[index].fields.push_back({ std::string(declarator.name), kind });
-				}
-			}
+			declare_fields(index, static_cast<VarDecl *>(member));
 		} else if (member->kind == NodeKind::FunctionDecl) {
-			FunctionDecl *function = static_cast<FunctionDecl *>(member);
-			if (!function->symbol) {
-				continue;
-			}
-			if (function->accessor != FunctionDecl::None) {
-				refuse(function->name_offset, "a getter or setter");
-				continue;
-			}
-			bool is_static = (function->modifiers.bits & Modifiers::Static) != 0;
-			if (symbol->klass->constructor == function->symbol) {
-				has_constructor = true;
-				uint32_t made = new_function(function, name, false);
-				module_.classes[index].constructor = made;
-				functions_[function->symbol] = made;
-				continue;
-			}
-			uint32_t made = new_function(function, name + "/" + std::string(function->name), is_static);
-			functions_[function->symbol] = made;
-			if (function->name == "toString" && !is_static) {
-				const Type *result = function->return_type ? compilation_.type_of(function->return_type) : nullptr;
-				if (function->parameters.count == 0 && result && result->kind == Type::Instance && result->symbol == string_) {
-					module_.classes[index].to_string = made;
-				} else {
-					refuse(function->name_offset, "a toString() that takes arguments or does not return a String");
-				}
-			}
-			if (is_static) {
-				continue;
-			}
-			// A method that overrides one of Godot's is what the engine calls under Godot's name.
-			if (function->modifiers.bits & Modifiers::Override) {
-				for (Symbol *at = symbol->klass->base; at && at->klass; at = at->klass->base) {
-					auto inherited = at->klass->members.find(function->name);
-					if (inherited == at->klass->members.end()) {
-						continue;
-					}
-					std::string godot;
-					if (!is_godot(inherited->second)) {
-						continue; // A script class's override of it: Godot's declaration is further up.
-					}
-					if (godot_name(at->name, function->name, &godot)) {
-						bool replaced = false;
-						for (auto &entry : module_.classes[index].virtuals) {
-							if (entry.first == godot) {
-								entry.second = made;
-								replaced = true;
-							}
-						}
-						if (!replaced) {
-							module_.classes[index].virtuals.push_back({ godot, made });
-						}
-					}
-					break;
-				}
-			}
-			// An override takes the slot of what it overrides.
-			std::unordered_map<std::string, uint32_t> &names = slot_names_[index];
-			std::string key(function->name);
-			auto slot = names.find(key);
-			if (slot != names.end() && (function->modifiers.bits & Modifiers::Override)) {
-				module_.classes[index].methods[slot->second] = made;
-				slots_[function->symbol] = slot->second;
-			} else {
-				uint32_t added = (uint32_t)module_.classes[index].methods.size();
-				module_.classes[index].methods.push_back(made);
-				// A private method is not seen by subclasses, so its name is not recorded for them.
-				if (!(function->modifiers.bits & Modifiers::Private)) {
-					names[key] = added;
-				}
-				slots_[function->symbol] = added;
-			}
+			declare_method(index, symbol, static_cast<FunctionDecl *>(member));
 		}
 	}
-	if (!has_constructor) {
-		module_.classes[index].constructor = new_function(nullptr, name, false);
+	if (module_.classes[index].constructor == NONE) {
+		// No constructor is written: one that only sets the fields is made.
+		module_.classes[index].constructor = add_function(index, module_.classes[index].name, p_decl->name_offset, false);
 	}
 }
 

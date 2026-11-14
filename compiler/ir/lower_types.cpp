@@ -167,49 +167,55 @@ uint32_t Lowerer::default_value(Kind p_kind, uint32_t p_position) {
 	return out;
 }
 
+// To or from an Int64. See convert() for p_written.
+uint32_t Lowerer::convert_wide(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p_written) {
+	Kind from = kind_at(p_reg);
+	auto step = [&](Op p_op, Kind p_kind, uint32_t p_source) {
+		uint32_t out = reg(p_kind);
+		emit(p_op, p_position, out, p_source);
+		return out;
+	};
+	if (from == Kind::I64) {
+		switch (p_to) {
+			case Kind::I32:
+				return step(p_written ? Op::I64WrapI32 : Op::I64ToI32, Kind::I32, p_reg);
+			case Kind::U32:
+				return step(p_written ? Op::I64WrapU32 : Op::I64ToU32, Kind::U32, p_reg);
+			case Kind::F64:
+				return step(p_written ? Op::I64RoundF64 : Op::I64ToF64, Kind::F64, p_reg);
+			case Kind::Bool:
+				return step(Op::I64ToBool, Kind::Bool, p_reg);
+			case Kind::Str:
+				return step(Op::I64ToStr, Kind::Str, p_reg);
+			default:
+				refuse(p_position, is_engine(p_to) ? "passing this value where a Godot value is expected" : "converting a value to an object");
+				return default_value(p_to, p_position);
+		}
+	}
+	switch (from) {
+		case Kind::I32:
+			return step(Op::I32ToI64, Kind::I64, p_reg);
+		case Kind::U32:
+			return step(Op::U32ToI64, Kind::I64, p_reg);
+		case Kind::F64:
+			return step(p_written ? Op::F64ClampI64 : Op::F64ToI64, Kind::I64, p_reg);
+		case Kind::Bool:
+			return step(Op::F64ClampI64, Kind::I64, step(Op::BoolToF64, Kind::F64, p_reg));
+		case Kind::Str:
+			return step(Op::StrToI64, Kind::I64, p_reg);
+		default:
+			refuse(p_position, is_engine(from) ? "converting a Godot value" : "converting an object to a number");
+			return default_value(Kind::I64, p_position);
+	}
+}
+
 uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p_written) {
 	Kind from = kind_at(p_reg);
 	if (from == p_to || p_to == Kind::Void) {
 		return p_reg;
 	}
 	if (from == Kind::I64 || p_to == Kind::I64) {
-		auto step = [&](Op p_op, Kind p_kind, uint32_t p_source) {
-			uint32_t out = reg(p_kind);
-			emit(p_op, p_position, out, p_source);
-			return out;
-		};
-		if (from == Kind::I64) {
-			switch (p_to) {
-				case Kind::I32:
-					return step(p_written ? Op::I64WrapI32 : Op::I64ToI32, Kind::I32, p_reg);
-				case Kind::U32:
-					return step(p_written ? Op::I64WrapU32 : Op::I64ToU32, Kind::U32, p_reg);
-				case Kind::F64:
-					return step(p_written ? Op::I64RoundF64 : Op::I64ToF64, Kind::F64, p_reg);
-				case Kind::Bool:
-					return step(Op::I64ToBool, Kind::Bool, p_reg);
-				case Kind::Str:
-					return step(Op::I64ToStr, Kind::Str, p_reg);
-				default:
-					refuse(p_position, is_engine(p_to) ? "passing this value where a Godot value is expected" : "converting a value to an object");
-					return default_value(p_to, p_position);
-			}
-		}
-		switch (from) {
-			case Kind::I32:
-				return step(Op::I32ToI64, Kind::I64, p_reg);
-			case Kind::U32:
-				return step(Op::U32ToI64, Kind::I64, p_reg);
-			case Kind::F64:
-				return step(p_written ? Op::F64ClampI64 : Op::F64ToI64, Kind::I64, p_reg);
-			case Kind::Bool:
-				return step(Op::F64ClampI64, Kind::I64, step(Op::BoolToF64, Kind::F64, p_reg));
-			case Kind::Str:
-				return step(Op::StrToI64, Kind::I64, p_reg);
-			default:
-				refuse(p_position, is_engine(from) ? "converting a Godot value" : "converting an object to a number");
-				return default_value(Kind::I64, p_position);
-		}
+		return convert_wide(p_reg, p_to, p_position, p_written);
 	}
 	if (is_engine(from) && p_to == Kind::Str) {
 		uint32_t out = reg(Kind::Str);

@@ -55,139 +55,78 @@ bool Lowerer::whole(const Expr *p_expression) {
 	return kind_of(p_expression->type, &kind) && is_integral(kind);
 }
 
+namespace {
+
+// How one of AS3's arithmetic or bitwise operators is carried out. Without an Int64 it is done on
+// Numbers, or on 32-bit integers for the bitwise ones. With one, whole-number arithmetic stays in 64
+// bits; division has no such form, and neither has `+ - * %` when the other side is a Number.
+struct Arithmetic {
+	TokenKind op;
+	TokenKind assign; // The same operator written with `=`.
+	Op narrow;
+	Kind operands;
+	Kind result;
+	Op wide; // Op::Stmt: none.
+	bool wide_needs_whole; // Both sides must be whole numbers for the 64-bit form.
+};
+
+constexpr Arithmetic ARITHMETIC[] = {
+	{ TokenKind::Plus, TokenKind::PlusAssign, Op::AddF64, Kind::F64, Kind::F64, Op::AddI64, true },
+	{ TokenKind::Minus, TokenKind::MinusAssign, Op::SubF64, Kind::F64, Kind::F64, Op::SubI64, true },
+	{ TokenKind::Star, TokenKind::StarAssign, Op::MulF64, Kind::F64, Kind::F64, Op::MulI64, true },
+	{ TokenKind::Slash, TokenKind::SlashAssign, Op::DivF64, Kind::F64, Kind::F64, Op::Stmt, true },
+	{ TokenKind::Percent, TokenKind::PercentAssign, Op::ModF64, Kind::F64, Kind::F64, Op::ModI64, true },
+	{ TokenKind::Amp, TokenKind::AmpAssign, Op::BitAnd, Kind::I32, Kind::I32, Op::BitAndI64, false },
+	{ TokenKind::Pipe, TokenKind::PipeAssign, Op::BitOr, Kind::I32, Kind::I32, Op::BitOrI64, false },
+	{ TokenKind::Caret, TokenKind::CaretAssign, Op::BitXor, Kind::I32, Kind::I32, Op::BitXorI64, false },
+	{ TokenKind::ShiftLeft, TokenKind::ShiftLeftAssign, Op::Shl, Kind::I32, Kind::I32, Op::ShlI64, false },
+	{ TokenKind::ShiftRight, TokenKind::ShiftRightAssign, Op::Shr, Kind::I32, Kind::I32, Op::ShrI64, false },
+	{ TokenKind::ShiftRightUnsigned, TokenKind::ShiftRightUnsignedAssign, Op::UShr, Kind::I32, Kind::U32, Op::UShrI64, false },
+};
+
+const Arithmetic *arithmetic_of(TokenKind p_op) {
+	for (const Arithmetic &entry : ARITHMETIC) {
+		if (entry.op == p_op || entry.assign == p_op) {
+			return &entry;
+		}
+	}
+	return nullptr;
+}
+
+} // namespace
+
+// Two values as strings, one after the other.
+uint32_t Lowerer::concatenate(uint32_t p_left, uint32_t p_right, uint32_t p_position) {
+	uint32_t left = reg(Kind::Str), right = reg(Kind::Str), out = reg(Kind::Str);
+	emit(Op::StrToStr, p_position, left, convert(p_left, Kind::Str, p_position));
+	emit(Op::StrToStr, p_position, right, convert(p_right, Kind::Str, p_position));
+	emit(Op::Concat, p_position, out, left, right);
+	return out;
+}
+
 uint32_t Lowerer::operate(TokenKind p_op, uint32_t p_left, uint32_t p_right, bool p_string, uint32_t p_position) {
 	if (p_string) {
-		uint32_t left = reg(Kind::Str), right = reg(Kind::Str), out = reg(Kind::Str);
-		emit(Op::StrToStr, p_position, left, convert(p_left, Kind::Str, p_position));
-		emit(Op::StrToStr, p_position, right, convert(p_right, Kind::Str, p_position));
-		emit(Op::Concat, p_position, out, left, right);
-		return out;
+		return concatenate(p_left, p_right, p_position);
 	}
-	if (kind_at(p_left) == Kind::I64 || kind_at(p_right) == Kind::I64) {
-		// With an Int64, whole-number arithmetic stays in 64 bits. Division, and anything with a
-		// Number, falls through to Numbers: the Int64 converts, and says so if it does not fit.
-		Op wide_op = Op::Stmt;
-		bool whole_only = true;
-		switch (p_op) {
-			case TokenKind::Plus:
-			case TokenKind::PlusAssign:
-				wide_op = Op::AddI64;
-				break;
-			case TokenKind::Minus:
-			case TokenKind::MinusAssign:
-				wide_op = Op::SubI64;
-				break;
-			case TokenKind::Star:
-			case TokenKind::StarAssign:
-				wide_op = Op::MulI64;
-				break;
-			case TokenKind::Percent:
-			case TokenKind::PercentAssign:
-				wide_op = Op::ModI64;
-				break;
-			case TokenKind::Amp:
-			case TokenKind::AmpAssign:
-				wide_op = Op::BitAndI64;
-				whole_only = false;
-				break;
-			case TokenKind::Pipe:
-			case TokenKind::PipeAssign:
-				wide_op = Op::BitOrI64;
-				whole_only = false;
-				break;
-			case TokenKind::Caret:
-			case TokenKind::CaretAssign:
-				wide_op = Op::BitXorI64;
-				whole_only = false;
-				break;
-			case TokenKind::ShiftLeft:
-			case TokenKind::ShiftLeftAssign:
-				wide_op = Op::ShlI64;
-				whole_only = false;
-				break;
-			case TokenKind::ShiftRight:
-			case TokenKind::ShiftRightAssign:
-				wide_op = Op::ShrI64;
-				whole_only = false;
-				break;
-			case TokenKind::ShiftRightUnsigned:
-			case TokenKind::ShiftRightUnsignedAssign:
-				wide_op = Op::UShrI64;
-				whole_only = false;
-				break;
-			default:
-				break;
-		}
-		if (wide_op != Op::Stmt && (!whole_only || (is_integral(kind_at(p_left)) && is_integral(kind_at(p_right))))) {
+	const Arithmetic *how = arithmetic_of(p_op);
+	if (!how) {
+		refuse(p_position, "this operator");
+		how = &ARITHMETIC[0];
+	} else if (kind_at(p_left) == Kind::I64 || kind_at(p_right) == Kind::I64) {
+		// Anything that has no 64-bit form falls through to Numbers: the Int64 converts, and says so if
+		// it does not fit.
+		const bool whole = is_integral(kind_at(p_left)) && is_integral(kind_at(p_right));
+		if (how->wide != Op::Stmt && (!how->wide_needs_whole || whole)) {
 			uint32_t left = convert(p_left, Kind::I64, p_position);
 			uint32_t right = convert(p_right, Kind::I64, p_position);
 			uint32_t out = reg(Kind::I64);
-			emit(wide_op, p_position, out, left, right);
+			emit(how->wide, p_position, out, left, right);
 			return out;
 		}
 	}
-	Op op = Op::AddF64;
-	Kind operands = Kind::F64;
-	Kind result = Kind::F64;
-	switch (p_op) {
-		case TokenKind::Plus:
-		case TokenKind::PlusAssign:
-			op = Op::AddF64;
-			break;
-		case TokenKind::Minus:
-		case TokenKind::MinusAssign:
-			op = Op::SubF64;
-			break;
-		case TokenKind::Star:
-		case TokenKind::StarAssign:
-			op = Op::MulF64;
-			break;
-		case TokenKind::Slash:
-		case TokenKind::SlashAssign:
-			op = Op::DivF64;
-			break;
-		case TokenKind::Percent:
-		case TokenKind::PercentAssign:
-			op = Op::ModF64;
-			break;
-		case TokenKind::Amp:
-		case TokenKind::AmpAssign:
-			op = Op::BitAnd;
-			operands = result = Kind::I32;
-			break;
-		case TokenKind::Pipe:
-		case TokenKind::PipeAssign:
-			op = Op::BitOr;
-			operands = result = Kind::I32;
-			break;
-		case TokenKind::Caret:
-		case TokenKind::CaretAssign:
-			op = Op::BitXor;
-			operands = result = Kind::I32;
-			break;
-		case TokenKind::ShiftLeft:
-		case TokenKind::ShiftLeftAssign:
-			op = Op::Shl;
-			operands = result = Kind::I32;
-			break;
-		case TokenKind::ShiftRight:
-		case TokenKind::ShiftRightAssign:
-			op = Op::Shr;
-			operands = result = Kind::I32;
-			break;
-		case TokenKind::ShiftRightUnsigned:
-		case TokenKind::ShiftRightUnsignedAssign:
-			op = Op::UShr;
-			operands = Kind::I32;
-			result = Kind::U32;
-			break;
-		default:
-			refuse(p_position, "this operator");
-			break;
-	}
-	uint32_t out = reg(result);
-	uint32_t left = convert(p_left, op == Op::UShr ? Kind::U32 : operands, p_position);
-	emit(op, p_position, out, left, convert(p_right, operands, p_position));
+	uint32_t out = reg(how->result);
+	uint32_t left = convert(p_left, how->narrow == Op::UShr ? Kind::U32 : how->operands, p_position);
+	emit(how->narrow, p_position, out, left, convert(p_right, how->operands, p_position));
 	return out;
 }
 
