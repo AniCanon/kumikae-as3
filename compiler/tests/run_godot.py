@@ -62,6 +62,9 @@ if moved:
     check("no sideways movement", abs(float(moved.group(3))) < 0.001, moved.group(3))
     check("a string came back", moved.group(4).strip() == "moved after 30 steps", moved.group(4))
 check("the AS3 error was reported", "TypeError: Error #1009" in output and "at Player/fail()" in output, output[-600:])
+check("the AS3 error is shown as Godot shows a script's own: with the script's file and line as its source",
+      re.search(r"SCRIPT ERROR: TypeError: Error #1009[^\n]*\n(\s+at [^\n]+\n)*\s+at: Player/fail\(\) \(res://Player\.as:\d+\)", output) is not None,
+      output[-900:])
 check("the engine carried on", "RESULT after error steps=30" in output, output[-600:])
 check("no crash", run.returncode == 0, "exit %d" % run.returncode)
 
