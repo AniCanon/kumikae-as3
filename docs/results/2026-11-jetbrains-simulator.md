@@ -2,7 +2,7 @@
 
 Date: 2026-11-14. Work on `feat/jetbrains-simulator`.
 
-The [design](../superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md)
+The design (`docs/superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md`)
 was committed before the implementation. Code and build instructions are in
 [`editors/jetbrains/`](../../editors/jetbrains/).
 
