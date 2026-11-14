@@ -12,6 +12,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -235,6 +236,13 @@ class Lowerer {
 
 	uint32_t call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind);
 
+	uint32_t super_call(Call *p_call);
+	std::optional<uint32_t> signal_call_by_name(Call *p_call);
+	uint32_t cast(Call *p_call, Symbol *p_type, Kind p_want);
+	uint32_t trace_call(Call *p_call);
+	uint32_t engine_text(Call *p_call);
+	uint32_t godot_call(Call *p_call, Symbol *p_method);
+	uint32_t script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function);
 	uint32_t call(Call *p_call, Kind p_want);
 
 	// A method written where Godot takes a function (`onHit`, `this.onHit`, `other.onHit`): the method
@@ -345,6 +353,12 @@ class Lowerer {
 public:
 	Lowerer(Compilation &p_compilation, Module &p_module);
 
+	using ClassInUnit = std::pair<Unit *, ClassDecl *>;
+	void find_error_classes();
+	std::vector<ClassInUnit> classes_in_order(const std::vector<Unit *> &p_units);
+	void declare_package_function(Unit *p_unit, FunctionDecl *p_decl);
+	void declare_package_level(Unit *p_unit, const List<Node *> &p_definitions);
+	void find_entry_class(Unit *p_first);
 	bool run(LowerMode p_mode);
 };
 

@@ -1,6 +1,4 @@
 godot_ext/callable.cpp: sweep_listeners() is over 120 lines
-ir/lower.cpp: Lowerer::run() is over 120 lines
-ir/lower_calls.cpp: Lowerer::call() is over 120 lines
 ir/lower_classes.cpp: Lowerer::declare_class() is over 120 lines
 ir/lower_operators.cpp: Lowerer::operate() is over 120 lines
 ir/lower_types.cpp: Lowerer::convert() is over 120 lines

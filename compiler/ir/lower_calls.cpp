@@ -49,115 +49,121 @@ uint32_t Lowerer::call_result(Symbol *p_function, uint32_t p_position, Kind *r_k
 	return kind == Kind::Void ? NONE : reg(kind);
 }
 
-uint32_t Lowerer::call(Call *p_call, Kind p_want) {
+// super(...): the base class's constructor. It has no value: the checker lets nothing use it.
+uint32_t Lowerer::super_call(Call *p_call) {
+	Symbol *base = class_ && class_->klass ? class_->klass->base : nullptr;
+	uint32_t base_index = 0;
+	if (base && base != object_ && class_index(base, &base_index)) {
+		std::vector<uint32_t> list = { 0 };
+		constructor_arguments(base, p_call->arguments, p_call->offset, list);
+		emit(Op::Call, p_call->offset, NONE, module_.classes[base_index].constructor, arguments(std::move(list)));
+	}
+	return 0;
+}
+
+// `timer[name].add(f)`: the checker can't know what `timer[name]` is. A signal's method written after
+// it says a signal is meant; the engine checks that it is one when the line runs. Nothing if the call is
+// not of that shape.
+std::optional<uint32_t> Lowerer::signal_call_by_name(Call *p_call) {
+	if (p_call->callee->kind != NodeKind::Member || !signal_ || !signal_->klass) {
+		return std::nullopt;
+	}
+	Member *member = static_cast<Member *>(p_call->callee);
+	auto verb = signal_->klass->members.find(member->name);
+	if (verb == signal_->klass->members.end() || verb->second->kind != SymbolKind::Method) {
+		return std::nullopt;
+	}
+	uint32_t object = 0, name = 0;
+	uint32_t found = signal_by_name(member->object, writer(p_call->arguments), &object, &name);
+	if (found == NONE) {
+		return std::nullopt;
+	}
+	return engine_call(p_call, verb->second, found, [&]() { emit(Op::HostMember, member->object->offset, found, object, name); });
+}
+
+// A conversion written as a call: int(x), String(x).
+uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
+	uint32_t position = p_call->offset;
+	Kind conversion = Kind::Void;
+	if (!kind_of_class(p_type, &conversion) || p_call->arguments.count != 1) {
+		refuse(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "'");
+		return default_value(p_want, position);
+	}
+	Kind given = Kind::Void;
+	bool known = kind_of(p_call->arguments[0]->type, &given);
+	// To or from an Int64, a conversion that is written out is AS3's own: see convert().
+	uint32_t value = known && (given == Kind::I64 || conversion == Kind::I64) && !is_null(p_call->arguments[0])
+			? convert(wide_operand(p_call->arguments[0], conversion), conversion, position, true)
+			: expression(p_call->arguments[0], conversion);
+	if (conversion != Kind::Str) {
+		return value;
+	}
+	// The conversion written out always gives a string: a missing one becomes "null".
+	uint32_t text = reg(Kind::Str);
+	emit(Op::StrToStr, position, text, value);
+	return text;
+}
+
+uint32_t Lowerer::trace_call(Call *p_call) {
+	std::vector<uint32_t> list;
+	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
+		Expr *later = nullptr;
+		for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
+			later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
+		}
+		uint32_t value = expression(p_call->arguments[i], Kind::Str);
+		// A null string traces as "null".
+		uint32_t text = reg(Kind::Str);
+		emit(Op::StrToStr, p_call->arguments[i]->offset, text, value);
+		list.push_back(settled(text, later, p_call->offset));
+	}
+	emit(Op::Trace, p_call->offset, arguments(std::move(list)));
+	return 0;
+}
+
+// AS3's own toString() on one of Godot's values or objects: Godot's text for it.
+uint32_t Lowerer::engine_text(Call *p_call) {
+	uint32_t value = expression(static_cast<Member *>(p_call->callee)->object, Kind::Void);
+	emit(Op::NullCheck, p_call->offset, value);
+	uint32_t out = reg(Kind::Str);
+	emit(Op::HostToStr, p_call->offset, out, value);
+	return out;
+}
+
+// A method of Godot's. `Input.isActionPressed(...)` is a method of the engine's one Input; any other
+// static one is called on no object.
+uint32_t Lowerer::godot_call(Call *p_call, Symbol *p_method) {
+	uint32_t position = p_call->offset;
+	if (p_method->is_static()) {
+		return is_singleton(p_method->owner) ? engine_call(p_call, p_method, singleton(p_method->owner, position)) : static_call(p_call, p_method);
+	}
+	Expr *callee = p_call->callee;
+	bool through_super = callee->kind == NodeKind::Member && static_cast<Member *>(callee)->object->kind == NodeKind::SuperExpr;
+	if (!through_super || (p_method->modifiers & Modifiers::Final)) {
+		return engine_call(p_call, p_method);
+	}
+	// Godot's own version of a virtual does nothing. Asking the engine for it would come straight back
+	// to the script. The arguments are still evaluated.
+	for (Expr *argument : p_call->arguments) {
+		expression(argument, Kind::Void);
+	}
+	Kind kind = Kind::Void;
+	if (p_method->type) {
+		kind_of(compilation_.type_of(p_method->type), &kind);
+	}
+	return kind == Kind::Void ? 0 : default_value(kind, position);
+}
+
+// A function or method of the program itself.
+uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function) {
 	Expr *callee = p_call->callee;
 	uint32_t position = p_call->offset;
-	// super(...): the base class's constructor.
-	if (callee->kind == NodeKind::SuperExpr) {
-		Symbol *base = class_ && class_->klass ? class_->klass->base : nullptr;
-		uint32_t base_index = 0;
-		if (base && base != object_ && class_index(base, &base_index)) {
-			std::vector<uint32_t> list = { 0 };
-			constructor_arguments(base, p_call->arguments, position, list);
-			emit(Op::Call, position, NONE, module_.classes[base_index].constructor, arguments(std::move(list)));
-		}
-		return 0; // No value: the checker lets nothing use it.
-	}
-	Symbol *symbol = callee_symbol(callee);
-	if (!symbol && callee->kind == NodeKind::Member && signal_ && signal_->klass) {
-		// `timer[name].add(f)`: the checker can't know what `timer[name]` is. A signal's method written
-		// after it says a signal is meant; the engine checks that it is one when the line runs.
-		Member *member = static_cast<Member *>(callee);
-		auto verb = signal_->klass->members.find(member->name);
-		if (verb != signal_->klass->members.end() && verb->second->kind == SymbolKind::Method) {
-			uint32_t object = 0, name = 0;
-			uint32_t found = signal_by_name(member->object, writer(p_call->arguments), &object, &name);
-			if (found != NONE) {
-				return engine_call(p_call, verb->second, found, [&]() { emit(Op::HostMember, member->object->offset, found, object, name); });
-			}
-		}
-	}
-	if (!symbol) {
-		refuse(callee->offset, "calling a value");
-		return default_value(p_want, position);
-	}
-	// A conversion written as a call: int(x), String(x).
-	Kind conversion = Kind::Void;
-	if (symbol->is_type()) {
-		if (kind_of_class(symbol, &conversion) && p_call->arguments.count == 1) {
-			Kind given = Kind::Void;
-			bool known = kind_of(p_call->arguments[0]->type, &given);
-			// To or from an Int64, a conversion that is written out is AS3's own: see convert().
-			uint32_t value = known && (given == Kind::I64 || conversion == Kind::I64) && !is_null(p_call->arguments[0])
-					? convert(wide_operand(p_call->arguments[0], conversion), conversion, position, true)
-					: expression(p_call->arguments[0], conversion);
-			if (conversion == Kind::Str) {
-				// The conversion written out always gives a string: a missing one becomes "null".
-				uint32_t text = reg(Kind::Str);
-				emit(Op::StrToStr, position, text, value);
-				return text;
-			}
-			return value;
-		}
-		refuse(callee->offset, "a cast to '" + std::string(symbol->name) + "'");
-		return default_value(p_want, position);
-	}
-	if (symbol->unit && symbol->unit->is_builtin && symbol->kind == SymbolKind::Function && symbol->name == "trace") {
-		std::vector<uint32_t> list;
-		for (uint32_t i = 0; i < p_call->arguments.count; i++) {
-			Expr *later = nullptr;
-			for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
-				later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
-			}
-			uint32_t value = expression(p_call->arguments[i], Kind::Str);
-			// A null string traces as "null".
-			uint32_t text = reg(Kind::Str);
-			emit(Op::StrToStr, p_call->arguments[i]->offset, text, value);
-			list.push_back(settled(text, later, position));
-		}
-		emit(Op::Trace, position, arguments(std::move(list)));
-		return 0;
-	}
-	if (symbol->name == "toString" && p_call->arguments.count == 0 && callee->kind == NodeKind::Member &&
-			static_cast<Member *>(callee)->object->kind != NodeKind::SuperExpr && is_engine(natural(static_cast<Member *>(callee)->object))) {
-		// AS3's own toString() on one of Godot's values or objects: Godot's text for it.
-		uint32_t value = expression(static_cast<Member *>(callee)->object, Kind::Void);
-		emit(Op::NullCheck, position, value);
-		uint32_t out = reg(Kind::Str);
-		emit(Op::HostToStr, position, out, value);
-		return out;
-	}
-	if (is_godot(symbol) && symbol->kind == SymbolKind::Method && symbol->is_static()) {
-		// `Input.isActionPressed(...)`: a method of the engine's one Input. Any other is called on no object.
-		return is_singleton(symbol->owner) ? engine_call(p_call, symbol, singleton(symbol->owner, position)) : static_call(p_call, symbol);
-	}
-	if (is_godot(symbol) && symbol->kind == SymbolKind::Method && !symbol->is_static()) {
-		bool through_super = callee->kind == NodeKind::Member && static_cast<Member *>(callee)->object->kind == NodeKind::SuperExpr;
-		if (through_super && !(symbol->modifiers & Modifiers::Final)) {
-			// Godot's own version of a virtual does nothing. Asking the engine for it would come straight
-			// back to the script. The arguments are still evaluated.
-			for (Expr *argument : p_call->arguments) {
-				expression(argument, Kind::Void);
-			}
-			Kind kind = Kind::Void;
-			if (symbol->type) {
-				kind_of(compilation_.type_of(symbol->type), &kind);
-			}
-			return kind == Kind::Void ? 0 : default_value(kind, position);
-		}
-		return engine_call(p_call, symbol);
-	}
-	auto function = functions_.find(symbol);
-	if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
-		refuse(callee->offset, "calling '" + std::string(symbol->name) + "'");
-		return default_value(p_want, position);
-	}
-	FunctionDecl *decl = static_cast<FunctionDecl *>(symbol->node);
+	FunctionDecl *decl = static_cast<FunctionDecl *>(p_symbol->node);
 	std::vector<uint32_t> list;
 	bool direct = true;
 	bool on_another = false; // Called on something other than `this`: it may be missing.
-	if (symbol->kind == SymbolKind::Method && !symbol->is_static()) {
-		direct = (symbol->modifiers & Modifiers::Private) != 0;
+	if (p_symbol->kind == SymbolKind::Method && !p_symbol->is_static()) {
+		direct = (p_symbol->modifiers & Modifiers::Private) != 0;
 		if (callee->kind == NodeKind::Member) {
 			Expr *object = static_cast<Member *>(callee)->object;
 			on_another = object->kind != NodeKind::ThisExpr && object->kind != NodeKind::SuperExpr;
@@ -174,17 +180,52 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	if (on_another) {
 		emit(Op::NullCheck, position, list[0]); // After the arguments.
 	}
-	if (symbol->is_static() && symbol->owner) {
-		touch(symbol->owner, position);
+	if (p_symbol->is_static() && p_symbol->owner) {
+		touch(p_symbol->owner, position);
 	}
 	Kind kind = Kind::Void;
-	uint32_t out = call_result(symbol, position, &kind);
+	uint32_t out = call_result(p_symbol, position, &kind);
 	if (direct) {
-		emit(Op::Call, position, out, function->second, arguments(std::move(list)));
+		emit(Op::Call, position, out, p_function, arguments(std::move(list)));
 	} else {
-		emit(Op::CallVirtual, position, out, slots_[symbol], arguments(std::move(list)));
+		emit(Op::CallVirtual, position, out, slots_[p_symbol], arguments(std::move(list)));
 	}
 	return out == NONE ? 0 : out;
+}
+
+uint32_t Lowerer::call(Call *p_call, Kind p_want) {
+	Expr *callee = p_call->callee;
+	uint32_t position = p_call->offset;
+	if (callee->kind == NodeKind::SuperExpr) {
+		return super_call(p_call);
+	}
+	Symbol *symbol = callee_symbol(callee);
+	if (!symbol) {
+		if (const std::optional<uint32_t> by_name = signal_call_by_name(p_call)) {
+			return *by_name;
+		}
+		refuse(callee->offset, "calling a value");
+		return default_value(p_want, position);
+	}
+	if (symbol->is_type()) {
+		return cast(p_call, symbol, p_want);
+	}
+	if (symbol->unit && symbol->unit->is_builtin && symbol->kind == SymbolKind::Function && symbol->name == "trace") {
+		return trace_call(p_call);
+	}
+	if (symbol->name == "toString" && p_call->arguments.count == 0 && callee->kind == NodeKind::Member &&
+			static_cast<Member *>(callee)->object->kind != NodeKind::SuperExpr && is_engine(natural(static_cast<Member *>(callee)->object))) {
+		return engine_text(p_call);
+	}
+	if (is_godot(symbol) && symbol->kind == SymbolKind::Method) {
+		return godot_call(p_call, symbol);
+	}
+	auto function = functions_.find(symbol);
+	if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
+		refuse(callee->offset, "calling '" + std::string(symbol->name) + "'");
+		return default_value(p_want, position);
+	}
+	return script_call(p_call, symbol, function->second);
 }
 
 uint32_t Lowerer::bound_method(Expr *p_expression) {
