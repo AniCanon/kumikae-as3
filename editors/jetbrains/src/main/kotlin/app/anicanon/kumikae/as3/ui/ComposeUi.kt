@@ -9,8 +9,11 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.compose.swing.modifier.SwingModifier
 import org.jetbrains.compose.swing.node.SwingNode
+import java.awt.GridBagConstraints
+import java.awt.GridBagLayout
 import javax.swing.Icon
 import javax.swing.JComponent
+import javax.swing.JPanel
 import javax.swing.SwingConstants
 
 /** Interop for controls that paint themselves or keep IDE behaviour; the caller owns the component. */
@@ -50,14 +53,58 @@ internal fun TitleButton(
     subtitle: String,
     onClick: (JComponent) -> Unit,
     modifier: SwingModifier = SwingModifier,
+    chevron: Boolean = true,
+    icon: Icon? = null,
 ) {
     SwingNode(factory = { TitleButtonControl() }, modifier = modifier, update = {
+        set(chevron) { this.chevron = it }
+        set(icon) { this.icon = it }
         set(title) {
             this.title = it
         }
         set(subtitle) { this.subtitle = it }
         set(onClick) { this.onClick = { it(this) } }
     })
+}
+
+/** One tab of a strip. With `onClose` it carries a cross. */
+@Composable
+internal fun Tab(
+    text: String,
+    chosen: Boolean,
+    onClick: () -> Unit,
+    modifier: SwingModifier = SwingModifier,
+    icon: Icon? = null,
+    onClose: (() -> Unit)? = null,
+) {
+    SwingNode(factory = { TabControl() }, modifier = modifier, update = {
+        set(text) {
+            this.text = it
+            name = it
+        }
+        set(icon) { this.icon = it }
+        set(chosen) { this.chosen = it }
+        set(onClick) { this.onClick = it }
+        set(onClose) { this.onClose = it }
+    })
+}
+
+/** Full-width rows stacked from the top. */
+@Composable
+internal fun Column(modifier: SwingModifier = SwingModifier, content: @Composable () -> Unit) {
+    SwingNode(factory = {
+        JPanel(object : GridBagLayout() {
+            init {
+                defaultConstraints = GridBagConstraints().apply {
+                    gridx = 0
+                    gridwidth = GridBagConstraints.REMAINDER
+                    weightx = 1.0
+                    fill = GridBagConstraints.HORIZONTAL
+                    anchor = GridBagConstraints.NORTHWEST
+                }
+            }
+        })
+    }, modifier = modifier, content = content)
 }
 
 /** A rounded bar of controls that floats over the panel. */

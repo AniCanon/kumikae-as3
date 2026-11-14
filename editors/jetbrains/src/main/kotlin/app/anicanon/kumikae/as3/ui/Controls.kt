@@ -49,7 +49,7 @@ internal abstract class FlatControl : JComponent() {
             )
 
             override fun mouseReleased(event: MouseEvent) {
-                val clicked = down && over && isEnabled
+                val clicked = down && over && isEnabled && clicked(event.x)
                 mark(isOver = over, isDown = false)
                 if (clicked) onClick()
             }
@@ -67,6 +67,9 @@ internal abstract class FlatControl : JComponent() {
         }
         return accessibleContext
     }
+
+    /** Whether a release at this x is a click on the control itself, not on a part with its own meaning. */
+    protected open fun clicked(x: Int): Boolean = true
 
     /** What a click does, for a caller that has no pointer. */
     fun doClick() {
@@ -144,16 +147,31 @@ internal class TitleButtonControl : FlatControl() {
             repaint()
         }
 
+    var chevron = true
+        set(value) {
+            field = value
+            revalidate()
+            repaint()
+        }
+    var icon: Icon? = null
+        set(value) {
+            field = value
+            revalidate()
+            repaint()
+        }
+
     private val titleFont get() = JBFont.label().asBold().biggerOn(1f)
     private val subtitleFont get() = JBFont.small()
     private val pad get() = JBUI.scale(PAD)
+
+    private val lead get() = icon?.let { it.iconWidth + pad } ?: 0
 
     override fun getPreferredSize(): Dimension {
         val names = getFontMetrics(titleFont)
         val details = getFontMetrics(subtitleFont)
         val text = maxOf(names.stringWidth(title), details.stringWidth(subtitle))
-        val chevron = AllIcons.General.ChevronDown
-        return Dimension(text + chevron.iconWidth + pad * 3, names.height + details.height + pad)
+        val trail = if (chevron) AllIcons.General.ChevronDown.iconWidth + pad else 0
+        return Dimension(lead + text + trail + pad * 2, names.height + details.height + pad)
     }
 
     override fun paintComponent(graphics: Graphics) {
@@ -162,19 +180,18 @@ internal class TitleButtonControl : FlatControl() {
         val names = getFontMetrics(titleFont)
         val details = getFontMetrics(subtitleFont)
         val top = (height - names.height - details.height) / 2
+        icon?.let { it.paintIcon(this, canvas, pad, (height - it.iconHeight) / 2) }
+        val x = pad + lead
         canvas.font = titleFont
         canvas.color = UIUtil.getLabelForeground()
-        canvas.drawString(title, pad, top + names.ascent)
+        canvas.drawString(title, x, top + names.ascent)
         canvas.font = subtitleFont
         canvas.color = UIUtil.getContextHelpForeground()
-        canvas.drawString(subtitle, pad, top + names.height + details.ascent)
-        val chevron = AllIcons.General.ChevronDown
-        chevron.paintIcon(
-            this,
-            canvas,
-            pad * 2 + names.stringWidth(title),
-            top + (names.height - chevron.iconHeight) / 2,
-        )
+        canvas.drawString(subtitle, x, top + names.height + details.ascent)
+        if (chevron) {
+            val mark = AllIcons.General.ChevronDown
+            mark.paintIcon(this, canvas, x + pad + names.stringWidth(title), top + (names.height - mark.iconHeight) / 2)
+        }
     }
 
     private companion object {

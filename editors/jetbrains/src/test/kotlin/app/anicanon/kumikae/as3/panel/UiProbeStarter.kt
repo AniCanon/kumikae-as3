@@ -1,7 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
 import app.anicanon.kumikae.as3.ui.IconButtonControl
-import app.anicanon.kumikae.as3.ui.TitleButtonControl
+import app.anicanon.kumikae.as3.ui.TabControl
 import com.intellij.ide.ui.LafManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationStarter
@@ -65,6 +65,7 @@ class UiProbeStarter : ApplicationStarter {
         lateinit var controller: SimulatorWindowController
         lateinit var view: SimulatorToolWindow
         lateinit var host: JFrame
+        lateinit var console: JTextArea
         onEdt {
             controller = SimulatorWindowController(
                 repository,
@@ -74,24 +75,25 @@ class UiProbeStarter : ApplicationStarter {
             view = SimulatorToolWindow(controller, prompts)
             // Compose mounts when its host reaches a window, even one that is never shown.
             host = JFrame().apply { contentPane.add(view.component) }
+            console = view.console
             controller.shown()
         }
         try {
-            await("the device list") { controller.devices.size == 2 && shows(view, "Choose a simulator") }
-            render(view.component, NARROW, TALL, destination.resolve("$prefix-1-opened.png"))
-            onEdt { menu(deviceEntries(controller), "Probe Phone") }
-            await("the selection") { shows(view, "Selected Probe Phone") }
-            onEdt { menu(moreEntries(controller, view.state, prompts), "Refresh devices") }
+            await("the device list") { shows(view, "2 simulators") && chosen(view, "Simulators") }
+            render(view.component, NARROW, TALL, destination.resolve("$prefix-1-list.png"))
+            press(view, "Refresh the list")
             await("Refresh") { repository.calls.count { it == "devices" } == 2 && !controller.status.endsWith("…") }
             val gate = CountDownLatch(1)
             repository.bootGate = gate
-            click(view, "Boot")
-            onEdt { menu(deviceEntries(controller), "Probe Tablet") }
+            press(view, "Boot Probe Phone 17 Pro")
+            await("the device's own tab") { chosen(view, "Probe Phone 17 Pro") }
+            render(view.component, NARROW, TALL, destination.resolve("$prefix-2-booting.png"))
+            onEdt { tab(view, "Simulators").doClick() }
+            press(view, "Boot Probe Tablet Air 13-inch")
             await("the refusal") { shows(view, "Another Simulator action is still running") }
             gate.countDown()
-            await("the heading to return to the booted device") { title(view).title.startsWith("Probe Phone") }
-            check(repository.calls.none { it.startsWith("select probe-tablet") }) { "A refused selection was sent" }
-            await("Boot") { shows(view, "Booted.") && title(view).subtitle.endsWith("Booted") }
+            check(repository.calls.none { it.startsWith("select probe-tablet") }) { "A refused boot was sent" }
+            await("Boot") { shows(view, "Booted.") && chosen(view, "Probe Phone 17 Pro") }
             press(view, "Launch org.kumikae.as3test")
             await("Launch") { shows(view, "Launch requested") }
             check("launch probe-phone org.kumikae.as3test" in repository.calls) { "Launch sent ${repository.calls}" }
@@ -100,13 +102,17 @@ class UiProbeStarter : ApplicationStarter {
             }
             await("a picture and the console") {
                 controller.poll()
-                screen(view).frame != null && console(view).text.contains("test 40 of 40 passed")
+                screen(view).frame != null && console.text.contains("test 40 of 40 passed")
             }
-            render(view.component, NARROW, TALL, destination.resolve("$prefix-2-running-narrow.png"))
-            render(view.component, WIDE, SHORT, destination.resolve("$prefix-3-running-wide.png"))
+            render(view.component, NARROW, TALL, destination.resolve("$prefix-3-running-narrow.png"))
+            render(view.component, WIDE, SHORT, destination.resolve("$prefix-4-running-wide.png"))
+            press(view, "Zoom in")
+            await("the zoom") { screen(view).zoom > 1.0 }
+            render(view.component, NARROW, TALL, destination.resolve("$prefix-5-zoomed.png"))
+            press(view, "Fit to the panel")
             press(view, "Show console")
-            await("the console to open") { console(view).isShowing || console(view).parent.parent.isVisible }
-            render(view.component, NARROW, TALL, destination.resolve("$prefix-5-console.png"))
+            await("the console to open") { console.parent?.parent?.isVisible == true }
+            render(view.component, NARROW, TALL, destination.resolve("$prefix-6-console.png"))
             press(view, "Copy screenshot")
             check(prompts.copiedImages == 1) { "The screenshot was not copied" }
             repository.inputEnabled = true
@@ -121,10 +127,14 @@ class UiProbeStarter : ApplicationStarter {
                 "Provide a valid path to the desired application bundle and try again."
             onEdt { menu(moreEntries(controller, view.state, prompts), "Install app") }
             await("the failure") { shows(view, "An application bundle was not found") && screen(view).frame == null }
-            check(console(view).text.contains("[Error] An application bundle")) {
-                "The failure is missing from the console"
-            }
-            render(view.component, NARROW, TALL, destination.resolve("$prefix-4-failed-input-on.png"))
+            check(console.text.contains("[Error] An application bundle")) { "The failure is missing from the console" }
+            render(view.component, NARROW, TALL, destination.resolve("$prefix-7-failed-input-on.png"))
+            onEdt { tab(view, "Probe Phone 17 Pro").doClose() }
+            await("the shutdown") { shows(view, "Probe Phone 17 Pro is shut down.") }
+            check("shutdown probe-phone" in repository.calls) { "Closing the tab sent ${repository.calls}" }
+            onEdt { tab(view, "Simulators").doClick() }
+            await("the list") { chosen(view, "Simulators") }
+            render(view.component, NARROW, TALL, destination.resolve("$prefix-8-list-after.png"))
         } finally {
             onEdt {
                 Disposer.dispose(controller)
@@ -135,23 +145,29 @@ class UiProbeStarter : ApplicationStarter {
         await("the composition to be released") { view.component.componentCount == 0 }
     }
 
-    private fun title(view: SimulatorToolWindow) =
-        descendants(view.component).filterIsInstance<TitleButtonControl>().single()
+    private fun tab(view: SimulatorToolWindow, name: String) =
+        descendants(view.component).filterIsInstance<TabControl>().single { it.name == name }
 
-    private fun console(view: SimulatorToolWindow) = descendants(view.component).filterIsInstance<JTextArea>().single()
+    /** False until the tab is both mounted and chosen: a condition is asked before the view has composed. */
+    private fun chosen(view: SimulatorToolWindow, name: String) =
+        descendants(view.component).filterIsInstance<TabControl>().any { it.name == name && it.chosen }
 
-    private fun screen(view: SimulatorToolWindow) =
-        descendants(view.component).filterIsInstance<SimulatorScreen>().single()
+    private fun screen(view: SimulatorToolWindow) = view.screen
 
     /** What the composed view displays, which can lag behind the controller's state by one recomposition. */
     private fun shows(view: SimulatorToolWindow, text: String) =
-        descendants(view.component).filterIsInstance<JLabel>().any { it.text.startsWith(text) } ||
-            title(view).title.startsWith(text)
+        descendants(view.component).filterIsInstance<JLabel>().any { it.text.startsWith(text) }
 
     private fun icon(view: SimulatorToolWindow, name: String) =
         descendants(view.component).filterIsInstance<IconButtonControl>().single { it.name == name }
 
-    private fun press(view: SimulatorToolWindow, name: String) = onEdt { icon(view, name).doClick() }
+    /** Presses a button once the view has composed it: a page shown by the last press is not there at once. */
+    private fun press(view: SimulatorToolWindow, name: String) {
+        await("the '$name' button") {
+            descendants(view.component).filterIsInstance<IconButtonControl>().any { it.name == name }
+        }
+        onEdt { icon(view, name).doClick() }
+    }
 
     private fun click(view: SimulatorToolWindow, text: String) = onEdt {
         descendants(view.component).filterIsInstance<JButton>().single { it.text == text }.doClick()

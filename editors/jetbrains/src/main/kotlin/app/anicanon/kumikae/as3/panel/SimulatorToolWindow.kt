@@ -11,8 +11,8 @@ import javax.swing.Timer
 internal class SimulatorToolWindow(val controller: SimulatorWindowController, val prompts: SimulatorPrompts) {
     val component: JPanel
     val state = SimulatorPanelState()
-    private val screen = SimulatorScreen(controller::gesture)
-    private val console = JBTextArea().apply {
+    val screen = SimulatorScreen(controller::gesture)
+    val console = JBTextArea().apply {
         isEditable = false
         lineWrap = true
         margin = JBUI.insets(4)

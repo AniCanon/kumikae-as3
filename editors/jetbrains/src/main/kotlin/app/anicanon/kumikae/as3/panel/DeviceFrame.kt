@@ -10,7 +10,14 @@ import java.awt.geom.RoundRectangle2D
  * Where a device with a screen of the given pixel size sits inside a view, and how it is drawn around
  * that screen. The screen's own rectangle is what a pointer position is measured against.
  */
-internal class DeviceFrame(screenWidth: Int, screenHeight: Int, viewWidth: Int, viewHeight: Int, margin: Int) {
+internal class DeviceFrame(
+    screenWidth: Int,
+    screenHeight: Int,
+    viewWidth: Int,
+    viewHeight: Int,
+    margin: Int,
+    private val island: Boolean = false,
+) {
     private val short = minOf(screenWidth, screenHeight).toDouble()
     private val phone = maxOf(screenWidth, screenHeight) / short > PHONE_ASPECT
     private val upright = screenHeight >= screenWidth
@@ -64,6 +71,28 @@ internal class DeviceFrame(screenWidth: Int, screenHeight: Int, viewWidth: Int, 
         canvas.fill(rounded(screen, edge, corner + edge))
     }
 
+    /**
+     * The camera housing that sits over the picture on current phones. A screenshot does not contain it,
+     * so without it an app's layout around it looks wrong. Drawn only upright: a picture alone does not
+     * say which way a sideways phone was turned.
+     */
+    fun paintIsland(canvas: Graphics2D) {
+        if (!island || !phone || !upright || scale <= 0.0) return
+        val width = screen.width * ISLAND_WIDTH
+        val height = screen.width * ISLAND_HEIGHT
+        canvas.color = Color.BLACK
+        canvas.fill(
+            RoundRectangle2D.Double(
+                screen.centerX - width / 2,
+                screen.y + screen.width * ISLAND_TOP,
+                width,
+                height,
+                height,
+                height,
+            ),
+        )
+    }
+
     private fun paintButtons(canvas: Graphics2D, ring: Double) {
         canvas.color = Color(0x6E7077)
         val long = if (upright) screen.height else screen.width
@@ -108,6 +137,11 @@ internal class DeviceFrame(screenWidth: Int, screenHeight: Int, viewWidth: Int, 
         const val SHADOW_SPREAD = 1.6
         const val SHADOW_DROP = 4.0
         const val BUTTON_REACH = 1.8
+
+        // As shares of the screen's width, measured on a current phone: 126 by 37 points, 14 down, of 402.
+        const val ISLAND_WIDTH = 0.313
+        const val ISLAND_HEIGHT = 0.092
+        const val ISLAND_TOP = 0.035
 
         // Along the long side, as a share of it: the action button and two volume buttons, then power.
         val BUTTONS = listOf(

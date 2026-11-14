@@ -29,6 +29,10 @@ internal class SimulatorWindowController(
         private set
     var inputEnabled by mutableStateOf(false)
         private set
+
+    /** An action the person started is running: a boot, a launch, an install. */
+    var working by mutableStateOf(false)
+        private set
     var console by mutableStateOf("")
         private set
 
@@ -237,12 +241,14 @@ internal class SimulatorWindowController(
             return false
         }
         val started = actions.submit(work) { result ->
+            working = false
             if (!disposed) result.fold(success, ::showFailure)
         }
         if (!started) {
             status = BUSY
             return false
         }
+        working = true
         status = "$label…"
         pollFailed = false
         lastError = null

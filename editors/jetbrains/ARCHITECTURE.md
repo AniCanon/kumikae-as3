@@ -12,7 +12,9 @@ SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window
     BackgroundWorker (x2)    one for actions, one for polling
   SimulatorWindowController  all requests and all state
   SimulatorToolWindow        mounts the view, owns the two native controls, the timer
-    SimulatorView            Compose: heading, framed device, floating bar, menus
+    SimulatorView            Compose: a tab for the list and one per running device
+    DeviceListPage           every simulator, each with Boot or Shut down
+    DevicePage               tool bar, framed device with zoom, floating bar, console drawer
     SimulatorScreen          native: paints the picture, mouse to gesture
 ```
 
@@ -106,6 +108,14 @@ tried on. `ui/ComposeUi.kt` holds the few shared composables (`IconButton`,
 `ui/Controls.kt` the small painted controls behind them. `DeviceFrame` works out
 where the device and its screen sit in the view and draws the body around the
 picture; a pointer position is measured against the screen it reports.
+
+## The service under load
+
+Boot, shutdown and install can take two minutes. They run outside the session's lock, one at a
+time (a second is refused with `BUSY`), so status, the list, the log and pictures still answer.
+Reading the list replaces what the session knows of the selected device, and the panel reads it
+every sixth poll: a device started or stopped elsewhere shows within about three seconds. A
+device that is not running is not asked for its picture.
 
 ## Validation
 

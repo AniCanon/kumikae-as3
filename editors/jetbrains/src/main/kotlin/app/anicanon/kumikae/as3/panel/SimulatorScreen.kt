@@ -7,14 +7,20 @@ import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Graphics2D
+import java.awt.Rectangle
 import java.awt.RenderingHints
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.geom.AffineTransform
 import javax.swing.JPanel
+import javax.swing.JViewport
+import javax.swing.Scrollable
+import javax.swing.SwingConstants
 
 /** Paints the device around the latest picture, and turns mouse presses on its screen into gestures. */
-internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixel, Long) -> Unit) : JPanel() {
+internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixel, Long) -> Unit) :
+    JPanel(),
+    Scrollable {
     var frame: SimulatorFrame? = null
         set(value) {
             field = value
@@ -24,10 +30,28 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
     /** Two lines shown on the dark screen while there is no picture: what is missing, and what to do. */
     var placeholder: Pair<String, String> = "" to ""
         set(value) {
+            if (field == value) return
             field = value
             repaint()
         }
     var inputEnabled = false
+
+    /** The device's name: which models have a camera housing over the screen is known only by it. */
+    var deviceName = ""
+        set(value) {
+            if (field == value) return
+            field = value
+            repaint()
+        }
+
+    /** 1 fits the device to the view. More than 1 makes it larger than the view, which then scrolls. */
+    var zoom = 1.0
+        set(value) {
+            if (field == value) return
+            field = value
+            revalidate()
+            repaint()
+        }
     private var pressed: Press? = null
 
     private class Press(val frame: SimulatorFrame, val at: Pixel, val nanos: Long)
@@ -58,8 +82,14 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
         })
     }
 
-    private fun device(screenWidth: Int, screenHeight: Int) =
-        DeviceFrame(screenWidth, screenHeight, width, height, JBUI.scale(MARGIN))
+    private fun device(screenWidth: Int, screenHeight: Int) = DeviceFrame(
+        screenWidth,
+        screenHeight,
+        width,
+        height,
+        JBUI.scale(MARGIN),
+        island = ISLAND.containsMatchIn(deviceName),
+    )
 
     private fun pixel(on: SimulatorFrame, event: MouseEvent): Pixel? =
         device(on.image.width, on.image.height).pixel(event.x.toDouble(), event.y.toDouble())?.let { (x, y) ->
@@ -83,11 +113,29 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
                 val place = AffineTransform.getTranslateInstance(device.screen.x, device.screen.y)
                 place.scale(device.scale, device.scale)
                 canvas.drawImage(image, place, null)
+                device.paintIsland(canvas)
             }
         } finally {
             canvas.dispose()
         }
     }
+
+    override fun getPreferredSize(): Dimension {
+        val view = (parent as? JViewport)?.extentSize ?: return super.getPreferredSize()
+        return Dimension((view.width * zoom).toInt(), (view.height * zoom).toInt())
+    }
+
+    override fun getPreferredScrollableViewportSize(): Dimension = super.getPreferredSize()
+
+    override fun getScrollableTracksViewportWidth() = zoom <= 1.0
+
+    override fun getScrollableTracksViewportHeight() = zoom <= 1.0
+
+    override fun getScrollableUnitIncrement(visible: Rectangle, orientation: Int, direction: Int) =
+        JBUI.scale(SCROLL_STEP)
+
+    override fun getScrollableBlockIncrement(visible: Rectangle, orientation: Int, direction: Int) =
+        if (orientation == SwingConstants.VERTICAL) visible.height else visible.width
 
     private fun paintPlaceholder(canvas: Graphics2D, device: DeviceFrame) {
         val screen = device.screen
@@ -107,12 +155,16 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
         canvas.drawString(text, (centre - canvas.fontMetrics.stringWidth(text) / 2.0).toFloat(), baseline.toFloat())
     }
 
-    private companion object {
-        const val NANOS_PER_MILLI = 1_000_000
-        const val MARGIN = 18
+    companion object {
+        private const val NANOS_PER_MILLI = 1_000_000
+        private const val MARGIN = 18
+        private const val SCROLL_STEP = 24
+
+        // The models whose screenshots lack the camera housing drawn over them.
+        val ISLAND = Regex("iPhone (14 Pro|1[5-9](?!e)|[2-9][0-9]|Air)")
 
         // The shape drawn while no picture has arrived: a current phone's screen.
-        const val EMPTY_WIDTH = 1206
-        const val EMPTY_HEIGHT = 2622
+        private const val EMPTY_WIDTH = 1206
+        private const val EMPTY_HEIGHT = 2622
     }
 }

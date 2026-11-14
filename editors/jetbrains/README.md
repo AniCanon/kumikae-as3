@@ -24,6 +24,9 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 
 ## What is implemented
 
+- A **Simulators** tab lists every simulator with a button to boot it or shut it down; each
+  running one has its own tab, and closing the tab shuts it down. Zoom, a console drawer and a
+  drawn device body (with the camera housing on the models that have one) are in the device's tab.
 - A macOS-only **iOS Simulator** tool window. Select a device, boot it, view its
   screen, install an explicit `.app`, launch a bundle, and read console output.
 - JPEG snapshots, capped at two requests per second. One capture is in flight at

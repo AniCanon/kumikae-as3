@@ -44,4 +44,21 @@ class DeviceFrameTest {
         assertEquals(2622.0 / 1206.0, wide.screen.width / wide.screen.height, 1e-9)
         assertEquals(1311 to 603, wide.pixel(wide.screen.centerX, wide.screen.centerY))
     }
+
+    @Test
+    fun `the camera housing is named by model`() {
+        val island = SimulatorScreen.ISLAND
+        for (name in listOf("iPhone 17 Pro", "iPhone 15", "iPhone 14 Pro Max", "iPhone Air", "iPhone 16 Plus")) {
+            assertTrue(name, island.containsMatchIn(name))
+        }
+        for (name in listOf(
+            "iPhone 14",
+            "iPhone SE (3rd generation)",
+            "iPhone 16e",
+            "iPad Pro 13-inch",
+            "iPhone 13 mini",
+        )) {
+            assertTrue(name, !island.containsMatchIn(name))
+        }
+    }
 }
