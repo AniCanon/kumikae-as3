@@ -65,6 +65,13 @@ package {
 		// A script object that is one of Godot's goes to Godot as its Godot object: returned, or in a field.
 		public var lastMade:Spawned;
 		public function makeOne():Spawned { lastMade = new Spawned(2); return lastMade; }
+		// Vectors of vectors, and of script objects that are Godot's, handed to Godot as Arrays.
+		public function handNested(target:Node):void {
+			var grid:Vector.<Vector.<int>> = new <Vector.<int>>[new <int>[1, 2], new <int>[3]];
+			target.setMeta("grid", grid);
+			var made:Vector.<Spawned> = new <Spawned>[new Spawned(1)];
+			target.setMeta("made", made);
+		}
 		// Searching a vector of Godot's objects or values: the same object, or an equal value.
 		public function searchGodot(a:Node, b:Node):String {
 			var nodes:Vector.<Node> = new <Node>[a, b, a];

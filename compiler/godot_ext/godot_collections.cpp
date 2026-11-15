@@ -1,5 +1,6 @@
 // AS3's vectors as Godot's collections.
 #include "godot_host.h"
+#include "program.h"
 
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
@@ -20,6 +21,36 @@ using namespace godot;
 namespace kas3 {
 
 namespace {
+
+// One element of a vector of objects, as an Array holds it: a script object that is one of Godot's as its
+// Godot object, and a vector as an Array of its own elements.
+bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_error) {
+	if (!p_object) {
+		*r_out = Variant();
+		return true;
+	}
+	const ir::Module &module = Project::get().module();
+	const ir::Kind element = module.classes[p_object->klass].element;
+	if (element != ir::Kind::Void) {
+		const vm::Vector *vector = static_cast<const vm::Vector *>(p_object);
+		Array array;
+		array.resize(static_cast<int64_t>(vector->length));
+		for (uint32_t i = 0; i < vector->length; i++) {
+			Variant value;
+			if (element == ir::Kind::Obj ? !object_element(static_cast<const vm::Object *>(vector->data[i].p), &value, r_error) : false) {
+				return false;
+			}
+			array[static_cast<int64_t>(i)] = element == ir::Kind::Obj ? value : to_variant(element, vector->data[i]);
+		}
+		*r_out = array;
+		return true;
+	}
+	if (!as_godot_object(p_object, r_out)) {
+		*r_error = "a Vector holds an object of '" + module.classes[p_object->klass].name + "', which extends none of Godot's classes: Godot can't hold it";
+		return false;
+	}
+	return true;
+}
 
 // A packed array of whole numbers: each element must be one, and within what the array's elements hold.
 template <typename Packed>
@@ -94,8 +125,10 @@ void *GodotHost::collection(std::string_view p_type, ir::Kind p_kind, const vm::
 		// An Array, or a place that takes anything: each element as Godot holds a value of its kind.
 		Array array;
 		array.resize(static_cast<int64_t>(p_count));
-		for (size_t i = 0; i < p_count; i++) {
-			array[static_cast<int64_t>(i)] = to_variant(p_kind, p_elements[i]);
+		for (size_t i = 0; i < p_count && ok; i++) {
+			Variant value;
+			ok = p_kind != ir::Kind::Obj || object_element(static_cast<const vm::Object *>(p_elements[i].p), &value, r_error);
+			array[static_cast<int64_t>(i)] = p_kind == ir::Kind::Obj ? value : to_variant(p_kind, p_elements[i]);
 		}
 		made = array;
 	}

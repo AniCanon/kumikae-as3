@@ -72,7 +72,7 @@ static GDExtensionBool instance_set(GDExtensionScriptInstanceDataPtr, GDExtensio
 
 // A script object as Godot holds it: the Godot object it is attached to, for a class that extends one of
 // Godot's. False for any other script object, which has no form Godot can hold.
-static bool as_godot_object(const vm::Object *p_object, Variant *r_out) {
+bool kas3::as_godot_object(const vm::Object *p_object, Variant *r_out) {
 	const ir::Module &module = Project::get().module();
 	if (!p_object || p_object->klass >= module.classes.size() || module.classes[p_object->klass].native_base.empty()) {
 		return false;
@@ -98,7 +98,7 @@ static GDExtensionBool instance_get(GDExtensionScriptInstanceDataPtr p_data, GDE
 																					 : nullptr;
 	if (held || (kind == ir::Kind::Obj && !value.p)) {
 		Variant owner;
-		if (held && !as_godot_object(held, &owner)) {
+		if (held && !kas3::as_godot_object(held, &owner)) {
 			UtilityFunctions::push_error(String("ActionScript: the field '") + String::utf8(name.get_data()) +
 					"' holds a script object of a class that extends none of Godot's, which Godot can't hold. Godot gets null.");
 		}
@@ -219,7 +219,7 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 			: function.result == ir::Kind::Any && vm::any::tag(result) == vm::AnyTag::Object ? static_cast<const vm::Object *>(vm::any::pointer(result))
 																							  : nullptr;
 	Variant owner;
-	if (ok && returned && as_godot_object(returned, &owner)) {
+	if (ok && returned && kas3::as_godot_object(returned, &owner)) {
 		*r_return = owner; // A script object that is one of Godot's: its Godot object.
 	} else if (ok && returned) {
 		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) +

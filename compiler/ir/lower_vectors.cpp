@@ -388,9 +388,8 @@ auto Lowerer::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::opti
 	}
 	const uint32_t position = p_value->offset;
 	const std::optional<uint32_t> klass = vector_class(p_value->type);
-	if (!klass || module_.classes[*klass].element == Kind::Obj) {
-		// Elements that are script objects, or vectors themselves, have no form Godot can hold yet.
-		refuse(position, "passing a Vector of script objects or of Vectors to Godot");
+	if (!klass) {
+		refuse(position, "passing this Vector to Godot");
 		return default_value(Kind::Val, position);
 	}
 	// Godot's name for what it takes here: a packed array, or an Array where it takes that or anything.
