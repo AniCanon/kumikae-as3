@@ -149,6 +149,9 @@ func _physics_process(_delta: float) -> bool:
 	node.listenByName(other, "nothingAtAll")
 	node.listenByName(other, "name")
 	show("by a wrong name", other.renamed.get_connections().size(), 1)
+	node.reset()
+	node.emitByName(other, "renamed")
+	show("listeners and emit by name", [node.listenersByName(other, "renamed"), node.count], [1, 1])
 	# A signal that GDScript defines, with an argument that is checked.
 	other.add_user_signal("hit", [{"name": "n", "type": TYPE_INT}])
 	node.reset()

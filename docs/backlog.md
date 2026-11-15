@@ -53,8 +53,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Stage 2b-2, part B: signals
 
-- A signal's own `numListeners` and `emit` can't follow `object[name]` as a property read: only its
-  methods can (`timer[name].add(f)`). **2c**
 - Objects that hold each other in a loop are freed only when a listener is part of the loop, or reaches
   it. A loop of script objects with no listener in it stays (the cycle collector). So does a loop
   that passes through a Godot collection. **2d**
