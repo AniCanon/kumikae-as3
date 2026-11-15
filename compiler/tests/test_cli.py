@@ -4,6 +4,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 KAS3C = sys.argv[1]
 failures = []
@@ -212,6 +213,20 @@ once = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "finally_
 result = run("ir", once)
 check("finally written once", result.returncode == 0 and result.stdout.count('"cleanup marker"') == 1,
       "%d copies" % result.stdout.count('"cleanup marker"'))
+
+# Godot's API is loaded only for files that name its package: a file that doesn't is checked far faster.
+def best_time(*args):
+    best = 1e9
+    for _ in range(3):
+        start = time.monotonic()
+        run(*args)
+        best = min(best, time.monotonic() - start)
+    return best
+
+plain = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "small_fixes.as")
+with_godot = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus", "Empty.as")
+check("check skips Godot's API when no file names it", best_time("check", plain) * 2 < best_time("check", with_godot),
+      "plain %.3fs, with Godot %.3fs" % (best_time("check", plain), best_time("check", with_godot)))
 
 # A script for Godot is lowered with Godot's API in reach, as the extension does it.
 empty = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus", "Empty.as")
