@@ -26,6 +26,8 @@ func _physics_process(_delta: float) -> bool:
 	show("a float", ask("describe", [2.5]), "number:2.5")
 	show("a whole float", ask("describe", [3.0]), "number:3")
 	show("a string", ask("describe", ["hi"]), "string:hi")
+	show("a string name", ask("describe", [&"name"]), "string:name")
+	show("a node path", ask("describe", [^"a/b"]), "string:a/b")
 	show("a bool", ask("describe", [true]), "boolean:true")
 	show("null", ask("describe", [null]), "object:null")
 	show("a vector", ask("describe", [Vector2(1, 2)]), "object:(1.0, 2.0)")

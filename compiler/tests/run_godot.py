@@ -252,7 +252,7 @@ check("Godot reads every recorded default", read is not None and int(read.group(
 
 # Untyped values to and from Godot: an integer stays one, a whole float stays a float.
 output = compare("untyped.gd", [
-    "an int", "a float", "a whole float", "a string", "a bool", "null", "a vector", "a node",
+    "an int", "a float", "a whole float", "a string", "a string name", "a node path", "a bool", "null", "a vector", "a node",
     "round trip int", "round trip float", "round trip String", "round trip Vector2", "round trip Object", "round trip Nil",
     "round trip bool", "meta keeps an int", "meta keeps a float", "dictionary element", "dictionary number", "wrong type",
     "script object not given", "equal values", "unequal values", "large integers", "a vector stays a vector",

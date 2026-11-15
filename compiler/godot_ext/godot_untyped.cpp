@@ -55,7 +55,11 @@ std::optional<vm::Slot> untyped_from_variant(const Variant &p_value) {
 		}
 		case Variant::FLOAT:
 			return vm::any::number((double)p_value);
-		case Variant::STRING: {
+		case Variant::STRING:
+		case Variant::STRING_NAME:
+		case Variant::NODE_PATH: {
+			// AS3 has one kind of text: Godot's names and paths are Strings too. (Godot takes a String
+			// back wherever it takes one of them.)
 			CharString utf8 = String(p_value).utf8();
 			vm::Str *text = vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));
 			if (!text) {
