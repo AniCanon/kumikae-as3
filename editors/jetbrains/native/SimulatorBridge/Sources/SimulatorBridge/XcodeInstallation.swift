@@ -29,7 +29,9 @@ public struct XcodeInstallation: Sendable {
       as? [String: Any]
     guard let build = values?["ProductBuildVersion"] as? String,
       let version = values?["CFBundleShortVersionString"] as? String
-    else { throw BridgeError.unavailable("The selected Xcode version could not be read.") }
+    else {
+      throw BridgeError.unavailable("The selected Xcode version could not be read.")
+    }
     return XcodeInstallation(
       developerDirectory: directory, version: "Xcode \(version)", build: build)
   }

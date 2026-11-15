@@ -18,27 +18,38 @@ final class RuntimeSymbols: SymbolLookup {
 
   func load(_ path: String) throws {
     guard let library = dlopen(path, RTLD_NOW | RTLD_LOCAL) else {
+      let failure = dlerror().map { String(cString: $0) } ?? "unknown loader error"
       throw BridgeError.unavailable(
-        "\(guardAPI.version) (\(guardAPI.build)) cannot load \(path): \(dlerror().map { String(cString: $0) } ?? "unknown loader error")"
+        "\(guardAPI.version) (\(guardAPI.build)) cannot load \(path): \(failure)"
       )
     }
     // Frameworks own asynchronous runtime registrations. Keep them loaded until process exit.
     libraries.append(library)
   }
 
-  func contains(_ symbol: String) -> Bool { libraries.contains { dlsym($0, symbol) != nil } }
+  func contains(_ symbol: String) -> Bool {
+    libraries.contains {
+      dlsym($0, symbol) != nil
+    }
+  }
 
   func function<T>(_ name: String, as type: T.Type) throws -> T {
-    let pointer = libraries.lazy.compactMap { dlsym($0, name) }.first
+    let pointer = libraries.lazy.compactMap {
+      dlsym($0, name)
+    }.first
     try guardAPI.require(pointer != nil, symbol: name)
-    guard let pointer else { throw BridgeError.unavailable("Missing function \(name)") }
+    guard let pointer else {
+      throw BridgeError.unavailable("Missing function \(name)")
+    }
     return unsafeBitCast(pointer, to: type)
   }
 
   func type(_ name: String) throws -> AnyClass {
     let type: AnyClass? = NSClassFromString(name)
     try guardAPI.require(type != nil, symbol: name)
-    guard let type else { throw BridgeError.unavailable("Missing class \(name)") }
+    guard let type else {
+      throw BridgeError.unavailable("Missing class \(name)")
+    }
     return type
   }
 

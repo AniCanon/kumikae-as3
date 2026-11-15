@@ -7,7 +7,9 @@ public enum BridgeError: Error, LocalizedError, Sendable {
   case system(String, Int32)
 
   public var code: String {
-    if case .deviceUnavailable = self { return "DEVICE_UNAVAILABLE" }
+    if case .deviceUnavailable = self {
+      return "DEVICE_UNAVAILABLE"
+    }
     return "INPUT_UNAVAILABLE"
   }
 

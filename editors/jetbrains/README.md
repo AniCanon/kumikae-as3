@@ -10,7 +10,7 @@ its measurements are described in the results below.
 | Service tests (`core`) | Automated build | 82 pass; three opt-in live probes skip in ordinary checks and passed separately. |
 | Panel tests (repository, controller, service adapter) | Automated build | 115 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
 | Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
-| Native Swift tests | `swift test` | 32 pass in 17 suites. |
+| Native Swift tests | `swift test` | 38 pass in 20 suites. |
 | Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
 | Native rotation and text | Owned iPhone and iPad fixtures, 2026-11-15 | Four orientation commands and target taps passed on each family; exact ASCII, accents, Japanese, Arabic and emoji reached the app. Interface orientation policy still applies. |
 | Native helper/reader endurance | Owned 60 Hz fixture, 600.020 seconds | 59.90 reader frames/s, 59.60 distinct raster ticks/s; 29,975 inputs, p95 6.72 ms and max 57.84 ms. Whole-panel cadence and the historical 82 ms event remain unverified. |
@@ -94,7 +94,10 @@ From this directory, with `JAVA_HOME` set to a JDK 25:
 python3 -m unittest discover -s tests -v
 ```
 
-`check` runs the style check and the Kotlin tests of both modules. `buildPlugin`
+`check` runs the Kotlin style check and tests of both modules, plus strict Swift
+lint when installed Swift on macOS is available. `./gradlew formatSimulatorBridge`
+formats native Swift with Xcode’s installed swift-format. Native builds and plugin
+packaging also require this lint check. `buildPlugin`
 refuses to build while the style check fails, and puts a zip in
 `build/distributions/`. `./gradlew ktlintFormat` fixes most style findings.
 `./gradlew verifyPlugin` runs JetBrains' plugin verifier against the installed Rider.
