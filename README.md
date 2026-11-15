@@ -72,14 +72,16 @@ package game {
 | Report type errors (assignments, arguments, returns, overrides, interfaces, constants) | **Works** |
 | Godot's whole API under AS3 names (`moveAndSlide()`, `timer.timeout.add(f)`, `Key.ESCAPE`) | **Works** |
 | Arithmetic on Godot's math types (`position + velocity * delta` is a `Vector2`; `position + node` is an error) | **Works** |
-| Language server (`kas3c lsp`): errors as you type, go to definition, find references, hover, outline | **Works** in VS Code on macOS; [Rider not yet tried, and not on Windows](editors/README.md) |
+| Language server (`kas3c lsp`): errors as you type, navigation, hover, outline, completion and signature help | **Works** on macOS; [Rider completion validated in the sandbox](docs/results/2026-11-completion.md). Windows remains unsupported |
 | Run an AS3 program on the command line (`kas3c run`): classes, inheritance, numbers, strings, loops | **Works** for that part of the language; the rest is refused by name |
 | An AS3 script attached to a Godot node (`CharacterBody2D`), run by headless Godot 4.7.2 | **Works** for properties, method calls, operators on Godot's values (`position + velocity * delta`, `position.x = 5`), signals (`timer.timeout.add(onTimeout)`), singletons (`Input.isActionPressed("jump")`), constants (`Vector2.ZERO`), static methods, global functions (`print`, `lerpf`) and Godot's 64-bit integers (`Int64`). It has run on an iPhone and in the iOS Simulator. The rest of the language is next |
 | Run a script in the Godot editor | Planned (stage 2d) |
 | Export a release build as native code | Planned (stage 3) |
 | iOS, Android, Nintendo Switch | Planned (stages 4 and 5) |
-| Completion, rename, Godot's documentation in hover | Planned |
-| Debugger, JetBrains plugin | Planned (stage 6) |
+| [Completion and typing assistance](editors/completion.md) | Typed chains, imports, scopes, snippets, replacement edits and argument help implemented |
+| Rename, Godot's documentation in hover | Planned |
+| JetBrains plugin | Native Rider language support, project/run tools and Simulator panel implemented; see [its README](editors/jetbrains/README.md) |
+| Debugger | Planned (stage 6) |
 
 ## Try the compiler
 
@@ -191,7 +193,7 @@ For what each stage delivers and what is being built now, see the [roadmap](docs
 | `compiler/lsp/` | The language server behind `kas3c lsp`. |
 | `compiler/ir/`, `compiler/vm/` | The typed IR and the interpreter that runs it. |
 | `compiler/godot_ext/` | The Godot extension: AS3 as a Godot scripting language. |
-| `editors/` | How to connect an editor, and the VS Code client. |
+| `editors/` | Completion guide, VS Code client and native JetBrains plugin. |
 | `docs/roadmap.md` | The plan: stages, what each delivers, and current progress. |
 | `docs/backlog.md` | What reviews put off: every deferred item, owed until fixed. |
 | `docs/diagrams/` | The diagrams on this page, and the script that generates them. |

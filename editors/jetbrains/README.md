@@ -1,14 +1,16 @@
 # Kumikae AS3 for JetBrains IDEs
 
-The first piece is an iOS Simulator panel. The owner has tried it in Rider and
-reported that the snapshot preview was slow. The live-picture implementation and
-its measurements are described in the results below.
+The plugin integrates ActionScript 3 with Rider through the compiler's language server and native
+editor handlers. It also provides project/run tools and an iOS Simulator panel. See
+[completion and typing assistance](../completion.md) for editor behavior, settings and limits, and
+[completion results](../../docs/results/2026-11-completion.md) for the checks and measurements.
+The Simulator's own measurements are described below.
 
 | Checked | By | Result |
 |---|---|---|
 | Compilation, style check and plugin zip | Automated build, 2026-11-15 | `./gradlew check buildPlugin` succeeds. |
 | Service tests (`core`) | Automated build | 82 pass; three opt-in live probes skip in ordinary checks and passed separately. |
-| Panel tests (repository, controller, service adapter) | Automated build | 115 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
+| Plugin tests (language, project tools, panel and adapters) | Automated build | 119 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
 | Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
 | Native Swift tests | `swift test` | 38 pass in 20 suites. |
 | Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
@@ -33,6 +35,10 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 
 ## What is implemented
 
+- Native LSP completion with typed member chains, imports, lexical scopes, replacement ranges,
+  capability-aware callable snippets and signature help.
+- Local paired punctuation, quote handling and Enter indentation using the IDE's settings. AS3 tokens
+  drive editing while the shared TextMate grammar supplies colors.
 - A **Simulators** tab lists every simulator with a button to boot it or shut it down; each
   running one has its own tab, and closing the tab shuts it down. Zoom, a console drawer and a
   drawn device body (with the camera housing on the models that have one) are in the device's tab.
@@ -69,10 +75,9 @@ with its reason. Only Xcode 27.0 build 27A266a has been measured. Missing or
 changed capabilities and unsupported devices fall back. The plugin
 installs idb only when you explicitly choose Install idb… and agree to its dialog.
 
-This is the beginning of the one plugin planned in roadmap stage 6. It does not
-yet connect `kas3c lsp`, set AS3 breakpoints or step through scripts. Keep using
-the [LSP4IJ setup](../README.md#rider-and-other-jetbrains-ides). The Simulator panel
-is absent on Windows and Linux. The descriptor accepts only platform build
+This is the beginning of the one plugin planned in roadmap stage 6. It connects `kas3c lsp` for
+completion, argument help, errors and navigation; AS3 breakpoints and stepping remain planned.
+The Simulator panel is absent on Windows and Linux. The descriptor accepts only platform build
 262.10968.170; other IDEs, builds and operating systems have not been tested.
 
 ## Build

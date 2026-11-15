@@ -1,6 +1,6 @@
 # `lsp/`: the language server
 
-`kas3c lsp`: errors as you type, go to definition, find references, hover, outline and symbol search, for
+`kas3c lsp`: errors as you type, go to definition, find references, hover, completion, signature help, outline and symbol search, for
 any editor that speaks the Language Server Protocol. Setting up an editor is in
 [editors/README.md](../../editors/README.md).
 
@@ -21,3 +21,18 @@ any editor that speaks the Language Server Protocol. Setting up an editor is in
   `tests/test_lsp_stdio.py`.
 
 Tests: `test_lsp`, `test_workspace`, `test_json`, `lsp_stdio`.
+
+## Completion transport
+
+`server_completion.cpp` maps compiler queries to LSP items and signature help. It negotiates snippets,
+insert/replace edits and completion-list edit defaults independently. Positions use the server's
+existing UTF-8/UTF-16 conversion. A client without snippets receives plain names; a client without
+insert/replace support receives one ordinary replacement range. Shared edit ranges are sent only to
+clients advertising that default. Completion lists are complete for the current prefix.
+
+The server does not parse declarations to discover call parameters. Structured compiler candidates
+provide required parameter names; signature queries identify the innermost call. Callback positions
+remain name-only. Query caches belong to `Workspace`'s current `Queries`; a recheck destroys them before
+replacing the compilation. The synchronous loop still coalesces waiting document changes.
+
+See [the user guide](../../editors/completion.md) and [measurements](../../docs/results/2026-11-completion.md).

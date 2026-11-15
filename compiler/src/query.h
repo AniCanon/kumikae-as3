@@ -4,6 +4,7 @@
 
 #include "names.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -50,13 +51,29 @@ struct FoundSymbol {
 	uint32_t length = 0;
 };
 
+struct CompletionRange {
+	uint32_t begin;
+	uint32_t caret;
+	uint32_t end;
+	bool call = false; // A standalone expression statement, not a possible function reference.
+};
+
+struct SignatureHelp {
+	std::string label;
+	std::vector<std::string> parameters;
+	uint32_t active_parameter = 0;
+};
+
 // One thing completion offers.
 struct Completion {
 	std::string name;
 	SymbolKind kind = SymbolKind::Local; // Not meaningful for a keyword.
 	bool is_keyword = false;
+	bool is_package = false;
 	bool is_const = false;
 	std::string detail; // The declaration as one line of AS3. Empty for a keyword.
+	bool callable = false;
+	std::vector<std::string> required_parameters;
 };
 
 // Built over a Compilation after check(). It reads the trees the passes wrote onto, so it is good for as
@@ -64,6 +81,11 @@ struct Completion {
 class Queries {
 	Compilation &compilation_;
 	std::unordered_map<const Unit *, std::vector<Occurrence>> occurrences_;
+	std::unordered_map<const Symbol *, Completion> completion_items_;
+	mutable std::unordered_map<const Unit *, std::vector<Node *>> context_nodes_;
+	const std::vector<Node *> &context_nodes(const Unit &p_unit) const;
+	const Completion &completion_item(Symbol *p_symbol);
+	static const FunctionDecl *function_declaration(const Symbol *p_symbol);
 
 	const std::vector<Occurrence> &occurrences(const Unit &p_unit);
 	friend class Completer;
@@ -91,6 +113,14 @@ public:
 	// After a dot: what the value before it has. Where a type is written: types. Otherwise the names in
 	// reach (locals, members, definitions, keywords). Nothing inside a comment or a string, and nothing
 	// after a dot whose value has no known type.
+	// Counts support bounded-state tests and benchmarks; caches are owned by this checked generation.
+	size_t cached_completion_items() const { return completion_items_.size(); }
+	size_t cached_context_units() const { return context_nodes_.size(); }
+	const LocalScope *local_scope_at(const Unit &p_unit, uint32_t p_offset) const;
+	bool text_byte(const Unit &p_unit, uint32_t p_offset) const;
+	bool in_text(const Unit &p_unit, uint32_t p_offset) const;
+	CompletionRange completion_range(const Unit &p_unit, uint32_t p_offset) const;
+	std::optional<SignatureHelp> signature_help(const Unit &p_unit, uint32_t p_offset) const;
 	std::vector<Completion> complete(const Unit &p_unit, uint32_t p_offset);
 };
 

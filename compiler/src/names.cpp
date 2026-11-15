@@ -96,7 +96,8 @@ static bool definition_name(Node *p_node, std::string_view *r_name, uint32_t *r_
 
 std::shared_ptr<Parsed> parse_file(std::string p_path, std::string p_text) {
 	std::shared_ptr<Parsed> parsed = std::make_shared<Parsed>(std::move(p_path), std::move(p_text));
-	parsed->tree = parse(parsed->source, parsed->arena, parsed->diagnostics);
+	Parser parser(parsed->source, parsed->arena, parsed->diagnostics, &parsed->text_regions);
+	parsed->tree = parser.parse_program();
 	return parsed;
 }
 

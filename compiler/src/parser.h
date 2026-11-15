@@ -32,7 +32,8 @@ public:
 	// `Vector.<Vector.<...>>` may nest this far.
 	static const int MAX_TYPE_DEPTH = 32;
 
-	Parser(const Source &p_source, Arena &p_arena, Diagnostics &p_diagnostics);
+	Parser(const Source &p_source, Arena &p_arena, Diagnostics &p_diagnostics,
+			std::vector<TextRegion> *p_regions = nullptr);
 
 	Program *parse_program();
 	Expr *parse_single_expression();

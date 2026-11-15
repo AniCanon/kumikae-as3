@@ -266,7 +266,8 @@ compiler/build/kas3c lsp --declarations lib.as  # lib.as declares what exists el
 | A file opening or changing | The file's errors: what `kas3c check` prints for the project. |
 | Go to definition | Where the name under the cursor is declared, in the project, the built-in library or Godot's API. |
 | Find references | Every use of it in the project's files. |
-| Completion | After a dot, what the value before it has, with what its bases have; where a type is written, types; otherwise the names in reach: locals, members, definitions, keywords. Narrowed by what is typed so far, whatever its case. Nothing after a dot whose value has no known type, and nothing in a comment or a string. |
+| Completion | After a dot, what the value before it has, with what its bases have; where a type is written, types; otherwise the names in reach: locals, members, definitions, keywords. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a dot whose value has no known type, and nothing in a comment, string or regular expression. |
+| Signature help | The callable declaration and active parameter, including unfinished and nested calls. |
 | Hover | Its declaration, and the class or package it belongs to. |
 | Document symbols | The classes and members of the file. |
 | Workspace symbols | The project's definitions whose name contains the query. |
@@ -297,7 +298,8 @@ Limits:
 - Find references on a method also lists the methods that override it and the one it overrides.
 - Workspace symbols are the project's own. Godot's classes are not listed.
 - A change arrives as the range of text that changed; a whole document is accepted too.
-- No completion, signature help, rename or code actions yet.
+- Rename and code actions are not implemented. Completion and signature help are described in
+  [the editor guide](../editors/completion.md).
 - A file is known by the path the editor gives. The same file reached through a symbolic link, or under a
   name that differs only in letter case, counts as a second file and its classes are reported as already
   defined.

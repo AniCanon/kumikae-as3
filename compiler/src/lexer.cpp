@@ -19,39 +19,28 @@ static bool is_identifier_start(char p_c) {
 }
 
 static bool is_identifier_part(char p_c) {
-	return is_identifier_start(p_c) || is_digit(p_c);
+	return is_identifier_byte(p_c);
 }
 
 static bool is_line_break(char p_c) {
 	return p_c == '\n' || p_c == '\r';
 }
 
-// Non-ASCII characters that are spacing, not part of a name. Returns the length in bytes (0 if p_text does
-// not start with one) and whether it ends a line: no-break space, ideographic space, a byte-order mark,
-// and the line and paragraph separators.
-static uint32_t unicode_space(const char *p_text, uint32_t p_left, bool *r_line_break) {
-	const unsigned char *c = reinterpret_cast<const unsigned char *>(p_text);
-	*r_line_break = false;
-	if (p_left >= 2 && c[0] == 0xC2 && c[1] == 0xA0) {
-		return 2;
-	}
-	if (p_left >= 3 && c[0] == 0xE3 && c[1] == 0x80 && c[2] == 0x80) {
-		return 3;
-	}
-	if (p_left >= 3 && c[0] == 0xEF && c[1] == 0xBB && c[2] == 0xBF) {
-		return 3;
-	}
-	if (p_left >= 3 && c[0] == 0xE2 && c[1] == 0x80 && (c[2] == 0xA8 || c[2] == 0xA9)) {
-		*r_line_break = true;
-		return 3;
-	}
-	return 0;
-}
-
-Lexer::Lexer(const Source &p_source, Diagnostics &p_diagnostics) :
+Lexer::Lexer(const Source &p_source, Diagnostics &p_diagnostics, std::vector<TextRegion> *p_regions) :
 		diagnostics_(p_diagnostics),
 		text_(p_source.text().data()),
-		size_((uint32_t)p_source.text().size()) {
+		size_(static_cast<uint32_t>(p_source.text().size())), regions_(p_regions) {
+}
+
+void Lexer::record_text(uint32_t p_start, bool p_closed) {
+	if (!regions_) {
+		return;
+	}
+	// Regex rescanning replaces any lookahead that interpreted its contents as code.
+	while (!regions_->empty() && regions_->back().begin >= p_start) {
+		regions_->pop_back();
+	}
+	regions_->push_back({ p_start, position_, p_closed });
 }
 
 std::string_view Lexer::text(const Token &p_token) const {
@@ -88,9 +77,11 @@ bool Lexer::skip_trivia(Token *r_error) {
 			newline = newline || line_break;
 			position_ += length;
 		} else if (c == '/' && position_ + 1 < size_ && text_[position_ + 1] == '/') {
+			const uint32_t start = position_;
 			while (position_ < size_ && !is_line_break(text_[position_])) {
 				position_++;
 			}
+			record_text(start, false);
 		} else if (c == '/' && position_ + 1 < size_ && text_[position_ + 1] == '*') {
 			uint32_t start = position_;
 			position_ += 2;
@@ -106,6 +97,7 @@ bool Lexer::skip_trivia(Token *r_error) {
 				}
 				position_++;
 			}
+			record_text(start, closed);
 			if (!closed) {
 				*r_error = fail(start, newline, "unterminated comment");
 				return newline;
@@ -172,6 +164,7 @@ Token Lexer::lex_string(uint32_t p_start, bool p_newline_before) {
 		char c = text_[position_];
 		if (c == quote) {
 			position_++;
+			record_text(p_start, true);
 			return make(TokenKind::String, p_start, p_newline_before);
 		}
 		if (is_line_break(c)) {
@@ -187,6 +180,7 @@ Token Lexer::lex_string(uint32_t p_start, bool p_newline_before) {
 		}
 		position_++;
 	}
+	record_text(p_start, false);
 	return fail(p_start, p_newline_before, "unterminated string");
 }
 
@@ -376,10 +370,12 @@ Token Lexer::rescan_as_regex(const Token &p_slash) {
 			while (position_ < size_ && is_identifier_part(text_[position_])) {
 				position_++;
 			}
+			record_text(start, true);
 			return make(TokenKind::Regex, start, p_slash.newline_before);
 		}
 		position_++;
 	}
+	record_text(start, false);
 	return fail(start, p_slash.newline_before, "unterminated regular expression");
 }
 

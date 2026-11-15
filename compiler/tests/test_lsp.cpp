@@ -768,7 +768,90 @@ static void test_typing() {
 	CHECK_EQ(files, 14);
 }
 
+static void test_completion_edits_and_signatures() {
+	for (bool snippets : { false, true }) {
+		Session session;
+		const Json completion_item = Json::object().set("snippetSupport", snippets).set("insertReplaceSupport", snippets);
+		const Json capabilities = Json::object().set("textDocument", Json::object().set("completion",
+				Json::object().set("completionItem", completion_item)));
+		const Json hello = session.request("initialize", Json::object().set("capabilities", capabilities));
+		CHECK(hello.get("result").get("capabilities").has("signatureHelpProvider"));
+		session.notify("initialized", Json::object());
+		const std::string head = "package { public class Main { public function move(amount:int, label:String = \"x\"):void {} public function run():void { ";
+		const std::string source = head + "movsuffix; } } }";
+		session.open(MAIN, source);
+		Json answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size() + 3)));
+		const Json &item = answer.get("result").get("items").at(0);
+		CHECK_EQ(item.get("label").string(), std::string("move"));
+		const Json &edit = item.get("textEdit");
+		CHECK(edit.is_object());
+		const Json &replace = edit.get(snippets ? "replace" : "range");
+		CHECK_EQ(replace.get("start").get("character").integer(-1), static_cast<int>(head.size()));
+		CHECK_EQ(replace.get("end").get("character").integer(-1), static_cast<int>(head.size() + 9));
+		CHECK_EQ(edit.get("newText").string(), snippets ? std::string("move(${1:amount})$0") : std::string("move"));
+		session.change(MAIN, head + "var callback:Function = mov; } } }");
+		answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size() + 27)));
+		CHECK_EQ(answer.get("result").get("items").at(0).get("textEdit").get("newText").string(), std::string("move"));
+		session.change(MAIN, head + "move(1, ); } } }");
+		answer = session.request("textDocument/signatureHelp", Session::at(MAIN, 0, static_cast<int>(head.size() + 8)));
+		CHECK(!answer.has("error"));
+		CHECK_EQ(answer.get("result").get("activeParameter").integer(-1), 1);
+		CHECK_EQ(answer.get("result").get("signatures").at(0).get("parameters").items().size(), size_t{2});
+	}
+}
+
+static void test_completion_unicode_boundaries() {
+	for (const char *encoding : { "utf-8", "utf-16" }) {
+		Session session;
+		session.request("initialize", Json::object().set("capabilities", Json::object().set("general",
+				Json::object().set("positionEncodings", Json::array().push(encoding)))));
+		session.notify("initialized", Json::object());
+		const std::string head = "package { class Main { function move():void {} function run():void { ";
+		for (const char *space : { "\u00a0", "\u2028" }) {
+			session.open(MAIN, head + "mov" + space + "next; } } }");
+			const Json answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size() + 3)));
+			const Json &edit = answer.get("result").get("items").at(0).get("textEdit");
+			CHECK_EQ(edit.get("range").get("end").get("character").integer(-1), static_cast<int>(head.size() + 3));
+		}
+	}
+}
+
+static void test_completion_default_range() {
+	Session session;
+	const Json capabilities = Json::object().set("textDocument", Json::object().set("completion",
+			Json::object().set("completionList", Json::object().set("itemDefaults", Json::array().push("editRange")))));
+	session.request("initialize", Json::object().set("capabilities", capabilities));
+	session.notify("initialized", Json::object());
+	session.open(MAIN, "package { class Main { var speed:int; function run():void { spe } } }");
+	const Json answer = session.request("textDocument/completion", Session::at(MAIN, 0, 61));
+	CHECK(answer.get("result").get("itemDefaults").get("editRange").is_object());
+	CHECK(!answer.get("result").get("items").at(0).has("textEdit"));
+}
+
+static void test_signature_contexts() {
+	Session session;
+	session.request("initialize", Json::object().set("capabilities", Json::object()));
+	session.notify("initialized", Json::object());
+	const std::string head = "package { class Main { function outer(a:*, b:*):void {} function inner(x:int):int { return x; } function run():void { ";
+	for (const auto &[body, expected] : std::vector<std::pair<std::string, int>>{
+		{ "outer /* test */ (|1);", 0 }, { "outer(1, |);", 1 }, { "outer(inner(|), 2);", 0 }, { "outer(inner(1), |);", 1 },
+		{ "outer(/[(),.]/, |);", 1 }, { "outer(\"a,b\", |);", 1 }, { "outer([1,2], |);", 1 },
+		{ "outer(/* , ) */1, |);", 1 }, { "outer(|", 0 },
+		{ "outer(\"inside|\", 2);", -1 }, { "outer(1, 2); |", -1 } }) {
+		std::string source = head + body + " } } }";
+		const size_t caret = source.find('|');
+		source.erase(caret, 1);
+		session.open(MAIN, source);
+		const Json answer = session.request("textDocument/signatureHelp", Session::at(MAIN, 0, static_cast<int>(caret)));
+		CHECK_EQ(answer.get("result").get("activeParameter").integer(-1), expected);
+	}
+}
+
 int main() {
+	test_completion_unicode_boundaries();
+	test_signature_contexts();
+	test_completion_default_range();
+	test_completion_edits_and_signatures();
 	test_completion();
 	test_lifecycle();
 	test_code_language();

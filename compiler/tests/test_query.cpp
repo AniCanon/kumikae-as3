@@ -149,6 +149,36 @@ static void test_completion() {
 	CHECK(in_class.has("function") && in_class.has("override") && in_class.has("public") && !in_class.has("position"));
 }
 
+static void test_completion_scopes_and_context() {
+	CHECK(!complete("package { import |; public class Player {} }").has(""));
+	CHECK(complete(player("\u00a0spe|")).has("speed"));
+	CHECK(complete(player("\u2028spe|")).has("speed"));
+	CHECK_EQ(complete(player("var café:int; café|")).items.size(), size_t{1});
+	CHECK_EQ(complete("package { import fl|; public class Player {} }").count("flash"), size_t{1});
+	CHECK(complete("package { public class Player { function run():void { import godot.Vector2; Vec| } } }").has("Vector2"));
+	const Offered nested_static = complete("package { public class Player { var instanceOnly:int; static function run():void { function inner():void { ins| } } } }");
+	CHECK(!nested_static.has("instanceOnly"));
+	CHECK(!complete(player("function inner():void { var innerOnly:int; } innerO|")).has("innerOnly"));
+	CHECK(complete(player("var outer:int; function inner():void { out| }")).has("outer"));
+	CHECK(complete(player("arg|")).has("arguments"));
+	CHECK(!complete(player("try {} catch (caught:Error) {} cau|")).has("caught"));
+	CHECK(complete(player("try {} catch (caught:Error) { cau| }")).has("caught"));
+	CHECK(complete(player("var callback:Function = function self():void { sel| };")).has("self"));
+	CHECK(!complete(player("var callback:Function = function self():void {}; sel|")).has("self"));
+	const Offered shadow = complete(player("var value:int; function inner(value:String):void { val| }"));
+	CHECK(shadow.find("value") && shadow.find("value")->detail == "value:String");
+	CHECK(complete("package { import godot.Vec|; public class Player {} }").has("Vector2"));
+	CHECK(complete(player("transform.origin.|")).has("x"));
+	CHECK(complete(player("position.normalized().|")).has("x"));
+	CHECK(complete(player("var items:Vector.<Vector2>; items[0].|")).has("x"));
+	CHECK(complete(player("(position).|")).has("x"));
+	CHECK(complete(player("missing.|; position.x;")).items.empty());
+	CHECK(complete(player("var re:RegExp = /spe|/;")).items.empty());
+	CHECK(complete(player("var re:RegExp = /[(),.]spe|/;")).items.empty());
+	CHECK(complete(player("var re:RegExp = /spe|\n")).items.empty());
+	CHECK(complete(player("var n:Number = 10 / spe|;")).has("speed"));
+}
+
 static const char *const BROKEN =
 		"package { import flash.utils.Dictionary; public class Main {\n"
 		"var count:int;\n"
@@ -723,6 +753,7 @@ static void test_typing() {
 }
 
 int main() {
+	test_completion_scopes_and_context();
 	test_completion();
 	test_typing();
 	test_index();

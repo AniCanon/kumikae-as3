@@ -189,6 +189,25 @@ with tempfile.TemporaryDirectory() as folder:
         check("symbols", len(symbols) == 1 and [s["name"] for s in symbols[0]["result"]] == ["Player"] and
               symbols[0]["result"][0]["location"]["uri"] == uri, repr(symbols))
 
+# Completion insertion and argument help over the actual framed transport.
+completion_text = ('package { public class Main { public function move(amount:int, label:String = "x"):void {} '
+                   'public function run():void { movsuffix; move(1, ); } } }')
+caps = {"textDocument": {"completion": {"completionItem": {"snippetSupport": True, "insertReplaceSupport": True}}}}
+start = request(1, "initialize", {"capabilities": caps}) + notify("initialized", {})
+position = completion_text.index("movsuffix")
+code, messages, errors = session(start + opened(completion_text) +
+    request(2, "textDocument/completion", {"textDocument": {"uri": URI}, "position": {"line": 0, "character": position + 3}}) +
+    request(3, "textDocument/signatureHelp", {"textDocument": {"uri": URI}, "position": {"line": 0, "character": completion_text.index("move(1") + 8}}) + END,
+    "--no-godot")
+check("completion session", code == 0 and messages is not None and errors == b"", repr(errors))
+if messages:
+    reply = next((m for m in messages if m.get("id") == 2), {})
+    item = next((i for i in reply.get("result", {}).get("items", []) if i.get("label") == "move"), {})
+    check("snippet", item.get("textEdit", {}).get("newText") == "move(${1:amount})$0", repr(item))
+    check("replace suffix", item.get("textEdit", {}).get("replace", {}).get("end", {}).get("character") == position + 9, repr(item))
+    signature = next((m for m in messages if m.get("id") == 3), {})
+    check("signature parameter", signature.get("result", {}).get("activeParameter") == 1, repr(signature))
+
 for failure in failures:
     print("FAIL " + failure)
 print("lsp stdio: %s" % ("OK" if not failures else "%d failed" % len(failures)))

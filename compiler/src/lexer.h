@@ -6,6 +6,7 @@
 #include "token.h"
 
 #include <string_view>
+#include <vector>
 
 namespace kas3 {
 
@@ -14,6 +15,8 @@ class Lexer {
 	const char *text_;
 	uint32_t size_;
 	uint32_t position_ = 0;
+	std::vector<TextRegion> *regions_;
+	void record_text(uint32_t p_start, bool p_closed);
 
 	bool skip_trivia(Token *r_error);
 	Token make(TokenKind p_kind, uint32_t p_start, bool p_newline_before) const;
@@ -23,7 +26,7 @@ class Lexer {
 	TokenKind lex_punctuation();
 
 public:
-	Lexer(const Source &p_source, Diagnostics &p_diagnostics);
+	Lexer(const Source &p_source, Diagnostics &p_diagnostics, std::vector<TextRegion> *p_regions = nullptr);
 
 	// Returns EndOfFile forever once the text is used up.
 	Token next();

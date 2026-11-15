@@ -144,6 +144,7 @@ struct Parsed {
 	Source source;
 	Arena arena;
 	Diagnostics diagnostics; // Syntax errors.
+	std::vector<TextRegion> text_regions; // Sorted, non-overlapping, shared with editor queries.
 	Program *tree = nullptr;
 	bool used = false; // A Compilation has written onto the tree.
 
@@ -154,6 +155,14 @@ struct Parsed {
 std::shared_ptr<Parsed> parse_file(std::string p_path, std::string p_text);
 // The embedded library, parsed.
 std::vector<std::shared_ptr<Parsed>> parse_builtins();
+
+// The resolver's scopes, retained for editor queries only where a body exists. Stable addresses in Unit.
+struct LocalScope {
+	LocalScope *parent = nullptr;
+	std::unordered_map<std::string_view, Symbol *> names;
+	ImportScope imports;
+	const Node *extent = nullptr;
+};
 
 // One source file in a Compilation.
 struct Unit {
@@ -169,6 +178,7 @@ struct Unit {
 	ImportScope outer_imports; // Imports outside it.
 	std::vector<Reference> references;
 	std::vector<TypedExpression> typed;
+	std::deque<LocalScope> local_scopes;
 
 	explicit Unit(std::shared_ptr<Parsed> p_parsed) :
 			parsed(std::move(p_parsed)), source(parsed->source), diagnostics(parsed->diagnostics), tree(parsed->tree) {}

@@ -1,7 +1,7 @@
 # Editors
 
 `kas3c lsp` is a language server: an editor starts it, and it reports the compiler's errors as you type and
-answers go to definition, find references, hover, outline and symbol search. It is the same program as
+answers go to definition, find references, hover, completion, signature help, outline and symbol search. It is the same program as
 `kas3c check`, so the two never disagree.
 
 Build it first:
@@ -17,14 +17,15 @@ too.
 Open the folder that holds `project.godot`, or any folder inside it. Every `.as` file in the project is
 part of the program.
 
-> **Tried so far (2026-11-12):**
+> **Editor validation:**
 > - **VS Code 1.145:** works. With the client below, VS Code started the server, opened a script that
 >   extends `CharacterBody2D`, received its two errors, and received the shorter list after the file changed.
 >   This was confirmed from a log of the messages between the two, and the owner saw both errors underlined
 >   in the editor.
 >   It found one fault, now fixed: VS Code starts a server with `--stdio`, which `kas3c lsp` used to reject.
-> - **Rider 2026.2:** the LSP4IJ plugin installs (`rider installPlugins com.redhat.devtools.lsp4ij`). Adding
->   the server in its settings, steps 2 to 4 below, has not been tried.
+> - **Rider RD-262.10968.170:** the native plugin passes automated sandbox checks for pairing,
+>   completion lookup, Tab/Enter acceptance, undo and changed-document cancellation (2026-11-15).
+>   See [completion results](../docs/results/2026-11-completion.md) for measurements and limits.
 
 > **Windows is not supported yet.** The server runs on macOS and Linux. On Windows it does not read the
 > editor's messages correctly and does not recognise which files belong to the project.
@@ -52,15 +53,14 @@ The colouring is a small grammar: keywords, strings, comments and numbers.
 
 ## Rider and other JetBrains IDEs
 
-The first [Kumikae JetBrains plugin](jetbrains/) adds source for a macOS Simulator panel and an agent interface. Its build is blocked on an uncached dependency; it has not run in Rider. It does not yet replace the language-server setup below.
+The [Kumikae JetBrains plugin](jetbrains/) connects `kas3c lsp` through the IDE's native LSP client.
+It provides AS3 highlighting, completion, argument help, navigation and local bracket/quote assistance,
+as well as project/run tools and the Simulator panel. Install the plugin ZIP built from the same
+compiler revision; it bundles `kas3c` when a compiler build is available. See the plugin README for the
+supported Rider build and build commands.
 
-JetBrains IDEs take a language server through a plugin. Until this project has its own plugin, the
-[LSP4IJ](https://github.com/redhat-developer/lsp4ij) plugin connects any language server without one:
-
-1. **Settings > Plugins > Marketplace**, install **LSP4IJ**.
-2. **Settings > Languages & Frameworks > Language Servers**, press **+**.
-3. **Name:** `Kumikae AS3`. **Command:** the full path of `kas3c`, then `lsp`.
-4. On the **Mappings** tab, under **File name patterns**, add `*.as`.
+The native plugin does not need LSP4IJ. Other JetBrains products/builds require separate verification;
+Android Studio and open-source IntelliJ builds do not provide its required JetBrains LSP module.
 
 ## Any other editor
 
@@ -83,9 +83,11 @@ output, for files ending in `.as`.
 | Outline | The classes and members of a file. |
 | Symbol search | The project's own classes, functions and members. |
 
-Completion is offered after a dot, where a type is written, and for the names in reach.
+[Completion and typing assistance](completion.md) covers chained members, types, imports, visible names,
+Tab replacement, callable snippets and argument help. Features that depend on client capabilities have
+plain-text and ordinary-edit fallbacks.
 
-Not yet: signature help, rename, Godot's documentation in hover, completion of an import's path.
+Not yet: rename and Godot's documentation in hover.
 
 Going to the definition of something in Godot's API opens a read-only copy of the declarations, which the
 server writes to the system's temporary folder.

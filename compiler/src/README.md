@@ -12,7 +12,7 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
 | `typer.h`, `typer_*.cpp`, `type_table.cpp` | The type of each expression and what fits where, by what is typed |
 | `whole_numbers` | Rules the checker and the lowerer must agree on, written once |
 | `godot_names.cpp`, `builtins.h` | The name table and AS3's own declarations |
-| `query` | What the language server asks: what is at a position, where it is used |
+| `query*`, `completion*` | Editor queries, lexical context, completion candidates/edits and active-call signatures |
 | `diagnostics` | Every error, as `file:line:column: error: message` |
 
 ## Rules
@@ -29,3 +29,19 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
 
 Tests: `test_lexer`, `test_parser`, `test_ast`, `test_names`, `test_types`, `test_type_errors`,
 `test_query`, `test_source`, and the `golden` group.
+
+## Editor query ownership
+
+`Parsed::text_regions` records comments, strings and regex literals from the actual lexer/parser,
+including their termination state. This avoids a second scanner in completion. Regex rescanning
+replaces any conflicting lookahead intervals. Identifier bytes have one shared definition in `token`.
+
+The resolver retains `Unit::local_scopes` for source bodies. Resolution and completion read the same
+scope maps, including hoisted locals, parameters, named expressions, catches and function imports.
+Scopes and their parent pointers live only as long as their owning compilation; native declarations
+without bodies do not retain scopes.
+
+`Queries` lazily caches candidate descriptions and relevant context nodes for that checked generation.
+It never caches a history of prefix responses. `Workspace` destroys queries before changing the
+compilation that owns their symbol/tree pointers. `test_workspace` exercises repeated requests, edits,
+changed types and close; the compiler corpus tests exercise malformed input under sanitizers.
