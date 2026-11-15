@@ -182,7 +182,8 @@ enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastInde
 //   ParseFloat            text                    -> Number
 enum class StringFunction : uint8_t {
 	CharAt, CharCodeAt, IndexOf, LastIndexOf, Substr, Substring, Slice, Concat, Upper, Lower, Replace, LocaleCompare,
-	FromCharCode, ParseInt, ParseFloat
+	FromCharCode, ParseInt, ParseFloat,
+	Split // The string, the delimiter (untyped), the limit (a Number): an Array.
 };
 
 // toString(radix), toFixed, toExponential and toPrecision, in NumText's second operand. The number is a
@@ -311,6 +312,7 @@ struct Module {
 	uint32_t argument_error_class = NONE; // Made when a program calls a function value: too many arguments.
 	// The built-in class of function values (FUNCTION_FIELDS), when the program has any.
 	uint32_t function_class = NONE;
+	uint32_t array_class = NONE; // The one class of every Array, when the program has any.
 };
 
 // The module as text, for tests and for reading.

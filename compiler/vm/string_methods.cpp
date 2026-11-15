@@ -52,6 +52,10 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 		give_text(made);
 		return;
 	}
+	if (which == StringFunction::Split) {
+		string_split(p_function, p_in);
+		return;
+	}
 	if (which == StringFunction::ParseInt || which == StringFunction::ParseFloat) {
 		out.d = which == StringFunction::ParseInt ? parse_int(text(0), p_registers[list[1]].i) : parse_float(text(0));
 		return;
@@ -185,6 +189,72 @@ void Interpreter::any_null_check(Slot p_value) {
 		raise(module_.type_error_class, "Error #1010: A term is undefined and has no properties.");
 	} else if (tag == AnyTag::Null) {
 		raise_null();
+	}
+}
+
+// split(delimiter, limit), as ECMAScript 3 has it for a delimiter that is not a regular expression: none
+// (null or undefined) is the whole string; an empty one gives each UTF-16 unit; at most `limit` pieces. A
+// delimiter that is neither a String nor null becomes its text, which may run the program: the registers
+// are read again after.
+void Interpreter::string_split(const Function &p_function, const Instruction &p_in) {
+	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	const size_t base = frames_.back().base;
+	const auto at = [&](size_t p_index) -> Slot & { return stack_[base + list[p_index]]; };
+	const AnyTag tag = any::tag(at(1));
+	const bool whole = tag == AnyTag::Null || tag == AnyTag::Undefined;
+	std::string by;
+	if (!whole) {
+		const Slot held = share(Kind::Any, at(1));
+		const bool said = any_text(held, &by);
+		drop_any(held);
+		if (!said) {
+			return;
+		}
+	}
+	const Str *string = static_cast<const Str *>(at(0).p);
+	const std::string_view self = string ? string->view() : std::string_view();
+	const uint32_t most = to_uint32(at(2).d);
+	const uint32_t length = static_cast<uint32_t>(utf16_length(self));
+	std::vector<std::string> pieces;
+	if (whole) {
+		pieces.emplace_back(self);
+	} else if (by.empty()) {
+		for (uint32_t i = 0; i < length && pieces.size() < most; i++) {
+			pieces.push_back(units_between(self, i, i + 1));
+		}
+	} else if (length > 0) {
+		const uint32_t step = static_cast<uint32_t>(utf16_length(by));
+		uint32_t from = 0;
+		while (pieces.size() < most) {
+			const int32_t found = find_units(self, by, from);
+			const uint32_t end = found < 0 ? length : static_cast<uint32_t>(found);
+			pieces.push_back(units_between(self, from, end));
+			if (found < 0) {
+				break;
+			}
+			from = end + step;
+		}
+	} else {
+		pieces.emplace_back(); // An empty string with a delimiter: one empty piece.
+	}
+	if (pieces.size() > most) {
+		pieces.resize(most);
+	}
+	Vector *made = fresh_vector(module_.array_class, pieces.size());
+	for (size_t i = 0; made && i < pieces.size(); i++) {
+		Str *piece = text(pieces[i]);
+		if (!piece) {
+			release_object(made);
+			out_of_memory();
+			return;
+		}
+		made->data[i] = any::string(piece);
+	}
+	if (made) {
+		Slot out;
+		out.bits = 0;
+		out.p = made;
+		put(Kind::Obj, stack_[base + p_in.a], out);
 	}
 }
 

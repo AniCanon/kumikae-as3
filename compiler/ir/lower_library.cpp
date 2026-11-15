@@ -155,7 +155,7 @@ public:
 			return text;
 		}
 		if (name == "split") {
-			return refused(" (it gives an Array)", Kind::Str);
+			return split();
 		}
 		if (!method) {
 			return refused(" (it takes a regular expression)", Kind::Str);
@@ -174,6 +174,40 @@ public:
 		std::vector<uint32_t> list = arguments(text, Kind::Str);
 		l_.emit(Op::NullCheck, position_, list[0]);
 		return emit(Op::StrCall, static_cast<uint32_t>(method->function), std::move(list), method->result);
+	}
+
+	// split(delimiter, limit): the delimiter untyped (null, left out, a String or what becomes one), the limit
+	// a Number. A regular expression waits for RegExp.
+	uint32_t split() {
+		Expr *delimiter = call_->arguments.count > 0 ? call_->arguments[0] : nullptr;
+		const Type *type = delimiter ? delimiter->type : nullptr;
+		if (type && type->kind == Type::Instance && type->symbol && type->symbol->name == "RegExp") {
+			return refused(" with a regular expression", Kind::Obj);
+		}
+		const std::optional<uint32_t> array = l_.vector_class(l_.compilation_.instance_type(l_.array_));
+		if (!array) {
+			return refused("", Kind::Obj);
+		}
+		std::vector<uint32_t> list;
+		list.push_back(l_.settled(l_.expression(object(), Kind::Str), later(0), position_));
+		uint32_t split_by = NONE;
+		if (delimiter) {
+			split_by = l_.settled(l_.any_value(delimiter), later(1), position_);
+		} else {
+			split_by = l_.reg(Kind::Any);
+			l_.emit(Op::AnyConst, position_, split_by, 1);
+		}
+		list.push_back(split_by);
+		uint32_t limit = NONE;
+		if (call_->arguments.count > 1) {
+			limit = l_.expression(call_->arguments[1], Kind::F64);
+		} else {
+			limit = l_.reg(Kind::F64);
+			l_.emit(Op::ConstF64, position_, limit, l_.number(2147483647.0));
+		}
+		list.push_back(limit);
+		l_.emit(Op::NullCheck, position_, list[0]);
+		return emit(Op::StrCall, static_cast<uint32_t>(StringFunction::Split), std::move(list), Kind::Obj);
 	}
 
 	uint32_t number_method(Kind p_kind) {

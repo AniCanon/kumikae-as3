@@ -132,6 +132,7 @@ private:
 	void object_to_text(const ir::Instruction &p_in, Slot *p_registers);
 	// The standard library (vm/string_methods.cpp): StrCall and NumText. Neither runs the program.
 	void string_call(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void string_split(const ir::Function &p_function, const ir::Instruction &p_in);
 	void number_text(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
 	void any_null_check(Slot p_value);

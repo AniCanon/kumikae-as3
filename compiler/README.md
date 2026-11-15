@@ -96,12 +96,15 @@ every arithmetic, comparison, logical and bitwise operator; assignment and `++`/
 `toString()` on any object (its class's own, or `[object Name]`; an `Error`'s name and message);
 `Error` and its subclasses; `NaN`, `Infinity` and the limits of the number types (`int.MAX_VALUE`); several
 files, packages, and package-level functions and variables. `String`'s methods, the numbers' (and `Int64`'s) `toString(radix)`,
-`toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite` and `Math`.
+`toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `split` and `Math`.
+`Vector.<T>` (`Vector.<*>` too) and `Array`, with their methods, those that take a function included;
+function values (a method or a function as a value, `f(a, b)`) and function expressions that capture
+their variables; `[Signal]` on a field of a class that extends one of Godot's.
 
-**What is refused, by name, until later slices:** function values and closures, `Array`, `Object` literals
-and `Dictionary`, interfaces, `for in` over anything but a vector, getters and setters, rest parameters,
-regular expressions and the `String` methods that take one or give an `Array` (`match`, `search`, `split`,
-and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
+**What is refused, by name, until later slices:** `Object` literals and dynamic properties, `Dictionary`,
+interfaces, `for in` over anything but a vector or an Array, getters and setters, rest parameters,
+`Function`'s `call` and `apply`, `this` inside a function expression, regular expressions and the `String`
+methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
 `Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
 `... is not supported by the interpreter yet` at the place.
 
