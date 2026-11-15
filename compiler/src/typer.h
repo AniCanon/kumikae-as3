@@ -141,6 +141,9 @@ class Typer {
 		const Type *element = nullptr; // What indexing gives; null if the class is not indexed.
 		bool keyed = false; // Indexed by any key, not only by a number.
 		bool complete = false; // The operators listed are all it has: another use is an error.
+		// The forms of its constructor, each its parameters' types, when it has more than one. The
+		// declared constructor merges them, so it takes calls that none of them takes.
+		std::vector<std::vector<const Type *>> forms;
 	};
 	std::unordered_map<Symbol *, Described> described_;
 
@@ -170,6 +173,8 @@ class Typer {
 	// if neither class describes any: the caller then does what it did before. Reports an operator that
 	// the classes don't have.
 	const Type *described_binary(TokenKind p_op, Expr *p_left, Expr *p_right, uint32_t p_offset);
+	// A `new` of a class whose constructor has forms: one of them must take the arguments.
+	void constructor_form(const Type *p_instance, const List<Expr *> &p_arguments, uint32_t p_offset);
 
 	// The same for `-x` and `+x`.
 	const Type *described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset);

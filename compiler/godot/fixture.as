@@ -14,6 +14,9 @@ package godot {
 	[Operator(op="*", left="int", returns="Vector2")]
 	[Operator(op="*", left="Number", returns="Vector2")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="Vector2")]
+	[Constructor(args="Number,Number")]
 	public final native class Vector2 {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -26,6 +29,9 @@ package godot {
 		public static native function fromAngle(angle:Number):Vector2;
 	}
 	[Operators]
+	[Constructor(args="")]
+	[Constructor(args="Signal")]
+	[Constructor(args="GodotObject,String")]
 	public final native class Signal {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function emit(...rest):void;

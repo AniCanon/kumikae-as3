@@ -491,6 +491,15 @@ class Generator:
             written.append(text)
         return "public native function %s(%s);" % (as3_name, ", ".join(written))
 
+    def constructor_lines(self, entry):
+        """Each form of the constructor, as a tag: the merged one alone would take calls none of them takes."""
+        where = entry["name"] + " constructor"
+        overloads = [overload.get("arguments", []) for overload in entry["constructors"]]
+        if len(overloads) < 2:
+            return []
+        return ['\t[Constructor(args="%s")]' % ",".join(self.type(argument["type"], None, where)[0] for argument in overload)
+                for overload in overloads]
+
     def operand(self, name):
         """How an operator's operand or result type is written in a tag, or None if AS3 has no such operand."""
         if name in ("int", "float", "bool"):
@@ -553,6 +562,7 @@ class Generator:
                 out.append(line)
         self.lines.extend(self.enum_lines(entry))
         self.lines.extend(self.operator_lines(entry))
+        self.lines.extend(self.constructor_lines(entry))
         self.block("public final native class %s" % as3_name, out)
         self.in_narrow = False
 

@@ -24,6 +24,10 @@ package godot {
 	[Operator(op="*", left="int", returns="Vector2")]
 	[Operator(op="*", left="Number", returns="Vector2")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="Vector2")]
+	[Constructor(args="Vector2i")]
+	[Constructor(args="Number,Number")]
 	public final native class Vector2 {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -107,6 +111,10 @@ package godot {
 	[Operator(op="*", left="int", returns="Vector2i")]
 	[Operator(op="*", left="Number", returns="Vector2")]
 	[Indexed(element="int")]
+	[Constructor(args="")]
+	[Constructor(args="Vector2i")]
+	[Constructor(args="Vector2")]
+	[Constructor(args="int,int")]
 	public final native class Vector2i {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -141,6 +149,11 @@ package godot {
 	}
 	[Operators]
 	[Operator(op="*", right="Transform2D", returns="Rect2")]
+	[Constructor(args="")]
+	[Constructor(args="Rect2")]
+	[Constructor(args="Rect2i")]
+	[Constructor(args="Vector2,Vector2")]
+	[Constructor(args="Number,Number,Number,Number")]
 	public final native class Rect2 {
 		public var position:Vector2;
 		public var size:Vector2;
@@ -164,6 +177,11 @@ package godot {
 		public native function abs():Rect2;
 	}
 	[Operators]
+	[Constructor(args="")]
+	[Constructor(args="Rect2i")]
+	[Constructor(args="Rect2")]
+	[Constructor(args="Vector2i,Vector2i")]
+	[Constructor(args="int,int,int,int")]
 	public final native class Rect2i {
 		public var position:Vector2i;
 		public var size:Vector2i;
@@ -205,6 +223,10 @@ package godot {
 	[Operator(op="*", left="int", returns="Vector3")]
 	[Operator(op="*", left="Number", returns="Vector3")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="Vector3")]
+	[Constructor(args="Vector3i")]
+	[Constructor(args="Number,Number,Number")]
 	public final native class Vector3 {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -298,6 +320,10 @@ package godot {
 	[Operator(op="*", left="int", returns="Vector3i")]
 	[Operator(op="*", left="Number", returns="Vector3")]
 	[Indexed(element="int")]
+	[Constructor(args="")]
+	[Constructor(args="Vector3i")]
+	[Constructor(args="Vector3")]
+	[Constructor(args="int,int,int")]
 	public final native class Vector3i {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -343,6 +369,11 @@ package godot {
 	[Operator(op="*", right="Transform2D", returns="Transform2D")]
 	[Operator(op="*", right="PackedVector2Array", returns="PackedVector2Array")]
 	[Indexed(element="Vector2")]
+	[Constructor(args="")]
+	[Constructor(args="Transform2D")]
+	[Constructor(args="Number,Vector2")]
+	[Constructor(args="Number,Vector2,Number,Vector2")]
+	[Constructor(args="Vector2,Vector2,Vector2")]
 	public final native class Transform2D {
 		public static const IDENTITY:Transform2D;
 		public static const FLIP_X:Transform2D;
@@ -393,6 +424,10 @@ package godot {
 	[Operator(op="*", left="int", returns="Vector4")]
 	[Operator(op="*", left="Number", returns="Vector4")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="Vector4")]
+	[Constructor(args="Vector4i")]
+	[Constructor(args="Number,Number,Number,Number")]
 	public final native class Vector4 {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -460,6 +495,10 @@ package godot {
 	[Operator(op="*", left="int", returns="Vector4i")]
 	[Operator(op="*", left="Number", returns="Vector4")]
 	[Indexed(element="int")]
+	[Constructor(args="")]
+	[Constructor(args="Vector4i")]
+	[Constructor(args="Vector4")]
+	[Constructor(args="int,int,int,int")]
 	public final native class Vector4i {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -495,6 +534,13 @@ package godot {
 	[Operator(op="-", returns="Plane")]
 	[Operator(op="+", returns="Plane")]
 	[Operator(op="*", right="Transform3D", returns="Plane")]
+	[Constructor(args="")]
+	[Constructor(args="Plane")]
+	[Constructor(args="Vector3")]
+	[Constructor(args="Vector3,Number")]
+	[Constructor(args="Vector3,Vector3")]
+	[Constructor(args="Vector3,Vector3,Vector3")]
+	[Constructor(args="Number,Number,Number,Number")]
 	public final native class Plane {
 		public static const PLANE_YZ:Plane;
 		public static const PLANE_XZ:Plane;
@@ -531,6 +577,12 @@ package godot {
 	[Operator(op="*", left="int", returns="Quaternion")]
 	[Operator(op="*", left="Number", returns="Quaternion")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="Quaternion")]
+	[Constructor(args="Basis")]
+	[Constructor(args="Vector3,Number")]
+	[Constructor(args="Vector3,Vector3")]
+	[Constructor(args="Number,Number,Number,Number")]
 	public final native class Quaternion {
 		public static const IDENTITY:Quaternion;
 		public var x:Number;
@@ -560,6 +612,9 @@ package godot {
 	}
 	[Operators]
 	[Operator(op="*", right="Transform3D", returns="AABB")]
+	[Constructor(args="")]
+	[Constructor(args="AABB")]
+	[Constructor(args="Vector3,Vector3")]
 	public final native class AABB {
 		public var position:Vector3;
 		public var size:Vector3;
@@ -599,6 +654,11 @@ package godot {
 	[Operator(op="*", right="Vector3", returns="Vector3")]
 	[Operator(op="*", right="Basis", returns="Basis")]
 	[Indexed(element="Vector3")]
+	[Constructor(args="")]
+	[Constructor(args="Basis")]
+	[Constructor(args="Quaternion")]
+	[Constructor(args="Vector3,Number")]
+	[Constructor(args="Vector3,Vector3,Vector3")]
 	public final native class Basis {
 		public static const IDENTITY:Basis;
 		public static const FLIP_X:Basis;
@@ -640,6 +700,11 @@ package godot {
 	[Operator(op="*", right="AABB", returns="AABB")]
 	[Operator(op="*", right="Transform3D", returns="Transform3D")]
 	[Operator(op="*", right="PackedVector3Array", returns="PackedVector3Array")]
+	[Constructor(args="")]
+	[Constructor(args="Transform3D")]
+	[Constructor(args="Basis,Vector3")]
+	[Constructor(args="Vector3,Vector3,Vector3,Vector3")]
+	[Constructor(args="Projection")]
 	public final native class Transform3D {
 		public static const IDENTITY:Transform3D;
 		public static const FLIP_X:Transform3D;
@@ -667,6 +732,10 @@ package godot {
 	[Operator(op="*", right="Vector4", returns="Vector4")]
 	[Operator(op="*", right="Projection", returns="Projection")]
 	[Indexed(element="Vector4")]
+	[Constructor(args="")]
+	[Constructor(args="Projection")]
+	[Constructor(args="Transform3D")]
+	[Constructor(args="Vector4,Vector4,Vector4,Vector4")]
 	public final native class Projection {
 		public static const PLANE_NEAR:int = 0;
 		public static const PLANE_FAR:int = 1;
@@ -722,6 +791,13 @@ package godot {
 	[Operator(op="*", left="int", returns="Color")]
 	[Operator(op="*", left="Number", returns="Color")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="Color")]
+	[Constructor(args="Color,Number")]
+	[Constructor(args="Number,Number,Number")]
+	[Constructor(args="Number,Number,Number,Number")]
+	[Constructor(args="String")]
+	[Constructor(args="String,Number")]
 	public final native class Color {
 		public static const ALICE_BLUE:Color;
 		public static const ANTIQUE_WHITE:Color;
@@ -916,12 +992,17 @@ package godot {
 	[Operator(op="<=", right="RID", returns="Boolean")]
 	[Operator(op=">", right="RID", returns="Boolean")]
 	[Operator(op=">=", right="RID", returns="Boolean")]
+	[Constructor(args="")]
+	[Constructor(args="RID")]
 	public final native class RID {
 		public native function RID(from:RID = null);
 		public native function isValid():Boolean;
 		public native function getId():Int64;
 	}
 	[Operators]
+	[Constructor(args="")]
+	[Constructor(args="Signal")]
+	[Constructor(args="GodotObject,String")]
 	public final native class Signal {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function isNull():Boolean;
@@ -938,6 +1019,9 @@ package godot {
 	}
 	[Operators]
 	[Indexed(element="*", keyed="true")]
+	[Constructor(args="")]
+	[Constructor(args="GodotDictionary")]
+	[Constructor(args="GodotDictionary,Int64,String,*,Int64,String,*")]
 	public final native class GodotDictionary {
 		public native function GodotDictionary(base:GodotDictionary = null, keyType:Int64 = 0, keyClassName:String = null, keyScript:* = null, valueType:Int64 = 0, valueClassName:String = null, valueScript:* = null);
 		public native function size():Int64;
@@ -982,6 +1066,19 @@ package godot {
 	[Operator(op=">=", right="GodotArray", returns="Boolean")]
 	[Operator(op="+", right="GodotArray", returns="GodotArray")]
 	[Indexed(element="*")]
+	[Constructor(args="")]
+	[Constructor(args="GodotArray")]
+	[Constructor(args="GodotArray,Int64,String,*")]
+	[Constructor(args="PackedByteArray")]
+	[Constructor(args="PackedInt32Array")]
+	[Constructor(args="PackedInt64Array")]
+	[Constructor(args="PackedFloat32Array")]
+	[Constructor(args="PackedFloat64Array")]
+	[Constructor(args="PackedStringArray")]
+	[Constructor(args="PackedVector2Array")]
+	[Constructor(args="PackedVector3Array")]
+	[Constructor(args="PackedColorArray")]
+	[Constructor(args="PackedVector4Array")]
 	public final native class GodotArray {
 		public native function GodotArray(base:* = null, type:Int64 = 0, className:String = null, script:* = null);
 		public native function size():Int64;
@@ -1039,6 +1136,9 @@ package godot {
 	[Operators]
 	[Operator(op="+", right="PackedByteArray", returns="PackedByteArray")]
 	[Indexed(element="Int64")]
+	[Constructor(args="")]
+	[Constructor(args="PackedByteArray")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedByteArray {
 		public native function PackedByteArray(from:* = null);
 		public native function get(index:Int64):Int64;
@@ -1114,6 +1214,9 @@ package godot {
 	[Operators]
 	[Operator(op="+", right="PackedInt32Array", returns="PackedInt32Array")]
 	[Indexed(element="int")]
+	[Constructor(args="")]
+	[Constructor(args="PackedInt32Array")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedInt32Array {
 		public native function PackedInt32Array(from:* = null);
 		public native function get(index:int):int;
@@ -1143,6 +1246,9 @@ package godot {
 	[Operators]
 	[Operator(op="+", right="PackedInt64Array", returns="PackedInt64Array")]
 	[Indexed(element="Int64")]
+	[Constructor(args="")]
+	[Constructor(args="PackedInt64Array")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedInt64Array {
 		public native function PackedInt64Array(from:* = null);
 		public native function get(index:Int64):Int64;
@@ -1172,6 +1278,9 @@ package godot {
 	[Operators]
 	[Operator(op="+", right="PackedFloat32Array", returns="PackedFloat32Array")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="PackedFloat32Array")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedFloat32Array {
 		public native function PackedFloat32Array(from:* = null);
 		public native function get(index:Int64):Number;
@@ -1201,6 +1310,9 @@ package godot {
 	[Operators]
 	[Operator(op="+", right="PackedFloat64Array", returns="PackedFloat64Array")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="PackedFloat64Array")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedFloat64Array {
 		public native function PackedFloat64Array(from:* = null);
 		public native function get(index:Int64):Number;
@@ -1230,6 +1342,9 @@ package godot {
 	[Operators]
 	[Operator(op="+", right="PackedStringArray", returns="PackedStringArray")]
 	[Indexed(element="String")]
+	[Constructor(args="")]
+	[Constructor(args="PackedStringArray")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedStringArray {
 		public native function PackedStringArray(from:* = null);
 		public native function get(index:Int64):String;
@@ -1260,6 +1375,9 @@ package godot {
 	[Operator(op="*", right="Transform2D", returns="PackedVector2Array")]
 	[Operator(op="+", right="PackedVector2Array", returns="PackedVector2Array")]
 	[Indexed(element="Vector2")]
+	[Constructor(args="")]
+	[Constructor(args="PackedVector2Array")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedVector2Array {
 		public native function PackedVector2Array(from:* = null);
 		public native function get(index:Int64):Vector2;
@@ -1290,6 +1408,9 @@ package godot {
 	[Operator(op="*", right="Transform3D", returns="PackedVector3Array")]
 	[Operator(op="+", right="PackedVector3Array", returns="PackedVector3Array")]
 	[Indexed(element="Vector3")]
+	[Constructor(args="")]
+	[Constructor(args="PackedVector3Array")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedVector3Array {
 		public native function PackedVector3Array(from:* = null);
 		public native function get(index:Int64):Vector3;
@@ -1319,6 +1440,9 @@ package godot {
 	[Operators]
 	[Operator(op="+", right="PackedColorArray", returns="PackedColorArray")]
 	[Indexed(element="Color")]
+	[Constructor(args="")]
+	[Constructor(args="PackedColorArray")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedColorArray {
 		public native function PackedColorArray(from:* = null);
 		public native function get(index:Int64):Color;
@@ -1348,6 +1472,9 @@ package godot {
 	[Operators]
 	[Operator(op="+", right="PackedVector4Array", returns="PackedVector4Array")]
 	[Indexed(element="Vector4")]
+	[Constructor(args="")]
+	[Constructor(args="PackedVector4Array")]
+	[Constructor(args="GodotArray")]
 	public final native class PackedVector4Array {
 		public native function PackedVector4Array(from:* = null);
 		public native function get(index:Int64):Vector4;

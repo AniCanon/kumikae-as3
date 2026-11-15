@@ -70,6 +70,23 @@ auto Typer::described(const Type *p_type) -> const Described * {
 				result.element = type;
 				result.keyed = keyed == "true";
 			}
+		} else if (tag.name == "Constructor") {
+			std::vector<const Type *> form;
+			std::string_view args;
+			for (const MetadataArg &argument : tag.args) {
+				args = argument.key == "args" ? argument.value : args;
+			}
+			bool known = true;
+			for (size_t start = 0; !args.empty() && start <= args.size();) {
+				size_t comma = args.find(',', start);
+				const Type *type = tag_type(symbol, tag, args.substr(start, comma == std::string_view::npos ? std::string_view::npos : comma - start));
+				known = known && type;
+				form.push_back(type);
+				start = comma == std::string_view::npos ? args.size() + 1 : comma + 1;
+			}
+			if (known) {
+				result.forms.push_back(std::move(form));
+			}
 		} else if (tag.name == "Operators") {
 			result.complete = true;
 		} else if (tag.name == "Operator") {
@@ -182,6 +199,35 @@ const Type *Typer::described_binary(TokenKind p_op, Expr *p_left, Expr *p_right,
 	error(p_offset, "can't use " + quoted(op) + " on " + quoted(compilation_.type_name(left)) + " and " +
 							quoted(compilation_.type_name(right)));
 	return unknown_;
+}
+
+void Typer::constructor_form(const Type *p_instance, const List<Expr *> &p_arguments, uint32_t p_offset) {
+	const Described *rules = described(p_instance);
+	if (!rules || rules->forms.empty()) {
+		return;
+	}
+	std::vector<Expr *> arguments(p_arguments.begin(), p_arguments.end());
+	for (Expr *argument : arguments) {
+		if (!argument->type || argument->type->kind == Type::Unknown) {
+			return; // Already reported.
+		}
+	}
+	for (const std::vector<const Type *> &form : rules->forms) {
+		bool takes = form.size() == arguments.size();
+		for (size_t i = 0; takes && i < form.size(); i++) {
+			bool exact = true;
+			takes = open_ended(arguments[i]->type) || operand_matches(arguments[i], arguments[i]->type, form[i], &exact);
+		}
+		if (takes) {
+			return;
+		}
+	}
+	std::string given;
+	for (Expr *argument : arguments) {
+		given += (given.empty() ? "" : ", ") + quoted(compilation_.type_name(argument->type));
+	}
+	error(p_offset, "no constructor of " + quoted(compilation_.type_name(p_instance)) + " takes " +
+							(given.empty() ? std::string("no arguments") : given));
 }
 
 const Type *Typer::described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset) {

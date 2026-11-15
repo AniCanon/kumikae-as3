@@ -2,6 +2,7 @@
 
 #include "json.h"
 
+#include <algorithm>
 #include <chrono>
 #include <string>
 
@@ -94,18 +95,36 @@ static void test_access() {
 	CHECK_EQ(write_json(Json((uint32_t)4000000000u)), std::string("4000000000"));
 }
 
-// A very wide object is read in time proportional to its size, and a key given twice keeps its last value.
-static void test_wide() {
+static std::string wide_object(int p_keys) {
 	std::string text = "{";
-	for (int i = 0; i < 200000; i++) {
+	for (int i = 0; i < p_keys; i++) {
 		text += (i ? ",\"k" : "\"k") + std::to_string(i) + "\":" + std::to_string(i);
 	}
-	text += ",\"k7\":-1}";
-	auto start = std::chrono::steady_clock::now();
+	return text + ",\"k7\":-1}";
+}
+
+// The best of three reads of the text, in seconds.
+static double read_time(const std::string &p_text) {
+	double best = 1e9;
+	for (int run = 0; run < 3; run++) {
+		auto start = std::chrono::steady_clock::now();
+		Json value;
+		CHECK(parse_json(p_text, &value));
+		best = std::min(best, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+	}
+	return best;
+}
+
+// A very wide object is read in time proportional to its size, and a key given twice keeps its last value.
+// Measured against itself, so that a busy machine slows both reads alike: four times the keys take far
+// less than the sixteen times a cost that grows with the square would.
+static void test_wide() {
+	const std::string text = wide_object(200000);
+	const double small = read_time(wide_object(50000));
+	const double large = read_time(text);
+	CHECK(large < small * 10 + 0.05);
 	Json value;
 	CHECK(parse_json(text, &value));
-	double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-	CHECK(seconds < 2.0);
 	CHECK_EQ(value.size(), (size_t)200001);
 	CHECK_EQ(value.get("k199999").integer(), (int64_t)199999);
 	CHECK_EQ(value.get("k7").integer(), (int64_t)-1);

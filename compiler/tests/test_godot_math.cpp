@@ -287,6 +287,16 @@ static void test_malformed_tags() {
 						"lib.as:3:50: error: a second [Operator] tag for '*' with 'int' on the right\n"));
 }
 
+// Godot's value types take only the forms of constructor Godot has, though AS3 sees one that merges them.
+static void test_constructor_forms() {
+	expect("new Vector3(); new Vector3(1, 2, 3); new Vector3(1.5, 2, 3); new Vector3(new Vector3()); new Vector3(any);"
+		   "new Vector3(new Vector3i()); new Vector2(1, 2); new Color(1, 0, 0, 0.5); new Color('red');",
+			{});
+	expect("new /*!*/Vector3(1, 2); new /*!*/Vector3('a', 1, 2); new /*!*/Vector2(new Vector3());",
+			{ "no constructor of 'Vector3' takes 'int', 'int'", "no constructor of 'Vector3' takes 'String', 'int', 'int'",
+					"no constructor of 'Vector2' takes 'Vector3'" });
+}
+
 static void test_indexing() {
 	types({
 			{ "points[0]", "Vector2" },
@@ -395,6 +405,7 @@ int main() {
 	test_tags_outside_declarations();
 	test_other_declarations();
 	test_malformed_tags();
+	test_constructor_forms();
 	test_indexing();
 	return check::finish();
 }

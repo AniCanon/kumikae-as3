@@ -70,6 +70,12 @@ class Fixture(unittest.TestCase):
             self.assertNotIn(" class %s " % name, self.text)
         self.assertNotIn("toUpper", self.text)
 
+    def test_constructor_forms(self):
+        # The merged constructor takes any of them; each form Godot has is written down, so that the
+        # checker can refuse a call that matches none.
+        self.assertIn('\t[Constructor(args="")]\n\t[Constructor(args="Vector2")]\n\t[Constructor(args="Number,Number")]\n',
+                      self.text)
+
     def test_constructor_only_when_instantiable(self):
         self.assertIn("public native function Node();", self.members("Node"))
         self.assertFalse([line for line in self.members("Texture2D") if "function Texture2D(" in line])

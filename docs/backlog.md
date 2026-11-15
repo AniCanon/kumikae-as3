@@ -39,7 +39,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
   holds its flags in 64. **clean-up**
 - The corpus prefix test loads Godot's API for one prefix in 293 only. **clean-up**
 - Loading Godot's API costs about 30 ms on every `kas3c check`. **clean-up**
-- The merged constructors accept calls no overload has: `new Vector3(1, 2)`. **clean-up**
 - **decision** 60 methods that take raw pointers are left out. AS3 has nothing to pass them, so the
   proposal is that this stands.
 
@@ -293,7 +292,6 @@ any Godot value passing as a condition):
   the vector is empty. **2d**
 - The interpreter converts a vector's index to a Number on every access. **clean-up**
 - Handing a vector to Godot copies its elements into a list first, then into Godot's array. **clean-up**
-- `test_json` times a large parse and fails when the machine is busy. **clean-up**
 - Not checked against Flash: `pop()` and `shift()` on an empty vector of numbers give 0; a negative length
   is an out-of-memory error, not a `RangeError`; setting a fixed vector's length to what it already is
   does nothing; `join(null)` puts the word "null" between the elements. **2c**
