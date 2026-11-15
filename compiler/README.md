@@ -247,8 +247,9 @@ package {
   `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
   gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.
 
-**Refused by name until the next slices:** elements of Godot's untyped collections, creating
-Godot objects with `new`, passing a script object to Godot, and everything `kas3c run` refuses.
+**Refused by name until the next slices:** elements of Godot's untyped collections, passing Godot a
+script object of a class that extends none of Godot's, `as` from one of Godot's objects to a script class,
+and everything `kas3c run` refuses.
 
 How it works:
 
@@ -266,7 +267,8 @@ How it works:
 
 Known fault, Godot's: the first time Godot's editor scans a project that has the extension and is told to
 quit at once (`godot --headless --import`, or `--editor --quit`), Godot crashes as it exits, after the scan
-has done its work. Loading an extension with a class makes the editor document it on a thread, which
+has done its work. The cause, read from Godot's source and borne out by experiments (Godot's binary has
+no symbols to show it in a trace): loading an extension with a class makes the editor document it on a thread, which
 queues a call (`EditorHelp::_gen_extensions_docs`); quitting in the same frame frees the documentation,
 and the call then runs on nothing in Godot's last flush. Any extension that registers a class does the
 same. Give the thread time (`--headless --editor --quit-after 300`), as `tests/run_godot.py` does; later

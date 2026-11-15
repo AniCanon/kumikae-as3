@@ -181,7 +181,9 @@ any Godot value passing as a condition):
 
 - **decision** **The first editor scan of a project with the extension crashes as Godot exits** when the
   editor is told to quit at once (`--editor --quit`, `--import`), after the scan has done its work. The
-  cause is Godot's: loading an extension that registers a class makes the editor document it on a thread,
+  cause, read from Godot's source and borne out by experiments (any one class does it, no class does not,
+  time to finish does not) but not seen in a symbolized trace, is Godot's: loading an extension that
+  registers a class makes the editor document it on a thread,
   which queues `EditorHelp::_gen_extensions_docs`; quitting in that frame frees the documentation first,
   and Godot's last flush of its queue then runs the call on nothing. Any extension with a class does it.
   `--quit-after` with time for the thread (the tests use it) is clean, as is every later run. Nothing in

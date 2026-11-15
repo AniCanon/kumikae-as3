@@ -106,6 +106,7 @@ package {
 
 		// Godot calling a method from one of its worker threads is refused: AS3 runs on the main thread.
 		private var total:int = 0;
+		public var shared:int = 1;
 		private var text:String = "";
 		public function race():int {
 			for (var i:int = 0; i < 64; i++) { WorkerThreadPool.addTask(spin); }

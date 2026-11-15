@@ -60,4 +60,18 @@ func _initialize() -> void:
 	show("saved after a change", stored(packed), ["items", "lives", "script", "spot"])
 
 	node.free()
+
+	# A subclass has what its base exports, with the base's first values, and its own.
+	var more := Node2D.new()
+	more.set_script(load("res://MoreExported.as"))
+	var subclass: Script = more.get_script()
+	var listed := []
+	for property in subclass.get_script_property_list():
+		if property["usage"] & PROPERTY_USAGE_EDITOR:
+			listed.append(property["name"])
+	show("a subclass's exports", [listed.has("speed"), listed.has("extra"), subclass.get_property_default_value("speed"),
+			subclass.get_property_default_value("extra")], [true, true, 5.0, 2])
+	more.set("speed", 1.5)
+	show("a subclass's methods", [more.has_method("describe"), more.call("sum")], [true, 3.5])
+	more.free()
 	quit()

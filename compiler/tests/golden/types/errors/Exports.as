@@ -39,6 +39,12 @@ package {
 		[Export] public var fresh:Resource = new Resource();
 		[Export] public var moved:Vector2 = new Vector2(speed, 1);
 		[Export] public var unset:Number;
+		[Export] public var onOff:Boolean = 1;
+		[Export] public var worded:Boolean = "x";
+		[Export] public var nothing:int = null;
+		[Export] public var numbered:String = 5;
+		[Export] public var flagged:Number = true;
+		[Export] public var noText:String = null;
 	}
 }
 

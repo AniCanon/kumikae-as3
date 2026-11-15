@@ -71,6 +71,8 @@ static void test_time_limit() {
 							   "  public function forever():void { while (true) {} }\n"
 							   "  public function loops():void { for (var i:int = 0; ; i++) { n = i; } }\n"
 							   "  public function down():void { do { n++; } while (true); }\n"
+							   "  public function counting():void { for (var i:int = 0; ; i++) {} }\n"
+							   "  public function empty():void { for (var j:int = 0; j >= 0; ) ; }\n"
 							   "  public function skipping():void { while (true) { if (n > 0) continue; n++; } }\n"
 							   "  public function caught():String { while (true) { try { for (;;) {} } catch (e:*) { n++; } finally { n++; } } return \"out\"; }\n"
 							   "  public function quick():int { var s:int = 0; for (var i:int = 0; i < 1000; i++) { s += i; } return s; }\n"
@@ -89,7 +91,7 @@ static void test_time_limit() {
 		interpreter.set_time_limit(50);
 		CHECK(interpreter.start());
 		vm::Object *object = interpreter.construct(spin);
-		for (const char *method : { "forever", "loops", "down", "skipping", "caught" }) {
+		for (const char *method : { "forever", "loops", "down", "counting", "empty", "skipping", "caught" }) {
 			host.errors.clear();
 			const auto started = std::chrono::steady_clock::now();
 			vm::Slot result;

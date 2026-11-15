@@ -33,6 +33,9 @@ called by the engine.
 - **Every behaviour is compared with GDScript's** in `tests/godot_project/`: the driver prints what the AS3
   script gave beside what GDScript gives, and `tests/run_godot.py` checks they agree.
 - An Array or a Dictionary handed to Godot may be written by it: never hand the same one to two calls.
+- Godot reaches a script's members by name only through `members.h` (`find_member`), so that get, set,
+  calls and the lists agree. Every place that runs AS3 on a script object for Godot calls
+  `hold_if_referenced` after it (`instance.h`): that is how a reference-counted object learns AS3 holds it.
 
 Build and test: `cmake --build compiler/build-godot -j8 && python3 compiler/tests/run_godot.py compiler/tests`
 (needs `godot` 4.7 on the `PATH`). iOS: `tests/build_ios.sh`.

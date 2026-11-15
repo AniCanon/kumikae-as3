@@ -206,8 +206,10 @@ output = compare("statics.gd", [
     "from angle", "hsv", "html", "euler", "image", "after orphans",
     "unset", "unset tint", "unset spot", "unset list", "cleared local",
     "declared twice", "declared twice, value first", "declared twice, other order", "declaration skipped",
-    "field read early", "static read early", "race",
+    "field read early", "static read early", "race", "a field from another thread is refused",
 ])
+check("statics.gd: a field asked for from another thread is refused and says so",
+      output.count("Godot asked for the field 'shared' from another thread") == 2, output[-900:])
 check("statics.gd: an error's source is where it was thrown, whatever its message says",
       re.search(r"at: Statics/fakeTrace\(\) \(res://Statics\.as:\d+\)", output) is not None and "at: fake()" not in output, output[-1500:])
 check("statics.gd: Godot says nothing of an editor-only singleton", "Can't retrieve singleton" not in output, output[-900:])
@@ -303,7 +305,7 @@ compare("members.gd", [
 compare("exported.gd", [
     "the scene's values", "shown in the inspector", "stored and shown", "a resource's hint", "first values",
     "one of Godot's values made from numbers", "a field that is not exported has none", "a node's hint", "saved again",
-    "a resource and a node let go",
+    "a resource and a node let go", "a subclass's exports", "a subclass's methods",
     "saved after a change",
 ])
 run = subprocess.run([godot, "--headless", "--editor", "--path", project, "-s", "exported_editor.gd"], capture_output=True, text=True,

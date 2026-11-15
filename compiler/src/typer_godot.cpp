@@ -412,6 +412,10 @@ void Typer::export_field(VarDecl *p_decl) {
 		if (first && (!export_constant(first) || (first->kind == NodeKind::New && !godot_value(first->type)))) {
 			error(first->offset, std::string("an [Export] field's first value is a constant, which Godot's inspector is told: a ") +
 					"number, String, Boolean, null, or one of Godot's values made from numbers");
+		} else if (first && ((type == boolean_ && first->kind != NodeKind::BoolLit) || (numeric(type) && first->kind == NodeKind::NullLit))) {
+			// Anything fits a Boolean and null fits a number, but Godot is told the constant as it is written.
+			error(first->offset, quoted(declarator.name) + " is an [Export] field, so its first value is written as its type: " +
+					(type == boolean_ ? "true or false" : "a number"));
 		}
 	}
 }
