@@ -227,16 +227,22 @@ class Completer {
 		}
 	}
 
-	// After a dot: what the value before it has. If what comes before is not a value (its first name
-	// means nothing here), it may be a package's path.
+	// After a dot: what the value before it has, when its type is known (`godot.Vector2.` is a class).
+	// Otherwise, if its first name means nothing here, it may be a package's path; if it does, it is a
+	// value of a type not known.
 	void offer_after_dot(uint32_t p_dot) {
 		const Member *member = member_after(p_dot);
 		const Expr *root = member ? member->object : nullptr;
 		while (root && root->kind == NodeKind::Member) {
 			root = static_cast<const Member *>(root)->object;
 		}
+		const Type *type = member ? member->object->type : nullptr;
+		if (type && type->kind != Type::Unknown) {
+			offer_of_type(type);
+			return;
+		}
 		if (root && !(root->kind == NodeKind::Name && !static_cast<const Name *>(root)->symbol)) {
-			offer_of_type(member->object->type);
+			offer_of_type(type);
 			return;
 		}
 		uint32_t begin = p_dot;

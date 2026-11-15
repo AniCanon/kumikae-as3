@@ -188,6 +188,9 @@ static void test_completion_scopes_and_context() {
 	// Where a type is written, its types only, however the file goes on.
 	Offered typed_path = complete(player("var d:flash.utils.|\nposition.x;"));
 	CHECK(typed_path.has("Dictionary") && !typed_path.has("getTimer") && !typed_path.has("x"));
+	// A class written with its package is a class: what it has, not a package's contents.
+	CHECK(complete(player("godot.Vector2.|")).has("ZERO"));
+	CHECK(complete(player("godot.Vector2.ZERO.|")).has("x"));
 	// A dot after something that is not a name is not a package's path, the top-level package included.
 	CHECK(complete(player("{ var a:int; }.|")).items.empty());
 	CHECK(complete(player("missing..|")).items.empty());
