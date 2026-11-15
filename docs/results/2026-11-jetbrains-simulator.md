@@ -1104,3 +1104,30 @@ No `runIde` command was executed. The exact
 under `docs/superpowers/`; none are staged or committed. Items 1 and 2 remain done
 as recorded in the preceding section; item 3 is partly done, items 4–6 are done,
 and items 7 and 8 are partly done with the limits stated above.
+
+## 2026-11-15: whole-IDE memory probe, run
+
+Run once, in a sandbox Rider started for it alone, with
+`KUMIKAE_SIMULATOR_MEMORY_PROBE=1 ./gradlew --offline --no-daemon runIde -PuiProbe` (JDK 25, the cached
+dependencies, `-Pkas3Root` set). Result: `passed`, `BUILD SUCCESSFUL in 10m 25s`. The production panel
+was mounted with synthetic frames for ten minutes; no Simulator was used and no input was sent.
+
+| Sample | Frames produced | Painted | Images held | Heap after collection |
+|---|---:|---:|---:|---:|
+| Start | 0 | 0 | 0 | 140.8 MiB |
+| Minute 1 | 3,141 | 3,139 | 2 | 175.3 MiB |
+| Minutes 2–9 | 6,260–28,224 | 6,236–28,150 | 2 | 142.1–145.1 MiB |
+| Minute 10 | 31,350 | 31,259 | 2 | 180.5 MiB |
+| Hidden | 31,352 | 31,261 | 0 | 150.8 MiB |
+| Disposed | 31,352 | 31,261 | 0 | 150.6 MiB |
+
+- From minute 2 to minute 9 the live objects in the heap histogram total 138.8 and 139.0 MiB: no growth
+  while frames stream.
+- The rise at minute 10 is mostly Kotlin reflection metadata (`ProtoBuf$Type`, `SmallSortedMap`) and
+  general collections, not images or panel objects; the heap falls back once the stream is hidden. Its
+  cause was not pinned down. Minute 1 is the IDE still settling.
+- After disposal the histogram still lists the panel's controller and screen. The probe itself holds
+  them: they are local variables of the probe's own function when that sample is taken. This was read
+  from the probe's code, not measured with a heap dump.
+- Not measured: a real Simulator's frames in the IDE over ten minutes, and memory across a reboot or
+  rotation.
