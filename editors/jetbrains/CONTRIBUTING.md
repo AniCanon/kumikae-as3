@@ -78,3 +78,13 @@ and look at the pictures in `build/reports/ui/`. Text that is cut off,
 controls that overlap and unreadable colours are defects.
 
 For other languages and documentation, follow the repository's own guides.
+
+The sandbox probe also uses the installed AS3 editor handlers for pairing and indentation, then opens
+a temporary project to exercise native LSP lookup and Tab/Enter acceptance. `language.txt`,
+`typing-times.txt`, `completion-*.txt` and `completion-heap.txt` accompany the light/dark PNGs. Timings
+include IDE scheduling; retained heap samples include the whole IDE and are not a leak proof. The
+probe plugin is excluded from the distributable ZIP.
+
+The native lookup probe supplies an activation event to its sandbox frame when launched in the
+background; it does not steal desktop focus or test OS activation. It trusts only its generated
+fixture path and restores the sandbox's trust settings when finished.

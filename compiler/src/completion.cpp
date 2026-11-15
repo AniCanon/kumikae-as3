@@ -1,5 +1,4 @@
 // What could be written at a place in a file: the language server's completion.
-#include "ast_walk.h"
 #include "query.h"
 
 #include <algorithm>
@@ -24,10 +23,6 @@ constexpr std::string_view IN_FILE[] = {
 	"const", "final", "dynamic",
 };
 
-bool is_word(char p_char) {
-	return std::isalnum((unsigned char)p_char) || p_char == '_' || p_char == '$';
-}
-
 bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix) {
 	if (p_name.size() < p_prefix.size()) {
 		return false;
@@ -38,49 +33,6 @@ bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix) {
 		}
 	}
 	return true;
-}
-
-// Whether the offset is inside a comment, a string or a regular expression's text: found by reading
-// the file from its start, since nothing else says where one began.
-bool in_text_or_comment(std::string_view p_source, uint32_t p_offset) {
-	enum { Code, Line, Block, Quoted } state = Code;
-	char quote = 0;
-	for (uint32_t i = 0; i < p_offset && i < p_source.size(); i++) {
-		const char here = p_source[i];
-		const char next = i + 1 < p_source.size() ? p_source[i + 1] : 0;
-		switch (state) {
-			case Code:
-				if (here == '/' && next == '/') {
-					state = Line;
-				} else if (here == '/' && next == '*') {
-					state = Block;
-					i++;
-				} else if (here == '"' || here == '\'') {
-					state = Quoted;
-					quote = here;
-				}
-				break;
-			case Line:
-				if (here == '\n') {
-					state = Code;
-				}
-				break;
-			case Block:
-				if (here == '*' && next == '/') {
-					state = Code;
-					i++;
-				}
-				break;
-			case Quoted:
-				if (here == '\\') {
-					i++;
-				} else if (here == quote || here == '\n') {
-					state = Code;
-				}
-				break;
-		}
-	}
-	return state != Code;
 }
 
 } // namespace
@@ -105,12 +57,7 @@ class Completer {
 				!seen_.insert(p_symbol->name).second) {
 			return;
 		}
-		Completion item;
-		item.name = std::string(p_symbol->name);
-		item.kind = p_symbol->kind;
-		item.is_const = p_symbol->is_const;
-		item.detail = queries_.describe(p_symbol);
-		found_.push_back(std::move(item));
+		found_.push_back(queries_.completion_item(p_symbol));
 	}
 
 	template <size_t N>
@@ -197,7 +144,10 @@ class Completer {
 	// is offered is exactly what would resolve.
 	void offer_definitions(bool p_types_only) {
 		Unit &unit = const_cast<Unit &>(unit_);
-		const Context context = class_ ? compilation_.context_of(class_) : compilation_.context_of(unit, true);
+		Context context = class_ ? compilation_.context_of(class_) : compilation_.context_of(unit, true);
+		if (const LocalScope *scope = queries_.local_scope_at(unit_, offset_)) {
+			context.imports = const_cast<ImportScope *>(&scope->imports);
+		}
 		std::vector<Symbol *> sorted;
 		std::unordered_set<const Package *> packages;
 		auto take = [&](Symbol *p_symbol) {
@@ -223,21 +173,66 @@ class Completer {
 		}
 	}
 
-	void offer_locals() {
-		if (!function_) {
-			return;
+	bool offer_import() {
+		uint32_t begin = start_;
+		while (begin > 0 && (is_identifier_at(source_, begin - 1) || source_[begin - 1] == '.')) {
+			--begin;
 		}
-		for (const Occurrence &item : queries_.occurrences(unit_)) {
-			const bool local = item.symbol->kind == SymbolKind::Local || item.symbol->kind == SymbolKind::Parameter ||
-					item.symbol->kind == SymbolKind::LocalFunction || item.symbol->kind == SymbolKind::CatchVariable;
-			if (item.is_declaration && local && item.offset >= function_->offset && item.offset < function_->end) {
-				offer(item.symbol);
+		uint32_t keyword_end = begin;
+		while (keyword_end > 0 && std::isspace(static_cast<unsigned char>(source_[keyword_end - 1]))) {
+			--keyword_end;
+		}
+		if (word_before(keyword_end) != "import") {
+			return false;
+		}
+		const std::string path(source_.substr(begin, start_ - begin));
+		const Context context = compilation_.context_of(const_cast<Unit &>(unit_), true);
+		std::unordered_set<const Package *> seen;
+		for (Unit &unit : compilation_.units()) {
+			if (!unit.package || !seen.insert(unit.package).second) {
+				continue;
+			}
+			const std::string qualified = unit.package->name + ".";
+			if (qualified == path) {
+				std::vector<Symbol *> sorted;
+				for (const auto &[name, symbol] : unit.package->definitions) {
+					if (compilation_.visible(symbol, context)) {
+						sorted.push_back(symbol);
+					}
+				}
+				std::sort(sorted.begin(), sorted.end(), [](const Symbol *p_a, const Symbol *p_b) { return p_a->name < p_b->name; });
+				for (Symbol *symbol : sorted) {
+					offer(symbol);
+				}
+			} else if (qualified.compare(0, path.size(), path) == 0) {
+				const std::string_view name = std::string_view(unit.package->name).substr(path.size(), qualified.find('.', path.size()) - path.size());
+				if (!name.empty() && starts_with_any_case(name, prefix_) && seen_.insert(name).second) {
+					Completion item;
+					item.name = std::string(name);
+					item.is_package = true;
+					found_.push_back(std::move(item));
+				}
+			}
+		}
+		return true;
+	}
+
+	void offer_locals() {
+		const LocalScope *scope = queries_.local_scope_at(unit_, offset_);
+		for (; scope; scope = scope->parent) {
+			std::vector<Symbol *> sorted;
+			for (const auto &[name, symbol] : scope->names) {
+				sorted.push_back(symbol);
+			}
+			std::sort(sorted.begin(), sorted.end(), [](const Symbol *p_a, const Symbol *p_b) { return p_a->name < p_b->name; });
+			for (Symbol *symbol : sorted) {
+				offer(symbol);
 			}
 		}
 	}
 
 	void find_enclosing() {
-		walk(unit_.tree, [&](Node *p_node) {
+		std::for_each(queries_.context_nodes(unit_).begin(), queries_.context_nodes(unit_).end(), [&](Node *p_node) {
 			if (p_node->offset > offset_ || p_node->end < offset_) {
 				return;
 			}
@@ -256,7 +251,7 @@ class Completer {
 	// The `a.b` whose dot is at p_dot: of the names written after that dot, the first.
 	Member *member_after(uint32_t p_dot) {
 		Member *found = nullptr;
-		walk(unit_.tree, [&](Node *p_node) {
+		std::for_each(queries_.context_nodes(unit_).begin(), queries_.context_nodes(unit_).end(), [&](Node *p_node) {
 			if (p_node->kind == NodeKind::Member) {
 				Member *member = static_cast<Member *>(p_node);
 				if (member->name_offset > p_dot && (!found || member->name_offset < found->name_offset)) {
@@ -278,7 +273,7 @@ class Completer {
 
 	std::string_view word_before(uint32_t p_end) const {
 		uint32_t begin = p_end;
-		while (begin > 0 && is_word(source_[begin - 1])) {
+		while (begin > 0 && is_identifier_at(source_, begin - 1)) {
 			begin--;
 		}
 		return source_.substr(begin, p_end - begin);
@@ -317,15 +312,18 @@ public:
 			queries_(p_queries), compilation_(p_compilation), unit_(p_unit), source_(p_unit.source.text()), offset_(p_offset) {}
 
 	std::vector<Completion> run() {
-		if (offset_ > source_.size() || in_text_or_comment(source_, offset_)) {
+		if (offset_ > source_.size() || queries_.in_text(unit_, offset_)) {
 			return {};
 		}
 		start_ = offset_;
-		while (start_ > 0 && is_word(source_[start_ - 1])) {
+		while (start_ > 0 && is_identifier_at(source_, start_ - 1)) {
 			start_--;
 		}
 		prefix_ = source_.substr(start_, offset_ - start_);
 		find_enclosing();
+		if (offer_import()) {
+			return std::move(found_);
+		}
 		const uint32_t end = before();
 		if (end > 0 && source_[end - 1] == '.') {
 			if (Member *member = member_after(end - 1); member && member->object && !member->symbol) {

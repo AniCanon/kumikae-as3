@@ -12,7 +12,7 @@ off, see the [backlog](backlog.md): those items are owed, not dropped.
 about 190,000 lines of real AS3. The compiler knows Godot's whole API under AS3 names, including arithmetic
 on its math types, and reports its errors to an editor through a language server. The front end is
 complete. The language server's first slice is built and passes its tests; it works in VS Code and is
-not yet tried in Rider.
+validated in the Rider sandbox; see [completion results](results/2026-11-completion.md).
 
 **Stage 2 is under way: five of its nine slices are built; the fifth is in its last review.** `kas3c run` executes AS3 on the command line
 (classes, inheritance, numbers, strings, loops). In headless Godot 4.7.2 an AS3 script attached to a
@@ -82,12 +82,12 @@ locals, classes, imports, inherited members and Godot's API.
 | Speed: a re-check of 100,000 lines in under 50 ms | Done: about 27 ms, by keeping the parse of files that did not change. |
 | A VS Code client and the [set-up guide](../editors/README.md) | Done. |
 | Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. The owner confirmed the underlined errors by eye. |
-| Tried in Rider | The LSP4IJ plugin is installed in Rider 2026.2. Adding the server in its settings is not yet tried. |
+| Tried in Rider | Native plugin completion and typing validated in the pinned sandbox on 2026-11-15; see [results](results/2026-11-completion.md). Full manual editor acceptance remains pending. |
 | Windows | Not yet: the server runs on macOS and Linux only. To do before the slice is called done. |
 
 **Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
-stage faster to build. The owner left the order to the builder. Completion follows in a second slice; the
-JetBrains plugin and Godot's documentation in hover stay in stage 6.
+stage faster to build. The owner left the order to the builder. Completion and the native JetBrains
+plugin were brought forward; remaining editor work and Godot's documentation in hover stay in stage 6.
 
 Read more: language server design (`docs/superpowers/specs/2026-11-12-language-server-design.md`),
 [how the server works](../compiler/README.md#language-server).
@@ -156,6 +156,11 @@ desktop and for the iOS Simulator (export, build, install, launch); and a panel 
 through a native helper, at about 60 frames a second with live touch, rotation and text in any script
 (measured by its builder; results in `docs/results/2026-11-jetbrains-simulator.md`). No debugger yet.
 
+Completion improvements are described in the [editor guide](../editors/completion.md): native paired
+typing, lexical scopes, import paths, replacement edits, callable snippets and signature help. The
+[results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
+complete stage 6 or add Windows support.
+
 Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 ### Later, designed separately
@@ -212,8 +217,8 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) gives every deferred item a stage:** none left in 2b-3, 17 in 2c, 9 in the
-  language server's second slice, 14 in 2d, 37 in a clean-up pass that closes stage 2, and 5 that wait on
+- **The [backlog](backlog.md) gives every deferred item a stage:** none left in 2b-3, 22 in 2c, 13 in the
+  language server's second slice, 21 in 2d, 50 in a clean-up pass that closes stage 2, and 8 that wait on
   the owner.
 - **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
   waits for the cycle collector (2d).

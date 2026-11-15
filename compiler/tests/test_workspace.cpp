@@ -275,7 +275,36 @@ static void test_godot() {
 	fs::remove_all(support);
 }
 
+static void test_completion_cache_lifetime() {
+	Workspace::Options options;
+	options.godot = false;
+	Workspace workspace(options);
+	const std::string path = "/work/Main.as";
+	const std::string head = "package { class Main { var current:";
+	for (int generation = 0; generation < 40; ++generation) {
+		const std::string type = generation % 2 ? "String" : "int";
+		const std::string source = head + type + "; function run():void { cur } } }";
+		workspace.open(path, source);
+		Unit *unit = workspace.unit(path);
+		Queries &queries = workspace.queries();
+		CHECK_EQ(queries.cached_completion_items(), size_t{0});
+		CHECK_EQ(queries.cached_context_units(), size_t{0});
+		const auto caret = static_cast<uint32_t>(source.find("cur }") + 3);
+		for (int request = 0; request < 100; ++request) {
+			const auto items = queries.complete(*unit, caret);
+			CHECK_EQ(items.size(), size_t{1});
+			CHECK_EQ(items.front().detail, "var current:" + type);
+			CHECK_EQ(queries.cached_completion_items(), size_t{1});
+			CHECK_EQ(queries.cached_context_units(), size_t{1});
+		}
+	}
+	workspace.close(path);
+	CHECK_EQ(workspace.queries().cached_completion_items(), size_t{0});
+	CHECK_EQ(workspace.queries().cached_context_units(), size_t{0});
+}
+
 int main() {
+	test_completion_cache_lifetime();
 	test_uri();
 	test_scan();
 	test_buffers();

@@ -20,11 +20,14 @@
                                implementationClass="app.anicanon.kumikae.as3.language.As3ParserDefinition"/>
         <gotoDeclarationHandler implementation="app.anicanon.kumikae.as3.language.As3GotoDeclaration"/>
         <lang.commenter language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.language.As3Commenter"/>
+        <enterHandlerDelegate implementation="app.anicanon.kumikae.as3.language.As3EnterHandler"/>
+        <lineIndentProvider implementation="app.anicanon.kumikae.as3.language.As3LineIndentProvider" order="first"/>
+        <lang.quoteHandler language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.language.As3QuoteHandler"/>
         <lang.braceMatcher language="KumikaeAS3"
                            implementationClass="app.anicanon.kumikae.as3.language.As3BraceMatcher"/>
         <!-- Colours still come from the grammar: the file type is ours, the highlighter is TextMate's. -->
         <editorHighlighterProvider filetype="ActionScript 3"
-                                   implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateEditorHighlighterProvider"/>
+                                   implementationClass="app.anicanon.kumikae.as3.language.As3EditorHighlighterProvider"/>
         <lang.syntaxHighlighterFactory language="KumikaeAS3"
                                        implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
         <treeStructureProvider implementation="app.anicanon.kumikae.as3.project.GameProjectView"/>

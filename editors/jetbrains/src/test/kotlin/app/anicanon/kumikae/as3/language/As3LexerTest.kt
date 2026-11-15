@@ -13,7 +13,15 @@ class As3LexerTest {
             assertEquals(covered, lexer.tokenStart, "tokens leave no gap")
             out += "${lexer.tokenType}:${text.substring(lexer.tokenStart, lexer.tokenEnd)}"
             covered = lexer.tokenEnd
+            val restart = As3Lexer()
+            restart.start(text, lexer.tokenStart, text.length, lexer.state)
+            assertEquals(lexer.tokenType, restart.tokenType, "restart keeps token kind")
+            assertEquals(lexer.tokenEnd, restart.tokenEnd, "restart keeps token boundary")
             lexer.advance()
+            restart.advance()
+            assertEquals(lexer.tokenType, restart.tokenType, "restart keeps next token")
+            assertEquals(lexer.state, restart.state, "restart keeps next state")
+            assertEquals(lexer.tokenEnd, restart.tokenEnd, "restart keeps next boundary")
         }
         assertEquals(text.length, covered, "tokens reach the end")
         return out.filterNot { it.startsWith("WHITE_SPACE") }
@@ -51,6 +59,20 @@ class As3LexerTest {
             listOf("AS3_LBRACE:{", "AS3_LBRACKET:[", "AS3_LPAREN:(", "AS3_RPAREN:)", "AS3_RBRACKET:]", "AS3_RBRACE:}"),
             tokens("{[()]}"),
         )
+    }
+
+    @Test fun `regex punctuation stays inside one token while division remains code`() {
+        assertEquals(listOf("AS3_REGEX:/[(),.]/"), tokens("/[(),.]/"))
+        assertEquals(listOf("AS3_REGEX:/a\\/b/"), tokens("/a\\/b/"))
+        assertEquals(listOf("AS3_REGEX:/unfinished"), tokens("/unfinished"))
+        assertEquals(listOf("AS3_WORD:x", "AS3_SYMBOL:/", "AS3_WORD:y"), tokens("x / y"))
+    }
+
+    @Test fun `regex after a control condition stays a literal`() {
+        for (source in listOf("if (ready) /[()]/", "while (ready()) /[()]/", "for (;;) /[()]/")) {
+            assertEquals("AS3_REGEX:/[()]/", tokens(source).last())
+        }
+        assertEquals("AS3_WORD:y", tokens("call() / y").last())
     }
 
     @Test fun `an empty file has no tokens`() {
