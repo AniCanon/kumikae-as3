@@ -7,6 +7,10 @@ import com.intellij.util.PlatformUtils
 
 /** Each client is referenced from a separate class so either optional dependency may be absent. */
 internal object UiProbeLsp {
+    fun checkDiagnostics(project: Project) {
+        if (PlatformUtils.isRider()) UiProbeRiderDiagnostics.checkReceiveBoundary(project)
+    }
+
     fun canComplete(project: Project, editor: Editor): Boolean = if (PlatformUtils.isRider()) {
         !DumbService.getInstance(project).isDumb
     } else {

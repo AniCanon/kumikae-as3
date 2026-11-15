@@ -140,6 +140,8 @@ a general dependency graph for incremental checking.
 Document changes with old or duplicate versions are ignored with a log message. Diagnostic versions are
 sent when the client advertises support, including empty diagnostic lists for each newly checked clean
 version. If typing overtakes an earlier clear, the next clean version clears stale errors again.
+Rider receives diagnostic versions and ranges atomically with respect to document writes, so a reply
+cannot cache pre-edit offsets while a deletion is still in progress.
 A bounded lookahead batch cancels queued requests or rejects
 requests made obsolete by a newer document change before checking. Partial frames do not delay an
 already complete request. A check already running remains synchronous and cannot be interrupted.

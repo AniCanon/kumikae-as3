@@ -67,12 +67,10 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - **Manual editor acceptance remains pending.** Rider and free unified IDEA pass sandbox editing
   checks; a person still needs to accept the full editing and navigation workflow. Paired ten-minute
   AS3/plain-text probes retain all ten disposed projects and reproduce the `HighlightingPanel` warning.
-  Rapid whole-document shrinking also exposed stale diagnostic ranges: Rider logs an uncaught
-  `IndexOutOfBoundsException` from its diagnostic cache; LSP4IJ logs a caught invalid-range warning.
-  Diagnostic version negotiation does not establish rendering-time invalidation.
-  A native probe retry also displayed an Undo dialog and failed immediate override Undo; the previous
-  compiler control and a later fixed-compiler run passed all three cycles. That intermittent failure
-  remains unexplained and must not be treated as reliable native Undo coverage.
+  The Rider diagnostic receive race now has a read-action guard and shrink/burst regressions. The
+  intermittent probe Undo dialog was traced to asynchronous ignore-file generation; fixture setup
+  and exact-editor Undo targeting now isolate completion history. LSP4IJ's caught invalid-range warning
+  and the separate shrink-then-parameter-help sequence still need investigation.
   The exact GC root and platform resolution remain pending; see the
   [retention results](results/2026-11-completion-followup.md#ide-lifecycle-investigation). **LS-2**
 - **Windows runtime validation is pending.** Binary stdio, pipe readiness, UTF-8 filesystem paths, network

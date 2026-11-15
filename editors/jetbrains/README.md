@@ -11,6 +11,8 @@ records generated-edit acceptance and body-only checking. Its paired ten-minute 
 controls retain all ten disposed projects in the pinned sandbox; the exact GC root remains unverified.
 The background completion probe suppresses window-deactivation cancellation only in its sandbox JVM,
 restoring the previous setting on exit. It also dispatches those focus events during lookup checks.
+The probe also checks diagnostic clearing after rapid document shrink and repeated immediate Undo.
+It prepares project ignore files before opening and targets the exact editor when undoing a completion.
 Production focus behavior and manual editor acceptance remain separate from this automated coverage.
 
 | Checked | By | Result |

@@ -121,7 +121,7 @@ not establish a compiler crash. Rapid whole-document replacement also exposed st
 LSP4IJ catches an invalid-range exception and logs a warning; Rider logged an uncaught
 `IndexOutOfBoundsException` at SEVERE level in its native diagnostic cache after the document shrank.
 Version negotiation rejects mismatched publications but does not prove that every previously accepted
-diagnostic is invalidated before rendering. These client issues remain unresolved and tracked in LS-2;
+diagnostic is invalidated before rendering. The Rider receive race is addressed below; the LSP4IJ warning remains tracked in LS-2;
 passing completion assertions do not establish error-free diagnostic handling or leak-free IDE behavior.
 
 ## Final integration check
@@ -132,9 +132,9 @@ all 24 in 155.43 seconds. The separately rebuilt extension reports `godot: OK`. 
 run used the older extension binary and failed its Godot group; rebuilding the matching extension
 before rerunning CTest resolved that build-state error.
 
-The final artifact passes `check buildPlugin verifyPlugin`, all four sandbox configurations, and nine
+The artifact at that integration revision passes `check buildPlugin verifyPlugin`, all four sandbox configurations, and nine
 Python tests. JUnit reports 134 plugin passes with one opt-in skip, and 82 core passes with three opt-in
-skips. Both verifier endpoints report compatibility, four deprecated API uses and 26 experimental API
+skips. At that revision both verifier endpoints report compatibility, four deprecated API uses and 26 experimental API
 uses; there are no internal API usages. The opposite product's optional module is absent as intended.
 Packaged compiler/extension hashes match the integration builds. No sandbox `kas3c` process remained
 after the matrix, and the final light/dark images were inspected.
@@ -257,7 +257,7 @@ restarting it to load the new binary. The server initialized successfully, and s
 unchanged across the restart; previously inserted source is not rewritten.
 Logs and preserved reports use `snippet-*` in the ignored build
 directories. No new latency or retention measurement was made for this serialization fix. The earlier
-diagnostic-range, lifecycle and platform-coverage limits remain.
+LSP4IJ diagnostic-range, lifecycle and platform-coverage limits remain.
 
 Agy reviewed the fix delta from `7ccf5f1` and reported no actionable findings. It independently ran the
 style check and inspected the fail-first evidence, Release, engine, Gradle, Python and both IDE results.
@@ -299,7 +299,7 @@ engine runner reports `godot: OK`. Offline Gradle `check buildPlugin verifyPlugi
 plugin tests passed/one skipped and 82 core tests passed/three skipped; unchanged core results were
 reused. Python's nine tests pass. Final Rider and IDEA probes each pass three project cycles, including
 the first-selection and explicit template-exit checks. Light/dark panel images were inspected. Both
-verifier endpoints remain compatible with four deprecated and 26 experimental API usages. Packaged
+verifier endpoints at that language-template revision report four deprecated and 26 experimental API usages. Packaged
 compiler/extension hashes match the builds, and no probe classes are shipped.
 
 Agy's first review identified the probe's Undo sequencing and missing exit wait. Both were corrected.
@@ -308,7 +308,8 @@ the style check independently and inspected recorded tests. The final IDEA run c
 inspection; that passing result was verified separately.
 
 Logs and preserved reports use `language-*` under the ignored compiler and JetBrains build directories.
-The existing diagnostic-range, retention and platform-coverage limits remain unchanged.
+The later Rider receive-boundary fix addresses its diagnostic-range race. LSP4IJ range warnings,
+retention and platform coverage remain separate limitations.
 After the owner saved and approved a restart, the native-only manual Rider sandbox initialized the
 rebuilt server and reopened the scratch project. Saved AS3 files were unchanged across the restart.
 Automated acceptance above covers Rider and IDEA; the new templates were not exercised in VS Code's UI.
@@ -377,15 +378,14 @@ while sanitizer tests were running. It also reproduced the native stale-range ex
 is preserved as `diagnostic-clear-rider-timeout`; it is not counted as a passing three-cycle run.
 A retry completed its first cycle but displayed an Undo dialog and failed immediate override Undo in
 the second. The unchanged `f6027a6` compiler control then passed all three cycles, as did a fresh run
-with the fixed compiler. The cause of the intermittent Undo failure is unverified and remains in LS-2;
-neither passing run erases that observation. The final candidate's bundled compiler matches the build.
+with the fixed compiler. The later Undo investigation below identifies an unrelated project-setup command above completion
+in the native history; neither of these earlier passing runs established the cause. The final candidate's bundled compiler matches the build.
 The final IDEA/LSP4IJ run also passes all three project cycles. Light/dark panel images from both final
 runs were inspected. Logs and preserved reports use `diagnostic-clear-*` in the ignored build folders.
 The manual sandbox was restarted after the owner saved. Its two AS3 files remained byte-identical,
 and the new wire log shows an empty diagnostic list for the opened `Player.as` at version 0.
-The existing native diagnostic-range exception and LSP4IJ invalid-range warning remain separate
-unresolved issues. This protocol fix alone does not establish that either client invalidates every
-previously accepted range correctly.
+This protocol fix alone did not address native diagnostic ranges. The Rider receive-boundary fix
+below handles that race separately; the LSP4IJ invalid-range warning remains a separate limitation.
 
 An alternating comparison against the saved `f6027a6` executable used the existing completion benchmark
 with one capability added to initialization: `textDocument.publishDiagnostics.versionSupport: true`.
@@ -540,6 +540,77 @@ plain-text run has none. No `As3ProjectLanguageService` or `DeclarationRefresh` 
 post-close AS3 histogram. This does not exclude other plugin retention paths or identify the live root.
 Both runs emit the Problems View disposal warning on shutdown. Retention remains unresolved; the
 passing functional result is not a passing leak check.
+
+## Rider diagnostic ranges and immediate Undo
+
+Rider advances the synchronized document version and sends `didChange` from `beforeDocumentChange`,
+before the document text mutates. Its notification handler can accept the matching reply on the reader
+thread while that write is still in progress. Inspection of the installed SDK identified this path to
+caching old offsets under a new version. The native client descriptor now delegates diagnostic
+publication inside one read action, covering both version validation and cache insertion. It uses the
+public handler factory, checks project disposal inside the lock, and adds no cache, executor or queue.
+
+The receive-boundary probe failed first with “Diagnostic version validation and cache insertion can
+race a document write.” It passes with the guard. The real editor probe also verifies an undefined-name
+error appears, clears after an 80-line shrink and forty alternating long/short edits, and appears and
+clears again afterwards. These are rendered error checks, not just wire-message assertions.
+
+The captured Undo dialog said “Undo last operation?” The native history dump showed a global,
+unnamed `.idea/.gitignore` generation command, with a mention of the AS3 editor, above the correctly
+named completion command. Fixture setup now creates that ignore file before opening the project,
+preventing the asynchronous project-setup edit from entering the test's history. A second fail-first
+regression selected another editor before Undo: the old probe undid that editor and left completion
+inserted. All probe Undo calls now resolve the exact `TextEditor` for the editor under test. Local and
+global edits in the other tab remain unchanged. No production Undo handler or confirmation override
+was added; an unexpected dialog is cancelled and fails with its message and native command state.
+
+The first corrected Rider run passes three project cycles in 1m 26s, including six repetitions of
+each override per cycle, unrelated-editor Undo and the diagnostic stress. Its log has no native range
+exception or Undo dialog. The existing Problems View disposal warning remains. Reports are preserved
+under `build/reports/rider-range-undo-green`; fail-first logs and the captured Undo state remain in
+ignored build output.
+
+Offline `check buildPlugin verifyPlugin` passes in 42 seconds after replacing direct client construction
+with delegation to the superclass factory. The first verifier run correctly rejected the override-only
+constructor call; no verification rule was disabled. Plugin tests: 134 pass, one opt-in skip. Core:
+82 pass, three opt-in skips (unchanged task up to date). Python: 9 pass. Both installed endpoints are
+compatible, with five deprecated and 26 experimental usages. The added deprecation is the deliberate
+non-cancellable read action around the side-effecting cache publication. The ZIP contains no probe
+classes and its compiler matches the existing build.
+
+Agy independently reviewed the receive guard, captured native Undo history, fail-first regressions and
+updated guides. It found no actionable code defect and asked that historical verifier counts be
+clearly distinguished from the current five deprecated usages; those descriptions are now explicit.
+This was a read-only review of code, SDK bytecode and recorded checks, not a separate test execution.
+The final compatibility matrix was still running during review and is verified separately below.
+
+The final sequential compatibility matrix passes:
+
+| Task | Elapsed wall time | Result |
+|---|---:|---|
+| `runIdeaWithoutLsp4ij -PuiProbe` | 29.36 s | Missing-client guidance and local editing |
+| `runIdea -PuiProbe` | 50.15 s | Three semantic, diagnostic and Undo cycles |
+| `runIde -PuiProbe` | 61.04 s | Three native cycles with LSP4IJ installed |
+| `runRiderWithoutLsp4ij -PuiProbe` | 86.09 s | Three native cycles; startup log confirms LSP4IJ disabled |
+
+All tasks use `--offline`. The last task uses an ignored Gradle init script to set
+`intellijPlatform.sandboxContainer` to `build/range-undo-sandbox`, leaving the active manual sandbox
+alone. Its first fresh-config attempt timed out in the IDE's AI-promotion dialog, confirmed by a
+thread dump. The retry cloned an existing test sandbox configuration; because that also enabled
+LSP4IJ, that passing repeat is not counted as the disabled-client check. The final run explicitly
+disables the plugin and confirms its state in the startup log. No real IDE settings were changed.
+
+Neither final Rider run logs a native range exception or an unexpected Undo dialog. IDEA passes the
+rendered-error assertions but still logs 31 caught invalid-range warnings; that issue remains in
+LS-2. Rider still logs the existing Problems View disposal warning. Light/dark panel images from
+Rider and IDEA were inspected. Reports and logs are preserved under `build/reports/range-undo-*`
+and `build/range-undo-*`; the disabled-client final report is `range-undo-rider-disabled-final`.
+
+The first corrected Rider run records 21 native lookup samples per project. Excluding the first sample, warm medians
+are 98.00, 70.93 and 64.05 ms; p95 values are 178.22, 157.47 and 100.61 ms. Cold samples are 780.47,
+181.59 and 299.77 ms. These include IDE scheduling and the probe's 10 ms polling. The manual sandbox
+remained open; this is a responsiveness observation, not a controlled overhead comparison or a new
+memory-soak result. The compiler is unchanged by this correction.
 
 ## Remaining limits
 

@@ -3,12 +3,14 @@ package app.anicanon.kumikae.as3.panel
 import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.actionSystem.TypedAction
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.testFramework.LightVirtualFile
 
 /** Additional import edits and generated declarations must be one undoable editor action. */
 object UiProbeGeneratedCompletion {
@@ -23,24 +25,28 @@ object UiProbeGeneratedCompletion {
             "package { import godot.Vector2; public class CompletionProbe { public var point:Vector2; } }",
         )
         observations += "Auto-import and type replacement accepted together; Undo restored both"
-        checkEdit(
-            project,
-            editor,
-            "package { import godot.Node2D; public class CompletionProbe extends Node2D { override function _ph| } }",
-            "_physicsProcess",
-            "package { import godot.Node2D; public class CompletionProbe extends Node2D { " +
-                "public override function _physicsProcess(delta:Number):void { throw new Error(\"Not implemented\"); } } }",
-        )
-        checkEdit(
-            project,
-            editor,
-            "package { public class CompletionProbe { override function setProp| } }",
-            "setPropertyIsEnumerable",
-            "package { public class CompletionProbe { " +
-                "public override function setPropertyIsEnumerable(name:String, isEnum:Boolean = true):void { " +
-                "throw new Error(\"Not implemented\"); } } }",
-        )
+        repeat(6) {
+            checkEdit(
+                project,
+                editor,
+                "package { import godot.Node2D; public class CompletionProbe extends Node2D { override function _ph| } }",
+                "_physicsProcess",
+                "package { import godot.Node2D; public class CompletionProbe extends Node2D { " +
+                    "public override function _physicsProcess(delta:Number):void { throw new Error(\"Not implemented\"); } } }",
+            )
+            checkEdit(
+                project,
+                editor,
+                "package { public class CompletionProbe { override function setProp| } }",
+                "setPropertyIsEnumerable",
+                "package { public class CompletionProbe { " +
+                    "public override function setPropertyIsEnumerable(name:String, isEnum:Boolean = true):void { " +
+                    "throw new Error(\"Not implemented\"); } } }",
+            )
+        }
         observations += "Override declaration accepted; Undo restored partial declaration"
+        for (global in listOf(true, false)) checkUndoContext(project, editor, global)
+        observations += "Override Undo targets its editor even when another tab is selected"
     }
 
     private fun checkTyping(project: Project, editor: Editor) {
@@ -61,7 +67,14 @@ object UiProbeGeneratedCompletion {
         }
     }
 
-    private fun checkEdit(project: Project, editor: Editor, marked: String, name: String, expected: String) {
+    private fun checkEdit(
+        project: Project,
+        editor: Editor,
+        marked: String,
+        name: String,
+        expected: String,
+        beforeUndo: () -> Unit = {},
+    ) {
         val caret = marked.indexOf('|')
         val source = marked.replace("|", "")
         UiProbeCompletion.edt {
@@ -93,9 +106,44 @@ object UiProbeGeneratedCompletion {
                     "Generated $name caret is not at the body"
                 }
             }
-            UndoManager.getInstance(project).undo(FileEditorManager.getInstance(project).selectedEditor)
+            beforeUndo()
+            UiProbeUndo.undo(project, editor)
             check(editor.document.text == source) {
                 "Generated completion was not one undoable edit: ${editor.document.text}"
+            }
+        }
+    }
+
+    private fun checkUndoContext(project: Project, editor: Editor, global: Boolean) {
+        val control = LightVirtualFile("UndoControl.txt", "control")
+        val files = FileEditorManager.getInstance(project)
+        val sourceFile = checkNotNull(FileDocumentManager.getInstance().getFile(editor.document))
+        var controlEditor: Editor? = null
+        try {
+            checkEdit(
+                project,
+                editor,
+                "package { public class CompletionProbe { override function setProp| } }",
+                "setPropertyIsEnumerable",
+                "package { public class CompletionProbe { " +
+                    "public override function setPropertyIsEnumerable(name:String, isEnum:Boolean = true):void { " +
+                    "throw new Error(\"Not implemented\"); } } }",
+            ) {
+                files.openFile(control, true)
+                controlEditor = checkNotNull(files.selectedTextEditor)
+                check(controlEditor !== editor) { "The unrelated editor was not selected" }
+                WriteCommandAction.runWriteCommandAction(project) {
+                    checkNotNull(controlEditor).document.setText("control changed")
+                    if (global) CommandProcessor.getInstance().markCurrentCommandAsGlobal(project)
+                }
+            }
+            UiProbeCompletion.edt {
+                check(controlEditor?.document?.text == "control changed") { "Undo changed the unrelated editor" }
+            }
+        } finally {
+            UiProbeCompletion.edt {
+                files.closeFile(control)
+                files.openFile(sourceFile, true)
             }
         }
     }

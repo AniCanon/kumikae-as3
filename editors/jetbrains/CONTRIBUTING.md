@@ -104,6 +104,14 @@ ten-minute runs retain all ten disposed projects; see the
 declarations are accepted and undone atomically. Generated-edit checks compare the whole document's
 non-whitespace text, including closing braces, and check the final caret before the throwing body.
 Both a Godot method and the built-in `setPropertyIsEnumerable` override are covered in each client.
+Generated overrides repeat six times each. Undo resolves the exact `TextEditor` under test, including
+when another tab with a local or global edit is selected. Temporary projects contain `.idea/.gitignore`
+before opening: Rider's asynchronous creation of that file otherwise inserts a global command above
+the completion in Undo history. The probe neither clears history nor suppresses confirmation. An
+unexpected Undo dialog is captured, cancelled and fails the check with its message and command state.
+`UiProbeRiderDiagnostics` checks read access at the installed native descriptor's receive boundary.
+`UiProbeDiagnostics` checks actual error highlights before and after an 80-line shrink and forty rapid
+replacements, then verifies errors can appear and clear again.
 `UiProbeStatementCompletion` checks seven language blocks, immediate insertion Undo, navigation through
 all tab stops and the final caret, and mirrored catch-name editing. Rider exposes the snippet as its
 lookup string; LSP4IJ exposes the item label. The probe matches either representation. Undo after Tab

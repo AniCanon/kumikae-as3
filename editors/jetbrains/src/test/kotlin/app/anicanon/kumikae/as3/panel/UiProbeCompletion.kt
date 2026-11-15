@@ -15,7 +15,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbService
@@ -81,6 +80,9 @@ object UiProbeCompletion {
         val trust = TrustedPathsSettings.getInstance()
         val trustedPaths = trust.getTrustedPaths().toList()
         try {
+            // Prevent asynchronous IDE ignore-file generation from entering the editor's Undo history.
+            Files.createDirectories(folder.resolve(".idea"))
+            Files.writeString(folder.resolve(".idea/.gitignore"), "# Disposable probe project\n*\n")
             trust.addTrustedPath(folder.toString())
             checkProject(destination, cycle, folder, source, plainText, missingClient)
         } finally {
@@ -138,6 +140,7 @@ object UiProbeCompletion {
                 UiProbeLsp.ready(project)
             }
             await("indexing") { !DumbService.getInstance(project).isDumb }
+            UiProbeLsp.checkDiagnostics(project)
             edt {
                 // First-run What's New can select a non-text tab while the project initializes.
                 FileEditorManager.getInstance(project).openFile(file, true)
@@ -175,7 +178,7 @@ object UiProbeCompletion {
                 }
                 check(editor.document.text.contains("transform.origin.normalized()")) { editor.document.text }
                 observations += "Tab replaced suffix and inserted call"
-                UndoManager.getInstance(project).undo(FileEditorManager.getInstance(project).selectedEditor)
+                UiProbeUndo.undo(project, editor)
                 check(editor.document.text == source) {
                     "Undo did not restore completion source: ${editor.document.text}"
                 }
@@ -225,6 +228,7 @@ object UiProbeCompletion {
             checkSnippet(project, editor, source)
             observations += "Required argument is selected; Tab exits the snippet after the call"
             UiProbeLanguageFeatures.run(project, editor, observations)
+            UiProbeDiagnostics.run(project, editor, observations)
         } finally {
             settings.AUTOCOMPLETE_ON_CODE_COMPLETION = autoComplete
             try {

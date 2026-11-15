@@ -8,6 +8,12 @@ semantics stay in `kas3c`; editor interaction stays in the IDE. AS3 debugging re
 `As3LspSupportProvider` starts one project-wide native LSP client using the located compiler.
 Completion, signature help, diagnostics and navigation come from that server. Standard LSP edits and
 snippets go through the platform lookup pipeline; the plugin does not override Tab globally.
+Rider's public notification-handler hook wraps diagnostic version validation and native cache insertion
+in one read action. Rider sends incremental changes from `beforeDocumentChange`; without this boundary,
+a reply can cache old offsets under the new document version while the write is still in progress.
+The short, synchronous cache publication is not cancellable/retried because it has side effects.
+It checks project disposal inside the read action and adds no worker, queue or diagnostic cache.
+
 AS3 language-block templates use that same client pipeline. Their ordinary source text and tab-stop
 spans originate in compiler queries; no template catalogue or snippet parser is duplicated in Kotlin.
 

@@ -2,11 +2,15 @@ package app.anicanon.kumikae.as3.language
 
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.lsp.api.Lsp4jClient
 import com.intellij.platform.lsp.api.LspIntegrationProvider
+import com.intellij.platform.lsp.api.LspServerNotificationsHandler
 import com.intellij.platform.lsp.api.ProjectWideLspClientDescriptor
+import org.eclipse.lsp4j.PublishDiagnosticsParams
 import java.nio.file.Path
 
 private const val EXTENSION = "as"
@@ -41,6 +45,18 @@ private class As3LspClientDescriptor(project: Project, private val compiler: Pat
     override fun createInitializationOptions(): Any = serverOptions()
 
     override fun createCommandLine(): GeneralCommandLine = serverCommandLine(compiler)
+
+    override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
+        super.createLsp4jClient(object : LspServerNotificationsHandler by handler {
+            override fun publishDiagnostics(params: PublishDiagnosticsParams) {
+                // Rider sends changes before the document write finishes. Keep validation and caching atomic.
+                // Native cache publication has side effects and must not be cancelled/retried midway.
+                @Suppress("DEPRECATION")
+                ReadAction.run<RuntimeException> {
+                    if (!project.isDisposed) handler.publishDiagnostics(params)
+                }
+            }
+        })
 
     /**
      * A definition in Godot's API is in a file the server keeps outside the project, which the IDE has

@@ -5,10 +5,8 @@ import com.intellij.codeInsight.template.TemplateManager
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.actionSystem.TypedAction
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 
 /** Language blocks must use the client's ordinary snippet navigation and undo. */
@@ -29,7 +27,7 @@ object UiProbeStatementCompletion {
         for ((name, text, stops) in cases) {
             val source = accept(project, editor, name, text)
             UiProbeCompletion.edt {
-                UndoManager.getInstance(project).undo(FileEditorManager.getInstance(project).selectedEditor)
+                UiProbeUndo.undo(project, editor)
                 check(editor.document.text == source) {
                     "$name insertion was not one undoable edit: ${editor.document.text}; expected $source"
                 }
