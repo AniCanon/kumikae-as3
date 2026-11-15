@@ -303,7 +303,7 @@ static void test_for_each_over_packed() {
 		   "for each (var anything:* in points) {}",
 			{});
 	expect("for each (var s:String in /*!*/bytes) {} for each (var x:Number in /*!*/points) {}",
-			{ "can't use a value of type 'int' where 'String' is expected", "can't use a value of type 'Vector2' where 'Number' is expected" });
+			{ "can't use a value of type 'Int64' where 'String' is expected", "can't use a value of type 'Vector2' where 'Number' is expected" });
 }
 
 static void test_indexing() {
