@@ -27,8 +27,9 @@ part of the program.
 >   completion lookup, Tab/Enter acceptance, undo and changed-document cancellation (2026-11-15).
 >   See [completion results](../docs/results/2026-11-completion.md) for measurements and limits.
 
-> **Windows is not supported yet.** The server runs on macOS and Linux. On Windows it does not read the
-> editor's messages correctly and does not recognise which files belong to the project.
+> **Windows: built for, not yet tried.** The server reads and writes its messages in binary and spells
+> Windows paths one way (drives, shares, `\` and letter case); those rules are tested on every system.
+> It has not been built or run on Windows itself. The JetBrains plugin looks for `kas3c.exe` there.
 
 ## VS Code
 

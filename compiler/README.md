@@ -297,19 +297,22 @@ is declared, who refers to it). The Godot editor will use the same three.
 
 Limits:
 
-- Find references on a method also lists the methods that override it and the one it overrides.
-- Workspace symbols are the project's own. Godot's classes are not listed.
+- Find references on a method also lists the methods that override it and the one it overrides, and an
+  interface's method the methods that implement it.
+- Workspace symbols are the project's own first, then Godot's classes and the built-in library's.
 - A change arrives as the range of text that changed; a whole document is accepted too.
 - Rename and code actions are not implemented. Completion and signature help are described in
   [the editor guide](../editors/completion.md).
-- A file is known by the path the editor gives. The same file reached through a symbolic link, or under a
-  name that differs only in letter case, counts as a second file and its classes are reported as already
-  defined.
+- A file is one file however the editor reaches it: through a symbolic link, in another letter case, or in
+  another Unicode form of its name.
 - A file the editor opens from outside the project, or from a folder whose name starts with a dot, is not
   checked, unless no folder is open at all.
-- A project of more than 20,000 `.as` files is read up to that number. The server says so on standard
-  error only.
-- Not yet usable on Windows.
+- A project of more than 20,000 `.as` files is read up to that number. The server says so in the editor
+  and on standard error.
+- **Windows:** paths are compared in one spelling (`/` between parts, a drive's letter in capitals, letter
+  case not counted), `file:` URIs carry drives and shares, and the server's input and output are binary.
+  The path rules are tested with Windows paths on every system; the server has not yet been built or run
+  on Windows itself.
 
 ## Declaration files
 

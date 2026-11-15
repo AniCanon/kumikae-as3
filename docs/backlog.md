@@ -48,7 +48,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
   checks; a person still needs to accept the full editing and navigation workflow. The completion probe
   also reports a platform `HighlightingPanel` retained on rapid project close; isolate it in a sustained
   IDE heap profile. **LS-2**
-- **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths. **LS-2**
 
 ## Stage 2b-2, part A: Godot's values
 

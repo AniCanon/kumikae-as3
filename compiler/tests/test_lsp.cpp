@@ -588,6 +588,32 @@ static void test_file_limit() {
 
 // An editor sends the part of a document that changed. Several changes in one message apply in order, each
 // to the text the one before left, with positions counted as the editor counts them.
+// A document with Windows line endings: changed ranges and the positions sent back count lines as the
+// editor does, and a change at a line's end goes before its "\r\n".
+static void test_windows_line_endings() {
+	Session session;
+	session.initialize(std::string(), false);
+	session.open(MAIN, "package {\r\npublic class Main {\r\n\tvar n:int = 1;\r\n}\r\n}\r\n");
+	session.settle();
+	CHECK_EQ(session.published(), std::string());
+	auto range = [](int p_line, int p_from, int p_to) {
+		return Json::object()
+				.set("start", Json::object().set("line", p_line).set("character", p_from))
+				.set("end", Json::object().set("line", p_line).set("character", p_to));
+	};
+	auto change = [&](const Json &p_range, const char *p_text) {
+		session.notify("textDocument/didChange",
+				Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", 2))
+						.set("contentChanges", Json::array().push(Json::object().set("range", p_range).set("text", p_text))));
+		session.settle();
+	};
+	change(range(2, 13, 14), "\"x\"");
+	CHECK_EQ(session.published(), MAIN + " 2:13-2:16 can't use a value of type 'String' where 'int' is expected\n");
+	change(range(1, 19, 19), "\r\n\tvar extra:Missing;");
+	CHECK_EQ(session.published(), MAIN + " 2:11-2:18 unknown type 'Missing'\n" + MAIN +
+										   " 3:13-3:16 can't use a value of type 'String' where 'int' is expected\n");
+}
+
 static void test_ranged_changes() {
 	for (int encoding = 0; encoding < 2; encoding++) {
 		bool utf8 = encoding == 1;
@@ -1041,6 +1067,7 @@ int main() {
 	test_signature_contexts();
 	test_completion_default_range();
 	test_override_completion();
+	test_windows_line_endings();
 	test_parameter_name_preselected();
 	test_completion_edits_and_signatures();
 	test_completion();

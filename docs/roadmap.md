@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 77 items;
+**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 76 items;
 none waits for a later stage (the owner, 2026-11-15), and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -83,7 +83,7 @@ locals, classes, imports, inherited members and Godot's API.
 | A VS Code client and the [set-up guide](../editors/README.md) | Done. |
 | Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. The owner confirmed the underlined errors by eye. |
 | Tried in Rider | Native plugin completion and typing validated in the pinned sandbox on 2026-11-15; see [results](results/2026-11-completion.md). Full manual editor acceptance remains pending. |
-| Windows | Not yet: the server runs on macOS and Linux only. To do before the slice is called done. |
+| Windows | Built for on 2026-11-15: binary input and output, one spelling of Windows paths, drives and shares in URIs, `kas3c.exe` in the JetBrains plugin; tested with Windows paths on macOS. Not yet built or run on Windows itself. |
 
 **Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
 stage faster to build. The owner left the order to the builder. Completion and the native JetBrains
@@ -219,13 +219,14 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) is being worked off in full, now:** 77 items, of which 11 wait on the
+- **The [backlog](backlog.md) is being worked off in full, now:** 76 items, of which 11 wait on the
   owner's answer.
 - **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
   waits for the cycle collector (2d).
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
-- **Language server:** Rider is not yet tried (the plugin is installed); Windows is not supported.
+- **Language server:** a person has still to accept Rider's editing and navigation by hand, and the server
+  has still to be built and run on Windows.
 
 ## Decisions made
 

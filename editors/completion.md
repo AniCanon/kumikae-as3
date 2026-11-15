@@ -104,8 +104,8 @@ See the [measured results](../docs/results/2026-11-completion.md) for latency, m
   offers only `Object`'s members until it has a known type.
 - For a sandbox trace, use `./gradlew runIde -PlspTrace=<existing-folder>` from `editors/jetbrains`.
   Trace files contain source text; keep them outside the repository and do not enable them for timings.
-- Windows language-server support, automatic imports and whole-project incremental type checking remain
-  separate work. Unknown callable signatures cannot show argument help.
+- Automatic imports and whole-project incremental type checking remain separate work. The server has not
+  yet been tried on Windows. Unknown callable signatures cannot show argument help.
 - The plugin is pinned to the Rider build listed in its README. Android Studio and IntelliJ open-source
   builds do not provide the JetBrains LSP module this plugin requires; they are not supported targets.
 

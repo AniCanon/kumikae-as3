@@ -1,6 +1,7 @@
 #include "workspace.h"
 
 #include "builtins.h"
+#include "paths.h"
 #include "uri.h"
 
 #include <cstdio>
@@ -13,17 +14,23 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// Every path the workspace holds is spelled this way, whatever the system: see paths.h.
 std::string normal(const std::string &p_path) {
-	return normal_path(p_path);
+	return generic_path(p_path);
 }
 
-bool starts_with(const std::string &p_text, const std::string &p_prefix) {
-	return p_text.compare(0, p_prefix.size(), p_prefix) == 0;
+std::string normal(const fs::path &p_path) {
+	return generic_path(p_path.string());
 }
 
 // True if the path is the folder or something in it.
 bool under(const std::string &p_folder, const std::string &p_path) {
-	return !p_folder.empty() && (p_path == p_folder || starts_with(p_path, p_folder + "/"));
+	return path_within(p_folder, p_path);
+}
+
+// True if the path is in the folder, and is not the folder itself.
+bool inside(const std::string &p_folder, const std::string &p_path) {
+	return p_path.size() > p_folder.size() && path_within(p_folder, p_path);
 }
 
 // The path as the file system has it: links followed, and each part spelled as it is on disk. What does
@@ -31,7 +38,7 @@ bool under(const std::string &p_folder, const std::string &p_path) {
 std::string followed(const std::string &p_path) {
 	std::error_code error;
 	fs::path real = fs::weakly_canonical(fs::path(p_path), error);
-	return error ? p_path : normal(real.string());
+	return error ? p_path : normal(real);
 }
 
 // True if the source was made from exactly this text.
@@ -85,7 +92,7 @@ Workspace::Workspace(Options p_options) :
 	for (const std::string &path : options_.declarations) {
 		// By absolute path, so that an editor can open it and the project scan can recognise it.
 		fs::path absolute = fs::absolute(fs::path(path), error);
-		std::string full = followed(normal(error ? path : absolute.string()));
+		std::string full = followed(error ? normal(path) : normal(absolute));
 		std::string text;
 		if (read_file(full, &text)) {
 			declarations_.push_back(parse_file(full, std::move(text)));
@@ -96,7 +103,7 @@ Workspace::Workspace(Options p_options) :
 	if (options_.support_folder.empty()) {
 		fs::path temporary = fs::temp_directory_path(error);
 		if (!error) {
-			options_.support_folder = (temporary / "kas3c-declarations").string();
+			options_.support_folder = normal(temporary / "kas3c-declarations");
 		}
 	}
 	options_.support_folder = followed(normal(options_.support_folder));
@@ -114,7 +121,7 @@ void Workspace::set_root(const std::string &p_folder) {
 	if (!folder.has_filename() && folder.has_parent_path()) {
 		folder = folder.parent_path();
 	}
-	opened_ = folder.string();
+	opened_ = normal(folder);
 	opened_real_ = followed(opened_);
 	folder = fs::path(opened_real_);
 	fs::path project = folder;
@@ -127,7 +134,7 @@ void Workspace::set_root(const std::string &p_folder) {
 			break;
 		}
 	}
-	root_ = project.string();
+	root_ = normal(project);
 	for (auto file = files_.begin(); file != files_.end();) {
 		file = file->second.open ? std::next(file) : files_.erase(file);
 	}
@@ -161,8 +168,8 @@ std::string Workspace::shown_path(const std::string &p_path) const {
 }
 
 bool Workspace::is_support(const std::string &p_path) const {
-	return !options_.support_folder.empty() && options_.support_folder != "/" &&
-			starts_with(p_path, options_.support_folder + "/");
+	// A root is never taken for the folder: everything would be in it.
+	return !options_.support_folder.empty() && options_.support_folder.back() != '/' && inside(options_.support_folder, p_path);
 }
 
 // Whether a file the workspace holds is part of the program.
@@ -186,7 +193,7 @@ void Workspace::scan(const std::string &p_folder) {
 		if (at->path().extension() != ".as" || (!name.empty() && name[0] == '.')) {
 			continue;
 		}
-		std::string path = at->path().string();
+		std::string path = normal(at->path());
 		if (at->is_symlink(error) && in_project(followed(path))) {
 			continue; // A link to a file of the project: the file is read once, under its own name.
 		}
@@ -206,7 +213,7 @@ void Workspace::scan(const std::string &p_folder) {
 }
 
 bool Workspace::in_project(const std::string &p_path) const {
-	if (root_.empty() || !starts_with(p_path, root_ + "/")) {
+	if (root_.empty() || !inside(root_, p_path)) {
 		return false;
 	}
 	if (fs::path(p_path).extension() != ".as") {
@@ -303,14 +310,14 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 		stale_ = true;
 		return;
 	}
-	if (root_.empty() || (path != root_ && !starts_with(path, root_ + "/"))) {
+	if (root_.empty() || !under(root_, path)) {
 		return;
 	}
 	// Not a file of the program: perhaps a folder. What was under it and is gone leaves the program, and
 	// what is under it now joins.
 	std::error_code error;
-	const std::string prefix = path + "/";
-	for (auto file = files_.lower_bound(prefix); file != files_.end() && starts_with(file->first, prefix);) {
+	const std::string prefix = path_join(path, "");
+	for (auto file = files_.lower_bound(prefix); file != files_.end() && file->first.compare(0, prefix.size(), prefix) == 0;) {
 		if (!file->second.open && !fs::is_regular_file(file->first, error)) {
 			file = files_.erase(file);
 			stale_ = true;
@@ -362,7 +369,7 @@ void Workspace::check() {
 	for (Unit &unit : compilation_->units()) {
 		const std::string &path = unit.source.path();
 		bool embedded = unit.is_builtin || path == GODOT_DECLARATIONS_PATH;
-		units_[embedded ? options_.support_folder + "/" + support_name(path) : path] = &unit;
+		units_[embedded ? path_join(options_.support_folder, support_name(path)) : path] = &unit;
 	}
 	stale_ = false;
 	checks_++;
@@ -410,11 +417,11 @@ const std::string &Workspace::support_folder() {
 	if (support_folder_.empty() && !options_.support_folder.empty()) {
 		bool written = true;
 		for (const std::shared_ptr<Parsed> &file : builtins_) {
-			written = write_read_only(options_.support_folder + "/" + support_name(file->source.path()), file->source.text()) &&
+			written = write_read_only(path_join(options_.support_folder, support_name(file->source.path())), file->source.text()) &&
 					written;
 		}
 		if (godot_) {
-			written = write_read_only(options_.support_folder + "/" + support_name(GODOT_DECLARATIONS_PATH),
+			written = write_read_only(path_join(options_.support_folder, support_name(GODOT_DECLARATIONS_PATH)),
 							  godot_->source.text()) &&
 					written;
 		}
@@ -431,7 +438,7 @@ std::string Workspace::real_path(const Unit &p_unit) {
 		return path;
 	}
 	const std::string &folder = support_folder();
-	return folder.empty() ? std::string() : folder + "/" + support_name(path);
+	return folder.empty() ? std::string() : path_join(folder, support_name(path));
 }
 
 } // namespace kas3

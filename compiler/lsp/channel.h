@@ -15,8 +15,9 @@ class Channel {
 	bool fill();
 
 public:
-	Channel(int p_input, int p_output) :
-			input_(p_input), output_(p_output) {}
+	// On Windows the descriptors are set to binary: in text mode "\r\n" would be read as "\n" and every
+	// "\n" written as "\r\n", and the lengths in the headers would be wrong.
+	Channel(int p_input, int p_output);
 
 	// The next message's body. False at the end of input, or when the framing is broken past repair.
 	bool next(std::string *r_message);

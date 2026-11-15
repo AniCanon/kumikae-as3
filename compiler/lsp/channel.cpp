@@ -1,6 +1,7 @@
 #include "channel.h"
 
 #ifdef _WIN32
+#include <fcntl.h>
 #include <io.h>
 #else
 #include <poll.h>
@@ -15,6 +16,14 @@ namespace {
 const size_t MAX_MESSAGE = 256u * 1024 * 1024;
 
 } // namespace
+
+Channel::Channel(int p_input, int p_output) :
+		input_(p_input), output_(p_output) {
+#ifdef _WIN32
+	_setmode(p_input, _O_BINARY);
+	_setmode(p_output, _O_BINARY);
+#endif
+}
 
 bool Channel::fill() {
 	char chunk[65536];
