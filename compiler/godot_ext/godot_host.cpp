@@ -22,6 +22,7 @@
 
 #include <godot_cpp/classes/ref_counted.hpp>
 
+#include <cmath>
 #include <cstdlib>
 #include <new>
 #include <vector>
@@ -469,9 +470,30 @@ static std::string element(const Variant &p_key, const Variant &p_of) {
 	return "element " + std::string(key.get_data()) + " of this " + std::string(type.get_data());
 }
 
+// A Number as an index of something indexed by number: it must be a whole one, as for AS3's Vector (Godot
+// would cut 1.5 to 1, and NaN to 0). It goes as Godot's integer. False, with AS3's RangeError, if not.
+static bool whole_index(const Variant &p_receiver, Variant *r_key, std::string *r_error) {
+	if (r_key->get_type() != Variant::FLOAT || p_receiver.get_type() == Variant::DICTIONARY || p_receiver.get_type() == Variant::OBJECT) {
+		return true;
+	}
+	const double index = *r_key;
+	if (index == std::trunc(index) && index >= -9223372036854775808.0 && index < 9223372036854775808.0) {
+		*r_key = (int64_t)index;
+		return true;
+	}
+	Variant copy = p_receiver;
+	const Variant size = copy.has_method("size") ? copy.call("size") : Variant(); // A Vector2 has none.
+	*r_error = "RangeError: Error #1125: The index " + vm::number_to_string(index) + " is out of range" +
+			(size.get_type() == Variant::INT ? " " + std::to_string((int64_t)size) : std::string()) + ".";
+	return false;
+}
+
 bool GodotHost::index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	const Variant *receiver = static_cast<Variant *>(p_receiver);
 	Variant key = to_variant(p_key.kind, p_key.slot);
+	if (!whole_index(*receiver, &key, r_error)) {
+		return false;
+	}
 	bool valid = false;
 	Variant value = receiver->get(key, &valid);
 	if (!valid) {
@@ -484,6 +506,9 @@ bool GodotHost::index_get(void *p_receiver, const vm::Argument &p_key, const vm:
 bool GodotHost::index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) {
 	Variant *receiver = static_cast<Variant *>(p_receiver);
 	Variant key = to_variant(p_key.kind, p_key.slot);
+	if (!whole_index(*receiver, &key, r_error)) {
+		return false;
+	}
 	bool valid = false;
 	receiver->set(key, to_variant(p_value.kind, p_value.slot), &valid);
 	if (!valid) {

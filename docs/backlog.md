@@ -65,8 +65,6 @@ Found by the review of the clean-up pass itself.
 
 ## Stage 2b-2, part A: Godot's values
 
-- A `Number` used as an index is cut to a whole number by Godot: `v[1.5]` reads element 1, and `v[NaN]`
-  element 0. **2c**
 - One part of a value that is stored nowhere (`a.normalized().x = 5`) is refused. So is `points[0].x = 5`
   on a packed array of vectors, though there the value is stored. **2c**
 - **decision** `"" + this` in a script without `toString()` reads `[object Values]` (AS3's), while Godot's

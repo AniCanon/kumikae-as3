@@ -139,7 +139,8 @@ output = compare("values.gd", [
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
     "freed text", "freed text after", "alive is not null", "alive is set", "alive counts", "freed is null", "freed is not set", "freed does not count",
-    "not freed", "freed name", "null as a Godot class", "for each over packed arrays", "freed children", "freed as an argument",
+    "not freed", "freed name", "null as a Godot class", "for each over packed arrays", "a whole Number index", "a fraction as an index", "NaN as an index",
+    "a fraction as a part's index", "freed children", "freed as an argument",
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
     "first", "color part", "set second", "add element", "position element", "packed", "set packed",
     "packed out of range", "out of range",
@@ -152,6 +153,8 @@ check("a null that is not the last argument takes Godot's default, with no error
 check("a member of a freed object is AS3's null error, and says the object was freed",
       all(re.search(r"TypeError: Error #1009[^\n]*Godot has freed the object\.\n\s+at Values/%s\(\)" % name, output) for name in
           ("keptName", "keptRename", "keptChildren", "keptSignal", "keptByName")), output[-1500:])
+check("a fraction as an index is AS3's RangeError", "RangeError: Error #1125: The index 1.5 is out of range 2." in output and
+      "The index NaN is out of range 2." in output and "The index 0.5 is out of range." in output, output[-1500:])
 check("an index out of range is an AS3 error", "at Values/outOfRange()" in output and "at Values/packed()" in output, output[-800:])
 traced = re.search(r"EXPECT TRACE (.*)", output)
 check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])
