@@ -150,9 +150,57 @@ class Rules {
 		}
 	}
 
+	// A getter takes nothing and gives a value; a setter takes one value and gives nothing. Reading or
+	// writing the property calls them so, and in no other way.
+	void accessor_shape(const FunctionDecl *p_accessor) {
+		if (p_accessor->accessor == FunctionDecl::None || !p_accessor->symbol) {
+			return;
+		}
+		Diagnostics &diagnostics = p_accessor->symbol->unit->diagnostics;
+		const List<Parameter> &parameters = p_accessor->parameters;
+		const Type *result = p_accessor->return_type ? compilation_.type_of(p_accessor->return_type) : nullptr;
+		if (p_accessor->accessor == FunctionDecl::Getter) {
+			if (parameters.count > 0) {
+				diagnostics.error(p_accessor->name_offset, "a getter takes no parameters");
+			} else if (result && result->kind == Type::Void) {
+				diagnostics.error(p_accessor->name_offset, "a getter must give a value: its type can't be void");
+			}
+		} else if (parameters.count != 1 || parameters[0].default_value || parameters[0].is_rest) {
+			diagnostics.error(p_accessor->name_offset, "a setter takes one parameter, with no default");
+		} else if (result && result->kind != Type::Void && result->kind != Type::Unknown) {
+			diagnostics.error(p_accessor->name_offset, "a setter gives nothing: its type must be void or not written");
+		}
+	}
+
+	// A property's getter and setter are of one type, wherever each is declared. Reported once, at the
+	// half the owner declares itself: its getter if it has one.
+	void property_type(FunctionDecl *p_accessor) {
+		accessor_shape(p_accessor);
+		const Symbol *property = p_accessor->symbol;
+		if (!property || !property->getter || !property->setter || property->setter->parameters.count == 0) {
+			return;
+		}
+		const FunctionDecl *reported = property->getter->symbol == property ? property->getter : property->setter;
+		if (reported == p_accessor && !same_type(property->getter->return_type, property->setter->parameters[0].type)) {
+			property->unit->diagnostics.error(p_accessor->name_offset, "the getter and the setter of " + quoted(property->name) +
+																			   " must be of the same type");
+		}
+	}
+
 	void definition(Unit &p_unit, Node *p_node) {
+		if (p_node->kind == NodeKind::InterfaceDecl) {
+			for (FunctionDecl *method : static_cast<InterfaceDecl *>(p_node)->methods) {
+				property_type(method);
+			}
+			return;
+		}
 		if (p_node->kind != NodeKind::ClassDecl) {
 			return;
+		}
+		for (Node *member : static_cast<ClassDecl *>(p_node)->members) {
+			if (member->kind == NodeKind::FunctionDecl && static_cast<FunctionDecl *>(member)->accessor != FunctionDecl::None) {
+				property_type(static_cast<FunctionDecl *>(member));
+			}
 		}
 		ClassDecl *decl = static_cast<ClassDecl *>(p_node);
 		Symbol *symbol = decl->symbol;

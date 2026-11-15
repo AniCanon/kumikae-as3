@@ -1,0 +1,3 @@
+closure_member.as:1:140: error: an instance member named inside a function expression is not supported by the interpreter yet
+closure_member.as:1:181: error: an instance member named inside a function expression is not supported by the interpreter yet
+closure_member.as:1:236: error: an instance member named inside a function expression is not supported by the interpreter yet

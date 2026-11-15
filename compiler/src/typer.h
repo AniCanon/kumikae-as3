@@ -26,6 +26,7 @@ class Typer {
 	FunctionDecl *current_ = nullptr; // The innermost function being typed.
 	mutable std::map<std::pair<Symbol *, Symbol *>, std::pair<bool, bool>> related_; // is_a's answers.
 	bool leaves_ = false; // It has a `return <value>` or a `throw` somewhere in its own body.
+	Expr *assigned_ = nullptr; // The target of the `=` being typed: written, not read.
 
 	const Type *any_;
 	const Type *unknown_;
@@ -86,6 +87,10 @@ class Typer {
 
 	// Reports a write to something that can't be written: `x = ...`, `x += ...`, `x++`.
 	void written(Expr *p_target);
+	// Reports a read of a property that has no getter: `x`, `o.x`, and the read in `x += 1` or `x++`.
+	void read(Expr *p_expression);
+	// The property a name or a member names, the interface or class it is reached through, and where.
+	Symbol *property_of(Expr *p_expression, Symbol **r_through, uint32_t *r_offset);
 
 	const Type *symbol_type(Symbol *p_symbol, const Type *p_element);
 

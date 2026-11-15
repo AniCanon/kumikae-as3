@@ -238,13 +238,15 @@ void Typer::written(Expr *p_target) {
 				error(offset, "can't assign to the constant " + name);
 			}
 		} break;
-		case SymbolKind::Property:
-			// The setter may be in a base class that did not resolve, or in another interface.
-			if (symbol->getter && !symbol->setter && symbol->owner && symbol->owner->kind == SymbolKind::Class &&
-					!compilation_.hierarchy_broken(symbol->owner)) {
+		case SymbolKind::Property: {
+			// The setter may be in a base class or an interface that did not resolve.
+			Symbol *through = nullptr;
+			property_of(p_target, &through, &offset);
+			bool known = false;
+			if (!compilation_.property_half(through, symbol, FunctionDecl::Setter, &known) && known) {
 				error(offset, name + " is read-only");
 			}
-			break;
+		} break;
 		case SymbolKind::Method:
 			// A built-in class's methods may be on its prototype, where they can be replaced.
 			if (!symbol->unit->is_builtin) {
@@ -260,6 +262,32 @@ void Typer::written(Expr *p_target) {
 			break;
 		default:
 			break;
+	}
+}
+
+Symbol *Typer::property_of(Expr *p_expression, Symbol **r_through, uint32_t *r_offset) {
+	Symbol *symbol = nullptr;
+	*r_through = nullptr;
+	*r_offset = p_expression->offset;
+	if (p_expression->kind == NodeKind::Name) {
+		symbol = static_cast<Name *>(p_expression)->symbol;
+	} else if (p_expression->kind == NodeKind::Member) {
+		Member *member = static_cast<Member *>(p_expression);
+		symbol = member->resolved();
+		*r_offset = member->name_offset;
+		const Type *object = member->object ? member->object->type : nullptr;
+		*r_through = object && object->kind == Type::Instance ? object->symbol : nullptr;
+	}
+	return symbol && symbol->kind == SymbolKind::Property ? symbol : nullptr;
+}
+
+void Typer::read(Expr *p_expression) {
+	Symbol *through = nullptr;
+	uint32_t offset = 0;
+	Symbol *property = p_expression == assigned_ ? nullptr : property_of(p_expression, &through, &offset);
+	bool known = false;
+	if (property && !compilation_.property_half(through, property, FunctionDecl::Getter, &known) && known) {
+		error(offset, quoted(property->name) + " is write-only");
 	}
 }
 

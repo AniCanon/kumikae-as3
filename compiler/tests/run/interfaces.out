@@ -1,0 +1,15 @@
+square 4 square/4
+circle 3 circle/0
+cube 54 cube/6
+9 18 90
+big 4
+5
+circle 61
+8 24 cube cube
+true true true false true
+null 27 true
+false null
+9
+8
+TypeError
+400 square true

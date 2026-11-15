@@ -157,8 +157,8 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	module_.classes.push_back(std::move(klass));
 	uint32_t index = (uint32_t)module_.classes.size() - 1;
 	classes_[p_class] = index;
-	if (p_class->klass->constructor) {
-		functions_[p_class->klass->constructor] = module_.classes[index].constructor;
+	if (const FunctionDecl *declared = declaration(p_class->klass->constructor)) {
+		functions_[declared] = module_.classes[index].constructor;
 	}
 	// What AS3 reads of an Error: its message, its name, and errorID (a getter, read as the field).
 	for (const auto &[name, field] : { std::pair<const char *, uint32_t>{ "message", ERROR_MESSAGE }, { "name", ERROR_NAME }, { "errorID", ERROR_ID } }) {

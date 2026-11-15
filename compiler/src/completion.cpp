@@ -125,6 +125,10 @@ class Completer {
 		switch (p_type->kind) {
 			case Type::Instance:
 				offer_members(p_type->symbol, false, true);
+				if (p_type->symbol && p_type->symbol->kind == SymbolKind::Interface) {
+					// The object is of some class, and every class has what every object has, as the checker says.
+					offer_members(compilation_.object_class(), false, false);
+				}
 				break;
 			case Type::Vector:
 				offer_members(compilation_.vector_class(), false, true);

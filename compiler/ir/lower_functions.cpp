@@ -1,5 +1,5 @@
 // Function values: a method or a function taken as a value, and a call through one.
-#include "lowerer.h"
+#include "lower_members.h"
 
 namespace kas3 {
 namespace ir {
@@ -18,7 +18,10 @@ uint32_t Lowerer::function_value(Expr *p_expression) {
 		refuse(position, "one of Godot's methods used as a value");
 		return default_value(Kind::Obj, position);
 	}
-	auto function = functions_.find(symbol);
+	if (const std::optional<uint32_t> bound = Members(*this).interface_value(p_expression, symbol)) {
+		return *bound;
+	}
+	auto function = functions_.find(declaration(symbol));
 	if (function == functions_.end()) {
 		refuse(position, "'" + std::string(symbol->name) + "' used as a value");
 		return default_value(Kind::Obj, position);
@@ -36,8 +39,8 @@ uint32_t Lowerer::function_value(Expr *p_expression) {
 			return default_value(Kind::Obj, position);
 		}
 		object = written->kind == NodeKind::ThisExpr ? 0 : receiver(written);
-	} else if (fn().is_static) {
-		refuse(position, "this name");
+	} else if (fn().is_static || received_env_) {
+		refuse(position, received_env_ ? "an instance member named inside a function expression" : "this name");
 		return default_value(Kind::Obj, position);
 	}
 	// A private or final method is that very one; any other is the object's class's own.
@@ -45,7 +48,7 @@ uint32_t Lowerer::function_value(Expr *p_expression) {
 		emit(Op::NullCheck, position, object);
 		emit(Op::MakeFunction, position, out, function->second, object);
 	} else {
-		emit(Op::MakeMethod, position, out, slots_[symbol], object);
+		emit(Op::MakeMethod, position, out, slots_[function->first], object);
 	}
 	return out;
 }
@@ -60,6 +63,8 @@ bool Lowerer::called_value(const Symbol *p_symbol) {
 		case SymbolKind::Local:
 		case SymbolKind::CatchVariable:
 			return true;
+		case SymbolKind::Property: // A getter that gives a function: `o.action(3)` calls what it gives.
+			return p_symbol->unit && !p_symbol->unit->is_declaration;
 		default:
 			return false;
 	}

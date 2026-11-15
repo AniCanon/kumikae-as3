@@ -45,6 +45,7 @@ inline bool is_held(Kind p_kind) {
 //   W  an index into the module's wide numbers (Int64 constants)
 //   L  an instruction index in the same function                     A  into the function's argument lists
 //   F  a function index    C  a class index    D  a field slot       G  a global slot    V  a method-table slot
+//   M  an interface method: an index into the module's interface_methods
 //   -  unused
 #define KAS3_IR_OPS(X) \
 	X(Stmt, "---") /* A statement starts here: where a debugger may stop. */ \
@@ -70,6 +71,8 @@ inline bool is_held(Kind p_kind) {
 	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
 	X(AnyNullCheck, "R--") /* An untyped value that is null (TypeError #1009) or undefined (#1010) has no members. */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
+	/* A method of an interface, found in the table of the class the object (the first argument) is of. */ \
+	X(CallInterface, "rMA") \
 	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is an int, a uint or a Number, \
 	   read as its register is declared; what is read or written is of the class's element kind. */ \
 	X(VecNew, "RCA") X(ArrayNew, "RCA") X(VecGet, "RRR") X(VecSet, "RRR") \
@@ -127,6 +130,7 @@ inline bool is_held(Kind p_kind) {
 	   CallFunction: out (untyped, or NONE), the function value (a Function or an untyped value), its \
 	   arguments, each untyped. */ \
 	X(MakeFunction, "RFr") X(MakeMethod, "RVR") X(CallFunction, "rRA") \
+	X(MakeInterfaceMethod, "RMR") /* out, an interface method, the object: its class's, bound to it. */ \
 	X(FunctionToCallable, "RR-") /* A function value as a Godot Callable that calls it; null for null. */ \
 	/* A vector method's callback and the object to call it on (both untyped): a method with an object \
 	   other than null is AS3's TypeError #1510. */ \
@@ -288,6 +292,13 @@ struct Class {
 	std::string native_base;
 	// The engine's virtual methods the class answers: Godot's name ("_physics_process") and the function.
 	std::vector<std::pair<std::string, uint32_t>> virtuals;
+	// An interface: it has no objects, fields, methods or constructor; a class lists it in `interfaces`.
+	bool is_interface = false; // Not `interface`: a macro in Windows's headers.
+	// Every interface the class implements, those its bases implement and those they extend; for an
+	// interface, those it extends. `is`, `as` and every check of an object's class read it.
+	std::vector<uint32_t> interfaces;
+	// By interface method (Module::interface_methods): the function the class runs for it, or NONE.
+	std::vector<uint32_t> interface_methods;
 	// The signals the class declares itself (`[Signal] public var hit:Signal;`), by name: Godot is told of
 	// them, with the base classes' too. Each one's field holds the signal from the start.
 	std::vector<std::string> signals;
@@ -312,6 +323,9 @@ struct Module {
 	// Functions run once, in order, before anything else: package-level variables. (A class's static fields
 	// are set on the class's first use: Class::static_init.)
 	std::vector<uint32_t> initializers;
+	// The interfaces' methods by name, as AVM2 finds them: "area", "get name", "set name". One name is one
+	// method, whichever interfaces declare it.
+	std::vector<std::string> interface_methods;
 	uint32_t entry_class = NONE; // Constructed with no arguments to start the program.
 	uint32_t error_class = NONE; // Error, and TypeError: the classes of the errors the interpreter raises.
 	uint32_t type_error_class = NONE;

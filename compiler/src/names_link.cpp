@@ -370,6 +370,38 @@ bool Compilation::hierarchy_broken(Symbol *p_class) const {
 	return false;
 }
 
+FunctionDecl *Compilation::property_half(Symbol *p_through, const Symbol *p_property, FunctionDecl::Accessor p_half,
+		bool *r_known) {
+	const auto half = [&](const Symbol *p_symbol) { return p_half == FunctionDecl::Getter ? p_symbol->getter : p_symbol->setter; };
+	FunctionDecl *found = half(p_property);
+	Symbol *from = p_through && p_through->kind == SymbolKind::Interface ? p_through : p_property->owner;
+	bool known = from != nullptr;
+	if (!found && from && from->kind == SymbolKind::Interface) {
+		// The interface, then everything it extends: AVM2 finds an interface's member by its name.
+		std::vector<Symbol *> pending{ from };
+		for (size_t i = 0; i < pending.size() && !found; i++) {
+			ClassInfo *info = pending[i]->klass;
+			Symbol *member = find_in(info->members, p_property->name);
+			found = member && member->kind == SymbolKind::Property ? half(member) : nullptr;
+			const Node *node = pending[i]->node;
+			known = known && !info->broken && node && node->kind == NodeKind::InterfaceDecl &&
+					info->interfaces.size() == static_cast<const InterfaceDecl *>(node)->extends.count;
+			for (Symbol *parent : info->interfaces) {
+				known = known && parent;
+				if (parent && std::find(pending.begin(), pending.end(), parent) == pending.end()) {
+					pending.push_back(parent);
+				}
+			}
+		}
+	} else if (!found && from) {
+		known = !hierarchy_broken(from);
+	}
+	if (r_known) {
+		*r_known = known;
+	}
+	return found;
+}
+
 // Works the answer to hierarchy_broken out once for every class, so that a deep hierarchy is not walked
 // again for each question. Called when no base class will change any more.
 void Compilation::settle_hierarchy() {

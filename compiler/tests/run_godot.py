@@ -288,6 +288,14 @@ compare("events.gd", [
     "touch position", "drag position", "neither", "is Node", "as Sprite2D", "null", "the script's own object", "delivered",
 ])
 
+# A script's getters and setters, which GDScript reaches as its properties.
+output = compare("accessors.gd", [
+    "getter", "setter", "setter ran once", "get by name", "set by name", "getter alone", "no setter, no change",
+    "setter alone", "setter alone reads as nothing", "a Godot value", "a value of the wrong kind is refused", "compound",
+    "through an interface", "a getter's error reads as nothing", "a native property still", "a native property set",
+])
+check("a getter's error is reported as a script's own", re.search(r"SCRIPT ERROR: Error: broken getter[^\n]*\n(\s+at [^\n]+\n)*\s+at: Accessors/get broken\(\)", output) is not None, output[-900:])
+
 # AS3's vectors handed to Godot: packed arrays by the element's type, arrays for the rest.
 output = compare("vectors.gd", [
     "points", "points type", "hull", "bytes", "empty", "too big for a byte", "below a byte", "offsets", "colors", "filters",

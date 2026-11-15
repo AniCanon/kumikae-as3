@@ -53,7 +53,10 @@ const Type *Typer::new_type(Expr *p_expression) {
 
 const Type *Typer::assign_type(Expr *p_expression) {
 	Assign *assign = static_cast<Assign *>(p_expression);
+	Expr *outer = assigned_;
+	assigned_ = assign->op == TokenKind::Assign ? assign->target : nullptr;
 	const Type *target = expression(assign->target);
+	assigned_ = outer;
 	const Type *value = expression(assign->value);
 	written(assign->target);
 	if (assign->op == TokenKind::Assign) {
@@ -123,6 +126,7 @@ const Type *Typer::compute(Expr *p_expression) {
 			return class_ && !static_ && class_->klass->base ? compilation_.instance_type(class_->klass->base)
 															 : unknown_;
 		case NodeKind::Name:
+			read(p_expression);
 			return symbol_type(static_cast<Name *>(p_expression)->symbol, nullptr);
 		case NodeKind::ArrayLit:
 			list(static_cast<ArrayLit *>(p_expression)->elements);
@@ -142,8 +146,11 @@ const Type *Typer::compute(Expr *p_expression) {
 			function(static_cast<FunctionExpr *>(p_expression)->function);
 			closures_--;
 			return function_;
-		case NodeKind::Member:
-			return member_expression_type(p_expression);
+		case NodeKind::Member: {
+			const Type *type = member_expression_type(p_expression);
+			read(p_expression);
+			return type;
+		}
 		case NodeKind::Index:
 			return index_type(p_expression);
 		case NodeKind::TypeApply: {

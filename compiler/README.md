@@ -99,11 +99,18 @@ files, packages, and package-level functions and variables. `String`'s methods, 
 `toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `split` and `Math`.
 `Vector.<T>` (`Vector.<*>` too) and `Array`, with their methods, those that take a function included;
 function values (a method or a function as a value, `f(a, b)`) and function expressions that capture
-their variables; `[Signal]` on a field of a class that extends one of Godot's.
+their variables; `[Signal]` on a field of a class that extends one of Godot's; getters and setters,
+static ones too, overridden and reached with `super` (`o.x += 1` and `o.x++` call each half once).
+In a stack trace a getter is `Class/get x()`, as in Flash. Interfaces, with their getters and setters:
+a value typed as one calls the method of whatever class the object is, found by name as AVM2 finds it;
+`is`, `as`, parameters, fields and vectors of an interface type; a class may implement several, and an
+interface extend several.
 
 **What is refused, by name, until later slices:** `Object` literals and dynamic properties, `Dictionary`,
-interfaces, `for in` over anything but a vector or an Array, getters and setters,
-`this` inside a function expression, regular expressions and the `String`
+`for in` over anything but a vector or an Array,
+`this` inside a function expression and the instance members it reaches without an object (`n`, `go()`,
+`super.go()`, a Godot property), an interface's method that a class has only from Godot's API or the built-in
+library, regular expressions and the `String`
 methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
 `Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
 `... is not supported by the interpreter yet` at the place.
@@ -181,7 +188,7 @@ package {
   Godot's `_physics_process`), and any other method by its AS3 name, from GDScript too.
 - The script reads and writes the node's properties, calls its methods, and makes Godot values with `new`.
 - Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript can read a
-  script's fields. A call from GDScript with too few arguments, the wrong kind of argument, or a number that
+  script's fields, and reads its getters and writes its setters as properties (`node.health += 1`). A call from GDScript with too few arguments, the wrong kind of argument, or a number that
   does not fit an `int` is refused, never bent to fit.
 - A script class may extend another script class, and may be attached to a reference-counted object
   without keeping it alive.
@@ -277,7 +284,7 @@ compiler/build/kas3c lsp --declarations lib.as  # lib.as declares what exists el
 | A file opening or changing | The file's errors: what `kas3c check` prints for the project. |
 | Go to definition | Where the name under the cursor is declared, in the project, the built-in library or Godot's API. |
 | Find references | Every use of it in the project's files. |
-| Completion | After a dot, what the value before it has, with what its bases have (`Object`'s members for a `*` or a value of a type not known), or what a package's path holds; where a type is written, types; after `override`, the base classes' methods, each written as its whole declaration; otherwise the names in reach: locals, members, definitions, keywords, with a call argument's parameter name first. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a name that means nothing here, and nothing in a comment, string or regular expression. |
+| Completion | After a dot, what the value before it has, with what its bases have (through an interface, what it extends and `Object`'s members; a getter and a setter are one property) (`Object`'s members for a `*` or a value of a type not known), or what a package's path holds; where a type is written, types; after `override`, the base classes' methods, each written as its whole declaration; otherwise the names in reach: locals, members, definitions, keywords, with a call argument's parameter name first. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a name that means nothing here, and nothing in a comment, string or regular expression. |
 | Signature help | The callable declaration and active parameter, including unfinished and nested calls. |
 | Hover | Its declaration, and the class or package it belongs to. |
 | Document symbols | The classes and members of the file. |
@@ -425,6 +432,10 @@ built-in.
   of every interface it names.
 - **Writes** to a `const`, to a property with no setter, to a method, a package function or a class. A
   built-in class's methods may be replaced (`o.toString = f`), because they may live on its prototype.
+- **Reads** of a property with no getter, `x += 1` and `x++` included.
+- **Properties:** a getter takes no parameters and gives a value; a setter takes one, with no default, and
+  gives nothing. A getter and its setter are of one type, wherever each is declared. Through an interface,
+  the other half is looked for in the interfaces it extends.
 
 ## What fits
 

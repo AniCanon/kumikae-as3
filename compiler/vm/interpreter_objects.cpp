@@ -164,12 +164,30 @@ bool Interpreter::is_class(const Object *p_object, uint32_t p_class) const {
 	if (!p_object) {
 		return false;
 	}
+	if (module_.classes[p_class].is_interface) {
+		const std::vector<uint32_t> &implemented = module_.classes[p_object->klass].interfaces;
+		return std::find(implemented.begin(), implemented.end(), p_class) != implemented.end();
+	}
 	for (uint32_t at = p_object->klass; at != NONE; at = module_.classes[at].base) {
 		if (at == p_class) {
 			return true;
 		}
 	}
 	return false;
+}
+
+uint32_t Interpreter::interface_function(const Object *p_object, uint32_t p_method) {
+	if (!p_object) {
+		raise_null();
+		return NONE;
+	}
+	const std::vector<uint32_t> &table = module_.classes[p_object->klass].interface_methods;
+	const uint32_t function = p_method < table.size() ? table[p_method] : NONE;
+	if (function == NONE) {
+		const std::string name = p_method < module_.interface_methods.size() ? module_.interface_methods[p_method] : std::string("a method");
+		raise(module_.type_error_class, "Error #1006: " + name + " is not a function.");
+	}
+	return function;
 }
 
 std::string Interpreter::object_text(Object *p_object) const {

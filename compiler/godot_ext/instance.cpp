@@ -77,8 +77,28 @@ static GDExtensionVariantType expected_type(ir::Kind p_kind) {
 	}
 }
 
-static GDExtensionBool instance_set(GDExtensionScriptInstanceDataPtr, GDExtensionConstStringNamePtr, GDExtensionConstVariantPtr) {
-	return false;
+// The script's getter or setter of that AS3 name, "get x" or "set x" among its methods; NONE if it has none.
+static uint32_t accessor(const vm::Object *p_object, const char *p_half, GDExtensionConstStringNamePtr p_name) {
+	CharString name = String(*reinterpret_cast<const StringName *>(p_name)).utf8();
+	return Project::get().interpreter().find_method(p_object->klass, std::string(p_half) + name.get_data());
+}
+
+// GDScript writing `node.x = v`: the script's setter, if it has one. Its fields can't be written yet.
+static GDExtensionBool instance_set(GDExtensionScriptInstanceDataPtr p_data, GDExtensionConstStringNamePtr p_name, GDExtensionConstVariantPtr p_value) {
+	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+	const uint32_t setter = accessor(instance->object, "set ", p_name);
+	if (setter == ir::NONE) {
+		return false;
+	}
+	if (!kas3::on_main_thread()) {
+		kas3::refuse_thread(setter);
+		return false;
+	}
+	const Variant *value = reinterpret_cast<const Variant *>(p_value);
+	Variant ignored;
+	GDExtensionCallError error{};
+	kas3::call_script(instance->object, setter, &value, 1, &ignored, &error);
+	return error.error == GDEXTENSION_CALL_OK; // A value of the wrong kind: Godot says it could not be set.
 }
 
 // A script object as Godot holds it: the Godot object it is attached to, for a class that extends one of
@@ -93,16 +113,35 @@ bool kas3::as_godot_object(const vm::Object *p_object, Variant *r_out) {
 	return true;
 }
 
-// A field of the script, by its AS3 name.
+// The script's getter of that name, called as GDScript reads `node.x`.
+static GDExtensionBool get_by_getter(ScriptInstance *p_instance, GDExtensionConstStringNamePtr p_name, GDExtensionVariantPtr r_value) {
+	const uint32_t getter = accessor(p_instance->object, "get ", p_name);
+	if (getter == ir::NONE) {
+		return false;
+	}
+	if (!kas3::on_main_thread()) {
+		kas3::refuse_thread(getter);
+		return false;
+	}
+	GDExtensionCallError error{};
+	Variant *out = reinterpret_cast<Variant *>(r_value);
+	*out = Variant(); // An error in the getter, reported as Godot reports a script's own, reads as null.
+	kas3::call_script(p_instance->object, getter, nullptr, 0, out, &error);
+	return error.error == GDEXTENSION_CALL_OK;
+}
+
+// A field of the script, by its AS3 name, or a getter.
 static GDExtensionBool instance_get(GDExtensionScriptInstanceDataPtr p_data, GDExtensionConstStringNamePtr p_name,
 		GDExtensionVariantPtr r_value) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
 	CharString name = String(*reinterpret_cast<const StringName *>(p_name)).utf8();
 	vm::Slot value;
 	ir::Kind kind = ir::Kind::Void;
-	if (!Project::get().interpreter().get_field(instance->object, std::string_view(name.get_data(), (size_t)name.length()), &value, &kind) ||
-			name.get_data()[0] == '$') {
+	if (name.get_data()[0] == '$') {
 		return false;
+	}
+	if (!Project::get().interpreter().get_field(instance->object, std::string_view(name.get_data(), (size_t)name.length()), &value, &kind)) {
+		return get_by_getter(instance, p_name, r_value);
 	}
 	const vm::Object *held = kind == ir::Kind::Obj ? static_cast<const vm::Object *>(value.p)
 			: kind == ir::Kind::Any && vm::any::tag(value) == vm::AnyTag::Object ? static_cast<const vm::Object *>(vm::any::pointer(value))

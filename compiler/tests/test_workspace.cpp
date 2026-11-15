@@ -1,4 +1,5 @@
 #include "check.h"
+#include "scratch.h"
 
 #include "builtins.h"
 #include "paths.h"
@@ -18,16 +19,12 @@ static void write(const fs::path &p_path, const std::string &p_text) {
 	out << p_text;
 }
 
-static fs::path fresh_folder(const char *p_name) {
-	fs::path folder = fs::temp_directory_path() / (std::string("kas3-test-") + p_name);
-	fs::remove_all(folder);
-	fs::create_directories(folder);
-	return fs::canonical(folder);
-}
+using check::fresh_folder;
 
 static Workspace::Options plain() {
 	Workspace::Options options;
 	options.godot = false;
+	options.support_folder = (check::run_folder() / "support").string();
 	return options;
 }
 
@@ -293,8 +290,7 @@ static void test_godot() {
 	fs::path declared = root / "decl" / "engine.txt";
 	write(declared, "package engine { public native class Motor { public native function run():void; } }");
 	write(player, "package { import engine.Motor; public class Player { function f(m:Motor):void { m.run(); m.stop(); } } }");
-	Workspace::Options with;
-	with.godot = false;
+	Workspace::Options with = plain();
 	with.declarations.push_back(declared.string());
 	Workspace third(with);
 	third.set_root(root.string());
@@ -327,8 +323,7 @@ static void test_godot() {
 }
 
 static void test_completion_cache_lifetime() {
-	Workspace::Options options;
-	options.godot = false;
+	Workspace::Options options = plain();
 	Workspace workspace(options);
 	const std::string path = "/work/Main.as";
 	const std::string head = "package { class Main { var current:";
