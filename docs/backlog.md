@@ -63,11 +63,7 @@ Found by the review of the clean-up pass itself.
 - A document that starts with a byte-order mark: a changed range on its first line lands one character
   early. **LS-2**
 - In UTF-8 position mode, a position inside a multi-byte character splits the character. **LS-2**
-- A static call's arguments are evaluated before the class's static fields are set, and `x is C` does not
-  set up `C`. Whether Flash does the same is unchecked. **clean-up**
 - Find references does not link an interface's method to the methods that implement it. **LS-2**
-- Tests are missing for: private and static members of the same name not counting as overrides, and the
-  base-first order when a host constructs an object. **clean-up**
 
 ## Stage 2b-2, part A: Godot's values
 

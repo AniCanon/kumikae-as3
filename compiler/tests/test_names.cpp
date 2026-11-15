@@ -349,6 +349,15 @@ static void test_overrides() {
 	CHECK_GODOT(head + "public static function make():Node { return null; }\n"
 					   "public static function add_child():void {}\n} }");
 	CHECK_GODOT(head + "public function make():void {}\n} }");
+	// Between two script classes too: a base's private method and its static ones are not overridden.
+	CHECK_MAIN("package { public class Main extends Base { public function hidden():void {} public function made():void {} } }\n"
+			   "class Base { private function hidden():void {} public static function made():void {} }");
+	CHECK_MAIN("package { public class Main extends Base { override public function /*!*/hidden():void {} } }\n"
+			   "class Base { private function hidden():void {} }",
+			"'hidden' is marked 'override' but no base class has a method to override");
+	CHECK_MAIN("package { public class Main extends Base { override public function /*!*/made():void {} } }\n"
+			   "class Base { public static function made():void {} }",
+			"'made' is marked 'override' but no base class has a method to override");
 	// Through two levels.
 	CHECK_GODOT("package { import godot.Node; public class Main extends Middle {\n"
 				"public function /*!*/add_child(node:Node):void {}\n"

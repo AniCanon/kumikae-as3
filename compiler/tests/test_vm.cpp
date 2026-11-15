@@ -1630,7 +1630,38 @@ static void test_untyped_out_of_memory() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// An object a host makes is built in the order `new` builds it, AS3's: a class's field values first, at
+// the start of its constructor, then its base's (fields, constructor), then the rest of its constructor.
+static void test_host_construct_order() {
+	Compilation compilation;
+	compilation.add("Child.as", "package { public class Child extends Base {\n"
+								"public var own:int = say('Child field');\n"
+								"public function Child() { trace('Child constructor'); }\n"
+								"} }\n"
+								"class Base {\n"
+								"public var first:int = say('Base field');\n"
+								"public function Base() { trace('Base constructor'); }\n"
+								"public function say(p_text:String):int { trace(p_text); return 1; }\n"
+								"}\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	uint32_t child = ir::NONE;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		child = module.classes[i].name == "Child" ? (uint32_t)i : child;
+	}
+	Recorder host;
+	vm::Interpreter interpreter(module, host);
+	CHECK(interpreter.start());
+	vm::Object *made = interpreter.construct(child);
+	CHECK(made != nullptr);
+	CHECK_EQ(host.printed, std::string("Child field\nBase field\nBase constructor\nChild constructor\n"));
+	interpreter.release_object(made);
+}
+
 int main() {
+	test_host_construct_order();
 	test_kept_traces();
 	test_untyped_out_of_memory();
 	test_out_of_memory();

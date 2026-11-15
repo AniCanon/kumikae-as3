@@ -227,12 +227,13 @@ uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_functio
 			list.push_back(0);
 		}
 	}
+	// The class is looked up before the arguments, and set up then, as in AVM2.
+	if (p_symbol->is_static() && p_symbol->owner) {
+		touch(p_symbol->owner, position);
+	}
 	call_arguments(decl, p_call->arguments, position, list);
 	if (on_another) {
 		emit(Op::NullCheck, position, list[0]); // After the arguments.
-	}
-	if (p_symbol->is_static() && p_symbol->owner) {
-		touch(p_symbol->owner, position);
 	}
 	Kind kind = Kind::Void;
 	uint32_t out = call_result(p_symbol, position, &kind);

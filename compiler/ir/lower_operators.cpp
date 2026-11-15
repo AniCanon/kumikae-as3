@@ -176,6 +176,9 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 		refuse(left->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " on a value that is not an object");
 		return default_value(Kind::Bool, position);
 	}
+	if (symbol) {
+		touch(symbol, position); // The class named is looked up after the value, and set up then, as in AVM2.
+	}
 	uint32_t out = reg(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj);
 	emit(p_binary->op == TokenKind::KwIs ? Op::IsClass : Op::AsClass, position, out, object, index);
 	return out;
