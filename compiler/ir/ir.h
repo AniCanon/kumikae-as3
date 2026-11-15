@@ -277,6 +277,9 @@ struct Class {
 	std::string native_base;
 	// The engine's virtual methods the class answers: Godot's name ("_physics_process") and the function.
 	std::vector<std::pair<std::string, uint32_t>> virtuals;
+	// The signals the class declares itself (`[Signal] public var hit:Signal;`), by name: Godot is told of
+	// them, with the base classes' too. Each one's field holds the signal from the start.
+	std::vector<std::string> signals;
 };
 
 struct Global {

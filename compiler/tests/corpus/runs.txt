@@ -4,7 +4,10 @@ MoveNodes
 NBody
 PerNodeChild
 PerNodeProcess
+Probe
 RayQueries
 Saxpy
 Shapes
 Sieve
+SignalTraffic
+V2Probe

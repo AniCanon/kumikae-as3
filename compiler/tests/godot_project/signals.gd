@@ -158,6 +158,16 @@ func _physics_process(_delta: float) -> bool:
 	other.emit_signal("hit", "five")
 	other.emit_signal("hit", 1, 2)
 	show("user signal", node.count, 7)
+	# A signal the script declares: Godot knows it, GDScript and AS3 both listen, AS3 emits it.
+	node.reset()
+	var heard := []
+	node.scored.connect(func(n): heard.append(n))
+	node.listenOwn()
+	node.score(4)
+	node.emit_signal("scored", 3)
+	show("declared signal", [node.has_signal("scored"), node.ownSignalName(), heard, node.count], [true, "scored", [4, 3], 7])
+	show("declared signal listed", node.get_signal_list().any(func(s): return s.name == "scored"), true)
+	node.stopAll()
 	# A signal kept in a script's own field, reached by the field's name.
 	node.stopAll()
 	node.reset()

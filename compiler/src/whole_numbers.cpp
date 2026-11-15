@@ -62,6 +62,15 @@ WholeResult gives_whole_number(const Call *p_call) {
 	return by_arguments ? WholeResult::IfArgumentsAre : WholeResult::No;
 }
 
+bool declares_signal(const VarDecl *p_decl) {
+	for (const Metadata &tag : p_decl->metadata) {
+		if (tag.name == "Signal") {
+			return true;
+		}
+	}
+	return false;
+}
+
 bool has_tag(const Symbol *p_class, std::string_view p_tag) {
 	if (!p_class || p_class->kind != SymbolKind::Class || !p_class->unit || !p_class->unit->is_declaration || !p_class->node ||
 			p_class->node->kind != NodeKind::ClassDecl) {

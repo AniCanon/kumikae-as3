@@ -331,6 +331,8 @@ inline std::string quoted(std::string_view p_name) {
 
 // Whether a class written in a declaration file carries a tag: [Abstract], [Singleton].
 bool has_tag(const Symbol *p_class, std::string_view p_tag);
+// Whether a field is written `[Signal] public var hit:Signal;`: it names a signal of the script's own.
+bool declares_signal(const VarDecl *p_decl);
 // The first p_count parts of a name written with dots ("flash.utils"), joined again.
 std::string dotted_name(const List<std::string_view> &p_parts, uint32_t p_count);
 

@@ -206,6 +206,7 @@ class Typer {
 	void shown(Expr *p_expression);
 
 	void declarators(VarDecl *p_decl);
+	void signal_field(VarDecl *p_decl);
 
 	void statement(Stmt *p_statement);
 

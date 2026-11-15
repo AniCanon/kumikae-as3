@@ -331,6 +331,7 @@ class Lowerer {
 
 	uint32_t super_call(Call *p_call);
 	std::optional<uint32_t> signal_call_by_name(Call *p_call);
+	uint32_t own_signal(std::string_view p_name, uint32_t p_position);
 	uint32_t cast(Call *p_call, Symbol *p_type, Kind p_want);
 	uint32_t trace_call(Call *p_call);
 	uint32_t engine_text(Call *p_call);

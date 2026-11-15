@@ -17,6 +17,11 @@ package {
 		private function isBig(n:int):Boolean { return n > 2; }
 
 		public function reset():void { count = 0; }
+		// A signal of the script's own, which Godot knows by its name.
+		[Signal] public var scored:Signal;
+		public function listenOwn():void { scored.add(onHit); }
+		public function score(n:int):void { scored.emit(n); }
+		public function ownSignalName():String { return scored.getName(); }
 		// A loop of a listener and what it listens to; a listener nothing else holds; a signal in a field.
 		private var mine:Signal;
 		public function loop(r:Resource):void { var h:Holder = new Holder(); h.res = r; r.changed.add(h.heard); }

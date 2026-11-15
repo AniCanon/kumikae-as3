@@ -49,8 +49,8 @@ public:
 	bool _is_valid() const override { return class_ != 0xFFFFFFFFu; }
 	bool _is_abstract() const override { return false; }
 	godot::ScriptLanguage *_get_language() const override;
-	bool _has_script_signal(const godot::StringName &) const override { return false; }
-	godot::TypedArray<godot::Dictionary> _get_script_signal_list() const override { return {}; }
+	bool _has_script_signal(const godot::StringName &p_signal) const override;
+	godot::TypedArray<godot::Dictionary> _get_script_signal_list() const override;
 	bool _has_property_default_value(const godot::StringName &) const override { return false; }
 	godot::Variant _get_property_default_value(const godot::StringName &) const override { return {}; }
 	void _update_exports() override {}

@@ -75,6 +75,54 @@ bool AS3Script::_has_method(const StringName &p_method) const {
 	return class_ != kas3::ir::NONE && script_method(class_, p_method) != kas3::ir::NONE;
 }
 
+namespace {
+
+// The signals the class declares with [Signal], and those of the classes it extends.
+std::vector<std::string> script_signals(uint32_t p_class) {
+	std::vector<std::string> all;
+	Project &program = Project::get();
+	for (uint32_t at = p_class; program.valid() && at < program.module().classes.size(); at = program.module().classes[at].base) {
+		const std::vector<std::string> &own = program.module().classes[at].signals;
+		all.insert(all.end(), own.begin(), own.end());
+	}
+	return all;
+}
+
+} // namespace
+
+bool AS3Script::_has_script_signal(const StringName &p_signal) const {
+	const String wanted(p_signal);
+	for (const std::string &name : script_signals(class_)) {
+		if (String::utf8(name.c_str()) == wanted) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Each as Godot describes a signal: a name, and no arguments said (it is given what emit() is given).
+TypedArray<Dictionary> AS3Script::_get_script_signal_list() const {
+	TypedArray<Dictionary> list;
+	for (const std::string &name : script_signals(class_)) {
+		Dictionary returned;
+		returned["name"] = String();
+		returned["type"] = Variant::NIL;
+		returned["class_name"] = StringName();
+		returned["hint"] = 0;
+		returned["hint_string"] = String();
+		returned["usage"] = PROPERTY_USAGE_DEFAULT;
+		Dictionary signal;
+		signal["name"] = String::utf8(name.c_str());
+		signal["args"] = Array();
+		signal["default_args"] = Array();
+		signal["return"] = returned;
+		signal["flags"] = METHOD_FLAG_NORMAL;
+		signal["id"] = 0;
+		list.push_back(signal);
+	}
+	return list;
+}
+
 ScriptLanguage *AS3Script::_get_language() const {
 	return AS3Language::singleton;
 }

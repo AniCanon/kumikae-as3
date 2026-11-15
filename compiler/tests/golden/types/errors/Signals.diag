@@ -1,0 +1,5 @@
+golden/types/errors/Signals.as:7:3: error: [Signal] takes nothing: a signal is given whatever emit() is given
+golden/types/errors/Signals.as:8:3: error: a [Signal] field can't be static: a signal belongs to an object
+golden/types/errors/Signals.as:9:23: error: 'count' is a [Signal] field, so its type is 'Signal'
+golden/types/errors/Signals.as:10:40: error: a [Signal] field holds its own signal: no value is written for it
+golden/types/errors/Signals.as:17:2: error: [Signal] is for a class that extends one of Godot's: only a Godot object has signals

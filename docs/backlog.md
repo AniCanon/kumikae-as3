@@ -55,7 +55,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 - A signal's own `numListeners` and `emit` can't follow `object[name]` as a property read: only its
   methods can (`timer[name].add(f)`). **2c**
-- A script's own signals wait for `[Signal]`. **2d**
 - Objects that hold each other in a loop are freed only when a listener is part of the loop, or reaches
   it. A loop of script objects with no listener in it stays (the cycle collector). So does a loop
   that passes through a Godot collection. **2d**
@@ -180,8 +179,8 @@ any Godot value passing as a condition):
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
-- 4 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
-  the four are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
+- 1 of the 14 corpus programs does not run yet, ArrayConversion, which needs `Array`:
+  `tests/run_corpus.py` prints what stops it. **2c**
 - An endless loop has no stop. **2d**
 
 ## Stage 2b-1: AS3 inside Godot, first slice

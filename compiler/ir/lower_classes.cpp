@@ -67,6 +67,9 @@ void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 		} else {
 			fields_[declarator.symbol] = (uint32_t)module_.classes[p_class].fields.size();
 			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null });
+			if (declares_signal(p_decl)) {
+				module_.classes[p_class].signals.push_back(std::string(declarator.name));
+			}
 		}
 	}
 }
@@ -281,6 +284,22 @@ bool Lowerer::calls_super(Block *p_body) {
 	return found;
 }
 
+// A signal the script declares, as its field holds it: Signal(the Godot object, its name).
+uint32_t Lowerer::own_signal(std::string_view p_name, uint32_t p_position) {
+	uint32_t type_name = 0;
+	if (!signal_ || !engine_name(signal_, std::string_view(), &type_name)) {
+		refuse(p_position, "a signal without Godot's API");
+		return default_value(Kind::Val, p_position);
+	}
+	const uint32_t owner = reg(Kind::Ref);
+	emit(Op::OwnerOf, p_position, owner, 0);
+	const uint32_t name = reg(Kind::Str);
+	emit(Op::ConstStr, p_position, name, string(std::string(p_name)));
+	const uint32_t out = reg(Kind::Val);
+	emit(Op::HostNew, p_position, out, type_name, arguments({ owner, name }));
+	return out;
+}
+
 void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 	Symbol *symbol = p_class->symbol;
 	uint32_t index = classes_[symbol];
@@ -304,6 +323,10 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 		}
 		for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
 			auto field = fields_.find(declarator.symbol);
+			if (field != fields_.end() && declares_signal(static_cast<VarDecl *>(member))) {
+				emit(Op::SetField, declarator.offset, 0, field->second, own_signal(declarator.name, declarator.offset));
+				continue;
+			}
 			// Those with a written value too: a method that the values of the fields above call may read it.
 			if (field != fields_.end() && module_.classes[index].fields[field->second].kind == Kind::Val) {
 				uint32_t zero = zero_value(declarator.type, declarator.offset);

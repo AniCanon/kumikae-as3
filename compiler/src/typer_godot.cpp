@@ -270,4 +270,45 @@ TokenKind Typer::compound_operator(TokenKind p_op) {
 	}
 }
 
+// `[Signal] public var hit:Signal;`: an instance field of type Signal, with no value written, in a class that
+// extends one of Godot's. Godot is told of the signal; the field holds it from the start.
+void Typer::signal_field(VarDecl *p_decl) {
+	const Metadata *tag = nullptr;
+	for (const Metadata &each : p_decl->metadata) {
+		tag = each.name == "Signal" ? &each : tag;
+	}
+	if (!tag) {
+		return;
+	}
+	if (tag->args.count) {
+		error(tag->offset, "[Signal] takes nothing: a signal is given whatever emit() is given");
+	}
+	if (p_decl->modifiers.bits & Modifiers::Static) {
+		error(tag->offset, "a [Signal] field can't be static: a signal belongs to an object");
+	}
+	const Symbol *object = nullptr;
+	if (godot_) {
+		const auto found = godot_->definitions.find("GodotObject");
+		object = found == godot_->definitions.end() ? nullptr : found->second;
+	}
+	bool godot_class = false;
+	for (const Symbol *at = class_; at && at->klass && object; at = at->klass->base) {
+		godot_class = godot_class || at == object;
+	}
+	if (!godot_class) {
+		error(tag->offset, "[Signal] is for a class that extends one of Godot's: only a Godot object has signals");
+	}
+	for (Declarator &declarator : p_decl->declarators) {
+		const Type *type = declarator.type ? compilation_.type_of(declarator.type) : nullptr;
+		const bool signal = type && type->kind == Type::Instance && type->symbol && type->symbol->name == "Signal" && godot_ &&
+				godot_->definitions.count("Signal") && godot_->definitions.find("Signal")->second == type->symbol;
+		if (!signal && type && type->kind != Type::Unknown) {
+			error(declarator.offset, quoted(declarator.name) + " is a [Signal] field, so its type is 'Signal'");
+		}
+		if (declarator.initializer) {
+			error(declarator.initializer->offset, "a [Signal] field holds its own signal: no value is written for it");
+		}
+	}
+}
+
 } // namespace kas3
