@@ -30,6 +30,7 @@ public:
 	void *copy(void *p_value) override { return p_value; }
 	void drop(void *) override {}
 	bool present(void *p_value) override { return p_value != nullptr; }
+	bool is_class(void *, std::string_view) override { return false; }
 	Str *text(void *) override { return nullptr; }
 	bool operate(std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 	bool index_get(void *, const Argument &, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }

@@ -448,6 +448,10 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		return true;
 	}
 	bool present(void *p_value) override { return p_value != nullptr; }
+	bool is_class(void *p_value, std::string_view p_class) override {
+		log += "is #" + std::to_string((intptr_t)p_value) + " " + std::string(p_class) + "\n";
+		return p_value != nullptr;
+	}
 	vm::Str *text(void *p_value) override {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
@@ -1082,6 +1086,50 @@ static void compile(const char *p_source, ir::Module *r_module, const char *p_fi
 }
 
 // A running program's objects are moved onto a newer build of it: what they hold stays, what they do is new.
+// Which classes changed code that runs once (a constructor, the field values it sets, `_ready`, a static
+// initializer, and what those call), so that a reload knows the running objects will not show it.
+static void test_run_once_changes() {
+	const char *base = "package { public class Game {\n"
+					   "  public var speed:Number = 300; public static var best:int = 1;\n"
+					   "  public function _ready():void { setup(); }\n"
+					   "  private function setup():void { speed += 1; }\n"
+					   "  public function _process(delta:Number):void { speed += delta; }\n"
+					   "} }\n";
+	const auto changes = [&](const std::string &p_after) {
+		ir::Module before, after;
+		compile(base, &before, "Game.as");
+		compile(p_after.c_str(), &after, "Game.as");
+		const std::vector<std::string> found = ir::run_once_changes(before, after);
+		std::string out;
+		for (const std::string &name : found) {
+			out += name + ";";
+		}
+		return out;
+	};
+	std::string same = base;
+	CHECK_EQ(changes(same), std::string());
+	// Moving code down a line, or changing what runs every frame, is not a change to what ran once.
+	CHECK_EQ(changes(std::string("\n\n") + base), std::string());
+	std::string frame = base;
+	frame.replace(frame.find("speed += delta"), 14, "speed += delta * 2");
+	CHECK_EQ(changes(frame), std::string());
+	std::string field = base;
+	field.replace(field.find("= 300"), 5, "= 500");
+	CHECK_EQ(changes(field), std::string("Game;"));
+	std::string ready = base;
+	ready.replace(ready.find("{ setup(); }"), 12, "{ setup(); speed = 2; }");
+	CHECK_EQ(changes(ready), std::string("Game;"));
+	std::string called = base;
+	called.replace(called.find("speed += 1;"), 11, "speed += 5;");
+	CHECK_EQ(changes(called), std::string("Game;"));
+	std::string statics = base;
+	statics.replace(statics.find("best:int = 1"), 12, "best:int = 9");
+	CHECK_EQ(changes(statics), std::string("Game;"));
+	std::string added = base;
+	added.replace(added.find("public static var"), 17, "public var lives:int = 3; public static var");
+	CHECK_EQ(changes(added), std::string("Game;"));
+}
+
 // Vectors across a reload: one is moved with its elements, and the objects in it are moved too.
 static void test_reload_vectors() {
 	const char *before = "package { public class Bag {\n"
@@ -1392,6 +1440,7 @@ static void test_failed_static_initializer() {
 int main() {
 	test_reload();
 	test_reload_vectors();
+	test_run_once_changes();
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();

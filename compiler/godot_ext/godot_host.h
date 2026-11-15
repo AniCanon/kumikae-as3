@@ -74,6 +74,7 @@ public:
 	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	bool present(void *p_value) override;
+	bool is_class(void *p_value, std::string_view p_class) override;
 	vm::Str *text(void *p_value) override;
 	void *copy(void *p_value) override;
 	void drop(void *p_value) override;

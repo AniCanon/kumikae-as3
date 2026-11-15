@@ -11,6 +11,7 @@
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/window.hpp>
@@ -176,6 +177,24 @@ void Project::watch() {
 	watch_seen = now;
 }
 
+// After the code itself is swapped: the scene that is running is made again from its file, so that what
+// runs once runs again with the new code. The game's static fields keep their values.
+static void restart_scene(const std::vector<std::string> &p_classes) {
+	String names;
+	for (const std::string &name : p_classes) {
+		names += String(names.is_empty() ? "" : ", ") + String::utf8(name.c_str());
+	}
+	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
+	godot::Node *scene = tree ? tree->get_current_scene() : nullptr;
+	if (!scene || scene->get_scene_file_path().is_empty()) {
+		UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names +
+				". Objects alive now keep what it did; restart the scene to see it.");
+		return;
+	}
+	UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names + ", so the scene was started again.");
+	tree->call_deferred("reload_current_scene");
+}
+
 void Project::reload() {
 	if (!program || !program->valid_) {
 		// Nothing is running: the scripts had errors. They are simply loaded again.
@@ -195,6 +214,9 @@ void Project::reload() {
 				String::utf8(errors.c_str()));
 		return;
 	}
+	// Code that runs once (a constructor, a field's first value, `_ready`) does not run again for the
+	// objects that are alive: for an edit there to show, the scene is made again from its file.
+	const std::vector<std::string> run_once = ir::run_once_changes(*program->module_, *module);
 	auto fresh = std::make_unique<vm::Interpreter>(*module, program->host_);
 	{
 		vm::Reload moving(*program->interpreter_, *fresh);
@@ -215,6 +237,9 @@ void Project::reload() {
 	module.reset();
 	AS3Script::refresh_all();
 	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.");
+	if (!run_once.empty()) {
+		restart_scene(run_once);
+	}
 }
 
 void Project::unload() {

@@ -682,6 +682,15 @@ bool GodotHost::present(void *p_value) {
 	return value && value->get_type() != Variant::NIL && !is_freed(*value);
 }
 
+bool GodotHost::is_class(void *p_value, std::string_view p_class) {
+	const Variant *value = static_cast<const Variant *>(p_value);
+	if (!value || value->get_type() != Variant::OBJECT || is_freed(*value)) {
+		return false;
+	}
+	const Object *object = *value;
+	return object && object->is_class(to_godot(p_class));
+}
+
 vm::Str *GodotHost::text(void *p_value) {
 	CharString utf8 = static_cast<Variant *>(p_value)->stringify().utf8();
 	return vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));

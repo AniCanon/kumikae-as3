@@ -121,6 +121,23 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 	uint32_t index = 0;
 	// `v is Vector.<int>`: the type written is the class itself, and its instances are the vector.
 	const Type *written = right->type && right->type->kind == Type::ClassObject ? right->type->element : nullptr;
+	uint32_t godot_class = 0;
+	if (symbol && is_godot(symbol) && is_godot_object(symbol) && engine_name(symbol, std::string_view(), &godot_class)) {
+		// One of Godot's classes: the engine knows what an object of its own is.
+		const bool test = p_binary->op == TokenKind::KwIs;
+		uint32_t object = expression(left, Kind::Void);
+		if (kind_at(object) != Kind::Ref) {
+			if (!test || !is_reference(kind_at(object))) {
+				refuse(left->offset, std::string(test ? "'is'" : "'as'") + " with a Godot class on a value that is not one of Godot's objects");
+				return default_value(test ? Kind::Bool : Kind::Ref, position);
+			}
+			// A script object or a string is never one of Godot's objects.
+			return default_value(Kind::Bool, position);
+		}
+		uint32_t out = test ? reg(Kind::Bool) : engine_reg(Kind::Ref, p_binary->type);
+		emit(test ? Op::HostIsClass : Op::HostAsClass, position, out, object, godot_class);
+		return out;
+	}
 	if (const std::optional<uint32_t> of_vector = is_vector(written) ? vector_class(written) : std::nullopt) {
 		index = *of_vector;
 	} else if (!symbol || !class_index(symbol, &index)) {
