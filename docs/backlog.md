@@ -59,7 +59,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths. **LS-2**
 - The same file reached through a symbolic link, or under a different letter case, or in a different
   Unicode form, counts as two files. **LS-2**
-- Symbol search covers the project only, not Godot's classes. **LS-2**
 - While any file has a syntax error, type errors are hidden everywhere. Silencing only the broken region
   would be kinder. **LS-2**
 

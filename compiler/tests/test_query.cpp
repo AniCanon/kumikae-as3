@@ -770,15 +770,28 @@ static void test_outline() {
 		std::string out;
 		for (const FoundSymbol &found : index.find(p_query, p_limit)) {
 			out += (found.container.empty() ? "" : found.container + ".") + found.name + " ";
-			CHECK(found.unit && !found.unit->is_declaration);
+			CHECK(found.unit != nullptr);
 		}
 		return out;
 	};
 	CHECK_EQ(names("HEALTH", 10), std::string("game.Player.health ")); // Once, though it has a getter and a setter.
-	CHECK_EQ(names("play", 10), std::string("game.Player game.Player.Player "));
-	CHECK_EQ(names("a", 3), std::string("game.Player game.Player.MAX game.Player.target "));
+	// The program's own definitions come first, then Godot's and the built-in library's.
+	CHECK_EQ(names("play", 3), std::string("game.Player game.Player.Player godot.Node.multiplayer "));	CHECK_EQ(names("a", 3), std::string("game.Player game.Player.MAX game.Player.target "));
 	CHECK(index.find("", 1000).size() > 15);
-	CHECK_EQ(names("Node", 10), std::string()); // Godot's own classes are not listed.
+	CHECK_EQ(names("CharacterBody2D", 1), std::string("godot.CharacterBody2D "));
+	CHECK_EQ(names("moveAndSlide", 10), std::string("godot.CharacterBody2D.moveAndSlide godot.CharacterBody3D.moveAndSlide "));
+	CHECK_EQ(names("charCodeAt", 10), std::string("String.charCodeAt "));
+	std::vector<FoundSymbol> all = index.find("e", 100000);
+	size_t program = 0;
+	while (program < all.size() && !all[program].unit->is_declaration) {
+		program++;
+	}
+	CHECK_EQ(program, (size_t)15);
+	CHECK(all.size() > 10000);
+	CHECK_EQ(index.find("", 100000).size(), (size_t)20); // With nothing asked for: the program, and no more.
+	for (size_t i = program; i < all.size(); i++) {
+		CHECK(all[i].unit->is_declaration); // None of the program's after the first of Godot's.
+	}
 }
 
 // Every query answers on files that do not parse.

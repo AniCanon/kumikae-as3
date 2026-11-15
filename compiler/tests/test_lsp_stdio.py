@@ -186,8 +186,11 @@ with tempfile.TemporaryDirectory() as folder:
         check("godot definition", target.startswith("file://") and target.endswith("godot.as") and
               os.path.exists(target[len("file://"):].replace("%20", " ")), repr(found))
         symbols = [m for m in messages if m.get("id") == 3]
-        check("symbols", len(symbols) == 1 and [s["name"] for s in symbols[0]["result"]] == ["Player"] and
-              symbols[0]["result"][0]["location"]["uri"] == uri, repr(symbols))
+        names = [s["name"] for s in symbols[0]["result"]] if len(symbols) == 1 else []
+        # The project's own class first, then what Godot's API has by that name.
+        check("symbols", names[:1] == ["Player"] and symbols[0]["result"][0]["location"]["uri"] == uri and
+              "AnimationPlayer" in names[1:] and
+              all(s["location"]["uri"].endswith("godot.as") for s in symbols[0]["result"][1:]), repr(symbols)[:2000])
 
 # Completion insertion and argument help over the actual framed transport.
 completion_text = ('package { public class Main { public function move(amount:int, label:String = "x"):void {} '

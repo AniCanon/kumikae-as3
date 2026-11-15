@@ -488,11 +488,27 @@ static void test_navigation() {
 
 	// Workspace symbols.
 	Json symbols = session.request("workspace/symbol", Json::object().set("query", "hur")).get("result");
-	CHECK_EQ(symbols.size(), (size_t)1);
+	CHECK_EQ(symbols.size(), (size_t)2); // The project's, then one of Godot's constants.
+	CHECK_EQ(symbols.at(1).get("name").string(), std::string("WEEKDAY_THURSDAY"));
 	CHECK_EQ(symbols.at(0).get("name").string(), std::string("hurt"));
 	CHECK_EQ(symbols.at(0).get("containerName").string(), std::string("game.Enemy"));
 	CHECK_EQ(spot(symbols.at(0).get("location")), std::string("Enemy.as 2:17-2:21"));
 	CHECK(session.request("workspace/symbol", Json::object().set("query", "")).get("result").size() >= 6);
+	// Godot's classes are found too, after the project's own, in the copy of the API an editor can open.
+	symbols = session.request("workspace/symbol", Json::object().set("query", "Enemy")).get("result");
+	CHECK_EQ(symbols.at(0).get("containerName").string(), std::string("game"));
+	symbols = session.request("workspace/symbol", Json::object().set("query", "CharacterBody2D")).get("result");
+	CHECK(symbols.size() >= 1);
+	CHECK_EQ(symbols.at(0).get("name").string(), std::string("CharacterBody2D"));
+	CHECK_EQ(symbols.at(0).get("containerName").string(), std::string("godot"));
+	CHECK_EQ(symbols.at(0).get("kind").integer(), (int64_t)5);
+	CHECK_EQ(symbols.at(0).get("location").get("uri").string(), godot_uri);
+	const Json &found_at = symbols.at(0).get("location").get("range").get("start");
+	size_t found_line = 0;
+	for (int64_t i = 0; i < found_at.get("line").integer(); i++) {
+		found_line = godot_text.find('\n', found_line) + 1;
+	}
+	CHECK_EQ(godot_text.substr(found_line + (size_t)found_at.get("character").integer(), 15), std::string("CharacterBody2D"));
 
 	// A file changes on disk: the program follows, and the errors appear in the open file.
 	write(enemy_path, "package game {\npublic class Enemy {\n}\n}\n");

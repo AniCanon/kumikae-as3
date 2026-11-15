@@ -117,8 +117,9 @@ public:
 	// What it is and where it lives: "method of game.Player", "class in package godot", "local variable".
 	std::string context(const Symbol *p_symbol) const;
 	std::vector<OutlineItem> outline(const Unit &p_unit) const;
-	// Definitions in the program's files whose name contains the query, whatever the case. An empty
-	// query matches everything.
+	// Definitions whose name contains the query, whatever the case: the program's own, then those of the
+	// declaration files (Godot's API, the built-in library). An empty query matches everything in the
+	// program, and nothing outside it.
 	std::vector<FoundSymbol> find(std::string_view p_query, size_t p_limit);
 	// What could be written at the offset, narrowed by the letters already there, whatever their case.
 	// After a dot: what the value before it has. Where a type is written: types. Otherwise the names in

@@ -483,19 +483,25 @@ std::vector<FoundSymbol> Queries::find(std::string_view p_query, size_t p_limit)
 		symbol.length = p_item.name_length;
 		found.push_back(std::move(symbol));
 	};
-	for (const Unit &unit : compilation_.units()) {
-		if (unit.is_declaration) {
-			continue;
+	// The program's own definitions first: with a limit, they are what is kept.
+	for (bool declared : { false, true }) {
+		if (declared && p_query.empty()) {
+			break; // Everything, unasked: the program is what is meant, not Godot's thousands of names.
 		}
-		const std::string package = unit.package ? unit.package->name : std::string();
-		for (const OutlineItem &item : outline(unit)) {
-			consider(unit, item, package);
-			const std::string container = package.empty() ? item.name : package + "." + item.name;
-			for (const OutlineItem &child : item.children) {
-				consider(unit, child, container);
+		for (const Unit &unit : compilation_.units()) {
+			if (unit.is_declaration != declared) {
+				continue;
 			}
-			if (found.size() >= p_limit) {
-				return found;
+			const std::string package = unit.package ? unit.package->name : std::string();
+			for (const OutlineItem &item : outline(unit)) {
+				consider(unit, item, package);
+				const std::string container = package.empty() ? item.name : package + "." + item.name;
+				for (const OutlineItem &child : item.children) {
+					consider(unit, child, container);
+				}
+				if (found.size() >= p_limit) {
+					return found;
+				}
 			}
 		}
 	}
