@@ -349,6 +349,15 @@ static void test_overrides() {
 	CHECK_GODOT(head + "public static function make():Node { return null; }\n"
 					   "public static function add_child():void {}\n} }");
 	CHECK_GODOT(head + "public function make():void {}\n} }");
+	// Between two script classes too: a base's private method and its static ones are not overridden.
+	CHECK_MAIN("package { public class Main extends Base { public function hidden():void {} public function made():void {} } }\n"
+			   "class Base { private function hidden():void {} public static function made():void {} }");
+	CHECK_MAIN("package { public class Main extends Base { override public function /*!*/hidden():void {} } }\n"
+			   "class Base { private function hidden():void {} }",
+			"'hidden' is marked 'override' but no base class has a method to override");
+	CHECK_MAIN("package { public class Main extends Base { override public function /*!*/made():void {} } }\n"
+			   "class Base { public static function made():void {} }",
+			"'made' is marked 'override' but no base class has a method to override");
 	// Through two levels.
 	CHECK_GODOT("package { import godot.Node; public class Main extends Middle {\n"
 				"public function /*!*/add_child(node:Node):void {}\n"
@@ -681,6 +690,9 @@ static void test_review_findings() {
 // crash or hang the checker, alone or beside the complete corpus.
 static void test_corpus_prefixes() {
 	const std::string godot = godot_declarations();
+	// Parsed once and handed to each check, as the language server does: every prefix gets Godot's API.
+	const std::shared_ptr<Parsed> parsed_godot = parse_file(GODOT_DECLARATIONS_PATH, godot);
+	const std::vector<std::shared_ptr<Parsed>> builtins = parse_builtins();
 	int files = 0;
 	Compilation whole; // The complete corpus as one program: its files refer to each other.
 	whole.add(GODOT_DECLARATIONS_PATH, godot, true);
@@ -694,12 +706,8 @@ static void test_corpus_prefixes() {
 		files++;
 		whole.add(name, text);
 		for (size_t length = 0; length < text.size(); length++) {
-			Compilation compilation;
-			// Godot's API takes far longer to load than a prefix takes to check, so only some prefixes get
-			// it. The others still run every pass, with the Godot names unknown.
-			if (length % 293 == 0) {
-				compilation.add(GODOT_DECLARATIONS_PATH, godot, true);
-			}
+			Compilation compilation(builtins);
+			compilation.add(parsed_godot, true);
 			compilation.add(name, text.substr(0, length));
 			compilation.check();
 			check::checks()++;

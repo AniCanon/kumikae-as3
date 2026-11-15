@@ -14,6 +14,41 @@ package {
 		public function strength(action:String):Number { return Input.getActionStrength(action); }
 		public function stick():Vector2 { return Input.getVector("ui_left", "ui_right", "ui_up", "ui_down"); }
 		public function system():String { return OS.getName(); }
+		// An error whose message looks like a stack line is still shown at the line it was thrown from.
+		public function fakeTrace():void { throw new Error("odd\n\tat fake()[nowhere.as:99]"); }
+		// A class's static method, called through its own entry: a call Godot refused would be the script's error.
+		public function staticWorks():String { return GodotJSON.stringify(3); }
+		// Its arguments are worked out left to right, and what it gives back is checked where it is stored.
+		private var order:String = "";
+		private function noted(p_text:String):String { order += p_text; return p_text; }
+		public function staticOrder():String { GodotJSON.stringify(noted("a"), noted("b")); return order; }
+		// A Godot property written through a missing script object: the value first, then AS3's null error.
+		public function writeMissing():String {
+			order = "";
+			var none:Statics = null;
+			try { none.visible = noted("value") == "value"; } catch (e:TypeError) { return order + " caught"; }
+			return order;
+		}
+		public function staticWrongType():String {
+			try { var node:Node = GodotJSON.parseString("[1]"); } catch (e:TypeError) { return "caught"; }
+			return "carried on";
+		}
+		public function orphansShown():Boolean { Node.printOrphanNodes(); return true; }
+		// A variable that holds a singleton reaches its members, on that object.
+		public function viaObject():Boolean {
+			var i:Input = Input.singleton;
+			return i.isActionPressed("ui_accept") == Input.isActionPressed("ui_accept") && i.mouseMode == Input.mouseMode;
+		}
+		public function viaNull():Boolean {
+			var none:Input = null;
+			try { none.isActionPressed("ui_accept"); } catch (e:TypeError) { return true; }
+			return false;
+		}
+		// An editor-only singleton in a game: one AS3 error, which can be caught, and nothing from Godot.
+		public function editorOnly():Boolean {
+			try { var editor:EditorInterface = EditorInterface.singleton; } catch (e:Error) { return true; }
+			return false;
+		}
 		public function slow(scale:Number):void { Engine.timeScale = scale; }
 		public function timeScale():Number { return Engine.timeScale; }
 		public function faster():Number { Engine.timeScale *= 2; return Engine.timeScale; }
@@ -44,7 +79,7 @@ package {
 
 		// Static methods.
 		public function fromAngle(angle:Number):Vector2 { return Vector2.fromAngle(angle); }
-		public function hsv(h:Number, s:Number, v:Number):Color { return Color.fromHsv(h, s, v); }
+		public function hsv(h:Number, s:Number, v:Number):Color { return Color.fromHSV(h, s, v); }
 		public function html(text:String):Color { return Color.html(text); }
 		public function euler(v:Vector3):Quaternion { return Quaternion.fromEuler(v); }
 		public function image():int {

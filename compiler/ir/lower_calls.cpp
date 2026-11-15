@@ -78,10 +78,32 @@ std::optional<uint32_t> Lowerer::signal_call_by_name(Call *p_call) {
 	if (found == NONE) {
 		return std::nullopt;
 	}
-	return engine_call(p_call, verb->second, found, [&]() { emit(Op::HostMember, member->object->offset, found, object, name); });
+	return engine_call(p_call, verb->second, found, Later{ Op::HostMember, member->object->offset, found, object, name });
 }
 
 // A conversion written as a call: int(x), String(x).
+// A value converted by a conversion written out. To or from an Int64 that is AS3's own (see convert()),
+// and in each branch of a `?:`, whatever the two branches join to: `int(c ? wide : 1.5)` cuts the wide one.
+uint32_t Lowerer::written_value(Expr *p_value, Kind p_conversion, uint32_t p_position) {
+	if (p_value->kind == NodeKind::Conditional) {
+		Conditional *conditional = static_cast<Conditional *>(p_value);
+		uint32_t out = reg(p_conversion);
+		uint32_t to_else = emit(Op::JumpIfNot, p_position, expression(conditional->condition, Kind::Bool), 0);
+		emit(Op::Move, p_position, out, written_value(conditional->then_value, p_conversion, p_position));
+		uint32_t to_end = emit(Op::Jump, p_position, 0);
+		patch(to_else, here());
+		emit(Op::Move, p_position, out, written_value(conditional->else_value, p_conversion, p_position));
+		patch(to_end, here());
+		return out;
+	}
+	Kind given = Kind::Void;
+	bool known = kind_of(p_value->type, &given);
+	if (known && (given == Kind::I64 || p_conversion == Kind::I64) && !is_null(p_value)) {
+		return convert(wide_operand(p_value, p_conversion), p_conversion, p_position, true);
+	}
+	return expression(p_value, p_conversion);
+}
+
 uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	uint32_t position = p_call->offset;
 	Kind conversion = Kind::Void;
@@ -92,12 +114,7 @@ uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	if (conversion == Kind::Str && untyped(p_call->arguments[0])) {
 		return any_text(p_call->arguments[0]); // String(x): "undefined" and "null" are words.
 	}
-	Kind given = Kind::Void;
-	bool known = kind_of(p_call->arguments[0]->type, &given);
-	// To or from an Int64, a conversion that is written out is AS3's own: see convert().
-	uint32_t value = known && (given == Kind::I64 || conversion == Kind::I64) && !is_null(p_call->arguments[0])
-			? convert(wide_operand(p_call->arguments[0], conversion), conversion, position, true)
-			: expression(p_call->arguments[0], conversion);
+	uint32_t value = written_value(p_call->arguments[0], conversion, position);
 	if (conversion != Kind::Str) {
 		return value;
 	}
@@ -150,6 +167,9 @@ uint32_t Lowerer::engine_text(Call *p_call) {
 uint32_t Lowerer::godot_call(Call *p_call, Symbol *p_method) {
 	uint32_t position = p_call->offset;
 	if (p_method->is_static()) {
+		if (is_singleton(p_method->owner) && on_object(p_call->callee)) {
+			return engine_call(p_call, p_method); // `i.isActionPressed()`: on the object `i` holds.
+		}
 		return is_singleton(p_method->owner) ? engine_call(p_call, p_method, singleton(p_method->owner, position)) : static_call(p_call, p_method);
 	}
 	Expr *callee = p_call->callee;
@@ -227,12 +247,13 @@ uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_functio
 			list.push_back(0);
 		}
 	}
+	// The class is looked up before the arguments, and set up then, as in AVM2.
+	if (p_symbol->is_static() && p_symbol->owner) {
+		touch(p_symbol->owner, position);
+	}
 	call_arguments(decl, p_call->arguments, position, list);
 	if (on_another) {
 		emit(Op::NullCheck, position, list[0]); // After the arguments.
-	}
-	if (p_symbol->is_static() && p_symbol->owner) {
-		touch(p_symbol->owner, position);
 	}
 	Kind kind = Kind::Void;
 	uint32_t out = call_result(p_symbol, position, &kind);
@@ -382,13 +403,23 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 				continue;
 			}
 			std::string godot_default;
-			if (is_null(p_arguments[i]) && !p_defaults.empty() && p_function->parameters[i].default_value &&
-					is_null(p_function->parameters[i].default_value) && kind_of(type, &kind) && kind == Kind::Val &&
-					godot_name("@default", p_defaults + "." + std::to_string(i), &godot_default)) {
+			if (!p_defaults.empty() && p_function->parameters[i].default_value && is_null(p_function->parameters[i].default_value) &&
+					kind_of(type, &kind) && kind == Kind::Val && godot_name("@default", p_defaults + "." + std::to_string(i), &godot_default)) {
 				// `null` where the default is one AS3 can't write, with arguments after it: Godot's own
-				// default, from Godot's text for it.
+				// default, from Godot's text for it. Written `null`, it is known now; a value that may be
+				// null (`var c:Color = null`) is looked at as the call is made.
 				uint32_t value = engine_reg(Kind::Val, type);
-				emit(Op::HostDefault, p_arguments[i]->offset, value, string(godot_default));
+				if (!is_null(p_arguments[i])) {
+					// Into a register of its own: what comes later can't change it.
+					emit(Op::Move, p_arguments[i]->offset, value, expression(p_arguments[i], Kind::Val));
+					uint32_t present = reg(Kind::Bool);
+					emit(Op::HostPresent, p_arguments[i]->offset, present, value);
+					uint32_t given = emit(Op::JumpIf, p_arguments[i]->offset, present, 0);
+					emit(Op::HostDefault, p_arguments[i]->offset, value, string(godot_default));
+					patch(given, here());
+				} else {
+					emit(Op::HostDefault, p_arguments[i]->offset, value, string(godot_default));
+				}
 				r_list.push_back(value);
 				continue;
 			}
@@ -428,7 +459,7 @@ std::string Lowerer::defaults_key(const Symbol *p_method) const {
 	return klass + "." + method;
 }
 
-uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver, const std::function<void()> &p_before) {
+uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver, std::optional<Later> p_before) {
 	uint32_t position = p_call->offset;
 	uint32_t name = 0;
 	if (!engine_name(p_method->owner, p_method->name, &name)) {
@@ -456,7 +487,7 @@ uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receive
 		owner_of(script_object, receiver, object->offset);
 	}
 	if (p_before) {
-		p_before(); // What the receiver still needs, now that the arguments are worked out.
+		emit(p_before->op, p_before->position, p_before->a, p_before->b, p_before->c); // What the receiver still needs.
 	}
 	uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
 	emit(Op::HostCall, position, out, name, arguments(std::move(list)));

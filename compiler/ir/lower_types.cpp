@@ -221,7 +221,8 @@ uint32_t Lowerer::convert_wide(uint32_t p_reg, Kind p_to, uint32_t p_position, b
 		case Kind::Bool:
 			return step(Op::F64ClampI64, Kind::I64, step(Op::BoolToF64, Kind::F64, p_reg));
 		case Kind::Str:
-			return step(Op::StrToI64, Kind::I64, p_reg);
+			// Written out, cut as AS3 cuts; otherwise text that is no whole number an Int64 holds is a RangeError.
+			return step(p_written ? Op::StrToI64 : Op::StrToI64Checked, Kind::I64, p_reg);
 		default:
 			refuse(p_position, is_engine(from) ? "converting a Godot value" : "converting an object to a number");
 			return default_value(Kind::I64, p_position);

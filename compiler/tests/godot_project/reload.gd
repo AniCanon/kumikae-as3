@@ -48,6 +48,7 @@ func _process(_delta: float) -> bool:
 		show("after an edit: the new code runs", ask("value"), 2)
 		show("after an edit: a field keeps its value", ask("count"), 2)
 		show("after an edit: a static field keeps its value", ask("total"), 2)
+		show("after an edit: a vector field keeps its elements", ask("seenText"), "1,2")
 		show("after an edit: a method that is new can be called", ask("added"), "new")
 		other.name = "second"
 		show("after an edit: a listener added before runs the new code", ask("heard"), 11)

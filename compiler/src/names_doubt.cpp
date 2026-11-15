@@ -115,7 +115,7 @@ public:
 void Compilation::drop_doubtful_errors() {
 	Doubt doubt;
 	for (Unit &unit : units_) {
-		if (unit.broken || !unit.diagnostics.has_errors()) {
+		if (unit.broken || !(unit.diagnostics.has_errors() || unit.diagnostics.has_warnings())) {
 			continue; // A broken file's own were never taken; a file with none has none to drop.
 		}
 		// An import that found nothing may have changed what the file's other names mean.

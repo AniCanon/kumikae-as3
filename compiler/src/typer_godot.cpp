@@ -1,5 +1,7 @@
 #include "typer.h"
 
+#include <algorithm>
+
 namespace kas3 {
 
 const Type *Typer::tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name) {
@@ -45,6 +47,7 @@ auto Typer::described(const Type *p_type) -> const Described * {
 			result = *base;
 		}
 	}
+	const size_t inherited = result.operators.size(); // A class may say again what its base says.
 	for (const Metadata &tag : static_cast<ClassDecl *>(symbol->node)->metadata) {
 		std::string_view op, left, right, returns, element, keyed;
 		for (const MetadataArg &argument : tag.args) {
@@ -67,10 +70,31 @@ auto Typer::described(const Type *p_type) -> const Described * {
 				result.element = type;
 				result.keyed = keyed == "true";
 			}
+		} else if (tag.name == "Constructor") {
+			std::vector<const Type *> form;
+			std::string_view args;
+			for (const MetadataArg &argument : tag.args) {
+				args = argument.key == "args" ? argument.value : args;
+			}
+			bool known = true;
+			for (size_t start = 0; !args.empty() && start <= args.size();) {
+				size_t comma = args.find(',', start);
+				const Type *type = tag_type(symbol, tag, args.substr(start, comma == std::string_view::npos ? std::string_view::npos : comma - start));
+				known = known && type;
+				form.push_back(type);
+				start = comma == std::string_view::npos ? args.size() + 1 : comma + 1;
+			}
+			if (known) {
+				result.forms.push_back(std::move(form));
+			}
 		} else if (tag.name == "Operators") {
 			result.complete = true;
 		} else if (tag.name == "Operator") {
 			result.complete = true;
+			if (!left.empty() && !right.empty()) {
+				symbol->unit->diagnostics.error(tag.offset, "an [Operator] tag names both a left and a right operand");
+				continue;
+			}
 			OperatorRule rule;
 			rule.op = op;
 			rule.result = tag_type(symbol, tag, returns);
@@ -84,6 +108,16 @@ auto Typer::described(const Type *p_type) -> const Described * {
 			}
 			// A tag that names a type the program does not have describes nothing.
 			if (!op.empty() && rule.result && (rule.other || rule.side == OperatorRule::Unary)) {
+				const auto same = [&](const OperatorRule &p_other) {
+					return p_other.op == rule.op && p_other.side == rule.side && p_other.other == rule.other;
+				};
+				if (std::any_of(result.operators.begin() + static_cast<std::ptrdiff_t>(inherited), result.operators.end(), same)) {
+					const std::string where = rule.side == OperatorRule::Unary
+							? std::string(" with no other operand")
+							: " with " + quoted(compilation_.type_name(rule.other)) + (rule.side == OperatorRule::Left ? " on the left" : " on the right");
+					symbol->unit->diagnostics.error(tag.offset, "a second [Operator] tag for " + quoted(op) + where);
+					continue;
+				}
 				result.operators.push_back(rule);
 			}
 		}
@@ -165,6 +199,35 @@ const Type *Typer::described_binary(TokenKind p_op, Expr *p_left, Expr *p_right,
 	error(p_offset, "can't use " + quoted(op) + " on " + quoted(compilation_.type_name(left)) + " and " +
 							quoted(compilation_.type_name(right)));
 	return unknown_;
+}
+
+void Typer::constructor_form(const Type *p_instance, const List<Expr *> &p_arguments, uint32_t p_offset) {
+	const Described *rules = described(p_instance);
+	if (!rules || rules->forms.empty()) {
+		return;
+	}
+	std::vector<Expr *> arguments(p_arguments.begin(), p_arguments.end());
+	for (Expr *argument : arguments) {
+		if (!argument->type || argument->type->kind == Type::Unknown) {
+			return; // Already reported.
+		}
+	}
+	for (const std::vector<const Type *> &form : rules->forms) {
+		bool takes = form.size() == arguments.size();
+		for (size_t i = 0; takes && i < form.size(); i++) {
+			bool exact = true;
+			takes = open_ended(arguments[i]->type) || operand_matches(arguments[i], arguments[i]->type, form[i], &exact);
+		}
+		if (takes) {
+			return;
+		}
+	}
+	std::string given;
+	for (Expr *argument : arguments) {
+		given += (given.empty() ? "" : ", ") + quoted(compilation_.type_name(argument->type));
+	}
+	error(p_offset, "no constructor of " + quoted(compilation_.type_name(p_instance)) + " takes " +
+							(given.empty() ? std::string("no arguments") : given));
 }
 
 const Type *Typer::described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset) {

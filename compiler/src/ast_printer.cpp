@@ -181,6 +181,195 @@ class Printer {
 		}
 	}
 
+	void print_array_lit(const Node *p_node, int p_depth) {
+		const ArrayLit *array = static_cast<const ArrayLit *>(p_node);
+		head("ArrayLit", p_depth);
+		at(p_node->offset);
+		for (Expr *element : array->elements) {
+			if (element) {
+				node(element, p_depth + 1);
+			} else {
+				label("hole", p_depth + 1);
+			}
+	}
+	}
+
+	void print_object_lit(const Node *p_node, int p_depth) {
+		const ObjectLit *object = static_cast<const ObjectLit *>(p_node);
+		head("ObjectLit", p_depth);
+		at(p_node->offset);
+		for (const ObjectField &field : object->fields) {
+			head("Field", p_depth + 1);
+			attribute("key", field.key);
+			flag(field.key_is_string, "string");
+			at(field.offset);
+			node(field.value, p_depth + 2);
+	}
+	}
+
+	void print_new(const Node *p_node, int p_depth) {
+		const New *create = static_cast<const New *>(p_node);
+		head("New", p_depth);
+		flag(create->has_arguments, "has_arguments");
+		at(p_node->offset);
+		node(create->callee, p_depth + 1);
+		children(create->arguments, p_depth + 1);
+	}
+
+	void print_binary(const Node *p_node, int p_depth) {
+		const Binary *binary = static_cast<const Binary *>(p_node);
+		head("Binary", p_depth);
+		attribute("op", token_kind_spelling(binary->op));
+		at(p_node->offset);
+		node(binary->left, p_depth + 1);
+		node(binary->right, p_depth + 1);
+	}
+
+	void print_assign(const Node *p_node, int p_depth) {
+		const Assign *assign = static_cast<const Assign *>(p_node);
+		head("Assign", p_depth);
+		attribute("op", token_kind_spelling(assign->op));
+		at(p_node->offset);
+		node(assign->target, p_depth + 1);
+		node(assign->value, p_depth + 1);
+	}
+
+	void print_conditional(const Node *p_node, int p_depth) {
+		const Conditional *conditional = static_cast<const Conditional *>(p_node);
+		head("Conditional", p_depth);
+		at(p_node->offset);
+		node(conditional->condition, p_depth + 1);
+		node(conditional->then_value, p_depth + 1);
+		node(conditional->else_value, p_depth + 1);
+	}
+
+	void print_if(const Node *p_node, int p_depth) {
+		const If *branch = static_cast<const If *>(p_node);
+		head("If", p_depth);
+		at(p_node->offset);
+		node(branch->condition, p_depth + 1);
+		node(branch->then_branch, p_depth + 1);
+		labelled("else:", branch->else_branch, p_depth + 1);
+	}
+
+	void print_for(const Node *p_node, int p_depth) {
+		const For *loop = static_cast<const For *>(p_node);
+		head("For", p_depth);
+		at(p_node->offset);
+		labelled("init:", loop->init, p_depth + 1);
+		labelled("condition:", loop->condition, p_depth + 1);
+		labelled("update:", loop->update, p_depth + 1);
+		node(loop->body, p_depth + 1);
+	}
+
+	void print_for_in(const Node *p_node, int p_depth) {
+		const ForIn *loop = static_cast<const ForIn *>(p_node);
+		head("ForIn", p_depth);
+		flag(loop->each, "each");
+		at(p_node->offset);
+		if (loop->declaration) {
+			variable(loop->declaration, p_depth + 1);
+	}
+	node(loop->target, p_depth + 1);
+	node(loop->collection, p_depth + 1);
+	node(loop->body, p_depth + 1);
+	}
+
+	void print_switch(const Node *p_node, int p_depth) {
+		const Switch *choice = static_cast<const Switch *>(p_node);
+		head("Switch", p_depth);
+		at(p_node->offset);
+		node(choice->subject, p_depth + 1);
+		for (const SwitchCase &clause : choice->cases) {
+			head(clause.is_default ? "Default" : "Case", p_depth + 1);
+			at(clause.offset);
+			node(clause.test, p_depth + 2);
+			children(clause.body, p_depth + 2);
+	}
+	}
+
+	void print_break(const Node *p_node, int p_depth) {
+		head("Break", p_depth);
+		std::string_view name = static_cast<const Break *>(p_node)->label;
+		if (!name.empty()) {
+			attribute("label", name);
+	}
+	at(p_node->offset);
+	}
+
+	void print_continue(const Node *p_node, int p_depth) {
+		head("Continue", p_depth);
+		std::string_view name = static_cast<const Continue *>(p_node)->label;
+		if (!name.empty()) {
+			attribute("label", name);
+	}
+	at(p_node->offset);
+	}
+
+	void print_try(const Node *p_node, int p_depth) {
+		const Try *attempt = static_cast<const Try *>(p_node);
+		head("Try", p_depth);
+		at(p_node->offset);
+		node(attempt->body, p_depth + 1);
+		for (const CatchClause &clause : attempt->catches) {
+			head("Catch", p_depth + 1);
+			attribute("name", clause.name);
+			at(clause.offset);
+			node(clause.type, p_depth + 2);
+			node(clause.body, p_depth + 2);
+	}
+	labelled("finally:", attempt->finally_block, p_depth + 1);
+	}
+
+	void print_class_decl(const Node *p_node, int p_depth) {
+		const ClassDecl *decl = static_cast<const ClassDecl *>(p_node);
+		head("ClassDecl", p_depth);
+		attribute("name", decl->name);
+		modifiers(decl->modifiers);
+		at(p_node->offset);
+		metadata(decl->metadata, p_depth + 1);
+		labelled("extends:", decl->extends, p_depth + 1);
+		if (decl->implements.count) {
+			label("implements:", p_depth + 1);
+			children(decl->implements, p_depth + 2);
+	}
+	children(decl->members, p_depth + 1);
+	}
+
+	void print_interface_decl(const Node *p_node, int p_depth) {
+		const InterfaceDecl *decl = static_cast<const InterfaceDecl *>(p_node);
+		head("InterfaceDecl", p_depth);
+		attribute("name", decl->name);
+		modifiers(decl->modifiers);
+		at(p_node->offset);
+		metadata(decl->metadata, p_depth + 1);
+		if (decl->extends.count) {
+			label("extends:", p_depth + 1);
+			children(decl->extends, p_depth + 2);
+	}
+	children(decl->methods, p_depth + 1);
+	}
+
+	void print_package_decl(const Node *p_node, int p_depth) {
+		const PackageDecl *package = static_cast<const PackageDecl *>(p_node);
+		head("PackageDecl", p_depth);
+		if (package->name.count) {
+			dotted_attribute("name", package->name);
+	}
+	at(p_node->offset);
+	children(package->imports, p_depth + 1);
+	children(package->definitions, p_depth + 1);
+	}
+
+	void print_program(const Node *p_node, int p_depth) {
+		const Program *program = static_cast<const Program *>(p_node);
+		head("Program", p_depth);
+		at(p_node->offset);
+		node(program->package, p_depth + 1);
+		children(program->imports, p_depth + 1);
+		children(program->definitions, p_depth + 1);
+	}
+
 public:
 	explicit Printer(const Source &p_source) :
 			source_(p_source) {}
@@ -233,30 +422,12 @@ public:
 				attribute("text", static_cast<const Name *>(p_node)->text);
 				at(p_node->offset);
 				break;
-			case NodeKind::ArrayLit: {
-				const ArrayLit *array = static_cast<const ArrayLit *>(p_node);
-				head("ArrayLit", p_depth);
-				at(p_node->offset);
-				for (Expr *element : array->elements) {
-					if (element) {
-						node(element, p_depth + 1);
-					} else {
-						label("hole", p_depth + 1);
-					}
-				}
-			} break;
-			case NodeKind::ObjectLit: {
-				const ObjectLit *object = static_cast<const ObjectLit *>(p_node);
-				head("ObjectLit", p_depth);
-				at(p_node->offset);
-				for (const ObjectField &field : object->fields) {
-					head("Field", p_depth + 1);
-					attribute("key", field.key);
-					flag(field.key_is_string, "string");
-					at(field.offset);
-					node(field.value, p_depth + 2);
-				}
-			} break;
+			case NodeKind::ArrayLit:
+				print_array_lit(p_node, p_depth);
+				break;
+			case NodeKind::ObjectLit:
+				print_object_lit(p_node, p_depth);
+				break;
 			case NodeKind::VectorLit: {
 				const VectorLit *vector = static_cast<const VectorLit *>(p_node);
 				head("VectorLit", p_depth);
@@ -297,14 +468,9 @@ public:
 				node(call->callee, p_depth + 1);
 				children(call->arguments, p_depth + 1);
 			} break;
-			case NodeKind::New: {
-				const New *create = static_cast<const New *>(p_node);
-				head("New", p_depth);
-				flag(create->has_arguments, "has_arguments");
-				at(p_node->offset);
-				node(create->callee, p_depth + 1);
-				children(create->arguments, p_depth + 1);
-			} break;
+			case NodeKind::New:
+				print_new(p_node, p_depth);
+				break;
 			case NodeKind::Unary: {
 				const Unary *unary = static_cast<const Unary *>(p_node);
 				head("Unary", p_depth);
@@ -319,30 +485,15 @@ public:
 				at(p_node->offset);
 				node(postfix->operand, p_depth + 1);
 			} break;
-			case NodeKind::Binary: {
-				const Binary *binary = static_cast<const Binary *>(p_node);
-				head("Binary", p_depth);
-				attribute("op", token_kind_spelling(binary->op));
-				at(p_node->offset);
-				node(binary->left, p_depth + 1);
-				node(binary->right, p_depth + 1);
-			} break;
-			case NodeKind::Assign: {
-				const Assign *assign = static_cast<const Assign *>(p_node);
-				head("Assign", p_depth);
-				attribute("op", token_kind_spelling(assign->op));
-				at(p_node->offset);
-				node(assign->target, p_depth + 1);
-				node(assign->value, p_depth + 1);
-			} break;
-			case NodeKind::Conditional: {
-				const Conditional *conditional = static_cast<const Conditional *>(p_node);
-				head("Conditional", p_depth);
-				at(p_node->offset);
-				node(conditional->condition, p_depth + 1);
-				node(conditional->then_value, p_depth + 1);
-				node(conditional->else_value, p_depth + 1);
-			} break;
+			case NodeKind::Binary:
+				print_binary(p_node, p_depth);
+				break;
+			case NodeKind::Assign:
+				print_assign(p_node, p_depth);
+				break;
+			case NodeKind::Conditional:
+				print_conditional(p_node, p_depth);
+				break;
 			case NodeKind::Block:
 				head("Block", p_depth);
 				at(p_node->offset);
@@ -360,14 +511,9 @@ public:
 			case NodeKind::VarStmt:
 				variable(static_cast<const VarStmt *>(p_node)->decl, p_depth);
 				break;
-			case NodeKind::If: {
-				const If *branch = static_cast<const If *>(p_node);
-				head("If", p_depth);
-				at(p_node->offset);
-				node(branch->condition, p_depth + 1);
-				node(branch->then_branch, p_depth + 1);
-				labelled("else:", branch->else_branch, p_depth + 1);
-			} break;
+			case NodeKind::If:
+				print_if(p_node, p_depth);
+				break;
 			case NodeKind::While: {
 				const While *loop = static_cast<const While *>(p_node);
 				head("While", p_depth);
@@ -382,55 +528,21 @@ public:
 				node(loop->body, p_depth + 1);
 				node(loop->condition, p_depth + 1);
 			} break;
-			case NodeKind::For: {
-				const For *loop = static_cast<const For *>(p_node);
-				head("For", p_depth);
-				at(p_node->offset);
-				labelled("init:", loop->init, p_depth + 1);
-				labelled("condition:", loop->condition, p_depth + 1);
-				labelled("update:", loop->update, p_depth + 1);
-				node(loop->body, p_depth + 1);
-			} break;
-			case NodeKind::ForIn: {
-				const ForIn *loop = static_cast<const ForIn *>(p_node);
-				head("ForIn", p_depth);
-				flag(loop->each, "each");
-				at(p_node->offset);
-				if (loop->declaration) {
-					variable(loop->declaration, p_depth + 1);
-				}
-				node(loop->target, p_depth + 1);
-				node(loop->collection, p_depth + 1);
-				node(loop->body, p_depth + 1);
-			} break;
-			case NodeKind::Switch: {
-				const Switch *choice = static_cast<const Switch *>(p_node);
-				head("Switch", p_depth);
-				at(p_node->offset);
-				node(choice->subject, p_depth + 1);
-				for (const SwitchCase &clause : choice->cases) {
-					head(clause.is_default ? "Default" : "Case", p_depth + 1);
-					at(clause.offset);
-					node(clause.test, p_depth + 2);
-					children(clause.body, p_depth + 2);
-				}
-			} break;
-			case NodeKind::Break: {
-				head("Break", p_depth);
-				std::string_view name = static_cast<const Break *>(p_node)->label;
-				if (!name.empty()) {
-					attribute("label", name);
-				}
-				at(p_node->offset);
-			} break;
-			case NodeKind::Continue: {
-				head("Continue", p_depth);
-				std::string_view name = static_cast<const Continue *>(p_node)->label;
-				if (!name.empty()) {
-					attribute("label", name);
-				}
-				at(p_node->offset);
-			} break;
+			case NodeKind::For:
+				print_for(p_node, p_depth);
+				break;
+			case NodeKind::ForIn:
+				print_for_in(p_node, p_depth);
+				break;
+			case NodeKind::Switch:
+				print_switch(p_node, p_depth);
+				break;
+			case NodeKind::Break:
+				print_break(p_node, p_depth);
+				break;
+			case NodeKind::Continue:
+				print_continue(p_node, p_depth);
+				break;
 			case NodeKind::Return:
 				head("Return", p_depth);
 				at(p_node->offset);
@@ -441,20 +553,9 @@ public:
 				at(p_node->offset);
 				node(static_cast<const Throw *>(p_node)->value, p_depth + 1);
 				break;
-			case NodeKind::Try: {
-				const Try *attempt = static_cast<const Try *>(p_node);
-				head("Try", p_depth);
-				at(p_node->offset);
-				node(attempt->body, p_depth + 1);
-				for (const CatchClause &clause : attempt->catches) {
-					head("Catch", p_depth + 1);
-					attribute("name", clause.name);
-					at(clause.offset);
-					node(clause.type, p_depth + 2);
-					node(clause.body, p_depth + 2);
-				}
-				labelled("finally:", attempt->finally_block, p_depth + 1);
-			} break;
+			case NodeKind::Try:
+				print_try(p_node, p_depth);
+				break;
 			case NodeKind::Labeled: {
 				const Labeled *labeled = static_cast<const Labeled *>(p_node);
 				head("Labeled", p_depth);
@@ -476,33 +577,12 @@ public:
 			case NodeKind::FunctionDecl:
 				function(static_cast<const FunctionDecl *>(p_node), p_depth);
 				break;
-			case NodeKind::ClassDecl: {
-				const ClassDecl *decl = static_cast<const ClassDecl *>(p_node);
-				head("ClassDecl", p_depth);
-				attribute("name", decl->name);
-				modifiers(decl->modifiers);
-				at(p_node->offset);
-				metadata(decl->metadata, p_depth + 1);
-				labelled("extends:", decl->extends, p_depth + 1);
-				if (decl->implements.count) {
-					label("implements:", p_depth + 1);
-					children(decl->implements, p_depth + 2);
-				}
-				children(decl->members, p_depth + 1);
-			} break;
-			case NodeKind::InterfaceDecl: {
-				const InterfaceDecl *decl = static_cast<const InterfaceDecl *>(p_node);
-				head("InterfaceDecl", p_depth);
-				attribute("name", decl->name);
-				modifiers(decl->modifiers);
-				at(p_node->offset);
-				metadata(decl->metadata, p_depth + 1);
-				if (decl->extends.count) {
-					label("extends:", p_depth + 1);
-					children(decl->extends, p_depth + 2);
-				}
-				children(decl->methods, p_depth + 1);
-			} break;
+			case NodeKind::ClassDecl:
+				print_class_decl(p_node, p_depth);
+				break;
+			case NodeKind::InterfaceDecl:
+				print_interface_decl(p_node, p_depth);
+				break;
 			case NodeKind::Import: {
 				const Import *import = static_cast<const Import *>(p_node);
 				head("Import", p_depth);
@@ -510,24 +590,12 @@ public:
 				flag(import->wildcard, "wildcard");
 				at(p_node->offset);
 			} break;
-			case NodeKind::PackageDecl: {
-				const PackageDecl *package = static_cast<const PackageDecl *>(p_node);
-				head("PackageDecl", p_depth);
-				if (package->name.count) {
-					dotted_attribute("name", package->name);
-				}
-				at(p_node->offset);
-				children(package->imports, p_depth + 1);
-				children(package->definitions, p_depth + 1);
-			} break;
-			case NodeKind::Program: {
-				const Program *program = static_cast<const Program *>(p_node);
-				head("Program", p_depth);
-				at(p_node->offset);
-				node(program->package, p_depth + 1);
-				children(program->imports, p_depth + 1);
-				children(program->definitions, p_depth + 1);
-			} break;
+			case NodeKind::PackageDecl:
+				print_package_decl(p_node, p_depth);
+				break;
+			case NodeKind::Program:
+				print_program(p_node, p_depth);
+				break;
 		}
 	}
 };

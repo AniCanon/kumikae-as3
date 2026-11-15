@@ -123,6 +123,9 @@ std::optional<uint32_t> Lowerer::any_type_test(Binary *p_binary) {
 		return std::nullopt; // `x as int` gives a number or null: a typed register cannot hold both.
 	}
 	const uint32_t value = any_value(p_binary->left);
+	if (symbol) {
+		touch(symbol, position); // As for a typed value: the class named is set up.
+	}
 	uint32_t fits = reg(Kind::Bool);
 	emit(Op::AnyIs, position, fits, value, code);
 	if (test) {

@@ -42,7 +42,12 @@ package {
 		public function nullNode(n:Node):String { return String(n); }
 		public function nullOwn(n:Node):String { return n.toString(); }
 		public function traced(v:Vector2):void { trace(v, v.x); }
-		public function keep(n:Node):void { kept = n; }
+		public function keep(n:Node):void { kept = n; keptReady = n.ready; }
+		// What is reached through a freed object, in every way: AS3's #1009, saying it was freed.
+		private var keptReady:Signal;
+		private function heard():void {}
+		public function keptSignal():void { keptReady.add(heard); }
+		public function keptByName():void { kept["ready"].add(heard); }
 		public function keptText():String { return "kept " + kept; }
 		// A Godot object that has been freed is null to a script.
 		public function keptIsNull():Boolean { return kept == null; }
@@ -86,6 +91,8 @@ package {
 		public function clampTrailingNull(c:Color):Color { return c.clamp(new Color(0.25, 0.25, 0.25, 1), null); }
 		public function clampBothNull(c:Color):Color { return c.clamp(null, null); }
 		public function clampMiddleNull(c:Color):Color { return c.clamp(null, new Color(0.5, 0.5, 0.5, 1)); }
+		// A variable that holds null there is the same: the default, looked at as the call is made.
+		public function clampNullVariable(c:Color):Color { var low:Color = null; return c.clamp(low, new Color(0.5, 0.5, 0.5, 1)); }
 		public function looking(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target); }
 		public function lookingNull(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target, null); }
 		public function wholeNumbers():Color { return new Color(1, 0, 1); }

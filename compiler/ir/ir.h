@@ -66,8 +66,8 @@ inline bool is_held(Kind p_kind) {
 	X(InitClass, "C--") /* The class is used: give its static fields their values, if this is the first time. */ \
 	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
-	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is a Number; what is read or \
-	   written is of the class's element kind. */ \
+	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is an int, a uint or a Number, \
+	   read as its register is declared; what is read or written is of the class's element kind. */ \
 	X(VecNew, "RCA") X(VecGet, "RRR") X(VecSet, "RRR") \
 	X(VecLength, "RR-") X(VecSetLength, "RR-") X(VecFixed, "RR-") X(VecSetFixed, "RR-") \
 	/* A method of a vector: out, which one (a VectorMethod), [the vector, then what the method takes]. */ \
@@ -80,12 +80,12 @@ inline bool is_held(Kind p_kind) {
 	X(BitAndI64, "RRR") X(BitOrI64, "RRR") X(BitXorI64, "RRR") X(BitNotI64, "RR-") X(ShlI64, "RRR") X(ShrI64, "RRR") X(UShrI64, "RRR") \
 	X(LtI64, "RRR") X(LeI64, "RRR") X(EqI64, "RRR") \
 	/* An Int64 against a Number, exactly: -1, 0 or 1 as a Number, or NaN when the Number is NaN. */ \
-	X(CmpI64F64, "RRR") \
+	X(CmpI64F64, "RRR") X(CmpI64Str, "RRR") \
 	X(I32ToI64, "RR-") X(U32ToI64, "RR-") X(I64ToBool, "RR-") X(I64ToStr, "RR-") \
 	/* Conversions the program did not write: a RangeError if the value does not fit. */ \
 	X(I64ToI32, "RR-") X(I64ToU32, "RR-") X(I64ToF64, "RR-") X(F64ToI64, "RR-") \
 	/* Conversions the program wrote, int(x) and the rest: AS3's own, which cut, round or hold at the end. */ \
-	X(I64WrapI32, "RR-") X(I64WrapU32, "RR-") X(I64RoundF64, "RR-") X(F64ClampI64, "RR-") X(StrToI64, "RR-") \
+	X(I64WrapI32, "RR-") X(I64WrapU32, "RR-") X(I64RoundF64, "RR-") X(F64ClampI64, "RR-") X(StrToI64, "RR-") X(StrToI64Checked, "RR-") \
 	X(HostNew, "RSA") X(HostCall, "rSA") X(HostGet, "RRS") X(HostSet, "RSR") \
 	/* An operator on Godot values: the operator as AS3 writes it ("+", "=="), and one or two operands. */ \
 	X(HostOperate, "RSA") \

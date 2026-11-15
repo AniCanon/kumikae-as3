@@ -19,37 +19,37 @@ public:
 		return none;
 	}
 
-	void *construct(std::string_view, const Argument *, size_t, std::string *r_error) override {
+	[[nodiscard]] void *construct(std::string_view, const Argument *, size_t, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;
 	}
-	void *collection(std::string_view, const Argument *, size_t, std::string *r_error) override {
+	[[nodiscard]] void *collection(std::string_view, ir::Kind, const Slot *, size_t, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;
 	}
-	void *copy(void *p_value) override { return p_value; }
+	[[nodiscard]] void *copy(void *p_value) override { return p_value; }
 	void drop(void *) override {}
-	bool present(void *p_value) override { return p_value != nullptr; }
-	bool is_class(void *, std::string_view) override { return false; }
-	Str *text(void *) override { return nullptr; }
-	bool operate(std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
-	bool index_get(void *, const Argument &, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
-	bool index_set(void *, const Argument &, const Argument &, std::string *r_error) override { return refuse(r_error); }
-	bool constant(std::string_view, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] bool present(void *p_value) override { return p_value != nullptr; }
+	[[nodiscard]] bool is_class(void *, std::string_view) override { return false; }
+	[[nodiscard]] Str *text(void *) override { return nullptr; }
+	[[nodiscard]] bool operate(std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] bool index_get(void *, const Argument &, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] bool index_set(void *, const Argument &, const Argument &, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] bool constant(std::string_view, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 
-	bool call(void *, std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
-	bool get(void *, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
-	bool set(void *, std::string_view, const Argument &, std::string *r_error) override { return refuse(r_error); }
-	bool member(void *, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
-	bool evaluate(std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
-	void *singleton(std::string_view, std::string *r_error) override {
+	[[nodiscard]] bool call(void *, std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] bool get(void *, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] bool set(void *, std::string_view, const Argument &, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] bool member(void *, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] bool evaluate(std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] void *singleton(std::string_view, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;
 	}
-	bool call_static(std::string_view, std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override {
+	[[nodiscard]] bool call_static(std::string_view, std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override {
 		return refuse(r_error);
 	}
-	void *bind(Object *, uint32_t, void *, std::string *r_error) override {
+	[[nodiscard]] void *bind(Object *, uint32_t, void *, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;
 	}

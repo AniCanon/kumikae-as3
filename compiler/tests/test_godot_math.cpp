@@ -184,6 +184,9 @@ static void test_never_operators() {
 	expect("/*!*/a++; /*!*/++a; /*!*/a--; /*!*/~a; /*!*/a <<= 1; /*!*/a &= 3; /*!*/gd++;",
 			{ NO_UNARY("++", "Vector2"), NO_UNARY("++", "Vector2"), NO_UNARY("--", "Vector2"), NO_UNARY("~", "Vector2"),
 					NO_UNARY("<<=", "Vector2"), NO_UNARY("&=", "Vector2"), NO_UNARY("++", "GodotDictionary") });
+	// On the right too: a number shifted by a vector.
+	expect("var n:int = 1; /*!*/n >>>= a; /*!*/n |= a; /*!*/n <<= gd;",
+			{ NO_UNARY(">>>=", "Vector2"), NO_UNARY("|=", "Vector2"), NO_UNARY("<<=", "GodotDictionary") });
 	// Numbers, and values that could be anything, are untouched.
 	expect("var n:int = 1; n++; ~n; n <<= 2; any++; ~any; mine++; node++;", {});
 }
@@ -265,6 +268,33 @@ static void test_other_declarations() {
 	for (int i = 0; i < 10; i++) {
 		CHECK_EQ(compilation.type_name(unit->typed[i].type), std::string(expected[i]));
 	}
+}
+
+// A tag that says two things, or a second rule for the same operator and operand, is an error in the
+// declaration file, not a choice made silently.
+static void test_malformed_tags() {
+	Compilation compilation;
+	compilation.add("lib.as",
+			"package lib {\n"
+			"[Operator(op=\"+\", left=\"int\", right=\"int\", returns=\"Money\")]\n"
+			"[Operator(op=\"*\", right=\"int\", returns=\"Money\")] [Operator(op=\"*\", right=\"int\", returns=\"int\")]\n"
+			"public native class Money {} }\n",
+			true);
+	compilation.add("Main.as", "package { import lib.*; public class Main { public function run(a:Money):void { a * 2; } } }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(),
+			std::string("lib.as:2:1: error: an [Operator] tag names both a left and a right operand\n"
+						"lib.as:3:50: error: a second [Operator] tag for '*' with 'int' on the right\n"));
+}
+
+// Godot's value types take only the forms of constructor Godot has, though AS3 sees one that merges them.
+static void test_constructor_forms() {
+	expect("new Vector3(); new Vector3(1, 2, 3); new Vector3(1.5, 2, 3); new Vector3(new Vector3()); new Vector3(any);"
+		   "new Vector3(new Vector3i()); new Vector2(1, 2); new Color(1, 0, 0, 0.5); new Color('red');",
+			{});
+	expect("new /*!*/Vector3(1, 2); new /*!*/Vector3('a', 1, 2); new /*!*/Vector2(new Vector3());",
+			{ "no constructor of 'Vector3' takes 'int', 'int'", "no constructor of 'Vector3' takes 'String', 'int', 'int'",
+					"no constructor of 'Vector2' takes 'Vector3'" });
 }
 
 static void test_indexing() {
@@ -374,6 +404,8 @@ int main() {
 	test_compound_assignment();
 	test_tags_outside_declarations();
 	test_other_declarations();
+	test_malformed_tags();
+	test_constructor_forms();
 	test_indexing();
 	return check::finish();
 }

@@ -76,8 +76,8 @@ uint32_t Lowerer::vector_literal(VectorLit *p_literal) {
 	uint32_t at = 0;
 	for (Expr *element : p_literal->elements) {
 		const uint32_t value = expression(element, module_.classes[*klass].element);
-		const uint32_t index = reg(Kind::F64);
-		emit(Op::ConstF64, element->offset, index, number(at++));
+		const uint32_t index = reg(Kind::U32);
+		emit(Op::ConstU32, element->offset, index, at++);
 		emit(Op::VecSet, element->offset, out, index, value);
 	}
 	return out;
@@ -116,7 +116,10 @@ auto Lowerer::vector_place(Expr *p_target, Expr *p_later) -> std::optional<Place
 	Expr *index = place.where == Place::Element ? static_cast<Index *>(p_target)->index : nullptr;
 	place.object = settled(expression(object, Kind::Obj), index && writes_locals(index) ? index : p_later, p_target->offset);
 	if (index) {
-		place.key = settled(expression(index, Kind::F64), p_later, p_target->offset);
+		// An int or a uint index is read in its own kind as it runs; anything else as a Number.
+		Kind kind = Kind::F64;
+		kind_of(index->type, &kind);
+		place.key = settled(expression(index, kind == Kind::I32 || kind == Kind::U32 ? kind : Kind::F64), p_later, p_target->offset);
 	}
 	return place;
 }

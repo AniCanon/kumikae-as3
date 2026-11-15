@@ -3,17 +3,6 @@
 
 namespace kas3 {
 
-static std::string join(const List<std::string_view> &p_parts, uint32_t p_count) {
-	std::string result;
-	for (uint32_t i = 0; i < p_count; i++) {
-		if (i) {
-			result += '.';
-		}
-		result += p_parts[i];
-	}
-	return result;
-}
-
 Context Compilation::context_of(Unit &p_unit, bool p_in_block) {
 	Context context;
 	context.unit = &p_unit;
@@ -137,9 +126,9 @@ Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
 		p_type->symbol = element_;
 		return element_;
 	}
-	std::string shown = join(p_type->name, p_type->name.count);
+	std::string shown = dotted_name(p_type->name, p_type->name.count);
 	Found found = last == 0 ? lookup_package_level(p_from, p_type->name[0])
-							: lookup_qualified(p_from, join(p_type->name, last), p_type->name[last]);
+							: lookup_qualified(p_from, dotted_name(p_type->name, last), p_type->name[last]);
 	if (!found.first) {
 		if (found.hidden && last > 0) {
 			diagnostics.unresolved(p_type->offset, quoted(shown) + " is not public");
@@ -174,7 +163,7 @@ void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports,
 		}
 		uint32_t offset = import->name_offsets[0];
 		if (import->wildcard) {
-			std::string name = join(import->name, import->name.count);
+			std::string name = dotted_name(import->name, import->name.count);
 			Package *found = find_package(name);
 			if (!found || found->definitions.empty()) {
 				p_unit.diagnostics.unresolved(offset, "can't find package " + quoted(name));
@@ -188,8 +177,8 @@ void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports,
 			continue;
 		}
 		uint32_t last = import->name.count - 1;
-		std::string shown = join(import->name, import->name.count);
-		Package *found = find_package(join(import->name, last));
+		std::string shown = dotted_name(import->name, import->name.count);
+		Package *found = find_package(dotted_name(import->name, last));
 		Symbol *symbol = found ? find_in(found->definitions, import->name[last]) : nullptr;
 		if (!symbol) {
 			p_unit.diagnostics.unresolved(offset, "can't find " + quoted(shown));

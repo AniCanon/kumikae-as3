@@ -44,6 +44,7 @@ func _physics_process(_delta: float) -> bool:
 	ask("say", [4, Vector2(1, 2)])
 	show("lerp as a number", ask("mixAny", [2.0, 6.0, 0.25]), lerp(2.0, 6.0, 0.25))
 	show("max of three", ask("largest", [3, 9, 7]), max(3, 9, 7))
+	show("max past what a Number holds", ask("widest", [9007199254740993, 1]), null)
 	show("wrong argument", ask("wrong", ["one"]), null)
 	show("in a loop", ask("count", [10]), 3 + 3 + 3 + 3 + 4 + 5 + 6 + 7 + 8 + 9)
 	show("no arguments", ask("nothing"), true)

@@ -301,7 +301,8 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 		}
 		for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
 			auto field = fields_.find(declarator.symbol);
-			if (field != fields_.end() && !declarator.initializer && module_.classes[index].fields[field->second].kind == Kind::Val) {
+			// Those with a written value too: a method that the values of the fields above call may read it.
+			if (field != fields_.end() && module_.classes[index].fields[field->second].kind == Kind::Val) {
 				uint32_t zero = zero_value(declarator.type, declarator.offset);
 				if (zero != NONE) {
 					emit(Op::SetField, declarator.offset, 0, field->second, zero);
@@ -365,7 +366,8 @@ void Lowerer::lower_statics(Unit &p_unit, ClassDecl *p_class) {
 		}
 		for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
 			auto global = globals_.find(declarator.symbol);
-			if (global != globals_.end() && !declarator.initializer && module_.globals[global->second].kind == Kind::Val) {
+			// With a written value too: one worked out above it may read it.
+			if (global != globals_.end() && module_.globals[global->second].kind == Kind::Val) {
 				uint32_t zero = zero_value(declarator.type, declarator.offset);
 				if (zero != NONE) {
 					emit(Op::SetGlobal, declarator.offset, global->second, zero);
@@ -392,6 +394,25 @@ void Lowerer::lower_statics(Unit &p_unit, ClassDecl *p_class) {
 void Lowerer::lower_package_variables(Unit &p_unit, VarDecl *p_decl) {
 	for (Declarator &declarator : p_decl->declarators) {
 		auto global = globals_.find(declarator.symbol);
+		if (global != globals_.end() && module_.globals[global->second].kind == Kind::Val) {
+			// One of Godot's values with parts starts at its zero, before any package variable's value is
+			// worked out: one of them may read it.
+			Function zeroing;
+			zeroing.name = std::string(declarator.name) + "$zero";
+			zeroing.file = file(&p_unit);
+			zeroing.position = declarator.offset;
+			zeroing.is_static = true;
+			module_.functions.push_back(std::move(zeroing));
+			const uint32_t index = (uint32_t)module_.functions.size() - 1;
+			module_.initializers.insert(module_.initializers.begin() + static_cast<std::ptrdiff_t>(zeroes_), index);
+			zeroes_++;
+			begin(index, p_unit, nullptr);
+			const uint32_t zero = zero_value(declarator.type, declarator.offset);
+			if (zero != NONE) {
+				emit(Op::SetGlobal, declarator.offset, global->second, zero);
+			}
+			emit(Op::ReturnVoid, declarator.offset);
+		}
 		if (global == globals_.end() || !declarator.initializer) {
 			continue;
 		}

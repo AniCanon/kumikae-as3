@@ -175,7 +175,9 @@ const Type *Typer::member_type(const Type *p_object, Member *p_member) {
 				}
 				return unknown_;
 			}
-			if (member->is_static()) {
+			// A Godot singleton's members are declared static (`Input.isActionPressed`), and its one object
+			// has them too: `var i:Input = Input.singleton; i.isActionPressed(...)`.
+			if (member->is_static() && !(member->owner && has_tag(member->owner, "Singleton"))) {
 				error(p_member->name_offset, quoted(p_member->name) + " is a static member of " +
 													 std::string(member->owner->name) + "; write " +
 													 std::string(member->owner->name) + "." + std::string(p_member->name));

@@ -11,9 +11,6 @@ using ir::Op;
 
 namespace {
 
-// More elements than this is refused: a length that came from a negative number, most likely.
-const uint32_t MAX_LENGTH = 1u << 30;
-
 // The element an index names, if it is a whole number from 0 to p_limit - 1.
 std::optional<uint32_t> element_index(double p_index, uint32_t p_limit) {
 	if (!(p_index >= 0 && p_index < static_cast<double>(p_limit))) {
@@ -21,6 +18,22 @@ std::optional<uint32_t> element_index(double p_index, uint32_t p_limit) {
 	}
 	const uint32_t whole = static_cast<uint32_t>(p_index);
 	return static_cast<double>(whole) == p_index ? std::optional<uint32_t>(whole) : std::nullopt;
+}
+
+// An index of any kind a register may declare for it, as a Number: what an error about it says.
+double index_number(Kind p_kind, const Slot &p_index) {
+	return p_kind == Kind::I32 ? p_index.i : p_kind == Kind::U32 ? (double)p_index.u : p_index.d;
+}
+
+// The same for an index held as an int or a uint, read as it is.
+std::optional<uint32_t> element_index(Kind p_kind, const Slot &p_index, uint32_t p_limit) {
+	if (p_kind == Kind::I32) {
+		return p_index.i >= 0 && (uint32_t)p_index.i < p_limit ? std::optional<uint32_t>((uint32_t)p_index.i) : std::nullopt;
+	}
+	if (p_kind == Kind::U32) {
+		return p_index.u < p_limit ? std::optional<uint32_t>(p_index.u) : std::nullopt;
+	}
+	return element_index(p_index.d, p_limit);
 }
 
 } // namespace
@@ -32,11 +45,10 @@ void Interpreter::raise_range(double p_index, uint32_t p_length) {
 
 // Gives the vector the length asked for: elements past it are let go, and new ones are empty.
 bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
-	if (p_vector->fixed) {
-		raise(module_.range_error_class, "Error #1126: Cannot change the length of a fixed Vector.");
+	if (length_is_fixed(p_vector)) {
 		return false;
 	}
-	if (p_length > MAX_LENGTH || !vector_reserve(p_vector, p_length)) {
+	if (p_length > MAX_VECTOR_LENGTH || !vector_reserve(p_vector, p_length)) {
 		out_of_memory();
 		return false;
 	}
@@ -65,7 +77,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 	if (p_in.op == Op::VecNew) {
 		const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 		const uint32_t length = r[list[0]].u;
-		Vector *made = length <= MAX_LENGTH ? new_vector(p_in.b, length, r[list[1]].b) : nullptr;
+		Vector *made = length <= MAX_VECTOR_LENGTH ? new_vector(p_in.b, length, r[list[1]].b) : nullptr;
 		if (!made) {
 			out_of_memory();
 			return;
@@ -82,9 +94,10 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 	const Kind kind = module_.classes[vector->klass].element;
 	switch (p_in.op) {
 		case Op::VecGet: {
-			const std::optional<uint32_t> at = element_index(r[p_in.c].d, vector->length);
+			const Kind index = p_function.registers[p_in.c];
+			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
 			if (!at) {
-				raise_range(r[p_in.c].d, vector->length);
+				raise_range(index_number(index, r[p_in.c]), vector->length);
 				return;
 			}
 			put(kind, r[p_in.a], share(kind, vector->data[*at]));
@@ -92,9 +105,10 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		}
 		case Op::VecSet: {
 			// One past the end adds an element, unless the length is fixed.
-			const std::optional<uint32_t> at = element_index(r[p_in.b].d, vector->fixed ? vector->length : vector->length + 1);
+			const Kind index = p_function.registers[p_in.b];
+			const std::optional<uint32_t> at = element_index(index, r[p_in.b], vector->fixed ? vector->length : vector->length + 1);
 			if (!at) {
-				raise_range(r[p_in.b].d, vector->length);
+				raise_range(index_number(index, r[p_in.b]), vector->length);
 				return;
 			}
 			if (*at == vector->length && !resize_vector(vector, vector->length + 1)) {

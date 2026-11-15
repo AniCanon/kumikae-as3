@@ -42,6 +42,11 @@ Interpreter::~Interpreter() {
 	while (!frames_.empty()) {
 		pop();
 	}
+	for (void *kept : singletons_) {
+		if (kept) {
+			host_.handles.drop(kept);
+		}
+	}
 	for (size_t i = 0; i < globals_.size(); i++) {
 		drop(module_.globals[i].kind, globals_[i]);
 	}
@@ -91,6 +96,20 @@ int Interpreter::line_at(size_t p_frame) const {
 }
 
 // "\tat Main/update()[Main.as:12]"
+// A frame that an error leaves, added to its trace; the first one is where it was thrown.
+void Interpreter::traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const {
+	if (*r_lines == 0) {
+		const Function &function = module_.functions[p_frame.function];
+		r_site->function = function.name + "()";
+		r_site->file = function.file < module_.files.size() ? module_.files[function.file] : "?";
+		r_site->line = (int32_t)line_at((size_t)(&p_frame - frames_.data()));
+	}
+	if (*r_lines < MAX_TRACE) {
+		*r_trace += site(p_frame) + "\n";
+	}
+	(*r_lines)++;
+}
+
 std::string Interpreter::site(const Frame &p_frame) const {
 	const Function &function = module_.functions[p_frame.function];
 	size_t index = (size_t)(&p_frame - frames_.data());
@@ -213,6 +232,7 @@ void Interpreter::take_trace(uint32_t p_reg) {
 		if (kept_traces_[i].reg == p_reg) {
 			trace_ = std::move(kept_traces_[i].trace);
 			trace_lines_ = kept_traces_[i].lines;
+			thrown_at_ = std::move(kept_traces_[i].site);
 			kept_traces_.erase(kept_traces_.begin() + static_cast<std::ptrdiff_t>(i));
 			frames_.back().traced = true; // Its line, where the error was thrown, is in.
 			return;
@@ -241,13 +261,11 @@ bool Interpreter::catch_error(size_t p_depth) {
 			if (handler.rethrows) {
 				std::string trace = trace_;
 				size_t lines = trace_lines_;
+				Site thrown = thrown_at_;
 				if (!frame.traced) {
-					if (lines < MAX_TRACE) {
-						trace += site(frame) + "\n";
-					}
-					lines++;
+					traced_frame(frame, &trace, &lines, &thrown);
 				}
-				keep_trace(Kept{ frames_.size(), handler.reg, std::move(trace), lines });
+				keep_trace(Kept{ frames_.size(), handler.reg, std::move(trace), lines, std::move(thrown) });
 			}
 			frame.traced = false;
 			const Kind kind = function.registers[handler.reg];
@@ -281,10 +299,7 @@ void Interpreter::leave_failed_frame() {
 	// A runaway recursion has thousands of frames: the first few and a count say as much. A frame whose
 	// line came with an error thrown again is in already.
 	if (!frames_.back().traced) {
-		if (trace_lines_ < MAX_TRACE) {
-			trace_ += site(frames_.back()) + "\n";
-		}
-		trace_lines_++;
+		traced_frame(frames_.back(), &trace_, &trace_lines_, &thrown_at_);
 	}
 	pop();
 }
@@ -365,7 +380,11 @@ void Interpreter::report() {
 		while (!text.empty() && text.back() == '\n') {
 			text.pop_back();
 		}
-		host_.output.error(text);
+		if (trace_lines_ > 0) {
+			host_.output.error_at(text, thrown_at_.function, thrown_at_.file, thrown_at_.line);
+		} else {
+			host_.output.error(text);
+		}
 	}
 	if (failing_) {
 		drop_any(pending_);

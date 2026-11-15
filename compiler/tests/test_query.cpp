@@ -222,7 +222,7 @@ static void test_tolerant() {
 }
 
 // A syntax error silences what it may have caused, and no more: everything else in its own file, every
-// file that uses something of that file's, and every complaint that a name is missing.
+// file that uses something of that file's (warnings too), and every complaint that a name is missing.
 static void test_errors_beside_a_syntax_error() {
 	const std::string wrong = "function f():void { var x:int = ; } ";
 	auto files = [&](const std::string &p_mistake) {
@@ -233,7 +233,7 @@ static void test_errors_beside_a_syntax_error() {
 								   "public var kept:int = \"k\"; public function alive():void {} } }" },
 			{ "Living.as", "package { public interface Living { function alive():void; } }" },
 			// Uses the broken file's class directly.
-			{ "Uses.as", "package { public class Uses { var b:Broken; var n:int = \"s\";\n"
+			{ "Uses.as", "package { public class Uses { var b:Broken; var n:int = \"s\"; var w:Number = 9007199254740993;\n"
 						 "function f():void { b.lost(); b.nothing; var l:Living = b; b.kept = \"t\"; } } }" },
 			// Extends a class that extends it.
 			{ "Middle.as", "package { public class Middle extends Broken { override public function gone():void {} } }" },
@@ -243,7 +243,7 @@ static void test_errors_beside_a_syntax_error() {
 			{ "Flow.as", "package { public class Flow { var h:Holder; function f():void { var n:int = h.value; } } }" },
 			// Has nothing to do with it: its mistakes are certain, except a name that is nowhere, which
 			// the broken file might have declared.
-			{ "Alone.as", "package { public class Alone { var n:int = \"s\"; var m:Nope;\n"
+			{ "Alone.as", "package { public class Alone { var n:int = \"s\"; var m:Nope; var w:Number = 9007199254740993;\n"
 						  "function f(l:Living):void { missing(); l.alive(1); l.nothing; } } }" },
 		};
 	};
@@ -257,6 +257,8 @@ static void test_errors_beside_a_syntax_error() {
 	};
 	const std::string certain =
 			"Alone.as:1:44: error: can't use a value of type 'String' where 'int' is expected\n"
+			"Alone.as:1:76: warning: 9007199254740993 is rounded: a Number can't hold every digit of it. Store it in an "
+			"Int64 to keep them\n"
 			"Alone.as:2:42: error: 'alive' takes no arguments but 1 was given\n"
 			"Alone.as:2:54: error: 'Living' has no member 'nothing'\n";
 	CHECK_EQ(reported(wrong, true), "Broken.as:1:119: error: expected an expression but found ';'\n" + certain);

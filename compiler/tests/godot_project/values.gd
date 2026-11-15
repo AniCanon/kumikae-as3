@@ -78,6 +78,8 @@ func _physics_process(_delta: float) -> bool:
 	show("freed name", ask("keptName", []), null)
 	ask("keptRename", [])
 	show("freed children", ask("keptChildren", []), null)
+	ask("keptSignal", [])
+	ask("keptByName", [])
 	show("freed as an argument", ask("keptUnder", [node]), false)
 	print("AFTER FREED")
 	# One part of a value. The twin has the same done to it in GDScript.
@@ -118,6 +120,7 @@ func _physics_process(_delta: float) -> bool:
 	show("clamp trailing null", ask("clampTrailingNull", [c]), c.clamp(low))
 	show("clamp both null", ask("clampBothNull", [c]), c.clamp())
 	show("clamp middle null", ask("clampMiddleNull", [c]), c.clamp(Color(0, 0, 0, 0), Color(0.5, 0.5, 0.5, 1)))
+	show("clamp null variable", ask("clampNullVariable", [c]), c.clamp(Color(0, 0, 0, 0), Color(0.5, 0.5, 0.5, 1)))
 	var t := Transform3D(Basis(), Vector3(1, 2, 3))
 	show("looking", ask("looking", [t, Vector3(5, 0, 5)]), t.looking_at(Vector3(5, 0, 5)))
 	show("looking null", ask("lookingNull", [t, Vector3(5, 0, 5)]), t.looking_at(Vector3(5, 0, 5)))

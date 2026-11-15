@@ -28,16 +28,6 @@ static bool compare_strings(Op p_op, const Str *p_left, const Str *p_right) {
 	return p_op == Op::LtStr ? left < right : left <= right;
 }
 
-// One string after the other. A missing one reads "null".
-static std::string joined(const Str *p_left, const Str *p_right) {
-	const std::string_view left = p_left ? p_left->view() : std::string_view("null");
-	const std::string_view right = p_right ? p_right->view() : std::string_view("null");
-	std::string result;
-	result.reserve(left.size() + right.size());
-	result += left;
-	result += right;
-	return result;
-}
 
 // An Int64 where an int, a uint or a Number is expected, or a Number where an Int64 is, when the
 // program did not write the conversion: the value, or a RangeError that names it.
@@ -302,6 +292,14 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::CmpI64F64:
 				r[in.a].d = compare_wide(r[in.b].l, r[in.c].d);
 				break;
+			case Op::CmpI64Str: {
+				// Text that is a whole number an Int64 holds is compared exactly; any other as a Number.
+				const Str *text = static_cast<const Str *>(r[in.c].p);
+				const std::string_view view = text ? text->view() : std::string_view("0");
+				const std::optional<int64_t> exact = string_to_wide_exact(view);
+				r[in.a].d = exact ? (r[in.b].l < *exact ? -1 : r[in.b].l > *exact ? 1 : 0) : compare_wide(r[in.b].l, string_to_number(view));
+				break;
+			}
 			case Op::I32ToI64:
 				r[in.a].l = r[in.b].i;
 				break;
@@ -335,6 +333,15 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::StrToI64: {
 				Str *string = static_cast<Str *>(r[in.b].p);
 				r[in.a].l = string ? string_to_wide(string->view()) : 0;
+				break;
+			}
+			case Op::StrToI64Checked: {
+				Str *string = static_cast<Str *>(r[in.b].p);
+				if (const std::optional<int64_t> exact = string ? string_to_wide_exact(string->view()) : std::optional<int64_t>(0)) {
+					r[in.a].l = *exact;
+				} else {
+					raise(module_.range_error_class, "\"" + std::string(string->view()) + "\" does not fit an Int64.");
+				}
 				break;
 			}
 			case Op::F64ToU32:
@@ -465,7 +472,13 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				flag(!r[in.b].b);
 				break;
 			case Op::Concat:
-				assign(Kind::Str, r[in.a], text(joined(static_cast<Str *>(r[in.b].p), static_cast<Str *>(r[in.c].p))));
+				// One string after the other; a missing one reads "null".
+				if (Str *joined = join_strings(r[in.b].p ? static_cast<Str *>(r[in.b].p)->view() : std::string_view("null"),
+							r[in.c].p ? static_cast<Str *>(r[in.c].p)->view() : std::string_view("null"))) {
+					assign(Kind::Str, r[in.a], joined);
+				} else {
+					out_of_memory();
+				}
 				break;
 			case Op::StrLength: {
 				Str *string = static_cast<Str *>(r[in.b].p);

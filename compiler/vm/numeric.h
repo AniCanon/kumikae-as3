@@ -16,6 +16,8 @@ int64_t clamp_wide(double p_number);
 // Text as an Int64: digits are read exactly, so that every Int64 can be written; anything else is read
 // as a Number first, as int("12.7") is.
 int64_t string_to_wide(std::string_view p_text);
+// The text as an Int64, if it is a whole number that one holds; nothing otherwise.
+std::optional<int64_t> string_to_wide_exact(std::string_view p_text);
 // An Int64 against a Number, exactly: below, equal or above as -1, 0 or 1, and not-a-number for one.
 double compare_wide(int64_t p_wide, double p_number);
 

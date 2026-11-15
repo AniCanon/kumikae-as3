@@ -34,20 +34,25 @@ size_t live_objects() {
 	return objects_alive;
 }
 
-Str *new_string(std::string_view p_text) {
+Str *join_strings(std::string_view p_first, std::string_view p_second) {
 	// A length is held in 32 bits: a longer text is refused as memory running out, never cut short.
-	const bool fits = p_text.size() <= UINT32_MAX;
-	void *memory = !fits || allocation_fails() ? nullptr : std::malloc(sizeof(Str) + p_text.size() + 1);
+	const uint64_t size = (uint64_t)p_first.size() + p_second.size();
+	void *memory = size > UINT32_MAX || allocation_fails() ? nullptr : std::malloc(sizeof(Str) + (size_t)size + 1);
 	if (!memory) {
 		return nullptr;
 	}
 	Str *string = new (memory) Str();
 	string->references = 1;
-	string->size = (uint32_t)p_text.size();
-	std::memcpy(string->data(), p_text.data(), p_text.size());
-	string->data()[p_text.size()] = 0;
+	string->size = (uint32_t)size;
+	std::memcpy(string->data(), p_first.data(), p_first.size());
+	std::memcpy(string->data() + p_first.size(), p_second.data(), p_second.size());
+	string->data()[size] = 0;
 	strings_alive++;
 	return string;
+}
+
+Str *new_string(std::string_view p_text) {
+	return join_strings(p_text, std::string_view());
 }
 
 void free_string(Str *p_string) {

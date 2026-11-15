@@ -70,7 +70,7 @@ bool Interpreter::length_is_fixed(const Vector *p_vector) {
 }
 
 Vector *Interpreter::fresh_vector(uint32_t p_class, uint64_t p_length) {
-	Vector *fresh = p_length <= UINT32_MAX ? new_vector(p_class, static_cast<uint32_t>(p_length), false) : nullptr;
+	Vector *fresh = p_length <= MAX_VECTOR_LENGTH ? new_vector(p_class, static_cast<uint32_t>(p_length), false) : nullptr;
 	if (!fresh) {
 		out_of_memory();
 	}
@@ -263,7 +263,7 @@ void Interpreter::splice(Vector *p_vector, const VectorCall &p_call) {
 		return;
 	}
 	const uint64_t grown = static_cast<uint64_t>(length) - taken + added;
-	if (grown > UINT32_MAX || !vector_reserve(p_vector, static_cast<uint32_t>(grown))) {
+	if (grown > MAX_VECTOR_LENGTH || !vector_reserve(p_vector, static_cast<uint32_t>(grown))) {
 		out_of_memory();
 		return;
 	}

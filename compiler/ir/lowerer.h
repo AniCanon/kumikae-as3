@@ -10,7 +10,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <functional>
+#include <deque>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -89,6 +89,7 @@ class Lowerer {
 	std::vector<std::string_view> next_labels_; // Labels written just before the statement being lowered.
 	// Types already refused where they were written: a value of one is not refused again at each use.
 	std::unordered_set<const Type *> refused_types_;
+	size_t zeroes_ = 0; // How many package variables are zeroed, first of all the initializers.
 	// The `try` statements around the code being lowered, outermost first: a `break`, `continue` or
 	// `return` that leaves one runs its `finally` on the way.
 	std::vector<TryBlock> tries_;
@@ -252,15 +253,21 @@ class Lowerer {
 		const Type *type = nullptr; // For Engine: what the member is declared to be.
 		uint32_t key = NONE; // For Engine: the place is an element (`value[key]`); the register holding the key.
 		bool constant = false; // One of Godot's constants: read from a register, and never written.
+		// For Engine: the script object whose Godot object `object` is, fetched when the place is read or
+		// written, so that a missing one is reported after the value is worked out, as in AS3.
+		uint32_t script_object = NONE;
 		// For Engine: the member is one part of a Godot value that is itself stored somewhere
 		// (`position.x`). Godot's values are copies, so writing the part is: read the whole value, change
 		// the part, write the whole value back.
-		std::shared_ptr<Part> part;
+		Part *part = nullptr; // In parts_.
 	};
 	struct Part {
 		Place whole; // Where the value is stored.
 		uint32_t value = NONE; // The register it was read into, once it has been.
 	};
+	// The parts of Godot values that places refer to (see Place::part): a deque, so that each stays where
+	// it is as more are made. Kept for the whole lowering: places are short-lived, and parts are small.
+	std::deque<Part> parts_;
 
 	// The value a part belongs to. It is read where the place is worked out, before anything to the right
 	// of it runs, as GDScript does: `position.x = f()` keeps the `y` that `position` had before `f()`.
@@ -289,6 +296,7 @@ class Lowerer {
 
 	// A class Godot keeps one object of (Input): tagged [Singleton] in the declarations.
 	static bool is_singleton(const Symbol *p_class);
+	static bool on_object(const Expr *p_member);
 
 	// The engine's one object of a singleton class. Everything written `Input.x` is then a member of it.
 	uint32_t singleton(const Symbol *p_class, uint32_t p_position);
@@ -298,7 +306,7 @@ class Lowerer {
 	Place constant_place(Symbol *p_symbol, uint32_t p_position);
 
 	// A property or field of an engine object.
-	Place engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position);
+	Place engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position, Expr *p_later = nullptr);
 
 	Place place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_position);
 
@@ -349,7 +357,12 @@ class Lowerer {
 	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
 			const std::string &p_defaults = std::string());
 
-	uint32_t engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver = NONE, const std::function<void()> &p_before = nullptr);
+	// An instruction a call still needs once its arguments are worked out (the signal it is made on).
+	struct Later {
+		Op op;
+		uint32_t position, a, b, c;
+	};
+	uint32_t engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver = NONE, std::optional<Later> p_before = std::nullopt);
 
 	// A method of Godot's that is called on no object: `Vector2.fromAngle(a)`.
 	uint32_t static_call(Call *p_call, Symbol *p_method);
@@ -358,6 +371,10 @@ class Lowerer {
 
 	uint32_t evaluate(Expr *p_expression, Kind p_want);
 	uint32_t number_literal(Expr *p_expression, Kind p_want);
+	uint32_t number_constant(double p_value, Kind p_kind, Kind p_want, uint32_t p_position);
+	uint32_t written_value(Expr *p_value, Kind p_conversion, uint32_t p_position);
+	uint32_t wide_order(Expr *p_left, Expr *p_right, uint32_t p_position);
+	uint32_t number_zero(uint32_t p_position);
 	uint32_t name_value(Expr *p_expression);
 	uint32_t member_value(Expr *p_expression);
 	uint32_t new_value(Expr *p_expression);

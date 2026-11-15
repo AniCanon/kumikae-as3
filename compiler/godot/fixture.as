@@ -14,6 +14,9 @@ package godot {
 	[Operator(op="*", left="int", returns="Vector2")]
 	[Operator(op="*", left="Number", returns="Vector2")]
 	[Indexed(element="Number")]
+	[Constructor(args="")]
+	[Constructor(args="Vector2")]
+	[Constructor(args="Number,Number")]
 	public final native class Vector2 {
 		public static const AXIS_X:int = 0;
 		public static const AXIS_Y:int = 1;
@@ -26,10 +29,13 @@ package godot {
 		public static native function fromAngle(angle:Number):Vector2;
 	}
 	[Operators]
+	[Constructor(args="")]
+	[Constructor(args="Signal")]
+	[Constructor(args="GodotObject,String")]
 	public final native class Signal {
 		public native function Signal(object:* = null, signal:String = null);
 		public native function emit(...rest):void;
-		public native function getObjectId():Int64;
+		public native function getObjectID():Int64;
 		public native function add(listener:Function, deferred:Boolean = false):void;
 		public native function addOnce(listener:Function, deferred:Boolean = false):void;
 		public native function remove(listener:Function):void;
@@ -66,7 +72,7 @@ package godot {
 		public final native function get(property:String):*;
 		public final native function set(property:String, value:*):void;
 		public final native function call(method:String, ...rest):*;
-		public final native function getInstanceId():Int64;
+		public final native function getInstanceID():Int64;
 		public final native function isClass(class_:String):Boolean;
 		public native function _notification(what:int):void;
 		public native function _get(property:String):*;
@@ -179,6 +185,6 @@ package godot {
 	public native function print(...rest):void;
 	public native function lerp(from:*, to:*, weight:*):*;
 	public native function degToRad(deg:Number):Number;
-	public native function instanceFromId(instanceId:Int64):GodotObject;
+	public native function instanceFromID(instanceID:Int64):GodotObject;
 	public native function randi():Int64;
 }

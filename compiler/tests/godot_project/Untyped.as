@@ -30,6 +30,28 @@ package {
 		public function throwValue(value:*):void { throw value; }
 		public function increment(value:*):* { return value + 1; }
 		public function moveBy(by:*):Vector2 { var q:Vector2 = position + by; return q; }
+		// The object written is the one named before the value changes the local: AS3's order.
+		public function writeOrder(a:Node2D, b:Node2D):Vector2 {
+			var first:Node2D = a;
+			a.position.x = (a = b, 5);
+			first.visible = true;
+			b.visible = true;
+			a = first;
+			a.visible = (a = b, false);
+			return new Vector2(first.position.x, first.visible ? 1 : 0);
+		}
+		// A Godot value read above the line that gives it a value is its zero, not null.
+		public var early:String = seen();
+		public var later:Vector2 = Vector2.ONE;
+		public static var seenStatic:String = seenStatics();
+		public static var laterStatic:Vector2 = Vector2.ONE;
+		private function seen():String { return "" + later; }
+		private static function seenStatics():String { return "" + laterStatic; }
+		public function readEarly():String {
+			var before:String = "" + v;
+			var v:Vector2 = Vector2.ONE;
+			return before + " " + early + " " + seenStatic + " " + origin;
+		}
 		public function minusOne(value:*):* { return value - 1; }
 		public function twice(value:*):* { return value * 2; }
 		public function stepped(value:*):* { value++; return value; }

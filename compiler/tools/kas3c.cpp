@@ -10,6 +10,7 @@
 #include "server.h"
 #include "source.h"
 
+#include <algorithm>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -96,11 +97,12 @@ static int run_check(int p_argc, char **p_argv) {
 	for (int i = 2; i < p_argc; i++) {
 		godot = godot && std::strcmp(p_argv[i], "--no-godot") != 0;
 	}
-	kas3::Compilation compilation;
-	if (godot) {
-		// Before the program's files: a name the program defines again is then reported in the program.
-		compilation.add(kas3::GODOT_DECLARATIONS_PATH, kas3::godot_declarations(), true);
-	}
+	struct File {
+		const char *path;
+		std::string text;
+		bool declaration;
+	};
+	std::vector<File> read;
 	for (int i = 2; i < p_argc; i++) {
 		bool declaration = false;
 		if (std::strcmp(p_argv[i], "--no-godot") == 0) {
@@ -128,7 +130,7 @@ static int run_check(int p_argc, char **p_argv) {
 			unreadable = true;
 			continue;
 		}
-		compilation.add(p_argv[i], std::move(text), declaration);
+		read.push_back(File{ p_argv[i], std::move(text), declaration });
 		files += declaration ? 0 : 1;
 	}
 	if (unreadable) {
@@ -136,6 +138,19 @@ static int run_check(int p_argc, char **p_argv) {
 	}
 	if (files == 0) {
 		return usage_error();
+	}
+	// Godot's API takes most of the time of a small check: it is loaded only for files that name its
+	// package. A file that never says `godot` can't reach it.
+	godot = godot && std::any_of(read.begin(), read.end(), [](const File &p_file) {
+		return p_file.text.find("godot") != std::string::npos;
+	});
+	kas3::Compilation compilation;
+	if (godot) {
+		// Before the program's files: a name the program defines again is then reported in the program.
+		compilation.add(kas3::GODOT_DECLARATIONS_PATH, kas3::godot_declarations(), true);
+	}
+	for (File &file : read) {
+		compilation.add(file.path, std::move(file.text), file.declaration);
 	}
 	// Through syntax errors: what they can't have caused is reported too, as the language server does.
 	compilation.check(true);

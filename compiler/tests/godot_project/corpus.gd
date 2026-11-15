@@ -27,6 +27,9 @@ func _process(_delta: float) -> bool:
 	frames += 1
 	if frames >= 10:
 		print("RAN %s" % names[at])
+		# What it worked out, for the programs whose work does not depend on the time between frames.
+		if node.has_method("checksum"):
+			print("CHECKSUM %s %s" % [names[at], str(node.call("checksum"))])
 		node.free()
 		node = null
 	return false

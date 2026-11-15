@@ -42,9 +42,9 @@ const char *symbol_kind_name(SymbolKind p_kind) {
 	return "?";
 }
 
-static std::string join(const List<std::string_view> &p_parts) {
+std::string dotted_name(const List<std::string_view> &p_parts, uint32_t p_count) {
 	std::string result;
-	for (uint32_t i = 0; i < p_parts.count; i++) {
+	for (uint32_t i = 0; i < p_count && i < p_parts.count; i++) {
 		if (i) {
 			result += '.';
 		}
@@ -252,7 +252,7 @@ std::string Compilation::where(const Unit &p_from, const Symbol *p_symbol) const
 
 void Compilation::declare_unit(Unit &p_unit) {
 	Program *tree = p_unit.tree;
-	p_unit.package = package(tree->package ? join(tree->package->name) : std::string());
+	p_unit.package = package(tree->package ? dotted_name(tree->package->name, tree->package->name.count) : std::string());
 	if (tree->package) {
 		uint32_t count = 0;
 		for (Node *definition : tree->package->definitions) {

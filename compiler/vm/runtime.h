@@ -62,6 +62,10 @@ inline bool release(Counted *p_value) {
 // value declared `Object`, and zero (no reference, `undefined`, 0, false) for the rest.
 Slot empty_value(bool p_number, bool p_null);
 
+// The most elements a vector may have: more is refused as memory running out (a length that came from a
+// negative number, most likely). Every way a vector grows checks this one number.
+constexpr uint32_t MAX_VECTOR_LENGTH = 1u << 30;
+
 // What AS3 says when memory runs out, wherever it does.
 constexpr std::string_view OUT_OF_MEMORY = "Error #1000: The system is out of memory.";
 
@@ -74,7 +78,9 @@ bool allocation_fails(); // True, and one fewer to fail, while any are still to 
 size_t live_strings();
 size_t live_objects();
 
-Str *new_string(std::string_view p_text); // One reference, the caller's.
+Str *new_string(std::string_view p_text); // One reference, the caller's. Null if out of memory.
+// The two, one after the other, made at once: nothing else is allocated. Null if out of memory.
+Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);
 Object *new_object(uint32_t p_class, size_t p_fields); // One reference; fields zeroed. Null if out of memory.
 void free_object(Object *p_object); // The fields must have been released.

@@ -91,11 +91,27 @@ uint32_t Lowerer::as_int32(uint32_t p_reg, uint32_t p_position) {
 	if (kind == Kind::I32 || !is_numeric(kind)) {
 		return p_reg;
 	}
+	if (kind == Kind::F64) {
+		// A whole number that came out as not a number is 0, as AS3's int() makes it; one past 32 bits
+		// is still a RangeError.
+		uint32_t wide = reg(Kind::I64);
+		emit(Op::F64ClampI64, p_position, wide, p_reg);
+		return convert(wide, Kind::I32, p_position);
+	}
 	return convert(convert(p_reg, Kind::I64, p_position), Kind::I32, p_position);
 }
 
 bool Lowerer::is_singleton(const Symbol *p_class) {
 	return has_tag(p_class, "Singleton");
+}
+
+// A member reached through an object (`i.mouseMode`), not through the class (`Input.mouseMode`).
+bool Lowerer::on_object(const Expr *p_member) {
+	if (!p_member || p_member->kind != NodeKind::Member) {
+		return false;
+	}
+	const Expr *object = static_cast<const Member *>(p_member)->object;
+	return object && object->type && object->type->kind == Type::Instance;
 }
 
 uint32_t Lowerer::singleton(const Symbol *p_class, uint32_t p_position) {
@@ -137,7 +153,8 @@ auto Lowerer::constant_place(Symbol *p_symbol, uint32_t p_position) -> Lowerer::
 	return place;
 }
 
-auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position) -> Lowerer::Place {
+// p_later is what is worked out after the place and before it is written: a local it changes is read first.
+auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position, Expr *p_later) -> Lowerer::Place {
 	Place place;
 	uint32_t name = 0;
 	Kind kind = Kind::F64;
@@ -172,7 +189,7 @@ auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position
 	place.index = name;
 	place.kind = kind;
 	place.type = compilation_.type_of(type);
-	if (of_singleton) {
+	if (of_singleton && !(p_object && p_object->type && p_object->type->kind == Type::Instance)) {
 		place.object = singleton(p_symbol->owner, p_position);
 		return place;
 	}
@@ -181,12 +198,17 @@ auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position
 			whole == Kind::Val) {
 		// A member of a value that is itself stored somewhere.
 		place.of_value = true;
-		place.part = std::make_shared<Part>();
-		place.part->whole = place_of(p_object);
+		place.part = &parts_.emplace_back();
+		place.part->whole = place_of(p_object, p_later);
 		whole_of(place, p_position);
 		return place;
 	}
-	place.object = engine_receiver(p_object, p_position, &place.of_value);
+	place.object = engine_receiver(p_object, p_position, &place.of_value, &place.script_object);
+	if (place.script_object != NONE) {
+		place.script_object = settled(place.script_object, p_later, p_position);
+	} else {
+		place.object = settled(place.object, p_later, p_position);
+	}
 	return place;
 }
 
@@ -199,7 +221,11 @@ uint32_t Lowerer::operand(Expr *p_expression, const Type *p_beside) {
 	if (!kind_of(p_expression->type, &kind) || !is_numeric(kind)) {
 		kind = Kind::Void;
 	} else if (kind == Kind::F64 && whole(p_expression)) {
-		kind = Kind::I64; // A whole number worked out as a Number: Godot's integer holds every one.
+		// A whole number worked out as a Number: Godot's integer holds every one. One that came out as not
+		// a number (`5 % 0`) goes as 0, as AS3's int() makes it.
+		uint32_t out = reg(Kind::I64);
+		emit(Op::F64ClampI64, p_expression->offset, out, expression(p_expression, Kind::F64));
+		return out;
 	}
 	return expression(p_expression, kind);
 }

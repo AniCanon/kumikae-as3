@@ -45,6 +45,7 @@ const Type *Typer::new_type(Expr *p_expression) {
 			return callee->element;
 		}
 		construct(callee->element, create->arguments, name_offset(create->callee));
+		constructor_form(callee->element, create->arguments, name_offset(create->callee));
 		return callee->element;
 	}
 	return callee->kind == Type::Any || dynamic_value(callee) ? any_ : unknown_;
@@ -74,7 +75,8 @@ const Type *Typer::assign_type(Expr *p_expression) {
 		default:
 			break;
 	}
-	if (bitwise && never_operator(assign->op, target, assign->offset)) {
+	// No Godot type has a bit operation, on either side.
+	if (bitwise && (never_operator(assign->op, target, assign->offset) || never_operator(assign->op, value, assign->offset))) {
 		return target;
 	}
 	TokenKind plain = compound_operator(assign->op);

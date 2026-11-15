@@ -367,17 +367,21 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	}
 	void print(std::string_view p_text) override { log += "print " + std::string(p_text) + "\n"; }
 	void error(std::string_view p_text) override { errors += std::string(p_text) + "\n"; }
-	void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *) override {
+	[[nodiscard]] void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *) override {
 		void *made = box();
 		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	void *collection(std::string_view p_type, const vm::Argument *p_elements, size_t p_count, std::string *) override {
+	[[nodiscard]] void *collection(std::string_view p_type, ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, std::string *) override {
 		void *made = box();
-		log += "collection " + std::string(p_type) + "[" + list(p_elements, p_count) + "] -> #" + std::to_string((intptr_t)made) + "\n";
+		std::vector<vm::Argument> elements;
+		for (size_t i = 0; i < p_count; i++) {
+			elements.push_back(vm::Argument{ p_kind, p_elements[i] });
+		}
+		log += "collection " + std::string(p_type) + "[" + list(elements.data(), p_count) + "] -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted,
+	[[nodiscard]] bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted,
 			vm::Slot *r_result, std::string *r_error) override {
 		ir::Kind p_kind = p_wanted.kind;
 		log += "call #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
@@ -388,40 +392,40 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_kind, r_result, 0.25, "text");
 		return true;
 	}
-	bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	[[nodiscard]] bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "get #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + "\n";
 		give(p_wanted.kind, r_result, 7.5, name);
 		return true;
 	}
-	bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	[[nodiscard]] bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "get #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "]\n";
 		give(p_wanted.kind, r_result, 2.5, "text");
 		return true;
 	}
-	bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *) override {
+	[[nodiscard]] bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *) override {
 		log += "set #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "] = " + show(p_value) + "\n";
 		return true;
 	}
 	const ir::Module *module = nullptr;
-	void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *) override {
+	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *) override {
 		void *made = box();
 		log += "bind " + (module ? module->functions[p_function].name : std::to_string(p_function)) + " of " +
 				(module ? module->classes[p_object->klass].name : std::string("?")) + " owner #" + std::to_string((intptr_t)p_owner) + " -> #" +
 				std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "member #" + std::to_string((intptr_t)p_receiver) + "[" + std::string(p_name) + "] as " + std::string(p_wanted.type) + "\n";
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
 	}
 	std::string missing; // A singleton, constant or static method the engine does not have.
-	bool evaluate(std::string_view p_expression, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "evaluate " + std::string(p_expression) + " as " + std::string(p_wanted.type) + "\n";
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
 	}
-	void *singleton(std::string_view p_class, std::string *r_error) override {
+	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override {
 		if (p_class == missing) {
 			*r_error = "Godot has no '" + missing + "' here";
 			return nullptr;
@@ -430,7 +434,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		log += "singleton " + std::string(p_class) + " -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
+	[[nodiscard]] bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
 		log += "constant " + std::string(p_class) + "." + std::string(p_name) + " as " + std::string(p_wanted.type) + "\n";
 		if (p_name == missing) {
 			*r_error = "Godot has no constant '" + missing + "'";
@@ -439,7 +443,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
 	}
-	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
+	[[nodiscard]] bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
 		log += "static " + std::string(p_class) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
 		if (p_method == missing) {
@@ -449,16 +453,16 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_wanted.kind, r_result, 0.5, "text");
 		return true;
 	}
-	bool present(void *p_value) override { return p_value != nullptr; }
-	bool is_class(void *p_value, std::string_view p_class) override {
+	[[nodiscard]] bool present(void *p_value) override { return p_value != nullptr; }
+	[[nodiscard]] bool is_class(void *p_value, std::string_view p_class) override {
 		log += "is #" + std::to_string((intptr_t)p_value) + " " + std::string(p_class) + "\n";
 		return p_value != nullptr;
 	}
-	vm::Str *text(void *p_value) override {
+	[[nodiscard]] vm::Str *text(void *p_value) override {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
 	}
-	bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
+	[[nodiscard]] bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
 			std::string *r_error) override {
 		log += "operate " + std::string(p_operator) + " (" + list(p_arguments, p_count) + ") as " + ir::kind_name(p_wanted.kind) +
 				(p_wanted.type.empty() ? "" : " " + std::string(p_wanted.type)) + "\n";
@@ -469,7 +473,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_wanted.kind, r_result, 1, "text");
 		return true;
 	}
-	bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override {
+	[[nodiscard]] bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override {
 		log += "set #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + " = " + show(p_value) + "\n";
 		if (fail_sets) {
 			*r_error = "the engine refused to set " + std::string(p_property);
@@ -480,7 +484,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		}
 		return true;
 	}
-	void *copy(void *p_value) override {
+	[[nodiscard]] void *copy(void *p_value) override {
 		if (p_value) {
 			boxes++;
 		}
@@ -648,8 +652,10 @@ static void test_engine_statics() {
 		vm::Object *object = interpreter.construct(pad, engine.box()); // #1
 		CHECK(object != nullptr);
 		// The class is used for the first time: its static field is set from the singleton. Then the object's
-		// field of a Godot value with parts starts at its zero.
-		CHECK_EQ(engine.log, std::string("singleton Engine -> #2\nget #2.physics_ticks_per_second\nconstruct Vector2() -> #3\n"));
+		// fields of a Godot value with parts start at their zero, a field with a value written too (an
+		// initializer above it may read it).
+		CHECK_EQ(engine.log, std::string("singleton Engine -> #2\nget #2.physics_ticks_per_second\nconstruct Vector2() -> #3\n"
+										 "construct Vector2() -> #4\n"));
 		engine.log.clear();
 		vm::Slot result;
 		result.bits = 0;
@@ -662,21 +668,21 @@ static void test_engine_statics() {
 		arguments[0].bits = 0;
 		arguments[0].p = vm::new_string("jump");
 		CHECK(interpreter.call_method(object, "pressed", arguments, 1, &result));
-		CHECK_EQ(engine.log, std::string("singleton Input -> #4\ncall #4.is_action_pressed(\"jump\", true)\n"));
+		CHECK_EQ(engine.log, std::string("singleton Input -> #5\ncall #5.is_action_pressed(\"jump\", true)\n"));
 		vm::free_string(static_cast<vm::Str *>(arguments[0].p));
 		engine.log.clear();
 		arguments[0].bits = 0;
 		arguments[0].d = 0.5;
 		CHECK(interpreter.call_method(object, "slow", arguments, 1, nullptr));
-		CHECK_EQ(engine.log, std::string("singleton Engine -> #5\nset #5.time_scale = 0.5\n"
-										 "singleton Engine -> #6\nget #6.time_scale\nset #6.time_scale = 8\n"));
+		// A singleton is looked up once, then kept: Engine was found when the class was set up.
+		CHECK_EQ(engine.log, std::string("set #2.time_scale = 0.5\nget #2.time_scale\nset #2.time_scale = 8\n"));
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "listen", nullptr, 0, nullptr));
-		CHECK_EQ(engine.log, std::string("singleton Input -> #7\nget #7.joy_connection_changed\nbind Pad/onJoy of Pad owner #1 -> #9\ncall #8.@add(#9)\n"));
+		CHECK_EQ(engine.log, std::string("get #5.joy_connection_changed\nbind Pad/onJoy of Pad owner #1 -> #7\ncall #6.@add(#7)\n"));
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "itself", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("singleton Input -> #10\n"));
-		CHECK_EQ((intptr_t)result.p, (intptr_t)10);
+		CHECK_EQ(engine.log, std::string());
+		CHECK_EQ((intptr_t)result.p, (intptr_t)5);
 		engine.drop(result.p);
 		// A constant with a value in the declarations asks the engine nothing.
 		engine.log.clear();
@@ -685,7 +691,7 @@ static void test_engine_statics() {
 		CHECK_EQ(result.d, 4194305.0 + 13.0 + 2.0);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "up", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("constant Vector2.UP as Vector2\nget #11.y\n"));
+		CHECK_EQ(engine.log, std::string("constant Vector2.UP as Vector2\nget #8.y\n"));
 		// A static method is called on no object.
 		engine.log.clear();
 		arguments[0].d = 1;
@@ -696,7 +702,7 @@ static void test_engine_statics() {
 		engine.drop(result.p);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "shown", nullptr, 0, nullptr));
-		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes()\n"));
+		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes 3218959716()\n"));
 		// A global function is called on no class, with its signature for the engine's side.
 		engine.log.clear();
 		arguments[0].d = 1;
@@ -718,12 +724,12 @@ static void test_engine_statics() {
 		// A local of a Godot value with parts starts at its zero, once: the declaration is not run again.
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "unset", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("construct Vector2() -> #13\n"));
+		CHECK_EQ(engine.log, std::string("construct Vector2() -> #10\n"));
 		engine.drop(result.p);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "twice", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("construct Vector2() -> #14\ntext #14\n"));
-		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("<#14>null"));
+		CHECK_EQ(engine.log, std::string("construct Vector2() -> #11\ntext #11\n"));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("<#11>null"));
 		vm::free_string(static_cast<vm::Str *>(result.p));
 		CHECK(interpreter.call_method(object, "field", nullptr, 0, &result));
 		CHECK_EQ((intptr_t)result.p, (intptr_t)3);
@@ -731,13 +737,21 @@ static void test_engine_statics() {
 		// A Godot value without parts, and one set to null, are missing.
 		CHECK(interpreter.call_method(object, "nothing", nullptr, 0, &result));
 		CHECK(result.b);
-		CHECK_EQ(engine.boxes, 2); // The owner and the field.
-		// What the engine does not have is an AS3 error, and nothing is left behind.
+		CHECK_EQ(engine.boxes, 4); // The owner, the field, and the two singletons kept.
+		// What the engine does not have is an AS3 error, and nothing is left behind. (A singleton not yet
+		// looked up: this interpreter has Input already.)
 		CHECK_EQ(engine.errors, std::string());
-		engine.missing = "Input";
-		CHECK(!interpreter.call_method(object, "listen", nullptr, 0, nullptr));
-		CHECK(engine.errors.find("Error: Godot has no 'Input' here") == 0);
-		engine.errors.clear();
+		{
+			vm::Interpreter fresh(module, engine);
+			CHECK(fresh.start());
+			vm::Object *other = fresh.construct(pad, engine.box());
+			engine.missing = "Input";
+			CHECK(!fresh.call_method(other, "listen", nullptr, 0, nullptr));
+			CHECK(engine.errors.find("Error: Godot has no 'Input' here") == 0);
+			engine.errors.clear();
+			engine.missing.clear();
+			fresh.release_object(other);
+		}
 		engine.missing = "UP";
 		CHECK(!interpreter.call_method(object, "up", nullptr, 0, &result));
 		CHECK(engine.errors.find("Error: Godot has no constant 'UP'") == 0);
@@ -745,9 +759,9 @@ static void test_engine_statics() {
 		engine.missing = "from_angle";
 		CHECK(!interpreter.call_method(object, "made", arguments, 2, &result));
 		CHECK(engine.errors.find("Error: Godot has no 'from_angle'") == 0);
-		CHECK_EQ(engine.boxes, 2);
+		CHECK_EQ(engine.boxes, 4);
 		interpreter.release_object(object);
-		CHECK_EQ(engine.boxes, 0);
+		CHECK_EQ(engine.boxes, 2); // The singletons, until the interpreter goes.
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
@@ -1594,6 +1608,7 @@ static void test_untyped_out_of_memory() {
 							  "public function add(a:*):* { return a + 1; }\n"
 							  "public function same(o:*):String { try { return String(o == 'grow'); } catch (e:Error) { return e.message; } return ''; }\n"
 							  "public function toString():String { return 'grow'; }\n"
+							  "public function glue(a:*):String { try { return a + 'x'; } catch (e:Error) { return e.message; } return ''; }\n"
 							  "} }\n");
 	compilation.check();
 	CHECK_EQ(compilation.format_diagnostics(), std::string());
@@ -1624,13 +1639,52 @@ static void test_untyped_out_of_memory() {
 		vm::fail_allocations(0);
 		CHECK_EQ(result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string(), std::string(vm::OUT_OF_MEMORY));
 		interpreter.discard(ir::Kind::Str, result);
+		// Text joined with an untyped `+`, with no memory for the result.
+		vm::Slot text = vm::any::string(vm::new_string("left"));
+		vm::fail_allocations(1);
+		CHECK(interpreter.call_method(object, "glue", &text, 1, &result));
+		vm::fail_allocations(0);
+		CHECK_EQ(result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string(), std::string(vm::OUT_OF_MEMORY));
+		interpreter.discard(ir::Kind::Str, result);
+		interpreter.discard(ir::Kind::Any, text);
 		interpreter.release_object(object);
 	}
 	CHECK_EQ(vm::live_strings(), strings);
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// An object a host makes is built in the order `new` builds it, AS3's: a class's field values first, at
+// the start of its constructor, then its base's (fields, constructor), then the rest of its constructor.
+static void test_host_construct_order() {
+	Compilation compilation;
+	compilation.add("Child.as", "package { public class Child extends Base {\n"
+								"public var own:int = say('Child field');\n"
+								"public function Child() { trace('Child constructor'); }\n"
+								"} }\n"
+								"class Base {\n"
+								"public var first:int = say('Base field');\n"
+								"public function Base() { trace('Base constructor'); }\n"
+								"public function say(p_text:String):int { trace(p_text); return 1; }\n"
+								"}\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	uint32_t child = ir::NONE;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		child = module.classes[i].name == "Child" ? (uint32_t)i : child;
+	}
+	Recorder host;
+	vm::Interpreter interpreter(module, host);
+	CHECK(interpreter.start());
+	vm::Object *made = interpreter.construct(child);
+	CHECK(made != nullptr);
+	CHECK_EQ(host.printed, std::string("Child field\nBase field\nBase constructor\nChild constructor\n"));
+	interpreter.release_object(made);
+}
+
 int main() {
+	test_host_construct_order();
 	test_kept_traces();
 	test_untyped_out_of_memory();
 	test_out_of_memory();

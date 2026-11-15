@@ -33,20 +33,12 @@ fields are set on a class's first use, and a call on a null object evaluates its
 ## Stage 1d: Godot's API in AS3
 
 - A script class named like a Godot class is ambiguous in the default package. **clean-up**
-- Acronyms come out lower-case: `getAabb`, not `getAABB`. **clean-up**
 - Four properties lose their element type. **2c**
-- One flag enum of `RenderingServer` whose listed values all fit 32 bits is declared `int`, though Godot
-  holds its flags in 64. **clean-up**
-- The corpus prefix test loads Godot's API for one prefix in 293 only. **clean-up**
-- Loading Godot's API costs about 30 ms on every `kas3c check`. **clean-up**
-- The merged constructors accept calls no overload has: `new Vector3(1, 2)`. **clean-up**
 - **decision** 60 methods that take raw pointers are left out. AS3 has nothing to pass them, so the
   proposal is that this stands.
 
 ## Stage 1e: Godot's math types
 
-- A malformed tag in a declaration file (both `left` and `right`, two rules for one operator) is resolved
-  silently. **clean-up**
 - `for each` over a packed array does not check the variable's type. **2c**
 - Godot's string-format operator (`"%s" % value`) is not available. **2c**
 
@@ -58,24 +50,12 @@ fields are set on a class's first use, and a call on a null object evaluates its
   IDE heap profile. **LS-2**
 - **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths. **LS-2**
 
-## Backlog pass, November 2026
-
-Found by the review of the clean-up pass itself.
-
-- A static call's arguments are evaluated before the class's static fields are set, and `x is C` does not
-  set up `C`. Whether Flash does the same is unchecked. **clean-up**
-- Tests are missing for: private and static members of the same name not counting as overrides, and the
-  base-first order when a host constructs an object. **clean-up**
-
 ## Stage 2b-2, part A: Godot's values
 
 - A `Number` used as an index is cut to a whole number by Godot: `v[1.5]` reads element 1, and `v[NaN]`
   element 0. **2c**
 - One part of a value that is stored nowhere (`a.normalized().x = 5`) is refused. So is `points[0].x = 5`
   on a packed array of vectors, though there the value is stored. **2c**
-- A local that the right-hand side reassigns is read after it: `a.position.x = (a = b, 5)` writes to `b`.
-  (A whole property behaves the same: `a.visible = (a = b, false)`.) **clean-up**
-- `x >>>= vector` passes the checker and fails when it runs. **clean-up**
 - **decision** `"" + this` in a script without `toString()` reads `[object Values]` (AS3's), while Godot's
   text for the same node reads `<Node2D#123>`. And a `toString()` that raises an error ends the caller
   through `"" + this`, but through Godot's text it is reported and Godot's text stands.
@@ -107,26 +87,11 @@ Found by the review of the clean-up pass itself.
 
 ## Stage 2b-3, part A: singletons, constants, static methods
 
-- A local, a field or a static field with a value written (`var v:Vector2 = position;`) that is read
-  above that line is null there, not the type's zero. So is a variable declared at package level.
-  **clean-up**
 - Godot calling a script from another thread (a method given to `WorkerThreadPool.addTask`) is refused
   with an error. Running AS3 off the main thread waits for the `async` research. Only method calls are
   guarded: a property read or a notification from another thread is not. **2d**
-- The singleton the engine gives is not checked against the class the script names. Right today, since
-  every singleton's name is its class. **clean-up**
-- A constant with a negative value is worked out when the line runs (three instructions), not written
-  as one number. **clean-up**
-- An editor-only singleton used in a game is reported twice: by Godot, then as an AS3 error. **clean-up**
-- A variable typed as a singleton class (`var i:Input = Input.singleton`) reaches only `GodotObject`'s
-  members: the class's own are static. **clean-up**
 - `removeAll()` on a singleton's signal removes every script's listeners, not only the caller's.
   **decision**
-- Tests are missing for: a static call's arguments worked out left to right, a static call that gives
-  the wrong type, and a failing `Node.printOrphanNodes()`. The review ran the first two by hand. **clean-up**
-- A class's static method that fails inside Godot (wrong arguments) is reported by Godot only: the script
-  carries on with nothing. **clean-up**
-- A singleton is looked up each time its name is written. **clean-up**
 
 ## Stage 2b-3, part B: `Int64`
 
@@ -138,17 +103,6 @@ Found by the review of the clean-up pass itself.
   their value; `Array`'s `removeAt`, `popAt`, `slice` and `find` cut an index; `Basis.getEuler` and
   `Quaternion.getEuler` cut the order; `Callable.unbind` its count. Guarding each needs a list kept by
   hand, which the owner chose against; the choice is whether a short one is worth it.
-- A written cast of a `?:` that mixes an `Int64` and a `Number` checks where it should cut:
-  `int(c ? w : 1.5)` raises a `RangeError` for a wide `w`. **clean-up**
-- An `Int64` against a Boolean or a String is compared through a `Number`, so one past 2^53 raises
-  (`w == true`). `w & "99999999999999999999"` holds the text at the largest `Int64`. **clean-up**
-- A whole number worked out as not-a-number (`v * (5 % 0)`) on its way to Godot is a `RangeError`. Before
-  `Int64` it went as 0. **clean-up**
-- Godot refusing a value says "cannot convert argument 1 ..., a int, to int", not that the value does not
-  fit. **clean-up**
-- An `Int64` shift count widens an `int` on its left: `i >>> c` is worked out in 64 bits. **clean-up**
-- A whole number written out is an `Int64` only where one is expected or beside one. Elsewhere it is a
-  `Number`, as in Flash: `var n:Number = 9007199254740993` rounds. **clean-up**
 - `x.toString(radix)` on an `Int64` waits for the standard library. **2c**
 - `Vector.<Int64>` and an `Int64` in an `Array` wait for those types. **2c**
 - Every program's IR now carries the `RangeError` class, used or not. **clean-up**
@@ -164,10 +118,6 @@ the review of the clean-up put off.
   671, `godot_host.cpp` 647) and three headers over 300 (`ast.h`, `lowerer.h`, `names.h`). **clean-up**
 - Planned and not done: the listener sweep in a file of its own, `godot_values.cpp`, a table of handlers
   in the language server. **clean-up**
-- The syntax-tree printer's cases print inline; 28 of its 48 are over five lines. **clean-up**
-- `Place::part` is a `std::shared_ptr` and `engine_call` takes a `std::function`; `join()` is written in
-  two files of the front end; `[[nodiscard]]` is on the host interfaces but not on their overrides.
-  **clean-up**
 - The interpreter makes a new handle for every value Godot gives back, which is most of what a call into
   Godot now costs. A design change, for the native backend's stage. **clean-up**
 
@@ -177,12 +127,8 @@ the review of the clean-up put off.
   program does not say what it expects, and for one of Godot's values. Each has a typed twin. **2c**
 - Godot's message for a listener that was not called names it `Node(Signals.as)::`, without the method.
   **clean-up**
-- A default is read by Godot each time a program is loaded, not once when the declarations are made.
-  **clean-up**
 - A freed Godot object still reads as `<Freed Object>` as text, as in GDScript, though it is `null` in
   every test. **decision**
-- An iOS library built before a script used something new does not load the project, and the test scene
-  then never finishes, without reporting why. **clean-up**
 
 From the review of part C (its five important findings were fixed with it: `print()` with no arguments, a
 default `[]` shared between calls, a null answer taken silently as text, `-5` reaching Godot as `-5.0`, and
@@ -191,18 +137,8 @@ any Godot value passing as a condition):
 - A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
   `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
   **decision**
-- Three messages for a freed receiver keep their old wording and are a plain `Error`, not #1009
-  (a signal by name, a signal's owner, a call's description). **clean-up**
-- The source of a reported error is read from the first `\tat ` and the first `]`: a path with `]` in it,
-  or a message that itself contains a stack line, is reported with the wrong source. **clean-up**
-- A property written through a missing script object is refused before the value is worked out; a call's
-  arguments are worked out first. **clean-up**
 - `int(lerp(a, b, t))` raises for a fraction instead of cutting it, and `Boolean(max(a, b))` is refused.
   **2c**
-- A wide integer into a Number from a function that gives back anything says "gave a int where Number
-  was expected", not the range error its typed twin gives. **clean-up**
-- In the global functions' host: a branch for fractions that can't be reached, an unknown type name read
-  as "anything", "takes 1 arguments". **clean-up**
 - A freed object arriving from Godot for a `Node` parameter of a script's method is refused, not null.
   **2d**
 - A Number variable that holds a whole value reaches a parameter that takes anything as a float
@@ -210,7 +146,6 @@ any Godot value passing as a condition):
   sent as integers. **decision**
 - New code that the guide would write otherwise: an empty string and an out-parameter where it asks for
   `std::optional`, `const std::string &` for `std::string_view`, two comments out of place. **clean-up**
-- `var c:Color = null; x.clamp(c, hi)` is an error where the literal `null` takes the default. **clean-up**
 
 ## Completion, brought forward
 
@@ -265,9 +200,6 @@ any Godot value passing as a condition):
 - An untyped value that holds a script object is an AS3 error when an AS3 call gives it to Godot; when
   Godot reads it (a return, a field), Godot gets null and an error is printed. Nothing converts it.
   **decision**
-- The encoding of an untyped value needs addresses below 2^47 with nothing in the top bits: a build where
-  the platform tags pointers there (Android's heap tagging on arm64) stops with a message. It has to be
-  handled before Android runs. **clean-up**
 - A Godot `StringName` or `NodePath` in an untyped value is held as Godot's own value, not as a String:
   `typeof` says "object". **2c**
 - Godot's integers in an untyped value: one that fits an `int` is held as one, a larger one as an `Int64`;
@@ -286,26 +218,15 @@ any Godot value passing as a condition):
 - `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
 - A reload is refused when a vector that is alive has a type the new program no longer mentions, even if
   the vector is empty. **2d**
-- The interpreter converts a vector's index to a Number on every access. **clean-up**
-- Handing a vector to Godot copies its elements into a list first, then into Godot's array. **clean-up**
-- `test_json` times a large parse and fails when the machine is busy. **clean-up**
 - Not checked against Flash: `pop()` and `shift()` on an empty vector of numbers give 0; a negative length
   is an out-of-memory error, not a `RangeError`; setting a fixed vector's length to what it already is
   does nothing; `join(null)` puts the word "null" between the elements. **2c**
-- A vector's error messages are each written in more than one place, and its greatest length is checked
-  against two different numbers. **clean-up**
-- The corpus run in Godot checks only that each program ran for ten frames with no error printed, not
-  what it did. **clean-up**
-- Vectors have no IR golden file, no vector in the reload test that runs in Godot, and `for each` is
-  tested only inside the methods' program. **clean-up**
 
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
-- Running out of memory while the C++ side builds a text (joining two strings) aborts. **clean-up**
 - 6 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
   the six are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
-- There is one IR golden file; the plan called for more. **2c**
 - A string's `length` counts characters, not UTF-16 units, and strings compare by character. **2c**
 - An endless loop has no stop. **2d**
 - After one refused construct, follow-on errors can appear on the same line. **2c**

@@ -89,7 +89,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 		Member *member = static_cast<Member *>(p_target);
 		Symbol *symbol = member->resolved();
 		if (symbol && is_godot(symbol) && (symbol->kind == SymbolKind::Property || symbol->kind == SymbolKind::Field)) {
-			return engine_place(symbol, member->object, member->name_offset);
+			return engine_place(symbol, member->object, member->name_offset, p_later);
 		}
 		if (symbol && (globals_.count(symbol) || !symbol->is_instance_member())) {
 			return place_of_symbol(symbol, 0, member->name_offset);
@@ -117,7 +117,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 			place.type = p_target->type;
 			place.of_value = true;
 			if (index->object->kind == NodeKind::Name || index->object->kind == NodeKind::Member) {
-				place.part = std::make_shared<Part>();
+				place.part = &parts_.emplace_back();
 				place.part->whole = place_of(index->object);
 				whole_of(place, p_target->offset);
 			} else {
@@ -151,6 +151,9 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 			return out;
 		}
 		case Place::Engine: {
+			if (p_place.script_object != NONE) {
+				owner_of(p_place.script_object, p_place.object, p_position);
+			}
 			uint32_t object = p_place.part ? whole_of(p_place, p_position) : p_place.object;
 			uint32_t out = engine_reg(p_place.kind, p_place.type);
 			if (p_place.key != NONE) {
@@ -210,6 +213,9 @@ void Lowerer::store(const Place &p_place, uint32_t p_value, uint32_t p_position)
 				// `a.normalized().x = 5` would change a copy that nobody keeps.
 				refuse(p_position, "changing one part of a Godot value that is not stored anywhere");
 			} else {
+				if (p_place.script_object != NONE) {
+					owner_of(p_place.script_object, p_place.object, p_position);
+				}
 				emit(Op::HostSet, p_position, p_place.object, p_place.index, p_value);
 			}
 			break;

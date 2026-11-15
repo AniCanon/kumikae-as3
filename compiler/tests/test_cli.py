@@ -4,6 +4,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 KAS3C = sys.argv[1]
 failures = []
@@ -207,11 +208,37 @@ with tempfile.TemporaryDirectory() as folder:
           result.stderr == "%s:2:15: error: 'Node' is already defined in Godot's API\n" % clash,
           repr(result.stderr[:300]))
 
+# A warning is said, and the program still checks and runs.
+with tempfile.TemporaryDirectory() as warned:
+    rounded = os.path.join(warned, "Rounded.as")
+    with open(rounded, "w") as handle:
+        handle.write("package { public class Rounded { public function Rounded() { var n:Number = 9007199254740993; trace(n); } } }\n")
+    result = run("check", rounded)
+    check("a warning does not fail the check", result.returncode == 0 and
+          result.stderr == "%s:1:77: warning: 9007199254740993 is rounded: a Number can't hold every digit of it. Store it in an Int64 to keep them\n" % rounded,
+          repr(result.stderr[:300]))
+    result = run("run", rounded)
+    check("a program with a warning runs", result.returncode == 0 and result.stdout == "9007199254740992\n", repr(result.stdout[:200]))
+
 # A finally is written once, however many ways lead out of its try.
 once = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "finally_once.as")
 result = run("ir", once)
 check("finally written once", result.returncode == 0 and result.stdout.count('"cleanup marker"') == 1,
       "%d copies" % result.stdout.count('"cleanup marker"'))
+
+# Godot's API is loaded only for files that name its package: a file that doesn't is checked far faster.
+def best_time(*args):
+    best = 1e9
+    for _ in range(3):
+        start = time.monotonic()
+        run(*args)
+        best = min(best, time.monotonic() - start)
+    return best
+
+plain = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "small_fixes.as")
+with_godot = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus", "Empty.as")
+check("check skips Godot's API when no file names it", best_time("check", plain) * 2 < best_time("check", with_godot),
+      "plain %.3fs, with Godot %.3fs" % (best_time("check", plain), best_time("check", with_godot)))
 
 # A script for Godot is lowered with Godot's API in reach, as the extension does it.
 empty = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus", "Empty.as")

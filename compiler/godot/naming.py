@@ -24,6 +24,20 @@ CLASS_RENAMES = {
 }
 
 
+# Words written in capitals after the first word of a member's name, as Flash writes them (`errorID`,
+# `URLRequest`): `get_aabb` is `getAABB`, `get_world_2d` is `getWorld2D`.
+ACRONYMS = frozenset("""
+aabb rid id uid url uri http https xml json csv uv uv2 ui gpu cpu fps rgb rgba rgba8 rgbe hsv hsl csg gltf
+fbx obj sdf ssao ssil ssr fov lod msaa fxaa taa hdr ldr dof ik vr xr ar pck utf8 utf16 utf32 ascii md5
+sha1 sha256 crc32 ip tcp udp dtls tls ssl dns mtu rpc api os 2d 3d
+""".split())
+
+
+def word(part):
+    """One word after the first: an acronym in capitals, any other with a capital."""
+    return part.upper() if part in ACRONYMS else part[0].upper() + part[1:]
+
+
 def camel(name):
     """move_and_slide -> moveAndSlide. Leading underscores stay; an all-capitals name is left alone."""
     if name.upper() == name:
@@ -33,7 +47,7 @@ def camel(name):
     parts = [part for part in body.split("_") if part]
     if not parts:
         return name
-    return lead + parts[0] + "".join(part[0].upper() + part[1:] for part in parts[1:])
+    return lead + parts[0] + "".join(word(part) for part in parts[1:])
 
 
 def safe(name):
@@ -75,6 +89,7 @@ def snake(name):
     """maxSpeed -> max_speed: how a script's own member is shown to the engine."""
     body = name.lstrip("_")
     lead = name[: len(name) - len(body)]
+    body = re.sub(r"([A-Za-z])([23])D(?![a-z])", r"\1_\2d", body)  # getWorld2D, as camel() writes it.
     body = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", body)
     body = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", body)
     return lead + body.lower()

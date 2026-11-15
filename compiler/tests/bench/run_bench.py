@@ -13,6 +13,7 @@ fastest and the slowest. A change is slower only if its median moved by more tha
   check     a full `kas3c check` of a generated project of about 100,000 lines
   recheck   the language server checking that project again after one edit (bench_recheck's median)
   run       `kas3c run` of loop.as: arithmetic, calls and fields in a loop
+  vectors   `kas3c run` of vectors.as: a vector's elements read and written in loops
   engine    in headless Godot, 160,000 calls from AS3 into the engine (--godot only; needs the extension)
 """
 import glob
@@ -45,7 +46,8 @@ def against(build, other, runs):
         subprocess.run([sys.executable, os.path.join(HERE, "generate_project.py"), project, "100000"], check=True,
                        capture_output=True)
         files = sorted(glob.glob(os.path.join(project, "**", "*.as"), recursive=True))
-        for name, command, cwd in (("check", ["check", *files], None), ("run", ["run", "loop.as"], HERE)):
+        for name, command, cwd in (("check", ["check", *files], None), ("run", ["run", "loop.as"], HERE),
+                                   ("vectors", ["run", "vectors.as"], HERE)):
             samples = {build: [], other: []}
             for _ in range(runs):
                 for which in (build, other):
@@ -97,6 +99,13 @@ def main():
             sys.exit("run failed:\n" + done.stderr[-600:])
         samples.append(elapsed)
     report("run", samples)
+    samples = []
+    for _ in range(runs):
+        elapsed, done = timed([kas3c, "run", "vectors.as"], cwd=HERE)
+        if done.returncode != 0:
+            sys.exit("vectors failed:\n" + done.stderr[-600:])
+        samples.append(elapsed)
+    report("vectors", samples)
     if godot_tests:
         godot = os.environ.get("KAS3_GODOT") or shutil.which("godot")
         samples = []
