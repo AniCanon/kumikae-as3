@@ -65,8 +65,6 @@ Found by the review of the clean-up pass itself.
 
 ## Stage 2b-2, part A: Godot's values
 
-- One part of a value that is stored nowhere (`a.normalized().x = 5`) is refused. So is `points[0].x = 5`
-  on a packed array of vectors, though there the value is stored. **2c**
 - **decision** `"" + this` in a script without `toString()` reads `[object Values]` (AS3's), while Godot's
   text for the same node reads `<Node2D#123>`. And a `toString()` that raises an error ends the caller
   through `"" + this`, but through Godot's text it is reported and Godot's text stands.

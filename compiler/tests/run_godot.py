@@ -139,7 +139,7 @@ output = compare("values.gd", [
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
     "freed text", "freed text after", "alive is not null", "alive is set", "alive counts", "freed is null", "freed is not set", "freed does not count",
-    "not freed", "freed name", "null as a Godot class", "for each over packed arrays", "a whole Number index", "a fraction as an index", "NaN as an index",
+    "not freed", "freed name", "null as a Godot class", "for each over packed arrays", "a part of an element", "a whole Number index", "a fraction as an index", "NaN as an index",
     "a fraction as a part's index", "freed children", "freed as an argument",
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
     "first", "color part", "set second", "add element", "position element", "packed", "set packed",

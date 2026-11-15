@@ -298,6 +298,7 @@ class Lowerer {
 	// A class Godot keeps one object of (Input): tagged [Singleton] in the declarations.
 	static bool is_singleton(const Symbol *p_class);
 	static bool on_object(const Expr *p_member);
+	bool stored_element(const Expr *p_expression);
 
 	// The engine's one object of a singleton class. Everything written `Input.x` is then a member of it.
 	uint32_t singleton(const Symbol *p_class, uint32_t p_position);

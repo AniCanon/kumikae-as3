@@ -116,7 +116,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 			place.where = Place::Engine;
 			place.type = p_target->type;
 			place.of_value = true;
-			if (index->object->kind == NodeKind::Name || index->object->kind == NodeKind::Member) {
+			if (index->object->kind == NodeKind::Name || index->object->kind == NodeKind::Member || stored_element(index->object)) {
 				place.part = &parts_.emplace_back();
 				place.part->whole = place_of(index->object);
 				whole_of(place, p_target->offset);

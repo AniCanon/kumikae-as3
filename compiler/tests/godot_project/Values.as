@@ -55,6 +55,13 @@ package {
 		public function keptCounts():Boolean { return kept ? true : false; }
 		public function keptNot():Boolean { return !kept; }
 		public function keptName():String { return kept.name; }
+		// A part of an element of a packed array, written back into the array.
+		public function partOfElement(points:PackedVector2Array):PackedVector2Array {
+			points[0].x = 5;
+			points[1][1] = 7;
+			points[0].y += 1;
+			return points;
+		}
 		// A Number as an index must be a whole one, as for a Vector: Godot would cut it.
 		public function fractionIndex(a:PackedInt32Array, at:Number):int { return a[at]; }
 		public function fractionPart(v:Vector2, at:Number):Number { return v[at]; }

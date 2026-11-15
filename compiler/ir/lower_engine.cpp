@@ -105,6 +105,18 @@ bool Lowerer::is_singleton(const Symbol *p_class) {
 	return has_tag(p_class, "Singleton");
 }
 
+// An element of one of Godot's collections that is itself stored somewhere (`points[0]`, `grid[1][2]`):
+// changing a part of it is writing it back there.
+bool Lowerer::stored_element(const Expr *p_expression) {
+	if (!p_expression || p_expression->kind != NodeKind::Index) {
+		return false;
+	}
+	const Expr *object = static_cast<const Index *>(p_expression)->object;
+	Kind kind = Kind::Void;
+	return kind_of(object->type, &kind) && kind == Kind::Val &&
+			(object->kind == NodeKind::Name || object->kind == NodeKind::Member || stored_element(object));
+}
+
 // A member reached through an object (`i.mouseMode`), not through the class (`Input.mouseMode`).
 bool Lowerer::on_object(const Expr *p_member) {
 	if (!p_member || p_member->kind != NodeKind::Member) {
@@ -194,8 +206,9 @@ auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position
 		return place;
 	}
 	Kind whole = Kind::Void;
-	if (p_object && (p_object->kind == NodeKind::Name || p_object->kind == NodeKind::Member) && kind_of(p_object->type, &whole) &&
-			whole == Kind::Val) {
+	// The value stored in a variable, a property, or an element of a collection (`points[0].x`).
+	if (p_object && (p_object->kind == NodeKind::Name || p_object->kind == NodeKind::Member || stored_element(p_object)) &&
+			kind_of(p_object->type, &whole) && whole == Kind::Val) {
 		// A member of a value that is itself stored somewhere.
 		place.of_value = true;
 		place.part = &parts_.emplace_back();

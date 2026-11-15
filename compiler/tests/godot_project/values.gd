@@ -77,6 +77,7 @@ func _physics_process(_delta: float) -> bool:
 	show("not freed", ask("keptNot", []), true)
 	show("freed name", ask("keptName", []), null)
 	show("null as a Godot class", ask("nullAs", []), true)
+	show("a part of an element", ask("partOfElement", [PackedVector2Array([Vector2(1, 2), Vector2(3, 4)])]), PackedVector2Array([Vector2(5, 3), Vector2(3, 7)]))
 	show("a whole Number index", ask("fractionIndex", [PackedInt32Array([5, 6]), 1.0]), 6)
 	show("a fraction as an index", ask("fractionIndex", [PackedInt32Array([5, 6]), 1.5]), null)
 	show("NaN as an index", ask("fractionIndex", [PackedInt32Array([5, 6]), NAN]), null)
