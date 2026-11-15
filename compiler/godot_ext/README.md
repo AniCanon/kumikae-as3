@@ -12,6 +12,7 @@ called by the engine.
 | `godot_utility.cpp` | Godot's global functions |
 | `godot_collections.cpp` | A vector handed to Godot: the packed array Godot takes there, or an Array |
 | `program` (reload) | Watches the scripts, compiles them again, and moves instances, listeners and script resources onto the new program (`vm/reload`) |
+| `program` (restart) | A save that changes code that runs once (`ir::run_once_changes`) starts the running scene again from its file |
 | `program` (`KAS3_SOURCE_DIR`) | In a debug build, a folder outside the project to read and watch the scripts in: a game on a simulator runs from a pack, and is told where on the computer its scripts are edited |
 | `callable` | A method as a Godot function; the look for listener loops |
 

@@ -20,7 +20,7 @@ not yet tried in Rider.
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 114 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 119 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)

@@ -24,9 +24,9 @@ it stands.
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 22 | Closures as listeners, `object[name]` in general, collections, strings |
-| **LS-2** | Language server, second slice (after 2c) | 13 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
-| **2d** | Editor features | 21 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
+| **2c** | The rest of the language | 23 | Closures as listeners, `object[name]` in general, collections, strings |
+| **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
+| **2d** | Editor features | 24 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 50 | What is left |
 | **decision** | The owner | 8 | See each item |
 
@@ -243,8 +243,19 @@ any Godot value passing as a condition):
 
 ## Reload while running
 
-- An object alive before a reload is not constructed again: a field added by the edit starts empty on
-  it, and a changed first value does not reach it. **2d**
+- A save that changes code that runs once starts the scene again, but only the scene that is running: an
+  object kept elsewhere (an autoload, a static field) keeps what the old code did. A static field keeps
+  its value when its first value is edited, and that edit starts nothing again. **2d**
+- Whether code that runs once changed is told by comparing it, with what it calls by name or on the
+  object itself; a method called on another object (`helper.go()` in `_ready`) is not followed, so an
+  edit there needs the scene started again by hand. **2d**
+- A second save in the one frame while a scene is being started again finds no scene, and says to start
+  it by hand; the scene then has the first save's constructors with the second save's `_ready`. **2d**
+- `null as Node` is refused, though `null is Node` is allowed. **2c**
+- On the iOS Simulator the scene comes from the app's own copy: a scene file edited on the computer is not
+  seen until the game is built again. **2d**
+- Rider's hover was failing on code marked `actionscript` (fixed: the plugin names its own language); not
+  yet seen working in Rider. **LS-2**
 - Scripts are looked at five times a second by their time and size; two saves of the same size within
   one second are seen as one. **2d**
 - A reload is refused when a class with a live object was removed or renamed. **2d**

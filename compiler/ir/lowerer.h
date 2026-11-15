@@ -173,6 +173,7 @@ class Lowerer {
 	uint32_t vector_new(New *p_made);
 	uint32_t vector_literal(VectorLit *p_literal);
 	uint32_t vector_call(Call *p_call);
+	uint32_t godot_object_of(uint32_t p_object, Expr *p_written, uint32_t p_position);
 	// A vector where Godot takes one of its own collections: converted, element by element, to the type
 	// wanted (an Array where Godot takes anything). Nothing if the value is not a vector.
 	std::optional<uint32_t> vector_to_engine(Expr *p_value, const Type *p_wanted);

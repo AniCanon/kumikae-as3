@@ -7,6 +7,7 @@ turns the checked tree from `src/` into it.
 |---|---|
 | `ir.h` | Kinds of register, the table of operations (`KAS3_IR_OPS`: a name and three shape letters each), a module |
 | `ir_print.cpp` | The text form the golden files hold |
+| `ir_compare.cpp` | What changed between two builds that a reload alone would not show (`run_once_changes`) |
 | `lower.h`, `lower.cpp` | The entry point, and units and classes in order |
 | `lowerer.h` | The one class: its state and every method's declaration |
 | `lower_emit`, `lower_types`, `lower_places` | Registers and constants; kinds, conversions, default values; what can be read and written |

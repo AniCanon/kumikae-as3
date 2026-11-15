@@ -250,10 +250,16 @@ const StringName &GodotHost::name(std::string_view p_text) {
 	Name &entry = names_[Place{ p_text.data(), p_text.size() }];
 	if (!entry.made || entry.text != p_text) {
 		entry.text.assign(p_text.data(), p_text.size());
-		entry.godot = StringName(to_godot(p_text));
+		entry.godot_text = to_godot(p_text);
+		entry.godot = StringName(entry.godot_text);
 		entry.made = true;
 	}
 	return entry.godot;
+}
+
+const String &GodotHost::text_of(std::string_view p_text) {
+	name(p_text);
+	return names_[Place{ p_text.data(), p_text.size() }].godot_text;
 }
 
 void GodotHost::print(std::string_view p_text) {
@@ -680,6 +686,15 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 bool GodotHost::present(void *p_value) {
 	const Variant *value = static_cast<const Variant *>(p_value);
 	return value && value->get_type() != Variant::NIL && !is_freed(*value);
+}
+
+bool GodotHost::is_class(void *p_value, std::string_view p_class) {
+	const Variant *value = static_cast<const Variant *>(p_value);
+	if (!value || value->get_type() != Variant::OBJECT || is_freed(*value)) {
+		return false;
+	}
+	const Object *object = *value;
+	return object && object->is_class(text_of(p_class));
 }
 
 vm::Str *GodotHost::text(void *p_value) {

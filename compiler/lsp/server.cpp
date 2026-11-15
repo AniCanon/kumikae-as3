@@ -2,6 +2,8 @@
 
 #include "uri.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <set>
@@ -273,6 +275,11 @@ Json Server::initialize(const Json &p_params) {
 		utf8_ = utf8_ || encoding.string() == "utf-8";
 	}
 	watch_files_ = capabilities.get("workspace").get("didChangeWatchedFiles").get("dynamicRegistration").boolean();
+	const std::string language = p_params.get("initializationOptions").get("codeLanguage").string();
+	// A name of letters and digits only: it goes into Markdown as it is.
+	if (!language.empty() && std::all_of(language.begin(), language.end(), [](char p_c) { return std::isalnum(static_cast<unsigned char>(p_c)) != 0; })) {
+		code_language_ = language;
+	}
 	std::string root = path_from_uri(p_params.get("workspaceFolders").at(0).get("uri").string());
 	if (root.empty()) {
 		root = path_from_uri(p_params.get("rootUri").string());
@@ -333,7 +340,7 @@ Json Server::hover(const Json &p_params) {
 		return Json();
 	}
 	Queries &queries = workspace_.queries();
-	std::string text = "```actionscript\n" + queries.describe(found->symbol) + "\n```\n" + queries.context(found->symbol);
+	std::string text = "```" + code_language_ + "\n" + queries.describe(found->symbol) + "\n```\n" + queries.context(found->symbol);
 	return Json::object()
 			.set("contents", Json::object().set("kind", "markdown").set("value", text))
 			.set("range", range(*unit, found->offset, found->length));

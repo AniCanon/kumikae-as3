@@ -178,6 +178,21 @@ Outcome present(Request &p_request) {
 	return Outcome::Done;
 }
 
+// `is` and `as` with one of Godot's classes.
+Outcome class_test(Request &p_request) {
+	void *value = p_request.handle(p_request.in.b);
+	const bool fits = value != nullptr && p_request.host.handles.is_class(value, p_request.text(p_request.in.c));
+	p_request.target = p_request.in.a;
+	if (p_request.in.op == Op::HostIsClass) {
+		p_request.kind = Kind::Bool;
+		p_request.result.b = fits;
+	} else {
+		p_request.kind = Kind::Ref;
+		p_request.result.p = fits ? p_request.host.handles.copy(value) : nullptr;
+	}
+	return Outcome::Done;
+}
+
 // Godot's text for a value or an object; "null" for a missing one.
 Outcome to_text(Request &p_request) {
 	p_request.target = p_request.in.a;
@@ -308,6 +323,9 @@ Outcome perform(Request &p_request) {
 			return to_text(p_request);
 		case Op::HostPresent:
 			return present(p_request);
+		case Op::HostIsClass:
+		case Op::HostAsClass:
+			return class_test(p_request);
 		case Op::HostGet:
 			return get(p_request);
 		case Op::HostBind:

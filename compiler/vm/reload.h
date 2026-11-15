@@ -44,6 +44,9 @@ public:
 	// Where a function of the old program is in the new one, by its name. NONE if it is gone.
 	uint32_t function(uint32_t p_old) const;
 	const std::string &missing() const { return missing_; }
+	// Whether an object of one of these classes (named as the new program names them) has been moved so
+	// far: one that is alive.
+	bool alive(const std::vector<std::string> &p_classes) const;
 };
 
 } // namespace vm

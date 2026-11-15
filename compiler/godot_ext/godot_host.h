@@ -25,6 +25,7 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	struct Name {
 		std::string text;
 		godot::StringName godot;
+		godot::String godot_text; // The same name as a String, for calls that take one.
 		bool made = false;
 	};
 	struct Place {
@@ -38,6 +39,7 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	std::unordered_map<Place, Name, PlaceHash> names_;
 	std::unordered_map<std::string, godot::Variant> evaluated_; // What evaluate() worked out, by its text.
 	const godot::StringName &name(std::string_view p_text);
+	const godot::String &text_of(std::string_view p_text); // name() as a String, made once.
 
 	// One of Godot's global functions, found once: see godot_utility.cpp.
 	struct Utility;
@@ -74,6 +76,7 @@ public:
 	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	bool present(void *p_value) override;
+	bool is_class(void *p_value, std::string_view p_class) override;
 	vm::Str *text(void *p_value) override;
 	void *copy(void *p_value) override;
 	void drop(void *p_value) override;

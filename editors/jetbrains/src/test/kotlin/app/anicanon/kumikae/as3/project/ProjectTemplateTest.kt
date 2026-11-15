@@ -11,6 +11,16 @@ import kotlin.test.assertTrue
 class ProjectTemplateTest {
     private val root = Files.createTempDirectory("template")
 
+    @Test fun `the disc of a new game goes the way it is swiped, by a finger or the mouse`() {
+        val files = ProjectTemplate("Star Hopper", emptySet()).files()
+        val script = files.getValue("Main.as")
+        assertTrue(script.contains("override public function _unhandledInput(event:InputEvent):void"))
+        assertTrue(script.contains("event as InputEventScreenTouch"))
+        // A mouse is turned into touches on a computer, so the same swipe works there.
+        assertTrue(files.getValue("project.godot").contains("pointing/emulate_touch_from_mouse=true"))
+        assertTrue(files.getValue("Hello.as").contains("Swipe"))
+    }
+
     @Test fun `a new game has a project file, a scene, a script and the extension's description`() {
         val files = ProjectTemplate("Star Hopper", emptySet()).files()
         assertEquals(
