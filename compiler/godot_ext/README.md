@@ -8,6 +8,7 @@ called by the engine.
 | `register.cpp`, `language.h` | Entry point; the script language Godot sees |
 | `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
+| `counted` | A script object whose Godot object is reference-counted: each lives while AS3 or Godot holds it |
 | `members` | What Godot reaches of a script by name: public fields to read and write, public methods, and the lists of both with Godot's types |
 | `godot_host` | The interpreter's three interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_source.cpp` | Where values come from (`EngineSource`): defaults, constants, constructors, singletons, static methods |

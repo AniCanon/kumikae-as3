@@ -320,6 +320,14 @@ with tempfile.TemporaryDirectory() as edited:
     for name, got, want in values:
         check("exported_reload.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
 
+# A script object of a reference-counted class lives as long as AS3 or Godot holds it, and no longer.
+compare("kept.gd", [
+    "made", "alive while AS3 holds them", "still alive when Godot lets go", "and AS3 still sees them", "alive while Godot holds it",
+    "freed when both let go", "freed when AS3 lets go", "given to Godot, alive while Godot holds them", "freed when Godot lets go",
+    "made and forgotten in AS3", "a resource that listens to itself goes", "a listener on another node goes",
+    "attached, kept while AS3 holds it", "attached, freed when AS3 lets go too",
+])
+
 # Godot's own classes with `is` and `as`, and input events as a script receives them.
 compare("events.gd", [
     "kind of InputEventScreenTouch", "kind of InputEventScreenDrag", "kind of InputEventMouseButton", "kind of InputEventKey",
@@ -447,7 +455,7 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 12, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 14, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
         check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 2, output[-1500:])

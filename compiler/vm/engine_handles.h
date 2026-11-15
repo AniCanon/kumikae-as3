@@ -27,6 +27,11 @@ struct EngineHandles {
 	[[nodiscard]] virtual bool is_class(void *p_value, std::string_view p_class) = 0;
 	// The engine's own text for a value or an object. Null only when there was no memory for it.
 	[[nodiscard]] virtual Str *text(void *p_value) = 0;
+	// The program let go of its last reference to a script object whose Godot object is reference-counted
+	// (ir::Class::counted). True if the engine still holds that object: the script object is then kept,
+	// with what it holds, for as long as the engine does, and given back with Interpreter::free_kept().
+	// False to free it now.
+	[[nodiscard]] virtual bool keep(Object *p_object) = 0;
 
 	[[nodiscard]] virtual bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count,
 			const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;

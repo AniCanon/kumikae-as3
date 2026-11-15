@@ -101,6 +101,7 @@ public:
 	[[nodiscard]] bool present(void *p_value) override;
 	[[nodiscard]] bool is_class(void *p_value, std::string_view p_class) override;
 	[[nodiscard]] vm::Str *text(void *p_value) override;
+	[[nodiscard]] bool keep(vm::Object *p_object) override; // counted.cpp
 	[[nodiscard]] void *copy(void *p_value) override;
 	void drop(void *p_value) override;
 };

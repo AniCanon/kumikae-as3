@@ -500,12 +500,79 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 			boxes--;
 		}
 	}
+	// What keep() answers, and what it does first: free another object the engine kept, as Godot freeing one
+	// object can free another.
+	bool keeps = false;
+	vm::Interpreter *interpreter = nullptr;
+	vm::Object *free_first = nullptr;
+	[[nodiscard]] bool keep(vm::Object *p_object) override {
+		log += "keep " + (module ? module->classes[p_object->klass].name : std::string("?")) + "\n";
+		if (free_first && interpreter) {
+			vm::Object *other = free_first;
+			free_first = nullptr;
+			interpreter->free_kept(other);
+		}
+		return keeps;
+	}
 };
 
 // A host that only prints implements Output alone, and a program that asks for the engine is told
 // there is none.
 static_assert(!std::is_base_of<vm::EngineHandles, vm::StandaloneOutput>::value, "the stand-alone host answers no engine entry");
 static_assert(!std::is_base_of<vm::EngineSource, Recorder>::value, "nor does the tests' recorder");
+
+// A script object whose Godot object is reference-counted is kept when the program lets go of it, if the
+// engine says it still holds the object, and freed with what it holds when the engine lets go too.
+static void test_kept_by_the_engine() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Counted.as", "package { import godot.*; public class Counted extends RefCounted { public var text:String = \"kept\"; } }");
+	compilation.add("Plain.as", "package { import godot.*; public class Plain extends Node { public var text:String = \"plain\"; } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	uint32_t counted = 0, plain = 0;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		counted = module.classes[i].name == "Counted" ? (uint32_t)i : counted;
+		plain = module.classes[i].name == "Plain" ? (uint32_t)i : plain;
+	}
+	CHECK(module.classes[counted].counted);
+	CHECK(!module.classes[plain].counted);
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		engine.interpreter = &interpreter;
+		CHECK(interpreter.start());
+		const size_t before = vm::live_objects();
+		// Kept: the object and its field stay until the engine lets go.
+		engine.keeps = true;
+		vm::Object *object = interpreter.construct(counted, engine.box());
+		vm::Object *second = interpreter.construct(counted, engine.box());
+		interpreter.release_object(object);
+		interpreter.release_object(second);
+		CHECK_EQ(engine.log, std::string("keep Counted\nkeep Counted\n"));
+		CHECK_EQ(vm::live_objects(), before + 2);
+		CHECK_EQ(std::string(static_cast<vm::Str *>(object->fields()[1].p)->view()), std::string("kept"));
+		// The engine lets go of the first; the engine's freeing it frees the second on the way.
+		engine.keeps = false;
+		engine.free_first = second;
+		engine.log.clear();
+		interpreter.free_kept(object);
+		CHECK_EQ(engine.log, std::string("keep Counted\nkeep Counted\n"));
+		CHECK_EQ(vm::live_objects(), before);
+		// Not kept: freed at once. Another class is never asked.
+		engine.log.clear();
+		interpreter.release_object(interpreter.construct(counted, engine.box()));
+		interpreter.release_object(interpreter.construct(plain, engine.box()));
+		CHECK_EQ(engine.log, std::string("keep Counted\n"));
+		CHECK_EQ(vm::live_objects(), before);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
 
 static void test_no_engine() {
 	const char *source = "package { import godot.*; public class Maker extends Node {\n"
@@ -1710,6 +1777,7 @@ int main() {
 	test_loop_markers();
 	test_engine_calls();
 	test_engine_operators();
+	test_kept_by_the_engine();
 	test_no_engine();
 	test_engine_listeners();
 	test_engine_statics();

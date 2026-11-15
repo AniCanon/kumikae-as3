@@ -4,6 +4,7 @@ extends SceneTree
 
 var node: Node2D
 var other: Node
+var counted: RefCounted
 var frames := 0
 var stage := 0
 var since := 0
@@ -32,6 +33,9 @@ func _initialize() -> void:
 	root.add_child(node)
 	other = Node.new()
 	root.add_child(other)
+	counted = RefCounted.new()
+	counted.set_script(load("res://Counted.as"))
+	counted.set("n", 5)
 
 func _process(_delta: float) -> bool:
 	frames += 1
@@ -50,6 +54,10 @@ func _process(_delta: float) -> bool:
 		show("after an edit: a static field keeps its value", ask("total"), 2)
 		show("after an edit: a vector field keeps its elements", ask("seenText"), "1,2")
 		show("after an edit: a method that is new can be called", ask("added"), "new")
+		show("after an edit: a counted object keeps its field", counted.get("n"), 5)
+		var weak: WeakRef = weakref(counted)
+		counted = null
+		show("after an edit: a counted object goes when let go", weak.get_ref() == null, true)
 		other.name = "second"
 		show("after an edit: a listener added before runs the new code", ask("heard"), 11)
 		ask("unlisten", [other])

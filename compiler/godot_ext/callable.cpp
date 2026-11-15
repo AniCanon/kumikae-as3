@@ -41,8 +41,12 @@ class BoundMethod : public CallableCustom {
 	friend void kas3::release_listeners();
 	friend bool kas3::listeners_can_move(vm::Reload &);
 	friend void kas3::move_listeners(vm::Interpreter &, vm::Reload &, uint64_t);
+	friend void kas3::forget_listeners(const vm::Object *);
 
 	vm::Object *object_;
+	// For a class whose Godot object is reference-counted: the callable does not hold the script object, as
+	// a callable of Godot's does not hold its object. It goes when that Godot object goes.
+	bool weak_ = false;
 	uint32_t function_;
 	ObjectID owner_; // Null for a class with no Godot object behind it.
 	uint64_t program_; // Which load of the project's scripts the object belongs to.
@@ -65,7 +69,7 @@ class BoundMethod : public CallableCustom {
 		// touched afterwards.
 		vm::Object *object = object_;
 		object_ = nullptr;
-		if (object && Project::generation() == program_) {
+		if (object && !weak_ && Project::generation() == program_) {
 			Project::get().interpreter().release_object(object);
 		}
 	}
@@ -90,7 +94,10 @@ public:
 				break;
 			}
 		}
-		vm::retain(object_);
+		weak_ = p_owner && Project::get().module().classes[p_object->klass].counted;
+		if (!weak_) {
+			vm::retain(object_);
+		}
 		bound_methods().insert(this);
 	}
 	~BoundMethod() override {
@@ -229,6 +236,13 @@ void move_listeners(vm::Interpreter &p_old, vm::Reload &p_reload, uint64_t p_gen
 		bound->object_ = function == ir::NONE ? nullptr : p_reload.object(old);
 		bound->function_ = function == ir::NONE ? bound->function_ : function;
 		bound->program_ = p_generation;
+		if (bound->weak_) {
+			// It holds neither the old object nor the new one.
+			if (bound->object_ && vm::release(bound->object_)) {
+				// Its instance keeps it.
+			}
+			continue;
+		}
 		p_old.release_object(old); // May destroy other bound methods: hence the check above.
 	}
 }
@@ -542,6 +556,14 @@ void sweep_listeners() {
 	ListenerSweep().run();
 	const Clock::duration took = Clock::now() - started;
 	next = Clock::now() + std::max<Clock::duration>(std::chrono::milliseconds(250), took * 50);
+}
+
+void forget_listeners(const vm::Object *p_object) {
+	for (BoundMethod *bound : bound_methods()) {
+		if (bound->weak_ && bound->object_ == p_object) {
+			bound->object_ = nullptr;
+		}
+	}
 }
 
 bool is_script_listener(const Callable &p_callable) {

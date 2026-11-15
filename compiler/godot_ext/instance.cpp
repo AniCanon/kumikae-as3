@@ -1,12 +1,14 @@
 // The object Godot holds for each object a script is attached to: the engine's calls arrive here and go
 // on into the interpreter.
 #include "any.h"
+#include "instance.h"
 #include "language.h"
 #include "members.h"
 #include "program.h"
 #include "script.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -21,12 +23,6 @@ using namespace godot;
 using kas3::Project;
 namespace ir = kas3::ir;
 namespace vm = kas3::vm;
-
-struct ScriptInstance {
-	vm::Object *object;
-	Object *owner;
-	Ref<AS3Script> script; // Kept alive for as long as anything runs it.
-};
 
 // Every script instance there is: a reload gives each its object's counterpart in the new program.
 static std::unordered_set<ScriptInstance *> &instances() {
@@ -48,8 +44,24 @@ bool kas3::instances_can_move(vm::Reload &p_reload) {
 void kas3::move_instances(vm::Interpreter &p_old, vm::Reload &p_reload) {
 	for (ScriptInstance *instance : instances()) {
 		vm::Object *old = instance->object;
+		if (instance->counted) {
+			vm::retain(old); // For the move, the instance holds it as any other instance does.
+		}
 		instance->object = p_reload.object(old);
+		if (instance->counted) {
+			kas3::counted_moved(old, instance);
+		}
 		p_old.release_object(old);
+		if (instance->counted && vm::release(instance->object)) {
+			// Nothing in the program holds it: the instance keeps it, as before.
+		}
+		if (Object::cast_to<RefCounted>(instance->owner)) {
+			// The reload copied its hold on its Godot object as an ordinary handle, which would keep the object.
+			vm::Slot borrowed;
+			borrowed.bits = 0;
+			borrowed.p = Project::get().host().borrow(instance->owner);
+			p_reload.target().set_field(instance->object, 0, borrowed);
+		}
 	}
 }
 
@@ -331,6 +343,7 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	if (ok) {
 		program.interpreter().discard(function.result, result);
 	}
+	kas3::hold_if_referenced(p_object);
 	r_error->error = GDEXTENSION_CALL_OK;
 }
 
@@ -350,7 +363,9 @@ static void instance_to_string(GDExtensionScriptInstanceDataPtr p_data, GDExtens
 	self.bits = 0;
 	self.p = instance->object;
 	result.bits = 0;
-	if (!program.interpreter().call_function(own, &self, 1, &result)) {
+	const bool called = program.interpreter().call_function(own, &self, 1, &result);
+	kas3::hold_if_referenced(instance->object);
+	if (!called) {
 		return; // The error has been reported.
 	}
 	const vm::Str *text = static_cast<const vm::Str *>(result.p);
@@ -372,7 +387,7 @@ static GDExtensionScriptLanguagePtr instance_get_language(GDExtensionScriptInsta
 }
 
 // For a script on a reference-counted object, Godot asks before freeing it when its count reaches zero.
-// The script holds no reference of its own to the object, so the answer is always yes.
+// Nothing of the script's holds the object then (counted.cpp), so the answer is always yes.
 static void instance_refcount_incremented(GDExtensionScriptInstanceDataPtr) {}
 
 static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDataPtr) {
@@ -382,7 +397,11 @@ static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDa
 static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
 	instances().erase(instance);
-	Project::get().interpreter().release_object(instance->object);
+	if (instance->counted) {
+		kas3::counted_freed(instance);
+	} else {
+		Project::get().interpreter().release_object(instance->object);
+	}
 	delete instance;
 }
 
@@ -417,14 +436,19 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	if (!program.valid()) {
 		return nullptr;
 	}
+	const bool counted = program.module().classes[p_script->get_class_index()].counted;
 	vm::Object *object = nullptr;
+	bool made_here = false;
 	if (pending_object && pending_object->klass == p_script->get_class_index()) {
 		object = pending_object; // Made by `new`: its constructor runs when the Godot object is ready.
-		vm::retain(object);
+		if (!counted) {
+			vm::retain(object);
+		}
 		pending_object = nullptr;
 	} else {
 		// The script's handle on the object it is attached to does not keep that object alive.
 		object = program.interpreter().construct(p_script->get_class_index(), program.host().borrow(p_owner));
+		made_here = true;
 	}
 	if (!object) {
 		return nullptr;
@@ -433,7 +457,14 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	instance->object = object;
 	instance->owner = p_owner;
 	instance->script = Ref<AS3Script>(const_cast<AS3Script *>(p_script));
+	instance->counted = counted;
 	instances().insert(instance);
+	if (counted) {
+		if (made_here && vm::release(object)) {
+			// Its constructor left no other reference: the instance keeps it (counted.cpp).
+		}
+		kas3::counted_attached(instance);
+	}
 	return gdextension_interface::script_instance_create3(&info, instance);
 }
 
@@ -462,7 +493,9 @@ void *GodotHost::attach_new(uint32_t p_class, vm::Object *p_object, std::string 
 	const bool attached = pending_object == nullptr;
 	pending_object = nullptr;
 	if (!attached) {
-		memdelete(owner);
+		if (!Object::cast_to<RefCounted>(owner)) {
+			memdelete(owner); // A counted one goes with `made`.
+		}
 		*r_error = "the script of '" + klass.name + "' could not be attached to its '" + klass.native_base + "'";
 		return nullptr;
 	}

@@ -182,7 +182,6 @@ any Godot value passing as a condition):
 
 - **The first editor scan of a project with the extension crashes as Godot exits,** after the scan has done
   its work. The speed spike's extension does the same. Cause unknown. **2d**
-- A script attached to a reference-counted Godot object would keep it alive for ever. **2d**
 - godot-cpp is built as `template_release` and loaded by the editor binary; whether editor features need a
   debug build is unchecked. **2d**
 - `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions

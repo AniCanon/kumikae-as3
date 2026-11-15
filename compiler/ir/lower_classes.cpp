@@ -37,6 +37,7 @@ Class Lowerer::inherited_class(ClassDecl *p_decl) {
 			klass.virtuals = from.virtuals;
 		}
 	}
+	klass.counted = !klass.native_base.empty() && extends_counted(symbol);
 	return klass;
 }
 

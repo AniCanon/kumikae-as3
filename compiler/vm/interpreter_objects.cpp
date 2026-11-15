@@ -126,6 +126,9 @@ void Interpreter::drop_object(Object *p_object) {
 			free_vector(vector);
 			continue;
 		}
+		if (klass.counted && host_.handles.keep(object)) {
+			continue; // The engine still holds its Godot object, and keeps it.
+		}
 		for (size_t i = 0; i < klass.fields.size(); i++) {
 			Slot &field = object->fields()[i];
 			if (klass.fields[i].kind == Kind::Str) {

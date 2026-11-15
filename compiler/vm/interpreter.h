@@ -255,6 +255,9 @@ public:
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
 	void release_object(Object *p_object);
+	// An object the engine kept (EngineHandles::keep()), with no reference left, freed now that the engine
+	// let go of it too.
+	void free_kept(Object *p_object) { drop_object(p_object); }
 
 	// How many traces finallies are keeping for errors they will throw again: one at most for each.
 	size_t kept_traces() const { return kept_traces_.size(); }

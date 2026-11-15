@@ -27,6 +27,9 @@ void release_listeners();
 // method is gone refuses to run from then on.
 bool listeners_can_move(vm::Reload &p_reload);
 void move_listeners(vm::Interpreter &p_old, vm::Reload &p_reload, uint64_t p_generation);
+// The script object is being freed: the callables of it that do not hold it (those of a class whose Godot
+// object is reference-counted, which live as Godot's own callables do, by the object's id) let go of it.
+void forget_listeners(const vm::Object *p_object);
 // Whether the callable is one of those: a listener that a script added.
 bool is_script_listener(const godot::Callable &p_callable);
 
