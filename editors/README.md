@@ -82,7 +82,7 @@ output, for files ending in `.as`.
 | Find references | Across the project's files. |
 | Hover | The declaration, and the class or package it belongs to. |
 | Outline | The classes and members of a file. |
-| Symbol search | The project's own classes, functions and members. |
+| Symbol search | The project's own classes, functions and members, then Godot's classes and the built-in library's. |
 
 [Completion and typing assistance](completion.md) covers chained members, types, imports, visible names,
 Tab replacement, callable snippets and argument help. Features that depend on client capabilities have
