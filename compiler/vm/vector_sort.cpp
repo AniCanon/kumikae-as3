@@ -103,6 +103,10 @@ bool Interpreter::sort_order(Kind p_kind, const std::vector<Slot> &p_elements, O
 				return std::nullopt;
 			}
 			order = std::isnan(number.d) ? 0.0 : number.d;
+		} else if (numeric && p_kind == Kind::I64) {
+			// Int64s by their own 64 bits: past 2^53 a Number can't tell them apart.
+			const int64_t a = p_elements[p_a].l, b = p_elements[p_b].l;
+			order = a < b ? -1 : a > b ? 1 : 0;
 		} else {
 			order = numeric ? (numbers[p_a] < numbers[p_b] ? -1 : numbers[p_a] > numbers[p_b] ? 1 : 0) : compare_utf16(texts[p_a], texts[p_b]);
 		}
