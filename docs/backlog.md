@@ -57,8 +57,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
   also reports a platform `HighlightingPanel` retained on rapid project close; isolate it in a sustained
   IDE heap profile. **LS-2**
 - **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths. **LS-2**
-- While any file has a syntax error, type errors are hidden everywhere. Silencing only the broken region
-  would be kinder. **LS-2**
 
 ## Backlog pass, November 2026
 

@@ -137,7 +137,8 @@ static int run_check(int p_argc, char **p_argv) {
 	if (files == 0) {
 		return usage_error();
 	}
-	compilation.check();
+	// Through syntax errors: what they can't have caused is reported too, as the language server does.
+	compilation.check(true);
 	std::fputs(compilation.format_diagnostics().c_str(), stderr);
 	if (dump_names) {
 		std::fputs(compilation.dump_names().c_str(), stdout);

@@ -81,6 +81,7 @@ class Resolver {
 	Symbol *arguments_ = nullptr;
 
 	void error(uint32_t p_offset, std::string p_message) { unit_.diagnostics.error(p_offset, std::move(p_message)); }
+	void unresolved(uint32_t p_offset, std::string p_message) { unit_.diagnostics.unresolved(p_offset, std::move(p_message)); }
 	void record(uint32_t p_offset, std::string_view p_name, Symbol *p_symbol) {
 		unit_.references.push_back({ p_offset, p_name, p_symbol });
 	}
@@ -118,14 +119,14 @@ class Resolver {
 			// A failed import has been reported, and may be where this name was to come from.
 		} else if (hidden) {
 			if (hidden->modifiers & Modifiers::Private) {
-				error(p_offset, quoted(p_name) + " is private in " + std::string(hidden->owner->name));
+				unresolved(p_offset, quoted(p_name) + " is private in " + std::string(hidden->owner->name));
 			} else {
-				error(p_offset, quoted(p_name) + " in " + std::string(hidden->owner->name) +
+				unresolved(p_offset, quoted(p_name) + " in " + std::string(hidden->owner->name) +
 										" is not visible from this package");
 			}
 		} else if (!(context_.klass && compilation_.hierarchy_broken(context_.klass))) {
 			// A base class that failed to resolve may be where the name comes from.
-			error(p_offset, "undefined name " + quoted(p_name));
+			unresolved(p_offset, "undefined name " + quoted(p_name));
 		}
 		return nullptr;
 	}

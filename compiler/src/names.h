@@ -172,6 +172,8 @@ struct Unit {
 	Program *tree = nullptr;
 	bool is_declaration = false; // Declares what exists elsewhere: `native`, no bodies.
 	bool is_builtin = false; // Part of the embedded library.
+	bool broken = false; // It has a syntax error: what it declares may be read wrongly, or not at all.
+	bool failed_import = false; // One of its imports named nothing.
 	Package *package = nullptr; // The package its block names; the top-level package if it has no block.
 	std::unordered_map<std::string_view, Symbol *> helpers; // Definitions outside the package block.
 	ImportScope block_imports; // Imports inside the package block.
@@ -234,6 +236,7 @@ class Compilation {
 	void cut_class_cycles();
 	void cut_interface_cycles();
 	void check_overrides(Symbol *p_class);
+	void drop_doubtful_errors();
 	void inherit_properties(Symbol *p_class);
 
 public:
@@ -248,7 +251,9 @@ public:
 	// Resolves names in every file added so far. Does nothing if any file has a syntax error, so that one
 	// mistake is not reported twice. Call once.
 	// With p_through_syntax_errors, names are resolved all the same, for tools that answer questions about
-	// code that is being typed. What is reported does not change: syntax errors only.
+	// code that is being typed, and what a syntax error can't have caused is still reported: nothing more
+	// in a file that has one, nothing in a file that uses what such a file declares, and nowhere that a
+	// name is missing (names_doubt.cpp).
 	void check(bool p_through_syntax_errors = false);
 	bool has_errors() const;
 	// The diagnostics of every file, in the order the files were added.

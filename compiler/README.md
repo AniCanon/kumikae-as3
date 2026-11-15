@@ -283,8 +283,10 @@ How it works:
   the project).
 - **Typing bursts are checked once.** A change marks the program as stale; the check runs when no further
   message is waiting, or when a request needs an answer.
-- **While any file has a syntax error, only syntax errors are reported,** as `kas3c check` does. Names are
-  still resolved, so go to definition, hover and the outline keep working in a half-typed file.
+- **A syntax error silences only what it may have caused,** as in `kas3c check`: the rest of its own file,
+  every file that uses something that file declares, and every complaint that a name is missing. Other
+  errors are still shown. Names are still resolved, so go to definition, hover and the outline keep working
+  in a half-typed file.
 - **Positions** are counted in UTF-16 code units, or in bytes when the editor offers UTF-8.
 - **Godot's API and the built-in library** are written, read-only, to `kas3c-declarations` in the system's
   temporary folder, so that go to definition has a file to open. No errors are ever reported for them.
@@ -535,8 +537,6 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 - **A built-in name can't be told apart from an imported one of the same spelling.** A class `Object` in an
   imported package would make a bare `Object` ambiguous, and the built-in one has no longer spelling. This
   is why Godot's `Object` is `GodotObject` here.
-- **Names are checked only when every file parses.** With a syntax error anywhere, `check` reports syntax
-  errors only.
 - **One function may declare a variable twice only with the same type.** Adobe's compiler warns in that case
   and this one is silent; with different types both report an error.
 - **Helpers outside the package block count as part of the file's package** when deciding whether an

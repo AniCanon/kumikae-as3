@@ -76,7 +76,7 @@ output, for files ending in `.as`.
 
 | Feature | Notes |
 |---|---|
-| Errors as you type | What `kas3c check` reports. While a file has a syntax error, only syntax errors are shown. |
+| Errors as you type | What `kas3c check` reports. A file with a syntax error shows only that; files that use nothing of it keep their other errors. |
 | Go to definition | Locals, parameters, fields, methods, classes, imports, inherited members, and Godot's API. |
 | Find references | Across the project's files. |
 | Hover | The declaration, and the class or package it belongs to. |

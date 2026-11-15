@@ -539,14 +539,15 @@ static void test_declaration_files() {
 	Session session(with);
 	session.initialize(root.string());
 	session.settle();
-	CHECK_EQ(session.published(), uri_from_path(declared.string()) + " 0:72-0:73 expected a parameter name but found ':'\n");
+	// Main.as uses nothing of the broken file, so its own error is certain and shown at once.
+	const std::string main_error =
+			uri_from_path((root / "Main.as").string()) + " 0:42-0:45 can't use a value of type 'String' where 'int' is expected\n";
+	CHECK_EQ(session.published(), uri_from_path(declared.string()) + " 0:72-0:73 expected a parameter name but found ':'\n" + main_error);
 	write(declared, "package engine { public native class Motor { public native function run():void; } }");
 	session.notify("workspace/didChangeWatchedFiles",
 			Json::object().set("changes", Json::array().push(Json::object().set("uri", uri_from_path(declared.string())).set("type", 2))));
 	session.settle();
-	CHECK_EQ(session.published(),
-			uri_from_path(declared.string()) + " clear\n" + uri_from_path((root / "Main.as").string()) +
-					" 0:42-0:45 can't use a value of type 'String' where 'int' is expected\n");
+	CHECK_EQ(session.published(), uri_from_path(declared.string()) + " clear\n");
 	fs::remove_all(root);
 }
 

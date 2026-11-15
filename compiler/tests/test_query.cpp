@@ -198,12 +198,14 @@ static void test_tolerant() {
 	std::string expected = plain.format_diagnostics();
 	CHECK_EQ(expected, std::string("Main.as:3:82: error: expected an expression but found '}'\n"));
 
-	// The tolerant check resolves names in both files and reports the same.
+	// The tolerant check resolves names in both files. The broken file says no more than its syntax
+	// error; the other file, which uses nothing of it, says what is wrong with it.
 	Compilation tolerant;
 	main = tolerant.add("Main.as", BROKEN);
 	other = tolerant.add("Other.as", OTHER);
 	tolerant.check(true);
-	CHECK_EQ(tolerant.format_diagnostics(), expected);
+	CHECK_EQ(tolerant.format_diagnostics(),
+			expected + "Other.as:1:83: error: can't use a value of type 'int' where 'String' is expected\n");
 	const Reference *count = reference(main, "count");
 	CHECK(count && count->symbol && count->symbol->kind == SymbolKind::Field);
 	const Reference *type = reference(main, "Other");
@@ -217,6 +219,66 @@ static void test_tolerant() {
 	whole.check(true);
 	CHECK_EQ(whole.format_diagnostics(),
 			std::string("Other.as:1:83: error: can't use a value of type 'int' where 'String' is expected\n"));
+}
+
+// A syntax error silences what it may have caused, and no more: everything else in its own file, every
+// file that uses something of that file's, and every complaint that a name is missing.
+static void test_errors_beside_a_syntax_error() {
+	const std::string wrong = "function f():void { var x:int = ; } ";
+	auto files = [&](const std::string &p_mistake) {
+		return std::vector<File>{
+			// What the broken file declares may have been read wrongly: a parameter, a modifier, a member or
+			// `implements` may be lost.
+			{ "Broken.as", "package { public class Broken implements Living { public function lost(a:int):void {} " + p_mistake +
+								   "public var kept:int = \"k\"; public function alive():void {} } }" },
+			{ "Living.as", "package { public interface Living { function alive():void; } }" },
+			// Uses the broken file's class directly.
+			{ "Uses.as", "package { public class Uses { var b:Broken; var n:int = \"s\";\n"
+						 "function f():void { b.lost(); b.nothing; var l:Living = b; b.kept = \"t\"; } } }" },
+			// Extends a class that extends it.
+			{ "Middle.as", "package { public class Middle extends Broken { override public function gone():void {} } }" },
+			{ "Through.as", "package { public class Through extends Middle { var n:int = \"s\"; } }" },
+			// Never names it, but handles a value of its type.
+			{ "Holder.as", "package { public class Holder { public var value:Middle; } }" },
+			{ "Flow.as", "package { public class Flow { var h:Holder; function f():void { var n:int = h.value; } } }" },
+			// Has nothing to do with it: its mistakes are certain, except a name that is nowhere, which
+			// the broken file might have declared.
+			{ "Alone.as", "package { public class Alone { var n:int = \"s\"; var m:Nope;\n"
+						  "function f(l:Living):void { missing(); l.alive(1); l.nothing; } } }" },
+		};
+	};
+	auto reported = [&](const std::string &p_mistake, bool p_tolerant) {
+		Compilation compilation;
+		for (const File &file : files(p_mistake)) {
+			compilation.add(file.path, file.text);
+		}
+		compilation.check(p_tolerant);
+		return compilation.format_diagnostics();
+	};
+	const std::string certain =
+			"Alone.as:1:44: error: can't use a value of type 'String' where 'int' is expected\n"
+			"Alone.as:2:42: error: 'alive' takes no arguments but 1 was given\n"
+			"Alone.as:2:54: error: 'Living' has no member 'nothing'\n";
+	CHECK_EQ(reported(wrong, true), "Broken.as:1:119: error: expected an expression but found ';'\n" + certain);
+	// The plain check still stops at the syntax error.
+	CHECK_EQ(reported(wrong, false), std::string("Broken.as:1:119: error: expected an expression but found ';'\n"));
+	// With the file mended everything is said, in every file.
+	const std::string mended = reported("", true);
+	for (const char *file : { "Broken.as:", "Uses.as:1:", "Uses.as:2:", "Middle.as:", "Through.as:", "Flow.as:", "Alone.as:1:55",
+				 "Alone.as:2:29" }) {
+		CHECK(mended.find(file) != std::string::npos);
+	}
+	CHECK(mended.find(certain.substr(0, certain.find('\n'))) != std::string::npos);
+
+	// A failed import may change what every other name of the file means: the file says nothing.
+	Compilation shadowed;
+	shadowed.add("lost/Thing.as", "package lost { public class Thing { " + wrong + "} }");
+	shadowed.add("other/Thing.as", "package other { public class Thing {} }");
+	shadowed.add("Picks.as", "package { import lost.Thing; import other.*; public class Picks { var t:Thing; var n:int = \"s\"; } }");
+	shadowed.add("Alone.as", "package { public class Alone { var n:int = \"s\"; } }");
+	shadowed.check(true);
+	CHECK_EQ(shadowed.format_diagnostics(), std::string("lost/Thing.as:1:69: error: expected an expression but found ';'\n"
+														"Alone.as:1:44: error: can't use a value of type 'String' where 'int' is expected\n"));
 }
 
 static void test_import_symbol() {
@@ -873,6 +935,7 @@ int main() {
 	test_outline();
 	test_queries_on_broken_files();
 	test_tolerant();
+	test_errors_beside_a_syntax_error();
 	test_import_symbol();
 	test_reuse();
 	return check::finish();
