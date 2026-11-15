@@ -1,5 +1,6 @@
 // The language server, driven in process: one JSON message in, the messages it answers with out.
 #include "check.h"
+#include "scratch.h"
 
 #include "builtins.h"
 #include "json.h"
@@ -14,12 +15,7 @@
 using namespace kas3;
 namespace fs = std::filesystem;
 
-static fs::path fresh_folder(const char *p_name) {
-	fs::path folder = fs::temp_directory_path() / (std::string("kas3-lsp-") + p_name);
-	fs::remove_all(folder);
-	fs::create_directories(folder);
-	return fs::canonical(folder);
-}
+using check::fresh_folder;
 
 static void write(const fs::path &p_path, const std::string &p_text) {
 	fs::create_directories(p_path.parent_path());
@@ -30,7 +26,7 @@ static void write(const fs::path &p_path, const std::string &p_text) {
 static Workspace::Options options(bool p_godot) {
 	Workspace::Options result;
 	result.godot = p_godot;
-	result.support_folder = (fs::temp_directory_path() / "kas3-lsp-support").string();
+	result.support_folder = (check::run_folder() / "support").string();
 	return result;
 }
 
