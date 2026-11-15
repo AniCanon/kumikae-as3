@@ -284,6 +284,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	if (callee->kind == NodeKind::Member && is_vector(static_cast<Member *>(callee)->object->type)) {
 		return vector_call(p_call);
 	}
+	if (const std::optional<uint32_t> called = function_method(p_call)) {
+		return *called; // f.call(), f.apply()
+	}
 	Symbol *symbol = callee_symbol(callee);
 	if (!symbol) {
 		if (const std::optional<uint32_t> by_name = signal_call_by_name(p_call)) {

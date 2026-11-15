@@ -149,6 +149,7 @@ private:
 	void let_go_arguments(const ir::Function &p_callee, std::vector<Slot> *p_values);
 	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
+	void apply_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	void to_callable(const ir::Instruction &p_in);
 	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);

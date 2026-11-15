@@ -65,6 +65,17 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 		case Op::FunctionToCallable:
 			to_callable(p_in);
 			break;
+		case Op::FunctionLength: {
+			if (Object *value = function_in(p_function.registers[p_in.b], r[p_in.b])) {
+				const Function &callee = module_.functions[static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i)];
+				const uint32_t declared = callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0);
+				set_int32(r[p_in.a], static_cast<int32_t>(declared));
+			}
+			break;
+		}
+		case Op::ApplyFunction:
+			apply_value(p_function, p_in);
+			break;
 		case Op::CallbackThis: {
 			// A method keeps its own object: Flash will not be told another.
 			const Slot value = r[p_in.a];
@@ -247,6 +258,44 @@ std::optional<Slot> Interpreter::call_function_within(Object *p_value, const Slo
 	const Slot untyped = callee.result == Kind::Void ? any::undefined() : to_any(callee.result, result);
 	drop(callee.result, result);
 	return untyped;
+}
+
+// f.apply(thisArg, array): the Array's elements are the arguments; null or undefined is none, and anything
+// else is AS3's TypeError #1116.
+void Interpreter::apply_value(const Function &p_function, const Instruction &p_in) {
+	Slot *r = stack_.data() + frames_.back().base;
+	if (p_in.a != NONE) {
+		put(Kind::Any, r[p_in.a], any::undefined());
+	}
+	Object *value = function_in(p_function.registers[p_in.b], r[p_in.b]);
+	if (!value) {
+		return;
+	}
+	const Slot list = r[p_in.c];
+	const AnyTag tag = any::tag(list);
+	const Object *object = tag == AnyTag::Object ? static_cast<const Object *>(any::pointer(list)) : nullptr;
+	const Vector *array = object && module_.classes[object->klass].array ? static_cast<const Vector *>(object) : nullptr;
+	if (!array && tag != AnyTag::Null && tag != AnyTag::Undefined) {
+		raise(module_.type_error_class, "Error #1116: second argument to Function.prototype.apply must be an array.");
+		return;
+	}
+	// The elements, each with a reference of its own: making an argument its type may run the program, which
+	// may take them out of the Array.
+	std::vector<Slot> given;
+	for (uint32_t i = 0; array && i < array->length; i++) {
+		given.push_back(share(Kind::Any, array->data[i]));
+	}
+	std::vector<Slot> values;
+	const bool ok = function_arguments(value, given.size(), given.data(), &values);
+	for (Slot &each : given) {
+		drop_any(each);
+	}
+	if (!ok) {
+		return;
+	}
+	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	push(target, values.data(), values.size(), p_in.a);
+	let_go_arguments(module_.functions[target], &values);
 }
 
 } // namespace vm

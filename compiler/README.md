@@ -103,7 +103,7 @@ their variables; `[Signal]` on a field of a class that extends one of Godot's.
 
 **What is refused, by name, until later slices:** `Object` literals and dynamic properties, `Dictionary`,
 interfaces, `for in` over anything but a vector or an Array, getters and setters,
-`Function`'s `call` and `apply`, `this` inside a function expression, regular expressions and the `String`
+`this` inside a function expression, regular expressions and the `String`
 methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
 `Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
 `... is not supported by the interpreter yet` at the place.

@@ -283,6 +283,12 @@ uint32_t Lowerer::member_value(Expr *p_expression) {
 		emit(Op::StrLength, position, out, text);
 		return out;
 	}
+	if (symbol && function_ && symbol->owner == function_ && symbol->name == "length") {
+		const uint32_t value = expression(member->object, Kind::Obj);
+		const uint32_t out = reg(Kind::I32);
+		emit(Op::FunctionLength, position, out, value);
+		return out;
+	}
 	uint32_t constant = 0;
 	if (builtin_constant(symbol, position, &constant)) {
 		return constant;

@@ -131,6 +131,10 @@ inline bool is_held(Kind p_kind) {
 	/* A vector method's callback and the object to call it on (both untyped): a method with an object \
 	   other than null is AS3's TypeError #1510. */ \
 	X(CallbackThis, "RR-") \
+	/* f.apply(thisArg, array): out (untyped, or NONE), the function value, the Array (untyped: null or \
+	   undefined is no arguments, anything else not an Array is AS3's TypeError #1116). f.length: out \
+	   (int), the function value: how many parameters it declares, the rest parameter not counted. */ \
+	X(ApplyFunction, "rRR") X(FunctionLength, "RR-") \
 	X(ObjectText, "RR-") /* Object's own toString(), or Error's, whatever the class says: what super.toString() reaches. */ \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
