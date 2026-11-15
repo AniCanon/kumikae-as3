@@ -46,4 +46,4 @@ function try_ir(r0:Object):void
   @28 Rethrow r8
   @29 ReturnVoid
   handler @1-@5 -> @7 into r1 catches String
-  handler @1-@15 -> @15 into r8 catches anything
+  handler @1-@15 -> @15 into r8 catches anything, for a finally

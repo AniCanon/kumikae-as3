@@ -198,10 +198,15 @@ Outcome to_text(Request &p_request) {
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Str;
 	void *value = p_request.handle(p_request.in.b);
-	p_request.result.p = value ? p_request.host.handles.text(value) : nullptr;
-	if (!p_request.result.p) {
+	if (!value) {
 		retain(p_request.null_text);
 		p_request.result.p = p_request.null_text;
+		return Outcome::Done;
+	}
+	p_request.result.p = p_request.host.handles.text(value);
+	if (!p_request.result.p) {
+		p_request.error = std::string(OUT_OF_MEMORY);
+		return Outcome::Refused;
 	}
 	return Outcome::Done;
 }

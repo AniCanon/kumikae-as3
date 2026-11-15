@@ -95,7 +95,7 @@ void Interpreter::make(uint32_t p_class, Slot &r_out) {
 	const ir::Class &klass = module_.classes[p_class];
 	Object *object = new_object(p_class, klass.fields.size());
 	if (!object) {
-		raise(module_.error_class, std::string(OUT_OF_MEMORY));
+		out_of_memory();
 		return;
 	}
 	for (size_t i = 0; i < klass.fields.size(); i++) {
@@ -585,12 +585,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::Rethrow:
 				pending_ = share(Kind::Any, r[in.a]);
 				failing_ = true;
-				if (!kept_traces_.empty() && kept_traces_.back().depth == frames_.size()) {
-					trace_ = std::move(kept_traces_.back().trace);
-					trace_lines_ = kept_traces_.back().lines;
-					kept_traces_.pop_back();
-					frames_.back().traced = true; // Its line, where the error was thrown, is in.
-				}
+				take_trace(in.a);
 				break;
 			case Op::HostNew:
 			case Op::HostCall:

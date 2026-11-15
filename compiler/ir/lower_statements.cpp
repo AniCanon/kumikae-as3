@@ -246,20 +246,9 @@ void Lowerer::return_statement(Stmt *p_statement) {
 		if (result->value) {
 			expression(result->value, Kind::Void);
 		}
-		leave_return(position);
+		leave_return(position, NONE);
 	} else {
-		uint32_t value = result->value ? typed(result->value, result_type_, fn().result) : default_value(fn().result, position);
-		bool guarded = std::any_of(tries_.begin(), tries_.end(), [](const TryBlock &p_try) { return p_try.finally_block; });
-		if (!guarded) {
-			emit(Op::Return, position, value);
-			return;
-		}
-		// The value is worked out first and kept; then the `finally` blocks run, and cannot change it.
-		if (return_reg_ == NONE) {
-			return_reg_ = reg(fn().result);
-		}
-		emit(Op::Move, position, return_reg_, value);
-		leave_return(position);
+		leave_return(position, result->value ? typed(result->value, result_type_, fn().result) : default_value(fn().result, position));
 	}
 }
 

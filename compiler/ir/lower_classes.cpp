@@ -184,7 +184,6 @@ void Lowerer::begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {
 	class_ = p_class;
 	constructor_ = false;
 	result_type_ = nullptr;
-	return_reg_ = NONE;
 	locals_.clear();
 	loops_.clear();
 }

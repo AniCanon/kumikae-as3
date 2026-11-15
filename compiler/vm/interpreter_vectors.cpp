@@ -37,7 +37,7 @@ bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 		return false;
 	}
 	if (p_length > MAX_LENGTH || !vector_reserve(p_vector, p_length)) {
-		raise(module_.error_class, std::string(OUT_OF_MEMORY));
+		out_of_memory();
 		return false;
 	}
 	const Kind kind = module_.classes[p_vector->klass].element;
@@ -67,7 +67,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		const uint32_t length = r[list[0]].u;
 		Vector *made = length <= MAX_LENGTH ? new_vector(p_in.b, length, r[list[1]].b) : nullptr;
 		if (!made) {
-			raise(module_.error_class, std::string(OUT_OF_MEMORY));
+			out_of_memory();
 			return;
 		}
 		assign(Kind::Obj, r[p_in.a], made);
@@ -173,6 +173,10 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 				}
 				if (held) {
 					host_.handles.drop(held);
+					if (!text) {
+						out_of_memory();
+						return false;
+					}
 				}
 				break;
 			}

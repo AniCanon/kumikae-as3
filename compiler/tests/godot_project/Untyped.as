@@ -30,6 +30,13 @@ package {
 		public function throwValue(value:*):void { throw value; }
 		public function increment(value:*):* { return value + 1; }
 		public function moveBy(by:*):Vector2 { var q:Vector2 = position + by; return q; }
+		public function minusOne(value:*):* { return value - 1; }
+		public function twice(value:*):* { return value * 2; }
+		public function stepped(value:*):* { value++; return value; }
+		public function half(value:*):* { return value / 2; }
+		public function plusPosition(by:*):* { return position + by; }
+		public function positionAfter(by:*):* { return by + position; }
+		public function addPosition(x:*):* { x += position; return x; }
 		// An error raised for a Godot value is caught like any other.
 		public function guarded(value:*):String {
 			try {

@@ -25,7 +25,7 @@ struct EngineHandles {
 	// Whether a handle is an object of the class of that name (Godot's), or of a class that extends it;
 	// for one of Godot's values, whether it is of the value type of that name. Not if null or freed.
 	[[nodiscard]] virtual bool is_class(void *p_value, std::string_view p_class) = 0;
-	// The engine's own text for a value or an object.
+	// The engine's own text for a value or an object. Null only when there was no memory for it.
 	[[nodiscard]] virtual Str *text(void *p_value) = 0;
 
 	[[nodiscard]] virtual bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count,

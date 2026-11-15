@@ -538,8 +538,7 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 		store(place, value, position);
 		patch(skip, here());
 		return value;
-	} else if (p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Any || untyped(p_assign->value)) &&
-			!is_engine(place.kind) && !engine_typed(p_assign->value)) {
+	} else if (p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Any || untyped(p_assign->value))) {
 		// `+=` with an untyped side: text or numbers, by what each holds when it runs.
 		uint32_t old = settled(convert(load(place, position), Kind::Any, position), p_assign->value, position);
 		uint32_t sum = reg(Kind::Any);

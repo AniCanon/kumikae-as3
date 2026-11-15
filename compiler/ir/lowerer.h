@@ -40,8 +40,10 @@ struct TryExit {
 // where to go after it (0 on past the try, 1 the error goes on, 2 and up one of `exits`) and jumps there.
 struct TryBlock {
 	Block *finally_block = nullptr;
-	size_t loops = 0; // How many loops were open when it began.
 	uint32_t exit_reg = 0;
+	// The value of a `return` that leads out through this finally, kept here so that a return cancelled
+	// inside the finally (by `break`, `continue` or a caught error) does not change an outer one.
+	uint32_t return_reg = NONE;
 	std::vector<uint32_t> to_finally; // Jumps to the finally, patched once it is written.
 	std::vector<TryExit> exits;
 };
@@ -85,7 +87,6 @@ class Lowerer {
 	std::unordered_map<const Symbol *, uint32_t> locals_;
 	std::vector<Loop> loops_;
 	std::vector<std::string_view> next_labels_; // Labels written just before the statement being lowered.
-	uint32_t return_reg_ = NONE; // Where a `return` inside a `try` with a `finally` keeps its value.
 	// Types already refused where they were written: a value of one is not refused again at each use.
 	std::unordered_set<const Type *> refused_types_;
 	// The `try` statements around the code being lowered, outermost first: a `break`, `continue` or
@@ -204,7 +205,6 @@ class Lowerer {
 	uint32_t godot_object_of(uint32_t p_object, Expr *p_written, uint32_t p_position);
 	// The untyped value: ir/lower_any.cpp.
 	bool untyped(const Expr *p_expression) const;
-	bool engine_typed(const Expr *p_expression) const; // Of a Godot value type or class.
 	bool untyped_type(const Type *p_type) const;
 	// A place of this kind and type starts null: an untyped one declared `Object` (a `*` starts undefined).
 	bool starts_null_type(Kind p_kind, const Type *p_type) const { return p_kind == Kind::Any && !untyped_type(p_type); }
@@ -416,7 +416,7 @@ class Lowerer {
 	// Leaves for a loop (break or continue) or the function (return), through the `finally` of every
 	// try statement on the way: the innermost one runs first, and goes on from there.
 	void leave_to(size_t p_loop, bool p_break, uint32_t p_position);
-	void leave_return(uint32_t p_position);
+	void leave_return(uint32_t p_position, uint32_t p_value); // p_value NONE for a function that gives nothing.
 	void route(size_t p_try, TryExit p_exit);
 	void finish_finally(TryBlock &p_try, uint32_t p_error, uint32_t p_position);
 	void open_loop(); // A loop or switch begins: it takes the label written before it, if any.

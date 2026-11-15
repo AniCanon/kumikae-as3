@@ -19,6 +19,7 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 		strings_.push_back(new_string(constant));
 	}
 	null_text_ = new_string("null");
+	memory_text_ = new_string(OUT_OF_MEMORY);
 	for (const char *name : { "undefined", "boolean", "number", "string", "object" }) {
 		type_names_.push_back(new_string(name));
 	}
@@ -59,6 +60,9 @@ Interpreter::~Interpreter() {
 	}
 	if (release(null_text_)) {
 		free_string(null_text_);
+	}
+	if (release(memory_text_)) {
+		free_string(memory_text_);
 	}
 }
 
@@ -157,14 +161,62 @@ void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
 	if (failing_) {
 		return;
 	}
+	// Not text(): with no memory, it would raise again. Then the error says that memory ran out.
+	Str *message = new_string(p_message);
+	if (!message && memory_text_) {
+		retain(memory_text_);
+		message = memory_text_;
+	}
+	throw_new(p_class, message, p_message);
+}
+
+// Error #1000, with nothing more allocated than the error object itself.
+void Interpreter::out_of_memory() {
+	if (failing_) {
+		return;
+	}
+	retain(memory_text_);
+	throw_new(module_.error_class, memory_text_, OUT_OF_MEMORY);
+}
+
+// p_message is the error's own, or null; p_words are what is said if not even the error can be made.
+void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
 	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size()) : nullptr;
 	if (error) {
-		error->fields()[0].p = new_string(p_message); // Not text(): with no memory, it would raise again.
+		error->fields()[0].p = p_message;
 		pending_ = any::object(error);
 		failing_ = true;
-	} else {
-		trace_ = p_message + "\n";
-		stopped_ = true; // Nothing to throw with: stop.
+		return;
+	}
+	if (release(p_message)) {
+		free_string(p_message);
+	}
+	trace_.assign(p_words);
+	trace_ += "\n";
+	stopped_ = true; // Nothing to throw with: stop.
+}
+
+// A finally that catches again replaces what it kept: one left behind (the finally went out by `break`,
+// `continue` or a throw of its own) is never taken by another, and never piles up.
+void Interpreter::keep_trace(Kept p_kept) {
+	for (size_t i = kept_traces_.size(); i-- > 0 && kept_traces_[i].depth == p_kept.depth;) {
+		if (kept_traces_[i].reg == p_kept.reg) {
+			kept_traces_[i] = std::move(p_kept);
+			return;
+		}
+	}
+	kept_traces_.push_back(std::move(p_kept));
+}
+
+void Interpreter::take_trace(uint32_t p_reg) {
+	for (size_t i = kept_traces_.size(); i-- > 0 && kept_traces_[i].depth == frames_.size();) {
+		if (kept_traces_[i].reg == p_reg) {
+			trace_ = std::move(kept_traces_[i].trace);
+			trace_lines_ = kept_traces_[i].lines;
+			kept_traces_.erase(kept_traces_.begin() + static_cast<std::ptrdiff_t>(i));
+			frames_.back().traced = true; // Its line, where the error was thrown, is in.
+			return;
+		}
 	}
 }
 
@@ -195,7 +247,7 @@ bool Interpreter::catch_error(size_t p_depth) {
 					}
 					lines++;
 				}
-				kept_traces_.push_back(Kept{ frames_.size(), std::move(trace), lines });
+				keep_trace(Kept{ frames_.size(), handler.reg, std::move(trace), lines });
 			}
 			frame.traced = false;
 			const Kind kind = function.registers[handler.reg];
@@ -296,7 +348,7 @@ std::string Interpreter::error_text() {
 	}
 	// A Godot value or object: Godot's own text for it.
 	Str *words = host_.handles.text(any::pointer(pending_));
-	std::string out = words ? std::string(words->view()) : std::string("null");
+	std::string out = words ? std::string(words->view()) : std::string(OUT_OF_MEMORY);
 	if (release(words)) {
 		free_string(words);
 	}
@@ -388,15 +440,16 @@ bool Interpreter::start() {
 	if (started_) {
 		return true;
 	}
-	started_ = true;
-	// The constants are made with the interpreter, which can't raise: a program missing one does not run.
+	// The constants are made with the interpreter, which can't raise: a program missing one does not run,
+	// now or later.
 	const auto missing = [](const std::vector<Str *> &p_strings) {
 		return std::find(p_strings.begin(), p_strings.end(), nullptr) != p_strings.end();
 	};
-	if (!null_text_ || missing(strings_) || missing(type_names_)) {
+	if (!null_text_ || !memory_text_ || missing(strings_) || missing(type_names_)) {
 		host_.output.error(OUT_OF_MEMORY);
 		return false;
 	}
+	started_ = true;
 	bool ok = true;
 	for (uint32_t initializer : module_.initializers) {
 		ok = ok && call(initializer, nullptr, 0);

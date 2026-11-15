@@ -168,7 +168,7 @@ void Interpreter::assign(Kind p_kind, Slot &p_slot, void *p_value) {
 Str *Interpreter::text(const std::string &p_text) {
 	Str *made = new_string(p_text);
 	if (!made) {
-		raise(module_.error_class, std::string(OUT_OF_MEMORY));
+		out_of_memory();
 	}
 	return made;
 }

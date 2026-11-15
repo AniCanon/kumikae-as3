@@ -168,8 +168,9 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 			for (size_t made = 0; made < i; made++) {
 				program.interpreter().discard(function.registers[made + 1], arguments[made + 1]);
 			}
-			UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) + ": " +
-					String::utf8(vm::OUT_OF_MEMORY.data(), (int64_t)vm::OUT_OF_MEMORY.size()));
+			// As an uncaught AS3 error reads, at the method Godot called.
+			UtilityFunctions::push_error(String("Error: ") + String::utf8(vm::OUT_OF_MEMORY.data(), (int64_t)vm::OUT_OF_MEMORY.size()) +
+					String("\n\tat ") + String::utf8(function.name.c_str()) + String("()"));
 			r_error->error = GDEXTENSION_CALL_OK;
 			return;
 		}

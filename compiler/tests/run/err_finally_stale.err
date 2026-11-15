@@ -1,0 +1,2 @@
+Error: first
+	at err_finally_stale()[err_finally_stale.as:5]

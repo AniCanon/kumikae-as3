@@ -248,6 +248,10 @@ output = compare("untyped.gd", [
     "a color is not a vector", "a vector3 is not a vector2", "a resource is not a node", "a node is a node",
     "a property takes its type only", "a script object returned", "a script object in a field", "freed", "caught in AS3",
     "an int plus one stays an int", "a Godot value and an untyped one",
+    "minusOne of an int stays an int", "twice of an int stays an int", "stepped of an int stays an int",
+    "an Int64 minus one stays whole", "a half is a float", "a Godot value plus text joins them",
+    "text plus a Godot value joins them", "text plus-assigned a Godot value joins them",
+    "a Godot value plus a number joins them, as AS3 does", "a Godot value plus-assigned a Godot value",
 ])
 check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",
       output.count("Error #1034") >= 5 and "at Untyped/asVector()" in output and "at Untyped/asNode()" in output and

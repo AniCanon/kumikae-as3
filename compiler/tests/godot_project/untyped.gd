@@ -64,5 +64,15 @@ func _physics_process(_delta: float) -> bool:
 	node.position = Vector2(1, 1)
 	show("an int plus one stays an int", [ask("increment", [5]), typeof(ask("increment", [5]))], [6, TYPE_INT])
 	show("a Godot value and an untyped one", ask("moveBy", [Vector2(2, 3)]), Vector2(3, 4))
+	for method in ["minusOne", "twice", "stepped"]:
+		var got = ask(method, [5])
+		show("%s of an int stays an int" % method, typeof(got), TYPE_INT)
+	show("an Int64 minus one stays whole", [ask("minusOne", [5000000000]), typeof(ask("minusOne", [5000000000]))], [4999999999, TYPE_INT])
+	show("a half is a float", ask("half", [5]), 2.5)
+	show("a Godot value plus text joins them", ask("plusPosition", ["text"]), "(1.0, 1.0)text")
+	show("text plus a Godot value joins them", ask("positionAfter", ["text"]), "text(1.0, 1.0)")
+	show("text plus-assigned a Godot value joins them", ask("addPosition", ["text"]), "text(1.0, 1.0)")
+	show("a Godot value plus a number joins them, as AS3 does", ask("plusPosition", [2]), "(1.0, 1.0)2")
+	show("a Godot value plus-assigned a Godot value", ask("addPosition", [Vector2(1, 2)]), Vector2(2, 3))
 	show("caught in AS3", [ask("guarded", [Vector2(2, 3)]), ask("guarded", [Color(1, 1, 1)]), node.position], ["fits (2.0, 3.0)", "caught true", Vector2(1, 1)])
 	return false

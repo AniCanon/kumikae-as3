@@ -41,17 +41,25 @@ void Lowerer::leave_to(size_t p_loop, bool p_break, uint32_t p_position) {
 	(p_break ? loops_[p_loop].breaks : loops_[p_loop].continues).push_back(jump);
 }
 
-void Lowerer::leave_return(uint32_t p_position) {
+// The value is worked out first and kept by the innermost finally; then the finallies run, and cannot
+// change it.
+void Lowerer::leave_return(uint32_t p_position, uint32_t p_value) {
 	for (size_t i = tries_.size(); i-- > 0;) {
 		if (tries_[i].finally_block) {
+			if (p_value != NONE) {
+				if (tries_[i].return_reg == NONE) {
+					tries_[i].return_reg = reg(fn().result);
+				}
+				emit(Op::Move, p_position, tries_[i].return_reg, p_value);
+			}
 			route(i, TryExit{ TryExit::Return, 0, p_position });
 			return;
 		}
 	}
-	if (constructor_ || fn().result == Kind::Void) {
+	if (p_value == NONE) {
 		emit(Op::ReturnVoid, p_position);
 	} else {
-		emit(Op::Return, p_position, return_reg_);
+		emit(Op::Return, p_position, p_value);
 	}
 }
 
@@ -110,7 +118,7 @@ void Lowerer::finish_finally(TryBlock &p_try, uint32_t p_error, uint32_t p_posit
 		const TryExit way = p_try.exits[k];
 		const uint32_t other = emit(Op::JumpIfNot, way.position, is(static_cast<uint32_t>(k) + 2), 0);
 		if (way.kind == TryExit::Return) {
-			leave_return(way.position);
+			leave_return(way.position, p_try.return_reg);
 		} else {
 			leave_to(way.loop, way.kind == TryExit::Break, way.position);
 		}
@@ -127,7 +135,6 @@ void Lowerer::try_statement(Try *p_try) {
 	const uint32_t position = p_try->offset;
 	TryBlock opened;
 	opened.finally_block = p_try->finally_block;
-	opened.loops = loops_.size();
 	if (p_try->finally_block) {
 		opened.exit_reg = reg(Kind::I32);
 	}

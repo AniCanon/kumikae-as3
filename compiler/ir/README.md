@@ -13,7 +13,7 @@ turns the checked tree from `src/` into it.
 | `lower_emit`, `lower_types`, `lower_places` | Registers and constants; kinds, conversions, default values; what can be read and written |
 | `lower_expressions`, `lower_operators`, `lower_calls`, `lower_statements`, `lower_classes` | By what each lowers |
 | `lower_engine` | Godot's members: properties, constants, singletons, parts of a value |
-| `lower_try` | `try`, `catch`, `finally` (handlers in `ir::Function`, the `finally` written on each way out) and labels |
+| `lower_try` | `try`, `catch`, `finally` (handlers in `ir::Function`; the `finally` written once, every way out going through it) and labels |
 | `lower_any` | The untyped value: coercion where a type is declared, `==`, `<`, `+`, `typeof`, `is`/`as` |
 | `lower_vectors`, `lower_math` | `Vector.<T>` (a class per element type, places, methods, loops, handing one to Godot); `Math` |
 

@@ -50,13 +50,13 @@ Slot Interpreter::to_any(Kind p_kind, Slot p_value) {
 		case Kind::U32:
 			return p_value.u <= static_cast<uint32_t>(INT32_MAX) ? any::integer(static_cast<int32_t>(p_value.u)) : any::number(p_value.u);
 		case Kind::F64:
-			return any::number(p_value.d);
+			return any_number(p_value.d);
 		case Kind::Bool:
 			return any::boolean(p_value.b);
 		case Kind::I64: {
 			Wide *wide = new_wide(p_value.l);
 			if (!wide) {
-				raise(module_.error_class, std::string(OUT_OF_MEMORY));
+				out_of_memory();
 				return any::undefined();
 			}
 			return any::wide(wide);
@@ -101,6 +101,10 @@ bool Interpreter::any_text(Slot p_value, std::string *r_text) {
 	}
 	if (held) {
 		host_.handles.drop(held);
+		if (!text) {
+			out_of_memory();
+			return false;
+		}
 	}
 	return true;
 }
@@ -258,6 +262,9 @@ bool Interpreter::any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
 		return false;
 	}
 	Str *as_text = text(words);
+	if (!as_text) {
+		return false; // No memory for it: the error is on its way out.
+	}
 	*r_equal = any::loose_equal(any::string(as_text), first_is_object ? p_b : p_a).value_or(false);
 	free_string(as_text);
 	return true;
@@ -361,34 +368,81 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 	}
 }
 
-// Two numbers added. Whole numbers stay whole, as AVM2 keeps an int an int when the sum fits: an `int`
-// if it fits one, an Int64 if it fits that and one side was an Int64; otherwise a Number.
+// A number as an untyped value, held as AVM2 holds one: a whole number as an `int` where it fits one, and
+// as an Int64 up to 2^53, where a Number is still exact; anything else (a fraction, -0, NaN, the very
+// large) as a Number. So `v - 1` with `v` from Godot's integer 5 goes back to Godot as the integer 4.
+// Undefined, with the error raised, when there is no memory for an Int64.
+Slot Interpreter::any_number(double p_value) {
+	constexpr double EXACT = 9007199254740992.0; // 2^53
+	if (p_value != std::trunc(p_value) || std::fabs(p_value) > EXACT || (p_value == 0 && std::signbit(p_value))) {
+		return any::number(p_value); // NaN fails the first test.
+	}
+	if (p_value >= INT32_MIN && p_value <= INT32_MAX) {
+		return any::integer(static_cast<int32_t>(p_value));
+	}
+	return any_wide(static_cast<int64_t>(p_value));
+}
+
+Slot Interpreter::any_wide(int64_t p_value) {
+	if (p_value >= INT32_MIN && p_value <= INT32_MAX) {
+		return any::integer(static_cast<int32_t>(p_value));
+	}
+	Wide *wide = new_wide(p_value);
+	if (!wide) {
+		out_of_memory();
+		return any::undefined();
+	}
+	return any::wide(wide);
+}
+
+// Two numbers added. Two whole ones stay whole; with an Int64 on a side, the sum wraps at 64 bits as a
+// typed Int64's does.
 Slot Interpreter::add_numbers(Slot p_a, Slot p_b) {
 	const AnyTag a = any::tag(p_a);
 	const AnyTag b = any::tag(p_b);
 	const auto whole = [](Slot p_value, AnyTag p_tag) {
 		return p_tag == AnyTag::Wide ? static_cast<const Wide *>(any::pointer(p_value))->value : static_cast<int64_t>(any::to_int_payload(p_value));
 	};
-	const bool integral = (a == AnyTag::Int || a == AnyTag::Wide) && (b == AnyTag::Int || b == AnyTag::Wide);
-	int64_t sum = 0;
-	if (integral && !__builtin_add_overflow(whole(p_a, a), whole(p_b, b), &sum)) {
-		if (sum >= INT32_MIN && sum <= INT32_MAX) {
-			return any::integer(static_cast<int32_t>(sum));
-		}
-		if (a == AnyTag::Wide || b == AnyTag::Wide) {
-			Wide *wide = new_wide(sum);
-			if (wide) {
-				return any::wide(wide);
-			}
-		}
+	if ((a == AnyTag::Int || a == AnyTag::Wide) && (b == AnyTag::Int || b == AnyTag::Wide)) {
+		const uint64_t sum = static_cast<uint64_t>(whole(p_a, a)) + static_cast<uint64_t>(whole(p_b, b));
+		return any_wide(static_cast<int64_t>(sum));
 	}
-	return any::number(any::to_number(p_a) + any::to_number(p_b));
+	return any_number(any::to_number(p_a) + any::to_number(p_b));
+}
+
+// `+` with a Godot value on a side and no text on either: Godot's own operator, where it has one
+// (Vector2 + Vector2). True if that settled it, with the result or the error in place.
+bool Interpreter::engine_add(const Instruction &p_in, Slot p_b, Slot p_c) {
+	const AnyTag b = any::tag(p_b);
+	const AnyTag c = any::tag(p_c);
+	if ((!any::is_engine(p_b) && !any::is_engine(p_c)) || b == AnyTag::String || c == AnyTag::String ||
+			b == AnyTag::Object || c == AnyTag::Object) {
+		return false;
+	}
+	const Argument operands[2] = { Argument{ Kind::Any, p_b }, Argument{ Kind::Any, p_c } };
+	Wanted wanted;
+	wanted.kind = Kind::Any;
+	Slot result;
+	result.bits = 0;
+	std::string error;
+	if (!host_.handles.operate("+", operands, 2, wanted, &result, &error)) {
+		if (error == OUT_OF_MEMORY) {
+			raise(module_.error_class, error);
+			return true;
+		}
+		return false; // No such operator in Godot: AS3's rule, which joins their text.
+	}
+	put(Kind::Any, stack_[frames_.back().base + p_in.a], result);
+	return true;
 }
 
 // `+`, `<` and `<=` with an untyped operand, as ECMAScript has them: both become primitives; `+` joins
 // text if either is text and adds numbers otherwise; `<` compares text if both are text.
 void Interpreter::any_arithmetic(const Instruction &p_in, Slot p_b, Slot p_c) {
 	const size_t base = frames_.back().base;
+	if (p_in.op == Op::AnyAdd && engine_add(p_in, p_b, p_c)) {
+		return;
+	}
 	Slot first;
 	Slot second;
 	if (!any_primitive(p_b, &first)) {

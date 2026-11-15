@@ -49,17 +49,22 @@ private:
 	std::vector<Slot> globals_;
 	std::vector<Str *> strings_; // The module's string constants.
 	Str *null_text_ = nullptr; // "null"
+	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	bool failing_ = false; // An error is on its way out: pending_ holds it.
 	Slot pending_{}; // What was thrown, as an untyped value with a reference of its own.
 	std::string trace_; // Its stack trace, built as frames are left.
-	// The trace of an error a `finally` caught, kept for when it is thrown again, by the depth of the frame.
+	// The trace of an error a `finally` caught, kept for when it is thrown again: by the depth of the frame
+	// and the register the finally keeps its error in, so that there is at most one for each finally.
 	struct Kept {
 		size_t depth;
+		uint32_t reg;
 		std::string trace;
 		size_t lines;
 	};
 	std::vector<Kept> kept_traces_;
+	void keep_trace(Kept p_kept);
+	void take_trace(uint32_t p_reg); // For a Rethrow of what that register's finally caught.
 	size_t trace_lines_ = 0;
 	bool stopped_ = false; // Nothing more is to run.
 	bool halted_ = false; // Because the statement hook said so, not because of an error.
@@ -84,6 +89,9 @@ private:
 	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	Slot add_numbers(Slot p_a, Slot p_b);
+	Slot any_number(double p_value);
+	Slot any_wide(int64_t p_value);
+	bool engine_add(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value); // Takes over one reference.
 	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.
@@ -91,6 +99,8 @@ private:
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
+	void out_of_memory();
+	void throw_new(uint32_t p_class, Str *p_message, std::string_view p_words);
 	// A member of nothing was asked for: AS3's TypeError #1009.
 	void raise_null();
 	void convert_checked(const ir::Instruction &p_in, Slot *p_registers);
@@ -195,6 +205,8 @@ public:
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
 	void release_object(Object *p_object);
 
+	// How many traces finallies are keeping for errors they will throw again: one at most for each.
+	size_t kept_traces() const { return kept_traces_.size(); }
 	// For a debugger: the frames, innermost last.
 	size_t depth() const { return frames_.size(); }
 	const ir::Function &function_at(size_t p_frame) const { return module_.functions[frames_[p_frame].function]; }

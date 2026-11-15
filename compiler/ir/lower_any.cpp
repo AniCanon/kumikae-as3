@@ -8,11 +8,6 @@ bool Lowerer::untyped_type(const Type *p_type) const {
 	return p_type && p_type->kind == Type::Any;
 }
 
-bool Lowerer::engine_typed(const Expr *p_expression) const {
-	Kind kind = Kind::Void;
-	return p_expression && kind_of(p_expression->type, &kind) && is_engine(kind);
-}
-
 bool Lowerer::untyped(const Expr *p_expression) const {
 	Kind kind = Kind::Void;
 	return p_expression && !is_null(p_expression) && kind_of(p_expression->type, &kind) && kind == Kind::Any;

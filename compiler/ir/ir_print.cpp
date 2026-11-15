@@ -160,6 +160,9 @@ std::string print(const Module &p_module, const Function &p_function) {
 		} else {
 			out += handler.type < p_module.classes.size() ? p_module.classes[handler.type].name : "?class";
 		}
+		if (handler.rethrows) {
+			out += ", for a finally"; // It keeps the trace, for the Rethrow after the finally.
+		}
 		out += "\n";
 	}
 	return out;

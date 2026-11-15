@@ -1,12 +1,14 @@
 // The interpreter as a library: what a debugger will use, and what the host is told.
 #include "check.h"
 
+#include "any.h"
 #include "builtins.h"
 #include "interpreter.h"
 #include "reload.h"
 #include "lower.h"
 #include "names.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -1548,13 +1550,89 @@ static void test_out_of_memory() {
 		vm::Interpreter interpreter(module, host);
 		vm::fail_allocations(0);
 		CHECK(!interpreter.start());
-		CHECK_EQ(host.errors, std::string(vm::OUT_OF_MEMORY) + "\n");
+		CHECK(!interpreter.start()); // Nor the second time.
+		CHECK_EQ(host.errors, std::string(vm::OUT_OF_MEMORY) + "\n" + std::string(vm::OUT_OF_MEMORY) + "\n");
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+static bool most_kept(vm::Interpreter &p_interpreter, void *p_data) {
+	size_t *most = static_cast<size_t *>(p_data);
+	*most = std::max(*most, p_interpreter.kept_traces());
+	return true;
+}
+
+// Errors swallowed in a loop inside finallies keep at most one trace for each finally.
+static void test_kept_traces() {
+	Compilation compilation;
+	compilation.add("Loop.as", "package { public class Loop { public function Loop() {\n"
+							   "	for (var i:int = 0; i < 200; i++) {\n"
+							   "		try { throw 'x'; } finally { continue; }\n"
+							   "	}\n"
+							   "	for (var j:int = 0; j < 200; j++) {\n"
+							   "		try { try { throw 'x'; } finally { throw 'y'; } } catch (e:String) {}\n"
+							   "	}\n"
+							   "} } }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module));
+	Recorder host;
+	size_t most = 0;
+	vm::Interpreter interpreter(module, host);
+	interpreter.set_statement_hook(most_kept, &most);
+	CHECK(interpreter.run_program());
+	CHECK(most <= 2);
+	CHECK_EQ(interpreter.kept_traces(), (size_t)0);
+}
+
+// Untyped arithmetic with no memory for an Int64, and `==` with no memory for an object's text.
+static void test_untyped_out_of_memory() {
+	Compilation compilation;
+	compilation.add("Any.as", "package { public class Any {\n"
+							  "public function add(a:*):* { return a + 1; }\n"
+							  "public function same(o:*):String { try { return String(o == 'grow'); } catch (e:Error) { return e.message; } return ''; }\n"
+							  "public function toString():String { return 'grow'; }\n"
+							  "} }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	uint32_t klass = ir::NONE;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		klass = module.classes[i].name == "Any" ? (uint32_t)i : klass;
+	}
+	const size_t strings = vm::live_strings();
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(klass);
+		CHECK(object != nullptr);
+		vm::Slot wide = vm::any::wide(vm::new_wide(9007199254740992LL));
+		vm::Slot result;
+		result.bits = 0;
+		vm::fail_allocations(1);
+		CHECK(!interpreter.call_method(object, "add", &wide, 1, &result)); // Not a Number that lost its last digit.
+		vm::fail_allocations(0);
+		CHECK(host.errors.find(std::string(vm::OUT_OF_MEMORY)) != std::string::npos);
+		interpreter.discard(ir::Kind::Any, wide);
+		vm::Slot self = vm::any::object(object);
+		vm::fail_allocations(1);
+		CHECK(interpreter.call_method(object, "same", &self, 1, &result));
+		vm::fail_allocations(0);
+		CHECK_EQ(result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string(), std::string(vm::OUT_OF_MEMORY));
+		interpreter.discard(ir::Kind::Str, result);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_strings(), strings);
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 int main() {
+	test_kept_traces();
+	test_untyped_out_of_memory();
 	test_out_of_memory();
 	test_reload();
 	test_reload_vectors();
