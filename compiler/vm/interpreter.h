@@ -176,7 +176,7 @@ private:
 		std::vector<int32_t> captures;
 	};
 	std::optional<Found> find_match(const regex::Program &p_program, std::string_view p_source, const std::u16string &p_text, uint32_t p_from);
-	Vector *match_array(const Found &p_found, const std::u16string &p_text);
+	Vector *match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program);
 	std::shared_ptr<const regex::Program> pattern_argument(Slot p_pattern, Object **r_regexp, std::string *r_source);
 	void string_match(const ir::Function &p_function, const ir::Instruction &p_in);
 	void string_search(const ir::Function &p_function, const ir::Instruction &p_in);

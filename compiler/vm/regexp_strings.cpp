@@ -129,7 +129,7 @@ void Interpreter::string_match(const Function &p_function, const Instruction &p_
 	}
 	Vector *array = nullptr;
 	if (!global && !matches->empty()) {
-		array = match_array(matches->front(), units);
+		array = match_array(matches->front(), units, *program);
 	} else if (!matches->empty()) {
 		array = fresh_vector(module_.array_class, matches->size());
 		for (size_t i = 0; array && i < matches->size(); i++) {

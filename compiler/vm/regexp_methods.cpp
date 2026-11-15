@@ -1,4 +1,5 @@
 #include "interpreter_internal.h"
+#include "table.h"
 
 #include "regex.h"
 #include "text_units.h"
@@ -92,8 +93,9 @@ std::optional<Interpreter::Found> Interpreter::find_match(const regex::Program &
 	return std::nullopt;
 }
 
-// What exec() gives: the match and each group, as Strings, undefined for a group that took no part.
-Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_text) {
+// What exec() gives: the match and each group, as Strings, undefined for a group that took no part; and as
+// its properties `index` (where the match starts), `input` (the text searched) and each named group.
+Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program) {
 	const size_t count = p_found.captures.size() / 2;
 	Vector *array = fresh_vector(module_.array_class, count);
 	for (size_t i = 0; array && i < count; i++) {
@@ -107,6 +109,31 @@ Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_t
 			return nullptr;
 		}
 		array->data[i] = any::string(piece);
+	}
+	if (!array) {
+		return nullptr;
+	}
+	const auto property = [&](const std::string &p_name, Slot p_value) {
+		PropertyKey key;
+		key.text = p_name;
+		const bool set = set_entry(properties_of(array), key, p_value);
+		drop_any(p_value);
+		return set;
+	};
+	Str *input = text(text_of_units(p_text));
+	// `input` first: the property takes the string and lets it go, whatever comes after.
+	bool ok = input && property("input", any::string(input)) && property("index", any::integer(p_found.captures[0]));
+	for (size_t i = 0; ok && i < p_program.names.size(); i++) {
+		if (!p_program.names[i].empty() && i + 1 < count) {
+			ok = property(text_of_units(p_program.names[i]), share(Kind::Any, array->data[i + 1]));
+		}
+	}
+	if (!ok) {
+		if (!input) {
+			out_of_memory();
+		}
+		release_object(array);
+		return nullptr;
 	}
 	return array;
 }
@@ -237,7 +264,7 @@ void Interpreter::regexp_exec(const Function &p_function, const Instruction &p_i
 		out.b = found.has_value();
 		return;
 	}
-	Vector *array = found ? match_array(*found, units) : nullptr;
+	Vector *array = found ? match_array(*found, units, *program) : nullptr;
 	if (found && !array) {
 		return;
 	}
