@@ -88,6 +88,12 @@ probe plugin is excluded from the distributable ZIP.
 The native lookup probe supplies an activation event to its sandbox frame when launched in the
 background; it does not steal desktop focus or test OS activation. It trusts only its generated
 fixture path and restores the sandbox's trust settings when finished.
+During the completion probe, `UiProbeFocus` also enables the IDE's test control for window deactivation
+events, then restores its previous value on the UI thread even when a check fails. Without it, a delayed
+background-window event can close a valid lookup through the popup manager. Regression checks dispatch
+deactivation and lost-focus events while a lookup is open, then continue native typing, Backspace,
+Enter/Tab and Undo checks. This control exists only in the sandbox probe; ordinary IDE focus behavior
+is not changed or verified by it.
 
 For a lifecycle control, run `KUMIKAE_COMPLETION_CONTROL_PROBE=1 ./gradlew --offline runIde -PuiProbe`.
 It opens plain-text files, confirms each project closes and is disposed, and records the same heap

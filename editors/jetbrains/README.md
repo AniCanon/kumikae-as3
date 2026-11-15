@@ -9,6 +9,9 @@ require it. It also provides project/run tools and an iOS Simulator panel. See
 The Simulator's own measurements are described below. The [completion follow-up](../../docs/results/2026-11-completion-followup.md)
 records generated-edit acceptance and body-only checking. Its paired ten-minute AS3/plain-text
 controls retain all ten disposed projects in the pinned sandbox; the exact GC root remains unverified.
+The background completion probe suppresses window-deactivation cancellation only in its sandbox JVM,
+restoring the previous setting on exit. It also dispatches those focus events during lookup checks.
+Production focus behavior and manual editor acceptance remain separate from this automated coverage.
 
 | Checked | By | Result |
 |---|---|---|

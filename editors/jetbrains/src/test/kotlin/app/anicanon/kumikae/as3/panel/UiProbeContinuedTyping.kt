@@ -28,6 +28,7 @@ internal object UiProbeContinuedTyping {
             UiProbeCompletion.invokeCompletion(project, editor)
         }
         awaitLookup(editor)
+        UiProbeFocus.checkLookup(project, editor)
         UiProbeCompletion.edt {
             val context = DataManager.getInstance().getDataContext(editor.contentComponent)
             "rm".forEach { TypedAction.getInstance().actionPerformed(editor, it, context) }

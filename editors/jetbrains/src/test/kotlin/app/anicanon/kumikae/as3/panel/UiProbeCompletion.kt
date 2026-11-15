@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit
 object UiProbeCompletion {
     private val projects = mutableListOf<WeakReference<com.intellij.openapi.project.Project>>()
 
-    fun run(destination: Path, plainText: Boolean = false, missingClient: Boolean = false) {
+    fun run(destination: Path, plainText: Boolean = false, missingClient: Boolean = false) = UiProbeFocus.run {
         projects.clear()
         val endurance = System.getenv("KUMIKAE_COMPLETION_RETENTION_PROBE") == "1"
         val heap = mutableListOf<String>()
@@ -162,6 +162,7 @@ object UiProbeCompletion {
                 times += (System.nanoTime() - start) / 1_000_000.0
                 if (sample < 20) edt { LookupManager.getInstance(project).hideActiveLookup() }
             }
+            UiProbeFocus.checkLookup(project, editor)
             val warm = times.drop(1).sorted()
             observations +=
                 "lookup cold=${times.first()} ms median=${warm[10]} ms p95=${warm[18]} ms max=${warm.last()} ms"

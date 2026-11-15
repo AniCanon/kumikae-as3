@@ -26,6 +26,9 @@ The sandbox `UiProbeLanguage` exercises native typing actions. `UiProbeCompletio
 native lookup against the bundled server in a disposable project. The compiler tests separately cover
 scope/type semantics, wire capabilities, Unicode ranges and cache invalidation. See the
 [results](../../docs/results/2026-11-completion.md) for observed coverage and remaining limitations.
+`UiProbeFocus` scopes the platform's window-deactivation test control to those background sandbox runs
+and restores it on exit. It prevents desktop focus changes from dismissing the test's live lookup;
+the production plugin contains no focus override.
 
 ## Simulator composition
 
