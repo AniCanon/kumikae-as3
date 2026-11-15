@@ -37,16 +37,16 @@ internal class PictureStreamController(
         }
         if (feed != null || tasks.isBusy || clock() < retryAt) return
         val started = epoch
-        tasks.submit({ repository.openFrames(wanted) }) { result ->
+        tasks.submitOwned({ repository.openFrames(wanted) }, { result ->
             if (disposed || started != epoch) {
                 result.getOrNull()?.close()
-                return@submit
+                return@submitOwned
             }
             result.fold({
                 feed = it
                 say("Live picture connected.")
             }, ::failed)
-        }
+        }, { it.close() })
     }
 
     fun stop() {

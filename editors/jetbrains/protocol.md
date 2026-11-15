@@ -54,20 +54,20 @@ change its selection; a stale device request fails instead of reaching a new one
 |---|---|---|
 | `devices` | `{}` | Array of `{id,name,runtime,state}` for available iOS devices. |
 | `select` | `device`: string | Status. A different selection closes the current console. |
-| `status` | `{}` | `device` object or null, `generation`, `inputEnabled`, `pixelsPerPoint`, `inputNotice`, `launch`. |
+| `status` | `{}` | `device` object or null, `generation`, `inputEnabled`, `pixelsPerPoint`, `inputNotice`, `launch`, optional `continuousTouch`. |
 | `boot` | `device` | Status after `bootstatus -b`, with a 120-second limit. |
 | `shutdown` | `device` | Status after `simctl shutdown`, with a 120-second limit. |
 | `screenshot` | `device`, optional `format`: `png` or `jpeg` (default `png`) | Frame described below. |
 | `tap` | `device`, `generation`, `width`, `height`, `x`, `y` | `{sent:true}`. |
 | `swipe` | Tap fields plus `endX`, `endY`, `durationMs` | `{sent:true}`. Duration 50–5,000 ms. |
-| `text` | `device`, `text`: nonempty printable ASCII | `{sent:true}`. Does not paste Unicode. |
+| `text` | `device`, `text`: 1–4096 UTF-16 code units, no ISO controls or unpaired surrogates | `{sent:true}`. Native Unicode uses the guest pasteboard; idb accepts ASCII only. |
 | `button` | `device`, `button`: `home` or `lock` | `{sent:true}`. |
 | `rotate` | `device`, `orientation`: `portrait`, `portrait_upside_down`, `landscape_left`, `landscape_right` | `{sent:true}`. Invalidates geometry even if input fails. |
 | `install` | `device`, `path`: absolute existing `.app` directory | `{installed:true}` after `simctl` succeeds. 120-second limit. |
 | `launch` | `device`, `bundle`: bundle identifier, optional `sources`: absolute folder the game's scripts are edited in (given to the app as `KAS3_SOURCE_DIR`, so it reloads them on save) | Console status plus `state:"starting"`. This acknowledges process creation, not successful app startup. |
 | `terminate` | `device`, `bundle` | `{terminated:true}`. Closes the console and ends the app; an app that already ended is not an error. |
 | `log` | `cursor`: integer, initially 0 | `{page:{entries,nextCursor,truncated},launch}`. |
-| `report` | `device`, `bundle` | `{text}` from only `Documents/as3test.txt` in that app's data container, at most 1 MiB. |
+| `report` | `device`, `bundle` | `{text}` from only `Documents/as3test.txt` in that app's data container, at most 1 MiB. I/O runs outside the session lock; a changed selection is `DEVICE_CHANGED`, or `STALE_REPORT` if the session changes and returns to the same device. |
 
 Other Xcode commands have a 15-second limit. The HTTP clients wait up to 130
 seconds. Timeouts are not proof that a state-changing operation did nothing.
@@ -93,7 +93,7 @@ are divided by that density and rounded down to whole points. Internal live pict
 are scaled; their dimensions and generation are validated before coordinates are
 mapped to native pixels and then points. Both presentations share the same geometry
 generation, so an agent screenshot does not invalidate a live picture. There is one
-display and one pointer gesture at a time. `sent:true` means idb acknowledged the
+display and one pointer gesture at a time. `sent:true` means the active backend acknowledged the
 input command, not that the application reached an expected state. Check
 the next screenshot or log.
 
@@ -112,14 +112,110 @@ They describe the console launcher. Inspect its output and the app's test report
 before concluding that the app started or passed its checks.
 
 Closing the IDE project or standalone service removes the endpoint and temporary
-files, stops the HTTP listener, and stops its console process and every idb child
+files, stops the HTTP listener, and stops its console process and every native or idb child
 it started. `simctl` forwards
 signals and may stop that app. The Simulator stays booted. After a crash, an old
 descriptor may remain; it is not a live session and must not be reused.
 
-Service error codes include `BAD_REQUEST`, `NO_DEVICE`, `DEVICE_CHANGED`,
-`STALE_FRAME`, `INPUT_DISABLED`, `INPUT_UNAVAILABLE`, `BUSY`, `PROCESS_FAILED`,
+Service error codes include `BAD_REQUEST`, `NO_DEVICE`, `DEVICE_CHANGED`, `DEVICE_UNAVAILABLE`,
+`STALE_FRAME`, `STALE_REPORT`, `INPUT_DISABLED`, `INPUT_UNAVAILABLE`, `BUSY`, `PROCESS_FAILED`,
 `TIMEOUT`, `CLOSED` and `INTERNAL_ERROR`. A missing report currently reports an
 internal I/O failure; it is not an empty or passing report. Input cannot be enabled
 through this protocol. The local process must have been started with the explicit
-idb opt-in described in the README.
+private-input opt-in described in the README.
+
+
+## Native helper transport, version 1
+
+This is a local implementation detail, separate from HTTP version 1. The same
+remembered private-input switch permits the bundled helper. With it off, pictures
+remain public `simctl` screenshots. Startup tries native, installed idb, then
+screenshots; the panel notice names the active route and the reason for fallback.
+`continuousTouch` is true only for the native route. `pixelsPerPoint` is the last
+known density, initially 1 until a picture or explicit input discovers it; clients
+must continue to send screenshot pixels with their geometry and generation.
+
+The service starts `simulator-bridge --device <id> --frames <new-absolute-file>`.
+It owns stdin and the temporary directory. The helper creates the slot with mode
+0600, refuses existing files/symlinks, connects to the selected boot generation,
+and validates/publishes its first frame before writing a ready JSON line containing
+`ready`, `width`, `height`, and `density`. A startup error writes an `error` and `code` line and exits nonzero.
+`DEVICE_UNAVAILABLE` means the selected device is stopped, restarting, or its
+input service has not acknowledged the empty startup barrier: retain the native
+route for a later reconnect. Other startup failures, including missing capabilities,
+permit fallback. Closing stdin cancels input even while a command is in flight,
+releases held controls, unmaps the slot and releases device objects. The service
+reaps the child before deleting its files. Closing a picture only signals its
+worker; file and process cleanup happen away from the EDT.
+
+Control lines contain positive `id` and `op`: `ping`, `down`, `move`, `up`, `home`,
+`lock`, `rotate`, `text`, or `paste`. Rotation takes `orientation` with the same four names
+as HTTP. Touch uses finite `x` and `y` in device points. Text is 1–4096
+printable ASCII characters on the helper wire. For non-ASCII HTTP text the service
+writes the entire unchanged UTF-8 string to the selected guest using `simctl pbcopy`,
+then sends `paste` (Command-V). It never writes the host pasteboard. The guest
+pasteboard is replaced and kept until the next copy. iOS may show an Allow Paste
+prompt; the user must accept it in the picture. Apps can refuse paste or restrict
+secure fields. A successful reply confirms transport, not text insertion.
+Combining sequences and emoji are not normalized. Replies contain `id`, `ok`,
+`receivedNanos`, `completedNanos`, and an `error` on failure. The completion timestamp
+is sampled just before serializing the reply; clients accept its absence from older
+helpers. Clients wait for each reply; one pending command is allowed.
+The panel coalesces unsent moves and preserves down/up order. Release outside the
+screen uses the last valid point; focus loss, hide and disposal release/cancel the
+gesture. Coordinates are checked against the shown frame before sending. Input
+with unknown delivery is never replayed on another route. Native rotation uses the
+guest orientation service and confirms its reply before ending the old feed.
+Reopen the feed after rotation. The helper rotates BGRA pixels
+from `screenProperties.uiOrientation` and applies the inverse transform to touch.
+An external orientation change ends the feed, including half turns with unchanged
+dimensions, so old coordinates cannot reach the rotated screen. App orientation
+locks and supported orientations remain under the guest application’s control.
+
+Frames never travel as JSON or base64. Both implementations read
+[`frame-layout.json`](native/SimulatorBridge/Sources/SimulatorBridge/Resources/frame-layout.json)
+and test against the same golden header. Version 1 is little endian, with a
+64-byte header followed by premultiplied BGRA rows. Padding is included in stride.
+The file reserves 64 MiB of payload; dimensions are limited to 4096, stride to
+16384, density to 1000–10000 milli-pixels per point, and 64-bit values to signed
+positive JVM `Long` values. The following table documents that resource rather
+than defining another layout in code.
+
+| Offset | Bytes | Field |
+|---:|---:|---|
+| 0 | 4 | magic, 827151179; zero while unpublished |
+| 4 | 4 | version, 1 |
+| 8 | 8 | monotonically increasing sequence |
+| 16 | 4 | width |
+| 20 | 4 | height |
+| 24 | 4 | stride in bytes |
+| 28 | 4 | pixel format, 1111970369 (`BGRA`) |
+| 32 | 8 | first observation of this changed surface, monotonic nanoseconds |
+| 40 | 8 | write timestamp, monotonic nanoseconds |
+| 48 | 4 | native width |
+| 52 | 4 | native height |
+| 56 | 4 | density in milli-pixels per point |
+| 60 | 4 | flags, 1 for valid |
+
+The writer takes a nonblocking POSIX whole-file record lock, invalidates the
+header, copies pixels, and publishes the complete header last. Contention drops
+that source frame. The JVM reads the header under a shared `FileChannel` lock,
+allocates the image after releasing that lock, then locks again and revalidates
+the newest header before copying. Moving the large image allocation outside the
+lock reduces writer contention; smaller allocations and GC can still delay the copy.
+Only a new sequence is copied into `TYPE_INT_ARGB_PRE` off the UI thread and
+replaces a newest-value slot. A zero header is skipped, including after interrupted
+publication. There is no queue or reuse of an image still being painted. Hidden
+panels stop the feed.
+
+A startup ping estimates the Swift/JVM monotonic clock offset using the request
+midpoint; half the round trip bounds its uncertainty. `observedNanos` is a seed
+poll timestamp, **not** the Simulator's presentation timestamp. Observation-to-paint
+measurements exclude the interval before observation. A native input reply follows
+a **separate** DTUHID barrier message: it establishes ordered progress through the
+guest input service's receive queue, not application handling or visual response.
+The actual input message has `isBarrier=false`; marking it as a barrier would skip
+its dispatch. `receivedNanos` is the helper's command-processing timestamp, not the
+guest receipt timestamp. The helper checks state, boot generation,
+surface identity and format on every poll. A later stream opening reconnects after
+device failure; no Simulator is booted or shut down by the helper.

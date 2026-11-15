@@ -36,6 +36,41 @@ class SimulatorSession(
     // outside the session's lock: status, the list, the log and pictures still answer meanwhile.
     private val slow = AtomicBoolean()
     private var sendingInput = false
+    private var openingFrames = false
+
+    private var touching = false
+
+    /** Panel-only phases keep HTTP version 1 compatible; every point still quotes its picture. */
+    fun touch(device: String, stamp: Long, displayed: Geometry, phase: String, at: Pixel) {
+        val (backend, point) = synchronized(this) {
+            checkDevice(device)
+            if (sendingInput || openingFrames ||
+                slow.get()
+            ) {
+                throw SimulatorException("BUSY", "Simulator input is still running")
+            }
+            if (streaming?.ended != false || !input.continuousTouch) {
+                throw SimulatorException("INPUT_UNAVAILABLE", "Reconnect the native picture before touching it")
+            }
+            require(phase in setOf("down", "move", "up")) { "Invalid touch phase" }
+            if ((phase == "down") == touching) throw SimulatorException("STALE_FRAME", "Touch is no longer active")
+            val point = geometry.point(stamp, displayed, at.x.toDouble(), at.y.toDouble(), input.statusScale(device))
+            touching = phase != "up"
+            sendingInput = true
+            input to point
+        }
+        try {
+            backend.send(device, phase, listOf(point.x.toString(), point.y.toString()))
+        } catch (failure: Exception) {
+            synchronized(this) {
+                touching = false
+                invalidate()
+            }
+            throw failure
+        } finally {
+            synchronized(this) { sendingInput = false }
+        }
+    }
 
     fun dispatch(method: String, params: JsonObject): Any {
         if (closed) throw SimulatorException("CLOSED", "Session is closed")
@@ -73,6 +108,8 @@ class SimulatorSession(
 
             "tap", "swipe", "text", "button", "rotate" -> sendInput(method, params)
 
+            "report" -> report(params)
+
             else -> synchronized(this) { quickly(method, params) }
         }
     }
@@ -97,8 +134,6 @@ class SimulatorSession(
                 runCatching { runner.run(Commands.terminate(device, bundle(params)), LIST_MILLIS) }
                 mapOf("terminated" to true)
             }
-
-            "report" -> report(device, bundle(params))
 
             else -> throw IllegalArgumentException("Unknown method")
         }
@@ -158,21 +193,24 @@ class SimulatorSession(
 
     private fun status(): Map<String, Any?> {
         val device = selected?.id
-        // A device idb cannot describe stays in viewer mode, with the reason shown.
-        val scale = device?.takeIf { input.enabled }?.let { runCatching { input.scale(it) } }
+        // Status reads cached geometry and never starts a helper for a hidden panel.
+        val scale = device?.takeIf { input.enabled }?.let { runCatching { input.statusScale(it) } }
         return mapOf(
             "device" to selected,
             "generation" to geometry.generation,
             "inputEnabled" to (scale?.isSuccess == true),
+            "continuousTouch" to input.continuousTouch,
             "pixelsPerPoint" to (scale?.getOrNull() ?: 1.0),
             "inputNotice" to when {
-                !input.enabled ->
-                    "Viewer mode. Switch input on in the menu for a live picture and controls; " +
-                        "it needs idb."
+                !input.enabled -> if (input === NoInput) {
+                    "Viewer mode. Switch input on in the menu for a live picture and controls."
+                } else {
+                    input.notice
+                }
 
                 scale?.isFailure == true -> "Viewer mode. ${scale.exceptionOrNull()?.message}"
 
-                else -> "Live picture and input are on, through idb."
+                else -> input.notice
             },
             "launch" to launchLog.status(),
         )
@@ -218,40 +256,47 @@ class SimulatorSession(
     fun openFrames(device: String): FrameFeed {
         val (serial, backend) = synchronized(this) {
             checkDevice(device)
-            if (!input.enabled) throw SimulatorException("INPUT_DISABLED", "Live picture needs the owner's idb switch")
+            requireInputIdle()
+            if (slow.get()) throw SimulatorException("BUSY", "Another Simulator operation is still running")
+            if (!input.enabled) {
+                throw SimulatorException(
+                    "INPUT_DISABLED",
+                    "Live picture needs the owner's private-input switch",
+                )
+            }
             stopFrames()
+            openingFrames = true
             streamSerial to input
         }
-        val (child, native) = backend.video(device)
-        synchronized(this) {
-            if (closed || selected?.id != device || streamSerial != serial) {
-                child.close()
-                throw SimulatorException("DEVICE_CHANGED", "Device changed while opening video")
-            }
-            val feed = LiveFrames(device, child, bind = { displayed ->
+        try {
+            val feed = backend.frames(device, bind = { native, displayed ->
                 synchronized(this) {
                     if (closed || streamSerial != serial || selected?.id != device) {
                         null
                     } else {
-                        val size = if ((displayed.width > displayed.height) == (native.width > native.height)) {
-                            native
-                        } else {
-                            Geometry(native.height, native.width)
-                        }
-                        geometry.record(size, displayed)
+                        geometry.record(native, displayed)
                     }
                 }
             }, stopped = {
                 synchronized(this) {
                     if (!closed && streamSerial == serial) {
                         geometry.invalidate()
+                        touching = false
+                        streaming = null
                         streamSerial++
                     }
                 }
             })
-            streaming = feed
-            feed.start()
-            return feed
+            synchronized(this) {
+                if (closed || selected?.id != device || streamSerial != serial) {
+                    feed.close()
+                    throw SimulatorException("DEVICE_CHANGED", "Device changed while opening video")
+                }
+                streaming = feed
+                return feed
+            }
+        } finally {
+            synchronized(this) { openingFrames = false }
         }
     }
 
@@ -270,32 +315,46 @@ class SimulatorSession(
 
     private fun stopFrames() {
         streamSerial++
+        touching = false
         streaming?.close()
         streaming = null
     }
 
     private fun sendInput(method: String, params: JsonObject): Any {
-        val (device, backend, args) = synchronized(this) {
-            if (closed) throw SimulatorException("CLOSED", "Session is closed")
+        val (device, backend) = synchronized(this) {
+            ensureOpen()
             requireInputIdle()
             if (slow.get()) throw SimulatorException("BUSY", "Another Simulator operation is still running")
             val device = chosen(params)
             if (!input.enabled) NoInput.send(device, method, emptyList())
-            val args = InputArguments.prepare(method, params, geometry, input.scale(device))
-            if (method == "rotate") invalidate()
+            // Validate before starting a helper, so malformed requests cannot leave one behind.
+            InputArguments.prepare(method, params, geometry, 1.0)
             sendingInput = true
-            Triple(device, input, args)
+            device to input
         }
         try {
+            val density = backend.scale(device)
+            val args = synchronized(this) {
+                checkDevice(device)
+                InputArguments.prepare(method, params, geometry, density)
+            }
             backend.send(device, method, args)
             return mapOf("sent" to true)
         } finally {
-            synchronized(this) { sendingInput = false }
+            // Rotation uses the live connection; revoke its frames only after acknowledgment or failure.
+            if (method == "rotate") synchronized(this) { invalidate() }
+            try {
+                backend.releaseIdle()
+            } finally {
+                synchronized(this) { sendingInput = false }
+            }
         }
     }
 
     private fun requireInputIdle() {
-        if (sendingInput) throw SimulatorException("BUSY", "Simulator input is still running")
+        if (sendingInput || touching || openingFrames) {
+            throw SimulatorException("BUSY", "Simulator input or stream startup is still running")
+        }
     }
 
     private fun install(device: String, app: String): Any {
@@ -313,6 +372,22 @@ class SimulatorSession(
 
     private fun bundle(params: JsonObject) = params["bundle"].asString.also {
         require(it.matches(Regex("[A-Za-z0-9][A-Za-z0-9.-]{0,254}"))) { "Invalid bundle identifier" }
+    }
+
+    private fun report(params: JsonObject): Any {
+        val (device, stamp, bundle) = synchronized(this) {
+            ensureOpen()
+            requireInputIdle()
+            Triple(chosen(params), geometry.generation, bundle(params))
+        }
+        val result = report(device, bundle)
+        return synchronized(this) {
+            checkDevice(device)
+            if (geometry.generation != stamp) {
+                throw SimulatorException("STALE_REPORT", "The Simulator changed while reading the report")
+            }
+            result
+        }
     }
 
     private fun report(device: String, bundle: String): Any {

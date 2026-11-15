@@ -7,16 +7,33 @@ import java.util.concurrent.ConcurrentHashMap
 
 interface InputBackend : AutoCloseable {
     val enabled: Boolean
+    val continuousTouch: Boolean get() = false
+    val notice: String get() = "Live picture and input are on, through idb."
 
     /** Screenshot pixels for one of the device's points: input is sent in points. */
     fun scale(device: String): Double
+    fun statusScale(device: String): Double = scale(device)
 
     fun supports(device: String): Boolean = enabled
 
     fun send(device: String, operation: String, args: List<String>)
 
+    fun releaseIdle() = Unit
+
     fun video(device: String): Pair<StreamProcess, Geometry> =
-        throw SimulatorException("INPUT_DISABLED", "Live picture needs the owner's idb switch")
+        throw SimulatorException("INPUT_DISABLED", "Live picture needs the owner's private-input switch")
+
+    fun frames(device: String, bind: (Geometry, Geometry) -> Long?, stopped: () -> Unit): FrameFeed {
+        val (child, native) = video(device)
+        return LiveFrames(device, child, bind = { displayed ->
+            val size = if ((displayed.width > displayed.height) == (native.width > native.height)) {
+                native
+            } else {
+                Geometry(native.height, native.width)
+            }
+            bind(size, displayed)
+        }, stopped = stopped).also { it.start() }
+    }
 
     override fun close() = Unit
 }
@@ -28,7 +45,7 @@ object NoInput : InputBackend {
 
     override fun send(device: String, operation: String, args: List<String>): Nothing = throw SimulatorException(
         "INPUT_DISABLED",
-        "Input is off. Switch it on in the panel's menu; it needs idb.",
+        "Input is off. Switch it on in the panel's menu.",
     )
 }
 
@@ -51,6 +68,8 @@ class IdbInput(
 
     override val enabled = true
 
+    override fun statusScale(device: String): Double = scales[device] ?: 1.0
+
     override fun scale(device: String): Double = persistent?.device(device)?.density ?: scales.computeIfAbsent(device) {
         val density = runCatching {
             JsonParser.parseString(runner.run(Commands.describe(executable, device), TIMEOUT_MILLIS))
@@ -63,6 +82,12 @@ class IdbInput(
     }
 
     override fun send(device: String, operation: String, args: List<String>) {
+        if (operation == "text" && !SimulatorText.isAscii(args.single())) {
+            throw SimulatorException(
+                "INPUT_UNAVAILABLE",
+                "Unicode text needs the native helper; idb accepts printable ASCII only",
+            )
+        }
         if (persistent != null) {
             persistent.device(device).send(operation, args)
         } else {
@@ -73,6 +98,7 @@ class IdbInput(
     override fun video(device: String): Pair<StreamProcess, Geometry> {
         val connection = persistent?.device(device)
             ?: throw SimulatorException("INPUT_UNAVAILABLE", "Live idb connection is unavailable")
+        scales[device] = connection.density
         return connection.video() to connection.geometry
     }
 

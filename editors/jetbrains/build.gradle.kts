@@ -110,6 +110,35 @@ tasks.withType<PrepareSandboxTask>().configureEach {
     }
 }
 
+// Native Simulator helper: SwiftPM's resource bundle must travel beside its executable.
+val buildSimulatorBridge = tasks.register<Exec>("buildSimulatorBridge") {
+    workingDir("native/SimulatorBridge")
+    commandLine("/usr/bin/xcrun", "swift", "build", "-c", "release")
+    onlyIf {
+        val available = System.getProperty("os.name").contains("Mac") &&
+            file("/usr/bin/xcrun").canExecute() && providers.exec {
+                commandLine("/usr/bin/xcrun", "--find", "swift")
+                isIgnoreExitValue = true
+            }.result.get().exitValue == 0
+        if (!available) logger.lifecycle("Skipping SimulatorBridge: installed Swift on macOS is required.")
+        available
+    }
+}
+tasks.runIde {
+    if (providers.environmentVariable("KUMIKAE_SIMULATOR_ENDURANCE_PROBE").orNull == "1" ||
+        providers.environmentVariable("KUMIKAE_SIMULATOR_MEMORY_PROBE").orNull == "1"
+    ) {
+        timeout = Duration.ofMinutes(12)
+    }
+}
+tasks.withType<PrepareSandboxTask>().configureEach {
+    dependsOn(buildSimulatorBridge)
+    from("native/SimulatorBridge/.build/release") {
+        include("simulator-bridge", "SimulatorBridge_SimulatorBridge.bundle/**")
+        into("${intellijPlatform.projectName.get()}/native")
+    }
+}
+
 // One grammar: the VS Code client's, copied into the plugin's folder for the IDE's TextMate support.
 tasks.withType<PrepareSandboxTask>().configureEach {
     from("../vscode") {

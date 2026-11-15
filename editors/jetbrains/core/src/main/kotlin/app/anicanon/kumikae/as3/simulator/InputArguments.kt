@@ -8,7 +8,7 @@ internal object InputArguments {
 
         "text" -> listOf(
             p["text"].asString.also { text ->
-                require(text.isNotEmpty() && text.all { it.code in 32..126 }) { "Text must be printable ASCII" }
+                SimulatorText.validate(text)
             },
         )
 
