@@ -238,6 +238,9 @@ struct Function {
 	// The first registers are the parameters; an instance method's first parameter is `this`.
 	uint32_t parameters = 0;
 	uint32_t required = 0; // How many of them have no default: a caller must pass at least these.
+	// `...rest`: the last parameter's register is an Array of every argument past the others. A caller
+	// passes those untyped, after the others, and as many as it likes.
+	bool rest = false;
 	Kind result = Kind::Void;
 	// For each register that takes a Godot value or object from outside (a parameter, or the result of a
 	// request to the engine): Godot's name for its type ("Vector2", "CharacterBody2D"), by register. Empty

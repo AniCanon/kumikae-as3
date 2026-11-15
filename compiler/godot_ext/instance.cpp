@@ -161,7 +161,10 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	// follow.
 	const size_t first = function.is_static ? 0 : 1;
 	size_t wanted = function.parameters > first ? function.parameters - first : 0;
-	if ((size_t)p_argc > wanted) {
+	// With a rest parameter, any number more, each untyped.
+	const size_t fixed = function.rest ? function.parameters - 1 : function.parameters;
+	const auto kind_at = [&](size_t p_at) { return p_at >= fixed ? ir::Kind::Any : function.registers[p_at]; };
+	if ((size_t)p_argc > wanted && !function.rest) {
 		r_error->error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
 		r_error->expected = (int32_t)wanted;
 		return;
@@ -175,11 +178,11 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	// An Array parameter takes one of Godot's Arrays, copied, or null.
 	const auto array_parameter = [&](size_t p_at) {
 		const uint32_t klass = p_at < function.parameter_classes.size() ? function.parameter_classes[p_at] : ir::NONE;
-		return function.registers[p_at] == ir::Kind::Obj && klass != ir::NONE && program.module().classes[klass].array;
+		return p_at < fixed && function.registers[p_at] == ir::Kind::Obj && klass != ir::NONE && program.module().classes[klass].array;
 	};
 	// Every argument is checked before any is converted, so that a refusal leaves nothing to give back.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		ir::Kind kind = function.registers[i + first];
+		ir::Kind kind = kind_at(i + first);
 		if (array_parameter(i + first) && (p_args[i]->get_type() == Variant::ARRAY || p_args[i]->get_type() == Variant::NIL)) {
 			continue;
 		}
@@ -217,12 +220,12 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 				taken = taken->p ? taken : std::nullopt;
 			}
 		} else {
-			taken = kas3::from_variant(function.registers[i + first], *p_args[i]);
+			taken = kas3::from_variant(kind_at(i + first), *p_args[i]);
 		}
 		if (!taken) {
 			// As with any call that fails: the error said, and null for the caller.
 			for (size_t made = 0; made < i; made++) {
-				program.interpreter().discard(function.registers[made + first], arguments[made + first]);
+				program.interpreter().discard(kind_at(made + first), arguments[made + first]);
 			}
 			// As an uncaught AS3 error reads, at the method Godot called.
 			UtilityFunctions::push_error(String("Error: ") + String::utf8(vm::OUT_OF_MEMORY.data(), (int64_t)vm::OUT_OF_MEMORY.size()) +
@@ -237,7 +240,7 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	bool ok = program.interpreter().call_function(method, arguments.data(), arguments.size(), &result);
 	// What was made for the call is given up again.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		program.interpreter().discard(function.registers[i + first], arguments[i + first]);
+		program.interpreter().discard(kind_at(i + first), arguments[i + first]);
 	}
 	const vm::Object *returned = function.result == ir::Kind::Obj ? static_cast<const vm::Object *>(result.p)
 			: function.result == ir::Kind::Any && vm::any::tag(result) == vm::AnyTag::Object ? static_cast<const vm::Object *>(vm::any::pointer(result))

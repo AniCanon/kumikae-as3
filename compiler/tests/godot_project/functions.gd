@@ -23,6 +23,7 @@ func _physics_process(_delta: float) -> bool:
 	if frames > 2:
 		return true
 	show("lerpf", ask("mix", [2.0, 6.0, 0.25]), lerpf(2.0, 6.0, 0.25))
+	show("rest from Godot", [ask("gather", [1]), ask("gather", [1, "a", 2])], ["1;0;", "1;2;a,2"])
 	show("clampf", ask("hold", [3.5]), clampf(3.5, -1, 1))
 	show("clampi", ask("holdWhole", [42]), clampi(42, 0, 10))
 	show("absi", ask("size", [-9007199254740993]), absi(-9007199254740993))

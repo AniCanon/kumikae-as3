@@ -175,10 +175,26 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		many.assign(p_arguments, p_arguments + p_count);
 		source = many.data();
 	}
+	// With a rest parameter, the arguments past the others (untyped) are its Array.
+	const size_t fixed = function.rest ? function.parameters - 1 : function.parameters;
+	Vector *rest = nullptr;
+	if (function.rest) {
+		rest = fresh_vector(module_.array_class, p_count > fixed ? p_count - fixed : 0);
+		if (!rest) {
+			return false;
+		}
+		for (size_t i = fixed; i < p_count; i++) {
+			rest->data[i - fixed] = share(Kind::Any, source[i]);
+		}
+		frame.arguments = static_cast<uint32_t>(std::min(p_count, fixed));
+	}
 	stack_.resize(stack_.size() + function.registers.size(), zero);
-	size_t count = std::min<size_t>(std::min<size_t>(p_count, function.parameters), function.registers.size());
+	size_t count = std::min<size_t>(std::min<size_t>(p_count, fixed), function.registers.size());
 	for (size_t i = 0; i < count; i++) {
 		stack_[frame.base + i] = share(function.registers[i], source[i]);
+	}
+	if (rest) {
+		stack_[frame.base + fixed].p = rest; // Its one reference, the frame's.
 	}
 	frames_.push_back(frame);
 	return true;

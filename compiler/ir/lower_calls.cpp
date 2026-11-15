@@ -5,13 +5,21 @@ namespace ir {
 
 void Lowerer::call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
 	uint32_t count = p_function ? p_function->parameters.count : 0;
-	if (p_arguments.count > count) {
+	const bool rest = count > 0 && p_function->parameters[count - 1].is_rest;
+	if (p_arguments.count > count && !rest) {
 		refuse(p_position, "a call with extra arguments");
 	}
 	for (uint32_t i = 0; i < count; i++) {
 		Parameter &parameter = p_function->parameters[i];
 		if (parameter.is_rest) {
-			refuse(p_position, "a call to a function with a rest parameter");
+			// What is left goes untyped: the function that is called makes them its Array.
+			for (uint32_t at = i; at < p_arguments.count; at++) {
+				Expr *later = nullptr;
+				for (uint32_t next = at + 1; next < p_arguments.count && !later; next++) {
+					later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
+				}
+				r_list.push_back(settled(any_value(p_arguments[at]), later, p_position));
+			}
 			break;
 		}
 		Kind kind = Kind::F64;

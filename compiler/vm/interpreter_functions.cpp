@@ -166,7 +166,7 @@ bool Interpreter::argument_as(const Function &p_callee, uint32_t p_register, Slo
 bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
 	const Function &callee = module_.functions[static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i)];
 	const size_t first = callee.is_static ? 0 : 1;
-	const size_t most = callee.parameters - first;
+	const size_t most = callee.rest ? SIZE_MAX : callee.parameters - first;
 	if (p_count > most || p_count + first < callee.required) {
 		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
 				"Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
@@ -178,7 +178,12 @@ bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot
 		(*r_values)[0].bits = 0;
 		(*r_values)[0].p = p_value->fields()[ir::FUNCTION_FIRST].p;
 	}
+	const size_t fixed = callee.rest ? callee.parameters - 1 - first : p_count;
 	for (size_t i = 0; i < p_count; i++) {
+		if (i >= fixed) {
+			(*r_values)[first + i] = share(Kind::Any, p_values[i]); // For the rest parameter, untyped.
+			continue;
+		}
 		if (!argument_as(callee, static_cast<uint32_t>(first + i), p_values[i], &(*r_values)[first + i])) {
 			r_values->resize(first + i);
 			let_go_arguments(callee, r_values);
@@ -190,8 +195,9 @@ bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot
 
 // The arguments function_arguments() made, once the callee has taken references of its own.
 void Interpreter::let_go_arguments(const Function &p_callee, std::vector<Slot> *p_values) {
+	const size_t fixed = p_callee.rest ? p_callee.parameters - 1 : SIZE_MAX;
 	for (size_t made = p_callee.is_static ? 0 : 1; made < p_values->size(); made++) {
-		drop(p_callee.registers[made], (*p_values)[made]);
+		drop(made >= fixed ? Kind::Any : p_callee.registers[made], (*p_values)[made]);
 	}
 }
 
