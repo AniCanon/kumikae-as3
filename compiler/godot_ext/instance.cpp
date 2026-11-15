@@ -172,15 +172,19 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 		r_error->expected = (int32_t)needed;
 		return;
 	}
-	// An Array parameter takes one of Godot's Arrays, copied, or null.
-	const auto array_parameter = [&](size_t p_at) {
+	// An Array parameter takes one of Godot's Arrays, copied, or null; a Dictionary one of Godot's
+	// Dictionaries, copied, or null.
+	const auto container_parameter = [&](size_t p_at, Variant::Type *r_type) {
 		const uint32_t klass = p_at < function.parameter_classes.size() ? function.parameter_classes[p_at] : ir::NONE;
-		return function.registers[p_at] == ir::Kind::Obj && klass != ir::NONE && program.module().classes[klass].array;
+		const bool object = function.registers[p_at] == ir::Kind::Obj && klass != ir::NONE;
+		*r_type = object && program.module().classes[klass].array ? Variant::ARRAY : Variant::DICTIONARY;
+		return object && (program.module().classes[klass].array || program.module().classes[klass].dictionary);
 	};
 	// Every argument is checked before any is converted, so that a refusal leaves nothing to give back.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		ir::Kind kind = function.registers[i + first];
-		if (array_parameter(i + first) && (p_args[i]->get_type() == Variant::ARRAY || p_args[i]->get_type() == Variant::NIL)) {
+		Variant::Type container = Variant::NIL;
+		if (container_parameter(i + first, &container) && (p_args[i]->get_type() == container || p_args[i]->get_type() == Variant::NIL)) {
 			continue;
 		}
 		const std::string godot_type = i + first < function.engine_types.size() ? function.engine_types[i + first] : std::string();
@@ -208,12 +212,15 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	}
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		std::optional<vm::Slot> taken;
-		if (array_parameter(i + first)) {
+		Variant::Type container = Variant::NIL;
+		if (container_parameter(i + first, &container)) {
 			taken = vm::Slot();
 			taken->bits = 0;
-			if (p_args[i]->get_type() == Variant::ARRAY) {
+			if (p_args[i]->get_type() == container) {
 				Variant held = *p_args[i];
-				taken->p = program.interpreter().copy_engine_array(&held, function.parameter_classes[i + first]);
+				const uint32_t klass = function.parameter_classes[i + first];
+				taken->p = container == Variant::ARRAY ? program.interpreter().copy_engine_array(&held, klass)
+													   : program.interpreter().copy_engine_dictionary(&held, klass);
 				taken = taken->p ? taken : std::nullopt;
 			}
 		} else {

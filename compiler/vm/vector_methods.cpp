@@ -183,6 +183,9 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		case VectorMethod::Sort:
 			vector_sort(vector, call);
 			break;
+		case VectorMethod::SortOn:
+			vector_sort_on(vector, call);
+			break;
 	}
 }
 

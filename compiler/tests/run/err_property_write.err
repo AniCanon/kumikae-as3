@@ -1,0 +1,2 @@
+ReferenceError: Error #1056: Cannot create property weight on Box.
+	at err_property_write()[err_property_write.as:7]

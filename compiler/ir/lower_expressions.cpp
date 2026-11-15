@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_dynamic.h"
 
 namespace kas3 {
 namespace ir {
@@ -330,6 +330,9 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 		emit(Op::HostNew, position, value, type_name, arguments({}));
 		return value;
 	}
+	if (const std::optional<uint32_t> table = Dynamic(*this).made(made, symbol)) {
+		return *table;
+	}
 	if (!symbol || !class_index(symbol, &index)) {
 		refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
 		return default_value(Kind::Obj, position);
@@ -460,8 +463,7 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 		case NodeKind::ArrayLit:
 			return vector_literal(p_expression, static_cast<ArrayLit *>(p_expression)->elements);
 		case NodeKind::ObjectLit:
-			refuse(position, "an Object literal");
-			break;
+			return Dynamic(*this).literal(static_cast<ObjectLit *>(p_expression));
 		case NodeKind::VectorLit:
 			return vector_literal(p_expression, static_cast<VectorLit *>(p_expression)->elements);
 		case NodeKind::FunctionExpr:
@@ -515,6 +517,8 @@ uint32_t Lowerer::unary(Unary *p_unary, Kind p_want) {
 		}
 		case TokenKind::KwTypeof:
 			return any_typeof(p_unary->operand, position);
+		case TokenKind::KwDelete:
+			return Dynamic(*this).remove(p_unary);
 		case TokenKind::Bang: {
 			uint32_t out = reg(Kind::Bool);
 			emit(Op::Not, position, out, expression(p_unary->operand, Kind::Bool));
@@ -580,7 +584,8 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 	Place place = place_of(p_assign->target, p_assign->value);
 	uint32_t value = 0;
 	if (p_assign->op == TokenKind::Assign) {
-		const std::optional<uint32_t> collection = place.where == Place::Engine ? vector_to_engine(p_assign->value, place.type) : std::nullopt;
+		std::optional<uint32_t> collection = place.where == Place::Engine ? vector_to_engine(p_assign->value, place.type) : std::nullopt;
+		collection = collection || place.where != Place::Engine ? collection : Dynamic(*this).to_engine(p_assign->value, place.type);
 		value = collection ? *collection : typed(p_assign->value, p_assign->target->type, place.kind);
 	} else if (p_assign->op == TokenKind::AmpAmpAssign || p_assign->op == TokenKind::PipePipeAssign) {
 		// a &&= b stores b only if a is true; a ||= b only if a is false. Otherwise a stays as it is.

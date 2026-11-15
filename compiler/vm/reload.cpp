@@ -1,6 +1,7 @@
 #include "reload.h"
 
 #include "any.h"
+#include "table.h"
 
 #include <algorithm>
 #include <limits>
@@ -70,6 +71,27 @@ Slot Reload::carry_into(Kind p_kind, uint32_t p_class, Slot p_value) {
 	return out;
 }
 
+// Each property, in order. A key that is an object whose class is gone is left out, with its value.
+void Reload::carry_entries(const Entries &p_from, Entries *p_to) {
+	for (const Entry &entry : p_from.all()) {
+		if (any::tag(entry.key) == AnyTag::Undefined) {
+			continue;
+		}
+		const Slot key = carry(Kind::Any, entry.key);
+		if (any::tag(key) == AnyTag::Null) {
+			continue;
+		}
+		const bool text = any::tag(key) == AnyTag::String;
+		const bool present = text ? p_to->find_text(static_cast<Str *>(any::pointer(key))->view()).has_value()
+								  : p_to->find_object(any::pointer(key)).has_value();
+		if (present) {
+			to_.drop_any(key); // Two keys that became one object: the first is kept.
+			continue;
+		}
+		p_to->add(key, carry(Kind::Any, entry.value));
+	}
+}
+
 Object *Reload::object(Object *p_old) {
 	if (!p_old) {
 		return nullptr;
@@ -87,6 +109,20 @@ Object *Reload::object(Object *p_old) {
 		return nullptr;
 	}
 	const ir::Class &new_class = to_.module_.classes[named->second];
+	if (old_class.table || new_class.table) {
+		// An Object or a Dictionary: each key and value carried as an untyped field is.
+		Object *table = old_class.table == new_class.table ? new_table(named->second) : nullptr;
+		if (!table) {
+			if (missing_.empty()) {
+				missing_ = old_class.name;
+			}
+			return nullptr;
+		}
+		moved_.emplace(p_old, table);
+		retain(table);
+		carry_entries(*entries_of(p_old), entries_of(table));
+		return table;
+	}
 	if (old_class.element != Kind::Void || new_class.element != Kind::Void) {
 		// A vector: the same length, and each element carried as a field is. Its type must still hold
 		// elements of the same kind.
@@ -102,6 +138,10 @@ Object *Reload::object(Object *p_old) {
 		retain(vector);
 		for (uint32_t i = 0; i < old->length; i++) {
 			vector->data[i] = carry(new_class.element, old->data[i]);
+		}
+		Entries *properties = old->properties && old->properties->size() ? properties_of(vector) : nullptr;
+		if (properties) {
+			carry_entries(*old->properties, properties);
 		}
 		return vector;
 	}

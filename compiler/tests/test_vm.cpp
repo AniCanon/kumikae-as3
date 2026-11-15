@@ -5,6 +5,7 @@
 #include "builtins.h"
 #include "interpreter.h"
 #include "reload.h"
+#include "table.h"
 #include "lower.h"
 #include "names.h"
 
@@ -1069,6 +1070,9 @@ static void test_engine_calls() {
 		"function f():void { position.normalized()[0] = 5; }",
 		"function f(v:Vector2):int { return v ? 1 : 0; }",
 		"function f(a:GodotArray):void { if (a) { trace(1); } }",
+		"function f():void { var n:int = 1; trace(delete n); }",
+		"function f():Boolean { return \"length\" in \"text\"; }",
+		"function f(v:Vector2):void { for (var k:* in v) { trace(k); } }",
 	};
 	for (const char *body : bodies) {
 		std::string result = refused(body);
@@ -1184,6 +1188,91 @@ static void test_reload_alive() {
 		running.release_object(game);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
+// The container behind Object, Dictionary and an Array's properties: insertion order kept through deletes
+// and through the packing that drops deleted entries; every key found again after it.
+static void test_entries() {
+	vm::Entries entries;
+	std::vector<vm::Str *> made;
+	for (int i = 0; i < 40; i++) {
+		made.push_back(vm::new_string("k" + std::to_string(i)));
+		entries.add(vm::any::string(made.back()), vm::any::integer(i));
+	}
+	for (int i = 0; i < 40; i += 3) {
+		const std::optional<uint32_t> at = entries.find_text("k" + std::to_string(i));
+		CHECK(at.has_value());
+		if (at) {
+			entries.remove(*at); // The key is still held in `made`.
+		}
+	}
+	vm::Str *last = vm::new_string("last");
+	entries.add(vm::any::string(last), vm::any::integer(99)); // Packs: 14 deleted of 40.
+	std::string order;
+	for (const vm::Entry &entry : entries.all()) {
+		if (vm::any::tag(entry.key) == vm::AnyTag::String) {
+			order += std::string(static_cast<vm::Str *>(vm::any::pointer(entry.key))->view()) + " ";
+		}
+	}
+	CHECK(order.find("k0 ") == std::string::npos && order.find("k1 k2 k4 k5 ") == 0);
+	CHECK_EQ(order.substr(order.size() - 13), std::string("k37 k38 last "));
+	CHECK_EQ(entries.size(), (uint32_t)27);
+	const std::optional<uint32_t> found = entries.find_text("k38");
+	CHECK(found && vm::any::to_int_payload(entries.value_at(*found)) == 38);
+	CHECK(!entries.find_text("k3"));
+	vm::Object object;
+	entries.add(vm::any::object(&object), vm::any::null());
+	CHECK(entries.find_object(&object).has_value());
+	CHECK_EQ(entries.take_all().size(), (size_t)28);
+	CHECK_EQ(entries.size(), (uint32_t)0);
+	for (vm::Str *each : made) {
+		vm::free_string(each);
+	}
+	vm::free_string(last);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+// Objects, Dictionaries and an Array's properties across a reload: each key and value carried, the order
+// kept, an object key still the same object.
+static void test_reload_tables() {
+	const char *source = "package { import flash.utils.Dictionary; public class Bag {\n"
+						 "  public var o:Object = { b: 1, a: \"two\" }; public var d:Dictionary = new Dictionary(); public var list:Array = [1];\n"
+						 "  public var key:Thing = new Thing();\n"
+						 "  public function fill():void { d[key] = o; d.x = 5; list.extra = key; o.c = [key]; }\n"
+						 "  public function tell():String { var s:String = \"\"; for (var k:String in o) { s += k + o[k] + \",\"; }\n"
+						 "    return s + (d[key] == o) + d.x + (list.extra == key) + (o.c[0] == key) + list.length; }\n"
+						 "} }\n"
+						 "class Thing { }\n";
+	ir::Module old_module, new_module;
+	compile(source, &old_module, "Bag.as");
+	compile(source, &new_module, "Bag.as");
+	{
+		Recorder recorder;
+		auto running = std::make_unique<vm::Interpreter>(old_module, recorder);
+		CHECK(running->start());
+		vm::Object *bag = running->construct(class_named(old_module, "Bag"), nullptr);
+		vm::Slot result;
+		CHECK(running->call_method(bag, "fill", nullptr, 0, &result));
+		vm::Interpreter fresh(new_module, recorder);
+		vm::Object *moved = nullptr;
+		{
+			vm::Reload reload(*running, fresh);
+			moved = reload.object(bag);
+			CHECK(moved != nullptr);
+			CHECK_EQ(reload.missing(), std::string());
+		}
+		running->release_object(bag);
+		running.reset();
+		if (moved) {
+			CHECK(fresh.call_method(moved, "tell", nullptr, 0, &result));
+			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("b1,atwo,c[object Thing],true5truetrue1"));
+			fresh.discard(ir::Kind::Str, result);
+			fresh.release_object(moved);
+		}
+		CHECK_EQ(recorder.errors, std::string());
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
 // A base class's `_ready` that calls a method a subclass overrides: the override is what runs.
@@ -1703,6 +1792,8 @@ int main() {
 	test_out_of_memory();
 	test_reload();
 	test_reload_vectors();
+	test_entries();
+	test_reload_tables();
 	test_run_once_changes();
 	test_run_once_overrides();
 	test_reload_alive();

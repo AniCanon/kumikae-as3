@@ -28,6 +28,7 @@ class Reload {
 	// to hold another class of object than the one that was there.
 	Slot carry_into(ir::Kind p_kind, uint32_t p_class, Slot p_value);
 	Slot carry(ir::Kind p_kind, Slot p_value);
+	void carry_entries(const Entries &p_from, Entries *p_to);
 
 public:
 	Reload(Interpreter &p_from, Interpreter &p_to);

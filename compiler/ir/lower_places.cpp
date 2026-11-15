@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_dynamic.h"
 
 namespace kas3 {
 namespace ir {
@@ -76,6 +76,9 @@ auto Lowerer::place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_po
 }
 
 auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
+	if (std::optional<Place> by_name = Dynamic(*this).place(p_target, p_later)) {
+		return *by_name;
+	}
 	if (std::optional<Place> of_vector = vector_place(p_target, p_later)) {
 		return *of_vector;
 	}
@@ -179,6 +182,11 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 			}
 			return out;
 		}
+		case Place::Property: {
+			uint32_t out = reg(Kind::Any);
+			emit(Op::DynGet, p_position, out, p_place.object, p_place.key);
+			return out;
+		}
 		default:
 			return default_value(Kind::F64, p_position);
 	}
@@ -232,6 +240,9 @@ void Lowerer::store(const Place &p_place, uint32_t p_value, uint32_t p_position)
 			break;
 		case Place::Fixed:
 			emit(Op::VecSetFixed, p_position, p_place.object, p_value);
+			break;
+		case Place::Property:
+			emit(Op::DynSet, p_position, p_place.object, p_place.key, convert(p_value, Kind::Any, p_position));
 			break;
 		default:
 			break;

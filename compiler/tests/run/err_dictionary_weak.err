@@ -1,0 +1,2 @@
+Error: a Dictionary with weak keys is not supported by the interpreter yet
+	at err_dictionary_weak()[err_dictionary_weak.as:8]

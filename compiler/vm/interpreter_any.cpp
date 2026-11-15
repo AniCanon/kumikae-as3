@@ -187,6 +187,12 @@ bool Interpreter::from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_
 				r_out->p = made;
 				return made != nullptr;
 			}
+			if (p_check != NONE && engine_dictionary(p_value, p_check)) {
+				// One of Godot's Dictionaries where a Dictionary is wanted: a new one of its keys and values.
+				Object *made = table_of_engine(any::pointer(p_value), p_check);
+				r_out->p = made;
+				return made != nullptr;
+			}
 			break;
 		}
 		case Kind::Val:
@@ -234,7 +240,8 @@ bool Interpreter::any_is(Slot p_value, uint32_t p_type) const {
 		case ir::ANY_IS_BOOLEAN:
 			return tag == AnyTag::Boolean;
 		default:
-			return (tag == AnyTag::Object && is_class(static_cast<const Object *>(any::pointer(p_value)), p_type)) || engine_array(p_value, p_type);
+			return (tag == AnyTag::Object && is_class(static_cast<const Object *>(any::pointer(p_value)), p_type)) || engine_array(p_value, p_type) ||
+					engine_dictionary(p_value, p_type);
 	}
 }
 
@@ -284,6 +291,11 @@ Vector *Interpreter::array_of_engine(void *p_array, uint32_t p_class) {
 // `==` and `===` where the values alone do not say: two Godot values, which Godot compares, or an object
 // against a text or a number, compared by its text.
 bool Interpreter::any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
+	if (any::tag(p_a) == AnyTag::Object && any::tag(p_b) == AnyTag::Object &&
+			same_function(static_cast<const Object *>(any::pointer(p_a)), static_cast<const Object *>(any::pointer(p_b)))) {
+		*r_equal = true; // One method of one object, taken twice: as EqRef has it.
+		return true;
+	}
 	const std::optional<bool> plain = p_strict ? any::strict_equal(p_a, p_b) : any::loose_equal(p_a, p_b);
 	if (plain) {
 		*r_equal = *plain;

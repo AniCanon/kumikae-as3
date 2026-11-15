@@ -160,8 +160,6 @@ any Godot value passing as a condition):
 
 ## Stage 2c-2: the untyped value
 
-- Members of an untyped value are refused: `x.name`, `x.method()`, `x[key]` wait for Object literals and
-  dynamic access. **2c**
 - A script object of a class that extends none of Godot's (in an untyped value or not) is an AS3 error when
   an AS3 call gives it to Godot; when Godot reads it (a return, a field), Godot gets null and an error is
   printed. Nothing converts it. (One of a class that extends a Godot class goes as its Godot object.)

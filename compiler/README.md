@@ -99,10 +99,24 @@ files, packages, and package-level functions and variables. `String`'s methods, 
 `toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `split` and `Math`.
 `Vector.<T>` (`Vector.<*>` too) and `Array`, with their methods, those that take a function included;
 function values (a method or a function as a value, `f(a, b)`) and function expressions that capture
-their variables; `[Signal]` on a field of a class that extends one of Godot's.
+their variables; `[Signal]` on a field of a class that extends one of Godot's. Object literals
+(`{a: 1, "b": 2, 3: x}`) and `new Object()`; `flash.utils.Dictionary`, whose keys are objects by their
+identity and anything else by its text; properties by name on an `Object`, a `*`, a Dictionary and an Array
+(`o.a`, `o["a"]`, `o.a = v`, `delete`, `in`, `hasOwnProperty`, a property that holds a function called as
+one); `for in` and `for each` over any of these; an untyped value that holds an object of a class of the
+program, by the names of its public fields and methods (Flash's ReferenceErrors #1069, #1056 and #1037 for
+the rest); Array's `sortOn`.
 
-**What is refused, by name, until later slices:** `Object` literals and dynamic properties, `Dictionary`,
-interfaces, `for in` over anything but a vector or an Array, getters and setters, rest parameters,
+Keys go in the order each was first set, in an Object, a Dictionary and an Array's properties beyond its
+indices: AS3 leaves the order unspecified, and this is the interpreter's ruling, so that what a program
+prints does not depend on a hash. A number as a key is its text (`o[1]` is `o["1"]`); so is a Boolean, and
+so is an object on an Object (its `toString()`), but not on a Dictionary. A loop goes through the keys there
+were when it began: one deleted on the way is passed over, one added is not reached.
+
+**What is refused, by name, until later slices:** `new Dictionary(true)` (weak keys, said when the program
+runs), a method of an Array, a Vector, a String or a number called or read by name on an untyped value
+(`u.push(1)`, said when it runs), a property of one of Godot's values held untyped, by name,
+interfaces, getters and setters, rest parameters,
 `Function`'s `call` and `apply`, `this` inside a function expression, regular expressions and the `String`
 methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
 `Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
@@ -449,7 +463,14 @@ A value of type A may be used where B is expected when one of these holds:
   | `PackedVector2Array`, `PackedVector3Array`, `PackedVector4Array`, `PackedColorArray` | `Array`, or a `Vector` of that type |
   | `GodotDictionary` | `Object`, or `flash.utils.Dictionary` |
 
-  Nothing converts on the way back: a collection that comes from the engine stays Godot's.
+  On the way back, one of Godot's Arrays is copied where an `Array` is wanted (a parameter, a store, `as`),
+  and one of its Dictionaries where a `flash.utils.Dictionary` is wanted: each key as a Dictionary keeps it,
+  so a number is its text and two of Godot's keys (`1` and `"1"`) may become one; a key that is one of
+  Godot's objects or values is refused. Where an `Object` or a `*` is wanted, the collection stays Godot's.
+  An Object or a Dictionary given to Godot (where it takes a `GodotDictionary` or anything) is one of its
+  Dictionaries, each key a String (an object key on a Dictionary is what that object is to Godot). An
+  Array with properties beyond its indices, a container that holds itself, and a script object of a class
+  that extends none of Godot's, anywhere inside, are AS3 errors that say so.
 
 Otherwise it is an error. When B is a subclass or implementer of A, the message asks for a cast
 (`a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`). A `void` result fits only `*`.

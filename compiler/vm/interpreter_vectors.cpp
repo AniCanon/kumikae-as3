@@ -134,7 +134,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			const Kind index = p_function.registers[p_in.c];
 			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
 			if (!at && module_.classes[vector->klass].array) {
-				put(kind, r[p_in.a], any::undefined()); // Nothing there: an Array gives undefined.
+				array_number_get(vector, index_number(index, r[p_in.c]), r[p_in.a]);
 				return;
 			}
 			if (!at) {
@@ -151,9 +151,12 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			const bool array = module_.classes[vector->klass].array;
 			const uint32_t limit = array ? MAX_VECTOR_LENGTH : vector->fixed ? vector->length : vector->length + 1;
 			const std::optional<uint32_t> at = element_index(index, r[p_in.b], limit);
+			if (!at && array && !element_index(index, r[p_in.b], UINT32_MAX)) {
+				array_number_set(vector, index_number(index, r[p_in.b]), r[p_in.c]);
+				return;
+			}
 			if (!at && array) {
-				raise(module_.error_class, "an Array's properties other than its indices (" + number_to_string(index_number(index, r[p_in.b])) +
-								") are not supported by the interpreter yet");
+				out_of_memory(); // An index past the most elements an Array may hold here.
 				return;
 			}
 			if (!at) {
@@ -275,6 +278,10 @@ bool Interpreter::object_as_text(Object *p_object, std::string *r_text) {
 	const ir::Class &klass = module_.classes[p_object->klass];
 	if (klass.element != Kind::Void) {
 		return vector_text(static_cast<Vector *>(p_object), ",", r_text);
+	}
+	bool own = false;
+	if (klass.table && (!table_text(p_object, r_text, &own) || own)) {
+		return !failing_;
 	}
 	if (klass.to_string == NONE) {
 		*r_text += object_text(p_object);

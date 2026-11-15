@@ -1,0 +1,2 @@
+ReferenceError: Error #1069: Property weight not found on Box and there is no default value.
+	at err_property_read()[err_property_read.as:6]

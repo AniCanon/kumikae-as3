@@ -252,6 +252,7 @@ class Lowerer {
 	std::optional<uint32_t> math_call(Call *p_call, const Symbol *p_function);
 	// String's and the numbers' methods, the top-level functions, and Object's toString() (lower_library).
 	friend class Library;
+	friend class Dynamic; // Properties by name: lower_dynamic.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 
 	Symbol * callee_symbol(Expr *p_callee);

@@ -187,9 +187,8 @@ uint32_t Lowerer::from_untyped(uint32_t p_any, const Type *p_type, Kind p_kind, 
 	uint32_t klass = NONE;
 	if (is_vector(p_type)) {
 		klass = vector_class(p_type).value_or(NONE);
-	} else if (symbol) {
-		const auto found = classes_.find(symbol);
-		klass = found == classes_.end() ? NONE : found->second;
+	} else if (symbol && !class_index(symbol, &klass)) {
+		klass = NONE;
 	}
 	if (klass == NONE) {
 		refuse(p_position, "converting an untyped value to '" + compilation_.type_name(p_type) + "'");

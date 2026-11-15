@@ -280,6 +280,18 @@ check("untyped.gd: a thrown Godot value nothing catches is reported as its text"
       output[-2000:])
 check("untyped.gd: a script object given to Godot is an AS3 error", "at Untyped/scriptObject()" in output, output[-1500:])
 
+# AS3's Objects and Dictionaries to Godot as its Dictionaries (keys as text), and a Dictionary of Godot's
+# copied where an AS3 Dictionary is wanted.
+output = compare("objects.gd", [
+    "an Object is a Dictionary", "a Dictionary is a Dictionary, its keys text", "Objects inside an Array", "an Object returned",
+    "an Object where Godot takes a Dictionary", "a Dictionary from Godot", "Godot's Dictionary as a Dictionary",
+    "a loop over Godot's Dictionary held untyped is not run", "an Object that holds itself is not given", "an Array with properties is not given", "a script object inside an Object is not given",
+])
+check("objects.gd: what Godot can't hold is an AS3 error that says why",
+      "holds itself, or nests too deep" in output and "at Objects/holdsItself()" in output and
+      "an Array with properties other than its indices" in output and "at Objects/plainInside()" in output and
+      "'for in' and 'for each' over one of Godot's values held untyped" in output, output[-2000:])
+
 # Godot's own classes with `is` and `as`, and input events as a script receives them.
 compare("events.gd", [
     "kind of InputEventScreenTouch", "kind of InputEventScreenDrag", "kind of InputEventMouseButton", "kind of InputEventKey",
