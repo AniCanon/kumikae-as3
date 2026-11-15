@@ -97,8 +97,10 @@ uint32_t Lowerer::value_call(Call *p_call, Kind p_want) {
 }
 
 // v.forEach(f), map, filter, some and every: a loop that calls the function with each element, its index and
-// the vector, as Flash's own Vector does: the length read once, before the first call, and each element read
-// as it is reached (one taken out by then is AS3's RangeError). The object to call it on is worked out and
+// the vector, as Flash's own Vector does (avmplus): the length read once, before the first call, and each
+// element read as it is reached (one taken out by then is AS3's RangeError). Only an answer of true counts
+// for filter, some and every. No function at all is no call: map gives a vector of empty elements, filter
+// an empty one. The object to call it on is checked (a method with one is a TypeError, but for map) and
 // set aside: a method keeps its own object, and a function expression can't use `this`.
 uint32_t Lowerer::vector_each(Call *p_call) {
 	const uint32_t position = p_call->offset;
@@ -115,10 +117,11 @@ uint32_t Lowerer::vector_each(Call *p_call) {
 	const uint32_t vector = settled(expression(callee->object, Kind::Obj), writer(p_call->arguments), position);
 	Expr *object = count > 1 ? p_call->arguments[1] : nullptr;
 	const uint32_t function = settled(expression(p_call->arguments[0], Kind::Any), object && writes_locals(object) ? object : nullptr, position);
-	if (object) {
-		expression(object, Kind::Void);
-	}
+	const uint32_t given = object ? expression(object, Kind::Any) : NONE;
 	emit(Op::NullCheck, position, vector);
+	if (given != NONE && !map) {
+		emit(Op::CallbackThis, position, function, given);
+	}
 	use_argument_error();
 	const uint32_t limit = reg(Kind::U32);
 	emit(Op::VecLength, position, limit, vector);
@@ -130,6 +133,19 @@ uint32_t Lowerer::vector_each(Call *p_call) {
 		out = reg(Kind::Bool);
 		emit(Op::ConstBool, position, out, every ? 1 : 0);
 	}
+	const uint32_t absent = emit(Op::JumpIfNot, position, convert(function, Kind::Bool, position), 0);
+	uint32_t yes = NONE;
+	if (filter || some || every) {
+		const uint32_t truth = reg(Kind::Bool);
+		emit(Op::ConstBool, position, truth, 1);
+		yes = convert(truth, Kind::Any, position);
+	}
+	// Whether the function answered true itself, not just something that is true as a condition.
+	const auto answered_true = [&](uint32_t p_answer) {
+		const uint32_t out = reg(Kind::Bool);
+		emit(Op::AnyStrictEq, position, out, p_answer, yes);
+		return out;
+	};
 	const uint32_t end = convert(limit, Kind::F64, position);
 	const uint32_t at = reg(Kind::F64);
 	emit(Op::ConstF64, position, at, number(0));
@@ -146,12 +162,12 @@ uint32_t Lowerer::vector_each(Call *p_call) {
 	if (map) {
 		emit(Op::VecSet, position, out, at, from_untyped(answer, callee->object->type->element, element, position));
 	} else if (filter) {
-		const uint32_t skip = emit(Op::JumpIfNot, position, convert(answer, Kind::Bool, position), 0);
+		const uint32_t skip = emit(Op::JumpIfNot, position, answered_true(answer), 0);
 		emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), arguments({ out, item }));
 		patch(skip, here());
 	} else if (some || every) {
 		// The first that answers true for some(), false for every(), settles it.
-		const uint32_t carry_on = emit(every ? Op::JumpIf : Op::JumpIfNot, position, convert(answer, Kind::Bool, position), 0);
+		const uint32_t carry_on = emit(every ? Op::JumpIf : Op::JumpIfNot, position, answered_true(answer), 0);
 		emit(Op::ConstBool, position, out, some ? 1 : 0);
 		found = emit(Op::Jump, position, 0);
 		patch(carry_on, here());
@@ -161,6 +177,7 @@ uint32_t Lowerer::vector_each(Call *p_call) {
 	emit(Op::AddF64, position, at, at, one);
 	emit(Op::Jump, position, top);
 	patch(exit, here());
+	patch(absent, here());
 	if (found != NONE) {
 		patch(found, here());
 	}

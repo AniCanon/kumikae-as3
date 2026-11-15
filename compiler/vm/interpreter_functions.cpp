@@ -65,6 +65,18 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 		case Op::FunctionToCallable:
 			to_callable(p_in);
 			break;
+		case Op::CallbackThis: {
+			// A method keeps its own object: Flash will not be told another.
+			const Slot value = r[p_in.a];
+			const Object *callback = any::tag(value) == AnyTag::Object ? static_cast<const Object *>(any::pointer(value)) : nullptr;
+			const bool method = callback && callback->klass == module_.function_class &&
+					module_.functions[static_cast<uint32_t>(const_cast<Object *>(callback)->fields()[ir::FUNCTION_INDEX].i)].owner != NONE;
+			const AnyTag given = any::tag(r[p_in.b]);
+			if (method && given != AnyTag::Null && given != AnyTag::Undefined) {
+				raise(module_.type_error_class, "Error #1510: When the callback argument is a method of a class, the optional this argument must be null.");
+			}
+			break;
+		}
 		default:
 			call_value(p_function, p_in);
 			break;

@@ -122,14 +122,25 @@ void Interpreter::vector_sort(Vector *p_vector, const VectorCall &p_call) {
 	const Slot behavior = argument(p_call, 1);
 	Object *compare = any::tag(behavior) == AnyTag::Object ? static_cast<Object *>(any::pointer(behavior)) : nullptr;
 	compare = compare && compare->klass == module_.function_class ? compare : nullptr;
+	// A function, or the options as a number; anything else is a TypeError, as avmplus has it.
 	Slot options;
 	options.bits = 0;
+	const AnyTag tag = any::tag(behavior);
+	if (!compare && tag != AnyTag::Int && tag != AnyTag::Number && tag != AnyTag::Wide) {
+		const std::optional<std::string> shown = any::text(behavior);
+		raise(module_.type_error_class, "Error #1034: Type Coercion failed: cannot convert " + (shown ? *shown : std::string("an object")) + " to Function.");
+		return;
+	}
 	if (!compare && !from_any(behavior, Kind::I32, NONE, &options)) {
 		return;
 	}
+	Slot self;
+	self.bits = 0;
+	self.p = p_vector;
 	if (options.i & INDEXED) {
-		// The indices come back as an Array, which is not this vector's type.
-		raise(module_.type_error_class, "Error #1034: Type Coercion failed: cannot convert Array to " + module_.classes[p_vector->klass].name + ".");
+		// Flash works out the indices as an Array and leaves the vector as it is; Vector.sort gives back
+		// the vector all the same.
+		give(p_call, Kind::Obj, share(Kind::Obj, self));
 		return;
 	}
 	std::vector<Slot> elements(p_vector->length);
@@ -142,9 +153,6 @@ void Interpreter::vector_sort(Vector *p_vector, const VectorCall &p_call) {
 		for (uint32_t i = 0; i < order.size() && i < p_vector->length; i++) {
 			put(kind, p_vector->data[i], share(kind, elements[order[i]]));
 		}
-		Slot self;
-		self.bits = 0;
-		self.p = p_vector;
 		give(p_call, Kind::Obj, share(Kind::Obj, self));
 	}
 	for (Slot &each : elements) {

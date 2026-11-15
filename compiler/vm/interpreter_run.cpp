@@ -638,6 +638,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::MakeMethod:
 			case Op::CallFunction:
 			case Op::FunctionToCallable:
+			case Op::CallbackThis:
 				function_op(function, in); // `frame` and `r` may be stale after this.
 				break;
 			case Op::OwnerOf: {

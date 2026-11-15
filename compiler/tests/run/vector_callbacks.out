@@ -4,11 +4,17 @@
 3,1 2
 true false true
 false true 0
-null callback
+0,0,0 0 false true
+0 false
+Error #1510: When the callback argument is a method of a class, the optional this argument must be null.
+6,2,4
 ArgumentError
 1,2,3
 3,2,1
 stop 3,1,2
+Error #1034: Type Coercion failed: cannot convert x to Function.
+3,1,2
+1,2,3 2,1,2
 C,a,b
 a,b,C
 C,b,a

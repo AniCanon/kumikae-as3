@@ -124,6 +124,9 @@ inline bool is_held(Kind p_kind) {
 	   arguments, each untyped. */ \
 	X(MakeFunction, "RFr") X(MakeMethod, "RVR") X(CallFunction, "rRA") \
 	X(FunctionToCallable, "RR-") /* A function value as a Godot Callable that calls it; null for null. */ \
+	/* A vector method's callback and the object to call it on (both untyped): a method with an object \
+	   other than null is AS3's TypeError #1510. */ \
+	X(CallbackThis, "RR-") \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
 
