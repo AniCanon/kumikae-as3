@@ -393,6 +393,7 @@ def reload_test(label, elsewhere):
             "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
             "hot_broken.txt": HOT % ("", "2 +", "10", ADDED),
             "hot_v3.txt": HOT % (" private var extra:String = \"x\";", "3", "10", ADDED),
+            "hot_v4.txt": HOT % (" private var extra:String = \"x\";", "4", "10", ADDED),
         }
         for name, text in versions.items():
             with open(os.path.join(copy, name), "w") as file:
@@ -409,10 +410,10 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 12, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 13, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
-        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 2, output[-1500:])
+        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 3, output[-1500:])
         check("%s: a script with an error is reported and not loaded" % label,
               "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
 

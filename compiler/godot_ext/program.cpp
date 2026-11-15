@@ -14,6 +14,8 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/time.hpp>
+
+#include <unordered_map>
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -111,20 +113,41 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 	return true;
 }
 
-// What the project's scripts are now: every file and when it was last written.
+// What the project's scripts are now: every file, when it was last written, its size, and what it held when
+// it was last read. The time is in whole seconds, so two saves of the same size within one are told apart
+// only by what they hold: a file is read again while it was written in the last two seconds, and what it
+// held then is kept, so that the signature does not change as the file grows old.
 static uint64_t scripts_signature() {
+	struct Seen {
+		uint64_t written = 0, size = 0, held = 0;
+	};
+	static std::unordered_map<std::string, Seen> seen;
 	std::vector<std::string> files;
 	collect_scripts(scripts_root(), files);
 	std::sort(files.begin(), files.end());
+	const uint64_t now = static_cast<uint64_t>(Time::get_singleton()->get_unix_time_from_system());
 	uint64_t mixed = 1469598103934665603ull;
+	const auto mix = [](uint64_t p_into, uint64_t p_value) { return (p_into ^ p_value) * 1099511628211ull; };
 	for (const std::string &path : files) {
 		for (char byte : path) {
-			mixed = (mixed ^ (uint8_t)byte) * 1099511628211ull;
+			mixed = mix(mixed, (uint8_t)byte);
 		}
 		const String file = String::utf8(path.c_str());
-		mixed = (mixed ^ FileAccess::get_modified_time(file)) * 1099511628211ull;
-		// The time is in whole seconds: two saves within one are told apart by the size, when it differs.
-		mixed = (mixed ^ (uint64_t)FileAccess::get_size(file)) * 1099511628211ull;
+		const uint64_t written = FileAccess::get_modified_time(file);
+		const uint64_t size = (uint64_t)FileAccess::get_size(file);
+		Seen &known = seen[path];
+		const bool moved = known.written != written || known.size != size;
+		if (moved || written + 2 >= now) {
+			uint64_t held = 1469598103934665603ull;
+			if (written + 2 >= now) {
+				const PackedByteArray bytes = FileAccess::get_file_as_bytes(file);
+				for (int64_t i = 0; i < bytes.size(); i++) {
+					held = mix(held, bytes[i]);
+				}
+			}
+			known = Seen{ written, size, held };
+		}
+		mixed = mix(mix(mix(mixed, written), size), known.held);
 	}
 	return mixed;
 }

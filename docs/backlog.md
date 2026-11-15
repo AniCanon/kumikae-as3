@@ -141,8 +141,6 @@ any Godot value passing as a condition):
   seen until the game is built again. **2d**
 - Rider's hover was failing on code marked `actionscript` (fixed: the plugin names its own language); not
   yet seen working in Rider. **LS-2**
-- Scripts are looked at five times a second by their time and size; two saves of the same size within
-  one second are seen as one. **2d**
 - A reload is refused when a class with a live object was removed or renamed. **2d**
 - A game on a simulator reloads from the folder it is told of (`KAS3_SOURCE_DIR`); only scripts are read
   there, so an edited scene or picture needs a new build. A real phone or tablet cannot see that folder:
