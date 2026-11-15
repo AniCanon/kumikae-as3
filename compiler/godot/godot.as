@@ -4500,7 +4500,7 @@ package godot {
 		public final native function setBlendShapeName(index:int, name:String):void;
 		public final native function clearBlendShapes():void;
 		[Godot(primitive="enum:Mesh.PrimitiveType", blendShapes="Array[GodotArray]", flags="bitfield:Mesh.ArrayFormat")]
-		public final native function addSurfaceFromArrays(primitive:int, arrays:GodotArray, blendShapes:GodotArray = null, lods:GodotDictionary = null, flags:int = 0):void;
+		public final native function addSurfaceFromArrays(primitive:int, arrays:GodotArray, blendShapes:GodotArray = null, lods:GodotDictionary = null, flags:Int64 = 0):void;
 		public final native function clearSurfaces():void;
 		public final native function surfaceRemove(surfIdx:int):void;
 		public final native function surfaceUpdateVertexRegion(surfIdx:int, offset:int, data:PackedByteArray):void;
@@ -4509,7 +4509,7 @@ package godot {
 		public final native function surfaceGetArrayLen(surfIdx:int):int;
 		public final native function surfaceGetArrayIndexLen(surfIdx:int):int;
 		[Godot(returns="bitfield:Mesh.ArrayFormat")]
-		public final native function surfaceGetFormat(surfIdx:int):int;
+		public final native function surfaceGetFormat(surfIdx:int):Int64;
 		[Godot(returns="enum:Mesh.PrimitiveType")]
 		public final native function surfaceGetPrimitiveType(surfIdx:int):int;
 		public final native function surfaceFindByName(name:String):int;

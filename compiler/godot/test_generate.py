@@ -337,6 +337,21 @@ class Refusals(unittest.TestCase):
     def node(self, api):
         return [c for c in api["classes"] if c["name"] == "Node"][0]
 
+    def test_flags_of_one_name_share_the_widest_width(self):
+        # Mesh.ArrayFormat holds RenderingServer.ArrayFormat's flags, whose version bits are above 32:
+        # every flag enum of that name is as wide as the widest.
+        api = fixture()
+        node = self.node(api)
+        node["enums"].append({"name": "Format", "is_bitfield": True, "values": [{"name": "FORMAT_A", "value": 1}]})
+        control = [entry for entry in api["classes"] if entry["name"] == "Control"][0]
+        control.setdefault("enums", []).append(
+            {"name": "Format", "is_bitfield": True, "values": [{"name": "FORMAT_HIGH", "value": 2 ** 35}]})
+        node["methods"].append({"name": "set_format", "is_const": False, "is_vararg": False, "is_static": False,
+                                "is_virtual": False, "hash": 1,
+                                "arguments": [{"name": "format", "type": "bitfield::Node.Format"}]})
+        text = generate.generate(api)
+        self.assertIn("public final native function setFormat(format:Int64):void;", lines_of(text, "Node"))
+
     def test_unknown_type(self):
         api = fixture()
         self.node(api)["methods"][3]["arguments"][0]["type"] = "Mystery"

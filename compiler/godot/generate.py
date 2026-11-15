@@ -200,10 +200,20 @@ class Generator:
         self.enums = {}
         for entry in api["global_enums"]:
             self.enums[entry["name"]] = wide(entry["values"])
+        wide_flags = set()  # The names of flag enums that need more than 32 bits somewhere.
         for group in (api["classes"], api["builtin_classes"]):
             for entry in group:
                 for enum in entry.get("enums", []):
                     self.enums[entry["name"] + "." + enum["name"]] = wide(enum["values"])
+                    if enum.get("is_bitfield") and wide(enum["values"]):
+                        wide_flags.add(enum["name"])
+        # Flags of one name are one set of flags in two classes (Mesh.ArrayFormat holds
+        # RenderingServer.ArrayFormat's, version bits included): each is as wide as the widest.
+        for group in (api["classes"], api["builtin_classes"]):
+            for entry in group:
+                for enum in entry.get("enums", []):
+                    if enum.get("is_bitfield") and enum["name"] in wide_flags:
+                        self.enums[entry["name"] + "." + enum["name"]] = True
 
     # Types.
 
