@@ -183,7 +183,6 @@ any Godot value passing as a condition):
   edit there needs the scene started again by hand. **2d**
 - A second save in the one frame while a scene is being started again finds no scene, and says to start
   it by hand; the scene then has the first save's constructors with the second save's `_ready`. **2d**
-- `null as Node` is refused, though `null is Node` is allowed. **2c**
 - On the iOS Simulator the scene comes from the app's own copy: a scene file edited on the computer is not
   seen until the game is built again. **2d**
 - Rider's hover was failing on code marked `actionscript` (fixed: the plugin names its own language); not

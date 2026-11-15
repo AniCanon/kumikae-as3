@@ -55,6 +55,8 @@ package {
 		public function keptCounts():Boolean { return kept ? true : false; }
 		public function keptNot():Boolean { return !kept; }
 		public function keptName():String { return kept.name; }
+		// `null as` one of Godot's classes is null, as `null is` it is false.
+		public function nullAs():Boolean { var n:Node = null as Node; return n == null && !(null is Node); }
 		public function keptRename():void { kept.name = "renamed"; }
 		public function keptChildren():int { return kept.getChildCount(); }
 		public function keptUnder(parent:Node):Boolean { return parent.isAncestorOf(kept); }

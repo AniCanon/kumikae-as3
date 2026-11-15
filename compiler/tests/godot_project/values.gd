@@ -76,6 +76,7 @@ func _physics_process(_delta: float) -> bool:
 	show("freed does not count", ask("keptCounts", []), false)
 	show("not freed", ask("keptNot", []), true)
 	show("freed name", ask("keptName", []), null)
+	show("null as a Godot class", ask("nullAs", []), true)
 	ask("keptRename", [])
 	show("freed children", ask("keptChildren", []), null)
 	ask("keptSignal", [])
