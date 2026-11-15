@@ -298,7 +298,7 @@ class Lowerer {
 	Place constant_place(Symbol *p_symbol, uint32_t p_position);
 
 	// A property or field of an engine object.
-	Place engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position);
+	Place engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position, Expr *p_later = nullptr);
 
 	Place place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_position);
 

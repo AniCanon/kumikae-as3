@@ -137,7 +137,8 @@ auto Lowerer::constant_place(Symbol *p_symbol, uint32_t p_position) -> Lowerer::
 	return place;
 }
 
-auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position) -> Lowerer::Place {
+// p_later is what is worked out after the place and before it is written: a local it changes is read first.
+auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position, Expr *p_later) -> Lowerer::Place {
 	Place place;
 	uint32_t name = 0;
 	Kind kind = Kind::F64;
@@ -182,11 +183,11 @@ auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position
 		// A member of a value that is itself stored somewhere.
 		place.of_value = true;
 		place.part = std::make_shared<Part>();
-		place.part->whole = place_of(p_object);
+		place.part->whole = place_of(p_object, p_later);
 		whole_of(place, p_position);
 		return place;
 	}
-	place.object = engine_receiver(p_object, p_position, &place.of_value);
+	place.object = settled(engine_receiver(p_object, p_position, &place.of_value), p_later, p_position);
 	return place;
 }
 

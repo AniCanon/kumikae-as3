@@ -30,6 +30,16 @@ package {
 		public function throwValue(value:*):void { throw value; }
 		public function increment(value:*):* { return value + 1; }
 		public function moveBy(by:*):Vector2 { var q:Vector2 = position + by; return q; }
+		// The object written is the one named before the value changes the local: AS3's order.
+		public function writeOrder(a:Node2D, b:Node2D):Vector2 {
+			var first:Node2D = a;
+			a.position.x = (a = b, 5);
+			first.visible = true;
+			b.visible = true;
+			a = first;
+			a.visible = (a = b, false);
+			return new Vector2(first.position.x, first.visible ? 1 : 0);
+		}
 		public function minusOne(value:*):* { return value - 1; }
 		public function twice(value:*):* { return value * 2; }
 		public function stepped(value:*):* { value++; return value; }

@@ -89,7 +89,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 		Member *member = static_cast<Member *>(p_target);
 		Symbol *symbol = member->resolved();
 		if (symbol && is_godot(symbol) && (symbol->kind == SymbolKind::Property || symbol->kind == SymbolKind::Field)) {
-			return engine_place(symbol, member->object, member->name_offset);
+			return engine_place(symbol, member->object, member->name_offset, p_later);
 		}
 		if (symbol && (globals_.count(symbol) || !symbol->is_instance_member())) {
 			return place_of_symbol(symbol, 0, member->name_offset);
