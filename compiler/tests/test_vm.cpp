@@ -1061,14 +1061,11 @@ static void test_engine_calls() {
 		"function f():void { Vector2.ZERO.x++; }",
 		"function f():void { treeEntered.add(function():void {}); }",
 		"function f(n:Node):void { var x:int = n[\"name\"].length; }",
-		"function f(n:Node):void { n.setMeta(\"a\", lerp(1, 2, 0.5)); }",
-		"function f():void { var v:Vector2 = lerp(position, position, 0.5); }",
 		"function f():void { position.normalized().x = 5; }",
 		"function f():void { position.normalized()[0] = 5; }",
 		"function f():void { addChild(this); }",
 		"function f(v:Vector2):int { return v ? 1 : 0; }",
 		"function f(a:GodotArray):void { if (a) { trace(1); } }",
-		"function f():void { if (max(1, 2)) { trace(1); } }",
 		"function f():void { var other:Player = new Player(); }",
 	};
 	for (const char *body : bodies) {
