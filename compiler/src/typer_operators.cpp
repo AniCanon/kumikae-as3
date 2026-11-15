@@ -60,7 +60,10 @@ const Type *Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_
 	if (!primitive(p_left) || !primitive(p_right)) {
 		return unknown_;
 	}
-	if (p_left == int64_ || p_right == int64_) {
+	// A shift is as wide as what is shifted: an Int64 count shifts an int by its low five bits.
+	const bool shift = p_op == TokenKind::ShiftLeft || p_op == TokenKind::ShiftRight || p_op == TokenKind::ShiftRightUnsigned ||
+			p_op == TokenKind::ShiftLeftAssign || p_op == TokenKind::ShiftRightAssign || p_op == TokenKind::ShiftRightUnsignedAssign;
+	if (p_left == int64_ || (p_right == int64_ && !shift)) {
 		// An Int64 keeps its 64 bits through whole-number arithmetic. Division gives a Number, as it
 		// always does in AS3, and so does anything with a Number on the other side.
 		switch (p_op) {

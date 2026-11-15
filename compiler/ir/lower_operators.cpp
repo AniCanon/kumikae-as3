@@ -67,7 +67,13 @@ uint32_t Lowerer::operate(TokenKind p_op, uint32_t p_left, uint32_t p_right, boo
 	if (!how) {
 		refuse(p_position, "this operator");
 		how = &ARITHMETIC[0];
-	} else if (kind_at(p_left) == Kind::I64 || kind_at(p_right) == Kind::I64) {
+	}
+	// A shift is as wide as what is shifted; its count is only ever its low bits, so an Int64 count is cut.
+	const bool shift = how->narrow == Op::Shl || how->narrow == Op::Shr || how->narrow == Op::UShr;
+	if (shift && kind_at(p_left) != Kind::I64 && kind_at(p_right) == Kind::I64) {
+		p_right = convert(p_right, Kind::I32, p_position, true);
+	}
+	if (kind_at(p_left) == Kind::I64 || kind_at(p_right) == Kind::I64) {
 		// Anything that has no 64-bit form falls through to Numbers: the Int64 converts, and says so if
 		// it does not fit.
 		const bool whole = is_integral(kind_at(p_left)) && is_integral(kind_at(p_right));

@@ -120,7 +120,6 @@ Found by the review of the clean-up pass itself.
   hand, which the owner chose against; the choice is whether a short one is worth it.
 - Godot refusing a value says "cannot convert argument 1 ..., a int, to int", not that the value does not
   fit. **clean-up**
-- An `Int64` shift count widens an `int` on its left: `i >>> c` is worked out in 64 bits. **clean-up**
 - A whole number written out is an `Int64` only where one is expected or beside one. Elsewhere it is a
   `Number`, as in Flash: `var n:Number = 9007199254740993` rounds. **clean-up**
 - `x.toString(radix)` on an `Int64` waits for the standard library. **2c**
