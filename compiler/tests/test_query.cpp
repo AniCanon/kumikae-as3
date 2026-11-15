@@ -934,6 +934,41 @@ static void test_interface_methods() {
 	CHECK_EQ(lines("speak():void {} }", 3, true), std::string("7 16 "));
 }
 
+// Accessors are offered and described as properties, through a class or an interface; an interface's
+// members include those of what it extends, and what every object has.
+static void test_accessors_and_interfaces() {
+	Offered through = complete("package { public class Main { function f(s:Shape, b:Box):void { s.| } } }\n"
+							   "interface Shape extends Named { function area():Number; function get sides():int; }\n"
+							   "class Box { public function get width():int { return 1; } public function set only(v:int):void {} }\n",
+			"package { public interface Named { function get name():String; function set name(v:String):void; } }");
+	CHECK(through.has("area") && through.has("sides") && through.has("name") && through.has("toString"));
+	CHECK_EQ(through.count("name"), (size_t)1); // A getter and a setter are one property.
+	const Completion *sides = through.find("sides");
+	CHECK(sides && sides->kind == SymbolKind::Property);
+	CHECK_EQ(sides ? sides->detail : std::string(), std::string("function get sides():int"));
+	const Completion *area = through.find("area");
+	CHECK(area && area->kind == SymbolKind::Method);
+	Offered box = complete("package { public class Main { function f(b:Box):void { b.| } } }\n"
+						   "class Box { public function get width():int { return 1; } public function set only(v:int):void {} }\n");
+	const Completion *only = box.find("only");
+	CHECK(box.has("width") && only && only->kind == SymbolKind::Property);
+	CHECK_EQ(only ? only->detail : std::string(), std::string("function set only(v:int):void"));
+
+	Compilation compilation;
+	Unit *main = compilation.add("Main.as", "package { public class Main { function f(s:Shape):void { s.area(); s.sides; s.name = null; } } }\n"
+											"interface Shape extends Named { function area():Number; function get sides():int; }\n"
+											"interface Named { function set name(v:String):void; }\n");
+	compilation.check(true);
+	Queries index(compilation);
+	auto describe = [&](const char *p_needle) {
+		const Occurrence *found = index.at(*main, offset_of(main, p_needle, 1));
+		return found ? index.describe(found->symbol) + " | " + index.context(found->symbol) : std::string("nothing");
+	};
+	CHECK_EQ(describe("area();"), std::string("function area():Number | method of Shape in this file"));
+	CHECK_EQ(describe("sides;"), std::string("function get sides():int | property of Shape in this file"));
+	CHECK_EQ(describe("name = "), std::string("function set name(v:String):void | property of Named in this file"));
+}
+
 static void test_describe() {
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -1116,6 +1151,7 @@ int main() {
 	test_new_goes_to_the_constructor();
 	test_interface_methods();
 	test_describe();
+	test_accessors_and_interfaces();
 	test_outline();
 	test_queries_on_broken_files();
 	test_tolerant();

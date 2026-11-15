@@ -752,6 +752,21 @@ static void test_completion() {
 		}
 	}
 
+	// Through an interface: its accessors as properties, its methods, and what every object has.
+	session.change(MAIN, "package {\npublic class Main {\n\tpublic function run(s:Shape):void {\n\t\ts.sides;\n\t\ts.\n\t}\n} }\n"
+						 "interface Shape { function area():Number; function get sides():int; }");
+	answer = session.request("textDocument/completion", Session::at(MAIN, 4, 4));
+	names.clear();
+	for (const Json &item : answer.get("result").get("items").items()) {
+		names += item.get("label").string() + ":" + std::to_string(item.get("kind").integer(0)) + " ";
+	}
+	CHECK(names.find("sides:10 ") != std::string::npos);
+	CHECK(names.find("area:2 ") != std::string::npos);
+	CHECK(names.find("toString:2 ") != std::string::npos);
+	Json shown = session.request("textDocument/hover", Session::at(MAIN, 3, 5)).get("result");
+	CHECK_EQ(shown.get("contents").get("value").string(),
+			std::string("```actionscript\nfunction get sides():int\n```\nproperty of Shape in this file"));
+
 	// A keyword has its own kind and no detail.
 	session.change(MAIN, "package {\npublic class Main {\n\tpublic function run():void {\n\t\tret\n\t}\n} }");
 	answer = session.request("textDocument/completion", Session::at(MAIN, 3, 5));
