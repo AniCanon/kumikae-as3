@@ -28,7 +28,9 @@ class LocalSession(
     fun enableInput(): Boolean {
         val candidates = mutableListOf<Pair<String, InputBackend>>()
         nativeExecutable?.takeIf { Files.isExecutable(it) && !Files.isDirectory(it) }?.let {
-            candidates += "native helper" to NativeInput(it.toString(), directory, OwnedStreamProcesses(4000))
+            candidates +=
+                "native helper" to
+                NativeInput(it.toString(), directory, OwnedStreamProcesses(4000), SimctlPasteboard(runner))
         }
         (System.getenv("KUMIKAE_SIMULATOR_IDB") ?: IdbInput.find())?.let {
             candidates +=

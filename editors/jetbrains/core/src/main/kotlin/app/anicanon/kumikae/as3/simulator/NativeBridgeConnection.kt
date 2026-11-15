@@ -1,6 +1,6 @@
 package app.anicanon.kumikae.as3.simulator
 
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicBoolean
@@ -14,28 +14,41 @@ class NativeBridgeConnection private constructor(
 ) : AutoCloseable {
     private val closed = AtomicBoolean()
     private var serial = 0L
-    private val gson = Gson()
+    private val gson = GsonBuilder().disableHtmlEscaping().create()
     val alive: Boolean get() = !closed.get() && child.alive
     val errors: String get() = child.errors
+    var lastCompletedNanos: Long? = null
+        private set
     var clockOffsetNanos = 0L
         private set
     var clockUncertaintyNanos = 0L
         private set
 
-    @Synchronized fun send(operation: String, x: Double? = null, y: Double? = null, text: String? = null): Long {
+    @Synchronized fun send(
+        operation: String,
+        x: Double? = null,
+        y: Double? = null,
+        text: String? = null,
+        orientation: String? = null,
+    ): Long {
         check(!closed.get()) { "Native Simulator bridge is closed" }
         val id = ++serial
         val command = mutableMapOf<String, Any>("id" to id, "op" to operation)
         x?.let { command["x"] = it }
         y?.let { command["y"] = it }
         text?.let { command["text"] = it }
+        orientation?.let { command["orientation"] = it }
         try {
             child.input.write((gson.toJson(command) + "\n").toByteArray(Charsets.UTF_8))
             child.input.flush()
             val reply = JsonParser.parseString(replies.next()).asJsonObject
             check(reply["id"]?.asLong == id) { reply["error"]?.asString ?: "Native input reply was out of order" }
             check(reply["ok"]?.asBoolean == true) { reply["error"]?.asString ?: "Native input failed" }
-            return reply["receivedNanos"].asLong
+            val received = reply["receivedNanos"].asLong
+            lastCompletedNanos = reply["completedNanos"]?.asLong?.also {
+                require(it >= received) { "Native completion precedes receipt" }
+            }
+            return received
         } catch (failure: Exception) {
             close()
             if (failure is InterruptedException) throw failure

@@ -29,7 +29,8 @@ class NativeLifecycleProbe {
         ProbeDeviceOwner(runner).use(type, runtime["identifier"].asString) { id ->
             val directory = Files.createTempDirectory("native-lifecycle-probe")
             try {
-                val input = NativeInput(executable.toString(), directory, OwnedStreamProcesses(4000))
+                val input =
+                    NativeInput(executable.toString(), directory, OwnedStreamProcesses(4000), SimctlPasteboard(runner))
                 val backend = FallbackInput(listOf("native helper" to input))
                 SimulatorSession(directory, runner, backend).use { session ->
                     session.dispatch("select", parameters(id))

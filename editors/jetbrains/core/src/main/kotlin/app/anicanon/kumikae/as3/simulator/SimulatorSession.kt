@@ -336,13 +336,13 @@ class SimulatorSession(
             val density = backend.scale(device)
             val args = synchronized(this) {
                 checkDevice(device)
-                InputArguments.prepare(method, params, geometry, density).also {
-                    if (method == "rotate") invalidate()
-                }
+                InputArguments.prepare(method, params, geometry, density)
             }
             backend.send(device, method, args)
             return mapOf("sent" to true)
         } finally {
+            // Rotation uses the live connection; revoke its frames only after acknowledgment or failure.
+            if (method == "rotate") synchronized(this) { invalidate() }
             try {
                 backend.releaseIdle()
             } finally {

@@ -17,6 +17,7 @@ class NativeSessionTest {
             override val continuousTouch = true
             override fun scale(device: String) = 3.0
             override fun send(device: String, operation: String, args: List<String>) {
+                assertTrue(!closed, "Input must finish before its feed closes")
                 sent += listOf(operation) + args
             }
             override fun frames(device: String, bind: (Geometry, Geometry) -> Long?, stopped: () -> Unit): FrameFeed {
@@ -51,8 +52,15 @@ class NativeSessionTest {
                 assertFailsWith<SimulatorException> {
                     session.touch("phone", stamp + 1, Geometry(120, 240), "down", Pixel(1, 1))
                 }
-                feed.close()
+                session.dispatch(
+                    "rotate",
+                    JsonObject().apply {
+                        addProperty("device", "phone")
+                        addProperty("orientation", "landscape_left")
+                    },
+                )
                 assertTrue(closed)
+                feed.close()
                 assertFailsWith<SimulatorException> {
                     session.touch("phone", stamp, Geometry(120, 240), "down", Pixel(1, 1))
                 }
