@@ -19,6 +19,7 @@ const std::vector<Node *> &Queries::context_nodes(const Unit &p_unit) const {
 				case NodeKind::ExprStmt:
 				case NodeKind::Call:
 				case NodeKind::New:
+				case NodeKind::TypeRef:
 					nodes.push_back(p_node);
 					break;
 				default:

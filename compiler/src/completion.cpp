@@ -279,32 +279,18 @@ class Completer {
 		return source_.substr(begin, p_end - begin);
 	}
 
-	// Whether a type is what is written here: `var a:`, `):`, `new`, `extends`, `implements`, `is`, `as`.
+	// Whether a type is what is written here. The tree says so wherever the grammar wants a type (`var a:`,
+	// a parameter, a result, `catch (e:)`, `extends`, `implements`), even before one is started: the
+	// parser gives a type not yet written the place from the colon to what follows. After `new`, `is` and
+	// `as` an expression is parsed, so there the word before says it.
 	bool at_type() const {
-		const uint32_t end = before();
-		if (end == 0) {
-			return false;
+		for (const Node *node : queries_.context_nodes(unit_)) {
+			if (node->kind == NodeKind::TypeRef && node->offset <= start_ && offset_ <= node->end) {
+				return true;
+			}
 		}
-		if (source_[end - 1] == ':') {
-			uint32_t name_end = end - 1;
-			while (name_end > 0 && std::isspace((unsigned char)source_[name_end - 1])) {
-				name_end--;
-			}
-			if (name_end > 0 && source_[name_end - 1] == ')') {
-				return true; // A function's result.
-			}
-			// `name:` is a type's place after `var`, `const`, or in a parameter list. In `a ? b : c` and
-			// `{ key: value }` it is not: there the name follows `?`, `{` or a value.
-			const std::string_view name = word_before(name_end);
-			uint32_t lead = name_end - (uint32_t)name.size();
-			while (lead > 0 && std::isspace((unsigned char)source_[lead - 1])) {
-				lead--;
-			}
-			const std::string_view keyword = word_before(lead);
-			return !name.empty() && (keyword == "var" || keyword == "const" || (function_ && !in_body_));
-		}
-		const std::string_view keyword = word_before(end);
-		return keyword == "new" || keyword == "extends" || keyword == "implements" || keyword == "is" || keyword == "as";
+		const std::string_view keyword = word_before(before());
+		return keyword == "new" || keyword == "is" || keyword == "as";
 	}
 
 public:

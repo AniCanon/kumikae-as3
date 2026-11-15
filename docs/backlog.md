@@ -155,8 +155,6 @@ any Godot value passing as a condition):
 - The local JetBrains lexer cannot distinguish every regex from division after a closing brace.
   Compiler completion and signature queries use the parser's regex regions; local pairing needs fuller
   syntax context in this ambiguous case. **LS-2**
-- Whether a `name:` is a type's place is read from the text before it, not from the tree, when the type
-  has not been started (`var a:`). **LS-2**
 
 ## Reload while running
 

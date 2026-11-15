@@ -179,6 +179,40 @@ static void test_completion_scopes_and_context() {
 	CHECK(complete(player("var n:Number = 10 / spe|;")).has("speed"));
 }
 
+// Whether a type is written here is read from the tree, so a type not yet started is told apart from a
+// value as surely as one that is.
+static void test_type_places() {
+	auto types = [](const char *p_body) {
+		Offered offered = complete(player(p_body));
+		return offered.has("Vector2") && !offered.has("speed") && !offered.has("var");
+	};
+	CHECK(types("var a:|"));
+	CHECK(types("var a: |\n"));
+	CHECK(types("try {} catch (e:|) {}"));
+	CHECK(types("var f:Function = function(a:|) {};"));
+	CHECK(types("var a:int, b:|"));
+	CHECK(types("var a /* a note */ :|"));
+	CHECK(types("for each (var item:| in []) {}"));
+	CHECK(types("var a:Vec|"));
+	CHECK(!types("var n:int = speed > 1 ? 2 : |;"));
+	CHECK(complete(player("var n:int = speed > 1 ? 2 : sp|;")).has("speed"));
+	CHECK(!types("var o:Object = { key: | };"));
+	// In a class, outside any function: a field's type and a method's parameters and result.
+	auto in_class = [](const char *p_member) {
+		Offered offered = complete(std::string("package { import godot.*; public class Player extends Node2D {\n") + p_member + " } }");
+		return offered.has("Vector2") && !offered.has("override");
+	};
+	CHECK(in_class("var a:|"));
+	CHECK(in_class("function f(a:|"));
+	CHECK(in_class("function f(a:int, b:|):void {}"));
+	CHECK(in_class("function f():|"));
+	CHECK(!in_class("function f(a:int = true ? 1 : |):void {}"));
+	CHECK(complete("package { import godot.*; public class Player extends | {} }").has("Node2D"));
+	CHECK(complete("package { import godot.*; public class Player extends Node2D implements | {} }").has("Node2D"));
+	CHECK(types("var b:Boolean = speed is |;"));
+	CHECK(types("var n:Node = speed as |;"));
+}
+
 static const char *const BROKEN =
 		"package { import flash.utils.Dictionary; public class Main {\n"
 		"var count:int;\n"
@@ -929,6 +963,7 @@ static void test_typing() {
 
 int main() {
 	test_completion_scopes_and_context();
+	test_type_places();
 	test_completion();
 	test_typing();
 	test_index();
