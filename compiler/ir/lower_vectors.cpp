@@ -32,6 +32,18 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 	return index;
 }
 
+uint32_t Lowerer::declared_class(TypeRef *p_type) {
+	const Type *type = p_type ? compilation_.type_of(p_type) : nullptr;
+	if (is_vector(type)) {
+		return vector_class(type).value_or(NONE);
+	}
+	if (type && type->kind == Type::Instance) {
+		const auto found = classes_.find(type->symbol);
+		return found == classes_.end() ? NONE : found->second;
+	}
+	return NONE;
+}
+
 uint32_t Lowerer::vector_new(New *p_made) {
 	const uint32_t position = p_made->offset;
 	const std::optional<uint32_t> klass = vector_class(p_made->type);

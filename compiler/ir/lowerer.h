@@ -168,6 +168,8 @@ class Lowerer {
 	// are of a type the interpreter does not hold yet.
 	static bool is_vector(const Type *p_type) { return p_type && p_type->kind == Type::Vector; }
 	std::optional<uint32_t> vector_class(const Type *p_type);
+	// The class a declaration says its value is of: a class of the program or a vector's. NONE otherwise.
+	uint32_t declared_class(TypeRef *p_type);
 	uint32_t vector_new(New *p_made);
 	uint32_t vector_literal(VectorLit *p_literal);
 	uint32_t vector_call(Call *p_call);

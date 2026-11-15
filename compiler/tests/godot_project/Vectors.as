@@ -53,6 +53,35 @@ package {
 			held.length = 0;
 			return held.length;
 		}
+		// A vector that is added to while it is being shortened: Godot runs the code of an object as the
+		// vector lets go of it, and that code calls back in.
+		private var counted:Vector.<RefCounted> = new Vector.<RefCounted>();
+		public function count(one:RefCounted):int { return counted.push(one); }
+		public function grow(a:RefCounted, b:RefCounted):void { counted.push(a, b); }
+		public function shorten():String {
+			counted.length = 0;
+			var out:String = "" + counted.length;
+			for (var i:int = 0; i < counted.length; i++) {
+				out += counted[i] == null ? " null" : " held";
+			}
+			return out;
+		}
+		public function release():int {
+			counted = new Vector.<RefCounted>();
+			return counted.length;
+		}
+		// No vector at all is Godot's null. A place that takes anything gets nothing; a packed array
+		// can't be nothing, and Godot's refusal is an AS3 error.
+		public function nothing(keeper:Node):Boolean {
+			var whole:Vector.<int>;
+			keeper.setMeta("nothing", whole);
+			return whole == null;
+		}
+		public function noPoints(target:Line2D):int {
+			var none:Vector.<Vector2> = null;
+			target.points = none;
+			return 1;
+		}
 		// Godot's own objects made with `new`: a node, which the tree then owns, and a resource, which is
 		// counted and goes when nothing holds it.
 		public function make():int {

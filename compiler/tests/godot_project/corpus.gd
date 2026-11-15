@@ -25,7 +25,7 @@ func _process(_delta: float) -> bool:
 		frames = 0
 		return false
 	frames += 1
-	if frames >= 5:
+	if frames >= 10:
 		print("RAN %s" % names[at])
 		node.free()
 		node = null

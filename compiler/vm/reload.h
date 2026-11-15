@@ -24,6 +24,9 @@ class Reload {
 	std::unordered_map<Object *, Object *> moved_; // Each holds one reference to the new object.
 	std::string missing_;
 
+	// What a field or a static field held, as the new one holds it: nothing, if the new one is declared
+	// to hold another class of object than the one that was there.
+	Slot carry_into(ir::Kind p_kind, uint32_t p_class, Slot p_value);
 	Slot carry(ir::Kind p_kind, Slot p_value);
 
 public:

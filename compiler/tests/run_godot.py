@@ -243,8 +243,10 @@ check("Godot reads every recorded default", read is not None and int(read.group(
 output = compare("vectors.gd", [
     "points", "points type", "hull", "bytes", "empty", "too big for a byte", "below a byte", "offsets", "colors", "filters",
     "polygons", "whole", "whole are integers", "fractions", "fractions are floats", "words", "flags", "nodes", "wide",
-    "keep", "spread", "moved", "words of values", "forget", "made a node", "the node is in the tree", "made a resource",
+    "keep", "spread", "moved", "words of values", "forget", "made a node", "the node is in the tree", "made a resource", "no vector", "no vector where Godot takes points",
+    "added to while it is shortened", "what it let go of is freed, what was added is held", "and let go of in the end",
 ])
+check("vectors.gd: no vector where Godot takes a packed array is an AS3 error", "at Vectors/noPoints()" in output, output[-1500:])
 check("vectors.gd: a value that does not fit a byte is an AS3 error that says so",
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
 

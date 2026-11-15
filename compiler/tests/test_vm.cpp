@@ -1136,6 +1136,49 @@ static void test_reload_vectors() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 
+	// A field that now holds another type of vector, or objects of another class, starts empty: what it
+	// held is not of that type, and the new code would read it as if it were.
+	ir::Module retyped;
+	compile("package { public class Bag {\n"
+			"  public var numbers:Vector.<String> = new <String>[\"s\"]; public var words:Vector.<int> = new <int>[5];\n"
+			"  public var things:Vector.<Thing> = new Vector.<Thing>(); public var one:Other; public static var kept:Vector.<Number>;\n"
+			"  public function empty():String { return \"\" + (numbers == null) + (words == null) + (things == null) + (one == null) + (kept == null); }\n"
+			"} }\n"
+			"class Thing { public var n:int; public function Thing(n:int) { this.n = n; } }\n"
+			"class Other { public var s:String = \"o\"; }\n",
+			&retyped, "Bag.as");
+	ir::Module typed;
+	compile("package { public class Bag {\n"
+			"  public var numbers:Vector.<int> = new <int>[1234567]; public var words:Vector.<String> = new <String>[\"a\"];\n"
+			"  public var things:Vector.<Thing> = new <Thing>[new Thing(1)]; public var one:Thing = new Thing(2); public static var kept:Vector.<int> = new <int>[3];\n"
+			"} }\n"
+			"class Thing { public var n:int; public function Thing(n:int) { this.n = n; } }\n",
+			&typed, "Bag.as");
+	{
+		Recorder recorder;
+		auto running = std::make_unique<vm::Interpreter>(typed, recorder);
+		CHECK(running->start());
+		vm::Object *bag = running->construct(class_named(typed, "Bag"), nullptr);
+		vm::Interpreter fresh(retyped, recorder);
+		vm::Reload reload(*running, fresh);
+		vm::Object *moved = reload.object(bag);
+		reload.globals();
+		CHECK(moved != nullptr);
+		running->release_object(bag);
+		running.reset();
+		if (moved) {
+			vm::Slot result;
+			CHECK(fresh.call_method(moved, "empty", nullptr, 0, &result));
+			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("truetruefalsetruetrue"));
+			fresh.discard(ir::Kind::Str, result);
+			fresh.release_object(moved);
+		}
+		fresh.clear_globals();
+		CHECK_EQ(recorder.errors, std::string());
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+
 	// A vector whose type the new program no longer has, or has with other elements, can't be moved.
 	ir::Module without;
 	compile("package { public class Bag { public var numbers:Vector.<Number> = new Vector.<Number>(); } }", &without, "Bag.as");

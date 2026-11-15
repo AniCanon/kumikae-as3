@@ -22,10 +22,10 @@ it stands.
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 21 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2c** | The rest of the language | 22 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 13 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 21 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 47 | What is left |
+| **clean-up** | A pass that closes stage 2 | 50 | What is left |
 | **decision** | The owner | 8 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
@@ -267,6 +267,15 @@ any Godot value passing as a condition):
 - The interpreter converts a vector's index to a Number on every access. **clean-up**
 - Handing a vector to Godot copies its elements into a list first, then into Godot's array. **clean-up**
 - `test_json` times a large parse and fails when the machine is busy. **clean-up**
+- Not checked against Flash: `pop()` and `shift()` on an empty vector of numbers give 0; a negative length
+  is an out-of-memory error, not a `RangeError`; setting a fixed vector's length to what it already is
+  does nothing; `join(null)` puts the word "null" between the elements. **2c**
+- A vector's error messages are each written in more than one place, and its greatest length is checked
+  against two different numbers. **clean-up**
+- The corpus run in Godot checks only that each program ran for ten frames with no error printed, not
+  what it did. **clean-up**
+- Vectors have no IR golden file, no vector in the reload test that runs in Godot, and `for each` is
+  tested only inside the methods' program. **clean-up**
 
 ## Stage 2a: interpreter core
 

@@ -202,12 +202,8 @@ void Interpreter::vector_take(Vector *p_vector, const VectorCall &p_call) {
 	}
 	Slot element;
 	element.bits = 0;
-	if (length == 0) {
-		// Nothing there: what `undefined` is as the element's type.
-		if (kind == Kind::F64) {
-			element.d = std::numeric_limits<double>::quiet_NaN();
-		}
-	} else {
+	// From an empty vector: the element type's empty value, which for every number is 0.
+	if (length != 0) {
 		element = p_vector->data[at];
 		shift_slots(p_vector, static_cast<uint32_t>(at) + 1, length - static_cast<uint32_t>(at) - 1, -1);
 		p_vector->data[length - 1].bits = 0;

@@ -1,0 +1,3 @@
+Error: boom
+	at Loud/toString()[err_vector_text.as:15]
+	at err_vector_text()[err_vector_text.as:7]

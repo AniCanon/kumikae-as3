@@ -11,6 +11,15 @@ func show(name: String, got, want) -> void:
 func ask(method: String, arguments: Array = []):
 	return Callable(node, method).callv(arguments)
 
+# Calls back into the script as it is freed.
+class Dying extends RefCounted:
+	var target
+	var a
+	var b
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and target != null:
+			target.grow(a, b)
+
 func _initialize() -> void:
 	node = Node2D.new()
 	node.set_script(load("res://Vectors.as"))
@@ -66,6 +75,29 @@ func _physics_process(_delta: float) -> bool:
 	show("moved", [first.position, second.position, third.position], [Vector2(0, 0), Vector2(10, 1), Vector2(20, 2)])
 	show("words of values", ask("words"), "(1.0, 2.0) (3.0, 4.0)/(1.0, 2.0),(3.0, 4.0)/3")
 	show("forget", ask("forget"), 0)
+	var keep_a := RefCounted.new()
+	var keep_b := RefCounted.new()
+	var dying := Dying.new()
+	dying.target = node
+	dying.a = keep_a
+	dying.b = keep_b
+	var middle := RefCounted.new()
+	var watched = weakref(middle)
+	ask("count", [dying])
+	ask("count", [middle])
+	ask("count", [RefCounted.new()])
+	dying = null
+	middle = null
+	show("added to while it is shortened", ask("shorten"), "2 held held")
+	show("what it let go of is freed, what was added is held", [watched.get_ref() == null, keep_a.get_reference_count(), keep_b.get_reference_count()], [true, 2, 2])
+	ask("release")
+	show("and let go of in the end", [keep_a.get_reference_count(), keep_b.get_reference_count()], [1, 1])
+	var plain := Line2D.new()
+	plain.points = PackedVector2Array([Vector2(1, 1)])
+	node.set_meta("nothing", 5)
+	show("no vector", [ask("nothing", [node]), node.has_meta("nothing")], [true, false])
+	show("no vector where Godot takes points", [ask("noPoints", [plain]), plain.points.size()], [null, 0])
+	plain.free()
 	show("made a node", ask("make"), 12)
 	var made := node.get_node_or_null("made")
 	show("the node is in the tree", [made != null, made.position if made else null, made.get_child(0).get_class() if made else null], [true, Vector2(3, 4), "Line2D"])

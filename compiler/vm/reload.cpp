@@ -47,6 +47,15 @@ Slot Reload::carry(Kind p_kind, Slot p_value) {
 	return out;
 }
 
+Slot Reload::carry_into(Kind p_kind, uint32_t p_class, Slot p_value) {
+	Slot out = carry(p_kind, p_value);
+	if (p_kind == Kind::Obj && out.p && p_class != ir::NONE && !to_.is_class(static_cast<Object *>(out.p), p_class)) {
+		to_.release_object(static_cast<Object *>(out.p));
+		out.bits = 0;
+	}
+	return out;
+}
+
 Object *Reload::object(Object *p_old) {
 	if (!p_old) {
 		return nullptr;
@@ -100,7 +109,7 @@ Object *Reload::object(Object *p_old) {
 				continue;
 			}
 			if (old_class.fields[j].kind == field.kind) {
-				fresh->fields()[i] = carry(field.kind, p_old->fields()[j]);
+				fresh->fields()[i] = carry_into(field.kind, field.klass, p_old->fields()[j]);
 			}
 			carried = true;
 		}
@@ -122,7 +131,7 @@ void Reload::globals() {
 		const auto found = held.find(fresh.globals[i].name);
 		if (found != held.end() && old.globals[found->second].kind == fresh.globals[i].kind) {
 			to_.drop(fresh.globals[i].kind, to_.globals_[i]);
-			to_.globals_[i] = carry(fresh.globals[i].kind, from_.globals_[found->second]);
+			to_.globals_[i] = carry_into(fresh.globals[i].kind, fresh.globals[i].klass, from_.globals_[found->second]);
 		}
 	}
 	for (size_t i = 0; i < old.classes.size() && i < from_.class_used_.size(); i++) {

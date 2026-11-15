@@ -186,6 +186,18 @@ void Interpreter::unwind(size_t p_depth) {
 // One entry from outside: runs the function to its end. An error is reported to the host and cleared, so
 // that the next entry starts clean; an error that was already on its way out when this entry began is put
 // back afterwards.
+bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+	if (entries_ >= MAX_ENTRIES) {
+		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		return false;
+	}
+	const size_t depth = frames_.size();
+	entries_++;
+	const bool ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
+	entries_--;
+	return ok;
+}
+
 bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
 	Object *outer_error = pending_;
 	std::string outer_trace = std::move(trace_);

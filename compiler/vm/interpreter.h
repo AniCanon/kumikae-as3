@@ -107,6 +107,10 @@ private:
 	void unwind(size_t p_depth);
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);
+	// A call made from inside running code that is not an instruction of its own (an element's
+	// toString() while a vector is put into words). If it fails the error is left on its way out, for
+	// the code that is running to carry on unwinding: it is not reported here, as call() reports one.
+	bool call_within(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result);
 	void report();
 	void forget_class(uint32_t p_class); // Its static fields were not all set: it is not used yet, after all.
 	void use_class(uint32_t p_class); // From running code: pushes what must run first.

@@ -165,6 +165,9 @@ struct Function {
 struct Field {
 	std::string name;
 	Kind kind = Kind::Void;
+	// For an object: the class it is declared to hold (a class of the program, or a vector's), or NONE
+	// where that is not known. A reload keeps what a field held only if it is still of that class.
+	uint32_t klass = NONE;
 };
 
 struct Class {
@@ -188,6 +191,7 @@ struct Class {
 struct Global {
 	std::string name; // "Main.count"
 	Kind kind = Kind::Void;
+	uint32_t klass = NONE; // As for a field.
 };
 
 struct Module {

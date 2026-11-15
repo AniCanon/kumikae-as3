@@ -42,16 +42,20 @@ bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 	}
 	const Kind kind = module_.classes[p_vector->klass].element;
 	const uint32_t old = p_vector->length;
-	p_vector->length = p_length;
+	if (p_length >= old) {
+		p_vector->length = p_length;
+		return true;
+	}
+	// Every element that goes is taken out before any is let go: letting one go may run code that adds
+	// to this very vector, and it must find the vector whole, with empty room past its end.
+	std::vector<Slot> gone;
 	if (held(kind)) {
-		for (uint32_t i = p_length; i < old; i++) {
-			// Taken out before it is let go: letting go may run code that looks at this vector.
-			Slot gone = p_vector->data[i];
-			p_vector->data[i].bits = 0;
-			drop(kind, gone);
-		}
-	} else if (p_length < old) {
-		std::fill(p_vector->data + p_length, p_vector->data + old, Slot());
+		gone.assign(p_vector->data + p_length, p_vector->data + old);
+	}
+	std::fill(p_vector->data + p_length, p_vector->data + old, Slot());
+	p_vector->length = p_length;
+	for (Slot &each : gone) {
+		drop(kind, each);
 	}
 	return true;
 }
@@ -147,16 +151,28 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 			case Kind::Str:
 				*r_text += element.p ? static_cast<Str *>(element.p)->view() : std::string_view("null");
 				break;
-			case Kind::Obj:
-				if (!object_as_text(static_cast<Object *>(element.p), r_text)) {
+			case Kind::Obj: {
+				// Held while it speaks: what it says may run the program, which may take it out of
+				// this vector, and then nothing else would be holding it.
+				Object *object = static_cast<Object *>(element.p);
+				retain(object);
+				const bool said = object_as_text(object, r_text);
+				release_object(object);
+				if (!said) {
 					return false;
 				}
 				break;
+			}
 			default: {
-				Str *text = element.p ? host_.handles.text(element.p) : nullptr;
+				// A handle of its own, for the same reason: Godot's text for an object can run a script.
+				void *held = element.p ? host_.handles.copy(element.p) : nullptr;
+				Str *text = held ? host_.handles.text(held) : nullptr;
 				*r_text += text ? text->view() : std::string_view("null");
 				if (release(text)) {
 					free_string(text);
+				}
+				if (held) {
+					host_.handles.drop(held);
 				}
 				break;
 			}
@@ -184,8 +200,8 @@ bool Interpreter::object_as_text(Object *p_object, std::string *r_text) {
 	self.p = p_object;
 	Slot result;
 	result.bits = 0;
-	if (!call(klass.to_string, &self, 1, &result)) {
-		return false;
+	if (!call_within(klass.to_string, &self, 1, &result)) {
+		return false; // Its error is on its way out of the code that asked.
 	}
 	Str *text = static_cast<Str *>(result.p);
 	*r_text += text ? text->view() : std::string_view("null");

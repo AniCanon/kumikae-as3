@@ -38,7 +38,9 @@ struct Request {
 	uint32_t target = NONE; // The register the result goes to, if any.
 
 	Request(const ir::Module &p_module, Host &p_host, const Function &p_function, const Instruction &p_in, Slot *p_registers, Str *p_null_text) :
-			module(p_module), host(p_host), function(p_function), in(p_in), registers(p_registers), null_text(p_null_text) {}
+			module(p_module), host(p_host), function(p_function), in(p_in), registers(p_registers), null_text(p_null_text) {
+		result.bits = 0; // All of it: `{}` on a union clears its first member only, which is half a pointer.
+	}
 
 	const std::string &text(uint32_t p_string) const { return module.strings[p_string]; }
 	void *handle(uint32_t p_register) const { return registers[p_register].p; }
