@@ -108,7 +108,9 @@ interface extend several.
 
 **What is refused, by name, until later slices:** `Object` literals and dynamic properties, `Dictionary`,
 `for in` over anything but a vector or an Array,
-`this` inside a function expression and the instance members it would name bare (`n`, `go()`), regular expressions and the `String`
+`this` inside a function expression and the instance members it reaches without an object (`n`, `go()`,
+`super.go()`, a Godot property), an interface's method that a class has only from Godot's API or the built-in
+library, regular expressions and the `String`
 methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
 `Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
 `... is not supported by the interpreter yet` at the place.
@@ -431,7 +433,8 @@ built-in.
 - **Writes** to a `const`, to a property with no setter, to a method, a package function or a class. A
   built-in class's methods may be replaced (`o.toString = f`), because they may live on its prototype.
 - **Reads** of a property with no getter, `x += 1` and `x++` included.
-- **Properties:** a getter and its setter are of one type, wherever each is declared. Through an interface,
+- **Properties:** a getter takes no parameters and gives a value; a setter takes one, with no default, and
+  gives nothing. A getter and its setter are of one type, wherever each is declared. Through an interface,
   the other half is looked for in the interfaces it extends.
 
 ## What fits

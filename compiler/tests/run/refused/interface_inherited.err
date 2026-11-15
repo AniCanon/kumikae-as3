@@ -1,0 +1,1 @@
+interface_inherited.as:3:7: error: implementing 'toString' of Text with a member of Godot's or of the built-in library is not supported by the interpreter yet

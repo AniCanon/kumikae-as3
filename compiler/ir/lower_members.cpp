@@ -61,6 +61,11 @@ std::optional<Place> Members::property(Expr *p_target, Expr *p_object, Expr *p_l
 		place.object = NONE;
 	} else {
 		const bool own = !p_object || p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr;
+		if (own && l_.received_env_) {
+			// A function expression's first register is its environment, not the object.
+			l_.refuse(position, "an instance member named inside a function expression");
+			return Place();
+		}
 		place.object = own ? 0 : l_.settled(l_.receiver(p_object), p_later, position);
 		// `super.x` is the base's own; a private property is never overridden.
 		const bool exact = (symbol->modifiers & Modifiers::Private) || (p_object && p_object->kind == NodeKind::SuperExpr);
@@ -177,7 +182,11 @@ void Members::implement(uint32_t p_class, const Symbol *p_symbol) {
 			const uint32_t number = l_.slots_[method];
 			const auto slot = slots.find(member_key(method));
 			if (slot == slots.end()) {
-				continue; // The checker has said so, unless the class is in a declaration file.
+				// The checker found it, so the class has it from Godot's API or the built-in library, which
+				// have no function in the module to put in the table.
+				l_.refuse(p_symbol->offset, "implementing '" + member_key(method) + "' of " + std::string(promise->name) +
+						" with a member of Godot's or of the built-in library");
+				continue;
 			}
 			if (klass.interface_methods.size() <= number) {
 				klass.interface_methods.resize(number + 1, NONE);

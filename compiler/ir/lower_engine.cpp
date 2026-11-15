@@ -7,6 +7,11 @@ uint32_t Lowerer::engine_receiver(Expr *p_object, uint32_t p_position, bool *r_o
 	*r_of_value = false;
 	if (!p_object || p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr) {
 		uint32_t klass = 0;
+		if (received_env_) {
+			// A function expression's first register is its environment, not the script's object.
+			refuse(p_position, "an instance member named inside a function expression");
+			return default_value(Kind::Ref, p_position);
+		}
 		if (fn().is_static || !class_ || !class_index(class_, &klass) || module_.classes[klass].native_base.empty()) {
 			refuse(p_position, "this use of a Godot member");
 			return default_value(Kind::Ref, p_position);

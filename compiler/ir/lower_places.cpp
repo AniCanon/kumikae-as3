@@ -12,6 +12,9 @@ void Lowerer::touch(const Symbol *p_class, uint32_t p_position) {
 
 uint32_t Lowerer::receiver(Expr *p_object) {
 	if (p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr) {
+		if (received_env_) {
+			refuse(p_object->offset, "an instance member named inside a function expression"); // r0 is the environment there.
+		}
 		return 0;
 	}
 	uint32_t object = expression(p_object, Kind::Void);
