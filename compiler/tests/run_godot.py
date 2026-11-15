@@ -151,7 +151,7 @@ check("a null that is not the last argument takes Godot's default, with no error
       output[-800:])
 check("a member of a freed object is AS3's null error, and says the object was freed",
       all(re.search(r"TypeError: Error #1009[^\n]*Godot has freed the object\.\n\s+at Values/%s\(\)" % name, output) for name in
-          ("keptName", "keptRename", "keptChildren")), output[-1500:])
+          ("keptName", "keptRename", "keptChildren", "keptSignal", "keptByName")), output[-1500:])
 check("an index out of range is an AS3 error", "at Values/outOfRange()" in output and "at Values/packed()" in output, output[-800:])
 traced = re.search(r"EXPECT TRACE (.*)", output)
 check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])

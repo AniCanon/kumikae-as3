@@ -78,6 +78,8 @@ func _physics_process(_delta: float) -> bool:
 	show("freed name", ask("keptName", []), null)
 	ask("keptRename", [])
 	show("freed children", ask("keptChildren", []), null)
+	ask("keptSignal", [])
+	ask("keptByName", [])
 	show("freed as an argument", ask("keptUnder", [node]), false)
 	print("AFTER FREED")
 	# One part of a value. The twin has the same done to it in GDScript.

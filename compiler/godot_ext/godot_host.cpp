@@ -30,6 +30,9 @@ using namespace godot;
 
 namespace kas3 {
 
+// What reaching through an object Godot has freed is: AS3's null error, which says so.
+static const char *const FREED = "TypeError: Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.";
+
 String to_godot(std::string_view p_text) {
 	return String::utf8(p_text.data(), (int64_t)p_text.size());
 }
@@ -46,26 +49,23 @@ std::string describe(const GDExtensionCallError &p_error, std::string_view p_wha
 		case GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS:
 			return "too few arguments for Godot's '" + what + "'";
 		case GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL:
-			return "'" + what + "' was called on an object Godot has freed";
+			return FREED;
 		default:
 			return "Godot could not call '" + what + "'";
 	}
 }
 
-// A handle on a reference-counted object that is gone. Copying it would count a reference on freed
-// memory. (Only a script's hold on its own owner can be one: any other handle keeps its object alive.) A
-// handle on any other freed object is safe to copy, and Godot knows it as a freed object.
 // An object Godot has freed. To a script it is null.
 static bool is_freed(const Variant &p_value) {
 	return p_value.get_type() == Variant::OBJECT && !((ObjectID)p_value).is_null() && !p_value.get_validated_object();
 }
 
-static const char *const FREED = "TypeError: Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.";
-
+// A handle on a reference-counted object that is gone. Copying it would count a reference on freed
+// memory. (Only a script's hold on its own owner can be one: any other handle keeps its object alive.) A
+// handle on any other freed object is safe to copy, and Godot knows it as a freed object.
 static bool is_dangling(const Variant &p_value) {
 	return p_value.get_type() == Variant::OBJECT && ((ObjectID)p_value).is_ref_counted() && !p_value.get_validated_object();
 }
-
 
 Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 	switch (p_kind) {
@@ -289,7 +289,7 @@ static bool signal_verb(const Variant &p_receiver, std::string_view p_verb, cons
 		return false;
 	}
 	if (!ObjectDB::get_instance(signal.get_object_id())) {
-		*r_error = "the signal belongs to an object Godot has freed";
+		*r_error = FREED;
 		return false;
 	}
 	if (p_verb == "@removeAll" || p_verb == "@numListeners") {
@@ -508,7 +508,7 @@ void *GodotHost::bind(vm::Object *p_object, uint32_t p_function, void *p_owner, 
 	if (p_owner) {
 		owner = static_cast<Variant *>(p_owner)->get_validated_object();
 		if (!owner) {
-			*r_error = "the object this script is attached to has been freed";
+			*r_error = FREED;
 			return nullptr;
 		}
 	}
@@ -518,7 +518,7 @@ void *GodotHost::bind(vm::Object *p_object, uint32_t p_function, void *p_owner, 
 bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	Object *object = static_cast<Variant *>(p_receiver)->get_validated_object();
 	if (!object) {
-		*r_error = "'" + std::string(p_name) + "' was asked of an object Godot has freed";
+		*r_error = FREED;
 		return false;
 	}
 	// The name is AS3's. Godot's own comes from the name table, for the object's class or one it extends.

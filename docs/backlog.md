@@ -160,8 +160,6 @@ any Godot value passing as a condition):
 - A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
   `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
   **decision**
-- Three messages for a freed receiver keep their old wording and are a plain `Error`, not #1009
-  (a signal by name, a signal's owner, a call's description). **clean-up**
 - The source of a reported error is read from the first `\tat ` and the first `]`: a path with `]` in it,
   or a message that itself contains a stack line, is reported with the wrong source. **clean-up**
 - A property written through a missing script object is refused before the value is worked out; a call's

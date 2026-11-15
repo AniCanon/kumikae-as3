@@ -42,7 +42,12 @@ package {
 		public function nullNode(n:Node):String { return String(n); }
 		public function nullOwn(n:Node):String { return n.toString(); }
 		public function traced(v:Vector2):void { trace(v, v.x); }
-		public function keep(n:Node):void { kept = n; }
+		public function keep(n:Node):void { kept = n; keptReady = n.ready; }
+		// What is reached through a freed object, in every way: AS3's #1009, saying it was freed.
+		private var keptReady:Signal;
+		private function heard():void {}
+		public function keptSignal():void { keptReady.add(heard); }
+		public function keptByName():void { kept["ready"].add(heard); }
 		public function keptText():String { return "kept " + kept; }
 		// A Godot object that has been freed is null to a script.
 		public function keptIsNull():Boolean { return kept == null; }
