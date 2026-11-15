@@ -14,7 +14,8 @@ recognizes code, punctuation and non-code text, retaining lexical state at token
 incremental highlighting. That state includes `Braces`: whether each open brace began a block or a
 value, which decides whether a slash after its `}` starts a regex or divides. Since a state holds all the
 lexer knows, it is a `RestartableLexer` (an experimental platform interface): the editor lexes again
-from a token near an edit, not from the top of the file. `As3EditorHighlighterProvider` combines a structural highlighter with the
+from a token near an edit, not from the top of the file. The editor keeps sixteen bits of such a state,
+so the whole state fits in them; `Braces` keeps only where the two innermost value braces are. `As3EditorHighlighterProvider` combines a structural highlighter with the
 existing TextMate highlighter. Its iterator intersects their intervals: AS3 supplies token kinds and
 TextMate supplies color attributes. Both receive the same document changes and belong to the editor;
 no document text or per-edit token history is copied into a separate cache.

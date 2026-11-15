@@ -1,38 +1,45 @@
 package app.anicanon.kumikae.as3.language
 
 /**
- * The kinds of the braces open at a place, innermost last, in the bits of a lexer's state: one bit for
- * each, above a leading 1 that marks where they start. Sixteen are told apart. Braces open deeper than
- * that are counted, so that closing them comes out right, and count as blocks.
+ * Where the open braces that began a value (an object, a function written in place) are, among the others,
+ * which began blocks. It is kept in seven bits of a lexer's state, because the editor keeps only sixteen
+ * bits of it: for the innermost such brace, how many blocks are open inside it (up to 14), and for the one
+ * around that, how many blocks lie between them (up to 6). Blocks need no more: any number may be open.
+ * A value brace further out, or past those counts, is forgotten, and its `}` is read as a block's.
  */
 @JvmInline
 internal value class Braces private constructor(val bits: Int) {
-    constructor() : this(EMPTY)
+    constructor() : this(0)
 
-    val innermostIsValue get() = deeper == 0 && kinds > EMPTY && kinds and 1 == 1
+    // Each count is kept plus one, so that 0 means "none" and the empty state is 0.
+    private val inner get() = bits and INNER_MASK
+    private val outer get() = bits ushr INNER_BITS
 
-    private val kinds get() = bits and KINDS_MASK
-    private val deeper get() = bits ushr KIND_BITS
+    val innermostIsValue get() = inner == 1
 
     fun push(value: Boolean): Braces = when {
-        deeper > 0 || kinds >= FULL -> Braces(kinds or (minOf(deeper + 1, DEEPER_MAX) shl KIND_BITS))
-        else -> Braces((kinds shl 1) or (if (value) 1 else 0))
+        value -> Braces(1 or (if (inner in 1..OUTER_MAX) inner shl INNER_BITS else 0))
+
+        inner == 0 -> this
+
+        inner == INNER_MASK -> Braces(0)
+
+        // Too many blocks inside it to count: it is forgotten.
+        else -> Braces((inner + 1) or (outer shl INNER_BITS))
     }
 
-    fun pop(): Braces = when {
-        deeper > 0 -> Braces(kinds or ((deeper - 1) shl KIND_BITS))
-        kinds > EMPTY -> Braces(kinds ushr 1)
-        else -> this // A `}` with nothing open: the file is being typed.
+    fun pop(): Braces = when (inner) {
+        0 -> this
+        1 -> Braces(outer)
+        else -> Braces((inner - 1) or (outer shl INNER_BITS))
     }
 
     companion object {
-        private const val KIND_BITS = 17
-        private const val KINDS_MASK = (1 shl KIND_BITS) - 1
-        private const val EMPTY = 1
-        private const val FULL = 1 shl (KIND_BITS - 1) // The leading 1 is at the top: no room for another.
-        private const val DEEPER_MAX = 31
+        const val BITS = 7
+        private const val INNER_BITS = 4
+        private const val INNER_MASK = (1 shl INNER_BITS) - 1
+        private const val OUTER_MAX = (1 shl (BITS - INNER_BITS)) - 1
 
-        /** From the state's bits; 0, a fresh start, has nothing open. */
-        fun of(bits: Int) = if (bits and KINDS_MASK == 0) Braces() else Braces(bits)
+        fun of(bits: Int) = Braces(bits and ((1 shl BITS) - 1))
     }
 }

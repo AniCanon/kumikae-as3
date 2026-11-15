@@ -73,8 +73,9 @@ Enter inside braces creates an indented line, using the project's tab/space sett
 inside comments and strings is not treated as a new code block. Regex literals are protected in
 expression positions and after control conditions. After a closing brace the local lexer remembers
 what the brace began: a block (`if (a) {} /re/`) may be followed by a regex, while an object or a
-function written in place (`var o = {} / 2`) is divided. It tells sixteen nested braces apart; deeper
-ones count as blocks. The compiler handles regex contexts independently for completion and argument
+function written in place (`var o = {} / 2`) is divided. Blocks may be nested to any depth. Of the braces
+that began values, the two innermost are remembered (with up to fourteen and six blocks inside them); a
+third one around them is read as a block's. The compiler handles regex contexts independently for completion and argument
 help.
 
 Highlighting still comes from the shared TextMate grammar. A small adapter supplies AS3 token boundaries

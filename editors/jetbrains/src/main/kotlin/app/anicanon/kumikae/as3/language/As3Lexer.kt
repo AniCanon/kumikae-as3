@@ -28,8 +28,8 @@ internal object As3Tokens {
  * from `kas3c`, through the language server.
  *
  * Its state at a token is all it needs to start again there, so the editor may start it again at any token
- * near an edit. A lexer that is not restartable is started again only where its state is the first one,
- * which inside a class, with braces open, it never is: every edit would be lexed again from the top.
+ * near an edit. It fits in fifteen bits: the editor keeps sixteen of a restartable lexer's state, and only
+ * a lexer that is restartable has its state kept and compared after an edit at all.
  */
 internal class As3Lexer :
     LexerBase(),
@@ -57,6 +57,10 @@ internal class As3Lexer :
     // A `?` waits for its `:`, after which a brace is a value.
     private var ternary = false
 
+    // A type is being written after a `:` (or a `case` or a label is ending): `*`, `.<` and `>` are part
+    // of it, and a brace after it begins a block.
+    private var inType = false
+
     override fun start(buffer: CharSequence, startOffset: Int, endOffset: Int, initialState: Int) {
         text = buffer
         end = endOffset
@@ -66,6 +70,7 @@ internal class As3Lexer :
         valueNext = initialState and 4 != 0
         functionValue = initialState and 8 != 0
         ternary = initialState and 16 != 0
+        inType = initialState and IN_TYPE != 0
         conditionDepth = (initialState ushr 5) and DEPTH_MASK
         braces = Braces.of(initialState ushr BRACES_SHIFT)
         advance()
@@ -97,8 +102,9 @@ internal class As3Lexer :
 
     override fun advance() {
         start = stop
-        tokenState = (braces.bits shl BRACES_SHIFT) or (conditionDepth shl 5) or flag(ternary, 16) or
-            flag(functionValue, 8) or flag(valueNext, 4) or flag(controlPending, 2) or (if (regexAllowed) 0 else 1)
+        tokenState = flag(inType, IN_TYPE) or (braces.bits shl BRACES_SHIFT) or (conditionDepth shl 5) or
+            flag(ternary, 16) or flag(functionValue, 8) or flag(valueNext, 4) or flag(controlPending, 2) or
+            (if (regexAllowed) 0 else 1)
         if (start >= end) {
             type = null
             return
@@ -118,17 +124,20 @@ internal class As3Lexer :
                 string(first)
                 regexAllowed = false
                 valueNext = false
+                inType = false
             }
 
             first == '/' && regexAllowed -> {
                 regex()
                 valueNext = false
+                inType = false
             }
 
             (first == '+' || first == '-') && next == first -> {
                 type = As3Tokens.SYMBOL
                 stop = start + 2
                 valueNext = false
+                inType = false
             }
 
             else -> symbol(first)
@@ -143,13 +152,18 @@ internal class As3Lexer :
         if (word == "function") {
             functionValue = valueNext
         }
-        valueNext = word in VALUE_PREFIXES
+        valueNext = !inType && word in VALUE_PREFIXES
     }
 
     private fun symbol(first: Char) {
         type = BRACKETS[first] ?: As3Tokens.SYMBOL
         stop = start + 1
         regexAllowed = first !in ")]}."
+        if (inType && first in TYPE_SYMBOLS) {
+            return // Part of the type: `*`, `Vector.<int>`.
+        }
+        val typeStarts = first == ':' && !ternary && !braces.innermostIsValue
+        inType = false
         when (first) {
             '{' -> {
                 braces = braces.push(valueNext || functionValue)
@@ -178,6 +192,7 @@ internal class As3Lexer :
         valueNext = first in VALUE_SYMBOLS || (first == ':' && (ternary || braces.innermostIsValue))
         if (first == ':') {
             ternary = false
+            inType = typeStarts
         }
         controlPending = false
     }
@@ -235,8 +250,10 @@ internal class As3Lexer :
     }
 
     private companion object {
-        const val DEPTH_MASK = 31
-        const val BRACES_SHIFT = 10
+        const val DEPTH_MASK = 7 // A control condition's parentheses, nested up to seven deep.
+        const val IN_TYPE = 1 shl 15
+        const val TYPE_SYMBOLS = "*.<>"
+        const val BRACES_SHIFT = 8
         const val VALUE_SYMBOLS = "=([,?!~+-*/%&|^<>"
         val VALUE_PREFIXES = setOf("return", "throw", "typeof", "delete", "in", "new", "yield")
         val CONTROL_PREFIXES = setOf("if", "while", "for", "switch", "catch", "with")

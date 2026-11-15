@@ -14,7 +14,8 @@ class As3LexerTest {
             out += "${lexer.tokenType}:${text.substring(lexer.tokenStart, lexer.tokenEnd)}"
             covered = lexer.tokenEnd
             val restart = As3Lexer()
-            restart.start(text, lexer.tokenStart, text.length, lexer.state)
+            // As the editor gives a state back: the low sixteen bits, sign and all.
+            restart.start(text, lexer.tokenStart, text.length, (lexer.state shl 16) shr 16)
             assertEquals(lexer.tokenType, restart.tokenType, "restart keeps token kind")
             assertEquals(lexer.tokenEnd, restart.tokenEnd, "restart keeps token boundary")
             lexer.advance()
@@ -78,7 +79,15 @@ class As3LexerTest {
     @Test fun `after a closing brace, what the brace opened says whether a slash is a regex or division`() {
         // A block ends a statement: a regex may follow.
         val blocks =
-            listOf("if (a) {} /re/", "function f():void {} /re/", "case 1: {} /re/", "{ {} /re/ }", "else {} /re/")
+            listOf(
+                "if (a) {} /re/",
+                "function f():void {} /re/",
+                "function f():* {} /re/",
+                "function f():Vector.<int> {} /re/",
+                "case 1: {} /re/",
+                "{ {} /re/ }",
+                "else {} /re/",
+            )
         for (source in blocks) {
             assertEquals(true, tokens(source).contains("AS3_REGEX:/re/"), source)
         }
@@ -86,6 +95,8 @@ class As3LexerTest {
         for (source in listOf(
             "var o = {} / 2",
             "x = function():void {} / 2",
+            "x = function():* {} / 2",
+            "var o:Object = {} / 2",
             "a ? b : {} / 2",
             "f({ a: {} } / 2)",
             "return {} / 2",
@@ -97,14 +108,26 @@ class As3LexerTest {
         }
     }
 
-    @Test fun `sixteen open braces are told apart, and deeper ones are counted`() {
-        val deep = "{".repeat(15) + "x = {} / 2" + "}".repeat(15) + " /re/"
+    @Test fun `blocks may be open to any depth, and the two innermost values are kept`() {
+        val deep = "{".repeat(40) + "x = {} / 2; if (a) {} /re/" + "}".repeat(40) + " /re/"
         assertEquals(listOf("AS3_SYMBOL:/", "AS3_WORD:2"), tokens(deep).dropWhile { it != "AS3_SYMBOL:/" }.take(2))
-        assertEquals("AS3_REGEX:/re/", tokens(deep).last())
-        // Past that a brace counts as a block; closing them all still leaves the file's top level.
-        val deeper = "{".repeat(40) + "if (a) {} /x/" + "}".repeat(40) + " x = {} / 2"
-        assertEquals("AS3_REGEX:/x/", tokens(deeper).first { it.startsWith("AS3_REGEX") })
-        assertEquals(listOf("AS3_SYMBOL:/", "AS3_WORD:2"), tokens(deeper).takeLast(2))
+        assertEquals(2, tokens(deep).count { it == "AS3_REGEX:/re/" })
+        // An object in an object, each with blocks inside: both are told apart from the blocks.
+        val nested = "x = { a: function() { if (b) { } }, c: { d: 1 } / 2 } / 3"
+        assertEquals(listOf("AS3_SYMBOL:/", "AS3_SYMBOL:/"), tokens(nested).filter { it == "AS3_SYMBOL:/" })
+        // A third value around them is forgotten: its `}` is read as a block's.
+        assertEquals("AS3_REGEX:/ 2", tokens("x = { a: { b: { c: 1 } } } / 2").last())
+    }
+
+    @Test fun `the whole state fits in the sixteen bits the editor keeps`() {
+        val text =
+            "{".repeat(40) + "x = { a: function():Vector.<int> { if (((((((((b))))))))) {} } } / 2" + "}".repeat(40)
+        val lexer = As3Lexer()
+        lexer.start(text, 0, text.length, 0)
+        while (lexer.tokenType != null) {
+            assertEquals(lexer.state, lexer.state and 0xFFFF)
+            lexer.advance()
+        }
     }
 
     @Test fun `the editor may start again at any token, as tokens() checks for every one`() {
