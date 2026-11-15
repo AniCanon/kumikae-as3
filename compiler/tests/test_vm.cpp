@@ -1064,7 +1064,6 @@ static void test_engine_calls() {
 		"function f():void { Vector2.ZERO.x = 5; }",
 		"function f():void { Vector2.ZERO[0] = 5; }",
 		"function f():void { Vector2.ZERO.x++; }",
-		"function f():void { treeEntered.add(function():void {}); }",
 		"function f(n:Node):void { var x:int = n[\"name\"].length; }",
 		"function f():void { position.normalized().x = 5; }",
 		"function f():void { position.normalized()[0] = 5; }",

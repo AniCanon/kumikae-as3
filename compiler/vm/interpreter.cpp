@@ -48,6 +48,9 @@ Interpreter::~Interpreter() {
 			host_.handles.drop(kept);
 		}
 	}
+	for (Object *kept : lone_functions_) {
+		release_object(kept);
+	}
 	for (size_t i = 0; i < globals_.size(); i++) {
 		drop(module_.globals[i].kind, globals_[i]);
 	}

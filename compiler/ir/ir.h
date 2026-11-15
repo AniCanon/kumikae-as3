@@ -123,6 +123,7 @@ inline bool is_held(Kind p_kind) {
 	   CallFunction: out (untyped, or NONE), the function value (a Function or an untyped value), its \
 	   arguments, each untyped. */ \
 	X(MakeFunction, "RFr") X(MakeMethod, "RVR") X(CallFunction, "rRA") \
+	X(FunctionToCallable, "RR-") /* A function value as a Godot Callable that calls it; null for null. */ \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
 

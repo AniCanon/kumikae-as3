@@ -71,8 +71,6 @@ Found by the review of the clean-up pass itself.
 
 ## Stage 2b-2, part B: signals
 
-- Only a method of a script object can be a listener. A function written in place, a package function and
-  a static method wait for closures. **2c**
 - A signal's own `numListeners` and `emit` can't follow `object[name]` as a property read: only its
   methods can (`timer[name].add(f)`). **2c**
 - A script's own signals wait for `[Signal]`. **2d**

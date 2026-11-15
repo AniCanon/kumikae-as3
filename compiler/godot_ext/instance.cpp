@@ -156,14 +156,16 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	Project &program = Project::get();
 	uint32_t method = p_function;
 	const ir::Function &function = program.module().functions[method];
-	// Register 0 is `this`; the parameters follow.
-	size_t wanted = function.parameters > 0 ? function.parameters - 1 : 0;
+	// Register 0 is `this` (or a function expression's environment), unless it takes none; the parameters
+	// follow.
+	const size_t first = function.is_static ? 0 : 1;
+	size_t wanted = function.parameters > first ? function.parameters - first : 0;
 	if ((size_t)p_argc > wanted) {
 		r_error->error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
 		r_error->expected = (int32_t)wanted;
 		return;
 	}
-	size_t needed = function.required > 0 ? function.required - 1 : 0;
+	size_t needed = function.required > first ? function.required - first : 0;
 	if ((size_t)p_argc < needed) {
 		r_error->error = GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS;
 		r_error->expected = (int32_t)needed;
@@ -171,8 +173,8 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	}
 	// Every argument is checked before any is converted, so that a refusal leaves nothing to give back.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		ir::Kind kind = function.registers[i + 1];
-		const std::string godot_type = i + 1 < function.engine_types.size() ? function.engine_types[i + 1] : std::string();
+		ir::Kind kind = function.registers[i + first];
+		const std::string godot_type = i + first < function.engine_types.size() ? function.engine_types[i + first] : std::string();
 		if (!kas3::arrives(kind, godot_type, *p_args[i])) {
 			// A whole number too wide for an int or a uint parameter: AS3's RangeError, said as an uncaught
 			// AS3 error is, and null for the caller. (Godot would say it can't convert an int to an int.)
@@ -190,15 +192,17 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 			return;
 		}
 	}
-	std::vector<vm::Slot> arguments((size_t)p_argc + 1);
-	arguments[0].bits = 0;
-	arguments[0].p = p_object;
+	std::vector<vm::Slot> arguments((size_t)p_argc + first);
+	if (first) {
+		arguments[0].bits = 0;
+		arguments[0].p = p_object;
+	}
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		const std::optional<vm::Slot> taken = kas3::from_variant(function.registers[i + 1], *p_args[i]);
+		const std::optional<vm::Slot> taken = kas3::from_variant(function.registers[i + first], *p_args[i]);
 		if (!taken) {
 			// As with any call that fails: the error said, and null for the caller.
 			for (size_t made = 0; made < i; made++) {
-				program.interpreter().discard(function.registers[made + 1], arguments[made + 1]);
+				program.interpreter().discard(function.registers[made + first], arguments[made + first]);
 			}
 			// As an uncaught AS3 error reads, at the method Godot called.
 			UtilityFunctions::push_error(String("Error: ") + String::utf8(vm::OUT_OF_MEMORY.data(), (int64_t)vm::OUT_OF_MEMORY.size()) +
@@ -206,14 +210,14 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 			r_error->error = GDEXTENSION_CALL_OK;
 			return;
 		}
-		arguments[i + 1] = *taken;
+		arguments[i + first] = *taken;
 	}
 	vm::Slot result;
 	result.bits = 0;
 	bool ok = program.interpreter().call_function(method, arguments.data(), arguments.size(), &result);
 	// What was made for the call is given up again.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		program.interpreter().discard(function.registers[i + 1], arguments[i + 1]);
+		program.interpreter().discard(function.registers[i + first], arguments[i + first]);
 	}
 	const vm::Object *returned = function.result == ir::Kind::Obj ? static_cast<const vm::Object *>(result.p)
 			: function.result == ir::Kind::Any && vm::any::tag(result) == vm::AnyTag::Object ? static_cast<const vm::Object *>(vm::any::pointer(result))

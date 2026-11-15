@@ -60,6 +60,13 @@ func _physics_process(_delta: float) -> bool:
 	ask("listen")
 	ask("unlisten")
 	show("not listening", ask("listening"), false)
+	var before = node.joys
+	ask("listenInPlace")
+	Input.joy_connection_changed.emit(2, true)
+	show("a function written in place listens", [node.joys - before, ask("heardStatic")], [20, 2])
+	ask("unlistenInPlace")
+	Input.joy_connection_changed.emit(5, true)
+	show("and is removed through its value", [node.joys - before, ask("heardStatic")], [20, 2])
 	Input.joy_connection_changed.disconnect(on_joy)
 	show("input class", ask("inputClass"), Input.get_class())
 	show("same singleton", ask("sameSingleton"), true)

@@ -326,8 +326,12 @@ uint32_t Lowerer::bound_method(Expr *p_expression) {
 	Symbol *symbol = callee_symbol(p_expression);
 	auto function = functions_.find(symbol);
 	if (!symbol || symbol->kind != SymbolKind::Method || symbol->is_static() || function == functions_.end()) {
-		refuse(position, "a function used as a value, other than a method of a script object");
-		return default_value(Kind::Val, position);
+		// Any other function value (a function expression, a static method, one held in a variable): a
+		// Godot Callable that calls it.
+		const uint32_t value = expression(p_expression, Kind::Obj);
+		uint32_t out = reg(Kind::Val);
+		emit(Op::FunctionToCallable, position, out, value);
+		return out;
 	}
 	uint32_t object = 0;
 	bool on_this = true;

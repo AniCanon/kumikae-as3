@@ -51,6 +51,7 @@ private:
 	Str *null_text_ = nullptr; // "null"
 	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
 	std::vector<void *> singletons_; // The engine's singletons, by the string of their name, once found.
+	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	bool failing_ = false; // An error is on its way out: pending_ holds it.
 	Slot pending_{}; // What was thrown, as an untyped value with a reference of its own.
@@ -132,6 +133,7 @@ private:
 	Object *function_in(ir::Kind p_kind, Slot p_value);
 	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
 	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
+	void to_callable(const ir::Instruction &p_in);
 	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	// A call of one of a vector's methods: its arguments (the vector first) by register, where the

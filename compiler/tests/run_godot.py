@@ -191,7 +191,7 @@ output = compare("statics.gd", [
     "pressed", "strength", "stick", "system", "an editor-only singleton is an AS3 error", "a class's static method",
     "orphan nodes printed", "a static call's arguments in order", "the value before the missing object", "a static call's result of the wrong type",
     "a singleton's members through a variable", "a singleton variable that is null", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
-    "listening", "heard", "cleared", "others still listen", "not listening", "input class", "same singleton",
+    "listening", "heard", "cleared", "others still listen", "not listening", "a function written in place listens", "and is removed through its value", "input class", "same singleton",
     "singleton object",
     "escape", "captured", "ready notice", "axis", "zero", "up", "red", "forward", "identity", "sum", "up y",
     "default key", "given key",

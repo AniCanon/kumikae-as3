@@ -10,8 +10,19 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-// A new function value: the function, and what it is called with first (held: a reference of its own).
+// A new function value: the function, and what it is called with first (held: a reference of its own). A
+// function that takes nothing first has one value, the same each time, as AVM2 gives one for a static
+// method: adding and removing it as a listener then match.
 Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
+	if (!p_first && module_.functions[p_function].is_static) {
+		if (lone_functions_.size() <= p_function) {
+			lone_functions_.resize(module_.functions.size(), nullptr);
+		}
+		if (Object *kept = lone_functions_[p_function]) {
+			retain(kept);
+			return kept;
+		}
+	}
 	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2);
 	if (!made) {
 		if (module_.function_class != NONE) {
@@ -22,6 +33,10 @@ Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
 	made->fields()[ir::FUNCTION_INDEX].i = static_cast<int32_t>(p_function);
 	retain(p_first);
 	made->fields()[ir::FUNCTION_FIRST].p = p_first;
+	if (!p_first && module_.functions[p_function].is_static) {
+		retain(made); // Kept until the interpreter goes.
+		lone_functions_[p_function] = made;
+	}
 	return made;
 }
 
@@ -47,10 +62,41 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			}
 			break;
 		}
+		case Op::FunctionToCallable:
+			to_callable(p_in);
+			break;
 		default:
 			call_value(p_function, p_in);
 			break;
 	}
+}
+
+// A function value as Godot's Callable: bound to what it is called with first (a method's object, a function
+// expression's environment), or to the function value itself for one that takes nothing first. A
+// method's is the one its object would give, so that adding and removing a listener match.
+void Interpreter::to_callable(const Instruction &p_in) {
+	Slot *r = stack_.data() + frames_.back().base;
+	Object *value = static_cast<Object *>(r[p_in.b].p);
+	Slot made;
+	made.bits = 0; // All of it: `{}` on a union clears its first member only.
+	if (!value) {
+		put(Kind::Val, r[p_in.a], made);
+		return;
+	}
+	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	const Function &callee = module_.functions[target];
+	// A function expression that captured nothing is given nothing first: the value itself goes there.
+	Object *first = static_cast<Object *>(value->fields()[ir::FUNCTION_FIRST].p);
+	Object *bound = callee.is_static || !first ? value : first;
+	const ir::Class &klass = module_.classes[bound->klass];
+	void *owner = !callee.is_static && !klass.native_base.empty() && !klass.fields.empty() ? bound->fields()[0].p : nullptr;
+	std::string error;
+	made.p = host_.source.bind(bound, target, owner, &error);
+	if (!made.p) {
+		raise(module_.error_class, error.empty() ? "the engine could not take this function" : error);
+		return;
+	}
+	put(Kind::Val, r[p_in.a], made);
 }
 
 // Two function values of one method on one object are equal, as AVM2 has it (`f == obj.method`).

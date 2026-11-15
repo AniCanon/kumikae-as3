@@ -161,13 +161,15 @@ public:
 			std::string text;
 			if (r_call_error.error == GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT && r_call_error.argument >= 0 && r_call_error.argument < p_argcount) {
 				CharString given = Variant::get_type_name(p_arguments[r_call_error.argument]->get_type()).utf8();
-				ir::Kind kind = callee.registers[(size_t)r_call_error.argument + 1];
-				const std::string &type = (size_t)r_call_error.argument + 1 < callee.engine_types.size() ? callee.engine_types[(size_t)r_call_error.argument + 1] : std::string();
+				const size_t at = (size_t)r_call_error.argument + (callee.is_static ? 0 : 1);
+				ir::Kind kind = callee.registers[at];
+				const std::string &type = at < callee.engine_types.size() ? callee.engine_types[at] : std::string();
 				text = "TypeError: Error #1034: Type Coercion failed: cannot convert argument " + std::to_string(r_call_error.argument + 1) +
 						" of " + callee.name + "(), a " + given.get_data() + ", to " + (type.empty() ? ir::kind_name(kind) : type.c_str()) + ".";
 			} else {
-				size_t most = callee.parameters > 0 ? callee.parameters - 1 : 0;
-				size_t least = callee.required > 0 ? callee.required - 1 : 0;
+				const size_t first = callee.is_static ? 0 : 1;
+				size_t most = callee.parameters > first ? callee.parameters - first : 0;
+				size_t least = callee.required > first ? callee.required - first : 0;
 				text = "ArgumentError: Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
 						std::to_string((size_t)p_argcount > most ? most : least) + ", got " + std::to_string(p_argcount) + ".";
 			}

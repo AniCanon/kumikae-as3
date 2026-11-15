@@ -59,6 +59,22 @@ package {
 		public function clear():void { Input.joyConnectionChanged.removeAll(); }
 		public function listening():Boolean { return Input.joyConnectionChanged.has(onJoy); }
 		private function onJoy(device:int, connected:Boolean):void { joys += connected ? device : 100; }
+		// Listeners that are not methods: a function written in place, which captures what it uses, and a
+		// static method. One kept in a variable is removed through it.
+		public static var staticJoys:int = 0;
+		private static function onJoyStatic(device:int, connected:Boolean):void { staticJoys += device; }
+		private var inPlace:Function;
+		public function listenInPlace():void {
+			var self:Statics = this;
+			inPlace = function (device:int, connected:Boolean):void { self.joys += device * 10; };
+			Input.joyConnectionChanged.add(inPlace);
+			Input.joyConnectionChanged.add(onJoyStatic);
+		}
+		public function unlistenInPlace():void {
+			Input.joyConnectionChanged.remove(inPlace);
+			Input.joyConnectionChanged.remove(onJoyStatic);
+		}
+		public function heardStatic():int { return staticJoys; }
 		public function inputClass():String { return Input.singleton.getClass(); }
 		public function sameSingleton():Boolean { return Input.singleton == Input.singleton; }
 		public function singletonObject():GodotObject { return Input.singleton; }
