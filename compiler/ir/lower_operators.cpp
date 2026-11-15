@@ -184,6 +184,32 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 	return out;
 }
 
+// Where the left of an Int64 and a Boolean or a String stands against the right: below 0, 0 or above.
+uint32_t Lowerer::wide_order(Expr *p_left, Expr *p_right, uint32_t p_position) {
+	Kind left_kind = Kind::Void;
+	kind_of(p_left->type, &left_kind);
+	const bool wide_first = left_kind == Kind::I64;
+	Expr *other = wide_first ? p_right : p_left;
+	Kind other_kind = Kind::Void;
+	kind_of(other->type, &other_kind);
+	uint32_t x = settled(expression(p_left, wide_first ? Kind::I64 : (other_kind == Kind::Str ? Kind::Str : Kind::F64)), p_right, p_position);
+	uint32_t y = expression(p_right, wide_first ? (other_kind == Kind::Str ? Kind::Str : Kind::F64) : Kind::I64);
+	uint32_t order = reg(Kind::F64);
+	emit(other_kind == Kind::Str ? Op::CmpI64Str : Op::CmpI64F64, p_position, order, wide_first ? x : y, wide_first ? y : x);
+	if (wide_first) {
+		return order;
+	}
+	uint32_t turned = reg(Kind::F64);
+	emit(Op::NegF64, p_position, turned, order); // The Int64 was on the right.
+	return turned;
+}
+
+uint32_t Lowerer::number_zero(uint32_t p_position) {
+	uint32_t zero = reg(Kind::F64);
+	emit(Op::ConstF64, p_position, zero, number(0));
+	return zero;
+}
+
 uint32_t Lowerer::comparison(Binary *p_binary) {
 	if (untyped(p_binary->left) || untyped(p_binary->right)) {
 		return any_comparison(p_binary);
@@ -204,6 +230,15 @@ uint32_t Lowerer::comparison(Binary *p_binary) {
 		uint32_t b = convert(wide_operand(right, left_kind), Kind::I64, position);
 		uint32_t out = reg(Kind::Bool);
 		emit(with_equal ? Op::LeI64 : Op::LtI64, position, out, swap_sides ? b : a, swap_sides ? a : b);
+		return out;
+	}
+	if ((left_kind == Kind::I64 && (right_kind == Kind::Bool || right_kind == Kind::Str)) ||
+			(right_kind == Kind::I64 && (left_kind == Kind::Bool || left_kind == Kind::Str))) {
+		// `order` places the left against the right, exactly.
+		uint32_t order = wide_order(left, right, position);
+		uint32_t zero = number_zero(position);
+		uint32_t out = reg(Kind::Bool);
+		emit(with_equal ? Op::LeF64 : Op::LtF64, position, out, swap_sides ? zero : order, swap_sides ? order : zero);
 		return out;
 	}
 	if ((left_kind == Kind::I64 && right_kind == Kind::F64) || (left_kind == Kind::F64 && right_kind == Kind::I64)) {
@@ -281,6 +316,16 @@ uint32_t Lowerer::equality(Binary *p_binary) {
 	} else if (a == Kind::Bool && b == Kind::Bool) {
 		kind = Kind::Bool;
 		op = Op::EqBool;
+	} else if (!strict && ((a == Kind::I64 && (b == Kind::Bool || b == Kind::Str)) || (b == Kind::I64 && (a == Kind::Bool || a == Kind::Str)))) {
+		// An Int64 against a Boolean or a String: exactly, as numbers.
+		uint32_t out = reg(Kind::Bool);
+		emit(Op::EqF64, position, out, wide_order(left, right, position), number_zero(position));
+		if (p_binary->op == TokenKind::NotEqual) {
+			uint32_t negated = reg(Kind::Bool);
+			emit(Op::Not, position, negated, out);
+			return negated;
+		}
+		return out;
 	} else if ((operand_kind(left, right) == Kind::I64 || operand_kind(right, left) == Kind::I64) &&
 			is_numeric(operand_kind(left, right)) && is_numeric(operand_kind(right, left))) {
 		Kind x_kind = operand_kind(left, right), y_kind = operand_kind(right, left);

@@ -82,6 +82,28 @@ std::optional<uint32_t> Lowerer::signal_call_by_name(Call *p_call) {
 }
 
 // A conversion written as a call: int(x), String(x).
+// A value converted by a conversion written out. To or from an Int64 that is AS3's own (see convert()),
+// and in each branch of a `?:`, whatever the two branches join to: `int(c ? wide : 1.5)` cuts the wide one.
+uint32_t Lowerer::written_value(Expr *p_value, Kind p_conversion, uint32_t p_position) {
+	if (p_value->kind == NodeKind::Conditional) {
+		Conditional *conditional = static_cast<Conditional *>(p_value);
+		uint32_t out = reg(p_conversion);
+		uint32_t to_else = emit(Op::JumpIfNot, p_position, expression(conditional->condition, Kind::Bool), 0);
+		emit(Op::Move, p_position, out, written_value(conditional->then_value, p_conversion, p_position));
+		uint32_t to_end = emit(Op::Jump, p_position, 0);
+		patch(to_else, here());
+		emit(Op::Move, p_position, out, written_value(conditional->else_value, p_conversion, p_position));
+		patch(to_end, here());
+		return out;
+	}
+	Kind given = Kind::Void;
+	bool known = kind_of(p_value->type, &given);
+	if (known && (given == Kind::I64 || p_conversion == Kind::I64) && !is_null(p_value)) {
+		return convert(wide_operand(p_value, p_conversion), p_conversion, p_position, true);
+	}
+	return expression(p_value, p_conversion);
+}
+
 uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	uint32_t position = p_call->offset;
 	Kind conversion = Kind::Void;
@@ -92,12 +114,7 @@ uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	if (conversion == Kind::Str && untyped(p_call->arguments[0])) {
 		return any_text(p_call->arguments[0]); // String(x): "undefined" and "null" are words.
 	}
-	Kind given = Kind::Void;
-	bool known = kind_of(p_call->arguments[0]->type, &given);
-	// To or from an Int64, a conversion that is written out is AS3's own: see convert().
-	uint32_t value = known && (given == Kind::I64 || conversion == Kind::I64) && !is_null(p_call->arguments[0])
-			? convert(wide_operand(p_call->arguments[0], conversion), conversion, position, true)
-			: expression(p_call->arguments[0], conversion);
+	uint32_t value = written_value(p_call->arguments[0], conversion, position);
 	if (conversion != Kind::Str) {
 		return value;
 	}
