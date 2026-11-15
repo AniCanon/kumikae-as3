@@ -45,6 +45,14 @@ class IdbInputTest {
         assertEquals(listOf(java, "ui", "tap", "--udid", "tablet", "10", "20"), calls.single())
     }
 
+    @Test fun `idb refuses Unicode before sending anything`() {
+        val failure = assertThrows(SimulatorException::class.java) {
+            IdbInput(java, runner).send("phone", "text", listOf("é"))
+        }
+        assertEquals("INPUT_UNAVAILABLE", failure.code)
+        assertTrue(calls.isEmpty())
+    }
+
     @Test fun `idb is found where its installers put it`() {
         val home = Files.createTempDirectory("idb-home")
         try {
@@ -99,7 +107,8 @@ class IdbInputTest {
                 assertEquals(false, status()["inputEnabled"])
                 session.useInput(IdbInput(java, both))
                 assertEquals(true, status()["inputEnabled"])
-                assertEquals(3.0, status()["pixelsPerPoint"])
+                // Status alone must not start private processes while the picture is hidden.
+                assertEquals(1.0, status()["pixelsPerPoint"])
             }
         } finally {
             Files.delete(dir)

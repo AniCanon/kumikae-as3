@@ -143,3 +143,18 @@ warnings are unrelated to completion.
 
 Windows, other IDE versions, manual Rider acceptance, and a sustained whole-IDE heap profile were not
 verified. Android Studio and IntelliJ Community do not supply the LSP module this plugin requires.
+
+## Integration before merge
+
+The completion branch was integrated with the latest main branch on 2026-11-15, preserving native
+Simulator work and Rider's hover language identifier. The README test-count conflict was resolved
+against the combined test results. Independent source review found no blocking integration defect.
+
+The first Release test run started before the updated Godot extension was rebuilt and failed its
+Godot group against the old binary. After rebuilding that extension, the separate Godot runner
+reported `godot: OK`, the full Release suite passed 24/24 in 22.44 seconds, and the full ASan/UBSan
+suite passed 24/24 in 126.80 seconds. The merged plugin's offline check, ZIP build and verifier passed:
+119 plugin tests passed with one opt-in probe skipped; 82 core tests passed with three opt-in probes
+skipped. All nine Python tests passed. The sandbox action probe passed in 31 seconds, and light/dark
+panel screenshots were inspected. The previously recorded platform `HighlightingPanel` shutdown
+warning remains and is part of the next completion follow-up investigation.

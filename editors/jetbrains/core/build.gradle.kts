@@ -21,3 +21,6 @@ application {
 }
 
 tasks.test { useJUnitPlatform() }
+
+// Swift and Kotlin read the same native frame layout.
+sourceSets.main { resources.srcDir("../native/SimulatorBridge/Sources/SimulatorBridge/Resources") }

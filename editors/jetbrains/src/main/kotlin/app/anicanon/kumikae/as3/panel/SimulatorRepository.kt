@@ -1,5 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.simulator.Pixel
+
 /** The typed boundary between the tool window and the local Simulator service. Every call may block. */
 internal interface SimulatorRepository : AutoCloseable {
     /** Starts the local service if it is not running and returns the agent endpoint file. */
@@ -32,6 +34,8 @@ internal interface SimulatorRepository : AutoCloseable {
     fun consolePage(cursor: Long): ConsolePage
 
     fun input(device: String, input: SimulatorInput)
+
+    fun touch(on: SimulatorFrame, phase: String, at: Pixel): Unit = error("Continuous touch is unavailable")
 }
 
 /** Polling this slot never performs I/O or decodes; the service workers own that work. */

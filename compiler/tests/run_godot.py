@@ -239,6 +239,12 @@ read = re.search(r"DEFAULTS read=(\d+) failed=(.*)", run.stdout)
 check("Godot reads every recorded default", read is not None and int(read.group(1)) > 10 and read.group(2) == "[]",
       (run.stdout + run.stderr)[-600:])
 
+# Godot's own classes with `is` and `as`, and input events as a script receives them.
+compare("events.gd", [
+    "kind of InputEventScreenTouch", "kind of InputEventScreenDrag", "kind of InputEventMouseButton", "kind of InputEventKey",
+    "touch position", "drag position", "neither", "is Node", "as Sprite2D", "null", "the script's own object", "delivered",
+])
+
 # AS3's vectors handed to Godot: packed arrays by the element's type, arrays for the rest.
 output = compare("vectors.gd", [
     "points", "points type", "hull", "bytes", "empty", "too big for a byte", "below a byte", "offsets", "colors", "filters",
@@ -251,6 +257,32 @@ check("vectors.gd: a value that does not fit a byte is an AS3 error that says so
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
 
 import tempfile
+
+# A scene edited while it runs: an edit to `_ready` (code that runs once) starts the scene again; an edit
+# elsewhere keeps the scene and its state. The versions differ in size: two saves of one size within a
+# second are seen as one (see the backlog).
+RESTART = """package { import godot.*; public class Restart extends Node2D {%s
+	private var word:String;
+	override public function _ready():void { word = "%s"; }
+	public function said():String { return word%s; }
+} }
+"""
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    # The second version also adds a field before the one `_ready` sets: nothing that ran changed.
+    unused = "\n\tpublic var unused:int;"
+    for name, text in {"Restart.as": RESTART % ("", "one", ""), "restart_body.txt": RESTART % (unused, "one", ' + "!"'),
+                       "restart_ready.txt": RESTART % (unused, "three", ' + "!"')}.items():
+        with open(os.path.join(copy, name), "w") as file:
+            file.write(text)
+    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300)
+    output = run.stdout + run.stderr
+    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 5, output[-1500:])
+    for name, got, want in values:
+        check("restart.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+    check("restart.gd: Godot is told why the scene started again", "so the scene starts again" in output, output[-1500:])
 
 # The corpus programs that are said to run (corpus/runs.txt) do run, in Godot, for some frames.
 with open(os.path.join(tests, "corpus", "runs.txt")) as listed:

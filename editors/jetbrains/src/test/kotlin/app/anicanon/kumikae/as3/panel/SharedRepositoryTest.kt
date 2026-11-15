@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.simulator.Pixel
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,5 +26,17 @@ class SharedRepositoryTest {
         shared.devices()
         shared.select("A")
         assertEquals(listOf("connect", "devices", "select A"), inner.calls)
+    }
+
+    @Test fun `continuous touch reaches the shared repository`() {
+        val receiver = object : SimulatorRepository by inner {
+            override fun touch(on: SimulatorFrame, phase: String, at: Pixel) {
+                this@SharedRepositoryTest.inner.calls.add(phase)
+            }
+        }
+        inner.select("A")
+        val frame = inner.screenshot("A")
+        SharedRepository(receiver).touch(frame, "down", Pixel(1, 1))
+        assertEquals("down", inner.calls.last())
     }
 }

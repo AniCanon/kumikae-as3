@@ -75,9 +75,17 @@ class As3LspSupportProvider : LspIntegrationProvider {
     }
 }
 
+/**
+ * What the server is told at the start. Code in a hover is marked as this plugin's own language: marked
+ * `actionscript`, Rider hands it to a JavaScript dialect of its own, which fails on it.
+ */
+internal fun serverOptions(): Map<String, String> = mapOf("codeLanguage" to As3Language.id)
+
 private class As3LspClientDescriptor(project: Project, private val compiler: Path) :
     ProjectWideLspClientDescriptor(project, "ActionScript 3") {
     override fun isSupportedFile(file: VirtualFile) = file.extension == EXTENSION
+
+    override fun createInitializationOptions(): Any = serverOptions()
 
     override fun createCommandLine(): GeneralCommandLine {
         // For looking into a feature that does not work in the editor: with this set to a folder, every

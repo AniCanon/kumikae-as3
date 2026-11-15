@@ -8,7 +8,12 @@ internal data class SimulatorDevice(val id: String, val name: String, val runtim
     val label: String get() = "$name · $runtime · $state"
 }
 
-internal data class SimulatorStatus(val device: SimulatorDevice?, val inputEnabled: Boolean, val notice: String)
+internal data class SimulatorStatus(
+    val device: SimulatorDevice?,
+    val inputEnabled: Boolean,
+    val notice: String,
+    val continuousTouch: Boolean = false,
+)
 
 /** One decoded picture. `generation` is the service's geometry counter that input must quote back. */
 internal class SimulatorFrame(

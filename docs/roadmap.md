@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 114 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 119 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -152,8 +152,9 @@ adapter, and one JetBrains plugin that covers Rider and the other IDEs.
 
 **Built ahead, on 2026-11-14:** the JetBrains plugin (`editors/jetbrains`): AS3 files with highlighting,
 completion and go to declaration from the language server; a project wizard; run configurations for the
-desktop and for the iOS Simulator (export, build, install, launch); and a panel that shows the Simulator.
-No debugger yet.
+desktop and for the iOS Simulator (export, build, install, launch); and a panel that shows the Simulator
+through a native helper, at about 60 frames a second with live touch, rotation and text in any script
+(measured by its builder; results in `docs/results/2026-11-jetbrains-simulator.md`). No debugger yet.
 
 Completion improvements are described in the [editor guide](../editors/completion.md): native paired
 typing, lexical scopes, import paths, replacement edits, callable snippets and signature help. The

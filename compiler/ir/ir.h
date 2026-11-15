@@ -91,6 +91,9 @@ inline bool is_engine(Kind p_kind) {
 	X(HostMember, "RRR") /* object[name], the name being AS3's and known only now: out, object, name. */ \
 	X(HostToStr, "RR-") /* Godot's text for one of its values or objects; "null" for a missing one. */ \
 	X(HostPresent, "RR-") /* Is there an engine value here? Not if it is null, or an object Godot has freed. */ \
+	/* `is` and `as` with one of Godot's classes: out, the object, Godot's name for the class. HostAsClass \
+	   gives the object, or null if it is not of that class. */ \
+	X(HostIsClass, "RRS") X(HostAsClass, "RRS") \
 	X(HostDefault, "RS-") /* The value of a default Godot declares, from Godot's own text for it. */ \
 	X(HostSingleton, "RS-") /* One of the engine's singletons (Input), by Godot's name for it. */ \
 	X(HostConstant, "RSS") /* A constant Godot keeps: out, the type, the constant (Vector2, ZERO). */ \
@@ -214,6 +217,19 @@ struct Module {
 
 // The module as text, for tests and for reading.
 std::string print(const Module &p_module);
+// One function as text. Names stand for what operands point at, and no position is shown: the same code
+// moved down a file prints the same.
+std::string print(const Module &p_module, const Function &p_function);
+// One operand of one of the function's instructions, by its shape letter (see KAS3_IR_OPS).
+std::string print_operand(const Module &p_module, const Function &p_function, char p_shape, uint32_t p_value);
+
+// The classes, by name, whose code that runs once for each object changed from one build to the next: a
+// constructor (which also gives fields their first values), `_ready`, `_enter_tree` or `_init` (its own or
+// inherited), or what those call by name or on the object itself (an override included). A field or
+// method of the object is compared by name, so one added before it changes nothing and one renamed does.
+// A method called on another object is not followed. Objects that are alive ran the old version, so a
+// reload of the code alone does not show such a change. A class that is new, or gone, is not listed.
+std::vector<std::string> run_once_changes(const Module &p_old, const Module &p_new);
 
 } // namespace ir
 } // namespace kas3

@@ -26,7 +26,7 @@ internal interface SimulatorPrompts {
 
     fun textToType(): String?
 
-    /** The owner's yes to input through idb. */
+    /** The owner's yes to private Simulator interfaces. */
     fun confirmInput(): Boolean
 
     /** The owner's yes to what the install puts on this Mac. */
@@ -55,10 +55,10 @@ internal class IdePrompts(private val project: Project) : SimulatorPrompts {
 
     override fun confirmInput(): Boolean = Messages.showYesNoDialog(
         project,
-        "Taps, typing, Home, Lock and Rotate are sent with idb, a tool from Meta that drives the Simulator " +
-            "through private Apple interfaces. Apple can change those without notice.\n\n" +
-            "This also switches the picture from snapshots to live video. " +
-            "Nothing is installed by this: idb must already be on this Mac.",
+        "Live pictures and controls use the bundled native helper through private Apple interfaces. " +
+            "Apple can change those without notice.\n\n" +
+            "If the helper is unavailable, an installed idb is used, then public screenshots. " +
+            "Nothing is installed by this.",
         "Switch Simulator Input On?",
         "Switch On",
         "Cancel",

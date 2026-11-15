@@ -83,8 +83,11 @@ struct Session {
 		server.settle(out);
 		take(out);
 	}
-	void initialize(const std::string &p_root = std::string(), bool p_utf8 = false) {
+	void initialize(const std::string &p_root = std::string(), bool p_utf8 = false, const std::string &p_code_language = std::string()) {
 		Json params = Json::object();
+		if (!p_code_language.empty()) {
+			params.set("initializationOptions", Json::object().set("codeLanguage", p_code_language));
+		}
 		params.set("processId", Json());
 		params.set("rootUri", p_root.empty() ? Json() : Json(uri_from_path(p_root)));
 		Json capabilities = Json::object();
@@ -154,6 +157,16 @@ static std::string spot(const Json &p_location) {
 }
 
 static const std::string MAIN = "file:///work/Main.as";
+
+// An editor may name the language its code blocks are in: Rider gives `actionscript` to a JavaScript
+// dialect of its own, which fails on what the server describes.
+static void test_code_language() {
+	Session session;
+	session.initialize(std::string(), false, "KumikaeAS3");
+	session.open(MAIN, "package { public class Main { var a:int; } }");
+	Json hover = session.request("textDocument/hover", Session::at(MAIN, 0, 35));
+	CHECK_EQ(hover.get("result").get("contents").get("value").string().rfind("```KumikaeAS3\n", 0), (size_t)0);
+}
 
 static void test_lifecycle() {
 	Session session;
@@ -285,6 +298,7 @@ static void test_diagnostics() {
 	session.change(MAIN, "package { public class Main { var a:int; var b:Nah; } }");
 	Json hover = session.request("textDocument/hover", Session::at(MAIN, 0, 35));
 	CHECK(hover.get("result").is_object());
+	CHECK_EQ(hover.get("result").get("contents").get("value").string().rfind("```actionscript\n", 0), (size_t)0);
 	CHECK_EQ(session.published(), MAIN + " 0:47-0:50 unknown type 'Nah'\n");
 
 	// An error in one file caused by another: both are reported under their own names.
@@ -840,6 +854,7 @@ int main() {
 	test_completion_edits_and_signatures();
 	test_completion();
 	test_lifecycle();
+	test_code_language();
 	test_diagnostics();
 	test_positions();
 	test_navigation();

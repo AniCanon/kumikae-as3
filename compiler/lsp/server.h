@@ -15,6 +15,8 @@ namespace kas3 {
 class Server {
 	Workspace workspace_;
 	bool initialized_ = false;
+	// What code blocks in a hover are marked as: the editor may ask for its own name for the language.
+	std::string code_language_ = "actionscript";
 	bool shutdown_ = false;
 	bool exited_ = false;
 	int exit_code_ = 1;

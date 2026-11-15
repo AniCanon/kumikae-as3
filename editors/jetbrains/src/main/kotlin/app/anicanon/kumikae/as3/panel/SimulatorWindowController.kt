@@ -17,10 +17,11 @@ internal class SimulatorWindowController(
     private val installer: IdbInstaller = IdbInstaller { throw IdbInstallFailed("No installer was given.", "") },
     streams: BackgroundTasks = polling,
     clock: () -> Long = { System.nanoTime() / 1_000_000 },
+    touches: BackgroundTasks = actions,
 ) : Disposable {
     var status by mutableStateOf("Starting the local Simulator service…")
         private set
-    var notice by mutableStateOf("Viewer mode. Input needs an explicitly enabled idb installation.")
+    var notice by mutableStateOf("Viewer mode. Switch input on for live pictures and controls.")
         private set
     var endpointFile by mutableStateOf("")
         private set
@@ -34,6 +35,15 @@ internal class SimulatorWindowController(
         private set
     var inputEnabled by mutableStateOf(false)
         private set
+    var continuousTouch by mutableStateOf(false)
+        private set
+    private val touchController = TouchController(touches, repository::touch, ::showFailure)
+
+    fun touch(on: SimulatorFrame, phase: String, at: Pixel) {
+        if (inputEnabled && continuousTouch && on.device == selected?.id && visible && tabShown) {
+            touchController.offer(on, phase, at)
+        }
+    }
 
     /** Input was asked for and idb is not on this Mac: the menu then offers to install it. */
     var idbMissing by mutableStateOf(false)
@@ -152,7 +162,7 @@ internal class SimulatorWindowController(
         status = "Booted."
     }
 
-    /** Called after the owner agreed to input through idb. */
+    /** Called after the owner agreed to private Simulator input. */
     fun enableInput() {
         run("Switching input on", { repository.enableInput() to repository.status() }) { (found, state) ->
             if (found) inputIsOn(state, "Input is on.") else idbIsMissing(NO_IDB)
@@ -255,6 +265,7 @@ internal class SimulatorWindowController(
         if (disposed) return
         disposed = true
         live.dispose()
+        touchController.dispose()
         actions.dispose()
         polling.dispose()
         repository.close()
@@ -285,7 +296,7 @@ internal class SimulatorWindowController(
 
     private fun connect(): Boolean = actions.submit({
         val file = repository.connect()
-        // The owner switched input on in an earlier session; a missing idb only leaves it off.
+        // The owner switched input on earlier; unavailable backends leave public screenshots.
         if (inputAllowed()) repository.enableInput()
         file to repository.devices()
     }) { result ->
@@ -360,6 +371,7 @@ internal class SimulatorWindowController(
      */
     private fun showStatus(value: SimulatorStatus, fresh: Boolean) {
         inputEnabled = value.inputEnabled
+        continuousTouch = value.continuousTouch
         notice = value.notice
         val device = value.device
         if (device?.id != selected?.id) clearPicture()
@@ -385,6 +397,7 @@ internal class SimulatorWindowController(
 
     private fun clearPicture() {
         pictureEpoch++
+        touchController.cancel()
         live.stop()
         frame = null
         capture = ""

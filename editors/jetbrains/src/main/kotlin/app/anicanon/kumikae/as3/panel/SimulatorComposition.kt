@@ -11,6 +11,7 @@ internal object SimulatorComposition {
         actions = BackgroundWorker("Kumikae AS3 Simulator actions"),
         polling = BackgroundWorker("Kumikae AS3 Simulator polling"),
         streams = BackgroundWorker("Kumikae AS3 Simulator stream startup"),
+        touches = BackgroundWorker("Kumikae AS3 Simulator touch"),
         inputAllowed = inputAllowed,
         rememberInput = rememberInput,
         installer = ScriptIdbInstaller(),

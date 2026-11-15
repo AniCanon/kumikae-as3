@@ -12,6 +12,7 @@ interface StreamProcess : AutoCloseable {
     val input: OutputStream
     val errors: String
     val alive: Boolean get() = true
+    fun awaitClosed() = close()
 }
 
 fun interface StreamProcesses : AutoCloseable {
@@ -20,7 +21,7 @@ fun interface StreamProcesses : AutoCloseable {
 }
 
 /** Session shutdown awaits every owned child, including a video whose nonblocking close is still reaping. */
-class OwnedStreamProcesses : StreamProcesses {
+class OwnedStreamProcesses(private val graceMillis: Long = 1000) : StreamProcesses {
     private val children = mutableListOf<NativeStreamProcess>()
     private var closed = false
     private var shutdown: Thread? = null
@@ -33,7 +34,7 @@ class OwnedStreamProcesses : StreamProcesses {
             }
         }
         children.removeAll { it.terminated }
-        return NativeStreamProcess(command).also { children += it }
+        return NativeStreamProcess(command, graceMillis).also { children += it }
     }
 
     @Synchronized override fun close() {
@@ -58,7 +59,7 @@ class OwnedStreamProcesses : StreamProcesses {
 }
 
 /** Owns only the child it starts. Closing is nonblocking; its reaper waits and closes the pipes. */
-class NativeStreamProcess(command: List<String>) : StreamProcess {
+class NativeStreamProcess(command: List<String>, private val graceMillis: Long = 1000) : StreamProcess {
     private val process = ProcessBuilder(command).start()
     private val stopped = AtomicBoolean()
     private val reaped = CountDownLatch(1)
@@ -88,10 +89,11 @@ class NativeStreamProcess(command: List<String>) : StreamProcess {
     override fun close() {
         if (!stopped.compareAndSet(false, true)) return
         val children = process.descendants().toList()
-        children.forEach { it.destroy() }
-        process.destroy()
         Thread({
             try {
+                // EOF gives the native helper time to release a held finger and its device ports.
+                runCatching { input.close() }
+                if (!process.waitFor(graceMillis, TimeUnit.MILLISECONDS)) process.destroy()
                 if (!process.waitFor(1, TimeUnit.SECONDS)) process.destroyForcibly()
                 children.forEach { if (it.isAlive) it.destroyForcibly() }
                 process.waitFor(1, TimeUnit.SECONDS)
@@ -104,14 +106,20 @@ class NativeStreamProcess(command: List<String>) : StreamProcess {
         }, "kumikae-idb-reaper").apply { isDaemon = true }.start()
     }
 
-    fun awaitClosed() {
+    override fun awaitClosed() {
         close()
-        check(reaped.await(3, TimeUnit.SECONDS) && !process.isAlive) { "idb child did not stop" }
+        check(reaped.await(graceMillis + 3000, TimeUnit.MILLISECONDS) && !process.isAlive) {
+            "Simulator child did not stop"
+        }
     }
 }
 
 /** Bounded replies and a deadline keep a broken companion from hanging input indefinitely. */
-internal class ProcessLines(private val child: StreamProcess) : AutoCloseable {
+internal class ProcessLines(
+    private val child: StreamProcess,
+    private val description: String = "idb",
+    private val timeoutMillis: Long = 15_000,
+) : AutoCloseable {
     val alive: Boolean get() = child.alive
     private val replies = ArrayBlockingQueue<Result<String>>(16)
     private val reader = Thread({
@@ -121,9 +129,9 @@ internal class ProcessLines(private val child: StreamProcess) : AutoCloseable {
                     val line = StringBuilder()
                     while (true) {
                         val next = input.read()
-                        if (next < 0) error("idb closed its output; input completion is unknown")
+                        if (next < 0) error("$description closed its output; input completion is unknown")
                         if (next == 10) break
-                        check(line.length < 65536) { "idb reply is too large" }
+                        check(line.length < 65536) { "$description reply is too large" }
                         line.append(next.toChar())
                     }
                     replies.put(Result.success(line.toString()))
@@ -132,15 +140,19 @@ internal class ProcessLines(private val child: StreamProcess) : AutoCloseable {
         } catch (failure: Exception) {
             replies.offer(Result.failure(failure))
         }
-    }, "kumikae-idb-replies").apply {
+    }, "kumikae-$description-replies").apply {
         isDaemon = true
         start()
     }
 
     fun next(): String = try {
-        (replies.poll(15, TimeUnit.SECONDS) ?: error("idb reply timed out; input completion is unknown")).getOrThrow()
+        (
+            replies.poll(timeoutMillis, TimeUnit.MILLISECONDS)
+                ?: error("$description reply timed out; input completion is unknown")
+            ).getOrThrow()
     } catch (failure: Exception) {
         close()
+        if (failure is InterruptedException) throw failure
         throw SimulatorException("INPUT_UNAVAILABLE", "${failure.message}. ${child.errors}".take(4096))
     }
 
