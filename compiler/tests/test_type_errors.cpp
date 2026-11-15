@@ -363,6 +363,18 @@ static void test_property_halves() {
 			{ "the getter and the setter of 'size' must be of the same type",
 					"the getter and the setter of 'count' must be of the same type",
 					"the getter and the setter of 'width' must be of the same type" });
+	// A getter takes nothing and gives a value; a setter takes one value, with no default, and gives nothing.
+	expect("package { public class Main { public function get /*!*/a(x:int):int { return x; }\n"
+		   "public function set /*!*/b():void {} public function set /*!*/c(x:int, y:int):void {}\n"
+		   "public function set /*!*/d(x:int = 1):void {} public function set /*!*/e(...rest):void {}\n"
+		   "public function get /*!*/f():void {} public function set /*!*/g(v:int):int { return 0; }\n"
+		   "public function get h():int { return 0; } public function set h(v:int) {} } }\n"
+		   "interface Shape { function get /*!*/width(x:int):int; function set /*!*/height():void; }\n",
+			{ "a getter takes no parameters", "a setter takes one parameter, with no default",
+					"a setter takes one parameter, with no default", "a setter takes one parameter, with no default",
+					"a setter takes one parameter, with no default", "a getter must give a value: its type can't be void",
+					"a setter gives nothing: its type must be void or not written", "a getter takes no parameters",
+					"a setter takes one parameter, with no default" });
 }
 
 // Valid programs that the first version of these checks rejected, found in review.
