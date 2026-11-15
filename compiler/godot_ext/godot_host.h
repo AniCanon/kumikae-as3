@@ -57,6 +57,7 @@ public:
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;
 	void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) override;
+	void *collection(std::string_view p_type, const vm::Argument *p_elements, size_t p_count, std::string *r_error) override;
 	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 			vm::Slot *r_result, std::string *r_error) override;
 	bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;

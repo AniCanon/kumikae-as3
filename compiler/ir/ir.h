@@ -54,11 +54,19 @@ inline bool is_engine(Kind p_kind) {
 	X(LtF64, "RRR") X(LeF64, "RRR") X(EqF64, "RRR") X(LtStr, "RRR") X(LeStr, "RRR") X(EqStr, "RRR") \
 	X(EqBool, "RRR") X(EqRef, "RRR") X(Not, "RR-") \
 	X(Concat, "RRR") X(StrLength, "RR-") \
+	/* Math. MathUnary: out, the Number, and which function (a MathFunction). */ \
+	X(MathUnary, "RRI") X(Atan2, "RRR") X(Pow, "RRR") X(MinF64, "RRR") X(MaxF64, "RRR") X(Random, "R--") \
 	X(Jump, "L--") X(JumpIf, "RL-") X(JumpIfNot, "RL-") \
 	X(GetField, "RRD") X(SetField, "RDR") X(GetGlobal, "RG-") X(SetGlobal, "GR-") \
 	X(InitClass, "C--") /* The class is used: give its static fields their values, if this is the first time. */ \
 	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
+	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is a Number; what is read or \
+	   written is of the class's element kind. */ \
+	X(VecNew, "RCA") X(VecGet, "RRR") X(VecSet, "RRR") \
+	X(VecLength, "RR-") X(VecSetLength, "RR-") X(VecFixed, "RR-") X(VecSetFixed, "RR-") \
+	/* A method of a vector: out, which one (a VectorMethod), [the vector, then what the method takes]. */ \
+	X(VecCall, "rIA") \
 	X(IsClass, "RRC") X(AsClass, "RRC") \
 	/* The engine. Names are Godot's own. In HostCall the first argument is what the method is called on. */ \
 	/* Int64. The constant is an index into the module's wide numbers. Arithmetic wraps at 64 bits. */ \
@@ -87,6 +95,8 @@ inline bool is_engine(Kind p_kind) {
 	X(HostSingleton, "RS-") /* One of the engine's singletons (Input), by Godot's name for it. */ \
 	X(HostConstant, "RSS") /* A constant Godot keeps: out, the type, the constant (Vector2, ZERO). */ \
 	X(HostCallStatic, "rSA") /* A method called on no object: "Vector2.from_angle", and its arguments. */ \
+	/* A vector as one of Godot's collections: out, the vector, Godot's name for the type wanted. */ \
+	X(HostCollection, "RRS") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") X(Trace, "A--")
 
@@ -95,6 +105,22 @@ enum class Op : uint8_t {
 	KAS3_IR_OPS(X)
 #undef X
 };
+
+// The functions of Math that take one Number, in MathUnary's third operand.
+enum class MathFunction : uint8_t { Abs, Acos, Asin, Atan, Ceil, Cos, Exp, Floor, Log, Round, Sin, Sqrt, Tan };
+
+// A vector's methods, in VecCall's second operand. After the vector, the arguments are:
+//   Push, Unshift   elements                         -> the new length (uint)
+//   Pop, Shift      nothing                          -> the element
+//   IndexOf, LastIndexOf   an element, where to start (int)   -> the index (int), or -1
+//   Reverse         nothing                          -> the vector itself
+//   Slice           start, end (int)                 -> a new vector
+//   Concat          vectors of the same class        -> a new vector
+//   Join            the separator (String)           -> a String
+//   InsertAt        index (int), an element          -> nothing
+//   RemoveAt        index (int)                      -> the element
+//   Splice          start (int), how many (uint), elements to put in   -> a new vector of what was removed
+enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice };
 
 const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.
@@ -139,11 +165,17 @@ struct Function {
 struct Field {
 	std::string name;
 	Kind kind = Kind::Void;
+	// For an object: the class it is declared to hold (a class of the program, or a vector's), or NONE
+	// where that is not known. A reload keeps what a field held only if it is still of that class.
+	uint32_t klass = NONE;
 };
 
 struct Class {
 	std::string name; // "game.Player"
 	uint32_t base = NONE;
+	// For a Vector.<T>, what its elements are; Void for every other class. A vector class has no fields,
+	// no methods and no base, and its objects are vm::Vector.
+	Kind element = Kind::Void;
 	std::vector<Field> fields; // The base's first: a field keeps its slot in every subclass.
 	std::vector<uint32_t> methods; // The method table: function indices, the base's slots first.
 	uint32_t constructor = NONE;
@@ -159,6 +191,7 @@ struct Class {
 struct Global {
 	std::string name; // "Main.count"
 	Kind kind = Kind::Void;
+	uint32_t klass = NONE; // As for a field.
 };
 
 struct Module {

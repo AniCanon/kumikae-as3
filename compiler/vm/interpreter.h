@@ -79,9 +79,38 @@ private:
 	void trace(const std::vector<uint32_t> &p_list, const Slot *p_registers);
 	void leave(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result);
 	void object_to_text(const ir::Instruction &p_in, Slot *p_registers);
+	// Vectors. An index outside the vector is AS3's RangeError #1125.
+	void raise_range(double p_index, uint32_t p_length);
+	bool resize_vector(Vector *p_vector, uint32_t p_length);
+	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	// A call of one of a vector's methods: its arguments (the vector first) by register, where the
+	// frame's registers start, and the register for what it gives back, or NONE.
+	struct VectorCall {
+		const std::vector<uint32_t> &list;
+		size_t base;
+		uint32_t out;
+		ir::VectorMethod method;
+	};
+	// Looked up each time it is wanted: putting an element into words can run the program, which may
+	// move the registers.
+	Slot &argument(const VectorCall &p_call, size_t p_index) { return stack_[p_call.base + p_call.list[p_index]]; }
+	void give(const VectorCall &p_call, ir::Kind p_kind, Slot p_owned);
+	bool length_is_fixed(const Vector *p_vector);
+	Vector *fresh_vector(uint32_t p_class, uint64_t p_length);
+	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	void vector_add(Vector *p_vector, const VectorCall &p_call);
+	void vector_take(Vector *p_vector, const VectorCall &p_call);
+	void vector_copy(Vector *p_vector, const VectorCall &p_call);
+	void splice(Vector *p_vector, const VectorCall &p_call);
+	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
+	bool object_as_text(Object *p_object, std::string *r_text);
 	void unwind(size_t p_depth);
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);
+	// A call made from inside running code that is not an instruction of its own (an element's
+	// toString() while a vector is put into words). If it fails the error is left on its way out, for
+	// the code that is running to carry on unwinding: it is not reported here, as call() reports one.
+	bool call_within(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result);
 	void report();
 	void forget_class(uint32_t p_class); // Its static fields were not all set: it is not used yet, after all.
 	void use_class(uint32_t p_class); // From running code: pushes what must run first.

@@ -21,7 +21,7 @@ static const char *const USAGE =
 		"usage: kas3c parse [--dump-ast] <file>...\n"
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c run <file>...\n"
-		"       kas3c ir <file>...\n"
+		"       kas3c ir [--godot] <file>...\n"
 		"       kas3c lsp [--stdio] [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
@@ -42,6 +42,8 @@ static const char *const USAGE =
 		"       nothing catches goes to standard error with its stack trace.\n"
 		"\n"
 		"ir     Check the files as one program and print the typed IR the interpreter runs.\n"
+		"       --godot  the files are scripts for Godot: load Godot's API, and expect no\n"
+		"                class to start the program with\n"
 		"\n"
 		"lsp    Serve an editor over standard input and output with the Language Server\n"
 		"       Protocol: errors as you type, go to definition, find references, hover,\n"
@@ -146,11 +148,18 @@ static int run_check(int p_argc, char **p_argv) {
 	return compilation.has_errors() ? 1 : 0;
 }
 
-// Checks the files and lowers them. Prints the errors and returns false if there are any.
-static bool compile(int p_argc, char **p_argv, kas3::ir::Module *r_module, int *r_status) {
+// Checks the files and lowers them. Prints the errors and returns false if there are any. With p_godot,
+// `--godot` may be given: the files are then scripts for Godot, lowered as the extension lowers them.
+static bool compile(int p_argc, char **p_argv, kas3::ir::Module *r_module, int *r_status, bool p_godot = false) {
 	kas3::Compilation compilation;
 	int files = 0;
+	bool library = false;
 	for (int i = 2; i < p_argc; i++) {
+		if (p_godot && !library && std::strcmp(p_argv[i], "--godot") == 0) {
+			library = true;
+			compilation.add(kas3::GODOT_DECLARATIONS_PATH, kas3::godot_declarations(), true);
+			continue;
+		}
 		if (p_argv[i][0] == '-' && p_argv[i][1] != 0) {
 			*r_status = usage_error();
 			return false;
@@ -169,7 +178,8 @@ static bool compile(int p_argc, char **p_argv, kas3::ir::Module *r_module, int *
 		return false;
 	}
 	compilation.check();
-	bool lowered = !compilation.has_errors() && kas3::ir::lower(compilation, r_module);
+	const kas3::ir::LowerMode mode = library ? kas3::ir::LowerMode::Library : kas3::ir::LowerMode::Program;
+	bool lowered = !compilation.has_errors() && kas3::ir::lower(compilation, r_module, mode);
 	std::fputs(compilation.format_diagnostics().c_str(), stderr);
 	*r_status = 1;
 	return lowered && !compilation.has_errors();
@@ -178,7 +188,7 @@ static bool compile(int p_argc, char **p_argv, kas3::ir::Module *r_module, int *
 static int run_ir(int p_argc, char **p_argv) {
 	kas3::ir::Module module;
 	int status = 0;
-	if (!compile(p_argc, p_argv, &module, &status)) {
+	if (!compile(p_argc, p_argv, &module, &status, true)) {
 		return status;
 	}
 	std::fputs(kas3::ir::print(module).c_str(), stdout);

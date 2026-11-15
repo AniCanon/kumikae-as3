@@ -38,7 +38,9 @@ struct Request {
 	uint32_t target = NONE; // The register the result goes to, if any.
 
 	Request(const ir::Module &p_module, Host &p_host, const Function &p_function, const Instruction &p_in, Slot *p_registers, Str *p_null_text) :
-			module(p_module), host(p_host), function(p_function), in(p_in), registers(p_registers), null_text(p_null_text) {}
+			module(p_module), host(p_host), function(p_function), in(p_in), registers(p_registers), null_text(p_null_text) {
+		result.bits = 0; // All of it: `{}` on a union clears its first member only, which is half a pointer.
+	}
 
 	const std::string &text(uint32_t p_string) const { return module.strings[p_string]; }
 	void *handle(uint32_t p_register) const { return registers[p_register].p; }
@@ -89,9 +91,26 @@ public:
 
 Outcome construct(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
+	p_request.into(p_request.in.a); // One of Godot's values, or one of its objects.
+	p_request.result.p = p_request.host.source.construct(p_request.text(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
+	return p_request.done(p_request.result.p != nullptr);
+}
+
+// A vector handed to the engine: its elements, as they are held, become one of Godot's collections.
+// No vector gives nothing: Godot's null.
+Outcome collection(Request &p_request) {
+	const Vector *vector = static_cast<const Vector *>(p_request.handle(p_request.in.b));
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Val;
-	p_request.result.p = p_request.host.source.construct(p_request.text(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
+	if (!vector) {
+		return Outcome::Done;
+	}
+	const Kind element = p_request.module.classes[vector->klass].element;
+	std::vector<Argument> elements(vector->length);
+	for (uint32_t i = 0; i < vector->length; i++) {
+		elements[i] = Argument{ element, vector->data[i] };
+	}
+	p_request.result.p = p_request.host.source.collection(p_request.text(p_request.in.c), elements.data(), elements.size(), &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -271,6 +290,8 @@ Outcome perform(Request &p_request) {
 	switch (p_request.in.op) {
 		case Op::HostNew:
 			return construct(p_request);
+		case Op::HostCollection:
+			return collection(p_request);
 		case Op::HostCall:
 			return call(p_request);
 		case Op::HostOperate:
@@ -315,8 +336,11 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 		case Outcome::Refused: {
 			// The engine's side may say that an error is AS3's TypeError: see engine_handles.h.
 			static const std::string_view type_error = "TypeError: ";
+			static const std::string_view range_error = "RangeError: ";
 			if (request.error.compare(0, type_error.size(), type_error) == 0) {
 				raise(module_.type_error_class, request.error.substr(type_error.size()));
+			} else if (request.error.compare(0, range_error.size(), range_error) == 0) {
+				raise(module_.range_error_class, request.error.substr(range_error.size()));
 			} else {
 				raise(module_.error_class, request.error.empty() ? "the engine refused" : request.error);
 			}

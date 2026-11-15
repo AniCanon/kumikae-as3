@@ -1,0 +1,2 @@
+RangeError: Error #1125: The index 3 is out of range 3.
+	at err_vector_read()[err_vector_read.as:6]

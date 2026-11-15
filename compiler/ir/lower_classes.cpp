@@ -58,12 +58,13 @@ void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 			continue;
 		}
 		Kind kind = written_kind(declarator.type, declarator.offset, Kind::F64);
+		const uint32_t holds = kind == Kind::Obj ? declared_class(declarator.type) : NONE;
 		if (p_decl->modifiers.bits & Modifiers::Static) {
 			globals_[declarator.symbol] = (uint32_t)module_.globals.size();
-			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind });
+			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds });
 		} else {
 			fields_[declarator.symbol] = (uint32_t)module_.classes[p_class].fields.size();
-			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind });
+			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds });
 		}
 	}
 }

@@ -20,7 +20,7 @@ not yet tried in Rider.
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 102 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 114 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -105,11 +105,12 @@ properties, signals and hot reload.
 | 2b-1. In Godot, first slice | The extension: a `.as` file is a script; Godot calls its methods; it reads and writes properties, calls methods and makes `Vector2`s | An AS3 script on a `CharacterBody2D` moves the body, in headless Godot 4.7.2. | Done |
 | 2b-2, part A. Godot's values | Operators and comparison on Godot's values, their text, `position.x = 5`, elements by index, defaults Godot fills in, a script's `toString()` shown by Godot | Each has a test in Godot that compares the result with GDScript's. | Done |
 | 2b-2, part B. Signals | A method as a listener; `add`, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`; `timer[name].add(f)` | Each has a test in Godot. | Done |
-| 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the `Int64` type | The test programs that need no unsupported language feature run in Godot, and the backlog items marked 2b-3 are closed. | Built; the last part in review |
-| 2c. The rest of the language | Closures, `Array`, `Vector`, `Dictionary`, `Object`, `*`, interfaces, `try`/`catch`, `switch`, `for in`, accessors, the standard library. With them, what stage 1 promised that needs them: AS3 collections converting when handed to Godot, `object[name]` in general, and elements of Godot's untyped collections | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
-| Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Planned |
-| 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Planned |
-| Clean-up pass | The 37 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
+| 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the `Int64` type | The test programs that need no unsupported language feature run in Godot, and the backlog items marked 2b-3 are closed. | Done |
+| 2c-1. Vectors, `switch`, `Math` | `Vector.<T>` with its methods, `for each` over one, vectors handed to Godot as packed arrays or arrays and carried across a reload; `switch`; `Math`; `new` of Godot's own classes | 8 of the 14 corpus programs run in Godot (`tests/run_corpus.py`, `tests/corpus/runs.txt`). | Built; in review |
+| 2c-2 to 2c-6. The rest of the language | In the order the corpus asks for, measured again as each slice ends: the untyped value (`*`, `Object`), `try`/`catch`, labelled loops; `Array`, `Object` literals, `Dictionary`, `for in` in general, rest parameters, elements of Godot's untyped collections; closures, and the collection methods that take one; accessors and interfaces; the standard library (`String`, `Number`, the top-level functions, `JSON`, `Date`, `RegExp`) | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
+| Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Completion built ahead, on 2026-11-14, and working in VS Code and Rider on macOS; the rest planned |
+| 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Hot reload built ahead, on 2026-11-14: on desktop and on the iOS Simulator; the rest planned |
+| Clean-up pass | The 50 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
 
@@ -129,6 +130,10 @@ passes on real compiled AS3 (not hand-written code, as in stage 0).
 
 **Done when:** the same game runs on both, and the speed gate passes on devices.
 
+**Built ahead, on 2026-11-14:** an interpreted debug build runs on the iOS Simulator, started from Rider,
+and reloads a script when it is saved. Android has no build of the extension yet, and a real phone cannot
+see the folder the scripts are edited in: it needs the edits sent to it.
+
 ### Stage 5: console
 
 **Delivers:** Nintendo Switch through the Kumikae build.
@@ -144,6 +149,11 @@ An early [Simulator panel and agent interface](../editors/jetbrains/) builds, pa
 adapter, and one JetBrains plugin that covers Rider and the other IDEs.
 
 **Done when:** you can set a breakpoint in Rider and step through AS3, in the editor and on a device.
+
+**Built ahead, on 2026-11-14:** the JetBrains plugin (`editors/jetbrains`): AS3 files with highlighting,
+completion and go to declaration from the language server; a project wizard; run configurations for the
+desktop and for the iOS Simulator (export, build, install, launch); and a panel that shows the Simulator.
+No debugger yet.
 
 Basic editor highlighting and error reporting arrive earlier, with stage 2.
 

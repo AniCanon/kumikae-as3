@@ -2,6 +2,7 @@
 // same ECMAScript rules:  node -e 'console.log(String(x), x | 0, x >>> 0, Number(s))'
 #include "check.h"
 
+#include "numeric.h"
 #include "runtime.h"
 
 #include <cmath>
@@ -107,7 +108,66 @@ static void test_counts() {
 	CHECK(!release(nullptr));
 }
 
+// Math, where C's library and AS3 differ. Checked against Node: Math.round(-0.5), Math.min(0, -0), ...
+static void test_math() {
+	using kas3::ir::MathFunction;
+	const double inf = INFINITY;
+	CHECK_EQ(math_unary(MathFunction::Round, 2.5), 3.0);
+	CHECK_EQ(math_unary(MathFunction::Round, -2.5), -2.0);
+	CHECK_EQ(math_unary(MathFunction::Round, 0.49999999999999994), 0.0);
+	CHECK(std::signbit(math_unary(MathFunction::Round, -0.5)));
+	CHECK(std::signbit(math_unary(MathFunction::Round, -0.2)));
+	CHECK_EQ(math_unary(MathFunction::Round, 1e300), 1e300);
+	CHECK(std::isnan(math_unary(MathFunction::Round, NAN)));
+	CHECK_EQ(math_unary(MathFunction::Sqrt, 16), 4.0);
+	CHECK_EQ(math_unary(MathFunction::Abs, -2.5), 2.5);
+	CHECK(std::signbit(math_min(0.0, -0.0)) && std::signbit(math_min(-0.0, 0.0)));
+	CHECK(!std::signbit(math_max(0.0, -0.0)) && !std::signbit(math_max(-0.0, 0.0)));
+	CHECK(std::isnan(math_max(NAN, 1)) && std::isnan(math_min(1, NAN)));
+	CHECK_EQ(math_max(1, 2), 2.0);
+	CHECK_EQ(math_min(1, 2), 1.0);
+	CHECK(std::isnan(math_pow(1, inf)) && std::isnan(math_pow(-1, -inf)) && std::isnan(math_pow(1, NAN)));
+	CHECK_EQ(math_pow(NAN, 0), 1.0);
+	CHECK_EQ(math_pow(2, 10), 1024.0);
+	for (int i = 0; i < 1000; i++) {
+		const double value = math_random();
+		CHECK(value >= 0 && value < 1);
+	}
+}
+
+// A vector's memory: its length, its room, and that it is counted among the objects alive.
+static void test_vectors() {
+	const size_t objects = live_objects();
+	Vector *vector = new_vector(7, 3, false);
+	CHECK(vector != nullptr);
+	CHECK_EQ(vector->klass, 7u);
+	CHECK_EQ(vector->references, 1u);
+	CHECK_EQ(vector->length, 3u);
+	CHECK(!vector->fixed);
+	CHECK(vector->capacity >= 3);
+	for (uint32_t i = 0; i < 3; i++) {
+		CHECK_EQ(vector->data[i].bits, (uint64_t)0);
+		vector->data[i].i = (int32_t)i + 1;
+	}
+	CHECK(vector_reserve(vector, 1000));
+	CHECK(vector->capacity >= 1000);
+	CHECK_EQ(vector->length, 3u);
+	CHECK_EQ(vector->data[2].i, 3);
+	CHECK_EQ(vector->data[999].bits, (uint64_t)0); // Room that was added is empty.
+	CHECK(vector_reserve(vector, 2)); // Never shrinks.
+	CHECK(vector->capacity >= 1000);
+	CHECK_EQ(live_objects(), objects + 1);
+	free_vector(vector);
+	CHECK_EQ(live_objects(), objects);
+	Vector *empty = new_vector(7, 0, true);
+	CHECK(empty && empty->length == 0 && empty->fixed);
+	free_vector(empty);
+	CHECK_EQ(live_objects(), objects);
+}
+
 int main() {
+	test_vectors();
+	test_math();
 	test_integers();
 	test_number_text();
 	test_text_number();

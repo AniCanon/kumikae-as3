@@ -1,0 +1,2 @@
+RangeError: Error #1125: The index 1 is out of range 1.
+	at err_vector_remove()[err_vector_remove.as:7]

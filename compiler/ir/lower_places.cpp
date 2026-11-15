@@ -71,6 +71,9 @@ auto Lowerer::place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_po
 }
 
 auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
+	if (std::optional<Place> of_vector = vector_place(p_target, p_later)) {
+		return *of_vector;
+	}
 	if (p_target->kind == NodeKind::Name) {
 		Name *name = static_cast<Name *>(p_target);
 		if (name->symbol && is_godot(name->symbol) && (name->symbol->kind == SymbolKind::Property || name->symbol->kind == SymbolKind::Field)) {
@@ -157,6 +160,17 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 			}
 			return out;
 		}
+		case Place::Element:
+		case Place::Length:
+		case Place::Fixed: {
+			uint32_t out = reg(p_place.kind);
+			if (p_place.where == Place::Element) {
+				emit(Op::VecGet, p_position, out, p_place.object, p_place.key);
+			} else {
+				emit(p_place.where == Place::Length ? Op::VecLength : Op::VecFixed, p_position, out, p_place.object);
+			}
+			return out;
+		}
 		default:
 			return default_value(Kind::F64, p_position);
 	}
@@ -198,6 +212,15 @@ void Lowerer::store(const Place &p_place, uint32_t p_value, uint32_t p_position)
 			} else {
 				emit(Op::HostSet, p_position, p_place.object, p_place.index, p_value);
 			}
+			break;
+		case Place::Element:
+			emit(Op::VecSet, p_position, p_place.object, p_place.key, p_value);
+			break;
+		case Place::Length:
+			emit(Op::VecSetLength, p_position, p_place.object, p_value);
+			break;
+		case Place::Fixed:
+			emit(Op::VecSetFixed, p_position, p_place.object, p_value);
 			break;
 		default:
 			break;

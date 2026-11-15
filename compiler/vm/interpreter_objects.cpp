@@ -62,6 +62,23 @@ void Interpreter::drop_object(Object *p_object) {
 		Object *object = dead.back();
 		dead.pop_back();
 		const ir::Class &klass = module_.classes[object->klass];
+		if (klass.element != Kind::Void) {
+			// A vector: its elements are let go as fields are, and its own memory is freed its own way.
+			Vector *vector = static_cast<Vector *>(object);
+			for (uint32_t i = 0; held(klass.element) && i < vector->length; i++) {
+				Slot element = vector->data[i];
+				vector->data[i].bits = 0;
+				if (klass.element == Kind::Obj) {
+					if (release(static_cast<Object *>(element.p))) {
+						dead.push_back(static_cast<Object *>(element.p));
+					}
+				} else {
+					drop(klass.element, element);
+				}
+			}
+			free_vector(vector);
+			continue;
+		}
 		for (size_t i = 0; i < klass.fields.size(); i++) {
 			Slot &field = object->fields()[i];
 			if (klass.fields[i].kind == Kind::Str) {

@@ -9,8 +9,9 @@ host differs.
 | `interpreter_run.cpp` | The loop: one case per operation |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
 | `interpreter_objects.cpp`, `runtime` | Lifetime of objects and strings |
-| `reload` | Moves a running program's objects and static fields onto a newer build, by name |
-| `numeric` | Conversions C++ alone would leave undefined |
+| `interpreter_vectors.cpp`, `vector_methods.cpp` | `Vector.<T>`: an object whose class says what its elements are; making, indexing, length, its methods, its text |
+| `reload` | Moves a running program's objects, vectors and static fields onto a newer build, by name |
+| `numeric`, `math.cpp` | Conversions C++ alone would leave undefined; `Math` where AS3 and C's library differ |
 | `host.h` | What the interpreter is given: `Output`, `EngineHandles`, `EngineSource` |
 | `output.h`, `engine_handles.h`, `engine_source.h`, `engine_types.h` | The three interfaces and the values they pass |
 | `no_engine.h`, `standalone_host.cpp` | The answers where there is no engine |

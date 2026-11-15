@@ -105,17 +105,24 @@ uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 }
 
 uint32_t Lowerer::trace_call(Call *p_call) {
-	std::vector<uint32_t> list;
+	// Every argument is worked out first, and only then is each put into words, as in Flash: a vector
+	// that a later argument changes is traced as it is after the change.
+	std::vector<uint32_t> values;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		Expr *later = nullptr;
 		for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
 			later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
 		}
-		uint32_t value = expression(p_call->arguments[i], Kind::Str);
+		Kind kind = Kind::Void;
+		const bool spoken_later = !is_null(p_call->arguments[i]) && kind_of(p_call->arguments[i]->type, &kind) && kind == Kind::Obj;
+		values.push_back(settled(expression(p_call->arguments[i], spoken_later ? Kind::Obj : Kind::Str), later, p_call->offset));
+	}
+	std::vector<uint32_t> list;
+	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		// A null string traces as "null".
 		uint32_t text = reg(Kind::Str);
-		emit(Op::StrToStr, p_call->arguments[i]->offset, text, value);
-		list.push_back(settled(text, later, p_call->offset));
+		emit(Op::StrToStr, p_call->arguments[i]->offset, text, convert(values[i], Kind::Str, p_call->arguments[i]->offset));
+		list.push_back(text);
 	}
 	emit(Op::Trace, p_call->offset, arguments(std::move(list)));
 	return 0;
@@ -235,6 +242,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	if (callee->kind == NodeKind::SuperExpr) {
 		return super_call(p_call);
 	}
+	if (callee->kind == NodeKind::Member && is_vector(static_cast<Member *>(callee)->object->type)) {
+		return vector_call(p_call);
+	}
 	Symbol *symbol = callee_symbol(callee);
 	if (!symbol) {
 		if (const std::optional<uint32_t> by_name = signal_call_by_name(p_call)) {
@@ -258,6 +268,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	}
 	if (is_godot(symbol) && symbol->kind == SymbolKind::Function) {
 		return global_call(p_call, symbol, p_want);
+	}
+	if (const std::optional<uint32_t> math = math_call(p_call, symbol)) {
+		return *math;
 	}
 	auto function = functions_.find(symbol);
 	if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
@@ -348,8 +361,9 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 	}
 	for (uint32_t i = 0; i < written; i++) {
 		Kind kind = Kind::Void;
+		const Type *type = nullptr;
 		if (i < count && !p_function->parameters[i].is_rest && p_function->parameters[i].type) {
-			const Type *type = compilation_.type_of(p_function->parameters[i].type);
+			type = compilation_.type_of(p_function->parameters[i].type);
 			if (type && type->kind == Type::Instance && type->symbol == function_ && function_) {
 				// Godot takes a function here: a method goes bound to its object.
 				Expr *later = nullptr;
@@ -387,7 +401,8 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 		if (kind == Kind::Void && kind_of(p_arguments[i]->type, &own) && is_numeric(own) && whole(p_arguments[i])) {
 			kind = Kind::I64; // Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
 		}
-		uint32_t value = expression(p_arguments[i], kind);
+		const std::optional<uint32_t> collection = vector_to_engine(p_arguments[i], type);
+		uint32_t value = collection ? *collection : expression(p_arguments[i], kind);
 		if (kind_at(value) == Kind::Obj) {
 			refuse(p_arguments[i]->offset, "passing a script object to Godot");
 		}

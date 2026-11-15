@@ -151,6 +151,11 @@ bool Lowerer::builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint
 		emit(Op::ConstF64, p_position, *r_reg, number(value));
 		return true;
 	}
+	if (const std::optional<double> constant = math_constant(p_symbol)) {
+		*r_reg = reg(Kind::F64);
+		emit(Op::ConstF64, p_position, *r_reg, number(*constant));
+		return true;
+	}
 	if (owner == int_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
 		*r_reg = reg(Kind::I32);
 		emit(Op::ConstI32, p_position, *r_reg, name == "MAX_VALUE" ? 0x7FFFFFFFu : 0x80000000u);
@@ -245,6 +250,9 @@ uint32_t Lowerer::member_value(Expr *p_expression) {
 uint32_t Lowerer::new_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	New *made = static_cast<New *>(p_expression);
+	if (is_vector(made->type)) {
+		return vector_new(made);
+	}
 	Symbol *symbol = named_class(made->callee);
 	uint32_t index = 0;
 	uint32_t type_name = 0;
@@ -266,6 +274,13 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 		}
 		uint32_t value = reg(Kind::Val);
 		emit(Op::HostNew, position, value, type_name, arguments(std::move(list)));
+		return value;
+	}
+	if (symbol && is_godot(symbol) && is_godot_object(symbol) && made->arguments.count == 0 && engine_name(symbol, std::string_view(), &type_name)) {
+		// One of Godot's own objects: the engine makes it, as GDScript's `Node2D.new()` does. A node is
+		// then the program's to put in the tree or free; a counted object goes when nothing holds it.
+		uint32_t value = engine_reg(Kind::Ref, made->type);
+		emit(Op::HostNew, position, value, type_name, arguments({}));
 		return value;
 	}
 	if (!symbol || !class_index(symbol, &index)) {
@@ -334,6 +349,9 @@ uint32_t Lowerer::conditional(Expr *p_expression, Kind p_want) {
 
 uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 	uint32_t position = p_expression->offset;
+	if (const auto held = evaluated_.find(p_expression); held != evaluated_.end()) {
+		return held->second;
+	}
 	switch (p_expression->kind) {
 		case NodeKind::NumberLit:
 			return number_literal(p_expression, p_want);
@@ -384,8 +402,7 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 			refuse(position, "an Object literal");
 			break;
 		case NodeKind::VectorLit:
-			refuse(position, "a Vector");
-			break;
+			return vector_literal(static_cast<VectorLit *>(p_expression));
 		case NodeKind::FunctionExpr:
 			refuse(position, "a function used as a value");
 			break;
@@ -497,7 +514,8 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 	Place place = place_of(p_assign->target, p_assign->value);
 	uint32_t value = 0;
 	if (p_assign->op == TokenKind::Assign) {
-		value = expression(p_assign->value, place.kind);
+		const std::optional<uint32_t> collection = place.where == Place::Engine ? vector_to_engine(p_assign->value, place.type) : std::nullopt;
+		value = collection ? *collection : expression(p_assign->value, place.kind);
 	} else if (p_assign->op == TokenKind::AmpAmpAssign || p_assign->op == TokenKind::PipePipeAssign) {
 		refuse(position, "'&&=' or '||='");
 		value = default_value(place.kind, position);

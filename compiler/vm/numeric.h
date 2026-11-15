@@ -1,6 +1,8 @@
 // Numbers as AS3 converts and compares them, where C++ alone would not say or would not be safe.
 #pragma once
 
+#include "ir.h"
+
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -45,6 +47,17 @@ inline int64_t shift_right_wide(int64_t p_value, int64_t p_count) {
 	}
 	return (int64_t)bits;
 }
+
+// Math as AS3 and ECMAScript define it, where C's library says otherwise: round takes a half up
+// (round(-2.5) is -2, round(-0.5) is -0); min and max tell -0 from 0 and give not-a-number if either is;
+// pow of 1 or -1 to an infinite power, and of anything to not-a-number, is not-a-number.
+double math_unary(ir::MathFunction p_function, double p_value);
+double math_min(double p_a, double p_b);
+double math_max(double p_a, double p_b);
+double math_pow(double p_base, double p_power);
+// At least 0 and below 1. The interpreter's own generator: the same on every platform, seeded once from
+// the clock.
+double math_random();
 
 } // namespace vm
 } // namespace kas3

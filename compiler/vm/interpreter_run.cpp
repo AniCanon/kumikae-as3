@@ -159,7 +159,16 @@ void Interpreter::leave(const Function &p_function, const Instruction &p_in, con
 void Interpreter::object_to_text(const Instruction &p_in, Slot *p_registers) {
 	Object *object = static_cast<Object *>(p_registers[p_in.b].p);
 	const uint32_t own = object ? module_.classes[object->klass].to_string : NONE;
-	if (own != NONE) {
+	if (object && module_.classes[object->klass].element != Kind::Void) {
+		// A vector's elements, each in its own words: that may run the program and move the registers.
+		retain(object);
+		std::string all;
+		const bool done = vector_text(static_cast<Vector *>(object), ",", &all);
+		if (done) {
+			assign(Kind::Str, stack_[frames_.back().base + p_in.a], text(all));
+		}
+		release_object(object);
+	} else if (own != NONE) {
 		Slot self = p_registers[p_in.b];
 		push(own, &self, 1, p_in.a);
 	} else {
@@ -393,6 +402,24 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::NegF64:
 				r[in.a].d = -r[in.b].d;
 				break;
+			case Op::MathUnary:
+				r[in.a].d = math_unary(static_cast<ir::MathFunction>(in.c), r[in.b].d);
+				break;
+			case Op::Atan2:
+				r[in.a].d = std::atan2(r[in.b].d, r[in.c].d);
+				break;
+			case Op::Pow:
+				r[in.a].d = math_pow(r[in.b].d, r[in.c].d);
+				break;
+			case Op::MinF64:
+				r[in.a].d = math_min(r[in.b].d, r[in.c].d);
+				break;
+			case Op::MaxF64:
+				r[in.a].d = math_max(r[in.b].d, r[in.c].d);
+				break;
+			case Op::Random:
+				r[in.a].d = math_random();
+				break;
 			case Op::BitAnd:
 				r[in.a].i = r[in.b].i & r[in.c].i;
 				break;
@@ -504,6 +531,18 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::New:
 				make(in.b, r[in.a]);
 				break;
+			case Op::VecNew:
+			case Op::VecGet:
+			case Op::VecSet:
+			case Op::VecLength:
+			case Op::VecSetLength:
+			case Op::VecFixed:
+			case Op::VecSetFixed:
+				vector_op(function, in, r);
+				break;
+			case Op::VecCall:
+				vector_call(function, in); // `frame` and `r` may be stale after this.
+				break;
 			case Op::Call:
 			case Op::CallVirtual:
 				enter(function, in, r); // `frame` and `r` are stale after this.
@@ -544,6 +583,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::HostDefault:
 			case Op::HostConstant:
 			case Op::HostCallStatic:
+			case Op::HostCollection:
 			case Op::HostBind:
 			case Op::HostMember:
 			case Op::HostIndexGet:

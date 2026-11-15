@@ -39,6 +39,15 @@ struct Object : Counted {
 	Slot *fields() { return reinterpret_cast<Slot *>(this + 1); }
 };
 
+// A Vector.<T>: an object whose class says what its elements are. They are held like fields: untagged
+// slots of that one kind.
+struct Vector : Object {
+	uint32_t length;
+	uint32_t capacity; // Slots there is room for; those from `length` on are zero.
+	bool fixed; // Its length may not change.
+	Slot *data;
+};
+
 inline void retain(Counted *p_value) {
 	if (p_value) {
 		p_value->references++;
@@ -57,6 +66,11 @@ Str *new_string(std::string_view p_text); // One reference, the caller's.
 void free_string(Str *p_string);
 Object *new_object(uint32_t p_class, size_t p_fields); // One reference; fields zeroed. Null if out of memory.
 void free_object(Object *p_object); // The fields must have been released.
+// One reference; `p_length` elements, all zero. Null if out of memory.
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed);
+// Room for at least that many elements, keeping the ones there are. False if out of memory.
+bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
+void free_vector(Vector *p_vector); // The elements must have been released.
 
 // Conversions, as ECMAScript and AS3 define them.
 

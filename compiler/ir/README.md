@@ -12,6 +12,7 @@ turns the checked tree from `src/` into it.
 | `lower_emit`, `lower_types`, `lower_places` | Registers and constants; kinds, conversions, default values; what can be read and written |
 | `lower_expressions`, `lower_operators`, `lower_calls`, `lower_statements`, `lower_classes` | By what each lowers |
 | `lower_engine` | Godot's members: properties, constants, singletons, parts of a value |
+| `lower_vectors`, `lower_math` | `Vector.<T>` (a class per element type, places, methods, loops, handing one to Godot); `Math` |
 
 ## Rules
 

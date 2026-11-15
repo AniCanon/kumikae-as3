@@ -23,6 +23,10 @@ public:
 		refuse(r_error);
 		return nullptr;
 	}
+	void *collection(std::string_view, const Argument *, size_t, std::string *r_error) override {
+		refuse(r_error);
+		return nullptr;
+	}
 	void *copy(void *p_value) override { return p_value; }
 	void drop(void *) override {}
 	bool present(void *p_value) override { return p_value != nullptr; }

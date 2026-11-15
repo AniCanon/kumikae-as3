@@ -125,10 +125,96 @@ void Lowerer::break_or_continue(Stmt *p_statement) {
 	std::string_view label = is_break ? static_cast<Break *>(p_statement)->label : static_cast<Continue *>(p_statement)->label;
 	if (!label.empty()) {
 		refuse(position, "a labelled 'break' or 'continue'");
-	} else if (!loops_.empty()) {
-		uint32_t jump = emit(Op::Jump, position, 0);
-		(is_break ? loops_.back().breaks : loops_.back().continues).push_back(jump);
+		return;
 	}
+	// `break` leaves the nearest loop or switch; `continue` goes round the nearest loop.
+	for (size_t i = loops_.size(); i-- > 0;) {
+		if (is_break || !loops_[i].is_switch) {
+			uint32_t jump = emit(Op::Jump, position, 0);
+			(is_break ? loops_[i].breaks : loops_[i].continues).push_back(jump);
+			return;
+		}
+	}
+}
+
+bool Lowerer::can_be_equal(Kind p_a, Kind p_b) {
+	const auto family = [](Kind p_kind) {
+		switch (p_kind) {
+			case Kind::I32:
+			case Kind::U32:
+			case Kind::F64:
+			case Kind::I64:
+				return 0;
+			case Kind::Val:
+			case Kind::Ref:
+				return 1;
+			default:
+				return 2 + static_cast<int>(p_kind);
+		}
+	};
+	const auto nullable = [](Kind p_kind) { return is_reference(p_kind) || is_engine(p_kind); };
+	if (p_a == Kind::Void || p_b == Kind::Void) {
+		return p_a == p_b || nullable(p_a == Kind::Void ? p_b : p_a);
+	}
+	return family(p_a) == family(p_b);
+}
+
+void Lowerer::switch_statement(Stmt *p_statement) {
+	uint32_t position = p_statement->offset;
+	Switch *choice = static_cast<Switch *>(p_statement);
+	if (!choice->subject || is_null(choice->subject)) {
+		refuse(position, "a 'switch' on null");
+		return;
+	}
+	// The subject is worked out once, and kept where nothing a case does can change it.
+	uint32_t value = expression(choice->subject, Kind::Void);
+	uint32_t subject = reg(kind_at(value));
+	emit(Op::Move, position, subject, value);
+	evaluated_[choice->subject] = subject;
+	// The tests, in the order written, each jumping to its body. Then the bodies, one after another, so
+	// that one without a `break` runs on into the next.
+	std::vector<uint32_t> to_body(choice->cases.count, NONE);
+	size_t at = 0;
+	for (SwitchCase &each : choice->cases) {
+		if (each.test) {
+			Kind kind = is_null(each.test) ? Kind::Void : natural(each.test);
+			if (can_be_equal(kind_at(subject), kind)) {
+				Binary same;
+				same.kind = NodeKind::Binary;
+				same.op = TokenKind::StrictEqual;
+				same.offset = each.offset;
+				same.left = choice->subject;
+				same.right = each.test;
+				to_body[at] = emit(Op::JumpIf, each.offset, equality(&same), 0);
+			} else {
+				expression(each.test, Kind::Void); // Never equal, but what it does is still done.
+			}
+		}
+		at++;
+	}
+	evaluated_.erase(choice->subject);
+	uint32_t to_default = emit(Op::Jump, position, 0);
+	bool has_default = false;
+	loops_.emplace_back();
+	loops_.back().is_switch = true;
+	at = 0;
+	for (SwitchCase &each : choice->cases) {
+		if (to_body[at] != NONE) {
+			patch(to_body[at], here());
+		}
+		if (!each.test) {
+			patch(to_default, here());
+			has_default = true;
+		}
+		for (Stmt *inner : each.body) {
+			statement(inner);
+		}
+		at++;
+	}
+	if (!has_default) {
+		patch(to_default, here());
+	}
+	finish_loop(here());
 }
 
 void Lowerer::return_statement(Stmt *p_statement) {
@@ -160,7 +246,8 @@ void Lowerer::statement(Stmt *p_statement) {
 		return;
 	}
 	uint32_t position = p_statement->offset;
-	bool loop = p_statement->kind == NodeKind::While || p_statement->kind == NodeKind::DoWhile || p_statement->kind == NodeKind::For;
+	bool loop = p_statement->kind == NodeKind::While || p_statement->kind == NodeKind::DoWhile || p_statement->kind == NodeKind::For ||
+			p_statement->kind == NodeKind::ForIn;
 	if (p_statement->kind != NodeKind::Block && p_statement->kind != NodeKind::Empty && !loop) {
 		emit(Op::Stmt, position); // A loop marks its condition instead, once for each pass.
 	}
@@ -202,13 +289,17 @@ void Lowerer::statement(Stmt *p_statement) {
 			throw_statement(p_statement);
 			break;
 		case NodeKind::Switch:
-			refuse(position, "'switch'");
+			switch_statement(p_statement);
 			break;
 		case NodeKind::Try:
 			refuse(position, "'try'");
 			break;
 		case NodeKind::ForIn:
-			refuse(position, static_cast<ForIn *>(p_statement)->each ? "'for each'" : "'for in'");
+			if (is_vector(static_cast<ForIn *>(p_statement)->collection->type)) {
+				vector_loop(static_cast<ForIn *>(p_statement));
+			} else {
+				refuse(position, static_cast<ForIn *>(p_statement)->each ? "'for each'" : "'for in'");
+			}
 			break;
 		case NodeKind::Labeled:
 			refuse(position, "a label");

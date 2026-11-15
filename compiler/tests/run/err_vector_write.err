@@ -1,0 +1,2 @@
+RangeError: Error #1125: The index 3 is out of range 2.
+	at err_vector_write()[err_vector_write.as:6]
