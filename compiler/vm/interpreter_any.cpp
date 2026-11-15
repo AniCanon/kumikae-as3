@@ -129,11 +129,14 @@ bool Interpreter::from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_
 	const AnyTag tag = any::tag(p_value);
 	const bool nothing = tag == AnyTag::Undefined || tag == AnyTag::Null;
 	switch (p_kind) {
+		// A large integer wraps (the owner's ruling): an Int64 by its own low bits, not a rounded Number's.
 		case Kind::I32:
-			r_out->i = to_int32(any::to_number(p_value));
+			r_out->i = tag == AnyTag::Wide ? (int32_t)(uint32_t)(uint64_t) static_cast<Wide *>(any::pointer(p_value))->value
+										   : to_int32(any::to_number(p_value));
 			return true;
 		case Kind::U32:
-			r_out->u = to_uint32(any::to_number(p_value));
+			r_out->u = tag == AnyTag::Wide ? (uint32_t)(uint64_t) static_cast<Wide *>(any::pointer(p_value))->value
+										   : to_uint32(any::to_number(p_value));
 			return true;
 		case Kind::F64:
 			r_out->d = any::to_number(p_value);

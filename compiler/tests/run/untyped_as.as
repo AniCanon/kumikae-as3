@@ -15,6 +15,12 @@ package {
 			var c:Boolean = five as Boolean;
 			trace(i, j, u, n, m, b, c);
 			trace(five is int, half is int, word is Number, yes is Boolean);
+			// A large integer wraps into an int by its own low bits.
+			var wide:Int64 = 9007199254740993;
+			var held:* = wide;
+			var low:int = held;
+			var lowU:uint = held;
+			trace(low, lowU);
 		}
 	}
 }

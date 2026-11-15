@@ -24,6 +24,13 @@ package {
 		// A function that gives back anything, where the program says what it expects.
 		public function mixAny(a:Number, b:Number, t:Number):Number { var x:Number = lerp(a, b, t); return x; }
 		public function largest(a:int, b:int, c:int):int { var n:int = max(a, b, c); return n; }
+		// What a function that gives back anything gives is converted where it is used, as AS3 converts.
+		public function lerpVector():Vector2 { var v:Vector2 = lerp(Vector2.ZERO, Vector2.ONE, 0.5); return v; }
+		public function lerpCut():int { return int(lerp(1, 2, 0.75)); }
+		public function maxAsCondition():Boolean { return Boolean(max(0, 1)); }
+		public function lerpText():String { return "" + lerp(1, 2, 0.5) + " " + max(1, 5); }
+		public function lerpAnything(a:*, b:*):* { return lerp(a, b, 0.5); }
+		public function lerpWrongType():Vector2 { var v:Vector2 = lerp(1, 2, 0.5); return v; }
 		// A wide whole number into a Number from a function that gives back anything: the RangeError its
 		// typed twin gives.
 		public function widest(a:Int64, b:Int64):Number { var n:Number = max(a, b); return n; }

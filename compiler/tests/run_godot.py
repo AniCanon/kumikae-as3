@@ -231,7 +231,8 @@ output = compare("functions.gd", [
     "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
     "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
     "anything as text", "a default is not shared",
-    "max past what a Number holds",
+    "max past what a Number holds", "lerp of vectors", "int of lerp cuts", "Boolean of max", "lerp and max as text",
+    "lerp of anything", "lerp into the wrong type",
 ])
 check("functions.gd: a wide whole number into a Number is a RangeError",
       "RangeError: 9007199254740993 does not fit a Number exactly.\n\tat Functions/widest()" in output, output[-1500:])

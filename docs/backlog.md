@@ -138,8 +138,6 @@ the review of the clean-up put off.
 
 ## Stage 2b-3, part C: global functions and errors
 
-- A global function that gives back anything (`lerp`, `max`, `clamp`: 26 of them) is refused where the
-  program does not say what it expects, and for one of Godot's values. Each has a typed twin. **2c**
 - Godot's message for a listener that was not called names it `Node(Signals.as)::`, without the method.
   **clean-up**
 - A freed Godot object still reads as `<Freed Object>` as text, as in GDScript, though it is `null` in
@@ -152,8 +150,6 @@ any Godot value passing as a condition):
 - A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
   `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
   **decision**
-- `int(lerp(a, b, t))` raises for a fraction instead of cutting it, and `Boolean(max(a, b))` is refused.
-  **2c**
 - A freed object arriving from Godot for a `Node` parameter of a script's method is refused, not null.
   **2d**
 - A Number variable that holds a whole value reaches a parameter that takes anything as a float
