@@ -10,6 +10,11 @@
 
 #ifdef _WIN32
 #include <io.h>
+#include <fcntl.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #else
 #include <poll.h>
 #include <unistd.h>
@@ -197,15 +202,18 @@ const Occurrence *Server::occurrence_at(const Json &p_params, Unit **r_unit) {
 }
 
 void Server::publish(std::vector<std::string> &r_out) {
-	if (workspace_.stale() || workspace_.checks() == published_check_) {
+	if (workspace_.stale() || (workspace_.checks() == published_check_ && document_generation_ == published_document_generation_)) {
 		return;
 	}
 	published_check_ = workspace_.checks();
+	published_document_generation_ = document_generation_;
 	std::set<std::string> present;
 	auto send = [&](const std::string &p_uri, const std::string &p_diagnostics) {
 		// The list is JSON already.
+		const auto version = document_version(p_uri);
 		r_out.push_back("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":" +
-				write_json(Json(p_uri)) + ",\"diagnostics\":" + p_diagnostics + "}}");
+				write_json(Json(p_uri)) + ",\"diagnostics\":" + p_diagnostics +
+				(version ? ",\"version\":" + std::to_string(*version) : "") + "}}");
 	};
 	for (Unit *unit : workspace_.reported_units()) {
 		std::string uri = uri_of(*unit);
@@ -238,9 +246,10 @@ void Server::publish(std::vector<std::string> &r_out) {
 							  .set("message", "too many errors (" + std::to_string(dropped) + " more)"));
 		}
 		std::string text = write_json(list);
-		if (before == published_.end() || before->second != text) {
+		const auto version = document_version(uri);
+		if (before == published_.end() || before->second.diagnostics != text || before->second.version != version) {
 			send(uri, text);
-			published_[uri] = std::move(text);
+			published_[uri] = { std::move(text), version };
 		}
 	}
 	// Files that left the program take their errors with them.
@@ -280,6 +289,7 @@ Json Server::initialize(const Json &p_params) {
 	for (const Json &encoding : capabilities.get("general").get("positionEncodings").items()) {
 		utf8_ = utf8_ || encoding.string() == "utf-8";
 	}
+	diagnostic_versions_ = capabilities.get("textDocument").get("publishDiagnostics").get("versionSupport").boolean();
 	watch_files_ = capabilities.get("workspace").get("didChangeWatchedFiles").get("dynamicRegistration").boolean();
 	const std::string language = p_params.get("initializationOptions").get("codeLanguage").string();
 	// A name of letters and digits only: it goes into Markdown as it is.
@@ -425,11 +435,14 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 											   .set("params", Json::object().set("registrations", Json::array().push(std::move(registration))))));
 		}
 	} else if (p_method == "textDocument/didOpen") {
-		if (!path.empty() && document.get("text").is_string()) {
+		if (!path.empty() && document.get("text").is_string() && accept_version(document, true, r_out)) {
 			uris_[normal_path(path)] = document.get("uri").string();
 			workspace_.open(path, document.get("text").string());
 		}
 	} else if (p_method == "textDocument/didChange") {
+		if (path.empty() || !accept_version(document, false, r_out)) {
+			return;
+		}
 		// Each change applies to the text the one before it left: a range of it replaced, or, with no
 		// range, the whole of it.
 		const std::string *held = path.empty() ? nullptr : workspace_.text(path);
@@ -463,6 +476,9 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 	} else if (p_method == "textDocument/didClose") {
 		if (!path.empty()) {
 			workspace_.close(path);
+			versions_.erase(normal_path(path));
+			++document_generation_;
+			uris_.erase(normal_path(path));
 		}
 	} else if (p_method == "workspace/didChangeWatchedFiles") {
 		for (const Json &change : p_params.get("changes").items()) {
@@ -484,20 +500,24 @@ void Server::handle(std::string_view p_message, std::vector<std::string> &r_out)
 		r_out.push_back(failure(Json(), PARSE_ERROR, "the message is not JSON"));
 		return;
 	}
-	if (!message.is_object()) {
+	handle_message(message, r_out);
+}
+
+void Server::handle_message(const Json &p_message, std::vector<std::string> &r_out) {
+	if (!p_message.is_object()) {
 		r_out.push_back(failure(Json(), INVALID_REQUEST, "the message is not a request"));
 		return;
 	}
-	const Json &id = message.get("id");
-	const Json &params = message.get("params");
-	if (!message.get("method").is_string()) {
-		if (!message.has("result") && !message.has("error")) {
+	const Json &id = p_message.get("id");
+	const Json &params = p_message.get("params");
+	if (!p_message.get("method").is_string()) {
+		if (!p_message.has("result") && !p_message.has("error")) {
 			r_out.push_back(failure(id, INVALID_REQUEST, "the message has no method"));
 		}
 		return; // An answer to something the server asked: nothing depends on it.
 	}
-	const std::string &method = message.get("method").string();
-	if (!message.has("id")) {
+	const std::string &method = p_message.get("method").string();
+	if (!p_message.has("id")) {
 		if (method == "exit") {
 			exited_ = true;
 			exit_code_ = shutdown_ ? 0 : 1;
@@ -559,7 +579,10 @@ class Channel {
 	std::string buffer_;
 	bool ended_ = false;
 
-	bool fill() {
+	bool fill(bool p_wait) {
+		if (ended_ || (!p_wait && !readable())) {
+			return false;
+		}
 		char chunk[65536];
 #ifdef _WIN32
 		int got = _read(input_, chunk, sizeof(chunk));
@@ -579,11 +602,11 @@ public:
 			input_(p_input), output_(p_output) {}
 
 	// The next message's body. False at the end of input, or when the framing is broken past repair.
-	bool next(std::string *r_message) {
+	bool next(std::string *r_message, bool p_wait = true) {
 		while (true) {
 			size_t header_end = buffer_.find("\r\n\r\n");
 			if (header_end == std::string::npos) {
-				if (buffer_.size() > 65536 || !fill()) {
+				if (buffer_.size() > 65536 || !fill(p_wait)) {
 					return false; // No header in sight.
 				}
 				continue;
@@ -624,7 +647,7 @@ public:
 			}
 			size_t body = header_end + 4;
 			while (buffer_.size() < body + length) {
-				if (!fill()) {
+				if (!fill(p_wait)) {
 					return false;
 				}
 			}
@@ -635,12 +658,13 @@ public:
 	}
 
 	// True if another message, or part of one, is already waiting.
-	bool waiting() const {
-		if (!buffer_.empty()) {
-			return true;
-		}
+	bool waiting() const { return !buffer_.empty() || readable(); }
+
+	bool readable() const {
 #ifdef _WIN32
-		return false;
+		const HANDLE handle = reinterpret_cast<HANDLE>(_get_osfhandle(input_));
+		DWORD available = 0;
+		return PeekNamedPipe(handle, nullptr, 0, nullptr, &available, nullptr) && available != 0;
 #else
 		struct pollfd descriptor;
 		descriptor.fd = input_;
@@ -674,13 +698,27 @@ public:
 } // namespace
 
 int run_server(int p_input, int p_output, Workspace::Options p_options) {
+#ifdef _WIN32
+	if (_setmode(p_input, _O_BINARY) == -1 || _setmode(p_output, _O_BINARY) == -1) {
+		std::fprintf(stderr, "kas3c: cannot set binary language-server transport\n");
+		return 1;
+	}
+#endif
 	Server server(std::move(p_options));
 	Channel channel(p_input, p_output);
 	std::string message;
 	std::vector<std::string> out;
 	while (!server.exited() && channel.next(&message)) {
 		out.clear();
-		server.handle(message, out);
+		std::vector<std::string> batch;
+		size_t bytes = message.size();
+		batch.push_back(std::move(message));
+		// Bound lookahead memory and work; do not wait for a quiet editor to answer.
+		while (batch.size() < 32 && bytes < 1024 * 1024 && channel.waiting() && channel.next(&message, false)) {
+			bytes += message.size();
+			batch.push_back(std::move(message));
+		}
+		server.handle_batch(batch, out);
 		// While someone is typing, changes arrive faster than they can be checked. Check once the editor
 		// pauses.
 		if (!server.exited() && !channel.waiting()) {

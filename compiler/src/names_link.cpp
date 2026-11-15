@@ -401,7 +401,7 @@ void Compilation::settle_hierarchy() {
 }
 
 // What code in a class of package p_package may name on a base class.
-static bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package) {
+bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package) {
 	if (p_member->modifiers & Modifiers::Private) {
 		return false;
 	}

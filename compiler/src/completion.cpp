@@ -49,6 +49,7 @@ class Completer {
 	Symbol *class_ = nullptr; // The class the cursor is in.
 	FunctionDecl *function_ = nullptr; // The outermost function the cursor is in.
 	bool in_body_ = false;
+	bool incomplete_ = false;
 	std::vector<Completion> found_;
 	std::unordered_set<std::string_view> seen_;
 
@@ -165,10 +166,30 @@ class Completer {
 		for (const auto &[name, symbol] : unit_.helpers) {
 			take(symbol);
 		}
-		std::sort(sorted.begin(), sorted.end(), [](const Symbol *p_a, const Symbol *p_b) { return p_a->name < p_b->name; });
+		std::sort(sorted.begin(), sorted.end(), [&](const Symbol *p_a, const Symbol *p_b) {
+			return p_a->name != p_b->name ? p_a->name < p_b->name :
+					compilation_.qualified_name(p_a) < compilation_.qualified_name(p_b);
+		});
 		for (Symbol *symbol : sorted) {
-			if (compilation_.lookup_package_level(context, symbol->name).first == symbol) {
+			const Found found = compilation_.lookup_package_level(context, symbol->name);
+			if (found.first == symbol && !found.second) {
 				offer(symbol);
+			}
+		}
+		for (Symbol *symbol : sorted) {
+			const Found found = compilation_.lookup_package_level(context, symbol->name);
+			if (symbol->is_type() && !symbol->file_private && symbol->package &&
+					!symbol->package->name.empty() && !found.first && !seen_.count(symbol->name) &&
+					compilation_.visible(symbol, context)) {
+				if (prefix_.empty()) {
+					incomplete_ = true;
+					continue;
+				}
+				Completion item = queries_.completion_item(symbol);
+				const std::string qualified = compilation_.qualified_name(symbol);
+				item.detail += " (import " + qualified + ")";
+				item.additional_edit = queries_.import_edit(unit_, offset_, qualified);
+				found_.push_back(std::move(item));
 			}
 		}
 	}
@@ -285,23 +306,13 @@ class Completer {
 		if (end == 0) {
 			return false;
 		}
-		if (source_[end - 1] == ':') {
-			uint32_t name_end = end - 1;
-			while (name_end > 0 && std::isspace((unsigned char)source_[name_end - 1])) {
-				name_end--;
+		for (const Node *node : queries_.context_nodes(unit_)) {
+			if (node->kind == NodeKind::TypeRef) {
+				const auto *type = static_cast<const TypeRef *>(node);
+				if (type->completion_begin <= offset_ && offset_ <= std::max(type->offset, type->end)) {
+					return true;
+				}
 			}
-			if (name_end > 0 && source_[name_end - 1] == ')') {
-				return true; // A function's result.
-			}
-			// `name:` is a type's place after `var`, `const`, or in a parameter list. In `a ? b : c` and
-			// `{ key: value }` it is not: there the name follows `?`, `{` or a value.
-			const std::string_view name = word_before(name_end);
-			uint32_t lead = name_end - (uint32_t)name.size();
-			while (lead > 0 && std::isspace((unsigned char)source_[lead - 1])) {
-				lead--;
-			}
-			const std::string_view keyword = word_before(lead);
-			return !name.empty() && (keyword == "var" || keyword == "const" || (function_ && !in_body_));
 		}
 		const std::string_view keyword = word_before(end);
 		return keyword == "new" || keyword == "extends" || keyword == "implements" || keyword == "is" || keyword == "as";
@@ -310,6 +321,8 @@ class Completer {
 public:
 	Completer(Queries &p_queries, Compilation &p_compilation, const Unit &p_unit, uint32_t p_offset) :
 			queries_(p_queries), compilation_(p_compilation), unit_(p_unit), source_(p_unit.source.text()), offset_(p_offset) {}
+
+	bool incomplete() const { return incomplete_; }
 
 	std::vector<Completion> run() {
 		if (offset_ > source_.size() || queries_.in_text(unit_, offset_)) {
@@ -321,6 +334,10 @@ public:
 		}
 		prefix_ = source_.substr(start_, offset_ - start_);
 		find_enclosing();
+		if (class_ && function_ && (function_->modifiers.bits & Modifiers::Override) &&
+				offset_ >= function_->name_offset && offset_ <= function_->name_offset + function_->name.size()) {
+			return queries_.overrides(unit_, *function_, class_, offset_);
+		}
 		if (offer_import()) {
 			return std::move(found_);
 		}
@@ -361,8 +378,10 @@ public:
 	}
 };
 
-std::vector<Completion> Queries::complete(const Unit &p_unit, uint32_t p_offset) {
-	return Completer(*this, compilation_, p_unit, p_offset).run();
+CompletionResult Queries::complete(const Unit &p_unit, uint32_t p_offset) {
+	Completer completer(*this, compilation_, p_unit, p_offset);
+	auto items = completer.run();
+	return { std::move(items), completer.incomplete() };
 }
 
 } // namespace kas3

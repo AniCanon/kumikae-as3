@@ -62,13 +62,20 @@ START = request(1, "initialize", {"capabilities": {}}) + notify("initialized", {
 END = request(99, "shutdown") + notify("exit")
 
 
+document_version = 0
+
+
 def opened(text):
+    global document_version
+    document_version = 1
     return notify("textDocument/didOpen", {"textDocument": {"uri": URI, "languageId": "actionscript", "version": 1,
                                                              "text": text}})
 
 
 def changed(text):
-    return notify("textDocument/didChange", {"textDocument": {"uri": URI, "version": 2},
+    global document_version
+    document_version += 1
+    return notify("textDocument/didChange", {"textDocument": {"uri": URI, "version": document_version},
                                              "contentChanges": [{"text": text}]})
 
 
@@ -207,6 +214,77 @@ if messages:
     check("replace suffix", item.get("textEdit", {}).get("replace", {}).get("end", {}).get("character") == position + 9, repr(item))
     signature = next((m for m in messages if m.get("id") == 3), {})
     check("signature parameter", signature.get("result", {}).get("activeParameter") == 1, repr(signature))
+
+# Invalid later changes cannot invalidate an otherwise current queued request.
+invalid_change = notify("textDocument/didChange", {"textDocument": {"uri": URI, "version": 2147483648},
+                         "contentChanges": [{"text": "ignored"}]})
+code, messages, errors = session(START + opened("package { public class Main {} }") +
+    request(2, "textDocument/completion", {"textDocument": {"uri": URI}, "position": {"line": 0, "character": 0}}) +
+    invalid_change + END, "--no-godot")
+check("invalid change keeps queued request", any(m.get("id") == 2 and "result" in m for m in messages or []))
+
+# An incomplete following frame must not hold a completed request hostage.
+for partial in (b"C", b"Content-Length: 100\r\n\r\n{"):
+    process = subprocess.Popen([KAS3C, "lsp", "--no-godot"], stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        process.stdin.write(START + partial)
+        process.stdin.flush()
+        ready = bool(select.select([process.stdout], [], [], 2)[0])
+        check("response before partial next frame", ready, repr(partial))
+        if ready:
+            check("initialize before partial next frame", b'"id":1' in os.read(process.stdout.fileno(), 65536))
+    finally:
+        process.stdin.close()
+        process.wait(timeout=10)
+        process.stdout.close()
+        process.stderr.close()
+
+# Empty-prefix lists must refresh when withheld imports become eligible.
+source = "package { public class Main { var point:; } }"
+code, messages, errors = session(START + opened(source) + request(2, "textDocument/completion",
+    {"textDocument": {"uri": URI}, "position": {"line": 0, "character": source.index(":") + 1}}) + END)
+check("empty prefix refresh", any(m.get("id") == 2 and m.get("result", {}).get("isIncomplete") is True for m in messages or []))
+
+# Generated edits preserve CRLF and keep a single-line primary range with list defaults.
+for kind, text, label in (
+    ("import", "package {\r\npublic class Main { var point:Vec|; } }", "Vector2"),
+    ("override", "package { import godot.*; public class Main extends Node2D { override\r\nfunction _ph| } }", "_physicsProcess"),
+):
+    caret = text.index("|")
+    source = text.replace("|", "")
+    before = source[:caret]
+    pos = {"line": before.count("\n"), "character": len(before.rsplit("\n", 1)[-1])}
+    caps = {"textDocument": {"completion": {"completionItem": {"snippetSupport": True},
+            "completionList": {"itemDefaults": ["editRange"]}}}}
+    start = request(1, "initialize", {"capabilities": caps}) + notify("initialized", {})
+    code, messages, errors = session(start + opened(source) + request(2, "textDocument/completion",
+        {"textDocument": {"uri": URI}, "position": pos}) + END)
+    reply = next((m for m in messages or [] if m.get("id") == 2), {})
+    result = reply.get("result", {})
+    item = next((i for i in result.get("items", []) if i.get("label") == label), {})
+    edits = item.get("additionalTextEdits", [])
+    check(kind + " additional edit", len(edits) == 1, repr(item))
+    if kind == "import":
+        check("import CRLF", bool(edits) and "import godot.Vector2;\r\n" in edits[0]["newText"], repr(item))
+    else:
+        primary = item.get("textEdit", {})
+        edit_range = primary.get("range", {})
+        check("override single line", edit_range.get("start", {}).get("line") == pos["line"] ==
+              edit_range.get("end", {}).get("line"), repr(item))
+        check("override snippet", primary.get("newText", "").startswith("_physicsProcess(") and
+              "$0throw" in primary.get("newText", "") and item.get("insertTextFormat") == 2, repr(item))
+
+# Requests already cancelled or superseded in the input queue must not check old text.
+params = {"textDocument": {"uri": URI}, "position": {"line": 0, "character": 0}}
+code, messages, errors = session(START + opened("package { public class Main {} }") +
+    request(2, "textDocument/completion", params) + notify("$/cancelRequest", {"id": 2}) +
+    request(3, "textDocument/completion", params) + changed("package { public class Main { var n:int; } }") +
+    request(4, "textDocument/completion", params) + END, "--no-godot")
+replies = {m.get("id"): m for m in messages or [] if "id" in m}
+check("cancel queued request", replies.get(2, {}).get("error", {}).get("code") == -32800, repr(replies.get(2)))
+check("superseded queued request", replies.get(3, {}).get("error", {}).get("code") == -32801, repr(replies.get(3)))
+check("latest queued request", "result" in replies.get(4, {}), repr(replies.get(4)))
 
 for failure in failures:
     print("FAIL " + failure)

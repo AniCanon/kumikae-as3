@@ -502,6 +502,7 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	std::vector<Parameter> parameters;
 	uint32_t defaults_height = 0; // Tallest default value, which hangs below this function in the tree.
 	Token open = expect(TokenKind::LParen, "'('");
+	function->has_parameter_list = open.length != 0;
 	if (open.length) {
 		bool rest_seen = false;
 		uint32_t rest_offset = 0;

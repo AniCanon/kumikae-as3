@@ -58,6 +58,7 @@ static std::string insertion(const Completion &p_item, bool p_call) {
 
 Json Server::completion(const Json &p_params) {
 	Json items = Json::array();
+	bool incomplete = false;
 	Json defaults;
 	Unit *unit = unit_of(p_params);
 	if (unit && p_params.get("position").is_object()) {
@@ -73,7 +74,9 @@ Json Server::completion(const Json &p_params) {
 			defaults = Json::object().set("editRange", edit_range);
 		}
 		uint32_t priority = 0;
-		for (const Completion &found : queries.complete(*unit, offset)) {
+		const auto completion = queries.complete(*unit, offset);
+		incomplete = completion.incomplete;
+		for (const Completion &found : completion.items) {
 			Json item = Json::object().set("label", found.name).set("kind", completion_kind(found));
 			if (!found.detail.empty()) {
 				item.set("detail", found.detail);
@@ -82,7 +85,22 @@ Json Server::completion(const Json &p_params) {
 			std::snprintf(order, sizeof(order), "%08u", priority++);
 			item.set("sortText", order);
 			const bool call = snippets_ && span.call && found.callable;
-			if (default_edit_range_) {
+			if (found.additional_edit) {
+				const auto &import = *found.additional_edit;
+				item.set("additionalTextEdits", Json::array().push(Json::object()
+						.set("range", range(*unit, import.begin, import.end - import.begin)).set("newText", import.text)));
+			}
+			if (found.edit) {
+				const auto &primary = *found.edit;
+				std::string text = primary.text;
+				if (snippets_ && found.caret) {
+					text = snippet_escape(std::string_view(text).substr(0, *found.caret)) + "$0" +
+							snippet_escape(std::string_view(text).substr(*found.caret));
+					item.set("insertTextFormat", 2);
+				}
+				item.set("textEdit", Json::object().set("range", range(*unit, primary.begin, primary.end - primary.begin))
+						.set("newText", std::move(text)));
+			} else if (default_edit_range_) {
 				if (call) {
 					item.set("textEditText", insertion(found, true));
 				}
@@ -101,7 +119,7 @@ Json Server::completion(const Json &p_params) {
 			items.push(std::move(item));
 		}
 	}
-	Json result = Json::object().set("isIncomplete", false).set("items", std::move(items));
+	Json result = Json::object().set("isIncomplete", incomplete).set("items", std::move(items));
 	if (!defaults.is_null()) {
 		result.set("itemDefaults", std::move(defaults));
 	}

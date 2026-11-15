@@ -64,6 +64,12 @@ struct SignatureHelp {
 	uint32_t active_parameter = 0;
 };
 
+struct CompletionEdit {
+	uint32_t begin = 0;
+	uint32_t end = 0;
+	std::string text;
+};
+
 // One thing completion offers.
 struct Completion {
 	std::string name;
@@ -74,6 +80,14 @@ struct Completion {
 	std::string detail; // The declaration as one line of AS3. Empty for a keyword.
 	bool callable = false;
 	std::vector<std::string> required_parameters;
+	std::optional<CompletionEdit> edit;
+	std::optional<CompletionEdit> additional_edit;
+	std::optional<uint32_t> caret; // Byte offset in edit.text for clients supporting a final tab stop.
+};
+
+struct CompletionResult {
+	std::vector<Completion> items;
+	bool incomplete = false; // More candidates become eligible once the user types a prefix.
 };
 
 // Built over a Compilation after check(). It reads the trees the passes wrote onto, so it is good for as
@@ -86,6 +100,10 @@ class Queries {
 	const std::vector<Node *> &context_nodes(const Unit &p_unit) const;
 	const Completion &completion_item(Symbol *p_symbol);
 	static const FunctionDecl *function_declaration(const Symbol *p_symbol);
+	CompletionEdit import_edit(const Unit &p_unit, uint32_t p_offset, std::string_view p_name) const;
+	std::vector<Completion> overrides(const Unit &p_unit, const FunctionDecl &p_function, Symbol *p_class, uint32_t p_offset);
+	static std::string line_break(const Unit &p_unit);
+	static std::string line_indent(const Unit &p_unit, uint32_t p_offset);
 
 	const std::vector<Occurrence> &occurrences(const Unit &p_unit);
 	friend class Completer;
@@ -121,7 +139,7 @@ public:
 	bool in_text(const Unit &p_unit, uint32_t p_offset) const;
 	CompletionRange completion_range(const Unit &p_unit, uint32_t p_offset) const;
 	std::optional<SignatureHelp> signature_help(const Unit &p_unit, uint32_t p_offset) const;
-	std::vector<Completion> complete(const Unit &p_unit, uint32_t p_offset);
+	CompletionResult complete(const Unit &p_unit, uint32_t p_offset);
 };
 
 } // namespace kas3

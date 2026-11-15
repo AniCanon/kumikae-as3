@@ -294,6 +294,7 @@ PackageDecl *Parser::parse_package() {
 	std::vector<Node *> definitions;
 	Token open = expect(TokenKind::LBrace, "'{'");
 	if (open.length) {
+		package->body_offset = open.offset + open.length;
 		parse_definitions(true, imports, definitions, nullptr);
 		expect_close(TokenKind::RBrace, open);
 	}

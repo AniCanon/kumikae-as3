@@ -61,4 +61,32 @@ CompletionRange Queries::completion_range(const Unit &p_unit, uint32_t p_offset)
 	return result;
 }
 
+std::string Queries::line_break(const Unit &p_unit) {
+	return p_unit.source.text().find("\r\n") != std::string::npos ? "\r\n" : "\n";
+}
+
+std::string Queries::line_indent(const Unit &p_unit, uint32_t p_offset) {
+	const auto line = p_unit.source.line_text(p_unit.source.position(p_offset).line);
+	return std::string(line.substr(0, line.find_first_not_of(" \t")));
+}
+
+CompletionEdit Queries::import_edit(const Unit &p_unit, uint32_t p_offset, std::string_view p_name) const {
+	const auto *package = p_unit.tree->package;
+	const bool in_package = package && package->body_offset && package->offset <= p_offset && p_offset <= package->end;
+	const auto &imports = in_package ? package->imports : p_unit.tree->imports;
+	const auto &definitions = in_package ? package->definitions : p_unit.tree->definitions;
+	uint32_t at = in_package ? package->body_offset : definitions.count ? definitions[0]->offset : 0;
+	std::string indent = definitions.count ? line_indent(p_unit, definitions[0]->offset) : std::string();
+	if (imports.count) {
+		at = imports[imports.count - 1]->end;
+		indent = line_indent(p_unit, imports[imports.count - 1]->offset);
+	}
+	if (in_package && indent.empty()) {
+		indent = "\t";
+	}
+	const auto newline = line_break(p_unit);
+	return { at, at, (in_package || imports.count ? newline : std::string()) + indent +
+			"import " + std::string(p_name) + ";" + newline };
+}
+
 } // namespace kas3

@@ -45,3 +45,15 @@ without bodies do not retain scopes.
 It never caches a history of prefix responses. `Workspace` destroys queries before changing the
 compilation that owns their symbol/tree pointers. `test_workspace` exercises repeated requests, edits,
 changed types and close; the compiler corpus tests exercise malformed input under sanitizers.
+
+`names_incremental` reuses the semantic environment only when source outside direct function bodies is
+identical and the prior full check was clean. Units with interfaces, accessors, body-local imports or
+parse errors fall back. All changed units resolve names before any is typed, preserving cross-file
+signature consistency. Stable declaration symbols own their names; each unit owns its replaceable body
+symbols and scopes. `Source` copies share an immutable snapshot, so replacing the parse never exposes
+text through an expired source reference. Type interning rebases after 1,024 additional entries.
+
+Override completion uses the same inherited visibility rule as name resolution. Its primary edit covers
+only the filtering word; additional edits insert visibility without rewriting metadata or comments.
+Generated signatures qualify accessible types and public default references. Tests apply generated edits
+and check the resulting source with a fresh compiler.

@@ -42,3 +42,13 @@ of twenty changes, with Godot loaded, in small and generated 100,000-line projec
 has 5,003 lines. Run without concurrent builds for comparable timings. RSS samples describe process
 pages; the workspace tests provide separate evidence about live cache ownership. Keep check/run
 controls from `bench/run_bench.py --against` alongside these results.
+
+The completion driver also accepts `--valid-body`: it changes a comment inside a valid method while
+requesting members at a dot. Run both modes. The default malformed-expression fixture measures the
+full-check recovery path; it must not be presented as evidence for incremental body reuse. The baseline
+and candidate always receive identical source and edit sequences.
+
+Follow-up regressions cover fresh-check equivalence after body edits, imports moved between functions,
+cross-file batch ordering, released parse snapshots, generated edits, stale document versions, queued
+cancellation and partial-frame responsiveness. Windows URI fixtures run on the host platform; executing
+the Windows runtime branches remains a separate validation requirement.

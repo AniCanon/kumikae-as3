@@ -38,6 +38,7 @@ static Workspace::Options options(bool p_godot) {
 struct Session {
 	Server server;
 	int next_id = 1;
+	std::unordered_map<std::string, int> versions;
 	std::vector<Json> received; // Since the last send.
 
 	explicit Session(bool p_godot = false) :
@@ -83,7 +84,7 @@ struct Session {
 		server.settle(out);
 		take(out);
 	}
-	void initialize(const std::string &p_root = std::string(), bool p_utf8 = false, const std::string &p_code_language = std::string()) {
+	void initialize(const std::string &p_root = std::string(), bool p_utf8 = false, const std::string &p_code_language = std::string(), bool p_versions = false) {
 		Json params = Json::object();
 		if (!p_code_language.empty()) {
 			params.set("initializationOptions", Json::object().set("codeLanguage", p_code_language));
@@ -91,6 +92,9 @@ struct Session {
 		params.set("processId", Json());
 		params.set("rootUri", p_root.empty() ? Json() : Json(uri_from_path(p_root)));
 		Json capabilities = Json::object();
+		if (p_versions) {
+			capabilities.set("textDocument", Json::object().set("publishDiagnostics", Json::object().set("versionSupport", true)));
+		}
 		if (p_utf8) {
 			capabilities.set("general", Json::object().set("positionEncodings", Json::array().push("utf-8").push("utf-16")));
 		}
@@ -100,6 +104,7 @@ struct Session {
 		notify("initialized", Json::object());
 	}
 	void open(const std::string &p_uri, const std::string &p_text) {
+		versions[p_uri] = 1;
 		notify("textDocument/didOpen",
 				Json::object().set("textDocument",
 						Json::object().set("uri", p_uri).set("languageId", "actionscript").set("version", 1).set("text", p_text)));
@@ -107,7 +112,7 @@ struct Session {
 	void change(const std::string &p_uri, const std::string &p_text) {
 		notify("textDocument/didChange",
 				Json::object()
-						.set("textDocument", Json::object().set("uri", p_uri).set("version", 2))
+						.set("textDocument", Json::object().set("uri", p_uri).set("version", ++versions[p_uri]))
 						.set("contentChanges", Json::array().push(Json::object().set("text", p_text))));
 	}
 	void close(const std::string &p_uri) {
@@ -570,7 +575,7 @@ static void test_ranged_changes() {
 		};
 		auto change = [&](Json p_changes) {
 			session.notify("textDocument/didChange",
-					Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", 2)).set("contentChanges", std::move(p_changes)));
+					Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", ++session.versions[MAIN])).set("contentChanges", std::move(p_changes)));
 			session.settle();
 		};
 		// Replace the `1` after the non-ASCII text with a string: the position differs by encoding.
@@ -847,7 +852,83 @@ static void test_signature_contexts() {
 	}
 }
 
+static void test_body_recheck_publishes_diagnostics() {
+	Session session;
+	session.initialize();
+	session.open(MAIN, "package { public class Main { function value():int { return 1; } } }");
+	session.settle();
+	session.change(MAIN, "package { public class Main { function value():int { return \"bad\"; } } }");
+	session.settle();
+	CHECK(session.published().find("where 'int' is expected") != std::string::npos);
+}
+
+static void test_repeated_diagnostics_version() {
+	Session session;
+	session.initialize({}, false, {}, true);
+	const std::string bad = "package { public class Main { var x:Missing; } }";
+	session.open(MAIN, bad);
+	session.settle();
+	for (int version : {2, 3}) {
+		session.change(MAIN, bad);
+		session.settle();
+		CHECK_EQ(session.received.size(), size_t{1});
+		if (!session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), version);
+		}
+	}
+}
+
+static void test_document_versions() {
+	Session session;
+	session.initialize({}, false, {}, true);
+	const std::string good = "package { public class Main { function value():int { return 1; } } }";
+	const std::string bad = "package { public class Main { function value():int { return \"bad\"; } } }";
+	session.open(MAIN, good);
+	session.change(MAIN, bad);
+	session.settle();
+	CHECK(!session.published().empty());
+	CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), 2);
+	for (int version : {1, 2}) {
+		session.notify("textDocument/didChange", Json::object()
+				.set("textDocument", Json::object().set("uri", MAIN).set("version", version))
+				.set("contentChanges", Json::array().push(Json::object().set("text", good))));
+		CHECK_EQ(*session.server.workspace().text(path_from_uri(MAIN)), bad);
+		CHECK_EQ(session.received.size(), size_t{1});
+		if (!session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("method").string(), std::string("window/logMessage"));
+		}
+	}
+	session.change(MAIN, good);
+	session.settle();
+	CHECK(session.published().find("clear") != std::string::npos);
+	CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), 3);
+	session.close(MAIN);
+	session.open(MAIN, bad);
+	session.settle();
+	CHECK(!session.published().empty());
+	CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), 1);
+}
+
+static void test_completion_import_refresh() {
+	Session session(true);
+	session.initialize();
+	for (const auto &[prefix, incomplete] : std::vector<std::pair<std::string, bool>>{ {"", true}, {"Vec", false} }) {
+		const std::string head = "package { public class Main { var point:" + prefix;
+		session.open(MAIN, head + "; } }");
+		const auto answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size())));
+		CHECK_EQ(answer.get("result").get("isIncomplete").boolean(), incomplete);
+	}
+	const std::string head = "package { import godot.*; public class Main extends Node2D { function run():void { position.";
+	session.open(MAIN, head + " } } }");
+	const auto answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size())));
+	CHECK(!answer.get("result").get("isIncomplete").boolean());
+}
+
 int main() {
+	test_completion_import_refresh();
+	test_repeated_diagnostics_version();
+	test_document_versions();
+	test_body_recheck_publishes_diagnostics();
 	test_completion_unicode_boundaries();
 	test_signature_contexts();
 	test_completion_default_range();
