@@ -21,7 +21,8 @@ static bool compare_strings(Op p_op, const Str *p_left, const Str *p_right) {
 		return p_left == p_right || (p_left && p_right && p_left->view() == p_right->view());
 	}
 	if (p_left && p_right) {
-		return p_op == Op::LtStr ? p_left->view() < p_right->view() : p_left->view() <= p_right->view();
+		const int order = compare_utf16(p_left->view(), p_right->view());
+		return p_op == Op::LtStr ? order < 0 : order <= 0;
 	}
 	const double left = p_left ? string_to_number(p_left->view()) : 0;
 	const double right = p_right ? string_to_number(p_right->view()) : 0;
@@ -482,7 +483,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::StrLength: {
 				Str *string = static_cast<Str *>(r[in.b].p);
-				r[in.a].i = string ? character_count(string->view()) : 0;
+				r[in.a].i = string ? utf16_length(string->view()) : 0;
 				break;
 			}
 			case Op::Jump:

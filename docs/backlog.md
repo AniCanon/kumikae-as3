@@ -219,7 +219,6 @@ any Godot value passing as a condition):
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
 - 6 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
   the six are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
-- A string's `length` counts characters, not UTF-16 units, and strings compare by character. **2c**
 - An endless loop has no stop. **2d**
 - After one refused construct, follow-on errors can appear on the same line. **2c**
 

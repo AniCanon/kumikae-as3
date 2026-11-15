@@ -99,8 +99,10 @@ std::string number_to_string(double p_value);
 // Leading and trailing white space is allowed; an empty string is 0; anything else that is not a number
 // is NaN.
 double string_to_number(std::string_view p_text);
-// The number of characters (Unicode code points) in UTF-8 text.
-int32_t character_count(std::string_view p_text);
+// AS3's length of UTF-8 text: its UTF-16 units, so a character past U+FFFF counts two.
+int32_t utf16_length(std::string_view p_text);
+// AS3's order of two texts held as UTF-8: by their UTF-16 units. Below 0, 0 or above.
+int compare_utf16(std::string_view p_a, std::string_view p_b);
 
 } // namespace vm
 } // namespace kas3

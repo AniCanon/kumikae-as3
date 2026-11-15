@@ -490,7 +490,8 @@ void Interpreter::any_arithmetic(const Instruction &p_in, Slot p_b, Slot p_c) {
 		if (any::tag(x_value) == AnyTag::String && any::tag(y_value) == AnyTag::String) {
 			const std::string_view x = static_cast<Str *>(any::pointer(x_value))->view();
 			const std::string_view y = static_cast<Str *>(any::pointer(y_value))->view();
-			answer = or_equal ? x <= y : x < y;
+			const int order = compare_utf16(x, y);
+			answer = or_equal ? order <= 0 : order < 0;
 		} else if (const std::optional<int> exact = any::compare_numbers(x_value, y_value)) {
 			answer = or_equal ? *exact <= 0 : *exact < 0;
 		}

@@ -81,10 +81,19 @@ static void test_text_number() {
 	CHECK(std::isnan(string_to_number("0x")));
 	CHECK(std::isnan(string_to_number("0xZZ")));
 	CHECK(std::isnan(string_to_number("--1")));
-	CHECK_EQ(character_count("abc"), 3);
-	CHECK_EQ(character_count("\xC3\xA9t\xC3\xA9"), 3);
-	CHECK_EQ(character_count("\xF0\x9F\x98\x80"), 1);
-	CHECK_EQ(character_count(""), 0);
+	// AS3's length is in UTF-16 units: a character past U+FFFF counts two.
+	CHECK_EQ(utf16_length("abc"), 3);
+	CHECK_EQ(utf16_length("\xC3\xA9t\xC3\xA9"), 3);
+	CHECK_EQ(utf16_length("\xF0\x9F\x98\x80"), 2);
+	CHECK_EQ(utf16_length(""), 0);
+	// And its order is the units': U+FFFD comes after a character past U+FFFF, whose first unit is a
+	// surrogate (U+D83D), though its code point is smaller.
+	CHECK(compare_utf16("\xF0\x9F\x98\x80", "\xEF\xBF\xBD") < 0);
+	CHECK(compare_utf16("abc", "abd") < 0);
+	CHECK(compare_utf16("ab", "abc") < 0);
+	CHECK(compare_utf16("b", "abc") > 0);
+	CHECK_EQ(compare_utf16("\xC3\xA9", "\xC3\xA9"), 0);
+	CHECK(compare_utf16("\xF0\x9F\x98\x80", "\xF0\x9F\x98\x81") < 0);
 }
 
 // A text too long for a string's 32-bit length is refused, never cut short. Its characters are not

@@ -232,12 +232,56 @@ double string_to_number(std::string_view p_text) {
 	return end == text.c_str() + text.size() ? value : std::nan("");
 }
 
-int32_t character_count(std::string_view p_text) {
+int32_t utf16_length(std::string_view p_text) {
 	int32_t count = 0;
 	for (unsigned char c : p_text) {
-		count += (c & 0xC0) != 0x80;
+		count += (c & 0xC0) != 0x80; // A character starts here,
+		count += c >= 0xF0; // and one of four bytes is two units.
 	}
 	return count;
+}
+
+namespace {
+
+// The code point that starts at p_at, and how many bytes it takes. Text that is not well-formed is read a
+// byte at a time.
+uint32_t code_point(std::string_view p_text, size_t p_at, size_t *r_size) {
+	const unsigned char lead = static_cast<unsigned char>(p_text[p_at]);
+	const size_t size = lead < 0x80 ? 1 : lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+	if (p_at + size > p_text.size()) {
+		*r_size = 1;
+		return lead;
+	}
+	uint32_t value = size == 1 ? lead : lead & (0xFF >> (size + 1));
+	for (size_t i = 1; i < size; i++) {
+		value = (value << 6) | (static_cast<unsigned char>(p_text[p_at + i]) & 0x3F);
+	}
+	*r_size = size;
+	return value;
+}
+
+// The first UTF-16 unit of a code point: a character past U+FFFF starts with its high surrogate.
+uint32_t first_unit(uint32_t p_code_point) {
+	return p_code_point < 0x10000 ? p_code_point : 0xD800 + ((p_code_point - 0x10000) >> 10);
+}
+
+} // namespace
+
+int compare_utf16(std::string_view p_a, std::string_view p_b) {
+	size_t a = 0, b = 0;
+	while (a < p_a.size() && b < p_b.size()) {
+		size_t a_size = 0, b_size = 0;
+		const uint32_t x = code_point(p_a, a, &a_size);
+		const uint32_t y = code_point(p_b, b, &b_size);
+		if (x != y) {
+			const uint32_t x_unit = first_unit(x), y_unit = first_unit(y);
+			// With the same high surrogate, the low ones are in the code points' order.
+			return x_unit != y_unit ? (x_unit < y_unit ? -1 : 1) : (x < y ? -1 : 1);
+		}
+		a += a_size;
+		b += b_size;
+	}
+	return a < p_a.size() ? 1 : b < p_b.size() ? -1 : 0;
 }
 
 } // namespace vm
