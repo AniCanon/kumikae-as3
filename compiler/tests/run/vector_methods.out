@@ -14,7 +14,7 @@ false 7,8,9,1,2,4,5,1 7,8,9,1,2,4,5,1,0 11 8
 12,2,4,5,13,1 11 1 11
 1 2 -1 b+a+null true a b 0
 2 -1 0 4 1.5,NaN,2,0.25
-0 0 null 0
+0 NaN null 0
 0 2 -1 first|second|first
 first true second first
 1,2,2,1,8

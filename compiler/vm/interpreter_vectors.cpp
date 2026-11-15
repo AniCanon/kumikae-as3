@@ -121,7 +121,8 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			set_uint32(r[p_in.a], vector->length);
 			break;
 		case Op::VecSetLength:
-			if (r[p_in.b].u != vector->length) {
+			// A fixed vector's length can't be set at all, even to what it is (AVM2 checks first).
+			if (!length_is_fixed(vector) && r[p_in.b].u != vector->length) {
 				resize_vector(vector, r[p_in.b].u);
 			}
 			break;

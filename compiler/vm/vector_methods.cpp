@@ -218,9 +218,9 @@ void Interpreter::vector_take(Vector *p_vector, const VectorCall &p_call) {
 			return;
 		}
 	}
-	Slot element;
-	element.bits = 0;
-	// From an empty vector: the element type's empty value, which for every number is 0.
+	// From an empty vector: undefined, made the element type, as AVM2 does: NaN for a Number, 0 for the
+	// other numbers, false, and null for the rest.
+	Slot element = empty_value(kind == Kind::F64, kind == Kind::Any);
 	if (length != 0) {
 		element = p_vector->data[at];
 		shift_slots(p_vector, static_cast<uint32_t>(at) + 1, length - static_cast<uint32_t>(at) - 1, -1);
