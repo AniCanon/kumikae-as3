@@ -74,7 +74,7 @@ public:
 	void error(std::string_view p_text) override;
 	void error_at(std::string_view p_text, std::string_view p_function, std::string_view p_file, int32_t p_line) override;
 	void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) override;
-	void *collection(std::string_view p_type, const vm::Argument *p_elements, size_t p_count, std::string *r_error) override;
+	void *collection(std::string_view p_type, ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, std::string *r_error) override;
 	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 			vm::Slot *r_result, std::string *r_error) override;
 	bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;

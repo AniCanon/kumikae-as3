@@ -244,7 +244,6 @@ any Godot value passing as a condition):
 - `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
 - A reload is refused when a vector that is alive has a type the new program no longer mentions, even if
   the vector is empty. **2d**
-- Handing a vector to Godot copies its elements into a list first, then into Godot's array. **clean-up**
 - Not checked against Flash: `pop()` and `shift()` on an empty vector of numbers give 0; a negative length
   is an out-of-memory error, not a `RangeError`; setting a fixed vector's length to what it already is
   does nothing; `join(null)` puts the word "null" between the elements. **2c**

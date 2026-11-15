@@ -16,10 +16,11 @@ struct EngineSource {
 	virtual ~EngineSource() {}
 	// A new value of one of Godot's value types, or (with no arguments) a new object of one of its classes.
 	[[nodiscard]] virtual void *construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) = 0;
-	// One of Godot's collections made from a vector's elements, each as it is held: a packed array of the
-	// type named ("PackedVector2Array"), or an Array for any other name. An element that does not fit the
-	// packed type is refused; a message that starts with "RangeError: " is raised as AS3's RangeError.
-	[[nodiscard]] virtual void *collection(std::string_view p_type, const Argument *p_elements, size_t p_count, std::string *r_error) = 0;
+	// One of Godot's collections made from a vector's elements, read where the vector holds them, all of
+	// the one kind: a packed array of the type named ("PackedVector2Array"), or an Array for any other
+	// name. An element that does not fit the packed type is refused; a message that starts with
+	// "RangeError: " is raised as AS3's RangeError.
+	[[nodiscard]] virtual void *collection(std::string_view p_type, ir::Kind p_kind, const Slot *p_elements, size_t p_count, std::string *r_error) = 0;
 	// A constant the engine keeps for one of its types: Vector2's ZERO.
 	[[nodiscard]] virtual bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, Slot *r_result,
 			std::string *r_error) = 0;

@@ -372,9 +372,13 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	void *collection(std::string_view p_type, const vm::Argument *p_elements, size_t p_count, std::string *) override {
+	void *collection(std::string_view p_type, ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, std::string *) override {
 		void *made = box();
-		log += "collection " + std::string(p_type) + "[" + list(p_elements, p_count) + "] -> #" + std::to_string((intptr_t)made) + "\n";
+		std::vector<vm::Argument> elements;
+		for (size_t i = 0; i < p_count; i++) {
+			elements.push_back(vm::Argument{ p_kind, p_elements[i] });
+		}
+		log += "collection " + std::string(p_type) + "[" + list(elements.data(), p_count) + "] -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
 	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted,

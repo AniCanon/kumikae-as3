@@ -107,11 +107,7 @@ Outcome collection(Request &p_request) {
 		return Outcome::Done;
 	}
 	const Kind element = p_request.module.classes[vector->klass].element;
-	std::vector<Argument> elements(vector->length);
-	for (uint32_t i = 0; i < vector->length; i++) {
-		elements[i] = Argument{ element, vector->data[i] };
-	}
-	p_request.result.p = p_request.host.source.collection(p_request.text(p_request.in.c), elements.data(), elements.size(), &p_request.error);
+	p_request.result.p = p_request.host.source.collection(p_request.text(p_request.in.c), element, vector->data, vector->length, &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 

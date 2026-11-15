@@ -23,7 +23,7 @@ public:
 		refuse(r_error);
 		return nullptr;
 	}
-	void *collection(std::string_view, const Argument *, size_t, std::string *r_error) override {
+	void *collection(std::string_view, ir::Kind, const Slot *, size_t, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;
 	}
