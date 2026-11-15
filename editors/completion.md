@@ -20,10 +20,22 @@ getParent().getParent().  // Members of Node
 points[0].                // Vector2 members if points is Vector.<Vector2>
 ```
 
-There are no guessed members for an unknown or `*` receiver. A partial expression can still be
+For a `*` receiver, or one whose type could not be worked out, only what every value has is offered:
+`Object`'s members (`toString`, `hasOwnProperty` and the rest). After a package's path (`flash.utils.`,
+`godot.`) completion offers what that package holds and the packages inside it; where a type is written
+(`var d:flash.utils.`), its types only. A name in reach comes before a package of the same name. Nothing
+is offered after a name that means nothing in the file. A partial expression can still be
 completed; errors elsewhere do not require saving a valid file first. Comments, strings and regular
 expressions do not offer code completion. Parameters, function-wide local variables, outer captures,
 named function expressions, catch variables and function-local imports respect their compiler scope.
+
+In a class, after `override` (with or without the access word and `function`), completion offers the
+methods and properties of the base classes that may be overridden: not private, static or final ones,
+not built-in ones (Flash takes those without `override`), and not one this class overrides already.
+Taking one writes the rest of its declaration: the access word and `function` if they are not there yet,
+the parameters with their defaults, the result, and a body that calls the base class's version (`{}` for
+a method that gives back nothing). A type the file cannot name by itself is written in full, as in
+`lib.Thing`. A rest parameter is not passed on to the base class's version.
 
 In an import, complete the package path and type, for example `import godot.Vec`. Completion does not
 silently add imports to the file. Types must already be visible to appear as unqualified names.
@@ -45,6 +57,10 @@ var callback:Function = onTimeout;
 timer.timeout.add(onTimeout);
 ```
 
+In a call's argument, a variable, parameter or member in reach whose name is the parameter's name there
+comes first and is preselected: in `move(|)` for `move(power:int)`, a local `power` is offered first. No
+name is made up when none is in reach, since AS3 has no named arguments.
+
 Typing `(` or `,` requests argument help. It shows the callable's declaration and active parameter,
 including inside nested calls. Commas inside nested expressions, strings, comments and regular
 expressions do not advance the outer call's active parameter.
@@ -55,9 +71,12 @@ Parentheses, square brackets, braces and single/double quotes use the IDE's pair
 partner can be typed to move past the existing one. Backspace in an empty bracket pair removes the pair.
 Enter inside braces creates an indented line, using the project's tab/space settings. Code punctuation
 inside comments and strings is not treated as a new code block. Regex literals are protected in
-expression positions and after control conditions. The local lexer cannot distinguish every regex
-from division after a closing brace; that context remains a limitation. The compiler handles regex
-contexts independently for completion and argument help.
+expression positions and after control conditions. After a closing brace the local lexer remembers
+what the brace began: a block (`if (a) {} /re/`) may be followed by a regex, while an object or a
+function written in place (`var o = {} / 2`) is divided. Blocks may be nested to any depth. Of the braces
+that began values, the two innermost are remembered (with up to fourteen and six blocks inside them); a
+third one around them is read as a block's. The compiler handles regex contexts independently for completion and argument
+help.
 
 Highlighting still comes from the shared TextMate grammar. A small adapter supplies AS3 token boundaries
 to the native editing handlers while preserving TextMate's color attributes, including string escapes.
@@ -85,11 +104,11 @@ See the [measured results](../docs/results/2026-11-completion.md) for latency, m
   compiler. Rebuilding an unrelated checkout does not update an installed plugin's binary.
 - If pairing is disabled, check the IDE's editor smart-key settings. The plugin honors those settings.
 - If a member is missing, hover the receiver and check its declared type and visibility. A dynamic value
-  requires a known type before its members can be offered.
+  offers only `Object`'s members until it has a known type.
 - For a sandbox trace, use `./gradlew runIde -PlspTrace=<existing-folder>` from `editors/jetbrains`.
   Trace files contain source text; keep them outside the repository and do not enable them for timings.
-- Windows language-server support, override-signature generation, automatic imports and whole-project
-  incremental type checking remain separate work. Unknown callable signatures cannot show argument help.
+- Automatic imports and whole-project incremental type checking remain separate work. The server has not
+  yet been tried on Windows. Unknown callable signatures cannot show argument help.
 - The plugin is pinned to the Rider build listed in its README. Android Studio and IntelliJ open-source
   builds do not provide the JetBrains LSP module this plugin requires; they are not supported targets.
 

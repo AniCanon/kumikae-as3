@@ -106,8 +106,9 @@ static void test_completion() {
 	CHECK(statics.has("ZERO") && statics.has("fromAngle") && !statics.has("x") && !statics.has("normalized"));
 	CHECK(complete(player("Player.|")).has("count"));
 
-	// Nothing is known of an untyped value, so nothing is offered: not everything.
-	CHECK(complete(player("var a:* = 1; a.|")).items.empty());
+	// Of an untyped value only what every value has is known: Object's members.
+	Offered untyped = complete(player("var a:* = 1; a.|"));
+	CHECK(untyped.has("toString") && untyped.has("hasOwnProperty") && !untyped.has("speed") && !untyped.has("x"));
 
 	// Not after a dot: what a name here could mean.
 	Offered scope = complete(player("var local:int = 1; |"));
@@ -173,10 +174,186 @@ static void test_completion_scopes_and_context() {
 	CHECK(complete(player("var items:Vector.<Vector2>; items[0].|")).has("x"));
 	CHECK(complete(player("(position).|")).has("x"));
 	CHECK(complete(player("missing.|; position.x;")).items.empty());
+	// A value whose type could not be worked out is a value all the same.
+	Offered unknown = complete(player("var v:Vector2; v.nope.|"));
+	CHECK(unknown.has("toString") && !unknown.has("x"));
+	CHECK(complete(player("arguments.|")).has("toString"));
+	// A package's path: what is in it, and the packages inside it.
+	Offered utils = complete(player("flash.utils.|"));
+	CHECK(utils.has("Dictionary") && utils.has("getTimer") && !utils.has("toString"));
+	Offered flash = complete(player("flash.|"));
+	CHECK(flash.find("utils") && flash.find("utils")->is_package && !flash.has("Dictionary"));
+	CHECK(complete(player("godot.Node|")).has("Node2D"));
+	CHECK(complete(player("var t:int = flash.utils.get|")).has("getTimer"));
+	// Where a type is written, its types only, however the file goes on.
+	Offered typed_path = complete(player("var d:flash.utils.|\nposition.x;"));
+	CHECK(typed_path.has("Dictionary") && !typed_path.has("getTimer") && !typed_path.has("x"));
+	// A class written with its package is a class: what it has, not a package's contents.
+	CHECK(complete(player("godot.Vector2.|")).has("ZERO"));
+	CHECK(complete(player("godot.Vector2.ZERO.|")).has("x"));
+	// A dot after something that is not a name is not a package's path, the top-level package included.
+	CHECK(complete(player("{ var a:int; }.|")).items.empty());
+	CHECK(complete(player("missing..|")).items.empty());
+	// A name in reach comes before a package of that name.
+	Offered shadowed = complete(player("var flash:Vector2; flash.|"));
+	CHECK(shadowed.has("x") && !shadowed.has("utils"));
 	CHECK(complete(player("var re:RegExp = /spe|/;")).items.empty());
 	CHECK(complete(player("var re:RegExp = /[(),.]spe|/;")).items.empty());
 	CHECK(complete(player("var re:RegExp = /spe|\n")).items.empty());
 	CHECK(complete(player("var n:Number = 10 / spe|;")).has("speed"));
+}
+
+// In a call's argument, a name in reach that is the parameter's own name comes first, and is marked.
+static void test_parameter_names() {
+	const std::string names = "var label:String; var power:int; var apple:int; function move(power:int, label:String):void {} ";
+	Offered first = complete(player((names + "move(|);").c_str()));
+	CHECK(!first.items.empty() && first.items[0].name == "power" && first.items[0].is_parameter_name);
+	CHECK_EQ(first.count("power"), size_t{1});
+	Offered second = complete(player((names + "move(1, |);").c_str()));
+	CHECK(!second.items.empty() && second.items[0].name == "label" && second.items[0].is_parameter_name);
+	CHECK(!second.find("power")->is_parameter_name);
+	Offered typed = complete(player((names + "move(1, la|);").c_str()));
+	CHECK(!typed.items.empty() && typed.items[0].name == "label");
+	// Through a member, and in a nested call: the innermost call's parameter.
+	const Offered through_member = complete(player("var by:int; this.hurt(|); } function hurt(by:int):void {"));
+	CHECK_EQ(through_member.items.at(0).name, std::string("by"));
+	Offered nested = complete(player((names + "move(Math.max(|), \"\");").c_str()));
+	CHECK(nested.items.empty() || !nested.items[0].is_parameter_name);
+	// Outside a call nothing is marked.
+	Offered outside = complete(player((names + "|").c_str()));
+	for (const Completion &item : outside.items) {
+		CHECK(!item.is_parameter_name);
+	}
+}
+
+// Whether a type is written here is read from the tree, so a type not yet started is told apart from a
+// value as surely as one that is.
+static void test_type_places() {
+	auto types = [](const char *p_body) {
+		Offered offered = complete(player(p_body));
+		return offered.has("Vector2") && !offered.has("speed") && !offered.has("var");
+	};
+	CHECK(types("var a:|"));
+	CHECK(types("var a: |\n"));
+	CHECK(types("try {} catch (e:|) {}"));
+	CHECK(types("var f:Function = function(a:|) {};"));
+	CHECK(types("var a:int, b:|"));
+	CHECK(types("var a /* a note */ :|"));
+	CHECK(types("for each (var item:| in []) {}"));
+	CHECK(types("var a:Vec|"));
+	CHECK(!types("var n:int = speed > 1 ? 2 : |;"));
+	CHECK(complete(player("var n:int = speed > 1 ? 2 : sp|;")).has("speed"));
+	CHECK(!types("var o:Object = { key: | };"));
+	// In a class, outside any function: a field's type and a method's parameters and result.
+	auto in_class = [](const char *p_member) {
+		Offered offered = complete(std::string("package { import godot.*; public class Player extends Node2D {\n") + p_member + " } }");
+		return offered.has("Vector2") && !offered.has("override");
+	};
+	CHECK(in_class("var a:|"));
+	CHECK(in_class("function f(a:|"));
+	CHECK(in_class("function f(a:int, b:|):void {}"));
+	CHECK(in_class("function f():|"));
+	CHECK(!in_class("function f(a:int = true ? 1 : |):void {}"));
+	CHECK(complete("package { import godot.*; public class Player extends | {} }").has("Node2D"));
+	CHECK(complete("package { import godot.*; public class Player extends Node2D implements | {} }").has("Node2D"));
+	CHECK(types("var b:Boolean = speed is |;"));
+	CHECK(types("var n:Node = speed as |;"));
+}
+
+// Where `override` is written before a member's name: the methods a base class lets this one override,
+// each as the whole declaration, written so that it compiles where it is put.
+struct Overriding {
+	std::vector<File> others;
+	std::string text; // The file being written, with `|` at the cursor.
+
+	Offered offered() const {
+		Compilation compilation;
+		compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		std::string written = text;
+		size_t at = written.find('|');
+		written.erase(at, 1);
+		Unit *unit = compilation.add("Derived.as", written);
+		for (const File &file : others) {
+			compilation.add(file.path, file.text);
+		}
+		compilation.check(true);
+		Queries queries(compilation);
+		return Offered{ queries.complete(*unit, (uint32_t)at) };
+	}
+	// What is reported once the item named is taken: its text in place of the word at the cursor.
+	std::string taken(std::string_view p_name) const {
+		Offered all = offered();
+		const Completion *item = all.find(p_name);
+		if (!item || item->insert_text.empty()) {
+			return "not offered";
+		}
+		std::string written = text;
+		size_t at = written.find('|');
+		written.erase(at, 1);
+		size_t begin = at;
+		while (begin > 0 && is_identifier_at(written, (uint32_t)begin - 1)) {
+			begin--;
+		}
+		written.replace(begin, at - begin, item->insert_text);
+		Compilation compilation;
+		compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		compilation.add("Derived.as", written);
+		for (const File &file : others) {
+			compilation.add(file.path, file.text);
+		}
+		compilation.check();
+		return compilation.format_diagnostics(false);
+	}
+};
+
+static void test_override_completion() {
+	const std::vector<File> bases = {
+		{ "lib/Thing.as", "package lib { public class Thing {} }" },
+		{ "game/Base.as", "package game { import lib.Thing; import godot.*; public class Base extends Node2D {\n"
+						  "public function hit(by:Thing, power:int = 1, ...rest):Boolean { return true; }\n"
+						  "protected function guard(at:Vector.<Thing>):void {}\n"
+						  "public function get hp():int { return 1; } public function set hp(p_value:int):void {}\n"
+						  "private function secret():void {} public static function make():void {}\n"
+						  "public final function fixed():void {} internal function inside():void {}\n"
+						  "public function done():void {} } }" },
+	};
+	const std::string head = "package { import game.Base; public class Derived extends Base {\n";
+	Overriding fresh{ bases, head + "override |\n} }" };
+	Offered offered = fresh.offered();
+	CHECK(offered.has("hit") && offered.has("guard") && offered.has("hp") && offered.has("done"));
+	CHECK(offered.has("_process") && offered.has("_ready") && !offered.has("addChild")); // Godot's own are final.
+	CHECK(!offered.has("secret") && !offered.has("make") && !offered.has("fixed") && !offered.has("inside"));
+	CHECK(!offered.has("toString")); // Built in: Flash takes it without `override`.
+	const Completion *hit = offered.find("hit");
+	CHECK_EQ(hit ? hit->insert_text : std::string(),
+			std::string("public function hit(by:lib.Thing, power:int = 1, ...rest):Boolean { return super.hit(by, power); }"));
+	const Completion *hp = offered.find("hp");
+	CHECK_EQ(hp ? hp->insert_text : std::string(), std::string("public function get hp():int { return super.hp; }"));
+	for (const char *name : { "hit", "guard", "hp", "done", "_process", "_ready" }) {
+		CHECK_EQ(fresh.taken(name), std::string());
+	}
+
+	// What is written already is not written again.
+	Overriding named{ bases, head + "override protected function gu|\n} }" };
+	CHECK_EQ(named.offered().find("guard") ? named.offered().find("guard")->insert_text : std::string(),
+			std::string("guard(at:Vector.<lib.Thing>):void {}"));
+	CHECK_EQ(named.taken("guard"), std::string());
+	Overriding modifiers{ bases, head + "public override |\n} }" };
+	CHECK_EQ(modifiers.taken("done"), std::string());
+	CHECK_EQ(Overriding({ bases, head + "override public function |\n} }" }).taken("_ready"), std::string());
+	Overriding setter{ bases, head + "override public function set |\n} }" };
+	CHECK_EQ(setter.offered().find("hp") ? setter.offered().find("hp")->insert_text : std::string(),
+			std::string("hp(p_value:int):void { super.hp = p_value; }"));
+	CHECK(!setter.offered().has("done"));
+	CHECK_EQ(setter.taken("hp"), std::string());
+	// Before another member, which the parser joins to what is written.
+	CHECK_EQ(Overriding({ bases, head + "override |\npublic var z:int; } }" }).taken("done"), std::string());
+
+	// A method this class overrides already is not offered again, and without `override` none is.
+	CHECK(!Overriding({ bases, head + "override public function done():void {}\noverride |\n} }" }).offered().has("done"));
+	CHECK(!Overriding({ bases, head + "public function |\n} }" }).offered().has("done"));
+	const Offered in_body = Overriding({ bases, head + "function f():void { override | }\n} }" }).offered();
+	CHECK(in_body.find("done") && in_body.find("done")->insert_text.empty());
 }
 
 static const char *const BROKEN =
@@ -198,12 +375,14 @@ static void test_tolerant() {
 	std::string expected = plain.format_diagnostics(false);
 	CHECK_EQ(expected, std::string("Main.as:3:82: error: expected an expression but found '}'\n"));
 
-	// The tolerant check resolves names in both files and reports the same.
+	// The tolerant check resolves names in both files. The broken file says no more than its syntax
+	// error; the other file, which uses nothing of it, says what is wrong with it.
 	Compilation tolerant;
 	main = tolerant.add("Main.as", BROKEN);
 	other = tolerant.add("Other.as", OTHER);
 	tolerant.check(true);
-	CHECK_EQ(tolerant.format_diagnostics(false), expected);
+	CHECK_EQ(tolerant.format_diagnostics(false),
+			expected + "Other.as:1:83: error: can't use a value of type 'int' where 'String' is expected\n");
 	const Reference *count = reference(main, "count");
 	CHECK(count && count->symbol && count->symbol->kind == SymbolKind::Field);
 	const Reference *type = reference(main, "Other");
@@ -217,6 +396,70 @@ static void test_tolerant() {
 	whole.check(true);
 	CHECK_EQ(whole.format_diagnostics(false),
 			std::string("Other.as:1:83: error: can't use a value of type 'int' where 'String' is expected\n"));
+}
+
+// A syntax error silences what it may have caused, and no more: everything else in its own file, every
+// file that uses something of that file's (warnings too), and every complaint that a name is missing.
+static void test_errors_beside_a_syntax_error() {
+	const std::string wrong = "function f():void { var x:int = ; } ";
+	auto files = [&](const std::string &p_mistake) {
+		return std::vector<File>{
+			// What the broken file declares may have been read wrongly: a parameter, a modifier, a member or
+			// `implements` may be lost.
+			{ "Broken.as", "package { public class Broken implements Living { public function lost(a:int):void {} " + p_mistake +
+								   "public var kept:int = \"k\"; public function alive():void {} } }" },
+			{ "Living.as", "package { public interface Living { function alive():void; } }" },
+			// Uses the broken file's class directly.
+			{ "Uses.as", "package { public class Uses { var b:Broken; var n:int = \"s\"; var w:Number = 9007199254740993;\n"
+						 "function f():void { b.lost(); b.nothing; var l:Living = b; b.kept = \"t\"; } } }" },
+			// Has only a warning, which rests on the broken file as much as an error would.
+			{ "Warns.as", "package { public class Warns { var b:Broken; var w:Number = 9007199254740993; } }" },
+			// Extends a class that extends it.
+			{ "Middle.as", "package { public class Middle extends Broken { override public function gone():void {} } }" },
+			{ "Through.as", "package { public class Through extends Middle { var n:int = \"s\"; } }" },
+			// Never names it, but handles a value of its type.
+			{ "Holder.as", "package { public class Holder { public var value:Middle; } }" },
+			{ "Flow.as", "package { public class Flow { var h:Holder; function f():void { var n:int = h.value; } } }" },
+			// Has nothing to do with it: its mistakes are certain, except a name that is nowhere, which
+			// the broken file might have declared.
+			{ "Alone.as", "package { public class Alone { var n:int = \"s\"; var m:Nope; var w:Number = 9007199254740993;\n"
+						  "function f(l:Living):void { missing(); l.alive(1); l.nothing; } } }" },
+		};
+	};
+	auto reported = [&](const std::string &p_mistake, bool p_tolerant) {
+		Compilation compilation;
+		for (const File &file : files(p_mistake)) {
+			compilation.add(file.path, file.text);
+		}
+		compilation.check(p_tolerant);
+		return compilation.format_diagnostics(); // Warnings too: they are part of what is checked here.
+	};
+	const std::string certain =
+			"Alone.as:1:44: error: can't use a value of type 'String' where 'int' is expected\n"
+			"Alone.as:1:76: warning: 9007199254740993 is rounded: a Number can't hold every digit of it. Store it in an "
+			"Int64 to keep them\n"
+			"Alone.as:2:42: error: 'alive' takes no arguments but 1 was given\n"
+			"Alone.as:2:54: error: 'Living' has no member 'nothing'\n";
+	CHECK_EQ(reported(wrong, true), "Broken.as:1:119: error: expected an expression but found ';'\n" + certain);
+	// The plain check still stops at the syntax error.
+	CHECK_EQ(reported(wrong, false), std::string("Broken.as:1:119: error: expected an expression but found ';'\n"));
+	// With the file mended everything is said, in every file.
+	const std::string mended = reported("", true);
+	for (const char *file : { "Broken.as:", "Uses.as:1:", "Uses.as:2:", "Warns.as:1:61: warning", "Middle.as:", "Through.as:", "Flow.as:", "Alone.as:1:55",
+				 "Alone.as:2:29" }) {
+		CHECK(mended.find(file) != std::string::npos);
+	}
+	CHECK(mended.find(certain.substr(0, certain.find('\n'))) != std::string::npos);
+
+	// A failed import may change what every other name of the file means: the file says nothing.
+	Compilation shadowed;
+	shadowed.add("lost/Thing.as", "package lost { public class Thing { " + wrong + "} }");
+	shadowed.add("other/Thing.as", "package other { public class Thing {} }");
+	shadowed.add("Picks.as", "package { import lost.Thing; import other.*; public class Picks { var t:Thing; var n:int = \"s\"; } }");
+	shadowed.add("Alone.as", "package { public class Alone { var n:int = \"s\"; } }");
+	shadowed.check(true);
+	CHECK_EQ(shadowed.format_diagnostics(false), std::string("lost/Thing.as:1:69: error: expected an expression but found ';'\n"
+														"Alone.as:1:44: error: can't use a value of type 'String' where 'int' is expected\n"));
 }
 
 static void test_import_symbol() {
@@ -595,6 +838,102 @@ static void test_super_and_overrides() {
 	CHECK_EQ(places("other():void", 1, false), std::string("1:109 "));
 }
 
+// `new X()` goes to X's constructor, where it declares one: that is the code the expression runs.
+static void test_new_goes_to_the_constructor() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	Unit *unit = compilation.add("Zoo.as",
+			"package { import godot.Node; import pets.Cat; public class Zoo {\n" // 1
+			"	function f():void { new Animal(\"a\"); new Bare(); new Bare; new pets.Cat(); new Node(); }\n" // 2
+			"	var a:Animal; var c:Class = Animal;\n" // 3
+			"} }\n"
+			"class Animal {\n" // 5
+			"	public function Animal(name:String) {}\n" // 6
+			"	function again():Animal { return new Animal(\"b\"); }\n" // 7
+			"}\n"
+			"class Bare {}\n"); // 9
+	Unit *cat = compilation.add("pets/Cat.as", "package pets { public class Cat { public function Cat() {} } }");
+	compilation.check(true);
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	Queries index(compilation);
+	auto goes = [&](const char *p_needle, int p_nth = 1, uint32_t p_plus = 0) {
+		return place(index.definition(*unit, offset_of(unit, p_needle, p_nth) + p_plus));
+	};
+	CHECK_EQ(goes("Animal(\"a\")"), std::string("Zoo.as:6:18+6"));
+	CHECK_EQ(goes("Animal(\"a\")", 1, 6), std::string("Zoo.as:6:18+6")); // Right after the name.
+	CHECK_EQ(goes("Animal(\"b\")"), std::string("Zoo.as:6:18+6"));
+	CHECK_EQ(goes("Cat()"), std::string("pets/Cat.as:1:51+3")); // Named by its package.
+	// A class that declares no constructor: the class.
+	CHECK_EQ(goes("Bare()"), std::string("Zoo.as:9:7+4"));
+	CHECK_EQ(goes("Bare;"), std::string("Zoo.as:9:7+4"));
+	std::string node = goes("Node()");
+	CHECK(node.rfind("<godot>/godot.as:", 0) == 0);
+	// Anywhere else the class's name is the class.
+	CHECK_EQ(goes("Animal; var c"), std::string("Zoo.as:5:7+6"));
+	CHECK_EQ(goes("Animal;\n"), std::string("Zoo.as:5:7+6"));
+	CHECK_EQ(goes("Animal { return"), std::string("Zoo.as:5:7+6"));
+	CHECK_EQ(goes("Animal {\n"), std::string("Zoo.as:5:7+6")); // The declaration itself.
+	CHECK_EQ(goes("pets.Cat()"), std::string("nowhere"));
+	CHECK_EQ(goes("function f"), std::string("nowhere"));
+	// The name is still a use of the class: its references keep every `new`.
+	const Occurrence *used = index.at(*unit, offset_of(unit, "Animal(\"a\")"));
+	CHECK(used && used->symbol->kind == SymbolKind::Class);
+	CHECK_EQ(index.references(used->symbol, false).size(), (size_t)5);
+	(void)cat;
+}
+
+// A method that implements an interface's method is the same thing to find references: a call through
+// the interface may reach it.
+static void test_interface_methods() {
+	Compilation compilation;
+	Unit *unit = compilation.add("Zoo.as",
+			"package { public class Zoo { function f(s:Speaker, d:Dog, c:Cat, l:Loud, p:Puppy, t:Stone):void {\n" // 1
+			"	s.speak();\n" // 2
+			"	d.speak();\n" // 3
+			"	c.speak();\n" // 4
+			"	l.speak();\n" // 5
+			"	p.speak();\n" // 6
+			"	t.speak();\n" // 7
+			"	c.shout();\n" // 8
+			"} } }\n"
+			"interface Speaker { function speak():void; }\n" // 10
+			"interface Loud extends Speaker { function shout():void; }\n" // 11
+			"class Dog implements Speaker { public function speak():void {} }\n" // 12
+			"class Cat implements Loud { public function speak():void {} public function shout():void {} }\n" // 13
+			"class Animal { public function speak():void {} }\n" // 14
+			"class Puppy extends Animal implements Speaker {}\n" // 15
+			"class Stone { public function speak():void {} }\n" // 16
+			"class Kitten extends Cat { override public function speak():void {} }\n"); // 17
+	compilation.check(true);
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	Queries index(compilation);
+	auto lines = [&](const char *p_needle, int p_nth, bool p_with_declaration) {
+		const Occurrence *found = index.at(*unit, offset_of(unit, p_needle, p_nth));
+		std::string out;
+		if (found) {
+			for (const Place &item : index.references(found->symbol, p_with_declaration)) {
+				out += std::to_string(unit->source.position(item.offset).line) + " ";
+			}
+		}
+		return out;
+	};
+	// From the interface: every call that may run an implementation, and each implementation: Dog's,
+	// Cat's, the one Kitten overrides it with, and the one Puppy has from its base class.
+	CHECK_EQ(lines("speak():void;", 1, false), std::string("2 3 4 5 6 "));
+	CHECK_EQ(lines("speak():void;", 1, true), std::string("2 3 4 5 6 10 12 13 14 17 "));
+	CHECK_EQ(lines("speak();", 1, true), std::string("2 3 4 5 6 10 12 13 14 17 ")); // From the call through it.
+	// From an implementation: its own calls, the calls through the interface, and both declarations.
+	// Another class's implementation is another method.
+	CHECK_EQ(lines("speak():void {} }", 1, true), std::string("2 3 5 10 12 ")); // Dog's.
+	CHECK_EQ(lines("speak():void {} public", 1, true), std::string("2 4 5 10 13 17 ")); // Cat's, with Kitten's override.
+	CHECK_EQ(lines("speak():void {} }", 2, true), std::string("2 5 6 10 14 ")); // Animal's, through Puppy.
+	// An interface that extends another passes its methods on.
+	CHECK_EQ(lines("shout():void;", 1, true), std::string("8 11 13 "));
+	CHECK_EQ(lines("shout():void {}", 1, true), std::string("8 11 13 "));
+	// A method of the same name in a class that implements nothing is another method.
+	CHECK_EQ(lines("speak():void {} }", 3, true), std::string("7 16 "));
+}
+
 static void test_describe() {
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -674,15 +1013,28 @@ static void test_outline() {
 		std::string out;
 		for (const FoundSymbol &found : index.find(p_query, p_limit)) {
 			out += (found.container.empty() ? "" : found.container + ".") + found.name + " ";
-			CHECK(found.unit && !found.unit->is_declaration);
+			CHECK(found.unit != nullptr);
 		}
 		return out;
 	};
 	CHECK_EQ(names("HEALTH", 10), std::string("game.Player.health ")); // Once, though it has a getter and a setter.
-	CHECK_EQ(names("play", 10), std::string("game.Player game.Player.Player "));
-	CHECK_EQ(names("a", 3), std::string("game.Player game.Player.MAX game.Player.target "));
+	// The program's own definitions come first, then Godot's and the built-in library's.
+	CHECK_EQ(names("play", 3), std::string("game.Player game.Player.Player godot.Node.multiplayer "));	CHECK_EQ(names("a", 3), std::string("game.Player game.Player.MAX game.Player.target "));
 	CHECK(index.find("", 1000).size() > 15);
-	CHECK_EQ(names("Node", 10), std::string()); // Godot's own classes are not listed.
+	CHECK_EQ(names("CharacterBody2D", 1), std::string("godot.CharacterBody2D "));
+	CHECK_EQ(names("moveAndSlide", 10), std::string("godot.CharacterBody2D.moveAndSlide godot.CharacterBody3D.moveAndSlide "));
+	CHECK_EQ(names("charCodeAt", 10), std::string("String.charCodeAt "));
+	std::vector<FoundSymbol> all = index.find("e", 100000);
+	size_t program = 0;
+	while (program < all.size() && !all[program].unit->is_declaration) {
+		program++;
+	}
+	CHECK_EQ(program, (size_t)15);
+	CHECK(all.size() > 10000);
+	CHECK_EQ(index.find("", 100000).size(), (size_t)20); // With nothing asked for: the program, and no more.
+	for (size_t i = program; i < all.size(); i++) {
+		CHECK(all[i].unit->is_declaration); // None of the program's after the first of Godot's.
+	}
 }
 
 // Every query answers on files that do not parse.
@@ -754,14 +1106,20 @@ static void test_typing() {
 
 int main() {
 	test_completion_scopes_and_context();
+	test_type_places();
+	test_parameter_names();
+	test_override_completion();
 	test_completion();
 	test_typing();
 	test_index();
 	test_super_and_overrides();
+	test_new_goes_to_the_constructor();
+	test_interface_methods();
 	test_describe();
 	test_outline();
 	test_queries_on_broken_files();
 	test_tolerant();
+	test_errors_beside_a_syntax_error();
 	test_import_symbol();
 	test_reuse();
 	return check::finish();

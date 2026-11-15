@@ -43,6 +43,9 @@ static std::string snippet_escape(std::string_view p_text) {
 }
 
 static std::string insertion(const Completion &p_item, bool p_call) {
+	if (!p_item.insert_text.empty()) {
+		return p_item.insert_text;
+	}
 	if (!p_call || !p_item.callable) {
 		return p_item.name;
 	}
@@ -81,10 +84,13 @@ Json Server::completion(const Json &p_params) {
 			char order[16];
 			std::snprintf(order, sizeof(order), "%08u", priority++);
 			item.set("sortText", order);
+			if (found.is_parameter_name) {
+				item.set("preselect", true);
+			}
 			const bool call = snippets_ && span.call && found.callable;
 			if (default_edit_range_) {
-				if (call) {
-					item.set("textEditText", insertion(found, true));
+				if (call || !found.insert_text.empty()) {
+					item.set("textEditText", insertion(found, call));
 				}
 			} else {
 				Json edit = Json::object().set("newText", insertion(found, call));

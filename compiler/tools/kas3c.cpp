@@ -152,7 +152,8 @@ static int run_check(int p_argc, char **p_argv) {
 	for (File &file : read) {
 		compilation.add(file.path, std::move(file.text), file.declaration);
 	}
-	compilation.check();
+	// Through syntax errors: what they can't have caused is reported too, as the language server does.
+	compilation.check(true);
 	std::fputs(compilation.format_diagnostics().c_str(), stderr);
 	if (dump_names) {
 		std::fputs(compilation.dump_names().c_str(), stdout);

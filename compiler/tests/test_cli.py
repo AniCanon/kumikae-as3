@@ -55,6 +55,14 @@ with tempfile.TemporaryDirectory() as folder:
     check("check clean", result.returncode == 0 and result.stdout == "" and result.stderr == "", repr(result))
     result = run("check", bad)
     check("check syntax error", result.returncode == 1 and "Bad.as:1:" in result.stderr, repr(result))
+    # A syntax error in one file does not hide a certain error in a file that uses nothing of it.
+    typed = os.path.join(folder, "Typed.as")
+    with open(typed, "w") as handle:
+        handle.write("package { public class Typed { var n:int = \"s\"; } }\n")
+    result = run("check", bad, typed)
+    check("check beside a syntax error", result.returncode == 1 and "Bad.as:1:" in result.stderr and
+          "%s:1:44: error: can't use a value of type 'String' where 'int' is expected\n" % typed in result.stderr,
+          repr(result))
     result = run("check", undefined)
     check("check name error", result.returncode == 1 and
           result.stderr == "%s:1:42: error: unknown type 'Missing'\n" % undefined and result.stdout == "",

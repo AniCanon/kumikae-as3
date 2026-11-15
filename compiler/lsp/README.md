@@ -8,7 +8,9 @@ any editor that speaks the Language Server Protocol. Setting up an editor is in
 |---|---|
 | `server` | Messages in and out, one handler per method |
 | `workspace` | The project's files as the editor has them, and re-checking after an edit |
-| `json`, `uri` | The wire format |
+| `channel` | Messages framed with `Content-Length`, over binary input and output |
+| `json`, `uri`, `positions` | The wire format |
+| `paths` | Paths as text, one spelling on every system; Windows' rules are tested everywhere |
 
 ## Rules
 

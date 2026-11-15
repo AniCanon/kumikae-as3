@@ -631,6 +631,13 @@ TypeRef *Parser::parse_type() {
 		}
 	} else {
 		error_expected("a type");
+		// Nothing is written. The type's place runs from what came before it to what follows, so that an
+		// editor can tell that a type goes there.
+		type->offset = previous_end_;
+		type->end = current_.offset;
+		type_depth_--;
+		leave();
+		return type;
 	}
 	type_depth_--;
 	leave();

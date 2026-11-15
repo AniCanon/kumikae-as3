@@ -186,8 +186,11 @@ with tempfile.TemporaryDirectory() as folder:
         check("godot definition", target.startswith("file://") and target.endswith("godot.as") and
               os.path.exists(target[len("file://"):].replace("%20", " ")), repr(found))
         symbols = [m for m in messages if m.get("id") == 3]
-        check("symbols", len(symbols) == 1 and [s["name"] for s in symbols[0]["result"]] == ["Player"] and
-              symbols[0]["result"][0]["location"]["uri"] == uri, repr(symbols))
+        names = [s["name"] for s in symbols[0]["result"]] if len(symbols) == 1 else []
+        # The project's own class first, then what Godot's API has by that name.
+        check("symbols", names[:1] == ["Player"] and symbols[0]["result"][0]["location"]["uri"] == uri and
+              "AnimationPlayer" in names[1:] and
+              all(s["location"]["uri"].endswith("godot.as") for s in symbols[0]["result"][1:]), repr(symbols)[:2000])
 
 # Completion insertion and argument help over the actual framed transport.
 completion_text = ('package { public class Main { public function move(amount:int, label:String = "x"):void {} '
@@ -207,6 +210,17 @@ if messages:
     check("replace suffix", item.get("textEdit", {}).get("replace", {}).get("end", {}).get("character") == position + 9, repr(item))
     signature = next((m for m in messages if m.get("id") == 3), {})
     check("signature parameter", signature.get("result", {}).get("activeParameter") == 1, repr(signature))
+
+# An override's whole declaration, over the transport, with Godot's API loaded.
+override_text = "package { import godot.*; public class Main extends Node2D {\noverride _pro\n} }"
+code, messages, errors = session(start + opened(override_text) +
+    request(2, "textDocument/completion", {"textDocument": {"uri": URI}, "position": {"line": 1, "character": 13}}) + END)
+check("override session", code == 0 and messages is not None, repr(errors))
+if messages:
+    reply = next((m for m in messages if m.get("id") == 2), {})
+    item = next((i for i in reply.get("result", {}).get("items", []) if i.get("label") == "_process"), {})
+    check("override", item.get("textEdit", {}).get("newText") == "public function _process(delta:Number):void {}" and
+          "insertTextFormat" not in item, repr(item))
 
 for failure in failures:
     print("FAIL " + failure)

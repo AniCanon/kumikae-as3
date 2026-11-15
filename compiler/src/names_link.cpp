@@ -131,11 +131,11 @@ Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
 							: lookup_qualified(p_from, dotted_name(p_type->name, last), p_type->name[last]);
 	if (!found.first) {
 		if (found.hidden && last > 0) {
-			diagnostics.error(p_type->offset, quoted(shown) + " is not public");
+			diagnostics.unresolved(p_type->offset, quoted(shown) + " is not public");
 		} else if (found.suppressed) {
 			// A failed import has been reported, and may be where this name was to come from.
 		} else {
-			diagnostics.error(p_type->offset, "unknown type " + quoted(shown));
+			diagnostics.unresolved(p_type->offset, "unknown type " + quoted(shown));
 		}
 		return nullptr;
 	}
@@ -166,7 +166,8 @@ void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports,
 			std::string name = dotted_name(import->name, import->name.count);
 			Package *found = find_package(name);
 			if (!found || found->definitions.empty()) {
-				p_unit.diagnostics.error(offset, "can't find package " + quoted(name));
+				p_unit.diagnostics.unresolved(offset, "can't find package " + quoted(name));
+				p_unit.failed_import = true;
 				r_scope.failed_wildcard = true;
 				continue;
 			}
@@ -180,12 +181,14 @@ void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports,
 		Package *found = find_package(dotted_name(import->name, last));
 		Symbol *symbol = found ? find_in(found->definitions, import->name[last]) : nullptr;
 		if (!symbol) {
-			p_unit.diagnostics.error(offset, "can't find " + quoted(shown));
+			p_unit.diagnostics.unresolved(offset, "can't find " + quoted(shown));
+			p_unit.failed_import = true;
 			r_scope.failed.push_back(import->name[last]);
 			continue;
 		}
 		if (!(symbol->modifiers & Modifiers::Public) && symbol->package != p_unit.package) {
-			p_unit.diagnostics.error(offset, quoted(shown) + " is not public");
+			p_unit.diagnostics.unresolved(offset, quoted(shown) + " is not public");
+			p_unit.failed_import = true;
 			r_scope.failed.push_back(import->name[last]);
 			continue;
 		}
@@ -389,8 +392,7 @@ void Compilation::settle_hierarchy() {
 	}
 }
 
-// What code in a class of package p_package may name on a base class.
-static bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package) {
+bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package) {
 	if (p_member->modifiers & Modifiers::Private) {
 		return false;
 	}

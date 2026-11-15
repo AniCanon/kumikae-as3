@@ -14,8 +14,10 @@ The adapter now supplies native token kinds and preserves the TextMate color att
 
 The sandbox passes pairing and closing-character skip, empty-pair backspace, pairing disabled in
 settings, two carets, suppression in comments and regex literals, and repeated Enter inside a block.
-The regex tests include a control condition followed by a literal. The local lexer still has an
-ambiguous closing-brace case, recorded in the backlog and user guide.
+The regex tests include a control condition followed by a literal. The ambiguous closing-brace case
+(a regex after a block, division after an object or a function written in place) was settled later,
+on 2026-11-15, by the lexer's memory of what each open brace began; that is tested in the plugin's unit
+tests, not yet in the sandbox.
 
 A real native LSP lookup in three disposable projects offers `normalized` at
 `transform.origin.norm|suffix`. Tab replaces the whole identifier and inserts `normalized()`.
@@ -108,9 +110,12 @@ history or old AST pointers are retained by the completion caches.
 Whole-IDE used heap sampled after explicit GC and project close was 282,885,152, 288,022,368 and
 291,456,256 bytes. It increased by about 8.2 MiB across these cycles. This includes Rider's own caches
 and startup services; it does not isolate completion retention or prove the IDE leak-free. The final sandbox also logged a retained
-`HighlightingPanel` under the platform's `ROOT_DISPOSABLE` during rapid project closure. Its stack is
-in Rider's Problems view; ownership has not been isolated beyond that observation. This warning and a
-sustained Rider heap profile remain follow-up work, recorded in the backlog.
+`HighlightingPanel` under the platform's `ROOT_DISPOSABLE` during rapid project closure. On 2026-11-15
+its registration stack was read from the sandbox log: Rider's own `RiderProblemsViewIconUpdater`, on an
+alarm, asks the Problems view for its tab, which makes the view's content (`CurrentFileProblemsPanelProvider`,
+then `HighlightingPanel` and its `ProblemsTreeModel`) after the project has begun to close. No frame of
+this plugin is on that stack; the log's "plugin to blame" names the UI probe only because the probe is
+what ends the IDE. It is Rider's, not the plugin's. A sustained whole-IDE heap profile was not made.
 
 ## Verification
 
@@ -157,4 +162,4 @@ suite passed 24/24 in 126.80 seconds. The merged plugin's offline check, ZIP bui
 119 plugin tests passed with one opt-in probe skipped; 82 core tests passed with three opt-in probes
 skipped. All nine Python tests passed. The sandbox action probe passed in 31 seconds, and light/dark
 panel screenshots were inspected. The previously recorded platform `HighlightingPanel` shutdown
-warning remains and is part of the next completion follow-up investigation.
+warning remains; it was later traced to Rider's own Problems view (see above).

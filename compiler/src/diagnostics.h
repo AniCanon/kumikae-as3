@@ -13,20 +13,30 @@ struct Diagnostic {
 	uint32_t offset;
 	std::string message;
 	bool warning = false; // Said, but the program still compiles.
+	bool unresolved = false; // Says that a name was not found: see Diagnostics::unresolved().
 };
 
 class Diagnostics {
 	std::vector<Diagnostic> items_;
 	int count_ = 0; // Errors reported.
+	int unresolved_ = 0; // How many of count_ say that a name was not found.
 	int stored_errors_ = 0; // Errors among items_.
 	bool muted_ = false;
 	void store(Diagnostic p_item);
+	void add(uint32_t p_offset, std::string p_message, bool p_unresolved);
 
 public:
 	// Errors beyond this many are counted but not stored.
 	static const int LIMIT = 100;
 
 	void error(uint32_t p_offset, std::string p_message);
+	// An error that says a name was not found, or was found where it can't be reached. It is true only if
+	// every file was read whole: a file with a syntax error may be where the name is declared.
+	void unresolved(uint32_t p_offset, std::string p_message);
+	// Takes back the errors reported with unresolved().
+	void drop_unresolved();
+	// Takes back every error and warning.
+	void clear();
 	// Something that is allowed and works as AS3 says, but likely not what was meant.
 	void warning(uint32_t p_offset, std::string p_message);
 	bool has_warnings() const { return (int)items_.size() > stored_errors_; }

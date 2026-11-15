@@ -1,6 +1,7 @@
 #include "check.h"
 
 #include "builtins.h"
+#include "paths.h"
 #include "uri.h"
 #include "workspace.h"
 
@@ -43,8 +44,8 @@ static void test_uri() {
 	CHECK_EQ(path_from_uri("file:///a%20b/c%C3%A9.as"), std::string("/a b/c\xC3\xA9.as"));
 	CHECK_EQ(path_from_uri("file:///a%25b.as"), std::string("/a%b.as"));
 	CHECK_EQ(path_from_uri("file://localhost/a/b.as"), std::string("/a/b.as"));
-	CHECK_EQ(path_from_uri("file:///c%3A/dir/b.as"), std::string("c:/dir/b.as"));
-	CHECK_EQ(path_from_uri("file:///C:/dir/b.as"), std::string("C:/dir/b.as"));
+	CHECK_EQ(path_from_uri("file:///c%3A/dir/b.as", PathStyle::Posix), std::string("/c:/dir/b.as"));
+	CHECK_EQ(path_from_uri("file://server/share/a.as", PathStyle::Posix), std::string("//server/share/a.as"));
 	CHECK_EQ(path_from_uri("untitled:Untitled-1"), std::string());
 	CHECK_EQ(path_from_uri("http://example.com/a.as"), std::string());
 	CHECK_EQ(path_from_uri("file:///a%2"), std::string("/a%2")); // A broken escape is kept as written.
@@ -52,10 +53,60 @@ static void test_uri() {
 	CHECK_EQ(path_from_uri(""), std::string());
 	CHECK_EQ(uri_from_path("/a/b.as"), std::string("file:///a/b.as"));
 	CHECK_EQ(uri_from_path("/a b/c\xC3\xA9%.as"), std::string("file:///a%20b/c%C3%A9%25.as"));
-	CHECK_EQ(uri_from_path("C:/dir/b.as"), std::string("file:///C:/dir/b.as"));
-	for (const char *path : { "/x/y z/\xE6\x97\xA5\xE6\x9C\xAC.as", "/a#b?c/d&e=f.as", "/plain.as", "/%41.as" }) {
-		CHECK_EQ(path_from_uri(uri_from_path(path)), std::string(path));
+	// On a Mac or Linux a '\' is part of a name, not a separator.
+	CHECK_EQ(uri_from_path("/a\\b.as", PathStyle::Posix), std::string("file:///a%5Cb.as"));
+	for (const char *path : { "/x/y z/\xE6\x97\xA5\xE6\x9C\xAC.as", "/a#b?c/d&e=f.as", "/plain.as", "/%41.as", "/a\\b.as" }) {
+		CHECK_EQ(path_from_uri(uri_from_path(path, PathStyle::Posix), PathStyle::Posix), std::string(path));
 	}
+
+	// On Windows: a drive's letter however the editor writes it, '\' as a separator, and shares.
+	const PathStyle windows = PathStyle::Windows;
+	CHECK_EQ(path_from_uri("file:///c%3A/dir/b.as", windows), std::string("C:/dir/b.as"));
+	CHECK_EQ(path_from_uri("file:///C:/dir/b.as", windows), std::string("C:/dir/b.as"));
+	CHECK_EQ(path_from_uri("file:///c:/My%20Game/a.as", windows), std::string("C:/My Game/a.as"));
+	CHECK_EQ(path_from_uri("file://server/share/a.as", windows), std::string("//server/share/a.as"));
+	CHECK_EQ(path_from_uri("file://localhost/C:/a.as", windows), std::string("C:/a.as"));
+	CHECK_EQ(uri_from_path("C:\\proj\\a.as", windows), std::string("file:///C:/proj/a.as"));
+	CHECK_EQ(uri_from_path("C:/My Game/a.as", windows), std::string("file:///C:/My%20Game/a.as"));
+	CHECK_EQ(uri_from_path("\\\\server\\share\\a.as", windows), std::string("file://server/share/a.as"));
+	for (const char *path : { "C:/proj/a.as", "//server/share/dir/a.as", "D:/x y/\xE6\x97\xA5.as" }) {
+		CHECK_EQ(path_from_uri(uri_from_path(path, windows), windows), std::string(path));
+	}
+}
+
+// Comparing, joining and spelling paths, with the rules of both kinds of system.
+static void test_paths() {
+	const PathStyle posix = PathStyle::Posix;
+	const PathStyle windows = PathStyle::Windows;
+	CHECK_EQ(generic_path("/a//b/./c/../d/", posix), std::string("/a/b/d"));
+	CHECK_EQ(generic_path("/", posix), std::string("/"));
+	CHECK_EQ(generic_path("/..", posix), std::string("/"));
+	CHECK_EQ(generic_path("a/../../b", posix), std::string("../b"));
+	CHECK_EQ(generic_path("/a\\b", posix), std::string("/a\\b"));
+	CHECK_EQ(generic_path("", posix), std::string());
+	CHECK_EQ(generic_path("C:\\proj\\src\\..\\a.as", windows), std::string("C:/proj/a.as"));
+	CHECK_EQ(generic_path("c:\\", windows), std::string("C:/"));
+	CHECK_EQ(generic_path("c:/proj/", windows), std::string("C:/proj"));
+	CHECK_EQ(generic_path("C:/..", windows), std::string("C:/"));
+	CHECK_EQ(generic_path("\\\\server\\share\\a\\..\\..\\b", windows), std::string("//server/share/b"));
+
+	CHECK(path_within("/proj", "/proj/a.as", posix));
+	CHECK(path_within("/proj", "/proj", posix));
+	CHECK(!path_within("/proj", "/project/a.as", posix));
+	CHECK(!path_within("/proj", "/Proj/a.as", posix));
+	CHECK(!path_within("", "/proj/a.as", posix));
+	CHECK(path_within("/", "/a.as", posix));
+	// A project at a drive's root, and letters in either case.
+	CHECK(path_within("C:/", "C:/a.as", windows));
+	CHECK(path_within("C:/Proj", "C:/proj/Main.as", windows));
+	CHECK(!path_within("C:/proj", "D:/proj/Main.as", windows));
+	CHECK(!path_within("C:/proj", "C:/projects/Main.as", windows));
+	CHECK(path_within("//server/share", "//server/share/a.as", windows));
+
+	CHECK_EQ(path_join("/proj", "a.as"), std::string("/proj/a.as"));
+	CHECK_EQ(path_join("/", "a.as"), std::string("/a.as"));
+	CHECK_EQ(path_join("C:/", "a.as"), std::string("C:/a.as"));
+	CHECK_EQ(path_join("C:/proj", "builtins/a.as"), std::string("C:/proj/builtins/a.as"));
 }
 
 static void test_scan() {
@@ -303,7 +354,97 @@ static void test_completion_cache_lifetime() {
 	CHECK_EQ(workspace.queries().cached_context_units(), size_t{0});
 }
 
+// A file has one place in the program, whatever name it is reached by: through a link to its folder or
+// to itself, and, where the file system does not tell them apart, in another letter case or with its
+// accented letters written another way.
+static void test_one_file_many_names() {
+	fs::path root = fresh_folder("names");
+	fs::path links = fresh_folder("names-links");
+	const std::string composed = "Caf\xC3\xA9.as"; // "é" as one character.
+	const std::string decomposed = "Cafe\xCC\x81.as"; // "e" and a combining accent.
+	write(root / "project.godot", "");
+	write(root / "game" / "Player.as", "package game { public class Player {} }");
+	write(root / "game" / composed, "package game { public class Caf\xC3\xA9 {} }");
+	write(links / "Outside.as", "package { public class Outside {} }");
+	std::error_code error;
+	fs::create_directory_symlink(root, links / "project", error);
+	CHECK(!error);
+	fs::create_symlink(root / "game" / "Player.as", root / "game" / "Alias.as", error);
+	CHECK(!error);
+	fs::create_symlink(links / "Outside.as", root / "Outside.as", error);
+	CHECK(!error);
+	const std::string real = (root / "game" / "Player.as").string();
+	const std::string changed = "package game { public class Player { var a:Nope; } }";
+
+	Workspace workspace(plain());
+	workspace.set_root((links / "project").string());
+	CHECK_EQ(workspace.root(), root.string());
+	// The link to a file of the project is that file, once. A link to a file outside it is a file here.
+	CHECK_EQ(paths(workspace, root), std::string("Outside.as game/" + composed + " game/Player.as "));
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+	Unit *player = workspace.unit(real);
+	CHECK(player != nullptr);
+	auto same = [&](const fs::path &p_name) {
+		const std::string name = p_name.string();
+		CHECK(workspace.unit(name) == workspace.unit(real));
+		workspace.open(name, changed);
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+		CHECK_EQ(workspace.compilation().format_diagnostics(false), real + ":1:44: error: unknown type 'Nope'\n");
+		CHECK(workspace.text(real) && *workspace.text(real) == changed);
+		CHECK(workspace.text(name) && *workspace.text(name) == changed);
+		CHECK(workspace.unit(name) == workspace.unit(real));
+		workspace.close(name);
+		CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+	};
+	same(links / "project" / "game" / "Player.as"); // Through a link to the folder.
+	same(root / "game" / "Alias.as"); // Through a link to the file.
+	same(root / "game" / ".." / "game" / "Player.as");
+	// Opened under one name, changed on disk under another: the editor's text stays.
+	workspace.open(real, changed);
+	workspace.file_changed_on_disk((links / "project" / "game" / "Player.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), real + ":1:44: error: unknown type 'Nope'\n");
+	workspace.close((root / "game" / "Alias.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+	// The link to a file outside the project keeps its own name: that is where the project has it.
+	CHECK(workspace.unit((root / "Outside.as").string()) != nullptr);
+	workspace.open((root / "Outside.as").string(), "package { public class Outside { var a:Nope; } }");
+	CHECK_EQ(workspace.program_units().size(), (size_t)3);
+	workspace.close((root / "Outside.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+	// A file that is not there yet has the name it was given.
+	workspace.open((links / "project" / "game" / "New.as").string(), "package game { public class New {} }");
+	CHECK(workspace.unit((root / "game" / "New.as").string()) != nullptr);
+	workspace.close((root / "game" / "New.as").string());
+	CHECK_EQ(workspace.program_units().size(), (size_t)3);
+
+	// Only where the file system itself takes the two names for one file.
+	if (fs::exists(root / "GAME" / "PLAYER.AS")) {
+		same(root / "GAME" / "PLAYER.AS");
+		same(root / "game" / "player.as");
+	} else {
+		std::printf("note: this file system tells letter case apart; that part was not run\n");
+	}
+	if (fs::exists(root / "game" / decomposed)) {
+		const std::string other = (root / "game" / composed).string();
+		const std::string name = (root / "game" / decomposed).string();
+		CHECK(workspace.unit(name) != nullptr);
+		CHECK(workspace.unit(name) == workspace.unit(other));
+		workspace.open(name, "package game { public class Caf\xC3\xA9 { var a:Nope; } }");
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+		CHECK(workspace.compilation().format_diagnostics(false).find("unknown type 'Nope'") != std::string::npos);
+		workspace.close(other);
+		CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+	} else {
+		std::printf("note: this file system tells Unicode forms apart; that part was not run\n");
+	}
+	fs::remove_all(root);
+	fs::remove_all(links);
+}
+
 int main() {
+	test_paths();
+	test_one_file_many_names();
 	test_completion_cache_lifetime();
 	test_uri();
 	test_scan();

@@ -1,5 +1,7 @@
 #include "server.h"
 
+#include "channel.h"
+#include "positions.h"
 #include "uri.h"
 
 #include <algorithm>
@@ -7,13 +9,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <set>
-
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <poll.h>
-#include <unistd.h>
-#endif
 
 namespace kas3 {
 
@@ -24,9 +19,6 @@ const int PARSE_ERROR = -32700;
 const int INVALID_REQUEST = -32600;
 const int METHOD_NOT_FOUND = -32601;
 const int NOT_INITIALIZED = -32002;
-
-// The most a single message may hold.
-const size_t MAX_MESSAGE = 256u * 1024 * 1024;
 
 std::string response(const Json &p_id, Json p_result) {
 	return write_json(Json::object().set("jsonrpc", "2.0").set("id", p_id).set("result", std::move(p_result)));
@@ -75,33 +67,6 @@ uint32_t extent(const std::string &p_text, uint32_t p_offset) {
 	return end - p_offset;
 }
 
-// UTF-16 code units in a stretch of UTF-8.
-int utf16_units(std::string_view p_text) {
-	int units = 0;
-	for (unsigned char c : p_text) {
-		if ((c & 0xC0) != 0x80) {
-			units += c >= 0xF0 ? 2 : 1;
-		}
-	}
-	return units;
-}
-
-// The bytes that hold the first p_units UTF-16 code units of the line. A position inside a character
-// counts the whole character.
-uint32_t bytes_for_units(std::string_view p_line, int64_t p_units) {
-	uint32_t at = 0;
-	int64_t units = 0;
-	while (at < p_line.size() && units < p_units) {
-		unsigned char c = (unsigned char)p_line[at];
-		units += c >= 0xF0 ? 2 : 1;
-		at++;
-		while (at < p_line.size() && ((unsigned char)p_line[at] & 0xC0) == 0x80) {
-			at++;
-		}
-	}
-	return at;
-}
-
 int symbol_kind(SymbolKind p_kind, bool p_const, bool p_constructor) {
 	switch (p_kind) {
 		case SymbolKind::Class:
@@ -133,7 +98,7 @@ std::string Server::uri_of(const Unit &p_unit) {
 		return std::string();
 	}
 	auto known = uris_.find(path);
-	return known != uris_.end() ? known->second : uri_from_path(path);
+	return known != uris_.end() ? known->second : uri_from_path(workspace_.shown_path(path));
 }
 
 Unit *Server::unit_of(const Json &p_params) {
@@ -144,8 +109,10 @@ Unit *Server::unit_of(const Json &p_params) {
 Json Server::position(const Unit &p_unit, uint32_t p_offset) const {
 	Position at = p_unit.source.position(p_offset);
 	std::string_view line = p_unit.source.line_text(at.line);
-	size_t bytes = (size_t)(at.column - 1) < line.size() ? (size_t)(at.column - 1) : line.size();
-	int character = utf8_ ? (int)bytes : utf16_units(line.substr(0, bytes));
+	int character = character_at(line, (size_t)(at.column - 1), utf8_);
+	if (at.line == 1) {
+		character += mark_width(p_unit.source);
+	}
 	return Json::object().set("line", at.line - 1).set("character", character);
 }
 
@@ -178,13 +145,19 @@ uint32_t Server::offset_in(const Source &p_source, const Json &p_position) const
 	if (line >= source.line_count()) {
 		return (uint32_t)source.text().size();
 	}
-	std::string_view text = source.line_text((int)line + 1);
-	if (character < 0) {
-		character = 0;
+	if (line == 0) {
+		character -= mark_width(source);
 	}
-	uint32_t bytes = utf8_ ? (uint32_t)(character < (int64_t)text.size() ? character : (int64_t)text.size())
-						   : bytes_for_units(text, character);
-	return source.line_start((int)line + 1) + bytes;
+	return source.line_start((int)line + 1) + bytes_before(source.line_text((int)line + 1), character, utf8_);
+}
+
+// What the editor counts before the first line's text: the byte-order mark it sent, if it sent one. A
+// file it has not opened is counted without: an editor shows a file from disk without its mark.
+int Server::mark_width(const Source &p_source) const {
+	if (!p_source.has_mark() || !workspace_.sent_with_mark(p_source.path())) {
+		return 0;
+	}
+	return utf8_ ? (int)BYTE_ORDER_MARK.size() : 1;
 }
 
 const Occurrence *Server::occurrence_at(const Json &p_params, Unit **r_unit) {
@@ -312,12 +285,11 @@ Json Server::initialize(const Json &p_params) {
 }
 
 Json Server::definition(const Json &p_params) {
-	Unit *unit = nullptr;
-	const Occurrence *found = occurrence_at(p_params, &unit);
-	if (!found) {
+	Unit *unit = unit_of(p_params);
+	if (!unit || !p_params.get("position").is_object()) {
 		return Json();
 	}
-	Json where = location(workspace_.queries().declaration(found->symbol));
+	Json where = location(workspace_.queries().definition(*unit, offset_at(*unit, p_params.get("position"))));
 	// A list of one. The protocol allows a place on its own, and VS Code reads it, but the client
 	// library JetBrains' IDEs use reads only a list: with a bare place, go to definition does nothing.
 	return where.is_null() ? Json() : Json::array().push(std::move(where));
@@ -426,7 +398,7 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 		}
 	} else if (p_method == "textDocument/didOpen") {
 		if (!path.empty() && document.get("text").is_string()) {
-			uris_[normal_path(path)] = document.get("uri").string();
+			uris_[workspace_.resolve(path)] = document.get("uri").string();
 			workspace_.open(path, document.get("text").string());
 		}
 	} else if (p_method == "textDocument/didChange") {
@@ -436,6 +408,9 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 		const Json &changes = p_params.get("contentChanges");
 		bool any = false;
 		std::string text = held ? *held : std::string();
+		if (held && workspace_.sent_with_mark(path)) {
+			text.insert(0, BYTE_ORDER_MARK); // Changed as the editor has it: the workspace keeps the mark out of the text.
+		}
 		for (const Json &change : changes.items()) {
 			if (!change.get("text").is_string()) {
 				continue;
@@ -447,13 +422,15 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 			} else if (!held) {
 				continue; // A piece of a document the server was never given.
 			} else {
-				Source before(std::string(), text);
-				uint32_t from = offset_in(before, range.get("start"));
-				uint32_t to = offset_in(before, range.get("end"));
+				auto offset = [&](const Json &p_position) {
+					return offset_in_text(text, p_position.get("line").integer(-1), p_position.get("character").integer(0), utf8_);
+				};
+				uint32_t from = offset(range.get("start"));
+				uint32_t to = offset(range.get("end"));
 				if (to < from) {
 					std::swap(from, to);
 				}
-				text = before.text().substr(0, from) + change.get("text").string() + before.text().substr(to);
+				text.replace(from, to - from, change.get("text").string());
 			}
 			any = true;
 		}
@@ -550,128 +527,6 @@ void Server::handle(std::string_view p_message, std::vector<std::string> &r_out)
 	// Answering made the server check the latest text: its errors are due as well.
 	publish(r_out);
 }
-
-namespace {
-
-class Channel {
-	int input_;
-	int output_;
-	std::string buffer_;
-	bool ended_ = false;
-
-	bool fill() {
-		char chunk[65536];
-#ifdef _WIN32
-		int got = _read(input_, chunk, sizeof(chunk));
-#else
-		ssize_t got = read(input_, chunk, sizeof(chunk));
-#endif
-		if (got <= 0) {
-			ended_ = true;
-			return false;
-		}
-		buffer_.append(chunk, (size_t)got);
-		return true;
-	}
-
-public:
-	Channel(int p_input, int p_output) :
-			input_(p_input), output_(p_output) {}
-
-	// The next message's body. False at the end of input, or when the framing is broken past repair.
-	bool next(std::string *r_message) {
-		while (true) {
-			size_t header_end = buffer_.find("\r\n\r\n");
-			if (header_end == std::string::npos) {
-				if (buffer_.size() > 65536 || !fill()) {
-					return false; // No header in sight.
-				}
-				continue;
-			}
-			size_t length = MAX_MESSAGE + 1;
-			size_t at = 0;
-			while (at < header_end) {
-				size_t line_end = buffer_.find("\r\n", at);
-				std::string line = buffer_.substr(at, line_end - at);
-				const std::string name = "content-length:";
-				bool matches = line.size() > name.size();
-				for (size_t i = 0; matches && i < name.size(); i++) {
-					char c = line[i];
-					matches = (c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c) == name[i];
-				}
-				if (matches) {
-					size_t digits = name.size();
-					while (digits < line.size() && line[digits] == ' ') {
-						digits++;
-					}
-					size_t value = 0;
-					bool any = false;
-					while (digits < line.size() && line[digits] >= '0' && line[digits] <= '9' && value <= MAX_MESSAGE) {
-						value = value * 10 + (size_t)(line[digits++] - '0');
-						any = true;
-					}
-					while (digits < line.size() && (line[digits] == ' ' || line[digits] == '\t')) {
-						digits++;
-					}
-					if (any && digits == line.size()) {
-						length = value;
-					}
-				}
-				at = line_end + 2;
-			}
-			if (length > MAX_MESSAGE) {
-				return false; // Without a length there is no telling where the message ends.
-			}
-			size_t body = header_end + 4;
-			while (buffer_.size() < body + length) {
-				if (!fill()) {
-					return false;
-				}
-			}
-			r_message->assign(buffer_, body, length);
-			buffer_.erase(0, body + length);
-			return true;
-		}
-	}
-
-	// True if another message, or part of one, is already waiting.
-	bool waiting() const {
-		if (!buffer_.empty()) {
-			return true;
-		}
-#ifdef _WIN32
-		return false;
-#else
-		struct pollfd descriptor;
-		descriptor.fd = input_;
-		descriptor.events = POLLIN;
-		descriptor.revents = 0;
-		return poll(&descriptor, 1, 0) > 0 && (descriptor.revents & POLLIN) != 0;
-#endif
-	}
-
-	bool send(const std::vector<std::string> &p_messages) {
-		std::string out;
-		for (const std::string &message : p_messages) {
-			out += "Content-Length: " + std::to_string(message.size()) + "\r\n\r\n" + message;
-		}
-		size_t sent = 0;
-		while (sent < out.size()) {
-#ifdef _WIN32
-			int wrote = _write(output_, out.data() + sent, (unsigned)(out.size() - sent));
-#else
-			ssize_t wrote = write(output_, out.data() + sent, out.size() - sent);
-#endif
-			if (wrote <= 0) {
-				return false;
-			}
-			sent += (size_t)wrote;
-		}
-		return true;
-	}
-};
-
-} // namespace
 
 int run_server(int p_input, int p_output, Workspace::Options p_options) {
 	Server server(std::move(p_options));

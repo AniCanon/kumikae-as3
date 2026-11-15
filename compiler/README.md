@@ -266,7 +266,7 @@ compiler/build/kas3c lsp --declarations lib.as  # lib.as declares what exists el
 | A file opening or changing | The file's errors: what `kas3c check` prints for the project. |
 | Go to definition | Where the name under the cursor is declared, in the project, the built-in library or Godot's API. |
 | Find references | Every use of it in the project's files. |
-| Completion | After a dot, what the value before it has, with what its bases have; where a type is written, types; otherwise the names in reach: locals, members, definitions, keywords. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a dot whose value has no known type, and nothing in a comment, string or regular expression. |
+| Completion | After a dot, what the value before it has, with what its bases have (`Object`'s members for a `*` or a value of a type not known), or what a package's path holds; where a type is written, types; after `override`, the base classes' methods, each written as its whole declaration; otherwise the names in reach: locals, members, definitions, keywords, with a call argument's parameter name first. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a name that means nothing here, and nothing in a comment, string or regular expression. |
 | Signature help | The callable declaration and active parameter, including unfinished and nested calls. |
 | Hover | Its declaration, and the class or package it belongs to. |
 | Document symbols | The classes and members of the file. |
@@ -283,8 +283,10 @@ How it works:
   the project).
 - **Typing bursts are checked once.** A change marks the program as stale; the check runs when no further
   message is waiting, or when a request needs an answer.
-- **While any file has a syntax error, only syntax errors are reported,** as `kas3c check` does. Names are
-  still resolved, so go to definition, hover and the outline keep working in a half-typed file.
+- **A syntax error silences only what it may have caused,** as in `kas3c check`: the rest of its own file,
+  every file that uses something that file declares, and every complaint that a name is missing. Other
+  errors are still shown. Names are still resolved, so go to definition, hover and the outline keep working
+  in a half-typed file.
 - **Positions** are counted in UTF-16 code units, or in bytes when the editor offers UTF-8.
 - **Godot's API and the built-in library** are written, read-only, to `kas3c-declarations` in the system's
   temporary folder, so that go to definition has a file to open. No errors are ever reported for them.
@@ -295,19 +297,22 @@ is declared, who refers to it). The Godot editor will use the same three.
 
 Limits:
 
-- Find references on a method also lists the methods that override it and the one it overrides.
-- Workspace symbols are the project's own. Godot's classes are not listed.
+- Find references on a method also lists the methods that override it and the one it overrides, and an
+  interface's method the methods that implement it.
+- Workspace symbols are the project's own first, then Godot's classes and the built-in library's.
 - A change arrives as the range of text that changed; a whole document is accepted too.
 - Rename and code actions are not implemented. Completion and signature help are described in
   [the editor guide](../editors/completion.md).
-- A file is known by the path the editor gives. The same file reached through a symbolic link, or under a
-  name that differs only in letter case, counts as a second file and its classes are reported as already
-  defined.
+- A file is one file however the editor reaches it: through a symbolic link, in another letter case, or in
+  another Unicode form of its name.
 - A file the editor opens from outside the project, or from a folder whose name starts with a dot, is not
   checked, unless no folder is open at all.
-- A project of more than 20,000 `.as` files is read up to that number. The server says so on standard
-  error only.
-- Not yet usable on Windows.
+- A project of more than 20,000 `.as` files is read up to that number. The server says so in the editor
+  and on standard error.
+- **Windows:** paths are compared in one spelling (`/` between parts, a drive's letter in capitals, letter
+  case not counted), `file:` URIs carry drives and shares, and the server's input and output are binary.
+  The path rules are tested with Windows paths on every system; the server has not yet been built or run
+  on Windows itself.
 
 ## Declaration files
 
@@ -535,8 +540,6 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 - **A built-in name can't be told apart from an imported one of the same spelling.** A class `Object` in an
   imported package would make a bare `Object` ambiguous, and the built-in one has no longer spelling. This
   is why Godot's `Object` is `GodotObject` here.
-- **Names are checked only when every file parses.** With a syntax error anywhere, `check` reports syntax
-  errors only.
 - **One function may declare a variable twice only with the same type.** Adobe's compiler warns in that case
   and this one is silent; with different types both report an error.
 - **Helpers outside the package block count as part of the file's package** when deciding whether an

@@ -143,17 +143,20 @@ void Compilation::check(bool p_through_syntax_errors) {
 	}
 	checked_ = true;
 	bool syntax_errors = false;
-	for (const Unit &unit : units_) {
-		syntax_errors = syntax_errors || unit.diagnostics.has_errors();
+	for (Unit &unit : units_) {
+		unit.broken = unit.diagnostics.has_errors();
+		syntax_errors = syntax_errors || unit.broken;
 	}
 	if (syntax_errors) {
 		if (!p_through_syntax_errors) {
 			return;
 		}
-		// A file that lost a declaration to a syntax error makes other files look wrong. Nothing the passes
-		// find is certain, so nothing they find is reported.
+		// Nothing the passes find in a file that did not parse is certain, so nothing they find there is
+		// reported. What they find in the other files is sorted out afterwards.
 		for (Unit &unit : units_) {
-			unit.diagnostics.mute();
+			if (unit.broken) {
+				unit.diagnostics.mute();
+			}
 		}
 	}
 	for (Unit &unit : units_) {
@@ -170,6 +173,9 @@ void Compilation::check(bool p_through_syntax_errors) {
 	resolve_bodies(*this);
 	check_class_rules(*this);
 	type_bodies(*this);
+	if (syntax_errors) {
+		drop_doubtful_errors();
+	}
 }
 
 bool Compilation::has_errors() const {
@@ -356,8 +362,13 @@ void Compilation::declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_i
 	auto &table = p_in_block ? p_unit.package->definitions : p_unit.helpers;
 	auto inserted = table.emplace(p_symbol->name, p_symbol);
 	if (!inserted.second) {
-		p_unit.diagnostics.error(p_symbol->offset,
-				quoted(p_symbol->name) + " is already defined " + where(p_unit, inserted.first->second));
+		std::string message = quoted(p_symbol->name) + " is already defined " + where(p_unit, inserted.first->second);
+		if (inserted.first->second->unit && inserted.first->second->unit->broken) {
+			// The other one is in a file that did not parse: it may not be what that file means to define.
+			p_unit.diagnostics.unresolved(p_symbol->offset, std::move(message));
+		} else {
+			p_unit.diagnostics.error(p_symbol->offset, std::move(message));
+		}
 	}
 }
 

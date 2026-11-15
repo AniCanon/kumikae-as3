@@ -43,25 +43,7 @@ fields are set on a class's first use, and a call on a null object evaluates its
 ## Language server, first slice
 
 - **Manual Rider acceptance remains pending.** The native plugin passes sandbox completion and typing
-  checks; a person still needs to accept the full editing and navigation workflow. The completion probe
-  also reports a platform `HighlightingPanel` retained on rapid project close; isolate it in a sustained
-  IDE heap profile. **LS-2**
-- **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths. **LS-2**
-- The same file reached through a symbolic link, or under a different letter case, or in a different
-  Unicode form, counts as two files. **LS-2**
-- Symbol search covers the project only, not Godot's classes. **LS-2**
-- On go to definition, `new X()` goes to the class, not to its constructor. **LS-2**
-- While any file has a syntax error, type errors are hidden everywhere. Silencing only the broken region
-  would be kinder. **LS-2**
-
-## Backlog pass, November 2026
-
-Found by the review of the clean-up pass itself.
-
-- A document that starts with a byte-order mark: a changed range on its first line lands one character
-  early. **LS-2**
-- In UTF-8 position mode, a position inside a multi-byte character splits the character. **LS-2**
-- Find references does not link an interface's method to the methods that implement it. **LS-2**
+  checks; a person still needs to accept the full editing and navigation workflow. **LS-2**
 
 ## Stage 2b-2, part A: Godot's values
 
@@ -149,17 +131,6 @@ any Godot value passing as a condition):
   sent as integers. **decision**
 - New code that the guide would write otherwise: an empty string and an out-parameter where it asks for
   `std::optional`, `const std::string &` for `std::string_view`, two comments out of place. **clean-up**
-
-## Completion, brought forward
-
-- Completion after a dot needs the value's type: nothing is offered for `*`, for a value whose type could
-  not be worked out, or for a package path (`flash.utils.`). **LS-2**
-- No completion of a parameter's name in a call or of an override's signature. **LS-2**
-- The local JetBrains lexer cannot distinguish every regex from division after a closing brace.
-  Compiler completion and signature queries use the parser's regex regions; local pairing needs fuller
-  syntax context in this ambiguous case. **LS-2**
-- Whether a `name:` is a type's place is read from the text before it, not from the tree, when the type
-  has not been started (`var a:`). **LS-2**
 
 ## Reload while running
 
