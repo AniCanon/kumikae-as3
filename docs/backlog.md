@@ -24,10 +24,10 @@ it stands.
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 30 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2c** | The rest of the language | 32 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
-| **2d** | Editor features | 24 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 53 | What is left |
+| **2d** | Editor features | 25 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
+| **clean-up** | A pass that closes stage 2 | 55 | What is left |
 | **decision** | The owner | 11 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
@@ -268,6 +268,17 @@ any Godot value passing as a condition):
   it needs the edits sent to it. **2d**
 - Not tried: a reload while a debugger is stopped, in the Godot editor's own play mode with the editor
   attached, or with more than a few hundred scripts. **2d**
+
+## Stage 2c-3: `try`, `catch`, `finally`, labels
+
+- An error that passes through a `finally` is reported at the line of its `try`, not where it was thrown:
+  the stack trace is built as frames are left, and the `finally` throws it again. **clean-up**
+- A `finally` is written out again for each `break`, `continue` or `return` that leaves it: a long one
+  left many ways makes the function's code that much longer. **clean-up**
+- `continue a` where `a` labels a label (`a: b: for ...`) is refused; AS3 allows it. **2c**
+- An error inside a script method that Godot called is reported there: a `try` in AS3 around the Godot
+  call that led to it does not see it. **2d**
+- An `Error`'s `errorID`, `name` and `getStackTrace()` wait for the standard library. **2c**
 
 ## Stage 2c-2: the untyped value
 

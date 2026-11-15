@@ -114,7 +114,8 @@ inline bool is_held(Kind p_kind) {
 	X(AnyEq, "RRR") X(AnyStrictEq, "RRR") X(AnyAdd, "RRR") X(AnyLt, "RRR") X(AnyLe, "RRR") X(AnyGt, "RRR") X(AnyGe, "RRR") \
 	X(AnyIs, "RRI") \
 	X(Return, "R--") X(ReturnVoid, "---") \
-	X(Throw, "R--") X(Trace, "A--")
+	X(Throw, "R--") /* An untyped value: AS3 throws any value. */ \
+	X(Trace, "A--")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,
@@ -164,6 +165,17 @@ struct Local {
 	uint32_t reg = 0;
 };
 
+// Where an error raised inside [start, end) of a function's code is caught: the error goes to register
+// `reg` and the function carries on at `target`. `type` is what the catch takes: a class, one of the
+// ANY_IS_ codes, or NONE for anything. A function's handlers are in order, the innermost first.
+struct Handler {
+	uint32_t start = 0;
+	uint32_t end = 0;
+	uint32_t target = 0;
+	uint32_t reg = 0;
+	uint32_t type = NONE;
+};
+
 struct Function {
 	std::string name; // "Main/update", "Main" for a constructor, "helper" for a package function.
 	uint32_t file = 0; // An index into Module::files.
@@ -182,6 +194,7 @@ struct Function {
 	std::vector<Instruction> code;
 	std::vector<std::vector<uint32_t>> argument_lists;
 	std::vector<Local> locals;
+	std::vector<Handler> handlers;
 };
 
 struct Field {

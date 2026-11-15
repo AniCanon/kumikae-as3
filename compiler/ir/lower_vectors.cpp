@@ -312,7 +312,7 @@ void Lowerer::vector_loop(ForIn *p_loop) {
 		emit(Op::VecGet, position, value, vector, at);
 	}
 	store(target, convert(value, target.kind, position), position);
-	loops_.emplace_back();
+	open_loop();
 	statement(p_loop->body);
 	const uint32_t next_at = here();
 	const uint32_t one = reg(Kind::F64);

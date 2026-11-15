@@ -186,8 +186,10 @@ void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_regis
 
 bool Interpreter::run(size_t p_depth, Slot *r_result) {
 	while (frames_.size() > p_depth) {
-		if (pending_ || stopped_) {
-			unwind(p_depth);
+		if (failing_ || stopped_) {
+			if (catch_error(p_depth)) {
+				continue;
+			}
 			return false;
 		}
 		Frame &frame = frames_.back();
@@ -576,16 +578,10 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::ReturnVoid:
 				leave(function, in, r, p_depth, r_result); // `frame` and `r` are stale after this.
 				break;
-			case Op::Throw: {
-				Object *thrown = static_cast<Object *>(r[in.a].p);
-				if (!thrown) {
-					raise_null();
-					break;
-				}
-				retain(thrown);
-				pending_ = thrown;
+			case Op::Throw:
+				pending_ = share(Kind::Any, r[in.a]); // Any value, null too.
+				failing_ = true;
 				break;
-			}
 			case Op::HostNew:
 			case Op::HostCall:
 			case Op::HostGet:
@@ -613,12 +609,14 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				trace(function.argument_lists[in.a], r);
 				break;
 		}
-		if (pending_ || stopped_) {
+		if (failing_ || stopped_) {
 			// The instruction that failed is the one before pc: point the frame back at it for the trace.
 			if (!frames_.empty() && frames_.back().pc > 0 && frames_.size() > p_depth) {
 				frames_.back().pc--;
 			}
-			unwind(p_depth);
+			if (catch_error(p_depth)) {
+				continue;
+			}
 			return false;
 		}
 	}

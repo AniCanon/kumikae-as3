@@ -149,6 +149,19 @@ std::string print(const Module &p_module, const Function &p_function) {
 		}
 		out += "\n";
 	}
+	for (const Handler &handler : p_function.handlers) {
+		out += "  handler @" + std::to_string(handler.start) + "-@" + std::to_string(handler.end) + " -> @" +
+				std::to_string(handler.target) + " into r" + std::to_string(handler.reg) + " catches ";
+		if (handler.type == NONE) {
+			out += "anything";
+		} else if (handler.type >= ANY_IS_INT) {
+			const char *names[] = { "int", "uint", "Number", "String", "Boolean" };
+			out += names[handler.type - ANY_IS_INT];
+		} else {
+			out += handler.type < p_module.classes.size() ? p_module.classes[handler.type].name : "?class";
+		}
+		out += "\n";
+	}
 	return out;
 }
 

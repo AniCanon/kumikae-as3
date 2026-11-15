@@ -1,0 +1,2 @@
+catch_kind.as:1:86: error: catching a 'Int64' is not supported by the interpreter yet
+catch_kind.as:1:156: error: 'continue a' here is not supported by the interpreter yet

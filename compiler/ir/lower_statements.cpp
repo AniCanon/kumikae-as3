@@ -27,6 +27,18 @@ void Lowerer::declare_locals(Node *p_body) {
 		}
 	}
 	walk(p_body, [&](Node *p_node) {
+		if (p_node->kind == NodeKind::Try) {
+			// A catch's variable: a register of the kind it is declared, untyped when it says none.
+			for (CatchClause &clause : static_cast<Try *>(p_node)->catches) {
+				if (!clause.symbol || locals_.count(clause.symbol)) {
+					continue;
+				}
+				const uint32_t local = reg(clause.type ? written_kind(clause.type, clause.offset, Kind::Any) : Kind::Any);
+				locals_[clause.symbol] = local;
+				fn().locals.push_back({ std::string(clause.name), local });
+			}
+			return;
+		}
 		if (p_node->kind != NodeKind::VarDecl) {
 			return;
 		}
@@ -74,7 +86,7 @@ void Lowerer::while_loop(Stmt *p_statement) {
 	emit(Op::Stmt, position);
 	uint32_t test = expression(loop->condition, Kind::Bool);
 	uint32_t out = emit(Op::JumpIfNot, position, test, 0);
-	loops_.emplace_back();
+	open_loop();
 	statement(loop->body);
 	emit(Op::Jump, position, top);
 	patch(out, here());
@@ -85,7 +97,7 @@ void Lowerer::do_while_loop(Stmt *p_statement) {
 	uint32_t position = p_statement->offset;
 	DoWhile *loop = static_cast<DoWhile *>(p_statement);
 	uint32_t top = here();
-	loops_.emplace_back();
+	open_loop();
 	statement(loop->body);
 	uint32_t test_at = here();
 	emit(Op::Stmt, loop->condition ? loop->condition->offset : position);
@@ -108,7 +120,7 @@ void Lowerer::for_loop(Stmt *p_statement) {
 		uint32_t test = expression(loop->condition, Kind::Bool);
 		out = emit(Op::JumpIfNot, position, test, 0);
 	}
-	loops_.emplace_back();
+	open_loop();
 	statement(loop->body);
 	uint32_t update_at = here();
 	if (loop->update) {
@@ -125,17 +137,24 @@ void Lowerer::break_or_continue(Stmt *p_statement) {
 	uint32_t position = p_statement->offset;
 	bool is_break = p_statement->kind == NodeKind::Break;
 	std::string_view label = is_break ? static_cast<Break *>(p_statement)->label : static_cast<Continue *>(p_statement)->label;
-	if (!label.empty()) {
-		refuse(position, "a labelled 'break' or 'continue'");
-		return;
-	}
-	// `break` leaves the nearest loop or switch; `continue` goes round the nearest loop.
+	// `break` leaves the nearest loop or switch, `continue` goes round the nearest loop; with a label, the
+	// statement of that label (a block only for `break`).
 	for (size_t i = loops_.size(); i-- > 0;) {
-		if (is_break || !loops_[i].is_switch) {
+		const Loop &target = loops_[i];
+		if (target.hidden) {
+			continue;
+		}
+		const bool fits = label.empty() ? !target.is_block && (is_break || !target.is_switch)
+										: target.label == label && (is_break || (!target.is_switch && !target.is_block));
+		if (fits) {
+			run_finallies(target.tries);
 			uint32_t jump = emit(Op::Jump, position, 0);
 			(is_break ? loops_[i].breaks : loops_[i].continues).push_back(jump);
 			return;
 		}
+	}
+	if (!label.empty()) {
+		refuse(position, "'" + std::string(is_break ? "break " : "continue ") + std::string(label) + "' here");
 	}
 }
 
@@ -200,7 +219,7 @@ void Lowerer::switch_statement(Stmt *p_statement) {
 	evaluated_.erase(choice->subject);
 	uint32_t to_default = emit(Op::Jump, position, 0);
 	bool has_default = false;
-	loops_.emplace_back();
+	open_loop();
 	loops_.back().is_switch = true;
 	at = 0;
 	for (SwitchCase &each : choice->cases) {
@@ -229,21 +248,24 @@ void Lowerer::return_statement(Stmt *p_statement) {
 		if (result->value) {
 			expression(result->value, Kind::Void);
 		}
+		run_finallies(0);
 		emit(Op::ReturnVoid, position);
 	} else {
 		uint32_t value = result->value ? typed(result->value, result_type_, fn().result) : default_value(fn().result, position);
+		if (!tries_.empty()) {
+			// The value is worked out first; then the `finally` blocks run, and cannot change it.
+			uint32_t kept = reg(kind_at(value));
+			emit(Op::Move, position, kept, value);
+			run_finallies(0);
+			value = kept;
+		}
 		emit(Op::Return, position, value);
 	}
 }
 
 void Lowerer::throw_statement(Stmt *p_statement) {
 	uint32_t position = p_statement->offset;
-	uint32_t value = expression(static_cast<Throw *>(p_statement)->value, Kind::Void);
-	if (kind_at(value) != Kind::Obj) {
-		refuse(position, "throwing a value that is not an object");
-	} else {
-		emit(Op::Throw, position, value);
-	}
+	emit(Op::Throw, position, any_value(static_cast<Throw *>(p_statement)->value)); // Any value at all.
 }
 
 void Lowerer::statement(Stmt *p_statement) {
@@ -297,7 +319,7 @@ void Lowerer::statement(Stmt *p_statement) {
 			switch_statement(p_statement);
 			break;
 		case NodeKind::Try:
-			refuse(position, "'try'");
+			try_statement(static_cast<Try *>(p_statement));
 			break;
 		case NodeKind::ForIn:
 			if (is_vector(static_cast<ForIn *>(p_statement)->collection->type)) {
@@ -307,7 +329,7 @@ void Lowerer::statement(Stmt *p_statement) {
 			}
 			break;
 		case NodeKind::Labeled:
-			refuse(position, "a label");
+			labeled(static_cast<Labeled *>(p_statement));
 			break;
 		case NodeKind::FunctionStmt:
 			refuse(position, "a function inside a function");
@@ -316,6 +338,14 @@ void Lowerer::statement(Stmt *p_statement) {
 			refuse(position, "this statement");
 			break;
 	}
+}
+
+void Lowerer::open_loop() {
+	Loop loop;
+	loop.label = next_label_;
+	loop.tries = tries_.size();
+	next_label_ = std::string_view();
+	loops_.push_back(std::move(loop));
 }
 
 void Lowerer::finish_loop(uint32_t p_continue_at) {

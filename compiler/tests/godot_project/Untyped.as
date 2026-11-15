@@ -27,6 +27,19 @@ package {
 		// A store into one of Godot's types checks the value is of that type.
 		public function asVector(value:*):Vector2 { var v:Vector2 = value; return v; }
 		public function asNode(value:*):Node { var n:Node = value; return n; }
+		public function throwValue(value:*):void { throw value; }
+		// An error raised for a Godot value is caught like any other.
+		public function guarded(value:*):String {
+			try {
+				var v:Vector2 = value;
+				return "fits " + v;
+			} catch (e:TypeError) {
+				return "caught " + (e is TypeError);
+			} finally {
+				position = new Vector2(1, 1);
+			}
+			return "never";
+		}
 		public function place(value:*):Vector2 { position = value; return position; }
 		// A script object does not reach Godot as a null with nothing said.
 		public var keep:* = new Thing();
