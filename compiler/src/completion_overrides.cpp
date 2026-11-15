@@ -41,10 +41,21 @@ std::string written_type(const Compilation &p_compilation, const TypeRef *p_type
 std::optional<std::string> default_value(const Compilation &p_compilation, const Unit &p_unit, Expr *p_value, const Context &p_context) {
 	bool accessible = true;
 	std::vector<CompletionEdit> names;
+	std::unordered_set<const Node *> package_parts;
 	walk(p_value, [&](Node *p_node) {
+		if (package_parts.count(p_node)) {
+			return;
+		}
 		if (p_node->kind == NodeKind::Member) {
-			const auto *symbol = static_cast<Member *>(p_node)->symbol;
-			accessible &= symbol && (symbol->modifiers & Modifiers::Public);
+			const auto *member = static_cast<Member *>(p_node);
+			if (member->symbol) {
+				accessible &= p_compilation.visible(member->symbol, p_context);
+				// Below a package-qualified definition the names are package text, not value references.
+				walk(member->object, [&](Node *p_part) { package_parts.insert(p_part); });
+			} else {
+				accessible &= member->member && (member->member->modifiers & Modifiers::Public);
+			}
+			return;
 		}
 		if (p_node->kind != NodeKind::Name) {
 			return;
@@ -120,6 +131,19 @@ bool matches(std::string_view p_name, std::string_view p_prefix) {
 	});
 }
 
+const FunctionDecl *accessor_of(const Symbol *p_member, FunctionDecl::Accessor p_accessor) {
+	return p_accessor == FunctionDecl::Getter ? p_member->getter : p_member->setter;
+}
+
+bool already_declared(const Symbol *p_member, const FunctionDecl &p_function) {
+	if (p_member->kind != SymbolKind::Property || p_function.accessor == FunctionDecl::None) {
+		return p_member != p_function.symbol;
+	}
+	const auto *accessor = accessor_of(p_member, p_function.accessor);
+	// Property linking copies the other half from the base; that is not a declaration in this class.
+	return accessor && accessor != &p_function && accessor->symbol == p_member;
+}
+
 } // namespace
 
 std::vector<Completion> Queries::overrides(const Unit &p_unit, const FunctionDecl &p_function, Symbol *p_class, uint32_t p_offset) {
@@ -136,18 +160,17 @@ std::vector<Completion> Queries::overrides(const Unit &p_unit, const FunctionDec
 	const std::string indent = line_indent(p_unit, p_function.offset);
 	for (Symbol *base = p_class->klass->base; base && base->klass && visited.insert(base).second; base = base->klass->base) {
 		for (const auto &[name, member] : base->klass->members) {
-			if (!matches(name, prefix) || !seen.insert(std::string(name)).second ||
-					(member->modifiers & Modifiers::Final) || member->is_static() ||
-					!inherited_visible(member, base, p_class->package)) {
+			if (!matches(name, prefix) || member->is_static() ||
+					!inherited_visible(member, base, p_class->package) || !seen.insert(std::string(name)).second) {
 				continue;
 			}
 			auto own = p_class->klass->members.find(name);
-			if (own != p_class->klass->members.end() && own->second != p_function.symbol) {
+			if (own != p_class->klass->members.end() && already_declared(own->second, p_function)) {
 				continue;
 			}
-			const FunctionDecl *function = p_function.accessor == FunctionDecl::Getter ? member->getter :
-					p_function.accessor == FunctionDecl::Setter ? member->setter : function_declaration(member);
-			if (!function || function->accessor != p_function.accessor) {
+			const FunctionDecl *function = p_function.accessor == FunctionDecl::None ? function_declaration(member) :
+					accessor_of(member, p_function.accessor);
+			if (!function || function->accessor != p_function.accessor || (function->modifiers.bits & Modifiers::Final)) {
 				continue;
 			}
 			constexpr uint16_t ACCESS = Modifiers::Public | Modifiers::Protected | Modifiers::Private | Modifiers::Internal;

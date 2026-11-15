@@ -335,7 +335,8 @@ public:
 		prefix_ = source_.substr(start_, offset_ - start_);
 		find_enclosing();
 		if (class_ && function_ && (function_->modifiers.bits & Modifiers::Override) &&
-				offset_ >= function_->name_offset && offset_ <= function_->name_offset + function_->name.size()) {
+				(function_->name.empty() ? offset_ > function_->name_offset :
+						offset_ >= function_->name_offset && offset_ <= function_->name_offset + function_->name.size())) {
 			return queries_.overrides(unit_, *function_, class_, offset_);
 		}
 		if (offer_import()) {

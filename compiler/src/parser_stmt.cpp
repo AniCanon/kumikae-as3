@@ -489,13 +489,18 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	function->modifiers = p_modifiers;
 	function->metadata = p_metadata;
 	// `function get name()` is an accessor; `function get()` is a function called `get`.
-	if (p_allow_accessor && (at_word("get") || at_word("set")) && is_identifier_like(peek2().kind)) {
+	if (p_allow_accessor && (at_word("get") || at_word("set")) &&
+			(is_identifier_like(peek2().kind) || ((p_modifiers.bits & Modifiers::Override) &&
+					(peek2().kind == TokenKind::RBrace || peek2().kind == TokenKind::EndOfFile)))) {
 		function->accessor = text(advance()) == "get" ? FunctionDecl::Getter : FunctionDecl::Setter;
 	}
+	uint32_t missing_name_end = 0;
 	if (at(TokenKind::Identifier) || (function->accessor != FunctionDecl::None && is_identifier_like(current_.kind))) {
 		function->name_offset = current_.offset;
 		function->name = text(advance());
 	} else if (p_name_required) {
+		function->name_offset = previous_end_;
+		missing_name_end = current_.offset;
 		error_expected("a function name");
 	}
 
@@ -566,7 +571,12 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	if (height > MAX_HEIGHT) {
 		abort_too_deep();
 	}
-	return finish(function);
+	finish(function);
+	// Retain the empty name's trivia span so completion can find the unfinished declaration.
+	if (function->end < missing_name_end) {
+		function->end = missing_name_end;
+	}
+	return function;
 }
 
 } // namespace kas3

@@ -36,7 +36,11 @@ Acceptance adds the signature and a body that throws `Error("Not implemented")`;
 your implementation. Metadata, comments and an existing `final` modifier are preserved. Stubs are offered
 only while the method name is unfinished, before a parameter list. Private, final and static methods,
 inaccessible signature types and non-public member defaults are excluded. An explicitly written
-visibility must match the inherited method. Getters/setters use their corresponding accessor prefix.
+visibility must match the inherited method. Public default constants work when written as `VALUE`,
+`Base.VALUE` or `package.name.Base.VALUE`; generated references retain their meaning in the derived class.
+Getters/setters use their corresponding accessor prefix. Overriding one does not hide the other, and
+`final` applies to the selected accessor. Completion also works immediately after `override function `,
+`override function get ` or `override function set `, before any name character is typed.
 
 ## Accepting a suggestion
 

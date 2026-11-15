@@ -28,7 +28,7 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
   to one file (`tools/bench_recheck.cpp` measures it).
 
 Tests: `test_lexer`, `test_parser`, `test_ast`, `test_names`, `test_types`, `test_type_errors`,
-`test_query`, `test_source`, and the `golden` group.
+`test_query`, `test_override_completion`, `test_source`, and the `golden` group.
 
 ## Editor query ownership
 
@@ -55,5 +55,8 @@ text through an expired source reference. Type interning rebases after 1,024 add
 
 Override completion uses the same inherited visibility rule as name resolution. Its primary edit covers
 only the filtering word; additional edits insert visibility without rewriting metadata or comments.
-Generated signatures qualify accessible types and public default references. Tests apply generated edits
-and check the resulting source with a fresh compiler.
+Generated signatures qualify accessible types and public default references, including references already
+qualified by class or package. Package prefixes are not value references. Getter and setter declarations
+and final modifiers are checked separately, including inherited complementary accessors. Parser recovery
+retains an empty override name's span so completion also works before its first character. Tests apply
+generated edits and check the resulting source with a fresh compiler.

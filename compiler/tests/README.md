@@ -30,6 +30,12 @@ capability negotiation, snippets, insertion/replacement ranges (including Unicod
 argument help. `test_lsp_stdio.py` repeats protocol cases against the executable. `test_workspace`
 checks cache counts across repeated requests, forty changed compilations, and document close.
 
+`test_override_completion` covers qualified default constants, inaccessible references, independent
+getter/setter overrides and final modifiers in either declaration order. It also covers inherited
+accessor slots, shadowing during error recovery and empty-name completion. Accepted edits are checked
+with a fresh compiler. `query_completion.h` shares completion fixtures and edit application with
+`test_query`; it contains no production rules.
+
 For alternating completion timings, build the unchanged revision separately before editing, then run:
 
 ```sh
