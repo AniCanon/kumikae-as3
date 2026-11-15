@@ -5,7 +5,9 @@ struct KeyboardEvent: Sendable, Equatable {
 
 enum PasteKeyboard {
   static let events: [KeyboardEvent] = [
-    KeyboardEvent(usage: 227, state: 1), KeyboardEvent(usage: 25, state: 1),
-    KeyboardEvent(usage: 25, state: 2), KeyboardEvent(usage: 227, state: 2)
+    KeyboardEvent(usage: NativeInputValues.leftCommand, state: NativeInputValues.pressed),
+    KeyboardEvent(usage: NativeInputValues.letterV, state: NativeInputValues.pressed),
+    KeyboardEvent(usage: NativeInputValues.letterV, state: NativeInputValues.released),
+    KeyboardEvent(usage: NativeInputValues.leftCommand, state: NativeInputValues.released),
   ]
 }

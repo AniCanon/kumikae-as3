@@ -14,7 +14,9 @@ public struct FrameLayout: Decodable, Sendable {
   public static func load() throws -> FrameLayout {
     // Bundle.module traps if packaging is incomplete; turn that into an actionable startup error.
     let roots = [Bundle.main.bundleURL, Bundle(for: ResourceLocation.self).bundleURL]
-    let candidates = roots.flatMap { [$0, $0.deletingLastPathComponent()] }
+    let candidates = roots.flatMap {
+      [$0, $0.deletingLastPathComponent()]
+    }
     let url = candidates.compactMap {
       Bundle(url: $0.appendingPathComponent("SimulatorBridge_SimulatorBridge.bundle"))?
         .url(forResource: "frame-layout", withExtension: "json")
@@ -29,11 +31,13 @@ public struct FrameLayout: Decodable, Sendable {
   func field(_ name: String) throws -> (offset: Int, bytes: Int) {
     guard let pair = fields[name], pair.count == 2, [4, 8].contains(pair[1]),
       pair[0] >= 0, pair[0] + pair[1] <= headerBytes
-    else { throw BridgeError.invalid("Invalid frame layout field: \(name)") }
+    else {
+      throw BridgeError.invalid("Invalid frame layout field: \(name)")
+    }
     return (pair[0], pair[1])
   }
 
-  func read(_ name: String, from data: Data) throws -> UInt64 {
+  func read(_ name: String, from data: borrowing Data) throws -> UInt64 {
     let field = try field(name)
     guard data.count >= headerBytes else {
       throw BridgeError.invalid("Truncated native frame header")

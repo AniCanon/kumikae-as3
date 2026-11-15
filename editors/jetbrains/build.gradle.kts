@@ -110,19 +110,34 @@ tasks.withType<PrepareSandboxTask>().configureEach {
     }
 }
 
+// The formatter ships with Xcode. Never download a separate lint dependency.
+val nativeSwiftAvailable = providers.provider {
+    System.getProperty("os.name").contains("Mac") &&
+        file("/usr/bin/xcrun").canExecute() && providers.exec {
+            commandLine("/usr/bin/xcrun", "--find", "swift")
+            isIgnoreExitValue = true
+        }.result.get().exitValue == 0
+}
+val swiftFiles = listOf("Package.swift", "Sources", "Tests", "ProbeApp")
+val lintSimulatorBridge = tasks.register<Exec>("lintSimulatorBridge") {
+    workingDir("native/SimulatorBridge")
+    commandLine(listOf("/usr/bin/xcrun", "swift-format", "lint", "--strict", "--recursive") + swiftFiles)
+    onlyIf("installed Swift on macOS is required") { nativeSwiftAvailable.get() }
+}
+tasks.register<Exec>("formatSimulatorBridge") {
+    workingDir("native/SimulatorBridge")
+    commandLine(listOf("/usr/bin/xcrun", "swift-format", "format", "--in-place", "--recursive") + swiftFiles)
+    onlyIf("installed Swift on macOS is required") { nativeSwiftAvailable.get() }
+}
+tasks.check { dependsOn(lintSimulatorBridge) }
+tasks.buildPlugin { dependsOn(lintSimulatorBridge) }
+
 // Native Simulator helper: SwiftPM's resource bundle must travel beside its executable.
 val buildSimulatorBridge = tasks.register<Exec>("buildSimulatorBridge") {
     workingDir("native/SimulatorBridge")
     commandLine("/usr/bin/xcrun", "swift", "build", "-c", "release")
-    onlyIf {
-        val available = System.getProperty("os.name").contains("Mac") &&
-            file("/usr/bin/xcrun").canExecute() && providers.exec {
-                commandLine("/usr/bin/xcrun", "--find", "swift")
-                isIgnoreExitValue = true
-            }.result.get().exitValue == 0
-        if (!available) logger.lifecycle("Skipping SimulatorBridge: installed Swift on macOS is required.")
-        available
-    }
+    dependsOn(lintSimulatorBridge)
+    onlyIf("installed Swift on macOS is required") { nativeSwiftAvailable.get() }
 }
 tasks.runIde {
     if (providers.environmentVariable("KUMIKAE_SIMULATOR_ENDURANCE_PROBE").orNull == "1" ||

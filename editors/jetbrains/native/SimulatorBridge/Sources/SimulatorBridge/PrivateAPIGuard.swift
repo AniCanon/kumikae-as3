@@ -23,7 +23,9 @@ public struct PrivateAPIGuard {
         "Native Simulator input is disabled for \(version) (\(build)): \(reason). Use the fallback."
       )
     }
-    for symbol in symbols { try require(loader.contains(symbol), symbol: symbol) }
+    for symbol in symbols {
+      try require(loader.contains(symbol), symbol: symbol)
+    }
   }
 
   func require(_ condition: Bool, symbol: String) throws {

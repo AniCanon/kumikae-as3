@@ -9,11 +9,42 @@ after the panel's private-input switch. See `../../protocol.md` for its transpor
 Keep private symbol names in the runtime adapter. Device lookup, frame source, frame
 sink and input sink are protocols. Mutable native objects stay actor-isolated.
 No force unwraps, unchecked sendability or silent error recovery in production code.
-Aim for fewer than 300 lines per file. Tests use Swift Testing and fake boundaries.
+Prefer readable spacing and cohesive files; 300 lines is a guideline, not a reason to
+compress code. Tests use Swift Testing and fake boundaries.
 
 The shared frame layout in `Sources/SimulatorBridge/Resources` belongs to both
 Swift and Kotlin. Change its version when compatibility changes. No Apple headers,
 binaries, device identifiers or captured screen contents belong in this folder.
+
+## Swift style and ownership
+
+The package keeps Swift tools 6.0 and Swift 6 language mode; this cleanup was built
+with installed Swift 6.4. Actor isolation and Sendable checking remain enabled.
+`FrameLayout.read` borrows its input bytes synchronously. `FrameRotation.apply`
+consumes a frame that it either forwards unchanged or replaces with rotated pixels.
+Other parameters use Swift's normal ownership rules. Retained frames remain copyable
+and keep Data's copy-on-write protection. Ownership annotations alone make no
+performance guarantee.
+
+Input wire names are converted to `InputOperation` before exhaustive dispatch.
+Replies use Encodable values; a failed reply write ends command processing without
+retrying the command reply. The runner separates command intake, frame publication and input
+handling, and retains both errors when work and cleanup fail.
+
+Use Xcode's installed swift-format; no package or downloaded linter is required:
+
+```sh
+xcrun swift-format lint --strict --recursive Package.swift Sources Tests ProbeApp
+xcrun swift-format format --in-place --recursive Package.swift Sources Tests ProbeApp
+```
+
+The checked-in `.swift-format` sets two-space indentation and 100-column formatting,
+keeps intentional line breaks, and rejects force unwraps, force-try and implicitly
+unwrapped optionals. From the plugin directory, `lintSimulatorBridge` and
+`formatSimulatorBridge` run these commands. `check`, `buildPlugin` and
+`buildSimulatorBridge` require lint. Native tasks skip when installed Swift on macOS
+is unavailable; if Swift exists but swift-format is missing, lint fails with the
+Xcode tool lookup error. Generated `.build` files are outside the lint paths.
 
 ## Runtime boundary
 

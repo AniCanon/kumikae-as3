@@ -10,22 +10,34 @@ struct InputTrace: Codable, Sendable {
   var inputReturnedNanos: UInt64?
 }
 
-enum InputTracePhase: Sendable { case actor, barrier, callback }
+enum InputTracePhase: Sendable {
+  case actor, barrier, callback
+}
 
 final class SlowInputTrace: Sendable {
-  struct Snapshot: Codable, Sendable { let inputs: [InputTrace]; let dropped: Int }
+  struct Snapshot: Codable, Sendable {
+    let inputs: [InputTrace]
+    let dropped: Int
+  }
+
   private struct State {
     var active: InputTrace?
     var completed: [InputTrace] = []
     var dropped = 0
   }
+
   private let state = OSAllocatedUnfairLock(initialState: State())
   func begin(id: Int, at: UInt64) {
-    state.withLock { $0.active = InputTrace(id: id, receivedNanos: at) }
+    state.withLock {
+      $0.active = InputTrace(id: id, receivedNanos: at)
+    }
   }
+
   func mark(id: Int, phase: InputTracePhase, at: UInt64) {
     state.withLock { state in
-      guard state.active?.id == id else { return }
+      guard state.active?.id == id else {
+        return
+      }
       switch phase {
       case .actor: state.active?.actorNanos = at
       case .barrier: state.active?.barrierNanos = at
@@ -33,16 +45,25 @@ final class SlowInputTrace: Sendable {
       }
     }
   }
+
   func finish(id: Int, at: UInt64) {
     state.withLock { state in
-      guard var active = state.active, active.id == id else { return }
+      guard var active = state.active, active.id == id else {
+        return
+      }
       state.active = nil
-      guard at >= active.receivedNanos, at - active.receivedNanos >= 10_000_000 else { return }
+      guard at >= active.receivedNanos, at - active.receivedNanos >= 10_000_000 else {
+        return
+      }
       active.inputReturnedNanos = at
-      if state.completed.count < 64 { state.completed.append(active) }
-      else { state.dropped += 1 }
+      if state.completed.count < 64 {
+        state.completed.append(active)
+      } else {
+        state.dropped += 1
+      }
     }
   }
+
   func drain() -> Snapshot {
     state.withLock { state in
       let snapshot = Snapshot(inputs: state.completed, dropped: state.dropped)
