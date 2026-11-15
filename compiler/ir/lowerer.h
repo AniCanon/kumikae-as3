@@ -97,10 +97,9 @@ class Lowerer {
 	const Stmt *refused_in_ = nullptr; // The last statement something was refused in.
 	bool uses_refused_type(const Stmt *p_statement);
 	size_t zeroes_ = 0; // How many package variables are zeroed, first of all the initializers.
-	// The environment of the function being lowered (see lower_closures.cpp): its register and layout, if
-	// a function written inside it uses its variables; whether it was given one (a function expression,
-	// in r0); the layouts reachable from that one, nearest first; and the function expressions met, to
-	// lower once the function they are in is done.
+	// The function's environment (lower_closures.cpp): its register and layout, if one written inside uses it;
+	// whether it was given one (a function expression, in r0); the layouts reachable from that one, nearest
+	// first; and the function expressions met, lowered once the function they are in is done.
 	uint32_t own_env_reg_ = NONE;
 	EnvLayout own_layout_;
 	bool received_env_ = false;
@@ -379,6 +378,7 @@ class Lowerer {
 	// Function expressions and what they capture (lower_closures.cpp).
 	void make_environment(FunctionDecl *p_decl);
 	std::optional<Place> captured_place(const Symbol *p_symbol, uint32_t p_position);
+	uint32_t self(uint32_t p_position);
 	uint32_t closure_value(FunctionExpr *p_expression);
 	void lower_pending_functions();
 	// Function values (lower_functions.cpp).

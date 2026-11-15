@@ -92,6 +92,8 @@ package {
 		// A signal's property and its emit(), by its name.
 		public function listenersByName(other:Node, signal:String):int { return other[signal].numListeners; }
 		public function emitByName(other:Node, signal:String):void { other[signal].emit(); }
+		// A function written in a method sees the object's members, its own and Godot's.
+		public function listenWithClosure():void { renamed.add(function ():void { count += 1000; last = name; }); }
 		// An error in a listener that this script's own emit() ran comes back out of emit(), as in Flash.
 		public function catchesListener():String {
 			renamed.add(fails);

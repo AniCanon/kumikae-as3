@@ -62,6 +62,9 @@ inline std::string member_key(const FunctionDecl *p_function) {
 struct EnvLayout {
 	uint32_t klass = NONE;
 	std::unordered_map<const Symbol *, uint32_t> fields;
+	// The object of the method the environment was made in, for the functions written inside it that name
+	// its members: the field it is in, or NONE.
+	uint32_t this_field = NONE;
 };
 
 // A function expression met while lowering a function: lowered once that function is done.

@@ -7,17 +7,18 @@ uint32_t Lowerer::engine_receiver(Expr *p_object, uint32_t p_position, bool *r_o
 	*r_of_value = false;
 	if (!p_object || p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr) {
 		uint32_t klass = 0;
-		if (received_env_) {
-			// A function expression's first register is its environment, not the script's object.
-			refuse(p_position, "an instance member named inside a function expression");
+		if (received_env_ && p_object) {
+			// `this` and `super` written in a function expression are not the method's object (AS3).
+			refuse(p_position, "'this' or 'super' inside a function expression");
 			return default_value(Kind::Ref, p_position);
 		}
 		if (fn().is_static || !class_ || !class_index(class_, &klass) || module_.classes[klass].native_base.empty()) {
 			refuse(p_position, "this use of a Godot member");
 			return default_value(Kind::Ref, p_position);
 		}
+		const uint32_t script = self(p_position); // In a function expression, the method's object.
 		uint32_t owner = reg(Kind::Ref);
-		emit(Op::GetField, p_position, owner, 0, 0);
+		emit(Op::GetField, p_position, owner, script, 0);
 		return owner;
 	}
 	uint32_t object = expression(p_object, Kind::Void);

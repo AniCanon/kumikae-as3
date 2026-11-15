@@ -1118,8 +1118,6 @@ static void test_engine_calls() {
 		"function f(v:Vector2):int { return v ? 1 : 0; }",
 		"function f(a:GodotArray):void { if (a) { trace(1); } }",
 		// A function expression's first register is its environment, not the script's object.
-		"function f():void { var g:Function = function():void { position = new Vector2(1, 1); }; }",
-		"function f():void { var g:Function = function():void { addChild(null); }; }",
 		"function f():void { var g:Function = function():void { super.queueFree(); }; }",
 	};
 	for (const char *body : bodies) {

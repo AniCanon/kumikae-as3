@@ -1,1 +1,0 @@
-package { public class closure_member { private var n:int = 5; public function closure_member() { var f:Function = function():int { return n; }; var g:Function = function():void { go(); }; var h:Function = function():Function { return go; }; trace(f()); } public function go():void {} } }

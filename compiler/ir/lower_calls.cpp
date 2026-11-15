@@ -251,10 +251,10 @@ uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_functio
 			direct = direct || object->kind == NodeKind::SuperExpr;
 			list.push_back(settled(receiver(object), writer(p_call->arguments), position));
 		} else {
-			if (fn().is_static || received_env_) {
-				refuse(callee->offset, received_env_ ? "an instance member named inside a function expression" : "this call");
+			if (fn().is_static) {
+				refuse(callee->offset, "this call");
 			}
-			list.push_back(0);
+			list.push_back(self(callee->offset));
 		}
 	}
 	// The class is looked up before the arguments, and set up then, as in AVM2.
@@ -370,9 +370,12 @@ uint32_t Lowerer::bound_method(Expr *p_expression) {
 			emit(Op::NullCheck, position, object);
 		}
 	}
-	if (on_this && (fn().is_static || received_env_)) {
-		refuse(position, received_env_ ? "an instance member named inside a function expression" : "this name");
+	if (on_this && fn().is_static) {
+		refuse(position, "this name");
 		return default_value(Kind::Val, position);
+	}
+	if (on_this) {
+		object = self(position);
 	}
 	bool exact = (symbol->modifiers & Modifiers::Private) != 0;
 	uint32_t out = reg(Kind::Val);

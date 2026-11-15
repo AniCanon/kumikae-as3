@@ -61,12 +61,12 @@ std::optional<Place> Members::property(Expr *p_target, Expr *p_object, Expr *p_l
 		place.object = NONE;
 	} else {
 		const bool own = !p_object || p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr;
-		if (own && l_.received_env_) {
-			// A function expression's first register is its environment, not the object.
-			l_.refuse(position, "an instance member named inside a function expression");
+		if (p_object && own && l_.received_env_) {
+			// `this` and `super` written in a function expression are not the method's object (AS3).
+			l_.refuse(position, "'this' or 'super' inside a function expression");
 			return Place();
 		}
-		place.object = own ? 0 : l_.settled(l_.receiver(p_object), p_later, position);
+		place.object = !p_object ? l_.self(position) : own ? 0 : l_.settled(l_.receiver(p_object), p_later, position);
 		// `super.x` is the base's own; a private property is never overridden.
 		const bool exact = (symbol->modifiers & Modifiers::Private) || (p_object && p_object->kind == NodeKind::SuperExpr);
 		place.dispatch = by_interface ? Place::Interface : exact ? Place::Direct : Place::Virtual;

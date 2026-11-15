@@ -25,26 +25,30 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 	if (!p_decl || !p_decl->body) {
 		return;
 	}
-	// What the functions written inside use, at any depth.
+	// What the functions written inside use, at any depth; and whether they name a member of the object.
 	std::unordered_set<const Symbol *> used;
+	bool members = false;
 	walk(p_decl->body, [&](Node *p_node) -> bool {
 		if (nested_function(p_node)) {
 			walk(p_node, [&](Node *p_inner) {
 				if (p_inner->kind == NodeKind::Name && static_cast<Name *>(p_inner)->symbol) {
 					used.insert(static_cast<Name *>(p_inner)->symbol);
+					members = members || static_cast<Name *>(p_inner)->symbol->is_instance_member();
 				}
 			});
 			return false;
 		}
 		return true;
 	});
+	// A method's: the functions written in it see the object's members, as AS3's scope chain has it.
+	const bool keeps_this = members && !fn().is_static && !received_env_;
 	std::vector<const Symbol *> captured;
 	for (const auto &[symbol, local] : locals_) {
 		if (used.count(symbol) && symbol->kind != SymbolKind::CatchVariable) {
 			captured.push_back(symbol);
 		}
 	}
-	if (captured.empty()) {
+	if (captured.empty() && !keeps_this) {
 		return;
 	}
 	// In the order they are declared, so that the class is the same each time the program is compiled.
@@ -52,6 +56,10 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 	Class klass;
 	klass.name = fn().name + "$environment";
 	klass.fields.push_back({ "$outer", Kind::Obj });
+	if (keeps_this) {
+		own_layout_.this_field = static_cast<uint32_t>(klass.fields.size());
+		klass.fields.push_back({ "$this", Kind::Obj });
+	}
 	for (const Symbol *symbol : captured) {
 		own_layout_.fields[symbol] = static_cast<uint32_t>(klass.fields.size());
 		klass.fields.push_back({ std::string(symbol->name), kind_at(locals_[symbol]) });
@@ -63,6 +71,9 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 	emit(Op::New, position, own_env_reg_, own_layout_.klass);
 	if (received_env_) {
 		emit(Op::SetField, position, own_env_reg_, 0, 0); // The environment it was given, from r0.
+	}
+	if (keeps_this) {
+		emit(Op::SetField, position, own_env_reg_, own_layout_.this_field, 0);
 	}
 	// What each holds now: a parameter's argument, a local's starting value.
 	for (const Symbol *symbol : captured) {
@@ -101,6 +112,30 @@ std::optional<Lowerer::Place> Lowerer::captured_place(const Symbol *p_symbol, ui
 		return place;
 	}
 	return std::nullopt;
+}
+
+// The object a bare member names: `this` in a method; in a function written in one, the method's object,
+// from the environment that keeps it.
+uint32_t Lowerer::self(uint32_t p_position) {
+	if (!received_env_) {
+		return 0;
+	}
+	for (size_t depth = 0; depth < chain_.size(); depth++) {
+		if (chain_[depth].this_field == NONE) {
+			continue;
+		}
+		uint32_t at = 0;
+		for (size_t step = 0; step < depth; step++) {
+			const uint32_t outer = reg(Kind::Obj);
+			emit(Op::GetField, p_position, outer, at, 0);
+			at = outer;
+		}
+		const uint32_t object = reg(Kind::Obj);
+		emit(Op::GetField, p_position, object, at, chain_[depth].this_field);
+		return object;
+	}
+	refuse(p_position, "an instance member named inside this function expression");
+	return default_value(Kind::Obj, p_position);
 }
 
 // `function (a:int):int { ... }`: a function value of a function of its own, given the environment it may
