@@ -19,6 +19,9 @@ namespace kas3 {
 // A script object as Godot holds it: the Godot object it is attached to, for a class that extends one of
 // Godot's (a null one when it has none). False for any other script object, which Godot can't hold.
 bool as_godot_object(const vm::Object *p_object, godot::Variant *r_out);
+// A script object as Godot holds it: its Godot object, or a vector or an Array as an Array. False, with
+// why, for an object of a class that extends none of Godot's.
+bool object_element(const vm::Object *p_object, godot::Variant *r_out, std::string *r_error);
 
 // Lets go of the defaults Godot worked out (see GodotHost::evaluate()). Before the extension goes.
 void forget_defaults();

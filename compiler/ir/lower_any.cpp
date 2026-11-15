@@ -117,6 +117,10 @@ std::optional<uint32_t> Lowerer::any_type_test(Binary *p_binary) {
 	} else if (symbol == boolean_) {
 		code = ANY_IS_BOOLEAN;
 		target = Kind::Bool;
+	} else if (const Type *written = p_binary->right->type && p_binary->right->type->kind == Type::ClassObject ? p_binary->right->type->element : nullptr;
+			is_vector(written) && vector_class(written)) {
+		code = *vector_class(written); // An Array, or a Vector.<T>: of that very class.
+		symbol = nullptr;
 	} else if (!symbol || !class_index(symbol, &code) || !module_.classes[code].native_base.empty()) {
 		return std::nullopt;
 	}

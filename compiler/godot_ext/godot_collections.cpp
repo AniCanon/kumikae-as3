@@ -20,10 +20,8 @@ using namespace godot;
 
 namespace kas3 {
 
-namespace {
-
-// One element of a vector of objects, as an Array holds it: a script object that is one of Godot's as its
-// Godot object, and a vector as an Array of its own elements.
+// A script object as Godot holds it: one that is one of Godot's as its Godot object, and a vector or an
+// Array as an Array of its own elements.
 bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_error) {
 	if (!p_object) {
 		*r_out = Variant();
@@ -51,6 +49,8 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 	}
 	return true;
 }
+
+namespace {
 
 // A packed array of whole numbers: each element must be one, and within what the array's elements hold.
 template <typename Packed>

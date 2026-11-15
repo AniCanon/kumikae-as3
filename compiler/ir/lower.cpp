@@ -133,6 +133,7 @@ Lowerer::Lowerer(Compilation &p_compilation, Module &p_module) :
 		signal_ = found == godot->definitions.end() ? nullptr : found->second;
 	}
 	function_ = compilation_.builtin("Function");
+	array_ = compilation_.builtin("Array");
 }
 
 // The interpreter raises these itself, whether or not the program names them.

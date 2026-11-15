@@ -46,6 +46,37 @@ void Interpreter::raise_range(double p_index, uint32_t p_length) {
 }
 
 // Gives the vector the length asked for: elements past it are let go, and new ones are empty.
+// new Array(), Array(n), new Array(a, b): one argument that is a number is the length, which must be a whole
+// number below 2^32 (AS3's RangeError #1005); anything else is the elements.
+void Interpreter::array_new(const Function &p_function, const Instruction &p_in) {
+	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	const size_t base = frames_.back().base;
+	const auto given = [&](size_t p_index) { return stack_[base + list[p_index]]; };
+	const AnyTag tag = list.size() == 1 ? any::tag(given(0)) : AnyTag::Undefined;
+	uint64_t length = list.size();
+	bool spread = true;
+	if (tag == AnyTag::Int || tag == AnyTag::Number || tag == AnyTag::Wide) {
+		const double asked = tag == AnyTag::Wide ? static_cast<double>(static_cast<Wide *>(any::pointer(given(0)))->value) : any::to_number(given(0));
+		if (!(asked >= 0 && asked <= 4294967295.0 && asked == static_cast<double>(static_cast<uint64_t>(asked)))) {
+			raise(module_.range_error_class, "Error #1005: Array index is not a positive integer (" + number_to_string(asked) + ").");
+			return;
+		}
+		length = static_cast<uint64_t>(asked);
+		spread = false;
+	}
+	Vector *made = fresh_vector(p_in.b, length);
+	if (!made) {
+		return;
+	}
+	for (size_t i = 0; spread && i < list.size(); i++) {
+		made->data[i] = share(Kind::Any, given(i));
+	}
+	Slot out;
+	out.bits = 0;
+	out.p = made;
+	put(Kind::Obj, stack_[base + p_in.a], out);
+}
+
 bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 	if (length_is_fixed(p_vector)) {
 		return false;
@@ -76,6 +107,10 @@ bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 
 void Interpreter::vector_op(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	Slot *r = p_registers;
+	if (p_in.op == Op::ArrayNew) {
+		array_new(p_function, p_in);
+		return;
+	}
 	if (p_in.op == Op::VecNew) {
 		const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 		const uint32_t length = r[list[0]].u;
@@ -98,6 +133,10 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		case Op::VecGet: {
 			const Kind index = p_function.registers[p_in.c];
 			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
+			if (!at && module_.classes[vector->klass].array) {
+				put(kind, r[p_in.a], any::undefined()); // Nothing there: an Array gives undefined.
+				return;
+			}
 			if (!at) {
 				raise_range(index_number(index, r[p_in.c]), vector->length);
 				return;
@@ -106,14 +145,22 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			break;
 		}
 		case Op::VecSet: {
-			// One past the end adds an element, unless the length is fixed.
+			// One past the end adds an element, unless the length is fixed. An Array grows to take any index,
+			// the elements between undefined.
 			const Kind index = p_function.registers[p_in.b];
-			const std::optional<uint32_t> at = element_index(index, r[p_in.b], vector->fixed ? vector->length : vector->length + 1);
+			const bool array = module_.classes[vector->klass].array;
+			const uint32_t limit = array ? MAX_VECTOR_LENGTH : vector->fixed ? vector->length : vector->length + 1;
+			const std::optional<uint32_t> at = element_index(index, r[p_in.b], limit);
+			if (!at && array) {
+				raise(module_.error_class, "an Array's properties other than its indices (" + number_to_string(index_number(index, r[p_in.b])) +
+								") are not supported by the interpreter yet");
+				return;
+			}
 			if (!at) {
 				raise_range(index_number(index, r[p_in.b]), vector->length);
 				return;
 			}
-			if (*at == vector->length && !resize_vector(vector, vector->length + 1)) {
+			if (*at >= vector->length && !resize_vector(vector, *at + 1)) {
 				return;
 			}
 			put(kind, vector->data[*at], share(kind, r[p_in.c]));

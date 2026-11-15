@@ -30,6 +30,12 @@ Variant untyped_to_variant(const vm::Slot &p_slot) {
 			handle.p = vm::any::pointer(p_slot);
 			return to_variant(ir::Kind::Ref, handle);
 		}
+		case vm::AnyTag::Object: {
+			// A script object, an Array or a vector: as Godot holds each; null for one Godot can't hold.
+			Variant made;
+			std::string error;
+			return object_element(static_cast<const vm::Object *>(vm::any::pointer(p_slot)), &made, &error) ? made : Variant();
+		}
 		default:
 			return Variant();
 	}

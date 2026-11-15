@@ -573,6 +573,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				make(in.b, r[in.a]);
 				break;
 			case Op::VecNew:
+			case Op::ArrayNew:
 			case Op::VecGet:
 			case Op::VecSet:
 			case Op::VecLength:

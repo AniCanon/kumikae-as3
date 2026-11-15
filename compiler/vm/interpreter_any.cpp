@@ -181,6 +181,12 @@ bool Interpreter::from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_
 				r_out->p = object;
 				return true;
 			}
+			if (p_check != NONE && engine_array(p_value, p_check)) {
+				// One of Godot's Arrays where an Array is wanted: a new Array of its elements.
+				Vector *made = array_of_engine(any::pointer(p_value), p_check);
+				r_out->p = made;
+				return made != nullptr;
+			}
 			break;
 		}
 		case Kind::Val:
@@ -228,8 +234,51 @@ bool Interpreter::any_is(Slot p_value, uint32_t p_type) const {
 		case ir::ANY_IS_BOOLEAN:
 			return tag == AnyTag::Boolean;
 		default:
-			return tag == AnyTag::Object && is_class(static_cast<const Object *>(any::pointer(p_value)), p_type);
+			return (tag == AnyTag::Object && is_class(static_cast<const Object *>(any::pointer(p_value)), p_type)) || engine_array(p_value, p_type);
 	}
+}
+
+// Whether a value is one of Godot's Arrays and the class is Array: AS3 takes one as an Array of its own.
+bool Interpreter::engine_array(Slot p_value, uint32_t p_class) const {
+	return any::tag(p_value) == AnyTag::Value && p_class < module_.classes.size() && module_.classes[p_class].array &&
+			host_.handles.is_class(any::pointer(p_value), "Array");
+}
+
+Object *Interpreter::copy_engine_array(void *p_array, uint32_t p_class) {
+	Vector *made = array_of_engine(p_array, p_class);
+	if (!made) {
+		report();
+	}
+	return made;
+}
+
+// A new Array of the elements of one of Godot's Arrays, each untyped: a copy, as a Vector given to Godot
+// is copied. Null, with the error raised, if the engine could not give them.
+Vector *Interpreter::array_of_engine(void *p_array, uint32_t p_class) {
+	std::string error;
+	Wanted whole;
+	whole.kind = Kind::I64;
+	Slot size;
+	size.bits = 0;
+	if (!host_.handles.call(p_array, "size", nullptr, 0, whole, &size, &error)) {
+		raise(module_.error_class, error);
+		return nullptr;
+	}
+	Vector *made = fresh_vector(p_class, size.l < 0 ? 0 : static_cast<uint64_t>(size.l));
+	Wanted untyped;
+	untyped.kind = Kind::Any;
+	for (uint32_t i = 0; made && i < made->length; i++) {
+		Argument key;
+		key.kind = Kind::I64;
+		key.slot.bits = 0;
+		key.slot.l = i;
+		if (!host_.handles.index_get(p_array, key, untyped, &made->data[i], &error)) {
+			release_object(made);
+			raise(module_.error_class, error);
+			return nullptr;
+		}
+	}
+	return made;
 }
 
 // `==` and `===` where the values alone do not say: two Godot values, which Godot compares, or an object

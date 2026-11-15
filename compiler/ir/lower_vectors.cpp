@@ -6,6 +6,17 @@ namespace kas3 {
 namespace ir {
 
 std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
+	if (p_type && array_ && p_type->kind == Type::Instance && p_type->symbol == array_) {
+		if (array_class_ == NONE) {
+			Class klass;
+			klass.name = "Array";
+			klass.element = Kind::Any;
+			klass.array = true;
+			module_.classes.push_back(std::move(klass));
+			array_class_ = static_cast<uint32_t>(module_.classes.size()) - 1;
+		}
+		return array_class_;
+	}
 	if (const auto found = vector_classes_.find(p_type); found != vector_classes_.end()) {
 		return found->second;
 	}
@@ -37,23 +48,37 @@ uint32_t Lowerer::declared_class(TypeRef *p_type) {
 	if (is_vector(type)) {
 		return vector_class(type).value_or(NONE);
 	}
-	if (type && type->kind == Type::Instance) {
-		const auto found = classes_.find(type->symbol);
-		return found == classes_.end() ? NONE : found->second;
+	uint32_t index = NONE;
+	if (type && type->kind == Type::Instance && class_index(type->symbol, &index)) {
+		return index; // A class of the program, or Function or an Error class, made when first named.
 	}
 	return NONE;
 }
 
-uint32_t Lowerer::vector_new(New *p_made) {
-	const uint32_t position = p_made->offset;
-	const std::optional<uint32_t> klass = vector_class(p_made->type);
-	if (!klass || p_made->arguments.count > 2) {
-		refuse(p_made->callee->offset, "the type '" + compilation_.type_name(p_made->type) + "'");
+uint32_t Lowerer::vector_new(const Type *p_type, const List<Expr *> &p_arguments, uint32_t p_position) {
+	const uint32_t position = p_position;
+	const std::optional<uint32_t> klass = vector_class(p_type);
+	if (klass && module_.classes[*klass].array) {
+		// new Array(...): each argument untyped; one number is the length, as it runs.
+		std::vector<uint32_t> list;
+		for (uint32_t i = 0; i < p_arguments.count; i++) {
+			Expr *later = nullptr;
+			for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
+				later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
+			}
+			list.push_back(settled(any_value(p_arguments[i]), later, position));
+		}
+		const uint32_t out = reg(Kind::Obj);
+		emit(Op::ArrayNew, position, out, *klass, arguments(std::move(list)));
+		return out;
+	}
+	if (!klass || p_arguments.count > 2) {
+		refuse(position, "the type '" + compilation_.type_name(p_type) + "'");
 		return default_value(Kind::Obj, position);
 	}
 	// new Vector.<T>(length = 0, fixed = false)
-	Expr *length_written = p_made->arguments.count > 0 ? p_made->arguments[0] : nullptr;
-	Expr *fixed_written = p_made->arguments.count > 1 ? p_made->arguments[1] : nullptr;
+	Expr *length_written = p_arguments.count > 0 ? p_arguments[0] : nullptr;
+	Expr *fixed_written = p_arguments.count > 1 ? p_arguments[1] : nullptr;
 	const uint32_t length = length_written
 			? settled(expression(length_written, Kind::U32), fixed_written, position)
 			: default_value(Kind::U32, position);
@@ -63,7 +88,7 @@ uint32_t Lowerer::vector_new(New *p_made) {
 	return out;
 }
 
-uint32_t Lowerer::vector_literal(VectorLit *p_literal) {
+uint32_t Lowerer::vector_literal(Expr *p_literal, const List<Expr *> &p_elements) {
 	const uint32_t position = p_literal->offset;
 	const std::optional<uint32_t> klass = vector_class(p_literal->type);
 	if (!klass) {
@@ -74,11 +99,19 @@ uint32_t Lowerer::vector_literal(VectorLit *p_literal) {
 	const uint32_t out = reg(Kind::Obj);
 	emit(Op::VecNew, position, out, *klass, arguments({ default_value(Kind::U32, position), default_value(Kind::Bool, position) }));
 	uint32_t at = 0;
-	for (Expr *element : p_literal->elements) {
-		const uint32_t value = expression(element, module_.classes[*klass].element);
+	for (Expr *element : p_elements) {
+		// A hole in an Array's, `[1,,2]`, is undefined.
+		const uint32_t where = element ? element->offset : position;
+		uint32_t value = NONE;
+		if (element) {
+			value = expression(element, module_.classes[*klass].element);
+		} else {
+			value = reg(Kind::Any);
+			emit(Op::AnyConst, where, value, 0);
+		}
 		const uint32_t index = reg(Kind::U32);
-		emit(Op::ConstU32, element->offset, index, at++);
-		emit(Op::VecSet, element->offset, out, index, value);
+		emit(Op::ConstU32, where, index, at++);
+		emit(Op::VecSet, where, out, index, value);
 	}
 	return out;
 }
@@ -166,7 +199,7 @@ std::optional<VectorMethod> vector_method(std::string_view p_name) {
 	return std::nullopt;
 }
 
-VectorShape vector_shape(VectorMethod p_method, Kind p_element) {
+VectorShape vector_shape(VectorMethod p_method, Kind p_element, bool p_array) {
 	const Kind element = p_element;
 	const Kind own = Kind::Obj;
 	std::vector<Kind> fixed;
@@ -198,7 +231,7 @@ VectorShape vector_shape(VectorMethod p_method, Kind p_element) {
 			result = own;
 			break;
 		case VectorMethod::Concat:
-			rest = own;
+			rest = p_array ? Kind::Any : own; // An Array's takes anything: an Array is spread, the rest added.
 			result = own;
 			break;
 		case VectorMethod::Join:
@@ -222,9 +255,15 @@ VectorShape vector_shape(VectorMethod p_method, Kind p_element) {
 			result = own;
 			break;
 		case VectorMethod::Sort:
-			fixed = { Kind::Any };
-			left_out = { std::nullopt };
-			result = own;
+			// A Vector's takes one; an Array's none to two, and gives the array, 0 or an Array of indices.
+			if (p_array) {
+				rest = Kind::Any;
+				result = Kind::Any;
+			} else {
+				fixed = { Kind::Any };
+				left_out = { std::nullopt };
+				result = own;
+			}
 			break;
 	}
 	return { fixed, left_out, rest, result };
@@ -248,12 +287,13 @@ uint32_t Lowerer::vector_call(Call *p_call) {
 		return default_value(Kind::Obj, position);
 	}
 	const Kind element = module_.classes[*klass].element;
-	const auto [fixed, left_out, rest, result] = vector_shape(*method, element);
+	const bool array = module_.classes[*klass].array;
+	const auto [fixed, left_out, rest, result] = vector_shape(*method, element, array);
 	bool fits = rest || count <= fixed.size();
 	for (size_t i = count; i < fixed.size(); i++) {
 		fits = fits && left_out[i].has_value();
 	}
-	for (uint32_t i = 0; *method == VectorMethod::Concat && i < count; i++) {
+	for (uint32_t i = 0; *method == VectorMethod::Concat && !array && i < count; i++) {
 		fits = fits && p_call->arguments[i]->type == callee->object->type; // concat: vectors of this very type.
 	}
 	if (!fits) {

@@ -290,7 +290,7 @@ compare("events.gd", [
 output = compare("vectors.gd", [
     "points", "points type", "hull", "bytes", "empty", "too big for a byte", "below a byte", "offsets", "colors", "filters",
     "polygons", "whole", "whole are integers", "fractions", "fractions are floats", "words", "flags", "nodes", "wide",
-    "keep", "spread", "moved", "words of values", "forget", "made a node", "the node is in the tree", "made a resource", "no vector", "no vector where Godot takes points",
+    "keep", "spread", "moved", "words of values", "forget", "array to Godot", "array from Godot", "Godot's array as an Array", "made a node", "the node is in the tree", "made a resource", "no vector", "no vector where Godot takes points",
     "added to while it is shortened", "what it let go of is freed, what was added is held", "and let go of in the end",
 ])
 check("vectors.gd: no vector where Godot takes a packed array is an AS3 error", "at Vectors/noPoints()" in output, output[-1500:])

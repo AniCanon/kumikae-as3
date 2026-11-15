@@ -135,8 +135,8 @@ package {
 		public native function shift():*;
 		public native function slice(startIndex:int = 0, endIndex:int = 16777215):Array;
 		public native function some(callback:Function, thisObject:* = null):Boolean;
-		public native function sort(...args):Array;
-		public native function sortOn(fieldName:Object, options:Object = null):Array;
+		public native function sort(...args):*;
+		public native function sortOn(fieldName:Object, options:Object = null):*;
 		public native function splice(startIndex:int, deleteCount:uint = 4294967295, ...values):Array;
 		public native function toLocaleString():String;
 		public native function toString():String;

@@ -98,7 +98,8 @@ static GDExtensionBool instance_get(GDExtensionScriptInstanceDataPtr p_data, GDE
 																					 : nullptr;
 	if (held || (kind == ir::Kind::Obj && !value.p)) {
 		Variant owner;
-		if (held && !kas3::as_godot_object(held, &owner)) {
+		std::string why;
+		if (held && !kas3::object_element(held, &owner, &why)) {
 			UtilityFunctions::push_error(String("ActionScript: the field '") + String::utf8(name.get_data()) +
 					"' holds a script object of a class that extends none of Godot's, which Godot can't hold. Godot gets null.");
 		}
@@ -171,9 +172,17 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 		r_error->expected = (int32_t)needed;
 		return;
 	}
+	// An Array parameter takes one of Godot's Arrays, copied, or null.
+	const auto array_parameter = [&](size_t p_at) {
+		const uint32_t klass = p_at < function.parameter_classes.size() ? function.parameter_classes[p_at] : ir::NONE;
+		return function.registers[p_at] == ir::Kind::Obj && klass != ir::NONE && program.module().classes[klass].array;
+	};
 	// Every argument is checked before any is converted, so that a refusal leaves nothing to give back.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		ir::Kind kind = function.registers[i + first];
+		if (array_parameter(i + first) && (p_args[i]->get_type() == Variant::ARRAY || p_args[i]->get_type() == Variant::NIL)) {
+			continue;
+		}
 		const std::string godot_type = i + first < function.engine_types.size() ? function.engine_types[i + first] : std::string();
 		if (!kas3::arrives(kind, godot_type, *p_args[i])) {
 			// A whole number too wide for an int or a uint parameter: AS3's RangeError, said as an uncaught
@@ -198,7 +207,18 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 		arguments[0].p = p_object;
 	}
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		const std::optional<vm::Slot> taken = kas3::from_variant(function.registers[i + first], *p_args[i]);
+		std::optional<vm::Slot> taken;
+		if (array_parameter(i + first)) {
+			taken = vm::Slot();
+			taken->bits = 0;
+			if (p_args[i]->get_type() == Variant::ARRAY) {
+				Variant held = *p_args[i];
+				taken->p = program.interpreter().copy_engine_array(&held, function.parameter_classes[i + first]);
+				taken = taken->p ? taken : std::nullopt;
+			}
+		} else {
+			taken = kas3::from_variant(function.registers[i + first], *p_args[i]);
+		}
 		if (!taken) {
 			// As with any call that fails: the error said, and null for the caller.
 			for (size_t made = 0; made < i; made++) {
@@ -223,8 +243,9 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 			: function.result == ir::Kind::Any && vm::any::tag(result) == vm::AnyTag::Object ? static_cast<const vm::Object *>(vm::any::pointer(result))
 																							  : nullptr;
 	Variant owner;
-	if (ok && returned && kas3::as_godot_object(returned, &owner)) {
-		*r_return = owner; // A script object that is one of Godot's: its Godot object.
+	std::string why;
+	if (ok && returned && kas3::object_element(returned, &owner, &why)) {
+		*r_return = owner; // A script object that is one of Godot's: its Godot object; an Array: Godot's Array.
 	} else if (ok && returned) {
 		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) +
 				" returns a script object of a class that extends none of Godot's, which Godot can't hold. The caller gets null.");

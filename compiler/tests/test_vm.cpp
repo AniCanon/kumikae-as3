@@ -116,7 +116,7 @@ static void test_statement_hook() {
 
 static void test_refused_program() {
 	Compilation compilation;
-	Unit *unit = compilation.add("Main.as", "package { public class Main { public function Main() { var a:Array = []; } } }");
+	Unit *unit = compilation.add("Main.as", "package { public class Main { public function Main() { var r:* = /a+/; } } }");
 	compilation.check();
 	ir::Module module;
 	CHECK(!ir::lower(compilation, &module));

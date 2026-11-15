@@ -44,7 +44,7 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Str;
 	} else if (symbol == object_) {
 		*r_kind = Kind::Any; // An Object may hold any value, numbers too.
-	} else if (classes_.count(symbol) || is_error(symbol) || (symbol == function_ && function_)) {
+	} else if (classes_.count(symbol) || is_error(symbol) || (symbol == function_ && function_) || (symbol == array_ && array_)) {
 		*r_kind = Kind::Obj;
 	} else if (is_godot(symbol) && symbol->kind == SymbolKind::Class) {
 		*r_kind = is_godot_object(symbol) ? Kind::Ref : Kind::Val;

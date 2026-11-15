@@ -99,8 +99,8 @@ uint32_t Lowerer::value_call(Call *p_call, Kind p_want) {
 // v.forEach(f), map, filter, some and every: a loop that calls the function with each element, its index and
 // the vector, as Flash's own Vector does (avmplus): the length read once, before the first call, and each
 // element read as it is reached (one taken out by then is AS3's RangeError). Only an answer of true counts
-// for filter, some and every. No function at all is no call: map gives a vector of empty elements, filter
-// an empty one. The object to call it on is checked (a method with one is a TypeError, but for map) and
+// for filter, some and every. No function at all is no call: a Vector's map gives a vector of empty
+// elements, an Array's an empty one (it pushes each answer), and filter an empty one. The object to call it on is checked (a method with one is a TypeError, but for map) and
 // set aside: a method keeps its own object, and a function expression can't use `this`.
 uint32_t Lowerer::vector_each(Call *p_call) {
 	const uint32_t position = p_call->offset;
@@ -128,7 +128,8 @@ uint32_t Lowerer::vector_each(Call *p_call) {
 	uint32_t out = NONE;
 	if (map || filter) {
 		out = reg(Kind::Obj);
-		emit(Op::VecNew, position, out, *klass, arguments({ map ? limit : default_value(Kind::U32, position), default_value(Kind::Bool, position) }));
+		const bool sized = map && !module_.classes[*klass].array;
+		emit(Op::VecNew, position, out, *klass, arguments({ sized ? limit : default_value(Kind::U32, position), default_value(Kind::Bool, position) }));
 	} else if (some || every) {
 		out = reg(Kind::Bool);
 		emit(Op::ConstBool, position, out, every ? 1 : 0);
@@ -159,7 +160,9 @@ uint32_t Lowerer::vector_each(Call *p_call) {
 	const uint32_t answer = map || filter || some || every ? reg(Kind::Any) : NONE;
 	emit(Op::CallFunction, position, answer, function, arguments({ convert(item, Kind::Any, position), index, convert(vector, Kind::Any, position) }));
 	uint32_t found = NONE;
-	if (map) {
+	if (map && module_.classes[*klass].array) {
+		emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), arguments({ out, answer }));
+	} else if (map) {
 		emit(Op::VecSet, position, out, at, from_untyped(answer, callee->object->type->element, element, position));
 	} else if (filter) {
 		const uint32_t skip = emit(Op::JumpIfNot, position, answered_true(answer), 0);

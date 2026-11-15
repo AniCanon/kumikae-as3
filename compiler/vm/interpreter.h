@@ -99,6 +99,8 @@ private:
 	bool any_text(Slot p_value, std::string *r_text);
 	bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
 	bool any_is(Slot p_value, uint32_t p_type) const;
+	bool engine_array(Slot p_value, uint32_t p_class) const;
+	Vector *array_of_engine(void *p_array, uint32_t p_class);
 	bool any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
 	bool any_primitive(Slot p_value, Slot *r_out);
 	Slot present_or_null(Slot p_value); // A freed Godot object is null; anything else is as it is.
@@ -149,6 +151,7 @@ private:
 	void to_callable(const ir::Instruction &p_in);
 	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void array_new(const ir::Function &p_function, const ir::Instruction &p_in);
 	// A call of one of a vector's methods: its arguments (the vector first) by register, where the
 	// frame's registers start, and the register for what it gives back, or NONE.
 	struct VectorCall {
@@ -167,9 +170,12 @@ private:
 	void vector_add(Vector *p_vector, const VectorCall &p_call);
 	void vector_take(Vector *p_vector, const VectorCall &p_call);
 	void vector_copy(Vector *p_vector, const VectorCall &p_call);
+	void array_concat(Vector *p_array, const VectorCall &p_call);
 	void splice(Vector *p_vector, const VectorCall &p_call);
 	void vector_sort(Vector *p_vector, const VectorCall &p_call);
-	bool sort_order(ir::Kind p_kind, const std::vector<Slot> &p_elements, Object *p_compare, int32_t p_options, std::vector<uint32_t> *r_order);
+	bool sort_order(ir::Kind p_kind, const std::vector<Slot> &p_elements, Object *p_compare, int32_t p_options, std::vector<uint32_t> *r_order,
+			bool *r_twins);
+	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
 	void leave_failed_frame(); // A frame the error leaves: its line goes into the trace.
@@ -238,6 +244,9 @@ public:
 	}
 	// Gives up a value the host was holding for the interpreter: a result, or an argument it made.
 	void discard(ir::Kind p_kind, Slot p_value) { drop(p_kind, p_value); }
+	// A new Array of the elements of one of Godot's Arrays (a handle), for a host passing one to a script:
+	// one reference, the caller's. Null if the engine could not give them (the error is reported).
+	Object *copy_engine_array(void *p_array, uint32_t p_class);
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
 	void release_object(Object *p_object);

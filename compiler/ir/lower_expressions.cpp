@@ -189,6 +189,18 @@ bool Lowerer::builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint
 		emit(Op::ConstI64, p_position, *r_reg, wide(name == "MAX_VALUE" ? INT64_MAX : INT64_MIN));
 		return true;
 	}
+	if (owner == array_ && array_) {
+		// Array's sort options.
+		constexpr std::pair<std::string_view, uint32_t> options[] = { { "CASEINSENSITIVE", 1 }, { "DESCENDING", 2 }, { "UNIQUESORT", 4 },
+			{ "RETURNINDEXEDARRAY", 8 }, { "NUMERIC", 16 } };
+		for (const auto &[option, value] : options) {
+			if (name == option) {
+				*r_reg = reg(Kind::U32);
+				emit(Op::ConstU32, p_position, *r_reg, value);
+				return true;
+			}
+		}
+	}
 	if (owner == uint_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
 		*r_reg = reg(Kind::U32);
 		emit(Op::ConstU32, p_position, *r_reg, name == "MAX_VALUE" ? 0xFFFFFFFFu : 0u);
@@ -286,7 +298,7 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	New *made = static_cast<New *>(p_expression);
 	if (is_vector(made->type)) {
-		return vector_new(made);
+		return vector_new(made->type, made->arguments, made->callee->offset);
 	}
 	Symbol *symbol = named_class(made->callee);
 	uint32_t index = 0;
@@ -446,13 +458,12 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 			refuse(position, "a regular expression");
 			break;
 		case NodeKind::ArrayLit:
-			refuse(position, "an Array");
-			break;
+			return vector_literal(p_expression, static_cast<ArrayLit *>(p_expression)->elements);
 		case NodeKind::ObjectLit:
 			refuse(position, "an Object literal");
 			break;
 		case NodeKind::VectorLit:
-			return vector_literal(static_cast<VectorLit *>(p_expression));
+			return vector_literal(p_expression, static_cast<VectorLit *>(p_expression)->elements);
 		case NodeKind::FunctionExpr:
 			return closure_value(static_cast<FunctionExpr *>(p_expression));
 		case NodeKind::Index:

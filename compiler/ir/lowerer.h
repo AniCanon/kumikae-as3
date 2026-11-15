@@ -67,6 +67,8 @@ class Lowerer {
 	Symbol *godot_object_ = nullptr; // godot.GodotObject: what every Godot object class extends.
 	Symbol *signal_ = nullptr; // godot.Signal
 	Symbol *function_ = nullptr; // Function
+	Symbol *array_ = nullptr; // Array, and the one class all Arrays are of, once made
+	uint32_t array_class_ = NONE;
 
 	std::unordered_map<const Symbol *, uint32_t> classes_;
 	std::unordered_map<const Type *, uint32_t> vector_classes_; // The class made for each Vector.<T> met.
@@ -210,12 +212,13 @@ class Lowerer {
 	bool builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg);
 	// Vectors. The class of a Vector.<T>, made the first time the type is met; nothing if its elements
 	// are of a type the interpreter does not hold yet.
-	static bool is_vector(const Type *p_type) { return p_type && p_type->kind == Type::Vector; }
+	// A Vector.<T>, or an Array (a vector of untyped elements with rules of its own).
+	bool is_vector(const Type *p_type) const { return p_type && (p_type->kind == Type::Vector || (array_ && p_type->symbol == array_)); }
 	std::optional<uint32_t> vector_class(const Type *p_type);
 	// The class a declaration says its value is of: a class of the program or a vector's. NONE otherwise.
 	uint32_t declared_class(TypeRef *p_type);
-	uint32_t vector_new(New *p_made);
-	uint32_t vector_literal(VectorLit *p_literal);
+	uint32_t vector_new(const Type *p_type, const List<Expr *> &p_arguments, uint32_t p_position);
+	uint32_t vector_literal(Expr *p_literal, const List<Expr *> &p_elements);
 	uint32_t vector_call(Call *p_call);
 	uint32_t godot_object_of(uint32_t p_object, Expr *p_written, uint32_t p_position);
 	// The untyped value: ir/lower_any.cpp.

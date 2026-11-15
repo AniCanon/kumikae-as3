@@ -72,7 +72,7 @@ inline bool is_held(Kind p_kind) {
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
 	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is an int, a uint or a Number, \
 	   read as its register is declared; what is read or written is of the class's element kind. */ \
-	X(VecNew, "RCA") X(VecGet, "RRR") X(VecSet, "RRR") \
+	X(VecNew, "RCA") X(ArrayNew, "RCA") X(VecGet, "RRR") X(VecSet, "RRR") \
 	X(VecLength, "RR-") X(VecSetLength, "RR-") X(VecFixed, "RR-") X(VecSetFixed, "RR-") \
 	/* A method of a vector: out, which one (a VectorMethod), [the vector, then what the method takes]. */ \
 	X(VecCall, "rIA") \
@@ -267,6 +267,9 @@ struct Class {
 	// For a Vector.<T>, what its elements are; Void for every other class. A vector class has no fields,
 	// no methods and no base, and its objects are vm::Vector.
 	Kind element = Kind::Void;
+	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
+	// the end is undefined, a write past it grows the array, never fixed).
+	bool array = false;
 	std::vector<Field> fields; // The base's first: a field keeps its slot in every subclass.
 	std::vector<uint32_t> methods; // The method table: function indices, the base's slots first.
 	uint32_t constructor = NONE;

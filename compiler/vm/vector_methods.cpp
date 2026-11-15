@@ -253,6 +253,10 @@ void Interpreter::vector_copy(Vector *p_vector, const VectorCall &p_call) {
 		}
 		return;
 	}
+	if (module_.classes[p_vector->klass].array) {
+		array_concat(p_vector, p_call);
+		return;
+	}
 	uint64_t total = 0;
 	for (size_t i = 0; i < p_call.list.size(); i++) {
 		const Vector *other = static_cast<const Vector *>(argument(p_call, i).p);
@@ -271,6 +275,39 @@ void Interpreter::vector_copy(Vector *p_vector, const VectorCall &p_call) {
 		const Vector *from = static_cast<const Vector *>(argument(p_call, i).p);
 		for (uint32_t k = 0; k < from->length; k++) {
 			all->data[at++] = share(kind, from->data[k]);
+		}
+	}
+	give(p_call, Kind::Obj, of_pointer(all));
+}
+
+// Array's concat: the array's elements, then each argument's: an Array's elements (one level), anything
+// else as itself.
+void Interpreter::array_concat(Vector *p_array, const VectorCall &p_call) {
+	const auto spread = [&](Slot p_value) -> const Vector * {
+		const Object *object = any::tag(p_value) == AnyTag::Object ? static_cast<const Object *>(any::pointer(p_value)) : nullptr;
+		return object && module_.classes[object->klass].array ? static_cast<const Vector *>(object) : nullptr;
+	};
+	uint64_t total = p_array->length;
+	for (size_t i = 1; i < p_call.list.size(); i++) {
+		const Vector *other = spread(argument(p_call, i));
+		total += other ? other->length : 1;
+	}
+	Vector *all = fresh_vector(p_array->klass, total);
+	if (!all) {
+		return;
+	}
+	uint32_t at = 0;
+	for (uint32_t k = 0; k < p_array->length; k++) {
+		all->data[at++] = share(Kind::Any, p_array->data[k]);
+	}
+	for (size_t i = 1; i < p_call.list.size(); i++) {
+		const Slot value = argument(p_call, i);
+		if (const Vector *other = spread(value)) {
+			for (uint32_t k = 0; k < other->length; k++) {
+				all->data[at++] = share(Kind::Any, other->data[k]);
+			}
+		} else {
+			all->data[at++] = share(Kind::Any, value);
 		}
 	}
 	give(p_call, Kind::Obj, of_pointer(all));

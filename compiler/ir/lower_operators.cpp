@@ -148,7 +148,7 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 	const Type *written = right->type && right->type->kind == Type::ClassObject ? right->type->element : nullptr;
 	uint32_t godot_class = 0;
 	const bool godot_target = symbol && is_godot(symbol) && is_godot_object(symbol);
-	if (!godot_target && !is_vector(written) && (untyped(left) || (!is_null(left) && natural(left) != Kind::Obj))) {
+	if (!godot_target && (untyped(left) || (!is_vector(written) && !is_null(left) && natural(left) != Kind::Obj))) {
 		if (const std::optional<uint32_t> tested = any_type_test(p_binary)) {
 			return *tested;
 		}

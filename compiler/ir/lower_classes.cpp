@@ -207,6 +207,11 @@ void Lowerer::parameters(FunctionDecl *p_function) {
 			}
 			Kind kind = written_kind(parameter.type, parameter.offset, Kind::F64);
 			uint32_t local = reg(kind);
+			if (kind == Kind::Obj) {
+				// The class it holds, which a call through a function value or from Godot checks.
+				fn().parameter_classes.resize(local + 1, NONE);
+				fn().parameter_classes[local] = declared_class(parameter.type);
+			}
 			if (is_engine(kind) && parameter.type) {
 				// What the engine must be handing over for this parameter.
 				const Type *type = compilation_.type_of(parameter.type);

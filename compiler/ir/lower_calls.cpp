@@ -108,6 +108,9 @@ uint32_t Lowerer::written_value(Expr *p_value, Kind p_conversion, uint32_t p_pos
 
 uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	uint32_t position = p_call->offset;
+	if (p_type == array_ && array_) {
+		return vector_new(compilation_.instance_type(array_), p_call->arguments, p_call->callee->offset); // Array(4) is new Array(4).
+	}
 	Kind conversion = Kind::Void;
 	if (!kind_of_class(p_type, &conversion) || p_call->arguments.count != 1) {
 		refuse(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "'");
