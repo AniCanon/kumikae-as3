@@ -1085,9 +1085,8 @@ static void compile(const char *p_source, ir::Module *r_module, const char *p_fi
 	CHECK(ir::lower(compilation, r_module, ir::LowerMode::Library));
 }
 
-// A running program's objects are moved onto a newer build of it: what they hold stays, what they do is new.
-// Which classes changed code that runs once (a constructor, the field values it sets, `_ready`, a static
-// initializer, and what those call), so that a reload knows the running objects will not show it.
+// Which classes changed code that runs once (a constructor, the field values it sets, `_ready`, and what
+// those call), so that a reload knows the running objects will not show it.
 static void test_run_once_changes() {
 	const char *base = "package { public class Game {\n"
 					   "  public var speed:Number = 300; public static var best:int = 1;\n"
@@ -1122,12 +1121,71 @@ static void test_run_once_changes() {
 	std::string called = base;
 	called.replace(called.find("speed += 1;"), 11, "speed += 5;");
 	CHECK_EQ(changes(called), std::string("Game;"));
+	// A static field keeps its value through a reload, so starting the scene again would not show it.
 	std::string statics = base;
 	statics.replace(statics.find("best:int = 1"), 12, "best:int = 9");
-	CHECK_EQ(changes(statics), std::string("Game;"));
+	CHECK_EQ(changes(statics), std::string());
+	// A new field with a first value: objects alive have it empty.
 	std::string added = base;
-	added.replace(added.find("public static var"), 17, "public var lives:int = 3; public static var");
+	added.replace(added.find("public function _process"), 23, "public var lives:int = 3; public function _process");
 	CHECK_EQ(changes(added), std::string("Game;"));
+	// A field renamed: objects alive have the new one empty, though their code has run.
+	std::string renamed = base;
+	for (size_t at = renamed.find("speed"); at != std::string::npos; at = renamed.find("speed", at)) {
+		renamed.replace(at, 5, "pace");
+	}
+	CHECK_EQ(changes(renamed), std::string("Game;"));
+	// Fields and methods added before the others move what comes after: nothing that ran changed.
+	std::string field_before = base;
+	field_before.replace(field_before.find("public var speed"), 16, "public var unused:int; public var speed");
+	CHECK_EQ(changes(field_before), std::string());
+	std::string method_before = base;
+	method_before.replace(method_before.find("private function setup"), 22, "public function unused():void {} private function setup");
+	CHECK_EQ(changes(method_before), std::string());
+}
+
+// Which classes have objects that a reload moved: a class that changed but has none alive needs no restart.
+static void test_reload_alive() {
+	const char *source = "package { public class Game { public var held:Shot = new Shot(); } }\n"
+						 "class Shot { public var n:int = 1; }\n"
+						 "class Unused { public var n:int = 1; }\n";
+	ir::Module old_module, new_module;
+	compile(source, &old_module, "Game.as");
+	compile(source, &new_module, "Game.as");
+	{
+		Recorder recorder;
+		vm::Interpreter running(old_module, recorder);
+		CHECK(running.start());
+		vm::Object *game = running.construct(class_named(old_module, "Game"), nullptr);
+		vm::Interpreter fresh(new_module, recorder);
+		{
+			vm::Reload reload(running, fresh);
+			vm::Object *moved = reload.object(game);
+			CHECK(reload.alive({ "Shot" }));
+			CHECK(reload.alive({ "Unused", "Game" }));
+			CHECK(!reload.alive({ "Unused" }));
+			CHECK(!reload.alive({}));
+			fresh.release_object(moved);
+		}
+		running.release_object(game);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
+// A base class's `_ready` that calls a method a subclass overrides: the override is what runs.
+static void test_run_once_overrides() {
+	const char *base = "package { public class Game extends Base {\n"
+					   "  override protected function setup():void { n = 2; }\n"
+					   "} }\n"
+					   "class Base { public var n:int; public function _ready():void { setup(); } protected function setup():void { n = 1; } }\n";
+	std::string after = base;
+	after.replace(after.find("n = 2"), 5, "n = 3");
+	ir::Module before_module, after_module;
+	compile(base, &before_module, "Game.as");
+	compile(after.c_str(), &after_module, "Game.as");
+	const std::vector<std::string> found = ir::run_once_changes(before_module, after_module);
+	CHECK_EQ(found.size(), (size_t)1);
+	CHECK(!found.empty() && found[0] == "Game");
 }
 
 // Vectors across a reload: one is moved with its elements, and the objects in it are moved too.
@@ -1250,6 +1308,7 @@ static void test_reload_vectors() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// A running program's objects are moved onto a newer build of it: what they hold stays, what they do is new.
 static void test_reload() {
 	const char *before = "package { public class Counter {\n"
 						 "  public var count:int; public var label:String = \"first\"; public var other:Counter;\n"
@@ -1441,6 +1500,8 @@ int main() {
 	test_reload();
 	test_reload_vectors();
 	test_run_once_changes();
+	test_run_once_overrides();
+	test_reload_alive();
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();

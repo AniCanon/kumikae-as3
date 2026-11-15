@@ -24,6 +24,12 @@ package {
 			return drag == null ? new Vector2(-1, -1) : drag.position + drag.relative;
 		}
 		public function isNode(thing:GodotObject):Boolean { return thing is Node; }
+		// The script's own object is the Godot object it is attached to.
+		public function selfIs():String {
+			var me:Events = this;
+			var plain:Loose = new Loose();
+			return "" + (this is Node2D) + "," + (me is CanvasItem) + "," + (this is Sprite2D) + "," + (plain is Node) + "," + ((this as Node2D) == null);
+		}
 		public function asSprite(thing:Node):String {
 			var sprite:Sprite2D = thing as Sprite2D;
 			return sprite == null ? "not a sprite" : sprite.name;
@@ -45,4 +51,7 @@ package {
 		}
 		public function heard():String { return seen; }
 	}
+}
+
+class Loose {
 }

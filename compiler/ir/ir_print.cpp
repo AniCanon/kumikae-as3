@@ -79,7 +79,9 @@ std::string number(double p_value) {
 	return buffer;
 }
 
-std::string operand(const Module &p_module, const Function &p_function, char p_shape, uint32_t p_value) {
+} // namespace
+
+std::string print_operand(const Module &p_module, const Function &p_function, char p_shape, uint32_t p_value) {
 	switch (p_shape) {
 		case 'R':
 			return "r" + std::to_string(p_value);
@@ -122,18 +124,16 @@ std::string operand(const Module &p_module, const Function &p_function, char p_s
 	}
 }
 
-} // namespace
 
 std::string print(const Module &p_module, const Function &p_function) {
-	const Function &function = p_function;
 	std::string out;
-	out += std::string(function.is_static ? "static function " : "function ") + function.name + "(";
-	for (uint32_t i = 0; i < function.parameters && i < function.registers.size(); i++) {
-		out += (i ? ", r" : "r") + std::to_string(i) + ":" + kind_name(function.registers[i]);
+	out += std::string(p_function.is_static ? "static function " : "function ") + p_function.name + "(";
+	for (uint32_t i = 0; i < p_function.parameters && i < p_function.registers.size(); i++) {
+		out += (i ? ", r" : "r") + std::to_string(i) + ":" + kind_name(p_function.registers[i]);
 	}
-	out += std::string("):") + kind_name(function.result) + "\n";
-	for (size_t i = 0; i < function.code.size(); i++) {
-		const Instruction &instruction = function.code[i];
+	out += std::string("):") + kind_name(p_function.result) + "\n";
+	for (size_t i = 0; i < p_function.code.size(); i++) {
+		const Instruction &instruction = p_function.code[i];
 		if (instruction.op == Op::Stmt) {
 			continue; // Markers only: they would drown the rest.
 		}
@@ -142,7 +142,7 @@ std::string print(const Module &p_module, const Function &p_function) {
 		const uint32_t values[3] = { instruction.a, instruction.b, instruction.c };
 		for (int n = 0; n < 3; n++) {
 			if (shape[n] != '-') {
-				out += " " + operand(p_module, function, shape[n], values[n]);
+				out += " " + print_operand(p_module, p_function, shape[n], values[n]);
 			}
 		}
 		out += "\n";

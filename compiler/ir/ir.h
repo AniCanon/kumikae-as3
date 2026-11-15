@@ -220,11 +220,15 @@ std::string print(const Module &p_module);
 // One function as text. Names stand for what operands point at, and no position is shown: the same code
 // moved down a file prints the same.
 std::string print(const Module &p_module, const Function &p_function);
+// One operand of one of the function's instructions, by its shape letter (see KAS3_IR_OPS).
+std::string print_operand(const Module &p_module, const Function &p_function, char p_shape, uint32_t p_value);
 
-// The classes, by name, whose code that runs once changed from one build to the next: a constructor
-// (which also gives fields their first values), `_ready`, `_enter_tree` or `_init`, a static initializer,
-// or a function any of those calls. Objects that are alive ran the old version, so a reload of the code
-// alone does not show such a change. A class that is new, or gone, is not listed.
+// The classes, by name, whose code that runs once for each object changed from one build to the next: a
+// constructor (which also gives fields their first values), `_ready`, `_enter_tree` or `_init` (its own or
+// inherited), or what those call by name or on the object itself (an override included). A field or
+// method of the object is compared by name, so one added before it changes nothing and one renamed does.
+// A method called on another object is not followed. Objects that are alive ran the old version, so a
+// reload of the code alone does not show such a change. A class that is new, or gone, is not listed.
 std::vector<std::string> run_once_changes(const Module &p_old, const Module &p_new);
 
 } // namespace ir

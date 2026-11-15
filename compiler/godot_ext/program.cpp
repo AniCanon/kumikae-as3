@@ -191,7 +191,7 @@ static void restart_scene(const std::vector<std::string> &p_classes) {
 				". Objects alive now keep what it did; restart the scene to see it.");
 		return;
 	}
-	UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names + ", so the scene was started again.");
+	UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names + ", so the scene starts again.");
 	tree->call_deferred("reload_current_scene");
 }
 
@@ -217,6 +217,7 @@ void Project::reload() {
 	// Code that runs once (a constructor, a field's first value, `_ready`) does not run again for the
 	// objects that are alive: for an edit there to show, the scene is made again from its file.
 	const std::vector<std::string> run_once = ir::run_once_changes(*program->module_, *module);
+	bool restart = false;
 	auto fresh = std::make_unique<vm::Interpreter>(*module, program->host_);
 	{
 		vm::Reload moving(*program->interpreter_, *fresh);
@@ -228,6 +229,8 @@ void Project::reload() {
 		moving.globals();
 		move_instances(*program->interpreter_, moving);
 		move_listeners(*program->interpreter_, moving, loads + 1);
+		// A class whose code that runs once changed matters only if an object of it is alive.
+		restart = moving.alive(run_once);
 	}
 	loads++;
 	// The old program goes last: what it still holds (its static fields) is let go while it can be.
@@ -237,7 +240,7 @@ void Project::reload() {
 	module.reset();
 	AS3Script::refresh_all();
 	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.");
-	if (!run_once.empty()) {
+	if (restart) {
 		restart_scene(run_once);
 	}
 }

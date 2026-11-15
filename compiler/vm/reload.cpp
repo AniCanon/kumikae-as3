@@ -1,5 +1,6 @@
 #include "reload.h"
 
+#include <algorithm>
 #include <limits>
 
 namespace kas3 {
@@ -140,6 +141,16 @@ void Reload::globals() {
 			to_.class_used_[named->second] = from_.class_used_[i];
 		}
 	}
+}
+
+bool Reload::alive(const std::vector<std::string> &p_classes) const {
+	for (const auto &[old, fresh] : moved_) {
+		const std::string &name = to_.module_.classes[fresh->klass].name;
+		if (std::find(p_classes.begin(), p_classes.end(), name) != p_classes.end()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 uint32_t Reload::function(uint32_t p_old) const {

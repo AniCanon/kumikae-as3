@@ -30,7 +30,7 @@ func _process(_delta: float) -> bool:
 		stage = 1
 	elif stage == 1 and (said() == "one!" or waited > 8000):
 		show("a method edited: the new code runs", said(), "one!")
-		show("a method edited: the scene is the same", current_scene.get_instance_id() == first_id, true)
+		show("a method edited and a field added: the scene is the same", current_scene.get_instance_id() == first_id, true)
 		put("ready")
 		stage = 2
 	elif stage == 2 and (str(said()).begins_with("three") or waited > 8000):

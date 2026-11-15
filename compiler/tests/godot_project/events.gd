@@ -47,6 +47,7 @@ func _process(_delta: float) -> bool:
 		show("as Sprite2D", [ask("asSprite", [sprite]), ask("asSprite", [node])], ["Hero", "not a sprite"])
 		sprite.free()
 		show("null", ask("nothing"), "falsetrue")
+		show("the script's own object", ask("selfIs"), "true,true,false,false,false")
 		var up := InputEventScreenTouch.new()
 		up.position = Vector2(30, 0)
 		Input.parse_input_event(touch)
