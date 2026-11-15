@@ -82,8 +82,8 @@ func _physics_process(_delta: float) -> bool:
 	# A class that extends no Godot class is not a script.
 	var plain := load("res://Plain.as") as Script
 	print("CHECK plain can attach=%s" % (plain != null and plain.can_instantiate()))
-	# A script object can't be handed to Godot yet: null, and it says so.
-	print("CHECK returned script object=%s" % str(Callable(node, "myself").callv([])))
+	# A script object of a class that extends one of Godot's is handed to Godot as its Godot object.
+	print("CHECK returned script object=%s" % str(Callable(node, "myself").callv([]) == node))
 	node.queue_free()
 	derived.queue_free()
 	return true

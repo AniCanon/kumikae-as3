@@ -196,8 +196,9 @@ any Godot value passing as a condition):
 
 - Members of an untyped value are refused: `x.name`, `x.method()`, `x[key]` wait for Object literals and
   dynamic access. **2c**
-- An untyped value that holds a script object is an AS3 error when an AS3 call gives it to Godot; when
-  Godot reads it (a return, a field), Godot gets null and an error is printed. Nothing converts it.
+- A script object of a class that extends none of Godot's (in an untyped value or not) is an AS3 error when
+  an AS3 call gives it to Godot; when Godot reads it (a return, a field), Godot gets null and an error is
+  printed. Nothing converts it. (One of a class that extends a Godot class goes as its Godot object.)
   **decision**
 - Godot's integers in an untyped value: one that fits an `int` is held as one, a larger one as an `Int64`;
   a whole float stays a float. My ruling, beside the Int64 rule the owner approved for typed values.
@@ -227,8 +228,6 @@ any Godot value passing as a condition):
 - godot-cpp is built as `template_release` and loaded by the editor binary; whether editor features need a
   debug build is unchecked. **2d**
 - GDScript cannot set a script's field, only read it; a script's method and property lists are empty. **2d**
-- A method that returns a script object can't hand it to Godot: the caller gets null, and an error says
-  so. **2c**
 - A script's private methods and fields can be reached from GDScript. **2d**
 - `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions
   but skips a virtual that a C++ extension class implements. **clean-up**

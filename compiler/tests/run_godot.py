@@ -102,14 +102,14 @@ expected = {
     "null script object": "<null>",
     "wrong node has script": "false",
     "plain can attach": "false",
-    "returned script object": "<null>",
+    "returned script object": "true",
 }
 for name, value in expected.items():
     check("check: " + name, lines.get(name) == value, "got %r, expected %r" % (lines.get(name), value))
 check("a call on a freed object is an AS3 error", "CHECK survived freed object" in output and "freed" in output, output[-800:])
 check("says why a script won't attach to the wrong kind of object", "can only be attached to a CharacterBody2D" in output, output[-900:])
 check("says why a plain class is not a script", "Plain.as" in output and "does not extend a Godot class" in output, output[-900:])
-check("says a script object can't be returned to Godot", output.count("returns a script object") == 1, output[-900:])
+check("a script object that is one of Godot's is returned with no word", output.count("returns a script object") == 0, output[-900:])
 check("checks: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
 check("checks: nothing leaked", "leaked" not in output.lower(), output[-600:])
 
@@ -139,7 +139,7 @@ output = compare("values.gd", [
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
     "freed text", "freed text after", "alive is not null", "alive is set", "alive counts", "freed is null", "freed is not set", "freed does not count",
-    "not freed", "freed name", "null as a Godot class", "for each over packed arrays", "new of a script class", "what new made, seen from GDScript", "searching vectors of Godot's objects and values", "a part of an element", "a whole Number index", "a fraction as an index", "NaN as an index",
+    "not freed", "freed name", "null as a Godot class", "for each over packed arrays", "new of a script class", "what new made, seen from GDScript", "a script object returned to Godot", "searching vectors of Godot's objects and values", "a part of an element", "a whole Number index", "a fraction as an index", "NaN as an index",
     "a fraction as a part's index", "freed children", "freed as an argument",
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
     "first", "color part", "set second", "add element", "position element", "packed", "set packed",

@@ -62,6 +62,9 @@ package {
 			addChild(made);
 			return made.value + " " + made.doubled() + " " + made.name + " " + (made.getParent() == this);
 		}
+		// A script object that is one of Godot's goes to Godot as its Godot object: returned, or in a field.
+		public var lastMade:Spawned;
+		public function makeOne():Spawned { lastMade = new Spawned(2); return lastMade; }
 		// Searching a vector of Godot's objects or values: the same object, or an equal value.
 		public function searchGodot(a:Node, b:Node):String {
 			var nodes:Vector.<Node> = new <Node>[a, b, a];
