@@ -186,7 +186,7 @@ package {
   Godot's `_physics_process`), and any other method by its AS3 name, from GDScript too.
 - The script reads and writes the node's properties, calls its methods, and makes Godot values with `new`.
 - Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript can read a
-  script's fields. A call from GDScript with too few arguments, the wrong kind of argument, or a number that
+  script's fields, and reads its getters and writes its setters as properties (`node.health += 1`). A call from GDScript with too few arguments, the wrong kind of argument, or a number that
   does not fit an `int` is refused, never bent to fit.
 - A script class may extend another script class, and may be attached to a reference-counted object
   without keeping it alive.
