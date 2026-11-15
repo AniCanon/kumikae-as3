@@ -89,6 +89,25 @@ static void test_text_number() {
 
 // A text too long for a string's 32-bit length is refused, never cut short. Its characters are not
 // read, so the text need not be there.
+// An address with a heap tag in its top byte (Android's, on arm64) is held, and comes back with its tag;
+// an untagged one beside it is untouched. Nothing is read through these: they only travel.
+static void test_tagged_addresses() {
+	Str *tagged = reinterpret_cast<Str *>(static_cast<uintptr_t>(0xB400001234567890ull));
+	const Slot held = any::string(tagged);
+	CHECK(any::tag(held) == AnyTag::String);
+	CHECK(any::pointer(held) == tagged);
+	CHECK(any::counted(held) == tagged);
+	Str *plain = new_string("plain");
+	const Slot beside = any::string(plain);
+	CHECK(any::pointer(beside) == plain);
+	CHECK(any::tag(beside) == AnyTag::String);
+	free_string(plain);
+	// The flag that says "tagged" is never taken for one of the values without a pointer.
+	CHECK(any::tag(any::null()) == AnyTag::Null);
+	CHECK(any::tag(any::boolean(true)) == AnyTag::Boolean);
+	CHECK(any::to_bool_payload(any::boolean(true)));
+}
+
 static void test_long_text() {
 	const char *start = "x";
 	CHECK(new_string(std::string_view(start, (size_t)UINT32_MAX + 1)) == nullptr);
@@ -257,6 +276,7 @@ static void test_any() {
 }
 
 int main() {
+	test_tagged_addresses();
 	test_long_text();
 	test_any();
 	test_vectors();

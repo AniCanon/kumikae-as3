@@ -30,16 +30,39 @@ Slot bits(uint64_t p_bits) {
 	return slot;
 }
 
+// Android tags the top byte of every heap address on arm64 (0xB4: the hardware ignores it, free() checks
+// it). The encoding needs the top bits clear, so the tag is taken off, and bit 3 (free: every pointer held
+// is 16-aligned) says to put it back. One tag for the whole run, learned from the first address that has
+// one; memory tagging, which gives each allocation its own, can't be held this way and says so.
+constexpr uint64_t HEAP_TAGGED = uint64_t(1) << 3;
+uint64_t heap_tag = 0;
+
+[[noreturn]] void unholdable(const char *p_why) {
+	std::fprintf(stderr, "kas3: this address can't be held in an untyped value: %s\n", p_why);
+	std::abort();
+}
+
 Slot tagged(const void *p_pointer, PointerTag p_tag) {
 	// No pointer is null with a tag: a null String or object is `null`.
-	const uintptr_t address = reinterpret_cast<uintptr_t>(p_pointer);
-	if ((static_cast<uint64_t>(address) >> 47) != 0) {
-		// The encoding needs addresses below 2^47 with nothing in the top bits; a platform that tags
-		// pointers there (Android's heap tagging) must be handled before it runs, not misread.
-		std::fprintf(stderr, "kas3: an address above 2^47 can't be held in an untyped value on this platform\n");
-		std::abort();
+	if (!p_pointer) {
+		return bits(NULL_BITS);
 	}
-	return p_pointer ? bits(address | static_cast<uint64_t>(p_tag)) : bits(NULL_BITS);
+	const uint64_t address = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(p_pointer));
+	const uint64_t top = address >> 56;
+	const uint64_t rest = address & ((uint64_t(1) << 56) - 1);
+	if ((rest >> 47) != 0) {
+		unholdable("it is above 2^47");
+	}
+	if (rest & HEAP_TAGGED) {
+		unholdable("it is not 16-aligned");
+	}
+	if (top != 0) {
+		heap_tag = heap_tag == 0 ? top : heap_tag;
+		if (top != heap_tag) {
+			unholdable("the platform tags each allocation differently (memory tagging)");
+		}
+	}
+	return bits(rest | (top != 0 ? HEAP_TAGGED : 0) | static_cast<uint64_t>(p_tag));
 }
 
 bool is_number(Slot p_value) {
@@ -155,7 +178,8 @@ void *pointer(Slot p_value) {
 	if (is_number(p_value) || (p_value.bits & INT_FLAG) || (p_value.bits & TAG_MASK) == 0) {
 		return nullptr;
 	}
-	return reinterpret_cast<void *>(static_cast<uintptr_t>(p_value.bits & ~TAG_MASK));
+	const uint64_t address = p_value.bits & ~(TAG_MASK | HEAP_TAGGED);
+	return reinterpret_cast<void *>(static_cast<uintptr_t>((p_value.bits & HEAP_TAGGED) ? address | (heap_tag << 56) : address));
 }
 Counted *counted(Slot p_value) {
 	const AnyTag kind = tag(p_value);

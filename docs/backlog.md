@@ -219,9 +219,6 @@ any Godot value passing as a condition):
 - An untyped value that holds a script object is an AS3 error when an AS3 call gives it to Godot; when
   Godot reads it (a return, a field), Godot gets null and an error is printed. Nothing converts it.
   **decision**
-- The encoding of an untyped value needs addresses below 2^47 with nothing in the top bits: a build where
-  the platform tags pointers there (Android's heap tagging on arm64) stops with a message. It has to be
-  handled before Android runs. **clean-up**
 - A Godot `StringName` or `NodePath` in an untyped value is held as Godot's own value, not as a String:
   `typeof` says "object". **2c**
 - Godot's integers in an untyped value: one that fits an `int` is held as one, a larger one as an `Int64`;
