@@ -124,6 +124,25 @@ Version negotiation rejects mismatched publications but does not prove that ever
 diagnostic is invalidated before rendering. These client issues remain unresolved and tracked in LS-2;
 passing completion assertions do not establish error-free diagnostic handling or leak-free IDE behavior.
 
+## Final integration check
+
+Revision `33defc4` includes the current main compiler stages from `044728d`. The merge needed only
+backlog/roadmap conflict resolution. Release passes all 24 groups in 20.87 seconds; ASan/UBSan passes
+all 24 in 155.43 seconds. The separately rebuilt extension reports `godot: OK`. An initial integration
+run used the older extension binary and failed its Godot group; rebuilding the matching extension
+before rerunning CTest resolved that build-state error.
+
+The final artifact passes `check buildPlugin verifyPlugin`, all four sandbox configurations, and nine
+Python tests. JUnit reports 134 plugin passes with one opt-in skip, and 82 core passes with three opt-in
+skips. Both verifier endpoints report compatibility, four deprecated API uses and 26 experimental API
+uses; there are no internal API usages. The opposite product's optional module is absent as intended.
+Packaged compiler/extension hashes match the integration builds. No sandbox `kas3c` process remained
+after the matrix, and the final light/dark images were inspected.
+
+Independent review found no remaining code blocker and corrected documentation counts to 136 backlog
+items. It did not rerun the suites independently. These integration runs validate functionality; the
+performance and sustained-retention measurements below remain tied to their stated earlier revisions.
+
 ## Timing and retention method
 
 ```sh

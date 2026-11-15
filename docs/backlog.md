@@ -28,7 +28,7 @@ it stands.
 | **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 25 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 55 | What is left |
-| **decision** | The owner | 11 | See each item |
+| **decision** | The owner | 10 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
