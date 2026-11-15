@@ -162,7 +162,8 @@ Completion improvements are described in the [editor guide](../editors/completio
 typing, lexical scopes, import paths, replacement edits, callable snippets and signature help. The
 [results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
 complete stage 6. The [follow-up results](results/2026-11-completion-followup.md) cover auto-imports,
-override stubs, body-only incremental checking and lifecycle controls. The optional LSP4IJ adapter
+override stubs (including qualified defaults and independent getter/setter slots), body-only incremental
+checking and lifecycle controls. The optional LSP4IJ adapter
 supports IntelliJ IDEA Community/free unified IDEA alongside Rider's native client. The installed
 IDEA and Rider endpoints pass sandbox editing checks; older Community builds and Windows runtime
 validation remain unverified. Android Studio is outside the scope.

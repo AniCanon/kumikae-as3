@@ -139,9 +139,41 @@ uses; there are no internal API usages. The opposite product's optional module i
 Packaged compiler/extension hashes match the integration builds. No sandbox `kas3c` process remained
 after the matrix, and the final light/dark images were inspected.
 
-Independent review found no remaining code blocker and corrected documentation counts to 136 backlog
-items. It did not rerun the suites independently. These integration runs validate functionality; the
+The integration review found no remaining code blocker and corrected documentation counts to 136 backlog
+items. It did not rerun the suites independently. The subsequent Agy review found the override defects
+described below. These integration runs validate functionality; the
 performance and sustained-retention measurements below remain tied to their stated earlier revisions.
+
+## Override review fixes
+
+Revision `a11c2ba` fixes two defects reproduced after Agy reviewed the PR:
+
+- An inherited method with `Base.VALUE` or `a.b.Base.VALUE` as a default was omitted. Completion now
+  distinguishes a resolved class member from a package-qualified definition and checks both for
+  accessibility. Package prefixes are not treated as unresolved value references.
+- A getter override hid its complementary setter, and a final accessor declared second could be offered.
+  Completion now checks the selected accessor's declaration and modifiers. It ignores invisible nearer
+  members before recording shadowing, while visible fields still shadow inherited methods.
+
+The new `test_override_completion` group first reported `54 checks, 10 failed` against the old code.
+It now reports `96 checks, 0 failed`. Cases include all three constant spellings, Godot constants,
+private/inaccessible references, either accessor order, partial inherited properties, empty/partial/full
+names and ordinary methods named `get`. Accepted stubs are applied and checked in a fresh compilation.
+The empty-name cases also required parser recovery to retain the unfinished accessor's source span.
+Candidate-only shadowing checks deliberately exercise invalid-source recovery.
+
+After the fixes, Release passes all 25 CTest groups in 19.05 seconds, ASan/UBSan all 25 in 116.13 seconds,
+and the rebuilt extension reports `godot: OK`. `check buildPlugin verifyPlugin` passes at both installed
+IDE endpoints. JUnit totals remain 134 plugin passes with one opt-in skip and 82 core passes with three
+opt-in skips; nine Python tests pass. Packaged compiler and extension hashes match the rebuilt binaries,
+and the distribution contains no probe classes or bundled LSP4J JARs. Light/dark images were inspected.
+
+Rider with LSP4IJ installed and IDEA with/without it pass their sandbox checks. Rider without LSP4IJ
+timed out twice waiting for the first lookup in the continued-typing case after document replacement.
+A subsequent run passed all three project cycles; no code changed between these runs. This is an
+intermittent unresolved result, not evidence that the timeout is fixed. Earlier native diagnostic and
+disposal warnings remain. The test logs are `agy-fixes-*.log` in each ignored build directory. These
+correctness checks do not replace the earlier latency or ten-minute retention measurements.
 
 ## Timing and retention method
 
