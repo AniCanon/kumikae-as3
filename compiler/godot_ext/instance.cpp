@@ -152,6 +152,16 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 		ir::Kind kind = function.registers[i + 1];
 		const std::string godot_type = i + 1 < function.engine_types.size() ? function.engine_types[i + 1] : std::string();
 		if (!kas3::arrives(kind, godot_type, *p_args[i])) {
+			// A whole number too wide for an int or a uint parameter: AS3's RangeError, said as an uncaught
+			// AS3 error is, and null for the caller. (Godot would say it can't convert an int to an int.)
+			if ((kind == ir::Kind::I32 || kind == ir::Kind::U32) && p_args[i]->get_type() == Variant::INT) {
+				const std::string number = std::to_string((int64_t)*p_args[i]);
+				UtilityFunctions::push_error(String::utf8(("RangeError: " + number + " does not fit " + (kind == ir::Kind::I32 ? "an int" : "a uint") +
+																   ".\n\tat " + function.name + "()")
+																  .c_str()));
+				r_error->error = GDEXTENSION_CALL_OK;
+				return;
+			}
 			r_error->error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
 			r_error->argument = (int32_t)i;
 			r_error->expected = (int32_t)expected_type(kind);

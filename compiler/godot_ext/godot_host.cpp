@@ -147,6 +147,11 @@ bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p
 					(p_wanted.kind == ir::Kind::I32 ? "an int" : "a uint");
 			return false;
 		}
+		if (p_wanted.kind == ir::Kind::F64 && p_value.get_type() == Variant::INT) {
+			// What a typed Int64 gives in the same place: a whole number a Number can't hold exactly.
+			*r_error = "RangeError: " + std::to_string((int64_t)p_value) + " does not fit a Number exactly.";
+			return false;
+		}
 		*r_error = "Godot's '" + std::string(p_from) + "' gave a " + std::string(got.get_data()) + " where " +
 				(p_wanted.type.empty() ? std::string(ir::kind_name(p_wanted.kind)) : std::string(p_wanted.type)) + " was expected";
 		return false;

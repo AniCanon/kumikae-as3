@@ -24,6 +24,9 @@ package {
 		// A function that gives back anything, where the program says what it expects.
 		public function mixAny(a:Number, b:Number, t:Number):Number { var x:Number = lerp(a, b, t); return x; }
 		public function largest(a:int, b:int, c:int):int { var n:int = max(a, b, c); return n; }
+		// A wide whole number into a Number from a function that gives back anything: the RangeError its
+		// typed twin gives.
+		public function widest(a:Int64, b:Int64):Number { var n:Number = max(a, b); return n; }
 		public function wrong(text:String):Number { var x:Number = lerp(text, 2, 0.5); return x; }
 		public function count(n:int):int { var total:int = 0; for (var i:int = 0; i < n; i++) { total += maxi(i, 3); } return total; }
 		// Review of part C.

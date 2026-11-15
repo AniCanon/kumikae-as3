@@ -218,6 +218,8 @@ check("wide.gd: a wide value for a 32-bit array is a RangeError before Godot see
 check("wide.gd: a wide value for an integer vector is a RangeError, eight times",
       output.count("RangeError: 4294967299 does not fit an int.") == 8 and "RangeError: 3000000000 does not fit an int." in output,
       output[-1500:])
+check("wide.gd: an int argument too wide is AS3's RangeError, not Godot's word",
+      "RangeError: 5000000000 does not fit an int.\n\tat Wide/asInt()" in output and "to int" not in output, output[-1500:])
 check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError: 9007199254740993 does not fit a Number exactly." in output,
       output[-1200:])
 
@@ -227,7 +229,11 @@ output = compare("functions.gd", [
     "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
     "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
     "anything as text", "a default is not shared",
+    "max past what a Number holds",
 ])
+check("functions.gd: a wide whole number into a Number is a RangeError",
+      "RangeError: 9007199254740993 does not fit a Number exactly.\n\tat Functions/widest()" in output, output[-1500:])
+
 check("functions.gd: a function that could not answer is an AS3 error", "at Functions/noAnswer()" in output and "'max'" in output,
       output[-1200:])
 check("functions.gd: print, printerr and pushWarning reach Godot's output",
