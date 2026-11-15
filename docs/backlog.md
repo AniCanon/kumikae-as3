@@ -60,7 +60,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - The same file reached through a symbolic link, or under a different letter case, or in a different
   Unicode form, counts as two files. **LS-2**
 - Symbol search covers the project only, not Godot's classes. **LS-2**
-- On go to definition, `new X()` goes to the class, not to its constructor. **LS-2**
 - While any file has a syntax error, type errors are hidden everywhere. Silencing only the broken region
   would be kinder. **LS-2**
 
@@ -70,7 +69,6 @@ Found by the review of the clean-up pass itself.
 
 - A static call's arguments are evaluated before the class's static fields are set, and `x is C` does not
   set up `C`. Whether Flash does the same is unchecked. **clean-up**
-- Find references does not link an interface's method to the methods that implement it. **LS-2**
 - Tests are missing for: private and static members of the same name not counting as overrides, and the
   base-first order when a host constructs an object. **clean-up**
 

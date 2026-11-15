@@ -416,6 +416,14 @@ static void test_navigation() {
 	CHECK_EQ(hurt.get("uri").string(), enemy);
 	CHECK_EQ(spot(defined(5, 20)), std::string("Enemy.as 1:13-1:18"));
 	CHECK(session.request("textDocument/definition", Session::at(player, 0, 3)).get("result").is_null());
+	// `new X()` goes to the constructor X declares.
+	const std::string maker = uri_from_path((root / "game" / "Maker.as").string());
+	session.open(maker, "package game {\npublic class Maker {\n\tpublic function Maker(a:int = 0) {}\n\tfunction again():Maker { return new Maker(1); }\n}\n}\n");
+	Json made = session.request("textDocument/definition", Session::at(maker, 3, 38)).get("result");
+	CHECK_EQ(spot(made.at(0)), std::string("Maker.as 2:17-2:22"));
+	made = session.request("textDocument/definition", Session::at(maker, 3, 20)).get("result");
+	CHECK_EQ(spot(made.at(0)), std::string("Maker.as 1:13-1:18"));
+	session.close(maker);
 	// Into Godot's API: a file that exists, and that the server answers questions about.
 	Json move = defined(8, 5);
 	std::string godot_uri = move.get("uri").string();

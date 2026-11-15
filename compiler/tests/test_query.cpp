@@ -595,6 +595,102 @@ static void test_super_and_overrides() {
 	CHECK_EQ(places("other():void", 1, false), std::string("1:109 "));
 }
 
+// `new X()` goes to X's constructor, where it declares one: that is the code the expression runs.
+static void test_new_goes_to_the_constructor() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	Unit *unit = compilation.add("Zoo.as",
+			"package { import godot.Node; import pets.Cat; public class Zoo {\n" // 1
+			"	function f():void { new Animal(\"a\"); new Bare(); new Bare; new pets.Cat(); new Node(); }\n" // 2
+			"	var a:Animal; var c:Class = Animal;\n" // 3
+			"} }\n"
+			"class Animal {\n" // 5
+			"	public function Animal(name:String) {}\n" // 6
+			"	function again():Animal { return new Animal(\"b\"); }\n" // 7
+			"}\n"
+			"class Bare {}\n"); // 9
+	Unit *cat = compilation.add("pets/Cat.as", "package pets { public class Cat { public function Cat() {} } }");
+	compilation.check(true);
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	Queries index(compilation);
+	auto goes = [&](const char *p_needle, int p_nth = 1, uint32_t p_plus = 0) {
+		return place(index.definition(*unit, offset_of(unit, p_needle, p_nth) + p_plus));
+	};
+	CHECK_EQ(goes("Animal(\"a\")"), std::string("Zoo.as:6:18+6"));
+	CHECK_EQ(goes("Animal(\"a\")", 1, 6), std::string("Zoo.as:6:18+6")); // Right after the name.
+	CHECK_EQ(goes("Animal(\"b\")"), std::string("Zoo.as:6:18+6"));
+	CHECK_EQ(goes("Cat()"), std::string("pets/Cat.as:1:51+3")); // Named by its package.
+	// A class that declares no constructor: the class.
+	CHECK_EQ(goes("Bare()"), std::string("Zoo.as:9:7+4"));
+	CHECK_EQ(goes("Bare;"), std::string("Zoo.as:9:7+4"));
+	std::string node = goes("Node()");
+	CHECK(node.rfind("<godot>/godot.as:", 0) == 0);
+	// Anywhere else the class's name is the class.
+	CHECK_EQ(goes("Animal; var c"), std::string("Zoo.as:5:7+6"));
+	CHECK_EQ(goes("Animal;\n"), std::string("Zoo.as:5:7+6"));
+	CHECK_EQ(goes("Animal { return"), std::string("Zoo.as:5:7+6"));
+	CHECK_EQ(goes("Animal {\n"), std::string("Zoo.as:5:7+6")); // The declaration itself.
+	CHECK_EQ(goes("pets.Cat()"), std::string("nowhere"));
+	CHECK_EQ(goes("function f"), std::string("nowhere"));
+	// The name is still a use of the class: its references keep every `new`.
+	const Occurrence *used = index.at(*unit, offset_of(unit, "Animal(\"a\")"));
+	CHECK(used && used->symbol->kind == SymbolKind::Class);
+	CHECK_EQ(index.references(used->symbol, false).size(), (size_t)5);
+	(void)cat;
+}
+
+// A method that implements an interface's method is the same thing to find references: a call through
+// the interface may reach it.
+static void test_interface_methods() {
+	Compilation compilation;
+	Unit *unit = compilation.add("Zoo.as",
+			"package { public class Zoo { function f(s:Speaker, d:Dog, c:Cat, l:Loud, p:Puppy, t:Stone):void {\n" // 1
+			"	s.speak();\n" // 2
+			"	d.speak();\n" // 3
+			"	c.speak();\n" // 4
+			"	l.speak();\n" // 5
+			"	p.speak();\n" // 6
+			"	t.speak();\n" // 7
+			"	c.shout();\n" // 8
+			"} } }\n"
+			"interface Speaker { function speak():void; }\n" // 10
+			"interface Loud extends Speaker { function shout():void; }\n" // 11
+			"class Dog implements Speaker { public function speak():void {} }\n" // 12
+			"class Cat implements Loud { public function speak():void {} public function shout():void {} }\n" // 13
+			"class Animal { public function speak():void {} }\n" // 14
+			"class Puppy extends Animal implements Speaker {}\n" // 15
+			"class Stone { public function speak():void {} }\n" // 16
+			"class Kitten extends Cat { override public function speak():void {} }\n"); // 17
+	compilation.check(true);
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	Queries index(compilation);
+	auto lines = [&](const char *p_needle, int p_nth, bool p_with_declaration) {
+		const Occurrence *found = index.at(*unit, offset_of(unit, p_needle, p_nth));
+		std::string out;
+		if (found) {
+			for (const Place &item : index.references(found->symbol, p_with_declaration)) {
+				out += std::to_string(unit->source.position(item.offset).line) + " ";
+			}
+		}
+		return out;
+	};
+	// From the interface: every call that may run an implementation, and each implementation: Dog's,
+	// Cat's, the one Kitten overrides it with, and the one Puppy has from its base class.
+	CHECK_EQ(lines("speak():void;", 1, false), std::string("2 3 4 5 6 "));
+	CHECK_EQ(lines("speak():void;", 1, true), std::string("2 3 4 5 6 10 12 13 14 17 "));
+	CHECK_EQ(lines("speak();", 1, true), std::string("2 3 4 5 6 10 12 13 14 17 ")); // From the call through it.
+	// From an implementation: its own calls, the calls through the interface, and both declarations.
+	// Another class's implementation is another method.
+	CHECK_EQ(lines("speak():void {} }", 1, true), std::string("2 3 5 10 12 ")); // Dog's.
+	CHECK_EQ(lines("speak():void {} public", 1, true), std::string("2 4 5 10 13 17 ")); // Cat's, with Kitten's override.
+	CHECK_EQ(lines("speak():void {} }", 2, true), std::string("2 5 6 10 14 ")); // Animal's, through Puppy.
+	// An interface that extends another passes its methods on.
+	CHECK_EQ(lines("shout():void;", 1, true), std::string("8 11 13 "));
+	CHECK_EQ(lines("shout():void {}", 1, true), std::string("8 11 13 "));
+	// A method of the same name in a class that implements nothing is another method.
+	CHECK_EQ(lines("speak():void {} }", 3, true), std::string("7 16 "));
+}
+
 static void test_describe() {
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -758,6 +854,8 @@ int main() {
 	test_typing();
 	test_index();
 	test_super_and_overrides();
+	test_new_goes_to_the_constructor();
+	test_interface_methods();
 	test_describe();
 	test_outline();
 	test_queries_on_broken_files();

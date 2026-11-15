@@ -315,12 +315,14 @@ std::vector<Place> Queries::references(const Symbol *p_symbol, bool p_with_decla
 	if (!p_symbol) {
 		return places;
 	}
+	const std::unordered_set<const Symbol *> implemented = same_through_interfaces(p_symbol);
 	for (const Unit &unit : compilation_.units()) {
 		if (unit.is_declaration) {
 			continue;
 		}
 		for (const Occurrence &item : occurrences(unit)) {
-			if (same_member(item.symbol, p_symbol) && (p_with_declaration || !item.is_declaration)) {
+			if ((same_member(item.symbol, p_symbol) || implemented.count(item.symbol)) &&
+					(p_with_declaration || !item.is_declaration)) {
 				places.push_back({ &unit, item.offset, item.length });
 			}
 		}

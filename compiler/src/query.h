@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace kas3 {
@@ -88,6 +89,12 @@ class Queries {
 	static const FunctionDecl *function_declaration(const Symbol *p_symbol);
 
 	const std::vector<Occurrence> &occurrences(const Unit &p_unit);
+	std::vector<const Symbol *> types_; // Every class and interface, once asked for.
+	bool types_listed_ = false;
+	const std::vector<const Symbol *> &types();
+	// The methods that are the same thing as this one because of an interface: for an interface's method
+	// the methods that implement it, and for a class's method the interface methods it implements.
+	std::unordered_set<const Symbol *> same_through_interfaces(const Symbol *p_member);
 	friend class Completer;
 
 public:
@@ -97,9 +104,13 @@ public:
 	// The name the offset is in, or that ends right at it. Null if there is none, or it resolved to nothing.
 	const Occurrence *at(const Unit &p_unit, uint32_t p_offset);
 	Place declaration(const Symbol *p_symbol) const;
+	// Where go to definition leads from the offset: the declaration of the name there, or for the class
+	// in `new X()` its constructor, if it declares one. No place if there is no name there.
+	Place definition(const Unit &p_unit, uint32_t p_offset);
 	// Every use in the program's files, in file order, then by position. Declaration files are searched
 	// only for the declaration itself. For a method, the methods that override it and the one it overrides
-	// count as the same thing: a call through a base class may reach any of them.
+	// count as the same thing: a call through a base class may reach any of them. So do an interface's
+	// method and the methods that implement it, in the class itself or in a base class.
 	std::vector<Place> references(const Symbol *p_symbol, bool p_with_declaration);
 	// The declaration as one line of AS3: "function hit(by:Node, power:int = 1):void".
 	std::string describe(const Symbol *p_symbol) const;
