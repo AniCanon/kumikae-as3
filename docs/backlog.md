@@ -220,7 +220,6 @@ any Godot value passing as a condition):
 - 6 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
   the six are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
 - An endless loop has no stop. **2d**
-- After one refused construct, follow-on errors can appear on the same line. **2c**
 
 ## Stage 2b-1: AS3 inside Godot, first slice
 

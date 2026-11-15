@@ -5,9 +5,27 @@ namespace ir {
 
 void Lowerer::refuse(uint32_t p_offset, const std::string &p_what) {
 	failed_ = true;
-	if (unit_) {
-		unit_->diagnostics.error(p_offset, p_what + " is not supported by the interpreter yet");
+	// One refusal is enough for a statement: what follows in it most often follows from the first. And a
+	// statement that uses a variable whose type was refused where it is declared is said nothing more of.
+	if (!unit_ || (statement_ && (statement_ == refused_in_ || uses_refused_type(statement_)))) {
+		return;
 	}
+	refused_in_ = statement_;
+	unit_->diagnostics.error(p_offset, p_what + " is not supported by the interpreter yet");
+}
+
+bool Lowerer::uses_refused_type(const Stmt *p_statement) {
+	if (refused_types_.empty()) {
+		return false;
+	}
+	bool found = false;
+	walk(const_cast<Stmt *>(p_statement), [&](Node *p_node) {
+		if (p_node->kind == NodeKind::Name) {
+			const Symbol *symbol = static_cast<Name *>(p_node)->symbol;
+			found = found || (symbol && symbol->type && refused_types_.count(compilation_.type_of(symbol->type)));
+		}
+	});
+	return found;
 }
 
 uint32_t Lowerer::string(const std::string &p_text) {

@@ -281,6 +281,15 @@ void Lowerer::statement(Stmt *p_statement) {
 	if (!p_statement) {
 		return;
 	}
+	// The statement being lowered, for refuse(): put back when this one is done.
+	struct Outer {
+		const Stmt *&current;
+		const Stmt *kept;
+		~Outer() { current = kept; }
+	} outer{ statement_, statement_ };
+	if (p_statement->kind != NodeKind::Block) {
+		statement_ = p_statement;
+	}
 	uint32_t position = p_statement->offset;
 	bool loop = p_statement->kind == NodeKind::While || p_statement->kind == NodeKind::DoWhile || p_statement->kind == NodeKind::For ||
 			p_statement->kind == NodeKind::ForIn;
