@@ -239,6 +239,7 @@ struct Function {
 	uint32_t position = 0; // Of its name.
 	uint32_t owner = NONE; // The class, for a method or constructor.
 	bool is_static = false; // No receiver: a static method or a package function.
+	bool is_public = false; // A public method: Godot may call it by name.
 	// The first registers are the parameters; an instance method's first parameter is `this`.
 	uint32_t parameters = 0;
 	uint32_t required = 0; // How many of them have no default: a caller must pass at least these.
@@ -260,6 +261,17 @@ struct Function {
 	std::vector<Handler> handlers;
 };
 
+// A value written in the source as a constant, for a host to be told of: `Empty` is what a field holds
+// before anything is written to it; `None` that the value is not a constant.
+struct Constant {
+	// Value: one of Godot's values made from numbers (`new Vector2(1, 2)`), its type's Godot name in `text`.
+	enum class Form : uint8_t { None, Empty, Number, Boolean, Text, Null, Value };
+	Form form = Form::None;
+	double number = 0; // A Number, or a Boolean as 0 or 1.
+	std::string text;
+	std::vector<double> parts; // A Value's numbers.
+};
+
 struct Field {
 	std::string name;
 	Kind kind = Kind::Void;
@@ -267,6 +279,16 @@ struct Field {
 	// where that is not known. A reload keeps what a field held only if it is still of that class.
 	uint32_t klass = NONE;
 	bool starts_null = false; // An untyped field declared `Object`: it starts null, a `*` undefined.
+	// What Godot may do with it by name (`node.speed`): read a public field, and write one that is not a
+	// const. Godot is told of no other.
+	bool is_public = false;
+	bool constant = false;
+	// Godot's name for its type, when it holds one of Godot's values or objects ("Vector2", "Node").
+	std::string engine_type = {};
+	// [Export]: Godot's inspector shows it, and a scene's value for it is given to it.
+	bool exported = false;
+	// An exported field's first value, as Godot is told it, to compare a scene's value with.
+	Constant first = {};
 };
 
 struct Class {

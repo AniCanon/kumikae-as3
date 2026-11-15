@@ -178,11 +178,16 @@ package {
 ```
 
 - A script class extends a Godot class. Godot calls the virtual methods it overrides (`_physicsProcess` is
-  Godot's `_physics_process`), and any other method by its AS3 name, from GDScript too.
+  Godot's `_physics_process`), and any other public method by its AS3 name, from GDScript too.
 - The script reads and writes the node's properties, calls its methods, and makes Godot values with `new`.
-- Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript can read a
-  script's fields. A call from GDScript with too few arguments, the wrong kind of argument, or a number that
-  does not fit an `int` is refused, never bent to fit.
+- Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript reads and
+  writes a script's public fields (`node.speed = 2`), converted as a store into the field converts: an
+  `Array` field takes a copy of Godot's Array. A `const`, a signal or a script object is not written from
+  Godot. A call from GDScript with too few arguments, the wrong kind of argument, or a number that does not
+  fit an `int` is refused, never bent to fit; so is a value that does not fit a field.
+- Only public members are reached from Godot. A private, protected or internal field or method is not
+  there for GDScript, `get`, `set`, `call` or `has_method`: Godot's code is neither a subclass nor in the
+  package. Godot's lists of a script's properties and methods give the public ones, with Godot's types.
 - A script class may extend another script class, and may be attached to a reference-counted object
   without keeping it alive.
 - A Godot object can be compared with `null`. Calling a method on one that Godot has freed is an AS3 error.
@@ -194,6 +199,15 @@ package {
 - An argument left out takes Godot's default. So does a `null` written last for a parameter declared
   `= null`.
 - A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
+- `[Export] public var speed:Number = 5;` shows the field in Godot's inspector, and a value a scene saved
+  is given to the script after its constructor has run. The field is a public instance field of a type
+  Godot can store (a number, `Boolean`, `String`, `Array`, one of Godot's values, a `Resource`, or a `Node`
+  in a node's script), and its first value is a constant Godot is told of: a number, a string, a Boolean,
+  `null`, nothing, or one of Godot's values made from numbers (`new Vector2(1, 2)`). A scene saves only
+  what differs from it. The checker says which rule a field breaks.
+- In the editor no script object is made and no method runs: an object Godot edits holds a stand-in with
+  the exported fields, starting at their first values, as GDScript's does for a script that is not a tool.
+  A script saved while the editor is open is compiled again, and the stand-ins get its exported fields.
 - Signals are listened to the AS3 way: `timer.timeout.add(onTimeout)`, `add(f, true)` for the end of the
   frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`. Adding a listener twice does
   nothing. `removeAll` and `numListeners` are about the listeners scripts added, not the engine's own. A

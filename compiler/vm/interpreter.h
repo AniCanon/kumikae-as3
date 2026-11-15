@@ -235,6 +235,9 @@ public:
 	// A field by its AS3 name: the value as it is held (no new reference) and its kind. False if there is
 	// no such field.
 	bool get_field(Object *p_object, std::string_view p_name, Slot *r_value, ir::Kind *r_kind = nullptr) const;
+	// Writes the field in that slot of the object's class, giving up what it held. The value's reference
+	// is handed over.
+	void set_field(Object *p_object, uint32_t p_field, Slot p_owned);
 	const ir::Module &module() const { return module_; }
 	// Calls the object's method of that name. The arguments are in the method's parameter kinds, and
 	// parameters left out take their defaults. A reference returned in r_result is the caller's to release.

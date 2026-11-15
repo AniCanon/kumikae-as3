@@ -46,6 +46,14 @@ void Lowerer::owner_of(uint32_t p_script_object, uint32_t p_owner, uint32_t p_po
 	emit(Op::GetField, p_position, p_owner, p_script_object, 0);
 }
 
+bool value_has_parts(const Symbol *p_class) {
+	bool parts = false;
+	for (const auto &member : p_class->klass->members) {
+		parts = parts || (member.second->kind == SymbolKind::Field && !member.second->is_static());
+	}
+	return parts;
+}
+
 uint32_t Lowerer::zero_value(TypeRef *p_written, uint32_t p_position, uint32_t p_into) {
 	const Type *type = p_written ? compilation_.type_of(p_written) : nullptr;
 	Kind kind = Kind::Void;
@@ -54,11 +62,7 @@ uint32_t Lowerer::zero_value(TypeRef *p_written, uint32_t p_position, uint32_t p
 			!engine_name(type->symbol, std::string_view(), &name)) {
 		return NONE;
 	}
-	bool parts = false;
-	for (const auto &member : type->symbol->klass->members) {
-		parts = parts || (member.second->kind == SymbolKind::Field && !member.second->is_static());
-	}
-	if (!parts) {
+	if (!value_has_parts(type->symbol)) {
 		return NONE;
 	}
 	uint32_t out = p_into != NONE ? p_into : reg(Kind::Val);

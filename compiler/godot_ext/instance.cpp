@@ -2,6 +2,7 @@
 // on into the interpreter.
 #include "any.h"
 #include "language.h"
+#include "members.h"
 #include "program.h"
 #include "script.h"
 
@@ -10,6 +11,9 @@
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <deque>
+#include <memory>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -66,8 +70,24 @@ static GDExtensionVariantType expected_type(ir::Kind p_kind) {
 	}
 }
 
-static GDExtensionBool instance_set(GDExtensionScriptInstanceDataPtr, GDExtensionConstStringNamePtr, GDExtensionConstVariantPtr) {
+// A field asked for from another thread is refused, and said so, as a call is: AS3 runs on the main thread.
+static bool field_on_main_thread(const StringName &p_name) {
+	if (kas3::on_main_thread()) {
+		return true;
+	}
+	UtilityFunctions::push_error(String("Error: Godot asked for the field '") + String(p_name) +
+			"' from another thread. AS3 runs on the main thread only: it was not read or written.");
 	return false;
+}
+
+// A field of the script, by its AS3 name, written by Godot: only a public field, with what fits it.
+static GDExtensionBool instance_set(GDExtensionScriptInstanceDataPtr p_data, GDExtensionConstStringNamePtr p_name,
+		GDExtensionConstVariantPtr p_value) {
+	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+	const StringName &name = *reinterpret_cast<const StringName *>(p_name);
+	const kas3::Member member = kas3::find_member(instance->object->klass, name);
+	return member.what == kas3::Member::What::Field && field_on_main_thread(name) &&
+			kas3::write_field(instance->object, member.index, *reinterpret_cast<const Variant *>(p_value));
 }
 
 // A script object as Godot holds it: the Godot object it is attached to, for a class that extends one of
@@ -82,47 +102,100 @@ bool kas3::as_godot_object(const vm::Object *p_object, Variant *r_out) {
 	return true;
 }
 
-// A field of the script, by its AS3 name.
+// A field of the script, by its AS3 name, read by Godot: only a public field.
 static GDExtensionBool instance_get(GDExtensionScriptInstanceDataPtr p_data, GDExtensionConstStringNamePtr p_name,
 		GDExtensionVariantPtr r_value) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
-	CharString name = String(*reinterpret_cast<const StringName *>(p_name)).utf8();
-	vm::Slot value;
-	ir::Kind kind = ir::Kind::Void;
-	if (!Project::get().interpreter().get_field(instance->object, std::string_view(name.get_data(), (size_t)name.length()), &value, &kind) ||
-			name.get_data()[0] == '$') {
+	const StringName &name = *reinterpret_cast<const StringName *>(p_name);
+	const kas3::Member member = kas3::find_member(instance->object->klass, name);
+	if (member.what != kas3::Member::What::Field || !field_on_main_thread(name)) {
 		return false;
 	}
-	const vm::Object *held = kind == ir::Kind::Obj ? static_cast<const vm::Object *>(value.p)
-			: kind == ir::Kind::Any && vm::any::tag(value) == vm::AnyTag::Object ? static_cast<const vm::Object *>(vm::any::pointer(value))
-																					 : nullptr;
-	if (held || (kind == ir::Kind::Obj && !value.p)) {
-		Variant owner;
-		std::string why;
-		if (held && !kas3::object_element(held, &owner, &why)) {
-			UtilityFunctions::push_error(String("ActionScript: the field '") + String::utf8(name.get_data()) +
-					"' holds a script object of a class that extends none of Godot's, which Godot can't hold. Godot gets null.");
-		}
-		*reinterpret_cast<Variant *>(r_value) = owner;
-		return true;
-	}
-	*reinterpret_cast<Variant *>(r_value) = kas3::to_variant(kind, value);
+	*reinterpret_cast<Variant *>(r_value) = kas3::read_field(instance->object, member.index);
 	return true;
 }
 
-static const GDExtensionPropertyInfo *instance_get_property_list(GDExtensionScriptInstanceDataPtr, uint32_t *r_count) {
-	*r_count = 0;
-	return nullptr;
+// The lists Godot asks an instance for, in the form the interface takes, kept until Godot frees them.
+struct Listed {
+	std::deque<StringName> names;
+	std::deque<String> texts;
+	std::deque<std::vector<GDExtensionPropertyInfo>> arguments;
+	// Godot reads a method's defaults as Variants side by side, whatever the field's declared type says.
+	std::deque<std::vector<Variant>> defaults;
+	std::vector<GDExtensionPropertyInfo> properties;
+	std::vector<GDExtensionMethodInfo> methods;
+
+	GDExtensionPropertyInfo property(const Dictionary &p_property) {
+		GDExtensionPropertyInfo info = {};
+		info.type = (GDExtensionVariantType)(int)p_property["type"];
+		info.name = &names.emplace_back(p_property["name"]);
+		info.class_name = &names.emplace_back(p_property["class_name"]);
+		info.hint = (uint32_t)(int)p_property["hint"];
+		info.hint_string = &texts.emplace_back(p_property["hint_string"]);
+		info.usage = (uint32_t)(int)p_property["usage"];
+		return info;
+	}
+};
+
+static std::unordered_map<const void *, std::unique_ptr<Listed>> &listed() {
+	static std::unordered_map<const void *, std::unique_ptr<Listed>> all;
+	return all;
 }
 
-static void instance_free_property_list(GDExtensionScriptInstanceDataPtr, const GDExtensionPropertyInfo *, uint32_t) {}
-
-static const GDExtensionMethodInfo *instance_get_method_list(GDExtensionScriptInstanceDataPtr, uint32_t *r_count) {
-	*r_count = 0;
-	return nullptr;
+static const GDExtensionPropertyInfo *instance_get_property_list(GDExtensionScriptInstanceDataPtr p_data, uint32_t *r_count) {
+	const TypedArray<Dictionary> list = kas3::property_list(static_cast<ScriptInstance *>(p_data)->object->klass);
+	std::unique_ptr<Listed> made = std::make_unique<Listed>();
+	for (int64_t i = 0; i < list.size(); i++) {
+		made->properties.push_back(made->property(list[i]));
+	}
+	*r_count = (uint32_t)made->properties.size();
+	const GDExtensionPropertyInfo *out = made->properties.empty() ? nullptr : made->properties.data();
+	if (out) {
+		listed()[out] = std::move(made);
+	}
+	return out;
 }
 
-static void instance_free_method_list(GDExtensionScriptInstanceDataPtr, const GDExtensionMethodInfo *, uint32_t) {}
+static void instance_free_property_list(GDExtensionScriptInstanceDataPtr, const GDExtensionPropertyInfo *p_list, uint32_t) {
+	listed().erase(p_list);
+}
+
+static const GDExtensionMethodInfo *instance_get_method_list(GDExtensionScriptInstanceDataPtr p_data, uint32_t *r_count) {
+	const TypedArray<Dictionary> list = kas3::method_list(static_cast<ScriptInstance *>(p_data)->object->klass);
+	std::unique_ptr<Listed> made = std::make_unique<Listed>();
+	for (int64_t i = 0; i < list.size(); i++) {
+		const Dictionary method = list[i];
+		GDExtensionMethodInfo info = {};
+		info.name = &made->names.emplace_back(method["name"]);
+		info.return_value = made->property(method["return"]);
+		info.flags = (uint32_t)(int)method["flags"];
+		const Array arguments = method["args"];
+		std::vector<GDExtensionPropertyInfo> &own = made->arguments.emplace_back();
+		for (int64_t a = 0; a < arguments.size(); a++) {
+			own.push_back(made->property(arguments[a]));
+		}
+		info.argument_count = (uint32_t)own.size();
+		info.arguments = own.empty() ? nullptr : own.data();
+		const Array defaults = method["default_args"];
+		std::vector<Variant> &values = made->defaults.emplace_back();
+		for (int64_t d = 0; d < defaults.size(); d++) {
+			values.push_back(defaults[d]);
+		}
+		info.default_argument_count = (uint32_t)values.size();
+		info.default_arguments = values.empty() ? nullptr : reinterpret_cast<GDExtensionVariantPtr *>(values.data());
+		made->methods.push_back(info);
+	}
+	*r_count = (uint32_t)made->methods.size();
+	const GDExtensionMethodInfo *out = made->methods.empty() ? nullptr : made->methods.data();
+	if (out) {
+		listed()[out] = std::move(made);
+	}
+	return out;
+}
+
+static void instance_free_method_list(GDExtensionScriptInstanceDataPtr, const GDExtensionMethodInfo *p_list, uint32_t) {
+	listed().erase(p_list);
+}
 
 static GDExtensionObjectPtr instance_get_owner(GDExtensionScriptInstanceDataPtr p_data) {
 	return static_cast<ScriptInstance *>(p_data)->owner->_owner;

@@ -333,6 +333,13 @@ inline std::string quoted(std::string_view p_name) {
 bool has_tag(const Symbol *p_class, std::string_view p_tag);
 // Whether a field is written `[Signal] public var hit:Signal;`: it names a signal of the script's own.
 bool declares_signal(const VarDecl *p_decl);
+// Whether a field is written `[Export] public var speed:Number;`: Godot's inspector shows it.
+bool declares_export(const VarDecl *p_decl);
+// The number literal written, alone or after a `-` (`5`, `-1.5`), or null; r_negative says which.
+const NumberLit *written_number(const Expr *p_value, bool *r_negative);
+// Whether an [Export] field's first value is a constant Godot can be told: a number, a String, a Boolean or
+// null, or `new` with numbers only (the checker makes sure the class is one of Godot's values).
+bool export_constant(const Expr *p_value);
 // The first p_count parts of a name written with dots ("flash.utils"), joined again.
 std::string dotted_name(const List<std::string_view> &p_parts, uint32_t p_count);
 

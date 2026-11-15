@@ -51,6 +51,40 @@ uint32_t Lowerer::add_function(uint32_t p_class, const std::string &p_name, uint
 	return (uint32_t)module_.functions.size() - 1;
 }
 
+// The first value Godot is told of for an exported field: a constant written with it, or what it holds when
+// none is written. Anything else is no constant: Godot is told of none.
+// The checker allows only what export_constant() says is one.
+static Constant first_value(const Expr *p_written, Kind p_kind, const Type *p_type, double (*p_number)(const NumberLit *),
+		std::string (*p_text)(std::string_view)) {
+	Constant out;
+	bool negative = false;
+	const NumberLit *number = written_number(p_written, &negative);
+	if (!p_written && p_kind == Kind::Val && p_type && p_type->symbol && p_type->symbol->klass && value_has_parts(p_type->symbol)) {
+		// It starts at its type's zero, as the constructor makes it.
+		out.form = godot_name(p_type->symbol->name, std::string_view(), &out.text) ? Constant::Form::Value : Constant::Form::None;
+	} else if (!p_written) {
+		out.form = Constant::Form::Empty;
+	} else if (number) {
+		out.form = Constant::Form::Number;
+		out.number = (negative ? -1 : 1) * p_number(number);
+	} else if (p_written->kind == NodeKind::New && p_written->type && p_written->type->symbol && export_constant(p_written)) {
+		out.form = godot_name(p_written->type->symbol->name, std::string_view(), &out.text) ? Constant::Form::Value : Constant::Form::None;
+		for (const Expr *argument : static_cast<const New *>(p_written)->arguments) {
+			const NumberLit *part = written_number(argument, &negative);
+			out.parts.push_back((negative ? -1 : 1) * p_number(part));
+		}
+	} else if (p_written->kind == NodeKind::StringLit) {
+		out.form = Constant::Form::Text;
+		out.text = p_text(static_cast<const StringLit *>(p_written)->text);
+	} else if (p_written->kind == NodeKind::BoolLit) {
+		out.form = Constant::Form::Boolean;
+		out.number = static_cast<const BoolLit *>(p_written)->value ? 1 : 0;
+	} else if (p_written->kind == NodeKind::NullLit) {
+		out.form = Constant::Form::Null;
+	}
+	return out;
+}
+
 // A static field is a global named after its class; any other takes the next slot of the object.
 void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 	for (Declarator &declarator : p_decl->declarators) {
@@ -67,6 +101,17 @@ void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 		} else {
 			fields_[declarator.symbol] = (uint32_t)module_.classes[p_class].fields.size();
 			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null });
+			Field &field = module_.classes[p_class].fields.back();
+			field.is_public = (p_decl->modifiers.bits & Modifiers::Public) != 0;
+			field.constant = p_decl->is_const;
+			const Type *type = declarator.type ? compilation_.type_of(declarator.type) : nullptr;
+			if (is_engine(kind) && type && type->symbol) {
+				godot_name(type->symbol->name, std::string_view(), &field.engine_type);
+			}
+			field.exported = declares_export(p_decl);
+			if (field.exported) {
+				field.first = first_value(declarator.initializer, kind, type, &Lowerer::literal_value, &Lowerer::unescape);
+			}
 			if (declares_signal(p_decl)) {
 				module_.classes[p_class].signals.push_back(std::string(declarator.name));
 			}
@@ -136,6 +181,7 @@ void Lowerer::declare_method(uint32_t p_class, const Symbol *p_symbol, FunctionD
 	bool is_static = (p_function->modifiers.bits & Modifiers::Static) != 0;
 	uint32_t made = add_function(p_class, name + "/" + std::string(p_function->name), p_function->name_offset, is_static);
 	functions_[p_function->symbol] = made;
+	module_.functions[made].is_public = (p_function->modifiers.bits & Modifiers::Public) != 0;
 	if (p_function->name == "toString" && !is_static) {
 		const Type *result = p_function->return_type ? compilation_.type_of(p_function->return_type) : nullptr;
 		if (p_function->parameters.count == 0 && result && result->kind == Type::Instance && result->symbol == string_) {

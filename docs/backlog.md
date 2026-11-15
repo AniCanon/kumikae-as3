@@ -74,8 +74,8 @@ fields are set on a class's first use, and a call on a null object evaluates its
 ## Stage 2b-3, part A: singletons, constants, static methods
 
 - Godot calling a script from another thread (a method given to `WorkerThreadPool.addTask`) is refused
-  with an error. Running AS3 off the main thread waits for the `async` research. Only method calls are
-  guarded: a property read or a notification from another thread is not. **2d**
+  with an error, and so is a field read or written from another thread. Running AS3 off the main thread
+  waits for the `async` research. **2d**
 - `removeAll()` on a singleton's signal removes every script's listeners, not only the caller's.
   **decision**
 
@@ -185,7 +185,5 @@ any Godot value passing as a condition):
 - A script attached to a reference-counted Godot object would keep it alive for ever. **2d**
 - godot-cpp is built as `template_release` and loaded by the editor binary; whether editor features need a
   debug build is unchecked. **2d**
-- GDScript cannot set a script's field, only read it; a script's method and property lists are empty. **2d**
-- A script's private methods and fields can be reached from GDScript. **2d**
 - `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions
   but skips a virtual that a C++ extension class implements. **clean-up**

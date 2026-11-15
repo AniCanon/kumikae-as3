@@ -52,5 +52,8 @@ struct PendingFunction {
 	std::vector<EnvLayout> chain; // The environments it can reach, nearest first.
 };
 
+// Whether one of Godot's value types has parts (Vector2, Color): a variable of it starts at the type's zero.
+bool value_has_parts(const Symbol *p_class);
+
 } // namespace ir
 } // namespace kas3

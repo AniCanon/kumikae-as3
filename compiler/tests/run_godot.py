@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 tests = os.path.abspath(sys.argv[1])
 project = os.path.join(tests, "godot_project")
@@ -280,6 +281,45 @@ check("untyped.gd: a thrown Godot value nothing catches is reported as its text"
       output[-2000:])
 check("untyped.gd: a script object given to Godot is an AS3 error", "at Untyped/scriptObject()" in output, output[-1500:])
 
+# What GDScript reaches of a script by name: public fields to read and write, public methods, and the lists.
+compare("members.gd", [
+    "fields set", "fields read back", "ratio is a float", "refused", "a whole float into an int", "an array is copied",
+    "an array set to null", "an array refuses what is not one", "a node field", "a node field refuses another class",
+    "a node field set to null", "a const", "a script object field is not set from Godot", "hidden fields read",
+    "hidden fields are not written", "hidden methods", "public methods",
+    "the script's properties", "the instance's properties", "their types", "a node's class", "not shown or stored",
+    "untyped is any value", "the script's methods", "a method's arguments", "the instance's methods", "has_method agrees",
+])
+
+# [Export]: a scene's values reach the script; Godot is told each field's first value; a scene saved again
+# keeps what differs from it. In the editor, no AS3 runs and the object holds the exported values.
+compare("exported.gd", [
+    "the scene's values", "shown in the inspector", "stored and shown", "a resource's hint", "first values",
+    "one of Godot's values made from numbers", "a field that is not exported has none", "a node's hint", "saved again",
+    "a resource and a node let go",
+    "saved after a change",
+])
+run = subprocess.run([godot, "--headless", "--editor", "--path", project, "-s", "exported_editor.gd"], capture_output=True, text=True,
+                     timeout=300)
+output = run.stdout + run.stderr
+seen = dict(line[len("VALUE "):].split("=", 1) for line in output.split("\n") if line.startswith("VALUE ") and "=" in line)
+for name in ["in the editor", "no AS3 ran", "first values", "a value the inspector set", "what the editor saves",
+             "a scene opened in the editor"]:
+    pair = seen.get(name, "").split("|", 1)
+    check("exported_editor.gd: " + name, len(pair) == 2 and pair[0] == pair[1], "got %r" % seen.get(name))
+check("exported_editor.gd: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
+# A field exported by an edit shows in the editor without a restart. In a copy: the test rewrites a script.
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    run = subprocess.run([godot, "--headless", "--editor", "--path", copy, "-s", "exported_reload.gd"], capture_output=True, text=True,
+                         timeout=300)
+    output = run.stdout + run.stderr
+    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+    check("exported_reload.gd ran to its end", run.returncode == 0 and len(values) == 2, output[-1500:])
+    for name, got, want in values:
+        check("exported_reload.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+
 # Godot's own classes with `is` and `as`, and input events as a script receives them.
 compare("events.gd", [
     "kind of InputEventScreenTouch", "kind of InputEventScreenDrag", "kind of InputEventMouseButton", "kind of InputEventKey",
@@ -296,8 +336,6 @@ output = compare("vectors.gd", [
 check("vectors.gd: no vector where Godot takes a packed array is an AS3 error", "at Vectors/noPoints()" in output, output[-1500:])
 check("vectors.gd: a value that does not fit a byte is an AS3 error that says so",
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
-
-import tempfile
 
 # A scene edited while it runs: an edit to `_ready` (code that runs once) starts the scene again; an edit
 # elsewhere keeps the scene and its state. The versions differ in size: two saves of one size within a

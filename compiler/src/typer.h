@@ -207,6 +207,9 @@ class Typer {
 
 	void declarators(VarDecl *p_decl);
 	void signal_field(VarDecl *p_decl);
+	void export_field(VarDecl *p_decl);
+	bool godot_storable(const Type *p_type, bool p_in_node) const;
+	bool godot_value(const Type *p_type) const;
 
 	void statement(Stmt *p_statement);
 

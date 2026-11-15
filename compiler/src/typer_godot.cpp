@@ -311,4 +311,109 @@ void Typer::signal_field(VarDecl *p_decl) {
 	}
 }
 
+// Whether Godot can store a value of the type in a scene and show it in the inspector: a number, a Boolean,
+// a String, an Array, one of Godot's values (but a Signal or an RID, which belong to the running engine),
+// a Resource, or a Node when the script is a node's.
+bool Typer::godot_storable(const Type *p_type, bool p_in_node) const {
+	if (numeric(p_type) || p_type == boolean_ || p_type == string_ || p_type == array_) {
+		return true;
+	}
+	if (!godot_ || !p_type || p_type->kind != Type::Instance || !p_type->symbol || !p_type->symbol->klass) {
+		return false;
+	}
+	const auto godot_class = [&](std::string_view p_name) {
+		const auto found = godot_->definitions.find(p_name);
+		return found == godot_->definitions.end() ? nullptr : found->second;
+	};
+	Symbol *symbol = p_type->symbol;
+	if (godot_class(symbol->name) != symbol) {
+		return false; // Not one of Godot's.
+	}
+	const auto extends = [&](Symbol *p_base) {
+		for (Symbol *at = symbol; at && at->klass && p_base; at = at->klass->base) {
+			if (at == p_base) {
+				return true;
+			}
+		}
+		return false;
+	};
+	if (!extends(godot_class("GodotObject"))) {
+		return symbol->name != "Signal" && symbol->name != "RID";
+	}
+	return extends(godot_class("Resource")) || (p_in_node && extends(godot_class("Node")));
+}
+
+// One of Godot's values a scene can store (a Vector2, a Color, a GodotArray): storable, and not an object.
+bool Typer::godot_value(const Type *p_type) const {
+	if (!godot_storable(p_type, true) || numeric(p_type) || p_type == boolean_ || p_type == string_ || p_type == array_) {
+		return false;
+	}
+	const auto object = godot_->definitions.find("GodotObject");
+	for (const Symbol *at = p_type->symbol; at && at->klass; at = at->klass->base) {
+		if (object != godot_->definitions.end() && at == object->second) {
+			return false;
+		}
+	}
+	return true;
+}
+
+// `[Export] public var speed:Number = 5;`: a public instance field, not a const, of a type Godot can store,
+// in a class that extends one of Godot's. Godot's inspector shows it, and a scene's value is given to it.
+void Typer::export_field(VarDecl *p_decl) {
+	const Metadata *tag = nullptr;
+	for (const Metadata &each : p_decl->metadata) {
+		tag = each.name == "Export" ? &each : tag;
+	}
+	if (!tag) {
+		return;
+	}
+	if (tag->args.count) {
+		error(tag->offset, "[Export] takes nothing: the field's type says what the inspector shows");
+	}
+	if (p_decl->modifiers.bits & Modifiers::Static) {
+		error(tag->offset, "an [Export] field can't be static: a scene keeps a value for each object");
+	}
+	if (!(p_decl->modifiers.bits & Modifiers::Public)) {
+		error(tag->offset, "an [Export] field is public: Godot's inspector writes it from outside the class");
+	}
+	if (p_decl->is_const) {
+		error(tag->offset, "an [Export] field can't be a const: the scene's value is written to it");
+	}
+	Symbol *object = nullptr;
+	Symbol *node = nullptr;
+	if (godot_) {
+		const auto found = godot_->definitions.find("GodotObject");
+		object = found == godot_->definitions.end() ? nullptr : found->second;
+		const auto found_node = godot_->definitions.find("Node");
+		node = found_node == godot_->definitions.end() ? nullptr : found_node->second;
+	}
+	bool godot_class = false;
+	bool in_node = false;
+	for (const Symbol *at = class_; at && at->klass; at = at->klass->base) {
+		godot_class = godot_class || (object && at == object);
+		in_node = in_node || (node && at == node);
+	}
+	if (!godot_class) {
+		error(tag->offset, "[Export] is for a class that extends one of Godot's: only a Godot object is kept in a scene");
+		return;
+	}
+	for (Declarator &declarator : p_decl->declarators) {
+		const Type *type = declarator.type ? compilation_.type_of(declarator.type) : any_;
+		if ((!type || type->kind != Type::Unknown) && !godot_storable(type, in_node)) {
+			error(declarator.offset, quoted(declarator.name) + " is an [Export] field, so its type is one Godot can store: a number, " +
+					"Boolean, String, Array, one of Godot's values, a Resource, or a Node in a node's script");
+		}
+		// Godot's inspector is told the first value, so it is a constant: `new` makes one only of Godot's values.
+		const Expr *first = declarator.initializer;
+		if (!first && type == number_) {
+			error(declarator.offset, quoted(declarator.name) + " is an [Export] Number, so its first value is written: a Number " +
+					"starts as NaN, which Godot's inspector can't show");
+		}
+		if (first && (!export_constant(first) || (first->kind == NodeKind::New && !godot_value(first->type)))) {
+			error(first->offset, std::string("an [Export] field's first value is a constant, which Godot's inspector is told: a ") +
+					"number, String, Boolean, null, or one of Godot's values made from numbers");
+		}
+	}
+}
+
 } // namespace kas3

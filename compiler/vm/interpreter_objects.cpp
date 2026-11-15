@@ -215,6 +215,10 @@ bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_v
 	return false;
 }
 
+void Interpreter::set_field(Object *p_object, uint32_t p_field, Slot p_owned) {
+	put(module_.classes[p_object->klass].fields[p_field].kind, p_object->fields()[p_field], p_owned);
+}
+
 Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 	if (p_class >= module_.classes.size()) {
 		return nullptr;

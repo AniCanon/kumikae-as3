@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 
 class AS3Script : public godot::ScriptExtension {
 	GDCLASS(AS3Script, godot::ScriptExtension)
@@ -14,6 +15,9 @@ class AS3Script : public godot::ScriptExtension {
 	std::string file_; // The file's path on disk.
 	godot::String source_;
 	uint32_t class_ = 0xFFFFFFFFu; // The class the file declares, in the program's IR.
+	// In the editor, the stand-ins Godot keeps on objects the script is attached to: they hold the exported
+	// fields' values, and no AS3 runs.
+	mutable std::unordered_set<void *> placeholders_;
 
 protected:
 	static void _bind_methods() {}
@@ -27,13 +31,15 @@ public:
 	uint32_t get_class_index() const { return class_; }
 
 	bool _editor_can_reload_from_file() override { return false; }
-	bool _can_instantiate() const override { return class_ != 0xFFFFFFFFu; }
+	// In the editor no script runs (none is a tool script yet): objects get stand-ins.
+	bool _can_instantiate() const override;
 	godot::Ref<godot::Script> _get_base_script() const override { return {}; }
 	godot::StringName _get_global_name() const override;
 	bool _inherits_script(const godot::Ref<godot::Script> &) const override { return false; }
 	godot::StringName _get_instance_base_type() const override;
 	void *_instance_create(godot::Object *p_for_object) const override;
-	void *_placeholder_instance_create(godot::Object *p_for_object) const override { return _instance_create(p_for_object); }
+	void *_placeholder_instance_create(godot::Object *p_for_object) const override;
+	void _placeholder_erased(void *p_placeholder) override { placeholders_.erase(p_placeholder); }
 	bool _has_source_code() const override { return true; }
 	godot::String _get_source_code() const override { return source_; }
 	void _set_source_code(const godot::String &p_code) override { source_ = p_code; }
@@ -51,11 +57,11 @@ public:
 	godot::ScriptLanguage *_get_language() const override;
 	bool _has_script_signal(const godot::StringName &p_signal) const override;
 	godot::TypedArray<godot::Dictionary> _get_script_signal_list() const override;
-	bool _has_property_default_value(const godot::StringName &) const override { return false; }
-	godot::Variant _get_property_default_value(const godot::StringName &) const override { return {}; }
-	void _update_exports() override {}
-	godot::TypedArray<godot::Dictionary> _get_script_method_list() const override { return {}; }
-	godot::TypedArray<godot::Dictionary> _get_script_property_list() const override { return {}; }
+	bool _has_property_default_value(const godot::StringName &p_property) const override;
+	godot::Variant _get_property_default_value(const godot::StringName &p_property) const override;
+	void _update_exports() override;
+	godot::TypedArray<godot::Dictionary> _get_script_method_list() const override;
+	godot::TypedArray<godot::Dictionary> _get_script_property_list() const override;
 	int32_t _get_member_line(const godot::StringName &) const override { return -1; }
 	godot::Dictionary _get_constants() const override { return {}; }
 	godot::TypedArray<godot::StringName> _get_members() const override { return {}; }
