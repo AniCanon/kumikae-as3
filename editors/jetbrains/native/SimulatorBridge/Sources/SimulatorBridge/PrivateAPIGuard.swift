@@ -7,12 +7,20 @@ public protocol SymbolLookup {
 public struct PrivateAPIGuard {
   let version: String
   let build: String
-  let supportedBuild: String
+  // Add a build only for a demonstrated incompatibility, with its actionable reason.
+  static let deniedBuilds: [String: String] = [:]
+  let deniedBuilds: [String: String]
+
+  init(version: String, build: String, deniedBuilds: [String: String] = Self.deniedBuilds) {
+    self.version = version
+    self.build = build
+    self.deniedBuilds = deniedBuilds
+  }
 
   func validate(_ symbols: [String], using loader: any SymbolLookup) throws {
-    guard build == supportedBuild else {
+    if let reason = deniedBuilds[build] {
       throw BridgeError.unavailable(
-        "Native Simulator input has not been validated for \(version) (\(build)). Use the fallback until the bridge is updated."
+        "Native Simulator input is disabled for \(version) (\(build)): \(reason). Use the fallback."
       )
     }
     for symbol in symbols { try require(loader.contains(symbol), symbol: symbol) }

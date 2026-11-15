@@ -30,7 +30,7 @@ public actor AppleSimulator: DeviceLookup, FrameSource, InputSink {
     self.installation = installation
     self.layout = layout
     let guardAPI = PrivateAPIGuard(
-      version: installation.version, build: installation.build, supportedBuild: "27A266a")
+      version: installation.version, build: installation.build)
     runtime = try RuntimeSymbols(guardAPI: guardAPI)
     try guardAPI.validate([], using: runtime)
     #if !arch(arm64)
