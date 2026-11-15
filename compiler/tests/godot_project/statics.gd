@@ -34,6 +34,7 @@ func _physics_process(_delta: float) -> bool:
 	show("an editor-only singleton is an AS3 error", ask("editorOnly"), true)
 	show("a class's static method", ask("staticWorks"), JSON.stringify(3))
 	show("orphan nodes printed", ask("orphansShown"), true)
+	ask("fakeTrace")
 	show("a static call's arguments in order", ask("staticOrder"), "ab")
 	show("a static call's result of the wrong type", ask("staticWrongType"), "caught")
 	show("a singleton's members through a variable", ask("viaObject"), true)

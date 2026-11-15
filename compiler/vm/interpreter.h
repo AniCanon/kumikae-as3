@@ -55,6 +55,14 @@ private:
 	bool failing_ = false; // An error is on its way out: pending_ holds it.
 	Slot pending_{}; // What was thrown, as an untyped value with a reference of its own.
 	std::string trace_; // Its stack trace, built as frames are left.
+	// Where it was thrown, as the trace's first line says it: what a host shows as the error's source.
+	struct Site {
+		std::string function;
+		std::string file;
+		int32_t line = 0;
+	};
+	Site thrown_at_;
+	void traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const;
 	// The trace of an error a `finally` caught, kept for when it is thrown again: by the depth of the frame
 	// and the register the finally keeps its error in, so that there is at most one for each finally.
 	struct Kept {
@@ -62,6 +70,7 @@ private:
 		uint32_t reg;
 		std::string trace;
 		size_t lines;
+		Site site;
 	};
 	std::vector<Kept> kept_traces_;
 	void keep_trace(Kept p_kept);

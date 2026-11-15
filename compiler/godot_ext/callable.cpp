@@ -173,6 +173,8 @@ public:
 			}
 			// The listener was never entered, so there is no stack: say where it is declared.
 			const ir::Module &module = Project::get().module();
+			// Reported in AS3's words, and Godot is told the call failed, so that whatever made it (a
+			// signal, callv, filter) knows.
 			if (callee.file < module.files.size() && callee.file < module.lines.size()) {
 				const std::vector<uint32_t> &starts = module.lines[callee.file];
 				size_t line = 0;
@@ -180,10 +182,10 @@ public:
 					line++;
 				}
 				text += "\n\tat " + callee.name + "()[" + module.files[callee.file] + ":" + std::to_string(line) + "]";
+				Project::get().host().error_at(text, callee.name + "()", module.files[callee.file], (int32_t)line);
+			} else {
+				Project::get().host().error(text);
 			}
-			// Reported in AS3's words, and Godot is told the call failed, so that whatever made it (a
-			// signal, callv, filter) knows.
-			Project::get().host().error(text);
 		}
 		Project::get().interpreter().release_object(object);
 	}

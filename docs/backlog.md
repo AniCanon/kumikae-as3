@@ -160,8 +160,6 @@ any Godot value passing as a condition):
 - A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
   `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
   **decision**
-- The source of a reported error is read from the first `\tat ` and the first `]`: a path with `]` in it,
-  or a message that itself contains a stack line, is reported with the wrong source. **clean-up**
 - A property written through a missing script object is refused before the value is worked out; a call's
   arguments are worked out first. **clean-up**
 - `int(lerp(a, b, t))` raises for a fraction instead of cutting it, and `Boolean(max(a, b))` is refused.

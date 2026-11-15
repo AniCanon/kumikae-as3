@@ -197,6 +197,8 @@ output = compare("statics.gd", [
     "declared twice", "declared twice, value first", "declared twice, other order", "declaration skipped",
     "field read early", "static read early", "race",
 ])
+check("statics.gd: an error's source is where it was thrown, whatever its message says",
+      re.search(r"at: Statics/fakeTrace\(\) \(res://Statics\.as:\d+\)", output) is not None and "at: fake()" not in output, output[-1500:])
 check("statics.gd: Godot says nothing of an editor-only singleton", "Can't retrieve singleton" not in output, output[-900:])
 check("statics.gd: a call from a worker thread is refused and says so",
       "Statics/spin() was called by Godot from another thread" in output, output[-900:])

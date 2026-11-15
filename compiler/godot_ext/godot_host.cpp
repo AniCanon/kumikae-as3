@@ -255,23 +255,13 @@ void GodotHost::print(std::string_view p_text) {
 // error's source, so that the editor can open the line. The text is the error and its AS3 stack, whose
 // first line reads "\tat Class/method()[file:line]".
 void GodotHost::error(std::string_view p_text) {
-	const std::string text(p_text);
-	std::string function, file;
-	int32_t line = 0;
-	const size_t at = text.find("\tat ");
-	const size_t open = at == std::string::npos ? at : text.find('[', at);
-	const size_t close = open == std::string::npos ? open : text.find(']', open);
-	const size_t colon = close == std::string::npos ? close : text.rfind(':', close);
-	if (colon != std::string::npos && colon > open) {
-		function = text.substr(at + 4, open - at - 4);
-		file = text.substr(open + 1, colon - open - 1);
-		line = (int32_t)std::strtol(text.substr(colon + 1, close - colon - 1).c_str(), nullptr, 10);
-	}
-	if (file.empty()) {
-		UtilityFunctions::push_error(to_godot(p_text)); // An error with no stack: nothing to point at.
-		return;
-	}
-	gdextension_interface::print_script_error(text.c_str(), function.c_str(), file.c_str(), line, false);
+	UtilityFunctions::push_error(to_godot(p_text)); // An error with no stack: nothing to point at.
+}
+
+// Shown as Godot shows a script's own error, with the script's file and line as its source.
+void GodotHost::error_at(std::string_view p_text, std::string_view p_function, std::string_view p_file, int32_t p_line) {
+	const std::string text(p_text), function(p_function), file(p_file);
+	gdextension_interface::print_script_error(text.c_str(), function.c_str(), file.c_str(), p_line, false);
 }
 
 

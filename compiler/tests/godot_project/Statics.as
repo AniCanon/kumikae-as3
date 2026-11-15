@@ -14,6 +14,8 @@ package {
 		public function strength(action:String):Number { return Input.getActionStrength(action); }
 		public function stick():Vector2 { return Input.getVector("ui_left", "ui_right", "ui_up", "ui_down"); }
 		public function system():String { return OS.getName(); }
+		// An error whose message looks like a stack line is still shown at the line it was thrown from.
+		public function fakeTrace():void { throw new Error("odd\n\tat fake()[nowhere.as:99]"); }
 		// A class's static method, called through its own entry: a call Godot refused would be the script's error.
 		public function staticWorks():String { return GodotJSON.stringify(3); }
 		// Its arguments are worked out left to right, and what it gives back is checked where it is stored.
