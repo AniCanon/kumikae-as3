@@ -36,6 +36,12 @@ struct Str : Counted {
 
 struct Object : Counted {
 	uint32_t klass; // An index into the module's classes.
+	// For the cycle collector (vm/collector.h): the list it is on, or null for an object no collector looks
+	// at (its class can hold nothing that leads back to it), and what the collector last found of it.
+	Object *gc_previous;
+	Object *gc_next;
+	int32_t gc_count;
+	uint32_t gc_state;
 	Slot *fields() { return reinterpret_cast<Slot *>(this + 1); }
 };
 
@@ -86,13 +92,25 @@ Str *new_string(std::string_view p_text); // One reference, the caller's. Null i
 // meet there become the character (vm/text_units.h). Null if out of memory.
 Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);
-Object *new_object(uint32_t p_class, size_t p_fields); // One reference; fields zeroed. Null if out of memory.
-void free_object(Object *p_object); // The fields must have been released.
+// One reference; fields zeroed. Null if out of memory. It is put on the list (the collector's list_for() its
+// class), or on none if that is null: the list is never left out by mistake.
+Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list);
+void free_object(Object *p_object); // The fields must have been released. It leaves the list it is on.
 // One reference; `p_length` elements, all zero. Null if out of memory.
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed);
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, Object *p_list);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
-void free_vector(Vector *p_vector); // The elements and properties must have been released.
+void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.
+
+// The cycle collector's lists: circular, through gc_previous and gc_next, each with an Object of its own as
+// its head, which is never freed. An object is on one list at most.
+void list_init(Object *p_head);
+inline bool list_empty(const Object *p_head) {
+	return p_head->gc_next == p_head;
+}
+void list_insert(Object *p_head, Object *p_object); // At the end.
+void list_remove(Object *p_object); // From whichever list it is on; nothing if none.
+void list_splice(Object *p_head, Object *p_from); // All of p_from's at the end of p_head's; p_from is left empty.
 
 // Conversions, as ECMAScript and AS3 define them.
 

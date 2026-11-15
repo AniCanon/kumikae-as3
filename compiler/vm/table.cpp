@@ -67,6 +67,13 @@ std::vector<Entry> Entries::take_all() {
 	return taken;
 }
 
+void Entries::forget() {
+	entries_.clear();
+	texts_.clear();
+	objects_.clear();
+	live_ = 0;
+}
+
 // The deleted entries taken out, the order kept, and every position found again.
 void Entries::pack() {
 	std::vector<Entry> kept;
@@ -88,12 +95,12 @@ void Entries::pack() {
 	entries_.swap(kept);
 }
 
-Object *new_table(uint32_t p_class) {
+Object *new_table(uint32_t p_class, Object *p_list) {
 	Entries *entries = allocation_fails() ? nullptr : new (std::nothrow) Entries();
 	if (!entries) {
 		return nullptr;
 	}
-	Object *table = new_object(p_class, 1);
+	Object *table = new_object(p_class, 1, p_list);
 	if (!table) {
 		delete entries;
 		return nullptr;

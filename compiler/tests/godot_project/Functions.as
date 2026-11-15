@@ -4,6 +4,8 @@ package {
 	// Godot's global functions: functions.gd works the same thing out in GDScript.
 	public class Functions extends Node2D {
 		public function mix(a:Number, b:Number, t:Number):Number { return lerpf(a, b, t); }
+		// A rest parameter, given its arguments by Godot.
+		public function gather(first:int, ...more):String { return first + ";" + more.length + ";" + more.join(","); }
 		public function hold(v:Number):Number { return clampf(v, -1, 1); }
 		public function holdWhole(v:Int64):Int64 { return clampi(v, 0, 10); }
 		public function size(v:Int64):Int64 { return absi(v); }

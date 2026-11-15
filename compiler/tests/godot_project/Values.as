@@ -6,6 +6,8 @@ package {
 		public var calls:int = 0;
 
 		public function add(a:Vector2, b:Vector2):Vector2 { return a + b; }
+		// A freed object is null to a script, also when Godot hands it over.
+		public function nothingThere(n:Node):Boolean { return n == null; }
 		public function sub(a:Vector2, b:Vector2):Vector2 { return a - b; }
 		public function times(a:Vector2, n:Number):Vector2 { return a * n; }
 		public function scaleInt(a:Vector2, n:int):Vector2 { return a * n; }

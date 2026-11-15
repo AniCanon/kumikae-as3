@@ -208,9 +208,10 @@ void Lowerer::parameters(FunctionDecl *p_function) {
 	if (p_function) {
 		for (Parameter &parameter : p_function->parameters) {
 			if (parameter.is_rest) {
-				refuse(parameter.offset, "a rest parameter");
+				fn().rest = true;
+				vector_class(compilation_.instance_type(array_)); // The Array it is made as.
 			}
-			Kind kind = written_kind(parameter.type, parameter.offset, Kind::F64);
+			Kind kind = parameter.is_rest ? Kind::Obj : written_kind(parameter.type, parameter.offset, Kind::F64);
 			uint32_t local = reg(kind);
 			if (kind == Kind::Obj) {
 				// The class it holds, which a call through a function value or from Godot checks.
@@ -233,7 +234,7 @@ void Lowerer::parameters(FunctionDecl *p_function) {
 		}
 	}
 	fn().parameters = (uint32_t)fn().registers.size();
-	fn().required = fn().parameters;
+	fn().required = fn().rest ? fn().parameters - 1 : fn().parameters;
 	for (uint32_t i = 0; p_function && i < p_function->parameters.count; i++) {
 		if (p_function->parameters[i].default_value) {
 			fn().required = fn().parameters - (p_function->parameters.count - i);

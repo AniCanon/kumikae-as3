@@ -41,6 +41,8 @@ public:
 	static void reload();
 	// Once a frame while the project is a folder a person can edit: looks for changed scripts.
 	static void watch();
+	// Once a frame: a step of the cycle collector, if the program is loaded.
+	static void collect_step();
 	// The class a script file declares: the one named after the file. NONE if there is none.
 	uint32_t class_of_file(const std::string &p_path) const;
 };
@@ -48,6 +50,9 @@ public:
 // For a reload: whether every script instance's object has a place in the new program, and the move.
 bool instances_can_move(vm::Reload &p_reload);
 void move_instances(vm::Interpreter &p_old, vm::Reload &p_reload);
+// The script object of the AS3 script attached to a Godot object, or null: the script instance holds a
+// reference to it.
+vm::Object *script_object(const godot::Object *p_owner);
 
 // AS3 runs on one thread, the one the extension was started on. Godot can call a script from another (a
 // task given to its worker threads): such a call is refused, and said so, before it touches anything.

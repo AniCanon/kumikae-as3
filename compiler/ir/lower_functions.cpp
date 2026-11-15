@@ -187,5 +187,49 @@ uint32_t Lowerer::vector_each(Call *p_call) {
 	return out == NONE ? 0 : out;
 }
 
+// f.call(thisArg, a, b) and f.apply(thisArg, [a, b]) on a Function: thisArg is worked out and set aside, as
+// vector_each() does with the object to call a callback on: a method keeps its own object, and a function
+// expression can't use `this`. Nothing if the call is not one of these.
+std::optional<uint32_t> Lowerer::function_method(Call *p_call) {
+	Member *member = p_call->callee->kind == NodeKind::Member ? static_cast<Member *>(p_call->callee) : nullptr;
+	Symbol *symbol = member ? member->resolved() : nullptr;
+	if (!symbol || !function_ || symbol->owner != function_ || (symbol->name != "call" && symbol->name != "apply")) {
+		return std::nullopt;
+	}
+	const uint32_t position = p_call->offset;
+	const List<Expr *> &given = p_call->arguments;
+	const uint32_t value = settled(expression(member->object, Kind::Obj), writer(given), position);
+	if (given.count > 0) {
+		Expr *later = nullptr;
+		for (uint32_t next = 1; next < given.count && !later; next++) {
+			later = writes_locals(given[next]) ? given[next] : nullptr;
+		}
+		settled(expression(given[0], Kind::Void), later, position);
+	}
+	use_argument_error();
+	const uint32_t out = reg(Kind::Any);
+	if (symbol->name == "apply") {
+		uint32_t array = NONE;
+		if (given.count > 1) {
+			array = any_value(given[1]);
+		} else {
+			array = reg(Kind::Any);
+			emit(Op::AnyConst, position, array, 1);
+		}
+		emit(Op::ApplyFunction, position, out, value, array);
+		return out;
+	}
+	std::vector<uint32_t> list;
+	for (uint32_t i = 1; i < given.count; i++) {
+		Expr *later = nullptr;
+		for (uint32_t next = i + 1; next < given.count && !later; next++) {
+			later = writes_locals(given[next]) ? given[next] : nullptr;
+		}
+		list.push_back(settled(any_value(given[i]), later, position));
+	}
+	emit(Op::CallFunction, position, out, value, arguments(std::move(list)));
+	return out;
+}
+
 } // namespace ir
 } // namespace kas3

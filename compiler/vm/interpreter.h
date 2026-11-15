@@ -5,6 +5,7 @@
 // resumed.
 #pragma once
 
+#include "collector.h"
 #include "host.h"
 #include "ir.h"
 #include "runtime.h"
@@ -21,6 +22,7 @@ namespace vm {
 
 class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
+	friend class Collector; // Frees objects that refer to each other in a loop.
 
 public:
 	// Calls may nest this deep. One more is an AS3 error.
@@ -46,6 +48,7 @@ private:
 
 	const ir::Module &module_;
 	Host host_;
+	Collector collector_; // After the module: it reads the classes.
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
 	std::vector<Slot> globals_;
@@ -68,6 +71,16 @@ private:
 		int32_t line = 0;
 	};
 	Site thrown_at_;
+	// An error that ended a call from outside made while this program's own code was running beneath it
+	// (a listener that its emit() ran): kept, to be raised again in that code once the engine's call returns.
+	struct Carried {
+		bool held = false;
+		Slot error{};
+		std::string trace;
+		size_t lines = 0;
+		Site at;
+	} carried_;
+	void raise_carried();
 	void traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const;
 	// The trace of an error a `finally` caught, kept for when it is thrown again: by the depth of the frame
 	// and the register the finally keeps its error in, so that there is at most one for each finally.
@@ -93,8 +106,9 @@ private:
 
 	void drop(ir::Kind p_kind, Slot &p_slot);
 	void drop_object(Object *p_object);
-	void let_go_into(Slot p_value, std::vector<Object *> *r_dead);
-	void let_go_entries(Entries *p_entries, std::vector<Object *> *r_dead);
+	void let_go(ir::Kind p_kind, Slot &p_slot); // One slot of an object being freed.
+	std::vector<Object *> dying_; // Objects whose last reference is gone, still to be freed.
+	bool freeing_ = false; // drop_object() is freeing them: one called meanwhile adds to the list.
 	void drop_any(Slot p_value); // Gives up what an untyped value holds.
 	// The untyped value: vm/interpreter_any.cpp.
 	Slot to_any(ir::Kind p_kind, Slot p_value);
@@ -192,6 +206,7 @@ private:
 	void let_go_arguments(const ir::Function &p_callee, std::vector<Slot> *p_values);
 	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
+	void apply_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	void to_callable(const ir::Instruction &p_in);
 	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
@@ -306,6 +321,17 @@ public:
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
 	void release_object(Object *p_object);
+
+	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
+	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of
+	// work, about as many objects and references to look at; it does nothing while a call from outside is
+	// in progress. True if a collection ended. collect() makes a whole collection at once: between calls, or
+	// at a statement (from the statement hook). When the interpreter goes, it collects once more.
+	bool collect_step(size_t p_work) { return entries_ == 0 && collector_.step(p_work); }
+	void collect() { collector_.collect(); }
+	// Another interpreter has taken over the program (a reload): the engine's objects hold its script
+	// objects now, not this one's, so this one's collector no longer looks through them.
+	void superseded() { collector_.ignore_engine(); }
 
 	// How many traces finallies are keeping for errors they will throw again: one at most for each.
 	size_t kept_traces() const { return kept_traces_.size(); }

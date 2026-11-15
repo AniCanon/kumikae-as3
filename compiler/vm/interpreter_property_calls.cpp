@@ -52,7 +52,7 @@ void Interpreter::table_new(const Function &p_function, const Instruction &p_in)
 		raise_unsupported("a Dictionary with weak keys");
 		return;
 	}
-	Object *made = new_table(p_in.b);
+	Object *made = new_table(p_in.b, collector_.list_for(p_in.b));
 	if (!made) {
 		out_of_memory();
 		return;
@@ -93,7 +93,7 @@ Object *Interpreter::table_of_engine(void *p_dictionary, uint32_t p_class) {
 	whole.kind = Kind::I64;
 	Slot size;
 	size.bits = 0;
-	Object *made = keys.p && host_.handles.call(keys.p, "size", nullptr, 0, whole, &size, &error) ? new_table(p_class) : nullptr;
+	Object *made = keys.p && host_.handles.call(keys.p, "size", nullptr, 0, whole, &size, &error) ? new_table(p_class, collector_.list_for(p_class)) : nullptr;
 	bool ok = made != nullptr;
 	if (!ok && error.empty()) {
 		out_of_memory();

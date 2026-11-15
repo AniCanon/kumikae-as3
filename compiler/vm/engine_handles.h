@@ -41,6 +41,19 @@ struct EngineHandles {
 	// value.
 	[[nodiscard]] virtual bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
 			Slot *r_result, std::string *r_error) = 0;
+
+	// For the cycle collector (vm/collector.h), which runs between calls into the program.
+	// The node a handle on one of the engine's objects holds a counted reference to (EngineNode), or 0 if
+	// it holds none: the collector then does not look past it.
+	[[nodiscard]] virtual uint64_t node(void *p_handle) = 0;
+	// What a node holds now. False if it is gone.
+	[[nodiscard]] virtual bool node_edges(uint64_t p_node, EngineNode *r_node) = 0;
+	// These nodes, whose counts were not exact, are held only by one another and by script objects that are
+	// about to be freed. The engine lets go of what holds them that it can't count (a listener's signal),
+	// and so of what they hold. If one of them outlives that (something else held a copy), everything is
+	// put back as it was, in the same order, and those that outlived it are returned; the collector then
+	// keeps them and what they hold.
+	[[nodiscard]] virtual std::vector<uint64_t> let_go(const std::vector<uint64_t> &p_nodes) = 0;
 };
 
 } // namespace vm

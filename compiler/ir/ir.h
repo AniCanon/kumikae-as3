@@ -131,6 +131,10 @@ inline bool is_held(Kind p_kind) {
 	/* A vector method's callback and the object to call it on (both untyped): a method with an object \
 	   other than null is AS3's TypeError #1510. */ \
 	X(CallbackThis, "RR-") \
+	/* f.apply(thisArg, array): out (untyped, or NONE), the function value, the Array (untyped: null or \
+	   undefined is no arguments, anything else not an Array is AS3's TypeError #1116). f.length: out \
+	   (int), the function value: how many parameters it declares, the rest parameter not counted. */ \
+	X(ApplyFunction, "rRR") X(FunctionLength, "RR-") \
 	X(ObjectText, "RR-") /* Object's own toString(), or Error's, whatever the class says: what super.toString() reaches. */ \
 	/* Objects, Dictionaries (vm::Table) and properties by name. TableNew: out (an object), its class (Object's \
 	   or Dictionary's), whether its keys are to be weak (a Boolean register, or NONE). The rest take what \
@@ -250,6 +254,9 @@ struct Function {
 	// The first registers are the parameters; an instance method's first parameter is `this`.
 	uint32_t parameters = 0;
 	uint32_t required = 0; // How many of them have no default: a caller must pass at least these.
+	// `...rest`: the last parameter's register is an Array of every argument past the others. A caller
+	// passes those untyped, after the others, and as many as it likes.
+	bool rest = false;
 	Kind result = Kind::Void;
 	// For each register that takes a Godot value or object from outside (a parameter, or the result of a
 	// request to the engine): Godot's name for its type ("Vector2", "CharacterBody2D"), by register. Empty

@@ -23,7 +23,7 @@ Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
 			return kept;
 		}
 	}
-	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2);
+	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, collector_.list_for(module_.function_class));
 	if (!made) {
 		if (module_.function_class != NONE) {
 			out_of_memory();
@@ -64,6 +64,17 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 		}
 		case Op::FunctionToCallable:
 			to_callable(p_in);
+			break;
+		case Op::FunctionLength: {
+			if (Object *value = function_in(p_function.registers[p_in.b], r[p_in.b])) {
+				const Function &callee = module_.functions[static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i)];
+				const uint32_t declared = callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0);
+				set_int32(r[p_in.a], static_cast<int32_t>(declared));
+			}
+			break;
+		}
+		case Op::ApplyFunction:
+			apply_value(p_function, p_in);
 			break;
 		case Op::CallbackThis: {
 			// A method keeps its own object: Flash will not be told another.
@@ -172,7 +183,7 @@ bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot
 bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
 	const Function &callee = module_.functions[p_target];
 	const size_t first = callee.is_static ? 0 : 1;
-	const size_t most = callee.parameters - first;
+	const size_t most = callee.rest ? SIZE_MAX : callee.parameters - first;
 	if (p_count > most || p_count + first < callee.required) {
 		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
 				"Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
@@ -184,7 +195,12 @@ bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t 
 		(*r_values)[0].bits = 0;
 		(*r_values)[0].p = p_first;
 	}
+	const size_t fixed = callee.rest ? callee.parameters - 1 - first : p_count;
 	for (size_t i = 0; i < p_count; i++) {
+		if (i >= fixed) {
+			(*r_values)[first + i] = share(Kind::Any, p_values[i]); // For the rest parameter, untyped.
+			continue;
+		}
 		if (!argument_as(callee, static_cast<uint32_t>(first + i), p_values[i], &(*r_values)[first + i])) {
 			r_values->resize(first + i);
 			let_go_arguments(callee, r_values);
@@ -196,8 +212,9 @@ bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t 
 
 // The arguments function_arguments() made, once the callee has taken references of its own.
 void Interpreter::let_go_arguments(const Function &p_callee, std::vector<Slot> *p_values) {
+	const size_t fixed = p_callee.rest ? p_callee.parameters - 1 : SIZE_MAX;
 	for (size_t made = p_callee.is_static ? 0 : 1; made < p_values->size(); made++) {
-		drop(p_callee.registers[made], (*p_values)[made]);
+		drop(made >= fixed ? Kind::Any : p_callee.registers[made], (*p_values)[made]);
 	}
 }
 
@@ -247,6 +264,44 @@ std::optional<Slot> Interpreter::call_function_within(Object *p_value, const Slo
 	const Slot untyped = callee.result == Kind::Void ? any::undefined() : to_any(callee.result, result);
 	drop(callee.result, result);
 	return untyped;
+}
+
+// f.apply(thisArg, array): the Array's elements are the arguments; null or undefined is none, and anything
+// else is AS3's TypeError #1116.
+void Interpreter::apply_value(const Function &p_function, const Instruction &p_in) {
+	Slot *r = stack_.data() + frames_.back().base;
+	if (p_in.a != NONE) {
+		put(Kind::Any, r[p_in.a], any::undefined());
+	}
+	Object *value = function_in(p_function.registers[p_in.b], r[p_in.b]);
+	if (!value) {
+		return;
+	}
+	const Slot list = r[p_in.c];
+	const AnyTag tag = any::tag(list);
+	const Object *object = tag == AnyTag::Object ? static_cast<const Object *>(any::pointer(list)) : nullptr;
+	const Vector *array = object && module_.classes[object->klass].array ? static_cast<const Vector *>(object) : nullptr;
+	if (!array && tag != AnyTag::Null && tag != AnyTag::Undefined) {
+		raise(module_.type_error_class, "Error #1116: second argument to Function.prototype.apply must be an array.");
+		return;
+	}
+	// The elements, each with a reference of its own: making an argument its type may run the program, which
+	// may take them out of the Array.
+	std::vector<Slot> given;
+	for (uint32_t i = 0; array && i < array->length; i++) {
+		given.push_back(share(Kind::Any, array->data[i]));
+	}
+	std::vector<Slot> values;
+	const bool ok = function_arguments(value, given.size(), given.data(), &values);
+	for (Slot &each : given) {
+		drop_any(each);
+	}
+	if (!ok) {
+		return;
+	}
+	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	push(target, values.data(), values.size(), p_in.a);
+	let_go_arguments(module_.functions[target], &values);
 }
 
 } // namespace vm

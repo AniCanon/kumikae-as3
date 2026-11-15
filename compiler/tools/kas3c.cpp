@@ -224,8 +224,8 @@ static int run_run(int p_argc, char **p_argv) {
 		ok = interpreter.run_program();
 	}
 	std::fflush(stdout);
-	// Everything the program made should be gone by now. Objects that refer to each other in a loop are
-	// not collected yet.
+	// Everything the program made should be gone by now: as the interpreter goes, its cycle collector frees
+	// what is left in loops (vm/collector.h).
 	if (std::getenv("KAS3_REPORT_LEAKS") && (kas3::vm::live_objects() || kas3::vm::live_strings())) {
 		std::fprintf(stderr, "kas3c: %zu objects and %zu strings were never freed\n", kas3::vm::live_objects(),
 				kas3::vm::live_strings());

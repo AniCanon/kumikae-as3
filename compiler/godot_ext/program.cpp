@@ -14,6 +14,8 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/time.hpp>
+
+#include <unordered_map>
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -42,6 +44,7 @@ static void before_shutdown() {
 	if (program && program->valid()) {
 		release_listeners();
 		program->interpreter().clear_globals();
+		program->interpreter().collect(); // Loops holding Godot's objects go while Godot can free them.
 	}
 }
 
@@ -111,20 +114,41 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 	return true;
 }
 
-// What the project's scripts are now: every file and when it was last written.
+// What the project's scripts are now: every file, when it was last written, its size, and what it held when
+// it was last read. The time is in whole seconds, so two saves of the same size within one are told apart
+// only by what they hold: a file is read again while it was written in the last two seconds, and what it
+// held then is kept, so that the signature does not change as the file grows old.
 static uint64_t scripts_signature() {
+	struct Seen {
+		uint64_t written = 0, size = 0, held = 0;
+	};
+	static std::unordered_map<std::string, Seen> seen;
 	std::vector<std::string> files;
 	collect_scripts(scripts_root(), files);
 	std::sort(files.begin(), files.end());
+	const uint64_t now = static_cast<uint64_t>(Time::get_singleton()->get_unix_time_from_system());
 	uint64_t mixed = 1469598103934665603ull;
+	const auto mix = [](uint64_t p_into, uint64_t p_value) { return (p_into ^ p_value) * 1099511628211ull; };
 	for (const std::string &path : files) {
 		for (char byte : path) {
-			mixed = (mixed ^ (uint8_t)byte) * 1099511628211ull;
+			mixed = mix(mixed, (uint8_t)byte);
 		}
 		const String file = String::utf8(path.c_str());
-		mixed = (mixed ^ FileAccess::get_modified_time(file)) * 1099511628211ull;
-		// The time is in whole seconds: two saves within one are told apart by the size, when it differs.
-		mixed = (mixed ^ (uint64_t)FileAccess::get_size(file)) * 1099511628211ull;
+		const uint64_t written = FileAccess::get_modified_time(file);
+		const uint64_t size = (uint64_t)FileAccess::get_size(file);
+		Seen &known = seen[path];
+		const bool moved = known.written != written || known.size != size;
+		if (moved || written + 2 >= now) {
+			uint64_t held = 1469598103934665603ull;
+			if (written + 2 >= now) {
+				const PackedByteArray bytes = FileAccess::get_file_as_bytes(file);
+				for (int64_t i = 0; i < bytes.size(); i++) {
+					held = mix(held, bytes[i]);
+				}
+			}
+			known = Seen{ written, size, held };
+		}
+		mixed = mix(mix(mix(mixed, written), size), known.held);
 	}
 	return mixed;
 }
@@ -163,6 +187,17 @@ Project &Project::get() {
 		}
 	}
 	return *program;
+}
+
+// How much the cycle collector looks at in a frame: objects and references. Most steps take 0.03 to 0.15
+// ms; one that looks at a vector of 100,000 elements (an object is looked at whole), or that frees what a
+// collection found, takes as long as that, 0.3 to 1.3 ms.
+static const size_t COLLECTOR_WORK = 10000;
+
+void Project::collect_step() {
+	if (program && program->valid_) {
+		program->interpreter_->collect_step(COLLECTOR_WORK);
+	}
 }
 
 void Project::watch() {
@@ -228,6 +263,7 @@ void Project::reload() {
 		if (!instances_can_move(moving) || !listeners_can_move(moving)) {
 			UtilityFunctions::push_error(String("ActionScript: the scripts were not reloaded: an object of the class '") +
 					String::utf8(moving.missing().c_str()) + "' is alive, and the class is no longer there. Restart the game.");
+			fresh->superseded(); // Godot's objects hold the running program's script objects, not this one's.
 			return;
 		}
 		moving.globals();
@@ -240,6 +276,7 @@ void Project::reload() {
 	// The old program goes last: what it still holds (its static fields) is let go while it can be.
 	program->interpreter_.swap(fresh);
 	program->module_.swap(module);
+	fresh->superseded(); // Godot's objects now hold the new program's script objects, not the old one's.
 	fresh.reset();
 	module.reset();
 	AS3Script::refresh_all();
@@ -254,6 +291,10 @@ void Project::unload() {
 	// static fields) knows the program is no longer there to be used.
 	if (program && program->valid_) {
 		release_listeners(); // While the interpreter is still there to free what they hold.
+		// And what the program holds, with loops among it: freeing a Godot object can call back into the
+		// interpreter, which must still be there to be found.
+		program->interpreter().clear_globals();
+		program->interpreter().collect();
 	}
 	loads++;
 	delete program;

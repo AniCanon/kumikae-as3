@@ -34,6 +34,24 @@ package {
 			h.next = far;
 			r.changed.add(h.heard);
 		}
+		// Loops the cycle collector frees: script objects that hold a Godot object and each other, with no
+		// listener; a loop through a Godot object with a script of AS3's; a listener whose object holds what
+		// it listens to through an untyped field; one listener in the signals of two objects, both held by
+		// the loop (GDScript connects the copy).
+		public function plainLoop(r:Resource):void {
+			var h:Holder = new Holder();
+			var g:Holder = new Holder();
+			h.res = r;
+			h.next = g;
+			g.next = h;
+		}
+		public function untypedLoop(r:Resource):void { var h:Holder = new Holder(); h.any = r; r.changed.add(h.heard); }
+		public function loopTwice(r:Resource, other:Resource):void {
+			var h:Holder = new Holder();
+			h.res = r;
+			h.other = other;
+			r.changed.add(h.heard);
+		}
 		// A listener that was removed again, while a list of the signal's listeners is still kept: the
 		// callable in that list can still be called, so its object and what it holds must stay whole.
 		private var keptList:GodotArray;
@@ -71,6 +89,21 @@ package {
 		public function listenFailing():void { renamed.add(fails); renamed.add(onRenamed); }
 		public function listenTo(other:Node):void { other.renamed.add(onRenamed); }
 		public function listenByName(other:Node, signal:String):void { other[signal].add(onRenamed); }
+		// A signal's property and its emit(), by its name.
+		public function listenersByName(other:Node, signal:String):int { return other[signal].numListeners; }
+		public function emitByName(other:Node, signal:String):void { other[signal].emit(); }
+		// An error in a listener that this script's own emit() ran comes back out of emit(), as in Flash.
+		public function catchesListener():String {
+			renamed.add(fails);
+			var said:String = "not caught";
+			try {
+				renamed.emit();
+			} catch (e:TypeError) {
+				said = "caught " + e.errorID;
+			}
+			renamed.remove(fails);
+			return said;
+		}
 		public function plain(other:Node):void { helper = new Listener(); other.renamed.add(helper.heard); }
 		public function plainCount():int { return helper.count; }
 		public function filtered(a:GodotArray):GodotArray { return a.filter(isBig); }

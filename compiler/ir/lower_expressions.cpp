@@ -283,6 +283,29 @@ uint32_t Lowerer::member_value(Expr *p_expression) {
 		emit(Op::StrLength, position, out, text);
 		return out;
 	}
+	if ((!symbol || symbol->owner == signal_) && signal_ && signal_->klass && member->object->kind == NodeKind::Index) {
+		// `node[name].numListeners`: a signal's property, the signal found by its name as the line runs.
+		const auto property = signal_->klass->members.find(member->name);
+		uint32_t getter = 0, object = 0, name = 0;
+		Kind kind = Kind::Void;
+		const Symbol *read = property != signal_->klass->members.end() && property->second->kind == SymbolKind::Property ? property->second : nullptr;
+		TypeRef *written = read ? (read->type ? read->type : read->getter ? read->getter->return_type : nullptr) : nullptr;
+		if (written && kind_of(compilation_.type_of(written), &kind) && engine_name(signal_, member->name, &getter)) {
+			const uint32_t found = signal_by_name(member->object, nullptr, &object, &name);
+			if (found != NONE) {
+				emit(Op::HostMember, member->object->offset, found, object, name);
+				const uint32_t out = reg(kind);
+				emit(Op::HostGet, position, out, found, getter);
+				return out;
+			}
+		}
+	}
+	if (symbol && function_ && symbol->owner == function_ && symbol->name == "length") {
+		const uint32_t value = expression(member->object, Kind::Obj);
+		const uint32_t out = reg(Kind::I32);
+		emit(Op::FunctionLength, position, out, value);
+		return out;
+	}
 	uint32_t constant = 0;
 	if (builtin_constant(symbol, position, &constant)) {
 		return constant;

@@ -111,7 +111,7 @@ Object *Reload::object(Object *p_old) {
 	const ir::Class &new_class = to_.module_.classes[named->second];
 	if (old_class.table || new_class.table) {
 		// An Object or a Dictionary: each key and value carried as an untyped field is.
-		Object *table = old_class.table == new_class.table ? new_table(named->second) : nullptr;
+		Object *table = old_class.table == new_class.table ? new_table(named->second, to_.collector_.list_for(named->second)) : nullptr;
 		if (!table) {
 			if (missing_.empty()) {
 				missing_ = old_class.name;
@@ -127,7 +127,7 @@ Object *Reload::object(Object *p_old) {
 		// A vector: the same length, and each element carried as a field is. Its type must still hold
 		// elements of the same kind.
 		const Vector *old = static_cast<const Vector *>(p_old);
-		Vector *vector = old_class.element == new_class.element ? new_vector(named->second, old->length, old->fixed) : nullptr;
+		Vector *vector = old_class.element == new_class.element ? new_vector(named->second, old->length, old->fixed, to_.collector_.list_for(named->second)) : nullptr;
 		if (!vector) {
 			if (missing_.empty()) {
 				missing_ = old_class.name;
@@ -145,7 +145,7 @@ Object *Reload::object(Object *p_old) {
 		}
 		return vector;
 	}
-	Object *fresh = new_object(named->second, new_class.fields.size());
+	Object *fresh = new_object(named->second, new_class.fields.size(), to_.collector_.list_for(named->second));
 	if (!fresh) {
 		return nullptr;
 	}

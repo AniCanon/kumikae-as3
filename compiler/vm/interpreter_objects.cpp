@@ -102,86 +102,50 @@ void Interpreter::put(Kind p_kind, Slot &p_target, Slot p_owned) {
 	}
 }
 
-// Gives up an untyped value's reference. An object whose last one that was goes on the list, to be freed
-// there: no recursion.
-void Interpreter::let_go_into(Slot p_value, std::vector<Object *> *r_dead) {
-	Object *other = any::tag(p_value) == AnyTag::Object ? static_cast<Object *>(any::pointer(p_value)) : nullptr;
-	if (!other) {
-		drop_any(p_value);
-	} else if (release(other)) {
-		r_dead->push_back(other);
-	}
-}
-
-// What a table or an Array's properties held, taken out first: letting each go may run code (a Godot
-// object's last reference) that must find the container whole and empty.
-void Interpreter::let_go_entries(Entries *p_entries, std::vector<Object *> *r_dead) {
-	for (const Entry &entry : p_entries->take_all()) {
-		let_go_into(entry.key, r_dead);
-		let_go_into(entry.value, r_dead);
-	}
-}
-
 // Frees an object whose last reference is gone, and whatever that in turn leaves unreferenced. A list
-// rather than recursion: a long chain of objects must not overflow the C++ stack.
+// rather than recursion: a long chain of objects must not overflow the C++ stack. Letting go of an engine
+// value can run code that frees more objects: those join the list of the call already freeing, which keeps
+// one list for every call and allocates nothing once it has grown.
 void Interpreter::drop_object(Object *p_object) {
-	std::vector<Object *> dead;
-	dead.push_back(p_object);
-	while (!dead.empty()) {
-		Object *object = dead.back();
-		dead.pop_back();
+	dying_.push_back(p_object);
+	if (freeing_) {
+		return;
+	}
+	freeing_ = true;
+	while (!dying_.empty()) {
+		Object *object = dying_.back();
+		dying_.pop_back();
 		const ir::Class &klass = module_.classes[object->klass];
+		each_held(klass, object, [this](Kind p_kind, Slot &p_slot) { let_go(p_kind, p_slot); });
 		if (klass.table) {
-			let_go_entries(entries_of(object), &dead);
 			free_table(object);
-			continue;
+		} else if (klass.element != Kind::Void) {
+			free_properties(static_cast<Vector *>(object));
+			free_vector(static_cast<Vector *>(object));
+		} else {
+			free_object(object);
 		}
-		if (klass.element != Kind::Void) {
-			// A vector: its elements are let go as fields are, and its own memory is freed its own way.
-			Vector *vector = static_cast<Vector *>(object);
-			for (uint32_t i = 0; held(klass.element) && i < vector->length; i++) {
-				Slot element = vector->data[i];
-				vector->data[i].bits = 0;
-				if (klass.element == Kind::Obj) {
-					if (release(static_cast<Object *>(element.p))) {
-						dead.push_back(static_cast<Object *>(element.p));
-					}
-				} else if (klass.element == Kind::Any) {
-					let_go_into(element, &dead);
-				} else {
-					drop(klass.element, element);
-				}
-			}
-			if (vector->properties) {
-				let_go_entries(vector->properties, &dead);
-				free_properties(vector);
-			}
-			free_vector(vector);
-			continue;
+	}
+	freeing_ = false;
+}
+
+// Empties one slot of an object being freed. An object it held whose last reference this was goes on the
+// list of those to free, as drop_object() keeps it.
+void Interpreter::let_go(Kind p_kind, Slot &p_slot) {
+	const Slot value = p_slot;
+	p_slot.bits = 0; // First: letting go of an engine value can run code that reads it.
+	Object *other = p_kind == Kind::Obj ? static_cast<Object *>(value.p)
+			: p_kind == Kind::Any && any::tag(value) == AnyTag::Object ? static_cast<Object *>(any::pointer(value))
+																	 : nullptr;
+	if (other) {
+		if (release(other)) {
+			dying_.push_back(other);
 		}
-		for (size_t i = 0; i < klass.fields.size(); i++) {
-			Slot &field = object->fields()[i];
-			if (klass.fields[i].kind == Kind::Str) {
-				Str *string = static_cast<Str *>(field.p);
-				if (release(string)) {
-					free_string(string);
-				}
-			} else if (klass.fields[i].kind == Kind::Obj) {
-				Object *other = static_cast<Object *>(field.p);
-				if (release(other)) {
-					dead.push_back(other);
-				}
-			} else if (ir::is_engine(klass.fields[i].kind) && field.p) {
-				void *handle = field.p;
-				field.p = nullptr;
-				host_.handles.drop(handle);
-			} else if (klass.fields[i].kind == Kind::Any) {
-				const Slot value = field;
-				field.bits = 0;
-				let_go_into(value, &dead); // On the list, as an object field is: no recursion.
-			}
-		}
-		free_object(object);
+	} else if (p_kind == Kind::Any) {
+		drop_any(value);
+	} else {
+		Slot copy = value;
+		drop(p_kind, copy);
 	}
 }
 
@@ -254,7 +218,7 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		}
 		return nullptr;
 	}
-	Object *object = new_object(p_class, klass.fields.size());
+	Object *object = new_object(p_class, klass.fields.size(), collector_.list_for(p_class));
 	if (!object) {
 		if (p_owner) {
 			host_.handles.drop(p_owner);

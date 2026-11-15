@@ -53,18 +53,10 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Stage 2b-2, part B: signals
 
-- A signal's own `numListeners` and `emit` can't follow `object[name]` as a property read: only its
-  methods can (`timer[name].add(f)`). **2c**
-- Objects that hold each other in a loop are freed only when a listener is part of the loop, or reaches
-  it. A loop of script objects with no listener in it stays (the cycle collector). So does a loop
-  that passes through a Godot collection. **2d**
-- The look for such loops walks everything the listeners without a Godot object of their own can reach.
-  It is paced by its own cost (at most four times a second, about a fiftieth of the time), but one look
-  over 100,000 objects takes about 30 ms in one go. The cycle collector should work in steps. **2d**
-- When GDScript holds a copy of a listener's callable, the look moves that listener behind listeners added
-  after it. **2d**
-- A loop whose own field holds its listener's callable (in a Godot collection), or whose one callable is
-  in two signals, is never freed. **2d**
+- A loop that passes through a Godot collection (a `GodotArray` or `GodotDictionary` in a field, such as
+  one that holds the loop's own listener's callable) is never freed: Godot tells an extension how many
+  hold a reference-counted object, but not how many hold an Array or a Dictionary, which GDScript may
+  share. **2d**
 - `other[name].add(f)` on another script object reaches only the Godot object's signals, not a signal the
   other script keeps in a public field. `this[name]` finds a subclass's field before a base class's
   private one of the same name. **2c**
@@ -91,7 +83,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
   their value; `Array`'s `removeAt`, `popAt`, `slice` and `find` cut an index; `Basis.getEuler` and
   `Quaternion.getEuler` cut the order; `Callable.unbind` its count. Guarding each needs a list kept by
   hand, which the owner chose against; the choice is whether a short one is worth it.
-- `Vector.<Int64>` and an `Int64` in an `Array` wait for those types. **2c**
 - Every program's IR now carries the `RangeError` class, used or not. **clean-up**
 
 ## C++ clean-up, November 2026
@@ -122,8 +113,6 @@ any Godot value passing as a condition):
 - A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
   `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
   **decision**
-- A freed object arriving from Godot for a `Node` parameter of a script's method is refused, not null.
-  **2d**
 - A Number variable that holds a whole value reaches a parameter that takes anything as a float
   (`str(x)` gives `2.0`, as GDScript does for a float). Only expressions that are whole by their form are
   sent as integers. **decision**
@@ -144,8 +133,6 @@ any Godot value passing as a condition):
   seen until the game is built again. **2d**
 - Rider's hover was failing on code marked `actionscript` (fixed: the plugin names its own language); not
   yet seen working in Rider. **LS-2**
-- Scripts are looked at five times a second by their time and size; two saves of the same size within
-  one second are seen as one. **2d**
 - A reload is refused when a class with a live object was removed or renamed. **2d**
 - A game on a simulator reloads from the folder it is told of (`KAS3_SOURCE_DIR`); only scripts are read
   there, so an edited scene or picture needs a new build. A real phone or tablet cannot see that folder:
@@ -155,8 +142,6 @@ any Godot value passing as a condition):
 
 ## Stage 2c-3: `try`, `catch`, `finally`, labels
 
-- An error inside a script method that Godot called is reported there: a `try` in AS3 around the Godot
-  call that led to it does not see it. **2d**
 
 ## Stage 2c-2: the untyped value
 
@@ -176,7 +161,6 @@ any Godot value passing as a condition):
 
 ## Stage 2a: interpreter core
 
-- Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
 - An endless loop has no stop. **2d**
 
 ## Stage 2b-1: AS3 inside Godot, first slice

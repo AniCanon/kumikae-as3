@@ -39,6 +39,9 @@ public:
 	[[nodiscard]] bool operate(std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 	[[nodiscard]] bool index_get(void *, const Argument &, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 	[[nodiscard]] bool index_set(void *, const Argument &, const Argument &, std::string *r_error) override { return refuse(r_error); }
+	[[nodiscard]] uint64_t node(void *) override { return 0; }
+	[[nodiscard]] bool node_edges(uint64_t, EngineNode *) override { return false; }
+	[[nodiscard]] std::vector<uint64_t> let_go(const std::vector<uint64_t> &) override { return {}; }
 	[[nodiscard]] bool constant(std::string_view, std::string_view, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 
 	[[nodiscard]] bool call(void *, std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }

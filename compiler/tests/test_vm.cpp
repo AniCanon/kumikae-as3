@@ -10,6 +10,7 @@
 #include "names.h"
 
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -500,6 +501,53 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		if (p_value) {
 			boxes--;
 		}
+	}
+	// For the cycle collector: boxes that stand for nodes (a Godot object a script listens to), and what
+	// each holds. A node's objects are references the test took for it, as a listener takes one.
+	struct Node {
+		uint64_t references = 1;
+		std::vector<vm::Object *> objects;
+		bool survives = false; // Something the collector can't see holds a copy of it.
+	};
+	std::map<intptr_t, uint64_t> node_boxes;
+	std::map<uint64_t, Node> nodes;
+	vm::Interpreter *running = nullptr;
+	[[nodiscard]] uint64_t node(void *p_handle) override {
+		auto found = node_boxes.find((intptr_t)p_handle);
+		return found == node_boxes.end() ? 0 : found->second;
+	}
+	int asked = 0; // How many times the collector asked what a node holds.
+	[[nodiscard]] bool node_edges(uint64_t p_node, vm::EngineNode *r_node) override {
+		asked++;
+		auto found = nodes.find(p_node);
+		if (found == nodes.end()) {
+			return false;
+		}
+		r_node->references = found->second.references;
+		r_node->exact = false;
+		r_node->objects = found->second.objects;
+		return true;
+	}
+	[[nodiscard]] std::vector<uint64_t> let_go(const std::vector<uint64_t> &p_nodes) override {
+		std::vector<uint64_t> survivors;
+		for (uint64_t at : p_nodes) {
+			log += "let go of node " + std::to_string(at) + "\n";
+			if (nodes[at].survives) {
+				survivors.push_back(at);
+			}
+		}
+		if (!survivors.empty()) {
+			log += "put back\n";
+			return survivors;
+		}
+		for (uint64_t at : p_nodes) {
+			std::vector<vm::Object *> held = nodes[at].objects;
+			nodes.erase(at);
+			for (vm::Object *object : held) {
+				running->release_object(object);
+			}
+		}
+		return survivors;
 	}
 };
 
@@ -1785,7 +1833,229 @@ static void test_host_construct_order() {
 	interpreter.release_object(made);
 }
 
+static const char *const CYCLES = "package {\n"
+								  "import flash.utils.Dictionary;\n"
+								  "public class Cycles {\n"
+								  "	public static var kept:Link;\n"
+								  "	public function pair():void { var a:Link = new Link(); var b:Link = new Link(); a.next = b; b.next = a; }\n"
+								  "	public function three():void { var a:Link = new Link(); a.next = new Link(); a.next.next = new Link(); a.next.next.next = a; }\n"
+								  "	public function chain(n:int):void {\n"
+								  "		var first:Link = new Link(); var at:Link = first;\n"
+								  "		for (var i:int = 1; i < n; i++) { at.next = new Link(); at = at.next; }\n"
+								  "		at.next = first;\n"
+								  "	}\n"
+								  "	public function throughVector():void { var v:Vector.<Link> = new Vector.<Link>(); var a:Link = new Link(); a.any = v; v.push(a); }\n"
+								  "	public function throughUntypedVector():void { var v:Vector.<*> = new Vector.<*>(); v.push(v); }\n"
+								  "	public function throughMethod():void { var a:Link = new Link(); a.any = a.hop; }\n"
+								  "	public function selfObject():void { var o:Object = { name: \"me\" }; o.self = o; }\n"
+								  "	public function keyedDictionary():void { var d:Dictionary = new Dictionary(); var a:Link = new Link(); a.any = d; d[a] = 1; }\n"
+								  "	public function valueDictionary():void { var d:Dictionary = new Dictionary(); d.x = { back: d }; }\n"
+								  "	public function arrayProperty():void { var list:Array = [1]; list.me = list; }\n"
+								  "	public function untypedPair():void { var a:Link = new Link(); var b:Link = new Link(); a.any = b; b.any = a; }\n"
+								  "	public function recursive():int {\n"
+								  "		var down:Function = function (n:int):int { return n <= 0 ? 0 : 1 + down(n - 1); };\n"
+								  "		return down(3);\n"
+								  "	}\n"
+								  "	public function keep():void { var a:Link = new Link(); a.next = new Link(); a.next.next = a; kept = a; }\n"
+								  "	public function forget():void { kept = null; }\n"
+								  "	public function held():Link { var a:Link = new Link(); a.next = new Link(); a.next.next = a; return a; }\n"
+								  "	public function onStack():Boolean {\n"
+								  "		var a:Link = new Link(); a.next = new Link(); a.next.next = a;\n"
+								  "		pair();\n"
+								  "		checkpoint();\n"
+								  "		return a.next.next == a;\n"
+								  "	}\n"
+								  "	public function checkpoint():void { var n:int = 0; n++; }\n"
+								  "}\n"
+								  "}\n"
+								  "class Link { public var next:Link; public var any:*; public function hop():int { return 1; } }\n";
+
+static void compile_cycles(ir::Module *r_module, const char *p_source, const char *p_file = "Cycles.as") {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add(p_file, p_source);
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	CHECK(ir::lower(compilation, r_module, ir::LowerMode::Library));
+}
+
+// The collector run at a statement of checkpoint(), with frames on the stack: what was alive after it.
+static bool collect_at_checkpoint(vm::Interpreter &p_interpreter, void *p_data) {
+	if (p_interpreter.function_at(p_interpreter.depth() - 1).name == "Cycles/checkpoint") {
+		p_interpreter.collect();
+		*static_cast<size_t *>(p_data) = vm::live_objects();
+	}
+	return true;
+}
+
+// Objects that refer to each other in a loop, and nothing else to them, are freed by the cycle collector;
+// a loop something still holds is not.
+static void test_cycles() {
+	ir::Module module;
+	compile_cycles(&module, CYCLES);
+	{
+		Recorder recorder;
+		vm::Interpreter interpreter(module, recorder);
+		CHECK(interpreter.start());
+		vm::Object *cycles = interpreter.construct(class_named(module, "Cycles"));
+		const size_t alone = vm::live_objects();
+		auto call = [&](const char *p_name, const vm::Slot *p_arguments = nullptr, size_t p_count = 0) {
+			vm::Slot result;
+			result.bits = 0;
+			CHECK(interpreter.call_method(cycles, p_name, p_arguments, p_count, &result));
+			return result;
+		};
+		auto alive = [&](const char *p_name) { return std::string(p_name) + " leaves " + std::to_string(vm::live_objects() - alone); };
+		for (const char *name : { "pair", "three", "throughVector", "throughUntypedVector", "throughMethod", "untypedPair", "recursive", "selfObject",
+				 "keyedDictionary", "valueDictionary", "arrayProperty" }) {
+			call(name);
+			CHECK(vm::live_objects() > alone);
+			interpreter.collect();
+			CHECK_EQ(alive(name), std::string(name) + " leaves 0");
+		}
+		// A long loop is freed in steps of bounded work, not in one look.
+		vm::Slot length;
+		length.bits = 0;
+		length.i = 10000;
+		call("chain", &length, 1);
+		CHECK_EQ(alive("chain"), std::string("chain leaves 10000"));
+		int steps = 1;
+		while (!interpreter.collect_step(500) && steps < 100000) {
+			steps++;
+		}
+		CHECK(steps > 20);
+		CHECK_EQ(alive("chain"), std::string("chain leaves 0"));
+		// A loop a static field holds stays, until it is let go.
+		call("keep");
+		interpreter.collect();
+		CHECK_EQ(alive("keep"), std::string("keep leaves 2"));
+		call("forget");
+		interpreter.collect();
+		CHECK_EQ(alive("forget"), std::string("forget leaves 0"));
+		// So does one the host holds.
+		vm::Slot held = call("held");
+		interpreter.collect();
+		CHECK_EQ(alive("held"), std::string("held leaves 2"));
+		interpreter.discard(ir::Kind::Obj, held);
+		interpreter.collect();
+		CHECK_EQ(alive("discard"), std::string("discard leaves 0"));
+		// A loop a register of a running function holds stays while it runs; another, made and let go
+		// there, is freed meanwhile.
+		size_t during = 0;
+		interpreter.set_statement_hook(collect_at_checkpoint, &during);
+		CHECK(call("onStack").b);
+		interpreter.set_statement_hook(nullptr, nullptr);
+		CHECK_EQ(during - alone, (size_t)2);
+		interpreter.collect();
+		CHECK_EQ(alive("onStack"), std::string("onStack leaves 0"));
+		// The program goes on changing what refers to what while a collection is under way.
+		for (int round = 0; round < 200; round++) {
+			call(round % 3 == 0 ? "pair" : round % 3 == 1 ? "keep" : "forget");
+			length.i = round;
+			call("chain", &length, 1);
+			interpreter.collect_step(37);
+		}
+		call("forget");
+		interpreter.collect();
+		CHECK_EQ(alive("while running"), std::string("while running leaves 0"));
+		interpreter.release_object(cycles);
+		// What is left in a loop when the interpreter goes is freed with it.
+		cycles = interpreter.construct(class_named(module, "Cycles"));
+		call("pair");
+		call("keep");
+		interpreter.release_object(cycles);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+// A loop that passes through the engine: a script object holds one of its objects, which holds the script
+// object back (as a Godot object holds a listener that is a method of it). The engine is asked to let go
+// of what it holds; if something else holds a copy, everything stays.
+static void test_cycles_through_engine() {
+	const char *source = "package { import godot.*;\n"
+						 "public class Holder { public var res:Resource;\n"
+						 "	public function make():void { res = new Resource(); }\n"
+						 "	public function makeTwice():void { res = new Resource(); res = new Resource(); } }\n"
+						 "}\n";
+	ir::Module module;
+	compile_cycles(&module, source, "Holder.as");
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		engine.running = &interpreter;
+		CHECK(interpreter.start());
+		const size_t before = vm::live_objects();
+		for (const char *make : { "make", "makeTwice" }) {
+			vm::Object *holder = interpreter.construct(class_named(module, "Holder"));
+			vm::Slot ignored;
+			CHECK(interpreter.call_method(holder, make, nullptr, 0, &ignored));
+			// The last box is the engine's object; node 7 stands for it, and holds the script object.
+			engine.node_boxes[engine.next - 1] = 7;
+			engine.nodes[7].objects.push_back(holder);
+			vm::retain(holder); // The listener's reference.
+			engine.nodes[7].survives = true;
+			engine.log.clear();
+			// Still held by the host: nothing is asked of the engine.
+			interpreter.collect();
+			CHECK_EQ(engine.log, std::string());
+			// Held only through the engine, but a copy of the listener is held elsewhere: it stays.
+			interpreter.release_object(holder);
+			interpreter.collect();
+			CHECK_EQ(engine.log, std::string("let go of node 7\nput back\n"));
+			CHECK_EQ(vm::live_objects(), before + 1);
+			// Once nothing else holds the copy, the loop goes, and so does the engine's object: the second
+			// time in the smallest steps there are, so that the node is asked about again in each.
+			engine.nodes[7].survives = false;
+			engine.log.clear();
+			if (make == std::string("make")) {
+				interpreter.collect();
+			} else {
+				int steps = 1;
+				while (!interpreter.collect_step(1) && steps < 1000) {
+					steps++;
+				}
+				CHECK(steps > 2);
+			}
+			CHECK_EQ(engine.log, std::string("let go of node 7\n"));
+			CHECK_EQ(vm::live_objects(), before);
+			CHECK_EQ(engine.boxes, 0);
+			engine.node_boxes.clear();
+		}
+		// Once another interpreter has taken over (a reload), the engine is asked nothing more, even about
+		// a node a collection under way has seen; what such a node held stays.
+		vm::Object *holder = interpreter.construct(class_named(module, "Holder"));
+		vm::Slot ignored;
+		CHECK(interpreter.call_method(holder, "make", nullptr, 0, &ignored));
+		engine.node_boxes[engine.next - 1] = 8;
+		engine.nodes[8].objects.push_back(holder);
+		vm::retain(holder);
+		interpreter.release_object(holder);
+		engine.asked = 0;
+		for (int steps = 0; engine.asked == 0 && steps < 1000; steps++) {
+			interpreter.collect_step(1);
+		}
+		CHECK(engine.asked > 0);
+		const int asked = engine.asked;
+		interpreter.superseded();
+		interpreter.collect();
+		CHECK_EQ(engine.asked, asked);
+		CHECK_EQ(vm::live_objects(), before + 1);
+		engine.log.clear();
+		CHECK(engine.nodes.count(8) == 1);
+		// The engine lets go of its listener: then nothing holds the object, and it goes.
+		engine.nodes.erase(8);
+		interpreter.release_object(holder);
+		CHECK_EQ(vm::live_objects(), before);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 int main() {
+	test_cycles();
+	test_cycles_through_engine();
 	test_host_construct_order();
 	test_kept_traces();
 	test_untyped_out_of_memory();

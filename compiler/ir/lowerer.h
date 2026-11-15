@@ -254,7 +254,6 @@ class Lowerer {
 	friend class Library;
 	friend class Dynamic; // Properties by name: lower_dynamic.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
-
 	Symbol * callee_symbol(Expr *p_callee);
 
 	// Marks a use of a class from outside it: its static fields get their values the first time. Code inside
@@ -387,6 +386,7 @@ class Lowerer {
 	static bool called_value(const Symbol *p_symbol);
 	uint32_t value_call(Call *p_call, Kind p_want);
 	uint32_t vector_each(Call *p_call);
+	std::optional<uint32_t> function_method(Call *p_call);
 	void use_argument_error();
 	uint32_t wide_order(Expr *p_left, Expr *p_right, uint32_t p_position);
 	uint32_t number_zero(uint32_t p_position);

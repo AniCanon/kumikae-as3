@@ -14,11 +14,14 @@ func show(name: String, got, want) -> void:
 func ask(method: String, arguments: Array = []):
 	return Callable(node, method).callv(arguments)
 
-func put(version: String) -> void:
-	var text := FileAccess.get_file_as_string("res://hot_%s.txt" % version)
+func hot_path() -> String:
 	# Where a person edits the scripts: the project, or the folder the game was told they are in.
 	var folder := OS.get_environment("KAS3_SOURCE_DIR")
-	var file := FileAccess.open(("res://" if folder.is_empty() else folder + "/") + "Hot.as", FileAccess.WRITE)
+	return ProjectSettings.globalize_path("res://Hot.as") if folder.is_empty() else folder + "/Hot.as"
+
+func put(version: String) -> void:
+	var text := FileAccess.get_file_as_string("res://hot_%s.txt" % version)
+	var file := FileAccess.open(hot_path(), FileAccess.WRITE)
 	file.store_string(text)
 	file.close()
 	since = Time.get_ticks_msec()
@@ -64,6 +67,14 @@ func _process(_delta: float) -> bool:
 	elif stage == 3 and (ask("value") == 3 or waited(8000)):
 		show("once the error is fixed: the new code runs", ask("value"), 3)
 		show("once the error is fixed: the field still has its value", ask("count"), 2)
+		# A save of the same size with the same time as the last (two saves within one second): still seen.
+		var stamp := ProjectSettings.globalize_path("user://stamp")
+		OS.execute("touch", ["-r", hot_path(), stamp])
+		put("v4")
+		OS.execute("touch", ["-r", stamp, hot_path()])
+		stage = 4
+	elif stage == 4 and (ask("value") == 4 or waited(8000)):
+		show("a save of the same size in the same second is seen", ask("value"), 4)
 		node.free()
 		other.free()
 		return true

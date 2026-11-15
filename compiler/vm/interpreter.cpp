@@ -15,7 +15,7 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host) {
+		module_(p_module), host_(p_host), collector_(*this) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}
@@ -57,6 +57,8 @@ Interpreter::~Interpreter() {
 	if (failing_) {
 		drop_any(pending_);
 	}
+	// With every root let go of, what is left in loops is held only by itself, or by the host.
+	collector_.collect();
 	for (Str *constant : strings_) {
 		if (release(constant)) {
 			free_string(constant);
@@ -175,10 +177,26 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		many.assign(p_arguments, p_arguments + p_count);
 		source = many.data();
 	}
+	// With a rest parameter, the arguments past the others (untyped) are its Array.
+	const size_t fixed = function.rest ? function.parameters - 1 : function.parameters;
+	Vector *rest = nullptr;
+	if (function.rest) {
+		rest = fresh_vector(module_.array_class, p_count > fixed ? p_count - fixed : 0);
+		if (!rest) {
+			return false;
+		}
+		for (size_t i = fixed; i < p_count; i++) {
+			rest->data[i - fixed] = share(Kind::Any, source[i]);
+		}
+		frame.arguments = static_cast<uint32_t>(std::min(p_count, fixed));
+	}
 	stack_.resize(stack_.size() + function.registers.size(), zero);
-	size_t count = std::min<size_t>(std::min<size_t>(p_count, function.parameters), function.registers.size());
+	size_t count = std::min<size_t>(std::min<size_t>(p_count, fixed), function.registers.size());
 	for (size_t i = 0; i < count; i++) {
 		stack_[frame.base + i] = share(function.registers[i], source[i]);
+	}
+	if (rest) {
+		stack_[frame.base + fixed].p = rest; // Its one reference, the frame's.
 	}
 	frames_.push_back(frame);
 	return true;
@@ -233,7 +251,7 @@ void Interpreter::out_of_memory() {
 
 // p_message is the error's own, or null; p_words are what is said if not even the error can be made.
 void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
-	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size()) : nullptr;
+	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size(), collector_.list_for(p_class)) : nullptr;
 	if (error) {
 		// What a script reads of it: its name, its number ("Error #1009: ..." is 1009), and the stack.
 		error->fields()[ir::ERROR_MESSAGE].p = p_message;
@@ -380,7 +398,19 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
 		entries_--;
 	}
-	if (!ok) {
+	if (!ok && depth > 0 && failing_ && !carried_.held) {
+		// This program's code is running beneath this call: the error goes back to it, as Flash has an
+		// error in a listener come out of the dispatch that ran it.
+		carried_.held = true;
+		carried_.error = pending_;
+		carried_.trace = std::move(trace_);
+		carried_.lines = trace_lines_;
+		carried_.at = thrown_at_;
+	} else if (!ok) {
+		report();
+	}
+	if (depth == 0 && carried_.held) {
+		raise_carried(); // Nothing took it back: it is reported here, as it would have been.
 		report();
 	}
 	pending_ = outer_error;
@@ -390,6 +420,17 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	stopped_ = outer_stopped;
 	halted_ = outer_halted;
 	return ok;
+}
+
+// The error carried back from a call the engine made: on its way out again, from where it was.
+void Interpreter::raise_carried() {
+	carried_.held = false;
+	pending_ = carried_.error;
+	failing_ = true;
+	trace_ = std::move(carried_.trace);
+	trace_lines_ = carried_.lines;
+	thrown_at_ = carried_.at;
+	carried_.error.bits = 0;
 }
 
 std::string Interpreter::error_text() {

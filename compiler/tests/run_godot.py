@@ -134,7 +134,7 @@ def compare(script, names):
 
 # Godot's values: operators, as GDScript works them out.
 output = compare("values.gd", [
-    "add", "sub", "times", "times int", "number first", "divide", "negate", "cells", "cells by number", "cells over",
+    "add", "a freed object arrives as null", "sub", "times", "times int", "number first", "divide", "negate", "cells", "cells by number", "cells over",
     "tint", "same", "not same", "differs", "same node", "not same node", "other node", "chain", "compound", "moved",
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
@@ -165,11 +165,13 @@ check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" 
 output = compare("signals.gd", [
     "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "counts what scripts added", "remove all leaves others", "lasting or once, not both",
     "null argument and order", "arguments", "removes itself",
-    "after a failing listener", "another object's signal", "by name", "by a wrong name", "user signal", "declared signal", "declared signal listed", "filter",
+    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "user signal", "declared signal", "declared signal listed", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed", "own signal field by name", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
     "a removed listener that is still held keeps what it holds",
-    "a loop whose callable is held stays", "a loop goes when its callable is let go",
+    "a loop with no listener is freed", "a loop through a script's Godot object is freed", "a loop through an untyped field is freed",
+    "a loop whose listener is in two signals is freed",
+    "a loop whose callable is held stays", "a held listener keeps its place", "a loop goes when its callable is let go",
     "an unheld listener stays",
 ])
 check("a listener given the wrong kind of argument is an AS3 error that names it",
@@ -230,7 +232,7 @@ check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError:
 
 # Godot's global functions, as GDScript works them out.
 output = compare("functions.gd", [
-    "lerpf", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
+    "lerpf", "rest from Godot", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
     "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
     "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
     "anything as text", "a default is not shared",
@@ -405,6 +407,7 @@ def reload_test(label, elsewhere):
             "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
             "hot_broken.txt": HOT % ("", "2 +", "10", ADDED),
             "hot_v3.txt": HOT % (" private var extra:String = \"x\";", "3", "10", ADDED),
+            "hot_v4.txt": HOT % (" private var extra:String = \"x\";", "4", "10", ADDED),
         }
         for name, text in versions.items():
             with open(os.path.join(copy, name), "w") as file:
@@ -421,10 +424,10 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 12, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 13, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
-        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 2, output[-1500:])
+        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 3, output[-1500:])
         check("%s: a script with an error is reported and not loaded" % label,
               "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
 
