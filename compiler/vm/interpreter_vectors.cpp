@@ -23,6 +23,22 @@ std::optional<uint32_t> element_index(double p_index, uint32_t p_limit) {
 	return static_cast<double>(whole) == p_index ? std::optional<uint32_t>(whole) : std::nullopt;
 }
 
+// An index of any kind a register may declare for it, as a Number: what an error about it says.
+double index_number(Kind p_kind, const Slot &p_index) {
+	return p_kind == Kind::I32 ? p_index.i : p_kind == Kind::U32 ? (double)p_index.u : p_index.d;
+}
+
+// The same for an index held as an int or a uint, read as it is.
+std::optional<uint32_t> element_index(Kind p_kind, const Slot &p_index, uint32_t p_limit) {
+	if (p_kind == Kind::I32) {
+		return p_index.i >= 0 && (uint32_t)p_index.i < p_limit ? std::optional<uint32_t>((uint32_t)p_index.i) : std::nullopt;
+	}
+	if (p_kind == Kind::U32) {
+		return p_index.u < p_limit ? std::optional<uint32_t>(p_index.u) : std::nullopt;
+	}
+	return element_index(p_index.d, p_limit);
+}
+
 } // namespace
 
 void Interpreter::raise_range(double p_index, uint32_t p_length) {
@@ -82,9 +98,10 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 	const Kind kind = module_.classes[vector->klass].element;
 	switch (p_in.op) {
 		case Op::VecGet: {
-			const std::optional<uint32_t> at = element_index(r[p_in.c].d, vector->length);
+			const Kind index = p_function.registers[p_in.c];
+			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
 			if (!at) {
-				raise_range(r[p_in.c].d, vector->length);
+				raise_range(index_number(index, r[p_in.c]), vector->length);
 				return;
 			}
 			put(kind, r[p_in.a], share(kind, vector->data[*at]));
@@ -92,9 +109,10 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		}
 		case Op::VecSet: {
 			// One past the end adds an element, unless the length is fixed.
-			const std::optional<uint32_t> at = element_index(r[p_in.b].d, vector->fixed ? vector->length : vector->length + 1);
+			const Kind index = p_function.registers[p_in.b];
+			const std::optional<uint32_t> at = element_index(index, r[p_in.b], vector->fixed ? vector->length : vector->length + 1);
 			if (!at) {
-				raise_range(r[p_in.b].d, vector->length);
+				raise_range(index_number(index, r[p_in.b]), vector->length);
 				return;
 			}
 			if (*at == vector->length && !resize_vector(vector, vector->length + 1)) {

@@ -66,8 +66,8 @@ inline bool is_held(Kind p_kind) {
 	X(InitClass, "C--") /* The class is used: give its static fields their values, if this is the first time. */ \
 	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
-	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is a Number; what is read or \
-	   written is of the class's element kind. */ \
+	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is an int, a uint or a Number, \
+	   read as its register is declared; what is read or written is of the class's element kind. */ \
 	X(VecNew, "RCA") X(VecGet, "RRR") X(VecSet, "RRR") \
 	X(VecLength, "RR-") X(VecSetLength, "RR-") X(VecFixed, "RR-") X(VecSetFixed, "RR-") \
 	/* A method of a vector: out, which one (a VectorMethod), [the vector, then what the method takes]. */ \
