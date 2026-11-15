@@ -192,9 +192,7 @@ std::string Interpreter::object_text(Object *p_object) const {
 	const std::string &name = module_.classes[p_object->klass].name;
 	std::string simple = name.substr(name.rfind('.') == std::string::npos ? 0 : name.rfind('.') + 1);
 	if (module_.error_class != NONE && is_class(p_object, module_.error_class)) {
-		// An Error reads as its class and its message.
-		Str *message = static_cast<Str *>(p_object->fields()[0].p);
-		return message && message->size ? simple + ": " + std::string(message->view()) : simple;
+		return error_heading(p_object); // A class of the program's that extends Error is named "Error".
 	}
 	return "[object " + simple + "]";
 }

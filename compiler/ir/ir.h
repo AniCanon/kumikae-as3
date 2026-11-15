@@ -59,12 +59,16 @@ inline bool is_held(Kind p_kind) {
 	X(LtF64, "RRR") X(LeF64, "RRR") X(EqF64, "RRR") X(LtStr, "RRR") X(LeStr, "RRR") X(EqStr, "RRR") \
 	X(EqBool, "RRR") X(EqRef, "RRR") X(Not, "RR-") \
 	X(Concat, "RRR") X(StrLength, "RR-") \
+	/* String's methods and the top-level functions on text: out, which (a StringFunction), [its arguments]. \
+	   A number as text: out, which (a NumberFormat), [the number, the radix or digits as a Number]. */ \
+	X(StrCall, "RIA") X(NumText, "RIA") \
 	/* Math. MathUnary: out, the Number, and which function (a MathFunction). */ \
 	X(MathUnary, "RRI") X(Atan2, "RRR") X(Pow, "RRR") X(MinF64, "RRR") X(MaxF64, "RRR") X(Random, "R--") \
 	X(Jump, "L--") X(JumpIf, "RL-") X(JumpIfNot, "RL-") \
 	X(GetField, "RRD") X(SetField, "RDR") X(GetGlobal, "RG-") X(SetGlobal, "GR-") \
 	X(InitClass, "C--") /* The class is used: give its static fields their values, if this is the first time. */ \
 	X(NullCheck, "R--") X(ArgMissing, "RR-") /* a: was the parameter in register b left out by the caller? */ \
+	X(AnyNullCheck, "R--") /* An untyped value that is null (TypeError #1009) or undefined (#1010) has no members. */ \
 	X(New, "RC-") X(Call, "rFA") X(CallVirtual, "rVA") \
 	/* A Vector.<T>. VecNew: out, its class, [length, fixed]. An index is an int, a uint or a Number, \
 	   read as its register is declared; what is read or written is of the class's element kind. */ \
@@ -127,6 +131,7 @@ inline bool is_held(Kind p_kind) {
 	/* A vector method's callback and the object to call it on (both untyped): a method with an object \
 	   other than null is AS3's TypeError #1510. */ \
 	X(CallbackThis, "RR-") \
+	X(ObjectText, "RR-") /* Object's own toString(), or Error's, whatever the class says: what super.toString() reaches. */ \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
 
@@ -160,6 +165,29 @@ constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK 
 //   Sort            a function that compares two elements, or the options as a number (untyped)   -> the vector
 // (forEach, map, filter, some and every are loops the lowerer writes, calling the function each time.)
 enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort };
+
+// String's methods and the functions on text, in StrCall's second operand. An index or a count is a
+// Number as the program wrote it; text is a String, and a null one reads "null". After the string:
+//   CharAt, CharCodeAt    an index                -> String, or a Number (NaN outside the string)
+//   IndexOf, LastIndexOf  text, where to start    -> int
+//   Substr                start, length           -> String
+//   Substring, Slice      start, end              -> String
+//   Concat                any number of texts     -> String
+//   Upper, Lower          nothing                 -> String
+//   Replace               text, replacement       -> String: the first match, the replacement as it is
+//   LocaleCompare         text                    -> int: -1, 0 or 1, by UTF-16 units
+// With no string first:
+//   FromCharCode          any number of Numbers   -> String
+//   ParseInt              text, radix (int)       -> Number
+//   ParseFloat            text                    -> Number
+enum class StringFunction : uint8_t {
+	CharAt, CharCodeAt, IndexOf, LastIndexOf, Substr, Substring, Slice, Concat, Upper, Lower, Replace, LocaleCompare,
+	FromCharCode, ParseInt, ParseFloat
+};
+
+// toString(radix), toFixed, toExponential and toPrecision, in NumText's second operand. The number is a
+// Number, or an Int64 (its register says which), written from its own digits.
+enum class NumberFormat : uint8_t { Radix, Fixed, Exponential, Precision };
 
 const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.

@@ -1,1 +1,0 @@
-parse_int.as:1:72: error: calling 'parseInt' is not supported by the interpreter yet

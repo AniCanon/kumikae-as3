@@ -1,5 +1,7 @@
 #include "interpreter_internal.h"
 
+#include "text_units.h"
+
 namespace kas3 {
 namespace vm {
 
@@ -144,7 +146,7 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 	const Kind kind = module_.classes[p_vector->klass].element;
 	for (uint32_t i = 0; i < p_vector->length; i++) {
 		if (i) {
-			*r_text += p_separator;
+			append_text(r_text, p_separator); // Text is joined as Concat joins it: two halves that meet are one character.
 		}
 		const Slot element = p_vector->data[i];
 		switch (kind) {
@@ -164,7 +166,7 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 				*r_text += element.b ? "true" : "false";
 				break;
 			case Kind::Str:
-				*r_text += element.p ? static_cast<Str *>(element.p)->view() : std::string_view("null");
+				append_text(r_text, element.p ? static_cast<Str *>(element.p)->view() : std::string_view("null"));
 				break;
 			case Kind::Obj: {
 				// Held while it speaks: what it says may run the program, which may take it out of

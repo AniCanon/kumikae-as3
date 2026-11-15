@@ -1,0 +1,11 @@
+[object Plain] named child [object object_text] [object object_text]
+child child child
+Error: boom Error RangeError: far Error: mine Error: mine Error: mine
+Custom: boom Custom: boom Custom: boom
+Custom
+named 5 text <[object Supered]> [Error: deep]
+1009
+1009
+TypeError: Error #1010: A term is undefined and has no properties.
+1009 1
+1009

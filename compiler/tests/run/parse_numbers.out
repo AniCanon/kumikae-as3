@@ -1,0 +1,10 @@
+12 -31 NaN 12 NaN NaN NaN
+5 35 35 NaN NaN 16 0
+1.2345678901234568e+29 9007199254740992 144115188075855860 7
+-Infinity 5 8 1 12 NaN 123 3
+-255 511 7 NaN NaN NaN 1000000000
+3.14 -0.0005 NaN 1 Infinity -Infinity 0
+NaN Infinity 1 NaN 2.5 1.2 -Infinity NaN
+5 NaN 1 100 NaN NaN 0.01
+true false true true false true false false false true
+12 0 7 26 -12 4294967295 true false 1.5 true

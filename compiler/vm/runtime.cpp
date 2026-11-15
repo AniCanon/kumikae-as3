@@ -1,5 +1,8 @@
 #include "runtime.h"
 
+#include "number_text.h"
+#include "text_units.h"
+
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -36,7 +39,9 @@ size_t live_objects() {
 
 Str *join_strings(std::string_view p_first, std::string_view p_second) {
 	// A length is held in 32 bits: a longer text is refused as memory running out, never cut short.
-	const uint64_t size = (uint64_t)p_first.size() + p_second.size();
+	// Two halves of a character that meet are joined into its four bytes (vm/text_units.h).
+	const size_t saved = joined_halves(p_first, p_second);
+	const uint64_t size = (uint64_t)p_first.size() + p_second.size() - saved;
 	void *memory = size > UINT32_MAX || allocation_fails() ? nullptr : std::malloc(sizeof(Str) + (size_t)size + 1);
 	if (!memory) {
 		return nullptr;
@@ -44,8 +49,13 @@ Str *join_strings(std::string_view p_first, std::string_view p_second) {
 	Str *string = new (memory) Str();
 	string->references = 1;
 	string->size = (uint32_t)size;
+	if (saved) {
+		write_joined(p_first, p_second, string->data() + p_first.size() - 3);
+		p_first.remove_suffix(3);
+		p_second.remove_prefix(3);
+	}
 	std::memcpy(string->data(), p_first.data(), p_first.size());
-	std::memcpy(string->data() + p_first.size(), p_second.data(), p_second.size());
+	std::memcpy(string->data() + size - p_second.size(), p_second.data(), p_second.size());
 	string->data()[size] = 0;
 	strings_alive++;
 	return string;
@@ -189,12 +199,16 @@ std::string number_to_string(double p_value) {
 }
 
 double string_to_number(std::string_view p_text) {
-	auto space = [](char p_c) { return p_c == ' ' || p_c == '\t' || p_c == '\n' || p_c == '\r' || p_c == '\f' || p_c == '\v'; };
-	while (!p_text.empty() && space(p_text.front())) {
-		p_text.remove_prefix(1);
-	}
-	while (!p_text.empty() && space(p_text.back())) {
-		p_text.remove_suffix(1);
+	p_text = without_leading_space(p_text);
+	while (!p_text.empty()) {
+		size_t last = p_text.size() - 1, size = 0;
+		while (last > 0 && (static_cast<unsigned char>(p_text[last]) & 0xC0) == 0x80) {
+			last--;
+		}
+		if (!is_text_space(code_point_at(p_text, last, &size))) {
+			break;
+		}
+		p_text.remove_suffix(p_text.size() - last);
 	}
 	if (p_text.empty()) {
 		return 0;
@@ -243,23 +257,6 @@ int32_t utf16_length(std::string_view p_text) {
 
 namespace {
 
-// The code point that starts at p_at, and how many bytes it takes. Text that is not well-formed is read a
-// byte at a time.
-uint32_t code_point(std::string_view p_text, size_t p_at, size_t *r_size) {
-	const unsigned char lead = static_cast<unsigned char>(p_text[p_at]);
-	const size_t size = lead < 0x80 ? 1 : lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
-	if (p_at + size > p_text.size()) {
-		*r_size = 1;
-		return lead;
-	}
-	uint32_t value = size == 1 ? lead : lead & (0xFF >> (size + 1));
-	for (size_t i = 1; i < size; i++) {
-		value = (value << 6) | (static_cast<unsigned char>(p_text[p_at + i]) & 0x3F);
-	}
-	*r_size = size;
-	return value;
-}
-
 // The first UTF-16 unit of a code point: a character past U+FFFF starts with its high surrogate.
 uint32_t first_unit(uint32_t p_code_point) {
 	return p_code_point < 0x10000 ? p_code_point : 0xD800 + ((p_code_point - 0x10000) >> 10);
@@ -271,8 +268,8 @@ int compare_utf16(std::string_view p_a, std::string_view p_b) {
 	size_t a = 0, b = 0;
 	while (a < p_a.size() && b < p_b.size()) {
 		size_t a_size = 0, b_size = 0;
-		const uint32_t x = code_point(p_a, a, &a_size);
-		const uint32_t y = code_point(p_b, b, &b_size);
+		const uint32_t x = code_point_at(p_a, a, &a_size);
+		const uint32_t y = code_point_at(p_b, b, &b_size);
 		if (x != y) {
 			const uint32_t x_unit = first_unit(x), y_unit = first_unit(y);
 			// With the same high surrogate, the low ones are in the code points' order.

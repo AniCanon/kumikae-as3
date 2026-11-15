@@ -278,6 +278,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 		if (const std::optional<uint32_t> by_name = signal_call_by_name(p_call)) {
 			return *by_name;
 		}
+		if (const std::optional<uint32_t> text = library_call(p_call, nullptr)) {
+			return *text; // `x.toString()` on an untyped value.
+		}
 		return value_call(p_call, p_want); // `make()(1)`, `table[name](2)`: whatever it gives is called.
 	}
 	if (called_value(symbol)) {
@@ -301,6 +304,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	}
 	if (const std::optional<uint32_t> math = math_call(p_call, symbol)) {
 		return *math;
+	}
+	if (const std::optional<uint32_t> library = library_call(p_call, symbol)) {
+		return *library;
 	}
 	if (symbol->name == "getStackTrace" && symbol->owner == error_ && callee->kind == NodeKind::Member && p_call->arguments.count == 0) {
 		// An Error's stack trace, taken when it was made.

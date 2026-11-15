@@ -71,8 +71,13 @@ std::string Lowerer::unescape(std::string_view p_text) {
 		} else if (p_code < 0x800) {
 			out += (char)(0xC0 | (p_code >> 6));
 			out += (char)(0x80 | (p_code & 0x3F));
-		} else {
+		} else if (p_code < 0x10000) {
 			out += (char)(0xE0 | (p_code >> 12));
+			out += (char)(0x80 | ((p_code >> 6) & 0x3F));
+			out += (char)(0x80 | (p_code & 0x3F));
+		} else {
+			out += (char)(0xF0 | (p_code >> 18));
+			out += (char)(0x80 | ((p_code >> 12) & 0x3F));
 			out += (char)(0x80 | ((p_code >> 6) & 0x3F));
 			out += (char)(0x80 | (p_code & 0x3F));
 		}
@@ -114,8 +119,16 @@ std::string Lowerer::unescape(std::string_view p_text) {
 				break;
 			case 'u':
 				if (hex(i + 1, 4, &code)) {
-					utf8(code);
 					i += 4;
+					// A high half written just before a low half is one character, held as its four bytes, as the
+					// runtime holds it (vm/text_units.h); a half with no partner is held alone.
+					uint32_t low = 0;
+					if (code >= 0xD800 && code < 0xDC00 && i + 2 < p_text.size() && p_text[i + 1] == '\\' && p_text[i + 2] == 'u' &&
+							hex(i + 3, 4, &low) && low >= 0xDC00 && low < 0xE000) {
+						code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+						i += 6;
+					}
+					utf8(code);
 				} else {
 					out += 'u';
 				}

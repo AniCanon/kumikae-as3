@@ -93,15 +93,17 @@ TypeError: Error #1009: Cannot access a property or method of a null object refe
 `override` and `super`; `int`, `uint`, `Number`, `Boolean`, `String` and `null` with AS3's conversions;
 every arithmetic, comparison, logical and bitwise operator; assignment and `++`/`--`; `if`, `while`, `do`,
 `for`, `break`, `continue`, `return`; calls with default parameters; `new`, `is`, `as`; `trace`; `throw`;
-a class's own `toString()`;
+`toString()` on any object (its class's own, or `[object Name]`; an `Error`'s name and message);
 `Error` and its subclasses; `NaN`, `Infinity` and the limits of the number types (`int.MAX_VALUE`); several
-files, packages, and package-level functions and variables.
+files, packages, and package-level functions and variables. `String`'s methods, the numbers' (and `Int64`'s) `toString(radix)`,
+`toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite` and `Math`.
 
-**What is refused, by name, until later slices:** function values and closures, `Array`, `Vector`,
-`Object` and `Dictionary`, untyped values (`*`), interfaces, `try`, `switch`, `for in`, labels, getters and
-setters, rest parameters, regular expressions, `Math` and the other library functions, `String`'s methods
-other than `length`, and the `godot` package. A program that uses one of these does not run: the compiler
-says `... is not supported by the interpreter yet` at the place.
+**What is refused, by name, until later slices:** function values and closures, `Array`, `Object` literals
+and `Dictionary`, interfaces, `for in` over anything but a vector, getters and setters, rest parameters,
+regular expressions and the `String` methods that take one or give an `Array` (`match`, `search`, `split`,
+and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
+`Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
+`... is not supported by the interpreter yet` at the place.
 
 How it works:
 
@@ -122,8 +124,14 @@ How it works:
 - **Memory** is reference-counted. Objects that refer to each other in a loop are not freed yet.
 - **Nothing in `vm/` or `ir/` names Godot.** What the engine will supply goes through the interfaces in `vm/host.h`.
 
-Differences from Flash so far: a string's `length` counts characters, not UTF-16 units, and strings compare
-by character.
+Strings are held as UTF-8 and counted, indexed and compared by UTF-16 unit, as AS3 does: a character past
+U+FFFF is two units, and `charAt` gives each half (`vm/text_units.h`). Case changes a character for a
+character, by Unicode's mappings within U+0000 to U+FFFF (`"ß".toUpperCase()` stays `"ß"`).
+
+Where Flash and ECMAScript part, Flash is followed as far as it is known, and each test says so where it
+does: `toString(radix)` writes only the whole part of a number in a radix other than 10, a
+digit count left out is the declared 0 (`toPrecision()` is a `RangeError`), `replace` inserts its
+replacement as it is written, and `localeCompare` orders by UTF-16 unit.
 
 ## Inside Godot
 
