@@ -12,7 +12,9 @@ snippets go through the platform lookup pipeline; the plugin does not override T
 `As3ParserDefinition` creates token-only PSI, sufficient for native editor integration. `As3Lexer`
 recognizes code, punctuation and non-code text, retaining lexical state at token boundaries for
 incremental highlighting. That state includes `Braces`: whether each open brace began a block or a
-value, which decides whether a slash after its `}` starts a regex or divides. `As3EditorHighlighterProvider` combines a structural highlighter with the
+value, which decides whether a slash after its `}` starts a regex or divides. Since a state holds all the
+lexer knows, it is a `RestartableLexer` (an experimental platform interface): the editor lexes again
+from a token near an edit, not from the top of the file. `As3EditorHighlighterProvider` combines a structural highlighter with the
 existing TextMate highlighter. Its iterator intersects their intervals: AS3 supplies token kinds and
 TextMate supplies color attributes. Both receive the same document changes and belong to the editor;
 no document text or per-edit token history is copied into a separate cache.

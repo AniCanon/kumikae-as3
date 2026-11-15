@@ -107,6 +107,19 @@ class As3LexerTest {
         assertEquals(listOf("AS3_SYMBOL:/", "AS3_WORD:2"), tokens(deeper).takeLast(2))
     }
 
+    @Test fun `the editor may start again at any token, as tokens() checks for every one`() {
+        // The state holds all the lexer knows: an edit is lexed again from a token near it, not from the
+        // top of the file, though inside a class the state is never the first one.
+        val lexer = As3Lexer()
+        assertEquals(0, lexer.startState)
+        val text = "package { class A { function f():void { x = {} / 2; } } }"
+        lexer.start(text, 0, text.length, 0)
+        while (lexer.tokenType != null) {
+            assertEquals(true, lexer.isRestartableState(lexer.state))
+            lexer.advance()
+        }
+    }
+
     @Test fun `an empty file has no tokens`() {
         assertEquals(emptyList(), tokens(""))
     }
