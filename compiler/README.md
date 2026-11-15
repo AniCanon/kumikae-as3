@@ -266,7 +266,7 @@ compiler/build/kas3c lsp --declarations lib.as  # lib.as declares what exists el
 | A file opening or changing | The file's errors: what `kas3c check` prints for the project. |
 | Go to definition | Where the name under the cursor is declared, in the project, the built-in library or Godot's API. |
 | Find references | Every use of it in the project's files. |
-| Completion | After a dot, what the value before it has, with what its bases have; where a type is written, types; otherwise the names in reach: locals, members, definitions, keywords. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a dot whose value has no known type, and nothing in a comment, string or regular expression. |
+| Completion | After a dot, what the value before it has, with what its bases have (`Object`'s members for a `*` or a value of a type not known), or what a package's path holds; where a type is written, types; after `override`, the base classes' methods, each written as its whole declaration; otherwise the names in reach: locals, members, definitions, keywords, with a call argument's parameter name first. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a name that means nothing here, and nothing in a comment, string or regular expression. |
 | Signature help | The callable declaration and active parameter, including unfinished and nested calls. |
 | Hover | Its declaration, and the class or package it belongs to. |
 | Document symbols | The classes and members of the file. |
