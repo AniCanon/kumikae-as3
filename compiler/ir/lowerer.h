@@ -25,8 +25,18 @@ struct Loop {
 	std::vector<uint32_t> continues; // Jumps to patch to where the loop continues.
 	bool is_switch = false; // A `switch`: `break` leaves it, `continue` belongs to the loop around it.
 	bool is_block = false; // A labelled block: only `break label` leaves it.
+	bool hidden = false; // Out of reach from the `finally` being written here: see run_finallies().
 	std::string_view label; // Empty when the statement has none.
-	size_t finallies = 0; // How many `finally` blocks were open when it began.
+	size_t tries = 0; // How many `try` statements were open when it began.
+};
+
+// A `try` statement being lowered.
+struct TryBlock {
+	Block *finally_block = nullptr;
+	size_t loops = 0; // How many loops were open when it began: its `finally` sees those only.
+	bool hidden = false; // Its `finally` is being written: what runs there is outside it.
+	// Stretches of its code that are a `finally` written for a way out: no handler of this try covers them.
+	std::vector<std::pair<uint32_t, uint32_t>> holes;
 };
 
 class Lowerer {
@@ -68,9 +78,9 @@ class Lowerer {
 	std::unordered_map<const Symbol *, uint32_t> locals_;
 	std::vector<Loop> loops_;
 	std::string_view next_label_; // A label written just before the loop being lowered.
-	// The `finally` blocks around the code being lowered, outermost first: a `break`, `continue` or
-	// `return` that leaves one runs it on the way.
-	std::vector<Block *> finallies_;
+	// The `try` statements around the code being lowered, outermost first: a `break`, `continue` or
+	// `return` that leaves one runs its `finally` on the way.
+	std::vector<TryBlock> tries_;
 	// Expressions whose value is already in a register and must not be worked out again: the subject of
 	// a `switch`, which every `case` is compared with.
 	std::unordered_map<const Expr *, uint32_t> evaluated_;
@@ -392,8 +402,11 @@ class Lowerer {
 	void switch_statement(Stmt *p_statement);
 	void try_statement(Try *p_try);
 	void labeled(Labeled *p_labeled);
-	// Lowers the `finally` blocks from the innermost down to p_keep of them, for a way out of them.
+	// Writes the `finally` blocks of the open `try` statements from the innermost down to p_keep of them,
+	// for a way out of them.
 	void run_finallies(size_t p_keep);
+	// The handlers of a range of code, less the holes in it: one for each stretch that is left.
+	void protect(uint32_t p_start, uint32_t p_end, const std::vector<std::pair<uint32_t, uint32_t>> &p_holes, Handler p_handler);
 	void open_loop(); // A loop or switch begins: it takes the label written before it, if any.
 	uint32_t catch_type(const CatchClause &p_clause);
 	void break_or_continue(Stmt *p_statement);

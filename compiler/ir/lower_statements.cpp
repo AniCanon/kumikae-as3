@@ -141,10 +141,13 @@ void Lowerer::break_or_continue(Stmt *p_statement) {
 	// statement of that label (a block only for `break`).
 	for (size_t i = loops_.size(); i-- > 0;) {
 		const Loop &target = loops_[i];
+		if (target.hidden) {
+			continue;
+		}
 		const bool fits = label.empty() ? !target.is_block && (is_break || !target.is_switch)
 										: target.label == label && (is_break || (!target.is_switch && !target.is_block));
 		if (fits) {
-			run_finallies(target.finallies);
+			run_finallies(target.tries);
 			uint32_t jump = emit(Op::Jump, position, 0);
 			(is_break ? loops_[i].breaks : loops_[i].continues).push_back(jump);
 			return;
@@ -249,7 +252,7 @@ void Lowerer::return_statement(Stmt *p_statement) {
 		emit(Op::ReturnVoid, position);
 	} else {
 		uint32_t value = result->value ? typed(result->value, result_type_, fn().result) : default_value(fn().result, position);
-		if (!finallies_.empty()) {
+		if (!tries_.empty()) {
 			// The value is worked out first; then the `finally` blocks run, and cannot change it.
 			uint32_t kept = reg(kind_at(value));
 			emit(Op::Move, position, kept, value);
@@ -340,7 +343,7 @@ void Lowerer::statement(Stmt *p_statement) {
 void Lowerer::open_loop() {
 	Loop loop;
 	loop.label = next_label_;
-	loop.finallies = finallies_.size();
+	loop.tries = tries_.size();
 	next_label_ = std::string_view();
 	loops_.push_back(std::move(loop));
 }

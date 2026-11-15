@@ -27,6 +27,7 @@ package {
 		// A store into one of Godot's types checks the value is of that type.
 		public function asVector(value:*):Vector2 { var v:Vector2 = value; return v; }
 		public function asNode(value:*):Node { var n:Node = value; return n; }
+		public function throwValue(value:*):void { throw value; }
 		// An error raised for a Godot value is caught like any other.
 		public function guarded(value:*):String {
 			try {

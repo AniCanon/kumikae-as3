@@ -60,5 +60,6 @@ func _physics_process(_delta: float) -> bool:
 	show("a script object returned", ask("giveScript"), null)
 	show("a script object in a field", node.get("keep"), null)
 	show("freed", ask("freed"), "truetruetruenotrue")
+	ask("throwValue", [Vector2(3, 4)])
 	show("caught in AS3", [ask("guarded", [Vector2(2, 3)]), ask("guarded", [Color(1, 1, 1)]), node.position], ["fits (2.0, 3.0)", "caught true", Vector2(1, 1)])
 	return false

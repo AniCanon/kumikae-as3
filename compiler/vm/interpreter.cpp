@@ -165,19 +165,7 @@ void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
 	}
 }
 
-// Leaves frames until p_depth remain, adding each to the stack trace.
-void Interpreter::unwind(size_t p_depth) {
-	bool innermost = true;
-	while (frames_.size() > p_depth) {
-		// A caller is at the instruction after its call: step back to the call for the line number.
-		if (!innermost && frames_.back().pc > 0) {
-			frames_.back().pc--;
-		}
-		innermost = false;
-		leave_failed_frame();
-	}
-}
-
+// Catches the error, or leaves frames until p_depth remain, adding each to the stack trace.
 bool Interpreter::catch_error(size_t p_depth) {
 	bool innermost = true;
 	while (frames_.size() > p_depth) {
@@ -280,12 +268,20 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	return ok;
 }
 
-std::string Interpreter::error_text() const {
+std::string Interpreter::error_text() {
 	if (any::tag(pending_) == AnyTag::Object) {
 		return object_text(static_cast<Object *>(any::pointer(pending_)));
 	}
-	// Anything else that was thrown is shown as it reads; a Godot value by what it is.
-	return any::text(pending_).value_or("[a Godot value]");
+	if (const std::optional<std::string> plain = any::text(pending_)) {
+		return *plain;
+	}
+	// A Godot value or object: Godot's own text for it.
+	Str *words = host_.handles.text(any::pointer(pending_));
+	std::string out = words ? std::string(words->view()) : std::string("null");
+	if (release(words)) {
+		free_string(words);
+	}
+	return out;
 }
 
 // Gives the host the error that ended an entry, and forgets it.

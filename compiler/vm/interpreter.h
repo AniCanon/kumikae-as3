@@ -117,12 +117,11 @@ private:
 	void splice(Vector *p_vector, const VectorCall &p_call);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
-	void unwind(size_t p_depth);
-	void leave_failed_frame(); // One frame of unwind(): its line goes into the trace.
+	void leave_failed_frame(); // A frame the error leaves: its line goes into the trace.
 	// Catches the error in a frame above p_depth that has a handler for it, innermost first: true, and
-	// that frame carries on at the handler. Otherwise the frames are left, as unwind() leaves them.
+	// that frame carries on at the handler. Otherwise the frames are left, each line put in the trace.
 	bool catch_error(size_t p_depth);
-	std::string error_text() const; // The error on its way out, as its report begins.
+	std::string error_text(); // The error on its way out, as its report begins.
 	bool run(size_t p_depth, Slot *r_result);
 	bool call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result = nullptr);
 	// A call made from inside running code that is not an instruction of its own (an element's

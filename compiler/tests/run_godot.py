@@ -255,6 +255,8 @@ check("untyped.gd: a script object reaching Godot is said", "giveScript returns 
       "'keep' holds a script object" in output, output[-2000:])
 check("untyped.gd: a value of the wrong type is AS3's coercion error", "at Untyped/wrongType()" in output and "Error #1034" in output,
       output[-1500:])
+check("untyped.gd: a thrown Godot value nothing catches is reported as its text", "(3.0, 4.0)\n\tat Untyped/throwValue()" in output,
+      output[-2000:])
 check("untyped.gd: a script object given to Godot is an AS3 error", "at Untyped/scriptObject()" in output, output[-1500:])
 
 # Godot's own classes with `is` and `as`, and input events as a script receives them.

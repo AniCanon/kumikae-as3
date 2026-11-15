@@ -27,7 +27,7 @@ it stands.
 | **2c** | The rest of the language | 32 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 25 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 54 | What is left |
+| **clean-up** | A pass that closes stage 2 | 55 | What is left |
 | **decision** | The owner | 11 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
@@ -273,8 +273,9 @@ any Godot value passing as a condition):
 
 - An error that passes through a `finally` is reported at the line of its `try`, not where it was thrown:
   the stack trace is built as frames are left, and the `finally` throws it again. **clean-up**
-- A `finally` run by a `break`, `continue` or `return` inside its `try` is written inside the `try`: an
-  error in it is caught by that same `try`'s catches, and its `finally` runs twice. **2c**
+- A `finally` is written out again for each `break`, `continue` or `return` that leaves it: a long one
+  left many ways makes the function's code that much longer. **clean-up**
+- `continue a` where `a` labels a label (`a: b: for ...`) is refused; AS3 allows it. **2c**
 - An error inside a script method that Godot called is reported there: a `try` in AS3 around the Godot
   call that led to it does not see it. **2d**
 - An `Error`'s `errorID`, `name` and `getStackTrace()` wait for the standard library. **2c**
