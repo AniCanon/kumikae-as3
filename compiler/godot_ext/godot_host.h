@@ -16,6 +16,9 @@
 
 namespace kas3 {
 
+// Lets go of the defaults Godot worked out (see GodotHost::evaluate()). Before the extension goes.
+void forget_defaults();
+
 class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::EngineSource {
 	std::unordered_set<void *> borrowed_; // Handles made by borrow().
 
@@ -38,11 +41,18 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
-	std::unordered_map<std::string, godot::Variant> evaluated_; // What evaluate() worked out, by its text.
+	// What evaluate() worked out, by the place of its text: the values are kept for the whole run (see
+	// forget_defaults()), so a program loaded again asks Godot nothing.
+	struct Evaluated {
+		std::string text;
+		const godot::Variant *value = nullptr;
+	};
+	std::unordered_map<Place, Evaluated, PlaceHash> evaluated_;
 	// A class's static method, by "Class.method hash", found once: called through it, a wrong call is an
 	// error the script is told of.
 	std::unordered_map<std::string, GDExtensionMethodBindPtr> static_methods_;
 	const godot::StringName &name(std::string_view p_text);
+	const godot::Variant *evaluated(std::string_view p_expression, std::string *r_error);
 	const godot::String &text_of(std::string_view p_text); // name() as a String, made once.
 
 	// One of Godot's global functions, found once: see godot_utility.cpp.

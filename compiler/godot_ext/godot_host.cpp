@@ -1,4 +1,5 @@
 #include "godot_host.h"
+#include "godot_calls.h"
 
 #include "any.h"
 
@@ -29,6 +30,28 @@ using namespace godot;
 
 namespace kas3 {
 
+String to_godot(std::string_view p_text) {
+	return String::utf8(p_text.data(), (int64_t)p_text.size());
+}
+
+std::string describe(const GDExtensionCallError &p_error, std::string_view p_what) {
+	std::string what(p_what);
+	switch (p_error.error) {
+		case GDEXTENSION_CALL_ERROR_INVALID_METHOD:
+			return "Godot has no '" + what + "' on this value";
+		case GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT:
+			return "Godot rejected argument " + std::to_string(p_error.argument + 1) + " of '" + what + "'";
+		case GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS:
+			return "too many arguments for Godot's '" + what + "'";
+		case GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS:
+			return "too few arguments for Godot's '" + what + "'";
+		case GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL:
+			return "'" + what + "' was called on an object Godot has freed";
+		default:
+			return "Godot could not call '" + what + "'";
+	}
+}
+
 // A handle on a reference-counted object that is gone. Copying it would count a reference on freed
 // memory. (Only a script's hold on its own owner can be one: any other handle keeps its object alive.) A
 // handle on any other freed object is safe to copy, and Godot knows it as a freed object.
@@ -43,9 +66,6 @@ static bool is_dangling(const Variant &p_value) {
 	return p_value.get_type() == Variant::OBJECT && ((ObjectID)p_value).is_ref_counted() && !p_value.get_validated_object();
 }
 
-static String to_godot(std::string_view p_text) {
-	return String::utf8(p_text.data(), (int64_t)p_text.size());
-}
 
 Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 	switch (p_kind) {
@@ -209,63 +229,7 @@ std::optional<vm::Slot> from_variant(ir::Kind p_kind, const Variant &p_value) {
 	return slot;
 }
 
-// The arguments of one call into Godot: as Variants, and as the pointers Godot takes. A call of up to
-// eight sits on the stack, so that nothing is allocated for it. p_leading values come before the
-// interpreter's own (the two names a class's static call starts with).
-class Arguments {
-	static constexpr size_t INLINE = 8;
-	Variant inline_values_[INLINE];
-	const Variant *inline_pointers_[INLINE];
-	std::vector<Variant> more_values_;
-	std::vector<const Variant *> more_pointers_;
-	const Variant **pointers_ = inline_pointers_;
-	size_t count_ = 0;
 
-public:
-	Arguments(const vm::Argument *p_arguments, size_t p_count, std::initializer_list<Variant> p_leading = {}) :
-			count_(p_count + p_leading.size()) {
-		Variant *values = inline_values_;
-		if (count_ > INLINE) {
-			more_values_.resize(count_);
-			more_pointers_.resize(count_);
-			values = more_values_.data();
-			pointers_ = more_pointers_.data();
-		}
-		size_t at = 0;
-		for (const Variant &leading : p_leading) {
-			values[at++] = leading;
-		}
-		for (size_t i = 0; i < p_count; i++) {
-			values[at++] = to_variant(p_arguments[i].kind, p_arguments[i].slot);
-		}
-		for (size_t i = 0; i < count_; i++) {
-			pointers_[i] = &values[i];
-		}
-	}
-	Arguments(const Arguments &) = delete;
-	Arguments &operator=(const Arguments &) = delete;
-
-	const Variant **pointers() { return pointers_; }
-	size_t count() const { return count_; }
-};
-
-static std::string describe(const GDExtensionCallError &p_error, std::string_view p_what) {
-	std::string what(p_what);
-	switch (p_error.error) {
-		case GDEXTENSION_CALL_ERROR_INVALID_METHOD:
-			return "Godot has no '" + what + "' on this value";
-		case GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT:
-			return "Godot rejected argument " + std::to_string(p_error.argument + 1) + " of '" + what + "'";
-		case GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS:
-			return "too many arguments for Godot's '" + what + "'";
-		case GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS:
-			return "too few arguments for Godot's '" + what + "'";
-		case GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL:
-			return "'" + what + "' was called on an object Godot has freed";
-		default:
-			return "Godot could not call '" + what + "'";
-	}
-}
 
 const StringName &GodotHost::name(std::string_view p_text) {
 	Name &entry = names_[Place{ p_text.data(), p_text.size() }];
@@ -310,152 +274,6 @@ void GodotHost::error(std::string_view p_text) {
 	gdextension_interface::print_script_error(text.c_str(), function.c_str(), file.c_str(), line, false);
 }
 
-// One of Godot's value types by its name ("Vector2"), or -1. The names are listed once.
-int value_type(std::string_view p_name) {
-	static const std::unordered_map<std::string, int> types = [] {
-		std::unordered_map<std::string, int> found;
-		for (int i = 1; i < Variant::VARIANT_MAX; i++) {
-			if (i != Variant::OBJECT) {
-				found.emplace(Variant::get_type_name((Variant::Type)i).utf8().get_data(), i);
-			}
-		}
-		return found;
-	}();
-	auto found = types.find(std::string(p_name));
-	return found == types.end() ? -1 : found->second;
-}
-
-bool GodotHost::evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
-	const std::string text(p_expression);
-	auto found = evaluated_.find(text);
-	if (found == evaluated_.end()) {
-		// Godot reads its own way of writing a value.
-		Ref<Expression> expression;
-		expression.instantiate();
-		Variant value;
-		if (expression->parse(to_godot(p_expression)) == OK) {
-			value = expression->execute(Array(), nullptr, false);
-		}
-		if (value.get_type() == Variant::NIL || expression->has_execute_failed()) {
-			*r_error = "Godot could not work out its default '" + text + "'";
-			return false;
-		}
-		found = evaluated_.emplace(text, value).first;
-	}
-	// Godot shares an Array or a Dictionary between everything that holds it, and may write into one it is
-	// given: each call gets its own.
-	const Variant::Type type = found->second.get_type();
-	const Variant value = type == Variant::ARRAY || type == Variant::DICTIONARY ? found->second.duplicate() : found->second;
-	return take(p_result, value, p_expression, r_result, r_error);
-}
-
-// Asked once for each singleton (the interpreter keeps it), so the list may be looked through.
-void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {
-	const StringName &singleton_name = name(p_class);
-	Engine *engine = Engine::get_singleton();
-	// An editor-only one is not in the list outside the editor; asking Godot for it would make Godot report
-	// it too, besides the AS3 error.
-	const bool listed = engine && engine->has_singleton(singleton_name) && engine->get_singleton_list().has(String(singleton_name));
-	Object *object = listed ? engine->get_singleton(singleton_name) : nullptr;
-	if (!object) {
-		// Some exist only in the editor, or only on one platform.
-		*r_error = "Godot has no '" + std::string(p_class) + "' here";
-		return nullptr;
-	}
-	// Each singleton is named for its class: the class the script names is the one it gets.
-	if (!object->is_class(String(singleton_name))) {
-		CharString got = object->get_class().utf8();
-		*r_error = "Godot's '" + std::string(p_class) + "' is a " + std::string(got.get_data()) + ", not a " + std::string(p_class);
-		return nullptr;
-	}
-	return new Variant(object);
-}
-
-bool GodotHost::constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
-	int type = value_type(p_class);
-	Variant value;
-	if (type >= 0) {
-		gdextension_interface::variant_get_constant_value((GDExtensionVariantType)type, name(p_name)._native_ptr(), value._native_ptr());
-	}
-	// Godot answers an unknown name with the integer -1. No constant asked for here is a number (those have
-	// their values in the declarations), so a number where a Godot value is wanted means there is none.
-	if (value.get_type() == Variant::NIL || (value.get_type() == Variant::INT && ir::is_engine(p_result.kind))) {
-		*r_error = "Godot has no constant '" + std::string(p_name) + "' in '" + std::string(p_class) + "'";
-		return false;
-	}
-	return take(p_result, value, p_name, r_result, r_error);
-}
-
-bool GodotHost::call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
-		const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
-	if (p_class.empty()) {
-		return call_utility(p_method, p_arguments, p_count, p_result, r_result, r_error);
-	}
-	// A class's static method comes with its hash ("print_orphan_nodes 2648703342").
-	const size_t space = p_method.find(' ');
-	const std::string_view method = p_method.substr(0, space);
-	const StringName &method_name = name(method);
-	Arguments arguments(p_arguments, p_count);
-	Variant result;
-	GDExtensionCallError error;
-	error.error = GDEXTENSION_CALL_OK;
-	int type = value_type(p_class);
-	if (type >= 0) {
-		Variant::callp_static((Variant::Type)type, method_name, arguments.pointers(), (int)p_count, result, error);
-	} else {
-		const std::string key = std::string(p_class) + "." + std::string(p_method);
-		auto found = static_methods_.find(key);
-		if (found == static_methods_.end()) {
-			const GDExtensionInt hash = space == std::string_view::npos ? 0 : std::strtoll(key.c_str() + p_class.size() + 1 + space + 1, nullptr, 10);
-			const StringName class_name(String::utf8(p_class.data(), (int64_t)p_class.size()));
-			GDExtensionMethodBindPtr bound = space == std::string_view::npos ? nullptr
-					: gdextension_interface::classdb_get_method_bind(class_name._native_ptr(), method_name._native_ptr(), hash);
-			found = static_methods_.emplace(key, bound).first;
-		}
-		if (!found->second) {
-			*r_error = "Godot has no '" + std::string(method) + "' in '" + std::string(p_class) + "'";
-			return false;
-		}
-		gdextension_interface::object_method_bind_call(found->second, nullptr, reinterpret_cast<GDExtensionConstVariantPtr *>(arguments.pointers()),
-				(GDExtensionInt)p_count, result._native_ptr(), &error);
-	}
-	if (error.error != GDEXTENSION_CALL_OK) {
-		*r_error = describe(error, std::string(p_class) + "." + std::string(method));
-		return false;
-	}
-	return take(p_result, result, method, r_result, r_error);
-}
-
-void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) {
-	int type = value_type(p_type);
-	if (type < 0) {
-		// Not a value type: one of Godot's classes, made as `ClassName.new()` makes it.
-		const StringName &klass = name(p_type);
-		ClassDBSingleton *classes = ClassDBSingleton::get_singleton();
-		if (p_count != 0 || !classes->class_exists(klass)) {
-			*r_error = "Godot has no value type '" + std::string(p_type) + "'";
-			return nullptr;
-		}
-		Variant object = classes->can_instantiate(klass) ? classes->instantiate(klass) : Variant();
-		if (object.get_type() != Variant::OBJECT) {
-			*r_error = "Godot can't make a '" + std::string(p_type) + "': it is a class to extend, not one to create";
-			return nullptr;
-		}
-		return new Variant(object);
-	}
-	Arguments arguments(p_arguments, p_count);
-	Variant *made = new Variant();
-	GDExtensionCallError error;
-	error.error = GDEXTENSION_CALL_OK;
-	gdextension_interface::variant_construct((GDExtensionVariantType)type, made->_native_ptr(),
-			reinterpret_cast<GDExtensionConstVariantPtr *>(arguments.pointers()), (int32_t)p_count, &error);
-	if (error.error != GDEXTENSION_CALL_OK) {
-		delete made;
-		*r_error = describe(error, "new " + std::string(p_type));
-		return nullptr;
-	}
-	return made;
-}
 
 // The AS3 way of listening to a signal, made from Godot's own calls. p_verb is "@add" and so on: the
 // names the generator gives members that Godot has no one method for.

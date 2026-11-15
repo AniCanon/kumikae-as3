@@ -148,8 +148,6 @@ the review of the clean-up put off.
   program does not say what it expects, and for one of Godot's values. Each has a typed twin. **2c**
 - Godot's message for a listener that was not called names it `Node(Signals.as)::`, without the method.
   **clean-up**
-- A default is read by Godot each time a program is loaded, not once when the declarations are made.
-  **clean-up**
 - A freed Godot object still reads as `<Freed Object>` as text, as in GDScript, though it is `null` in
   every test. **decision**
 - An iOS library built before a script used something new does not load the project, and the test scene

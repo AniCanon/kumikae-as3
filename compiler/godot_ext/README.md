@@ -9,6 +9,8 @@ called by the engine.
 | `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
 | `godot_host` | The interpreter's three interfaces, done with Godot's calls; values to and from `Variant` |
+| `godot_source.cpp` | Where values come from (`EngineSource`): defaults, constants, constructors, singletons, static methods |
+| `godot_calls.h` | What the two host files share: the arguments of a call, a failed call in AS3's words |
 | `godot_utility.cpp` | Godot's global functions |
 | `godot_untyped.cpp` | An untyped value as a Variant and back: an integer stays an integer, a whole float a float |
 | `godot_collections.cpp` | A vector handed to Godot: the packed array Godot takes there, or an Array |

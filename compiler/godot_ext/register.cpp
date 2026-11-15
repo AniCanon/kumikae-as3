@@ -34,6 +34,7 @@ static void terminate(ModuleInitializationLevel p_level) {
 	ResourceLoader::get_singleton()->remove_resource_format_loader(loader);
 	loader.unref();
 	kas3::Project::unload();
+	kas3::forget_defaults();
 	Engine::get_singleton()->unregister_script_language(AS3Language::singleton);
 	memdelete(AS3Language::singleton);
 	AS3Language::singleton = nullptr;
