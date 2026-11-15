@@ -44,8 +44,8 @@ Interpreter::~Interpreter() {
 	for (size_t i = 0; i < globals_.size(); i++) {
 		drop(module_.globals[i].kind, globals_[i]);
 	}
-	if (pending_ && release(pending_)) {
-		drop_object(pending_);
+	if (failing_) {
+		drop_any(pending_);
 	}
 	for (Str *constant : strings_) {
 		if (release(constant)) {
@@ -151,17 +151,18 @@ void Interpreter::raise_null() {
 }
 
 void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
-	if (pending_) {
+	if (failing_) {
 		return;
 	}
 	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size()) : nullptr;
 	if (error) {
 		error->fields()[0].p = text(p_message);
+		pending_ = any::object(error);
+		failing_ = true;
 	} else {
 		trace_ = p_message + "\n";
 		stopped_ = true; // Nothing to throw with: stop.
 	}
-	pending_ = error;
 }
 
 // Leaves frames until p_depth remain, adding each to the stack trace.
@@ -173,19 +174,60 @@ void Interpreter::unwind(size_t p_depth) {
 			frames_.back().pc--;
 		}
 		innermost = false;
-		// A class whose static fields were being set when the error came is not ready: the next use of it
-		// sets them again, and fails again, where carrying on would run with fields that were never set.
-		const Function &leaving = module_.functions[frames_.back().function];
-		if (leaving.owner != NONE && module_.classes[leaving.owner].static_init == frames_.back().function) {
-			forget_class(leaving.owner);
-		}
-		// A runaway recursion has thousands of frames: the first few and a count say as much.
-		if (trace_lines_ < MAX_TRACE) {
-			trace_ += site(frames_.back()) + "\n";
-		}
-		trace_lines_++;
-		pop();
+		leave_failed_frame();
 	}
+}
+
+bool Interpreter::catch_error(size_t p_depth) {
+	bool innermost = true;
+	while (frames_.size() > p_depth) {
+		Frame &frame = frames_.back();
+		if (!innermost && frame.pc > 0) {
+			frame.pc--; // A caller: at its call, as for the trace.
+		}
+		innermost = false;
+		const Function &function = module_.functions[frame.function];
+		for (const ir::Handler &handler : function.handlers) {
+			if (!failing_ || stopped_ || frame.pc < handler.start || frame.pc >= handler.end ||
+					(handler.type != NONE && !any_is(pending_, handler.type))) {
+				continue;
+			}
+			// Caught: the error goes to the catch's variable, as its kind holds it, and is no longer on
+			// its way out.
+			const Kind kind = function.registers[handler.reg];
+			const Slot error = pending_;
+			pending_.bits = 0;
+			failing_ = false;
+			trace_.clear();
+			trace_lines_ = 0;
+			Slot caught;
+			caught.bits = 0;
+			const bool converted = from_any(error, kind, NONE, &caught);
+			drop_any(error);
+			if (converted) {
+				put(kind, stack_[frame.base + handler.reg], caught);
+			}
+			frame.pc = handler.target;
+			return true;
+		}
+		leave_failed_frame();
+	}
+	return false;
+}
+
+void Interpreter::leave_failed_frame() {
+	// A class whose static fields were being set when the error came is not ready: the next use of it
+	// sets them again, and fails again, where carrying on would run with fields that were never set.
+	const Function &leaving = module_.functions[frames_.back().function];
+	if (leaving.owner != NONE && module_.classes[leaving.owner].static_init == frames_.back().function) {
+		forget_class(leaving.owner);
+	}
+	// A runaway recursion has thousands of frames: the first few and a count say as much.
+	if (trace_lines_ < MAX_TRACE) {
+		trace_ += site(frames_.back()) + "\n";
+	}
+	trace_lines_++;
+	pop();
 }
 
 // One entry from outside: runs the function to its end. An error is reported to the host and cleared, so
@@ -204,12 +246,14 @@ bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size
 }
 
 bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
-	Object *outer_error = pending_;
+	const Slot outer_error = pending_;
+	const bool outer_failing = failing_;
 	std::string outer_trace = std::move(trace_);
 	size_t outer_lines = trace_lines_;
 	bool outer_stopped = stopped_;
 	bool outer_halted = halted_;
-	pending_ = nullptr;
+	pending_.bits = 0;
+	failing_ = false;
 	trace_.clear();
 	trace_lines_ = 0;
 	stopped_ = false;
@@ -228,6 +272,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		report();
 	}
 	pending_ = outer_error;
+	failing_ = outer_failing;
 	trace_ = std::move(outer_trace);
 	trace_lines_ = outer_lines;
 	stopped_ = outer_stopped;
@@ -235,22 +280,31 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	return ok;
 }
 
+std::string Interpreter::error_text() const {
+	if (any::tag(pending_) == AnyTag::Object) {
+		return object_text(static_cast<Object *>(any::pointer(pending_)));
+	}
+	// Anything else that was thrown is shown as it reads; a Godot value by what it is.
+	return any::text(pending_).value_or("[a Godot value]");
+}
+
 // Gives the host the error that ended an entry, and forgets it.
 void Interpreter::report() {
-	if (!(halted_ && !pending_)) { // Stopped on request: there is no error to report.
+	if (!(halted_ && !failing_)) { // Stopped on request: there is no error to report.
 		if (trace_lines_ > MAX_TRACE) {
 			trace_ += "\t... " + std::to_string(trace_lines_ - MAX_TRACE) + " more\n";
 		}
-		std::string text = pending_ ? object_text(pending_) + "\n" + trace_ : trace_;
+		std::string text = failing_ ? error_text() + "\n" + trace_ : trace_;
 		while (!text.empty() && text.back() == '\n') {
 			text.pop_back();
 		}
 		host_.output.error(text);
 	}
-	if (pending_ && release(pending_)) {
-		drop_object(pending_);
+	if (failing_) {
+		drop_any(pending_);
 	}
-	pending_ = nullptr;
+	pending_.bits = 0;
+	failing_ = false;
 	trace_.clear();
 	trace_lines_ = 0;
 }

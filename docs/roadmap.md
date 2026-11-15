@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 132 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 136 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -108,7 +108,8 @@ properties, signals and hot reload.
 | 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the `Int64` type | The test programs that need no unsupported language feature run in Godot, and the backlog items marked 2b-3 are closed. | Done |
 | 2c-1. Vectors, `switch`, `Math` | `Vector.<T>` with its methods, `for each` over one, vectors handed to Godot as packed arrays or arrays and carried across a reload; `switch`; `Math`; `new` of Godot's own classes | 8 of the 14 corpus programs run in Godot (`tests/run_corpus.py`, `tests/corpus/runs.txt`). | Done: reviewed, and merged on 2026-11-15 |
 | 2c-2. The untyped value | `*` and `Object` as types: held in one slot, compared, added, printed, tested with `is`, `as` and `typeof`, and handed to Godot and taken from it with Godot's types kept | `RayQueries` runs in Godot: 9 of the 14 corpus programs. | Built; in review |
-| 2c-3 to 2c-6. The rest of the language | In the order the corpus asks for, measured again as each slice ends: `try`/`catch`, labelled loops; `Array`, `Object` literals and dynamic access, `Dictionary`, `for in` in general, rest parameters; closures, and the collection methods that take one; accessors and interfaces; the standard library (`String`, `Number`, the top-level functions, `JSON`, `Date`, `RegExp`) | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
+| 2c-3. Errors and labels | `try`, `catch` (by class, by `String`, `int` or `Number`, or anything), `finally` on every way out, any value thrown, labelled `break` and `continue`, `&&=` and `||=` | Each has a program checked against Node, and an error from a Godot value is caught in Godot. | Built; in review |
+| 2c-4 to 2c-6. The rest of the language | In the order the corpus asks for: `Array`, `Object` literals and dynamic access, `Dictionary`, `for in` in general, rest parameters; closures, and the collection methods that take one; accessors and interfaces; the standard library (`String`, `Number`, the top-level functions, `JSON`, `Date`, `RegExp`) | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
 | Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Completion built ahead, on 2026-11-14, and working in VS Code and Rider on macOS; the rest planned |
 | 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Hot reload built ahead, on 2026-11-14: on desktop and on the iOS Simulator; the rest planned |
 | Clean-up pass | The 50 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |

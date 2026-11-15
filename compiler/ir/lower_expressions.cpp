@@ -529,8 +529,15 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 		const std::optional<uint32_t> collection = place.where == Place::Engine ? vector_to_engine(p_assign->value, place.type) : std::nullopt;
 		value = collection ? *collection : typed(p_assign->value, p_assign->target->type, place.kind);
 	} else if (p_assign->op == TokenKind::AmpAmpAssign || p_assign->op == TokenKind::PipePipeAssign) {
-		refuse(position, "'&&=' or '||='");
-		value = default_value(place.kind, position);
+		// a &&= b stores b only if a is true; a ||= b only if a is false. Otherwise a stays as it is.
+		value = reg(place.kind);
+		emit(Op::Move, position, value, load(place, position));
+		const uint32_t test = convert(value, Kind::Bool, position);
+		const uint32_t skip = emit(p_assign->op == TokenKind::AmpAmpAssign ? Op::JumpIfNot : Op::JumpIf, position, test, 0);
+		emit(Op::Move, position, value, typed(p_assign->value, p_assign->target->type, place.kind));
+		store(place, value, position);
+		patch(skip, here());
+		return value;
 	} else if (p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Any || untyped(p_assign->value))) {
 		// `+=` with an untyped side: text or numbers, by what each holds when it runs.
 		uint32_t old = settled(convert(load(place, position), Kind::Any, position), p_assign->value, position);
