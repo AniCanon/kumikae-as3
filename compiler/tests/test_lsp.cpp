@@ -898,6 +898,53 @@ static void test_repeated_diagnostics_version() {
 	}
 }
 
+static void test_repeated_diagnostic_clear() {
+	for (bool versions : { false, true }) {
+		Session session;
+		session.initialize({}, false, {}, versions);
+		const std::string good = "package { public class Main { public function later():void {} } }";
+		session.open(MAIN, "package { public class Main { public function later():void } }");
+		session.settle();
+		CHECK(session.published().find("expected '{'") != std::string::npos);
+		session.change(MAIN, good);
+		session.settle();
+		CHECK_EQ(session.received.size(), size_t{1});
+		if (!session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("params").get("diagnostics").size(), size_t{0});
+		}
+		// The editor has already advanced to v3, so it drops the delayed v2 clear.
+		for (int version : {3, 4}) {
+			session.change(MAIN, good + " ");
+			session.settle();
+			CHECK_EQ(session.received.size(), versions ? size_t{1} : size_t{0});
+			if (versions && !session.received.empty()) {
+				const Json &params = session.received.at(0).get("params");
+				CHECK_EQ(params.get("version").integer(-1), version);
+				CHECK_EQ(params.get("diagnostics").size(), size_t{0});
+			}
+			session.settle();
+			CHECK(session.received.empty());
+		}
+		// Checking another file must not resend this file's unchanged clean version.
+		const std::string other = "file:///work/Other.as";
+		session.open(other, "package { public class Other { var n:int = \"bad\"; } }");
+		session.settle();
+		CHECK_EQ(session.received.size(), size_t{1});
+		if (!session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("params").get("uri").string(), other);
+		}
+		session.close(MAIN);
+		session.settle();
+		session.open(MAIN, good);
+		session.settle();
+		CHECK_EQ(session.received.size(), versions ? size_t{1} : size_t{0});
+		if (versions && !session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), 1);
+			CHECK_EQ(session.received.at(0).get("params").get("diagnostics").size(), size_t{0});
+		}
+	}
+}
+
 static void test_document_versions() {
 	Session session;
 	session.initialize({}, false, {}, true);
@@ -945,6 +992,7 @@ static void test_completion_import_refresh() {
 }
 
 int main() {
+	test_repeated_diagnostic_clear();
 	test_override_snippet_text();
 	test_completion_import_refresh();
 	test_repeated_diagnostics_version();

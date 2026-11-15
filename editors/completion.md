@@ -138,7 +138,9 @@ is bounded by periodically rebuilding the semantic environment. This is a conser
 a general dependency graph for incremental checking.
 
 Document changes with old or duplicate versions are ignored with a log message. Diagnostic versions are
-sent when the client advertises support. A bounded lookahead batch cancels queued requests or rejects
+sent when the client advertises support, including empty diagnostic lists for each newly checked clean
+version. If typing overtakes an earlier clear, the next clean version clears stale errors again.
+A bounded lookahead batch cancels queued requests or rejects
 requests made obsolete by a newer document change before checking. Partial frames do not delay an
 already complete request. A check already running remains synchronous and cannot be interrupted.
 See the [follow-up results](../docs/results/2026-11-completion-followup.md) for latency, memory and validation.

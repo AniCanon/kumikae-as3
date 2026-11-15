@@ -343,6 +343,68 @@ runs: the 101-sample 100k-line run started at 92,096 → 89,424 KiB, while the e
 91,248 → 94,096 KiB. Those single startup samples are not a retention or leak measurement. No new
 ten-minute soak was run. Full output is in `compiler/build/language-bench-*.log`.
 
+## Diagnostic clears while typing
+
+A manual screenshot showed `expected '{' but found '}'` beside a valid empty `later():void {}` method.
+Both saved sandbox sources compile without diagnostics. Rider's language-service wire log records the
+error at version 300 after typing `try`, followed by an empty diagnostic list at version 301 after
+deleting the `y`. Its client log records discarding that clear because the document was already at
+version 303. Subsequent clean edits received no new diagnostic list. This confirms the dropped-clear
+sequence behind the stale message; it was not an error in the empty method shown in the screenshot.
+
+The investigation reproduced a server fault: after sending an empty list for clean version 2, it erased
+the publication record. Clean versions 3 and 4 then sent nothing. A client that discarded the version-2
+clear could retain an older error indefinitely. The server now publishes an empty list for every new
+checked clean version of an open document when the client supports versions. It retains one latest
+record, suppresses same-version duplicates, and releases clean records on close. Unversioned clients
+keep their previous single-clear behavior. No client adapter or parser rule changed.
+
+The in-process regression failed first at the two later clean versions and clean reopen (three failures).
+The sequential stdio regression separately failed with `diagnostic clear version 3 []`. Both pass after
+the fix. Coverage includes unchanged text at a newer version, an unrelated file's check, repeated settle,
+close/reopen and clients without version support. `test_lsp` reports `109218 checks, 0 failed`.
+Release passes all 26 CTest groups in 27.87 seconds; the separately rebuilt extension reports `godot: OK`.
+ASan/UBSan passes all 26 groups in 289.61 seconds. Offline Gradle `check buildPlugin verifyPlugin` passes,
+with unchanged Kotlin test tasks up to date (134 plugin passes/one opt-in skip; 82 core passes/three
+opt-in skips). The Python client suite passes nine tests. Both installed IDE endpoints remain compatible;
+the compiler and extension in the ZIP match the rebuilt files, and no probe classes are shipped.
+Agy independently reviewed the fix, regressions and guides, ran the style check and inspected the
+red/green logs. It found no actionable issues. Sanitizer and IDE probes were still running when it
+inspected their logs; the sanitizer result above was verified afterwards.
+
+The first updated Rider probe completed one project cycle, then exceeded its two-minute task limit
+while sanitizer tests were running. It also reproduced the native stale-range exception. That attempt
+is preserved as `diagnostic-clear-rider-timeout`; it is not counted as a passing three-cycle run.
+A retry completed its first cycle but displayed an Undo dialog and failed immediate override Undo in
+the second. The unchanged `f6027a6` compiler control then passed all three cycles, as did a fresh run
+with the fixed compiler. The cause of the intermittent Undo failure is unverified and remains in LS-2;
+neither passing run erases that observation. The final candidate's bundled compiler matches the build.
+The final IDEA/LSP4IJ run also passes all three project cycles. Light/dark panel images from both final
+runs were inspected. Logs and preserved reports use `diagnostic-clear-*` in the ignored build folders.
+The manual sandbox was restarted after the owner saved. Its two AS3 files remained byte-identical,
+and the new wire log shows an empty diagnostic list for the opened `Player.as` at version 0.
+The existing native diagnostic-range exception and LSP4IJ invalid-range warning remain separate
+unresolved issues. This protocol fix alone does not establish that either client invalidates every
+previously accepted range correctly.
+
+An alternating comparison against the saved `f6027a6` executable used the existing completion benchmark
+with one capability added to initialization: `textDocument.publishDiagnostics.versionSupport: true`.
+This exercises the extra clear messages. The ignored `diagnostic-version-bench.py` wrapper changes only
+that capability; it calls the existing driver with `--runs 101 --valid-body`, then `--runs 31` for
+recovery, using `compiler/build/diagnostic-baseline` as `--against`.
+
+| 100,000-line workload | Before median / p95 (ms) | Fixed median / p95 (ms) |
+|---|---:|---:|
+| Warm member completion, 101 samples | 0.167 / 0.215 | 0.167 / 0.212 |
+| Valid body edit + completion, 101 samples | 1.280 / 1.459 | 1.401 / 1.549 |
+| Twenty valid edits + completion, 101 samples | 12.073 / 13.434 | 11.519 / 12.752 |
+| Recovery edit + completion, 31 samples | 31.345 / 32.595 | 31.161 / 32.274 |
+
+The valid-edit median increased by 0.121 ms (9.5%) in the large fixture; in the small fixture it changed
+from 1.085 to 1.044 ms. Responses still contain 56 candidates and 6,020 bytes. These shared-host results
+do not establish a general speedup or absence of overhead. The manual sandbox remained open; this
+task's builds, sanitizer suite and automated IDE probes had finished. No new memory soak was run.
+
 ## Timing and retention method
 
 ```sh

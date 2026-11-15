@@ -222,11 +222,8 @@ void Server::publish(std::vector<std::string> &r_out) {
 		}
 		present.insert(uri);
 		auto before = published_.find(uri);
-		if (!unit->diagnostics.has_errors()) {
-			if (before != published_.end()) {
-				send(uri, "[]");
-				published_.erase(before);
-			}
+		const auto version = document_version(uri);
+		if (!unit->diagnostics.has_errors() && before == published_.end() && !version) {
 			continue;
 		}
 		Json list = Json::array();
@@ -246,10 +243,14 @@ void Server::publish(std::vector<std::string> &r_out) {
 							  .set("message", "too many errors (" + std::to_string(dropped) + " more)"));
 		}
 		std::string text = write_json(list);
-		const auto version = document_version(uri);
 		if (before == published_.end() || before->second.diagnostics != text || before->second.version != version) {
 			send(uri, text);
-			published_[uri] = { std::move(text), version };
+			if (!unit->diagnostics.has_errors() && !version) {
+				published_.erase(uri);
+			} else {
+				// A client typing ahead can discard a clear, so clean open versions need fresh clears too.
+				published_[uri] = { std::move(text), version };
+			}
 		}
 	}
 	// Files that left the program take their errors with them.

@@ -154,6 +154,41 @@ check("unasked exit", process.wait(timeout=20) == 0)
 process.stdout.close()
 process.stderr.close()
 
+# A client may discard a clean version while typing ahead. The next clean version must clear it too.
+process = subprocess.Popen([KAS3C, "lsp", "--no-godot"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE)
+try:
+    process.stdin.write(request(1, "initialize", {"capabilities": {
+        "textDocument": {"publishDiagnostics": {"versionSupport": True}}}}) + notify("initialized", {}))
+    good = "package { public class Main { public function later():void {} } }"
+    edits = [opened("package { public class Main { public function later():void } }"),
+             changed(good), changed(good + " ")]
+    for version, edit in enumerate(edits, 1):
+        process.stdin.write(edit)
+        process.stdin.flush()
+        collected = b""
+        published = []
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline and not published:
+            if select.select([process.stdout], [], [], 0.2)[0]:
+                chunk = os.read(process.stdout.fileno(), 65536)
+                if not chunk:
+                    break
+                collected += chunk
+                messages = unframe(collected)
+                if messages is not None:
+                    published = diagnostics(messages)
+        check("diagnostic clear version %d" % version,
+              len(published) == 1 and published[0].get("version") == version and
+              published[0]["uri"] == URI and bool(published[0]["diagnostics"]) == (version == 1),
+              repr(published))
+finally:
+    process.stdin.write(END)
+    process.stdin.close()
+    check("diagnostic clear exit", process.wait(timeout=20) == 0)
+    process.stdout.close()
+    process.stderr.close()
+
 # Editors' clients say how to talk by adding --stdio (VS Code's does): it is the only way, and accepted.
 code, messages, errors = session(START + END, "--no-godot", "--stdio")
 check("--stdio", code == 0 and messages is not None and len(messages) == 2 and errors == b"", repr((code, errors)))

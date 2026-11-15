@@ -46,7 +46,11 @@ line, contain the caret and filter on the method name; metadata and existing mod
 clients receive a final caret before the generated throwing body; other clients receive plain text.
 Snippet escaping distinguishes ordinary text from placeholder text: a closing brace is escaped only
 inside a placeholder. This keeps generated source braces literal in Rider's native snippet converter.
-Diagnostics retain their document version when supported, including unchanged errors at a new version.
+Diagnostics retain their document version when supported, including unchanged errors and empty lists
+at a new checked version. A client typing ahead may discard an earlier clear; the next clean version
+must clear its errors again. The publication cache retains only the latest list/version per file, keeps
+clean entries only while open with version support, and suppresses same-version duplicates. Clients
+without version support still receive a single clear when an error goes away.
 Windows stdio is binary and pipe readiness uses the Windows pipe API; runtime verification is pending.
 
 Language-block candidates carry ordinary source text and tab-stop spans from the front end. The shared

@@ -67,3 +67,7 @@ Follow-up regressions cover fresh-check equivalence after body edits, imports mo
 cross-file batch ordering, released parse snapshots, generated edits, stale document versions, queued
 cancellation and partial-frame responsiveness. Windows URI fixtures run on the host platform; executing
 the Windows runtime branches remains a separate validation requirement.
+Diagnostic clearing tests reproduce an error followed by successive clean versions: even if the client
+discards an earlier clear, the next version supplies another. In-process checks also cover unchanged
+text at a new version, duplicate suppression, an unrelated file's check, close/reopen and clients
+without version support. The stdio test waits for each actual publication before sending the next edit.
