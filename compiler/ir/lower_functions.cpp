@@ -36,8 +36,8 @@ uint32_t Lowerer::function_value(Expr *p_expression) {
 			return default_value(Kind::Obj, position);
 		}
 		object = written->kind == NodeKind::ThisExpr ? 0 : receiver(written);
-	} else if (fn().is_static) {
-		refuse(position, "this name");
+	} else if (fn().is_static || received_env_) {
+		refuse(position, received_env_ ? "an instance member named inside a function expression" : "this name");
 		return default_value(Kind::Obj, position);
 	}
 	// A private or final method is that very one; any other is the object's class's own.

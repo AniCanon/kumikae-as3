@@ -84,8 +84,9 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 		if (name->symbol && is_godot(name->symbol) && (name->symbol->kind == SymbolKind::Property || name->symbol->kind == SymbolKind::Field)) {
 			return engine_place(name->symbol, nullptr, name->offset);
 		}
-		if (name->symbol && name->symbol->is_instance_member() && fn().is_static) {
-			refuse(name->offset, "this name");
+		if (name->symbol && name->symbol->is_instance_member() && (fn().is_static || received_env_)) {
+			// A function expression's first register is its environment, not the object it was written in.
+			refuse(name->offset, received_env_ ? "an instance member named inside a function expression" : "this name");
 			return Place();
 		}
 		if (std::optional<Place> property = Members(*this).property(name, nullptr, p_later)) {

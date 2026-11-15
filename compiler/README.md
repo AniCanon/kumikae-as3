@@ -105,7 +105,7 @@ In a stack trace a getter is `Class/get x()`, as in Flash.
 
 **What is refused, by name, until later slices:** `Object` literals and dynamic properties, `Dictionary`,
 interfaces, `for in` over anything but a vector or an Array,
-`this` inside a function expression, regular expressions and the `String`
+`this` inside a function expression and the instance members it would name bare (`n`, `go()`), regular expressions and the `String`
 methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
 `Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
 `... is not supported by the interpreter yet` at the place.
