@@ -28,6 +28,7 @@ package { public class vector_callbacks {
 		try { unsorted.sort("x"); } catch (e:TypeError) { trace(e.message); }
 		trace(unsorted.sort(8));
 		trace(unsorted.sort(4 | 16), new <int>[2, 1, 2].sort(4 | 16));
+		trace(new <String>["Ê", "é"].sort(1)); // As toLowerCase() has it (avmplus): beyond ASCII too.
 		var names:Vector.<String> = new <String>["b", "C", "a"];
 		trace(names.sort(0));
 		trace(names.sort(1));

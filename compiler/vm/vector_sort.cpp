@@ -1,7 +1,7 @@
 // Vector.sort(f) and Vector.sort(options).
 #include "interpreter_internal.h"
+#include "text_units.h"
 
-#include <cctype>
 #include <cmath>
 #include <numeric>
 
@@ -15,13 +15,6 @@ namespace {
 
 // Array's options, which sort() takes as a number.
 constexpr int32_t CASE_INSENSITIVE = 1, DESCENDING = 2, UNIQUE = 4, INDEXED = 8, NUMERIC = 16;
-
-std::string folded(std::string p_text) {
-	for (char &each : p_text) {
-		each = static_cast<char>(std::tolower(static_cast<unsigned char>(each)));
-	}
-	return p_text;
-}
 
 // A stable merge sort of the order: p_compare says whether its first comes after its second (more than 0),
 // or nothing if it raised, and then so does this.
@@ -92,7 +85,7 @@ bool Interpreter::sort_order(Kind p_kind, const std::vector<Slot> &p_elements, O
 		} else {
 			std::string text;
 			ok = any_text(untyped, &text);
-			texts.push_back((p_options & CASE_INSENSITIVE) ? folded(std::move(text)) : std::move(text));
+			texts.push_back((p_options & CASE_INSENSITIVE) ? lower_case(text) : std::move(text));
 		}
 		drop_any(untyped);
 		if (!ok) {
