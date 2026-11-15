@@ -7,10 +7,12 @@ public protocol CommandSource: Sendable {
 }
 
 public actor CommandChannel: CommandSource {
+  private let metrics: BridgeMetrics?
   private var pending = Data()
   private let descriptor: Int32
 
-  public init(descriptor: Int32 = STDIN_FILENO) throws {
+  public init(descriptor: Int32 = STDIN_FILENO, metrics: BridgeMetrics? = nil) throws {
+    self.metrics = metrics
     self.descriptor = descriptor
     let flags = fcntl(descriptor, F_GETFL)
     guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) == 0 else {
@@ -46,13 +48,15 @@ public actor CommandChannel: CommandSource {
       guard errno == EAGAIN || errno == EINTR else {
         throw BridgeError.system("Reading bridge commands", errno)
       }
+      let sleepStart = DispatchTime.now().uptimeNanoseconds
       try await Task.sleep(for: .milliseconds(2))
+      metrics?.record("commandSleepLateNs", max(DispatchTime.now().uptimeNanoseconds - sleepStart, 2_000_000) - 2_000_000)
     }
     throw CancellationError()
   }
 
   public func reply(id: Int, receivedNanos: UInt64, error: String?) throws {
-    var reply: [String: Any] = ["id": id, "receivedNanos": receivedNanos, "ok": error == nil]
+    var reply: [String: Any] = ["id": id, "receivedNanos": receivedNanos, "completedNanos": DispatchTime.now().uptimeNanoseconds, "ok": error == nil]
     if let error { reply["error"] = error }
     try Self.write(reply)
   }

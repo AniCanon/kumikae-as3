@@ -17,6 +17,7 @@ public struct InputCommand: Codable, Sendable {
   public let x: Double?
   public let y: Double?
   public let text: String?
+  public var orientation: String? = nil
 }
 
 public protocol DeviceLookup: Sendable {

@@ -5,9 +5,17 @@ import XPC
 // Input is part of the same private adapter, separated from device and framebuffer lookup.
 extension AppleSimulator {
   public func send(_ command: InputCommand) async throws {
+    let started = DispatchTime.now().uptimeNanoseconds
+    activeCommandID = command.id
+    metrics?.inputTrace.mark(id: command.id, phase: .actor, at: started)
+    defer {
+      activeCommandID = nil
+      metrics?.record("inputExecuteNs", DispatchTime.now().uptimeNanoseconds - started)
+    }
     switch command.op {
     case "ping": return
     case "down", "move", "up":
+      guard !rotationRequested else { throw BridgeError.invalid("Reconnect the picture after rotation") }
       guard let x = command.x, let y = command.y, x.isFinite, y.isFinite,
         x >= 0, y >= 0, x < Double(info.width) / info.density,
         y < Double(info.height) / info.density
@@ -18,6 +26,11 @@ extension AppleSimulator {
       try await touch(command.op, x, y)
     case "home", "lock":
       for state: UInt32 in [1, 2] { try await button(command.op == "home" ? 0 : 1, state: state) }
+    case "rotate":
+      guard let orientation = command.orientation else { throw BridgeError.invalid("Orientation is missing") }
+      try await rotate(orientation)
+    case "paste":
+      for event in PasteKeyboard.events { try await key(event.usage, state: event.state) }
     case "text":
       guard let text = command.text else { throw BridgeError.invalid("Text is missing") }
       let keys = try ASCIIKeyboard.keys(for: text)
@@ -33,9 +46,10 @@ extension AppleSimulator {
   }
 
   private func touch(_ phase: String, _ x: Double, _ y: Double) async throws {
-    let message = try Self.touchMessage(
-      phase: phase, x: x * info.density / Double(info.width),
-      y: y * info.density / Double(info.height))
+    guard let frameRotation else { throw BridgeError.unavailable("No oriented Simulator picture is ready") }
+    let point = frameRotation.sourcePoint(
+      x: x * info.density / Double(info.width), y: y * info.density / Double(info.height))
+    let message = try Self.touchMessage(phase: phase, x: point.0, y: point.1)
     if phase != "up" { finger = (x, y) }
     try await deliver(message)
     if phase == "up" { finger = nil }
@@ -60,6 +74,8 @@ extension AppleSimulator {
     if let heldButton {
       do { try await button(heldButton, state: 2) } catch { reportReleaseFailure(error) }
     }
+    if let orientationConnection { xpc_connection_cancel(orientationConnection) }
+    orientationConnection = nil
     if let hid { xpc_connection_cancel(hid) }
     hid = nil
     display = nil

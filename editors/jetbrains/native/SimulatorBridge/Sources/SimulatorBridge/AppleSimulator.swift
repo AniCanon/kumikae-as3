@@ -8,25 +8,33 @@ import os
 /// The only type that knows private Apple symbols. No private framework is linked into the executable.
 public actor AppleSimulator: DeviceLookup, FrameSource, InputSink {
   private let installation: XcodeInstallation
+  let metrics: BridgeMetrics?
   let runtime: RuntimeSymbols
   private let layout: FrameLayout
   var device: AnyObject?
   var display: AnyObject?
   var hid: xpc_connection_t?
+  var orientationConnection: xpc_connection_t?
+  var rotationRequested = false
   let inputFailure = OSAllocatedUnfairLock<String?>(initialState: nil)
   private var used = false
   private var generation: UInt64 = 0
   private var sequence: UInt64 = 0
+  private var pixelBuffer = PixelCopyBuffer()
   private var lastSurface: UInt32 = 0
   private var lastSeed: UInt32 = 0
+  var frameRotation: FrameRotation?
+  private var surfaceSize = (width: 0, height: 0)
   var info = DeviceInfo(width: 0, height: 0, density: 1)
   var finger: (Double, Double)?
+  var activeCommandID: Int?
   var heldKeys: Set<UInt32> = []
   var heldButton: UInt32?
   private typealias ObjectError =
     @convention(c) (AnyObject, Selector, UnsafeMutablePointer<NSError?>?) -> Unmanaged<AnyObject>?
 
-  public init(installation: XcodeInstallation, layout: FrameLayout) throws {
+  public init(installation: XcodeInstallation, layout: FrameLayout, metrics: BridgeMetrics? = nil) throws {
+    self.metrics = metrics
     self.installation = installation
     self.layout = layout
     let guardAPI = PrivateAPIGuard(
@@ -127,6 +135,8 @@ public actor AppleSimulator: DeviceLookup, FrameSource, InputSink {
   }
 
   public func nextFrame() throws -> CapturedFrame? {
+    // A rotation command revokes this stream; the service reconnects after its reply.
+    if rotationRequested { return nil }
     if let failure = inputFailure.withLock({ $0 }) { throw BridgeError.unavailable(failure) }
     guard let device, let display, try runtime.integer(device, "state", encoding: "Q") == 3,
       try runtime.integer(device, "bootGeneration", encoding: "Q") == generation,
@@ -135,9 +145,18 @@ public actor AppleSimulator: DeviceLookup, FrameSource, InputSink {
       throw BridgeError.deviceUnavailable(
         "The Simulator stopped or restarted. Reconnect its picture.")
     }
+    guard let properties = try runtime.object(display, "screenProperties") else {
+      throw BridgeError.unavailable("Missing Simulator screenProperties")
+    }
+    let rotation = try FrameRotation(runtime.integer(properties, "uiOrientation", encoding: "I"))
+    try rotation.checkContinuation(from: frameRotation)
     let identity = IOSurfaceGetID(surface)
     let seed = surface.seed
-    if identity == lastSurface && seed == lastSeed { return nil }
+    if identity == lastSurface && seed == lastSeed && rotation.orientation == frameRotation?.orientation {
+      metrics?.record("seedUnchanged")
+      return nil
+    }
+    metrics?.record("seedChanged")
     let observed = DispatchTime.now().uptimeNanoseconds
     guard surface.pixelFormat == layout.pixelFormat, surface.width > 0, surface.height > 0,
       surface.width <= layout.maxDimension, surface.height <= layout.maxDimension,
@@ -147,15 +166,23 @@ public actor AppleSimulator: DeviceLookup, FrameSource, InputSink {
     guard surface.lock(options: .readOnly, seed: nil) == 0 else {
       throw BridgeError.unavailable("The Simulator framebuffer could not be locked")
     }
-    let pixels = Data(bytes: surface.baseAddress, count: surface.bytesPerRow * surface.height)
+    let copyStart = DispatchTime.now().uptimeNanoseconds
+    let pixels = pixelBuffer.copy(from: surface.baseAddress, count: surface.bytesPerRow * surface.height)
+    metrics?.record("pixelCopyNs", DispatchTime.now().uptimeNanoseconds - copyStart)
+    if pixelBuffer.storageChanged { metrics?.record("pixelStorageChanged") }
     guard surface.unlock(options: .readOnly, seed: nil) == 0 else {
       throw BridgeError.unavailable("The Simulator framebuffer could not be unlocked")
     }
-    guard surface.seed == seed else { return nil }
+    guard surface.seed == seed,
+      let currentProperties = try runtime.object(display, "screenProperties"),
+      try runtime.integer(currentProperties, "uiOrientation", encoding: "I") == rotation.orientation
+    else { metrics?.record("changedDuringCopy"); return nil }
+    metrics?.record("captured")
     lastSurface = identity
     lastSeed = seed
     sequence += 1
-    if finger != nil && (surface.width != info.width || surface.height != info.height) {
+    if finger != nil && (rotation.orientation != frameRotation?.orientation ||
+        surface.width != surfaceSize.width || surface.height != surfaceSize.height) {
       throw BridgeError.unavailable(
         "Screen geometry changed during a touch. Reconnect the picture.")
     }
@@ -165,7 +192,11 @@ public actor AppleSimulator: DeviceLookup, FrameSource, InputSink {
       observedNanos: observed, writtenNanos: observed, nativeWidth: info.width,
       nativeHeight: info.height,
       densityMilli: Int(info.density * 1000))
-    return CapturedFrame(header: header, pixels: pixels)
+    let frame = try rotation.apply(CapturedFrame(header: header, pixels: pixels), layout: layout)
+    frameRotation = rotation
+    surfaceSize = (surface.width, surface.height)
+    info = DeviceInfo(width: frame.header.width, height: frame.header.height, density: info.density)
+    return frame
   }
 
 }

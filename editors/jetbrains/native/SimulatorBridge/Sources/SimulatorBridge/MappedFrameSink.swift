@@ -2,12 +2,14 @@ import Darwin
 import Foundation
 
 public actor MappedFrameSink: FrameSink {
+  private let metrics: BridgeMetrics?
   private let layout: FrameLayout
   private var descriptor: Int32
   private var memory: UnsafeMutableRawPointer?
   private let size: Int
 
-  public init(path: String, layout: FrameLayout) throws {
+  public init(path: String, layout: FrameLayout, metrics: BridgeMetrics? = nil) throws {
+    self.metrics = metrics
     self.layout = layout
     size = layout.headerBytes + layout.maxPayloadBytes
     descriptor = Darwin.open(path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW, S_IRUSR | S_IWUSR)
@@ -35,7 +37,7 @@ public actor MappedFrameSink: FrameSink {
     var lock = flock(
       l_start: 0, l_len: 0, l_pid: 0, l_type: Int16(F_WRLCK), l_whence: Int16(SEEK_SET))
     if fcntl(descriptor, F_SETLK, &lock) < 0 {
-      if errno == EACCES || errno == EAGAIN { return }
+      if errno == EACCES || errno == EAGAIN { metrics?.record("publishBusy"); return }
       throw BridgeError.system("Locking the frame slot", errno)
     }
     do {
@@ -59,6 +61,7 @@ public actor MappedFrameSink: FrameSink {
     guard fcntl(descriptor, F_SETLK, &lock) == 0 else {
       throw BridgeError.system("Unlocking the frame slot", errno)
     }
+    metrics?.record("published")
   }
 
   public func close() throws {

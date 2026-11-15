@@ -19,14 +19,15 @@ struct Main {
         throw BridgeError.invalid(
           "Usage: simulator-bridge --device <id> --frames <absolute-new-file>")
       }
-      let commands = try CommandChannel()
-      let source = try AppleSimulator(installation: XcodeInstallation.current(), layout: layout)
-      let sink = try MappedFrameSink(path: arguments[3], layout: layout)
+      let metrics = try ProcessInfo.processInfo.environment["KUMIKAE_NATIVE_METRICS"].map { try BridgeMetrics(path: $0) }
+      let commands = try CommandChannel(metrics: metrics)
+      let source = try AppleSimulator(installation: XcodeInstallation.current(), layout: layout, metrics: metrics)
+      let sink = try MappedFrameSink(path: arguments[3], layout: layout, metrics: metrics)
       do {
-        let device = try await source.connect(device: arguments[1])
-        try await FrameStartup.publish(from: source, to: sink)
+        _ = try await source.connect(device: arguments[1])
+        let frame = try await FrameStartup.publish(from: source, to: sink)
         try CommandChannel.write([
-          "ready": true, "width": device.width, "height": device.height, "density": device.density,
+          "ready": true, "width": frame.width, "height": frame.height, "density": Double(frame.densityMilli) / 1000,
         ])
       } catch {
         await source.disconnect()
@@ -34,8 +35,9 @@ struct Main {
         throw error
       }
       try await BridgeRunner(
-        device: source, source: source, sink: sink, input: source, commands: commands
+        device: source, source: source, sink: sink, input: source, commands: commands, metrics: metrics
       ).run()
+      try metrics?.flush(force: true)
     } catch {
       let message = "Native Simulator unavailable: \(error.localizedDescription)"
       do {

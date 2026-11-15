@@ -5,6 +5,11 @@ import XPC
 
 extension AppleSimulator {
   func connectInput(_ device: AnyObject) async throws {
+    hid = try openConnection(device, service: Self.inputService)
+    try await InputReadiness.check { try await self.inputBarrier(recordMetrics: false) }
+  }
+
+  func openConnection(_ device: AnyObject, service: String) throws -> xpc_connection_t {
     typealias Lookup =
       @convention(c) (AnyObject, Selector, NSString, UnsafeMutablePointer<NSError?>?) -> UInt32
     typealias Endpoint = @convention(c) (UInt32, UInt64, UInt64) -> Unmanaged<AnyObject>?
@@ -15,7 +20,7 @@ extension AppleSimulator {
       device, "lookup:error:", types: ["I", "@", ":", "@", "^@"], as: Lookup.self)
     var error: NSError?
     let port = lookup(
-      device, NSSelectorFromString("lookup:error:"), Self.inputService as NSString, &error)
+      device, NSSelectorFromString("lookup:error:"), service as NSString, &error)
     guard port != 0, port != UInt32.max else {
       throw BridgeError.unavailable(
         error?.localizedDescription ?? "The Simulator input service is unavailable")
@@ -41,18 +46,25 @@ extension AppleSimulator {
       }
     }
     xpc_connection_activate(connection)
-    hid = connection
-    try await InputReadiness.check { try await self.inputBarrier() }
+    return connection
   }
 
   // A reply establishes daemon liveness and ordered transport progress, not application handling.
-  func inputBarrier() async throws {
+  func inputBarrier(recordMetrics: Bool = true) async throws {
     guard let hid else { throw BridgeError.unavailable("Simulator input is disconnected") }
+    let started = DispatchTime.now().uptimeNanoseconds
+    let metrics = recordMetrics ? self.metrics : nil
+    let commandID = activeCommandID
+    if let commandID { metrics?.inputTrace.mark(id: commandID, phase: .barrier, at: started) }
+    defer { metrics?.record("barrierAwaitNs", DispatchTime.now().uptimeNanoseconds - started) }
     let (replies, continuation) = AsyncStream<Bool>.makeStream(bufferingPolicy: .bufferingNewest(1))
     xpc_connection_send_message_with_reply(
       hid, Self.message("IndigoKeyboardButtonEvent", barrier: true),
       DispatchQueue.global(qos: .userInteractive)
     ) { reply in
+      let callback = DispatchTime.now().uptimeNanoseconds
+      metrics?.record("barrierCallbackNs", callback - started)
+      if let commandID { metrics?.inputTrace.mark(id: commandID, phase: .callback, at: callback) }
       continuation.yield(xpc_get_type(reply) != XPC_TYPE_ERROR)
       continuation.finish()
     }

@@ -23,7 +23,8 @@ struct FrameStartupTests {
   }
   @Test func startupWaitsForACompleteFrame() async throws {
     let sink = Sink()
-    try await FrameStartup.publish(from: Source(), to: sink)
+    let header = try await FrameStartup.publish(from: Source(), to: sink)
+    #expect(header.width == 1)
     #expect(await sink.published)
   }
 }
