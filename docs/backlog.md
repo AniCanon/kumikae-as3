@@ -63,8 +63,10 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Language server, first slice
 
-- **Rider is not yet tried.** The LSP4IJ plugin is installed; adding the server in its settings is not.
-  It waits on the owner's machine. **LS-2**
+- **Manual Rider acceptance remains pending.** The native plugin passes sandbox completion and typing
+  checks; a person still needs to accept the full editing and navigation workflow. The completion probe
+  also reports a platform `HighlightingPanel` retained on rapid project close; isolate it in a sustained
+  IDE heap profile. **LS-2**
 - **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths. **LS-2**
 - The same file reached through a symbolic link, or under a different letter case, or in a different
   Unicode form, counts as two files. **LS-2**
@@ -235,9 +237,10 @@ any Godot value passing as a condition):
 
 - Completion after a dot needs the value's type: nothing is offered for `*`, for a value whose type could
   not be worked out, or for a package path (`flash.utils.`). **LS-2**
-- No completion of an import's path, of a parameter's name in a call, or of an override's signature.
-  **LS-2**
-- A local of a nested function is offered in the function around it, and the reverse. **LS-2**
+- No completion of a parameter's name in a call or of an override's signature. **LS-2**
+- The local JetBrains lexer cannot distinguish every regex from division after a closing brace.
+  Compiler completion and signature queries use the parser's regex regions; local pairing needs fuller
+  syntax context in this ambiguous case. **LS-2**
 - Whether a `name:` is a type's place is read from the text before it, not from the tree, when the type
   has not been started (`var a:`). **LS-2**
 

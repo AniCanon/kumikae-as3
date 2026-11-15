@@ -16,6 +16,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.FileViewProvider
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.tree.IFileElementType
 import com.intellij.psi.tree.TokenSet
@@ -94,7 +95,9 @@ class As3Commenter : Commenter {
 class As3BraceMatcher : PairedBraceMatcher {
     override fun getPairs() = PAIRS
 
-    override fun isPairedBracesAllowedBeforeType(lbraceType: IElementType, contextType: IElementType?) = true
+    override fun isPairedBracesAllowedBeforeType(lbraceType: IElementType, contextType: IElementType?) =
+        contextType == null || contextType == TokenType.WHITE_SPACE || contextType == As3Tokens.SYMBOL ||
+            contextType == As3Tokens.RPAREN || contextType == As3Tokens.RBRACKET || contextType == As3Tokens.RBRACE
 
     override fun getCodeConstructStart(file: PsiFile?, openingBraceOffset: Int) = openingBraceOffset
 

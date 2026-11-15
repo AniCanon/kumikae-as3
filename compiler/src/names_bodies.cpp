@@ -12,10 +12,7 @@ namespace kas3 {
 
 namespace {
 
-struct Scope {
-	Scope *parent = nullptr;
-	std::unordered_map<std::string_view, Symbol *> names;
-};
+using Scope = LocalScope;
 
 struct Label {
 	std::string_view name;
@@ -259,12 +256,23 @@ class Resolver {
 		}
 	}
 
+	Scope &retain_scope(Scope &p_fallback, const Node *p_extent) {
+		if (!p_extent || unit_.is_declaration) {
+			return p_fallback;
+		}
+		Scope &scope = unit_.local_scopes.emplace_back();
+		scope.extent = p_extent;
+		scope.imports.parent = context_.imports;
+		return scope;
+	}
+
 	void function(FunctionDecl *p_function, bool p_expression) {
 		// A named function expression can call itself by its name. The name sits just outside the body, so a
 		// parameter or local may reuse it.
-		Scope self;
+		Scope transient_self, transient_scope;
+		Scope &self = retain_scope(transient_self, p_expression && !p_function->name.empty() ? p_function->body : nullptr);
 		self.parent = scope_;
-		Scope scope;
+		Scope &scope = retain_scope(transient_scope, p_function->body);
 		scope.parent = scope_;
 		if (p_expression && !p_function->name.empty()) {
 			Symbol *symbol = compilation_.new_symbol(SymbolKind::LocalFunction, p_function->name, &unit_,
@@ -286,7 +294,7 @@ class Resolver {
 		switches_ = 0;
 
 		// Imports written in the body are in force for the whole function.
-		ImportScope imports;
+		ImportScope &imports = scope.imports;
 		imports.parent = context_.imports;
 		if (p_function->body) {
 			std::vector<Import *> written;
@@ -354,7 +362,8 @@ class Resolver {
 		statement(p_try->body);
 		for (CatchClause &clause : p_try->catches) {
 			type(clause.type);
-			Scope scope;
+			Scope transient;
+			Scope &scope = retain_scope(transient, clause.body);
 			scope.parent = scope_;
 			if (!clause.name.empty()) {
 				Symbol *symbol = compilation_.new_symbol(SymbolKind::CatchVariable, clause.name, &unit_, clause.name_offset);

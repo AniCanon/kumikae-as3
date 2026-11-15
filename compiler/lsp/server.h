@@ -18,6 +18,9 @@ class Server {
 	bool shutdown_ = false;
 	bool exited_ = false;
 	int exit_code_ = 1;
+	bool default_edit_range_ = false;
+	bool snippets_ = false;
+	bool insert_replace_ = false;
 	bool utf8_ = false; // Positions count bytes. Otherwise UTF-16 code units.
 	bool warned_cut_off_ = false; // The editor has been told the project is too big to read whole.
 	bool watch_files_ = false; // The editor lets the server ask to be told about files changing on disk.
@@ -41,6 +44,7 @@ class Server {
 	Json references(const Json &p_params);
 	Json hover(const Json &p_params);
 	Json completion(const Json &p_params);
+	Json signature_help(const Json &p_params);
 	Json document_symbols(const Json &p_params);
 	Json workspace_symbols(const Json &p_params);
 	void notification(const std::string &p_method, const Json &p_params, std::vector<std::string> &r_out);

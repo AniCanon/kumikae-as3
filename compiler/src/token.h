@@ -119,6 +119,13 @@ enum class TokenKind : uint8_t {
 #undef X
 };
 
+// Non-code text recorded by the lexer, including incomplete literals while editing.
+struct TextRegion {
+	uint32_t begin;
+	uint32_t end;
+	bool closed;
+};
+
 struct Token {
 	TokenKind kind;
 	uint32_t offset; // Byte offset of the first character.
@@ -134,6 +141,10 @@ std::string_view token_kind_spelling(TokenKind p_kind);
 bool is_reserved_word(TokenKind p_kind);
 // An identifier or any reserved word: what may follow a dot or name an object-literal key.
 bool is_identifier_like(TokenKind p_kind);
+// UTF-8 bytes that can occur in an identifier; whitespace is recognized separately by the lexer.
+bool is_identifier_byte(char p_char);
+bool is_identifier_at(std::string_view p_text, uint32_t p_offset);
+uint32_t unicode_space(const char *p_text, uint32_t p_left, bool *r_line_break);
 // The reserved word spelled p_text, or Identifier.
 TokenKind keyword_kind(std::string_view p_text);
 

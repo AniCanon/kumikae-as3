@@ -2,8 +2,8 @@
 
 namespace kas3 {
 
-Parser::Parser(const Source &p_source, Arena &p_arena, Diagnostics &p_diagnostics) :
-		source_(p_source), arena_(p_arena), diagnostics_(p_diagnostics), lexer_(p_source, p_diagnostics) {
+Parser::Parser(const Source &p_source, Arena &p_arena, Diagnostics &p_diagnostics, std::vector<TextRegion> *p_regions) :
+		source_(p_source), arena_(p_arena), diagnostics_(p_diagnostics), lexer_(p_source, p_diagnostics, p_regions) {
 	current_ = lexer_.next();
 	note_current();
 }

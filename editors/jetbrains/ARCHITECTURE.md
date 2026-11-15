@@ -1,8 +1,33 @@
 # Plugin structure
 
-The plugin has one feature so far: the iOS Simulator tool window. It is split so
-that each part can be tested without the others, and so that a later feature
-(the language server client, the debugger) can reuse the same shapes.
+The plugin separates language support, project/run tools and the iOS Simulator panel. Compiler
+semantics stay in `kas3c`; editor interaction stays in the IDE. AS3 debugging remains planned.
+
+## Language support
+
+`As3LspSupportProvider` starts one project-wide native LSP client using the located compiler.
+Completion, signature help, diagnostics and navigation come from that server. Standard LSP edits and
+snippets go through the platform lookup pipeline; the plugin does not override Tab globally.
+
+`As3ParserDefinition` creates token-only PSI, sufficient for native editor integration. `As3Lexer`
+recognizes code, punctuation and non-code text, retaining lexical state at token boundaries for
+incremental highlighting. `As3EditorHighlighterProvider` combines a structural highlighter with the
+existing TextMate highlighter. Its iterator intersects their intervals: AS3 supplies token kinds and
+TextMate supplies color attributes. Both receive the same document changes and belong to the editor;
+no document text or per-edit token history is copied into a separate cache.
+
+`As3BraceMatcher` and `As3QuoteHandler` use those structural tokens. Quotes use the whole literal's
+boundaries even when TextMate splits it into escape/color segments. `As3LineIndentProvider` computes
+local indentation from existing tokens and project settings. `As3EnterHandler` applies that provider
+after native Enter because token-only PSI has no full formatter. None of these handlers reads files,
+starts processes or waits for the server.
+
+The sandbox `UiProbeLanguage` exercises native typing actions. `UiProbeCompletion` exercises the
+native lookup against the bundled server in a disposable project. The compiler tests separately cover
+scope/type semantics, wire capabilities, Unicode ranges and cache invalidation. See the
+[results](../../docs/results/2026-11-completion.md) for observed coverage and remaining limitations.
+
+## Simulator composition
 
 ```text
 SimulatorToolWindowFactory   entry point: resolves IDE paths, builds the window
