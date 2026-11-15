@@ -28,7 +28,7 @@ it stands.
 | **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 24 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 53 | What is left |
-| **decision** | The owner | 12 | See each item |
+| **decision** | The owner | 11 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -40,6 +40,7 @@ fields are set on a class's first use, and a call on a null object evaluates its
 | Decision | What to build | When |
 |---|---|---|
 | **64-bit integers are supported,** in whatever way is easiest to maintain in the long term | Built in stage 2b-3, part B: the `Int64` type, by one rule in the generator (approved 2026-11-14). See the design (`docs/superpowers/specs/2026-11-14-int64-design.md`). | Done |
+| **A value read through `*` converts as AS3 converts** (2026-11-15): into `int` a non-number is 0 and a large integer wraps, with no error; into a class or one of Godot's types the type is checked, a `TypeError` if it is wrong. A typed read straight from Godot stays strict. | Built in stage 2c-2. | Done |
 
 ## Stage 1d: Godot's API in AS3
 
@@ -281,9 +282,6 @@ any Godot value passing as a condition):
 - An untyped value that holds a script object is an AS3 error when an AS3 call gives it to Godot; when
   Godot reads it (a return, a field), Godot gets null and an error is printed. Nothing converts it.
   **decision**
-- A Godot value read into a typed place through `*` is converted as AS3 converts (a `Vector2` into an `int`
-  is 0, an integer past an `int` wraps), where a typed read straight from Godot is refused. My reading of
-  AS3's rule for `*`; the owner may want Godot's stricter check. **decision**
 - `+` on untyped values gives a Number, as AS3 does: `v + 1` with `v` from Godot's integer 5 goes back to
   Godot as the float 6.0, and an `Int64` past 2^53 loses its last digits. **2c**
 - The encoding of an untyped value needs addresses below 2^47 with nothing in the top bits: a build where
