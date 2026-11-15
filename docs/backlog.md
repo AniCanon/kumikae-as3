@@ -151,7 +151,6 @@ any Godot value passing as a condition):
 
 - Completion after a dot needs the value's type: nothing is offered for `*`, for a value whose type could
   not be worked out, or for a package path (`flash.utils.`). **LS-2**
-- No completion of a parameter's name in a call or of an override's signature. **LS-2**
 - The local JetBrains lexer cannot distinguish every regex from division after a closing brace.
   Compiler completion and signature queries use the parser's regex regions; local pairing needs fuller
   syntax context in this ambiguous case. **LS-2**

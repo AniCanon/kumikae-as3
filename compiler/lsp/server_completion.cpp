@@ -84,6 +84,9 @@ Json Server::completion(const Json &p_params) {
 			char order[16];
 			std::snprintf(order, sizeof(order), "%08u", priority++);
 			item.set("sortText", order);
+			if (found.is_parameter_name) {
+				item.set("preselect", true);
+			}
 			const bool call = snippets_ && span.call && found.callable;
 			if (default_edit_range_) {
 				if (call || !found.insert_text.empty()) {

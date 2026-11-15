@@ -887,6 +887,20 @@ static void test_override_completion() {
 	}
 }
 
+// In a call's argument, the name in reach that the parameter has is first and preselected.
+static void test_parameter_name_preselected() {
+	Session session;
+	session.request("initialize", Json::object().set("capabilities", Json::object()));
+	session.notify("initialized", Json::object());
+	const std::string head = "package { class Main { function move(power:int):void {} function run():void { var apple:int; var power:int; move(";
+	session.open(MAIN, head + "); } } }");
+	const Json answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size())));
+	const Json &first = answer.get("result").get("items").at(0);
+	CHECK_EQ(first.get("label").string(), std::string("power"));
+	CHECK(first.get("preselect").boolean());
+	CHECK(!answer.get("result").get("items").at(1).has("preselect"));
+}
+
 static void test_signature_contexts() {
 	Session session;
 	session.request("initialize", Json::object().set("capabilities", Json::object()));
@@ -1027,6 +1041,7 @@ int main() {
 	test_signature_contexts();
 	test_completion_default_range();
 	test_override_completion();
+	test_parameter_name_preselected();
 	test_completion_edits_and_signatures();
 	test_completion();
 	test_lifecycle();

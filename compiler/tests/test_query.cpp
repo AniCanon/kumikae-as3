@@ -179,6 +179,28 @@ static void test_completion_scopes_and_context() {
 	CHECK(complete(player("var n:Number = 10 / spe|;")).has("speed"));
 }
 
+// In a call's argument, a name in reach that is the parameter's own name comes first, and is marked.
+static void test_parameter_names() {
+	const std::string names = "var label:String; var power:int; var apple:int; function move(power:int, label:String):void {} ";
+	Offered first = complete(player((names + "move(|);").c_str()));
+	CHECK(!first.items.empty() && first.items[0].name == "power" && first.items[0].is_parameter_name);
+	CHECK_EQ(first.count("power"), size_t{1});
+	Offered second = complete(player((names + "move(1, |);").c_str()));
+	CHECK(!second.items.empty() && second.items[0].name == "label" && second.items[0].is_parameter_name);
+	CHECK(!second.find("power")->is_parameter_name);
+	Offered typed = complete(player((names + "move(1, la|);").c_str()));
+	CHECK(!typed.items.empty() && typed.items[0].name == "label");
+	// Through a member, and in a nested call: the innermost call's parameter.
+	CHECK_EQ(complete(player("var by:int; this.hurt(|); } function hurt(by:int):void {")).items.at(0).name, std::string("by"));
+	Offered nested = complete(player((names + "move(Math.max(|), \"\");").c_str()));
+	CHECK(nested.items.empty() || !nested.items[0].is_parameter_name);
+	// Outside a call nothing is marked.
+	Offered outside = complete(player((names + "|").c_str()));
+	for (const Completion &item : outside.items) {
+		CHECK(!item.is_parameter_name);
+	}
+}
+
 // Whether a type is written here is read from the tree, so a type not yet started is told apart from a
 // value as surely as one that is.
 static void test_type_places() {
@@ -1060,6 +1082,7 @@ static void test_typing() {
 int main() {
 	test_completion_scopes_and_context();
 	test_type_places();
+	test_parameter_names();
 	test_override_completion();
 	test_completion();
 	test_typing();

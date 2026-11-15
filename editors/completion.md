@@ -53,6 +53,10 @@ var callback:Function = onTimeout;
 timer.timeout.add(onTimeout);
 ```
 
+In a call's argument, a variable, parameter or member in reach whose name is the parameter's name there
+comes first and is preselected: in `move(|)` for `move(power:int)`, a local `power` is offered first. No
+name is made up when none is in reach, since AS3 has no named arguments.
+
 Typing `(` or `,` requests argument help. It shows the callable's declaration and active parameter,
 including inside nested calls. Commas inside nested expressions, strings, comments and regular
 expressions do not advance the outer call's active parameter.

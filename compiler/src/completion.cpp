@@ -279,6 +279,20 @@ class Completer {
 		return source_.substr(begin, p_end - begin);
 	}
 
+	// In a call's argument, the name in reach that the parameter there has goes first: most often it is
+	// what is meant.
+	void put_parameter_name_first() {
+		const std::optional<SignatureHelp> help = queries_.signature_help(unit_, offset_);
+		if (!help || help->active_name.empty()) {
+			return;
+		}
+		auto match = std::find_if(found_.begin(), found_.end(), [&](const Completion &p_item) { return p_item.name == help->active_name; });
+		if (match != found_.end()) {
+			match->is_parameter_name = true;
+			std::rotate(found_.begin(), match, match + 1);
+		}
+	}
+
 	// Whether a type is what is written here. The tree says so wherever the grammar wants a type (`var a:`,
 	// a parameter, a result, `catch (e:)`, `extends`, `implements`), even before one is started: the
 	// parser gives a type not yet written the place from the colon to what follows. After `new`, `is` and
@@ -331,6 +345,7 @@ public:
 				offer_members(class_, true, true);
 			}
 			offer_definitions(false);
+			put_parameter_name_first();
 			offer_keywords(IN_FUNCTION);
 			if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
 				Completion item;

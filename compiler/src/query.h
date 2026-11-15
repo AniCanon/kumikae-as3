@@ -63,6 +63,7 @@ struct SignatureHelp {
 	std::string label;
 	std::vector<std::string> parameters;
 	uint32_t active_parameter = 0;
+	std::string active_name; // The active parameter's name. Empty if the function takes none.
 };
 
 // One thing completion offers.
@@ -78,6 +79,7 @@ struct Completion {
 	// Written in place of the word at the cursor, when that is not the name alone: an override's whole
 	// declaration, less what is written before the cursor already. Plain text.
 	std::string insert_text;
+	bool is_parameter_name = false; // In a call's argument, the name of that argument's parameter.
 };
 
 // True if the name starts with the prefix, whatever the case of either: how completion narrows.
