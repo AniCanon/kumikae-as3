@@ -19,7 +19,7 @@ package {
 		public function mark(text:String):Int64 { return hash(text); }
 		public function join(n:int, text:String, v:Vector2):String { return str(n, text, v); }
 		public function alive(node:Node):Boolean { return isInstanceValid(node); }
-		public function find(id:Int64):GodotObject { return instanceFromId(id); }
+		public function find(id:Int64):GodotObject { return instanceFromID(id); }
 		public function say(n:int, v:Vector2):void { print("said ", n, " ", v); printerr("to the error output"); pushWarning("a warning from AS3"); }
 		// A function that gives back anything, where the program says what it expects.
 		public function mixAny(a:Number, b:Number, t:Number):Number { var x:Number = lerp(a, b, t); return x; }

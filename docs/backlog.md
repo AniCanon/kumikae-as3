@@ -33,7 +33,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 ## Stage 1d: Godot's API in AS3
 
 - A script class named like a Godot class is ambiguous in the default package. **clean-up**
-- Acronyms come out lower-case: `getAabb`, not `getAABB`. **clean-up**
 - Four properties lose their element type. **2c**
 - One flag enum of `RenderingServer` whose listed values all fit 32 bits is declared `int`, though Godot
   holds its flags in 64. **clean-up**

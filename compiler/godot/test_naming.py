@@ -11,8 +11,28 @@ class Camel(unittest.TestCase):
         self.assertEqual(naming.camel("move_and_slide"), "moveAndSlide")
         self.assertEqual(naming.camel("add_child"), "addChild")
         self.assertEqual(naming.camel("position"), "position")
-        self.assertEqual(naming.camel("get_node_3d"), "getNode3d")
-        self.assertEqual(naming.camel("set_use_aabb"), "setUseAabb")
+        self.assertEqual(naming.camel("get_node_3d"), "getNode3D")
+        self.assertEqual(naming.camel("set_use_aabb"), "setUseAABB")
+
+    def test_acronyms_keep_their_capitals(self):
+        # As Flash writes them (errorID, URLRequest), after the first word.
+        self.assertEqual(naming.camel("get_aabb"), "getAABB")
+        self.assertEqual(naming.camel("get_instance_id"), "getInstanceID")
+        self.assertEqual(naming.camel("get_rid"), "getRID")
+        self.assertEqual(naming.camel("to_utf8_buffer"), "toUTF8Buffer")
+        self.assertEqual(naming.camel("get_world_2d"), "getWorld2D")
+        self.assertEqual(naming.camel("request_url"), "requestURL")
+        # The first word stays lower-case, as every member's does.
+        self.assertEqual(naming.camel("id"), "id")
+        self.assertEqual(naming.camel("rid_create"), "ridCreate")
+        self.assertEqual(naming.camel("uv"), "uv")
+        # Not a word that merely starts like one.
+        self.assertEqual(naming.camel("get_identity"), "getIdentity")
+        # Back to Godot's name, for a script's own member.
+        self.assertEqual(naming.snake("getAABB"), "get_aabb")
+        self.assertEqual(naming.snake("getInstanceID"), "get_instance_id")
+        self.assertEqual(naming.snake("getWorld2D"), "get_world_2d")
+        self.assertEqual(naming.snake("toUTF8Buffer"), "to_utf8_buffer")
 
     def test_leading_underscores_stay(self):
         self.assertEqual(naming.camel("_ready"), "_ready")

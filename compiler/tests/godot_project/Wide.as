@@ -6,8 +6,8 @@ package {
 		public var kept:Int64 = 9007199254740993;
 		public var heard:Int64 = 0;
 
-		public function idOf(object:GodotObject):Int64 { return object.getInstanceId(); }
-		public function sameId(object:GodotObject, id:Int64):Boolean { return object.getInstanceId() == id; }
+		public function idOf(object:GodotObject):Int64 { return object.getInstanceID(); }
+		public function sameId(object:GodotObject, id:Int64):Boolean { return object.getInstanceID() == id; }
 		public function rgba64(color:Color):Int64 { return color.toRgba64(); }
 		public function rgba32(color:Color):uint { return color.toRgba32(); }
 		public function count(items:GodotArray):int { return items.size(); }

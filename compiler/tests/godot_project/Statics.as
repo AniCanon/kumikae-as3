@@ -44,7 +44,7 @@ package {
 
 		// Static methods.
 		public function fromAngle(angle:Number):Vector2 { return Vector2.fromAngle(angle); }
-		public function hsv(h:Number, s:Number, v:Number):Color { return Color.fromHsv(h, s, v); }
+		public function hsv(h:Number, s:Number, v:Number):Color { return Color.fromHSV(h, s, v); }
 		public function html(text:String):Color { return Color.html(text); }
 		public function euler(v:Vector3):Quaternion { return Quaternion.fromEuler(v); }
 		public function image():int {

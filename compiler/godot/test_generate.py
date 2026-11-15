@@ -108,7 +108,7 @@ class Fixture(unittest.TestCase):
         self.assertNotIn("setOwnerPtr", self.text)
 
     def test_wide_integers_are_int64(self):
-        self.assertIn("public final native function getInstanceId():Int64;", self.members("GodotObject"))
+        self.assertIn("public final native function getInstanceID():Int64;", self.members("GodotObject"))
         self.assertIn("public static native function getTicks():Int64;", self.members("Input"))
 
     def test_defaults(self):
@@ -264,9 +264,9 @@ class Fixture(unittest.TestCase):
 
     def test_an_integer_the_description_gives_no_width_is_an_int64(self):
         # A global function, a built-in type's method, and a signal's argument.
-        self.assertIn("\tpublic native function instanceFromId(instanceId:Int64):GodotObject;\n", self.text)
+        self.assertIn("\tpublic native function instanceFromID(instanceID:Int64):GodotObject;\n", self.text)
         self.assertIn("\tpublic native function randi():Int64;\n", self.text)
-        self.assertIn("public native function getObjectId():Int64;", self.members("Signal"))
+        self.assertIn("public native function getObjectID():Int64;", self.members("Signal"))
         self.assertIn("public native function size():Int64;", self.members("GodotArray"))
 
     def test_to_string_is_as3s(self):
@@ -448,7 +448,7 @@ class FixtureCompiles(unittest.TestCase):
 			processMode = Node.PROCESS_MODE_ALWAYS;
 			var at:Vector2 = new Vector2(1, 2);
 			at.x = Vector2.ZERO.distanceTo(new Vector2());
-			var id:Number = getInstanceId();
+			var id:Number = getInstanceID();
 			if (Input.isActionPressed("jump") && Key.ESCAPE != Key.KEY_0) {
 				print("jump", degToRad(90), anchorLeft, size.y, name);
 			}
@@ -549,7 +549,7 @@ class RealApi(unittest.TestCase):
         self.assertEqual(names["CharacterBody2D.velocity"], "velocity")
         self.assertEqual(names["Node.childEnteredTree"], "child_entered_tree")
         self.assertEqual(names["GodotObject"], "Object")
-        self.assertEqual(names["GodotObject.getInstanceId"], "get_instance_id")
+        self.assertEqual(names["GodotObject.getInstanceID"], "get_instance_id")
         self.assertEqual(names["Vector2.distanceTo"], "distance_to")
         self.assertEqual(names["Vector2.x"], "x")
         self.assertEqual(names["Input.isActionPressed"], "is_action_pressed")
