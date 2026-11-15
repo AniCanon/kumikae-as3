@@ -57,6 +57,23 @@ static std::string insertion(const Completion &p_item, bool p_call) {
 	return result + ")$0";
 }
 
+static std::string edit_snippet(const Completion &p_item) {
+	const std::string_view text = p_item.edit->text;
+	std::string result;
+	uint32_t previous = 0;
+	for (const auto &stop : p_item.tab_stops) {
+		result += snippet_escape(text.substr(previous, stop.begin - previous));
+		if (stop.begin == stop.end) {
+			result += "$" + std::to_string(stop.index);
+		} else {
+			result += "${" + std::to_string(stop.index) + ":" +
+					snippet_escape(text.substr(stop.begin, stop.end - stop.begin), true) + "}";
+		}
+		previous = stop.end;
+	}
+	return result + snippet_escape(text.substr(previous));
+}
+
 Json Server::completion(const Json &p_params) {
 	Json items = Json::array();
 	bool incomplete = false;
@@ -94,10 +111,11 @@ Json Server::completion(const Json &p_params) {
 			if (found.edit) {
 				const auto &primary = *found.edit;
 				std::string text = primary.text;
-				if (snippets_ && found.caret) {
-					text = snippet_escape(std::string_view(text).substr(0, *found.caret)) + "$0" +
-							snippet_escape(std::string_view(text).substr(*found.caret));
+				if (snippets_ && !found.tab_stops.empty()) {
+					text = edit_snippet(found);
 					item.set("insertTextFormat", 2);
+				} else if (found.is_keyword) {
+					text = found.name;
 				}
 				item.set("textEdit", Json::object().set("range", range(*unit, primary.begin, primary.end - primary.begin))
 						.set("newText", std::move(text)));

@@ -46,6 +46,46 @@ the following line, including its modifiers and metadata, remains intact.
 
 ## Accepting a suggestion
 
+### AS3 language blocks
+
+Inside a function, accept a keyword suggestion to insert its block. For example, type `tr` or `try`,
+select **try**, and press Tab:
+
+```actionscript
+try {
+
+} catch (error:Error) {
+    throw error;
+}
+```
+
+The first caret is inside the try body. Tab then visits the catch name, its type, the handler body,
+and finally the position after the block. Renaming `error` updates the rethrow too. Replace the rethrow
+when you implement handling; the default does not swallow the error. The catch type is editable,
+including `*` when you intend to catch values other than `Error` objects.
+
+| Suggestion | Editable parts |
+|---|---|
+| `try` | Try body, catch name/type, catch body |
+| `if`, `while` | Condition, body |
+| `do` | Body, condition |
+| `for` | Linked loop-variable name, upper bound, body |
+| `for each` (offered while typing `for`) | Item name, collection, body |
+| `switch` | Subject, case value, case body, default body |
+
+Names such as `condition`, `count`, `items` and `value` are editable placeholders: replace them with
+your expressions. Tab visits placeholders in order and then leaves the template. Accepting a block is
+one undoable insertion. Later placeholder edits and navigation use the IDE's normal Undo history;
+Rider can first undo a navigation step without changing the source text.
+
+Expansion requires a statement position and does not replace an existing parenthesis or block.
+Expression positions, imports, types, class/file scope, comments, strings and regex literals do not
+expand language blocks. Empty gaps after `{`, `;` or `}` offer blocks directly; after a statement without
+a semicolon, type a keyword prefix first. Other keywords remain words, and clients without snippet
+support receive words too. Typing alone never expands a block: accept the completion suggestion.
+
+### Names and calls
+
 The server supplies the identifier's insertion and replacement ranges, including the suffix when the
 caret is in the middle of a name. Clients that support separate ranges can use their normal Enter
 insertion and Tab replacement behavior. Clients with ordinary text edits replace the entire identifier.

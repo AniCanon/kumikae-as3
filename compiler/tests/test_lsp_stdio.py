@@ -277,6 +277,25 @@ for kind, text, label in (
         check("override literal closing brace", primary.get("newText", "") ==
               '_physicsProcess(delta:Number):void {\r\n\t$0throw new Error("Not implemented");\r\n}', repr(item))
 
+# Language templates negotiate snippets separately from shared completion-list ranges.
+for snippets in (False, True):
+    for defaults in (False, True):
+        source = "package { class Main { function run():void { trsuffix } } }"
+        start_at = source.index("trsuffix")
+        caps = {"textDocument": {"completion": {"completionItem": {"snippetSupport": snippets},
+                "completionList": {"itemDefaults": ["editRange"] if defaults else []}}}}
+        start = request(1, "initialize", {"capabilities": caps}) + notify("initialized", {})
+        code, messages, errors = session(start + opened(source) + request(2, "textDocument/completion",
+            {"textDocument": {"uri": URI}, "position": {"line": 0, "character": start_at + 2}}) + END)
+        result = next((m.get("result", {}) for m in messages or [] if m.get("id") == 2), {})
+        item = next((i for i in result.get("items", []) if i.get("label") == "try"), {})
+        edit = item.get("textEdit", {})
+        expected = 'try {\n\t$1\n} catch (${2:error}:${3:Error}) {\n\t$4throw ${2:error};\n}$0' if snippets else "try"
+        check("try template text", edit.get("newText") == expected, repr(item))
+        check("try template format", item.get("insertTextFormat", 1) == (2 if snippets else 1), repr(item))
+        check("try template replacement", edit.get("range") == {"start": {"line": 0, "character": start_at},
+              "end": {"line": 0, "character": start_at + len("trsuffix")}}, repr(item))
+
 # Requests already cancelled or superseded in the input queue must not check old text.
 params = {"textDocument": {"uri": URI}, "position": {"line": 0, "character": 0}}
 code, messages, errors = session(START + opened("package { public class Main {} }") +

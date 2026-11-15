@@ -10,7 +10,7 @@ namespace kas3 {
 namespace {
 
 constexpr std::string_view IN_FUNCTION[] = {
-	"var", "const", "if", "else", "for", "each", "in", "while", "do", "return", "break", "continue", "switch", "case",
+	"var", "const", "if", "else", "for", "for each", "each", "in", "while", "do", "return", "break", "continue", "switch", "case",
 	"default", "new", "null", "true", "false", "is", "as", "typeof", "function", "throw", "try", "catch", "finally",
 	"super", "delete", "void",
 };
@@ -364,6 +364,9 @@ public:
 			}
 			offer_definitions(false);
 			offer_keywords(IN_FUNCTION);
+			queries_.statement_templates(unit_, offset_, found_);
+			// Typing a keyword can turn a recovery gap into a known statement start.
+			incomplete_ |= prefix_.empty();
 			if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
 				Completion item;
 				item.name = "this";

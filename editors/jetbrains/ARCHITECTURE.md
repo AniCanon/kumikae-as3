@@ -8,6 +8,8 @@ semantics stay in `kas3c`; editor interaction stays in the IDE. AS3 debugging re
 `As3LspSupportProvider` starts one project-wide native LSP client using the located compiler.
 Completion, signature help, diagnostics and navigation come from that server. Standard LSP edits and
 snippets go through the platform lookup pipeline; the plugin does not override Tab globally.
+AS3 language-block templates use that same client pipeline. Their ordinary source text and tab-stop
+spans originate in compiler queries; no template catalogue or snippet parser is duplicated in Kotlin.
 
 `As3ParserDefinition` creates token-only PSI, sufficient for native editor integration. `As3Lexer`
 recognizes code, punctuation and non-code text, retaining lexical state at token boundaries for

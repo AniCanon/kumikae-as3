@@ -194,7 +194,8 @@ std::vector<Completion> Queries::overrides(const Unit &p_unit, const FunctionDec
 			text->erase(0, name_at);
 			item.callable = false;
 			*text += " {" + newline + indent + "\t";
-			item.caret = static_cast<uint32_t>(text->size());
+			const auto caret = static_cast<uint32_t>(text->size());
+			item.tab_stops.push_back({ caret, caret, 0 });
 			*text += "throw new Error(\"Not implemented\");" + newline + indent + "}";
 			item.edit = CompletionEdit{ span.begin, span.end, std::move(*text) };
 			result.push_back(std::move(item));

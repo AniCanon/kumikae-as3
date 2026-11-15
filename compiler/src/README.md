@@ -28,7 +28,7 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
   to one file (`tools/bench_recheck.cpp` measures it).
 
 Tests: `test_lexer`, `test_parser`, `test_ast`, `test_names`, `test_types`, `test_type_errors`,
-`test_query`, `test_override_completion`, `test_source`, and the `golden` group.
+`test_query`, `test_override_completion`, `test_statement_completion`, `test_source`, and the `golden` group.
 
 ## Editor query ownership
 
@@ -61,3 +61,10 @@ and final modifiers are checked separately, including inherited complementary ac
 retains an empty override name's span so completion also works before its first character. A declaration
 on the next line remains a separate member, including its metadata; valid multiline signatures retain
 their names. Tests apply generated edits and check the resulting source with a fresh compiler.
+
+`completion_statements` adds language-block text at statement starts found through cached AST containers.
+It excludes expression/header positions and existing continuations, including keyword recovery in
+unfinished `if`/`for` headers. Empty gaps use conservative brace/semicolon boundaries. A block carries
+ordinary AS3 text and ordered byte-span tab stops; repeated indices link names, and zero is the final
+caret. Overrides use the same representation. Only the LSP layer encodes snippet syntax. The try/catch
+default rethrows its caught error. These candidates add no project-wide scan or history of edits.

@@ -104,6 +104,10 @@ ten-minute runs retain all ten disposed projects; see the
 declarations are accepted and undone atomically. Generated-edit checks compare the whole document's
 non-whitespace text, including closing braces, and check the final caret before the throwing body.
 Both a Godot method and the built-in `setPropertyIsEnumerable` override are covered in each client.
+`UiProbeStatementCompletion` checks seven language blocks, immediate insertion Undo, navigation through
+all tab stops and the final caret, and mirrored catch-name editing. Rider exposes the snippet as its
+lookup string; LSP4IJ exposes the item label. The probe matches either representation. Undo after Tab
+navigation is a separate native template-history operation; the probe does not override that history.
 
 Add `KUMIKAE_COMPLETION_RETENTION_PROBE=1` for ten projects across ten minutes, with live-GC histograms
 and weak closed-project counts. Combine it with the control flag for the same plain-text workload.

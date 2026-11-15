@@ -31,6 +31,11 @@ argument help. `test_lsp_stdio.py` repeats protocol cases against the executable
 checks cache counts across repeated requests, forty changed compilations, and document close.
 Override wire tests compare the complete insertion text, including the closing brace and final caret,
 with snippet support enabled/disabled and with CRLF source.
+`test_statement_completion` checks language-block text, fresh compilation of generated defaults,
+ordered/mirrored tab-stop spans, partial/full keywords, nested statements, expression/header exclusions,
+empty recovery gaps, CRLF and suffix replacement. The stdio group negotiates language templates with
+snippet support and completion-list defaults independently. Real client insertion, Tab navigation,
+mirrored-name editing and immediate Undo run in the JetBrains sandbox probe.
 
 `test_override_completion` covers qualified default constants, inaccessible references, independent
 getter/setter overrides and final modifiers in either declaration order. It also covers inherited

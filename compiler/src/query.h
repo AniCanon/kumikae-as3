@@ -70,6 +70,12 @@ struct CompletionEdit {
 	std::string text;
 };
 
+struct CompletionTabStop {
+	uint32_t begin; // Byte span in edit.text, ordered by source position; empty spans are caret stops.
+	uint32_t end;
+	uint32_t index; // Repeated indices mirror one another; zero is the final caret.
+};
+
 // One thing completion offers.
 struct Completion {
 	std::string name;
@@ -82,7 +88,7 @@ struct Completion {
 	std::vector<std::string> required_parameters;
 	std::optional<CompletionEdit> edit;
 	std::optional<CompletionEdit> additional_edit;
-	std::optional<uint32_t> caret; // Byte offset in edit.text for clients supporting a final tab stop.
+	std::vector<CompletionTabStop> tab_stops;
 };
 
 struct CompletionResult {
@@ -104,6 +110,9 @@ class Queries {
 	std::vector<Completion> overrides(const Unit &p_unit, const FunctionDecl &p_function, Symbol *p_class, uint32_t p_offset);
 	static std::string line_break(const Unit &p_unit);
 	static std::string line_indent(const Unit &p_unit, uint32_t p_offset);
+	void statement_templates(const Unit &p_unit, uint32_t p_offset, std::vector<Completion> &p_items) const;
+	bool statement_start(const Unit &p_unit, uint32_t p_offset) const;
+	static uint32_t skip_trivia(const Unit &p_unit, uint32_t p_offset);
 
 	const std::vector<Occurrence> &occurrences(const Unit &p_unit);
 	friend class Completer;

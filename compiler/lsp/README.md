@@ -48,3 +48,10 @@ Snippet escaping distinguishes ordinary text from placeholder text: a closing br
 inside a placeholder. This keeps generated source braces literal in Rider's native snippet converter.
 Diagnostics retain their document version when supported, including unchanged errors at a new version.
 Windows stdio is binary and pipe readiness uses the Windows pipe API; runtime verification is pending.
+
+Language-block candidates carry ordinary source text and tab-stop spans from the front end. The shared
+edit serializer escapes literal slices and encodes numbered/mirrored placeholders and the final caret.
+Keyword templates replace the filtering identifier, including its suffix, with one ordinary text edit.
+They coexist with completion-list range defaults. A client without snippet support still receives the
+keyword; override declarations retain their plain-text fallback. Empty function-prefix lists are
+incomplete so typing can refresh statement eligibility after parser recovery.

@@ -162,7 +162,8 @@ Completion improvements are described in the [editor guide](../editors/completio
 typing, lexical scopes, import paths, replacement edits, callable snippets and signature help. The
 [results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
 complete stage 6. The [follow-up results](results/2026-11-completion-followup.md) cover auto-imports,
-override stubs (including qualified defaults and independent getter/setter slots), body-only incremental
+override stubs (including qualified defaults and independent getter/setter slots), AS3 statement-block
+templates with linked Tab stops, body-only incremental
 checking and lifecycle controls. Empty override names work before following members, and background
 sandbox completion checks isolate window-deactivation cancellation. The optional LSP4IJ adapter
 supports IntelliJ IDEA Community/free unified IDEA alongside Rider's native client. The installed

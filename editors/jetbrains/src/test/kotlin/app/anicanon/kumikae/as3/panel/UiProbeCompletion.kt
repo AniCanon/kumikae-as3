@@ -221,6 +221,7 @@ object UiProbeCompletion {
             }
             UiProbeContinuedTyping.run(project, editor, observations)
             UiProbeGeneratedCompletion.run(project, editor, observations)
+            UiProbeStatementCompletion.run(project, editor, observations)
             checkSnippet(project, editor, source)
             observations += "Required argument is selected; Tab exits the snippet after the call"
             UiProbeLanguageFeatures.run(project, editor, observations)

@@ -264,6 +264,85 @@ style check and inspected the fail-first evidence, Release, engine, Gradle, Pyth
 The sanitizer run was still in progress when inspected; its completed result above was verified
 separately after the review's inspection.
 
+## AS3 language-block templates
+
+Accepting `try` now inserts a try/catch block. The same query path supplies `if`, `while`, `do/while`,
+`for`, `for each` and `switch` blocks. Editable expressions, names and bodies have numbered tab stops;
+repeated names share an index, and zero exits the template. The default catch rethrows its error.
+The front end stores ordinary AS3 text and byte spans; the LSP serializer alone encodes snippet syntax.
+Override stubs use the same span representation and retain their previous insertion text.
+
+Eligibility uses cached AST containers and parsed comment intervals. It excludes expressions and
+loop headers, including a fully typed keyword recovered as a body before a missing closing parenthesis.
+An existing `(` or `{` after the keyword suppresses block expansion. Empty gaps use conservative
+brace/semicolon boundaries; after an automatic-semicolon-insertion gap, typing a prefix identifies
+the statement. Empty function-prefix lists refresh accordingly. `for each` is a choice while typing
+`for`. Declaration templates and additional block variants are outside this change. Clients without
+snippet support keep keyword insertion.
+
+Fail-first evidence: the initial query group reported `82 checks, 24 failed`, the stdio group failed
+seven assertions, and Rider acceptance inserted only `try`. Added empty-expression checks failed three
+assertions before the boundary guard; fully typed `try` in unfinished `if` and `for` headers failed two
+before the backward header check. The final focused group reports `295 checks, 0 failed`; generated
+defaults fresh-check successfully, tab-stop spans are ordered and in bounds, and mirrored defaults
+agree. The stdio group reports `lsp stdio: OK` across independent snippet/range-default capabilities.
+
+Rider and IDEA each passed three project cycles with all seven blocks, complete non-whitespace text
+comparison, immediate insertion Undo, Tab navigation and final caret checks, and catch-name mirroring.
+Rider exposes raw snippet text as the lookup string; LSP4IJ exposes the label. The probe handles both.
+IDEA indents blank lines differently, so body-caret checks use the line boundary. Native Rider records
+template-navigation Undo steps: Undo after tabbing can first restore a caret state without changing
+source. Immediate insertion Undo is tested separately. No production Undo handler was introduced.
+
+Release passes all 26 groups in 21.22 seconds and ASan/UBSan all 26 in 211.37 seconds; the rebuilt
+engine runner reports `godot: OK`. Offline Gradle `check buildPlugin verifyPlugin` passes, with 134
+plugin tests passed/one skipped and 82 core tests passed/three skipped; unchanged core results were
+reused. Python's nine tests pass. Final Rider and IDEA probes each pass three project cycles, including
+the first-selection and explicit template-exit checks. Light/dark panel images were inspected. Both
+verifier endpoints remain compatible with four deprecated and 26 experimental API usages. Packaged
+compiler/extension hashes match the builds, and no probe classes are shipped.
+
+Agy's first review identified the probe's Undo sequencing and missing exit wait. Both were corrected.
+Its re-review found no actionable findings, including in the updated header-recovery guard. It ran
+the style check independently and inspected recorded tests. The final IDEA run completed after its
+inspection; that passing result was verified separately.
+
+Logs and preserved reports use `language-*` under the ignored compiler and JetBrains build directories.
+The existing diagnostic-range, retention and platform-coverage limits remain unchanged.
+After the owner saved and approved a restart, the native-only manual Rider sandbox initialized the
+rebuilt server and reopened the scratch project. Saved AS3 files were unchanged across the restart.
+Automated acceptance above covers Rider and IDEA; the new templates were not exercised in VS Code's UI.
+
+### Language-template performance controls
+
+The existing member-completion driver compared the saved `f9ead1e` executable with this change,
+alternating builds. This checks the previous completion path, not keyword-template acceptance latency.
+The owner's manual sandbox remained open; no build or automated IDE probe ran during measurement.
+These shared-host controls are separate from the original controlled measurements below.
+
+```sh
+python3 compiler/tests/bench/completion.py compiler/build --against compiler/build/language-baseline --runs 31 --valid-body
+python3 compiler/tests/bench/completion.py compiler/build --against compiler/build/language-baseline --runs 31
+python3 compiler/tests/bench/completion.py compiler/build --against compiler/build/language-baseline --runs 101 --valid-body
+```
+
+The 31-sample valid-body run showed substantial scheduling variation: on 100k lines, median edit plus
+completion was 1.900 → 2.092 ms and the 20-edit burst was 20.587 → 19.679 ms. A 101-sample follow-up,
+after the review process exited, gave the following controls:
+
+| 100k-line workload | Before median / p95 (ms) | After median / p95 (ms) |
+|---|---:|---:|
+| Warm member completion | 0.254 / 0.339 | 0.249 / 0.340 |
+| Valid body edit + completion | 1.666 / 1.810 | 1.726 / 1.930 |
+| Twenty valid body edits + completion | 15.109 / 27.862 | 15.807 / 26.233 |
+
+Valid-edit and burst medians are 3.6% and 4.6% higher in that follow-up; this change makes no speedup
+claim. In the 31-sample malformed-source run, median edit plus completion was 50.031 → 49.374 ms.
+Every control returned the same 56 member candidates and 6,020 response bytes. Cold RSS varied across
+runs: the 101-sample 100k-line run started at 92,096 → 89,424 KiB, while the earlier valid-body run was
+91,248 → 94,096 KiB. Those single startup samples are not a retention or leak measurement. No new
+ten-minute soak was run. Full output is in `compiler/build/language-bench-*.log`.
+
 ## Timing and retention method
 
 ```sh

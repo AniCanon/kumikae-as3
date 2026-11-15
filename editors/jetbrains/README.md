@@ -45,6 +45,8 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 
 - Native LSP completion with typed member chains, imports, lexical scopes, replacement ranges,
   capability-aware callable snippets, automatic type imports, override stubs and signature help.
+- AS3 statement templates for `try/catch`, `if`, `while`, `do/while`, `for`, `for each` and `switch`,
+  with native Tab navigation and linked names. See the [completion guide](../completion.md).
 - Local paired punctuation, quote handling and Enter indentation using the IDE's settings. AS3 tokens
   drive editing while the shared TextMate grammar supplies colors.
 - A **Simulators** tab lists every simulator with a button to boot it or shut it down; each
