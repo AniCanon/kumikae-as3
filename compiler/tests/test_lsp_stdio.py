@@ -274,6 +274,8 @@ for kind, text, label in (
               edit_range.get("end", {}).get("line"), repr(item))
         check("override snippet", primary.get("newText", "").startswith("_physicsProcess(") and
               "$0throw" in primary.get("newText", "") and item.get("insertTextFormat") == 2, repr(item))
+        check("override literal closing brace", primary.get("newText", "") ==
+              '_physicsProcess(delta:Number):void {\r\n\t$0throw new Error("Not implemented");\r\n}', repr(item))
 
 # Requests already cancelled or superseded in the input queue must not check old text.
 params = {"textDocument": {"uri": URI}, "position": {"line": 0, "character": 0}}

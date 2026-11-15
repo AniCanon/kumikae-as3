@@ -29,6 +29,8 @@ Every group runs under `ctest`. What each is, in more words, is in the
 capability negotiation, snippets, insertion/replacement ranges (including Unicode whitespace), and
 argument help. `test_lsp_stdio.py` repeats protocol cases against the executable. `test_workspace`
 checks cache counts across repeated requests, forty changed compilations, and document close.
+Override wire tests compare the complete insertion text, including the closing brace and final caret,
+with snippet support enabled/disabled and with CRLF source.
 
 `test_override_completion` covers qualified default constants, inaccessible references, independent
 getter/setter overrides and final modifiers in either declaration order. It also covers inherited

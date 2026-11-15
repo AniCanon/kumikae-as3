@@ -31,10 +31,11 @@ static int completion_kind(const Completion &p_item) {
 	}
 }
 
-static std::string snippet_escape(std::string_view p_text) {
+static std::string snippet_escape(std::string_view p_text, bool p_placeholder = false) {
 	std::string result;
 	for (char c : p_text) {
-		if (c == '$' || c == '}' || c == '\\') {
+		// Only a placeholder uses '}' as a delimiter. Rider preserves an unnecessary top-level escape.
+		if (c == '$' || c == '\\' || (p_placeholder && c == '}')) {
 			result += '\\';
 		}
 		result += c;
@@ -51,7 +52,7 @@ static std::string insertion(const Completion &p_item, bool p_call) {
 		if (i) {
 			result += ", ";
 		}
-		result += "${" + std::to_string(i + 1) + ":" + snippet_escape(p_item.required_parameters[i]) + "}";
+		result += "${" + std::to_string(i + 1) + ":" + snippet_escape(p_item.required_parameters[i], true) + "}";
 	}
 	return result + ")$0";
 }

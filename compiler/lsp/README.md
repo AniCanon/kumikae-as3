@@ -44,5 +44,7 @@ See [the user guide](../../editors/completion.md) and [measurements](../../docs/
 Auto-import and override items include an additional text edit. Override primary ranges remain on one
 line, contain the caret and filter on the method name; metadata and existing modifiers survive. Snippet
 clients receive a final caret before the generated throwing body; other clients receive plain text.
+Snippet escaping distinguishes ordinary text from placeholder text: a closing brace is escaped only
+inside a placeholder. This keeps generated source braces literal in Rider's native snippet converter.
 Diagnostics retain their document version when supported, including unchanged errors at a new version.
 Windows stdio is binary and pipe readiness uses the Windows pipe API; runtime verification is pending.

@@ -101,7 +101,9 @@ samples. Save the reports before running another probe: both use `build/reports/
 AS3 probes both reproduce the pinned Rider's `HighlightingPanel` disposal warning. The paired
 ten-minute runs retain all ten disposed projects; see the
 [results](../../docs/results/2026-11-completion-followup.md#ide-lifecycle-investigation). The AS3 probe also verifies generated imports and override
-signatures are accepted and undone atomically.
+declarations are accepted and undone atomically. Generated-edit checks compare the whole document's
+non-whitespace text, including closing braces, and check the final caret before the throwing body.
+Both a Godot method and the built-in `setPropertyIsEnumerable` override are covered in each client.
 
 Add `KUMIKAE_COMPLETION_RETENTION_PROBE=1` for ten projects across ten minutes, with live-GC histograms
 and weak closed-project counts. Combine it with the control flag for the same plain-text workload.

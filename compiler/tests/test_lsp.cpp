@@ -805,6 +805,26 @@ static void test_completion_edits_and_signatures() {
 	}
 }
 
+static void test_override_snippet_text() {
+	for (bool snippets : { false, true }) {
+		Session session;
+		const Json capabilities = Json::object().set("textDocument", Json::object().set("completion",
+				Json::object().set("completionItem", Json::object().set("snippetSupport", snippets))));
+		session.request("initialize", Json::object().set("capabilities", capabilities));
+		session.notify("initialized", Json::object());
+		const std::string head = "package { public class Main { override function setProp";
+		session.open(MAIN, head + " } }");
+		const Json answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size())));
+		const Json &item = answer.get("result").get("items").at(0);
+		CHECK_EQ(item.get("label").string(), std::string("setPropertyIsEnumerable"));
+		const std::string body = snippets ? "$0throw" : "throw";
+		CHECK_EQ(item.get("textEdit").get("newText").string(),
+				"setPropertyIsEnumerable(name:String, isEnum:Boolean = true):void {\n\t" + body +
+				" new Error(\"Not implemented\");\n}");
+		CHECK_EQ(item.get("insertTextFormat").integer(1), snippets ? 2 : 1);
+	}
+}
+
 static void test_completion_unicode_boundaries() {
 	for (const char *encoding : { "utf-8", "utf-16" }) {
 		Session session;
@@ -925,6 +945,7 @@ static void test_completion_import_refresh() {
 }
 
 int main() {
+	test_override_snippet_text();
 	test_completion_import_refresh();
 	test_repeated_diagnostics_version();
 	test_document_versions();

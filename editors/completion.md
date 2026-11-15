@@ -33,7 +33,8 @@ An empty-prefix lookup is refreshed as a prefix is typed, so imports do not requ
 
 Inside a derived class, `override function _ph` offers inherited methods such as `_physicsProcess`.
 Acceptance adds the signature and a body that throws `Error("Not implemented")`; replace that body with
-your implementation. Metadata, comments and an existing `final` modifier are preserved. Stubs are offered
+your implementation. With snippet support, the caret lands immediately before `throw`; generated braces
+are ordinary source characters. Metadata, comments and an existing `final` modifier are preserved. Stubs are offered
 only while the method name is unfinished, before a parameter list. Private, final and static methods,
 inaccessible signature types and non-public member defaults are excluded. An explicitly written
 visibility must match the inherited method. Public default constants work when written as `VALUE`,

@@ -228,6 +228,42 @@ documented scope, independently passed the override group (384 checks), parser g
 ASan/UBSan (503 checks each), and style check, and verified binary matching and probe exclusion. It
 inspected the broader compiler, Gradle and sandbox results from logs rather than rerunning those suites.
 
+## Literal braces in generated overrides
+
+Manual sandbox testing found a literal backslash before the closing brace of
+`setPropertyIsEnumerable`. The server escaped every snippet closing brace. The installed Rider
+`SnippetToTemplateConverter` replaces template variables but retains that escape in ordinary text.
+The server now escapes `}` only inside placeholder text; dollar signs and backslashes retain their
+existing escaping. No client-specific protocol flag or production editor handler was added.
+Literal top-level braces follow the [documented snippet examples and grammar](https://code.visualstudio.com/docs/editing/userdefinedsnippets#_grammar).
+
+Before the fix, the new in-process check reported `109160 checks, 1 failed`, the stdio check failed
+its exact CRLF override text assertion, and the native Rider probe reproduced the unwanted backslash.
+The probe previously checked only signature/body substrings. It now compares the complete document's
+non-whitespace text, checks the caret before `throw`, and verifies atomic Undo. Both `_physicsProcess`
+and the built-in `setPropertyIsEnumerable` are covered. Wire tests also cover a client without snippets.
+
+After the fix, `test_lsp` reports `109160 checks, 0 failed`, and `lsp stdio: OK`. Release passes all
+25 groups in 19.56 seconds; ASan/UBSan passes all 25 in 181.47 seconds. The separate engine runner
+reports `godot: OK`. Rider's native client with LSP4IJ installed and IDEA with LSP4IJ each pass three
+project cycles. Gradle `check buildPlugin verifyPlugin` passes against both installed endpoints.
+JUnit reports 134 plugin tests passed/one
+skipped and 82 core tests passed/three skipped; unchanged core results were reused by Gradle. Python's
+nine tests pass. Light/dark panel images were inspected. The ZIP's compiler matches the rebuilt binary,
+and the ZIP contains no probe classes.
+
+The native-only Rider sandbox remained open during the automated checks. The owner then approved
+restarting it to load the new binary. The server initialized successfully, and saved AS3 files were
+unchanged across the restart; previously inserted source is not rewritten.
+Logs and preserved reports use `snippet-*` in the ignored build
+directories. No new latency or retention measurement was made for this serialization fix. The earlier
+diagnostic-range, lifecycle and platform-coverage limits remain.
+
+Agy reviewed the fix delta from `7ccf5f1` and reported no actionable findings. It independently ran the
+style check and inspected the fail-first evidence, Release, engine, Gradle, Python and both IDE results.
+The sanitizer run was still in progress when inspected; its completed result above was verified
+separately after the review's inspection.
+
 ## Timing and retention method
 
 ```sh
