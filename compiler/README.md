@@ -101,10 +101,13 @@ files, packages, and package-level functions and variables. `String`'s methods, 
 function values (a method or a function as a value, `f(a, b)`) and function expressions that capture
 their variables; `[Signal]` on a field of a class that extends one of Godot's; getters and setters,
 static ones too, overridden and reached with `super` (`o.x += 1` and `o.x++` call each half once).
-In a stack trace a getter is `Class/get x()`, as in Flash.
+In a stack trace a getter is `Class/get x()`, as in Flash. Interfaces, with their getters and setters:
+a value typed as one calls the method of whatever class the object is, found by name as AVM2 finds it;
+`is`, `as`, parameters, fields and vectors of an interface type; a class may implement several, and an
+interface extend several.
 
 **What is refused, by name, until later slices:** `Object` literals and dynamic properties, `Dictionary`,
-interfaces, `for in` over anything but a vector or an Array,
+`for in` over anything but a vector or an Array,
 `this` inside a function expression and the instance members it would name bare (`n`, `go()`), regular expressions and the `String`
 methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
 `Date`), and the `godot` package. A program that uses one of these does not run: the compiler says

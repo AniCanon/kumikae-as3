@@ -1,5 +1,5 @@
 // Function values: a method or a function taken as a value, and a call through one.
-#include "lowerer.h"
+#include "lower_members.h"
 
 namespace kas3 {
 namespace ir {
@@ -17,6 +17,9 @@ uint32_t Lowerer::function_value(Expr *p_expression) {
 	if (is_godot(symbol)) {
 		refuse(position, "one of Godot's methods used as a value");
 		return default_value(Kind::Obj, position);
+	}
+	if (const std::optional<uint32_t> bound = Members(*this).interface_value(p_expression, symbol)) {
+		return *bound;
 	}
 	auto function = functions_.find(declaration(symbol));
 	if (function == functions_.end()) {

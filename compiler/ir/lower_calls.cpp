@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_members.h"
 
 namespace kas3 {
 namespace ir {
@@ -329,6 +329,9 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 		uint32_t out = reg(Kind::Str);
 		emit(Op::GetField, position, out, object, ERROR_STACK);
 		return out;
+	}
+	if (const std::optional<uint32_t> through = Members(*this).interface_call(p_call, symbol)) {
+		return *through; // On whatever class the object is.
 	}
 	auto function = functions_.find(declaration(symbol));
 	if (function == functions_.end()) {

@@ -62,6 +62,16 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			}
 			break;
 		}
+		case Op::MakeInterfaceMethod: {
+			Object *object = static_cast<Object *>(r[p_in.c].p);
+			const uint32_t method = interface_function(object, p_in.b);
+			if (method != NONE) {
+				if (Object *made = make_function(method, object)) {
+					assign(Kind::Obj, r[p_in.a], made);
+				}
+			}
+			break;
+		}
 		case Op::FunctionToCallable:
 			to_callable(p_in);
 			break;

@@ -159,9 +159,6 @@ void Lowerer::declare_class(Unit &p_unit, ClassDecl *p_decl) {
 		return;
 	}
 	unit_ = &p_unit;
-	if (p_decl->implements.count > 0) {
-		refuse(p_decl->implements[0]->offset, "'implements'");
-	}
 	Class klass = inherited_class(p_decl);
 	uint32_t index = classes_[symbol];
 	if (klass.base != NONE) {
@@ -179,6 +176,7 @@ void Lowerer::declare_class(Unit &p_unit, ClassDecl *p_decl) {
 		// No constructor is written: one that only sets the fields is made.
 		module_.classes[index].constructor = add_function(index, module_.classes[index].name, p_decl->name_offset, false);
 	}
+	Members(*this).implement(index, symbol);
 }
 
 void Lowerer::begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {

@@ -118,6 +118,11 @@ void Interpreter::enter(const Function &p_function, const Instruction &p_in, con
 			return;
 		}
 		target = module_.classes[object->klass].methods[p_in.b];
+	} else if (p_in.op == Op::CallInterface) {
+		target = interface_function(list.empty() ? nullptr : static_cast<const Object *>(p_registers[list[0]].p), p_in.b);
+		if (target == NONE) {
+			return;
+		}
 	}
 	Slot few[16];
 	std::vector<Slot> many;
@@ -603,6 +608,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::Call:
 			case Op::CallVirtual:
+			case Op::CallInterface:
 				enter(function, in, r); // `frame` and `r` are stale after this.
 				break;
 			case Op::IsClass:
@@ -649,6 +655,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			}
 			case Op::MakeFunction:
 			case Op::MakeMethod:
+			case Op::MakeInterfaceMethod:
 			case Op::CallFunction:
 			case Op::FunctionToCallable:
 			case Op::CallbackThis:

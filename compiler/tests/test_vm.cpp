@@ -1614,6 +1614,55 @@ static void test_kept_traces() {
 	CHECK_EQ(interpreter.kept_traces(), (size_t)0);
 }
 
+// A call through an interface finds the method in the object's class's table. A class whose table lacks it
+// (a module the lowerer did not make) is AS3's error for a missing method, never a read past the table.
+static void test_interface_table() {
+	Compilation compilation;
+	compilation.add("Main.as", "package { public class Main { public function Main() {\n"
+							   "	var s:Shape = new Square();\n"
+							   "	trace(s.area());\n"
+							   "	var f:Function = s.area;\n"
+							   "} } }\n"
+							   "interface Shape { function area():Number; }\n"
+							   "class Square implements Shape { public function area():Number { return 4; } }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module));
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.run_program());
+		CHECK_EQ(host.printed, std::string("4\n"));
+	}
+	for (ir::Class &klass : module.classes) {
+		klass.interface_methods.clear();
+	}
+	const std::string missing = "TypeError: Error #1006: area is not a function.";
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(!interpreter.run_program());
+		CHECK_EQ(host.errors.substr(0, host.errors.find('\n')), missing);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	// The method taken as a value, the same.
+	for (ir::Function &function : module.functions) {
+		for (ir::Instruction &instruction : function.code) {
+			if (instruction.op == ir::Op::CallInterface) {
+				instruction.op = ir::Op::Stmt;
+			}
+		}
+	}
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(!interpreter.run_program());
+		CHECK_EQ(host.errors.substr(0, host.errors.find('\n')), missing);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 // Untyped arithmetic with no memory for an Int64, and `==` with no memory for an object's text.
 static void test_untyped_out_of_memory() {
 	Compilation compilation;
@@ -1698,6 +1747,7 @@ static void test_host_construct_order() {
 
 int main() {
 	test_host_construct_order();
+	test_interface_table();
 	test_kept_traces();
 	test_untyped_out_of_memory();
 	test_out_of_memory();

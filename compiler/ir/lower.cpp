@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_members.h"
 
 namespace kas3 {
 namespace ir {
@@ -193,14 +193,11 @@ void Lowerer::declare_package_function(Unit *p_unit, FunctionDecl *p_decl) {
 	module_.functions.push_back(std::move(function));
 }
 
-// What a file holds at package level other than classes: functions and variables get their places, and
-// an interface is refused.
+// What a file holds at package level other than classes and interfaces: functions and variables get their
+// places.
 void Lowerer::declare_package_level(Unit *p_unit, const List<Node *> &p_definitions) {
 	for (Node *definition : p_definitions) {
 		switch (definition->kind) {
-			case NodeKind::InterfaceDecl:
-				refuse(static_cast<InterfaceDecl *>(definition)->name_offset, "an interface");
-				break;
 			case NodeKind::FunctionDecl:
 				declare_package_function(p_unit, static_cast<FunctionDecl *>(definition));
 				break;
@@ -258,6 +255,7 @@ bool Lowerer::run(LowerMode p_mode) {
 		return false;
 	}
 	find_error_classes();
+	Members(*this).reserve_interfaces(units);
 	const std::vector<ClassInUnit> classes = classes_in_order(units);
 	for (const ClassInUnit &entry : classes) {
 		reserve_class(entry.second);
