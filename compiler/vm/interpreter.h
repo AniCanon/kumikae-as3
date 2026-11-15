@@ -9,6 +9,7 @@
 #include "ir.h"
 #include "runtime.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -132,7 +133,10 @@ private:
 	void function_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	Object *function_in(ir::Kind p_kind, Slot p_value);
 	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
+	bool function_arguments(Object *p_value, size_t p_count, const Slot *p_values, const uint32_t *p_list, std::vector<Slot> *r_values);
+	void let_go_arguments(const ir::Function &p_callee, std::vector<Slot> *p_values);
 	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
+	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
 	void to_callable(const ir::Instruction &p_in);
 	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
@@ -155,6 +159,8 @@ private:
 	void vector_take(Vector *p_vector, const VectorCall &p_call);
 	void vector_copy(Vector *p_vector, const VectorCall &p_call);
 	void splice(Vector *p_vector, const VectorCall &p_call);
+	void vector_sort(Vector *p_vector, const VectorCall &p_call);
+	bool sort_order(ir::Kind p_kind, const std::vector<Slot> &p_elements, Object *p_compare, int32_t p_options, std::vector<uint32_t> *r_order);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
 	void leave_failed_frame(); // A frame the error leaves: its line goes into the trace.

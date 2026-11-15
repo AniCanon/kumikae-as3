@@ -149,13 +149,23 @@ uint32_t Lowerer::empty_untyped(const Type *p_type, uint32_t p_position) {
 }
 
 uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
-	if (starts_null_type(p_kind, p_type) && untyped(p_expression)) {
+	// A plain value is asked for in its own kind: a call of Godot's that gives any value then gives that one.
+	const bool checked = starts_null_type(p_kind, p_type) || is_engine(p_kind) || p_kind == Kind::Obj;
+	if (!checked || !untyped(p_expression)) {
+		return expression(p_expression, p_kind);
+	}
+	return from_untyped(expression(p_expression, Kind::Any), p_type, p_kind, p_expression->offset);
+}
+
+// An untyped value stored where a type is declared.
+uint32_t Lowerer::from_untyped(uint32_t p_any, const Type *p_type, Kind p_kind, uint32_t p_position) {
+	if (starts_null_type(p_kind, p_type)) {
 		// Into an Object: undefined becomes null, as AS3's coercion has it.
 		uint32_t out = reg(Kind::Any);
-		emit(Op::FromAny, p_expression->offset, out, expression(p_expression, Kind::Any), 0);
+		emit(Op::FromAny, p_position, out, p_any, 0);
 		return out;
 	}
-	if (is_engine(p_kind) && untyped(p_expression)) {
+	if (is_engine(p_kind)) {
 		// Into a place of one of Godot's types: the value must be of that type, checked by its name.
 		uint32_t name = NONE;
 		const Symbol *godot = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
@@ -163,11 +173,11 @@ uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
 			name = NONE;
 		}
 		uint32_t out = engine_reg(p_kind, p_type);
-		emit(Op::FromAny, p_expression->offset, out, expression(p_expression, Kind::Any), name);
+		emit(Op::FromAny, p_position, out, p_any, name);
 		return out;
 	}
-	if (p_kind != Kind::Obj || !untyped(p_expression)) {
-		return expression(p_expression, p_kind);
+	if (p_kind != Kind::Obj) {
+		return convert(p_any, p_kind, p_position);
 	}
 	const Symbol *symbol = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
 	uint32_t klass = NONE;
@@ -178,11 +188,11 @@ uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
 		klass = found == classes_.end() ? NONE : found->second;
 	}
 	if (klass == NONE) {
-		refuse(p_expression->offset, "converting an untyped value to '" + compilation_.type_name(p_type) + "'");
-		return default_value(Kind::Obj, p_expression->offset);
+		refuse(p_position, "converting an untyped value to '" + compilation_.type_name(p_type) + "'");
+		return default_value(Kind::Obj, p_position);
 	}
 	uint32_t out = reg(Kind::Obj);
-	emit(Op::FromAny, p_expression->offset, out, expression(p_expression, Kind::Any), klass);
+	emit(Op::FromAny, p_position, out, p_any, klass);
 	return out;
 }
 

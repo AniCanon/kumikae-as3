@@ -174,8 +174,6 @@ any Godot value passing as a condition):
 
 ## Stage 2c-1: vectors, `switch` and `Math`
 
-- A vector's methods that take a function (`forEach`, `map`, `filter`, `some`, `every`, `sort`) are refused:
-  they wait for closures. **2c**
 - `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
 - A reload is refused when a vector that is alive has a type the new program no longer mentions, even if
   the vector is empty. **2d**

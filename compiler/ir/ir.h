@@ -154,7 +154,9 @@ constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK 
 //   InsertAt        index (int), an element          -> nothing
 //   RemoveAt        index (int)                      -> the element
 //   Splice          start (int), how many (uint), elements to put in   -> a new vector of what was removed
-enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice };
+//   Sort            a function that compares two elements, or the options as a number (untyped)   -> the vector
+// (forEach, map, filter, some and every are loops the lowerer writes, calling the function each time.)
+enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort };
 
 const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.

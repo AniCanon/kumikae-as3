@@ -141,7 +141,7 @@ std::optional<VectorMethod> vector_method(std::string_view p_name) {
 		std::string_view name;
 		VectorMethod method;
 	};
-	static constexpr std::array<Method, 14> methods = { {
+	static constexpr std::array<Method, 15> methods = { {
 			{ "push", VectorMethod::Push },
 			{ "unshift", VectorMethod::Unshift },
 			{ "pop", VectorMethod::Pop },
@@ -156,13 +156,14 @@ std::optional<VectorMethod> vector_method(std::string_view p_name) {
 			{ "insertAt", VectorMethod::InsertAt },
 			{ "removeAt", VectorMethod::RemoveAt },
 			{ "splice", VectorMethod::Splice },
+			{ "sort", VectorMethod::Sort },
 	} };
 	for (const Method &each : methods) {
 		if (each.name == p_name) {
 			return each.method;
 		}
 	}
-	return std::nullopt; // forEach, map, filter, some, every and sort take a function: they wait for closures.
+	return std::nullopt;
 }
 
 VectorShape vector_shape(VectorMethod p_method, Kind p_element) {
@@ -220,6 +221,11 @@ VectorShape vector_shape(VectorMethod p_method, Kind p_element) {
 			rest = element;
 			result = own;
 			break;
+		case VectorMethod::Sort:
+			fixed = { Kind::Any };
+			left_out = { std::nullopt };
+			result = own;
+			break;
 	}
 	return { fixed, left_out, rest, result };
 }
@@ -232,6 +238,11 @@ uint32_t Lowerer::vector_call(Call *p_call) {
 	const std::optional<uint32_t> klass = vector_class(callee->object->type);
 	const std::optional<VectorMethod> method = vector_method(callee->name);
 	const uint32_t count = p_call->arguments.count;
+	for (std::string_view loop : { "forEach", "map", "filter", "some", "every" }) {
+		if (klass && callee->name == loop) {
+			return vector_each(p_call);
+		}
+	}
 	if (!klass || !method || (callee->name == "toString" && count)) {
 		refuse(callee->name_offset, "calling '" + std::string(callee->name) + "' on a Vector");
 		return default_value(Kind::Obj, position);

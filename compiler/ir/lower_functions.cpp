@@ -65,6 +65,15 @@ bool Lowerer::called_value(const Symbol *p_symbol) {
 	}
 }
 
+// A call of a function value may raise AS3's ArgumentError: the class it is of.
+void Lowerer::use_argument_error() {
+	if (module_.argument_error_class == NONE) {
+		if (Symbol *argument_error = compilation_.builtin("ArgumentError")) {
+			class_index(argument_error, &module_.argument_error_class);
+		}
+	}
+}
+
 // f(a, b) on a function value: each argument untyped, and what it gives back too.
 uint32_t Lowerer::value_call(Call *p_call, Kind p_want) {
 	const uint32_t position = p_call->offset;
@@ -73,11 +82,7 @@ uint32_t Lowerer::value_call(Call *p_call, Kind p_want) {
 		refuse(p_call->callee->offset, "calling a value of type '" + compilation_.type_name(p_call->callee->type) + "'");
 		return default_value(p_want, position);
 	}
-	if (module_.argument_error_class == NONE) {
-		if (Symbol *argument_error = compilation_.builtin("ArgumentError")) {
-			class_index(argument_error, &module_.argument_error_class);
-		}
-	}
+	use_argument_error();
 	std::vector<uint32_t> list;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		Expr *later = nullptr;
@@ -89,6 +94,77 @@ uint32_t Lowerer::value_call(Call *p_call, Kind p_want) {
 	uint32_t out = reg(Kind::Any);
 	emit(Op::CallFunction, position, out, value, arguments(std::move(list)));
 	return out;
+}
+
+// v.forEach(f), map, filter, some and every: a loop that calls the function with each element, its index and
+// the vector, as Flash's own Vector does: the length read once, before the first call, and each element read
+// as it is reached (one taken out by then is AS3's RangeError). The object to call it on is worked out and
+// set aside: a method keeps its own object, and a function expression can't use `this`.
+uint32_t Lowerer::vector_each(Call *p_call) {
+	const uint32_t position = p_call->offset;
+	Member *callee = static_cast<Member *>(p_call->callee);
+	const std::string_view name = callee->name;
+	const uint32_t count = p_call->arguments.count;
+	const std::optional<uint32_t> klass = vector_class(callee->object->type);
+	if (!klass || count < 1 || count > 2) {
+		refuse(callee->name_offset, "this call of '" + std::string(name) + "' on a Vector");
+		return default_value(Kind::Obj, position);
+	}
+	const bool map = name == "map", filter = name == "filter", some = name == "some", every = name == "every";
+	const Kind element = module_.classes[*klass].element;
+	const uint32_t vector = settled(expression(callee->object, Kind::Obj), writer(p_call->arguments), position);
+	Expr *object = count > 1 ? p_call->arguments[1] : nullptr;
+	const uint32_t function = settled(expression(p_call->arguments[0], Kind::Any), object && writes_locals(object) ? object : nullptr, position);
+	if (object) {
+		expression(object, Kind::Void);
+	}
+	emit(Op::NullCheck, position, vector);
+	use_argument_error();
+	const uint32_t limit = reg(Kind::U32);
+	emit(Op::VecLength, position, limit, vector);
+	uint32_t out = NONE;
+	if (map || filter) {
+		out = reg(Kind::Obj);
+		emit(Op::VecNew, position, out, *klass, arguments({ map ? limit : default_value(Kind::U32, position), default_value(Kind::Bool, position) }));
+	} else if (some || every) {
+		out = reg(Kind::Bool);
+		emit(Op::ConstBool, position, out, every ? 1 : 0);
+	}
+	const uint32_t end = convert(limit, Kind::F64, position);
+	const uint32_t at = reg(Kind::F64);
+	emit(Op::ConstF64, position, at, number(0));
+	const uint32_t top = here();
+	const uint32_t more = reg(Kind::Bool);
+	emit(Op::LtF64, position, more, at, end);
+	const uint32_t exit = emit(Op::JumpIfNot, position, more, 0);
+	const uint32_t item = reg(element);
+	emit(Op::VecGet, position, item, vector, at);
+	const uint32_t index = convert(convert(at, Kind::I32, position), Kind::Any, position);
+	const uint32_t answer = map || filter || some || every ? reg(Kind::Any) : NONE;
+	emit(Op::CallFunction, position, answer, function, arguments({ convert(item, Kind::Any, position), index, convert(vector, Kind::Any, position) }));
+	uint32_t found = NONE;
+	if (map) {
+		emit(Op::VecSet, position, out, at, from_untyped(answer, callee->object->type->element, element, position));
+	} else if (filter) {
+		const uint32_t skip = emit(Op::JumpIfNot, position, convert(answer, Kind::Bool, position), 0);
+		emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), arguments({ out, item }));
+		patch(skip, here());
+	} else if (some || every) {
+		// The first that answers true for some(), false for every(), settles it.
+		const uint32_t carry_on = emit(every ? Op::JumpIf : Op::JumpIfNot, position, convert(answer, Kind::Bool, position), 0);
+		emit(Op::ConstBool, position, out, some ? 1 : 0);
+		found = emit(Op::Jump, position, 0);
+		patch(carry_on, here());
+	}
+	const uint32_t one = reg(Kind::F64);
+	emit(Op::ConstF64, position, one, number(1));
+	emit(Op::AddF64, position, at, at, one);
+	emit(Op::Jump, position, top);
+	patch(exit, here());
+	if (found != NONE) {
+		patch(found, here());
+	}
+	return out == NONE ? 0 : out;
 }
 
 } // namespace ir

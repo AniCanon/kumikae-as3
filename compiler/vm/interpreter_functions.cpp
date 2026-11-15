@@ -147,45 +147,78 @@ bool Interpreter::argument_as(const Function &p_callee, uint32_t p_register, Slo
 	return true;
 }
 
-// f(a, b): the callee's parameters take the arguments as stores take untyped values. One left out takes its
-// default; too many is AS3's ArgumentError #1063. What it gives back is untyped.
+// What a call of a function value starts with: what it takes first, then each untyped argument as its
+// parameter holds it (p_list picks them out of p_values, or they are p_values in order). One left out takes
+// its default; too many is AS3's ArgumentError #1063. False if it raised.
+bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, const uint32_t *p_list, std::vector<Slot> *r_values) {
+	const Function &callee = module_.functions[static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i)];
+	const size_t first = callee.is_static ? 0 : 1;
+	const size_t most = callee.parameters - first;
+	if (p_count > most || p_count + first < callee.required) {
+		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
+				"Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
+						std::to_string(p_count > most ? most : callee.required - first) + ", got " + std::to_string(p_count) + ".");
+		return false;
+	}
+	r_values->assign(first + p_count, Slot());
+	if (first) {
+		(*r_values)[0].bits = 0;
+		(*r_values)[0].p = p_value->fields()[ir::FUNCTION_FIRST].p;
+	}
+	for (size_t i = 0; i < p_count; i++) {
+		if (!argument_as(callee, static_cast<uint32_t>(first + i), p_values[p_list ? p_list[i] : i], &(*r_values)[first + i])) {
+			r_values->resize(first + i);
+			let_go_arguments(callee, r_values);
+			return false;
+		}
+	}
+	return true;
+}
+
+// The arguments function_arguments() made, once the callee has taken references of its own.
+void Interpreter::let_go_arguments(const Function &p_callee, std::vector<Slot> *p_values) {
+	for (size_t made = p_callee.is_static ? 0 : 1; made < p_values->size(); made++) {
+		drop(p_callee.registers[made], (*p_values)[made]);
+	}
+}
+
+// f(a, b): the callee's parameters take the arguments as stores take untyped values. What it gives back is
+// untyped.
 void Interpreter::call_value(const Function &p_function, const Instruction &p_in) {
 	Slot *r = stack_.data() + frames_.back().base;
 	if (p_in.a != NONE) {
 		put(Kind::Any, r[p_in.a], any::undefined()); // A function that gives nothing gives undefined.
 	}
 	Object *value = function_in(p_function.registers[p_in.b], r[p_in.b]);
-	if (!value) {
+	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	std::vector<Slot> values;
+	if (!value || !function_arguments(value, list.size(), r, list.data(), &values)) {
 		return;
 	}
 	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
-	const Function &callee = module_.functions[target];
-	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
-	const size_t first = callee.is_static ? 0 : 1;
-	const size_t most = callee.parameters - first;
-	if (list.size() > most || list.size() + first < callee.required) {
-		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
-				"Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
-						std::to_string(list.size() > most ? most : callee.required - first) + ", got " + std::to_string(list.size()) + ".");
-		return;
-	}
-	std::vector<Slot> values(first + list.size());
-	if (first) {
-		values[0].bits = 0;
-		values[0].p = value->fields()[ir::FUNCTION_FIRST].p;
-	}
-	for (size_t i = 0; i < list.size(); i++) {
-		if (!argument_as(callee, static_cast<uint32_t>(first + i), r[list[i]], &values[first + i])) {
-			for (size_t made = first; made < first + i; made++) {
-				drop(callee.registers[made], values[made]);
-			}
-			return;
-		}
-	}
 	push(target, values.data(), values.size(), p_in.a); // It takes references of its own.
-	for (size_t made = first; made < values.size(); made++) {
-		drop(callee.registers[made], values[made]);
+	let_go_arguments(module_.functions[target], &values);
+}
+
+// A function value called from inside an instruction, with untyped arguments: what it gives back, untyped,
+// or nothing if it raised (the error is then on its way out, as call_within() leaves it).
+std::optional<Slot> Interpreter::call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count) {
+	std::vector<Slot> values;
+	if (!function_arguments(p_value, p_count, p_arguments, nullptr, &values)) {
+		return std::nullopt;
 	}
+	const uint32_t target = static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i);
+	const Function &callee = module_.functions[target];
+	Slot result;
+	result.bits = 0;
+	const bool ok = call_within(target, values.data(), values.size(), &result);
+	let_go_arguments(callee, &values);
+	if (!ok) {
+		return std::nullopt;
+	}
+	const Slot untyped = callee.result == Kind::Void ? any::undefined() : to_any(callee.result, result);
+	drop(callee.result, result);
+	return untyped;
 }
 
 } // namespace vm

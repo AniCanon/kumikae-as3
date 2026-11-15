@@ -235,6 +235,7 @@ class Lowerer {
 	// An expression stored where a type is declared: a value from an untyped one is checked against the
 	// class the place holds.
 	uint32_t typed(Expr *p_expression, const Type *p_type, Kind p_kind);
+	uint32_t from_untyped(uint32_t p_any, const Type *p_type, Kind p_kind, uint32_t p_position);
 	// A vector where Godot takes one of its own collections: converted, element by element, to the type
 	// wanted (an Array where Godot takes anything). Nothing if the value is not a vector.
 	std::optional<uint32_t> vector_to_engine(Expr *p_value, const Type *p_wanted);
@@ -377,6 +378,8 @@ class Lowerer {
 	uint32_t function_value(Expr *p_expression);
 	static bool called_value(const Symbol *p_symbol);
 	uint32_t value_call(Call *p_call, Kind p_want);
+	uint32_t vector_each(Call *p_call);
+	void use_argument_error();
 	uint32_t wide_order(Expr *p_left, Expr *p_right, uint32_t p_position);
 	uint32_t number_zero(uint32_t p_position);
 	uint32_t name_value(Expr *p_expression);
