@@ -186,6 +186,10 @@ void Lowerer::begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {
 	result_type_ = nullptr;
 	locals_.clear();
 	loops_.clear();
+	received_env_ = false;
+	chain_.clear();
+	own_env_reg_ = NONE;
+	own_layout_ = EnvLayout();
 }
 
 void Lowerer::parameters(FunctionDecl *p_function) {
@@ -262,9 +266,11 @@ void Lowerer::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl
 	fn().result = p_decl->return_type ? written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void) : Kind::Any;
 	if (p_decl->body) {
 		declare_locals(p_decl->body);
+		make_environment(p_decl);
 		statement(p_decl->body);
 	}
 	end(p_decl->end ? p_decl->end - 1 : p_decl->offset);
+	lower_pending_functions();
 }
 
 bool Lowerer::calls_super(Block *p_body) {
@@ -287,6 +293,7 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 	parameters(decl);
 	if (decl && decl->body) {
 		declare_locals(decl->body);
+		make_environment(decl);
 	}
 	// The class's own fields get their values first, before any constructor body runs. One of Godot's
 	// values with parts starts at its zero, and does so before any written value is worked out, since
@@ -331,6 +338,7 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 		statement(decl->body);
 	}
 	emit(Op::ReturnVoid, decl && decl->end ? decl->end - 1 : p_class->name_offset);
+	lower_pending_functions();
 }
 
 void Lowerer::lower_statics(Unit &p_unit, ClassDecl *p_class) {

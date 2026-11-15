@@ -398,6 +398,11 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 			return out;
 		}
 		case NodeKind::ThisExpr:
+			if (received_env_) {
+				// In a function expression AS3's `this` is not the object the function was written in.
+				refuse(position, "'this' in a function expression");
+				return default_value(Kind::Obj, position);
+			}
 			if (fn().is_static) {
 				refuse(position, "'this' here");
 				return default_value(Kind::Obj, position);
@@ -436,8 +441,7 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 		case NodeKind::VectorLit:
 			return vector_literal(static_cast<VectorLit *>(p_expression));
 		case NodeKind::FunctionExpr:
-			refuse(position, "a function used as a value");
-			break;
+			return closure_value(static_cast<FunctionExpr *>(p_expression));
 		case NodeKind::Index:
 			return load(place_of(p_expression), position);
 		case NodeKind::TypeApply:

@@ -32,6 +32,11 @@ uint32_t Lowerer::whole_of(const Place &p_place, uint32_t p_position) {
 }
 
 auto Lowerer::place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_position) -> Lowerer::Place {
+	if (p_symbol && (p_symbol->kind == SymbolKind::Local || p_symbol->kind == SymbolKind::Parameter)) {
+		if (std::optional<Place> shared = captured_place(p_symbol, p_position)) {
+			return *shared; // A variable a function written inside shares, through its environment.
+		}
+	}
 	Place place;
 	if (!p_symbol) {
 		refuse(p_position, "this name");

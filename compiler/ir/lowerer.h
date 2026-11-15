@@ -6,7 +6,9 @@
 
 #include "ast_walk.h"
 #include "builtins.h"
+#include "lower_env.h"
 #include "whole_numbers.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -93,6 +95,15 @@ class Lowerer {
 	const Stmt *refused_in_ = nullptr; // The last statement something was refused in.
 	bool uses_refused_type(const Stmt *p_statement);
 	size_t zeroes_ = 0; // How many package variables are zeroed, first of all the initializers.
+	// The environment of the function being lowered (see lower_closures.cpp): its register and layout, if
+	// a function written inside it uses its variables; whether it was given one (a function expression,
+	// in r0); the layouts reachable from that one, nearest first; and the function expressions met, to
+	// lower once the function they are in is done.
+	uint32_t own_env_reg_ = NONE;
+	EnvLayout own_layout_;
+	bool received_env_ = false;
+	std::vector<EnvLayout> chain_;
+	std::vector<PendingFunction> pending_functions_;
 	// The `try` statements around the code being lowered, outermost first: a `break`, `continue` or
 	// `return` that leaves one runs its `finally` on the way.
 	std::vector<TryBlock> tries_;
@@ -245,30 +256,8 @@ class Lowerer {
 	// The object a member is reached through, checked for null unless it is `this` or `super`.
 	uint32_t receiver(Expr *p_object);
 
-	struct Part;
-	// A place a value can be stored: a local, a field of an object, or a global.
-	struct Place {
-		// Element, Length and Fixed are of a Vector: `object` holds it, and for Element `key` the index.
-		enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine, Element, Length, Fixed } where = Nowhere;
-		uint32_t index = 0; // The register, the field slot, the global, or the string of Godot's name.
-		uint32_t object = 0; // For FieldOf and Engine: the register holding the object.
-		Kind kind = Kind::F64;
-		bool of_value = false; // For Engine: a member of a value type, which is a copy.
-		const Type *type = nullptr; // For Engine: what the member is declared to be.
-		uint32_t key = NONE; // For Engine: the place is an element (`value[key]`); the register holding the key.
-		bool constant = false; // One of Godot's constants: read from a register, and never written.
-		// For Engine: the script object whose Godot object `object` is, fetched when the place is read or
-		// written, so that a missing one is reported after the value is worked out, as in AS3.
-		uint32_t script_object = NONE;
-		// For Engine: the member is one part of a Godot value that is itself stored somewhere
-		// (`position.x`). Godot's values are copies, so writing the part is: read the whole value, change
-		// the part, write the whole value back.
-		Part *part = nullptr; // In parts_.
-	};
-	struct Part {
-		Place whole; // Where the value is stored.
-		uint32_t value = NONE; // The register it was read into, once it has been.
-	};
+	using Place = ir::Place; // lower_env.h
+	using Part = ir::Part;
 	// The parts of Godot values that places refer to (see Place::part): a deque, so that each stays where
 	// it is as more are made. Kept for the whole lowering: places are short-lived, and parts are small.
 	std::deque<Part> parts_;
@@ -379,6 +368,11 @@ class Lowerer {
 	uint32_t number_literal(Expr *p_expression, Kind p_want);
 	uint32_t number_constant(double p_value, Kind p_kind, Kind p_want, uint32_t p_position);
 	uint32_t written_value(Expr *p_value, Kind p_conversion, uint32_t p_position);
+	// Function expressions and what they capture (lower_closures.cpp).
+	void make_environment(FunctionDecl *p_decl);
+	std::optional<Place> captured_place(const Symbol *p_symbol, uint32_t p_position);
+	uint32_t closure_value(FunctionExpr *p_expression);
+	void lower_pending_functions();
 	// Function values (lower_functions.cpp).
 	uint32_t function_value(Expr *p_expression);
 	static bool called_value(const Symbol *p_symbol);

@@ -48,7 +48,11 @@ void Lowerer::declare_locals(Node *p_body) {
 			}
 		});
 	}
-	walk(p_body, [&](Node *p_node) {
+	// A function's own locals: not those of a function written inside it, which are that one's.
+	walk(p_body, [&](Node *p_node) -> bool {
+		if (p_node->kind == NodeKind::FunctionExpr || p_node->kind == NodeKind::FunctionStmt) {
+			return false;
+		}
 		if (p_node->kind == NodeKind::Try) {
 			// A catch's variable: a register of the kind it is declared, untyped when it says none.
 			for (CatchClause &clause : static_cast<Try *>(p_node)->catches) {
@@ -59,10 +63,10 @@ void Lowerer::declare_locals(Node *p_body) {
 				locals_[clause.symbol] = local;
 				fn().locals.push_back({ std::string(clause.name), local });
 			}
-			return;
+			return true;
 		}
 		if (p_node->kind != NodeKind::VarDecl) {
-			return;
+			return true;
 		}
 		for (Declarator &declarator : static_cast<VarDecl *>(p_node)->declarators) {
 			if (!declarator.symbol || locals_.count(declarator.symbol)) {
@@ -82,6 +86,7 @@ void Lowerer::declare_locals(Node *p_body) {
 				zero_value(declarator.type, declarator.offset, local);
 			}
 		}
+		return true;
 	});
 }
 
@@ -385,7 +390,9 @@ void Lowerer::variables(VarDecl *p_decl) {
 			continue; // Without an initializer a `var` keeps what the variable holds: it is declared once.
 		}
 		uint32_t value = typed(declarator.initializer, compilation_.type_of(declarator.type), kind_at(local->second));
-		if (value != local->second) {
+		if (std::optional<Place> shared = captured_place(declarator.symbol, declarator.offset)) {
+			store(*shared, value, declarator.offset); // One a function written inside shares.
+		} else if (value != local->second) {
 			emit(Op::Move, declarator.offset, local->second, value);
 		}
 	}
