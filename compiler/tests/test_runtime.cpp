@@ -3,8 +3,10 @@
 #include "check.h"
 
 #include "any.h"
+#include "number_text.h"
 #include "numeric.h"
 #include "runtime.h"
+#include "text_units.h"
 
 #include <cmath>
 #include <string>
@@ -284,7 +286,105 @@ static void test_any() {
 	}
 }
 
+// Text by UTF-16 unit. A character past U+FFFF is two units; a half held alone is three bytes.
+static void test_text_units() {
+	const std::string face = "a\xF0\x9F\x98\x80" "b"; // a, U+1F600, b
+	const std::string high = "\xED\xA0\xBD", low = "\xED\xB8\x80"; // U+D83D, U+DE00 alone
+	CHECK_EQ(unit_at(face, 0).value_or(0), 'a');
+	CHECK_EQ(unit_at(face, 1).value_or(0), 0xD83D);
+	CHECK_EQ(unit_at(face, 2).value_or(0), 0xDE00);
+	CHECK_EQ(unit_at(face, 3).value_or(0), 'b');
+	CHECK(!unit_at(face, 4));
+	CHECK_EQ(units_between(face, 1, 2), high);
+	CHECK_EQ(units_between(face, 2, 4), low + "b");
+	CHECK_EQ(units_between(face, 1, 3), std::string("\xF0\x9F\x98\x80"));
+	CHECK_EQ(units_between(face, 0, 4), face);
+	CHECK_EQ(units_between(face, 3, 3), std::string());
+	CHECK_EQ(joined_halves(high, low), (size_t)2);
+	CHECK_EQ(joined_halves(low, high), (size_t)0);
+	std::string joined = "a" + high;
+	append_text(&joined, low + "b");
+	CHECK_EQ(joined, face);
+	std::string built;
+	append_unit(&built, 0xD83D);
+	append_unit(&built, 0xDE00);
+	CHECK_EQ(built, std::string("\xF0\x9F\x98\x80"));
+	Str *whole = join_strings("a" + high, low + "b");
+	CHECK(whole && whole->view() == face);
+	free_string(whole);
+	CHECK_EQ(find_units(face, high, 0), 1);
+	CHECK_EQ(find_units(face, low, 0), 2);
+	CHECK_EQ(find_units(face, low + "b", 0), 2);
+	CHECK_EQ(find_units(face, "b", 2), 3);
+	CHECK_EQ(find_units(face, "\xF0\x9F\x98\x80", 2), -1);
+	CHECK_EQ(find_units(face, "", 9), 4);
+	CHECK_EQ(find_last_units(face, high, 1), 1);
+	CHECK_EQ(find_last_units(face, high, 0), -1);
+	CHECK_EQ(find_last_units(face, "\xF0\x9F\x98\x80", 2), 1);
+	CHECK_EQ(find_last_units(face, "a", 99), 0);
+	CHECK_EQ(upper_case("abc \xC3\xA9 \xC3\x9F \xC4\xB1"), std::string("ABC \xC3\x89 \xC3\x9F I")); // é to É, ß stays, ı to I
+	CHECK_EQ(lower_case("ABC \xC3\x89 \xD0\x96"), std::string("abc \xC3\xA9 \xD0\xB6"));
+	CHECK_EQ(to_upper(0x3B1), (uint32_t)0x391);
+	CHECK_EQ(to_lower(0x1C5), (uint32_t)0x1C6);
+	CHECK_EQ(to_upper(0xFF41), (uint32_t)0xFF21);
+	CHECK_EQ(to_upper(0xD83D), (uint32_t)0xD83D);
+	CHECK_EQ(upper_case(face), std::string("A\xF0\x9F\x98\x80" "B"));
+}
+
+// Checked against Node, except where AS3 differs (said at each).
+static void test_number_methods() {
+	CHECK_EQ(radix_text(255, 16), std::string("ff"));
+	CHECK_EQ(radix_text(-255, 2), std::string("-11111111"));
+	CHECK_EQ(radix_text(1e21, 16), std::string("3635c9adc5dea00000"));
+	CHECK_EQ(radix_text(255.5, 16), std::string("ff")); // AS3: the whole part only.
+	CHECK_EQ(radix_text(-0.5, 2), std::string("0"));
+	CHECK_EQ(radix_text(1.5, 10), std::string("1.5"));
+	CHECK_EQ(radix_text(18446744073709551616.0, 16), std::string("10000000000000000"));
+	CHECK_EQ(radix_text(1.7976931348623157e308, 36).size(), (size_t)199);
+	CHECK_EQ(wide_radix_text(INT64_MIN, 16), std::string("-8000000000000000"));
+	CHECK_EQ(wide_radix_text(INT64_MAX, 36), std::string("1y2p0ij32e8e7"));
+	CHECK_EQ(wide_radix_text(0, 2), std::string("0"));
+	CHECK_EQ(fixed_text(2.5, 0), std::string("3"));
+	CHECK_EQ(fixed_text(0.125, 2), std::string("0.13"));
+	CHECK_EQ(fixed_text(1.005, 2), std::string("1.00"));
+	CHECK_EQ(fixed_text(-0.0001, 2), std::string("-0.00"));
+	CHECK_EQ(fixed_text(0.006, 2), std::string("0.01"));
+	CHECK_EQ(fixed_text(0.004, 2), std::string("0.00"));
+	CHECK_EQ(fixed_text(0.0004, 2), std::string("0.00"));
+	CHECK_EQ(fixed_text(999.995, 2), std::string("1000.00"));
+	CHECK_EQ(fixed_text(1e21, 2), std::string("1e+21"));
+	CHECK_EQ(fixed_text(-0.0, 1), std::string("0.0"));
+	CHECK_EQ(exponential_text(1.5, 0), std::string("2e+0"));
+	CHECK_EQ(exponential_text(-12.5, 1), std::string("-1.3e+1"));
+	CHECK_EQ(exponential_text(99.99, 1), std::string("1.0e+2"));
+	CHECK_EQ(exponential_text(0, 2), std::string("0.00e+0"));
+	CHECK_EQ(exponential_text(5e-324, 3), std::string("4.941e-324"));
+	CHECK_EQ(precision_text(25, 1), std::string("3e+1"));
+	CHECK_EQ(precision_text(99.99, 3), std::string("100"));
+	CHECK_EQ(precision_text(0.000123, 2), std::string("0.00012"));
+	CHECK_EQ(precision_text(1e-7, 1), std::string("1e-7"));
+	CHECK_EQ(precision_text(123456, 2), std::string("1.2e+5"));
+	CHECK_EQ(precision_text(0, 3), std::string("0.00"));
+	CHECK(std::isnan(parse_int("x", 10)));
+	CHECK_EQ(parse_int("  -0x1F", 0), -31.0);
+	CHECK_EQ(parse_int("9007199254740993", 0), 9007199254740992.0);
+	CHECK_EQ(parse_int("9007199254740995", 0), 9007199254740996.0);
+	CHECK_EQ(parse_int("1fffffffffffff1", 16), 144115188075855856.0);
+	CHECK_EQ(parse_int("08", 0), 8.0);
+	CHECK(std::isinf(parse_int(std::string(400, '9'), 10)));
+	CHECK(std::isnan(parse_int("12", 37)));
+	CHECK(std::signbit(parse_int("-0", 0)));
+	CHECK_EQ(parse_float("  -.5e-3x"), -0.0005);
+	CHECK_EQ(parse_float("1e+"), 1.0);
+	CHECK(std::isnan(parse_float(".e1")));
+	CHECK_EQ(parse_float("\xE2\x80\x83 2.5"), 2.5); // An em space first.
+	CHECK_EQ(string_to_number(" \xC2\xA0" "12\xE3\x80\x80"), 12.0); // A no-break space, and an ideographic one.
+	CHECK_EQ(string_to_number("\xE3\x80\x80"), 0.0);
+}
+
 int main() {
+	test_text_units();
+	test_number_methods();
 	test_tagged_addresses();
 	test_long_text();
 	test_any();

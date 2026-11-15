@@ -79,7 +79,8 @@ size_t live_strings();
 size_t live_objects();
 
 Str *new_string(std::string_view p_text); // One reference, the caller's. Null if out of memory.
-// The two, one after the other, made at once: nothing else is allocated. Null if out of memory.
+// The two, one after the other, made at once: nothing else is allocated. Two halves of a character that
+// meet there become the character (vm/text_units.h). Null if out of memory.
 Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);
 Object *new_object(uint32_t p_class, size_t p_fields); // One reference; fields zeroed. Null if out of memory.
@@ -96,8 +97,8 @@ int32_t to_int32(double p_value);
 uint32_t to_uint32(double p_value);
 // "0.1", "1e+21", "NaN", "-Infinity": the shortest text that reads back as the same number.
 std::string number_to_string(double p_value);
-// Leading and trailing white space is allowed; an empty string is 0; anything else that is not a number
-// is NaN.
+// Leading and trailing white space (ECMAScript's, vm/number_text.h) is allowed; an empty string is 0;
+// anything else that is not a number is NaN.
 double string_to_number(std::string_view p_text);
 // AS3's length of UTF-8 text: its UTF-16 units, so a character past U+FFFF counts two.
 int32_t utf16_length(std::string_view p_text);

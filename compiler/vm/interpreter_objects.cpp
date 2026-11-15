@@ -192,9 +192,12 @@ std::string Interpreter::object_text(Object *p_object) const {
 	const std::string &name = module_.classes[p_object->klass].name;
 	std::string simple = name.substr(name.rfind('.') == std::string::npos ? 0 : name.rfind('.') + 1);
 	if (module_.error_class != NONE && is_class(p_object, module_.error_class)) {
-		// An Error reads as its class and its message.
-		Str *message = static_cast<Str *>(p_object->fields()[0].p);
-		return message && message->size ? simple + ": " + std::string(message->view()) : simple;
+		// An Error reads as its name and its message, as Error's toString() gives them: the name is
+		// "Error" in a class of the program's that extends it, unless the program changes it.
+		const Str *message = static_cast<const Str *>(p_object->fields()[ir::ERROR_MESSAGE].p);
+		const Str *named = static_cast<const Str *>(p_object->fields()[ir::ERROR_NAME].p);
+		const std::string name = named ? std::string(named->view()) : "null";
+		return message && message->size ? name + ": " + std::string(message->view()) : name;
 	}
 	return "[object " + simple + "]";
 }

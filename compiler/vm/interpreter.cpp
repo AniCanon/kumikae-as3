@@ -64,6 +64,11 @@ Interpreter::~Interpreter() {
 			free_string(name);
 		}
 	}
+	for (Str *character : characters_) {
+		if (release(character)) {
+			free_string(character);
+		}
+	}
 	if (release(null_text_)) {
 		free_string(null_text_);
 	}

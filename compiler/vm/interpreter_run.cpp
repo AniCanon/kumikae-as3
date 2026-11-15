@@ -497,6 +497,12 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				r[in.a].i = string ? utf16_length(string->view()) : 0;
 				break;
 			}
+			case Op::StrCall:
+				string_call(function, in, r);
+				break;
+			case Op::NumText:
+				number_text(function, in, r);
+				break;
 			case Op::Jump:
 				frame.pc = in.a;
 				break;
@@ -553,6 +559,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					raise_null();
 				}
 				break;
+			case Op::AnyNullCheck:
+				any_null_check(r[in.a]);
+				break;
 			case Op::New:
 				make(in.b, r[in.a]);
 				break;
@@ -603,6 +612,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::Return:
 			case Op::ReturnVoid:
 				leave(function, in, r, p_depth, r_result); // `frame` and `r` are stale after this.
+				break;
+			case Op::ObjectText:
+				assign(Kind::Str, r[in.a], text(object_text(static_cast<Object *>(r[in.b].p))));
 				break;
 			case Op::ErrorStack: {
 				// In an Error's constructor: the frames below it, and below any constructor of an error

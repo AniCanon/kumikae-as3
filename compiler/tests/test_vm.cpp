@@ -1523,6 +1523,19 @@ static void test_out_of_memory() {
 							   "	try { var g:Grow = new Grow(); return 'made'; } catch (e:Error) { return 'caught: ' + e.message; }\n"
 							   "	return '';\n"
 							   "}\n"
+							   "public function concatenated(a:String, b:String):String {\n"
+							   "	try { return a.concat(b); } catch (e:Error) { return 'caught: ' + e.message; }\n"
+							   "	return '';\n"
+							   "}\n"
+							   "public function fixed():String {\n"
+							   "	try { return (1.5).toFixed(2); } catch (e:Error) { return 'caught: ' + e.message; }\n"
+							   "	return '';\n"
+							   "}\n"
+							   "public function character():String {\n"
+							   "	var s:String = 'xy';\n"
+							   "	try { return s.charAt(1); } catch (e:Error) { return 'caught: ' + e.message; }\n"
+							   "	return '';\n"
+							   "}\n"
 							   "} }\n");
 	compilation.check();
 	CHECK_EQ(compilation.format_diagnostics(false), std::string());
@@ -1539,14 +1552,15 @@ static void test_out_of_memory() {
 		vm::Object *object = interpreter.construct(grow);
 		CHECK(object != nullptr);
 		const std::string wanted = "caught: " + std::string(vm::OUT_OF_MEMORY);
-		for (const char *method : { "joined", "made" }) {
+		for (const char *method : { "joined", "made", "concatenated", "fixed", "character" }) {
 			vm::Slot arguments[2];
 			arguments[0].p = vm::new_string("left");
 			arguments[1].p = vm::new_string("right");
 			vm::Slot result;
 			result.bits = 0;
 			vm::fail_allocations(1);
-			CHECK(interpreter.call_method(object, method, arguments, std::string_view(method) == "joined" ? 2 : 0, &result));
+			const bool two = std::string_view(method) == "joined" || std::string_view(method) == "concatenated";
+			CHECK(interpreter.call_method(object, method, arguments, two ? 2 : 0, &result));
 			vm::fail_allocations(0);
 			CHECK(result.p != nullptr);
 			CHECK_EQ(result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string(), wanted);

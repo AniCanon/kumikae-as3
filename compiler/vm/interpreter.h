@@ -9,6 +9,7 @@
 #include "ir.h"
 #include "runtime.h"
 
+#include <array>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -52,6 +53,9 @@ private:
 	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
 	std::vector<void *> singletons_; // The engine's singletons, by the string of their name, once found.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
+	// The strings of one ASCII character each, made the first time charAt() gives one: a loop over a
+	// string's characters makes no string for each.
+	std::array<Str *, 128> characters_{};
 	bool failing_ = false; // An error is on its way out: pending_ holds it.
 	Slot pending_{}; // What was thrown, as an untyped value with a reference of its own.
 	std::string trace_; // Its stack trace, built as frames are left.
@@ -122,6 +126,11 @@ private:
 	void trace(const std::vector<uint32_t> &p_list, const Slot *p_registers);
 	void leave(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result);
 	void object_to_text(const ir::Instruction &p_in, Slot *p_registers);
+	// The standard library (vm/string_methods.cpp): StrCall and NumText. Neither runs the program.
+	void string_call(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void number_text(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
+	void any_null_check(Slot p_value);
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
 	void raise_range(double p_index, uint32_t p_length);
 	bool resize_vector(Vector *p_vector, uint32_t p_length);
