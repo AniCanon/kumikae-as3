@@ -24,11 +24,11 @@ it stands.
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 29 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2c** | The rest of the language | 30 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 24 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 50 | What is left |
-| **decision** | The owner | 11 | See each item |
+| **clean-up** | A pass that closes stage 2 | 53 | What is left |
+| **decision** | The owner | 12 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -278,8 +278,21 @@ any Godot value passing as a condition):
   **2c**
 - `var y = 2`, a declaration with no type, is refused rather than taken as `*`. **2c**
 - `typeof` of a String variable that holds null says "string"; AS3 says "object". **2c**
-- An untyped value that holds a script object is an AS3 error when given to Godot; nothing converts it.
+- An untyped value that holds a script object is an AS3 error when an AS3 call gives it to Godot; when
+  Godot reads it (a return, a field), Godot gets null and an error is printed. Nothing converts it.
   **decision**
+- A Godot value read into a typed place through `*` is converted as AS3 converts (a `Vector2` into an `int`
+  is 0, an integer past an `int` wraps), where a typed read straight from Godot is refused. My reading of
+  AS3's rule for `*`; the owner may want Godot's stricter check. **decision**
+- `+` on untyped values gives a Number, as AS3 does: `v + 1` with `v` from Godot's integer 5 goes back to
+  Godot as the float 6.0, and an `Int64` past 2^53 loses its last digits. **2c**
+- The encoding of an untyped value needs addresses below 2^47 with nothing in the top bits: a build where
+  the platform tags pointers there (Android's heap tagging on arm64) stops with a message. It has to be
+  handled before Android runs. **clean-up**
+- Godot running out of memory while an untyped value is made from what it gave gives null, not error
+  #1000. **clean-up**
+- Refusal messages: `var q:Vector2 = position + p` (with `p:*`) says "a value of type '?'", and
+  `Vector.<*>` adds "converting an object to a number" after the right message. **clean-up**
 - A Godot `StringName` or `NodePath` in an untyped value is held as Godot's own value, not as a String:
   `typeof` says "object". **2c**
 - Godot's integers in an untyped value: one that fits an `int` is held as one, a larger one as an `Int64`;

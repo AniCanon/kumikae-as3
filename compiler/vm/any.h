@@ -61,6 +61,9 @@ std::optional<std::string> text(Slot p_value);
 // answers) or one is a script object being compared by `==` with a primitive (its text, from the
 // interpreter).
 std::optional<bool> strict_equal(Slot p_a, Slot p_b);
+// Two numbers in order, exactly: -1, 0 or 1; nothing if either is not a number (NaN). An Int64 is never
+// rounded to a Number to be compared.
+std::optional<int> compare_numbers(Slot p_a, Slot p_b);
 std::optional<bool> loose_equal(Slot p_a, Slot p_b);
 
 } // namespace any

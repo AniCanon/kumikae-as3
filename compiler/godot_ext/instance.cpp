@@ -1,5 +1,6 @@
 // The object Godot holds for each object a script is attached to: the engine's calls arrive here and go
 // on into the interpreter.
+#include "any.h"
 #include "language.h"
 #include "program.h"
 #include "script.h"
@@ -77,6 +78,10 @@ static GDExtensionBool instance_get(GDExtensionScriptInstanceDataPtr p_data, GDE
 	if (!Project::get().interpreter().get_field(instance->object, std::string_view(name.get_data(), (size_t)name.length()), &value, &kind) ||
 			kind == ir::Kind::Obj || name.get_data()[0] == '$') {
 		return false;
+	}
+	if (kind == ir::Kind::Any && vm::any::tag(value) == vm::AnyTag::Object) {
+		UtilityFunctions::push_error(String("ActionScript: the field '") + String::utf8(name.get_data()) +
+				"' holds a script object, which can't be handed to Godot yet. Godot gets null.");
 	}
 	*reinterpret_cast<Variant *>(r_value) = kas3::to_variant(kind, value);
 	return true;
@@ -166,7 +171,9 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		program.interpreter().discard(function.registers[i + 1], arguments[i + 1]);
 	}
-	if (ok && function.result == ir::Kind::Obj && result.p) {
+	const bool script_object = (function.result == ir::Kind::Obj && result.p) ||
+			(function.result == ir::Kind::Any && vm::any::tag(result) == vm::AnyTag::Object);
+	if (ok && script_object) {
 		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) +
 				" returns a script object, which can't be handed to Godot yet. The caller gets null.");
 	} else if (ok && function.result != ir::Kind::Void) {

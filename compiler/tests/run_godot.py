@@ -244,8 +244,15 @@ output = compare("untyped.gd", [
     "an int", "a float", "a whole float", "a string", "a bool", "null", "a vector", "a node",
     "round trip int", "round trip float", "round trip String", "round trip Vector2", "round trip Object", "round trip Nil",
     "round trip bool", "meta keeps an int", "meta keeps a float", "dictionary element", "dictionary number", "wrong type",
-    "script object not given", "equal values",
+    "script object not given", "equal values", "unequal values", "large integers", "a vector stays a vector",
+    "a color is not a vector", "a vector3 is not a vector2", "a resource is not a node", "a node is a node",
+    "a property takes its type only", "a script object returned", "a script object in a field", "freed",
 ])
+check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",
+      output.count("Error #1034") >= 5 and "at Untyped/asVector()" in output and "at Untyped/asNode()" in output and
+      "at Untyped/place()" in output, output[-2000:])
+check("untyped.gd: a script object reaching Godot is said", "giveScript returns a script object" in output and
+      "'keep' holds a script object" in output, output[-2000:])
 check("untyped.gd: a value of the wrong type is AS3's coercion error", "at Untyped/wrongType()" in output and "Error #1034" in output,
       output[-1500:])
 check("untyped.gd: a script object given to Godot is an AS3 error", "at Untyped/scriptObject()" in output, output[-1500:])

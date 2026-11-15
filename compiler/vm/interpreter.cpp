@@ -19,6 +19,9 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 		strings_.push_back(new_string(constant));
 	}
 	null_text_ = new_string("null");
+	for (const char *name : { "undefined", "boolean", "number", "string", "object" }) {
+		type_names_.push_back(new_string(name));
+	}
 	// A method's function by name, for calls from outside: the class's own and what it inherits.
 	methods_.resize(module_.classes.size());
 	for (size_t i = 0; i < module_.classes.size(); i++) {
@@ -47,6 +50,11 @@ Interpreter::~Interpreter() {
 	for (Str *constant : strings_) {
 		if (release(constant)) {
 			free_string(constant);
+		}
+	}
+	for (Str *name : type_names_) {
+		if (release(name)) {
+			free_string(name);
 		}
 	}
 	if (release(null_text_)) {

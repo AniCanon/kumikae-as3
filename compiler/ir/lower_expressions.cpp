@@ -531,6 +531,12 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 	} else if (p_assign->op == TokenKind::AmpAmpAssign || p_assign->op == TokenKind::PipePipeAssign) {
 		refuse(position, "'&&=' or '||='");
 		value = default_value(place.kind, position);
+	} else if (p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Any || untyped(p_assign->value))) {
+		// `+=` with an untyped side: text or numbers, by what each holds when it runs.
+		uint32_t old = settled(convert(load(place, position), Kind::Any, position), p_assign->value, position);
+		uint32_t sum = reg(Kind::Any);
+		emit(Op::AnyAdd, position, sum, old, any_value(p_assign->value));
+		value = convert(sum, place.kind, position);
 	} else {
 		uint32_t old = settled(load(place, position), p_assign->value, position);
 		bool strings = p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Str || is_string_type(p_assign->value->type));

@@ -178,6 +178,10 @@ class Lowerer {
 	// The untyped value: ir/lower_any.cpp.
 	bool untyped(const Expr *p_expression) const;
 	bool untyped_type(const Type *p_type) const;
+	// A place of this kind and type starts null: an untyped one declared `Object` (a `*` starts undefined).
+	bool starts_null_type(Kind p_kind, const Type *p_type) const { return p_kind == Kind::Any && !untyped_type(p_type); }
+	// The empty value of an untyped place of this type: null for `Object`, undefined for `*`.
+	uint32_t empty_untyped(const Type *p_type, uint32_t p_position);
 	uint32_t any_value(Expr *p_expression);
 	uint32_t any_text(Expr *p_expression);
 	uint32_t any_equality(Binary *p_binary);

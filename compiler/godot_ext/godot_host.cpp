@@ -698,7 +698,10 @@ bool GodotHost::present(void *p_value) {
 
 bool GodotHost::is_class(void *p_value, std::string_view p_class) {
 	const Variant *value = static_cast<const Variant *>(p_value);
-	if (!value || value->get_type() != Variant::OBJECT || is_freed(*value)) {
+	if (value && value->get_type() != Variant::OBJECT) {
+		return Variant::get_type_name(value->get_type()) == text_of(p_class); // One of Godot's value types.
+	}
+	if (!value || is_freed(*value)) {
 		return false;
 	}
 	const Object *object = *value;

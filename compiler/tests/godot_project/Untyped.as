@@ -23,6 +23,22 @@ package {
 			target.setMeta("mine", mine);
 		}
 		public function equal(a:*, b:*):String { return "" + (a == b) + (a === b); }
+		public function order(a:*, b:*):String { return "" + (a == b) + (a === b) + (a < b) + (a <= b); }
+		// A store into one of Godot's types checks the value is of that type.
+		public function asVector(value:*):Vector2 { var v:Vector2 = value; return v; }
+		public function asNode(value:*):Node { var n:Node = value; return n; }
+		public function place(value:*):Vector2 { position = value; return position; }
+		// A script object does not reach Godot as a null with nothing said.
+		public var keep:* = new Thing();
+		public function giveScript():* { return new Thing(); }
+		// A Godot object freed while an untyped value holds it is null, as a typed one is.
+		public function freed():String {
+			var n:Node = new Node();
+			var x:* = n;
+			var o:Object = n;
+			n.free();
+			return "" + (n == null) + (x == null) + (o == null) + (x ? "yes" : "no") + (o === null);
+		}
 	}
 }
 

@@ -1,22 +1,25 @@
 #include "any.h"
 
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
+
+#include "numeric.h"
 
 namespace kas3 {
 namespace vm {
 
 namespace {
 
-const uint64_t NUMBER_OFFSET = uint64_t(1) << 48; // Added to a Number's bits: its top 16 bits are never 0.
-const uint64_t INT_FLAG = uint64_t(1) << 47;
-const uint64_t TAG_MASK = 7;
-const uint64_t NULL_BITS = 1 << 3;
-const uint64_t FALSE_BITS = 2 << 3;
-const uint64_t TRUE_BITS = 3 << 3;
+constexpr uint64_t NUMBER_OFFSET = uint64_t(1) << 48; // Added to a Number's bits: its top 16 bits are never 0.
+constexpr uint64_t INT_FLAG = uint64_t(1) << 47;
+constexpr uint64_t TAG_MASK = 7;
+constexpr uint64_t NULL_BITS = 1 << 3;
+constexpr uint64_t FALSE_BITS = 2 << 3;
+constexpr uint64_t TRUE_BITS = 3 << 3;
 
 // The low 3 bits of a pointer that is held.
 enum PointerTag : uint64_t { STRING = 1, OBJECT = 2, VALUE = 3, GODOT = 4, WIDE = 5 };
@@ -29,7 +32,14 @@ Slot bits(uint64_t p_bits) {
 
 Slot tagged(const void *p_pointer, PointerTag p_tag) {
 	// No pointer is null with a tag: a null String or object is `null`.
-	return p_pointer ? bits(reinterpret_cast<uintptr_t>(p_pointer) | p_tag) : bits(NULL_BITS);
+	const uintptr_t address = reinterpret_cast<uintptr_t>(p_pointer);
+	if ((static_cast<uint64_t>(address) >> 47) != 0) {
+		// The encoding needs addresses below 2^47 with nothing in the top bits; a platform that tags
+		// pointers there (Android's heap tagging) must be handled before it runs, not misread.
+		std::fprintf(stderr, "kas3: an address above 2^47 can't be held in an untyped value on this platform\n");
+		std::abort();
+	}
+	return p_pointer ? bits(address | static_cast<uint64_t>(p_tag)) : bits(NULL_BITS);
 }
 
 bool is_number(Slot p_value) {
@@ -243,14 +253,40 @@ bool numeric(AnyTag p_tag) {
 
 } // namespace
 
+std::optional<int> compare_numbers(Slot p_a, Slot p_b) {
+	const AnyTag a = tag(p_a);
+	const AnyTag b = tag(p_b);
+	const auto whole = [](Slot p_value, AnyTag p_tag) {
+		return p_tag == AnyTag::Wide ? static_cast<Wide *>(pointer(p_value))->value : static_cast<int64_t>(to_int_payload(p_value));
+	};
+	if ((a == AnyTag::Wide || a == AnyTag::Int) && (b == AnyTag::Wide || b == AnyTag::Int)) {
+		const int64_t x = whole(p_a, a);
+		const int64_t y = whole(p_b, b);
+		return x < y ? -1 : (x > y ? 1 : 0);
+	}
+	if (a == AnyTag::Wide || b == AnyTag::Wide) {
+		// An Int64 against a Number, exactly: compare_wide puts the Int64 first.
+		const bool wide_first = a == AnyTag::Wide;
+		const double order = compare_wide(whole(wide_first ? p_a : p_b, AnyTag::Wide), to_number(wide_first ? p_b : p_a));
+		if (order != order) {
+			return std::nullopt;
+		}
+		const int sign = order < 0 ? -1 : (order > 0 ? 1 : 0);
+		return wide_first ? sign : -sign;
+	}
+	const double x = to_number(p_a);
+	const double y = to_number(p_b);
+	if (x != x || y != y) {
+		return std::nullopt;
+	}
+	return x < y ? -1 : (x > y ? 1 : 0);
+}
+
 std::optional<bool> strict_equal(Slot p_a, Slot p_b) {
 	const AnyTag a = tag(p_a);
 	const AnyTag b = tag(p_b);
 	if (numeric(a) && numeric(b)) {
-		if (a == AnyTag::Wide && b == AnyTag::Wide) {
-			return static_cast<Wide *>(pointer(p_a))->value == static_cast<Wide *>(pointer(p_b))->value;
-		}
-		return to_number(p_a) == to_number(p_b);
+		return compare_numbers(p_a, p_b) == 0;
 	}
 	if (is_engine(p_a) && is_engine(p_b)) {
 		return std::nullopt; // Godot says whether two of its values are equal.
@@ -275,6 +311,9 @@ std::optional<bool> loose_equal(Slot p_a, Slot p_b) {
 	if (primitive(a) && primitive(b)) {
 		if (a == AnyTag::String && b == AnyTag::String) {
 			return strict_equal(p_a, p_b);
+		}
+		if (numeric(a) && numeric(b)) {
+			return compare_numbers(p_a, p_b) == 0;
 		}
 		return to_number(p_a) == to_number(p_b);
 	}

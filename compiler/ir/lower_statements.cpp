@@ -41,7 +41,7 @@ void Lowerer::declare_locals(Node *p_body) {
 			// A Number starts as NaN. The rest start as zero, which is what a fresh register holds.
 			if (kind == Kind::F64) {
 				emit(Op::ConstF64, declarator.offset, local, number(std::numeric_limits<double>::quiet_NaN()));
-			} else if (kind == Kind::Any && !untyped_type(compilation_.type_of(declarator.type))) {
+			} else if (starts_null_type(kind, compilation_.type_of(declarator.type))) {
 				emit(Op::AnyConst, declarator.offset, local, 1); // An Object starts null; a `*` undefined.
 			} else if (kind == Kind::Val && !valued.count(declarator.symbol)) {
 				// One of Godot's values with parts starts at its zero.
@@ -154,7 +154,10 @@ bool Lowerer::can_be_equal(Kind p_a, Kind p_b) {
 				return 2 + static_cast<int>(p_kind);
 		}
 	};
-	const auto nullable = [](Kind p_kind) { return is_reference(p_kind) || is_engine(p_kind); };
+	const auto nullable = [](Kind p_kind) { return is_reference(p_kind) || is_engine(p_kind) || p_kind == Kind::Any; };
+	if (p_a == Kind::Any || p_b == Kind::Any) {
+		return true; // What an untyped value holds is known only when it runs.
+	}
 	if (p_a == Kind::Void || p_b == Kind::Void) {
 		return p_a == p_b || nullable(p_a == Kind::Void ? p_b : p_a);
 	}

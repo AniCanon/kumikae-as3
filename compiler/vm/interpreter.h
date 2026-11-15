@@ -48,6 +48,7 @@ private:
 	std::vector<Slot> globals_;
 	std::vector<Str *> strings_; // The module's string constants.
 	Str *null_text_ = nullptr; // "null"
+	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	Object *pending_ = nullptr; // An error on its way out.
 	std::string trace_; // Its stack trace, built as frames are left.
 	size_t trace_lines_ = 0;
@@ -70,6 +71,7 @@ private:
 	bool any_is(Slot p_value, uint32_t p_type) const;
 	bool any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
 	bool any_primitive(Slot p_value, Slot *r_out);
+	Slot present_or_null(Slot p_value); // A freed Godot object is null; anything else is as it is.
 	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value); // Takes over one reference.

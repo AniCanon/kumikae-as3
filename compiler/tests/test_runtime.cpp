@@ -184,7 +184,8 @@ static void test_any() {
 		CHECK_EQ(std::signbit(any::to_number_payload(held)), std::signbit(value));
 	}
 	CHECK(std::isnan(any::to_number_payload(any::number(NAN))) && any::tag(any::number(-NAN)) == AnyTag::Number);
-	for (int32_t value : { 0, -1, 7, INT32_MIN, INT32_MAX }) {
+	// An int whose low bits look like a pointer's tag is still an int.
+	for (int32_t value : { 0, -1, 1, 2, 3, 4, 5, 8, 16, 24, INT32_MIN, INT32_MAX }) {
 		CHECK(any::tag(any::integer(value)) == AnyTag::Int);
 		CHECK_EQ(any::to_int_payload(any::integer(value)), value);
 	}

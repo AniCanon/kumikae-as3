@@ -48,12 +48,19 @@ uint32_t Lowerer::any_equality(Binary *p_binary) {
 
 uint32_t Lowerer::any_comparison(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
-	const bool swap_sides = p_binary->op == TokenKind::Greater || p_binary->op == TokenKind::GreaterEqual;
-	const bool with_equal = p_binary->op == TokenKind::LessEqual || p_binary->op == TokenKind::GreaterEqual;
+	// The left one is made a primitive first, whichever way the comparison goes.
+	Op op = Op::AnyLt;
+	if (p_binary->op == TokenKind::LessEqual) {
+		op = Op::AnyLe;
+	} else if (p_binary->op == TokenKind::Greater) {
+		op = Op::AnyGt;
+	} else if (p_binary->op == TokenKind::GreaterEqual) {
+		op = Op::AnyGe;
+	}
 	const uint32_t a = settled(any_value(p_binary->left), p_binary->right, position);
 	const uint32_t b = any_value(p_binary->right);
 	uint32_t out = reg(Kind::Bool);
-	emit(with_equal ? Op::AnyLe : Op::AnyLt, position, out, swap_sides ? b : a, swap_sides ? a : b);
+	emit(op, position, out, a, b);
 	return out;
 }
 
@@ -130,11 +137,28 @@ std::optional<uint32_t> Lowerer::any_type_test(Binary *p_binary) {
 	return out;
 }
 
+uint32_t Lowerer::empty_untyped(const Type *p_type, uint32_t p_position) {
+	uint32_t out = reg(Kind::Any);
+	emit(Op::AnyConst, p_position, out, starts_null_type(Kind::Any, p_type) ? 1 : 0);
+	return out;
+}
+
 uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
-	if (p_kind == Kind::Any && !untyped_type(p_type) && untyped(p_expression)) {
+	if (starts_null_type(p_kind, p_type) && untyped(p_expression)) {
 		// Into an Object: undefined becomes null, as AS3's coercion has it.
 		uint32_t out = reg(Kind::Any);
 		emit(Op::FromAny, p_expression->offset, out, expression(p_expression, Kind::Any), 0);
+		return out;
+	}
+	if (is_engine(p_kind) && untyped(p_expression)) {
+		// Into a place of one of Godot's types: the value must be of that type, checked by its name.
+		uint32_t name = NONE;
+		const Symbol *godot = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
+		if (!godot || !is_godot(godot) || !engine_name(godot, std::string_view(), &name)) {
+			name = NONE;
+		}
+		uint32_t out = engine_reg(p_kind, p_type);
+		emit(Op::FromAny, p_expression->offset, out, expression(p_expression, Kind::Any), name);
 		return out;
 	}
 	if (p_kind != Kind::Obj || !untyped(p_expression)) {

@@ -111,7 +111,8 @@ inline bool is_held(Kind p_kind) {
 	   any third operand but NONE means an `Object`, where undefined is null. AnyText is String(x). \
 	   AnyIs: the third operand is a class, or one of the ANY_IS_ codes. */ \
 	X(AnyConst, "RI-") X(ToAny, "RR-") X(FromAny, "RRI") X(AnyText, "RR-") X(AnyTypeof, "RR-") \
-	X(AnyEq, "RRR") X(AnyStrictEq, "RRR") X(AnyAdd, "RRR") X(AnyLt, "RRR") X(AnyLe, "RRR") X(AnyIs, "RRI") \
+	X(AnyEq, "RRR") X(AnyStrictEq, "RRR") X(AnyAdd, "RRR") X(AnyLt, "RRR") X(AnyLe, "RRR") X(AnyGt, "RRR") X(AnyGe, "RRR") \
+	X(AnyIs, "RRI") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") X(Trace, "A--")
 

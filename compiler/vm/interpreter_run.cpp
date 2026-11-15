@@ -548,6 +548,8 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::AnyAdd:
 			case Op::AnyLt:
 			case Op::AnyLe:
+			case Op::AnyGt:
+			case Op::AnyGe:
 			case Op::AnyIs:
 				any_op(function, in, r); // `frame` and `r` may be stale after this.
 				break;

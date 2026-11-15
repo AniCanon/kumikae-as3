@@ -46,4 +46,18 @@ func _physics_process(_delta: float) -> bool:
 	ask("scriptObject", [node])
 	show("script object not given", node.has_meta("mine"), false)
 	show("equal values", [ask("equal", [Vector2(1, 1), Vector2(1, 1)]), ask("equal", [5, 5.0]), ask("equal", [node, node])], ["truetrue", "truetrue", "truetrue"])
+	var other := Node2D.new()
+	show("unequal values", [ask("equal", [Vector2(1, 1), Vector2(1, 2)]), ask("equal", [node, other])], ["falsefalse", "falsefalse"])
+	other.free()
+	show("large integers", [ask("order", [9007199254740992, 9007199254740993]), ask("order", [9223372036854775806, 9223372036854775807])],
+			["falsefalsetruetrue", "falsefalsetruetrue"])
+	show("a vector stays a vector", ask("asVector", [Vector2(1, 2)]), Vector2(1, 2))
+	show("a color is not a vector", ask("asVector", [Color(1, 0.5, 0.25)]), null)
+	show("a vector3 is not a vector2", ask("asVector", [Vector3(3, 4, 12)]), null)
+	show("a resource is not a node", ask("asNode", [Resource.new()]), null)
+	show("a node is a node", ask("asNode", [node]) == node, true)
+	show("a property takes its type only", [ask("place", [Vector2(7, 8)]), ask("place", [Color(1, 1, 1)])], [Vector2(7, 8), null])
+	show("a script object returned", ask("giveScript"), null)
+	show("a script object in a field", node.get("keep"), null)
+	show("freed", ask("freed"), "truetruetruenotrue")
 	return false
