@@ -15,8 +15,9 @@ void Lowerer::call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arg
 			break;
 		}
 		Kind kind = Kind::F64;
-		const Type *type = compilation_.type_of(parameter.type);
-		if (!parameter.type || !kind_of(type, &kind)) {
+		// A parameter with no type written is `*`.
+		const Type *type = parameter.type ? compilation_.type_of(parameter.type) : compilation_.any_type();
+		if (!kind_of(type, &kind)) {
 			refuse(p_position, "a call to a function with a parameter of type '" + compilation_.type_name(type) + "'");
 			break;
 		}
@@ -41,7 +42,8 @@ Expr *Lowerer::writer(const List<Expr *> &p_expressions) {
 }
 
 uint32_t Lowerer::call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind) {
-	Kind kind = Kind::Void;
+	// A function with no return type written gives `*`; `:void` is written, and gives nothing.
+	Kind kind = Kind::Any;
 	if (p_function->type && !kind_of(compilation_.type_of(p_function->type), &kind)) {
 		refuse(p_position, "a call to a function that returns '" + compilation_.type_name(compilation_.type_of(p_function->type)) + "'");
 	}

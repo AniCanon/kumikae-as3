@@ -29,9 +29,12 @@ void Diagnostics::warning(uint32_t p_offset, std::string p_message) {
 	}
 }
 
-std::string Diagnostics::format(const Source &p_source) const {
+std::string Diagnostics::format(const Source &p_source, bool p_warnings) const {
 	std::string out;
 	for (const Diagnostic &item : items_) {
+		if (item.warning && !p_warnings) {
+			continue;
+		}
 		Position at = p_source.position(item.offset);
 		out += p_source.path();
 		out += ':';

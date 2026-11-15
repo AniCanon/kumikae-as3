@@ -30,7 +30,7 @@ static void expect(const std::string &p_source, std::initializer_list<const char
 	Compilation compilation;
 	compilation.add("Main.as", source.text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), source.expected);
+	CHECK_EQ(compilation.format_diagnostics(false), source.expected);
 }
 
 #define UNRELATED(from, to) "can't use a value of type '" from "' where '" to "' is expected"
@@ -253,7 +253,7 @@ static void test_override_signatures() {
 							   "override public function f(t:lib.Thing):Thing { return t; }\n"
 							   "override public function g(t:int):void {} } }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string("lib/Base.as:2:21: error: unknown type 'Gone'\n"));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string("lib/Base.as:2:21: error: unknown type 'Gone'\n"));
 }
 
 static void test_interfaces() {
@@ -292,7 +292,7 @@ static void test_interfaces() {
 			true);
 	compilation.add("Main.as", "package { import lib.*; public class Main extends Disc {} }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 }
 
 static void test_constants() {
@@ -384,7 +384,7 @@ static void expect_godot(const std::string &p_source, std::initializer_list<cons
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Main.as", source.text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), source.expected);
+	CHECK_EQ(compilation.format_diagnostics(false), source.expected);
 }
 
 // AS3's own collections convert when they are passed to the engine (performance redesign, section 7).

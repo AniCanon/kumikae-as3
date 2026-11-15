@@ -256,14 +256,10 @@ void Lowerer::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl
 		return;
 	}
 	begin(found->second, p_unit, p_class);
-	result_type_ = p_decl->return_type ? compilation_.type_of(p_decl->return_type) : nullptr;
+	// No return type written: AS3 takes it as `*`, and falling off the end gives undefined.
+	result_type_ = p_decl->return_type ? compilation_.type_of(p_decl->return_type) : compilation_.any_type();
 	parameters(p_decl);
-	if (p_decl->return_type) {
-		fn().result = written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void);
-	} else {
-		unit_ = &p_unit;
-		refuse(p_decl->name_offset, "a function without a return type");
-	}
+	fn().result = p_decl->return_type ? written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void) : Kind::Any;
 	if (p_decl->body) {
 		declare_locals(p_decl->body);
 		statement(p_decl->body);

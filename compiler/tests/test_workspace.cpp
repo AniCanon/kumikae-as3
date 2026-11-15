@@ -71,7 +71,7 @@ static void test_scan() {
 	workspace.set_root((root / "scripts" / "deep").string());
 	CHECK_EQ(workspace.root(), root.string());
 	CHECK_EQ(paths(workspace, root), std::string("scripts/Player.as scripts/deep/Enemy.as "));
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 	CHECK(workspace.unit((root / "scripts" / "Player.as").string()) != nullptr);
 	CHECK(workspace.unit((root / "notes.txt").string()) == nullptr);
 
@@ -98,7 +98,7 @@ static void test_buffers() {
 	write(enemy, "package { public class Enemy {} }");
 	Workspace workspace(plain());
 	workspace.set_root(root.string());
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 	CHECK_EQ(workspace.checks(), 1);
 	workspace.compilation();
 	CHECK_EQ(workspace.checks(), 1); // Nothing changed: no second check.
@@ -108,26 +108,26 @@ static void test_buffers() {
 	workspace.open(player, "package { public class Player { public var other:Enemi; } }");
 	CHECK(workspace.stale());
 	CHECK_EQ(workspace.program_units().size(), (size_t)2);
-	CHECK_EQ(workspace.compilation().format_diagnostics(), player + ":1:50: error: unknown type 'Enemi'\n");
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), player + ":1:50: error: unknown type 'Enemi'\n");
 	CHECK_EQ(workspace.checks(), 2);
 	// The file that did not change kept its parse.
 	CHECK(workspace.unit(enemy)->parsed == enemy_parse);
 
 	workspace.change(player, "package { public class Player { public var other:Enemy; } }");
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 	// The same text again is not a change.
 	workspace.change(player, "package { public class Player { public var other:Enemy; } }");
 	CHECK(!workspace.stale());
 	// The disk copy changing under an open buffer changes nothing.
 	write(player, "package { public class Player { broken");
 	workspace.file_changed_on_disk(player);
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 	// Closing returns to what is on disk.
 	workspace.close(player);
 	CHECK(workspace.compilation().has_errors());
 	write(player, "package { public class Player {} }");
 	workspace.file_changed_on_disk(player);
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 
 	// A new file on disk joins the program; a deleted one leaves it.
 	std::string extra = (root / "sub" / "Extra.as").string();
@@ -137,7 +137,7 @@ static void test_buffers() {
 	fs::remove(enemy);
 	workspace.file_changed_on_disk(enemy);
 	CHECK_EQ(paths(workspace, root), std::string("Player.as sub/Extra.as "));
-	CHECK_EQ(workspace.compilation().format_diagnostics(), extra + ":1:38: error: unknown type 'Enemy'\n");
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), extra + ":1:38: error: unknown type 'Enemy'\n");
 	// Files that are not .as, or are outside the project, are not picked up from disk.
 	write(root / "readme.md", "x");
 	workspace.file_changed_on_disk((root / "readme.md").string());
@@ -151,7 +151,7 @@ static void test_buffers() {
 	workspace.open((root / ".bak" / "Player.as").string(), "package { public class Player {} }");
 	CHECK_EQ(workspace.program_units().size(), (size_t)2);
 	CHECK(workspace.unit((outside / "Player.as").string()) == nullptr);
-	CHECK_EQ(workspace.compilation().format_diagnostics(), extra + ":1:38: error: unknown type 'Enemy'\n");
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), extra + ":1:38: error: unknown type 'Enemy'\n");
 	workspace.close((outside / "Player.as").string());
 	workspace.close((root / ".bak" / "Player.as").string());
 	CHECK_EQ(workspace.program_units().size(), (size_t)2);
@@ -208,7 +208,7 @@ static void test_godot() {
 	options.support_folder = support.string();
 	Workspace workspace(options);
 	workspace.set_root(root.string());
-	CHECK_EQ(workspace.compilation().format_diagnostics(),
+	CHECK_EQ(workspace.compilation().format_diagnostics(false),
 			player + ":2:67: error: can't use a value of type 'int' where 'String' is expected\n");
 	// Godot's API is not one of the program's files, but it has a file an editor can open.
 	CHECK_EQ(workspace.program_units().size(), (size_t)1);
@@ -247,7 +247,7 @@ static void test_godot() {
 	with.declarations.push_back(declared.string());
 	Workspace third(with);
 	third.set_root(root.string());
-	CHECK_EQ(third.compilation().format_diagnostics(), player + ":1:92: error: 'Motor' has no member 'stop'\n");
+	CHECK_EQ(third.compilation().format_diagnostics(false), player + ":1:92: error: 'Motor' has no member 'stop'\n");
 	CHECK_EQ(third.program_units().size(), (size_t)1);
 	// The declaration file is inside the project, but it is read once, as a declaration file: no
 	// "already defined", and errors in it are reported as `kas3c check` reports them.
@@ -255,14 +255,14 @@ static void test_godot() {
 	third.file_changed_on_disk(declared.string());
 	CHECK_EQ(third.program_units().size(), (size_t)1);
 	CHECK_EQ(third.reported_units().size(), (size_t)2);
-	CHECK_EQ(third.compilation().format_diagnostics(),
+	CHECK_EQ(third.compilation().format_diagnostics(false),
 			declared.string() + ":1:73: error: expected a parameter name but found ':'\n");
 	// The editor's text for it stands in, as for any file.
 	third.open(declared.string(), "package engine { public native class Motor { public native function run():void; } }");
 	CHECK_EQ(third.program_units().size(), (size_t)1);
-	CHECK_EQ(third.compilation().format_diagnostics(), player + ":1:92: error: 'Motor' has no member 'stop'\n");
+	CHECK_EQ(third.compilation().format_diagnostics(false), player + ":1:92: error: 'Motor' has no member 'stop'\n");
 	third.close(declared.string());
-	CHECK(third.compilation().format_diagnostics().find("expected a parameter name") != std::string::npos);
+	CHECK(third.compilation().format_diagnostics(false).find("expected a parameter name") != std::string::npos);
 
 	// With no folder for the embedded declarations, files still open.
 	Workspace::Options nowhere;

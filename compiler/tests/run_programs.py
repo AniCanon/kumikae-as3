@@ -3,7 +3,8 @@
 Usage: run_programs.py <path to kas3c> <tests dir> [--update]
 
   run/X.as            runs; standard output must equal X.out. With X.err, standard error must equal it and
-                      the exit status must be 1; without, standard error must be empty and the status 0.
+                      the exit status must be 1 (0 if X.err holds only warnings); without, standard error
+                      must be empty and the status 0.
   run/X.args          the files of a program of several files, the entry file first, instead of X.as.
   run/X.ir            if present, `kas3c ir` of the program must print it.
   run/refused/X.as    uses something the interpreter does not run yet: status 1, nothing on standard
@@ -63,7 +64,8 @@ for name in names:
     base = os.path.join(folder, name)
     files = open(base + ".args").read().split() if os.path.exists(base + ".args") else [name + ".as"]
     result = run("run", files, folder)
-    fails = os.path.exists(base + ".err")
+    # Standard error with only warnings on it is a program that ran.
+    fails = os.path.exists(base + ".err") and any(": warning: " not in line for line in open(base + ".err").read().splitlines())
     compare(name + " output", result.stdout, base + ".out")
     compare(name + " errors", result.stderr, base + ".err", "")
     check(name + " status", result.returncode == (1 if fails else 0), "exit %d" % result.returncode)

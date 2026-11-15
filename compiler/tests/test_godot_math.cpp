@@ -40,7 +40,7 @@ static void types(std::initializer_list<Case> p_cases) {
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	Unit *unit = compilation.add("Main.as", program(body));
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	std::vector<std::string> found(p_cases.size(), "(none)");
 	for (const TypedExpression &typed : unit->typed) {
 		int line = unit->source.position(typed.offset).line - 9;
@@ -66,7 +66,7 @@ static void expect(const std::string &p_body, std::initializer_list<const char *
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Main.as", source.text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), source.expected);
+	CHECK_EQ(compilation.format_diagnostics(false), source.expected);
 }
 
 #define NO_OPERATOR(op, left, right) "can't use '" op "' on '" left "' and '" right "'"
@@ -236,7 +236,7 @@ static void test_tags_outside_declarations() {
 	Compilation compilation;
 	Unit *unit = compilation.add("Main.as", source.text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	CHECK_EQ(compilation.type_name(unit->typed[0].type), std::string("?"));
 	CHECK_EQ(compilation.type_name(unit->typed[1].type), std::string("*"));
 }
@@ -260,7 +260,7 @@ static void test_other_declarations() {
 			"public function run(a:Money, b:Money, r:Rate, u:uint, s:String, x:Bonus):void {\n"
 			"a + b;\na * 2;\na / r;\na % s;\na[0];\nx + a;\na + x;\n-x;\nx[1];\na > u;\na - b;\na * r;\n} } }\n");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(),
+	CHECK_EQ(compilation.format_diagnostics(false),
 			std::string("lib.as:2:52: error: unknown type 'Ghost' in an [Operator] tag\n"
 						"Main.as:13:1: error: can't use '-' on 'Money' and 'Money'\n"
 						"Main.as:14:1: error: can't use '*' on 'Money' and 'Rate'\n"));
@@ -282,7 +282,7 @@ static void test_malformed_tags() {
 			true);
 	compilation.add("Main.as", "package { import lib.*; public class Main { public function run(a:Money):void { a * 2; } } }\n");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(),
+	CHECK_EQ(compilation.format_diagnostics(false),
 			std::string("lib.as:2:1: error: an [Operator] tag names both a left and a right operand\n"
 						"lib.as:3:50: error: a second [Operator] tag for '*' with 'int' on the right\n"));
 }

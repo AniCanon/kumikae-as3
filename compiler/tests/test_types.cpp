@@ -60,7 +60,7 @@ static void check_types(std::initializer_list<Case> p_cases, bool p_clean = true
 	Unit *unit = compilation.add("Main.as", fixture(body));
 	compilation.check();
 	if (p_clean) {
-		CHECK_EQ(compilation.format_diagnostics(), std::string());
+		CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	}
 	// Lines 1 to 11 are the fixture's head; statement i is on line 12 + i.
 	std::vector<std::string> types(p_cases.size(), "(none)");
@@ -111,7 +111,7 @@ static void check_errors(const std::string &p_body, std::initializer_list<const 
 	compilation.add("godot.as", GODOT_STUB, true);
 	compilation.add("Main.as", text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), expected);
+	CHECK_EQ(compilation.format_diagnostics(false), expected);
 }
 
 static void test_literals_and_names() {
@@ -324,7 +324,7 @@ static void test_errors() {
 	compilation.add("a/Thing.as", "package a { public class Thing { internal var near:int; public var far:int; } }");
 	compilation.add("Main.as", "package { import a.Thing; public class Main { function f(t:Thing):void { t.far; t.near; } } }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(),
+	CHECK_EQ(compilation.format_diagnostics(false),
 			std::string("Main.as:1:83: error: 'near' in Thing is not visible from this package\n"));
 }
 
@@ -432,7 +432,7 @@ static void test_review_findings() {
 											"function later():void {\nthis;\n}\n"
 											"class List extends Array { public var length:int; public function push(x:*):void {} }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	CHECK_EQ(unit->typed.size(), (size_t)2);
 	if (unit->typed.size() == 2) {
 		CHECK_EQ(compilation.type_name(unit->typed[0].type), std::string("void"));

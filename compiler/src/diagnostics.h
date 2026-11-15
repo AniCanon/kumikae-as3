@@ -41,7 +41,7 @@ public:
 	const std::vector<Diagnostic> &items() const { return items_; }
 	// One "<file>:<line>:<column>: error: <message>" (or "warning:") line per item, then a note if any were
 	// dropped.
-	std::string format(const Source &p_source) const;
+	std::string format(const Source &p_source, bool p_warnings = true) const;
 };
 
 } // namespace kas3

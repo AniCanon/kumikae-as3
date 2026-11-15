@@ -181,10 +181,10 @@ bool Compilation::has_errors() const {
 	return false;
 }
 
-std::string Compilation::format_diagnostics() const {
+std::string Compilation::format_diagnostics(bool p_warnings) const {
 	std::string result;
 	for (const Unit &unit : units_) {
-		result += unit.diagnostics.format(unit.source);
+		result += unit.diagnostics.format(unit.source, p_warnings);
 	}
 	return result;
 }

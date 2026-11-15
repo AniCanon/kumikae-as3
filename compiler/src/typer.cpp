@@ -8,8 +8,18 @@ void Typer::shown(Expr *p_expression) {
 	}
 }
 
+// A name with no type written is `*`, as Adobe's compiler takes it, and says so (its warning 1008).
+void Typer::no_type(uint32_t p_offset, std::string_view p_what) {
+	if (!unit_.is_declaration && !unit_.is_builtin) {
+		warning(p_offset, std::string(p_what) + " has no type: it is taken as '*'. Write ':*' to say so");
+	}
+}
+
 void Typer::declarators(VarDecl *p_decl) {
 	for (Declarator &declarator : p_decl->declarators) {
+		if (!declarator.type) {
+			no_type(declarator.offset, quoted(declarator.name));
+		}
 		shown(declarator.initializer);
 		store(declarator.initializer, compilation_.type_of(declarator.type));
 	}
@@ -118,7 +128,14 @@ void Typer::returned(Return *p_return) {
 }
 
 void Typer::function(FunctionDecl *p_function) {
+	const bool is_constructor = class_ && class_->klass && class_->klass->constructor && class_->klass->constructor->node == p_function;
+	if (!p_function->return_type && !is_constructor && !p_function->name.empty() && p_function->accessor != FunctionDecl::Setter) {
+		no_type(p_function->name_offset, "what " + quoted(p_function->name) + " gives back");
+	}
 	for (Parameter &parameter : p_function->parameters) {
+		if (!parameter.type && !parameter.is_rest) {
+			no_type(parameter.offset, quoted(parameter.name));
+		}
 		expression(parameter.default_value);
 		if (!parameter.is_rest) {
 			store(parameter.default_value, compilation_.type_of(parameter.type));

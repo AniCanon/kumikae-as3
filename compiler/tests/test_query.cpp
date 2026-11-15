@@ -195,7 +195,7 @@ static void test_tolerant() {
 	plain.check();
 	CHECK(main->references.empty());
 	CHECK(other->references.empty());
-	std::string expected = plain.format_diagnostics();
+	std::string expected = plain.format_diagnostics(false);
 	CHECK_EQ(expected, std::string("Main.as:3:82: error: expected an expression but found '}'\n"));
 
 	// The tolerant check resolves names in both files and reports the same.
@@ -203,7 +203,7 @@ static void test_tolerant() {
 	main = tolerant.add("Main.as", BROKEN);
 	other = tolerant.add("Other.as", OTHER);
 	tolerant.check(true);
-	CHECK_EQ(tolerant.format_diagnostics(), expected);
+	CHECK_EQ(tolerant.format_diagnostics(false), expected);
 	const Reference *count = reference(main, "count");
 	CHECK(count && count->symbol && count->symbol->kind == SymbolKind::Field);
 	const Reference *type = reference(main, "Other");
@@ -215,7 +215,7 @@ static void test_tolerant() {
 	Compilation whole;
 	whole.add("Other.as", OTHER);
 	whole.check(true);
-	CHECK_EQ(whole.format_diagnostics(),
+	CHECK_EQ(whole.format_diagnostics(false),
 			std::string("Other.as:1:83: error: can't use a value of type 'int' where 'String' is expected\n"));
 }
 
@@ -294,7 +294,7 @@ static std::ostream &operator<<(std::ostream &p_out, const Outcome &p_outcome) {
 }
 static Outcome outcome(Compilation &p_compilation) {
 	p_compilation.check(true);
-	return { p_compilation.format_diagnostics(), p_compilation.dump_names(), p_compilation.dump_types() };
+	return { p_compilation.format_diagnostics(false), p_compilation.dump_names(), p_compilation.dump_types() };
 }
 
 // A parsed file checked a second time gives what a fresh parse gives.
@@ -373,7 +373,7 @@ static void test_reuse() {
 		compilation.add(user);
 		compilation.check(true);
 		CHECK_EQ(resolved(), 0);
-		CHECK(compilation.format_diagnostics().find("'B'") != std::string::npos);
+		CHECK(compilation.format_diagnostics(false).find("'B'") != std::string::npos);
 	}
 	// Every kind of annotation is wiped: here a name reached through its package, and a catch variable.
 	std::shared_ptr<Parsed> odd = parse_file("Odd.as",
@@ -394,7 +394,7 @@ static void test_reuse() {
 		Compilation compilation(builtins);
 		compilation.add(odd);
 		compilation.check(true);
-		CHECK_EQ(compilation.format_diagnostics(), std::string());
+		CHECK_EQ(compilation.format_diagnostics(false), std::string());
 		CHECK_EQ(marks(), std::string("1 1"));
 	}
 	clear_annotations(odd->tree);
@@ -476,7 +476,7 @@ static void test_index() {
 	Unit *enemy = compilation.add("game/Enemy.as", ENEMY);
 	Unit *living = compilation.add("game/Living.as", LIVING);
 	compilation.check(true);
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	Queries index(compilation);
 
 	// Go to definition.
@@ -567,7 +567,7 @@ static void test_super_and_overrides() {
 			"class Bare {}\n" // 15
 			"class Stranger { public function speak():void {} function g(s:Stranger):void { s.speak(); } }\n"); // 16
 	compilation.check(true);
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	Queries index(compilation);
 	// The constructor the call runs; the class, where it declares none.
 	CHECK_EQ(definition(index, unit, "super(\"dog\")", 1, 2), std::string("Zoo.as:3:18+6"));

@@ -21,7 +21,7 @@ static std::string check_files(std::initializer_list<File> p_files) {
 		compilation.add(file.path, file.text, file.declaration);
 	}
 	compilation.check();
-	return compilation.format_diagnostics();
+	return compilation.format_diagnostics(false);
 }
 
 // The source may mark where errors are expected with `/*!*/`, placed just before the offending text. The
@@ -77,7 +77,7 @@ static void test_model() {
 	Compilation builtins;
 	builtins.check();
 	CHECK(!builtins.has_errors());
-	CHECK_EQ(builtins.format_diagnostics(), std::string());
+	CHECK_EQ(builtins.format_diagnostics(false), std::string());
 
 	// A syntax error anywhere means only syntax errors are reported.
 	std::string output = check_files({
@@ -543,7 +543,7 @@ static std::string names_of(std::initializer_list<File> p_files) {
 		compilation.add(file.path, file.text, file.declaration);
 	}
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	return compilation.dump_names();
 }
 
@@ -622,7 +622,7 @@ static void test_bindings() {
 											"public function set v(x:int):void {} function f():int { return v; } } }\n"
 											"class Mid extends Base {}\nclass Base { public function get v():int { return 0; } }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	const Symbol *property = nullptr;
 	for (const Reference &reference : unit->references) {
 		if (reference.name == "v") {
@@ -715,7 +715,7 @@ static void test_corpus_prefixes() {
 	}
 	CHECK_EQ(files, 14);
 	whole.check();
-	CHECK_EQ(whole.format_diagnostics(), std::string());
+	CHECK_EQ(whole.format_diagnostics(false), std::string());
 }
 
 static void test_godot_names() {

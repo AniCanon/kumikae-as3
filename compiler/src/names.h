@@ -252,7 +252,7 @@ public:
 	void check(bool p_through_syntax_errors = false);
 	bool has_errors() const;
 	// The diagnostics of every file, in the order the files were added.
-	std::string format_diagnostics() const;
+	std::string format_diagnostics(bool p_warnings = true) const; // Without the warnings when false.
 	// One line per resolved reference in each file that is not a declaration file.
 	std::string dump_names() const;
 	// One line per expression statement and initializer in each file that is not a declaration file.

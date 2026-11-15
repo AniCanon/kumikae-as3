@@ -79,11 +79,9 @@ bool Lowerer::engine_name(const Symbol *p_class, std::string_view p_member, uint
 
 Kind Lowerer::written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing) {
 	if (!p_type) {
-		if (p_missing == Kind::Void) {
-			return Kind::Void;
-		}
-		refuse(p_offset, "a declaration without a type");
-		return Kind::F64;
+		// No type written: AS3 takes it as `*` (the checker says so).
+		(void)p_offset;
+		return p_missing == Kind::Void ? Kind::Void : Kind::Any;
 	}
 	Kind kind = Kind::Void;
 	if (!kind_of(compilation_.type_of(p_type), &kind)) {

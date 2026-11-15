@@ -65,7 +65,7 @@ static void test_statement_hook() {
 	Compilation compilation;
 	compilation.add("Main.as", PROGRAM);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module));
 
@@ -121,7 +121,7 @@ static void test_refused_program() {
 	ir::Module module;
 	CHECK(!ir::lower(compilation, &module));
 	CHECK(unit->diagnostics.has_errors());
-	CHECK(compilation.format_diagnostics().find("is not supported by the interpreter yet") != std::string::npos);
+	CHECK(compilation.format_diagnostics(false).find("is not supported by the interpreter yet") != std::string::npos);
 }
 
 // The engine will call into one interpreter again and again, and a script's call out may come back in.
@@ -170,7 +170,7 @@ static void test_entry_points() {
 	Compilation compilation;
 	compilation.add("Counter.as", LIBRARY);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
 	uint32_t counter_class = ir::NONE;
@@ -511,7 +511,7 @@ static void test_no_engine() {
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Maker.as", source);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
 	{
@@ -560,10 +560,10 @@ static void test_engine_listeners() {
 	compilation.add("Base.as", base);
 	compilation.add("Child.as", source);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	{
 		FakeEngine engine;
 		engine.module = &module;
@@ -635,10 +635,10 @@ static void test_engine_statics() {
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Pad.as", source);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	{
 		FakeEngine engine;
 		engine.module = &module;
@@ -788,10 +788,10 @@ static void test_engine_operators() {
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Mover.as", source);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	{
 		FakeEngine engine;
 		vm::Interpreter interpreter(module, engine);
@@ -899,10 +899,10 @@ static void test_engine_calls() {
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Player.as", PLAYER);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	uint32_t player = ir::NONE;
 	for (size_t i = 0; i < module.classes.size(); i++) {
 		if (module.classes[i].name == "Player") {
@@ -989,10 +989,10 @@ static void test_engine_calls() {
 							"public function need(a:int, b:int, c:int = 3):int { return a; } } }");
 		program.add("Z.as", "package { public class Z extends A { override public function _ready():void { n += 100; } } }");
 		program.check();
-		CHECK_EQ(program.format_diagnostics(), std::string());
+		CHECK_EQ(program.format_diagnostics(false), std::string());
 		ir::Module out;
 		CHECK(ir::lower(program, &out, ir::LowerMode::Library));
-		CHECK_EQ(program.format_diagnostics(), std::string());
+		CHECK_EQ(program.format_diagnostics(false), std::string());
 		std::string found;
 		for (const ir::Class &klass : out.classes) {
 			for (const auto &entry : klass.virtuals) {
@@ -1049,10 +1049,10 @@ static void test_engine_calls() {
 		program.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 		program.add("Player.as", std::string("package { import godot.*; public class Player extends Node2D {\n") + p_body + "\n} }");
 		program.check();
-		std::string checked = program.format_diagnostics();
+		std::string checked = program.format_diagnostics(false);
 		ir::Module out;
 		bool lowered = ir::lower(program, &out, ir::LowerMode::Library);
-		std::string text = program.format_diagnostics();
+		std::string text = program.format_diagnostics(false);
 		return std::string(checked.empty() ? "" : "CHECK ") + (lowered ? "LOWERED " : "") + text;
 	};
 	const char *bodies[] = {
@@ -1096,7 +1096,7 @@ static void compile(const char *p_source, ir::Module *r_module, const char *p_fi
 	Compilation compilation;
 	compilation.add(p_file, p_source);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	CHECK(ir::lower(compilation, r_module, ir::LowerMode::Library));
 }
 
@@ -1475,7 +1475,7 @@ static void test_failed_static_initializer() {
 							   "class Child extends Boom { public static var own:int = 3; }\n"
 							   "class Fine { public static var n:int = 1; }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
 	uint32_t boom = ir::NONE, child = ir::NONE, fine = ir::NONE;
@@ -1525,7 +1525,7 @@ static void test_out_of_memory() {
 							   "}\n"
 							   "} }\n");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
 	uint32_t grow = ir::NONE;
@@ -1589,7 +1589,7 @@ static void test_kept_traces() {
 							   "	}\n"
 							   "} } }\n");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module));
 	Recorder host;
@@ -1611,7 +1611,7 @@ static void test_untyped_out_of_memory() {
 							  "public function glue(a:*):String { try { return a + 'x'; } catch (e:Error) { return e.message; } return ''; }\n"
 							  "} }\n");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
 	uint32_t klass = ir::NONE;
@@ -1667,7 +1667,7 @@ static void test_host_construct_order() {
 								"public function say(p_text:String):int { trace(p_text); return 1; }\n"
 								"}\n");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
 	uint32_t child = ir::NONE;
