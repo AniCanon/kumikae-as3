@@ -208,8 +208,6 @@ any Godot value passing as a condition):
 - A vector's methods that take a function (`forEach`, `map`, `filter`, `some`, `every`, `sort`) are refused:
   they wait for closures. **2c**
 - A vector of script objects, or of vectors, is not converted when it is handed to Godot: it is refused. **2c**
-- `new` of a script class that extends a Godot class is refused: the object needs a Godot object made
-  and the script attached to it. `new Node2D()` and the rest of Godot's own classes work. **2c**
 - `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
 - A reload is refused when a vector that is alive has a type the new program no longer mentions, even if
   the vector is empty. **2d**
@@ -217,8 +215,8 @@ any Godot value passing as a condition):
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
-- 6 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
-  the six are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
+- 4 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
+  the four are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
 - An endless loop has no stop. **2d**
 
 ## Stage 2b-1: AS3 inside Godot, first slice

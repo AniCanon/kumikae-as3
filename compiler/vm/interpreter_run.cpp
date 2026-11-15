@@ -92,6 +92,17 @@ void Interpreter::make(uint32_t p_class, Slot &r_out) {
 	for (size_t i = 0; i < klass.fields.size(); i++) {
 		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
 	}
+	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref) {
+		// A script class that extends one of Godot's: the Godot object is made, with the script attached.
+		std::string error;
+		void *owner = host_.source.attach_new(p_class, object, &error);
+		if (!owner) {
+			release_object(object);
+			raise(module_.error_class, error.empty() ? "the engine could not make a '" + klass.name + "'" : error);
+			return;
+		}
+		object->fields()[0].p = owner;
+	}
 	assign(Kind::Obj, r_out, object);
 }
 
@@ -593,6 +604,19 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::ReturnVoid:
 				leave(function, in, r, p_depth, r_result); // `frame` and `r` are stale after this.
 				break;
+			case Op::OwnerOf: {
+				Object *object = static_cast<Object *>(r[in.b].p);
+				const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
+				if (klass && (klass->native_base.empty() || klass->fields.empty())) {
+					raise(module_.type_error_class, "Error #1034: Type Coercion failed: cannot convert a " + klass->name +
+									" to one of Godot's objects: its class extends none of Godot's classes.");
+					break;
+				}
+				Slot none;
+				none.bits = 0; // All of it: `{}` on a union clears its first member only.
+				put(Kind::Ref, r[in.a], object ? share(Kind::Ref, object->fields()[0]) : none);
+				break;
+			}
 			case Op::Throw:
 				pending_ = share(Kind::Any, r[in.a]); // Any value, null too.
 				failing_ = true;

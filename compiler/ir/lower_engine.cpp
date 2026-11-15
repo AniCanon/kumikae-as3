@@ -260,9 +260,9 @@ uint32_t Lowerer::engine_operate(TokenKind p_op, std::vector<uint32_t> p_operand
 			}
 			break;
 	}
-	for (uint32_t operand : p_operands) {
+	for (uint32_t &operand : p_operands) {
 		if (kind_at(operand) == Kind::Obj) {
-			refuse(p_position, "an operator between a Godot value and a script object");
+			operand = convert(operand, Kind::Ref, p_position); // `node == this`: the Godot object it is.
 		}
 	}
 	uint32_t out = engine_reg(p_result, p_type);

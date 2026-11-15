@@ -116,6 +116,7 @@ inline bool is_held(Kind p_kind) {
 	X(AnyIs, "RRI") X(AnyIsGodot, "RRS") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") /* An untyped value: AS3 throws any value. */ \
+	X(OwnerOf, "RR-") /* A script object as the Godot object it is attached to; null for null. */ \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
 

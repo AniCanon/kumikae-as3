@@ -23,6 +23,10 @@ public:
 		refuse(r_error);
 		return nullptr;
 	}
+	[[nodiscard]] void *attach_new(uint32_t, Object *, std::string *r_error) override {
+		refuse(r_error);
+		return nullptr;
+	}
 	[[nodiscard]] void *collection(std::string_view, ir::Kind, const Slot *, size_t, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;

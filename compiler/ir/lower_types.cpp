@@ -261,6 +261,13 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 		emit(Op::HostPresent, p_position, out, p_reg);
 		return out;
 	}
+	if (from == Kind::Obj && p_to == Kind::Ref) {
+		// A script object where one of Godot's objects is wanted: the Godot object it is attached to. One
+		// with none (of a class that extends no Godot class) is AS3's TypeError as it runs.
+		uint32_t out = reg(Kind::Ref);
+		emit(Op::OwnerOf, p_position, out, p_reg);
+		return out;
+	}
 	if (is_engine(from) || is_engine(p_to)) {
 		refuse(p_position, is_engine(from) ? "converting a Godot value" : "passing this value where a Godot value is expected");
 		return default_value(p_to, p_position);

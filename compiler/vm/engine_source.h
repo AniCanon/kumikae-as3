@@ -16,6 +16,10 @@ struct EngineSource {
 	virtual ~EngineSource() {}
 	// A new value of one of Godot's value types, or (with no arguments) a new object of one of its classes.
 	[[nodiscard]] virtual void *construct(std::string_view p_type, const Argument *p_arguments, size_t p_count, std::string *r_error) = 0;
+	// `new` of a script class that extends one of Godot's classes: a new object of that Godot class, with the
+	// class's script attached and p_object, which is being made, as its script's object. The handle that
+	// comes back does not keep the Godot object alive (it is p_object's first field).
+	[[nodiscard]] virtual void *attach_new(uint32_t p_class, Object *p_object, std::string *r_error) = 0;
 	// One of Godot's collections made from a vector's elements, read where the vector holds them, all of
 	// the one kind: a packed array of the type named ("PackedVector2Array"), or an Array for any other
 	// name. An element that does not fit the packed type is refused; a message that starts with

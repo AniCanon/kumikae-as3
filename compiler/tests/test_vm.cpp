@@ -367,6 +367,11 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	}
 	void print(std::string_view p_text) override { log += "print " + std::string(p_text) + "\n"; }
 	void error(std::string_view p_text) override { errors += std::string(p_text) + "\n"; }
+	[[nodiscard]] void *attach_new(uint32_t p_class, vm::Object *, std::string *) override {
+		void *made = box();
+		log += "attach " + (module ? module->classes[p_class].name : std::to_string(p_class)) + " -> #" + std::to_string((intptr_t)made) + "\n";
+		return made;
+	}
 	[[nodiscard]] void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *) override {
 		void *made = box();
 		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
@@ -1063,10 +1068,8 @@ static void test_engine_calls() {
 		"function f(n:Node):void { var x:int = n[\"name\"].length; }",
 		"function f():void { position.normalized().x = 5; }",
 		"function f():void { position.normalized()[0] = 5; }",
-		"function f():void { addChild(this); }",
 		"function f(v:Vector2):int { return v ? 1 : 0; }",
 		"function f(a:GodotArray):void { if (a) { trace(1); } }",
-		"function f():void { var other:Player = new Player(); }",
 	};
 	for (const char *body : bodies) {
 		std::string result = refused(body);

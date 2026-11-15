@@ -303,9 +303,9 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 		refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
 		return default_value(Kind::Obj, position);
 	}
-	if (!module_.classes[index].native_base.empty()) {
-		// It would have no Godot object behind it: a script comes to life attached to one.
-		refuse(made->callee->offset, "creating a script class with 'new'");
+	if (!module_.classes[index].native_base.empty() && extends_counted(symbol)) {
+		// Who keeps a counted Godot object alive when a script made it is not settled yet.
+		refuse(made->callee->offset, "creating with 'new' a script class that extends a reference-counted Godot class");
 		return default_value(Kind::Obj, position);
 	}
 	touch(symbol, position);
@@ -315,6 +315,16 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 	constructor_arguments(symbol, made->arguments, position, list);
 	emit(Op::Call, position, NONE, module_.classes[index].constructor, arguments(std::move(list)));
 	return out;
+}
+
+// Whether a class extends Godot's RefCounted, by its own bases.
+bool Lowerer::extends_counted(const Symbol *p_class) const {
+	for (const Symbol *at = p_class; at && at->klass; at = at->klass->base) {
+		if (at->name == "RefCounted" && is_godot(at)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 uint32_t Lowerer::postfix(Expr *p_expression) {

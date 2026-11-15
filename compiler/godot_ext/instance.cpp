@@ -5,6 +5,8 @@
 #include "program.h"
 #include "script.h"
 
+#include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -259,6 +261,10 @@ static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	delete instance;
 }
 
+// The script object being made by AS3's `new` (GodotHost::attach_new), for the script instance that its
+// Godot object's set_script() makes next: that instance takes it rather than making one of its own.
+static vm::Object *pending_object = nullptr;
+
 void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	static GDExtensionScriptInstanceInfo3 info = {};
 	static bool ready = false;
@@ -286,8 +292,15 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	if (!program.valid()) {
 		return nullptr;
 	}
-	// The script's handle on the object it is attached to does not keep that object alive.
-	vm::Object *object = program.interpreter().construct(p_script->get_class_index(), program.host().borrow(p_owner));
+	vm::Object *object = nullptr;
+	if (pending_object && pending_object->klass == p_script->get_class_index()) {
+		object = pending_object; // Made by `new`: its constructor runs when the Godot object is ready.
+		vm::retain(object);
+		pending_object = nullptr;
+	} else {
+		// The script's handle on the object it is attached to does not keep that object alive.
+		object = program.interpreter().construct(p_script->get_class_index(), program.host().borrow(p_owner));
+	}
 	if (!object) {
 		return nullptr;
 	}
@@ -298,3 +311,37 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	instances().insert(instance);
 	return gdextension_interface::script_instance_create3(&info, instance);
 }
+
+namespace kas3 {
+
+// `new` of a script class that extends one of Godot's: Godot's object of that class, made as GDScript's
+// `Node2D.new()` makes one, with the class's script attached, whose object is p_object.
+void *GodotHost::attach_new(uint32_t p_class, vm::Object *p_object, std::string *r_error) {
+	Project &program = Project::get();
+	const ir::Module &module = program.module();
+	const ir::Class &klass = module.classes[p_class];
+	const uint32_t file = klass.constructor < module.functions.size() ? module.functions[klass.constructor].file : ir::NONE;
+	const Ref<AS3Script> script = file < module.files.size() ? ResourceLoader::get_singleton()->load(String::utf8(module.files[file].c_str())) : Ref<Resource>();
+	if (script.is_null() || script->get_class_index() != p_class) {
+		*r_error = "the script of '" + klass.name + "' can't be found to attach";
+		return nullptr;
+	}
+	Variant made = ClassDBSingleton::get_singleton()->instantiate(StringName(klass.native_base.c_str()));
+	Object *owner = made.get_validated_object();
+	if (!owner) {
+		*r_error = "Godot can't make a '" + klass.native_base + "' for '" + klass.name + "'";
+		return nullptr;
+	}
+	pending_object = p_object;
+	owner->set_script(script);
+	const bool attached = pending_object == nullptr;
+	pending_object = nullptr;
+	if (!attached) {
+		memdelete(owner);
+		*r_error = "the script of '" + klass.name + "' could not be attached to its '" + klass.native_base + "'";
+		return nullptr;
+	}
+	return borrow(owner);
+}
+
+} // namespace kas3

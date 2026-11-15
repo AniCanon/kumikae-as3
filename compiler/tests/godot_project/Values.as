@@ -55,6 +55,13 @@ package {
 		public function keptCounts():Boolean { return kept ? true : false; }
 		public function keptNot():Boolean { return !kept; }
 		public function keptName():String { return kept.name; }
+		// `new` of a script class that extends one of Godot's: a Godot object with the script attached, made
+		// with the constructor's arguments, which the program then puts in the tree.
+		public function spawn():String {
+			var made:Spawned = new Spawned(7);
+			addChild(made);
+			return made.value + " " + made.doubled() + " " + made.name + " " + (made.getParent() == this);
+		}
 		// Searching a vector of Godot's objects or values: the same object, or an equal value.
 		public function searchGodot(a:Node, b:Node):String {
 			var nodes:Vector.<Node> = new <Node>[a, b, a];
