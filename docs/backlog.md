@@ -256,7 +256,6 @@ any Godot value passing as a condition):
 - Running out of memory while the C++ side builds a text (joining two strings) aborts. **clean-up**
 - 6 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
   the six are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
-- There is one IR golden file; the plan called for more. **2c**
 - A string's `length` counts characters, not UTF-16 units, and strings compare by character. **2c**
 - An endless loop has no stop. **2d**
 - After one refused construct, follow-on errors can appear on the same line. **2c**
