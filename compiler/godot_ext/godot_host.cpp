@@ -653,16 +653,9 @@ bool GodotHost::node_edges(uint64_t p_node, vm::EngineNode *r_node) {
 	return true;
 }
 
+// Only listeners have counts that are not exact: an object is freed by Godot when the handles on it go.
 std::vector<uint64_t> GodotHost::let_go(const std::vector<uint64_t> &p_nodes) {
-	// An object is freed by Godot when the script objects' handles on it go; only listeners are held by
-	// something the collector can't count.
-	std::vector<uint64_t> listeners;
-	for (uint64_t node : p_nodes) {
-		if (!ObjectID(node).is_ref_counted()) {
-			listeners.push_back(node);
-		}
-	}
-	return listeners.empty() ? listeners : let_go_listeners(listeners);
+	return let_go_listeners(p_nodes);
 }
 
 } // namespace kas3

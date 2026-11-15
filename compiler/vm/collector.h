@@ -51,8 +51,9 @@ public:
 	bool step(size_t p_work);
 	// Ends the collection under way, then makes a whole one: every loop let go of before now is freed.
 	void collect();
-	// From now on a handle on one of the engine's objects is not looked past.
-	void ignore_engine() { engine_ = false; }
+	// From now on the engine is not asked about anything: a handle on one of its objects is not looked
+	// past, and a node already seen counts as in use.
+	void ignore_engine();
 
 private:
 	enum class Phase : uint8_t { Idle, Count, Mark };

@@ -89,11 +89,12 @@ Str *new_string(std::string_view p_text); // One reference, the caller's. Null i
 // meet there become the character (vm/text_units.h). Null if out of memory.
 Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);
-// One reference; fields zeroed. Null if out of memory. Given a list (a collector's), it is put on it.
-Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list = nullptr);
+// One reference; fields zeroed. Null if out of memory. It is put on the list (the collector's list_for() its
+// class), or on none if that is null: the list is never left out by mistake.
+Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list);
 void free_object(Object *p_object); // The fields must have been released. It leaves the list it is on.
 // One reference; `p_length` elements, all zero. Null if out of memory.
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, Object *p_list = nullptr);
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, Object *p_list);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
 void free_vector(Vector *p_vector); // The elements must have been released. It leaves its list.

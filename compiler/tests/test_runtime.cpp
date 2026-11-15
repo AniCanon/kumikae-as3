@@ -139,7 +139,7 @@ static void test_counts() {
 	CHECK(!release(text));
 	CHECK(release(text));
 	free_string(text);
-	Object *object = new_object(3, 2);
+	Object *object = new_object(3, 2, nullptr);
 	CHECK_EQ(object->klass, 3u);
 	CHECK_EQ(object->fields()[1].bits, (uint64_t)0);
 	CHECK_EQ(live_objects(), objects + 1);
@@ -181,7 +181,7 @@ static void test_math() {
 // A vector's memory: its length, its room, and that it is counted among the objects alive.
 static void test_vectors() {
 	const size_t objects = live_objects();
-	Vector *vector = new_vector(7, 3, false);
+	Vector *vector = new_vector(7, 3, false, nullptr);
 	CHECK(vector != nullptr);
 	CHECK_EQ(vector->klass, 7u);
 	CHECK_EQ(vector->references, 1u);
@@ -202,7 +202,7 @@ static void test_vectors() {
 	CHECK_EQ(live_objects(), objects + 1);
 	free_vector(vector);
 	CHECK_EQ(live_objects(), objects);
-	Vector *empty = new_vector(7, 0, true);
+	Vector *empty = new_vector(7, 0, true, nullptr);
 	CHECK(empty && empty->length == 0 && empty->fixed);
 	free_vector(empty);
 	CHECK_EQ(live_objects(), objects);

@@ -166,7 +166,9 @@ Project &Project::get() {
 	return *program;
 }
 
-// How much the cycle collector looks at in a frame: objects and references, about 0.1 ms of work.
+// How much the cycle collector looks at in a frame: objects and references. Most steps take 0.03 to 0.15
+// ms; one that looks at a vector of 100,000 elements (an object is looked at whole), or that frees what a
+// collection found, takes as long as that, 0.3 to 1.3 ms.
 static const size_t COLLECTOR_WORK = 10000;
 
 void Project::collect_step() {

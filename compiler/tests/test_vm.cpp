@@ -515,7 +515,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		auto found = node_boxes.find((intptr_t)p_handle);
 		return found == node_boxes.end() ? 0 : found->second;
 	}
+	int asked = 0; // How many times the collector asked what a node holds.
 	[[nodiscard]] bool node_edges(uint64_t p_node, vm::EngineNode *r_node) override {
+		asked++;
 		auto found = nodes.find(p_node);
 		if (found == nodes.end()) {
 			return false;
@@ -1908,15 +1910,50 @@ static void test_cycles_through_engine() {
 			interpreter.collect();
 			CHECK_EQ(engine.log, std::string("let go of node 7\nput back\n"));
 			CHECK_EQ(vm::live_objects(), before + 1);
-			// Once nothing else holds the copy, the loop goes, and so does the engine's object.
+			// Once nothing else holds the copy, the loop goes, and so does the engine's object: the second
+			// time in the smallest steps there are, so that the node is asked about again in each.
 			engine.nodes[7].survives = false;
 			engine.log.clear();
-			interpreter.collect();
+			if (make == std::string("make")) {
+				interpreter.collect();
+			} else {
+				int steps = 1;
+				while (!interpreter.collect_step(1) && steps < 1000) {
+					steps++;
+				}
+				CHECK(steps > 2);
+			}
 			CHECK_EQ(engine.log, std::string("let go of node 7\n"));
 			CHECK_EQ(vm::live_objects(), before);
 			CHECK_EQ(engine.boxes, 0);
 			engine.node_boxes.clear();
 		}
+		// Once another interpreter has taken over (a reload), the engine is asked nothing more, even about
+		// a node a collection under way has seen; what such a node held stays.
+		vm::Object *holder = interpreter.construct(class_named(module, "Holder"));
+		vm::Slot ignored;
+		CHECK(interpreter.call_method(holder, "make", nullptr, 0, &ignored));
+		engine.node_boxes[engine.next - 1] = 8;
+		engine.nodes[8].objects.push_back(holder);
+		vm::retain(holder);
+		interpreter.release_object(holder);
+		engine.asked = 0;
+		for (int steps = 0; engine.asked == 0 && steps < 1000; steps++) {
+			interpreter.collect_step(1);
+		}
+		CHECK(engine.asked > 0);
+		const int asked = engine.asked;
+		interpreter.superseded();
+		interpreter.collect();
+		CHECK_EQ(engine.asked, asked);
+		CHECK_EQ(vm::live_objects(), before + 1);
+		engine.log.clear();
+		CHECK(engine.nodes.count(8) == 1);
+		// The engine lets go of its listener: then nothing holds the object, and it goes.
+		engine.nodes.erase(8);
+		interpreter.release_object(holder);
+		CHECK_EQ(vm::live_objects(), before);
+		CHECK_EQ(engine.boxes, 0);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }

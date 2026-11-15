@@ -155,7 +155,16 @@ void Collector::touch(Object *p_object) {
 
 bool Collector::ask(uint64_t p_node, EngineNode *r_edges) {
 	work_ += NODE_WORK;
-	return interpreter_.host_.handles.node_edges(p_node, r_edges);
+	return engine_ && interpreter_.host_.handles.node_edges(p_node, r_edges);
+}
+
+void Collector::ignore_engine() {
+	engine_ = false;
+	for (auto &[key, node] : nodes_) {
+		node.count = GONE;
+		node.edges = EngineNode();
+	}
+	node_queue_.clear();
 }
 
 Collector::Node &Collector::touch_node(uint64_t p_node) {
@@ -410,9 +419,10 @@ bool Collector::free_garbage() {
 		retain(object);
 		found_.push_back(object);
 	}
+	// Nodes whose count is exact go when the handles on them do; the others must be let go of first.
 	std::vector<uint64_t> dead;
 	for (const auto &[key, node] : nodes_) {
-		if (!node.in_use) {
+		if (!node.in_use && !node.edges.exact) {
 			dead.push_back(key);
 		}
 	}
