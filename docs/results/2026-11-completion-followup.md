@@ -170,8 +170,8 @@ and the distribution contains no probe classes or bundled LSP4J JARs. Light/dark
 
 Rider with LSP4IJ installed and IDEA with/without it pass their sandbox checks. Rider without LSP4IJ
 timed out twice waiting for the first lookup in the continued-typing case after document replacement.
-A subsequent run passed all three project cycles; no code changed between these runs. This is an
-intermittent unresolved result, not evidence that the timeout is fixed. Earlier native diagnostic and
+A subsequent run passed all three project cycles; no code changed between these runs. This unchanged rerun did not establish a fix. The later focus investigation below explains the
+timeout. Earlier native diagnostic and
 disposal warnings remain. The test logs are `agy-fixes-*.log` in each ignored build directory. These
 correctness checks do not replace the earlier latency or ten-minute retention measurements.
 
@@ -181,8 +181,47 @@ regression. It independently ran the new override group in Release and ASan/UBSa
 without rerunning those suites. Its non-blocking note identified incomplete empty-name recovery before
 another member. A separate stdio check confirmed `override function get |` offers `count` at the end of
 the class, omits it before a following public method, and offers it again after typing `c`. The guide
-now states that limit, and LS-2 tracks it. This note does not affect the fixed qualified defaults or
-accessor-slot filtering.
+stated that limit, which is fixed in the recovery change below. This note did not affect the fixed
+qualified defaults or accessor-slot filtering.
+
+## Recovery and background sandbox focus
+
+Revision `143b55a` preserves empty override names before a following class member. Recovery recognizes
+next-line declarations without consuming their modifiers as names. It retains following metadata and
+continues accepting valid multiline method/accessor signatures, including names such as `get`, `set`,
+`override` and reserved accessor names. Completion cases cover methods, getters and setters before
+fields, methods, modifiers and metadata, with LF, CRLF and comments. They apply the offered edits and
+fresh-check the result. Parser cases also inspect the recovered tree.
+
+The completion regressions first reported `270 checks, 57 failed`; the metadata-retention parser cases
+then reported `503 checks, 6 failed`. After both changes, the groups report `384 checks, 0 failed` and
+`503 checks, 0 failed`. Release passes all 25 groups in 20.74 seconds and ASan/UBSan all 25 in 250.75
+seconds; the separately rebuilt Godot extension reports `godot: OK`. These are correctness runs under
+concurrent build load, not performance comparisons.
+
+The Rider trace showed a valid `normalized` response for the request that timed out. A failed probe's
+lookup-disposal stack then identified `IdePopupManager` handling window deactivation through
+`maybeCloseAllPopups` and `LookupImpl.onPopupCancel`. The background sandbox had lost its popup; the
+server was not stuck. The probe reproduced the timeout before the focus fix, including with added
+focus-event checks. It also reproduced cancellation at the preceding latest-document lookup.
+
+Revision `21428d8` scopes the platform's `skipWindowDeactivationEvents` test control to the sandbox
+completion run. It saves and restores the previous value on the UI thread in `finally`. Controlled
+window-deactivated and lost-focus events go through the real popup manager while lookup is open;
+continued typing, Backspace, Enter/Tab and Undo still use native handlers. The control and checks are
+excluded from the distributable ZIP. This fixes the observed background-probe cancellation; it does
+not change or establish production OS-focus behavior, resolve stale diagnostic ranges, or prove that
+all possible lookup delays are gone.
+
+The offline `check buildPlugin verifyPlugin` passes. JUnit totals are 134 plugin passes with one opt-in
+skip and 82 core passes with three opt-in skips. The packaged compiler and extension match the rebuilt
+binaries, and no probe classes appear in the distribution. The existing deprecated/experimental API
+reports remain at both installed verifier endpoints. Five consecutive native-only Rider runs pass all
+15 project cycles. Rider with LSP4IJ installed and IDEA with/without it also pass; nine Python tests
+pass. Light/dark images were inspected. Logs and per-run reports are `recovery-final-*` under the
+ignored JetBrains build directory; compiler logs are `recovery-*.log` in their build directories.
+The original server benchmarks and ten-minute
+retention measurements were not repeated for these correctness fixes.
 
 ## Timing and retention method
 
@@ -334,8 +373,8 @@ passing functional result is not a passing leak check.
   of compiler syntax trees was introduced.
 - Override generation requires an unfinished method/accessor name before its parameter list. It skips
   inaccessible signature types and non-public member defaults, preserves existing metadata/modifiers,
-  and emits an explicit throwing body for the user to implement. Before another member declaration,
-  type at least one name character; empty-name parser recovery in that position remains incomplete.
+  and emits an explicit throwing body for the user to implement. Empty names work before a following
+  member declaration, including its metadata and modifiers.
 - The pinned Rider retains all ten disposed projects in both sustained workloads and reports a
   Problems View disposal warning. The exact GC root is not verified. Manual editing acceptance and
   broad IDE/platform compatibility remain unverified.

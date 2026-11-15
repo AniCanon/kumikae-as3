@@ -70,8 +70,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
   Rapid whole-document shrinking also exposed stale diagnostic ranges: Rider logs an uncaught
   `IndexOutOfBoundsException` from its diagnostic cache; LSP4IJ logs a caught invalid-range warning.
   Diagnostic version negotiation does not establish rendering-time invalidation.
-  The native-only Rider probe also timed out twice on a continued-typing lookup after document
-  replacement, then passed unchanged; the intermittent timeout remains unexplained.
   The exact GC root and platform resolution remain pending; see the
   [retention results](results/2026-11-completion-followup.md#ide-lifecycle-investigation). **LS-2**
 - **Windows runtime validation is pending.** Binary stdio, pipe readiness, UTF-8 filesystem paths, network
@@ -246,8 +244,7 @@ any Godot value passing as a condition):
 - Completion after a dot needs the value's type: nothing is offered for `*`, for a value whose type could
   not be worked out, or for a package path (`flash.utils.`). **LS-2**
 - Parameter-name completion inside an existing call is not implemented. Override stubs require an
-  unfinished `override function` name; existing signatures are left intact. Empty-name recovery before
-  another member declaration is incomplete; typing the first name character enables the lookup. **LS-2**
+  unfinished `override function` name; existing signatures are left intact. **LS-2**
 - General incremental checking remains pending. The body-only fast path falls back for declaration
   changes, syntax errors, accessors, interfaces and function-local imports. **LS-2**
 - Cancellation skips queued requests; a semantic check already running cannot be interrupted. A future
