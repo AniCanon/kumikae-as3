@@ -21,7 +21,7 @@ class As3Lsp4ijFactory :
             // LSP4IJ filters mismatched versions, but does not advertise that support by default.
             params.capabilities.textDocument?.publishDiagnostics?.versionSupport = true
         }
-    }.setCompletionFeature(As3Lsp4ijCompletion())
+    }.setCompletionFeature(As3Lsp4ijCompletion()).setDiagnosticFeature(As3Lsp4ijDiagnostics())
 
     override fun createConnectionProvider(project: Project): StreamConnectionProvider = As3Lsp4ijConnection(project)
 

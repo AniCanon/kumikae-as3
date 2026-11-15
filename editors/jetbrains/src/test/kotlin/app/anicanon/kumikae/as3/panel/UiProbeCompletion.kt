@@ -18,7 +18,6 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbService
-import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.psi.PsiDocumentManager
@@ -70,6 +69,9 @@ object UiProbeCompletion {
                 "heap_after_gc_mib=${UiProbeHeap.usedMiB()} retained_projects=${projects.count { it.get() != null }}"
         }
         Files.write(destination.resolve("completion-heap.txt"), heap)
+        if (UiProbeRetention.enabled()) {
+            UiProbeRetention.checkReleased(projects, destination)
+        }
         projects.clear()
     }
 
@@ -236,9 +238,7 @@ object UiProbeCompletion {
             } finally {
                 try {
                     edt {
-                        check(ProjectManagerEx.getInstanceEx().forceCloseProject(project, false))
-                        check(project.isDisposed) { "Closed probe project was not disposed" }
-                        observations += "Project closed and disposed"
+                        UiProbeRetention.closeProject(project, observations)
                     }
                 } finally {
                     Files.write(destination.resolve("completion-$cycle.txt"), observations)
