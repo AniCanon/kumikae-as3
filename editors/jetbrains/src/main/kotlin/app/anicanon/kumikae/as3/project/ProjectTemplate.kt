@@ -159,6 +159,10 @@ window/size/viewport_width=960
 window/size/viewport_height=540
 window/stretch/mode="canvas_items"
 
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
@@ -197,7 +201,7 @@ script = ExtResource("1")
 	// The words at the top of the screen.
 	public class Hello extends Label {
 		override public function _ready():void {
-			text = "Hello from ActionScript 3. Move the disc with the arrow keys.";
+			text = "Hello from ActionScript 3. Swipe to send the disc, tap to stop it, or use the arrow keys.";
 		}
 	}
 }
@@ -206,11 +210,30 @@ script = ExtResource("1")
         private const val SCRIPT = """package {
 	import godot.*;
 
-	// A disc that follows the arrow keys.
+	// A disc that goes the way it is swiped, stops when tapped, and follows the arrow keys.
 	public class Main extends Node2D {
+		private var heading:Vector2 = Vector2.ZERO;
+		private var from:Vector2 = Vector2.ZERO;
+
+		// A finger on the screen (or the mouse, on a computer) arrives here as a touch.
+		override public function _input(event:InputEvent):void {
+			var touch:InputEventScreenTouch = event as InputEventScreenTouch;
+			if (touch == null) {
+				return;
+			}
+			if (touch.pressed) {
+				from = touch.position;
+			} else if (from.distanceTo(touch.position) > 40) {
+				heading = (touch.position - from).normalized(); // A swipe.
+			} else {
+				heading = Vector2.ZERO; // A tap.
+			}
+		}
+
 		override public function _process(delta:Number):void {
+			var keys:Vector2 = Input.getVector("ui_left", "ui_right", "ui_up", "ui_down");
 			// Change the speed while the game runs, and save: it takes effect at once.
-			position += Input.getVector("ui_left", "ui_right", "ui_up", "ui_down") * 300 * delta;
+			position += (keys == Vector2.ZERO ? heading : keys) * 300 * delta;
 			queueRedraw();
 		}
 
