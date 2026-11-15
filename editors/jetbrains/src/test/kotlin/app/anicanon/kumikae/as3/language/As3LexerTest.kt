@@ -75,6 +75,38 @@ class As3LexerTest {
         assertEquals("AS3_WORD:y", tokens("call() / y").last())
     }
 
+    @Test fun `after a closing brace, what the brace opened says whether a slash is a regex or division`() {
+        // A block ends a statement: a regex may follow.
+        val blocks =
+            listOf("if (a) {} /re/", "function f():void {} /re/", "case 1: {} /re/", "{ {} /re/ }", "else {} /re/")
+        for (source in blocks) {
+            assertEquals(true, tokens(source).contains("AS3_REGEX:/re/"), source)
+        }
+        // A value ends in its brace: an object or a function written in place. A slash divides it.
+        for (source in listOf(
+            "var o = {} / 2",
+            "x = function():void {} / 2",
+            "a ? b : {} / 2",
+            "f({ a: {} } / 2)",
+            "return {} / 2",
+            "x = { f: function() { if (a) {} } } / 2",
+        )) {
+            val found = tokens(source)
+            assertEquals(listOf("AS3_SYMBOL:/", "AS3_WORD:2"), found.dropWhile { it != "AS3_SYMBOL:/" }.take(2), source)
+            assertEquals(false, found.any { it.startsWith("AS3_REGEX") }, source)
+        }
+    }
+
+    @Test fun `sixteen open braces are told apart, and deeper ones are counted`() {
+        val deep = "{".repeat(15) + "x = {} / 2" + "}".repeat(15) + " /re/"
+        assertEquals(listOf("AS3_SYMBOL:/", "AS3_WORD:2"), tokens(deep).dropWhile { it != "AS3_SYMBOL:/" }.take(2))
+        assertEquals("AS3_REGEX:/re/", tokens(deep).last())
+        // Past that a brace counts as a block; closing them all still leaves the file's top level.
+        val deeper = "{".repeat(40) + "if (a) {} /x/" + "}".repeat(40) + " x = {} / 2"
+        assertEquals("AS3_REGEX:/x/", tokens(deeper).first { it.startsWith("AS3_REGEX") })
+        assertEquals(listOf("AS3_SYMBOL:/", "AS3_WORD:2"), tokens(deeper).takeLast(2))
+    }
+
     @Test fun `an empty file has no tokens`() {
         assertEquals(emptyList(), tokens(""))
     }

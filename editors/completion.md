@@ -71,9 +71,11 @@ Parentheses, square brackets, braces and single/double quotes use the IDE's pair
 partner can be typed to move past the existing one. Backspace in an empty bracket pair removes the pair.
 Enter inside braces creates an indented line, using the project's tab/space settings. Code punctuation
 inside comments and strings is not treated as a new code block. Regex literals are protected in
-expression positions and after control conditions. The local lexer cannot distinguish every regex
-from division after a closing brace; that context remains a limitation. The compiler handles regex
-contexts independently for completion and argument help.
+expression positions and after control conditions. After a closing brace the local lexer remembers
+what the brace began: a block (`if (a) {} /re/`) may be followed by a regex, while an object or a
+function written in place (`var o = {} / 2`) is divided. It tells sixteen nested braces apart; deeper
+ones count as blocks. The compiler handles regex contexts independently for completion and argument
+help.
 
 Highlighting still comes from the shared TextMate grammar. A small adapter supplies AS3 token boundaries
 to the native editing handlers while preserving TextMate's color attributes, including string escapes.

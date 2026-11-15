@@ -14,8 +14,10 @@ The adapter now supplies native token kinds and preserves the TextMate color att
 
 The sandbox passes pairing and closing-character skip, empty-pair backspace, pairing disabled in
 settings, two carets, suppression in comments and regex literals, and repeated Enter inside a block.
-The regex tests include a control condition followed by a literal. The local lexer still has an
-ambiguous closing-brace case, recorded in the backlog and user guide.
+The regex tests include a control condition followed by a literal. The ambiguous closing-brace case
+(a regex after a block, division after an object or a function written in place) was settled later,
+on 2026-11-15, by the lexer's memory of what each open brace began; that is tested in the plugin's unit
+tests, not yet in the sandbox.
 
 A real native LSP lookup in three disposable projects offers `normalized` at
 `transform.origin.norm|suffix`. Tab replaces the whole identifier and inserts `normalized()`.

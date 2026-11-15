@@ -146,12 +146,6 @@ any Godot value passing as a condition):
 - New code that the guide would write otherwise: an empty string and an out-parameter where it asks for
   `std::optional`, `const std::string &` for `std::string_view`, two comments out of place. **clean-up**
 
-## Completion, brought forward
-
-- The local JetBrains lexer cannot distinguish every regex from division after a closing brace.
-  Compiler completion and signature queries use the parser's regex regions; local pairing needs fuller
-  syntax context in this ambiguous case. **LS-2**
-
 ## Reload while running
 
 - A save that changes code that runs once starts the scene again, but only the scene that is running: an
