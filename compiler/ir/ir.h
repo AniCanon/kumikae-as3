@@ -115,6 +115,7 @@ inline bool is_held(Kind p_kind) {
 	X(AnyIs, "RRI") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") /* An untyped value: AS3 throws any value. */ \
+	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
 
 enum class Op : uint8_t {
@@ -174,6 +175,8 @@ struct Handler {
 	uint32_t target = 0;
 	uint32_t reg = 0;
 	uint32_t type = NONE;
+	// The catch of a `finally`, which throws the error again: the trace it had is kept for that.
+	bool rethrows = false;
 };
 
 struct Function {

@@ -61,5 +61,8 @@ func _physics_process(_delta: float) -> bool:
 	show("a script object in a field", node.get("keep"), null)
 	show("freed", ask("freed"), "truetruetruenotrue")
 	ask("throwValue", [Vector2(3, 4)])
+	node.position = Vector2(1, 1)
+	show("an int plus one stays an int", [ask("increment", [5]), typeof(ask("increment", [5]))], [6, TYPE_INT])
+	show("a Godot value and an untyped one", ask("moveBy", [Vector2(2, 3)]), Vector2(3, 4))
 	show("caught in AS3", [ask("guarded", [Vector2(2, 3)]), ask("guarded", [Color(1, 1, 1)]), node.position], ["fits (2.0, 3.0)", "caught true", Vector2(1, 1)])
 	return false

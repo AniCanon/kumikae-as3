@@ -162,7 +162,18 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	arguments[0].bits = 0;
 	arguments[0].p = p_object;
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		arguments[i + 1] = kas3::from_variant(function.registers[i + 1], *p_args[i]);
+		const std::optional<vm::Slot> taken = kas3::from_variant(function.registers[i + 1], *p_args[i]);
+		if (!taken) {
+			// As with any call that fails: the error said, and null for the caller.
+			for (size_t made = 0; made < i; made++) {
+				program.interpreter().discard(function.registers[made + 1], arguments[made + 1]);
+			}
+			UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) + ": " +
+					String::utf8(vm::OUT_OF_MEMORY.data(), (int64_t)vm::OUT_OF_MEMORY.size()));
+			r_error->error = GDEXTENSION_CALL_OK;
+			return;
+		}
+		arguments[i + 1] = *taken;
 	}
 	vm::Slot result;
 	result.bits = 0;

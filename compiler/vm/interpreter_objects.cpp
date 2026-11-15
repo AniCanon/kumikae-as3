@@ -164,8 +164,13 @@ void Interpreter::assign(Kind p_kind, Slot &p_slot, void *p_value) {
 	drop(p_kind, old);
 }
 
+// Null, and the error raised, when there is no memory for it.
 Str *Interpreter::text(const std::string &p_text) {
-	return new_string(p_text);
+	Str *made = new_string(p_text);
+	if (!made) {
+		raise(module_.error_class, std::string(OUT_OF_MEMORY));
+	}
+	return made;
 }
 
 bool Interpreter::is_class(const Object *p_object, uint32_t p_class) const {

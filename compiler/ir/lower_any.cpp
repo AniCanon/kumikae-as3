@@ -8,6 +8,11 @@ bool Lowerer::untyped_type(const Type *p_type) const {
 	return p_type && p_type->kind == Type::Any;
 }
 
+bool Lowerer::engine_typed(const Expr *p_expression) const {
+	Kind kind = Kind::Void;
+	return p_expression && kind_of(p_expression->type, &kind) && is_engine(kind);
+}
+
 bool Lowerer::untyped(const Expr *p_expression) const {
 	Kind kind = Kind::Void;
 	return p_expression && !is_null(p_expression) && kind_of(p_expression->type, &kind) && kind == Kind::Any;
@@ -76,7 +81,8 @@ uint32_t Lowerer::any_add(Binary *p_binary) {
 // typeof: of an untyped value, asked as the program runs; of anything else, known now.
 uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 	uint32_t out = reg(Kind::Str);
-	if (untyped(p_operand)) {
+	// Asked as it runs of an untyped value, and of a String, which is "object" when it holds null.
+	if (untyped(p_operand) || (!is_null(p_operand) && natural(p_operand) == Kind::Str)) {
 		emit(Op::AnyTypeof, p_position, out, any_value(p_operand));
 		return out;
 	}
@@ -87,8 +93,6 @@ uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 		name = "number";
 	} else if (kind == Kind::Bool) {
 		name = "boolean";
-	} else if (kind == Kind::Str) {
-		name = "string"; // A String that is null is still "string" to AS3's checker: typeof of a typed null.
 	}
 	emit(Op::ConstStr, p_position, out, string(name));
 	return out;

@@ -1,85 +1,57 @@
 #include "lowerer.h"
 
-#include <algorithm>
-
 namespace kas3 {
 namespace ir {
 
-// A statement with a label: a loop or a switch takes the label; any other statement is a block that
-// `break label` leaves.
+// A statement with labels: a loop or a switch takes them all; any other statement is a block that
+// `break label` leaves. `a: b: for ...` gives the loop both.
 void Lowerer::labeled(Labeled *p_labeled) {
+	next_labels_.push_back(p_labeled->label);
 	Stmt *body = p_labeled->body;
-	const bool loop = body && (body->kind == NodeKind::While || body->kind == NodeKind::DoWhile || body->kind == NodeKind::For ||
-									  body->kind == NodeKind::ForIn || body->kind == NodeKind::Switch);
-	if (loop) {
-		next_label_ = p_labeled->label;
+	const bool takes_labels = body && (body->kind == NodeKind::While || body->kind == NodeKind::DoWhile || body->kind == NodeKind::For ||
+											  body->kind == NodeKind::ForIn || body->kind == NodeKind::Switch || body->kind == NodeKind::Labeled);
+	if (takes_labels) {
 		statement(body);
-		next_label_ = std::string_view();
+		next_labels_.clear();
 		return;
 	}
 	open_loop();
 	loops_.back().is_block = true;
-	loops_.back().label = p_labeled->label;
 	statement(body);
 	finish_loop(here());
 }
 
-void Lowerer::run_finallies(size_t p_keep) {
-	const size_t open = tries_.size();
-	for (size_t i = open; i-- > p_keep;) {
-		if (tries_[i].hidden || !tries_[i].finally_block) {
-			continue;
-		}
-		// Written as if where it stands in the source: the try statements from this one in, and the
-		// loops opened inside it, are out of its reach; what it throws is outside their handlers.
-		std::vector<size_t> hid_tries;
-		std::vector<size_t> hid_loops;
-		for (size_t j = i; j < open; j++) {
-			if (!tries_[j].hidden) {
-				tries_[j].hidden = true;
-				hid_tries.push_back(j);
-			}
-		}
-		for (size_t l = tries_[i].loops; l < loops_.size(); l++) {
-			if (!loops_[l].hidden) {
-				loops_[l].hidden = true;
-				hid_loops.push_back(l);
-			}
-		}
-		const uint32_t start = here();
-		statement(tries_[i].finally_block);
-		const uint32_t end = here();
-		for (size_t j = i; j < open; j++) {
-			tries_[j].holes.push_back({ start, end });
-		}
-		for (size_t j : hid_tries) {
-			tries_[j].hidden = false;
-		}
-		for (size_t l : hid_loops) {
-			loops_[l].hidden = false;
-		}
-	}
+void Lowerer::route(size_t p_try, TryExit p_exit) {
+	TryBlock &block = tries_[p_try];
+	const uint32_t code = static_cast<uint32_t>(block.exits.size()) + 2;
+	block.exits.push_back(p_exit);
+	emit(Op::ConstI32, p_exit.position, block.exit_reg, code);
+	block.to_finally.push_back(emit(Op::Jump, p_exit.position, 0));
 }
 
-void Lowerer::protect(uint32_t p_start, uint32_t p_end, const std::vector<std::pair<uint32_t, uint32_t>> &p_holes, Handler p_handler) {
-	std::vector<std::pair<uint32_t, uint32_t>> holes = p_holes;
-	std::sort(holes.begin(), holes.end());
-	uint32_t from = p_start;
-	for (const auto &[hole_start, hole_end] : holes) {
-		if (hole_end <= from || hole_start >= p_end) {
-			continue;
+void Lowerer::leave_to(size_t p_loop, bool p_break, uint32_t p_position) {
+	// The innermost try with a finally that the loop is outside of: its finally runs first.
+	for (size_t i = tries_.size(); i-- > loops_[p_loop].tries;) {
+		if (tries_[i].finally_block) {
+			route(i, TryExit{ p_break ? TryExit::Break : TryExit::Continue, p_loop, p_position });
+			return;
 		}
-		if (hole_start > from) {
-			p_handler.start = from;
-			p_handler.end = hole_start;
-			fn().handlers.push_back(p_handler);
-		}
-		from = std::max(from, hole_end);
 	}
-	if (from < p_end) {
-		p_handler.start = from;
-		p_handler.end = p_end;
-		fn().handlers.push_back(p_handler);
+	uint32_t jump = emit(Op::Jump, p_position, 0);
+	(p_break ? loops_[p_loop].breaks : loops_[p_loop].continues).push_back(jump);
+}
+
+void Lowerer::leave_return(uint32_t p_position) {
+	for (size_t i = tries_.size(); i-- > 0;) {
+		if (tries_[i].finally_block) {
+			route(i, TryExit{ TryExit::Return, 0, p_position });
+			return;
+		}
+	}
+	if (constructor_ || fn().result == Kind::Void) {
+		emit(Op::ReturnVoid, p_position);
+	} else {
+		emit(Op::Return, p_position, return_reg_);
 	}
 }
 
@@ -114,21 +86,65 @@ uint32_t Lowerer::catch_type(const CatchClause &p_clause) {
 	return index;
 }
 
+// The finally, written once, then where to go after it: on past the try, the error on its way, or the
+// way out that led there.
+void Lowerer::finish_finally(TryBlock &p_try, uint32_t p_error, uint32_t p_position) {
+	const uint32_t start = here();
+	for (uint32_t jump : p_try.to_finally) {
+		patch(jump, start);
+	}
+	statement(p_try.finally_block);
+	const uint32_t exit = convert(p_try.exit_reg, Kind::F64, p_position);
+	const auto is = [&](uint32_t p_code) {
+		uint32_t code = reg(Kind::F64);
+		emit(Op::ConstF64, p_position, code, number(p_code));
+		uint32_t same = reg(Kind::Bool);
+		emit(Op::EqF64, p_position, same, exit, code);
+		return same;
+	};
+	const uint32_t to_past = emit(Op::JumpIf, p_position, is(0), 0);
+	const uint32_t not_error = emit(Op::JumpIfNot, p_position, is(1), 0);
+	emit(Op::Rethrow, p_position, p_error);
+	patch(not_error, here());
+	for (size_t k = 0; k < p_try.exits.size(); k++) {
+		const TryExit way = p_try.exits[k];
+		const uint32_t other = emit(Op::JumpIfNot, way.position, is(static_cast<uint32_t>(k) + 2), 0);
+		if (way.kind == TryExit::Return) {
+			leave_return(way.position);
+		} else {
+			leave_to(way.loop, way.kind == TryExit::Break, way.position);
+		}
+		patch(other, here());
+	}
+	patch(to_past, here());
+}
+
 // try { body } catch (e:T) { ... } ... finally { ... }
 //
-// Laid out as: the body, then a jump to the end; each catch, then a jump to the end; for a finally,
-// a catch of anything that runs it and throws again; and at the end, the finally for every way out
-// that is not an error. A break, continue or return inside runs the finally before it leaves.
+// Laid out as: the body; each catch; for a finally, a catch of anything that keeps the error; then the
+// finally, once, which every way out of the body and the catches goes through.
 void Lowerer::try_statement(Try *p_try) {
 	const uint32_t position = p_try->offset;
-	TryBlock block;
-	block.finally_block = p_try->finally_block;
-	block.loops = loops_.size();
-	tries_.push_back(std::move(block));
+	TryBlock opened;
+	opened.finally_block = p_try->finally_block;
+	opened.loops = loops_.size();
+	if (p_try->finally_block) {
+		opened.exit_reg = reg(Kind::I32);
+	}
+	tries_.push_back(std::move(opened));
+	std::vector<uint32_t> to_end;
+	const auto on_past = [&]() {
+		if (p_try->finally_block) {
+			emit(Op::ConstI32, position, tries_.back().exit_reg, 0);
+			tries_.back().to_finally.push_back(emit(Op::Jump, position, 0));
+		} else {
+			to_end.push_back(emit(Op::Jump, position, 0));
+		}
+	};
 	const uint32_t body_start = here();
 	statement(p_try->body);
 	const uint32_t body_end = here();
-	std::vector<uint32_t> to_end = { emit(Op::Jump, position, 0) };
+	on_past();
 	std::vector<Handler> catches;
 	for (CatchClause &clause : p_try->catches) {
 		const auto local = locals_.find(clause.symbol);
@@ -137,35 +153,36 @@ void Lowerer::try_statement(Try *p_try) {
 			continue;
 		}
 		Handler handler;
+		handler.start = body_start;
+		handler.end = body_end;
 		handler.target = here();
 		handler.reg = local->second;
 		handler.type = catch_type(clause);
 		catches.push_back(handler);
 		emit(Op::Stmt, clause.offset);
 		statement(clause.body);
-		to_end.push_back(emit(Op::Jump, position, 0));
+		on_past();
 	}
 	const uint32_t catches_end = here();
-	const std::vector<std::pair<uint32_t, uint32_t>> holes = std::move(tries_.back().holes);
+	TryBlock block = std::move(tries_.back());
 	tries_.pop_back();
 	// The innermost first: this try's catches, in the order written, then its finally.
-	for (const Handler &handler : catches) {
-		protect(body_start, body_end, holes, handler);
-	}
+	fn().handlers.insert(fn().handlers.end(), catches.begin(), catches.end());
 	if (p_try->finally_block) {
-		// An error in the body or a catch: the finally runs, and the error goes on.
+		// An error in the body or a catch: kept, the finally runs, and it goes on.
 		Handler anything;
+		anything.start = body_start;
+		anything.end = catches_end;
 		anything.target = here();
 		anything.reg = reg(Kind::Any);
-		protect(body_start, catches_end, holes, anything);
-		statement(p_try->finally_block);
-		emit(Op::Throw, position, anything.reg);
+		anything.rethrows = true;
+		fn().handlers.push_back(anything);
+		emit(Op::ConstI32, position, block.exit_reg, 1);
+		block.to_finally.push_back(emit(Op::Jump, position, 0));
+		finish_finally(block, anything.reg, position);
 	}
 	for (uint32_t jump : to_end) {
 		patch(jump, here());
-	}
-	if (p_try->finally_block) {
-		statement(p_try->finally_block);
 	}
 }
 

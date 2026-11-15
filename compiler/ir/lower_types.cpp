@@ -88,7 +88,10 @@ Kind Lowerer::written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing) {
 	Kind kind = Kind::Void;
 	if (!kind_of(compilation_.type_of(p_type), &kind)) {
 		refuse(p_type->offset, "the type '" + compilation_.type_name(compilation_.type_of(p_type)) + "'");
-		return Kind::F64;
+		refused_types_.insert(compilation_.type_of(p_type));
+		// What it would be held as, where that is known (a vector of a kind not held yet is an object):
+		// the rest of the program then lowers without errors that only follow from this one.
+		return kind == Kind::Void ? Kind::F64 : kind;
 	}
 	return kind;
 }
@@ -338,8 +341,10 @@ Kind Lowerer::natural(Expr *p_expression) {
 		return Kind::Obj;
 	}
 	if (!kind_of(p_expression->type, &kind)) {
-		refuse(p_expression->offset, "a value of type '" + compilation_.type_name(p_expression->type) + "'");
-		return Kind::F64;
+		if (refused_types_.insert(p_expression->type).second) {
+			refuse(p_expression->offset, "a value of type '" + compilation_.type_name(p_expression->type) + "'");
+		}
+		return kind == Kind::Void ? Kind::F64 : kind;
 	}
 	return kind;
 }

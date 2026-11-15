@@ -143,6 +143,9 @@ void Interpreter::pop() {
 	}
 	stack_.resize(base);
 	frames_.resize(index);
+	while (!kept_traces_.empty() && kept_traces_.back().depth > frames_.size()) {
+		kept_traces_.pop_back(); // Kept for a frame that is gone.
+	}
 }
 
 // Starts an error on its way out: an object of the class with the message.
@@ -156,7 +159,7 @@ void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
 	}
 	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size()) : nullptr;
 	if (error) {
-		error->fields()[0].p = text(p_message);
+		error->fields()[0].p = new_string(p_message); // Not text(): with no memory, it would raise again.
 		pending_ = any::object(error);
 		failing_ = true;
 	} else {
@@ -181,7 +184,20 @@ bool Interpreter::catch_error(size_t p_depth) {
 				continue;
 			}
 			// Caught: the error goes to the catch's variable, as its kind holds it, and is no longer on
-			// its way out.
+			// its way out. A finally's catch keeps the trace, this frame's line included, for when it
+			// throws the error again.
+			if (handler.rethrows) {
+				std::string trace = trace_;
+				size_t lines = trace_lines_;
+				if (!frame.traced) {
+					if (lines < MAX_TRACE) {
+						trace += site(frame) + "\n";
+					}
+					lines++;
+				}
+				kept_traces_.push_back(Kept{ frames_.size(), std::move(trace), lines });
+			}
+			frame.traced = false;
 			const Kind kind = function.registers[handler.reg];
 			const Slot error = pending_;
 			pending_.bits = 0;
@@ -210,11 +226,14 @@ void Interpreter::leave_failed_frame() {
 	if (leaving.owner != NONE && module_.classes[leaving.owner].static_init == frames_.back().function) {
 		forget_class(leaving.owner);
 	}
-	// A runaway recursion has thousands of frames: the first few and a count say as much.
-	if (trace_lines_ < MAX_TRACE) {
-		trace_ += site(frames_.back()) + "\n";
+	// A runaway recursion has thousands of frames: the first few and a count say as much. A frame whose
+	// line came with an error thrown again is in already.
+	if (!frames_.back().traced) {
+		if (trace_lines_ < MAX_TRACE) {
+			trace_ += site(frames_.back()) + "\n";
+		}
+		trace_lines_++;
 	}
-	trace_lines_++;
 	pop();
 }
 
@@ -370,6 +389,14 @@ bool Interpreter::start() {
 		return true;
 	}
 	started_ = true;
+	// The constants are made with the interpreter, which can't raise: a program missing one does not run.
+	const auto missing = [](const std::vector<Str *> &p_strings) {
+		return std::find(p_strings.begin(), p_strings.end(), nullptr) != p_strings.end();
+	};
+	if (!null_text_ || missing(strings_) || missing(type_names_)) {
+		host_.output.error(OUT_OF_MEMORY);
+		return false;
+	}
 	bool ok = true;
 	for (uint32_t initializer : module_.initializers) {
 		ok = ok && call(initializer, nullptr, 0);

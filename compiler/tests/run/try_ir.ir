@@ -20,22 +20,30 @@ function RangeError(r0:Object, r1:String):void
   @0 SetField r0 .0 r1
   @1 ReturnVoid
 function try_ir(r0:Object):void
-  @2 ConstStr r2 "body"
-  @3 StrToStr r3 r2
-  @4 Trace (r3)
-  @5 Jump @18
-  @8 ConstStr r4 "text"
-  @9 StrToStr r5 r4
-  @10 StrToStr r6 r1
-  @11 Trace (r5, r6)
-  @12 Jump @18
-  @14 ConstStr r8 "finally"
-  @15 StrToStr r9 r8
-  @16 Trace (r9)
-  @17 Throw r7
-  @19 ConstStr r10 "finally"
-  @20 StrToStr r11 r10
-  @21 Trace (r11)
-  @22 ReturnVoid
-  handler @1-@5 -> @6 into r1 catches String
-  handler @1-@13 -> @13 into r7 catches anything
+  @2 ConstStr r3 "body"
+  @3 StrToStr r4 r3
+  @4 Trace (r4)
+  @5 ConstI32 r2 0
+  @6 Jump @17
+  @9 ConstStr r5 "text"
+  @10 StrToStr r6 r5
+  @11 StrToStr r7 r1
+  @12 Trace (r6, r7)
+  @13 ConstI32 r2 0
+  @14 Jump @17
+  @15 ConstI32 r2 1
+  @16 Jump @17
+  @18 ConstStr r9 "finally"
+  @19 StrToStr r10 r9
+  @20 Trace (r10)
+  @21 I32ToF64 r11 r2
+  @22 ConstF64 r12 0
+  @23 EqF64 r13 r11 r12
+  @24 JumpIf r13 @29
+  @25 ConstF64 r14 1
+  @26 EqF64 r15 r11 r14
+  @27 JumpIfNot r15 @29
+  @28 Rethrow r8
+  @29 ReturnVoid
+  handler @1-@5 -> @7 into r1 catches String
+  handler @1-@15 -> @15 into r8 catches anything

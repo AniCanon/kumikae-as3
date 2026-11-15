@@ -1495,7 +1495,67 @@ static void test_failed_static_initializer() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// With no memory left, AS3 is told so (Error #1000), and can catch it.
+static void test_out_of_memory() {
+	Compilation compilation;
+	compilation.add("Grow.as", "package { public class Grow {\n"
+							   "public function joined(a:String, b:String):String {\n"
+							   "	try { return a + b; } catch (e:Error) { return 'caught: ' + e.message; }\n"
+							   "	return '';\n"
+							   "}\n"
+							   "public function made():String {\n"
+							   "	try { var g:Grow = new Grow(); return 'made'; } catch (e:Error) { return 'caught: ' + e.message; }\n"
+							   "	return '';\n"
+							   "}\n"
+							   "} }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	uint32_t grow = ir::NONE;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		grow = module.classes[i].name == "Grow" ? (uint32_t)i : grow;
+	}
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(grow);
+		CHECK(object != nullptr);
+		const std::string wanted = "caught: " + std::string(vm::OUT_OF_MEMORY);
+		for (const char *method : { "joined", "made" }) {
+			vm::Slot arguments[2];
+			arguments[0].p = vm::new_string("left");
+			arguments[1].p = vm::new_string("right");
+			vm::Slot result;
+			result.bits = 0;
+			vm::fail_allocations(1);
+			CHECK(interpreter.call_method(object, method, arguments, std::string_view(method) == "joined" ? 2 : 0, &result));
+			vm::fail_allocations(0);
+			CHECK(result.p != nullptr);
+			CHECK_EQ(result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string(), wanted);
+			interpreter.discard(ir::Kind::Str, result);
+			interpreter.discard(ir::Kind::Str, arguments[0]);
+			interpreter.discard(ir::Kind::Str, arguments[1]);
+		}
+		interpreter.release_object(object);
+		CHECK_EQ(interpreter.depth(), (size_t)0);
+	}
+	// A program whose constants could not be made does not start, and says why.
+	{
+		Recorder host;
+		vm::fail_allocations(1);
+		vm::Interpreter interpreter(module, host);
+		vm::fail_allocations(0);
+		CHECK(!interpreter.start());
+		CHECK_EQ(host.errors, std::string(vm::OUT_OF_MEMORY) + "\n");
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 int main() {
+	test_out_of_memory();
 	test_reload();
 	test_reload_vectors();
 	test_run_once_changes();

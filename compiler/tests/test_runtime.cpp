@@ -87,6 +87,18 @@ static void test_text_number() {
 	CHECK_EQ(character_count(""), 0);
 }
 
+// A text too long for a string's 32-bit length is refused, never cut short. Its characters are not
+// read, so the text need not be there.
+static void test_long_text() {
+	const char *start = "x";
+	CHECK(new_string(std::string_view(start, (size_t)UINT32_MAX + 1)) == nullptr);
+	fail_allocations(1);
+	CHECK(new_string("short") == nullptr);
+	Str *after = new_string("short"); // Only that one failed.
+	CHECK(after != nullptr);
+	free_string(after);
+}
+
 static void test_counts() {
 	size_t strings = live_strings();
 	size_t objects = live_objects();
@@ -245,6 +257,7 @@ static void test_any() {
 }
 
 int main() {
+	test_long_text();
 	test_any();
 	test_vectors();
 	test_math();

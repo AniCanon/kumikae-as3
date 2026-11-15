@@ -188,13 +188,13 @@ static void test_never_operators() {
 	expect("var n:int = 1; n++; ~n; n <<= 2; any++; ~any; mine++; node++;", {});
 }
 
-// Nothing is said where the operand could be anything, or where the class says nothing about operators.
+// Nothing is said where the operand could be anything (the result is then untyped), or where the class says nothing about operators.
 static void test_silence() {
 	types({
-			{ "a + any", "?" },
-			{ "any * a", "?" },
-			{ "a + obj", "?" },
-			{ "a + null", "?" },
+			{ "a + any", "*" },
+			{ "any * a", "*" },
+			{ "a + obj", "*" },
+			{ "a + null", "*" },
 			{ "mine + mine", "?" },
 			{ "node * 2", "?" },
 			{ "-node", "?" },

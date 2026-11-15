@@ -25,18 +25,25 @@ struct Loop {
 	std::vector<uint32_t> continues; // Jumps to patch to where the loop continues.
 	bool is_switch = false; // A `switch`: `break` leaves it, `continue` belongs to the loop around it.
 	bool is_block = false; // A labelled block: only `break label` leaves it.
-	bool hidden = false; // Out of reach from the `finally` being written here: see run_finallies().
-	std::string_view label; // Empty when the statement has none.
+	std::vector<std::string_view> labels; // The labels written before it; one statement may have several.
 	size_t tries = 0; // How many `try` statements were open when it began.
 };
 
-// A `try` statement being lowered.
+// A way out of a `try` that has a `finally`: the finally runs, then this.
+struct TryExit {
+	enum Kind { Break, Continue, Return } kind = Break;
+	size_t loop = 0; // For Break and Continue: the loop it leaves or goes round.
+	uint32_t position = 0;
+};
+
+// A `try` statement being lowered. Its `finally` is written once; each way out sets `exit_reg` to say
+// where to go after it (0 on past the try, 1 the error goes on, 2 and up one of `exits`) and jumps there.
 struct TryBlock {
 	Block *finally_block = nullptr;
-	size_t loops = 0; // How many loops were open when it began: its `finally` sees those only.
-	bool hidden = false; // Its `finally` is being written: what runs there is outside it.
-	// Stretches of its code that are a `finally` written for a way out: no handler of this try covers them.
-	std::vector<std::pair<uint32_t, uint32_t>> holes;
+	size_t loops = 0; // How many loops were open when it began.
+	uint32_t exit_reg = 0;
+	std::vector<uint32_t> to_finally; // Jumps to the finally, patched once it is written.
+	std::vector<TryExit> exits;
 };
 
 class Lowerer {
@@ -77,7 +84,10 @@ class Lowerer {
 	const Type *result_type_ = nullptr; // What the function being lowered says it returns, if it says.
 	std::unordered_map<const Symbol *, uint32_t> locals_;
 	std::vector<Loop> loops_;
-	std::string_view next_label_; // A label written just before the loop being lowered.
+	std::vector<std::string_view> next_labels_; // Labels written just before the statement being lowered.
+	uint32_t return_reg_ = NONE; // Where a `return` inside a `try` with a `finally` keeps its value.
+	// Types already refused where they were written: a value of one is not refused again at each use.
+	std::unordered_set<const Type *> refused_types_;
 	// The `try` statements around the code being lowered, outermost first: a `break`, `continue` or
 	// `return` that leaves one runs its `finally` on the way.
 	std::vector<TryBlock> tries_;
@@ -194,6 +204,7 @@ class Lowerer {
 	uint32_t godot_object_of(uint32_t p_object, Expr *p_written, uint32_t p_position);
 	// The untyped value: ir/lower_any.cpp.
 	bool untyped(const Expr *p_expression) const;
+	bool engine_typed(const Expr *p_expression) const; // Of a Godot value type or class.
 	bool untyped_type(const Type *p_type) const;
 	// A place of this kind and type starts null: an untyped one declared `Object` (a `*` starts undefined).
 	bool starts_null_type(Kind p_kind, const Type *p_type) const { return p_kind == Kind::Any && !untyped_type(p_type); }
@@ -402,11 +413,12 @@ class Lowerer {
 	void switch_statement(Stmt *p_statement);
 	void try_statement(Try *p_try);
 	void labeled(Labeled *p_labeled);
-	// Writes the `finally` blocks of the open `try` statements from the innermost down to p_keep of them,
-	// for a way out of them.
-	void run_finallies(size_t p_keep);
-	// The handlers of a range of code, less the holes in it: one for each stretch that is left.
-	void protect(uint32_t p_start, uint32_t p_end, const std::vector<std::pair<uint32_t, uint32_t>> &p_holes, Handler p_handler);
+	// Leaves for a loop (break or continue) or the function (return), through the `finally` of every
+	// try statement on the way: the innermost one runs first, and goes on from there.
+	void leave_to(size_t p_loop, bool p_break, uint32_t p_position);
+	void leave_return(uint32_t p_position);
+	void route(size_t p_try, TryExit p_exit);
+	void finish_finally(TryBlock &p_try, uint32_t p_error, uint32_t p_position);
 	void open_loop(); // A loop or switch begins: it takes the label written before it, if any.
 	uint32_t catch_type(const CatchClause &p_clause);
 	void break_or_continue(Stmt *p_statement);

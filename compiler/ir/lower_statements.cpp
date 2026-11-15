@@ -1,5 +1,7 @@
 #include "lowerer.h"
 
+#include <algorithm>
+
 namespace kas3 {
 namespace ir {
 
@@ -141,15 +143,11 @@ void Lowerer::break_or_continue(Stmt *p_statement) {
 	// statement of that label (a block only for `break`).
 	for (size_t i = loops_.size(); i-- > 0;) {
 		const Loop &target = loops_[i];
-		if (target.hidden) {
-			continue;
-		}
+		const bool named = std::find(target.labels.begin(), target.labels.end(), label) != target.labels.end();
 		const bool fits = label.empty() ? !target.is_block && (is_break || !target.is_switch)
-										: target.label == label && (is_break || (!target.is_switch && !target.is_block));
+										: named && (is_break || (!target.is_switch && !target.is_block));
 		if (fits) {
-			run_finallies(target.tries);
-			uint32_t jump = emit(Op::Jump, position, 0);
-			(is_break ? loops_[i].breaks : loops_[i].continues).push_back(jump);
+			leave_to(i, is_break, position);
 			return;
 		}
 	}
@@ -248,18 +246,20 @@ void Lowerer::return_statement(Stmt *p_statement) {
 		if (result->value) {
 			expression(result->value, Kind::Void);
 		}
-		run_finallies(0);
-		emit(Op::ReturnVoid, position);
+		leave_return(position);
 	} else {
 		uint32_t value = result->value ? typed(result->value, result_type_, fn().result) : default_value(fn().result, position);
-		if (!tries_.empty()) {
-			// The value is worked out first; then the `finally` blocks run, and cannot change it.
-			uint32_t kept = reg(kind_at(value));
-			emit(Op::Move, position, kept, value);
-			run_finallies(0);
-			value = kept;
+		bool guarded = std::any_of(tries_.begin(), tries_.end(), [](const TryBlock &p_try) { return p_try.finally_block; });
+		if (!guarded) {
+			emit(Op::Return, position, value);
+			return;
 		}
-		emit(Op::Return, position, value);
+		// The value is worked out first and kept; then the `finally` blocks run, and cannot change it.
+		if (return_reg_ == NONE) {
+			return_reg_ = reg(fn().result);
+		}
+		emit(Op::Move, position, return_reg_, value);
+		leave_return(position);
 	}
 }
 
@@ -342,9 +342,9 @@ void Lowerer::statement(Stmt *p_statement) {
 
 void Lowerer::open_loop() {
 	Loop loop;
-	loop.label = next_label_;
+	loop.labels = std::move(next_labels_);
 	loop.tries = tries_.size();
-	next_label_ = std::string_view();
+	next_labels_.clear();
 	loops_.push_back(std::move(loop));
 }
 

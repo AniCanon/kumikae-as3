@@ -60,7 +60,7 @@ Slot empty_value(bool p_number, bool p_null) {
 }
 
 Wide *new_wide(int64_t p_value) {
-	void *memory = std::malloc(sizeof(Wide));
+	void *memory = allocation_fails() ? nullptr : std::malloc(sizeof(Wide));
 	if (!memory) {
 		return nullptr;
 	}

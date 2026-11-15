@@ -39,6 +39,7 @@ private:
 		size_t base; // Where its registers start in stack_.
 		uint32_t result; // The caller's register for the value returned, or NONE.
 		uint32_t arguments; // How many the caller passed.
+		bool traced = false; // Its line is already in the trace of the error on its way out.
 	};
 
 	const ir::Module &module_;
@@ -52,6 +53,13 @@ private:
 	bool failing_ = false; // An error is on its way out: pending_ holds it.
 	Slot pending_{}; // What was thrown, as an untyped value with a reference of its own.
 	std::string trace_; // Its stack trace, built as frames are left.
+	// The trace of an error a `finally` caught, kept for when it is thrown again, by the depth of the frame.
+	struct Kept {
+		size_t depth;
+		std::string trace;
+		size_t lines;
+	};
+	std::vector<Kept> kept_traces_;
 	size_t trace_lines_ = 0;
 	bool stopped_ = false; // Nothing more is to run.
 	bool halted_ = false; // Because the statement hook said so, not because of an error.
@@ -75,6 +83,7 @@ private:
 	Slot present_or_null(Slot p_value); // A freed Godot object is null; anything else is as it is.
 	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
+	Slot add_numbers(Slot p_a, Slot p_b);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value); // Takes over one reference.
 	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.

@@ -28,6 +28,8 @@ package {
 		public function asVector(value:*):Vector2 { var v:Vector2 = value; return v; }
 		public function asNode(value:*):Node { var n:Node = value; return n; }
 		public function throwValue(value:*):void { throw value; }
+		public function increment(value:*):* { return value + 1; }
+		public function moveBy(by:*):Vector2 { var q:Vector2 = position + by; return q; }
 		// An error raised for a Godot value is caught like any other.
 		public function guarded(value:*):String {
 			try {

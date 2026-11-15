@@ -62,6 +62,14 @@ inline bool release(Counted *p_value) {
 // value declared `Object`, and zero (no reference, `undefined`, 0, false) for the rest.
 Slot empty_value(bool p_number, bool p_null);
 
+// What AS3 says when memory runs out, wherever it does.
+constexpr std::string_view OUT_OF_MEMORY = "Error #1000: The system is out of memory.";
+
+// For tests: the next p_count allocations of strings, objects, vectors and Int64 boxes fail, as they
+// would with no memory left.
+void fail_allocations(uint32_t p_count);
+bool allocation_fails(); // True, and one fewer to fail, while any are still to fail.
+
 // How many strings and objects are alive, for finding leaks.
 size_t live_strings();
 size_t live_objects();

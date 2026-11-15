@@ -24,10 +24,10 @@ it stands.
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 32 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2c** | The rest of the language | 29 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 25 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 55 | What is left |
+| **clean-up** | A pass that closes stage 2 | 51 | What is left |
 | **decision** | The owner | 11 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
@@ -271,11 +271,6 @@ any Godot value passing as a condition):
 
 ## Stage 2c-3: `try`, `catch`, `finally`, labels
 
-- An error that passes through a `finally` is reported at the line of its `try`, not where it was thrown:
-  the stack trace is built as frames are left, and the `finally` throws it again. **clean-up**
-- A `finally` is written out again for each `break`, `continue` or `return` that leaves it: a long one
-  left many ways makes the function's code that much longer. **clean-up**
-- `continue a` where `a` labels a label (`a: b: for ...`) is refused; AS3 allows it. **2c**
 - An error inside a script method that Godot called is reported there: a `try` in AS3 around the Godot
   call that led to it does not see it. **2d**
 - An `Error`'s `errorID`, `name` and `getStackTrace()` wait for the standard library. **2c**
@@ -289,19 +284,12 @@ any Godot value passing as a condition):
 - The checker gives no type to arithmetic on an `Object` (`o + 1`), so it is refused; on a `*` it works.
   **2c**
 - `var y = 2`, a declaration with no type, is refused rather than taken as `*`. **2c**
-- `typeof` of a String variable that holds null says "string"; AS3 says "object". **2c**
 - An untyped value that holds a script object is an AS3 error when an AS3 call gives it to Godot; when
   Godot reads it (a return, a field), Godot gets null and an error is printed. Nothing converts it.
   **decision**
-- `+` on untyped values gives a Number, as AS3 does: `v + 1` with `v` from Godot's integer 5 goes back to
-  Godot as the float 6.0, and an `Int64` past 2^53 loses its last digits. **2c**
 - The encoding of an untyped value needs addresses below 2^47 with nothing in the top bits: a build where
   the platform tags pointers there (Android's heap tagging on arm64) stops with a message. It has to be
   handled before Android runs. **clean-up**
-- Godot running out of memory while an untyped value is made from what it gave gives null, not error
-  #1000. **clean-up**
-- Refusal messages: `var q:Vector2 = position + p` (with `p:*`) says "a value of type '?'", and
-  `Vector.<*>` adds "converting an object to a number" after the right message. **clean-up**
 - A Godot `StringName` or `NodePath` in an untyped value is held as Godot's own value, not as a String:
   `typeof` says "object". **2c**
 - Godot's integers in an untyped value: one that fits an `int` is held as one, a larger one as an `Int64`;
@@ -336,7 +324,7 @@ any Godot value passing as a condition):
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
-- A string of 4 GiB or more is truncated; running out of memory while building a string aborts. **clean-up**
+- Running out of memory while the C++ side builds a text (joining two strings) aborts. **clean-up**
 - 6 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
   the six are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
 - There is one IR golden file; the plan called for more. **2c**

@@ -12,7 +12,20 @@ namespace vm {
 namespace {
 size_t strings_alive = 0;
 size_t objects_alive = 0;
+uint32_t failing_allocations = 0;
 } // namespace
+
+void fail_allocations(uint32_t p_count) {
+	failing_allocations = p_count;
+}
+
+bool allocation_fails() {
+	if (failing_allocations == 0) {
+		return false;
+	}
+	failing_allocations--;
+	return true;
+}
 
 size_t live_strings() {
 	return strings_alive;
@@ -22,7 +35,9 @@ size_t live_objects() {
 }
 
 Str *new_string(std::string_view p_text) {
-	void *memory = std::malloc(sizeof(Str) + p_text.size() + 1);
+	// A length is held in 32 bits: a longer text is refused as memory running out, never cut short.
+	const bool fits = p_text.size() <= UINT32_MAX;
+	void *memory = !fits || allocation_fails() ? nullptr : std::malloc(sizeof(Str) + p_text.size() + 1);
 	if (!memory) {
 		return nullptr;
 	}
@@ -41,7 +56,7 @@ void free_string(Str *p_string) {
 }
 
 Object *new_object(uint32_t p_class, size_t p_fields) {
-	void *memory = std::calloc(1, sizeof(Object) + p_fields * sizeof(Slot));
+	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Object) + p_fields * sizeof(Slot));
 	if (!memory) {
 		return nullptr;
 	}
@@ -58,7 +73,7 @@ void free_object(Object *p_object) {
 }
 
 Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed) {
-	void *memory = std::calloc(1, sizeof(Vector));
+	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Vector));
 	if (!memory) {
 		return nullptr;
 	}
@@ -85,7 +100,7 @@ bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 	if (capacity > UINT32_MAX) {
 		return false;
 	}
-	void *memory = std::realloc(p_vector->data, capacity * sizeof(Slot));
+	void *memory = allocation_fails() ? nullptr : std::realloc(p_vector->data, capacity * sizeof(Slot));
 	if (!memory) {
 		return false;
 	}

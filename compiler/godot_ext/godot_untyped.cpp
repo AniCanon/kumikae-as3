@@ -36,7 +36,7 @@ Variant untyped_to_variant(const vm::Slot &p_slot) {
 }
 
 // What Godot gives, as an untyped value: an integer that fits an `int` as one, a larger one as an Int64.
-vm::Slot untyped_from_variant(const Variant &p_value) {
+std::optional<vm::Slot> untyped_from_variant(const Variant &p_value) {
 	switch (p_value.get_type()) {
 		case Variant::NIL:
 			return vm::any::null();
@@ -48,13 +48,20 @@ vm::Slot untyped_from_variant(const Variant &p_value) {
 				return vm::any::integer((int32_t)value);
 			}
 			vm::Wide *wide = vm::new_wide(value);
-			return wide ? vm::any::wide(wide) : vm::any::null();
+			if (!wide) {
+				return std::nullopt;
+			}
+			return vm::any::wide(wide);
 		}
 		case Variant::FLOAT:
 			return vm::any::number((double)p_value);
 		case Variant::STRING: {
 			CharString utf8 = String(p_value).utf8();
-			return vm::any::string(vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length())));
+			vm::Str *text = vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));
+			if (!text) {
+				return std::nullopt;
+			}
+			return vm::any::string(text);
 		}
 		case Variant::OBJECT:
 			if (((ObjectID)p_value).is_null()) {

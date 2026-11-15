@@ -207,6 +207,12 @@ with tempfile.TemporaryDirectory() as folder:
           result.stderr == "%s:2:15: error: 'Node' is already defined in Godot's API\n" % clash,
           repr(result.stderr[:300]))
 
+# A finally is written once, however many ways lead out of its try.
+once = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "finally_once.as")
+result = run("ir", once)
+check("finally written once", result.returncode == 0 and result.stdout.count('"cleanup marker"') == 1,
+      "%d copies" % result.stdout.count('"cleanup marker"'))
+
 # A script for Godot is lowered with Godot's API in reach, as the extension does it.
 empty = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus", "Empty.as")
 result = run("ir", empty)

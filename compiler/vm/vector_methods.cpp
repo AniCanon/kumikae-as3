@@ -72,7 +72,7 @@ bool Interpreter::length_is_fixed(const Vector *p_vector) {
 Vector *Interpreter::fresh_vector(uint32_t p_class, uint64_t p_length) {
 	Vector *fresh = p_length <= UINT32_MAX ? new_vector(p_class, static_cast<uint32_t>(p_length), false) : nullptr;
 	if (!fresh) {
-		raise(module_.error_class, "Error #1000: The system is out of memory.");
+		raise(module_.error_class, std::string(OUT_OF_MEMORY));
 	}
 	return fresh;
 }
@@ -264,7 +264,7 @@ void Interpreter::splice(Vector *p_vector, const VectorCall &p_call) {
 	}
 	const uint64_t grown = static_cast<uint64_t>(length) - taken + added;
 	if (grown > UINT32_MAX || !vector_reserve(p_vector, static_cast<uint32_t>(grown))) {
-		raise(module_.error_class, "Error #1000: The system is out of memory.");
+		raise(module_.error_class, std::string(OUT_OF_MEMORY));
 		return;
 	}
 	Vector *removed = fresh_vector(p_vector->klass, taken);

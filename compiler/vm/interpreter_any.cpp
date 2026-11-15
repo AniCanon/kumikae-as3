@@ -56,7 +56,7 @@ Slot Interpreter::to_any(Kind p_kind, Slot p_value) {
 		case Kind::I64: {
 			Wide *wide = new_wide(p_value.l);
 			if (!wide) {
-				raise(module_.error_class, "Error #1000: The system is out of memory.");
+				raise(module_.error_class, std::string(OUT_OF_MEMORY));
 				return any::undefined();
 			}
 			return any::wide(wide);
@@ -361,6 +361,30 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 	}
 }
 
+// Two numbers added. Whole numbers stay whole, as AVM2 keeps an int an int when the sum fits: an `int`
+// if it fits one, an Int64 if it fits that and one side was an Int64; otherwise a Number.
+Slot Interpreter::add_numbers(Slot p_a, Slot p_b) {
+	const AnyTag a = any::tag(p_a);
+	const AnyTag b = any::tag(p_b);
+	const auto whole = [](Slot p_value, AnyTag p_tag) {
+		return p_tag == AnyTag::Wide ? static_cast<const Wide *>(any::pointer(p_value))->value : static_cast<int64_t>(any::to_int_payload(p_value));
+	};
+	const bool integral = (a == AnyTag::Int || a == AnyTag::Wide) && (b == AnyTag::Int || b == AnyTag::Wide);
+	int64_t sum = 0;
+	if (integral && !__builtin_add_overflow(whole(p_a, a), whole(p_b, b), &sum)) {
+		if (sum >= INT32_MIN && sum <= INT32_MAX) {
+			return any::integer(static_cast<int32_t>(sum));
+		}
+		if (a == AnyTag::Wide || b == AnyTag::Wide) {
+			Wide *wide = new_wide(sum);
+			if (wide) {
+				return any::wide(wide);
+			}
+		}
+	}
+	return any::number(any::to_number(p_a) + any::to_number(p_b));
+}
+
 // `+`, `<` and `<=` with an untyped operand, as ECMAScript has them: both become primitives; `+` joins
 // text if either is text and adds numbers otherwise; `<` compares text if both are text.
 void Interpreter::any_arithmetic(const Instruction &p_in, Slot p_b, Slot p_c) {
@@ -382,7 +406,7 @@ void Interpreter::any_arithmetic(const Instruction &p_in, Slot p_b, Slot p_c) {
 		out = any::string(text(joined));
 		put(Kind::Any, stack_[base + p_in.a], out);
 	} else if (p_in.op == Op::AnyAdd) {
-		put(Kind::Any, stack_[base + p_in.a], any::number(any::to_number(first) + any::to_number(second)));
+		put(Kind::Any, stack_[base + p_in.a], add_numbers(first, second));
 	} else {
 		// `a > b` is `b < a` once both are primitives; the left one was made one first.
 		const bool flipped = p_in.op == Op::AnyGt || p_in.op == Op::AnyGe;

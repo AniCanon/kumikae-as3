@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 137 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 130 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -112,7 +112,7 @@ properties, signals and hot reload.
 | 2c-4 to 2c-6. The rest of the language | In the order the corpus asks for: `Array`, `Object` literals and dynamic access, `Dictionary`, `for in` in general, rest parameters; closures, and the collection methods that take one; accessors and interfaces; the standard library (`String`, `Number`, the top-level functions, `JSON`, `Date`, `RegExp`) | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
 | Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Completion built ahead, on 2026-11-14, and working in VS Code and Rider on macOS; the rest planned |
 | 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Hot reload built ahead, on 2026-11-14: on desktop and on the iOS Simulator; the rest planned |
-| Clean-up pass | The 50 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
+| Clean-up pass | The 51 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
 

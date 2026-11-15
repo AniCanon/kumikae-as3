@@ -323,12 +323,14 @@ uint32_t Lowerer::arithmetic(Binary *p_binary, Kind p_want) {
 	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
-	if (p_binary->op == TokenKind::Plus && (untyped(left) || untyped(right))) {
-		return any_add(p_binary);
-	}
 	Kind left_kind = Kind::Void, right_kind = Kind::Void;
 	kind_of(left->type, &left_kind);
 	kind_of(right->type, &right_kind);
+	// With a Godot value on one side, Godot adds, as it does every other operator on one.
+	if (p_binary->op == TokenKind::Plus && (untyped(left) || untyped(right)) && !is_engine(left_kind) &&
+			!is_engine(right_kind)) {
+		return any_add(p_binary);
+	}
 	bool strings = p_binary->op == TokenKind::Plus && is_string_type(p_binary->type);
 	if (!strings && (is_engine(left_kind) || is_engine(right_kind))) {
 		Kind result = Kind::Void;

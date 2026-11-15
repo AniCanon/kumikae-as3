@@ -247,6 +247,7 @@ output = compare("untyped.gd", [
     "script object not given", "equal values", "unequal values", "large integers", "a vector stays a vector",
     "a color is not a vector", "a vector3 is not a vector2", "a resource is not a node", "a node is a node",
     "a property takes its type only", "a script object returned", "a script object in a field", "freed", "caught in AS3",
+    "an int plus one stays an int", "a Godot value and an untyped one",
 ])
 check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",
       output.count("Error #1034") >= 5 and "at Untyped/asVector()" in output and "at Untyped/asNode()" in output and

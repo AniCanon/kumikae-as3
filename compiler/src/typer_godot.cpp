@@ -130,8 +130,11 @@ const Type *Typer::described_binary(TokenKind p_op, Expr *p_left, Expr *p_right,
 	if (!left || !right || (!has_operators(left) && !has_operators(right))) {
 		return nullptr;
 	}
-	if (open_ended(left) || open_ended(right)) {
+	if (left->kind == Type::Unknown || right->kind == Type::Unknown) {
 		return unknown_;
+	}
+	if (open_ended(left) || open_ended(right)) {
+		return any_; // An untyped side: Godot works it out when the program runs.
 	}
 	std::string_view op = token_kind_spelling(p_op);
 	const Type *loose = nullptr;

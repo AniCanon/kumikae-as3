@@ -151,11 +151,16 @@ bool take(const vm::Wanted &p_wanted, const Variant &p_value, std::string_view p
 				(p_wanted.type.empty() ? std::string(ir::kind_name(p_wanted.kind)) : std::string(p_wanted.type)) + " was expected";
 		return false;
 	}
-	*r_result = from_variant(p_wanted.kind, p_value);
+	const std::optional<vm::Slot> taken = from_variant(p_wanted.kind, p_value);
+	if (!taken) {
+		*r_error = std::string(vm::OUT_OF_MEMORY);
+		return false;
+	}
+	*r_result = *taken;
 	return true;
 }
 
-vm::Slot from_variant(ir::Kind p_kind, const Variant &p_value) {
+std::optional<vm::Slot> from_variant(ir::Kind p_kind, const Variant &p_value) {
 	vm::Slot slot;
 	slot.bits = 0;
 	switch (p_kind) {
@@ -178,6 +183,9 @@ vm::Slot from_variant(ir::Kind p_kind, const Variant &p_value) {
 			if (p_value.get_type() != Variant::NIL) {
 				CharString utf8 = String(p_value).utf8();
 				slot.p = vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));
+				if (!slot.p) {
+					return std::nullopt;
+				}
 			}
 			break;
 		case ir::Kind::Any:

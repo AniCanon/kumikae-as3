@@ -9,6 +9,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -83,11 +84,11 @@ public:
 };
 
 // An interpreter value as a Variant, and back. A string or an engine value coming back is the caller's
-// to release or drop.
+// to release or drop. Nothing comes back when there was no memory to hold it.
 godot::Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot);
-vm::Slot from_variant(ir::Kind p_kind, const godot::Variant &p_value);
+std::optional<vm::Slot> from_variant(ir::Kind p_kind, const godot::Variant &p_value);
 godot::Variant untyped_to_variant(const vm::Slot &p_slot);
-vm::Slot untyped_from_variant(const godot::Variant &p_value);
+std::optional<vm::Slot> untyped_from_variant(const godot::Variant &p_value);
 // Whether a value arriving from Godot may be taken as this kind, and for an engine value as the type of
 // this name ("Vector2", "Node"; empty for any). Numbers are taken as GDScript itself would take them, but
 // one that does not fit an int or a uint is refused, never wrapped.
