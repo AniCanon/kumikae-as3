@@ -80,6 +80,7 @@ bool Collector::step(size_t p_work) {
 	}
 	running_ = true;
 	work_ = 0;
+	steps_++;
 	bool ended = false;
 	if (phase_ == Phase::Idle) {
 		begin();
@@ -152,21 +153,31 @@ void Collector::touch(Object *p_object) {
 	}
 }
 
+bool Collector::ask(uint64_t p_node, EngineNode *r_edges) {
+	work_ += NODE_WORK;
+	return interpreter_.host_.handles.node_edges(p_node, r_edges);
+}
+
 Collector::Node &Collector::touch_node(uint64_t p_node) {
 	auto [at, made] = nodes_.try_emplace(p_node);
 	if (made) {
-		EngineNode edges;
-		at->second.count = interpreter_.host_.handles.node_edges(p_node, &edges) ? static_cast<int64_t>(edges.references) : GONE;
+		Node &node = at->second;
+		node.count = ask(p_node, &node.edges) ? static_cast<int64_t>(node.edges.references) : GONE;
+		node.asked = steps_;
 		node_queue_.push_back(p_node);
 	}
 	return at->second;
 }
 
-// The references a node holds come off the counts of what it holds. Asked again now, rather than kept from
-// when it was first seen: what it held then may have been freed since.
+// The references a node holds come off the counts of what it holds. What it was found to hold is used if
+// that was in this step; otherwise it is asked again: what it held then may have been freed since.
 void Collector::count_node(uint64_t p_node) {
 	EngineNode edges;
-	if (!interpreter_.host_.handles.node_edges(p_node, &edges)) {
+	Node &node = nodes_[p_node];
+	if (node.asked == steps_) {
+		edges = std::move(node.edges);
+		node.edges = EngineNode();
+	} else if (!ask(p_node, &edges)) {
 		return;
 	}
 	for (Object *object : edges.objects) {
@@ -239,7 +250,7 @@ bool Collector::marking(size_t p_work) {
 			const uint64_t key = node_queue_.back();
 			node_queue_.pop_back();
 			EngineNode edges;
-			if (interpreter_.host_.handles.node_edges(key, &edges)) {
+			if (ask(key, &edges)) {
 				for (Object *object : edges.objects) {
 					work_++;
 					if (object && object->gc_next) {
@@ -290,7 +301,7 @@ Collector::Node &Collector::suspect_node(uint64_t p_node) {
 	auto [at, made] = nodes_.try_emplace(p_node);
 	if (made) {
 		Node &node = at->second;
-		node.count = interpreter_.host_.handles.node_edges(p_node, &node.edges) ? static_cast<int64_t>(node.edges.references) : GONE;
+		node.count = ask(p_node, &node.edges) ? static_cast<int64_t>(node.edges.references) : GONE;
 		node_queue_.push_back(p_node);
 	}
 	return at->second;

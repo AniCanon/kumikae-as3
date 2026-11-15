@@ -7,7 +7,9 @@
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_custom.hpp>
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/signal.hpp>
@@ -277,22 +279,54 @@ void release_listeners() {
 // a loop is freed each listener is taken out of its signals: if it outlives that, something else holds it,
 // and everything is put back as it was.
 
+namespace {
+
+struct TextHash {
+	size_t operator()(const String &p_text) const { return p_text.hash(); }
+};
+
+// The signals of a class, its own and those it inherits: found once for each class. A signal added to
+// one object alone (add_user_signal) is not among them, and a listener in one is not found here: it then
+// counts as held from outside, which keeps it, and what it holds.
+const std::vector<StringName> &class_signals(const String &p_class) {
+	static std::unordered_map<String, std::vector<StringName>, TextHash> known;
+	auto [at, made] = known.try_emplace(p_class);
+	if (made) {
+		TypedArray<Dictionary> signals = ClassDBSingleton::get_singleton()->class_get_signal_list(p_class);
+		for (int64_t i = 0; i < signals.size(); i++) {
+			at->second.push_back(Dictionary(signals[i])["name"]);
+		}
+	}
+	return at->second;
+}
+
+} // namespace
+
 // Read from the object's own connections, so that a copy of a listener GDScript connected is found too.
 void listeners_of(Object *p_object, std::vector<uint64_t> *r_nodes) {
-	TypedArray<Dictionary> signals = p_object->get_signal_list();
-	for (int64_t i = 0; i < signals.size(); i++) {
-		const StringName name = Dictionary(signals[i])["name"];
-		if (!p_object->has_connections(name)) {
-			continue;
+	auto look = [&](const StringName &p_name) {
+		if (!p_object->has_connections(p_name)) {
+			return;
 		}
-		TypedArray<Dictionary> connections = p_object->get_signal_connection_list(name);
-		for (int64_t j = 0; j < connections.size(); j++) {
-			Callable callable = Dictionary(connections[j])["callable"];
+		TypedArray<Dictionary> connections = p_object->get_signal_connection_list(p_name);
+		for (int64_t i = 0; i < connections.size(); i++) {
+			Callable callable = Dictionary(connections[i])["callable"];
 			BoundMethod *bound = callable.is_custom() ? dynamic_cast<BoundMethod *>(callable.get_custom()) : nullptr;
 			if (bound && bound->collected()) {
-				bound->listens_to(Signal(p_object, name));
+				bound->listens_to(Signal(p_object, p_name));
 				r_nodes->push_back(bound->number_);
 			}
+		}
+	};
+	for (const StringName &name : class_signals(p_object->get_class())) {
+		look(name);
+	}
+	// The signals its script declares (an AS3 class's [Signal] fields among them).
+	const Ref<Script> script = p_object->get_script();
+	if (script.is_valid()) {
+		TypedArray<Dictionary> declared = script->get_script_signal_list();
+		for (int64_t i = 0; i < declared.size(); i++) {
+			look(Dictionary(declared[i])["name"]);
 		}
 	}
 }

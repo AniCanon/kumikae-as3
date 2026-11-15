@@ -59,11 +59,15 @@ private:
 	// The low two bits of gc_state: what this collection found of the object. The rest is which collection.
 	static constexpr uint32_t COUNTED = 0, IN_USE = 1, SUSPECT = 2;
 	static constexpr uint32_t EPOCHS = 1u << 30;
+	// Asking the engine about a node costs about as much as looking at this many references.
+	static constexpr size_t NODE_WORK = 32;
 	// An engine node: its count, as an object's gc_count is kept.
 	struct Node {
 		int64_t count = 0;
 		bool in_use = false;
-		EngineNode edges; // Only while the suspects are counted again, in one go.
+		// What it holds, kept only within one step (asked: which), or while the suspects are counted again.
+		EngineNode edges;
+		uint32_t asked = 0;
 	};
 
 	Interpreter &interpreter_;
@@ -79,6 +83,7 @@ private:
 	bool running_ = false;
 	bool engine_ = true;
 	size_t work_ = 0;
+	uint32_t steps_ = 0;
 	std::unordered_map<uint64_t, Node> nodes_;
 	std::vector<uint64_t> node_queue_; // Nodes to count, or found in use and not yet followed.
 	std::vector<Object *> found_; // While the suspects are counted again: those found in use, or garbage.
@@ -93,6 +98,7 @@ private:
 	bool seen(const Object *p_object) const { return (p_object->gc_state >> 2) == epoch_; }
 	uint32_t found(const Object *p_object) const { return seen(p_object) ? p_object->gc_state & 3 : COUNTED; }
 	void touch(Object *p_object);
+	bool ask(uint64_t p_node, EngineNode *r_edges);
 	Node &touch_node(uint64_t p_node);
 	void count_node(uint64_t p_node);
 	void reach(Object *p_object);
