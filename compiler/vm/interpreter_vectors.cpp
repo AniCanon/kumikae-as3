@@ -11,9 +11,6 @@ using ir::Op;
 
 namespace {
 
-// More elements than this is refused: a length that came from a negative number, most likely.
-const uint32_t MAX_LENGTH = 1u << 30;
-
 // The element an index names, if it is a whole number from 0 to p_limit - 1.
 std::optional<uint32_t> element_index(double p_index, uint32_t p_limit) {
 	if (!(p_index >= 0 && p_index < static_cast<double>(p_limit))) {
@@ -48,11 +45,10 @@ void Interpreter::raise_range(double p_index, uint32_t p_length) {
 
 // Gives the vector the length asked for: elements past it are let go, and new ones are empty.
 bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
-	if (p_vector->fixed) {
-		raise(module_.range_error_class, "Error #1126: Cannot change the length of a fixed Vector.");
+	if (length_is_fixed(p_vector)) {
 		return false;
 	}
-	if (p_length > MAX_LENGTH || !vector_reserve(p_vector, p_length)) {
+	if (p_length > MAX_VECTOR_LENGTH || !vector_reserve(p_vector, p_length)) {
 		out_of_memory();
 		return false;
 	}
@@ -81,7 +77,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 	if (p_in.op == Op::VecNew) {
 		const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 		const uint32_t length = r[list[0]].u;
-		Vector *made = length <= MAX_LENGTH ? new_vector(p_in.b, length, r[list[1]].b) : nullptr;
+		Vector *made = length <= MAX_VECTOR_LENGTH ? new_vector(p_in.b, length, r[list[1]].b) : nullptr;
 		if (!made) {
 			out_of_memory();
 			return;

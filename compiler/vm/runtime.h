@@ -62,6 +62,10 @@ inline bool release(Counted *p_value) {
 // value declared `Object`, and zero (no reference, `undefined`, 0, false) for the rest.
 Slot empty_value(bool p_number, bool p_null);
 
+// The most elements a vector may have: more is refused as memory running out (a length that came from a
+// negative number, most likely). Every way a vector grows checks this one number.
+constexpr uint32_t MAX_VECTOR_LENGTH = 1u << 30;
+
 // What AS3 says when memory runs out, wherever it does.
 constexpr std::string_view OUT_OF_MEMORY = "Error #1000: The system is out of memory.";
 

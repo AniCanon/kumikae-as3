@@ -247,8 +247,6 @@ any Godot value passing as a condition):
 - Not checked against Flash: `pop()` and `shift()` on an empty vector of numbers give 0; a negative length
   is an out-of-memory error, not a `RangeError`; setting a fixed vector's length to what it already is
   does nothing; `join(null)` puts the word "null" between the elements. **2c**
-- A vector's error messages are each written in more than one place, and its greatest length is checked
-  against two different numbers. **clean-up**
 - The corpus run in Godot checks only that each program ran for ten frames with no error printed, not
   what it did. **clean-up**
 - Vectors have no IR golden file, no vector in the reload test that runs in Godot, and `for each` is
