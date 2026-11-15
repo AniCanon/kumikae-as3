@@ -114,7 +114,8 @@ program, by the names of its public fields, methods, getters and setters (Flash'
 `g i m s x`, its properties, `exec` and `test` with `lastIndex`) and String's `match`, `search`, `replace`
 (with `$1`, `$&` and the rest, or a function) and `split` by one; `Date`, with the host's clock and zone
 (its getters and setters, local and UTC, its texts, `Date.parse` and `Date.UTC`); `escape`, `unescape`,
-`encodeURI`, `encodeURIComponent`, `decodeURI` and `decodeURIComponent`.
+`encodeURI`, `encodeURIComponent`, `decodeURI` and `decodeURIComponent`; `JSON.parse` (with a reviver) and
+`JSON.stringify` (with a replacer function or Array of keys, and space).
 
 Keys go in the order each was first set, in an Object, a Dictionary and an Array's properties beyond its
 indices: AS3 leaves the order unspecified, and this is the interpreter's ruling, so that what a program
@@ -127,7 +128,7 @@ runs), a method of an Array, a Vector, a String or a number called or read by na
 (`u.push(1)`, said when it runs), a property of one of Godot's values held untyped, by name, `this` and
 `super` written inside a function expression (AS3's `this` there is not the method's object), an
 interface's method that a class has only from Godot's API or the built-in library, a class that extends
-`RegExp`, `JSON`, and the `godot` package. A program that uses one of these does not run: the compiler says
+`RegExp`, and the `godot` package. A program that uses one of these does not run: the compiler says
 `... is not supported by the interpreter yet` at the place.
 
 How it works:
@@ -169,6 +170,19 @@ ten million steps, plus a thousand for each unit of the text, with an `Error` th
 the extension, the system's in `kas3c run`, where `KAS3_NOW` fixes the time and `TZ` the zone. Its texts
 are AS3's: `Thu Feb 29 13:05:09 GMT-0800 2024`, `Thu Feb 29 21:05:09 2024 UTC`, and the rest, written
 from recollection of avmplus, not checked against Flash.
+
+**JSON** reads and writes by ECMA-262 5th edition (15.12), its grammar exactly (`vm/json_text.cpp`). What it
+reads is Objects, Arrays, Strings (a `\u` half of a character kept as the unit it is), Booleans, null and
+numbers, an `int` when whole. What it writes: toJSON() first, then the replacer; an Object's keys in their
+order, an Array's and a Vector's elements, an object of a class of the program by its public fields (its
+base's first) and then its public getters, nothing for a function or undefined (null in an Array), null for
+NaN and Infinity, a Date as its text, a Dictionary as `"Dictionary"`; an object of the library's own classes
+(an Error, a RegExp) has no members to write. The errors are avmplus's, from recollection: SyntaxError #1132
+for text it can't read (a null text too), TypeError #1129 for a structure that holds itself, TypeError #1131
+for a replacer that is neither a function nor an Array (ECMAScript passes over one). Rulings: more than
+1,000 levels of nesting is Error #1023; one of Godot's values or objects is refused with a TypeError, since
+JSON has no form for one; a value written as nothing gives a null String, as the declared String holds
+undefined.
 
 ## Inside Godot
 

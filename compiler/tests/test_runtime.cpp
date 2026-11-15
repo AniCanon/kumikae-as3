@@ -3,6 +3,7 @@
 #include "check.h"
 
 #include "any.h"
+#include "json_text.h"
 #include "number_text.h"
 #include "numeric.h"
 #include "regex.h"
@@ -558,7 +559,110 @@ static void test_number_methods() {
 	CHECK_EQ(string_to_number("\xE3\x80\x80"), 0.0);
 }
 
+// What the JSON reader hands its builder, as tokens: `n`, `t`, `f`, numbers, "texts", `key:`, brackets.
+class JsonTokens : public json::Builder {
+	void add(const std::string &p_token) { tokens += (tokens.empty() ? "" : " ") + p_token; }
+	bool next() { return calls++ != stop_at; }
+
+public:
+	std::string tokens;
+	int stop_at = -1; // Stops at this call, counted from 0.
+	int calls = 0;
+	double last = 0;
+	bool null() override {
+		add("n");
+		return next();
+	}
+	bool boolean(bool p_value) override {
+		add(p_value ? "t" : "f");
+		return next();
+	}
+	bool number(double p_value) override {
+		add(number_to_string(p_value));
+		last = p_value;
+		return next();
+	}
+	bool string(std::string_view p_text) override {
+		add("\"" + std::string(p_text) + "\"");
+		return next();
+	}
+	bool begin_object() override {
+		add("{");
+		return next();
+	}
+	bool key(std::string_view p_text) override {
+		add(std::string(p_text) + ":");
+		return next();
+	}
+	bool end_object() override {
+		add("}");
+		return next();
+	}
+	bool begin_array() override {
+		add("[");
+		return next();
+	}
+	bool end_array() override {
+		add("]");
+		return next();
+	}
+};
+
+static std::string json_tokens(std::string_view p_text) {
+	JsonTokens tokens;
+	switch (json::parse(p_text, tokens)) {
+		case json::Fault::None:
+			return tokens.tokens;
+		case json::Fault::Syntax:
+			return "syntax";
+		case json::Fault::TooDeep:
+			return "deep";
+		default:
+			return "stopped";
+	}
+}
+
+// ECMA-262 5th edition's JSON grammar (15.12.1); Node's JSON.parse agrees with every case.
+static void test_json_text() {
+	CHECK_EQ(json_tokens("[1, -0.5e1, \"a\", true, false, null, {\"k\": {}}, []]"), std::string("[ 1 -5 \"a\" t f n { k: { } } [ ] ]"));
+	CHECK_EQ(json_tokens("{\"a\":1,\"b\":[2],\"a\":3}"), std::string("{ a: 1 b: [ 2 ] a: 3 }"));
+	CHECK_EQ(json_tokens("\t\r\n 1 \n"), std::string("1"));
+	CHECK_EQ(json_tokens("\"\\u0041\\ud83d\\ude00\\n\\/\\\\\\\"\\b\\f\\r\\t\""), std::string("\"A\xF0\x9F\x98\x80\n/\\\"\b\f\r\t\""));
+	CHECK_EQ(json_tokens("\"\\ud83d\""), std::string("\"\xED\xA0\xBD\"")); // A half alone is held as its three bytes.
+	CHECK_EQ(json_tokens("\"\xED\xA0\xBD\\ude00\""), std::string("\"\xF0\x9F\x98\x80\""));
+	CHECK_EQ(json_tokens("\"\\uD83D\xED\xB8\x80 \xC3\xA9\""), std::string("\"\xF0\x9F\x98\x80 \xC3\xA9\""));
+	CHECK_EQ(json_tokens("[0, 0.1, 5e-324, 1E+2, 1e400, 123456789012345678901234567890]"),
+			std::string("[ 0 0.1 5e-324 100 Infinity 1.2345678901234568e+29 ]"));
+	JsonTokens zero;
+	CHECK(json::parse("-0", zero) == json::Fault::None && std::signbit(zero.last));
+	const char *bad[] = { "", " ", "01", "-01", "-", "1.", ".5", "+1", "1e", "1e+", "0x1", "NaN", "Infinity", "'a'", "\"a", "\"\\x\"",
+		"\"\\u12\"", "\"\\u12G4\"", "\"a\tb\"", "[1,]", "[,1]", "{\"a\":1,}", "{a:1}", "{\"a\" 1}", "{\"a\":}", "[1 2]", "tru", "nulll", "1 2",
+		"[", "]", "{", "}", "[1}", "{\"a\":1]", "\xC2\xA0" "1", "\v1", "\f1", "1\xE2\x80\xA8", "{1:2}", "[\"a\"\"b\"]" };
+	for (const char *text : bad) {
+		check::checks()++;
+		if (json_tokens(text) != "syntax") {
+			check::failures()++;
+			std::printf("FAIL JSON read: %s\n", text);
+		}
+	}
+	CHECK_EQ(json_tokens(std::string_view("\"\0\"", 3)), std::string("syntax"));
+	CHECK_EQ(json_tokens(std::string(json::MAX_DEPTH, '[') + std::string(json::MAX_DEPTH, ']')).size(), json::MAX_DEPTH * 4 - 1);
+	CHECK_EQ(json_tokens(std::string(json::MAX_DEPTH + 1, '[') + std::string(json::MAX_DEPTH + 1, ']')), std::string("deep"));
+	CHECK_EQ(json_tokens(std::string(json::MAX_DEPTH, '{')), std::string("syntax"));
+	JsonTokens stopping;
+	stopping.stop_at = 2;
+	CHECK(json::parse("[1, 2, 3]", stopping) == json::Fault::Stopped);
+	CHECK_EQ(stopping.tokens, std::string("[ 1 2"));
+	std::string quoted;
+	json::quote("a\"\\/\b\f\n\r\t\x01\x1f\x7f \xC3\xA9", &quoted);
+	CHECK_EQ(quoted, std::string("\"a\\\"\\\\/\\b\\f\\n\\r\\t\\u0001\\u001f\x7f \xC3\xA9\""));
+	quoted = "x";
+	json::quote("", &quoted);
+	CHECK_EQ(quoted, std::string("x\"\""));
+}
+
 int main() {
+	test_json_text();
 	test_regex_matches();
 	test_regex_limits();
 	test_text_units();

@@ -270,6 +270,7 @@ output = compare("untyped.gd", [
     "an Int64 minus one stays whole", "a half is a float", "a Godot value plus text joins them",
     "text plus a Godot value joins them", "text plus-assigned a Godot value joins them",
     "a Godot value plus a number joins them, as AS3 does", "a Godot value plus-assigned a Godot value",
+    "JSON refuses Godot's values",
 ])
 check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",
       output.count("Error #1034") >= 5 and "at Untyped/asVector()" in output and "at Untyped/asNode()" in output and

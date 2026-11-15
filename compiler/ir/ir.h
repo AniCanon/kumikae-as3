@@ -67,6 +67,9 @@ inline bool is_held(Kind p_kind) {
 	/* RegExp and Date: out, which (a RegExpFunction, or a date_code()), [its arguments]. Either may run \
 	   the program: a replacement function, or a value's text. A missing RegExp or Date is TypeError #1009. */ \
 	X(RegExpCall, "RIA") X(DateCall, "RIA") \
+	/* JSON: out, which (a JsonFunction), [its arguments]. It may run the program: a reviver, a replacer, \
+	   a toJSON() or a getter. */ \
+	X(JsonCall, "RIA") \
 	/* Math. MathUnary: out, the Number, and which function (a MathFunction). */ \
 	X(MathUnary, "RRI") X(Atan2, "RRR") X(Pow, "RRR") X(MinF64, "RRR") X(MaxF64, "RRR") X(Random, "R--") \
 	X(Jump, "L--") X(JumpIf, "RL-") X(JumpIfNot, "RL-") \
@@ -243,6 +246,12 @@ constexpr uint32_t date_code(DateFunction p_function, uint32_t p_detail = 0, boo
 	return static_cast<uint32_t>(p_function) | p_detail << 8 | (p_utc ? 1u << 16 : 0u);
 }
 constexpr uint32_t DATE_TIME = 0; // The one field of a Date: its time, in milliseconds since 1970 in UTC.
+
+// JSON's functions, in JsonCall's second operand:
+//   Parse      the text (String), the reviver (a Function, or null)          -> untyped: null for undefined
+//   Stringify  the value, the replacer, the space (each untyped)             -> String: null for nothing
+//   ToJson     a Dictionary, the key (String): Dictionary's toJSON()          -> untyped
+enum class JsonFunction : uint8_t { Parse, Stringify, ToJson };
 
 // toString(radix), toFixed, toExponential and toPrecision, in NumText's second operand. The number is a
 // Number, or an Int64 (its register says which), written from its own digits.

@@ -1,0 +1,2 @@
+SyntaxError: Error #1132: Invalid JSON parse input.
+	at err_json_parse()[err_json_parse.as:6]
