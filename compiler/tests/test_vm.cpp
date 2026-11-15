@@ -648,8 +648,10 @@ static void test_engine_statics() {
 		vm::Object *object = interpreter.construct(pad, engine.box()); // #1
 		CHECK(object != nullptr);
 		// The class is used for the first time: its static field is set from the singleton. Then the object's
-		// field of a Godot value with parts starts at its zero.
-		CHECK_EQ(engine.log, std::string("singleton Engine -> #2\nget #2.physics_ticks_per_second\nconstruct Vector2() -> #3\n"));
+		// fields of a Godot value with parts start at their zero, a field with a value written too (an
+		// initializer above it may read it).
+		CHECK_EQ(engine.log, std::string("singleton Engine -> #2\nget #2.physics_ticks_per_second\nconstruct Vector2() -> #3\n"
+										 "construct Vector2() -> #4\n"));
 		engine.log.clear();
 		vm::Slot result;
 		result.bits = 0;
@@ -662,21 +664,21 @@ static void test_engine_statics() {
 		arguments[0].bits = 0;
 		arguments[0].p = vm::new_string("jump");
 		CHECK(interpreter.call_method(object, "pressed", arguments, 1, &result));
-		CHECK_EQ(engine.log, std::string("singleton Input -> #4\ncall #4.is_action_pressed(\"jump\", true)\n"));
+		CHECK_EQ(engine.log, std::string("singleton Input -> #5\ncall #5.is_action_pressed(\"jump\", true)\n"));
 		vm::free_string(static_cast<vm::Str *>(arguments[0].p));
 		engine.log.clear();
 		arguments[0].bits = 0;
 		arguments[0].d = 0.5;
 		CHECK(interpreter.call_method(object, "slow", arguments, 1, nullptr));
-		CHECK_EQ(engine.log, std::string("singleton Engine -> #5\nset #5.time_scale = 0.5\n"
-										 "singleton Engine -> #6\nget #6.time_scale\nset #6.time_scale = 8\n"));
+		CHECK_EQ(engine.log, std::string("singleton Engine -> #6\nset #6.time_scale = 0.5\n"
+										 "singleton Engine -> #7\nget #7.time_scale\nset #7.time_scale = 8\n"));
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "listen", nullptr, 0, nullptr));
-		CHECK_EQ(engine.log, std::string("singleton Input -> #7\nget #7.joy_connection_changed\nbind Pad/onJoy of Pad owner #1 -> #9\ncall #8.@add(#9)\n"));
+		CHECK_EQ(engine.log, std::string("singleton Input -> #8\nget #8.joy_connection_changed\nbind Pad/onJoy of Pad owner #1 -> #10\ncall #9.@add(#10)\n"));
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "itself", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("singleton Input -> #10\n"));
-		CHECK_EQ((intptr_t)result.p, (intptr_t)10);
+		CHECK_EQ(engine.log, std::string("singleton Input -> #11\n"));
+		CHECK_EQ((intptr_t)result.p, (intptr_t)11);
 		engine.drop(result.p);
 		// A constant with a value in the declarations asks the engine nothing.
 		engine.log.clear();
@@ -685,7 +687,7 @@ static void test_engine_statics() {
 		CHECK_EQ(result.d, 4194305.0 + 13.0 + 2.0);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "up", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("constant Vector2.UP as Vector2\nget #11.y\n"));
+		CHECK_EQ(engine.log, std::string("constant Vector2.UP as Vector2\nget #12.y\n"));
 		// A static method is called on no object.
 		engine.log.clear();
 		arguments[0].d = 1;
@@ -718,12 +720,12 @@ static void test_engine_statics() {
 		// A local of a Godot value with parts starts at its zero, once: the declaration is not run again.
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "unset", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("construct Vector2() -> #13\n"));
+		CHECK_EQ(engine.log, std::string("construct Vector2() -> #14\n"));
 		engine.drop(result.p);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "twice", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("construct Vector2() -> #14\ntext #14\n"));
-		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("<#14>null"));
+		CHECK_EQ(engine.log, std::string("construct Vector2() -> #15\ntext #15\n"));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("<#15>null"));
 		vm::free_string(static_cast<vm::Str *>(result.p));
 		CHECK(interpreter.call_method(object, "field", nullptr, 0, &result));
 		CHECK_EQ((intptr_t)result.p, (intptr_t)3);
