@@ -257,9 +257,20 @@ How it works:
 - **Calls can nest.** The engine calls a script, which calls the engine, which may call a script again,
   up to 64 levels deep.
 
-Known fault: the first time Godot's editor scans a project that has the extension (for example
-`godot --headless --import`), Godot crashes as it exits, after the scan has done its work. Later runs are
-clean. The speed spike's extension does the same; the cause is not yet known.
+Known fault, Godot's: the first time Godot's editor scans a project that has the extension and is told to
+quit at once (`godot --headless --import`, or `--editor --quit`), Godot crashes as it exits, after the scan
+has done its work. Loading an extension with a class makes the editor document it on a thread, which
+queues a call (`EditorHelp::_gen_extensions_docs`); quitting in the same frame frees the documentation,
+and the call then runs on nothing in Godot's last flush. Any extension that registers a class does the
+same. Give the thread time (`--headless --editor --quit-after 300`), as `tests/run_godot.py` does; later
+runs are clean.
+
+godot-cpp is built as `template_release`, and Godot's editor loads that library too. That is enough for
+the editor: godot-cpp compiles nothing differently for it (its `editor` target only adds `DEBUG_ENABLED`,
+as `template_debug` does: argument checks for methods an extension binds, which this one does not, and
+godot-cpp's own bounds checks). The editor's features run on it, and the tests run them in the editor:
+the inspector's stand-ins and a script edited while the editor is open (`exported_editor.gd`,
+`exported_reload.gd`).
 
 ## Editing a script while the game runs
 

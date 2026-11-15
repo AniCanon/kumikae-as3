@@ -180,9 +180,12 @@ any Godot value passing as a condition):
 
 ## Stage 2b-1: AS3 inside Godot, first slice
 
-- **The first editor scan of a project with the extension crashes as Godot exits,** after the scan has done
-  its work. The speed spike's extension does the same. Cause unknown. **2d**
-- godot-cpp is built as `template_release` and loaded by the editor binary; whether editor features need a
-  debug build is unchecked. **2d**
+- **decision** **The first editor scan of a project with the extension crashes as Godot exits** when the
+  editor is told to quit at once (`--editor --quit`, `--import`), after the scan has done its work. The
+  cause is Godot's: loading an extension that registers a class makes the editor document it on a thread,
+  which queues `EditorHelp::_gen_extensions_docs`; quitting in that frame frees the documentation first,
+  and Godot's last flush of its queue then runs the call on nothing. Any extension with a class does it.
+  `--quit-after` with time for the thread (the tests use it) is clean, as is every later run. Nothing in
+  the extension can wait for the editor's thread; the choice is whether this stands until Godot fixes it.
 - `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions
   but skips a virtual that a C++ extension class implements. **clean-up**

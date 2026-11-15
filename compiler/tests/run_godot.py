@@ -43,12 +43,19 @@ def check(name, condition, detail=""):
         failures.append("%s %s" % (name, detail))
 
 
-# Godot learns of a project's extensions when the editor first scans it. Known fault: that first scan ends
-# in a crash on exit when an extension registers a scripting language (the speed spike's does the same),
-# after the scan has done its work. So only the list it leaves behind is checked.
+# Godot learns of a project's extensions when the editor first scans it. Told to quit at once (--import),
+# Godot crashes as it exits after that first scan: its documentation thread for the new classes outlives
+# the documentation (see the compiler's README). Given time for the thread, the first scan is clean, and
+# is checked so in a copy that has never been scanned.
+FIRST_SCAN = ["--headless", "--editor", "--quit-after", "300"]
+with tempfile.TemporaryDirectory() as fresh:
+    copy = os.path.join(fresh, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", ".godot"))
+    run = subprocess.run([godot, *FIRST_SCAN, "--path", copy], capture_output=True, text=True, timeout=300)
+    check("the first editor scan exits cleanly", run.returncode == 0, "exit %d\n%s" % (run.returncode, (run.stdout + run.stderr)[-800:]))
 listed = os.path.join(project, ".godot", "extension_list.cfg")
 if not os.path.exists(listed):
-    subprocess.run([godot, "--headless", "--path", project, "--import"], capture_output=True, text=True, timeout=300)
+    subprocess.run([godot, *FIRST_SCAN, "--path", project], capture_output=True, text=True, timeout=300)
 check("the extension is listed", os.path.exists(listed) and "kas3.gdextension" in open(listed).read())
 
 run = subprocess.run([godot, "--headless", "--path", project, "-s", "driver.gd"], capture_output=True, text=True,
