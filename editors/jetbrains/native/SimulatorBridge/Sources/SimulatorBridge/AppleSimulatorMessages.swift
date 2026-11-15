@@ -10,14 +10,18 @@ extension AppleSimulator {
     xpc_dictionary_set_string(message, "messageType", type)
     xpc_dictionary_set_string(message, "featureIdentifier", inputService)
     xpc_dictionary_set_bool(message, "isBarrier", barrier)
-    if let payload { xpc_dictionary_set_value(message, "payload", payload) }
+    if let payload {
+      xpc_dictionary_set_value(message, "payload", payload)
+    }
     return message
   }
 
   static func touchMessage(phase: String, x: Double, y: Double) throws -> xpc_object_t {
     guard let event = ["down": UInt64(0), "move": 1, "up": 2][phase],
       x.isFinite, y.isFinite, (0...1).contains(x), (0...1).contains(y)
-    else { throw BridgeError.invalid("Invalid native touch phase or position") }
+    else {
+      throw BridgeError.invalid("Invalid native touch phase or position")
+    }
     let point = xpc_dictionary_create_empty()
     xpc_dictionary_set_double(point, "x", x)
     xpc_dictionary_set_double(point, "y", y)
@@ -33,7 +37,9 @@ extension AppleSimulator {
     let payload = xpc_dictionary_create_empty()
     xpc_dictionary_set_uint64(payload, "usageCode", usage)
     xpc_dictionary_set_uint64(payload, "state", state)
-    if !keyboard { xpc_dictionary_set_uint64(payload, "usagePage", 12) }
+    if !keyboard {
+      xpc_dictionary_set_uint64(payload, "usagePage", 12)
+    }
     return message(keyboard ? "IndigoKeyboardButtonEvent" : "IndigoButtonEvent", payload: payload)
   }
 }

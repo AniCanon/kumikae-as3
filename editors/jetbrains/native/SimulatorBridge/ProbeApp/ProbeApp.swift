@@ -3,8 +3,10 @@ import UIKit
 @main
 final class ProbeApp: UIResponder, UIApplicationDelegate {
   var window: UIWindow?
-  func application(_ application: UIApplication,
-                   didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+  func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
     let window = UIWindow(frame: UIScreen.main.bounds)
     window.rootViewController = ProbeController()
     window.makeKeyAndVisible()
@@ -45,7 +47,9 @@ final class ProbeController: UIViewController, UITextViewDelegate {
     self.link = link
     UIDevice.current.beginGeneratingDeviceOrientationNotifications()
   }
-  override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
+  override func viewWillTransition(
+    to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator
+  ) {
     transitioning = true
     report()
     super.viewWillTransition(to: size, with: coordinator)
@@ -60,7 +64,10 @@ final class ProbeController: UIViewController, UITextViewDelegate {
     target.frame = CGRect(x: view.bounds.width - 80, y: 70, width: 30, height: 30)
     report()
   }
-  @objc private func hit() { hits += 1; report() }
+  @objc private func hit() {
+    hits += 1
+    report()
+  }
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     editor.becomeFirstResponder()
@@ -73,16 +80,20 @@ final class ProbeController: UIViewController, UITextViewDelegate {
     if ticks % 60 == 0 { report() }
   }
   private func report() {
-    let value: [String: Any] = ["text": editor.text ?? "", "ticks": ticks,
+    let value: [String: Any] = [
+      "text": editor.text ?? "", "ticks": ticks,
       "draws": picture.draws, "touches": picture.touches, "hits": hits,
       "width": view.bounds.width, "height": view.bounds.height, "transitioning": transitioning,
       "uptime": ProcessInfo.processInfo.systemUptime,
       "orientation": view.window?.windowScene?.interfaceOrientation.rawValue ?? 0,
-      "deviceOrientation": UIDevice.current.orientation.rawValue]
+      "deviceOrientation": UIDevice.current.orientation.rawValue,
+    ]
     do {
-      let directory = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
-                                                 appropriateFor: nil, create: true)
-      try JSONSerialization.data(withJSONObject: value).write(to: directory.appendingPathComponent("probe.json"), options: .atomic)
+      let directory = try FileManager.default.url(
+        for: .documentDirectory, in: .userDomainMask,
+        appropriateFor: nil, create: true)
+      try JSONSerialization.data(withJSONObject: value).write(
+        to: directory.appendingPathComponent("probe.json"), options: .atomic)
     } catch { fatalError("Probe report failed: \(error)") }
   }
 }
@@ -91,7 +102,9 @@ final class ProbePicture: UIView {
   var tick = 0
   var draws = 0
   var touches = 0
-  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { self.touches += touches.count }
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+    self.touches += touches.count
+  }
   override func draw(_ rect: CGRect) {
     draws += 1
     UIColor.white.setFill()

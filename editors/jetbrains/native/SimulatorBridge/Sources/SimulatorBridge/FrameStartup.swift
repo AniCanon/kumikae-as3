@@ -1,7 +1,9 @@
 import Foundation
 
 public enum FrameStartup {
-  public static func publish(from source: any FrameSource, to sink: any FrameSink) async throws -> FrameHeader {
+  public static func publish(from source: any FrameSource, to sink: any FrameSink) async throws
+    -> FrameHeader
+  {
     let deadline = ContinuousClock.now + .seconds(2)
     repeat {
       try Task.checkCancellation()

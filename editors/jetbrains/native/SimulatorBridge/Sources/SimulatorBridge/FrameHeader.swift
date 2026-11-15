@@ -22,7 +22,9 @@ public struct FrameHeader: Equatable, Sendable {
       "writtenNanos": writtenNanos, "nativeWidth": UInt64(nativeWidth),
       "nativeHeight": UInt64(nativeHeight), "densityMilli": UInt64(densityMilli), "flags": 1,
     ]
-    for (name, value) in values { try layout.write(name, value: value, into: &data) }
+    for (name, value) in values {
+      try layout.write(name, value: value, into: &data)
+    }
     return data
   }
 
@@ -36,7 +38,9 @@ public struct FrameHeader: Equatable, Sendable {
         throw BridgeError.invalid("Unsupported native frame \(name)")
       }
     }
-    func read(_ name: String) throws -> UInt64 { try layout.read(name, from: data) }
+    func read(_ name: String) throws -> UInt64 {
+      try layout.read(name, from: data)
+    }
     let header = try FrameHeader(
       sequence: read("sequence"), width: Int(read("width")), height: Int(read("height")),
       stride: Int(read("stride")), observedNanos: read("observedNanos"),
@@ -55,6 +59,8 @@ public struct FrameHeader: Equatable, Sendable {
       stride >= width * 4, stride <= layout.maxDimension * 4, stride % 4 == 0,
       stride * height <= layout.maxPayloadBytes, (1000...10000).contains(densityMilli),
       observedNanos > 0, writtenNanos >= observedNanos
-    else { throw BridgeError.invalid("Invalid native frame geometry or timestamp") }
+    else {
+      throw BridgeError.invalid("Invalid native frame geometry or timestamp")
+    }
   }
 }
