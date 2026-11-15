@@ -59,12 +59,14 @@ void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 		}
 		Kind kind = written_kind(declarator.type, declarator.offset, Kind::F64);
 		const uint32_t holds = kind == Kind::Obj ? declared_class(declarator.type) : NONE;
+		// An untyped field starts undefined; one declared `Object` starts null.
+		const bool starts_null = kind == Kind::Any && !untyped_type(compilation_.type_of(declarator.type)) ;
 		if (p_decl->modifiers.bits & Modifiers::Static) {
 			globals_[declarator.symbol] = (uint32_t)module_.globals.size();
-			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds });
+			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds, starts_null });
 		} else {
 			fields_[declarator.symbol] = (uint32_t)module_.classes[p_class].fields.size();
-			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds });
+			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null });
 		}
 	}
 }
@@ -181,6 +183,7 @@ void Lowerer::begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {
 	unit_ = &p_unit;
 	class_ = p_class;
 	constructor_ = false;
+	result_type_ = nullptr;
 	locals_.clear();
 	loops_.clear();
 }
@@ -253,6 +256,7 @@ void Lowerer::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl
 		return;
 	}
 	begin(found->second, p_unit, p_class);
+	result_type_ = p_decl->return_type ? compilation_.type_of(p_decl->return_type) : nullptr;
 	parameters(p_decl);
 	if (p_decl->return_type) {
 		fn().result = written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void);

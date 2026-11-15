@@ -16,6 +16,11 @@ uint32_t Lowerer::expression(Expr *p_expression, Kind p_want) {
 	if (!p_expression) {
 		return default_value(p_want, 0);
 	}
+	if (is_null(p_expression) && p_want == Kind::Any) {
+		uint32_t out = reg(Kind::Any);
+		emit(Op::AnyConst, p_expression->offset, out, 1);
+		return out;
+	}
 	if (is_null(p_expression)) {
 		// null is whatever is asked for: no reference, 0, or false.
 		uint32_t out = default_value(p_want == Kind::Void ? Kind::Obj : p_want == Kind::F64 ? Kind::I32 : p_want, p_expression->offset);
@@ -132,6 +137,11 @@ bool Lowerer::builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint
 	std::string_view name = p_symbol->name;
 	const double infinity = std::numeric_limits<double>::infinity();
 	const double nan = std::numeric_limits<double>::quiet_NaN();
+	if (!owner && name == "undefined") {
+		*r_reg = reg(Kind::Any);
+		emit(Op::AnyConst, p_position, *r_reg, 0);
+		return true;
+	}
 	if (!owner || owner == number_) {
 		double value = 0;
 		if (name == "NaN") {
@@ -449,6 +459,8 @@ uint32_t Lowerer::unary(Unary *p_unary, Kind p_want) {
 			emit(Op::NegF64, position, out, expression(p_unary->operand, Kind::F64));
 			return out;
 		}
+		case TokenKind::KwTypeof:
+			return any_typeof(p_unary->operand, position);
 		case TokenKind::Bang: {
 			uint32_t out = reg(Kind::Bool);
 			emit(Op::Not, position, out, expression(p_unary->operand, Kind::Bool));
@@ -515,7 +527,7 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 	uint32_t value = 0;
 	if (p_assign->op == TokenKind::Assign) {
 		const std::optional<uint32_t> collection = place.where == Place::Engine ? vector_to_engine(p_assign->value, place.type) : std::nullopt;
-		value = collection ? *collection : expression(p_assign->value, place.kind);
+		value = collection ? *collection : typed(p_assign->value, p_assign->target->type, place.kind);
 	} else if (p_assign->op == TokenKind::AmpAmpAssign || p_assign->op == TokenKind::PipePipeAssign) {
 		refuse(position, "'&&=' or '||='");
 		value = default_value(place.kind, position);

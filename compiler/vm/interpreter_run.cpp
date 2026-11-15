@@ -99,9 +99,7 @@ void Interpreter::make(uint32_t p_class, Slot &r_out) {
 		return;
 	}
 	for (size_t i = 0; i < klass.fields.size(); i++) {
-		if (klass.fields[i].kind == Kind::F64) {
-			object->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
-		}
+		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
 	}
 	assign(Kind::Obj, r_out, object);
 }
@@ -539,6 +537,19 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::VecFixed:
 			case Op::VecSetFixed:
 				vector_op(function, in, r);
+				break;
+			case Op::AnyConst:
+			case Op::ToAny:
+			case Op::FromAny:
+			case Op::AnyText:
+			case Op::AnyTypeof:
+			case Op::AnyEq:
+			case Op::AnyStrictEq:
+			case Op::AnyAdd:
+			case Op::AnyLt:
+			case Op::AnyLe:
+			case Op::AnyIs:
+				any_op(function, in, r); // `frame` and `r` may be stale after this.
 				break;
 			case Op::VecCall:
 				vector_call(function, in); // `frame` and `r` may be stale after this.

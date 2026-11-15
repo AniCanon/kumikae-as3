@@ -1,5 +1,7 @@
 #include "godot_host.h"
 
+#include "any.h"
+
 #include "builtins.h"
 #include "callable.h"
 
@@ -70,6 +72,8 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 			}
 			return *value;
 		}
+		case ir::Kind::Any:
+			return untyped_to_variant(p_slot);
 		default:
 			return Variant();
 	}
@@ -118,6 +122,8 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 			Object *object = type == Variant::OBJECT ? p_value.get_validated_object() : nullptr;
 			return object && (p_godot_type.empty() || object->is_class(to_godot(p_godot_type)));
 		}
+		case ir::Kind::Any:
+			return true; // Anything at all.
 		case ir::Kind::Val:
 			// The value type that is named, and no other: a Vector3 is not a Vector2. Nothing at all is null.
 			if (type == Variant::OBJECT) {
@@ -174,6 +180,8 @@ vm::Slot from_variant(ir::Kind p_kind, const Variant &p_value) {
 				slot.p = vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));
 			}
 			break;
+		case ir::Kind::Any:
+			return untyped_from_variant(p_value);
 		case ir::Kind::Val:
 		case ir::Kind::Ref:
 			// An object-typed value that holds no object is null, like null itself.

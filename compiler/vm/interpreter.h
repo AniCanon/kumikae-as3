@@ -62,6 +62,16 @@ private:
 
 	void drop(ir::Kind p_kind, Slot &p_slot);
 	void drop_object(Object *p_object);
+	void drop_any(Slot p_value); // Gives up what an untyped value holds.
+	// The untyped value: vm/interpreter_any.cpp.
+	Slot to_any(ir::Kind p_kind, Slot p_value);
+	bool any_text(Slot p_value, std::string *r_text);
+	bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
+	bool any_is(Slot p_value, uint32_t p_type) const;
+	bool any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
+	bool any_primitive(Slot p_value, Slot *r_out);
+	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value); // Takes over one reference.
 	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.

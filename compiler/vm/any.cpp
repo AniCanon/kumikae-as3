@@ -38,6 +38,17 @@ bool is_number(Slot p_value) {
 
 } // namespace
 
+Slot empty_value(bool p_number, bool p_null) {
+	Slot out;
+	out.bits = 0;
+	if (p_number) {
+		out.d = std::numeric_limits<double>::quiet_NaN();
+	} else if (p_null) {
+		out = any::null();
+	}
+	return out;
+}
+
 Wide *new_wide(int64_t p_value) {
 	void *memory = std::malloc(sizeof(Wide));
 	if (!memory) {

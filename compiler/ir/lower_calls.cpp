@@ -27,7 +27,7 @@ void Lowerer::call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arg
 		for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
 			later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
 		}
-		r_list.push_back(settled(expression(p_arguments[i], kind), later, p_position));
+		r_list.push_back(settled(typed(p_arguments[i], type, kind), later, p_position));
 	}
 }
 
@@ -89,6 +89,9 @@ uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 		refuse(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "'");
 		return default_value(p_want, position);
 	}
+	if (conversion == Kind::Str && untyped(p_call->arguments[0])) {
+		return any_text(p_call->arguments[0]); // String(x): "undefined" and "null" are words.
+	}
 	Kind given = Kind::Void;
 	bool known = kind_of(p_call->arguments[0]->type, &given);
 	// To or from an Int64, a conversion that is written out is AS3's own: see convert().
@@ -114,14 +117,19 @@ uint32_t Lowerer::trace_call(Call *p_call) {
 			later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
 		}
 		Kind kind = Kind::Void;
-		const bool spoken_later = !is_null(p_call->arguments[i]) && kind_of(p_call->arguments[i]->type, &kind) && kind == Kind::Obj;
-		values.push_back(settled(expression(p_call->arguments[i], spoken_later ? Kind::Obj : Kind::Str), later, p_call->offset));
+		const bool spoken_later = !is_null(p_call->arguments[i]) && kind_of(p_call->arguments[i]->type, &kind) && (kind == Kind::Obj || kind == Kind::Any);
+		values.push_back(settled(expression(p_call->arguments[i], spoken_later ? kind : Kind::Str), later, p_call->offset));
 	}
 	std::vector<uint32_t> list;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
 		// A null string traces as "null".
 		uint32_t text = reg(Kind::Str);
-		emit(Op::StrToStr, p_call->arguments[i]->offset, text, convert(values[i], Kind::Str, p_call->arguments[i]->offset));
+		uint32_t words = values[i];
+		if (kind_at(words) == Kind::Any) {
+			words = reg(Kind::Str);
+			emit(Op::AnyText, p_call->arguments[i]->offset, words, values[i]); // "undefined", not null.
+		}
+		emit(Op::StrToStr, p_call->arguments[i]->offset, text, convert(words, Kind::Str, p_call->arguments[i]->offset));
 		list.push_back(text);
 	}
 	emit(Op::Trace, p_call->offset, arguments(std::move(list)));

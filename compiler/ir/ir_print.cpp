@@ -28,6 +28,8 @@ const char *kind_name(Kind p_kind) {
 			return "GodotValue";
 		case Kind::Ref:
 			return "GodotObject";
+		case Kind::Any:
+			return "*";
 	}
 	return "?";
 }

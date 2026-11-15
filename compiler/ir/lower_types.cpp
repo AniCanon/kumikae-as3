@@ -16,11 +16,16 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Void;
 		return true;
 	}
+	if (p_type->kind == Type::Any) {
+		*r_kind = Kind::Any;
+		return true;
+	}
 	if (p_type->kind == Type::Vector) {
-		// A vector is an object, if the interpreter can hold what is in it.
+		// A vector is an object, if the interpreter can hold what is in it. Untyped elements wait for
+		// Array (2c-3).
 		Kind element = Kind::Void;
 		*r_kind = Kind::Obj;
-		return kind_of(p_type->element, &element) && element != Kind::Void;
+		return kind_of(p_type->element, &element) && element != Kind::Void && element != Kind::Any;
 	}
 	if (p_type->kind != Type::Instance || !p_type->symbol) {
 		return false;
@@ -38,6 +43,8 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Bool;
 	} else if (symbol == string_) {
 		*r_kind = Kind::Str;
+	} else if (symbol == object_) {
+		*r_kind = Kind::Any; // An Object may hold any value, numbers too.
 	} else if (classes_.count(symbol) || is_error(symbol)) {
 		*r_kind = Kind::Obj;
 	} else if (is_godot(symbol) && symbol->kind == SymbolKind::Class) {
@@ -166,6 +173,9 @@ uint32_t Lowerer::default_value(Kind p_kind, uint32_t p_position) {
 		case Kind::Ref:
 			emit(Op::ConstNull, p_position, out);
 			break;
+		case Kind::Any:
+			emit(Op::AnyConst, p_position, out, 0); // undefined
+			break;
 		default:
 			emit(Op::ConstF64, p_position, out, number(std::numeric_limits<double>::quiet_NaN()));
 			break;
@@ -219,6 +229,21 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 	Kind from = kind_at(p_reg);
 	if (from == p_to || p_to == Kind::Void) {
 		return p_reg;
+	}
+	if (p_to == Kind::Any) {
+		uint32_t out = reg(Kind::Any);
+		emit(Op::ToAny, p_position, out, p_reg);
+		return out;
+	}
+	if (from == Kind::Any) {
+		if (p_to == Kind::Obj) {
+			// Which class is not known here: typed() checks it where the place's type is.
+			refuse(p_position, "converting an untyped value to an object here");
+			return default_value(Kind::Obj, p_position);
+		}
+		uint32_t out = reg(p_to);
+		emit(Op::FromAny, p_position, out, p_reg, NONE);
+		return out;
 	}
 	if (from == Kind::I64 || p_to == Kind::I64) {
 		return convert_wide(p_reg, p_to, p_position, p_written);

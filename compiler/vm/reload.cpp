@@ -1,5 +1,7 @@
 #include "reload.h"
 
+#include "any.h"
+
 #include <algorithm>
 #include <limits>
 
@@ -42,6 +44,14 @@ Slot Reload::carry(Kind p_kind, Slot p_value) {
 			// The engine's value is the host's, and the host is the same: each program holds its own.
 			out.p = p_value.p ? to_.host_.handles.copy(p_value.p) : nullptr;
 			break;
+		case Kind::Any:
+			if (any::tag(p_value) == AnyTag::Object) {
+				Object *moved = object(static_cast<Object *>(any::pointer(p_value)));
+				out = moved ? any::object(moved) : any::null();
+			} else {
+				out = to_.share(Kind::Any, p_value); // A string, a box or a handle: the same thing, held again.
+			}
+			break;
 		default:
 			break;
 	}
@@ -50,6 +60,9 @@ Slot Reload::carry(Kind p_kind, Slot p_value) {
 
 Slot Reload::carry_into(Kind p_kind, uint32_t p_class, Slot p_value) {
 	Slot out = carry(p_kind, p_value);
+	if (p_kind == Kind::Any) {
+		return out; // Any value fits.
+	}
 	if (p_kind == Kind::Obj && out.p && p_class != ir::NONE && !to_.is_class(static_cast<Object *>(out.p), p_class)) {
 		to_.release_object(static_cast<Object *>(out.p));
 		out.bits = 0;
@@ -114,8 +127,8 @@ Object *Reload::object(Object *p_old) {
 			}
 			carried = true;
 		}
-		if (!carried && field.kind == Kind::F64) {
-			fresh->fields()[i].d = std::numeric_limits<double>::quiet_NaN(); // A Number's own empty value.
+		if (!carried) {
+			fresh->fields()[i] = empty_value(field.kind == Kind::F64, field.starts_null);
 		}
 	}
 	return fresh;

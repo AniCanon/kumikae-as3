@@ -41,6 +41,8 @@ void Lowerer::declare_locals(Node *p_body) {
 			// A Number starts as NaN. The rest start as zero, which is what a fresh register holds.
 			if (kind == Kind::F64) {
 				emit(Op::ConstF64, declarator.offset, local, number(std::numeric_limits<double>::quiet_NaN()));
+			} else if (kind == Kind::Any && !untyped_type(compilation_.type_of(declarator.type))) {
+				emit(Op::AnyConst, declarator.offset, local, 1); // An Object starts null; a `*` undefined.
 			} else if (kind == Kind::Val && !valued.count(declarator.symbol)) {
 				// One of Godot's values with parts starts at its zero.
 				zero_value(declarator.type, declarator.offset, local);
@@ -226,7 +228,7 @@ void Lowerer::return_statement(Stmt *p_statement) {
 		}
 		emit(Op::ReturnVoid, position);
 	} else {
-		uint32_t value = result->value ? expression(result->value, fn().result) : default_value(fn().result, position);
+		uint32_t value = result->value ? typed(result->value, result_type_, fn().result) : default_value(fn().result, position);
 		emit(Op::Return, position, value);
 	}
 }
@@ -329,7 +331,7 @@ void Lowerer::variables(VarDecl *p_decl) {
 		if (local == locals_.end() || !declarator.initializer) {
 			continue; // Without an initializer a `var` keeps what the variable holds: it is declared once.
 		}
-		uint32_t value = expression(declarator.initializer, kind_at(local->second));
+		uint32_t value = typed(declarator.initializer, compilation_.type_of(declarator.type), kind_at(local->second));
 		if (value != local->second) {
 			emit(Op::Move, declarator.offset, local->second, value);
 		}

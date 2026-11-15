@@ -1,3 +1,1 @@
-untyped.as:1:68: error: the type '*' is not supported by the interpreter yet
 untyped.as:1:79: error: a declaration without a type is not supported by the interpreter yet
-untyped.as:1:92: error: a value of type '*' is not supported by the interpreter yet
