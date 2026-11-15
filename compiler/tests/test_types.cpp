@@ -368,7 +368,7 @@ static void test_review_findings() {
 			{ "cls.create()", "*" },
 			// More of what the plan names.
 			{ "shape.width", "Number" },
-			{ "only", "String" },
+			{ "only = null", "String" }, // A property with only a setter can't be read; it has the setter's type.
 			{ "count += 1", "int" },
 			{ "++count", "int" },
 			{ "flag &&= flag", "Boolean" },

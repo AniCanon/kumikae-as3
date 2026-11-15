@@ -72,10 +72,10 @@ class Lowerer {
 
 	std::unordered_map<const Symbol *, uint32_t> classes_;
 	std::unordered_map<const Type *, uint32_t> vector_classes_; // The class made for each Vector.<T> met.
-	std::unordered_map<const Symbol *, uint32_t> functions_; // Methods, constructors, package functions.
+	std::unordered_map<const FunctionDecl *, uint32_t> functions_; // Every function of the program, by declaration.
 	std::unordered_map<const Symbol *, uint32_t> fields_; // Instance fields: the slot.
 	std::unordered_map<const Symbol *, uint32_t> globals_; // Static fields and package variables.
-	std::unordered_map<const Symbol *, uint32_t> slots_; // Instance methods: the method-table slot.
+	std::unordered_map<const FunctionDecl *, uint32_t> slots_; // Table slots; for an interface's, its number.
 	std::unordered_map<std::string, uint32_t> strings_;
 	std::unordered_map<uint64_t, uint32_t> numbers_; // A Number constant by its bits.
 	std::unordered_map<int64_t, uint32_t> wides_;
@@ -210,9 +210,8 @@ class Lowerer {
 
 	// NaN, Infinity, and the limits of the number types: constants of the built-in library.
 	bool builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg);
-	// Vectors. The class of a Vector.<T>, made the first time the type is met; nothing if its elements
-	// are of a type the interpreter does not hold yet.
-	// A Vector.<T>, or an Array (a vector of untyped elements with rules of its own).
+	// Vectors: a Vector.<T>, or an Array (a vector of untyped elements with rules of its own). The class of
+	// a Vector.<T> is made the first time the type is met; nothing if its elements are of a kind not held.
 	bool is_vector(const Type *p_type) const { return p_type && (p_type->kind == Type::Vector || (array_ && p_type->symbol == array_)); }
 	std::optional<uint32_t> vector_class(const Type *p_type);
 	// The class a declaration says its value is of: a class of the program or a vector's. NONE otherwise.
@@ -252,6 +251,7 @@ class Lowerer {
 	std::optional<uint32_t> math_call(Call *p_call, const Symbol *p_function);
 	// String's and the numbers' methods, the top-level functions, and Object's toString() (lower_library).
 	friend class Library;
+	friend class Members; // Getters, setters and interfaces (lower_members.cpp).
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 
 	Symbol * callee_symbol(Expr *p_callee);

@@ -82,8 +82,7 @@ void Lowerer::lower_unit(Unit &p_unit) {
 				for (Node *member : decl->members) {
 					if (member->kind == NodeKind::FunctionDecl) {
 						FunctionDecl *function = static_cast<FunctionDecl *>(member);
-						if (function->symbol && function->symbol != decl->symbol->klass->constructor &&
-								function->accessor == FunctionDecl::None) {
+						if (function->symbol && function->symbol != decl->symbol->klass->constructor) {
 							lower_function(p_unit, decl->symbol, function);
 						}
 					}
@@ -190,7 +189,7 @@ void Lowerer::declare_package_function(Unit *p_unit, FunctionDecl *p_decl) {
 	function.file = file(p_unit);
 	function.position = p_decl->name_offset;
 	function.is_static = true;
-	functions_[symbol] = (uint32_t)module_.functions.size();
+	functions_[p_decl] = (uint32_t)module_.functions.size();
 	module_.functions.push_back(std::move(function));
 }
 

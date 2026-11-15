@@ -6,6 +6,7 @@
 #include "names.h"
 
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -16,7 +17,8 @@ struct Part;
 // A place a value can be stored: a local, a field of an object, or a global.
 struct Place {
 	// Element, Length and Fixed are of a Vector: `object` holds it, and for Element `key` the index.
-	enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine, Element, Length, Fixed } where = Nowhere;
+	// Accessor: a property of the program's, read by its getter and written by its setter.
+	enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine, Element, Length, Fixed, Accessor } where = Nowhere;
 	uint32_t index = 0; // The register, the field slot, the global, or the string of Godot's name.
 	uint32_t object = 0; // For FieldOf and Engine: the register holding the object.
 	Kind kind = Kind::F64;
@@ -31,11 +33,30 @@ struct Place {
 	// (`position.x`). Godot's values are copies, so writing the part is: read the whole value, change
 	// the part, write the whole value back.
 	Part *part = nullptr; // In parts_.
+	// For Accessor: the getter and the setter (NONE where there is none) and how each is reached: a function
+	// called as it is, a method-table slot of the object's class, or an interface method's number.
+	// `object` is NONE for a static property.
+	enum Dispatch { Direct, Virtual, Interface } dispatch = Direct;
+	uint32_t getter = NONE;
+	uint32_t setter = NONE;
 };
 struct Part {
 	Place whole; // Where the value is stored.
 	uint32_t value = NONE; // The register it was read into, once it has been.
 };
+
+// The function a symbol declares, if it declares one.
+inline FunctionDecl *declaration(const Symbol *p_symbol) {
+	return p_symbol && p_symbol->node && p_symbol->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_symbol->node)
+																						: nullptr;
+}
+
+// The name a method's function and table slot go by: its own, or "get x" and "set x" for an accessor, as
+// Flash names a getter's frame in a stack trace.
+inline std::string member_key(const FunctionDecl *p_function) {
+	const char *half = p_function->accessor == FunctionDecl::Getter ? "get " : p_function->accessor == FunctionDecl::Setter ? "set " : "";
+	return half + std::string(p_function->name);
+}
 
 // An environment's class: the variables it holds, each by its field. The first field is the outer one.
 struct EnvLayout {

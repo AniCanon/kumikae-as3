@@ -270,7 +270,7 @@ uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_functio
 	if (direct) {
 		emit(Op::Call, position, out, p_function, arguments(std::move(list)));
 	} else {
-		emit(Op::CallVirtual, position, out, slots_[p_symbol], arguments(std::move(list)));
+		emit(Op::CallVirtual, position, out, slots_[decl], arguments(std::move(list)));
 	}
 	return out == NONE ? 0 : out;
 }
@@ -330,8 +330,8 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 		emit(Op::GetField, position, out, object, ERROR_STACK);
 		return out;
 	}
-	auto function = functions_.find(symbol);
-	if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
+	auto function = functions_.find(declaration(symbol));
+	if (function == functions_.end()) {
 		refuse(callee->offset, "calling '" + std::string(symbol->name) + "'");
 		return default_value(p_want, position);
 	}
@@ -344,7 +344,7 @@ uint32_t Lowerer::bound_method(Expr *p_expression) {
 		return default_value(Kind::Val, position);
 	}
 	Symbol *symbol = callee_symbol(p_expression);
-	auto function = functions_.find(symbol);
+	auto function = functions_.find(declaration(symbol));
 	if (!symbol || symbol->kind != SymbolKind::Method || symbol->is_static() || function == functions_.end()) {
 		// Any other function value (a function expression, a static method, one held in a variable): a
 		// Godot Callable that calls it.
@@ -373,7 +373,7 @@ uint32_t Lowerer::bound_method(Expr *p_expression) {
 	}
 	bool exact = (symbol->modifiers & Modifiers::Private) != 0;
 	uint32_t out = reg(Kind::Val);
-	emit(Op::HostBind, position, out, object, exact ? function->second : (slots_[symbol] | ir::BIND_SLOT));
+	emit(Op::HostBind, position, out, object, exact ? function->second : (slots_[function->first] | ir::BIND_SLOT));
 	return out;
 }
 

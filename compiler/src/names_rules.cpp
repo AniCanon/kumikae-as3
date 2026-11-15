@@ -150,9 +150,34 @@ class Rules {
 		}
 	}
 
+	// A property's getter and setter are of one type, wherever each is declared. Reported once, at the
+	// half the owner declares itself: its getter if it has one.
+	void property_type(FunctionDecl *p_accessor) {
+		const Symbol *property = p_accessor->symbol;
+		if (!property || !property->getter || !property->setter || property->setter->parameters.count == 0) {
+			return;
+		}
+		const FunctionDecl *reported = property->getter->symbol == property ? property->getter : property->setter;
+		if (reported == p_accessor && !same_type(property->getter->return_type, property->setter->parameters[0].type)) {
+			property->unit->diagnostics.error(p_accessor->name_offset, "the getter and the setter of " + quoted(property->name) +
+																			   " must be of the same type");
+		}
+	}
+
 	void definition(Unit &p_unit, Node *p_node) {
+		if (p_node->kind == NodeKind::InterfaceDecl) {
+			for (FunctionDecl *method : static_cast<InterfaceDecl *>(p_node)->methods) {
+				property_type(method);
+			}
+			return;
+		}
 		if (p_node->kind != NodeKind::ClassDecl) {
 			return;
+		}
+		for (Node *member : static_cast<ClassDecl *>(p_node)->members) {
+			if (member->kind == NodeKind::FunctionDecl && static_cast<FunctionDecl *>(member)->accessor != FunctionDecl::None) {
+				property_type(static_cast<FunctionDecl *>(member));
+			}
 		}
 		ClassDecl *decl = static_cast<ClassDecl *>(p_node);
 		Symbol *symbol = decl->symbol;

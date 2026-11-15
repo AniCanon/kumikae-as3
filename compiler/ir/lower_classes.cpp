@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_members.h"
 
 namespace kas3 {
 namespace ir {
@@ -101,11 +101,11 @@ void Lowerer::record_godot_virtual(uint32_t p_class, const Symbol *p_symbol, Fun
 // A method's place in the class's table. An override takes the slot of what it overrides.
 void Lowerer::give_method_slot(uint32_t p_class, FunctionDecl *p_function, uint32_t p_made) {
 	std::unordered_map<std::string, uint32_t> &names = slot_names_[p_class];
-	std::string key(p_function->name);
+	std::string key = member_key(p_function);
 	auto slot = names.find(key);
 	if (slot != names.end() && (p_function->modifiers.bits & Modifiers::Override)) {
 		module_.classes[p_class].methods[slot->second] = p_made;
-		slots_[p_function->symbol] = slot->second;
+		slots_[p_function] = slot->second;
 		return;
 	}
 	uint32_t added = (uint32_t)module_.classes[p_class].methods.size();
@@ -114,7 +114,7 @@ void Lowerer::give_method_slot(uint32_t p_class, FunctionDecl *p_function, uint3
 	if (!(p_function->modifiers.bits & Modifiers::Private)) {
 		names[key] = added;
 	}
-	slots_[p_function->symbol] = added;
+	slots_[p_function] = added;
 }
 
 // One function of a class: its constructor, a static function, or a method.
@@ -123,19 +123,19 @@ void Lowerer::declare_method(uint32_t p_class, const Symbol *p_symbol, FunctionD
 		return;
 	}
 	if (p_function->accessor != FunctionDecl::None) {
-		refuse(p_function->name_offset, "a getter or setter");
+		Members(*this).declare_accessor(p_class, p_function);
 		return;
 	}
 	const std::string name = module_.classes[p_class].name;
 	if (p_symbol->klass->constructor == p_function->symbol) {
 		uint32_t made = add_function(p_class, name, p_function->name_offset, false);
 		module_.classes[p_class].constructor = made;
-		functions_[p_function->symbol] = made;
+		functions_[p_function] = made;
 		return;
 	}
 	bool is_static = (p_function->modifiers.bits & Modifiers::Static) != 0;
 	uint32_t made = add_function(p_class, name + "/" + std::string(p_function->name), p_function->name_offset, is_static);
-	functions_[p_function->symbol] = made;
+	functions_[p_function] = made;
 	if (p_function->name == "toString" && !is_static) {
 		const Type *result = p_function->return_type ? compilation_.type_of(p_function->return_type) : nullptr;
 		if (p_function->parameters.count == 0 && result && result->kind == Type::Instance && result->symbol == string_) {
@@ -264,7 +264,7 @@ void Lowerer::end(uint32_t p_position) {
 }
 
 void Lowerer::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl) {
-	auto found = functions_.find(p_decl->symbol);
+	auto found = functions_.find(p_decl);
 	if (found == functions_.end()) {
 		return;
 	}

@@ -18,7 +18,7 @@ uint32_t Lowerer::function_value(Expr *p_expression) {
 		refuse(position, "one of Godot's methods used as a value");
 		return default_value(Kind::Obj, position);
 	}
-	auto function = functions_.find(symbol);
+	auto function = functions_.find(declaration(symbol));
 	if (function == functions_.end()) {
 		refuse(position, "'" + std::string(symbol->name) + "' used as a value");
 		return default_value(Kind::Obj, position);
@@ -45,7 +45,7 @@ uint32_t Lowerer::function_value(Expr *p_expression) {
 		emit(Op::NullCheck, position, object);
 		emit(Op::MakeFunction, position, out, function->second, object);
 	} else {
-		emit(Op::MakeMethod, position, out, slots_[symbol], object);
+		emit(Op::MakeMethod, position, out, slots_[function->first], object);
 	}
 	return out;
 }
@@ -60,6 +60,8 @@ bool Lowerer::called_value(const Symbol *p_symbol) {
 		case SymbolKind::Local:
 		case SymbolKind::CatchVariable:
 			return true;
+		case SymbolKind::Property: // A getter that gives a function: `o.action(3)` calls what it gives.
+			return p_symbol->unit && !p_symbol->unit->is_declaration;
 		default:
 			return false;
 	}

@@ -313,6 +313,11 @@ public:
 	// True if the members that the class inherits are not all known: a base failed to resolve, or is a
 	// built-in class whose members are not declared yet.
 	bool hierarchy_broken(Symbol *p_class) const;
+	// The getter or the setter of a property reached through p_through (null: the property's own owner). A
+	// class's property holds both halves, inherited ones too; through an interface the other half may be
+	// declared in an interface it extends. *r_known: whether a missing half is certainly missing.
+	FunctionDecl *property_half(Symbol *p_through, const Symbol *p_property, FunctionDecl::Accessor p_half,
+			bool *r_known = nullptr);
 
 	// "a.b.C", "C", or "C in this file" for a helper; "Owner.name" for a member.
 	std::string qualified_name(const Symbol *p_symbol) const;

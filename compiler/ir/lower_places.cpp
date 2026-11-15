@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_members.h"
 
 namespace kas3 {
 namespace ir {
@@ -88,6 +88,9 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 			refuse(name->offset, "this name");
 			return Place();
 		}
+		if (std::optional<Place> property = Members(*this).property(name, nullptr, p_later)) {
+			return *property;
+		}
 		return place_of_symbol(name->symbol, 0, name->offset);
 	}
 	if (p_target->kind == NodeKind::Member) {
@@ -95,6 +98,9 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 		Symbol *symbol = member->resolved();
 		if (symbol && is_godot(symbol) && (symbol->kind == SymbolKind::Property || symbol->kind == SymbolKind::Field)) {
 			return engine_place(symbol, member->object, member->name_offset, p_later);
+		}
+		if (std::optional<Place> property = Members(*this).property(member, member->object, p_later)) {
+			return *property;
 		}
 		if (symbol && (globals_.count(symbol) || !symbol->is_instance_member())) {
 			return place_of_symbol(symbol, 0, member->name_offset);
@@ -179,6 +185,8 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 			}
 			return out;
 		}
+		case Place::Accessor:
+			return Members(*this).get(p_place, p_position);
 		default:
 			return default_value(Kind::F64, p_position);
 	}
@@ -232,6 +240,9 @@ void Lowerer::store(const Place &p_place, uint32_t p_value, uint32_t p_position)
 			break;
 		case Place::Fixed:
 			emit(Op::VecSetFixed, p_position, p_place.object, p_value);
+			break;
+		case Place::Accessor:
+			Members(*this).set(p_place, p_value, p_position);
 			break;
 		default:
 			break;

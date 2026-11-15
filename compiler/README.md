@@ -99,10 +99,12 @@ files, packages, and package-level functions and variables. `String`'s methods, 
 `toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `split` and `Math`.
 `Vector.<T>` (`Vector.<*>` too) and `Array`, with their methods, those that take a function included;
 function values (a method or a function as a value, `f(a, b)`) and function expressions that capture
-their variables; `[Signal]` on a field of a class that extends one of Godot's.
+their variables; `[Signal]` on a field of a class that extends one of Godot's; getters and setters,
+static ones too, overridden and reached with `super` (`o.x += 1` and `o.x++` call each half once).
+In a stack trace a getter is `Class/get x()`, as in Flash.
 
 **What is refused, by name, until later slices:** `Object` literals and dynamic properties, `Dictionary`,
-interfaces, `for in` over anything but a vector or an Array, getters and setters,
+interfaces, `for in` over anything but a vector or an Array,
 `this` inside a function expression, regular expressions and the `String`
 methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
 `Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
@@ -425,6 +427,9 @@ built-in.
   of every interface it names.
 - **Writes** to a `const`, to a property with no setter, to a method, a package function or a class. A
   built-in class's methods may be replaced (`o.toString = f`), because they may live on its prototype.
+- **Reads** of a property with no getter, `x += 1` and `x++` included.
+- **Properties:** a getter and its setter are of one type, wherever each is declared. Through an interface,
+  the other half is looked for in the interfaces it extends.
 
 ## What fits
 
