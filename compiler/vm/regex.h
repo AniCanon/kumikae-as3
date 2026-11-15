@@ -26,8 +26,10 @@ namespace regex {
 constexpr uint8_t GLOBAL = 1, IGNORE_CASE = 2, MULTILINE = 4, DOTALL = 8, EXTENDED = 16;
 // The flags a RegExp's second argument writes, by letter: g, i, m, s and x. Any other letter is left out.
 uint8_t read_flags(std::string_view p_text);
-// The flags as RegExp's toString() ends with them, in the order g, i, m, s, x.
+// The flags as RegExp's toString() ends with them, in the order g, i, m, s, x; and the whole of that text,
+// "/source/flags".
 std::string flags_text(uint8_t p_flags);
+std::string regexp_text(std::string_view p_source, uint8_t p_flags);
 
 // The most groups, nested, the most instructions a pattern may need, and the largest count a quantifier
 // may write: more is refused when the pattern is read (`a{1000}{1000}`).

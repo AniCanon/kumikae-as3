@@ -26,7 +26,7 @@ bool object_element(const vm::Object *p_object, godot::Variant *r_out, std::stri
 // Lets go of the defaults Godot worked out (see GodotHost::evaluate()). Before the extension goes.
 void forget_defaults();
 
-class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::EngineSource {
+class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::EngineSource, public vm::Clock {
 	std::unordered_set<void *> borrowed_; // Handles made by borrow().
 
 	// Godot's form of a name the interpreter passes on every call ("move_and_slide"), made once. The
@@ -95,6 +95,10 @@ public:
 	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override;
+	// Godot's clock; the zone's offset at a moment is the C library's, which knows the past and the future
+	// of daylight saving where Godot gives only the offset now.
+	double now() override;
+	double local_offset(double p_utc) override;
 	[[nodiscard]] bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;

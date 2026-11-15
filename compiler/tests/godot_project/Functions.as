@@ -47,5 +47,9 @@ package {
 		public function ping():void { pings++; }
 		public function run():int { var a:PackedStringArray = new PackedStringArray(); a.append("hello"); return OS.execute("echo", a, null, true); }
 		public function reached():int { pings = 0; propagateCall("ping", null, true); return pings; }
+		// Date's clock and zone are the host's: compared with GDScript's, so that nothing depends on where it runs.
+		public function since(godot:Number):Boolean { return Math.abs(new Date().time - godot) < 5000; }
+		public function zone():int { return int(-new Date().timezoneOffset); }
+		public function marked(text:String):String { return text.replace(/(\d+)/g, "<$1>") + " " + escape(text) + " " + encodeURIComponent("é"); }
 	}
 }

@@ -61,5 +61,8 @@ func _physics_process(_delta: float) -> bool:
 	ask("run")
 	ask("run")
 	show("a default is not shared", ask("reached"), 1)
+	show("now", ask("since", [Time.get_unix_time_from_system() * 1000.0]), true)
+	show("zone", ask("zone"), Time.get_time_zone_from_system().bias)
+	show("a regular expression", ask("marked", ["a1 b22"]), "a<1> b<22> a1%20b22 %C3%A9")
 	node.free()
 	return false

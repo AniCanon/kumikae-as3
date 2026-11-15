@@ -1,5 +1,7 @@
 #include "regex_tree.h"
 
+#include <algorithm>
+
 namespace kas3 {
 namespace vm {
 namespace regex {
@@ -183,6 +185,65 @@ void Emitter::repeat(const Node &p_node) {
 
 } // namespace
 
+bool can_be_empty(const Tree &p_tree, uint32_t p_node) {
+	const Node &node = p_tree.nodes[p_node];
+	switch (node.kind) {
+		case Node::Unit:
+		case Node::Any:
+		case Node::Set:
+			return false;
+		case Node::Group:
+			return can_be_empty(p_tree, node.children[0]);
+		case Node::Concat:
+			return std::all_of(node.children.begin(), node.children.end(), [&](uint32_t p_child) { return can_be_empty(p_tree, p_child); });
+		case Node::Alternation:
+			return std::any_of(node.children.begin(), node.children.end(), [&](uint32_t p_child) { return can_be_empty(p_tree, p_child); });
+		case Node::Repeat:
+			return node.min == 0 || can_be_empty(p_tree, node.children[0]);
+		case Node::Look:
+			return node.value != static_cast<uint32_t>(LookKind::Atomic) || can_be_empty(p_tree, node.children[0]);
+		default:
+			return true;
+	}
+}
+
+std::optional<uint32_t> fixed_length(const Tree &p_tree, uint32_t p_node) {
+	const Node &node = p_tree.nodes[p_node];
+	switch (node.kind) {
+		case Node::Unit:
+		case Node::Any:
+		case Node::Set:
+			return 1;
+		case Node::Group:
+			return fixed_length(p_tree, node.children[0]);
+		case Node::Look:
+			return node.value == static_cast<uint32_t>(LookKind::Atomic) ? fixed_length(p_tree, node.children[0]) : 0;
+		case Node::Concat:
+		case Node::Alternation: {
+			std::optional<uint32_t> total = 0;
+			for (size_t i = 0; i < node.children.size() && total; i++) {
+				const std::optional<uint32_t> one = fixed_length(p_tree, node.children[i]);
+				if (!one || (node.kind == Node::Alternation && i > 0 && *one != *total)) {
+					return std::nullopt;
+				}
+				total = node.kind == Node::Concat ? *total + *one : *one;
+			}
+			return total;
+		}
+		case Node::Repeat: {
+			const std::optional<uint32_t> one = fixed_length(p_tree, node.children[0]);
+			if (!one || node.min != node.max) {
+				return std::nullopt;
+			}
+			return *one * node.min;
+		}
+		case Node::Backref:
+			return std::nullopt;
+		default:
+			return 0;
+	}
+}
+
 uint8_t read_flags(std::string_view p_text) {
 	uint8_t flags = 0;
 	for (const char letter : p_text) {
@@ -218,6 +279,10 @@ std::string flags_text(uint8_t p_flags) {
 		}
 	}
 	return text;
+}
+
+std::string regexp_text(std::string_view p_source, uint8_t p_flags) {
+	return "/" + std::string(p_source) + "/" + flags_text(p_flags);
 }
 
 std::optional<Program> compile(std::u16string_view p_pattern, uint8_t p_flags, std::string *r_error) {

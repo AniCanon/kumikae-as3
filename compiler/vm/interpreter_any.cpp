@@ -116,7 +116,7 @@ bool Interpreter::from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_
 	if (numeric && (any::tag(p_value) == AnyTag::Object || any::is_engine(p_value))) {
 		// An object as a number: its text, then that as a number (ECMAScript's ToPrimitive).
 		Slot primitive;
-		if (!any_primitive(p_value, &primitive)) {
+		if (!any_primitive(p_value, &primitive, true)) {
 			return false;
 		}
 		const bool done = from_any(primitive, p_kind, p_check, r_out);
@@ -323,10 +323,40 @@ bool Interpreter::any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
 }
 
 // An untyped value as a primitive, for `+` and `<`: an object or a Godot value becomes its text.
-bool Interpreter::any_primitive(Slot p_value, Slot *r_out) {
+bool Interpreter::any_primitive(Slot p_value, Slot *r_out, bool p_number) {
 	if (any::tag(p_value) != AnyTag::Object && !any::is_engine(p_value)) {
 		*r_out = share(Kind::Any, p_value);
 		return true;
+	}
+	const Object *object = any::tag(p_value) == AnyTag::Object ? static_cast<const Object *>(any::pointer(p_value)) : nullptr;
+	if (p_number && object && object->klass == module_.date_class) {
+		*r_out = any_number(const_cast<Object *>(object)->fields()[ir::DATE_TIME].d); // A Date's valueOf().
+		return true;
+	}
+	// A class's own valueOf() comes first, if what it gives is not an object (ECMAScript's [[DefaultValue]]).
+	const uint32_t value_of = object && module_.classes[object->klass].element == Kind::Void ? find_method(object->klass, "valueOf") : NONE;
+	if (value_of != NONE) {
+		Slot self;
+		self.bits = 0;
+		self.p = const_cast<Object *>(object);
+		Slot result;
+		result.bits = 0;
+		retain(self.p ? static_cast<Object *>(self.p) : nullptr);
+		const bool called = call_within(value_of, &self, 1, &result);
+		const Kind kind = module_.functions[value_of].result;
+		const Slot given = called && kind != Kind::Void ? to_any(kind, result) : any::undefined();
+		if (called) {
+			drop(kind, result);
+		}
+		release_object(static_cast<Object *>(self.p));
+		if (!called) {
+			return false;
+		}
+		if (any::tag(given) != AnyTag::Object && !any::is_engine(given)) {
+			*r_out = given;
+			return true;
+		}
+		drop_any(given);
 	}
 	std::string words;
 	if (!any_text(p_value, &words)) {
@@ -501,10 +531,11 @@ void Interpreter::any_arithmetic(const Instruction &p_in, Slot p_b, Slot p_c) {
 	}
 	Slot first;
 	Slot second;
-	if (!any_primitive(p_b, &first)) {
+	const bool number = p_in.op != Op::AnyAdd; // `+` takes a Date's text; `<` its time.
+	if (!any_primitive(p_b, &first, number)) {
 		return;
 	}
-	if (!any_primitive(p_c, &second)) {
+	if (!any_primitive(p_c, &second, number)) {
 		drop_any(first);
 		return;
 	}

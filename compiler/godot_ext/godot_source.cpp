@@ -1,15 +1,17 @@
 // Where values come from in Godot (EngineSource): its value types' defaults, constants and constructors,
-// its singletons, and its classes' static methods.
+// its singletons, and its classes' static methods; and the time (Clock).
 #include "godot_calls.h"
 #include "godot_host.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/expression.hpp>
+#include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 
+#include <cmath>
 #include <cstdlib>
 #include <string>
 #include <unordered_map>
@@ -190,6 +192,14 @@ void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_argume
 		return nullptr;
 	}
 	return made;
+}
+
+double GodotHost::now() {
+	return std::floor(Time::get_singleton()->get_unix_time_from_system() * 1000.0);
+}
+
+double GodotHost::local_offset(double p_utc) {
+	return vm::SystemClock::system_offset(p_utc);
 }
 
 } // namespace kas3

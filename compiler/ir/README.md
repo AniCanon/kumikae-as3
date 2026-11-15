@@ -16,6 +16,7 @@ turns the checked tree from `src/` into it.
 | `lower_try` | `try`, `catch`, `finally` (handlers in `ir::Function`; the `finally` written once, every way out going through it) and labels |
 | `lower_any` | The untyped value: coercion where a type is declared, `==`, `<`, `+`, `typeof`, `is`/`as` |
 | `lower_vectors`, `lower_math` | `Vector.<T>` (a class per element type, places, methods, loops, handing one to Godot); `Math` |
+| `lower_regexp`, `lower_date` | RegExp and Date for the `Library` class: their classes (made on first use), a regular expression literal, `new`, their properties as places, their methods and String's that take a pattern |
 | `lower_library.h`, `lower_library` | The standard library (the `Library` class, a friend of the lowerer): `String`'s methods, the numbers' `toString(radix)`, `toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, and `toString()` of any object |
 
 ## Rules

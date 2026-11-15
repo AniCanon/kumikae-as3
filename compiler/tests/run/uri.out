@@ -1,0 +1,20 @@
+a%20b+c/d%3Fe%3Df%26g%23h%20%7E%21*%27%28%29%3B%3A@%24%2C%5B%5D%E9%u20AC%uD83D%uDE00
+true AB%zz%u12% é
+a%20b+c/d?e=f&g#h%20~!*'();:@$,%5B%5D%C3%A9%E2%82%AC%F0%9F%98%80
+a%20b%2Bc%2Fd%3Fe%3Df%26g%23h%20~!*'()%3B%3A%40%24%2C%5B%5D%C3%A9%E2%82%AC%F0%9F%98%80
+true true
+%3B%2F%3F%3A%40%26%3D%2B%24%2C%23Aé ;/#Aé
+undefined undefined undefined undefined
+% URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+%4 URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+%G1 URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+%C3 URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+%C3%28 URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+%E0%80%80 URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+%ED%A0%80 URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+%F4%90%80%80 URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+%FF URIError: Error #1052: Invalid URI passed to decodeURIComponent function.
+URIError: Error #1052: Invalid URI passed to encodeURIComponent function.
+URIError: Error #1052: Invalid URI passed to encodeURI function.
+URIError: Error #1052: Invalid URI passed to decodeURI function.
+%F0%9F%98%80

@@ -51,6 +51,7 @@ inline bool is_held(Kind p_kind) {
 	X(ConstI32, "RI-") X(ConstU32, "RI-") X(ConstF64, "RN-") X(ConstBool, "RI-") X(ConstStr, "RS-") X(ConstNull, "R--") \
 	X(Move, "RR-") \
 	X(I32ToF64, "RR-") X(U32ToF64, "RR-") X(BoolToF64, "RR-") X(StrToF64, "RR-") \
+	X(ObjToF64, "RR-") /* An object as a Number, as ECMAScript makes one: a Date its time, any other its text. */ \
 	X(F64ToI32, "RR-") X(F64ToU32, "RR-") X(I32ToU32, "RR-") X(U32ToI32, "RR-") \
 	X(I32ToBool, "RR-") X(U32ToBool, "RR-") X(F64ToBool, "RR-") X(StrToBool, "RR-") X(ObjToBool, "RR-") \
 	X(I32ToStr, "RR-") X(U32ToStr, "RR-") X(F64ToStr, "RR-") X(BoolToStr, "RR-") X(ObjToStr, "RR-") X(StrToStr, "RR-") \
@@ -62,6 +63,9 @@ inline bool is_held(Kind p_kind) {
 	/* String's methods and the top-level functions on text: out, which (a StringFunction), [its arguments]. \
 	   A number as text: out, which (a NumberFormat), [the number, the radix or digits as a Number]. */ \
 	X(StrCall, "RIA") X(NumText, "RIA") \
+	/* RegExp and Date: out, which (a RegExpFunction, or a date_code()), [its arguments]. Either may run \
+	   the program: a replacement function, or a value's text. A missing RegExp or Date is TypeError #1009. */ \
+	X(RegExpCall, "RIA") X(DateCall, "RIA") \
 	/* Math. MathUnary: out, the Number, and which function (a MathFunction). */ \
 	X(MathUnary, "RRI") X(Atan2, "RRR") X(Pow, "RRR") X(MinF64, "RRR") X(MaxF64, "RRR") X(Random, "R--") \
 	X(Jump, "L--") X(JumpIf, "RL-") X(JumpIfNot, "RL-") \
@@ -187,8 +191,42 @@ enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastInde
 enum class StringFunction : uint8_t {
 	CharAt, CharCodeAt, IndexOf, LastIndexOf, Substr, Substring, Slice, Concat, Upper, Lower, Replace, LocaleCompare,
 	FromCharCode, ParseInt, ParseFloat,
-	Split // The string, the delimiter (untyped), the limit (a Number): an Array.
+	Split, // The string, the delimiter (untyped: a RegExp, or what becomes text), the limit (a Number): an Array.
+	// The text -> String. A decode of text that is not a URI's, or an encode of a half of a character
+	// alone, is AS3's URIError #1052.
+	Escape, Unescape, EncodeURI, EncodeURIComponent, DecodeURI, DecodeURIComponent
 };
+
+// RegExp's methods and properties, in RegExpCall's second operand. After the RegExp, or the text for
+// String's methods:
+//   New                   the source, the flags (each a String, or untyped: a RegExp source is copied)  -> the RegExp
+//   Exec                  the text                                -> an Array, or null (untyped)
+//   Test                  the text                                -> Boolean
+//   Source ... Extended   nothing                                 -> String, or Boolean
+//   Match                 the pattern (untyped: a RegExp, or what becomes one)   -> an Array, or null
+//   Search                the pattern                             -> int
+//   Replace               the pattern, the replacement (both untyped: a function is called)   -> String
+enum class RegExpFunction : uint8_t { New, Exec, Test, Source, Global, IgnoreCase, Multiline, Dotall, Extended, Match, Search, Replace };
+// The fields of a RegExp: the source, the flags (vm/regex.h), and lastIndex, which a program reads and
+// writes as a field.
+constexpr uint32_t REGEXP_SOURCE = 0, REGEXP_FLAGS = 1, REGEXP_LAST_INDEX = 2;
+
+// Date's methods and properties, in DateCall's second operand as date_code(function, detail, utc). Every
+// number is a Number. After the Date:
+//   New        nothing (now), one untyped value (a time, a Date, or text to parse), or the parts from
+//              the year, two to seven of them (with no Date first)   -> the Date
+//   Parse      the text; UTC   the parts (with no Date first)        -> the time
+//   Time, TimezoneOffset   nothing    -> Number;   SetTime   the time   -> the time
+//   Get        nothing (detail: a DatePart)  -> Number
+//   Set        the parts written, from the detail's on (setHours(h, m)) -> the time
+//   Text       nothing (detail: a DateText)  -> String
+enum class DateFunction : uint8_t { New, Parse, UTC, Time, SetTime, TimezoneOffset, Get, Set, Text };
+enum class DatePart : uint8_t { FullYear, Month, Date, Day, Hours, Minutes, Seconds, Milliseconds };
+enum class DateText : uint8_t { Full, Date, Time, Locale, LocaleDate, LocaleTime, UTC };
+constexpr uint32_t date_code(DateFunction p_function, uint32_t p_detail = 0, bool p_utc = false) {
+	return static_cast<uint32_t>(p_function) | p_detail << 8 | (p_utc ? 1u << 16 : 0u);
+}
+constexpr uint32_t DATE_TIME = 0; // The one field of a Date: its time, in milliseconds since 1970 in UTC.
 
 // toString(radix), toFixed, toExponential and toPrecision, in NumText's second operand. The number is a
 // Number, or an Int64 (its register says which), written from its own digits.
@@ -320,6 +358,11 @@ struct Module {
 	// The built-in class of function values (FUNCTION_FIELDS), when the program has any.
 	uint32_t function_class = NONE;
 	uint32_t array_class = NONE; // The one class of every Array, when the program has any.
+	// RegExp and Date, and the errors their functions and the URI functions raise, when the program uses them.
+	uint32_t regexp_class = NONE;
+	uint32_t date_class = NONE;
+	uint32_t syntax_error_class = NONE;
+	uint32_t uri_error_class = NONE;
 };
 
 // The module as text, for tests and for reading.

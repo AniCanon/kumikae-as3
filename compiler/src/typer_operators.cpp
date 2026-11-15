@@ -1,5 +1,7 @@
 #include "typer.h"
 
+#include "builtins.h"
+
 namespace kas3 {
 
 const Type *Typer::unary(Unary *p_unary) {
@@ -58,6 +60,31 @@ const Type *Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_
 	// A string plus anything is a string: the other side is converted.
 	if ((p_op == TokenKind::Plus || p_op == TokenKind::PlusAssign) && (p_left == string_ || p_right == string_)) {
 		return string_;
+	}
+	// An object of AS3's (a Date, a vector, a class of the program) is made a primitive as the line runs,
+	// by its valueOf() or its text: beside `+` a String or a Number, decided then; with `-`, `*`, `/`
+	// and `%` a Number.
+	const auto as3_object = [&](const Type *p_type) {
+		return !primitive(p_type) && (p_type->kind == Type::Vector ||
+				(p_type->kind == Type::Instance && p_type->symbol && p_type->symbol->unit && p_type->symbol->unit->source.path() != GODOT_DECLARATIONS_PATH));
+	};
+	if ((as3_object(p_left) || as3_object(p_right)) && (primitive(p_left) || as3_object(p_left)) && (primitive(p_right) || as3_object(p_right))) {
+		switch (p_op) {
+			case TokenKind::Plus:
+			case TokenKind::PlusAssign:
+				return any_;
+			case TokenKind::Minus:
+			case TokenKind::MinusAssign:
+			case TokenKind::Star:
+			case TokenKind::StarAssign:
+			case TokenKind::Slash:
+			case TokenKind::SlashAssign:
+			case TokenKind::Percent:
+			case TokenKind::PercentAssign:
+				return number_;
+			default:
+				break;
+		}
 	}
 	// On anything but the primitives the result depends on the class. Godot's math types get their
 	// rules in a later stage; until then the type is unknown.

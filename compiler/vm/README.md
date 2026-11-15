@@ -14,16 +14,19 @@ host differs.
 | `any`, `interpreter_any.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, equality, `+`, `<` |
 | `numeric`, `math.cpp` | Conversions C++ alone would leave undefined; `Math` where AS3 and C's library differ |
 | `text_units`, `case_table.cpp` | Strings by UTF-16 unit: indexing, cutting, searching and joining text held as UTF-8, and changing case (the table is written by `tools/case_table.py`) |
-| `regex.h`, `regex_tree.h`, `regex_parse.cpp`, `regex_compile.cpp`, `regex_match.cpp` | Regular expressions on their own: a pattern read into a tree, the tree written as a small program, and a backtracking matcher over UTF-16 units that counts its steps and stops at a limit |
+| `regex.h`, `regex_tree.h`, `regex_parse.cpp`, `regex_classes.cpp`, `regex_compile.cpp`, `regex_match.cpp` | Regular expressions on their own: a pattern read into a tree, the tree written as a small program, and a backtracking matcher over UTF-16 units that counts its steps and stops at a limit |
+| `regexp_methods.cpp`, `regexp_strings.cpp` | The instructions of RegExp (`new`, `exec`, `test`, its properties) and of String's methods that take one (`match`, `search`, `replace`, `split`); the patterns read, kept by source and flags |
+| `date_time`, `date_parse.cpp`, `date_methods.cpp` | Date: ECMAScript's arithmetic of times, AS3's texts and what `Date.parse` reads, and the instructions, with local time from the host's clock |
+| `uri_text` | `escape`, `unescape` and the four URI functions |
 | `number_text`, `string_methods.cpp` | Numbers as text and text as numbers (radix, `toFixed` and the rest, `parseInt`, `parseFloat`); the instructions that run `String`'s methods and those |
-| `host.h` | What the interpreter is given: `Output`, `EngineHandles`, `EngineSource` |
-| `output.h`, `engine_handles.h`, `engine_source.h`, `engine_types.h` | The three interfaces and the values they pass |
+| `host.h` | What the interpreter is given: `Output`, `EngineHandles`, `EngineSource`, `Clock` |
+| `output.h`, `engine_handles.h`, `engine_source.h`, `engine_types.h`, `clock.h` | The four interfaces and the values they pass; `SystemClock` is the system's time and zone (`standalone_host.cpp`), which a host without a clock of its own gets |
 | `no_engine.h`, `standalone_host.cpp` | The answers where there is no engine |
 
 ## Rules
 
 - **No Godot header, and nothing from `src/`.** It includes `ir/ir.h` and the standard library.
-- **The engine is known only through the three interfaces.** Something new asked of Godot is a new entry on
+- **The engine is known only through the interfaces.** Something new asked of Godot is a new entry on
   `EngineHandles` (done to a value the interpreter holds) or `EngineSource` (where a value comes from).
   `NoEngine` must answer it, and the recorder in `tests/test_vm.cpp` must record it.
 - **Nothing is allocated per instruction, and no text is built on the path that succeeds.**

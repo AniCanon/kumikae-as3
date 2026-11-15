@@ -354,7 +354,13 @@ static std::string regex_find(std::u16string_view p_pattern, const char *p_flags
 }
 
 // Every case but the marked ones was checked against Node (`new RegExp(p, f + "gd")`, lastIndex set to the
-// start, then exec's indices), which keeps ECMAScript 3's rules for all of them.
+// start, then exec's indices), which keeps ECMAScript 3's rules for all of them. Node vouches for
+// ECMAScript, not for Flash, whose PCRE parts from it in places, and this engine follows ECMAScript there
+// (unverified against Flash): a loop's groups are unset as each turn begins (`((a)|b)+`, `(?:(a)|b)+`,
+// `(z)((a+)?(b+)?(c))*`); a reference to a group that took no part takes nothing (`(a)?\1b`); `$` is only
+// the end (not before a last line break), `.` and `^`/`$` know four line breaks, `\s` is ECMAScript's
+// white space; and the text is matched by UTF-16 unit, where PCRE in UTF-8 takes a character past U+FFFF
+// as one.
 static void test_regex_matches() {
 	struct Case {
 		std::u16string_view pattern;
@@ -479,6 +485,7 @@ static void test_regex_limits() {
 	CHECK_EQ(regex_find(u"a+b", "", many, 0, regex::Limits{ 100, regex::MAX_BACKTRACK }), std::string("limit"));
 	CHECK_EQ(regex_find(u"(?:a|b)*", "", many, 0, regex::Limits{ regex::STEPS, 10 }), std::string("limit"));
 	CHECK_EQ(regex_find(u"(?:a|b)*", "", many, 0, regex::Limits{ regex::STEPS, 100 }), std::string("0-30"));
+	// A letter that is no flag is left out (recollection of Flash, where ECMAScript raises a SyntaxError).
 	CHECK_EQ(regex::read_flags("gimsxq"), static_cast<uint8_t>(regex::GLOBAL | regex::IGNORE_CASE | regex::MULTILINE | regex::DOTALL | regex::EXTENDED));
 	CHECK_EQ(regex::flags_text(regex::EXTENDED | regex::GLOBAL | regex::DOTALL), std::string("gsx"));
 	std::string error;

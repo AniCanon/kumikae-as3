@@ -9,7 +9,8 @@ namespace ir {
 // One call of the standard library, lowered. The arguments are worked out as the declarations in
 // builtins/toplevel.as say, left to right after what the method is called on, and a missing string is
 // reported after them, as in Flash. Each is converted before the instruction runs it, so the instruction
-// itself never runs the program.
+// itself runs the program only where what an argument is can't be known before (an untyped pattern's
+// text, a replacement function).
 class Library {
 	Lowerer &l_;
 	Call *call_;
@@ -38,6 +39,28 @@ public:
 	// toString() of Object: a class's own, the one of the class the object is of; super.toString() and an
 	// Error's are Object's and Error's own.
 	uint32_t object_text();
+
+	// RegExp's methods, and String's that take one (lower_regexp.cpp).
+	uint32_t regexp_method();
+	uint32_t pattern_call(RegExpFunction p_which);
+	// Date's methods and its static ones (lower_date.cpp).
+	uint32_t date_method();
+	uint32_t date_static();
+
+	// RegExp and Date where no call is: their class, a literal, `new`, a property (lower_regexp.cpp).
+	// Whether a class is one of the two: the interpreter holds its objects.
+	static bool holds(const Symbol *p_class);
+	// Its class in the module, made the first time it is asked for. Nothing for any other class.
+	static std::optional<uint32_t> class_of(Lowerer &p_lowerer, const Symbol *p_class);
+	static uint32_t regex_literal(Lowerer &p_lowerer, RegexLit *p_literal);
+	static std::optional<uint32_t> construct(Lowerer &p_lowerer, New *p_new);
+	static std::optional<Place> place(Lowerer &p_lowerer, Expr *p_target, Expr *p_later);
+	static uint32_t load(Lowerer &p_lowerer, const Place &p_place, uint32_t p_position);
+	static void store(Lowerer &p_lowerer, const Place &p_place, uint32_t p_value, uint32_t p_position);
+	// Whether the value's class, one of the program's, declares valueOf(): beside `+` it is then that.
+	static bool own_value_of(const Expr *p_value);
+	static std::optional<Place> date_place(Lowerer &p_lowerer, Member *p_member, Expr *p_later);
+	static uint32_t date_new(Lowerer &p_lowerer, New *p_new);
 };
 
 } // namespace ir

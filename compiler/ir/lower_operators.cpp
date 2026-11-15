@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_library.h"
 
 namespace kas3 {
 namespace ir {
@@ -189,6 +189,11 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 	}
 	if (const std::optional<uint32_t> of_vector = is_vector(written) ? vector_class(written) : std::nullopt) {
 		index = *of_vector;
+	} else if (symbol == object_ && p_binary->op == TokenKind::KwIs && natural(left) == Kind::Obj) {
+		// Every object is an Object: only null is not.
+		uint32_t out = reg(Kind::Bool);
+		emit(Op::ObjToBool, position, out, expression(left, Kind::Obj));
+		return out;
 	} else if (!symbol || !class_index(symbol, &index)) {
 		refuse(right->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " with this type");
 		return default_value(p_binary->op == TokenKind::KwIs ? Kind::Bool : Kind::Obj, position);
@@ -401,6 +406,13 @@ uint32_t Lowerer::arithmetic(Binary *p_binary, Kind p_want) {
 	kind_of(left->type, &left_kind);
 	kind_of(right->type, &right_kind);
 	bool strings = p_binary->op == TokenKind::Plus && is_string_type(p_binary->type);
+	// An object beside `+` is what ECMAScript's ToPrimitive gives with no hint: its class's own valueOf(),
+	// or else its text (a Date's too), decided as it runs. Beside a String, one with no valueOf() of its
+	// own is its text, written here.
+	if (p_binary->op == TokenKind::Plus && (left_kind == Kind::Obj || right_kind == Kind::Obj) &&
+			(!strings || Library::own_value_of(left) || Library::own_value_of(right))) {
+		return any_add(p_binary);
+	}
 	if (!strings && (is_engine(left_kind) || is_engine(right_kind))) {
 		Kind result = Kind::Void;
 		if (!kind_of(p_binary->type, &result) || result == Kind::Void) {

@@ -146,7 +146,7 @@ class Lowerer {
 	// The kind a written type names; refused if the interpreter has no such values yet.
 	Kind written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing);
 
-	// A built-in class that is Error or extends it. These are the only built-in classes with objects so far.
+	// A built-in class that is Error or extends it.
 	bool is_error(const Symbol *p_class) const;
 
 	// The class's index, creating the built-in Error classes on first use.
@@ -210,10 +210,9 @@ class Lowerer {
 
 	// NaN, Infinity, and the limits of the number types: constants of the built-in library.
 	bool builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg);
-	// Vectors. The class of a Vector.<T>, made the first time the type is met; nothing if its elements
-	// are of a type the interpreter does not hold yet.
 	// A Vector.<T>, or an Array (a vector of untyped elements with rules of its own).
 	bool is_vector(const Type *p_type) const { return p_type && (p_type->kind == Type::Vector || (array_ && p_type->symbol == array_)); }
+	// Its class, made the first time the type is met; nothing if the interpreter does not hold its elements.
 	std::optional<uint32_t> vector_class(const Type *p_type);
 	// The class a declaration says its value is of: a class of the program or a vector's. NONE otherwise.
 	uint32_t declared_class(TypeRef *p_type);
@@ -262,6 +261,7 @@ class Lowerer {
 
 	// The object a member is reached through, checked for null unless it is `this` or `super`.
 	uint32_t receiver(Expr *p_object);
+	uint32_t self(uint32_t p_position, bool p_written = true); // `this`; in a function expression, the object it was written in (lower_closures).
 
 	using Place = ir::Place; // lower_env.h
 	using Part = ir::Part;

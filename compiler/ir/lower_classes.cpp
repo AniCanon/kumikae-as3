@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_library.h"
 
 namespace kas3 {
 namespace ir {
@@ -26,7 +26,7 @@ Class Lowerer::inherited_class(ClassDecl *p_decl) {
 		klass.native_base = godot_base;
 		klass.fields.push_back({ "$owner", Kind::Ref });
 	} else if (base && base != object_) {
-		if (!class_index(base, &klass.base)) {
+		if (Library::holds(base) || !class_index(base, &klass.base)) {
 			refuse(p_decl->extends ? p_decl->extends->offset : p_decl->name_offset, "extending '" + std::string(base->name) + "'");
 		} else {
 			const Class &from = module_.classes[klass.base];
@@ -298,7 +298,7 @@ uint32_t Lowerer::own_signal(std::string_view p_name, uint32_t p_position) {
 		return default_value(Kind::Val, p_position);
 	}
 	const uint32_t owner = reg(Kind::Ref);
-	emit(Op::OwnerOf, p_position, owner, 0);
+	emit(Op::OwnerOf, p_position, owner, self(p_position));
 	const uint32_t name = reg(Kind::Str);
 	emit(Op::ConstStr, p_position, name, string(std::string(p_name)));
 	const uint32_t out = reg(Kind::Val);

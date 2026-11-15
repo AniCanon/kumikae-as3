@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_library.h"
 
 namespace kas3 {
 namespace ir {
@@ -12,7 +12,7 @@ void Lowerer::touch(const Symbol *p_class, uint32_t p_position) {
 
 uint32_t Lowerer::receiver(Expr *p_object) {
 	if (p_object->kind == NodeKind::ThisExpr || p_object->kind == NodeKind::SuperExpr) {
-		return 0;
+		return self(p_object->offset);
 	}
 	uint32_t object = expression(p_object, Kind::Void);
 	if (kind_at(object) != Kind::Obj) {
@@ -79,16 +79,20 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 	if (std::optional<Place> of_vector = vector_place(p_target, p_later)) {
 		return *of_vector;
 	}
+	if (std::optional<Place> of_library = Library::place(*this, p_target, p_later)) {
+		return *of_library;
+	}
 	if (p_target->kind == NodeKind::Name) {
 		Name *name = static_cast<Name *>(p_target);
 		if (name->symbol && is_godot(name->symbol) && (name->symbol->kind == SymbolKind::Property || name->symbol->kind == SymbolKind::Field)) {
 			return engine_place(name->symbol, nullptr, name->offset);
 		}
-		if (name->symbol && name->symbol->is_instance_member() && fn().is_static) {
+		const bool member = name->symbol && name->symbol->is_instance_member();
+		if (member && fn().is_static) {
 			refuse(name->offset, "this name");
 			return Place();
 		}
-		return place_of_symbol(name->symbol, 0, name->offset);
+		return place_of_symbol(name->symbol, member ? self(name->offset, false) : 0, name->offset);
 	}
 	if (p_target->kind == NodeKind::Member) {
 		Member *member = static_cast<Member *>(p_target);
@@ -179,6 +183,8 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 			}
 			return out;
 		}
+		case Place::Library:
+			return Library::load(*this, p_place, p_position);
 		default:
 			return default_value(Kind::F64, p_position);
 	}
@@ -232,6 +238,9 @@ void Lowerer::store(const Place &p_place, uint32_t p_value, uint32_t p_position)
 			break;
 		case Place::Fixed:
 			emit(Op::VecSetFixed, p_position, p_place.object, p_value);
+			break;
+		case Place::Library:
+			Library::store(*this, p_place, p_value, p_position);
 			break;
 		default:
 			break;

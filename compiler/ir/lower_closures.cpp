@@ -25,13 +25,16 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 	if (!p_decl || !p_decl->body) {
 		return;
 	}
-	// What the functions written inside use, at any depth.
+	// What the functions written inside use, at any depth; and whether they name a member of the object
+	// without `this` (`count++`, `update()`), which is then kept too.
 	std::unordered_set<const Symbol *> used;
+	bool member = false;
 	walk(p_decl->body, [&](Node *p_node) -> bool {
 		if (nested_function(p_node)) {
 			walk(p_node, [&](Node *p_inner) {
 				if (p_inner->kind == NodeKind::Name && static_cast<Name *>(p_inner)->symbol) {
 					used.insert(static_cast<Name *>(p_inner)->symbol);
+					member = member || static_cast<Name *>(p_inner)->symbol->is_instance_member();
 				}
 			});
 			return false;
@@ -44,7 +47,8 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 			captured.push_back(symbol);
 		}
 	}
-	if (captured.empty()) {
+	const bool keeps_self = member && !fn().is_static && !received_env_;
+	if (captured.empty() && !keeps_self) {
 		return;
 	}
 	// In the order they are declared, so that the class is the same each time the program is compiled.
@@ -52,6 +56,10 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 	Class klass;
 	klass.name = fn().name + "$environment";
 	klass.fields.push_back({ "$outer", Kind::Obj });
+	if (keeps_self) {
+		own_layout_.fields[nullptr] = static_cast<uint32_t>(klass.fields.size()); // The object, by no symbol.
+		klass.fields.push_back({ "$this", Kind::Obj });
+	}
 	for (const Symbol *symbol : captured) {
 		own_layout_.fields[symbol] = static_cast<uint32_t>(klass.fields.size());
 		klass.fields.push_back({ std::string(symbol->name), kind_at(locals_[symbol]) });
@@ -68,6 +76,25 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 	for (const Symbol *symbol : captured) {
 		emit(Op::SetField, position, own_env_reg_, own_layout_.fields[symbol], locals_[symbol]);
 	}
+	if (keeps_self) {
+		emit(Op::SetField, position, own_env_reg_, own_layout_.fields[nullptr], 0);
+	}
+}
+
+// `this` is register 0 of a method. In a function expression register 0 is the environment: a member named
+// without `this` is of the object the function was written in, kept in an environment; AS3's own `this`
+// there is the caller's object, which the interpreter has not got, and is refused.
+uint32_t Lowerer::self(uint32_t p_position, bool p_written) {
+	if (!received_env_) {
+		return 0;
+	}
+	if (!p_written) {
+		if (const std::optional<Place> kept = captured_place(nullptr, p_position)) {
+			return load(*kept, p_position);
+		}
+	}
+	refuse(p_position, "'this' in a function expression");
+	return default_value(Kind::Obj, p_position);
 }
 
 // A variable a function written inside this one shares, or one of an enclosing function's that this one

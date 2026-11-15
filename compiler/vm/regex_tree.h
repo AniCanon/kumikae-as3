@@ -33,6 +33,9 @@ struct Tree {
 // from the tree after. Nothing, and why in r_error, if the pattern is not one this engine takes.
 std::optional<Tree> parse(std::u16string_view p_pattern, Program &r_program, std::string *r_error);
 
+// The ranges of a class escape (\d, \w, \s), or of what they leave out (\D, \W, \S): regex_classes.cpp.
+std::vector<std::pair<char16_t, char16_t>> class_ranges(char16_t p_letter);
+
 // Whether the node can match without taking a unit, and how many units it always takes, if it always
 // takes the same number.
 bool can_be_empty(const Tree &p_tree, uint32_t p_node);

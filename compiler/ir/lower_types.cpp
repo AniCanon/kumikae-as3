@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_library.h"
 
 namespace kas3 {
 namespace ir {
@@ -44,7 +44,7 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Str;
 	} else if (symbol == object_) {
 		*r_kind = Kind::Any; // An Object may hold any value, numbers too.
-	} else if (classes_.count(symbol) || is_error(symbol) || (symbol == function_ && function_) || (symbol == array_ && array_)) {
+	} else if (classes_.count(symbol) || is_error(symbol) || (symbol == function_ && function_) || (symbol == array_ && array_) || Library::holds(symbol)) {
 		*r_kind = Kind::Obj;
 	} else if (is_godot(symbol) && symbol->kind == SymbolKind::Class) {
 		*r_kind = is_godot_object(symbol) ? Kind::Ref : Kind::Val;
@@ -106,6 +106,10 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	auto found = classes_.find(p_class);
 	if (found != classes_.end()) {
 		*r_index = found->second;
+		return true;
+	}
+	if (const std::optional<uint32_t> library = Library::class_of(*this, p_class)) {
+		*r_index = *library;
 		return true;
 	}
 	if (p_class && p_class == function_) {
@@ -307,6 +311,8 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 				return via(Op::StrToF64, Kind::F64, p_reg);
 			case Kind::F64:
 				return p_reg;
+			case Kind::Obj:
+				return via(Op::ObjToF64, Kind::F64, p_reg);
 			default:
 				refuse(p_position, "converting an object to a number");
 				return via(Op::ConstF64, Kind::F64, number(0));

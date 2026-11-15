@@ -13,7 +13,7 @@ struct StringMethod {
 	Kind result;
 };
 
-constexpr std::array<StringMethod, 17> STRING_METHODS = { {
+constexpr std::array<StringMethod, 23> STRING_METHODS = { {
 		{ "charAt", StringFunction::CharAt, Kind::Str },
 		{ "charCodeAt", StringFunction::CharCodeAt, Kind::F64 },
 		{ "indexOf", StringFunction::IndexOf, Kind::I32 },
@@ -31,6 +31,12 @@ constexpr std::array<StringMethod, 17> STRING_METHODS = { {
 		{ "fromCharCode", StringFunction::FromCharCode, Kind::Str },
 		{ "parseInt", StringFunction::ParseInt, Kind::F64 },
 		{ "parseFloat", StringFunction::ParseFloat, Kind::F64 },
+		{ "escape", StringFunction::Escape, Kind::Str },
+		{ "unescape", StringFunction::Unescape, Kind::Str },
+		{ "encodeURI", StringFunction::EncodeURI, Kind::Str },
+		{ "encodeURIComponent", StringFunction::EncodeURIComponent, Kind::Str },
+		{ "decodeURI", StringFunction::DecodeURI, Kind::Str },
+		{ "decodeURIComponent", StringFunction::DecodeURIComponent, Kind::Str },
 } };
 
 struct NumberMethod {
@@ -142,17 +148,21 @@ uint32_t Library::string_method() {
 	if (name == "split") {
 		return split();
 	}
+	if (name == "match" || name == "search") {
+		return pattern_call(name == "match" ? RegExpFunction::Match : RegExpFunction::Search);
+	}
 	if (!method) {
-		return refused(" (it takes a regular expression)", Kind::Str);
+		return refused("", Kind::Str);
 	}
 	if (method->function == StringFunction::Replace) {
-		// Two strings: what else AS3 takes there (a regular expression, a function) waits for those.
+		// Two strings, known to be strings: one instruction that runs nothing. Anything else is found out
+		// as the call runs (a RegExp, a function).
 		bool strings = call_->arguments.count == 2;
 		for (Expr *argument : call_->arguments) {
 			strings = strings && l_.is_string_type(argument->type);
 		}
 		if (!strings) {
-			return refused(" with anything but two Strings", Kind::Str);
+			return pattern_call(RegExpFunction::Replace);
 		}
 	}
 	const uint32_t text = l_.expression(object(), Kind::Str);
@@ -163,10 +173,7 @@ uint32_t Library::string_method() {
 
 uint32_t Library::split() {
 	Expr *delimiter = call_->arguments.count > 0 ? call_->arguments[0] : nullptr;
-	const Type *type = delimiter ? delimiter->type : nullptr;
-	if (type && type->kind == Type::Instance && type->symbol && type->symbol->name == "RegExp") {
-		return refused(" with a regular expression", Kind::Obj);
-	}
+	class_of(l_, l_.compilation_.builtin("RegExp")); // A delimiter may be one.
 	const std::optional<uint32_t> array = l_.vector_class(l_.compilation_.instance_type(l_.array_));
 	if (!array) {
 		return refused("", Kind::Obj);
@@ -227,6 +234,12 @@ uint32_t Library::top_level() {
 		return out;
 	}
 	const StringMethod *method = find(STRING_METHODS, name);
+	if (method->function >= StringFunction::Escape) {
+		Symbol *uri_error = l_.compilation_.builtin("URIError"); // What the decoders and encoders raise.
+		if (uri_error) {
+			l_.class_index(uri_error, &l_.module_.uri_error_class);
+		}
+	}
 	return emit(Op::StrCall, static_cast<uint32_t>(method->function), arguments(NONE), method->result);
 }
 
@@ -237,7 +250,7 @@ uint32_t Library::object_text() {
 		if (l_.fn().is_static) {
 			return refused(" with no object", Kind::Str);
 		}
-		l_.emit(written && written->kind == NodeKind::SuperExpr ? Op::ObjectText : Op::ObjToStr, position_, out, 0);
+		l_.emit(written && written->kind == NodeKind::SuperExpr ? Op::ObjectText : Op::ObjToStr, position_, out, l_.self(position_, written != nullptr));
 		return out;
 	}
 	if (l_.untyped(written) || l_.natural(written) == Kind::Any) {
@@ -284,8 +297,14 @@ std::optional<uint32_t> Lowerer::library_call(Call *p_call, Symbol *p_function) 
 		return library.number_method(number);
 	}
 	const std::string_view name = p_function->name;
-	if (!owner && p_function->kind == SymbolKind::Function && (name == "isNaN" || name == "isFinite" || name == "parseInt" || name == "parseFloat")) {
+	if (!owner && p_function->kind == SymbolKind::Function && (name == "isNaN" || name == "isFinite" || find(STRING_METHODS, name))) {
 		return library.top_level();
+	}
+	if (owner && Library::holds(owner)) {
+		if (owner->name == "RegExp") {
+			return library.regexp_method();
+		}
+		return p_function->is_static() ? library.date_static() : library.date_method();
 	}
 	if (owner && owner == object_ && name == "toString" && p_call->arguments.count == 0) {
 		return library.object_text();

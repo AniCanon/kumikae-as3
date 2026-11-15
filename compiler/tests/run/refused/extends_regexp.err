@@ -1,0 +1,1 @@
+extends_regexp.as:2:21: error: extending 'RegExp' is not supported by the interpreter yet

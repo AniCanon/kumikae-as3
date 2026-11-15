@@ -12,7 +12,7 @@ uint32_t Lowerer::engine_receiver(Expr *p_object, uint32_t p_position, bool *r_o
 			return default_value(Kind::Ref, p_position);
 		}
 		uint32_t owner = reg(Kind::Ref);
-		emit(Op::GetField, p_position, owner, 0, 0);
+		emit(Op::GetField, p_position, owner, self(p_position, p_object != nullptr), 0);
 		return owner;
 	}
 	uint32_t object = expression(p_object, Kind::Void);
