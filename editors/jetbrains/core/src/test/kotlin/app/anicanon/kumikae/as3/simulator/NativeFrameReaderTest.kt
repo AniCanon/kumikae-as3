@@ -8,6 +8,33 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class NativeFrameReaderTest {
+    @Test fun allocationAllowsPublicationAndThenReadsTheNewestHeader() {
+        val file = Files.createTempFile("native-allocation", ".slot")
+        try {
+            RandomAccessFile(file.toFile(), "rw").use { writer ->
+                writer.setLength(NativeFrameLayout.fileBytes)
+                val header = NativeFrameHeader(1, 1, 1, 4, 1, 2, 1, 1, 1000)
+                writer.write(header.encode())
+                writer.write(byteArrayOf(0, 0, -1, -1))
+                NativeFrameReader(file) { width, height ->
+                    // Allocation may trigger GC. The writer must be free to publish meanwhile.
+                    assertNotNull(writer.channel.tryLock()).use {
+                        writer.seek(0)
+                        writer.write(header.copy(sequence = 2).encode())
+                        writer.write(byteArrayOf(-1, 0, 0, -1))
+                    }
+                    java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE)
+                }.use { reader ->
+                    val newest = assertNotNull(reader.poll())
+                    assertEquals(2, newest.header.sequence)
+                    assertEquals(0xff0000ff.toInt(), newest.image.getRGB(0, 0))
+                }
+            }
+        } finally {
+            Files.delete(file)
+        }
+    }
+
     @Test fun copiesBGRAWithPaddingAndRetainsOnlyNewestSequence() {
         val file = Files.createTempFile("native-frame", ".slot")
         try {

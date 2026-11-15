@@ -9,7 +9,12 @@ import java.nio.file.StandardOpenOption
 
 internal data class NativePicture(val header: NativeFrameHeader, val image: BufferedImage)
 
-internal class NativeFrameReader(path: Path) : AutoCloseable {
+internal class NativeFrameReader(
+    path: Path,
+    private val allocate: (Int, Int) -> BufferedImage = { width, height ->
+        BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB_PRE)
+    },
+) : AutoCloseable {
     private val channel = FileChannel.open(path, StandardOpenOption.READ)
     private val memory = try {
         require(channel.size() == NativeFrameLayout.fileBytes) { "Invalid native frame slot size" }
@@ -21,15 +26,15 @@ internal class NativeFrameReader(path: Path) : AutoCloseable {
     private var sequence = 0L
 
     fun poll(): NativePicture? {
+        val initialLock = channel.tryLock(0, Long.MAX_VALUE, true) ?: return null
+        val initial = initialLock.use { readHeader() } ?: return null
+        // Allocation can collect the JVM heap. Never make the native writer wait for that pause.
+        val image = allocate(initial.width, initial.height)
+        val pixels = (image.raster.dataBuffer as DataBufferInt).data
         val lock = channel.tryLock(0, Long.MAX_VALUE, true) ?: return null
         lock.use {
-            memory.position(0)
-            if (NativeFrameLayout.read("magic", memory) == 0L) return null
-            val header = NativeFrameHeader.decode(memory)
-            if (header.sequence == sequence) return null
-            require(header.sequence > sequence) { "Native frame sequence went backwards" }
-            val image = BufferedImage(header.width, header.height, BufferedImage.TYPE_INT_ARGB_PRE)
-            val pixels = (image.raster.dataBuffer as DataBufferInt).data
+            val header = readHeader() ?: return null
+            if (header.width != image.width || header.height != image.height) return null
             for (row in 0 until header.height) {
                 memory.position(NativeFrameLayout.headerBytes + row * header.stride)
                 memory.asIntBuffer().get(pixels, row * header.width, header.width)
@@ -37,6 +42,16 @@ internal class NativeFrameReader(path: Path) : AutoCloseable {
             sequence = header.sequence
             return NativePicture(header, image)
         }
+    }
+
+    /** Called only under the slot lock, including the recheck after allocating. */
+    private fun readHeader(): NativeFrameHeader? {
+        memory.position(0)
+        if (NativeFrameLayout.read("magic", memory) == 0L) return null
+        val header = NativeFrameHeader.decode(memory)
+        if (header.sequence == sequence) return null
+        require(header.sequence > sequence) { "Native frame sequence went backwards" }
+        return header
     }
 
     override fun close() = channel.close()
