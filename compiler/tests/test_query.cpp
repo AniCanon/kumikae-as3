@@ -213,6 +213,102 @@ static void test_type_places() {
 	CHECK(types("var n:Node = speed as |;"));
 }
 
+// Where `override` is written before a member's name: the methods a base class lets this one override,
+// each as the whole declaration, written so that it compiles where it is put.
+struct Overriding {
+	std::vector<File> others;
+	std::string text; // The file being written, with `|` at the cursor.
+
+	Offered offered() const {
+		Compilation compilation;
+		compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		std::string written = text;
+		size_t at = written.find('|');
+		written.erase(at, 1);
+		Unit *unit = compilation.add("Derived.as", written);
+		for (const File &file : others) {
+			compilation.add(file.path, file.text);
+		}
+		compilation.check(true);
+		Queries queries(compilation);
+		return Offered{ queries.complete(*unit, (uint32_t)at) };
+	}
+	// What is reported once the item named is taken: its text in place of the word at the cursor.
+	std::string taken(std::string_view p_name) const {
+		Offered all = offered();
+		const Completion *item = all.find(p_name);
+		if (!item || item->insert_text.empty()) {
+			return "not offered";
+		}
+		std::string written = text;
+		size_t at = written.find('|');
+		written.erase(at, 1);
+		size_t begin = at;
+		while (begin > 0 && is_identifier_at(written, (uint32_t)begin - 1)) {
+			begin--;
+		}
+		written.replace(begin, at - begin, item->insert_text);
+		Compilation compilation;
+		compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		compilation.add("Derived.as", written);
+		for (const File &file : others) {
+			compilation.add(file.path, file.text);
+		}
+		compilation.check();
+		return compilation.format_diagnostics();
+	}
+};
+
+static void test_override_completion() {
+	const std::vector<File> bases = {
+		{ "lib/Thing.as", "package lib { public class Thing {} }" },
+		{ "game/Base.as", "package game { import lib.Thing; import godot.*; public class Base extends Node2D {\n"
+						  "public function hit(by:Thing, power:int = 1, ...rest):Boolean { return true; }\n"
+						  "protected function guard(at:Vector.<Thing>):void {}\n"
+						  "public function get hp():int { return 1; } public function set hp(p_value:int):void {}\n"
+						  "private function secret():void {} public static function make():void {}\n"
+						  "public final function fixed():void {} internal function inside():void {}\n"
+						  "public function done():void {} } }" },
+	};
+	const std::string head = "package { import game.Base; public class Derived extends Base {\n";
+	Overriding fresh{ bases, head + "override |\n} }" };
+	Offered offered = fresh.offered();
+	CHECK(offered.has("hit") && offered.has("guard") && offered.has("hp") && offered.has("done"));
+	CHECK(offered.has("_process") && offered.has("_ready") && !offered.has("addChild")); // Godot's own are final.
+	CHECK(!offered.has("secret") && !offered.has("make") && !offered.has("fixed") && !offered.has("inside"));
+	CHECK(!offered.has("toString")); // Built in: Flash takes it without `override`.
+	const Completion *hit = offered.find("hit");
+	CHECK_EQ(hit ? hit->insert_text : std::string(),
+			std::string("public function hit(by:lib.Thing, power:int = 1, ...rest):Boolean { return super.hit(by, power); }"));
+	const Completion *hp = offered.find("hp");
+	CHECK_EQ(hp ? hp->insert_text : std::string(), std::string("public function get hp():int { return super.hp; }"));
+	for (const char *name : { "hit", "guard", "hp", "done", "_process", "_ready" }) {
+		CHECK_EQ(fresh.taken(name), std::string());
+	}
+
+	// What is written already is not written again.
+	Overriding named{ bases, head + "override protected function gu|\n} }" };
+	CHECK_EQ(named.offered().find("guard") ? named.offered().find("guard")->insert_text : std::string(),
+			std::string("guard(at:Vector.<lib.Thing>):void {}"));
+	CHECK_EQ(named.taken("guard"), std::string());
+	Overriding modifiers{ bases, head + "public override |\n} }" };
+	CHECK_EQ(modifiers.taken("done"), std::string());
+	CHECK_EQ(Overriding({ bases, head + "override public function |\n} }" }).taken("_ready"), std::string());
+	Overriding setter{ bases, head + "override public function set |\n} }" };
+	CHECK_EQ(setter.offered().find("hp") ? setter.offered().find("hp")->insert_text : std::string(),
+			std::string("hp(p_value:int):void { super.hp = p_value; }"));
+	CHECK(!setter.offered().has("done"));
+	CHECK_EQ(setter.taken("hp"), std::string());
+	// Before another member, which the parser joins to what is written.
+	CHECK_EQ(Overriding({ bases, head + "override |\npublic var z:int; } }" }).taken("done"), std::string());
+
+	// A method this class overrides already is not offered again, and without `override` none is.
+	CHECK(!Overriding({ bases, head + "override public function done():void {}\noverride |\n} }" }).offered().has("done"));
+	CHECK(!Overriding({ bases, head + "public function |\n} }" }).offered().has("done"));
+	const Offered in_body = Overriding({ bases, head + "function f():void { override | }\n} }" }).offered();
+	CHECK(in_body.find("done") && in_body.find("done")->insert_text.empty());
+}
+
 static const char *const BROKEN =
 		"package { import flash.utils.Dictionary; public class Main {\n"
 		"var count:int;\n"
@@ -964,6 +1060,7 @@ static void test_typing() {
 int main() {
 	test_completion_scopes_and_context();
 	test_type_places();
+	test_override_completion();
 	test_completion();
 	test_typing();
 	test_index();

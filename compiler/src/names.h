@@ -195,6 +195,10 @@ struct Context {
 };
 
 // The outcome of a package-level lookup.
+// What code in a class of package p_package may name on a base class p_base: p_member is not private, and
+// if it is internal, p_base is in that package.
+bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package);
+
 struct Found {
 	Symbol *first = nullptr;
 	Symbol *second = nullptr; // Set when the name is ambiguous.

@@ -75,6 +75,18 @@ struct Completion {
 	std::string detail; // The declaration as one line of AS3. Empty for a keyword.
 	bool callable = false;
 	std::vector<std::string> required_parameters;
+	// Written in place of the word at the cursor, when that is not the name alone: an override's whole
+	// declaration, less what is written before the cursor already. Plain text.
+	std::string insert_text;
+};
+
+// True if the name starts with the prefix, whatever the case of either: how completion narrows.
+bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix);
+
+// What is written where `override` comes before a member's name.
+struct OverrideOffer {
+	std::vector<Completion> items;
+	bool after_function = false; // `function` is written already: no keyword can follow.
 };
 
 // Built over a Compilation after check(). It reads the trees the passes wrote onto, so it is good for as
@@ -87,6 +99,9 @@ class Queries {
 	const std::vector<Node *> &context_nodes(const Unit &p_unit) const;
 	const Completion &completion_item(Symbol *p_symbol);
 	static const FunctionDecl *function_declaration(const Symbol *p_symbol);
+	// Where `override` is written before a member's name in p_class: each method of a base class that it
+	// may override, nearest first. Nothing if the words before p_start are not modifiers with `override`.
+	std::optional<OverrideOffer> overrides(const Unit &p_unit, Symbol *p_class, uint32_t p_start, std::string_view p_prefix);
 
 	const std::vector<Occurrence> &occurrences(const Unit &p_unit);
 	std::vector<const Symbol *> types_; // Every class and interface, once asked for.

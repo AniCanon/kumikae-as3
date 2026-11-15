@@ -862,6 +862,31 @@ static void test_completion_default_range() {
 	CHECK(!answer.get("result").get("items").at(0).has("textEdit"));
 }
 
+// An override's declaration goes in whole, as plain text, however the editor takes edits.
+static void test_override_completion() {
+	for (int client = 0; client < 3; client++) {
+		Session session;
+		Json completion = Json::object();
+		if (client == 1) {
+			completion.set("completionItem", Json::object().set("snippetSupport", true).set("insertReplaceSupport", true));
+		} else if (client == 2) {
+			completion.set("completionList", Json::object().set("itemDefaults", Json::array().push("editRange")));
+		}
+		session.request("initialize",
+				Json::object().set("capabilities", Json::object().set("textDocument", Json::object().set("completion", completion))));
+		session.notify("initialized", Json::object());
+		session.open("file:///work/Base.as", "package { public class Base { public function done(by:int):Boolean { return true; } } }");
+		const std::string head = "package { public class Main extends Base {\noverride do";
+		session.open(MAIN, head + "\n} }");
+		const Json answer = session.request("textDocument/completion", Session::at(MAIN, 1, 11));
+		const Json &item = answer.get("result").get("items").at(0);
+		CHECK_EQ(item.get("label").string(), std::string("done"));
+		const std::string written = "public function done(by:int):Boolean { return super.done(by); }";
+		CHECK_EQ(client == 2 ? item.get("textEditText").string() : item.get("textEdit").get("newText").string(), written);
+		CHECK(!item.has("insertTextFormat"));
+	}
+}
+
 static void test_signature_contexts() {
 	Session session;
 	session.request("initialize", Json::object().set("capabilities", Json::object()));
@@ -1001,6 +1026,7 @@ int main() {
 	test_completion_unicode_boundaries();
 	test_signature_contexts();
 	test_completion_default_range();
+	test_override_completion();
 	test_completion_edits_and_signatures();
 	test_completion();
 	test_lifecycle();

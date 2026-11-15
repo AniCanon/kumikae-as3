@@ -25,6 +25,14 @@ completed; errors elsewhere do not require saving a valid file first. Comments, 
 expressions do not offer code completion. Parameters, function-wide local variables, outer captures,
 named function expressions, catch variables and function-local imports respect their compiler scope.
 
+In a class, after `override` (with or without the access word and `function`), completion offers the
+methods and properties of the base classes that may be overridden: not private, static or final ones,
+not built-in ones (Flash takes those without `override`), and not one this class overrides already.
+Taking one writes the rest of its declaration: the access word and `function` if they are not there yet,
+the parameters with their defaults, the result, and a body that calls the base class's version (`{}` for
+a method that gives back nothing). A type the file cannot name by itself is written in full, as in
+`lib.Thing`. A rest parameter is not passed on to the base class's version.
+
 In an import, complete the package path and type, for example `import godot.Vec`. Completion does not
 silently add imports to the file. Types must already be visible to appear as unqualified names.
 
@@ -88,8 +96,8 @@ See the [measured results](../docs/results/2026-11-completion.md) for latency, m
   requires a known type before its members can be offered.
 - For a sandbox trace, use `./gradlew runIde -PlspTrace=<existing-folder>` from `editors/jetbrains`.
   Trace files contain source text; keep them outside the repository and do not enable them for timings.
-- Windows language-server support, override-signature generation, automatic imports and whole-project
-  incremental type checking remain separate work. Unknown callable signatures cannot show argument help.
+- Windows language-server support, automatic imports and whole-project incremental type checking remain
+  separate work. Unknown callable signatures cannot show argument help.
 - The plugin is pinned to the Rider build listed in its README. Android Studio and IntelliJ open-source
   builds do not provide the JetBrains LSP module this plugin requires; they are not supported targets.
 

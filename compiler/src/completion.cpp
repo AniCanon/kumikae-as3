@@ -23,6 +23,8 @@ constexpr std::string_view IN_FILE[] = {
 	"const", "final", "dynamic",
 };
 
+} // namespace
+
 bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix) {
 	if (p_name.size() < p_prefix.size()) {
 		return false;
@@ -34,8 +36,6 @@ bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix) {
 	}
 	return true;
 }
-
-} // namespace
 
 // One completion request: where the cursor is, and what is collected for it.
 class Completer {
@@ -339,6 +339,15 @@ public:
 				found_.push_back(std::move(item));
 			}
 		} else if (class_) {
+			if (std::optional<OverrideOffer> offer = queries_.overrides(unit_, class_, start_, prefix_)) {
+				for (Completion &item : offer->items) {
+					seen_.insert(item.name); // Its name is in the base's tree, which outlives the request.
+					found_.push_back(std::move(item));
+				}
+				if (offer->after_function) {
+					return std::move(found_);
+				}
+			}
 			offer_keywords(IN_CLASS);
 		} else {
 			offer_keywords(IN_FILE);

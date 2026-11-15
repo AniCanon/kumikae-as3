@@ -211,6 +211,17 @@ if messages:
     signature = next((m for m in messages if m.get("id") == 3), {})
     check("signature parameter", signature.get("result", {}).get("activeParameter") == 1, repr(signature))
 
+# An override's whole declaration, over the transport, with Godot's API loaded.
+override_text = "package { import godot.*; public class Main extends Node2D {\noverride _pro\n} }"
+code, messages, errors = session(start + opened(override_text) +
+    request(2, "textDocument/completion", {"textDocument": {"uri": URI}, "position": {"line": 1, "character": 13}}) + END)
+check("override session", code == 0 and messages is not None, repr(errors))
+if messages:
+    reply = next((m for m in messages if m.get("id") == 2), {})
+    item = next((i for i in reply.get("result", {}).get("items", []) if i.get("label") == "_process"), {})
+    check("override", item.get("textEdit", {}).get("newText") == "public function _process(delta:Number):void {}" and
+          "insertTextFormat" not in item, repr(item))
+
 for failure in failures:
     print("FAIL " + failure)
 print("lsp stdio: %s" % ("OK" if not failures else "%d failed" % len(failures)))
