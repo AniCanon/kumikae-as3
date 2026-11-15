@@ -251,8 +251,8 @@ class Lowerer {
 	// String's and the numbers' methods, the top-level functions, and Object's toString() (lower_library).
 	friend class Library;
 	friend class Members; // Getters, setters and interfaces (lower_members.cpp).
+	friend class Dynamic; // Properties by name: lower_dynamic.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
-
 	Symbol * callee_symbol(Expr *p_callee);
 
 	// Marks a use of a class from outside it: its static fields get their values the first time. Code inside

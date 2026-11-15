@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_dynamic.h"
 
 namespace kas3 {
 namespace ir {
@@ -443,8 +443,9 @@ uint32_t Lowerer::binary(Binary *p_binary, Kind p_want) {
 		case TokenKind::StrictNotEqual:
 			return equality(p_binary);
 		case TokenKind::KwIn:
+			return Dynamic(*this).in(p_binary);
 		case TokenKind::KwInstanceof:
-			refuse(position, p_binary->op == TokenKind::KwIn ? "'in'" : "'instanceof'");
+			refuse(position, "'instanceof'");
 			return default_value(Kind::Bool, position);
 		default:
 			return arithmetic(p_binary, p_want);

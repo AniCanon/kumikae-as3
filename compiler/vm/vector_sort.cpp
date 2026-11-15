@@ -1,5 +1,6 @@
 // Vector.sort(f) and Vector.sort(options).
 #include "interpreter_internal.h"
+#include "table.h"
 #include "text_units.h"
 
 #include <cmath>
@@ -186,33 +187,171 @@ void Interpreter::vector_sort(Vector *p_vector, const VectorCall &p_call) {
 	retain(p_vector);
 	std::vector<uint32_t> order;
 	bool twins = false;
-	Slot self;
-	self.bits = 0;
-	self.p = p_vector;
-	const Kind gives = klass.array ? Kind::Any : Kind::Obj;
 	if (sort_order(kind, elements, compare, options, &order, &twins)) {
-		if (klass.array && twins) {
-			give(p_call, Kind::Any, any::integer(0));
-		} else if (klass.array && (options & INDEXED)) {
-			if (Vector *indices = fresh_vector(p_vector->klass, order.size())) {
-				for (uint32_t i = 0; i < order.size(); i++) {
-					indices->data[i] = any::integer(static_cast<int32_t>(order[i]));
-				}
-				Slot made;
-				made.bits = 0;
-				made.p = indices;
-				give(p_call, Kind::Any, to_any(Kind::Obj, made));
-				release_object(indices);
-			}
-		} else {
-			for (uint32_t i = 0; !twins && !(options & INDEXED) && i < order.size() && i < p_vector->length; i++) {
-				put(kind, p_vector->data[i], share(kind, elements[order[i]]));
-			}
-			give(p_call, gives, gives == Kind::Any ? to_any(Kind::Obj, self) : share(Kind::Obj, self));
-		}
+		sorted(p_vector, p_call, elements, order, twins, options);
 	}
 	for (Slot &each : elements) {
 		drop(kind, each);
+	}
+	release_object(p_vector);
+}
+
+// What sort() and sortOn() give, once the new order is known (see vector_sort).
+void Interpreter::sorted(Vector *p_vector, const VectorCall &p_call, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order,
+		bool p_twins, int32_t p_options) {
+	const ir::Class &klass = module_.classes[p_vector->klass];
+	const Kind kind = klass.element;
+	Slot self;
+	self.bits = 0;
+	self.p = p_vector;
+	if (klass.array && p_twins) {
+		give(p_call, Kind::Any, any::integer(0));
+	} else if (klass.array && (p_options & INDEXED)) {
+		if (Vector *indices = fresh_vector(p_vector->klass, p_order.size())) {
+			for (uint32_t i = 0; i < p_order.size(); i++) {
+				indices->data[i] = any::integer(static_cast<int32_t>(p_order[i]));
+			}
+			Slot made;
+			made.bits = 0;
+			made.p = indices;
+			give(p_call, Kind::Any, to_any(Kind::Obj, made));
+			release_object(indices);
+		}
+	} else {
+		for (uint32_t i = 0; !p_twins && !(p_options & INDEXED) && i < p_order.size() && i < p_vector->length; i++) {
+			put(kind, p_vector->data[i], share(kind, p_elements[p_order[i]]));
+		}
+		const Kind gives = klass.array ? Kind::Any : Kind::Obj;
+		give(p_call, gives, gives == Kind::Any ? to_any(Kind::Obj, self) : share(Kind::Obj, self));
+	}
+}
+
+// sortOn(names, options), as avmplus's generic sortOn reads them: one name (its text) or an Array of
+// names; options a number for every field, or an Array of one number per name, the first of which says
+// UNIQUESORT and RETURNINDEXEDARRAY for the whole sort. An options Array of another length is not used.
+bool Interpreter::sort_on_fields(const VectorCall &p_call, std::vector<SortField> *r_fields, int32_t *r_options) {
+	*r_options = 0;
+	r_fields->clear();
+	const Slot names = p_call.list.size() > 1 ? argument(p_call, 1) : any::undefined();
+	const Slot options = p_call.list.size() > 2 ? argument(p_call, 2) : any::undefined();
+	const auto array_of = [&](Slot p_value) -> const Vector * {
+		const Object *object = held_object(p_value);
+		return object && module_.classes[object->klass].array ? static_cast<const Vector *>(object) : nullptr;
+	};
+	const auto number = [&](Slot p_value, int32_t *r_number) {
+		Slot whole;
+		const bool done = any::tag(p_value) == AnyTag::Undefined || from_any(p_value, Kind::I32, NONE, &whole);
+		*r_number = any::tag(p_value) == AnyTag::Undefined ? 0 : whole.i;
+		return done;
+	};
+	std::vector<Slot> written;
+	if (const Vector *list = array_of(names)) {
+		written.assign(list->data, list->data + list->length);
+	} else {
+		written.push_back(names);
+	}
+	for (Slot each : written) {
+		std::string name;
+		if (!any_text(each, &name)) {
+			return false;
+		}
+		r_fields->push_back({ std::move(name), 0 });
+	}
+	const Vector *each_option = array_of(options);
+	if (each_option && each_option->length == r_fields->size()) {
+		for (uint32_t i = 0; i < each_option->length; i++) {
+			if (!number(each_option->data[i], &(*r_fields)[i].options)) {
+				return false;
+			}
+		}
+		*r_options = r_fields->empty() ? 0 : (*r_fields)[0].options;
+	} else if (!each_option) {
+		if (!number(options, r_options)) {
+			return false;
+		}
+		for (SortField &field : *r_fields) {
+			field.options = *r_options;
+		}
+	}
+	return true;
+}
+
+// The element's property of that name, or undefined when it has none (a value that is not an object, or
+// an object without it): sortOn never raises #1069.
+bool Interpreter::sort_field(Slot p_element, Str *p_name, Slot *r_value) {
+	*r_value = any::undefined();
+	if (!held_object(p_element)) {
+		return true;
+	}
+	PropertyKey key;
+	bool has = false;
+	if (!property_key(p_element, any::string(p_name), &key) || !has_property(p_element, key, false, &has)) {
+		return false;
+	}
+	return !has || get_property(p_element, key, r_value);
+}
+
+// sortOn(): by each field in turn, as text unless the field's options say NUMERIC, each field ascending
+// unless they say DESCENDING. Stable; what sort() gives is given (see sorted()).
+void Interpreter::vector_sort_on(Vector *p_vector, const VectorCall &p_call) {
+	std::vector<SortField> fields;
+	int32_t options = 0;
+	if (!sort_on_fields(p_call, &fields, &options)) {
+		return;
+	}
+	const uint32_t count = p_vector->length;
+	std::vector<Slot> elements(count);
+	for (uint32_t i = 0; i < count; i++) {
+		elements[i] = share(Kind::Any, p_vector->data[i]);
+	}
+	retain(p_vector);
+	// Each element's key for each field, found once: [field * count + element].
+	std::vector<double> numbers(fields.size() * count);
+	std::vector<std::string> texts(fields.size() * count);
+	bool ok = true;
+	for (size_t f = 0; ok && f < fields.size(); f++) {
+		Str *name = text(fields[f].name);
+		ok = name != nullptr;
+		for (uint32_t i = 0; ok && i < count; i++) {
+			Slot value;
+			ok = sort_field(elements[i], name, &value);
+			if (ok && (fields[f].options & NUMERIC)) {
+				Slot as_number;
+				ok = from_any(value, Kind::F64, NONE, &as_number);
+				numbers[f * count + i] = as_number.d;
+			} else if (ok) {
+				std::string words;
+				ok = any_text(value, &words);
+				texts[f * count + i] = (fields[f].options & CASE_INSENSITIVE) ? lower_case(words) : std::move(words);
+			}
+			drop_any(value); // Undefined if it could not be read.
+		}
+		if (release(name)) {
+			free_string(name);
+		}
+	}
+	const auto compare = [&](uint32_t p_a, uint32_t p_b) -> std::optional<double> {
+		for (size_t f = 0; f < fields.size(); f++) {
+			const double a = numbers[f * count + p_a], b = numbers[f * count + p_b];
+			double order = (fields[f].options & NUMERIC) ? (a < b ? -1 : a > b ? 1 : 0) : compare_utf16(texts[f * count + p_a], texts[f * count + p_b]);
+			order = (fields[f].options & DESCENDING) ? -order : order;
+			if (order != 0) {
+				return order;
+			}
+		}
+		return 0.0;
+	};
+	std::vector<uint32_t> order(count);
+	std::iota(order.begin(), order.end(), 0);
+	if (ok && merge_sort(&order, compare)) {
+		bool twins = false;
+		for (size_t i = 1; (options & UNIQUE) && i < order.size() && !twins; i++) {
+			twins = *compare(order[i - 1], order[i]) == 0;
+		}
+		sorted(p_vector, p_call, elements, twins ? std::vector<uint32_t>() : order, twins, options);
+	}
+	for (Slot &each : elements) {
+		drop_any(each);
 	}
 	release_object(p_vector);
 }

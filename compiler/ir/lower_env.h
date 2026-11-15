@@ -16,9 +16,10 @@ namespace ir {
 struct Part;
 // A place a value can be stored: a local, a field of an object, or a global.
 struct Place {
-	// Element, Length and Fixed are of a Vector: `object` holds it, and for Element `key` the index.
-	// Accessor: a property of the program's, read by its getter and written by its setter.
-	enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine, Element, Length, Fixed, Accessor } where = Nowhere;
+	// Element, Length and Fixed are of a Vector: `object` holds it, and for Element `key` the index. Property
+	// is reached by name (lower_dynamic.h): `object` holds what has it, `key` its name. Accessor: a property
+	// of the program's, read by its getter and written by its setter.
+	enum Where { Nowhere, Register, FieldOf, GlobalSlot, Engine, Element, Length, Fixed, Property, Accessor } where = Nowhere;
 	uint32_t index = 0; // The register, the field slot, the global, or the string of Godot's name.
 	uint32_t object = 0; // For FieldOf and Engine: the register holding the object.
 	Kind kind = Kind::F64;

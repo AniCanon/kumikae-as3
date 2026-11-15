@@ -1,3 +1,4 @@
+#include "lower_dynamic.h"
 #include "lower_members.h"
 
 namespace kas3 {
@@ -281,6 +282,12 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	if (callee->kind == NodeKind::SuperExpr) {
 		return super_call(p_call);
 	}
+	if (const std::optional<uint32_t> signal = callee_symbol(callee) ? std::nullopt : signal_call_by_name(p_call)) {
+		return *signal; // `timer[name].add(f)`: a signal by its AS3 name.
+	}
+	if (const std::optional<uint32_t> by_name = Dynamic(*this).call(p_call)) {
+		return *by_name;
+	}
 	if (callee->kind == NodeKind::Member && is_vector(static_cast<Member *>(callee)->object->type)) {
 		return vector_call(p_call);
 	}
@@ -479,7 +486,8 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 		if (kind == Kind::Void && kind_of(p_arguments[i]->type, &own) && is_numeric(own) && whole(p_arguments[i])) {
 			kind = Kind::I64; // Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
 		}
-		const std::optional<uint32_t> collection = vector_to_engine(p_arguments[i], type);
+		std::optional<uint32_t> collection = vector_to_engine(p_arguments[i], type);
+		collection = collection ? collection : Dynamic(*this).to_engine(p_arguments[i], type);
 		uint32_t value = collection ? *collection : expression(p_arguments[i], kind);
 		if (kind_at(value) == Kind::Obj) {
 			refuse(p_arguments[i]->offset, "passing a script object to Godot");

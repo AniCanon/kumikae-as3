@@ -175,7 +175,7 @@ std::optional<VectorMethod> vector_method(std::string_view p_name) {
 		std::string_view name;
 		VectorMethod method;
 	};
-	static constexpr std::array<Method, 15> methods = { {
+	static constexpr std::array<Method, 16> methods = { {
 			{ "push", VectorMethod::Push },
 			{ "unshift", VectorMethod::Unshift },
 			{ "pop", VectorMethod::Pop },
@@ -191,6 +191,7 @@ std::optional<VectorMethod> vector_method(std::string_view p_name) {
 			{ "removeAt", VectorMethod::RemoveAt },
 			{ "splice", VectorMethod::Splice },
 			{ "sort", VectorMethod::Sort },
+			{ "sortOn", VectorMethod::SortOn },
 	} };
 	for (const Method &each : methods) {
 		if (each.name == p_name) {
@@ -255,6 +256,10 @@ VectorShape vector_shape(VectorMethod p_method, Kind p_element, bool p_array) {
 			rest = element;
 			result = own;
 			break;
+		case VectorMethod::SortOn: // An Array's: the names and the options, each untyped.
+			rest = Kind::Any;
+			result = Kind::Any;
+			break;
 		case VectorMethod::Sort:
 			// A Vector's takes one; an Array's none to two, and gives the array, 0 or an Array of indices.
 			if (p_array) {
@@ -283,7 +288,7 @@ uint32_t Lowerer::vector_call(Call *p_call) {
 			return vector_each(p_call);
 		}
 	}
-	if (!klass || !method || (callee->name == "toString" && count)) {
+	if (!klass || !method || (callee->name == "toString" && count) || (*method == VectorMethod::SortOn && !module_.classes[*klass].array)) {
 		refuse(callee->name_offset, "calling '" + std::string(callee->name) + "' on a Vector");
 		return default_value(Kind::Obj, position);
 	}

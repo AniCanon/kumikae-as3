@@ -12,6 +12,7 @@ host differs.
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
 | `interpreter_vectors.cpp`, `vector_methods.cpp` | `Vector.<T>`: an object whose class says what its elements are; making, indexing, length, its methods, its text |
+| `table`, `interpreter_properties.cpp`, `interpreter_property_calls.cpp` | Objects and Dictionaries (`vm::Table`: an object whose one slot holds its `Entries`, keys and values in the order each key was first set) and an Array's properties beyond its indices; a property by name on anything (`DynGet` and the rest), a property called by its name, the loops over properties, and Godot's Dictionaries copied in |
 | `reload` | Moves a running program's objects, vectors and static fields onto a newer build, by name |
 | `any`, `interpreter_any.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, equality, `+`, `<` |
 | `numeric`, `math.cpp` | Conversions C++ alone would leave undefined; `Math` where AS3 and C's library differ |
@@ -42,5 +43,14 @@ host differs.
   goes, and `kas3c run` reports what is still alive after that.
 - **Every failure is an AS3 error** with a class, a message and a stack line. Handles and objects are
   released on the error path too: the tests count what is left alive.
+
+## What a table holds
+
+An Object or a Dictionary (`klass.table`), and an Array's `properties` when the pointer is not null, hold
+their keys and values in `Entries` (vm/table.h). `each_held()` visits them through `each_entry()`: for each
+entry whose key is not undefined, the key (a String, or a Dictionary's object key, held strongly) and the
+value, both untyped. A deleted entry has both undefined and holds nothing. Before freeing an object, or the
+collector emptying its garbage, `take_entries()` takes the properties out and the caller lets go of them:
+engine code run meanwhile finds the table empty, never half emptied.
 
 Tests: `test_vm`, `test_runtime`, the `programs` group, and the sanitizer build.

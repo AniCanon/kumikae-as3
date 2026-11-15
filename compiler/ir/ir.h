@@ -140,6 +140,17 @@ inline bool is_held(Kind p_kind) {
 	   (int), the function value: how many parameters it declares, the rest parameter not counted. */ \
 	X(ApplyFunction, "rRR") X(FunctionLength, "RR-") \
 	X(ObjectText, "RR-") /* Object's own toString(), or Error's, whatever the class says: what super.toString() reaches. */ \
+	/* Objects, Dictionaries (vm::Table) and properties by name. TableNew: out (an object), its class (Object's \
+	   or Dictionary's), whether its keys are to be weak (a Boolean register, or NONE). The rest take what \
+	   holds the property as an untyped or an object register, and the key as a String or untyped one: \
+	   DynGet out (untyped), holder, key; DynSet holder, key, value (untyped); DynDelete \
+	   and DynIn (`in`: its own, or its prototype's): out (Boolean), holder, key. DynCall: out (untyped, or NONE), \
+	   the holder, [the key, then the arguments, untyped], the property called once the arguments are \
+	   worked out. A loop over the properties: DynKeys out (the keys there are now, or null), the holder; \
+	   DynNext out (Boolean: one more), the cursor (a Number, moved on), [holder, keys]; DynKey out \
+	   (untyped: the one DynNext found), the cursor, [holder, keys]. */ \
+	X(TableNew, "RCr") X(DynGet, "RRR") X(DynSet, "RRR") X(DynDelete, "RRR") X(DynIn, "RRR") \
+	X(DynCall, "rRA") X(DynKeys, "RR-") X(DynNext, "RRA") X(DynKey, "RRA") \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
 
@@ -172,7 +183,8 @@ constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK 
 //   Splice          start (int), how many (uint), elements to put in   -> a new vector of what was removed
 //   Sort            a function that compares two elements, or the options as a number (untyped)   -> the vector
 // (forEach, map, filter, some and every are loops the lowerer writes, calling the function each time.)
-enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort };
+//   SortOn          the field names, the options (untyped), as Array's sortOn takes them   -> as Sort's
+enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort, SortOn };
 
 // String's methods and the functions on text, in StrCall's second operand. An index or a count is a
 // Number as the program wrote it; text is a String, and a null one reads "null". After the string:
@@ -271,6 +283,7 @@ struct Field {
 	// where that is not known. A reload keeps what a field held only if it is still of that class.
 	uint32_t klass = NONE;
 	bool starts_null = false; // An untyped field declared `Object`: it starts null, a `*` undefined.
+	bool named = false; // Public: reached by its name as the program runs (`x.name` on an untyped value).
 };
 
 struct Class {
@@ -282,8 +295,18 @@ struct Class {
 	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;
+	// Object and flash.utils.Dictionary: objects that are vm::Table, keyed by text (a Dictionary also by the
+	// identity of an object), with no fields.
+	bool table = false;
+	bool dictionary = false;
+	// A class of the library (Error, Function): AS3 makes it dynamic, so a name it lacks is not one of
+	// Flash's ReferenceErrors here but something the interpreter does not do yet.
+	bool built_in = false;
 	std::vector<Field> fields; // The base's first: a field keeps its slot in every subclass.
 	std::vector<uint32_t> methods; // The method table: function indices, the base's slots first.
+	// The public instance methods, by name, with their method-table slots: reached by name as the program
+	// runs. The base's first; an override is listed once, under its base's slot.
+	std::vector<std::pair<std::string, uint32_t>> named_methods;
 	uint32_t constructor = NONE;
 	uint32_t static_init = NONE; // The function that gives the class's static fields their values, if any.
 	uint32_t to_string = NONE; // The class's toString(), its own or inherited: what converting to a String calls.
@@ -334,6 +357,10 @@ struct Module {
 	// The built-in class of function values (FUNCTION_FIELDS), when the program has any.
 	uint32_t function_class = NONE;
 	uint32_t array_class = NONE; // The one class of every Array, when the program has any.
+	uint32_t object_class = NONE; // The class of `{}` and `new Object()`, when the program makes one.
+	uint32_t dictionary_class = NONE; // flash.utils.Dictionary, when the program makes one.
+	// Made when a program reaches a property by name: a sealed object's missing one (#1069, #1056).
+	uint32_t reference_error_class = NONE;
 };
 
 // The module as text, for tests and for reading.

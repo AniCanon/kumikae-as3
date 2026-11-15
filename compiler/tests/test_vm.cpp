@@ -5,6 +5,7 @@
 #include "builtins.h"
 #include "interpreter.h"
 #include "reload.h"
+#include "table.h"
 #include "lower.h"
 #include "names.h"
 
@@ -1117,8 +1118,11 @@ static void test_engine_calls() {
 		"function f():void { position.normalized()[0] = 5; }",
 		"function f(v:Vector2):int { return v ? 1 : 0; }",
 		"function f(a:GodotArray):void { if (a) { trace(1); } }",
-		// A function expression's first register is its environment, not the script's object.
+		// `super` written in a function expression is not the method's.
 		"function f():void { var g:Function = function():void { super.queueFree(); }; }",
+		"function f():void { var n:int = 1; trace(delete n); }",
+		"function f():Boolean { return \"length\" in \"text\"; }",
+		"function f(v:Vector2):void { for (var k:* in v) { trace(k); } }",
 	};
 	for (const char *body : bodies) {
 		std::string result = refused(body);
@@ -1234,6 +1238,91 @@ static void test_reload_alive() {
 		running.release_object(game);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
+// The container behind Object, Dictionary and an Array's properties: insertion order kept through deletes
+// and through the packing that drops deleted entries; every key found again after it.
+static void test_entries() {
+	vm::Entries entries;
+	std::vector<vm::Str *> made;
+	for (int i = 0; i < 40; i++) {
+		made.push_back(vm::new_string("k" + std::to_string(i)));
+		entries.add(vm::any::string(made.back()), vm::any::integer(i));
+	}
+	for (int i = 0; i < 40; i += 3) {
+		const std::optional<uint32_t> at = entries.find_text("k" + std::to_string(i));
+		CHECK(at.has_value());
+		if (at) {
+			entries.remove(*at); // The key is still held in `made`.
+		}
+	}
+	vm::Str *last = vm::new_string("last");
+	entries.add(vm::any::string(last), vm::any::integer(99)); // Packs: 14 deleted of 40.
+	std::string order;
+	for (const vm::Entry &entry : entries.all()) {
+		if (vm::any::tag(entry.key) == vm::AnyTag::String) {
+			order += std::string(static_cast<vm::Str *>(vm::any::pointer(entry.key))->view()) + " ";
+		}
+	}
+	CHECK(order.find("k0 ") == std::string::npos && order.find("k1 k2 k4 k5 ") == 0);
+	CHECK_EQ(order.substr(order.size() - 13), std::string("k37 k38 last "));
+	CHECK_EQ(entries.size(), (uint32_t)27);
+	const std::optional<uint32_t> found = entries.find_text("k38");
+	CHECK(found && vm::any::to_int_payload(entries.value_at(*found)) == 38);
+	CHECK(!entries.find_text("k3"));
+	vm::Object object;
+	entries.add(vm::any::object(&object), vm::any::null());
+	CHECK(entries.find_object(&object).has_value());
+	CHECK_EQ(entries.take_all().size(), (size_t)28);
+	CHECK_EQ(entries.size(), (uint32_t)0);
+	for (vm::Str *each : made) {
+		vm::free_string(each);
+	}
+	vm::free_string(last);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+// Objects, Dictionaries and an Array's properties across a reload: each key and value carried, the order
+// kept, an object key still the same object.
+static void test_reload_tables() {
+	const char *source = "package { import flash.utils.Dictionary; public class Bag {\n"
+						 "  public var o:Object = { b: 1, a: \"two\" }; public var d:Dictionary = new Dictionary(); public var list:Array = [1];\n"
+						 "  public var key:Thing = new Thing();\n"
+						 "  public function fill():void { d[key] = o; d.x = 5; list.extra = key; o.c = [key]; }\n"
+						 "  public function tell():String { var s:String = \"\"; for (var k:String in o) { s += k + o[k] + \",\"; }\n"
+						 "    return s + (d[key] == o) + d.x + (list.extra == key) + (o.c[0] == key) + list.length; }\n"
+						 "} }\n"
+						 "class Thing { }\n";
+	ir::Module old_module, new_module;
+	compile(source, &old_module, "Bag.as");
+	compile(source, &new_module, "Bag.as");
+	{
+		Recorder recorder;
+		auto running = std::make_unique<vm::Interpreter>(old_module, recorder);
+		CHECK(running->start());
+		vm::Object *bag = running->construct(class_named(old_module, "Bag"), nullptr);
+		vm::Slot result;
+		CHECK(running->call_method(bag, "fill", nullptr, 0, &result));
+		vm::Interpreter fresh(new_module, recorder);
+		vm::Object *moved = nullptr;
+		{
+			vm::Reload reload(*running, fresh);
+			moved = reload.object(bag);
+			CHECK(moved != nullptr);
+			CHECK_EQ(reload.missing(), std::string());
+		}
+		running->release_object(bag);
+		running.reset();
+		if (moved) {
+			CHECK(fresh.call_method(moved, "tell", nullptr, 0, &result));
+			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("b1,atwo,c[object Thing],true5truetrue1"));
+			fresh.discard(ir::Kind::Str, result);
+			fresh.release_object(moved);
+		}
+		CHECK_EQ(recorder.errors, std::string());
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
 // A base class's `_ready` that calls a method a subclass overrides: the override is what runs.
@@ -1765,6 +1854,53 @@ static void test_untyped_out_of_memory() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// Objects, Dictionaries and an Array's properties with no memory left: Error #1000, caught, and nothing
+// left alive.
+static void test_tables_out_of_memory() {
+	Compilation compilation;
+	compilation.add("Tables.as", "package { public class Tables {\n"
+								 "public function make():String { try { var o:Object = {}; return 'made'; } catch (e:Error) { return e.message; } return ''; }\n"
+								 "public function key(o:*):String { try { o['fresh'] = 1; return 'set'; } catch (e:Error) { return e.message; } return ''; }\n"
+								 "public function extra(a:*):String { try { a.extra = 1; return 'set'; } catch (e:Error) { return e.message; } return ''; }\n"
+								 "public function keys(o:*):String { var n:int = 0; try { for (var k:* in o) { n++; } return 'went'; } catch (e:Error) { return e.message; } return ''; }\n"
+								 "public function table():* { return { a: 1 }; }\n"
+								 "public function list():* { return [1]; }\n"
+								 "} }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	const size_t strings = vm::live_strings();
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(class_named(module, "Tables"));
+		CHECK(object != nullptr);
+		vm::Slot table, list, result;
+		CHECK(interpreter.call_method(object, "table", nullptr, 0, &table));
+		CHECK(interpreter.call_method(object, "list", nullptr, 0, &list));
+		const auto failing = [&](const char *p_method, vm::Slot *p_argument) {
+			vm::fail_allocations(1);
+			const bool called = interpreter.call_method(object, p_method, p_argument, p_argument ? 1 : 0, &result);
+			vm::fail_allocations(0);
+			const std::string said = called && result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string("failed");
+			interpreter.discard(ir::Kind::Str, result);
+			return said;
+		};
+		CHECK_EQ(failing("make", nullptr), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(failing("key", &table), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(failing("extra", &list), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(failing("keys", &table), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(failing("keys", &list), std::string(vm::OUT_OF_MEMORY)); // An index's text, as the loop gives it.
+		interpreter.discard(ir::Kind::Any, table);
+		interpreter.discard(ir::Kind::Any, list);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_strings(), strings);
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 // An object a host makes is built in the order `new` builds it, AS3's: a class's field values first, at
 // the start of its constructor, then its base's (fields, constructor), then the rest of its constructor.
 static void test_host_construct_order() {
@@ -1796,6 +1932,7 @@ static void test_host_construct_order() {
 }
 
 static const char *const CYCLES = "package {\n"
+								  "import flash.utils.Dictionary;\n"
 								  "public class Cycles {\n"
 								  "	public static var kept:Link;\n"
 								  "	public function pair():void { var a:Link = new Link(); var b:Link = new Link(); a.next = b; b.next = a; }\n"
@@ -1808,6 +1945,10 @@ static const char *const CYCLES = "package {\n"
 								  "	public function throughVector():void { var v:Vector.<Link> = new Vector.<Link>(); var a:Link = new Link(); a.any = v; v.push(a); }\n"
 								  "	public function throughUntypedVector():void { var v:Vector.<*> = new Vector.<*>(); v.push(v); }\n"
 								  "	public function throughMethod():void { var a:Link = new Link(); a.any = a.hop; }\n"
+								  "	public function selfObject():void { var o:Object = { name: \"me\" }; o.self = o; }\n"
+								  "	public function keyedDictionary():void { var d:Dictionary = new Dictionary(); var a:Link = new Link(); a.any = d; d[a] = 1; }\n"
+								  "	public function valueDictionary():void { var d:Dictionary = new Dictionary(); d.x = { back: d }; }\n"
+								  "	public function arrayProperty():void { var list:Array = [1]; list.me = list; }\n"
 								  "	public function untypedPair():void { var a:Link = new Link(); var b:Link = new Link(); a.any = b; b.any = a; }\n"
 								  "	public function recursive():int {\n"
 								  "		var down:Function = function (n:int):int { return n <= 0 ? 0 : 1 + down(n - 1); };\n"
@@ -1863,7 +2004,8 @@ static void test_cycles() {
 			return result;
 		};
 		auto alive = [&](const char *p_name) { return std::string(p_name) + " leaves " + std::to_string(vm::live_objects() - alone); };
-		for (const char *name : { "pair", "three", "throughVector", "throughUntypedVector", "throughMethod", "untypedPair", "recursive" }) {
+		for (const char *name : { "pair", "three", "throughVector", "throughUntypedVector", "throughMethod", "untypedPair", "recursive", "selfObject",
+				 "keyedDictionary", "valueDictionary", "arrayProperty" }) {
 			call(name);
 			CHECK(vm::live_objects() > alone);
 			interpreter.collect();
@@ -2016,9 +2158,12 @@ int main() {
 	test_interface_table();
 	test_kept_traces();
 	test_untyped_out_of_memory();
+	test_tables_out_of_memory();
 	test_out_of_memory();
 	test_reload();
 	test_reload_vectors();
+	test_entries();
+	test_reload_tables();
 	test_run_once_changes();
 	test_run_once_overrides();
 	test_reload_alive();

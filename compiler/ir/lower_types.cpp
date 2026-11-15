@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_dynamic.h"
 
 namespace kas3 {
 namespace ir {
@@ -44,7 +44,7 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Str;
 	} else if (symbol == object_) {
 		*r_kind = Kind::Any; // An Object may hold any value, numbers too.
-	} else if (classes_.count(symbol) || is_error(symbol) || (symbol == function_ && function_) || (symbol == array_ && array_)) {
+	} else if (classes_.count(symbol) || is_error(symbol) || is_dictionary(symbol) || (symbol == function_ && function_) || (symbol == array_ && array_)) {
 		*r_kind = Kind::Obj;
 	} else if (is_godot(symbol) && symbol->kind == SymbolKind::Class) {
 		*r_kind = is_godot_object(symbol) ? Kind::Ref : Kind::Val;
@@ -108,11 +108,17 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 		*r_index = found->second;
 		return true;
 	}
+	if (is_dictionary(p_class)) {
+		*r_index = Dynamic(*this).table_class(true);
+		classes_[p_class] = *r_index;
+		return true;
+	}
 	if (p_class && p_class == function_) {
 		// Function: the built-in class of function values (FUNCTION_FIELDS in ir.h).
 		Class klass;
 		klass.name = "Function";
 		klass.fields = { { "function", Kind::I32 }, { "first", Kind::Obj } };
+		klass.built_in = true;
 		module_.classes.push_back(std::move(klass));
 		module_.function_class = *r_index = (uint32_t)module_.classes.size() - 1;
 		classes_[p_class] = module_.function_class;
@@ -131,7 +137,9 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	Class klass;
 	klass.name = class_name(p_class);
 	klass.base = base;
-	klass.fields = { { "message", Kind::Str }, { "name", Kind::Str }, { "errorID", Kind::I32 }, { "stack", Kind::Str } };
+	klass.fields = { { "message", Kind::Str, NONE, false, true }, { "name", Kind::Str, NONE, false, true }, { "errorID", Kind::I32, NONE, false, true },
+		{ "stack", Kind::Str } };
+	klass.built_in = true;
 	Function constructor;
 	constructor.name = klass.name;
 	constructor.owner = (uint32_t)module_.classes.size();

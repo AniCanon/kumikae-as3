@@ -1,0 +1,17 @@
+rex 3 rex speaks softly rex speaks loudly
+max 8 number
+max speaks softly true
+true true false true false true
+false true max
+0 [object Thing] [object Thing]
+kid sub kid speaks softly true from Thing
+1069 Error #1069: Property secret not found on Thing and there is no default value.
+1056 Error #1056: Cannot create property invented on Thing.
+1037 Error #1037: Cannot assign to a method speak on Thing.
+1069 Error #1069: Property hidden not found on Thing and there is no default value.
+1034 Error #1034: Type Coercion failed: cannot convert not a thing to Thing.
+1006 Error #1006: name is not a function.
+too far RangeError 7
+1009
+arguments first
+1010

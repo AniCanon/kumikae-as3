@@ -1,5 +1,7 @@
 #include "interpreter_internal.h"
 
+#include "table.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -114,8 +116,16 @@ void Interpreter::drop_object(Object *p_object) {
 		Object *object = dying_.back();
 		dying_.pop_back();
 		const ir::Class &klass = module_.classes[object->klass];
+		std::vector<Entry> taken = take_entries(klass, object);
 		each_held(klass, object, [this](Kind p_kind, Slot &p_slot) { let_go(p_kind, p_slot); });
-		if (klass.element != Kind::Void) {
+		for (Entry &entry : taken) {
+			let_go(Kind::Any, entry.key);
+			let_go(Kind::Any, entry.value);
+		}
+		if (klass.table) {
+			free_table(object);
+		} else if (klass.element != Kind::Void) {
+			free_properties(static_cast<Vector *>(object));
 			free_vector(static_cast<Vector *>(object));
 		} else {
 			free_object(object);

@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_dynamic.h"
 
 #include <algorithm>
 
@@ -345,12 +345,12 @@ void Lowerer::statement(Stmt *p_statement) {
 			try_statement(static_cast<Try *>(p_statement));
 			break;
 		case NodeKind::ForIn:
-			if (is_vector(static_cast<ForIn *>(p_statement)->collection->type)) {
+			if (is_vector(static_cast<ForIn *>(p_statement)->collection->type) && !(array_ && static_cast<ForIn *>(p_statement)->collection->type->symbol == array_)) {
 				vector_loop(static_cast<ForIn *>(p_statement));
 			} else if (static_cast<ForIn *>(p_statement)->element) {
 				engine_loop(static_cast<ForIn *>(p_statement));
 			} else {
-				refuse(position, static_cast<ForIn *>(p_statement)->each ? "'for each'" : "'for in'");
+				Dynamic(*this).loop(static_cast<ForIn *>(p_statement)); // An Array's properties too.
 			}
 			break;
 		case NodeKind::Labeled:

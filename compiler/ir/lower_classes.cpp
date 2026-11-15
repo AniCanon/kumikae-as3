@@ -1,3 +1,4 @@
+#include "lower_dynamic.h"
 #include "lower_members.h"
 
 namespace kas3 {
@@ -26,12 +27,13 @@ Class Lowerer::inherited_class(ClassDecl *p_decl) {
 		klass.native_base = godot_base;
 		klass.fields.push_back({ "$owner", Kind::Ref });
 	} else if (base && base != object_) {
-		if (!class_index(base, &klass.base)) {
+		if (is_dictionary(base) || !class_index(base, &klass.base)) { // A Dictionary's objects are tables, with no fields to add to.
 			refuse(p_decl->extends ? p_decl->extends->offset : p_decl->name_offset, "extending '" + std::string(base->name) + "'");
 		} else {
 			const Class &from = module_.classes[klass.base];
 			klass.fields = from.fields;
 			klass.methods = from.methods;
+			klass.named_methods = from.named_methods;
 			klass.to_string = from.to_string;
 			klass.native_base = from.native_base;
 			klass.virtuals = from.virtuals;
@@ -66,7 +68,8 @@ void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds, starts_null });
 		} else {
 			fields_[declarator.symbol] = (uint32_t)module_.classes[p_class].fields.size();
-			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null });
+			const bool named = (p_decl->modifiers.bits & Modifiers::Public) != 0;
+			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null, named });
 			if (declares_signal(p_decl)) {
 				module_.classes[p_class].signals.push_back(std::string(declarator.name));
 			}
@@ -113,6 +116,9 @@ void Lowerer::give_method_slot(uint32_t p_class, FunctionDecl *p_function, uint3
 	// A private method is not seen by subclasses, so its name is not recorded for them.
 	if (!(p_function->modifiers.bits & Modifiers::Private)) {
 		names[key] = added;
+	}
+	if (p_function->modifiers.bits & Modifiers::Public) {
+		module_.classes[p_class].named_methods.push_back({ key, added });
 	}
 	slots_[p_function] = added;
 }

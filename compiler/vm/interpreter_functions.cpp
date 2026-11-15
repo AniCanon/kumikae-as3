@@ -185,7 +185,13 @@ bool Interpreter::argument_as(const Function &p_callee, uint32_t p_register, Slo
 // raised. p_values must not be in the stack: making an argument a String may run the program, which may
 // move the stack.
 bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
-	const Function &callee = module_.functions[static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i)];
+	return function_arguments(static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i), static_cast<Object *>(p_value->fields()[ir::FUNCTION_FIRST].p),
+			p_count, p_values, r_values);
+}
+
+// The same for a function and what it takes first (a method's object), with no function value made.
+bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
+	const Function &callee = module_.functions[p_target];
 	const size_t first = callee.is_static ? 0 : 1;
 	const size_t most = callee.rest ? SIZE_MAX : callee.parameters - first;
 	if (p_count > most || p_count + first < callee.required) {
@@ -197,7 +203,7 @@ bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot
 	r_values->assign(first + p_count, Slot());
 	if (first) {
 		(*r_values)[0].bits = 0;
-		(*r_values)[0].p = p_value->fields()[ir::FUNCTION_FIRST].p;
+		(*r_values)[0].p = p_first;
 	}
 	const size_t fixed = callee.rest ? callee.parameters - 1 - first : p_count;
 	for (size_t i = 0; i < p_count; i++) {

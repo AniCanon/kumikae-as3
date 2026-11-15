@@ -1,6 +1,10 @@
 // AS3's vectors as Godot's collections.
 #include "godot_host.h"
 #include "program.h"
+#include "any.h"
+#include "table.h"
+
+#include <godot_cpp/variant/dictionary.hpp>
 
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
@@ -20,25 +24,80 @@ using namespace godot;
 
 namespace kas3 {
 
-// A script object as Godot holds it: one that is one of Godot's as its Godot object, and a vector or an
-// Array as an Array of its own elements.
+namespace {
+
+// How deep the containers being made are (vm::MAX_ENGINE_NESTING).
+int nesting = 0;
+
+struct Deeper {
+	Deeper() { nesting++; }
+	~Deeper() { nesting--; }
+};
+
+// An Object or a Dictionary as one of Godot's Dictionaries: each key a String, or for an object key what
+// that object is to Godot; each value as an untyped value goes.
+bool table_element(const vm::Object *p_table, Variant *r_out, std::string *r_error) {
+	Dictionary dictionary;
+	for (const vm::Entry &entry : vm::entries_of(const_cast<vm::Object *>(p_table))->all()) {
+		if (vm::any::tag(entry.key) == vm::AnyTag::Undefined) {
+			continue;
+		}
+		Variant key;
+		if (vm::any::tag(entry.key) == vm::AnyTag::Object && !object_element(static_cast<const vm::Object *>(vm::any::pointer(entry.key)), &key, r_error)) {
+			return false;
+		}
+		if (vm::any::tag(entry.key) != vm::AnyTag::Object) {
+			key = untyped_to_variant(entry.key);
+		}
+		Variant value;
+		if (vm::any::tag(entry.value) == vm::AnyTag::Object && !object_element(static_cast<const vm::Object *>(vm::any::pointer(entry.value)), &value, r_error)) {
+			return false;
+		}
+		dictionary[key] = vm::any::tag(entry.value) == vm::AnyTag::Object ? value : untyped_to_variant(entry.value);
+	}
+	*r_out = dictionary;
+	return true;
+}
+
+} // namespace
+
+// A script object as Godot holds it: one that is one of Godot's as its Godot object, a vector or an Array
+// as an Array of its own elements, and an Object or a Dictionary as a Dictionary.
 bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_error) {
 	if (!p_object) {
 		*r_out = Variant();
 		return true;
 	}
+	const Deeper deeper;
+	if (nesting > vm::MAX_ENGINE_NESTING) {
+		*r_error = vm::HOLDS_ITSELF;
+		return false;
+	}
 	const ir::Module &module = Project::get().module();
+	if (module.classes[p_object->klass].table) {
+		return table_element(p_object, r_out, r_error);
+	}
 	const ir::Kind element = module.classes[p_object->klass].element;
 	if (element != ir::Kind::Void) {
 		const vm::Vector *vector = static_cast<const vm::Vector *>(p_object);
+		if (vector->properties && vector->properties->size()) {
+			*r_error = vm::ARRAY_PROPERTIES;
+			return false;
+		}
 		Array array;
 		array.resize(static_cast<int64_t>(vector->length));
 		for (uint32_t i = 0; i < vector->length; i++) {
+			// An object, typed or untyped, goes this same way, so that what it can't be is an error here.
+			const vm::Slot held = vector->data[i];
+			const bool untyped_object = element == ir::Kind::Any && vm::any::tag(held) == vm::AnyTag::Object;
+			const vm::Object *object = element == ir::Kind::Obj ? static_cast<const vm::Object *>(held.p)
+					: untyped_object							? static_cast<const vm::Object *>(vm::any::pointer(held))
+																: nullptr;
 			Variant value;
-			if (element == ir::Kind::Obj ? !object_element(static_cast<const vm::Object *>(vector->data[i].p), &value, r_error) : false) {
+			if ((element == ir::Kind::Obj || untyped_object) && !object_element(object, &value, r_error)) {
 				return false;
 			}
-			array[static_cast<int64_t>(i)] = element == ir::Kind::Obj ? value : to_variant(element, vector->data[i]);
+			array[static_cast<int64_t>(i)] = element == ir::Kind::Obj || untyped_object ? value : to_variant(element, held);
 		}
 		*r_out = array;
 		return true;

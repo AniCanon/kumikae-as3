@@ -45,6 +45,8 @@ struct Object : Counted {
 	Slot *fields() { return reinterpret_cast<Slot *>(this + 1); }
 };
 
+class Entries; // vm/table.h
+
 // A Vector.<T>: an object whose class says what its elements are. They are held like fields: untagged
 // slots of that one kind.
 struct Vector : Object {
@@ -52,6 +54,7 @@ struct Vector : Object {
 	uint32_t capacity; // Slots there is room for; those from `length` on are zero.
 	bool fixed; // Its length may not change.
 	Slot *data;
+	Entries *properties; // An Array's properties other than its indices, once it has any (vm/table.h).
 };
 
 inline void retain(Counted *p_value) {
@@ -97,7 +100,7 @@ void free_object(Object *p_object); // The fields must have been released. It le
 Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, Object *p_list);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
-void free_vector(Vector *p_vector); // The elements must have been released. It leaves its list.
+void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.
 
 // The cycle collector's lists: circular, through gc_previous and gc_next, each with an Object of its own as
 // its head, which is never freed. An object is on one list at most.

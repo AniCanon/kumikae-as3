@@ -13,7 +13,7 @@ called by the engine.
 | `godot_calls.h` | What the two host files share: the arguments of a call, a failed call in AS3's words |
 | `godot_utility.cpp` | Godot's global functions |
 | `godot_untyped.cpp` | An untyped value as a Variant and back: an integer stays an integer, a whole float a float |
-| `godot_collections.cpp` | A vector handed to Godot: the packed array Godot takes there, or an Array |
+| `godot_collections.cpp` | A vector handed to Godot: the packed array Godot takes there, or an Array; an Object or a Dictionary as a Dictionary, its keys as text |
 | `program` (collector) | Once a frame, a step of the cycle collector with a budget of work (`COLLECTOR_WORK`); a whole collection when the scene tree goes and when the program is unloaded. `GodotHost::node` and `node_edges` say what a reference-counted object holds: its AS3 script's object, and its listeners |
 | `program` (reload) | Watches the scripts, compiles them again, and moves instances, listeners and script resources onto the new program (`vm/reload`) |
 | `program` (restart) | A save that changes code that runs once (`ir::run_once_changes`) starts the running scene again from its file |

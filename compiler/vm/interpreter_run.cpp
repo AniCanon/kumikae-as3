@@ -606,6 +606,17 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::VecCall:
 				vector_call(function, in); // `frame` and `r` may be stale after this.
 				break;
+			case Op::TableNew:
+			case Op::DynGet:
+			case Op::DynSet:
+			case Op::DynDelete:
+			case Op::DynIn:
+			case Op::DynCall:
+			case Op::DynKeys:
+			case Op::DynNext:
+			case Op::DynKey:
+				dynamic_op(function, in); // `frame` and `r` are stale after this.
+				break;
 			case Op::Call:
 			case Op::CallVirtual:
 			case Op::CallInterface:

@@ -117,6 +117,8 @@ private:
 	bool any_is(Slot p_value, uint32_t p_type) const;
 	bool engine_array(Slot p_value, uint32_t p_class) const;
 	Vector *array_of_engine(void *p_array, uint32_t p_class);
+	bool engine_dictionary(Slot p_value, uint32_t p_class) const;
+	Object *table_of_engine(void *p_dictionary, uint32_t p_class);
 	bool any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
 	bool any_primitive(Slot p_value, Slot *r_out);
 	Slot present_or_null(Slot p_value); // A freed Godot object is null; anything else is as it is.
@@ -130,6 +132,8 @@ private:
 	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	std::optional<std::string> godot_refuses(Slot p_value, int p_depth) const;
+	std::optional<std::string> refused_by_godot(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers) const;
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
@@ -162,6 +166,41 @@ private:
 	Object *function_in(ir::Kind p_kind, Slot p_value);
 	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
 	bool function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values);
+	bool function_arguments(uint32_t p_target, Object *p_first, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values);
+	// Properties by name (interpreter_properties.cpp, interpreter_property_calls.cpp). A key as its holder
+	// keeps it: an element's index, a Dictionary's object, or text (always filled in but for an object).
+	struct PropertyKey {
+		std::optional<uint32_t> index;
+		Object *object = nullptr; // Held by the key it came from.
+		std::string text;
+	};
+	Object *held_object(Slot p_value) const;
+	std::string holder_name(Slot p_holder) const;
+	void raise_unsupported(const std::string &p_what);
+	void raise_not_found(const PropertyKey &p_key, Slot p_holder);
+	bool property_key(Slot p_holder, Slot p_key, PropertyKey *r_key);
+	std::optional<uint32_t> entry_of(const Entries *p_entries, const PropertyKey &p_key) const;
+	bool set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p_value);
+	std::optional<uint32_t> named_field(const ir::Class &p_class, std::string_view p_name) const;
+	std::optional<uint32_t> named_method(const ir::Class &p_class, std::string_view p_name) const;
+	bool get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
+	bool primitive_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
+	bool set_property(Slot p_holder, const PropertyKey &p_key, Slot p_value);
+	bool set_element(Vector *p_vector, const PropertyKey &p_key, Slot p_value);
+	void array_number_get(Vector *p_array, double p_number, Slot &r_out);
+	void array_number_set(Vector *p_array, double p_number, Slot p_value);
+	bool delete_property(Slot p_holder, const PropertyKey &p_key, bool *r_done);
+	bool has_property(Slot p_holder, const PropertyKey &p_key, bool p_prototype, bool *r_has);
+	void dynamic_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	void property_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	void table_new(const ir::Function &p_function, const ir::Instruction &p_in);
+	bool table_text(Object *p_table, std::string *r_text, bool *r_own);
+	void call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out);
+	bool object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
+	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
+	void property_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	Entries *loop_entries(Slot p_holder) const;
+	void property_loop(const ir::Function &p_function, const ir::Instruction &p_in);
 	void let_go_arguments(const ir::Function &p_callee, std::vector<Slot> *p_values);
 	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
@@ -191,6 +230,15 @@ private:
 	void array_concat(Vector *p_array, const VectorCall &p_call);
 	void splice(Vector *p_vector, const VectorCall &p_call);
 	void vector_sort(Vector *p_vector, const VectorCall &p_call);
+	void sorted(Vector *p_vector, const VectorCall &p_call, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, bool p_twins,
+			int32_t p_options);
+	struct SortField {
+		std::string name;
+		int32_t options;
+	};
+	bool sort_on_fields(const VectorCall &p_call, std::vector<SortField> *r_fields, int32_t *r_options);
+	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);
+	void vector_sort_on(Vector *p_vector, const VectorCall &p_call);
 	bool sort_order(ir::Kind p_kind, const std::vector<Slot> &p_elements, Object *p_compare, int32_t p_options, std::vector<uint32_t> *r_order,
 			bool *r_twins);
 	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
@@ -268,6 +316,9 @@ public:
 	// A new Array of the elements of one of Godot's Arrays (a handle), for a host passing one to a script:
 	// one reference, the caller's. Null if the engine could not give them (the error is reported).
 	Object *copy_engine_array(void *p_array, uint32_t p_class);
+	// The same for one of Godot's Dictionaries, where a flash.utils.Dictionary is wanted: its keys as a
+	// Dictionary keeps them (a number by its text), each value untyped.
+	Object *copy_engine_dictionary(void *p_dictionary, uint32_t p_class);
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
 	void release_object(Object *p_object);
