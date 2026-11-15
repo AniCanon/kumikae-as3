@@ -58,5 +58,6 @@ only the filtering word; additional edits insert visibility without rewriting me
 Generated signatures qualify accessible types and public default references, including references already
 qualified by class or package. Package prefixes are not value references. Getter and setter declarations
 and final modifiers are checked separately, including inherited complementary accessors. Parser recovery
-retains an empty override name's span so completion also works before its first character. Tests apply
-generated edits and check the resulting source with a fresh compiler.
+retains an empty override name's span at the end of a class so completion also works before its first
+character. Empty-name recovery before another member remains incomplete. Tests apply generated edits
+and check the resulting source with a fresh compiler.

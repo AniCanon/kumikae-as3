@@ -246,7 +246,8 @@ any Godot value passing as a condition):
 - Completion after a dot needs the value's type: nothing is offered for `*`, for a value whose type could
   not be worked out, or for a package path (`flash.utils.`). **LS-2**
 - Parameter-name completion inside an existing call is not implemented. Override stubs require an
-  unfinished `override function` name; existing signatures are left intact. **LS-2**
+  unfinished `override function` name; existing signatures are left intact. Empty-name recovery before
+  another member declaration is incomplete; typing the first name character enables the lookup. **LS-2**
 - General incremental checking remains pending. The body-only fast path falls back for declaration
   changes, syntax errors, accessors, interfaces and function-local imports. **LS-2**
 - Cancellation skips queued requests; a semantic check already running cannot be interrupted. A future

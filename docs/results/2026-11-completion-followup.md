@@ -175,6 +175,15 @@ intermittent unresolved result, not evidence that the timeout is fixed. Earlier 
 disposal warnings remain. The test logs are `agy-fixes-*.log` in each ignored build directory. These
 correctness checks do not replace the earlier latency or ten-minute retention measurements.
 
+Agy re-reviewed `b8d3048..2337414`, confirmed both findings resolved and found no new actionable
+regression. It independently ran the new override group in Release and ASan/UBSan (96 checks each),
+`test_query` (42,249 checks) and the style check; all passed. It inspected the broader recorded results
+without rerunning those suites. Its non-blocking note identified incomplete empty-name recovery before
+another member. A separate stdio check confirmed `override function get |` offers `count` at the end of
+the class, omits it before a following public method, and offers it again after typing `c`. The guide
+now states that limit, and LS-2 tracks it. This note does not affect the fixed qualified defaults or
+accessor-slot filtering.
+
 ## Timing and retention method
 
 ```sh
@@ -325,7 +334,8 @@ passing functional result is not a passing leak check.
   of compiler syntax trees was introduced.
 - Override generation requires an unfinished method/accessor name before its parameter list. It skips
   inaccessible signature types and non-public member defaults, preserves existing metadata/modifiers,
-  and emits an explicit throwing body for the user to implement.
+  and emits an explicit throwing body for the user to implement. Before another member declaration,
+  type at least one name character; empty-name parser recovery in that position remains incomplete.
 - The pinned Rider retains all ten disposed projects in both sustained workloads and reports a
   Problems View disposal warning. The exact GC root is not verified. Manual editing acceptance and
   broad IDE/platform compatibility remain unverified.
