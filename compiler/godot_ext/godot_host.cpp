@@ -344,13 +344,23 @@ bool GodotHost::evaluate(std::string_view p_expression, const vm::Wanted &p_resu
 	return take(p_result, value, p_expression, r_result, r_error);
 }
 
+// Asked once for each singleton (the interpreter keeps it), so the list may be looked through.
 void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {
 	const StringName &singleton_name = name(p_class);
 	Engine *engine = Engine::get_singleton();
-	Object *object = engine && engine->has_singleton(singleton_name) ? engine->get_singleton(singleton_name) : nullptr;
+	// An editor-only one is not in the list outside the editor; asking Godot for it would make Godot report
+	// it too, besides the AS3 error.
+	const bool listed = engine && engine->has_singleton(singleton_name) && engine->get_singleton_list().has(String(singleton_name));
+	Object *object = listed ? engine->get_singleton(singleton_name) : nullptr;
 	if (!object) {
 		// Some exist only in the editor, or only on one platform.
 		*r_error = "Godot has no '" + std::string(p_class) + "' here";
+		return nullptr;
+	}
+	// Each singleton is named for its class: the class the script names is the one it gets.
+	if (!object->is_class(String(singleton_name))) {
+		CharString got = object->get_class().utf8();
+		*r_error = "Godot's '" + std::string(p_class) + "' is a " + std::string(got.get_data()) + ", not a " + std::string(p_class);
 		return nullptr;
 	}
 	return new Variant(object);

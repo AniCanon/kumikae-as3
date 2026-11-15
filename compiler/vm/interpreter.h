@@ -50,6 +50,7 @@ private:
 	std::vector<Str *> strings_; // The module's string constants.
 	Str *null_text_ = nullptr; // "null"
 	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
+	std::vector<void *> singletons_; // The engine's singletons, by the string of their name, once found.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	bool failing_ = false; // An error is on its way out: pending_ holds it.
 	Slot pending_{}; // What was thrown, as an untyped value with a reference of its own.

@@ -185,7 +185,7 @@ check("an empty signal says so", "the signal is empty" in output and "at Signals
 
 # Singletons, constants and static methods, as GDScript works them out.
 output = compare("statics.gd", [
-    "pressed", "strength", "stick", "system", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
+    "pressed", "strength", "stick", "system", "an editor-only singleton is an AS3 error", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
     "listening", "heard", "cleared", "others still listen", "not listening", "input class", "same singleton",
     "singleton object",
     "escape", "captured", "ready notice", "axis", "zero", "up", "red", "forward", "identity", "sum", "up y",
@@ -195,6 +195,7 @@ output = compare("statics.gd", [
     "declared twice", "declared twice, value first", "declared twice, other order", "declaration skipped",
     "field read early", "static read early", "race",
 ])
+check("statics.gd: Godot says nothing of an editor-only singleton", "Can't retrieve singleton" not in output, output[-900:])
 check("statics.gd: a call from a worker thread is refused and says so",
       "Statics/spin() was called by Godot from another thread" in output, output[-900:])
 check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not in output and "Godot has no" not in output,

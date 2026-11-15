@@ -31,6 +31,7 @@ struct Request {
 	const Instruction &in;
 	Slot *registers;
 	Str *null_text;
+	void **singleton = nullptr; // For HostSingleton: where the singleton is kept once it is found.
 
 	std::string error;
 	Slot result{};
@@ -142,11 +143,18 @@ Outcome operate(Request &p_request) {
 			&p_request.error));
 }
 
+// Looked up once, then kept: a singleton lives as long as the engine.
 Outcome singleton(Request &p_request) {
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Ref;
-	p_request.result.p = p_request.host.source.singleton(p_request.text(p_request.in.b), &p_request.error);
-	return p_request.done(p_request.result.p != nullptr);
+	if (!*p_request.singleton) {
+		*p_request.singleton = p_request.host.source.singleton(p_request.text(p_request.in.b), &p_request.error);
+		if (!*p_request.singleton) {
+			return Outcome::Refused;
+		}
+	}
+	p_request.result.p = p_request.host.handles.copy(*p_request.singleton);
+	return Outcome::Done;
 }
 
 Outcome evaluate(Request &p_request) {
@@ -378,6 +386,12 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 		return;
 	}
 	Request request(module_, host_, p_function, p_in, stack_.data() + frames_.back().base, null_text_);
+	if (p_in.op == Op::HostSingleton) {
+		if (singletons_.size() <= p_in.b) {
+			singletons_.resize(module_.strings.size(), nullptr);
+		}
+		request.singleton = &singletons_[p_in.b];
+	}
 	switch (perform(request)) {
 		case Outcome::Missing:
 			raise_null();

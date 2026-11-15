@@ -42,6 +42,11 @@ Interpreter::~Interpreter() {
 	while (!frames_.empty()) {
 		pop();
 	}
+	for (void *kept : singletons_) {
+		if (kept) {
+			host_.handles.drop(kept);
+		}
+	}
 	for (size_t i = 0; i < globals_.size(); i++) {
 		drop(module_.globals[i].kind, globals_[i]);
 	}

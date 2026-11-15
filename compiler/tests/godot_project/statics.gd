@@ -31,6 +31,7 @@ func _physics_process(_delta: float) -> bool:
 	show("strength", ask("strength", ["ui_accept"]), Input.get_action_strength("ui_accept"))
 	show("stick", ask("stick"), Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down"))
 	show("system", ask("system"), OS.get_name())
+	show("an editor-only singleton is an AS3 error", ask("editorOnly"), true)
 	ask("slow", [0.5])
 	show("slowed", Engine.time_scale, 0.5)
 	show("time scale", ask("timeScale"), Engine.time_scale)

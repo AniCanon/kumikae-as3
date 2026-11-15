@@ -14,6 +14,11 @@ package {
 		public function strength(action:String):Number { return Input.getActionStrength(action); }
 		public function stick():Vector2 { return Input.getVector("ui_left", "ui_right", "ui_up", "ui_down"); }
 		public function system():String { return OS.getName(); }
+		// An editor-only singleton in a game: one AS3 error, which can be caught, and nothing from Godot.
+		public function editorOnly():Boolean {
+			try { var editor:EditorInterface = EditorInterface.singleton; } catch (e:Error) { return true; }
+			return false;
+		}
 		public function slow(scale:Number):void { Engine.timeScale = scale; }
 		public function timeScale():Number { return Engine.timeScale; }
 		public function faster():Number { Engine.timeScale *= 2; return Engine.timeScale; }

@@ -670,15 +670,15 @@ static void test_engine_statics() {
 		arguments[0].bits = 0;
 		arguments[0].d = 0.5;
 		CHECK(interpreter.call_method(object, "slow", arguments, 1, nullptr));
-		CHECK_EQ(engine.log, std::string("singleton Engine -> #6\nset #6.time_scale = 0.5\n"
-										 "singleton Engine -> #7\nget #7.time_scale\nset #7.time_scale = 8\n"));
+		// A singleton is looked up once, then kept: Engine was found when the class was set up.
+		CHECK_EQ(engine.log, std::string("set #2.time_scale = 0.5\nget #2.time_scale\nset #2.time_scale = 8\n"));
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "listen", nullptr, 0, nullptr));
-		CHECK_EQ(engine.log, std::string("singleton Input -> #8\nget #8.joy_connection_changed\nbind Pad/onJoy of Pad owner #1 -> #10\ncall #9.@add(#10)\n"));
+		CHECK_EQ(engine.log, std::string("get #5.joy_connection_changed\nbind Pad/onJoy of Pad owner #1 -> #7\ncall #6.@add(#7)\n"));
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "itself", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("singleton Input -> #11\n"));
-		CHECK_EQ((intptr_t)result.p, (intptr_t)11);
+		CHECK_EQ(engine.log, std::string());
+		CHECK_EQ((intptr_t)result.p, (intptr_t)5);
 		engine.drop(result.p);
 		// A constant with a value in the declarations asks the engine nothing.
 		engine.log.clear();
@@ -687,7 +687,7 @@ static void test_engine_statics() {
 		CHECK_EQ(result.d, 4194305.0 + 13.0 + 2.0);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "up", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("constant Vector2.UP as Vector2\nget #12.y\n"));
+		CHECK_EQ(engine.log, std::string("constant Vector2.UP as Vector2\nget #8.y\n"));
 		// A static method is called on no object.
 		engine.log.clear();
 		arguments[0].d = 1;
@@ -720,12 +720,12 @@ static void test_engine_statics() {
 		// A local of a Godot value with parts starts at its zero, once: the declaration is not run again.
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "unset", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("construct Vector2() -> #14\n"));
+		CHECK_EQ(engine.log, std::string("construct Vector2() -> #10\n"));
 		engine.drop(result.p);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "twice", nullptr, 0, &result));
-		CHECK_EQ(engine.log, std::string("construct Vector2() -> #15\ntext #15\n"));
-		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("<#15>null"));
+		CHECK_EQ(engine.log, std::string("construct Vector2() -> #11\ntext #11\n"));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("<#11>null"));
 		vm::free_string(static_cast<vm::Str *>(result.p));
 		CHECK(interpreter.call_method(object, "field", nullptr, 0, &result));
 		CHECK_EQ((intptr_t)result.p, (intptr_t)3);
@@ -733,13 +733,21 @@ static void test_engine_statics() {
 		// A Godot value without parts, and one set to null, are missing.
 		CHECK(interpreter.call_method(object, "nothing", nullptr, 0, &result));
 		CHECK(result.b);
-		CHECK_EQ(engine.boxes, 2); // The owner and the field.
-		// What the engine does not have is an AS3 error, and nothing is left behind.
+		CHECK_EQ(engine.boxes, 4); // The owner, the field, and the two singletons kept.
+		// What the engine does not have is an AS3 error, and nothing is left behind. (A singleton not yet
+		// looked up: this interpreter has Input already.)
 		CHECK_EQ(engine.errors, std::string());
-		engine.missing = "Input";
-		CHECK(!interpreter.call_method(object, "listen", nullptr, 0, nullptr));
-		CHECK(engine.errors.find("Error: Godot has no 'Input' here") == 0);
-		engine.errors.clear();
+		{
+			vm::Interpreter fresh(module, engine);
+			CHECK(fresh.start());
+			vm::Object *other = fresh.construct(pad, engine.box());
+			engine.missing = "Input";
+			CHECK(!fresh.call_method(other, "listen", nullptr, 0, nullptr));
+			CHECK(engine.errors.find("Error: Godot has no 'Input' here") == 0);
+			engine.errors.clear();
+			engine.missing.clear();
+			fresh.release_object(other);
+		}
 		engine.missing = "UP";
 		CHECK(!interpreter.call_method(object, "up", nullptr, 0, &result));
 		CHECK(engine.errors.find("Error: Godot has no constant 'UP'") == 0);
@@ -747,9 +755,9 @@ static void test_engine_statics() {
 		engine.missing = "from_angle";
 		CHECK(!interpreter.call_method(object, "made", arguments, 2, &result));
 		CHECK(engine.errors.find("Error: Godot has no 'from_angle'") == 0);
-		CHECK_EQ(engine.boxes, 2);
+		CHECK_EQ(engine.boxes, 4);
 		interpreter.release_object(object);
-		CHECK_EQ(engine.boxes, 0);
+		CHECK_EQ(engine.boxes, 2); // The singletons, until the interpreter goes.
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
