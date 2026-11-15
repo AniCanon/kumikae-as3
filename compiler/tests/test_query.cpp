@@ -212,7 +212,8 @@ static void test_parameter_names() {
 	Offered typed = complete(player((names + "move(1, la|);").c_str()));
 	CHECK(!typed.items.empty() && typed.items[0].name == "label");
 	// Through a member, and in a nested call: the innermost call's parameter.
-	CHECK_EQ(complete(player("var by:int; this.hurt(|); } function hurt(by:int):void {")).items.at(0).name, std::string("by"));
+	const Offered through_member = complete(player("var by:int; this.hurt(|); } function hurt(by:int):void {"));
+	CHECK_EQ(through_member.items.at(0).name, std::string("by"));
 	Offered nested = complete(player((names + "move(Math.max(|), \"\");").c_str()));
 	CHECK(nested.items.empty() || !nested.items[0].is_parameter_name);
 	// Outside a call nothing is marked.
