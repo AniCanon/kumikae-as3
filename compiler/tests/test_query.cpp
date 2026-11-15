@@ -106,8 +106,9 @@ static void test_completion() {
 	CHECK(statics.has("ZERO") && statics.has("fromAngle") && !statics.has("x") && !statics.has("normalized"));
 	CHECK(complete(player("Player.|")).has("count"));
 
-	// Nothing is known of an untyped value, so nothing is offered: not everything.
-	CHECK(complete(player("var a:* = 1; a.|")).items.empty());
+	// Of an untyped value only what every value has is known: Object's members.
+	Offered untyped = complete(player("var a:* = 1; a.|"));
+	CHECK(untyped.has("toString") && untyped.has("hasOwnProperty") && !untyped.has("speed") && !untyped.has("x"));
 
 	// Not after a dot: what a name here could mean.
 	Offered scope = complete(player("var local:int = 1; |"));
@@ -173,6 +174,26 @@ static void test_completion_scopes_and_context() {
 	CHECK(complete(player("var items:Vector.<Vector2>; items[0].|")).has("x"));
 	CHECK(complete(player("(position).|")).has("x"));
 	CHECK(complete(player("missing.|; position.x;")).items.empty());
+	// A value whose type could not be worked out is a value all the same.
+	Offered unknown = complete(player("var v:Vector2; v.nope.|"));
+	CHECK(unknown.has("toString") && !unknown.has("x"));
+	CHECK(complete(player("arguments.|")).has("toString"));
+	// A package's path: what is in it, and the packages inside it.
+	Offered utils = complete(player("flash.utils.|"));
+	CHECK(utils.has("Dictionary") && utils.has("getTimer") && !utils.has("toString"));
+	Offered flash = complete(player("flash.|"));
+	CHECK(flash.find("utils") && flash.find("utils")->is_package && !flash.has("Dictionary"));
+	CHECK(complete(player("godot.Node|")).has("Node2D"));
+	CHECK(complete(player("var t:int = flash.utils.get|")).has("getTimer"));
+	// Where a type is written, its types only, however the file goes on.
+	Offered typed_path = complete(player("var d:flash.utils.|\nposition.x;"));
+	CHECK(typed_path.has("Dictionary") && !typed_path.has("getTimer") && !typed_path.has("x"));
+	// A dot after something that is not a name is not a package's path, the top-level package included.
+	CHECK(complete(player("{ var a:int; }.|")).items.empty());
+	CHECK(complete(player("missing..|")).items.empty());
+	// A name in reach comes before a package of that name.
+	Offered shadowed = complete(player("var flash:Vector2; flash.|"));
+	CHECK(shadowed.has("x") && !shadowed.has("utils"));
 	CHECK(complete(player("var re:RegExp = /spe|/;")).items.empty());
 	CHECK(complete(player("var re:RegExp = /[(),.]spe|/;")).items.empty());
 	CHECK(complete(player("var re:RegExp = /spe|\n")).items.empty());

@@ -139,9 +139,10 @@ public:
 	// program, and nothing outside it.
 	std::vector<FoundSymbol> find(std::string_view p_query, size_t p_limit);
 	// What could be written at the offset, narrowed by the letters already there, whatever their case.
-	// After a dot: what the value before it has. Where a type is written: types. Otherwise the names in
+	// After a dot: what the value before it has (Object's members if its type is `*` or not known), or
+	// for a package's path what the package holds. Where a type is written: types. Otherwise the names in
 	// reach (locals, members, definitions, keywords). Nothing inside a comment or a string, and nothing
-	// after a dot whose value has no known type.
+	// after a name that means nothing here.
 	// Counts support bounded-state tests and benchmarks; caches are owned by this checked generation.
 	size_t cached_completion_items() const { return completion_items_.size(); }
 	size_t cached_context_units() const { return context_nodes_.size(); }

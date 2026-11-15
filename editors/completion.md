@@ -20,7 +20,11 @@ getParent().getParent().  // Members of Node
 points[0].                // Vector2 members if points is Vector.<Vector2>
 ```
 
-There are no guessed members for an unknown or `*` receiver. A partial expression can still be
+For a `*` receiver, or one whose type could not be worked out, only what every value has is offered:
+`Object`'s members (`toString`, `hasOwnProperty` and the rest). After a package's path (`flash.utils.`,
+`godot.`) completion offers what that package holds and the packages inside it; where a type is written
+(`var d:flash.utils.`), its types only. A name in reach comes before a package of the same name. Nothing
+is offered after a name that means nothing in the file. A partial expression can still be
 completed; errors elsewhere do not require saving a valid file first. Comments, strings and regular
 expressions do not offer code completion. Parameters, function-wide local variables, outer captures,
 named function expressions, catch variables and function-local imports respect their compiler scope.
@@ -97,7 +101,7 @@ See the [measured results](../docs/results/2026-11-completion.md) for latency, m
   compiler. Rebuilding an unrelated checkout does not update an installed plugin's binary.
 - If pairing is disabled, check the IDE's editor smart-key settings. The plugin honors those settings.
 - If a member is missing, hover the receiver and check its declared type and visibility. A dynamic value
-  requires a known type before its members can be offered.
+  offers only `Object`'s members until it has a known type.
 - For a sandbox trace, use `./gradlew runIde -PlspTrace=<existing-folder>` from `editors/jetbrains`.
   Trace files contain source text; keep them outside the repository and do not enable them for timings.
 - Windows language-server support, automatic imports and whole-project incremental type checking remain
