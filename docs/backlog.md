@@ -45,8 +45,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Stage 1e: Godot's math types
 
-- A malformed tag in a declaration file (both `left` and `right`, two rules for one operator) is resolved
-  silently. **clean-up**
 - `for each` over a packed array does not check the variable's type. **2c**
 - Godot's string-format operator (`"%s" % value`) is not available. **2c**
 
@@ -85,7 +83,6 @@ Found by the review of the clean-up pass itself.
   on a packed array of vectors, though there the value is stored. **2c**
 - A local that the right-hand side reassigns is read after it: `a.position.x = (a = b, 5)` writes to `b`.
   (A whole property behaves the same: `a.visible = (a = b, false)`.) **clean-up**
-- `x >>>= vector` passes the checker and fails when it runs. **clean-up**
 - **decision** `"" + this` in a script without `toString()` reads `[object Values]` (AS3's), while Godot's
   text for the same node reads `<Node2D#123>`. And a `toString()` that raises an error ends the caller
   through `"" + this`, but through Godot's text it is reported and Godot's text stands.
@@ -125,8 +122,6 @@ Found by the review of the clean-up pass itself.
   guarded: a property read or a notification from another thread is not. **2d**
 - The singleton the engine gives is not checked against the class the script names. Right today, since
   every singleton's name is its class. **clean-up**
-- A constant with a negative value is worked out when the line runs (three instructions), not written
-  as one number. **clean-up**
 - An editor-only singleton used in a game is reported twice: by Godot, then as an AS3 error. **clean-up**
 - A variable typed as a singleton class (`var i:Input = Input.singleton`) reaches only `GodotObject`'s
   members: the class's own are static. **clean-up**

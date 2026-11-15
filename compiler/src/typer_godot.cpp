@@ -1,5 +1,7 @@
 #include "typer.h"
 
+#include <algorithm>
+
 namespace kas3 {
 
 const Type *Typer::tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name) {
@@ -45,6 +47,7 @@ auto Typer::described(const Type *p_type) -> const Described * {
 			result = *base;
 		}
 	}
+	const size_t inherited = result.operators.size(); // A class may say again what its base says.
 	for (const Metadata &tag : static_cast<ClassDecl *>(symbol->node)->metadata) {
 		std::string_view op, left, right, returns, element, keyed;
 		for (const MetadataArg &argument : tag.args) {
@@ -71,6 +74,10 @@ auto Typer::described(const Type *p_type) -> const Described * {
 			result.complete = true;
 		} else if (tag.name == "Operator") {
 			result.complete = true;
+			if (!left.empty() && !right.empty()) {
+				symbol->unit->diagnostics.error(tag.offset, "an [Operator] tag names both a left and a right operand");
+				continue;
+			}
 			OperatorRule rule;
 			rule.op = op;
 			rule.result = tag_type(symbol, tag, returns);
@@ -84,6 +91,16 @@ auto Typer::described(const Type *p_type) -> const Described * {
 			}
 			// A tag that names a type the program does not have describes nothing.
 			if (!op.empty() && rule.result && (rule.other || rule.side == OperatorRule::Unary)) {
+				const auto same = [&](const OperatorRule &p_other) {
+					return p_other.op == rule.op && p_other.side == rule.side && p_other.other == rule.other;
+				};
+				if (std::any_of(result.operators.begin() + static_cast<std::ptrdiff_t>(inherited), result.operators.end(), same)) {
+					const std::string where = rule.side == OperatorRule::Unary
+							? std::string(" with no other operand")
+							: " with " + quoted(compilation_.type_name(rule.other)) + (rule.side == OperatorRule::Left ? " on the left" : " on the right");
+					symbol->unit->diagnostics.error(tag.offset, "a second [Operator] tag for " + quoted(op) + where);
+					continue;
+				}
 				result.operators.push_back(rule);
 			}
 		}

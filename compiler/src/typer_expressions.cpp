@@ -74,7 +74,8 @@ const Type *Typer::assign_type(Expr *p_expression) {
 		default:
 			break;
 	}
-	if (bitwise && never_operator(assign->op, target, assign->offset)) {
+	// No Godot type has a bit operation, on either side.
+	if (bitwise && (never_operator(assign->op, target, assign->offset) || never_operator(assign->op, value, assign->offset))) {
 		return target;
 	}
 	TokenKind plain = compound_operator(assign->op);

@@ -358,6 +358,7 @@ class Lowerer {
 
 	uint32_t evaluate(Expr *p_expression, Kind p_want);
 	uint32_t number_literal(Expr *p_expression, Kind p_want);
+	uint32_t number_constant(double p_value, Kind p_kind, Kind p_want, uint32_t p_position);
 	uint32_t name_value(Expr *p_expression);
 	uint32_t member_value(Expr *p_expression);
 	uint32_t new_value(Expr *p_expression);

@@ -208,8 +208,14 @@ uint32_t Lowerer::number_literal(Expr *p_expression, Kind p_want) {
 		emit(Op::ConstI64, position, out, wide(*exact));
 		return out;
 	}
-	double value = literal_value(static_cast<NumberLit *>(p_expression));
-	Kind kind = natural(p_expression);
+	return number_constant(literal_value(static_cast<NumberLit *>(p_expression)), natural(p_expression), p_want, position);
+}
+
+// A number known now, as one constant: in the kind that is wanted when it fits that exactly, else its own.
+uint32_t Lowerer::number_constant(double p_value, Kind p_kind, Kind p_want, uint32_t p_position) {
+	const double value = p_value;
+	const uint32_t position = p_position;
+	Kind kind = p_kind;
 	// A literal is written straight into the kind that is wanted, when it fits exactly.
 	if ((p_want == Kind::F64 || p_want == Kind::I32 || p_want == Kind::U32) && kind != p_want) {
 		bool fits = p_want == Kind::F64 || (value == std::floor(value) && (p_want == Kind::I32 ? value >= -2147483648.0 && value <= 2147483647.0 : value >= 0 && value <= 4294967295.0));
@@ -430,7 +436,6 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 
 uint32_t Lowerer::unary(Unary *p_unary, Kind p_want) {
 	uint32_t position = p_unary->offset;
-	(void)p_want;
 	switch (p_unary->op) {
 		case TokenKind::Minus:
 		case TokenKind::Plus: {
@@ -454,6 +459,11 @@ uint32_t Lowerer::unary(Unary *p_unary, Kind p_want) {
 			}
 			if (p_unary->op == TokenKind::Plus) {
 				return expression(p_unary->operand, Kind::F64);
+			}
+			if (p_unary->operand->kind == NodeKind::NumberLit) {
+				// `-1` is one constant, not a 1 negated as the program runs. -0 stays a Number.
+				const double value = -literal_value(static_cast<NumberLit *>(p_unary->operand));
+				return number_constant(value, natural(p_unary), value == 0 ? Kind::F64 : p_want, position);
 			}
 			uint32_t out = reg(Kind::F64);
 			emit(Op::NegF64, position, out, expression(p_unary->operand, Kind::F64));
