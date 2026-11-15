@@ -198,7 +198,7 @@ auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position
 			whole == Kind::Val) {
 		// A member of a value that is itself stored somewhere.
 		place.of_value = true;
-		place.part = std::make_shared<Part>();
+		place.part = &parts_.emplace_back();
 		place.part->whole = place_of(p_object, p_later);
 		whole_of(place, p_position);
 		return place;

@@ -134,9 +134,6 @@ the review of the clean-up put off.
 - Planned and not done: the listener sweep in a file of its own, `godot_values.cpp`, a table of handlers
   in the language server. **clean-up**
 - The syntax-tree printer's cases print inline; 28 of its 48 are over five lines. **clean-up**
-- `Place::part` is a `std::shared_ptr` and `engine_call` takes a `std::function`; `join()` is written in
-  two files of the front end; `[[nodiscard]]` is on the host interfaces but not on their overrides.
-  **clean-up**
 - The interpreter makes a new handle for every value Godot gives back, which is most of what a call into
   Godot now costs. A design change, for the native backend's stage. **clean-up**
 

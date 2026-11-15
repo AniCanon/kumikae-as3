@@ -78,7 +78,7 @@ std::optional<uint32_t> Lowerer::signal_call_by_name(Call *p_call) {
 	if (found == NONE) {
 		return std::nullopt;
 	}
-	return engine_call(p_call, verb->second, found, [&]() { emit(Op::HostMember, member->object->offset, found, object, name); });
+	return engine_call(p_call, verb->second, found, Later{ Op::HostMember, member->object->offset, found, object, name });
 }
 
 // A conversion written as a call: int(x), String(x).
@@ -459,7 +459,7 @@ std::string Lowerer::defaults_key(const Symbol *p_method) const {
 	return klass + "." + method;
 }
 
-uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver, const std::function<void()> &p_before) {
+uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver, std::optional<Later> p_before) {
 	uint32_t position = p_call->offset;
 	uint32_t name = 0;
 	if (!engine_name(p_method->owner, p_method->name, &name)) {
@@ -487,7 +487,7 @@ uint32_t Lowerer::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receive
 		owner_of(script_object, receiver, object->offset);
 	}
 	if (p_before) {
-		p_before(); // What the receiver still needs, now that the arguments are worked out.
+		emit(p_before->op, p_before->position, p_before->a, p_before->b, p_before->c); // What the receiver still needs.
 	}
 	uint32_t out = kind == Kind::Void ? NONE : engine_reg(kind, p_method->type ? compilation_.type_of(p_method->type) : nullptr);
 	emit(Op::HostCall, position, out, name, arguments(std::move(list)));

@@ -367,12 +367,12 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	}
 	void print(std::string_view p_text) override { log += "print " + std::string(p_text) + "\n"; }
 	void error(std::string_view p_text) override { errors += std::string(p_text) + "\n"; }
-	void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *) override {
+	[[nodiscard]] void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *) override {
 		void *made = box();
 		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	void *collection(std::string_view p_type, ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, std::string *) override {
+	[[nodiscard]] void *collection(std::string_view p_type, ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, std::string *) override {
 		void *made = box();
 		std::vector<vm::Argument> elements;
 		for (size_t i = 0; i < p_count; i++) {
@@ -381,7 +381,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		log += "collection " + std::string(p_type) + "[" + list(elements.data(), p_count) + "] -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted,
+	[[nodiscard]] bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted,
 			vm::Slot *r_result, std::string *r_error) override {
 		ir::Kind p_kind = p_wanted.kind;
 		log += "call #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
@@ -392,40 +392,40 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_kind, r_result, 0.25, "text");
 		return true;
 	}
-	bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	[[nodiscard]] bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "get #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + "\n";
 		give(p_wanted.kind, r_result, 7.5, name);
 		return true;
 	}
-	bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	[[nodiscard]] bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "get #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "]\n";
 		give(p_wanted.kind, r_result, 2.5, "text");
 		return true;
 	}
-	bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *) override {
+	[[nodiscard]] bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *) override {
 		log += "set #" + std::to_string((intptr_t)p_receiver) + "[" + show(p_key) + "] = " + show(p_value) + "\n";
 		return true;
 	}
 	const ir::Module *module = nullptr;
-	void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *) override {
+	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *) override {
 		void *made = box();
 		log += "bind " + (module ? module->functions[p_function].name : std::to_string(p_function)) + " of " +
 				(module ? module->classes[p_object->klass].name : std::string("?")) + " owner #" + std::to_string((intptr_t)p_owner) + " -> #" +
 				std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "member #" + std::to_string((intptr_t)p_receiver) + "[" + std::string(p_name) + "] as " + std::string(p_wanted.type) + "\n";
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
 	}
 	std::string missing; // A singleton, constant or static method the engine does not have.
-	bool evaluate(std::string_view p_expression, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
+	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *) override {
 		log += "evaluate " + std::string(p_expression) + " as " + std::string(p_wanted.type) + "\n";
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
 	}
-	void *singleton(std::string_view p_class, std::string *r_error) override {
+	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override {
 		if (p_class == missing) {
 			*r_error = "Godot has no '" + missing + "' here";
 			return nullptr;
@@ -434,7 +434,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		log += "singleton " + std::string(p_class) + " -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
-	bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
+	[[nodiscard]] bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
 		log += "constant " + std::string(p_class) + "." + std::string(p_name) + " as " + std::string(p_wanted.type) + "\n";
 		if (p_name == missing) {
 			*r_error = "Godot has no constant '" + missing + "'";
@@ -443,7 +443,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_wanted.kind, r_result, 0, "");
 		return true;
 	}
-	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
+	[[nodiscard]] bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
 		log += "static " + std::string(p_class) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
 		if (p_method == missing) {
@@ -453,16 +453,16 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_wanted.kind, r_result, 0.5, "text");
 		return true;
 	}
-	bool present(void *p_value) override { return p_value != nullptr; }
-	bool is_class(void *p_value, std::string_view p_class) override {
+	[[nodiscard]] bool present(void *p_value) override { return p_value != nullptr; }
+	[[nodiscard]] bool is_class(void *p_value, std::string_view p_class) override {
 		log += "is #" + std::to_string((intptr_t)p_value) + " " + std::string(p_class) + "\n";
 		return p_value != nullptr;
 	}
-	vm::Str *text(void *p_value) override {
+	[[nodiscard]] vm::Str *text(void *p_value) override {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
 	}
-	bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
+	[[nodiscard]] bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
 			std::string *r_error) override {
 		log += "operate " + std::string(p_operator) + " (" + list(p_arguments, p_count) + ") as " + ir::kind_name(p_wanted.kind) +
 				(p_wanted.type.empty() ? "" : " " + std::string(p_wanted.type)) + "\n";
@@ -473,7 +473,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		give(p_wanted.kind, r_result, 1, "text");
 		return true;
 	}
-	bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override {
+	[[nodiscard]] bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override {
 		log += "set #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_property) + " = " + show(p_value) + "\n";
 		if (fail_sets) {
 			*r_error = "the engine refused to set " + std::string(p_property);
@@ -484,7 +484,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		}
 		return true;
 	}
-	void *copy(void *p_value) override {
+	[[nodiscard]] void *copy(void *p_value) override {
 		if (p_value) {
 			boxes++;
 		}

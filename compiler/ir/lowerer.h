@@ -10,7 +10,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <functional>
+#include <deque>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -259,12 +259,15 @@ class Lowerer {
 		// For Engine: the member is one part of a Godot value that is itself stored somewhere
 		// (`position.x`). Godot's values are copies, so writing the part is: read the whole value, change
 		// the part, write the whole value back.
-		std::shared_ptr<Part> part;
+		Part *part = nullptr; // In parts_.
 	};
 	struct Part {
 		Place whole; // Where the value is stored.
 		uint32_t value = NONE; // The register it was read into, once it has been.
 	};
+	// The parts of Godot values that places refer to (see Place::part): a deque, so that each stays where
+	// it is as more are made. Kept for the whole lowering: places are short-lived, and parts are small.
+	std::deque<Part> parts_;
 
 	// The value a part belongs to. It is read where the place is worked out, before anything to the right
 	// of it runs, as GDScript does: `position.x = f()` keeps the `y` that `position` had before `f()`.
@@ -354,7 +357,12 @@ class Lowerer {
 	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
 			const std::string &p_defaults = std::string());
 
-	uint32_t engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver = NONE, const std::function<void()> &p_before = nullptr);
+	// An instruction a call still needs once its arguments are worked out (the signal it is made on).
+	struct Later {
+		Op op;
+		uint32_t position, a, b, c;
+	};
+	uint32_t engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver = NONE, std::optional<Later> p_before = std::nullopt);
 
 	// A method of Godot's that is called on no object: `Vector2.fromAngle(a)`.
 	uint32_t static_call(Call *p_call, Symbol *p_method);

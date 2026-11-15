@@ -117,7 +117,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 			place.type = p_target->type;
 			place.of_value = true;
 			if (index->object->kind == NodeKind::Name || index->object->kind == NodeKind::Member) {
-				place.part = std::make_shared<Part>();
+				place.part = &parts_.emplace_back();
 				place.part->whole = place_of(index->object);
 				whole_of(place, p_target->offset);
 			} else {
