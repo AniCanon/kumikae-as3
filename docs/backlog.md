@@ -1,8 +1,8 @@
 # Backlog: deferred items
 
-Every review leaves some findings that were judged minor and put off. They are not forgotten: this page
-lists all of them, by the stage that found them, and the owner has said they are to be fixed (2026-11-12).
-An item leaves this page only when it is fixed, with a test, or when the owner decides it stands.
+Findings that earlier reviews put off. Since 2026-11-15 nothing is added here: the owner's rule is that
+what is found is fixed at once, by anyone and any agent. This page only shrinks: an item leaves it when it
+is fixed, with a test, or when the owner decides it stands.
 
 The [roadmap](roadmap.md) says what is being built now. This page says what is owed, and when.
 
@@ -10,7 +10,7 @@ The [roadmap](roadmap.md) says what is being built now. This page says what is o
 
 ## How this page is kept
 
-- When a stage's review defers a finding, it is added here in the same branch, with the stage that fixes it.
+- Nothing new is added (the owner's rule, 2026-11-15).
 - When an item is fixed, its line is removed and the commit says so.
 - An item marked **decision** needs the owner's answer, not code.
 
