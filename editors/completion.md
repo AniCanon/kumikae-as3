@@ -25,8 +25,18 @@ completed; errors elsewhere do not require saving a valid file first. Comments, 
 expressions do not offer code completion. Parameters, function-wide local variables, outer captures,
 named function expressions, catch variables and function-local imports respect their compiler scope.
 
-In an import, complete the package path and type, for example `import godot.Vec`. Completion does not
-silently add imports to the file. Types must already be visible to appear as unqualified names.
+In an import, complete the package path and type, for example `import godot.Vec`. Outside imports,
+a partial type name can offer an accessible type from another package. Its description names the import.
+Accepting `Vector2` for `Vec` adds `import godot.Vector2;` and replaces the identifier in one undoable action.
+An existing visible name takes precedence; duplicate short names keep their qualified descriptions.
+An empty-prefix lookup is refreshed as a prefix is typed, so imports do not require reopening the popup.
+
+Inside a derived class, `override function _ph` offers inherited methods such as `_physicsProcess`.
+Acceptance adds the signature and a body that throws `Error("Not implemented")`; replace that body with
+your implementation. Metadata, comments and an existing `final` modifier are preserved. Stubs are offered
+only while the method name is unfinished, before a parameter list. Private, final and static methods,
+inaccessible signature types and non-public member defaults are excluded. An explicitly written
+visibility must match the inherited method. Getters/setters use their corresponding accessor prefix.
 
 ## Accepting a suggestion
 
@@ -54,10 +64,10 @@ expressions do not advance the outer call's active parameter.
 Parentheses, square brackets, braces and single/double quotes use the IDE's pairing settings. A closing
 partner can be typed to move past the existing one. Backspace in an empty bracket pair removes the pair.
 Enter inside braces creates an indented line, using the project's tab/space settings. Code punctuation
-inside comments and strings is not treated as a new code block. Regex literals are protected in
-expression positions and after control conditions. The local lexer cannot distinguish every regex
-from division after a closing brace; that context remains a limitation. The compiler handles regex
-contexts independently for completion and argument help.
+inside comments and strings is not treated as a new code block. The local lexer tracks expression and statement braces, control conditions, function declarations and
+expressions, ternary expressions and labels to distinguish regex literals from division. Its restart
+state carries common nesting directly; deeper nesting reconstructs context from the text prefix without
+retaining a document history. The compiler supplies its own parsed regions for completion and argument help.
 
 Highlighting still comes from the shared TextMate grammar. A small adapter supplies AS3 token boundaries
 to the native editing handlers while preserving TextMate's color attributes, including string escapes.
@@ -74,9 +84,18 @@ Clients advertising LSP completion-list edit defaults receive the shared range o
 receive a range with each item. Snippets and separate insert/replace edits are also capability-gated.
 Every result describes the current document known to the server.
 
-The server still checks names and types across the project after an edit, reusing unchanged parses.
-This change does not introduce concurrent access to mutable syntax trees or a second type checker.
-See the [measured results](../docs/results/2026-11-completion.md) for latency, memory, commands and limits.
+After a clean check, edits confined to method/function bodies reuse stable declaration symbols and
+recheck the changed units. Sources are immutable shared snapshots; body symbols and scopes belong to
+the changed unit and are replaced together. Declaration changes, syntax errors, interfaces, accessors,
+function-local imports and recovery from an initially invalid program use a full check. Type-table growth
+is bounded by periodically rebuilding the semantic environment. This is a conservative fast path, not
+a general dependency graph for incremental checking.
+
+Document changes with old or duplicate versions are ignored with a log message. Diagnostic versions are
+sent when the client advertises support. A bounded lookahead batch cancels queued requests or rejects
+requests made obsolete by a newer document change before checking. Partial frames do not delay an
+already complete request. A check already running remains synchronous and cannot be interrupted.
+See the [follow-up results](../docs/results/2026-11-completion-followup.md) for latency, memory and validation.
 
 ## Troubleshooting and limits
 
@@ -88,10 +107,13 @@ See the [measured results](../docs/results/2026-11-completion.md) for latency, m
   requires a known type before its members can be offered.
 - For a sandbox trace, use `./gradlew runIde -PlspTrace=<existing-folder>` from `editors/jetbrains`.
   Trace files contain source text; keep them outside the repository and do not enable them for timings.
-- Windows language-server support, override-signature generation, automatic imports and whole-project
-  incremental type checking remain separate work. Unknown callable signatures cannot show argument help.
-- The plugin is pinned to the Rider build listed in its README. Android Studio and IntelliJ open-source
-  builds do not provide the JetBrains LSP module this plugin requires; they are not supported targets.
+- Windows transport uses binary stdio, pipe readiness checks, UTF-8 filesystem paths and `.exe` compiler
+  discovery. Windows runtime validation is still pending; the macOS tests do not establish Windows support.
+- Unknown callable signatures cannot show argument help. General incremental declaration checking and
+  interruption of a running check remain pending.
+- Rider and IntelliJ IDEA Community are the intended JetBrains targets. The current package uses Rider's
+  native LSP module and remains pinned to its verified build. Community integration needs an optional
+  LSP4IJ adapter and separate validation; it is not yet included. Android Studio is outside the scope.
 
 The [IntelliJ LSP documentation](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html)
 describes the supported products. The [editor extension documentation](https://plugins.jetbrains.com/docs/intellij/additional-minor-features.html)

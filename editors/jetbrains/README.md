@@ -4,20 +4,22 @@ The plugin integrates ActionScript 3 with Rider through the compiler's language 
 editor handlers. It also provides project/run tools and an iOS Simulator panel. See
 [completion and typing assistance](../completion.md) for editor behavior, settings and limits, and
 [completion results](../../docs/results/2026-11-completion.md) for the checks and measurements.
-The Simulator's own measurements are described below.
+The Simulator's own measurements are described below. The [completion follow-up](../../docs/results/2026-11-completion-followup.md)
+records generated-edit acceptance and body-only checking. Its paired ten-minute AS3/plain-text
+controls retain all ten disposed projects in the pinned sandbox; the exact GC root remains unverified.
 
 | Checked | By | Result |
 |---|---|---|
 | Compilation, style check and plugin zip | Automated build, 2026-11-15 | `./gradlew check buildPlugin` succeeds. |
 | Service tests (`core`) | Automated build | 82 pass; three opt-in live probes skip in ordinary checks and passed separately. |
-| Plugin tests (language, project tools, panel and adapters) | Automated build | 119 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
+| Plugin tests (language, project tools, panel and adapters) | Automated build | 126 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
 | Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
 | Native Swift tests | `swift test` | 38 pass in 20 suites. |
 | Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
 | Native rotation and text | Owned iPhone and iPad fixtures, 2026-11-15 | Four orientation commands and target taps passed on each family; exact ASCII, accents, Japanese, Arabic and emoji reached the app. Interface orientation policy still applies. |
 | Native helper/reader endurance | Owned 60 Hz fixture, 600.020 seconds | 59.90 reader frames/s, 59.60 distinct raster ticks/s; 29,975 inputs, p95 6.72 ms and max 57.84 ms. Whole-panel cadence and the historical 82 ms event remain unverified. |
 | Standalone frame retention | Production repository/controller/screen, synthetic frames | 7,800 distinct paints; full-GC heap 48.023–48.097 MiB, one retained stream image; zero images and 35.097 MiB hidden. Whole IDE/Compose not measured. |
-| Agent client tests | `python3 -m unittest` | 8 pass. |
+| Agent client tests | `python3 -m unittest` | 9 pass. |
 | Service and agent client against a booted Simulator | Run by hand through `simulator.py` | Devices, select, launch of `org.kumikae.as3test`, a 2622x1206 PNG screenshot, console log, and the test report "14 passed, 0 failed". |
 | The panel's own repository against a booted Simulator | One throwaway test, read-only | Select, a decoded 1206x2622 JPEG picture in 403 ms, an empty console page and status. |
 | Panel layout and buttons | UI probe in a sandbox Rider, with a synthetic service | Light and dark pictures under `build/reports/ui/`; Refresh, Boot and Launch pressed through the real buttons. |
@@ -36,7 +38,7 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 ## What is implemented
 
 - Native LSP completion with typed member chains, imports, lexical scopes, replacement ranges,
-  capability-aware callable snippets and signature help.
+  capability-aware callable snippets, automatic type imports, override stubs and signature help.
 - Local paired punctuation, quote handling and Enter indentation using the IDE's settings. AS3 tokens
   drive editing while the shared TextMate grammar supplies colors.
 - A **Simulators** tab lists every simulator with a button to boot it or shut it down; each
@@ -78,7 +80,8 @@ installs idb only when you explicitly choose Install idb… and agree to its dia
 This is the beginning of the one plugin planned in roadmap stage 6. It connects `kas3c lsp` for
 completion, argument help, errors and navigation; AS3 breakpoints and stepping remain planned.
 The Simulator panel is absent on Windows and Linux. The descriptor accepts only platform build
-262.10968.170; other IDEs, builds and operating systems have not been tested.
+262.10968.170; IntelliJ IDEA Community integration and other operating systems remain unverified.
+Community is the second intended target and needs an optional LSP4IJ adapter; Android Studio is outside the scope.
 
 ## Build
 

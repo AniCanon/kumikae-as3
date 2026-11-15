@@ -90,8 +90,8 @@ struct CompletionResult {
 	bool incomplete = false; // More candidates become eligible once the user types a prefix.
 };
 
-// Built over a Compilation after check(). It reads the trees the passes wrote onto, so it is good for as
-// long as that Compilation is the one using them.
+// Built over one checked generation. Discard queries before the compilation's trees or body scopes
+// change, including a successful update_bodies that preserves the Compilation itself.
 class Queries {
 	Compilation &compilation_;
 	std::unordered_map<const Unit *, std::vector<Occurrence>> occurrences_;

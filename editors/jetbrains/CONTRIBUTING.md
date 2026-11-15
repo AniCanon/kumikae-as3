@@ -88,3 +88,17 @@ probe plugin is excluded from the distributable ZIP.
 The native lookup probe supplies an activation event to its sandbox frame when launched in the
 background; it does not steal desktop focus or test OS activation. It trusts only its generated
 fixture path and restores the sandbox's trust settings when finished.
+
+For a lifecycle control, run `KUMIKAE_COMPLETION_CONTROL_PROBE=1 ./gradlew --offline runIde -PuiProbe`.
+It opens plain-text files, confirms each project closes and is disposed, and records the same heap
+samples. Save the reports before running another probe: both use `build/reports/ui/`. The control and
+AS3 probes both reproduce the pinned Rider's `HighlightingPanel` disposal warning. The paired
+ten-minute runs retain all ten disposed projects; see the
+[results](../../docs/results/2026-11-completion-followup.md#ide-lifecycle-investigation). The AS3 probe also verifies generated imports and override
+signatures are accepted and undone atomically.
+
+Add `KUMIKAE_COMPLETION_RETENTION_PROBE=1` for ten projects across ten minutes, with live-GC histograms
+and weak closed-project counts. Combine it with the control flag for the same plain-text workload.
+The test plugin cancels the pinned Rider's unsolicited evaluation feedback survey, which otherwise
+blocks project opening during longer runs. It matches only that survey class and uses Cancel; license
+dialogs and production IDE settings are untouched. Callback failures are propagated to the probe result.

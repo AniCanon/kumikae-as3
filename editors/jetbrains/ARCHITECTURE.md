@@ -219,3 +219,15 @@ Native Unicode input uses shared string validation, copies unchanged UTF-8 throu
 injected guest pasteboard, then sends the native paste shortcut. A failed copy sends
 no shortcut. The command runner owns separate pipe workers for each child and joins
 them when that child ends; blocking pipe work never occupies the shared common pool.
+
+Language-server launch discovery and declaration refresh belong to `As3ProjectLanguageService`.
+Its disposable alarm drives one bounded refresh controller per project, instead of a sleeping worker
+for every opened file. Disposal cancels scheduled work; callbacks delivered after disposal do nothing.
+The missing-compiler warning is also project-owned. `DeclarationRefreshTest` checks scheduling,
+success, retry bounds and disposal with injected callbacks and no real threads.
+
+The local lexer carries expression/control/brace context in its restart state. Deep stacks use a
+prefix replay sentinel instead of keeping old document states. The UI probe checks auto-import and
+override additional edits through native completion acceptance and one Undo. Its plain-text-only mode
+(`KUMIKAE_COMPLETION_CONTROL_PROBE=1`) opens the same temporary projects without an AS3 session, to
+separate platform lifecycle warnings from completion activity.

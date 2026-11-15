@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 119 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 120 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -83,7 +83,7 @@ locals, classes, imports, inherited members and Godot's API.
 | A VS Code client and the [set-up guide](../editors/README.md) | Done. |
 | Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. The owner confirmed the underlined errors by eye. |
 | Tried in Rider | Native plugin completion and typing validated in the pinned sandbox on 2026-11-15; see [results](results/2026-11-completion.md). Full manual editor acceptance remains pending. |
-| Windows | Not yet: the server runs on macOS and Linux only. To do before the slice is called done. |
+| Windows | Binary transport and UTF-8 paths are implemented; Windows runtime validation remains required. |
 
 **Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
 stage faster to build. The owner left the order to the builder. Completion and the native JetBrains
@@ -159,7 +159,9 @@ through a native helper, at about 60 frames a second with live touch, rotation a
 Completion improvements are described in the [editor guide](../editors/completion.md): native paired
 typing, lexical scopes, import paths, replacement edits, callable snippets and signature help. The
 [results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
-complete stage 6 or add Windows support.
+complete stage 6. The [follow-up results](results/2026-11-completion-followup.md) cover auto-imports,
+override stubs, body-only incremental checking and lifecycle controls. Windows runtime validation and
+IntelliJ IDEA Community integration remain pending; Android Studio is outside the scope.
 
 Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
@@ -224,7 +226,8 @@ Open items:
   waits for the cycle collector (2d).
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
-- **Language server:** Rider is not yet tried (the plugin is installed); Windows is not supported.
+- **Language server:** Rider passes automated sandbox editing checks; manual acceptance, Community
+  integration and Windows runtime validation remain pending.
 
 ## Decisions made
 

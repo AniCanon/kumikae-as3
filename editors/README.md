@@ -27,8 +27,8 @@ part of the program.
 >   completion lookup, Tab/Enter acceptance, undo and changed-document cancellation (2026-11-15).
 >   See [completion results](../docs/results/2026-11-completion.md) for measurements and limits.
 
-> **Windows is not supported yet.** The server runs on macOS and Linux. On Windows it does not read the
-> editor's messages correctly and does not recognise which files belong to the project.
+> **Windows validation is pending.** Binary transport, pipe readiness, UTF-8 filesystem paths and
+> `.exe` discovery are implemented, but these runtime branches have not been exercised on Windows.
 
 ## VS Code
 
@@ -51,7 +51,7 @@ with the extension loaded. In that window, open your project and set **Kumikae A
 
 The colouring is a small grammar: keywords, strings, comments and numbers.
 
-## Rider and other JetBrains IDEs
+## Rider and IntelliJ IDEA Community
 
 The [Kumikae JetBrains plugin](jetbrains/) connects `kas3c lsp` through the IDE's native LSP client.
 It provides AS3 highlighting, completion, argument help, navigation and local bracket/quote assistance,
@@ -59,8 +59,9 @@ as well as project/run tools and the Simulator panel. Install the plugin ZIP bui
 compiler revision; it bundles `kas3c` when a compiler build is available. See the plugin README for the
 supported Rider build and build commands.
 
-The native plugin does not need LSP4IJ. Other JetBrains products/builds require separate verification;
-Android Studio and open-source IntelliJ builds do not provide its required JetBrains LSP module.
+Rider uses its native LSP client. IntelliJ IDEA Community is the other intended target, but needs an
+optional LSP4IJ adapter and separate verification; the current package still requires the native LSP
+module. Android Studio is outside the scope.
 
 ## Any other editor
 

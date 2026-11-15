@@ -254,6 +254,8 @@ public:
 	// code that is being typed. What is reported does not change: syntax errors only.
 	void check(bool p_through_syntax_errors = false);
 	// Reuses declaration identities only when the source outside function bodies is unchanged.
+	// Drop queries before calling: a successful update invalidates changed units' body symbols,
+	// scopes and syntax pointers. False leaves the compilation unchanged and requests a full check.
 	bool update_bodies(const std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> &p_changes);
 	bool has_errors() const;
 	// The diagnostics of every file, in the order the files were added.

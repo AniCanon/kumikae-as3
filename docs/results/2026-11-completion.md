@@ -1,5 +1,8 @@
 # Completion and typing assistance: November 2026
 
+This records the first completion PR. The [follow-up results](2026-11-completion-followup.md)
+cover the subsequent implementation, checks and remaining limits.
+
 Measured on 2026-11-15, on macOS 27.2.1, arm64, with Apple Clang 21.0.0
 (`clang-2100.3.34.2`), C++17 Release builds. The comparison binary was built from unchanged revision
 `b491adb` before implementation. Both binaries use the same embedded Godot declarations. The IDE
