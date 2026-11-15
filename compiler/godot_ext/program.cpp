@@ -44,6 +44,7 @@ static void before_shutdown() {
 	if (program && program->valid()) {
 		release_listeners();
 		program->interpreter().clear_globals();
+		program->interpreter().collect(); // Loops holding Godot's objects go while Godot can free them.
 	}
 }
 
@@ -188,6 +189,17 @@ Project &Project::get() {
 	return *program;
 }
 
+// How much the cycle collector looks at in a frame: objects and references. Most steps take 0.03 to 0.15
+// ms; one that looks at a vector of 100,000 elements (an object is looked at whole), or that frees what a
+// collection found, takes as long as that, 0.3 to 1.3 ms.
+static const size_t COLLECTOR_WORK = 10000;
+
+void Project::collect_step() {
+	if (program && program->valid_) {
+		program->interpreter_->collect_step(COLLECTOR_WORK);
+	}
+}
+
 void Project::watch() {
 	static uint64_t looked = 0; // When, in milliseconds.
 	const uint64_t time = Time::get_singleton()->get_ticks_msec();
@@ -251,6 +263,7 @@ void Project::reload() {
 		if (!instances_can_move(moving) || !listeners_can_move(moving)) {
 			UtilityFunctions::push_error(String("ActionScript: the scripts were not reloaded: an object of the class '") +
 					String::utf8(moving.missing().c_str()) + "' is alive, and the class is no longer there. Restart the game.");
+			fresh->superseded(); // Godot's objects hold the running program's script objects, not this one's.
 			return;
 		}
 		moving.globals();
@@ -263,6 +276,7 @@ void Project::reload() {
 	// The old program goes last: what it still holds (its static fields) is let go while it can be.
 	program->interpreter_.swap(fresh);
 	program->module_.swap(module);
+	fresh->superseded(); // Godot's objects now hold the new program's script objects, not the old one's.
 	fresh.reset();
 	module.reset();
 	AS3Script::refresh_all();
@@ -277,6 +291,10 @@ void Project::unload() {
 	// static fields) knows the program is no longer there to be used.
 	if (program && program->valid_) {
 		release_listeners(); // While the interpreter is still there to free what they hold.
+		// And what the program holds, with loops among it: freeing a Godot object can call back into the
+		// interpreter, which must still be there to be found.
+		program->interpreter().clear_globals();
+		program->interpreter().collect();
 	}
 	loads++;
 	delete program;

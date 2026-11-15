@@ -3,6 +3,7 @@
 
 #include "interpreter.h"
 #include "any.h"
+#include "held.h"
 #include "numeric.h"
 
 namespace kas3 {

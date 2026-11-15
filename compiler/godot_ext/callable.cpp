@@ -7,7 +7,9 @@
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_custom.hpp>
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/signal.hpp>
@@ -15,8 +17,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
-#include <chrono>
-#include <map>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -27,20 +28,24 @@ namespace kas3 {
 namespace {
 
 class BoundMethod;
-class ListenerSweep;
 // Every bound method there is, so that the ones a program leaves behind can be dealt with.
 std::unordered_set<BoundMethod *> &bound_methods() {
 	static std::unordered_set<BoundMethod *> all;
 	return all;
 }
-
+// The same, by the number the cycle collector knows each by.
+std::unordered_map<uint64_t, BoundMethod *> &by_number() {
+	static std::unordered_map<uint64_t, BoundMethod *> all;
+	return all;
+}
 class BoundMethod : public CallableCustom {
 	friend void kas3::listener_added(const Callable &, const Signal &);
-	friend void kas3::sweep_listeners();
-	friend class ListenerSweep;
 	friend void kas3::release_listeners();
 	friend bool kas3::listeners_can_move(vm::Reload &);
 	friend void kas3::move_listeners(vm::Interpreter &, vm::Reload &, uint64_t);
+	friend void kas3::listeners_of(Object *, std::vector<uint64_t> *);
+	friend bool kas3::listener_edges(uint64_t, vm::EngineNode *);
+	friend class ListenerRemoval;
 
 	vm::Object *object_;
 	uint32_t function_;
@@ -52,12 +57,12 @@ class BoundMethod : public CallableCustom {
 	const vm::Object *key_object_;
 	uint32_t key_function_;
 	uint64_t key_program_;
-	// Set when the one thing done with this callable was to add it to a signal as a listener: the signal.
-	Signal listening_to_;
-	bool listener_ = false;
-	// When a copy of a listener is held outside its signal, the signal holds a stand-in equal to it.
-	BoundMethod *stand_in_ = nullptr; // In the copy: the one in the signal.
-	BoundMethod *stands_for_ = nullptr; // In the one in the signal: the copy.
+	// The cycle collector's number for it (vm::EngineNode). Counted from 1, it never has the top bit set,
+	// which every id of a reference-counted object has: the two are never taken for each other.
+	uint64_t number_;
+	// The signals it is known to have been in: those a script added it to, and those the cycle collector
+	// found it in (GDScript may connect a copy of it). It may have been taken out of some since.
+	std::vector<Signal> signals_;
 
 	// Lets go of the script object. After this the callable refuses to run.
 	void let_go() {
@@ -75,9 +80,38 @@ class BoundMethod : public CallableCustom {
 		return object_ && Project::generation() == program_ && (owner_.is_null() || ObjectDB::get_instance(owner_) != nullptr);
 	}
 
+	// A listener the cycle collector looks through: one with no Godot object of its own (Godot drops the
+	// connections of one that has, when that object goes), whose script object is the loaded program's.
+	bool collected() const { return object_ && owner_.is_null() && program_ == Project::generation(); }
+
+	void listens_to(const Signal &p_signal) {
+		if (std::find(signals_.begin(), signals_.end(), p_signal) != signals_.end()) {
+			return;
+		}
+		signals_.push_back(p_signal);
+	}
+
+	// Whether it is in that signal now: a listener may have been removed since (remove(), a once-only
+	// listener that ran, GDScript disconnecting it).
+	bool in(const Signal &p_signal) const {
+		if (!ObjectDB::get_instance(p_signal.get_object_id())) {
+			return false;
+		}
+		Array connections = p_signal.get_connections();
+		for (int64_t i = 0; i < connections.size(); i++) {
+			Callable callable = Dictionary(connections[i])["callable"];
+			if (callable.is_custom() && callable.get_custom() == this) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 public:
 	BoundMethod(vm::Object *p_object, uint32_t p_function, Object *p_owner) :
 			object_(p_object), function_(p_function), program_(Project::generation()), key_object_(p_object), key_function_(p_function), key_program_(program_) {
+		static uint64_t numbers = 0;
+		number_ = ++numbers;
 		if (p_owner) {
 			owner_ = ObjectID(p_owner->get_instance_id());
 		}
@@ -92,17 +126,11 @@ public:
 		}
 		vm::retain(object_);
 		bound_methods().insert(this);
+		by_number()[number_] = this;
 	}
 	~BoundMethod() override {
 		bound_methods().erase(this);
-		if (stand_in_ && bound_methods().count(stand_in_)) {
-			// The copy held outside the signal is gone: the one in the signal is an ordinary listener again.
-			stand_in_->stands_for_ = nullptr;
-			stand_in_->listener_ = true;
-		}
-		if (stands_for_ && bound_methods().count(stands_for_)) {
-			stands_for_->stand_in_ = nullptr;
-		}
+		by_number().erase(number_);
 		let_go();
 	}
 
@@ -197,8 +225,7 @@ public:
 
 void listener_added(const Callable &p_callable, const Signal &p_signal) {
 	if (BoundMethod *bound = p_callable.is_custom() ? dynamic_cast<BoundMethod *>(p_callable.get_custom()) : nullptr) {
-		bound->listening_to_ = p_signal;
-		bound->listener_ = true;
+		bound->listens_to(p_signal);
 	}
 }
 
@@ -243,305 +270,217 @@ void release_listeners() {
 	}
 }
 
-// A listener with no Godot object of its own is kept alive by the signal it listens to. If it also holds
-// the signal's object, directly or through other script objects, and nothing else refers to any of them,
-// they keep each other alive for ever. Found here, once a frame, by counting.
-//
-// The things looked at are the script objects that such listeners belong to, whatever those reach through
-// their fields, and the reference-counted Godot objects among that. Each has a count of references. A
-// reference from a field of one of them, or from a listener on a signal of one of them, is accounted
-// for. A thing with more references than are accounted for is held from outside (a variable, a node's
-// script, a callable handed to something other than a signal, a collection): it is in use, and so is
-// everything it reaches. What is left is held only by itself. Its listeners are removed and its fields
-// emptied, which frees it.
+// The cycle collector's view of listeners (vm/collector.h). A listener with no Godot object of its own is
+// kept alive by the signals it is in. If it also holds the signal's object, directly or through other
+// script objects, and nothing else refers to any of them, they keep each other alive for ever. To the
+// collector, such a reference-counted object holds its listeners, one reference for each connection, and a
+// listener holds its script object. Godot can't say how many hold a callable: a copy may be kept anywhere
+// (GDScript took it from get_connections()). So a listener's count is only of its connections, and before
+// a loop is freed each listener is taken out of its signals: if it outlives that, something else holds it,
+// and everything is put back as it was.
+
 namespace {
 
-// One such look.
-class ListenerSweep {
-	struct Thing {
-		int64_t references = 0; // What it says of itself.
-		int64_t accounted = 0; // Those that come from other things.
-		bool in_use = false;
-		std::vector<void *> reaches;
-		RefCounted *emitter = nullptr; // Null for a script object.
-	};
-	// A listener taken out of its signal through a callable equal to it, not through a copy of it, so that
-	// it can be seen whether the signal was the only thing holding it.
-	struct Removed {
-		Signal signal;
-		Callable stand_in;
-		int64_t flags;
-		// Not null if the listener outlived its removal: something else holds a copy of it. (Whether it
-		// did is settled at once: a stand-in made later may be given the address of one that is gone.)
-		BoundMethod *survivor;
-	};
+struct TextHash {
+	size_t operator()(const String &p_text) const { return p_text.hash(); }
+};
 
-	const ir::Module &module_ = Project::get().module();
-	vm::Interpreter &interpreter_ = Project::get().interpreter();
-	std::map<void *, Thing> things_;
-	std::vector<void *> pending_;
-	// The listeners on a signal of each Godot object, as far as they are known.
-	std::map<uint64_t, std::vector<BoundMethod *>> listeners_;
-
-	static bool current(const BoundMethod *p_bound) { return p_bound->program_ == Project::generation(); }
-
-	// A listener counts as one only while it really is in the signal it was added to. One that has been
-	// removed since (remove(), a once-only listener that ran, GDScript disconnecting it) and is still
-	// alive is held by something else, and is a reference from outside like any other.
-	static void check_connections() {
-		for (BoundMethod *bound : bound_methods()) {
-			if (!bound->listener_ || !current(bound)) {
-				continue;
-			}
-			bool connected = false;
-			if (ObjectDB::get_instance(bound->listening_to_.get_object_id())) {
-				Array connections = bound->listening_to_.get_connections();
-				for (int64_t i = 0; i < connections.size() && !connected; i++) {
-					Callable callable = Dictionary(connections[i])["callable"];
-					connected = callable.is_custom() && callable.get_custom() == bound;
-				}
-			}
-			bound->listener_ = connected;
+// The signals of a class, its own and those it inherits: found once for each class. A signal added to
+// one object alone (add_user_signal) is not among them, and a listener in one is not found here: it then
+// counts as held from outside, which keeps it, and what it holds.
+const std::vector<StringName> &class_signals(const String &p_class) {
+	static std::unordered_map<String, std::vector<StringName>, TextHash> known;
+	auto [at, made] = known.try_emplace(p_class);
+	if (made) {
+		TypedArray<Dictionary> signals = ClassDBSingleton::get_singleton()->class_get_signal_list(p_class);
+		for (int64_t i = 0; i < signals.size(); i++) {
+			at->second.push_back(Dictionary(signals[i])["name"]);
 		}
 	}
+	return at->second;
+}
 
-	void visit(void *p_key, RefCounted *p_emitter) {
-		if (things_.count(p_key)) {
+} // namespace
+
+// Read from the object's own connections, so that a copy of a listener GDScript connected is found too.
+void listeners_of(Object *p_object, std::vector<uint64_t> *r_nodes) {
+	auto look = [&](const StringName &p_name) {
+		if (!p_object->has_connections(p_name)) {
 			return;
 		}
-		Thing &thing = things_[p_key];
-		thing.emitter = p_emitter;
-		thing.references = p_emitter ? p_emitter->get_reference_count() : (int64_t) static_cast<vm::Object *>(p_key)->references;
-		pending_.push_back(p_key);
+		TypedArray<Dictionary> connections = p_object->get_signal_connection_list(p_name);
+		for (int64_t i = 0; i < connections.size(); i++) {
+			Callable callable = Dictionary(connections[i])["callable"];
+			BoundMethod *bound = callable.is_custom() ? dynamic_cast<BoundMethod *>(callable.get_custom()) : nullptr;
+			if (bound && bound->collected()) {
+				bound->listens_to(Signal(p_object, p_name));
+				r_nodes->push_back(bound->number_);
+			}
+		}
+	};
+	for (const StringName &name : class_signals(p_object->get_class())) {
+		look(name);
 	}
-
-	// A Godot object reaches the script objects that listen to it.
-	std::vector<void *> reached_from_emitter(RefCounted *p_emitter) {
-		std::vector<void *> reaches;
-		auto found = listeners_.find(p_emitter->get_instance_id());
-		if (found != listeners_.end()) {
-			for (BoundMethod *bound : found->second) {
-				visit(bound->object_, nullptr);
-				reaches.push_back(bound->object_);
-			}
-		}
-		return reaches;
-	}
-
-	// A script object reaches what its fields hold: other script objects, and counted Godot objects.
-	std::vector<void *> reached_from_object(vm::Object *p_object) {
-		std::vector<void *> reaches;
-		const ir::Class &klass = module_.classes[p_object->klass];
-		for (size_t i = 0; i < klass.fields.size(); i++) {
-			void *held = p_object->fields()[i].p;
-			ir::Kind kind = klass.fields[i].kind;
-			if (kind == ir::Kind::Any) {
-				// What an untyped field holds is walked as a field of that kind would be.
-				const vm::Slot value = p_object->fields()[i];
-				const vm::AnyTag tag = vm::any::tag(value);
-				held = tag == vm::AnyTag::Object || vm::any::is_engine(value) ? vm::any::pointer(value) : nullptr;
-				kind = tag == vm::AnyTag::Object ? ir::Kind::Obj : ir::Kind::Ref;
-			}
-			if (!held) {
-				continue;
-			}
-			if (kind == ir::Kind::Obj) {
-				visit(held, nullptr);
-				reaches.push_back(held);
-			} else if (ir::is_engine(kind)) {
-				const Variant *value = static_cast<const Variant *>(held);
-				RefCounted *counted = value->get_type() == Variant::OBJECT ? Object::cast_to<RefCounted>(value->get_validated_object()) : nullptr;
-				// The script's own hold on the object it is attached to is not a counted reference.
-				if (counted && !(i == 0 && !klass.native_base.empty())) {
-					visit(counted, counted);
-					reaches.push_back(counted);
-				}
-			}
-		}
-		return reaches;
-	}
-
-	// Everything the listeners without a Godot object of their own can reach, and what each reaches.
-	void gather() {
-		for (BoundMethod *bound : bound_methods()) {
-			if (bound->object_ && bound->listener_ && current(bound)) {
-				listeners_[(uint64_t)bound->listening_to_.get_object_id()].push_back(bound);
-			}
-		}
-		for (BoundMethod *bound : bound_methods()) {
-			if (bound->object_ && bound->owner_.is_null() && current(bound)) {
-				visit(bound->object_, nullptr);
-			}
-		}
-		while (!pending_.empty()) {
-			void *key = pending_.back();
-			pending_.pop_back();
-			RefCounted *emitter = things_[key].emitter;
-			std::vector<void *> reaches = emitter ? reached_from_emitter(emitter) : reached_from_object(static_cast<vm::Object *>(key));
-			things_[key].reaches = std::move(reaches);
+	// The signals its script declares (an AS3 class's [Signal] fields among them).
+	const Ref<Script> script = p_object->get_script();
+	if (script.is_valid()) {
+		TypedArray<Dictionary> declared = script->get_script_signal_list();
+		for (int64_t i = 0; i < declared.size(); i++) {
+			look(Dictionary(declared[i])["name"]);
 		}
 	}
+}
 
-	// A thing with more references than the things gathered account for is held from outside, and so is
-	// everything it reaches.
-	void mark_in_use() {
-		for (auto &[key, thing] : things_) {
-			for (void *reached : thing.reaches) {
-				things_[reached].accounted++;
-			}
-		}
-		for (auto &[key, thing] : things_) {
-			if (thing.references > thing.accounted && !thing.in_use) {
-				thing.in_use = true;
-				pending_.push_back(key);
-			}
-		}
-		while (!pending_.empty()) {
-			void *key = pending_.back();
-			pending_.pop_back();
-			for (void *reached : things_[key].reaches) {
-				if (!things_[reached].in_use) {
-					things_[reached].in_use = true;
-					pending_.push_back(reached);
-				}
-			}
-		}
+bool listener_edges(uint64_t p_node, vm::EngineNode *r_node) {
+	auto found = by_number().find(p_node);
+	if (found == by_number().end() || !found->second->collected()) {
+		return false;
 	}
-
-	// The script objects nothing holds, and the listeners that go with them.
-	void find_unused(std::vector<vm::Object *> &r_dead, std::vector<BoundMethod *> &r_doomed) {
-		for (auto &[key, thing] : things_) {
-			if (thing.in_use) {
-				continue;
-			}
-			if (!thing.emitter) {
-				r_dead.push_back(static_cast<vm::Object *>(key));
-				continue;
-			}
-			for (BoundMethod *bound : listeners_[thing.emitter->get_instance_id()]) {
-				// A listener that is itself in use goes when the object it listens to does.
-				if (!things_[bound->object_].in_use) {
-					r_doomed.push_back(bound);
-				}
-			}
-		}
+	const BoundMethod *bound = found->second;
+	r_node->exact = false;
+	r_node->references = 0;
+	for (const Signal &signal : bound->signals_) {
+		r_node->references += bound->in(signal) ? 1 : 0;
 	}
+	r_node->objects.push_back(bound->object_);
+	return true;
+}
 
-	static int64_t connection_flags(const Signal &p_signal, const Callable &p_callable) {
+namespace {
+
+// Listeners taken out of their signals, to see whether anything else holds them, and put back if so.
+class ListenerRemoval {
+	// One connection of a signal as it was. A listener being taken out is known by its place among those,
+	// never by a copy of its callable: a copy would hold it.
+	struct Connection {
+		Callable callable;
 		int64_t flags = 0;
+		int taken = -1; // Which of the listeners being taken out it is, or -1.
+		int times = 0; // How many times it was connected (a reference-counted connection may be more).
+	};
+	struct Taken {
+		Signal signal;
+		std::vector<Connection> connections;
+	};
+
+	std::vector<BoundMethod *> listeners_;
+	std::vector<uint64_t> numbers_;
+	std::vector<Callable> twins_; // Equal to each listener: what takes it out, and what goes back in its place.
+	std::vector<Taken> taken_;
+
+	int index_of(const Callable &p_callable) const {
+		if (!p_callable.is_custom()) {
+			return -1;
+		}
+		auto found = std::find(listeners_.begin(), listeners_.end(), p_callable.get_custom());
+		return found == listeners_.end() ? -1 : static_cast<int>(found - listeners_.begin());
+	}
+
+	void remember(const Signal &p_signal) {
+		for (const Taken &taken : taken_) {
+			if (taken.signal == p_signal) {
+				return;
+			}
+		}
+		Taken taken{ p_signal, {} };
 		Array connections = p_signal.get_connections();
 		for (int64_t i = 0; i < connections.size(); i++) {
 			Dictionary connection = connections[i];
-			if (Callable(connection["callable"]) == p_callable) {
-				flags = connection["flags"];
-			}
+			Callable callable = connection["callable"];
+			const int index = index_of(callable);
+			taken.connections.push_back({ index < 0 ? callable : Callable(), (int64_t)connection["flags"], index, 0 });
 		}
-		return flags;
+		taken_.push_back(std::move(taken));
 	}
 
-	// Takes each listener out of its signal. False, and no further, as soon as one outlives its removal:
-	// a copy is held somewhere (GDScript kept it in a variable) and may yet be called.
-	static bool remove(const std::vector<BoundMethod *> &p_doomed, std::vector<Removed> &r_removed) {
-		for (BoundMethod *bound : p_doomed) {
-			if (!bound_methods().count(bound)) {
-				continue;
-			}
-			Signal signal = bound->listening_to_;
-			BoundMethod *twin = memnew(BoundMethod(bound->object_, bound->function_, nullptr));
-			Callable stand_in(twin);
-			const int64_t flags = connection_flags(signal, stand_in);
-			if (!signal.is_connected(stand_in)) {
-				continue;
-			}
-			signal.disconnect(stand_in);
-			const bool survived = bound_methods().count(bound) != 0;
-			r_removed.push_back({ signal, stand_in, flags, survived ? bound : nullptr });
-			if (survived) {
-				return false;
-			}
+	// Takes a connection out entirely: how many times it was there.
+	static int disconnect(Signal p_signal, const Callable &p_callable) {
+		int times = 0;
+		while (p_signal.is_connected(p_callable)) {
+			p_signal.disconnect(p_callable);
+			times++;
 		}
-		return true;
+		return times;
 	}
 
-	// Everything is put back as it was.
-	static void put_back(std::vector<Removed> &p_removed) {
-		for (Removed &entry : p_removed) {
-			entry.signal.connect(entry.stand_in, entry.flags);
-			BoundMethod *twin = static_cast<BoundMethod *>(entry.stand_in.get_custom());
-			twin->listening_to_ = entry.signal;
-			if (!entry.survivor) {
-				twin->listener_ = true;
-				continue;
-			}
-			// The copy that is held elsewhere now stands outside the signal: while it lives, the listener
-			// in the signal counts as held from outside. When it goes, that ends.
-			twin->listener_ = false;
-			twin->stands_for_ = entry.survivor;
-			entry.survivor->stand_in_ = twin;
-			entry.survivor->listener_ = false;
+	// Every connection from the first that was taken out on is taken out and made again, in order: Godot
+	// adds a connection at the end.
+	void put_back(Taken &p_taken) {
+		size_t first = 0;
+		while (first < p_taken.connections.size() && p_taken.connections[first].taken < 0) {
+			first++;
 		}
-	}
-
-	void empty_fields(const std::vector<vm::Object *> &p_dead) {
-		for (vm::Object *object : p_dead) {
-			const ir::Class &klass = module_.classes[object->klass];
-			for (size_t i = 0; i < klass.fields.size(); i++) {
-				vm::Slot value = object->fields()[i];
-				object->fields()[i].bits = 0;
-				interpreter_.discard(klass.fields[i].kind, value);
+		for (size_t i = first; i < p_taken.connections.size(); i++) {
+			Connection &connection = p_taken.connections[i];
+			if (connection.taken < 0) {
+				connection.times = disconnect(p_taken.signal, connection.callable);
+			}
+		}
+		for (size_t i = first; i < p_taken.connections.size(); i++) {
+			const Connection &connection = p_taken.connections[i];
+			const Callable &callable = connection.taken < 0 ? connection.callable : twins_[connection.taken];
+			for (int time = 0; time < connection.times; time++) {
+				if (p_taken.signal.connect(callable, connection.flags) != OK) {
+					UtilityFunctions::push_error("ActionScript: a listener could not be put back in its signal");
+				}
+			}
+			if (connection.taken >= 0 && connection.times > 0) {
+				static_cast<BoundMethod *>(callable.get_custom())->listens_to(p_taken.signal);
 			}
 		}
 	}
 
 public:
-	void run() {
-		check_connections();
-		gather();
-		mark_in_use();
-		std::vector<vm::Object *> dead;
-		std::vector<BoundMethod *> doomed;
-		find_unused(dead, doomed);
-		if (dead.empty()) {
-			return;
+	// The listeners the collector found held only by their signals and by garbage, and what takes each out.
+	explicit ListenerRemoval(const std::vector<uint64_t> &p_nodes) {
+		for (uint64_t node : p_nodes) {
+			auto found = by_number().find(node);
+			if (found != by_number().end() && found->second->collected()) {
+				listeners_.push_back(found->second);
+				numbers_.push_back(node);
+			}
 		}
-		// Held while they are taken apart, so that nothing is freed half way.
-		for (vm::Object *object : dead) {
-			vm::retain(object);
+		for (BoundMethod *bound : listeners_) {
+			for (const Signal &signal : bound->signals_) {
+				if (bound->in(signal)) {
+					remember(signal);
+				}
+			}
 		}
-		std::vector<Removed> removed;
-		if (remove(doomed, removed)) {
-			removed.clear();
-			empty_fields(dead);
-		} else {
-			put_back(removed);
+		// Made before any is taken out: a bound method made after one is freed could be given its address.
+		for (BoundMethod *bound : listeners_) {
+			twins_.push_back(Callable(memnew(BoundMethod(bound->object_, bound->function_, nullptr))));
 		}
-		for (vm::Object *object : dead) {
-			interpreter_.release_object(object);
+	}
+
+	// Those that outlived being taken out; if there are any, everything is back as it was.
+	std::vector<uint64_t> run() {
+		for (Taken &taken : taken_) {
+			for (Connection &connection : taken.connections) {
+				if (connection.taken >= 0) {
+					connection.times = disconnect(taken.signal, twins_[connection.taken]);
+				}
+			}
 		}
+		std::vector<uint64_t> survivors;
+		for (size_t i = 0; i < listeners_.size(); i++) {
+			if (bound_methods().count(listeners_[i])) {
+				survivors.push_back(numbers_[i]);
+			}
+		}
+		if (!survivors.empty()) {
+			for (Taken &taken : taken_) {
+				put_back(taken);
+			}
+		}
+		return survivors;
 	}
 };
 
 } // namespace
 
-void sweep_listeners() {
-	bool any = false;
-	for (BoundMethod *bound : bound_methods()) {
-		any = any || (bound->object_ && bound->owner_.is_null() && bound->program_ == Project::generation());
-	}
-	if (!any) {
-		return;
-	}
-	// The look takes time in proportion to what the listeners reach, so it is paced by its own cost: at
-	// most four times a second, and never more than about a fiftieth of the time.
-	using Clock = std::chrono::steady_clock;
-	static Clock::time_point next;
-	const Clock::time_point started = Clock::now();
-	if (started < next) {
-		return;
-	}
-	ListenerSweep().run();
-	const Clock::duration took = Clock::now() - started;
-	next = Clock::now() + std::max<Clock::duration>(std::chrono::milliseconds(250), took * 50);
+std::vector<uint64_t> let_go_listeners(const std::vector<uint64_t> &p_nodes) {
+	return ListenerRemoval(p_nodes).run();
 }
 
 bool is_script_listener(const Callable &p_callable) {

@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 46 items;
+**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 42 items;
 none waits for a later stage (the owner, 2026-11-15), and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -111,7 +111,7 @@ properties, signals and hot reload.
 | 2c-3. Errors and labels | `try`, `catch` (by class, by `String`, `int` or `Number`, or anything), `finally` on every way out, any value thrown, labelled `break` and `continue`, `&&=` and `||=` | Each has a program checked against Node, and an error from a Godot value is caught in Godot. | Built; in review |
 | 2c-4 to 2c-6. The rest of the language | In the order the corpus asks for: `Array`, `Object` literals and dynamic access, `Dictionary`, `for in` in general, rest parameters; closures, and the collection methods that take one; accessors and interfaces; the standard library (`String`, `Number`, the top-level functions, `JSON`, `Date`, `RegExp`) | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
 | Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Completion built ahead, on 2026-11-14, and working in VS Code and Rider on macOS. On 2026-11-15 the LS-2 items were built: completion after any dot and of overrides and parameter names, Windows paths and binary I/O, the lexer's closing braces. Left: a person's acceptance in Rider, and a first run on Windows |
-| 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Hot reload built ahead, on 2026-11-14: on desktop and on the iOS Simulator. `[Signal]` built on 2026-11-15. The rest planned |
+| 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Hot reload built ahead, on 2026-11-14: on desktop and on the iOS Simulator. `[Signal]` built on 2026-11-15, and the cycle collector. The rest planned |
 | Clean-up pass | The 9 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
@@ -219,10 +219,11 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) is being worked off in full, now:** 46 items, of which 11 wait on the
+- **The [backlog](backlog.md) is being worked off in full, now:** 42 items, of which 11 wait on the
   owner's answer.
-- **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
-  waits for the cycle collector (2d).
+- **Loops:** the cycle collector frees objects that refer to each other in a loop, also through Godot's
+  reference-counted objects, their AS3 scripts and listeners, in a short step each frame. A loop through
+  a Godot Array or Dictionary is not freed (see the backlog).
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
 - **Language server:** a person has still to accept Rider's editing and navigation by hand, and the server

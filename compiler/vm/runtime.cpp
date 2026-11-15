@@ -70,7 +70,41 @@ void free_string(Str *p_string) {
 	std::free(p_string);
 }
 
-Object *new_object(uint32_t p_class, size_t p_fields) {
+void list_init(Object *p_head) {
+	p_head->gc_previous = p_head;
+	p_head->gc_next = p_head;
+}
+
+void list_insert(Object *p_head, Object *p_object) {
+	p_object->gc_previous = p_head->gc_previous;
+	p_object->gc_next = p_head;
+	p_head->gc_previous->gc_next = p_object;
+	p_head->gc_previous = p_object;
+}
+
+void list_remove(Object *p_object) {
+	if (p_object->gc_next) {
+		p_object->gc_previous->gc_next = p_object->gc_next;
+		p_object->gc_next->gc_previous = p_object->gc_previous;
+		p_object->gc_previous = nullptr;
+		p_object->gc_next = nullptr;
+	}
+}
+
+void list_splice(Object *p_head, Object *p_from) {
+	if (list_empty(p_from)) {
+		return;
+	}
+	Object *first = p_from->gc_next;
+	Object *last = p_from->gc_previous;
+	first->gc_previous = p_head->gc_previous;
+	p_head->gc_previous->gc_next = first;
+	last->gc_next = p_head;
+	p_head->gc_previous = last;
+	list_init(p_from);
+}
+
+Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list) {
 	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Object) + p_fields * sizeof(Slot));
 	if (!memory) {
 		return nullptr;
@@ -78,16 +112,20 @@ Object *new_object(uint32_t p_class, size_t p_fields) {
 	Object *object = new (memory) Object();
 	object->references = 1;
 	object->klass = p_class;
+	if (p_list) {
+		list_insert(p_list, object);
+	}
 	objects_alive++;
 	return object;
 }
 
 void free_object(Object *p_object) {
+	list_remove(p_object);
 	objects_alive--;
 	std::free(p_object);
 }
 
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed) {
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, Object *p_list) {
 	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Vector));
 	if (!memory) {
 		return nullptr;
@@ -102,6 +140,9 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed) {
 		return nullptr;
 	}
 	vector->length = p_length;
+	if (p_list) {
+		list_insert(p_list, vector);
+	}
 	return vector;
 }
 
@@ -126,6 +167,7 @@ bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 }
 
 void free_vector(Vector *p_vector) {
+	list_remove(p_vector);
 	std::free(p_vector->data);
 	objects_alive--;
 	std::free(p_vector);

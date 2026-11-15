@@ -5,6 +5,7 @@
 
 #include "builtins.h"
 #include "callable.h"
+#include "program.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -616,6 +617,48 @@ void GodotHost::drop(void *p_value) {
 		return;
 	}
 	delete static_cast<Variant *>(p_value);
+}
+
+// A handle that counts as a reference to a reference-counted object, which may lead back to a script
+// object: through a script of AS3's on it, or a listener on one of its signals. A borrowed handle (a
+// script's hold on what it is attached to) counts as none.
+uint64_t GodotHost::node(void *p_value) {
+	if (!p_value || borrowed_.count(p_value)) {
+		return 0;
+	}
+	const Variant *value = static_cast<const Variant *>(p_value);
+	if (value->get_type() != Variant::OBJECT) {
+		return 0;
+	}
+	RefCounted *counted = Object::cast_to<RefCounted>(value->get_validated_object());
+	if (!counted) {
+		return 0;
+	}
+	return counted->get_instance_id();
+}
+
+// An object's id has its top bit set when the object is reference-counted; a listener's number never has.
+bool GodotHost::node_edges(uint64_t p_node, vm::EngineNode *r_node) {
+	const ObjectID id(p_node);
+	if (!id.is_ref_counted()) {
+		return listener_edges(p_node, r_node);
+	}
+	RefCounted *counted = Object::cast_to<RefCounted>(ObjectDB::get_instance(id));
+	if (!counted) {
+		return false;
+	}
+	r_node->references = (uint64_t)counted->get_reference_count();
+	r_node->exact = true;
+	if (vm::Object *object = script_object(counted)) {
+		r_node->objects.push_back(object);
+	}
+	listeners_of(counted, &r_node->nodes);
+	return true;
+}
+
+// Only listeners have counts that are not exact: an object is freed by Godot when the handles on it go.
+std::vector<uint64_t> GodotHost::let_go(const std::vector<uint64_t> &p_nodes) {
+	return let_go_listeners(p_nodes);
 }
 
 } // namespace kas3

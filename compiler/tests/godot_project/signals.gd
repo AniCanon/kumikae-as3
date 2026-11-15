@@ -7,7 +7,12 @@ var late: Node
 var looped: WeakRef
 var looped_far: WeakRef
 var looped_kept: WeakRef
+var looped_plain: WeakRef
+var looped_script: WeakRef
+var looped_untyped: WeakRef
+var looped_twice: Array
 var kept_listener: Callable
+var later_listener := func(): pass
 var removed_kept: WeakRef
 var frames := 0
 
@@ -52,10 +57,18 @@ func _physics_process(_delta: float) -> bool:
 		# A listener and the object it listens to, held only by each other, are both gone.
 		show("a loop is freed", looped.get_ref() == null, true)
 		show("a longer loop is freed", looped_far.get_ref() == null, true)
+		show("a loop with no listener is freed", looped_plain.get_ref() == null, true)
+		show("a loop through a script's Godot object is freed", looped_script.get_ref() == null, true)
+		show("a loop through an untyped field is freed", looped_untyped.get_ref() == null, true)
+		show("a loop whose listener is in two signals is freed", looped_twice.map(func(w): return w.get_ref() == null), [true, true])
 		show("a removed listener that is still held keeps what it holds", removed_kept.get_ref() != null, true)
 		# While GDScript holds the listener's callable, the listener stays where it was.
 		var still = looped_kept.get_ref()
-		show("a loop whose callable is held stays", [still != null, still.changed.get_connections().size() if still != null else -1, kept_listener.is_valid()], [true, 1, true])
+		var heard = still.changed.get_connections() if still != null else []
+		show("a loop whose callable is held stays", [still != null, heard.size(), kept_listener.is_valid()], [true, 2, true])
+		# Its listener was taken out of the signal and put back, in the place it had.
+		show("a held listener keeps its place", [str(heard[0].callable) if heard.size() == 2 else "", heard[1].callable == later_listener if heard.size() == 2 else false], ["Holder/heard", true])
+		heard = []
 		still = null
 		kept_listener = Callable()
 		# A listener that only its signal holds is still there, and still hears.
@@ -213,6 +226,24 @@ func _physics_process(_delta: float) -> bool:
 	looped_kept = weakref(resource)
 	node.loop(resource)
 	kept_listener = resource.changed.get_connections()[0].callable
+	resource.changed.connect(later_listener)
+	resource = Resource.new()
+	looped_plain = weakref(resource)
+	node.plainLoop(resource)
+	var scripted := Resource.new()
+	scripted.set_script(load("res://Looped.as"))
+	looped_script = weakref(scripted)
+	scripted.hold()
+	scripted = null
+	resource = Resource.new()
+	looped_untyped = weakref(resource)
+	node.untypedLoop(resource)
+	resource = Resource.new()
+	var second := Resource.new()
+	looped_twice = [weakref(resource), weakref(second)]
+	node.loopTwice(resource, second)
+	second.changed.connect(resource.changed.get_connections()[0].callable)
+	second = null
 	resource = Resource.new()
 	removed_kept = weakref(resource)
 	node.removedButKept(resource)

@@ -169,7 +169,9 @@ output = compare("signals.gd", [
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed", "own signal field by name", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
     "a removed listener that is still held keeps what it holds",
-    "a loop whose callable is held stays", "a loop goes when its callable is let go",
+    "a loop with no listener is freed", "a loop through a script's Godot object is freed", "a loop through an untyped field is freed",
+    "a loop whose listener is in two signals is freed",
+    "a loop whose callable is held stays", "a held listener keeps its place", "a loop goes when its callable is let go",
     "an unheld listener stays",
 ])
 check("a listener given the wrong kind of argument is an AS3 error that names it",

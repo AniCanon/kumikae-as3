@@ -34,6 +34,24 @@ package {
 			h.next = far;
 			r.changed.add(h.heard);
 		}
+		// Loops the cycle collector frees: script objects that hold a Godot object and each other, with no
+		// listener; a loop through a Godot object with a script of AS3's; a listener whose object holds what
+		// it listens to through an untyped field; one listener in the signals of two objects, both held by
+		// the loop (GDScript connects the copy).
+		public function plainLoop(r:Resource):void {
+			var h:Holder = new Holder();
+			var g:Holder = new Holder();
+			h.res = r;
+			h.next = g;
+			g.next = h;
+		}
+		public function untypedLoop(r:Resource):void { var h:Holder = new Holder(); h.any = r; r.changed.add(h.heard); }
+		public function loopTwice(r:Resource, other:Resource):void {
+			var h:Holder = new Holder();
+			h.res = r;
+			h.other = other;
+			r.changed.add(h.heard);
+		}
 		// A listener that was removed again, while a list of the signal's listeners is still kept: the
 		// callable in that list can still be called, so its object and what it holds must stay whole.
 		private var keptList:GodotArray;

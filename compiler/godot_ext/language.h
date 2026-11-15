@@ -99,7 +99,7 @@ public:
 		return 0;
 	}
 	int32_t _profiling_get_frame_data(godot::ScriptLanguageExtensionProfilingInfo *, int32_t) override { return 0; }
-	void _frame() override { kas3::sweep_listeners(); }
+	void _frame() override { kas3::Project::collect_step(); }
 	bool _handles_global_class_type(const godot::String &) const override { return false; }
 	godot::Dictionary _get_global_class_name(const godot::String &) const override { return {}; }
 };

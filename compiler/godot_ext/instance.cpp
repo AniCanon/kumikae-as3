@@ -10,6 +10,7 @@
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -28,6 +29,16 @@ struct ScriptInstance {
 static std::unordered_set<ScriptInstance *> &instances() {
 	static std::unordered_set<ScriptInstance *> all;
 	return all;
+}
+// The same, by the Godot object each is attached to.
+static std::unordered_map<const Object *, ScriptInstance *> &instances_on() {
+	static std::unordered_map<const Object *, ScriptInstance *> all;
+	return all;
+}
+
+vm::Object *kas3::script_object(const Object *p_owner) {
+	auto found = instances_on().find(p_owner);
+	return found == instances_on().end() ? nullptr : found->second->object;
 }
 
 bool kas3::instances_can_move(vm::Reload &p_reload) {
@@ -309,6 +320,10 @@ static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDa
 static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
 	instances().erase(instance);
+	auto on = instances_on().find(instance->owner);
+	if (on != instances_on().end() && on->second == instance) {
+		instances_on().erase(on);
+	}
 	Project::get().interpreter().release_object(instance->object);
 	delete instance;
 }
@@ -361,6 +376,7 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	instance->owner = p_owner;
 	instance->script = Ref<AS3Script>(const_cast<AS3Script *>(p_script));
 	instances().insert(instance);
+	instances_on()[p_owner] = instance;
 	return gdextension_interface::script_instance_create3(&info, instance);
 }
 

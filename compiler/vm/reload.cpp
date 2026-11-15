@@ -91,7 +91,7 @@ Object *Reload::object(Object *p_old) {
 		// A vector: the same length, and each element carried as a field is. Its type must still hold
 		// elements of the same kind.
 		const Vector *old = static_cast<const Vector *>(p_old);
-		Vector *vector = old_class.element == new_class.element ? new_vector(named->second, old->length, old->fixed) : nullptr;
+		Vector *vector = old_class.element == new_class.element ? new_vector(named->second, old->length, old->fixed, to_.collector_.list_for(named->second)) : nullptr;
 		if (!vector) {
 			if (missing_.empty()) {
 				missing_ = old_class.name;
@@ -105,7 +105,7 @@ Object *Reload::object(Object *p_old) {
 		}
 		return vector;
 	}
-	Object *fresh = new_object(named->second, new_class.fields.size());
+	Object *fresh = new_object(named->second, new_class.fields.size(), to_.collector_.list_for(named->second));
 	if (!fresh) {
 		return nullptr;
 	}

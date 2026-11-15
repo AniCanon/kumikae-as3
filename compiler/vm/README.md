@@ -9,6 +9,8 @@ host differs.
 | `interpreter_run.cpp` | The loop: one case per operation |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
 | `interpreter_objects.cpp`, `runtime` | Lifetime of objects and strings |
+| `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
+| `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
 | `interpreter_vectors.cpp`, `vector_methods.cpp` | `Vector.<T>`: an object whose class says what its elements are; making, indexing, length, its methods, its text |
 | `reload` | Moves a running program's objects, vectors and static fields onto a newer build, by name |
 | `any`, `interpreter_any.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, equality, `+`, `<` |
@@ -28,6 +30,16 @@ host differs.
 - **Nothing is allocated per instruction, and no text is built on the path that succeeds.**
 - **The loop is measured, not guessed.** A change to `interpreter_run.cpp` comes with
   `tests/bench/run_bench.py <build> --against <other build>`. A helper in a header has cost 3% before.
+- **What a container holds is said once, in `each_held()` (`held.h`).** An object's fields, a vector's
+  elements, a function value's bound object or environment (its `FUNCTION_FIRST` field): freeing lets go of
+  each slot it visits, and the cycle collector follows each. A new container (an Array, a keyed table for
+  Object literals and Dictionary) adds its slots there and nowhere else; `may_hold_objects()` beside it
+  says which classes the collector looks at. Every object is made with `collector_.list_for(class)` as its
+  list, so that the collector sees it.
+- **The cycle collector deletes by trial** (`collector.h`): an object whose count of references is more than
+  the references from other objects is held from outside, and so is what it reaches. It needs no list of
+  roots. The host calls `collect_step()` with a budget of work; the interpreter collects once more when it
+  goes, and `kas3c run` reports what is still alive after that.
 - **Every failure is an AS3 error** with a class, a message and a stack line. Handles and objects are
   released on the error path too: the tests count what is left alive.
 

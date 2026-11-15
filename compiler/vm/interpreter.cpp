@@ -15,7 +15,7 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host) {
+		module_(p_module), host_(p_host), collector_(*this) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}
@@ -57,6 +57,8 @@ Interpreter::~Interpreter() {
 	if (failing_) {
 		drop_any(pending_);
 	}
+	// With every root let go of, what is left in loops is held only by itself, or by the host.
+	collector_.collect();
 	for (Str *constant : strings_) {
 		if (release(constant)) {
 			free_string(constant);
@@ -249,7 +251,7 @@ void Interpreter::out_of_memory() {
 
 // p_message is the error's own, or null; p_words are what is said if not even the error can be made.
 void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
-	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size()) : nullptr;
+	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size(), collector_.list_for(p_class)) : nullptr;
 	if (error) {
 		// What a script reads of it: its name, its number ("Error #1009: ..." is 1009), and the stack.
 		error->fields()[ir::ERROR_MESSAGE].p = p_message;
