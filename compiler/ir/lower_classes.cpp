@@ -59,12 +59,14 @@ void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 		}
 		Kind kind = written_kind(declarator.type, declarator.offset, Kind::F64);
 		const uint32_t holds = kind == Kind::Obj ? declared_class(declarator.type) : NONE;
+		// An untyped field starts undefined; one declared `Object` starts null.
+		const bool starts_null = starts_null_type(kind, compilation_.type_of(declarator.type));
 		if (p_decl->modifiers.bits & Modifiers::Static) {
 			globals_[declarator.symbol] = (uint32_t)module_.globals.size();
-			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds });
+			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds, starts_null });
 		} else {
 			fields_[declarator.symbol] = (uint32_t)module_.classes[p_class].fields.size();
-			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds });
+			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null });
 		}
 	}
 }
@@ -181,6 +183,7 @@ void Lowerer::begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {
 	unit_ = &p_unit;
 	class_ = p_class;
 	constructor_ = false;
+	result_type_ = nullptr;
 	locals_.clear();
 	loops_.clear();
 }
@@ -243,7 +246,7 @@ void Lowerer::end(uint32_t p_position) {
 		emit(Op::ReturnVoid, p_position);
 	} else {
 		// Falling off the end gives the type's default value.
-		emit(Op::Return, p_position, default_value(fn().result, p_position));
+		emit(Op::Return, p_position, fn().result == Kind::Any ? empty_untyped(result_type_, p_position) : default_value(fn().result, p_position));
 	}
 }
 
@@ -253,6 +256,7 @@ void Lowerer::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl
 		return;
 	}
 	begin(found->second, p_unit, p_class);
+	result_type_ = p_decl->return_type ? compilation_.type_of(p_decl->return_type) : nullptr;
 	parameters(p_decl);
 	if (p_decl->return_type) {
 		fn().result = written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void);
@@ -313,7 +317,7 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 			auto field = fields_.find(declarator.symbol);
 			if (field != fields_.end() && declarator.initializer) {
 				Kind kind = module_.classes[index].fields[field->second].kind;
-				emit(Op::SetField, declarator.offset, 0, field->second, expression(declarator.initializer, kind));
+				emit(Op::SetField, declarator.offset, 0, field->second, typed(declarator.initializer, compilation_.type_of(declarator.type), kind));
 			}
 		}
 	}
@@ -378,7 +382,7 @@ void Lowerer::lower_statics(Unit &p_unit, ClassDecl *p_class) {
 			if (global != globals_.end() && declarator.initializer) {
 				emit(Op::Stmt, declarator.offset);
 				emit(Op::SetGlobal, declarator.offset, global->second,
-						expression(declarator.initializer, module_.globals[global->second].kind));
+						typed(declarator.initializer, compilation_.type_of(declarator.type), module_.globals[global->second].kind));
 			}
 		}
 	}
@@ -401,7 +405,7 @@ void Lowerer::lower_package_variables(Unit &p_unit, VarDecl *p_decl) {
 		module_.initializers.push_back(index);
 		begin(index, p_unit, nullptr);
 		emit(Op::SetGlobal, declarator.offset, global->second,
-				expression(declarator.initializer, module_.globals[global->second].kind));
+				typed(declarator.initializer, compilation_.type_of(declarator.type), module_.globals[global->second].kind));
 		emit(Op::ReturnVoid, declarator.offset);
 	}
 }

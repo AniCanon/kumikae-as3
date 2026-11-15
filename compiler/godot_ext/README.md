@@ -10,6 +10,7 @@ called by the engine.
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
 | `godot_host` | The interpreter's three interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_utility.cpp` | Godot's global functions |
+| `godot_untyped.cpp` | An untyped value as a Variant and back: an integer stays an integer, a whole float a float |
 | `godot_collections.cpp` | A vector handed to Godot: the packed array Godot takes there, or an Array |
 | `program` (reload) | Watches the scripts, compiles them again, and moves instances, listeners and script resources onto the new program (`vm/reload`) |
 | `program` (restart) | A save that changes code that runs once (`ir::run_once_changes`) starts the running scene again from its file |

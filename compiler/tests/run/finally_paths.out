@@ -1,0 +1,11 @@
+f: from finally fin 
+g: from finally g fin 
+h: from outer finally ab
+loop: 2 x0x1c1x2
+after loop 01F
+after loop i0F
+finally swallowed s
+null: null
+undefined: undefined
+as Object: 7
+two0f0f1

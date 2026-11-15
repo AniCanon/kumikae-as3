@@ -2,6 +2,7 @@
 #pragma once
 
 #include "interpreter.h"
+#include "any.h"
 #include "numeric.h"
 
 namespace kas3 {
@@ -10,7 +11,7 @@ namespace vm {
 // A value the interpreter must give up when its register, field or global is overwritten: a counted
 // string or object, or a handle on an engine value.
 inline bool held(ir::Kind p_kind) {
-	return ir::is_reference(p_kind) || ir::is_engine(p_kind);
+	return ir::is_held(p_kind);
 }
 
 // An integer into a register. The whole slot is cleared first: a register is compared and copied as 64

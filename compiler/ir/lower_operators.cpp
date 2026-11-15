@@ -99,6 +99,9 @@ uint32_t Lowerer::logical(Binary *p_binary, Kind p_want) {
 			a = b = Kind::I64; // An Int64 holds both, as the checker took it.
 		}
 		kind = a == Kind::Void ? b : a;
+		if (a == Kind::Any || b == Kind::Any) {
+			kind = a = b = Kind::Any; // An untyped value holds either side.
+		}
 		if (kind == Kind::Void || (a != Kind::Void && b != Kind::Void && a != b)) {
 			refuse(position, "'&&' or '||' between values of different types");
 			kind = Kind::Bool;
@@ -138,7 +141,13 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 	// `v is Vector.<int>`: the type written is the class itself, and its instances are the vector.
 	const Type *written = right->type && right->type->kind == Type::ClassObject ? right->type->element : nullptr;
 	uint32_t godot_class = 0;
-	if (symbol && is_godot(symbol) && is_godot_object(symbol) && engine_name(symbol, std::string_view(), &godot_class)) {
+	const bool godot_target = symbol && is_godot(symbol) && is_godot_object(symbol);
+	if (!godot_target && !is_vector(written) && (untyped(left) || (!is_null(left) && natural(left) != Kind::Obj))) {
+		if (const std::optional<uint32_t> tested = any_type_test(p_binary)) {
+			return *tested;
+		}
+	}
+	if (godot_target && engine_name(symbol, std::string_view(), &godot_class)) {
 		// One of Godot's classes: the engine knows what an object of its own is.
 		const bool test = p_binary->op == TokenKind::KwIs;
 		uint32_t object = expression(left, Kind::Void);
@@ -173,6 +182,9 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 }
 
 uint32_t Lowerer::comparison(Binary *p_binary) {
+	if (untyped(p_binary->left) || untyped(p_binary->right)) {
+		return any_comparison(p_binary);
+	}
 	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
@@ -219,6 +231,9 @@ uint32_t Lowerer::comparison(Binary *p_binary) {
 }
 
 uint32_t Lowerer::equality(Binary *p_binary) {
+	if (untyped(p_binary->left) || untyped(p_binary->right)) {
+		return any_equality(p_binary);
+	}
 	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
@@ -308,6 +323,9 @@ uint32_t Lowerer::arithmetic(Binary *p_binary, Kind p_want) {
 	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
+	if (p_binary->op == TokenKind::Plus && (untyped(left) || untyped(right))) {
+		return any_add(p_binary);
+	}
 	Kind left_kind = Kind::Void, right_kind = Kind::Void;
 	kind_of(left->type, &left_kind);
 	kind_of(right->type, &right_kind);

@@ -22,8 +22,8 @@ struct EngineHandles {
 	// Whether a handle still has something behind it: not if it is null, or an object the engine has freed.
 	// A freed object is null to a script.
 	[[nodiscard]] virtual bool present(void *p_value) = 0;
-	// Whether a handle is an object of the class of that name (Godot's), or of a class that extends it.
-	// Not if it is null or freed.
+	// Whether a handle is an object of the class of that name (Godot's), or of a class that extends it;
+	// for one of Godot's values, whether it is of the value type of that name. Not if null or freed.
 	[[nodiscard]] virtual bool is_class(void *p_value, std::string_view p_class) = 0;
 	// The engine's own text for a value or an object.
 	[[nodiscard]] virtual Str *text(void *p_value) = 0;

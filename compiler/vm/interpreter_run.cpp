@@ -99,9 +99,7 @@ void Interpreter::make(uint32_t p_class, Slot &r_out) {
 		return;
 	}
 	for (size_t i = 0; i < klass.fields.size(); i++) {
-		if (klass.fields[i].kind == Kind::F64) {
-			object->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
-		}
+		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
 	}
 	assign(Kind::Obj, r_out, object);
 }
@@ -188,8 +186,10 @@ void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_regis
 
 bool Interpreter::run(size_t p_depth, Slot *r_result) {
 	while (frames_.size() > p_depth) {
-		if (pending_ || stopped_) {
-			unwind(p_depth);
+		if (failing_ || stopped_) {
+			if (catch_error(p_depth)) {
+				continue;
+			}
 			return false;
 		}
 		Frame &frame = frames_.back();
@@ -540,6 +540,21 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::VecSetFixed:
 				vector_op(function, in, r);
 				break;
+			case Op::AnyConst:
+			case Op::ToAny:
+			case Op::FromAny:
+			case Op::AnyText:
+			case Op::AnyTypeof:
+			case Op::AnyEq:
+			case Op::AnyStrictEq:
+			case Op::AnyAdd:
+			case Op::AnyLt:
+			case Op::AnyLe:
+			case Op::AnyGt:
+			case Op::AnyGe:
+			case Op::AnyIs:
+				any_op(function, in, r); // `frame` and `r` may be stale after this.
+				break;
 			case Op::VecCall:
 				vector_call(function, in); // `frame` and `r` may be stale after this.
 				break;
@@ -563,16 +578,10 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::ReturnVoid:
 				leave(function, in, r, p_depth, r_result); // `frame` and `r` are stale after this.
 				break;
-			case Op::Throw: {
-				Object *thrown = static_cast<Object *>(r[in.a].p);
-				if (!thrown) {
-					raise_null();
-					break;
-				}
-				retain(thrown);
-				pending_ = thrown;
+			case Op::Throw:
+				pending_ = share(Kind::Any, r[in.a]); // Any value, null too.
+				failing_ = true;
 				break;
-			}
 			case Op::HostNew:
 			case Op::HostCall:
 			case Op::HostGet:
@@ -600,12 +609,14 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				trace(function.argument_lists[in.a], r);
 				break;
 		}
-		if (pending_ || stopped_) {
+		if (failing_ || stopped_) {
 			// The instruction that failed is the one before pc: point the frame back at it for the trace.
 			if (!frames_.empty() && frames_.back().pc > 0 && frames_.size() > p_depth) {
 				frames_.back().pc--;
 			}
-			unwind(p_depth);
+			if (catch_error(p_depth)) {
+				continue;
+			}
 			return false;
 		}
 	}

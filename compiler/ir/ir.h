@@ -23,6 +23,7 @@ enum class Kind : uint8_t {
 	Val, // A value of one of Godot's value types (Vector2, Color, Signal, ...): copied when assigned
 	Ref, // A Godot object (a node, a resource), or null
 	I64, // Int64: Godot's own integer
+	Any, // `*` or `Object`: any value, with what it is beside it (vm/any.h)
 };
 
 const char *kind_name(Kind p_kind);
@@ -32,6 +33,10 @@ inline bool is_reference(Kind p_kind) {
 // Held by the engine: the interpreter keeps a handle that the host gave it.
 inline bool is_engine(Kind p_kind) {
 	return p_kind == Kind::Val || p_kind == Kind::Ref;
+}
+// Holds something that must be let go: a counted string or object, a handle, or an untyped value.
+inline bool is_held(Kind p_kind) {
+	return is_reference(p_kind) || is_engine(p_kind) || p_kind == Kind::Any;
 }
 
 // How an instruction uses its three operands.
@@ -100,8 +105,17 @@ inline bool is_engine(Kind p_kind) {
 	X(HostCallStatic, "rSA") /* A method called on no object: "Vector2.from_angle", and its arguments. */ \
 	/* A vector as one of Godot's collections: out, the vector, Godot's name for the type wanted. */ \
 	X(HostCollection, "RRS") \
+	/* The untyped value. AnyConst: 0 undefined, 1 null. ToAny takes any kind; FromAny converts to the \
+	   out register's kind as a store does (AS3's coercion), checking a class (an object), or Godot's \
+	   name for a type (a Godot object) when the third operand is not NONE; into an untyped register, \
+	   any third operand but NONE means an `Object`, where undefined is null. AnyText is String(x). \
+	   AnyIs: the third operand is a class, or one of the ANY_IS_ codes. */ \
+	X(AnyConst, "RI-") X(ToAny, "RR-") X(FromAny, "RRI") X(AnyText, "RR-") X(AnyTypeof, "RR-") \
+	X(AnyEq, "RRR") X(AnyStrictEq, "RRR") X(AnyAdd, "RRR") X(AnyLt, "RRR") X(AnyLe, "RRR") X(AnyGt, "RRR") X(AnyGe, "RRR") \
+	X(AnyIs, "RRI") \
 	X(Return, "R--") X(ReturnVoid, "---") \
-	X(Throw, "R--") X(Trace, "A--")
+	X(Throw, "R--") /* An untyped value: AS3 throws any value. */ \
+	X(Trace, "A--")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,
@@ -129,6 +143,12 @@ const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.
 
 const uint32_t NONE = 0xFFFFFFFFu;
+// AnyIs with a type that is not a class: what AS3 asks of the value itself.
+const uint32_t ANY_IS_INT = 0xFFFFFFF0u;
+const uint32_t ANY_IS_UINT = 0xFFFFFFF1u;
+const uint32_t ANY_IS_NUMBER = 0xFFFFFFF2u;
+const uint32_t ANY_IS_STRING = 0xFFFFFFF3u;
+const uint32_t ANY_IS_BOOLEAN = 0xFFFFFFF4u;
 const uint32_t BIND_SLOT = 0x80000000u; // In HostBind: the operand is a method-table slot.
 
 struct Instruction {
@@ -143,6 +163,17 @@ struct Instruction {
 struct Local {
 	std::string name;
 	uint32_t reg = 0;
+};
+
+// Where an error raised inside [start, end) of a function's code is caught: the error goes to register
+// `reg` and the function carries on at `target`. `type` is what the catch takes: a class, one of the
+// ANY_IS_ codes, or NONE for anything. A function's handlers are in order, the innermost first.
+struct Handler {
+	uint32_t start = 0;
+	uint32_t end = 0;
+	uint32_t target = 0;
+	uint32_t reg = 0;
+	uint32_t type = NONE;
 };
 
 struct Function {
@@ -163,6 +194,7 @@ struct Function {
 	std::vector<Instruction> code;
 	std::vector<std::vector<uint32_t>> argument_lists;
 	std::vector<Local> locals;
+	std::vector<Handler> handlers;
 };
 
 struct Field {
@@ -171,6 +203,7 @@ struct Field {
 	// For an object: the class it is declared to hold (a class of the program, or a vector's), or NONE
 	// where that is not known. A reload keeps what a field held only if it is still of that class.
 	uint32_t klass = NONE;
+	bool starts_null = false; // An untyped field declared `Object`: it starts null, a `*` undefined.
 };
 
 struct Class {
@@ -195,6 +228,7 @@ struct Global {
 	std::string name; // "Main.count"
 	Kind kind = Kind::Void;
 	uint32_t klass = NONE; // As for a field.
+	bool starts_null = false; // As for a field.
 };
 
 struct Module {

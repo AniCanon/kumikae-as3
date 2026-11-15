@@ -1,0 +1,13 @@
+caught too far RangeError: too far
+null: Error #1009: Cannot access a property or method of a null object reference.
+a string: plain text
+anything: 42 number
+an object: thrown
+from deep: bottom
+normal caught returned abcde
+rethrown: goes on f
+2 20 g0g1g2h0h1h2
+outer caught: inner g0g1g2h0h1h2[inner finally]
+second from first
+00 01 10 11 20 21 in 
+false true default set!

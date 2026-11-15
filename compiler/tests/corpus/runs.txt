@@ -3,6 +3,7 @@ Empty
 MoveNodes
 NBody
 PerNodeChild
+RayQueries
 Saxpy
 Shapes
 Sieve

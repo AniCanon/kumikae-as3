@@ -1,5 +1,7 @@
 #include "callable.h"
 
+#include "any.h"
+
 #include "program.h"
 
 #include <godot_cpp/core/object.hpp>
@@ -328,13 +330,21 @@ class ListenerSweep {
 		const ir::Class &klass = module_.classes[p_object->klass];
 		for (size_t i = 0; i < klass.fields.size(); i++) {
 			void *held = p_object->fields()[i].p;
+			ir::Kind kind = klass.fields[i].kind;
+			if (kind == ir::Kind::Any) {
+				// What an untyped field holds is walked as a field of that kind would be.
+				const vm::Slot value = p_object->fields()[i];
+				const vm::AnyTag tag = vm::any::tag(value);
+				held = tag == vm::AnyTag::Object || vm::any::is_engine(value) ? vm::any::pointer(value) : nullptr;
+				kind = tag == vm::AnyTag::Object ? ir::Kind::Obj : ir::Kind::Ref;
+			}
 			if (!held) {
 				continue;
 			}
-			if (klass.fields[i].kind == ir::Kind::Obj) {
+			if (kind == ir::Kind::Obj) {
 				visit(held, nullptr);
 				reaches.push_back(held);
-			} else if (ir::is_engine(klass.fields[i].kind)) {
+			} else if (ir::is_engine(kind)) {
 				const Variant *value = static_cast<const Variant *>(held);
 				RefCounted *counted = value->get_type() == Variant::OBJECT ? Object::cast_to<RefCounted>(value->get_validated_object()) : nullptr;
 				// The script's own hold on the object it is attached to is not a counted reference.
