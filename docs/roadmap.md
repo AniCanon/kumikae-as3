@@ -152,8 +152,9 @@ adapter, and one JetBrains plugin that covers Rider and the other IDEs.
 
 **Built ahead, on 2026-11-14:** the JetBrains plugin (`editors/jetbrains`): AS3 files with highlighting,
 completion and go to declaration from the language server; a project wizard; run configurations for the
-desktop and for the iOS Simulator (export, build, install, launch); and a panel that shows the Simulator.
-No debugger yet.
+desktop and for the iOS Simulator (export, build, install, launch); and a panel that shows the Simulator
+through a native helper, at about 60 frames a second with live touch, rotation and text in any script
+(measured by its builder; results in `docs/results/2026-11-jetbrains-simulator.md`). No debugger yet.
 
 Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
