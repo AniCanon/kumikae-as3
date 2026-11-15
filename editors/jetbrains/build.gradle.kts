@@ -125,7 +125,9 @@ val buildSimulatorBridge = tasks.register<Exec>("buildSimulatorBridge") {
     }
 }
 tasks.runIde {
-    if (providers.environmentVariable("KUMIKAE_SIMULATOR_ENDURANCE_PROBE").orNull == "1") {
+    if (providers.environmentVariable("KUMIKAE_SIMULATOR_ENDURANCE_PROBE").orNull == "1" ||
+        providers.environmentVariable("KUMIKAE_SIMULATOR_MEMORY_PROBE").orNull == "1"
+    ) {
         timeout = Duration.ofMinutes(12)
     }
 }

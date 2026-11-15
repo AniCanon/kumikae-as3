@@ -36,6 +36,7 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
                 cancelTouch()
             }
             field = value
+            if (value == null) presented = null
             if (previous != null && value != null && previous.geometry == value.geometry) {
                 repaint(device(value.image.width, value.image.height).screen.bounds)
             } else {
