@@ -133,7 +133,7 @@ private:
 	void function_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	Object *function_in(ir::Kind p_kind, Slot p_value);
 	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
-	bool function_arguments(Object *p_value, size_t p_count, const Slot *p_values, const uint32_t *p_list, std::vector<Slot> *r_values);
+	bool function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values);
 	void let_go_arguments(const ir::Function &p_callee, std::vector<Slot> *p_values);
 	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);

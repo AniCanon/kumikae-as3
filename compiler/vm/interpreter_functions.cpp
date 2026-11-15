@@ -148,9 +148,10 @@ bool Interpreter::argument_as(const Function &p_callee, uint32_t p_register, Slo
 }
 
 // What a call of a function value starts with: what it takes first, then each untyped argument as its
-// parameter holds it (p_list picks them out of p_values, or they are p_values in order). One left out takes
-// its default; too many is AS3's ArgumentError #1063. False if it raised.
-bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, const uint32_t *p_list, std::vector<Slot> *r_values) {
+// parameter holds it. One left out takes its default; too many is AS3's ArgumentError #1063. False if it
+// raised. p_values must not be in the stack: making an argument a String may run the program, which may
+// move the stack.
+bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
 	const Function &callee = module_.functions[static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i)];
 	const size_t first = callee.is_static ? 0 : 1;
 	const size_t most = callee.parameters - first;
@@ -166,7 +167,7 @@ bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot
 		(*r_values)[0].p = p_value->fields()[ir::FUNCTION_FIRST].p;
 	}
 	for (size_t i = 0; i < p_count; i++) {
-		if (!argument_as(callee, static_cast<uint32_t>(first + i), p_values[p_list ? p_list[i] : i], &(*r_values)[first + i])) {
+		if (!argument_as(callee, static_cast<uint32_t>(first + i), p_values[i], &(*r_values)[first + i])) {
 			r_values->resize(first + i);
 			let_go_arguments(callee, r_values);
 			return false;
@@ -191,8 +192,17 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 	}
 	Object *value = function_in(p_function.registers[p_in.b], r[p_in.b]);
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	if (!value) {
+		return;
+	}
+	// Taken out of the registers first (each still held by its register, which nothing can change while
+	// this call is made).
+	std::vector<Slot> given(list.size());
+	for (size_t i = 0; i < list.size(); i++) {
+		given[i] = r[list[i]];
+	}
 	std::vector<Slot> values;
-	if (!value || !function_arguments(value, list.size(), r, list.data(), &values)) {
+	if (!function_arguments(value, given.size(), given.data(), &values)) {
 		return;
 	}
 	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
@@ -204,7 +214,7 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 // or nothing if it raised (the error is then on its way out, as call_within() leaves it).
 std::optional<Slot> Interpreter::call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count) {
 	std::vector<Slot> values;
-	if (!function_arguments(p_value, p_count, p_arguments, nullptr, &values)) {
+	if (!function_arguments(p_value, p_count, p_arguments, &values)) {
 		return std::nullopt;
 	}
 	const uint32_t target = static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i);
