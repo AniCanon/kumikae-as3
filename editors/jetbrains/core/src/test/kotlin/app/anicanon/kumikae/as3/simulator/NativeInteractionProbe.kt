@@ -12,7 +12,10 @@ class NativeInteractionProbe {
     @Test fun rotationAndTextReachTheOwnedGuest() {
         assumeTrue(System.getenv("KUMIKAE_NATIVE_INTERACTION_PROBE") == "1")
         val runner = ProcessRunner()
-        NativeProbeApp(runner).use { id, report ->
+        val family = System.getenv("KUMIKAE_NATIVE_PROBE_FAMILY") ?: "iPhone"
+        require(family in setOf("iPhone", "iPad"))
+        println("interaction_family=$family")
+        NativeProbeApp(runner).use(family) { id, report ->
             val directory = Files.createTempDirectory("native-interaction-probe")
             val helper = Path.of("../native/SimulatorBridge/.build/release/simulator-bridge").toAbsolutePath()
             try {
@@ -25,7 +28,7 @@ class NativeInteractionProbe {
                     for ((orientation, ui) in listOf(
                         "landscape_left" to 3,
                         "landscape_right" to 4,
-                        "portrait_upside_down" to 4,
+                        "portrait_upside_down" to if (family == "iPad") 2 else 4,
                         "portrait" to 1,
                     )) {
                         session.dispatch("rotate", params(id).apply { addProperty("orientation", orientation) })
@@ -47,7 +50,7 @@ class NativeInteractionProbe {
                                     frame.image.getRGB(x, y) == 0xFFFF0000.toInt()
                             }
                             val landscape = ui == 3 || ui == 4
-                            val snapshots = Path.of("build/reports/native-interaction")
+                            val snapshots = Path.of("build/reports/native-interaction", family)
                             Files.createDirectories(snapshots)
                             javax.imageio.ImageIO.write(
                                 frame.image,
@@ -79,24 +82,24 @@ class NativeInteractionProbe {
                     var permission = picture(feed)
                     await("guest paste permission") {
                         feed.poll()?.let { permission = it }
-                        val color = permission.image.getRGB(
-                            (permission.image.width * 0.2).toInt(),
-                            (
-                                permission.image.height *
-                                    0.555
-                                ).toInt(),
-                        )
-                        (color and 0xff) > 220 && ((color shr 16) and 0xff) < 30
+                        read(report)["text"].asString == text || ProbePastePermission.button(permission.image) != null
                     }
-                    // The system dialog has no app-owned transition callback; let its presentation finish.
-                    Thread.sleep(600)
-                    permission = picture(feed)
-                    val allow = Pixel(permission.image.width / 2, (permission.image.height * 0.62).toInt())
-                    val size = Geometry(permission.image.width, permission.image.height)
-                    session.touch(id, permission.generation, size, "down", allow)
-                    Thread.sleep(50)
-                    session.touch(id, permission.generation, size, "up", allow)
-                    println("paste_permission=tapped_on_owned_fixture_only")
+                    if (read(report)["text"].asString != text) {
+                        // The system dialog has no app-owned transition callback; let its presentation finish.
+                        Thread.sleep(600)
+                        permission = picture(feed)
+                        javax.imageio.ImageIO.write(
+                            permission.image,
+                            "png",
+                            Path.of("build/reports/native-interaction", family, "permission.png").toFile(),
+                        )
+                        val allow = checkNotNull(ProbePastePermission.button(permission.image))
+                        val size = Geometry(permission.image.width, permission.image.height)
+                        session.touch(id, permission.generation, size, "down", allow)
+                        Thread.sleep(50)
+                        session.touch(id, permission.generation, size, "up", allow)
+                        println("paste_permission=tapped_on_owned_fixture_only")
+                    }
                     try {
                         await("exact Unicode text") { read(report)["text"].asString == text }
                     } catch (failure: Exception) {
@@ -104,7 +107,7 @@ class NativeInteractionProbe {
                         javax.imageio.ImageIO.write(
                             picture(feed).image,
                             "png",
-                            Path.of("build/reports/native-interaction/paste.png").toFile(),
+                            Path.of("build/reports/native-interaction", family, "paste.png").toFile(),
                         )
                         throw failure
                     }

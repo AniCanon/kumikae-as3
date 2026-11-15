@@ -119,9 +119,7 @@ public actor AppleSimulator: DeviceLookup, FrameSource, InputSink {
     let family = try runtime.method(
       deviceType, "productFamilyID", types: ["i", "@", ":"], as: Family.self)(
         deviceType, NSSelectorFromString("productFamilyID"))
-    guard family == 1 else {
-      throw BridgeError.unavailable("Native input is validated for iPhone simulators only")
-    }
+    try NativeDeviceFamily.validate(family)
     typealias Scale = @convention(c) (AnyObject, Selector) -> Float
     let scale = try runtime.method(
       deviceType, "mainScreenScale", types: ["f", "@", ":"], as: Scale.self)(

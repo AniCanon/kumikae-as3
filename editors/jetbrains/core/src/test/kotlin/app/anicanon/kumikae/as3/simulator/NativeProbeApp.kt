@@ -33,7 +33,8 @@ internal class NativeProbeApp(private val runner: CommandRunner) {
         val sdk = runner.run(listOf("/usr/bin/xcrun", "--sdk", "iphonesimulator", "--show-sdk-path"), 15_000).trim()
         runner.run(
             listOf(
-                "/usr/bin/xcrun", "swiftc", "-swift-version", "6", "-strict-concurrency=complete", "-parse-as-library", "-sdk", sdk,
+                "/usr/bin/xcrun", "swiftc", "-swift-version", "6", "-strict-concurrency=complete",
+                "-parse-as-library", "-sdk", sdk,
                 "-target", "arm64-apple-ios17.0-simulator", source.resolve("ProbeApp.swift").toString(),
                 "-o", app.resolve("NativeProbe").toString(),
             ),
