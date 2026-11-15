@@ -276,6 +276,29 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 			*r_value = made ? any::object(made) : any::undefined();
 			return made != nullptr;
 		}
+		if (const std::optional<uint32_t> getter = named_method(*klass, "get " + p_key.text)) {
+			// A public getter: called, on the object's class's own (it may be overridden).
+			const uint32_t function = klass->methods[*getter];
+			Slot self;
+			self.bits = 0;
+			self.p = object;
+			Slot result;
+			result.bits = 0;
+			retain(object); // Held while its getter runs.
+			const bool ok = call_within(function, &self, 1, &result);
+			release_object(object);
+			if (ok) {
+				const Kind kind = module_.functions[function].result;
+				*r_value = to_any(kind, result);
+				drop(kind, result);
+			}
+			return ok;
+		}
+		if (named_method(*klass, "set " + p_key.text)) {
+			raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
+					"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
+			return false;
+		}
 		if (klass->built_in || listed(OBJECT_METHODS, p_key.text)) {
 			raise_unsupported("reading '" + p_key.text + "' of " + holder_name(p_holder) + " by its name");
 			return false;
@@ -343,6 +366,25 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 		}
 		if (named_method(*klass, p_key.text)) {
 			return cannot("1037", "Cannot assign to a method ");
+		}
+		if (const std::optional<uint32_t> setter = named_method(*klass, "set " + p_key.text)) {
+			// A public setter: given the value as its parameter takes it.
+			const uint32_t function = klass->methods[*setter];
+			const ir::Function &callee = module_.functions[function];
+			Slot both[2];
+			both[0].bits = 0;
+			both[0].p = object;
+			if (!argument_as(callee, 1, p_value, &both[1])) {
+				return false;
+			}
+			retain(object);
+			const bool ok = call_within(function, both, 2, nullptr);
+			release_object(object);
+			drop(callee.registers[1], both[1]);
+			return ok;
+		}
+		if (named_method(*klass, "get " + p_key.text)) {
+			return cannot("1074", "Illegal write to read-only property ");
 		}
 		if (klass->built_in) {
 			raise_unsupported("adding a property to " + holder_name(p_holder));
