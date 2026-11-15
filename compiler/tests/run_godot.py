@@ -165,7 +165,7 @@ check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" 
 output = compare("signals.gd", [
     "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "counts what scripts added", "remove all leaves others", "lasting or once, not both",
     "null argument and order", "arguments", "removes itself",
-    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "user signal", "declared signal", "declared signal listed", "filter",
+    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "user signal", "declared signal", "declared signal listed", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed", "own signal field by name", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
     "a removed listener that is still held keeps what it holds",

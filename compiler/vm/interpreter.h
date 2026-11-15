@@ -68,6 +68,16 @@ private:
 		int32_t line = 0;
 	};
 	Site thrown_at_;
+	// An error that ended a call from outside made while this program's own code was running beneath it
+	// (a listener that its emit() ran): kept, to be raised again in that code once the engine's call returns.
+	struct Carried {
+		bool held = false;
+		Slot error{};
+		std::string trace;
+		size_t lines = 0;
+		Site at;
+	} carried_;
+	void raise_carried();
 	void traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const;
 	// The trace of an error a `finally` caught, kept for when it is thrown again: by the depth of the frame
 	// and the register the finally keeps its error in, so that there is at most one for each finally.

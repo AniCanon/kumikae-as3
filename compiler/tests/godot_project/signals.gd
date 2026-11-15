@@ -152,6 +152,7 @@ func _physics_process(_delta: float) -> bool:
 	node.reset()
 	node.emitByName(other, "renamed")
 	show("listeners and emit by name", [node.listenersByName(other, "renamed"), node.count], [1, 1])
+	show("a listener's error comes back out of emit", node.catchesListener(), "caught 1009")
 	# A signal that GDScript defines, with an argument that is checked.
 	other.add_user_signal("hit", [{"name": "n", "type": TYPE_INT}])
 	node.reset()

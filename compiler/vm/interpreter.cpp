@@ -396,7 +396,19 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
 		entries_--;
 	}
-	if (!ok) {
+	if (!ok && depth > 0 && failing_ && !carried_.held) {
+		// This program's code is running beneath this call: the error goes back to it, as Flash has an
+		// error in a listener come out of the dispatch that ran it.
+		carried_.held = true;
+		carried_.error = pending_;
+		carried_.trace = std::move(trace_);
+		carried_.lines = trace_lines_;
+		carried_.at = thrown_at_;
+	} else if (!ok) {
+		report();
+	}
+	if (depth == 0 && carried_.held) {
+		raise_carried(); // Nothing took it back: it is reported here, as it would have been.
 		report();
 	}
 	pending_ = outer_error;
@@ -406,6 +418,17 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	stopped_ = outer_stopped;
 	halted_ = outer_halted;
 	return ok;
+}
+
+// The error carried back from a call the engine made: on its way out again, from where it was.
+void Interpreter::raise_carried() {
+	carried_.held = false;
+	pending_ = carried_.error;
+	failing_ = true;
+	trace_ = std::move(carried_.trace);
+	trace_lines_ = carried_.lines;
+	thrown_at_ = carried_.at;
+	carried_.error.bits = 0;
 }
 
 std::string Interpreter::error_text() {

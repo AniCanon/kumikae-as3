@@ -74,6 +74,18 @@ package {
 		// A signal's property and its emit(), by its name.
 		public function listenersByName(other:Node, signal:String):int { return other[signal].numListeners; }
 		public function emitByName(other:Node, signal:String):void { other[signal].emit(); }
+		// An error in a listener that this script's own emit() ran comes back out of emit(), as in Flash.
+		public function catchesListener():String {
+			renamed.add(fails);
+			var said:String = "not caught";
+			try {
+				renamed.emit();
+			} catch (e:TypeError) {
+				said = "caught " + e.errorID;
+			}
+			renamed.remove(fails);
+			return said;
+		}
 		public function plain(other:Node):void { helper = new Listener(); other.renamed.add(helper.heard); }
 		public function plainCount():int { return helper.count; }
 		public function filtered(a:GodotArray):GodotArray { return a.filter(isBig); }
