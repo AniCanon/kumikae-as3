@@ -793,3 +793,314 @@ The XCTest compatibility runner's zero-test line is not that test result.
 A final read-only device/process check printed **`remaining_probe_devices=0`**
 and **`remaining_worktree_processes=0`**. Owned helpers and single-use Gradle/test
 processes had exited. No process belonging to the person was killed or signalled.
+
+
+## Native rotation, Unicode and timing follow-up — 2026-11-15
+
+This continuation uses the same installed Apple-silicon Xcode 27.0 build 27A266a,
+iOS 26.4 and JDK 25. It starts no IDE and drives no host window, keyboard or pointer.
+Input, installation and lifecycle operations use only the disposable device owned
+by the probe. The owned Swift/UIKit fixture reports interface/device orientation,
+transition completion, exact text, target hits and display-link/draw counts. It is
+compiled with the installed SDK, without downloads or a signing account.
+
+### 4. Native rotation
+
+The native helper now sends orientation changes over the guest orientation service,
+validates the reply, rotates the raw BGRA surface using its reported UI orientation,
+and inversely maps touch coordinates. The session revokes the old feed after the
+reply and reconnects with the actual oriented dimensions. External orientation
+changes also revoke the feed, including half turns with unchanged dimensions.
+
+Live landscape-left and landscape-right pictures measured **2622×1206**; portrait
+measured **1206×2622**. Each had the red fixture target in the correct position and
+a native tap incremented the app's target-hit count. The upside-down command set
+the guest's device orientation to 2, but this iPhone's UIKit interface retained its
+previous landscape orientation (4). The picture and taps followed the interface.
+Application orientation policy still applies.
+
+Failures caught before correction included unsupported native rotation, premature
+feed closure, reuse of a closing helper, wrong orientation-reply parsing, a raw
+portrait-sized frame after rotation, and an upside-down raster transform. Synthetic
+pixel and inverse-coordinate assertions failed before the transform was corrected.
+The visible red target then provided independent live evidence. The fixture also
+needed to wait for UIKit's transition completion before asserting a target tap.
+An external half-turn regression failed before stream revocation was added.
+
+### 5. Unicode text
+
+ASCII retains the US keyboard-usage route. Other printable Unicode is copied
+unchanged as UTF-8 to the selected guest with `simctl pbcopy`, followed by native
+Command-V. Copy failure sends no shortcut. The host pasteboard is never written.
+The guest pasteboard remains replaced. Input rejects ISO controls, unpaired
+surrogates, empty strings and strings over 4096 UTF-16 code units. idb rejects
+Unicode with an explicit native-helper requirement before sending any command.
+
+The first live paste stopped at the guest's **Allow Paste** prompt, visible in the
+captured frame; ASCII had arrived. The product does not accept that prompt. The
+probe accepts it only on its owned fixture. Real users may need to accept the
+prompt, and apps may refuse paste or restrict secure fields. Transport success is
+not proof of application text insertion.
+
+Validation/routing tests first reported **11 tests completed, 6 failed**, then
+passed. The native paste-key sequence first failed against an empty sequence, then
+passed. Review found a process-pipe starvation risk: blocking readers and the stdin
+writer shared the common pool. The saturation regression failed with **TIMEOUT**.
+Each command now owns and joins three pipe workers; that regression passed. The
+idb refusal regression reported **7 tests completed, 1 failed** without its guard,
+then passed after restoration.
+
+The completed owned-device run printed all four rotation results, then
+`paste_permission=tapped_on_owned_fixture_only`,
+`text=ASCII_and_exact_Unicode_combining_CJK_Arabic_emoji`,
+`interaction_cleanup=all_helper_slots_removed`, and
+`owned_device_deleted=true`. The app's exact string contained ASCII, precomposed
+and decomposed accented letters, Japanese, Arabic and a skin-tone/ZWJ emoji.
+Gradle printed **`BUILD SUCCESSFUL in 1m 3s`**, one live test passed. No input was
+sent to the person's Simulator. Failed live runs also deleted their owned device.
+
+### 6. Previously unobserved failures
+
+The mutation script saves each original source, restores it in `finally`, then
+reruns the same focused tests. It changes no test assertions.
+
+- **Swift mapped sink:** changed the pixel `memcpy` length to zero. The newest-frame
+  assertion failed at `MappedFrameTests.swift:22`: the final eight bytes did not
+  equal eight copies of 22. **2 tests, 1 issue**; restoration: **2 tests passed**.
+- **ASCII keyboard:** removed Shift from uppercase letters. The `aA1!` Shift-array
+  assertion failed at `ASCIIKeyboardTests.swift:13`. **2 tests, 1 issue**;
+  restoration: **2 tests passed**.
+- **Shared repository touch:** inserted a no-op `touch` override in the shared
+  wrapper. **4 tests completed, 1 failed**, naming `continuous touch reaches the
+  shared repository`. Restoration printed **`BUILD SUCCESSFUL in 11s`** and all
+  four tests passed. All three mutations are removed; focused logs remain under
+  ignored `build/reports/native-mutations/`.
+
+
+### 7. Timing investigation
+
+The historical 82 ms event came from the separate Python/helper-only endurance
+run, which recorded no per-stage trace. The visible-panel frame-rate dips came
+from another run: its Settings animation was not a verified continuous 60 Hz
+source. Forced collections, process sampling and file writes shared that panel
+probe's measured windows, and its frame drain crossed timestamp boundaries.
+These are confounders, not proof of what caused a particular old dip.
+The IDE run remains unrepeatable here because `runIde` is prohibited.
+
+The new owned UIKit fixture requests 60 Hz, records display-link and draw counts,
+and paints a binary tick and its inverse. A helper/production-reader probe sends
+touch phases at 50 Hz for ten minutes, records ten-second windows, and captures
+clock uncertainty, natural GC and helper stages. It does not mount the panel or
+measure app response to every touch. No builds overlap the measured interval.
+
+Three avoidable costs in our path were corrected:
+
+- The JVM allocated its full-size image while holding the slot read lock. The
+  regression failed with `OverlappingFileLockException` when allocation tried to
+  publish a newer frame. Allocation now occurs unlocked; a second validated
+  header read copies the newest compatible frame. The regression passed.
+- Swift allocated a fresh pixel Data for every changed surface. An actor-owned
+  buffer now reuses storage while preserving retained Data values through copy
+  on write. The retained-frame regression first reported three issues, then
+  passed. A traced live run counted one storage change across hundreds of frames.
+- Each loop slept eight milliseconds after copying and publishing. Those costs
+  now consume the eight-millisecond polling budget. The cadence regression first
+  reported three failed expectations, then passed. An overrun yields without
+  trying to replay missed polling deadlines.
+
+Diagnostics are opt-in, bounded aggregates and slow single-touch traces. Their
+barrier callback interval includes guest transport/service and host callback
+scheduling. Actor entry and return after callback expose additional host/helper
+waits. They do not provide an optical presentation timestamp.
+
+Short diagnostic runs completed at 60, 31, 31 and 31 seconds. The first baseline
+consumed 45.67, 53.05 and then 59.39–59.89 fps in ten-second windows; its input
+p95/max was 7.88/31.48 ms. It used the earlier single-ping clock estimate with
+4.65 ms uncertainty, so its stage estimates are weak. A later 31-second run had
+p95/max 9.44/35.01 ms, with 0.88 ms calibration uncertainty. The longest event
+included an estimated 25.27 ms before helper processing and 6.23 ms from helper
+processing to reply. These runs had different startup/machine conditions and
+are not an isolated speedup comparison.
+
+The first marker location proved unreliable: an owned-device image showed a
+transient guest banner covering it. The marker moved below that area, with an
+inverse row that makes occlusion an error. The affected short-run raster-tick
+rates are discarded; reader frame counts and independent guest reports remain
+valid. File writers now close on all paths, final partial windows are included,
+and start/end minimum-RTT calibrations bound clock drift. The final Swift run
+before the long measurement printed **30 tests in 16 suites passed**.
+
+The final **portrait** run lasted **600.020 s**, with **35,942 reader frames**
+(**59.90 fps**) and **35,763 distinct raster ticks** (**59.60/s**). It delivered
+**99.40%** of the tick range visible between the first and last sampled images;
+no tick went backwards. Ten-second reader windows were **54.37–60.70 fps**;
+distinct-tick windows were **53.47–60.10/s**. After the first 20 seconds, their
+minima were **59.55 fps** and **59.32 distinct ticks/s**. A final one-frame partial
+window is included in totals, not in these full-window ranges.
+
+| Minute | Reader frames/s | Distinct fixture ticks/s |
+|---:|---:|---:|
+| 1 | 58.13 | 57.75 |
+| 2 | 59.83 | 59.70 |
+| 3 | 60.23 | 59.90 |
+| 4 | 60.28 | 59.82 |
+| 5 | 60.07 | 59.72 |
+| 6 | 60.22 | 59.85 |
+| 7 | 60.00 | 59.85 |
+| 8 | 60.08 | 59.80 |
+| 9 | 60.22 | 59.90 |
+| 10 | 59.95 | 59.75 |
+
+There were **29,975 measured inputs**: round-trip **p50 3.00 ms, p95 6.72 ms,
+max 57.84 ms**. The maximum occurred at **1.276 s**, with **51.03 ms** from
+helper processing to reply. Its paired trace measured **19.48 ms** before actor
+entry, **0.05 ms** to barrier submission, **0.97 ms** to the callback, then
+**30.53 ms** until the input call returned. The estimated pre-helper interval was
+**5.94 ms ±0.66 ms**. End calibration shifted **0.055 ms**, within the combined
+**0.970 ms** uncertainty bound. No slow trace overflowed its bounded storage.
+
+The guest itself reported **58.16 fps** in the second window despite requesting
+60 Hz; its draw count followed its display-link count. That source dip exists
+before our reader. The helper also measured sleep overshoots of **23.53 ms** for
+command polling and **24.30 ms** for frame polling. Together with waits outside
+the worst event's short barrier interval, these show host/helper waiting in
+addition to source cadence, consistent with scheduling delay or actor contention.
+The trace does not establish which work occupied the actor during that wait. These
+observations do not isolate an OS, GPU or other-process cause, and do not prove the historical 82 ms had the same
+cause. The actor still serializes surface access and input; lock/copy work can
+therefore delay actor entry or resumption.
+
+Across the helper lifetime, including warmup and tail, **104 copies** were
+rejected because the surface changed during copying and **104 publications**
+met a busy slot. Pixel storage changed **once** across **36,252 copy attempts**.
+The measured JVM reported **2,142 collections / 2,875 ms** without forced GC.
+The reader's row views still allocate unless eliminated by the JIT; moving the
+large image allocation outside the lock does not make the locked copy proven
+allocation-free. The remaining losses and cold-start delays mean this is **not a
+guaranteed 60 fps result**. Whole-panel paint cadence and landscape performance
+were not remeasured.
+
+The run printed **`BUILD SUCCESSFUL in 10m 45s`**, one test passed,
+`performance_helper_cleanup=true`, and `owned_device_deleted=true`. Raw CSV,
+clock bounds and JSON metrics are under ignored
+`core/build/reports/native-performance/ten-minute/`. Item 7 is **partly done**:
+the controlled run and avoidable costs are addressed; exact attribution of the
+old event and a repeat whole-IDE endurance run remain unverified.
+
+### 8. iPad and session-lock follow-up
+
+The native family guard now accepts iPhone and iPad and still rejects other
+families explicitly. Its regression first reported **2 tests, 1 issue** against
+the phone-only guard, then **2 tests passed**. The owned iPad run passed all four
+orientations and a target tap in each: landscape pictures were **2752×2064**;
+portrait and upside-down pictures were **2064×2752**. Unlike the measured iPhone,
+this fixture's iPad interface accepted upside-down orientation 2.
+
+The first iPad Unicode runs failed because the probe selected the blue **Don't
+Allow Paste** button. An owned-device screenshot showed **Allow Paste** in gray
+below it. This was a probe error, not lost Unicode transport. The corrected
+locator rejects a blue button without the gray allowance below it; its revised
+unit test first printed **1 test completed, 1 failed**, then passed. It also accepts
+immediate exact-text insertion when no prompt appears. This locator is only for
+the owned fixture on the measured runtime and is not product auto-acceptance.
+
+The successful iPad run printed **`BUILD SUCCESSFUL in 57s`**, with four tests
+passed (interaction, permission locator and two report-concurrency tests). Its
+output included `text=ASCII_and_exact_Unicode_combining_CJK_Arabic_emoji`,
+`interaction_cleanup=all_helper_slots_removed`, and `owned_device_deleted=true`.
+Failed runs also deleted their owned device. Images and the final live test XML
+are under ignored `core/build/reports/native-interaction/iPad/`.
+
+The final iPhone rerun with the same locator also passed: **`BUILD SUCCESSFUL in
+54s`**, all four rotation/target checks and exact Unicode, with helper-slot removal
+and `owned_device_deleted=true`. The same invocation passed the permission,
+report-concurrency and `SessionStateTest` regressions. Its retained XML and images
+are under ignored `core/build/reports/native-interaction/iPhone/`.
+
+Reading a test report no longer holds the session lock while finding its app
+container and reading the file. The session snapshots its device and generation,
+then rejects a result after a changed selection, including a switch away and
+back. The concurrency regression failed against the locked implementation, then
+both tests passed. They also assert that a subsequent unchanged-device report
+succeeds. Status and selection remain responsive while the fake report I/O is
+blocked. The new `STALE_REPORT` error is documented in the protocol.
+
+Item 8 is **partly done**. iPad and report I/O are covered. Two-finger gesture
+ownership/UI and the remaining synchronous launch/terminate paths are not changed
+or verified here. Moving those launch operations requires coordinating the
+console-launcher's ownership and selection/disposal; the report change does not
+claim to solve those lifetimes. No whole-IDE interaction was run.
+
+### 3. Whole-IDE memory probe remains unrun
+
+The standalone retention result from the preceding section still covers the
+repository/controller/native screen only. The prepared whole-IDE probe remains
+available. Once the other sandbox session has ended, from the plugin folder with
+JDK 25 and the cached dependencies configured, run:
+
+```sh
+KUMIKAE_SIMULATOR_MEMORY_PROBE=1 ./gradlew --offline --no-daemon runIde -PuiProbe
+```
+
+It mounts the production view with synthetic frames for ten minutes and writes
+`memory.csv` plus live heap histograms under `build/reports/ui/`, including hidden
+and disposed samples. It was **not run** in this continuation because the owner
+prohibited `runIde`. Item 3 remains **partly done**; absence of whole-IDE growth
+is not established.
+
+### Final offline checks and cleanup for this continuation
+
+The commands below used JDK 25, this worktree's Gradle home and the already
+configured read-only dependency cache. No tool, SDK or dependency was downloaded.
+
+```sh
+./gradlew --offline --no-daemon -Pkas3Root=<repository> ktlintFormat
+./gradlew --offline --no-daemon -Pkas3Root=<repository> check buildPlugin verifyPlugin
+python3 -m unittest discover -s tests
+swift build -c release && swift test
+KUMIKAE_NATIVE_INTERACTION_PROBE=1 KUMIKAE_NATIVE_PROBE_FAMILY=iPhone \
+  ./gradlew --offline --no-daemon :core:test --tests '*NativeInteractionProbe' \
+  --tests '*ProbePastePermissionTest' --tests '*ReportConcurrencyTest' --tests '*SessionStateTest'
+KUMIKAE_NATIVE_INTERACTION_PROBE=1 KUMIKAE_NATIVE_PROBE_FAMILY=iPad \
+  ./gradlew --offline --no-daemon :core:test --tests '*NativeInteractionProbe' \
+  --tests '*ProbePastePermissionTest' --tests '*ReportConcurrencyTest'
+KUMIKAE_NATIVE_PERFORMANCE_PROBE=1 KUMIKAE_NATIVE_PROBE_LABEL=ten-minute \
+  ./gradlew --offline --no-daemon :core:test --tests '*NativePerformanceProbe'
+```
+
+The final full build printed **`BUILD SUCCESSFUL in 31s`**, 37 tasks (14 executed,
+23 up-to-date). XML reports show **116 panel tests: 115 passed, 1 opt-in probe
+skipped**, and **85 core tests: 82 passed, 3 opt-in probes skipped**; zero failures
+or errors. Interaction and performance probes were run separately above; lifecycle
+and standalone retention probes passed in the preceding section. The verifier
+reported **Compatible** with **RD-262.10968.170**, four existing deprecated-API and
+six experimental-API notices, and **0 B downloaded**. It also printed warnings
+about missing components in the installed IDE layout; verification completed.
+The style tooling printed its existing `sun.misc.Unsafe` deprecation warning.
+
+Python printed **`Ran 8 tests in 4.050s`**, **`OK`**. Swift release printed
+**`Build complete! (3.20 sec)`**; Swift Testing printed **`Test run with 32 tests in
+17 suites passed after 0.011 seconds`**. The XCTest compatibility runner's zero-test
+line is not the Swift Testing result. The plugin build separately rebuilt the
+release helper successfully in 2.96 seconds. Focused failures and restoration
+results are recorded with their corresponding items above.
+
+Independent review checked ownership, rotation and touch transforms, Unicode
+routing, report concurrency, metrics and the raw ten-minute totals. The final
+probe review compared its locator with the owned iPad screenshot. Review findings
+were corrected, including stale README claims, clock/trace qualifications and
+the immediate-paste probe path. `git diff --check` produced no output.
+
+The final read-only checks printed **`remaining_probe_devices=0`** and
+**`remaining_owned_work_processes=0`**. The process check used helper/build command
+paths and this worktree's Gradle daemon logs; persistent application/tool hosts
+sharing the working directory were excluded and left alone. Every owned live
+probe reported deletion, including failed attempts. No process belonging to the
+person was killed or signalled, and no input went to their Simulator or host UI.
+
+No `runIde` command was executed. The exact
+`launchLog.launch(device, bundle(params), sources(params))` forwarding line and its
+`SessionStateTest` regression survive and pass. Designs and plans remain ignored
+under `docs/superpowers/`; none are staged or committed. Items 1 and 2 remain done
+as recorded in the preceding section; item 3 is partly done, items 4–6 are done,
+and items 7 and 8 are partly done with the limits stated above.

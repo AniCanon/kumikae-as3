@@ -25,7 +25,7 @@ tested there with JUnit 4; both modules run on the JUnit Platform, so either
 style of test is picked up. Read the test count after a build change: a missing
 engine gives a green build that ran nothing.
 
-The wire protocol is shared with `simulator.py`. Keep its seven Python tests
+The wire protocol is shared with `simulator.py`. Keep its Python client tests
 green, and change `protocol.md`, the service and both clients together.
 
 ## Dependency injection

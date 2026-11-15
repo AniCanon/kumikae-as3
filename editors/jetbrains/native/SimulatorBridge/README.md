@@ -33,10 +33,11 @@ The complete private surface used by the helper is:
 | Service context and device set | `defaultDeviceSetWithError:`, `availableDevices` |
 | Device | `UDID`, `state`, `bootGeneration`, `io`, `deviceType`, `lookup:error:` |
 | Device I/O and port | `ioPorts`, `descriptor` |
-| Display descriptor and properties | `screenProperties`, `uniqueId` (`PurpleMain`), `framebufferSurface` |
+| Display descriptor and properties | `screenProperties`, `uniqueId` (`PurpleMain`), `uiOrientation`, `framebufferSurface` |
 | Device type | `productFamilyID`, `mainScreenScale` |
 | Runtime-loaded system libxpc | `xpc_endpoint_create_mach_port_4sim`, `xpc_connection_enable_sim2host_4sim` |
 | Guest DTUHID service | `com.apple.coredevice.feature.remote.hid.digitizer` |
+| Guest orientation service | `com.apple.coredevice.feature.remote.devicecontrol.orientation` |
 | Private XPC message types | `IndigoDigitizerEvent`, `IndigoButtonEvent`, `IndigoKeyboardButtonEvent` |
 
 Every callable class, selector and export is checked before use; Objective-C
@@ -59,7 +60,13 @@ and `target`. Button payloads use `usageCode`, `state` and, for consumer buttons
 `usagePage`. These private values live only in the adapter. Each actual input
 message is followed by a separate barrier; its reply means ordered receive-queue
 progress in the guest input service, not application handling. The barrier itself
-must carry no input payload. No SimulatorKit, legacy HID client, callback
+must carry no input payload. Orientation uses a separate connection and a `payload.changeOrientation._0`
+request. Its dictionary reply must confirm `currentDeviceOrientation`. The helper
+suspends frames once rotation is requested; the service closes that feed only
+after the reply or failure. A new helper reads the oriented display metadata.
+Public Accelerate rotates BGRA pixels; input uses the inverse transform. External
+orientation changes end the feed even if dimensions stay the same.
+No SimulatorKit, legacy HID client, callback
 registration, private header or Apple binary is shipped.
 
 The private endpoint factory consumes the device lookup's Mach send right. The
@@ -74,8 +81,50 @@ The actor is single-use so callbacks from an old connection cannot affect a new 
 The [results](../../../../docs/results/2026-11-jetbrains-simulator.md) distinguish
 seed-observation-to-paint timing from actual presentation latency. No authoritative
 presentation timestamp is available. The current route reads full-size BGRA and
-polls seeds every 8 ms; it has no private screen callback ABI. The mapped slot drops
-a frame under lock contention. Only iPhone, printable US ASCII, single touch, Home
-and Lock are implemented; native rotation fails explicitly. Shutdown, reboot and
+targets an 8 ms seed-poll interval including copy/publication work; it has no private
+screen callback ABI. Actor-owned pixel storage is reused with Data copy-on-write
+protection for retained frames. The mapped slot drops
+a frame under lock contention. iPhone and iPad, printable US ASCII key events, Unicode through the guest pasteboard and
+Command-V, single touch, Home, Lock and rotation are implemented. Unicode may need
+the guest app’s Allow Paste confirmation; paste restrictions and secure fields
+remain under the app’s control. Control characters are refused. The guest app may restrict its orientations. Shutdown, reboot and
 selection recovery were checked on a disposable device, including a startup
 readiness failure fixed in this pass. Lock remains a separate live-device check.
+
+
+Optional `KUMIKAE_NATIVE_METRICS` names a new, private output file. Ordinary runs
+leave it unset. Ten-second JSON windows contain aggregate copy, seed, publication,
+actor and barrier timings plus at most 64 slow input traces; overflow is counted.
+The trace's `inputReturnedNanos` precedes the wire reply's `completedNanos`.
+A trace keeps the last barrier of a command, so phase decomposition is meaningful
+for single touch commands, not multi-key text. Barrier callback time includes host
+callback scheduling and must not be labelled guest processing time.
+
+After building the release helper, run this from the plugin folder for owned-device
+rotation, target taps and exact Unicode text:
+
+```sh
+KUMIKAE_NATIVE_INTERACTION_PROBE=1 ./gradlew --offline --no-daemon :core:test \
+  --tests '*NativeInteractionProbe'
+```
+
+The default family is iPhone; add `KUMIKAE_NATIVE_PROBE_FAMILY=iPad` for a tablet.
+The probe may accept the guest paste permission only on its disposable fixture.
+Its dialog locator is specific to the measured runtime; exact guest text is the
+success criterion, including when no permission prompt appears.
+
+```sh
+KUMIKAE_NATIVE_PERFORMANCE_PROBE=1 KUMIKAE_NATIVE_PROBE_LABEL=run-1 \
+  ./gradlew --offline --no-daemon :core:test --tests '*NativePerformanceProbe'
+```
+
+Choose a fresh label for each run. This runs 600 seconds of a 60 Hz guest fixture
+and 50 Hz touch requests. The optional
+`KUMIKAE_NATIVE_PROBE_SECONDS` accepts 30–600 for diagnosis. It records helper
+metrics, frame/tick timelines, input intervals, natural JVM GC counts and bounded
+clock calibration under `core/build/reports/native-performance/`. It verifies an
+on-screen tick and its inverse, plus guest display-link/draw reports. No forced
+GC, process sampling, IDE, host UI or other-device input occurs in this probe.
+Do not overlap builds with the measured interval. This measures helper-to-reader
+delivery, not panel paint or application response to each touch. Both probes build
+the fixture with the installed SDK and delete their owned device in `finally`.

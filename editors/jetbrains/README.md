@@ -7,13 +7,15 @@ its measurements are described in the results below.
 | Checked | By | Result |
 |---|---|---|
 | Compilation, style check and plugin zip | Automated build, 2026-11-15 | `./gradlew check buildPlugin` succeeds. |
-| Service tests (`core`) | Automated build | 67 pass; one opt-in live probe skips in ordinary checks and passed separately. |
+| Service tests (`core`) | Automated build | 82 pass; three opt-in live probes skip in ordinary checks and passed separately. |
 | Panel tests (repository, controller, service adapter) | Automated build | 115 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
 | Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
-| Native Swift tests | `swift test` | 21 pass. |
+| Native Swift tests | `swift test` | 32 pass in 17 suites. |
 | Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
+| Native rotation and text | Owned iPhone and iPad fixtures, 2026-11-15 | Four orientation commands and target taps passed on each family; exact ASCII, accents, Japanese, Arabic and emoji reached the app. Interface orientation policy still applies. |
+| Native helper/reader endurance | Owned 60 Hz fixture, 600.020 seconds | 59.90 reader frames/s, 59.60 distinct raster ticks/s; 29,975 inputs, p95 6.72 ms and max 57.84 ms. Whole-panel cadence and the historical 82 ms event remain unverified. |
 | Standalone frame retention | Production repository/controller/screen, synthetic frames | 7,800 distinct paints; full-GC heap 48.023–48.097 MiB, one retained stream image; zero images and 35.097 MiB hidden. Whole IDE/Compose not measured. |
-| Agent client tests | `python3 -m unittest` | 7 pass. |
+| Agent client tests | `python3 -m unittest` | 8 pass. |
 | Service and agent client against a booted Simulator | Run by hand through `simulator.py` | Devices, select, launch of `org.kumikae.as3test`, a 2622x1206 PNG screenshot, console log, and the test report "14 passed, 0 failed". |
 | The panel's own repository against a booted Simulator | One throwaway test, read-only | Select, a decoded 1206x2622 JPEG picture in 403 ms, an empty console page and status. |
 | Panel layout and buttons | UI probe in a sandbox Rider, with a synthetic service | Light and dark pictures under `build/reports/ui/`; Refresh, Boot and Launch pressed through the real buttons. |
@@ -52,8 +54,8 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 - An agent command-line client that talks to the same service as the panel.
   It saves PNG screenshots, reads logs and the test report, and offers input.
 - Native input tracks press, movement and release live; pending moves coalesce.
-  Taps, printable ASCII text, Home and Lock use the same persistent helper. Native
-  rotation returns an explicit unsupported error. The idb fallback retains its
+  Taps, ASCII keys, Unicode paste, Home and Lock use the same persistent helper. Native
+  rotation changes the guest orientation, turns the picture and remaps touch. The idb fallback retains its
   release-time swipe and rotation behavior. Both routes require the owner's switch.
 - Tests for protocol validation, geometry, device parsing, command construction,
   log limits, process timeouts, session cleanup and HTTP authentication, and for
@@ -61,7 +63,7 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   cursor, input permission, hidden windows and late results after closing.
 
 The bundled helper needs no idb at runtime. It loads private Apple interfaces only
-after the existing opt-in. It accepts Apple-silicon iPhone devices when the selected Xcode passes the
+after the existing opt-in. It accepts Apple-silicon iPhone and iPad devices when the selected Xcode passes the
 runtime capability checks; a build deny list can reject a known incompatibility
 with its reason. Only Xcode 27.0 build 27A266a has been measured. Missing or
 changed capabilities and unsupported devices fall back. The plugin
@@ -142,6 +144,10 @@ from an already booted Simulator for the selection check, sends it no input, and
 deletes only the device it created, including after failures. A pre-existing probe
 name is refused. `ProbeDeviceOwnerTest` covers lost creation replies and cleanup
 errors with fake commands.
+
+The owned rotation/Unicode and ten-minute timing probes are documented in the
+[native helper README](native/SimulatorBridge/README.md#measurements-and-limits).
+They also delete their disposable device on failure; no IDE is started.
 
 `KUMIKAE_FRAME_RETENTION_PROBE=1 ./gradlew --offline :test --tests '*FrameRetentionProbe'`
 paints 7,800 fresh 1206×2622 images through the production repository, controller
@@ -249,9 +255,13 @@ export KUMIKAE_SIMULATOR_NATIVE=/absolute/path/to/simulator-bridge
 export KUMIKAE_SIMULATOR_IDB=/absolute/path/to/idb   # optional fallback override
 ```
 
-Text is printable ASCII using US keyboard usages. Native drags follow the pointer
-live. There is no multi-touch, audio or Unicode paste. Lock is implemented but has
-not been visually verified on the shared device; native rotation is unsupported.
+ASCII text uses US keyboard usages. Other printable Unicode uses the selected
+guest’s pasteboard and Command-V; accept the guest’s Allow Paste prompt when shown.
+Apps may refuse paste, particularly in secure fields. Controls, invalid surrogate
+pairs and text longer than 4096 UTF-16 code units are refused. idb remains ASCII-only. Native drags follow the pointer
+live. There is no multi-touch or audio. Lock is implemented but has
+not been visually verified on the shared device. Native rotation follows the
+guest's interface orientation; an app may restrict which orientations it accepts.
 
 ## Layout of the code
 

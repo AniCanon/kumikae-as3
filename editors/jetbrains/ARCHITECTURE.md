@@ -46,9 +46,14 @@ Objective-C signatures and private XPC export presence. Runtime capabilities
 are the Xcode compatibility gate; an empty-by-default build deny list records
 reasons for any known incompatibilities. A failed empty startup barrier is
 retryable after reboot, without replaying input. Capture polls the IOSurface seed
-at 8 ms and only copies changes. DTUHID sends down/move/up and waits for a separate
-guest-service barrier reply. The actor is single-use; reconnection creates another
-helper. Stdin EOF cancels active work and releases input and device references.
+on an 8 ms budget including copying and publication, and only copies changes.
+Its pixel buffer is reused; the JVM allocates its own image outside the slot lock
+and revalidates the header before copying. DTUHID sends down/move/up and waits for
+a separate guest-service barrier reply. Rotation uses a separate guest orientation service;
+its reply precedes feed closure. Oriented pixels and inverse touch coordinates
+share one transform. External orientation changes revoke the feed. The actor is
+single-use; reconnection creates another helper. Stdin EOF cancels active work and
+releases input and device references.
 See [the native package](native/SimulatorBridge/README.md) for the complete private
 surface and [protocol.md](protocol.md) for the shared frame layout.
 
@@ -184,3 +189,8 @@ device that is not running is not asked for its picture.
   `simulator.py`; see the [results](../../docs/results/2026-11-jetbrains-simulator.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the Kotlin and Compose conventions.
+
+Native Unicode input uses shared string validation, copies unchanged UTF-8 through an
+injected guest pasteboard, then sends the native paste shortcut. A failed copy sends
+no shortcut. The command runner owns separate pipe workers for each child and joins
+them when that child ends; blocking pipe work never occupies the shared common pool.
