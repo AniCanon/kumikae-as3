@@ -32,6 +32,8 @@ private:
 
 	Options options_;
 	std::string root_; // The project folder; empty if there is none.
+	std::string opened_; // The folder the editor opened, by the editor's name for it.
+	std::string opened_real_; // The same folder with links followed.
 	std::map<std::string, File> files_; // By path: the order they are checked in.
 	std::vector<std::shared_ptr<Parsed>> builtins_;
 	std::shared_ptr<Parsed> godot_;
@@ -61,6 +63,14 @@ public:
 	// `project.godot`, or else the folder itself. Every .as file under the project is read.
 	void set_root(const std::string &p_folder);
 	const std::string &root() const { return root_; }
+
+	// The one name the workspace has a file by, whatever name it was reached by: links are followed, and
+	// where the file system takes two spellings for one file (letter case, the form of an accented
+	// letter) the spelling on disk is the name. A link in the project to a file outside it keeps its own
+	// name. A file that does not exist keeps the name given, with the folders above it resolved.
+	std::string resolve(const std::string &p_path) const;
+	// The name an editor has for a file the workspace names: under the folder as the editor opened it.
+	std::string shown_path(const std::string &p_path) const;
 
 	// The editor's text for a file. A file outside the project (or in a dot folder of it) is not part of
 	// the program, unless there is no project folder at all: then the open files are the program.

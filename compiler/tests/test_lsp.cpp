@@ -949,7 +949,43 @@ static void test_inside_a_character() {
 	CHECK_EQ(*session.server.workspace().text("/work/Main.as"), std::string("var s:String = \"e\xC3\xA9\xF0\x9F\x98\x80!\";\n"));
 }
 
+// A project opened through a link: the editor is answered with its own names for the files, and a file
+// it opens is the file the project already has.
+static void test_linked_project() {
+	fs::path root = fresh_folder("linked");
+	fs::path links = fresh_folder("linked-from");
+	std::error_code error;
+	fs::create_directory_symlink(root, links / "project", error);
+	CHECK(!error);
+	write(root / "project.godot", "");
+	write(root / "Main.as", "package { public class Main { var other:Other; var bad:Nope; } }");
+	write(root / "Other.as", "package { public class Other { var bad:Nah; } }");
+	const std::string main_uri = uri_from_path((links / "project" / "Main.as").string());
+	const std::string other_uri = uri_from_path((links / "project" / "Other.as").string());
+	Session session;
+	session.initialize((links / "project").string());
+	session.settle();
+	// Named as the editor will open them, not by where the link leads.
+	CHECK_EQ(session.published(), main_uri + " 0:55-0:59 unknown type 'Nope'\n" + other_uri + " 0:39-0:42 unknown type 'Nah'\n");
+	session.open(main_uri, "package { public class Main { var other:Other; } }");
+	session.settle();
+	CHECK_EQ(session.published(), main_uri + " clear\n"); // One Main, not a second one beside the first.
+	Json where = session.request("textDocument/definition", Session::at(main_uri, 0, 42)).get("result");
+	CHECK_EQ(where.at(0).get("uri").string(), other_uri);
+	// The same file by its real name is the same document.
+	const std::string real_uri = uri_from_path((root / "Main.as").string());
+	session.change(real_uri, "package { public class Main { var other:Nope; } }");
+	session.settle();
+	CHECK_EQ(session.published(), main_uri + " 0:40-0:44 unknown type 'Nope'\n");
+	session.close(real_uri);
+	session.settle();
+	CHECK_EQ(session.published(), main_uri + " 0:55-0:59 unknown type 'Nope'\n");
+	fs::remove_all(root);
+	fs::remove_all(links);
+}
+
 int main() {
+	test_linked_project();
 	test_byte_order_mark();
 	test_inside_a_character();
 	test_completion_unicode_boundaries();

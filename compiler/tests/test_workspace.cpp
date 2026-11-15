@@ -303,7 +303,96 @@ static void test_completion_cache_lifetime() {
 	CHECK_EQ(workspace.queries().cached_context_units(), size_t{0});
 }
 
+// A file has one place in the program, whatever name it is reached by: through a link to its folder or
+// to itself, and, where the file system does not tell them apart, in another letter case or with its
+// accented letters written another way.
+static void test_one_file_many_names() {
+	fs::path root = fresh_folder("names");
+	fs::path links = fresh_folder("names-links");
+	const std::string composed = "Caf\xC3\xA9.as"; // "é" as one character.
+	const std::string decomposed = "Cafe\xCC\x81.as"; // "e" and a combining accent.
+	write(root / "project.godot", "");
+	write(root / "game" / "Player.as", "package game { public class Player {} }");
+	write(root / "game" / composed, "package game { public class Caf\xC3\xA9 {} }");
+	write(links / "Outside.as", "package { public class Outside {} }");
+	std::error_code error;
+	fs::create_directory_symlink(root, links / "project", error);
+	CHECK(!error);
+	fs::create_symlink(root / "game" / "Player.as", root / "game" / "Alias.as", error);
+	CHECK(!error);
+	fs::create_symlink(links / "Outside.as", root / "Outside.as", error);
+	CHECK(!error);
+	const std::string real = (root / "game" / "Player.as").string();
+	const std::string changed = "package game { public class Player { var a:Nope; } }";
+
+	Workspace workspace(plain());
+	workspace.set_root((links / "project").string());
+	CHECK_EQ(workspace.root(), root.string());
+	// The link to a file of the project is that file, once. A link to a file outside it is a file here.
+	CHECK_EQ(paths(workspace, root), std::string("Outside.as game/" + composed + " game/Player.as "));
+	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	Unit *player = workspace.unit(real);
+	CHECK(player != nullptr);
+	auto same = [&](const fs::path &p_name) {
+		const std::string name = p_name.string();
+		CHECK(workspace.unit(name) == workspace.unit(real));
+		workspace.open(name, changed);
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+		CHECK_EQ(workspace.compilation().format_diagnostics(), real + ":1:44: error: unknown type 'Nope'\n");
+		CHECK(workspace.text(real) && *workspace.text(real) == changed);
+		CHECK(workspace.text(name) && *workspace.text(name) == changed);
+		CHECK(workspace.unit(name) == workspace.unit(real));
+		workspace.close(name);
+		CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+	};
+	same(links / "project" / "game" / "Player.as"); // Through a link to the folder.
+	same(root / "game" / "Alias.as"); // Through a link to the file.
+	same(root / "game" / ".." / "game" / "Player.as");
+	// Opened under one name, changed on disk under another: the editor's text stays.
+	workspace.open(real, changed);
+	workspace.file_changed_on_disk((links / "project" / "game" / "Player.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(), real + ":1:44: error: unknown type 'Nope'\n");
+	workspace.close((root / "game" / "Alias.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	// The link to a file outside the project keeps its own name: that is where the project has it.
+	CHECK(workspace.unit((root / "Outside.as").string()) != nullptr);
+	workspace.open((root / "Outside.as").string(), "package { public class Outside { var a:Nope; } }");
+	CHECK_EQ(workspace.program_units().size(), (size_t)3);
+	workspace.close((root / "Outside.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	// A file that is not there yet has the name it was given.
+	workspace.open((links / "project" / "game" / "New.as").string(), "package game { public class New {} }");
+	CHECK(workspace.unit((root / "game" / "New.as").string()) != nullptr);
+	workspace.close((root / "game" / "New.as").string());
+	CHECK_EQ(workspace.program_units().size(), (size_t)3);
+
+	// Only where the file system itself takes the two names for one file.
+	if (fs::exists(root / "GAME" / "PLAYER.AS")) {
+		same(root / "GAME" / "PLAYER.AS");
+		same(root / "game" / "player.as");
+	} else {
+		std::printf("note: this file system tells letter case apart; that part was not run\n");
+	}
+	if (fs::exists(root / "game" / decomposed)) {
+		const std::string other = (root / "game" / composed).string();
+		const std::string name = (root / "game" / decomposed).string();
+		CHECK(workspace.unit(name) != nullptr);
+		CHECK(workspace.unit(name) == workspace.unit(other));
+		workspace.open(name, "package game { public class Caf\xC3\xA9 { var a:Nope; } }");
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+		CHECK(workspace.compilation().format_diagnostics().find("unknown type 'Nope'") != std::string::npos);
+		workspace.close(other);
+		CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	} else {
+		std::printf("note: this file system tells Unicode forms apart; that part was not run\n");
+	}
+	fs::remove_all(root);
+	fs::remove_all(links);
+}
+
 int main() {
+	test_one_file_many_names();
 	test_completion_cache_lifetime();
 	test_uri();
 	test_scan();

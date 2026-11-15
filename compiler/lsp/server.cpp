@@ -107,7 +107,7 @@ std::string Server::uri_of(const Unit &p_unit) {
 		return std::string();
 	}
 	auto known = uris_.find(path);
-	return known != uris_.end() ? known->second : uri_from_path(path);
+	return known != uris_.end() ? known->second : uri_from_path(workspace_.shown_path(path));
 }
 
 Unit *Server::unit_of(const Json &p_params) {
@@ -407,7 +407,7 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 		}
 	} else if (p_method == "textDocument/didOpen") {
 		if (!path.empty() && document.get("text").is_string()) {
-			uris_[normal_path(path)] = document.get("uri").string();
+			uris_[workspace_.resolve(path)] = document.get("uri").string();
 			workspace_.open(path, document.get("text").string());
 		}
 	} else if (p_method == "textDocument/didChange") {
