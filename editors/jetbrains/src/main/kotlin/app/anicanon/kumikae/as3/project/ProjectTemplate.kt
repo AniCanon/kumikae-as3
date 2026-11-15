@@ -181,6 +181,7 @@ textures/vram_compression/import_etc2_astc=true
 offset_right = 960.0
 offset_bottom = 540.0
 color = Color(0.09, 0.1, 0.14, 1)
+mouse_filter = 2
 
 [node name="Hello" type="Label" parent="."]
 offset_left = 24.0
@@ -188,6 +189,7 @@ offset_top = 16.0
 offset_right = 936.0
 offset_bottom = 60.0
 theme_override_font_sizes/font_size = 28
+mouse_filter = 2
 script = ExtResource("2")
 
 [node name="Disc" type="Node2D" parent="."]
@@ -214,19 +216,25 @@ script = ExtResource("1")
 	public class Main extends Node2D {
 		private var heading:Vector2 = Vector2.ZERO;
 		private var from:Vector2 = Vector2.ZERO;
+		private var touching:Boolean = false;
 
-		// A finger on the screen (or the mouse, on a computer) arrives here as a touch.
-		override public function _input(event:InputEvent):void {
+		// A finger on the screen (or the mouse, on a computer) arrives here as a touch, once the game's
+		// buttons and other controls have had the chance to take it.
+		override public function _unhandledInput(event:InputEvent):void {
 			var touch:InputEventScreenTouch = event as InputEventScreenTouch;
-			if (touch == null) {
-				return;
+			if (touch == null || touch.index != 0) {
+				return; // Only the first finger steers.
 			}
 			if (touch.pressed) {
 				from = touch.position;
-			} else if (from.distanceTo(touch.position) > 40) {
-				heading = (touch.position - from).normalized(); // A swipe.
-			} else {
-				heading = Vector2.ZERO; // A tap.
+				touching = true;
+			} else if (touching) {
+				touching = false;
+				if (from.distanceTo(touch.position) > 40) {
+					heading = (touch.position - from).normalized(); // A swipe.
+				} else {
+					heading = Vector2.ZERO; // A tap.
+				}
 			}
 		}
 
