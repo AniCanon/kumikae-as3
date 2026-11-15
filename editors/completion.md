@@ -39,10 +39,9 @@ inaccessible signature types and non-public member defaults are excluded. An exp
 visibility must match the inherited method. Public default constants work when written as `VALUE`,
 `Base.VALUE` or `package.name.Base.VALUE`; generated references retain their meaning in the derived class.
 Getters/setters use their corresponding accessor prefix. Overriding one does not hide the other, and
-`final` applies to the selected accessor. At the end of the class, completion also works immediately after
-`override function `, `override function get ` or `override function set `, before any name character is
-typed. Before another member declaration, type at least one name character: empty-name parser recovery
-in that position is still incomplete.
+`final` applies to the selected accessor. Completion also works immediately after `override function `,
+`override function get ` or `override function set `, before any name character is typed. A member on
+the following line, including its modifiers and metadata, remains intact.
 
 ## Accepting a suggestion
 

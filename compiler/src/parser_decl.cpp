@@ -209,7 +209,10 @@ ClassDecl *Parser::parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Me
 				}
 			}
 			if (panic_) {
-				synchronize(level);
+				// Metadata on the next line starts another class member, not the failed declaration.
+				if (!at(TokenKind::LBracket) || !current_.newline_before) {
+					synchronize(level);
+				}
 				panic_ = false;
 			}
 			if (current_.offset == start && !at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {

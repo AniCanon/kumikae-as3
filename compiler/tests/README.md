@@ -35,6 +35,8 @@ getter/setter overrides and final modifiers in either declaration order. It also
 accessor slots, shadowing during error recovery and empty-name completion. Accepted edits are checked
 with a fresh compiler. `query_completion.h` shares completion fixtures and edit application with
 `test_query`; it contains no production rules.
+Empty-name cases include following methods, fields, modifiers and metadata with comments and CRLF.
+`test_parser` checks that recovery retains those declarations and accepts valid multiline names.
 
 For alternating completion timings, build the unchanged revision separately before editing, then run:
 

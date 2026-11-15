@@ -491,11 +491,17 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	// `function get name()` is an accessor; `function get()` is a function called `get`.
 	if (p_allow_accessor && (at_word("get") || at_word("set")) &&
 			(is_identifier_like(peek2().kind) || ((p_modifiers.bits & Modifiers::Override) &&
-					(peek2().kind == TokenKind::RBrace || peek2().kind == TokenKind::EndOfFile)))) {
+					(peek2().kind == TokenKind::RBrace || peek2().kind == TokenKind::EndOfFile ||
+							(peek2().kind == TokenKind::LBracket && peek2().newline_before))))) {
 		function->accessor = text(advance()) == "get" ? FunctionDecl::Getter : FunctionDecl::Setter;
 	}
 	uint32_t missing_name_end = 0;
-	if (at(TokenKind::Identifier) || (function->accessor != FunctionDecl::None && is_identifier_like(current_.kind))) {
+	// A declaration on the next line belongs to the enclosing list. A name followed by '(' is
+	// still a valid multiline function/accessor signature, even when that name is a modifier word.
+	const bool next_declaration = p_name_required && current_.newline_before &&
+			(begins_statement(current_.kind) || at_modifier_word()) && peek2().kind != TokenKind::LParen;
+	if (!next_declaration && (at(TokenKind::Identifier) ||
+			(function->accessor != FunctionDecl::None && is_identifier_like(current_.kind)))) {
 		function->name_offset = current_.offset;
 		function->name = text(advance());
 	} else if (p_name_required) {

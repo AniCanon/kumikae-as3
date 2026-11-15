@@ -96,9 +96,28 @@ static void inherited_slots() {
 			"package { public class Other { public function get count():int { return 1; } } }").has("count"));
 }
 
+static void empty_names_before_members() {
+	const char *base = "package { public class Other { public function step():void {} "
+			"public function get count():int { return 1; } public function set count(v:int):void {} } }";
+	for (const char *following : {
+		"public function later():void {}", "override public function toString():String { return ''; }",
+		"final public function later():void {}", "static public var later:int;", "var later:int;",
+		"const later:int = 1;", "[Tag] public function later():void {}", "function later():void {}",
+	}) {
+		for (const char *gap : { "\n", "\r\n// next member\r\n", "\n/* next */ " }) {
+			const std::string prefix = "package { public class Player extends Other { override function ";
+			const std::string suffix = std::string(gap) + following + " } }";
+			accepts(prefix + "|" + suffix, base, "step", "step():void");
+			accepts(prefix + "get |" + suffix, base, "count", "get count():int");
+			accepts(prefix + "set |" + suffix, base, "count", "set count(v:int):void");
+		}
+	}
+}
+
 int main() {
 	qualified_defaults();
 	accessor_slots();
 	inherited_slots();
+	empty_names_before_members();
 	return check::finish();
 }
