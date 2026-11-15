@@ -122,8 +122,6 @@ Found by the review of the clean-up pass itself.
   `int(c ? w : 1.5)` raises a `RangeError` for a wide `w`. **clean-up**
 - An `Int64` against a Boolean or a String is compared through a `Number`, so one past 2^53 raises
   (`w == true`). `w & "99999999999999999999"` holds the text at the largest `Int64`. **clean-up**
-- A whole number worked out as not-a-number (`v * (5 % 0)`) on its way to Godot is a `RangeError`. Before
-  `Int64` it went as 0. **clean-up**
 - Godot refusing a value says "cannot convert argument 1 ..., a int, to int", not that the value does not
   fit. **clean-up**
 - An `Int64` shift count widens an `int` on its left: `i >>> c` is worked out in 64 bits. **clean-up**

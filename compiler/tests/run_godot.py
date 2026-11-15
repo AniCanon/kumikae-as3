@@ -209,7 +209,7 @@ output = compare("wide.gd", [
     "counted id", "node id", "same id", "rgba64", "rgba32", "count", "frames", "element", "negative element", "plus one",
     "stored", "narrow fits", "narrow refused", "echo most", "echo least", "wraps", "whole float", "fraction refused",
     "text refused", "int refused", "number exact", "number refused", "to number", "to number refused", "field", "flags",
-    "product", "heard", "product past int", "cell", "cell refused", "cell3 refused", "box", "box refused", "over", "over refused",
+    "product", "heard", "product past int", "a whole NaN goes as 0", "cell", "cell refused", "cell3 refused", "box", "box refused", "over", "over refused",
     "remainder", "remainder refused", "times", "times refused", "times left refused", "grow refused", "at least one",
     "at least its size",
 ])

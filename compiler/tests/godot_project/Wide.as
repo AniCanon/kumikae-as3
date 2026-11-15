@@ -22,6 +22,8 @@ package {
 		public function asNumber(value:Number):Number { return value; }
 		public function toNumber(value:Int64):Number { return value; }
 		public function product(cell:Vector2i, a:int, b:int):Vector2i { return cell * (a * b); }
+		// A whole number that came out as not a number goes to Godot as 0, as AS3's int() makes it.
+		public function byNothing(cell:Vector2i, a:int):Vector2i { return cell * (a % 0); }
 		public function cell(x:Int64):Vector2i { return new Vector2i(x, 0); }
 		public function cell3(x:Int64):Vector3i { return new Vector3i(x, 1, 2); }
 		public function box(x:Int64):Rect2i { return new Rect2i(x, x, 5, 5); }

@@ -91,6 +91,13 @@ uint32_t Lowerer::as_int32(uint32_t p_reg, uint32_t p_position) {
 	if (kind == Kind::I32 || !is_numeric(kind)) {
 		return p_reg;
 	}
+	if (kind == Kind::F64) {
+		// A whole number that came out as not a number is 0, as AS3's int() makes it; one past 32 bits
+		// is still a RangeError.
+		uint32_t wide = reg(Kind::I64);
+		emit(Op::F64ClampI64, p_position, wide, p_reg);
+		return convert(wide, Kind::I32, p_position);
+	}
 	return convert(convert(p_reg, Kind::I64, p_position), Kind::I32, p_position);
 }
 
@@ -209,7 +216,11 @@ uint32_t Lowerer::operand(Expr *p_expression, const Type *p_beside) {
 	if (!kind_of(p_expression->type, &kind) || !is_numeric(kind)) {
 		kind = Kind::Void;
 	} else if (kind == Kind::F64 && whole(p_expression)) {
-		kind = Kind::I64; // A whole number worked out as a Number: Godot's integer holds every one.
+		// A whole number worked out as a Number: Godot's integer holds every one. One that came out as not
+		// a number (`5 % 0`) goes as 0, as AS3's int() makes it.
+		uint32_t out = reg(Kind::I64);
+		emit(Op::F64ClampI64, p_expression->offset, out, expression(p_expression, Kind::F64));
+		return out;
 	}
 	return expression(p_expression, kind);
 }
