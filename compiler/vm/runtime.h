@@ -78,7 +78,9 @@ bool allocation_fails(); // True, and one fewer to fail, while any are still to 
 size_t live_strings();
 size_t live_objects();
 
-Str *new_string(std::string_view p_text); // One reference, the caller's.
+Str *new_string(std::string_view p_text); // One reference, the caller's. Null if out of memory.
+// The two, one after the other, made at once: nothing else is allocated. Null if out of memory.
+Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);
 Object *new_object(uint32_t p_class, size_t p_fields); // One reference; fields zeroed. Null if out of memory.
 void free_object(Object *p_object); // The fields must have been released.

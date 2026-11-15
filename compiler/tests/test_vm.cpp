@@ -1608,6 +1608,7 @@ static void test_untyped_out_of_memory() {
 							  "public function add(a:*):* { return a + 1; }\n"
 							  "public function same(o:*):String { try { return String(o == 'grow'); } catch (e:Error) { return e.message; } return ''; }\n"
 							  "public function toString():String { return 'grow'; }\n"
+							  "public function glue(a:*):String { try { return a + 'x'; } catch (e:Error) { return e.message; } return ''; }\n"
 							  "} }\n");
 	compilation.check();
 	CHECK_EQ(compilation.format_diagnostics(), std::string());
@@ -1638,6 +1639,14 @@ static void test_untyped_out_of_memory() {
 		vm::fail_allocations(0);
 		CHECK_EQ(result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string(), std::string(vm::OUT_OF_MEMORY));
 		interpreter.discard(ir::Kind::Str, result);
+		// Text joined with an untyped `+`, with no memory for the result.
+		vm::Slot text = vm::any::string(vm::new_string("left"));
+		vm::fail_allocations(1);
+		CHECK(interpreter.call_method(object, "glue", &text, 1, &result));
+		vm::fail_allocations(0);
+		CHECK_EQ(result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string(), std::string(vm::OUT_OF_MEMORY));
+		interpreter.discard(ir::Kind::Str, result);
+		interpreter.discard(ir::Kind::Any, text);
 		interpreter.release_object(object);
 	}
 	CHECK_EQ(vm::live_strings(), strings);

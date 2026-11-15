@@ -456,9 +456,22 @@ void Interpreter::any_arithmetic(const Instruction &p_in, Slot p_b, Slot p_c) {
 	Slot out;
 	out.bits = 0;
 	if (p_in.op == Op::AnyAdd && texts) {
-		std::string joined = *any::text(first) + *any::text(second);
-		out = any::string(text(joined));
-		put(Kind::Any, stack_[base + p_in.a], out);
+		// A string is joined as it is held; only the other side, a number or a word, is made into text.
+		const auto view = [](Slot p_side, std::string *r_words) {
+			if (any::tag(p_side) == AnyTag::String) {
+				return static_cast<const Str *>(any::pointer(p_side))->view();
+			}
+			*r_words = *any::text(p_side);
+			return std::string_view(*r_words);
+		};
+		std::string first_words, second_words;
+		const std::string_view first_text = view(first, &first_words);
+		Str *joined = join_strings(first_text, view(second, &second_words));
+		if (!joined) {
+			out_of_memory();
+		} else {
+			put(Kind::Any, stack_[base + p_in.a], any::string(joined));
+		}
 	} else if (p_in.op == Op::AnyAdd) {
 		put(Kind::Any, stack_[base + p_in.a], add_numbers(first, second));
 	} else {

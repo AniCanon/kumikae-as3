@@ -244,7 +244,6 @@ any Godot value passing as a condition):
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
-- Running out of memory while the C++ side builds a text (joining two strings) aborts. **clean-up**
 - 6 of the 14 corpus programs do not run yet: `tests/run_corpus.py` prints what stops each, and two of
   the six are taken by the interpreter but wait for `[Signal]` (`tests/corpus/waits.txt`). **2c**
 - A string's `length` counts characters, not UTF-16 units, and strings compare by character. **2c**
