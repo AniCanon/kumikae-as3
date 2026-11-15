@@ -1,5 +1,6 @@
 #include "server.h"
 
+#include "channel.h"
 #include "positions.h"
 #include "uri.h"
 
@@ -8,13 +9,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <set>
-
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <poll.h>
-#include <unistd.h>
-#endif
 
 namespace kas3 {
 
@@ -25,9 +19,6 @@ const int PARSE_ERROR = -32700;
 const int INVALID_REQUEST = -32600;
 const int METHOD_NOT_FOUND = -32601;
 const int NOT_INITIALIZED = -32002;
-
-// The most a single message may hold.
-const size_t MAX_MESSAGE = 256u * 1024 * 1024;
 
 std::string response(const Json &p_id, Json p_result) {
 	return write_json(Json::object().set("jsonrpc", "2.0").set("id", p_id).set("result", std::move(p_result)));
@@ -536,128 +527,6 @@ void Server::handle(std::string_view p_message, std::vector<std::string> &r_out)
 	// Answering made the server check the latest text: its errors are due as well.
 	publish(r_out);
 }
-
-namespace {
-
-class Channel {
-	int input_;
-	int output_;
-	std::string buffer_;
-	bool ended_ = false;
-
-	bool fill() {
-		char chunk[65536];
-#ifdef _WIN32
-		int got = _read(input_, chunk, sizeof(chunk));
-#else
-		ssize_t got = read(input_, chunk, sizeof(chunk));
-#endif
-		if (got <= 0) {
-			ended_ = true;
-			return false;
-		}
-		buffer_.append(chunk, (size_t)got);
-		return true;
-	}
-
-public:
-	Channel(int p_input, int p_output) :
-			input_(p_input), output_(p_output) {}
-
-	// The next message's body. False at the end of input, or when the framing is broken past repair.
-	bool next(std::string *r_message) {
-		while (true) {
-			size_t header_end = buffer_.find("\r\n\r\n");
-			if (header_end == std::string::npos) {
-				if (buffer_.size() > 65536 || !fill()) {
-					return false; // No header in sight.
-				}
-				continue;
-			}
-			size_t length = MAX_MESSAGE + 1;
-			size_t at = 0;
-			while (at < header_end) {
-				size_t line_end = buffer_.find("\r\n", at);
-				std::string line = buffer_.substr(at, line_end - at);
-				const std::string name = "content-length:";
-				bool matches = line.size() > name.size();
-				for (size_t i = 0; matches && i < name.size(); i++) {
-					char c = line[i];
-					matches = (c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c) == name[i];
-				}
-				if (matches) {
-					size_t digits = name.size();
-					while (digits < line.size() && line[digits] == ' ') {
-						digits++;
-					}
-					size_t value = 0;
-					bool any = false;
-					while (digits < line.size() && line[digits] >= '0' && line[digits] <= '9' && value <= MAX_MESSAGE) {
-						value = value * 10 + (size_t)(line[digits++] - '0');
-						any = true;
-					}
-					while (digits < line.size() && (line[digits] == ' ' || line[digits] == '\t')) {
-						digits++;
-					}
-					if (any && digits == line.size()) {
-						length = value;
-					}
-				}
-				at = line_end + 2;
-			}
-			if (length > MAX_MESSAGE) {
-				return false; // Without a length there is no telling where the message ends.
-			}
-			size_t body = header_end + 4;
-			while (buffer_.size() < body + length) {
-				if (!fill()) {
-					return false;
-				}
-			}
-			r_message->assign(buffer_, body, length);
-			buffer_.erase(0, body + length);
-			return true;
-		}
-	}
-
-	// True if another message, or part of one, is already waiting.
-	bool waiting() const {
-		if (!buffer_.empty()) {
-			return true;
-		}
-#ifdef _WIN32
-		return false;
-#else
-		struct pollfd descriptor;
-		descriptor.fd = input_;
-		descriptor.events = POLLIN;
-		descriptor.revents = 0;
-		return poll(&descriptor, 1, 0) > 0 && (descriptor.revents & POLLIN) != 0;
-#endif
-	}
-
-	bool send(const std::vector<std::string> &p_messages) {
-		std::string out;
-		for (const std::string &message : p_messages) {
-			out += "Content-Length: " + std::to_string(message.size()) + "\r\n\r\n" + message;
-		}
-		size_t sent = 0;
-		while (sent < out.size()) {
-#ifdef _WIN32
-			int wrote = _write(output_, out.data() + sent, (unsigned)(out.size() - sent));
-#else
-			ssize_t wrote = write(output_, out.data() + sent, out.size() - sent);
-#endif
-			if (wrote <= 0) {
-				return false;
-			}
-			sent += (size_t)wrote;
-		}
-		return true;
-	}
-};
-
-} // namespace
 
 int run_server(int p_input, int p_output, Workspace::Options p_options) {
 	Server server(std::move(p_options));
