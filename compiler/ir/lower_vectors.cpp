@@ -327,6 +327,52 @@ void Lowerer::vector_loop(ForIn *p_loop) {
 	finish_loop(next_at);
 }
 
+// for each (x in packed): one of Godot's collections that says what it holds, by index, first to last. Its
+// size is asked again each time round, as a vector's length is read.
+void Lowerer::engine_loop(ForIn *p_loop) {
+	const uint32_t position = p_loop->offset;
+	Kind element = Kind::Void;
+	uint32_t size_name = 0;
+	const Type *whole = p_loop->collection->type;
+	const Symbol *klass = whole && whole->kind == Type::Instance ? whole->symbol : nullptr;
+	if (!kind_of(p_loop->element, &element) || element == Kind::Void || !engine_name(klass, "size", &size_name)) {
+		refuse(position, "'for each' over a collection of '" + compilation_.type_name(p_loop->element) + "'");
+		return;
+	}
+	Place target;
+	if (p_loop->declaration && p_loop->declaration->declarators.count == 1) {
+		target = place_of_symbol(p_loop->declaration->declarators[0].symbol, 0, p_loop->declaration->declarators[0].offset);
+	} else if (p_loop->target) {
+		target = place_of(p_loop->target);
+	} else {
+		refuse(position, "this loop variable");
+		return;
+	}
+	const uint32_t collection = reg(Kind::Val);
+	emit(Op::Move, position, collection, expression(p_loop->collection, Kind::Val));
+	const uint32_t at = reg(Kind::I64);
+	emit(Op::ConstI64, position, at, wide(0));
+	const uint32_t top = here();
+	emit(Op::Stmt, position);
+	const uint32_t size = reg(Kind::I64);
+	emit(Op::HostCall, position, size, size_name, arguments({ collection }));
+	const uint32_t more = reg(Kind::Bool);
+	emit(Op::LtI64, position, more, at, size);
+	const uint32_t out = emit(Op::JumpIfNot, position, more, 0);
+	const uint32_t value = engine_reg(element, p_loop->element);
+	emit(Op::HostIndexGet, position, value, collection, at);
+	store(target, convert(value, target.kind, position), position);
+	open_loop();
+	statement(p_loop->body);
+	const uint32_t next_at = here();
+	const uint32_t one = reg(Kind::I64);
+	emit(Op::ConstI64, position, one, wide(1));
+	emit(Op::AddI64, position, at, at, one);
+	emit(Op::Jump, position, top);
+	patch(out, here());
+	finish_loop(next_at);
+}
+
 auto Lowerer::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::optional<uint32_t> {
 	if (!is_vector(p_value->type)) {
 		return std::nullopt;

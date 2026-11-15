@@ -333,6 +333,8 @@ void Lowerer::statement(Stmt *p_statement) {
 		case NodeKind::ForIn:
 			if (is_vector(static_cast<ForIn *>(p_statement)->collection->type)) {
 				vector_loop(static_cast<ForIn *>(p_statement));
+			} else if (static_cast<ForIn *>(p_statement)->element) {
+				engine_loop(static_cast<ForIn *>(p_statement));
 			} else {
 				refuse(position, static_cast<ForIn *>(p_statement)->each ? "'for each'" : "'for in'");
 			}

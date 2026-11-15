@@ -297,6 +297,15 @@ static void test_constructor_forms() {
 					"no constructor of 'Vector2' takes 'Vector3'" });
 }
 
+// for each over a packed array stores each element as an assignment stores it, and is checked as one is.
+static void test_for_each_over_packed() {
+	expect("var i:int; var n:Number; for each (i in wide) {} for each (n in bytes) {} for each (var p:Vector2 in points) {}"
+		   "for each (var anything:* in points) {}",
+			{});
+	expect("for each (var s:String in /*!*/bytes) {} for each (var x:Number in /*!*/points) {}",
+			{ "can't use a value of type 'int' where 'String' is expected", "can't use a value of type 'Vector2' where 'Number' is expected" });
+}
+
 static void test_indexing() {
 	types({
 			{ "points[0]", "Vector2" },
@@ -406,6 +415,7 @@ int main() {
 	test_other_declarations();
 	test_malformed_tags();
 	test_constructor_forms();
+	test_for_each_over_packed();
 	test_indexing();
 	return check::finish();
 }

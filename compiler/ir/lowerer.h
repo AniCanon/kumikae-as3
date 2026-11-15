@@ -225,6 +225,7 @@ class Lowerer {
 	// wanted (an Array where Godot takes anything). Nothing if the value is not a vector.
 	std::optional<uint32_t> vector_to_engine(Expr *p_value, const Type *p_wanted);
 	void vector_loop(ForIn *p_loop);
+	void engine_loop(ForIn *p_loop);
 	// What `===` can find equal: a number with a number, otherwise two values of one kind, and null with
 	// anything that can be null.
 	static bool can_be_equal(Kind p_a, Kind p_b);

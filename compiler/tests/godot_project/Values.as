@@ -55,6 +55,16 @@ package {
 		public function keptCounts():Boolean { return kept ? true : false; }
 		public function keptNot():Boolean { return !kept; }
 		public function keptName():String { return kept.name; }
+		// for each over Godot's packed arrays, into variables of the element's type or one it converts to.
+		public function eachPacked(a:PackedInt32Array, v:PackedVector2Array):String {
+			var out:String = "";
+			for each (var i:int in a) { out += i + ","; }
+			for each (var p:Vector2 in v) { out += p.x; }
+			var n:Number;
+			for each (n in a) { out += n; }
+			for each (var none:int in new PackedInt32Array()) { out += "never"; }
+			return out;
+		}
 		// `null as` one of Godot's classes is null, as `null is` it is false.
 		public function nullAs():Boolean { var n:Node = null as Node; return n == null && !(null is Node); }
 		public function keptRename():void { kept.name = "renamed"; }

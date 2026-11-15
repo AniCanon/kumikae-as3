@@ -77,6 +77,7 @@ func _physics_process(_delta: float) -> bool:
 	show("not freed", ask("keptNot", []), true)
 	show("freed name", ask("keptName", []), null)
 	show("null as a Godot class", ask("nullAs", []), true)
+	show("for each over packed arrays", ask("eachPacked", [PackedInt32Array([1, 2, 3]), PackedVector2Array([Vector2(1, 2), Vector2(3, 4)])]), "1,2,3,13123")
 	ask("keptRename", [])
 	show("freed children", ask("keptChildren", []), null)
 	ask("keptSignal", [])

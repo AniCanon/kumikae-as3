@@ -287,6 +287,9 @@ struct For : Stmt {
 struct ForIn : Stmt { // Exactly one of declaration and target is set.
 	static const NodeKind KIND = NodeKind::ForIn;
 	bool each = false;
+	// Set by the checker for `for each` over one of Godot's collections that says what it holds (a packed
+	// array): the type of each element.
+	const Type *element = nullptr;
 	VarDecl *declaration = nullptr;
 	Expr *target = nullptr;
 	Expr *collection = nullptr;

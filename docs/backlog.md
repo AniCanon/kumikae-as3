@@ -38,7 +38,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Stage 1e: Godot's math types
 
-- `for each` over a packed array does not check the variable's type. **2c**
 - Godot's string-format operator (`"%s" % value`) is not available. **2c**
 
 ## Language server, first slice

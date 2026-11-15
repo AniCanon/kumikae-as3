@@ -65,7 +65,22 @@ void Typer::statement(Stmt *p_statement) {
 		case NodeKind::ForIn: {
 			ForIn *loop = static_cast<ForIn *>(p_statement);
 			expression(loop->target);
-			expression(loop->collection);
+			const Type *collection = expression(loop->collection);
+			if (loop->each && collection) {
+				// Over one of Godot's collections that says what it holds: each element is stored in the
+				// variable as an assignment stores it, and checked as one is.
+				const Described *rules = described(collection);
+				if (rules && rules->element && !rules->keyed && rules->element->kind != Type::Any) {
+					loop->element = rules->element;
+					const Type *variable = loop->declaration && loop->declaration->declarators.count == 1
+							? compilation_.type_of(loop->declaration->declarators[0].type)
+							: loop->target ? loop->target->type : nullptr;
+					if (variable && fits(loop->element, variable) != Fit::Yes) {
+						error(loop->collection->offset, "can't use a value of type " + quoted(compilation_.type_name(loop->element)) +
+																" where " + quoted(compilation_.type_name(variable)) + " is expected");
+					}
+				}
+			}
 			statement(loop->body);
 		} break;
 		case NodeKind::Switch: {
