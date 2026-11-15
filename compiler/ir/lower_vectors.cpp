@@ -76,8 +76,8 @@ uint32_t Lowerer::vector_literal(VectorLit *p_literal) {
 	uint32_t at = 0;
 	for (Expr *element : p_literal->elements) {
 		const uint32_t value = expression(element, module_.classes[*klass].element);
-		const uint32_t index = reg(Kind::F64);
-		emit(Op::ConstF64, element->offset, index, number(at++));
+		const uint32_t index = reg(Kind::U32);
+		emit(Op::ConstU32, element->offset, index, at++);
 		emit(Op::VecSet, element->offset, out, index, value);
 	}
 	return out;

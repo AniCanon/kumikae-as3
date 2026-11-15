@@ -1,0 +1,75 @@
+class Error
+  .0 message:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  new RangeError
+class vectors_ir
+  new vectors_ir
+class Vector.<int> of int
+entry vectors_ir
+function Error(r0:Object, r1:String):void
+  @0 SetField r0 .0 r1
+  @1 ReturnVoid
+function TypeError(r0:Object, r1:String):void
+  @0 SetField r0 .0 r1
+  @1 ReturnVoid
+function RangeError(r0:Object, r1:String):void
+  @0 SetField r0 .0 r1
+  @1 ReturnVoid
+function vectors_ir(r0:Object):void
+  @1 ConstU32 r6 0
+  @2 ConstBool r7 0
+  @3 VecNew r5 Vector.<int> (r6, r7)
+  @4 ConstI32 r8 1
+  @5 ConstU32 r9 0
+  @6 VecSet r5 r9 r8
+  @7 ConstI32 r10 2
+  @8 ConstU32 r11 1
+  @9 VecSet r5 r11 r10
+  @10 ConstI32 r12 3
+  @11 ConstU32 r13 2
+  @12 VecSet r5 r13 r12
+  @13 Move r1 r5
+  @15 ConstI32 r14 1
+  @16 Move r2 r14
+  @18 ConstI32 r15 0
+  @19 VecGet r16 r1 r15
+  @20 ConstI32 r17 5
+  @21 I32ToF64 r19 r16
+  @22 I32ToF64 r20 r17
+  @23 AddF64 r18 r19 r20
+  @24 F64ToI32 r21 r18
+  @25 VecSet r1 r2 r21
+  @27 ConstI32 r22 9
+  @28 VecCall r23 0 (r1, r22)
+  @30 ConstI32 r24 0
+  @31 Move r3 r24
+  @32 Move r25 r1
+  @33 ObjToBool r26 r25
+  @34 JumpIfNot r26 @52
+  @35 ConstF64 r27 0
+  @37 VecLength r28 r25
+  @38 U32ToF64 r30 r28
+  @39 LtF64 r29 r27 r30
+  @40 JumpIfNot r29 @52
+  @41 VecGet r31 r25 r27
+  @42 Move r4 r31
+  @44 I32ToF64 r33 r3
+  @45 I32ToF64 r34 r4
+  @46 AddF64 r32 r33 r34
+  @47 F64ToI32 r35 r32
+  @48 Move r3 r35
+  @49 ConstF64 r36 1
+  @50 AddF64 r27 r27 r36
+  @51 Jump @36
+  @53 VecLength r37 r1
+  @54 U32ToStr r38 r37
+  @55 I32ToStr r39 r3
+  @56 StrToStr r40 r38
+  @57 StrToStr r41 r39
+  @58 Trace (r40, r41)
+  @59 ReturnVoid

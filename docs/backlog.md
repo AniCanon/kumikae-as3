@@ -249,8 +249,6 @@ any Godot value passing as a condition):
   does nothing; `join(null)` puts the word "null" between the elements. **2c**
 - The corpus run in Godot checks only that each program ran for ten frames with no error printed, not
   what it did. **clean-up**
-- Vectors have no IR golden file, no vector in the reload test that runs in Godot, and `for each` is
-  tested only inside the methods' program. **clean-up**
 
 ## Stage 2a: interpreter core
 

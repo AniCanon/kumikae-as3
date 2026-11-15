@@ -339,8 +339,10 @@ with tempfile.TemporaryDirectory() as folder:
 # Scripts edited while the game runs. In a copy of the project: the test rewrites a script.
 HOT = """package { import godot.*; public class Hot extends Node2D {
 	private var n:int = 0; private var h:int = 0; public static var made:int = 0;%s
+	private var seen:Vector.<int> = new Vector.<int>();
 	public function value():int { return %s; }
-	public function bump():int { n++; made++; return n; }
+	public function bump():int { n++; made++; seen.push(n); return n; }
+	public function seenText():String { return seen.join(","); }
 	public function count():int { return n; }
 	public function heard():int { return h; }
 	public function total():int { return made; }
@@ -378,7 +380,7 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 11, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 12, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
         check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 2, output[-1500:])
