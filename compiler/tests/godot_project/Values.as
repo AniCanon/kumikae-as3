@@ -91,6 +91,8 @@ package {
 		public function clampTrailingNull(c:Color):Color { return c.clamp(new Color(0.25, 0.25, 0.25, 1), null); }
 		public function clampBothNull(c:Color):Color { return c.clamp(null, null); }
 		public function clampMiddleNull(c:Color):Color { return c.clamp(null, new Color(0.5, 0.5, 0.5, 1)); }
+		// A variable that holds null there is the same: the default, looked at as the call is made.
+		public function clampNullVariable(c:Color):Color { var low:Color = null; return c.clamp(low, new Color(0.5, 0.5, 0.5, 1)); }
 		public function looking(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target); }
 		public function lookingNull(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target, null); }
 		public function wholeNumbers():Color { return new Color(1, 0, 1); }

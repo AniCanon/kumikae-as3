@@ -143,7 +143,7 @@ output = compare("values.gd", [
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
     "first", "color part", "set second", "add element", "position element", "packed", "set packed",
     "packed out of range", "out of range",
-    "clamp default", "clamp one", "clamp trailing null", "clamp both null", "clamp middle null", "looking",
+    "clamp default", "clamp one", "clamp trailing null", "clamp both null", "clamp middle null", "clamp null variable", "looking",
     "looking null", "whole numbers", "to string", "to string in AS3", "no to string", "no to string in AS3",
     "negative cells", "cells plus", "cells compound", "plain order", "compound order", "mixed", "big hash", "decode",
 ])

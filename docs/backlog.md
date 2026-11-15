@@ -162,8 +162,6 @@ any Godot value passing as a condition):
   **decision**
 - `int(lerp(a, b, t))` raises for a fraction instead of cutting it, and `Boolean(max(a, b))` is refused.
   **2c**
-- In the global functions' host: a branch for fractions that can't be reached, an unknown type name read
-  as "anything", "takes 1 arguments". **clean-up**
 - A freed object arriving from Godot for a `Node` parameter of a script's method is refused, not null.
   **2d**
 - A Number variable that holds a whole value reaches a parameter that takes anything as a float
@@ -171,7 +169,6 @@ any Godot value passing as a condition):
   sent as integers. **decision**
 - New code that the guide would write otherwise: an empty string and an out-parameter where it asks for
   `std::optional`, `const std::string &` for `std::string_view`, two comments out of place. **clean-up**
-- `var c:Color = null; x.clamp(c, hi)` is an error where the literal `null` takes the default. **clean-up**
 
 ## Completion, brought forward
 

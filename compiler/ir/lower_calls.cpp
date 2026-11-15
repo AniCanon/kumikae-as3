@@ -403,13 +403,23 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 				continue;
 			}
 			std::string godot_default;
-			if (is_null(p_arguments[i]) && !p_defaults.empty() && p_function->parameters[i].default_value &&
-					is_null(p_function->parameters[i].default_value) && kind_of(type, &kind) && kind == Kind::Val &&
-					godot_name("@default", p_defaults + "." + std::to_string(i), &godot_default)) {
+			if (!p_defaults.empty() && p_function->parameters[i].default_value && is_null(p_function->parameters[i].default_value) &&
+					kind_of(type, &kind) && kind == Kind::Val && godot_name("@default", p_defaults + "." + std::to_string(i), &godot_default)) {
 				// `null` where the default is one AS3 can't write, with arguments after it: Godot's own
-				// default, from Godot's text for it.
+				// default, from Godot's text for it. Written `null`, it is known now; a value that may be
+				// null (`var c:Color = null`) is looked at as the call is made.
 				uint32_t value = engine_reg(Kind::Val, type);
-				emit(Op::HostDefault, p_arguments[i]->offset, value, string(godot_default));
+				if (!is_null(p_arguments[i])) {
+					// Into a register of its own: what comes later can't change it.
+					emit(Op::Move, p_arguments[i]->offset, value, expression(p_arguments[i], Kind::Val));
+					uint32_t present = reg(Kind::Bool);
+					emit(Op::HostPresent, p_arguments[i]->offset, present, value);
+					uint32_t given = emit(Op::JumpIf, p_arguments[i]->offset, present, 0);
+					emit(Op::HostDefault, p_arguments[i]->offset, value, string(godot_default));
+					patch(given, here());
+				} else {
+					emit(Op::HostDefault, p_arguments[i]->offset, value, string(godot_default));
+				}
 				r_list.push_back(value);
 				continue;
 			}
