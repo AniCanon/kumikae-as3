@@ -153,6 +153,22 @@ uint32_t Lowerer::type_test(Binary *p_binary) {
 			return *tested;
 		}
 	}
+	if (godot_target && untyped(left) && engine_name(symbol, std::string_view(), &godot_class)) {
+		// An untyped value and one of Godot's classes: whether it holds such an object decides.
+		const bool test = p_binary->op == TokenKind::KwIs;
+		const uint32_t value = any_value(left);
+		uint32_t fits = reg(Kind::Bool);
+		emit(Op::AnyIsGodot, position, fits, value, godot_class);
+		if (test) {
+			return fits;
+		}
+		uint32_t out = engine_reg(Kind::Ref, p_binary->type);
+		emit(Op::ConstNull, position, out);
+		const uint32_t skip = emit(Op::JumpIfNot, position, fits, 0);
+		emit(Op::FromAny, position, out, value, godot_class);
+		patch(skip, here());
+		return out;
+	}
 	if (godot_target && engine_name(symbol, std::string_view(), &godot_class)) {
 		// One of Godot's classes: the engine knows what an object of its own is.
 		const bool test = p_binary->op == TokenKind::KwIs;

@@ -566,6 +566,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::AnyGt:
 			case Op::AnyGe:
 			case Op::AnyIs:
+			case Op::AnyIsGodot:
 				any_op(function, in, r); // `frame` and `r` may be stale after this.
 				break;
 			case Op::VecCall:

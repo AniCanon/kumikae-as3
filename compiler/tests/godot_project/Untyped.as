@@ -52,6 +52,10 @@ package {
 			var v:Vector2 = Vector2.ONE;
 			return before + " " + early + " " + seenStatic + " " + origin;
 		}
+		// `is` and `as` with one of Godot's classes, on an untyped value.
+		public function holdsNode(value:*):Boolean { return value is Node; }
+		public function holdsNode2D(value:*):Boolean { return value is Node2D; }
+		public function asNodeOrNull(value:*):Node { return value as Node; }
 		public function minusOne(value:*):* { return value - 1; }
 		public function twice(value:*):* { return value * 2; }
 		public function stepped(value:*):* { value++; return value; }

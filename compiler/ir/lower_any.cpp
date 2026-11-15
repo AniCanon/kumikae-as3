@@ -119,9 +119,6 @@ std::optional<uint32_t> Lowerer::any_type_test(Binary *p_binary) {
 		return std::nullopt;
 	}
 	const bool test = p_binary->op == TokenKind::KwIs;
-	if (!test && target != Kind::Obj && target != Kind::Str) {
-		return std::nullopt; // `x as int` gives a number or null: a typed register cannot hold both.
-	}
 	const uint32_t value = any_value(p_binary->left);
 	if (symbol) {
 		touch(symbol, position); // As for a typed value: the class named is set up.
@@ -131,8 +128,12 @@ std::optional<uint32_t> Lowerer::any_type_test(Binary *p_binary) {
 	if (test) {
 		return fits;
 	}
-	// `as`: the value as that type if it is one, otherwise null.
-	uint32_t out = default_value(target, position);
+	// `as`: the value as that type if it is one, otherwise null. The checker types `x as int` as an int,
+	// as Adobe's compiler does, so the null is what an int holds for it: 0 (false for a Boolean).
+	uint32_t out = target == Kind::F64 ? reg(Kind::F64) : default_value(target, position);
+	if (target == Kind::F64) {
+		emit(Op::ConstF64, position, out, number(0)); // Not the NaN a Number starts as.
+	}
 	const uint32_t skip = emit(Op::JumpIfNot, position, fits, 0);
 	emit(Op::FromAny, position, out, value, target == Kind::Obj ? code : NONE);
 	patch(skip, here());

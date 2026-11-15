@@ -109,10 +109,11 @@ inline bool is_held(Kind p_kind) {
 	   out register's kind as a store does (AS3's coercion), checking a class (an object), or Godot's \
 	   name for a type (a Godot object) when the third operand is not NONE; into an untyped register, \
 	   any third operand but NONE means an `Object`, where undefined is null. AnyText is String(x). \
-	   AnyIs: the third operand is a class, or one of the ANY_IS_ codes. */ \
+	   AnyIs: the third operand is a class, or one of the ANY_IS_ codes. AnyIsGodot: whether it holds an \
+	   object of the Godot class of that name, or of one that extends it. */ \
 	X(AnyConst, "RI-") X(ToAny, "RR-") X(FromAny, "RRI") X(AnyText, "RR-") X(AnyTypeof, "RR-") \
 	X(AnyEq, "RRR") X(AnyStrictEq, "RRR") X(AnyAdd, "RRR") X(AnyLt, "RRR") X(AnyLe, "RRR") X(AnyGt, "RRR") X(AnyGe, "RRR") \
-	X(AnyIs, "RRI") \
+	X(AnyIs, "RRI") X(AnyIsGodot, "RRS") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") /* An untyped value: AS3 throws any value. */ \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \

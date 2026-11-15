@@ -363,6 +363,9 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 		case Op::AnyIs:
 			result(Kind::Bool, of_bool(any_is(b, p_in.c)));
 			break;
+		case Op::AnyIsGodot:
+			result(Kind::Bool, of_bool(any::tag(b) == AnyTag::Godot && host_.handles.is_class(any::pointer(b), module_.strings[p_in.c])));
+			break;
 		default:
 			break;
 	}
