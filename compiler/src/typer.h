@@ -44,6 +44,7 @@ class Typer {
 	const Type *class_type_;
 
 	void error(uint32_t p_offset, std::string p_message) { unit_.diagnostics.error(p_offset, std::move(p_message)); }
+	void warning(uint32_t p_offset, std::string p_message) { unit_.diagnostics.warning(p_offset, std::move(p_message)); }
 
 
 

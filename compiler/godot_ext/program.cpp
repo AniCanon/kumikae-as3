@@ -104,6 +104,10 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 		*r_errors = compilation.format_diagnostics();
 		return false;
 	}
+	const std::string warnings = compilation.format_diagnostics();
+	if (!warnings.empty()) {
+		UtilityFunctions::push_warning(String("ActionScript:\n") + String::utf8(warnings.c_str()));
+	}
 	return true;
 }
 

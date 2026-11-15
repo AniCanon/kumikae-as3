@@ -119,7 +119,8 @@ struct Session {
 				.set("position", Json::object().set("line", p_line).set("character", p_character));
 	}
 	// What was published since the last send, one line per diagnostic:
-	// "<uri> <line>:<character>-<line>:<character> <message>", or "<uri> clear".
+	// "<uri> <line>:<character>-<line>:<character> <message>", or "<uri> clear". A warning's message starts
+	// with "warning: ".
 	std::string published() const {
 		std::string out;
 		for (const Json &message : received) {
@@ -132,12 +133,14 @@ struct Session {
 			}
 			for (const Json &item : params.get("diagnostics").items()) {
 				const Json &range = item.get("range");
-				CHECK_EQ(item.get("severity").integer(), (int64_t)1);
+				const int64_t severity = item.get("severity").integer();
+				CHECK(severity == 1 || severity == 2);
 				CHECK_EQ(item.get("source").string(), std::string("kas3c"));
 				out += params.get("uri").string() + " " + std::to_string(range.get("start").get("line").integer()) + ":" +
 						std::to_string(range.get("start").get("character").integer()) + "-" +
 						std::to_string(range.get("end").get("line").integer()) + ":" +
-						std::to_string(range.get("end").get("character").integer()) + " " + item.get("message").string() + "\n";
+						std::to_string(range.get("end").get("character").integer()) + " " + (severity == 2 ? "warning: " : "") +
+						item.get("message").string() + "\n";
 			}
 		}
 		return out;
@@ -264,6 +267,12 @@ static void test_diagnostics() {
 	CHECK_EQ(session.published(),
 			MAIN + " 2:17-2:24 can't use a value of type 'String' where 'int' is expected\n" + MAIN +
 					" 3:11-3:18 unknown type 'Missing'\n");
+	// A warning is published as one, beside the errors.
+	session.change(MAIN, "package {\npublic class Main {\n\tvar count:int = \"three\";\n\tvar big:Number = 9007199254740993;\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(),
+			MAIN + " 2:17-2:24 can't use a value of type 'String' where 'int' is expected\n" + MAIN +
+					" 3:18-3:34 warning: 9007199254740993 is rounded: a Number can't hold every digit of it. Store it in an Int64 to keep them\n");
 	// Fixed: an empty list clears the editor's markers.
 	session.change(MAIN, "package {\npublic class Main {\n\tvar count:int = 3;\n}\n}\n");
 	session.settle();

@@ -208,6 +208,18 @@ with tempfile.TemporaryDirectory() as folder:
           result.stderr == "%s:2:15: error: 'Node' is already defined in Godot's API\n" % clash,
           repr(result.stderr[:300]))
 
+# A warning is said, and the program still checks and runs.
+with tempfile.TemporaryDirectory() as warned:
+    rounded = os.path.join(warned, "Rounded.as")
+    with open(rounded, "w") as handle:
+        handle.write("package { public class Rounded { public function Rounded() { var n:Number = 9007199254740993; trace(n); } } }\n")
+    result = run("check", rounded)
+    check("a warning does not fail the check", result.returncode == 0 and
+          result.stderr == "%s:1:77: warning: 9007199254740993 is rounded: a Number can't hold every digit of it. Store it in an Int64 to keep them\n" % rounded,
+          repr(result.stderr[:300]))
+    result = run("run", rounded)
+    check("a program with a warning runs", result.returncode == 0 and result.stdout == "9007199254740992\n", repr(result.stdout[:200]))
+
 # A finally is written once, however many ways lead out of its try.
 once = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "finally_once.as")
 result = run("ir", once)

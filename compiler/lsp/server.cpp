@@ -225,11 +225,11 @@ void Server::publish(std::vector<std::string> &r_out) {
 		for (const Diagnostic &item : unit->diagnostics.items()) {
 			list.push(Json::object()
 							  .set("range", range(*unit, item.offset, extent(unit->source.text(), item.offset)))
-							  .set("severity", 1)
+							  .set("severity", item.warning ? 2 : 1)
 							  .set("source", "kas3c")
 							  .set("message", item.message));
 		}
-		int dropped = unit->diagnostics.count() - (int)unit->diagnostics.items().size();
+		int dropped = unit->diagnostics.dropped();
 		if (dropped > 0) {
 			list.push(Json::object()
 							  .set("range", range(*unit, 0, 0))

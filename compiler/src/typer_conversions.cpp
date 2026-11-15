@@ -179,6 +179,15 @@ void Typer::store(Expr *p_value, const Type *p_to) {
 			error(p_value->offset, std::string(literal.negative ? "-" : "") + std::string(literal.digits) + " does not fit an Int64");
 			return;
 		}
+	} else if (p_to == number_ || p_to->kind == Type::Any || p_to == object_) {
+		// Stored as a Number, as Flash does: one that a Number can't hold exactly is rounded, which is said.
+		const WideLiteral literal = read_wide_literal(p_value);
+		const uint64_t magnitude = literal.negative ? 0 - (uint64_t)literal.value : (uint64_t)literal.value;
+		const bool exact = literal.state == WideLiteral::State::Fits && (uint64_t)(double)magnitude == magnitude;
+		if (literal.state != WideLiteral::State::NotWhole && !exact) {
+			const std::string written = std::string(literal.negative ? "-" : "") + std::string(literal.digits);
+			warning(p_value->offset, written + " is rounded: a Number can't hold every digit of it. Store it in an Int64 to keep them");
+		}
 	}
 	switch (fits(p_value->type, p_to)) {
 		case Fit::Yes:
