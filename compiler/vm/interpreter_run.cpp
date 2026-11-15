@@ -605,7 +605,6 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::DynGet:
 			case Op::DynSet:
 			case Op::DynDelete:
-			case Op::DynHas:
 			case Op::DynIn:
 			case Op::DynCall:
 			case Op::DynKeys:

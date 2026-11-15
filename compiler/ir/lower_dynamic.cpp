@@ -236,11 +236,14 @@ uint32_t Dynamic::in(Binary *p_in) {
 auto Dynamic::to_engine(Expr *p_value, const Type *p_wanted) -> std::optional<uint32_t> {
 	const Type *type = p_value->type;
 	const Symbol *symbol = type && type->kind == Type::Instance ? type->symbol : nullptr;
-	if (!symbol || (symbol != l_.object_ && !is_dictionary(symbol))) {
-		return std::nullopt;
-	}
 	const Symbol *wanted = p_wanted && p_wanted->kind == Type::Instance ? p_wanted->symbol : nullptr;
 	const bool dictionary = wanted && Lowerer::is_godot(wanted) && wanted->name == "GodotDictionary";
+	// A `*` where Godot takes a Dictionary may hold an Object as well as one of Godot's: Godot's call
+	// says when it holds neither.
+	const bool untyped = l_.untyped_type(type) && dictionary;
+	if (!untyped && (!symbol || (symbol != l_.object_ && !is_dictionary(symbol)))) {
+		return std::nullopt;
+	}
 	if (p_wanted && p_wanted->kind != Type::Any && !dictionary) {
 		return std::nullopt;
 	}

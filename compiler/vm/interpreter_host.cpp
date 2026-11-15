@@ -361,8 +361,8 @@ std::optional<std::string> Interpreter::godot_refuses(Slot p_value, int p_depth)
 	if (!object) {
 		return std::nullopt;
 	}
-	if (p_depth > MAX_GODOT_NESTING) {
-		return std::string("what is given to Godot holds itself, or nests too deep: Godot can't hold it.");
+	if (p_depth > MAX_ENGINE_NESTING) {
+		return std::string(HOLDS_ITSELF);
 	}
 	const ir::Class &klass = module_.classes[object->klass];
 	std::optional<std::string> why;
@@ -381,7 +381,7 @@ std::optional<std::string> Interpreter::godot_refuses(Slot p_value, int p_depth)
 	if (klass.element != Kind::Void) {
 		const Vector *vector = static_cast<const Vector *>(object);
 		if (vector->properties && vector->properties->size()) {
-			return std::string("an Array with properties other than its indices can't be given to Godot: a Godot Array can't hold them.");
+			return std::string(ARRAY_PROPERTIES);
 		}
 		for (uint32_t i = 0; i < vector->length && (klass.element == Kind::Any || klass.element == Kind::Obj); i++) {
 			each(klass.element == Kind::Any ? vector->data[i] : any::object(static_cast<Object *>(vector->data[i].p)));

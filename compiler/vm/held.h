@@ -52,15 +52,18 @@ void each_held(const ir::Class &p_class, Object *p_object, Visit &&p_visit) {
 	}
 }
 
-// After each_held() has let go of every slot of an object that may still be reached (the collector's
-// garbage, while the engine runs): a table's or an Array's properties are forgotten, so that what is left is
-// an empty container, not one that names keys it no longer holds.
-inline void emptied(const ir::Class &p_class, Object *p_object) {
+// Before what an object holds is let go of (freeing it, or the collector emptying its garbage): a table's
+// or an Array's properties are taken out first, and the container is left empty. Letting go of one can
+// run engine code that reaches the container, which then finds it whole and empty, never half emptied.
+// The caller lets go of each key and value, untyped, and each_held() then visits nothing of them.
+inline std::vector<Entry> take_entries(const ir::Class &p_class, Object *p_object) {
 	if (p_class.table) {
-		entries_of(p_object)->forget();
-	} else if (p_class.array && static_cast<Vector *>(p_object)->properties) {
-		static_cast<Vector *>(p_object)->properties->forget();
+		return entries_of(p_object)->take_all();
 	}
+	if (p_class.array && static_cast<Vector *>(p_object)->properties) {
+		return static_cast<Vector *>(p_object)->properties->take_all();
+	}
+	return {};
 }
 
 // Whether an object of the class can hold anything that may lead back to it: another object, an untyped

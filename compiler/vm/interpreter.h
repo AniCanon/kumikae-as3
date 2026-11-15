@@ -132,8 +132,6 @@ private:
 	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
-	// Containers inside containers may go this deep to Godot: deeper is taken for one that holds itself.
-	static const int MAX_GODOT_NESTING = 128;
 	std::optional<std::string> godot_refuses(Slot p_value, int p_depth) const;
 	std::optional<std::string> refused_by_godot(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers) const;
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);

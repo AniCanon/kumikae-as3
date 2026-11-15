@@ -286,7 +286,7 @@ check("untyped.gd: a script object given to Godot is an AS3 error", "at Untyped/
 # copied where an AS3 Dictionary is wanted.
 output = compare("objects.gd", [
     "an Object is a Dictionary", "a Dictionary is a Dictionary, its keys text", "Objects inside an Array", "an Object returned",
-    "an Object where Godot takes a Dictionary", "a Dictionary from Godot", "Godot's Dictionary as a Dictionary",
+    "an Object where Godot takes a Dictionary", "an untyped Object where Godot takes a Dictionary", "a Dictionary from Godot", "Godot's Dictionary as a Dictionary",
     "a loop over Godot's Dictionary held untyped is not run", "an Object that holds itself is not given", "an Array with properties is not given", "a script object inside an Object is not given",
 ])
 check("objects.gd: what Godot can't hold is an AS3 error that says why",

@@ -25,6 +25,10 @@ package {
 			var client:HTTPClient = new HTTPClient();
 			return client.queryStringFromDict({ a: 1, b: "x y" });
 		}
+		public function queriedUntyped():String {
+			var fields:* = { c: 3 };
+			return new HTTPClient().queryStringFromDict(fields);
+		}
 		public function fromGodot(d:Dictionary):String {
 			var out:String = "";
 			for (var k:String in d) {

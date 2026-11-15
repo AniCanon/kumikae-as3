@@ -466,7 +466,7 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 	return true;
 }
 
-// DynGet, DynSet, DynDelete, DynHas and DynIn. Making the key's text may run the program, which may move
+// DynGet, DynSet, DynDelete and DynIn. Making the key's text may run the program, which may move
 // the registers: the operands are held first, and the result is written through the frame's place.
 void Interpreter::property_op(const Function &p_function, const Instruction &p_in) {
 	const size_t base = frames_.back().base;
@@ -498,7 +498,7 @@ void Interpreter::property_op(const Function &p_function, const Instruction &p_i
 				}
 				break;
 			default:
-				if (has_property(holder, found, p_in.op == Op::DynIn, &answer)) {
+				if (has_property(holder, found, true, &answer)) {
 					put(Kind::Bool, stack_[base + p_in.a], of_bool(answer));
 				}
 				break;

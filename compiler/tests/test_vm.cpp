@@ -1803,6 +1803,53 @@ static void test_untyped_out_of_memory() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// Objects, Dictionaries and an Array's properties with no memory left: Error #1000, caught, and nothing
+// left alive.
+static void test_tables_out_of_memory() {
+	Compilation compilation;
+	compilation.add("Tables.as", "package { public class Tables {\n"
+								 "public function make():String { try { var o:Object = {}; return 'made'; } catch (e:Error) { return e.message; } return ''; }\n"
+								 "public function key(o:*):String { try { o['fresh'] = 1; return 'set'; } catch (e:Error) { return e.message; } return ''; }\n"
+								 "public function extra(a:*):String { try { a.extra = 1; return 'set'; } catch (e:Error) { return e.message; } return ''; }\n"
+								 "public function keys(o:*):String { var n:int = 0; try { for (var k:* in o) { n++; } return 'went'; } catch (e:Error) { return e.message; } return ''; }\n"
+								 "public function table():* { return { a: 1 }; }\n"
+								 "public function list():* { return [1]; }\n"
+								 "} }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	const size_t strings = vm::live_strings();
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(class_named(module, "Tables"));
+		CHECK(object != nullptr);
+		vm::Slot table, list, result;
+		CHECK(interpreter.call_method(object, "table", nullptr, 0, &table));
+		CHECK(interpreter.call_method(object, "list", nullptr, 0, &list));
+		const auto failing = [&](const char *p_method, vm::Slot *p_argument) {
+			vm::fail_allocations(1);
+			const bool called = interpreter.call_method(object, p_method, p_argument, p_argument ? 1 : 0, &result);
+			vm::fail_allocations(0);
+			const std::string said = called && result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string("failed");
+			interpreter.discard(ir::Kind::Str, result);
+			return said;
+		};
+		CHECK_EQ(failing("make", nullptr), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(failing("key", &table), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(failing("extra", &list), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(failing("keys", &table), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(failing("keys", &list), std::string(vm::OUT_OF_MEMORY)); // An index's text, as the loop gives it.
+		interpreter.discard(ir::Kind::Any, table);
+		interpreter.discard(ir::Kind::Any, list);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_strings(), strings);
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 // An object a host makes is built in the order `new` builds it, AS3's: a class's field values first, at
 // the start of its constructor, then its base's (fields, constructor), then the rest of its constructor.
 static void test_host_construct_order() {
@@ -2059,6 +2106,7 @@ int main() {
 	test_host_construct_order();
 	test_kept_traces();
 	test_untyped_out_of_memory();
+	test_tables_out_of_memory();
 	test_out_of_memory();
 	test_reload();
 	test_reload_vectors();

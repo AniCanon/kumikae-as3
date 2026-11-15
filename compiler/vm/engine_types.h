@@ -38,5 +38,12 @@ struct EngineNode {
 	std::vector<uint64_t> nodes; // The nodes it holds, once for each reference.
 };
 
+// Containers inside containers may go this deep to Godot: deeper is taken for one that holds itself. With
+// the words for what Godot can't hold, said by the interpreter before a request and by the extension where
+// Godot reads a value itself (a field, a result).
+constexpr int MAX_ENGINE_NESTING = 128;
+constexpr std::string_view HOLDS_ITSELF = "what is given to Godot holds itself, or nests too deep: Godot can't hold it.";
+constexpr std::string_view ARRAY_PROPERTIES = "an Array with properties other than its indices can't be given to Godot: a Godot Array can't hold them.";
+
 } // namespace vm
 } // namespace kas3

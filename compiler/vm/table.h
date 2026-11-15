@@ -47,8 +47,6 @@ public:
 	Entry remove(uint32_t p_at);
 	// Takes every property out, in order: the references are the caller's.
 	std::vector<Entry> take_all();
-	// Forgets every property, once each_held() has let go of what they held (their slots are empty).
-	void forget();
 };
 
 // An Object or a Dictionary: an object of a class marked `table`, with no fields of its own; its one slot

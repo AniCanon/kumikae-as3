@@ -67,13 +67,6 @@ std::vector<Entry> Entries::take_all() {
 	return taken;
 }
 
-void Entries::forget() {
-	entries_.clear();
-	texts_.clear();
-	objects_.clear();
-	live_ = 0;
-}
-
 // The deleted entries taken out, the order kept, and every position found again.
 void Entries::pack() {
 	std::vector<Entry> kept;

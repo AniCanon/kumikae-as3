@@ -30,6 +30,7 @@ func _physics_process(_delta: float) -> bool:
 	show("Objects inside an Array", node.get_meta("list"), [{"k": "v"}, [{"n": null}]])
 	show("an Object returned", ask("made"), {"made": true, "count": 3})
 	show("an Object where Godot takes a Dictionary", ask("queried"), HTTPClient.new().query_string_from_dict({"a": 1, "b": "x y"}))
+	show("an untyped Object where Godot takes a Dictionary", ask("queriedUntyped"), "c=3")
 	show("a Dictionary from Godot", ask("fromGodot", [{"a": 1, 2: "b"}]), "a=1;2=b;")
 	node.set_meta("table", {"name": "t"})
 	show("Godot's Dictionary as a Dictionary", ask("stored", [node]), "t/true/true")

@@ -26,9 +26,7 @@ namespace kas3 {
 
 namespace {
 
-// How deep containers inside containers may go on their way to Godot: deeper is taken for a loop (an
-// Object that holds itself), which Godot's values can't be.
-constexpr int MAX_NESTING = 128;
+// How deep the containers being made are (vm::MAX_ENGINE_NESTING).
 int nesting = 0;
 
 struct Deeper {
@@ -71,8 +69,8 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 		return true;
 	}
 	const Deeper deeper;
-	if (nesting > MAX_NESTING) {
-		*r_error = "what goes to Godot holds itself, or nests more than " + std::to_string(MAX_NESTING) + " deep: Godot can't hold it";
+	if (nesting > vm::MAX_ENGINE_NESTING) {
+		*r_error = vm::HOLDS_ITSELF;
 		return false;
 	}
 	const ir::Module &module = Project::get().module();
@@ -83,7 +81,7 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 	if (element != ir::Kind::Void) {
 		const vm::Vector *vector = static_cast<const vm::Vector *>(p_object);
 		if (vector->properties && vector->properties->size()) {
-			*r_error = "an Array with properties other than its indices goes to Godot: a Godot Array can't hold them";
+			*r_error = vm::ARRAY_PROPERTIES;
 			return false;
 		}
 		Array array;

@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_dynamic.h"
 
 namespace kas3 {
 namespace ir {
@@ -26,7 +26,7 @@ Class Lowerer::inherited_class(ClassDecl *p_decl) {
 		klass.native_base = godot_base;
 		klass.fields.push_back({ "$owner", Kind::Ref });
 	} else if (base && base != object_) {
-		if (!class_index(base, &klass.base)) {
+		if (is_dictionary(base) || !class_index(base, &klass.base)) { // A Dictionary's objects are tables, with no fields to add to.
 			refuse(p_decl->extends ? p_decl->extends->offset : p_decl->name_offset, "extending '" + std::string(base->name) + "'");
 		} else {
 			const Class &from = module_.classes[klass.base];

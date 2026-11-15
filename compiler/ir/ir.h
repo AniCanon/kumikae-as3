@@ -139,13 +139,13 @@ inline bool is_held(Kind p_kind) {
 	/* Objects, Dictionaries (vm::Table) and properties by name. TableNew: out (an object), its class (Object's \
 	   or Dictionary's), whether its keys are to be weak (a Boolean register, or NONE). The rest take what \
 	   holds the property as an untyped or an object register, and the key as a String or untyped one: \
-	   DynGet out (untyped), holder, key; DynSet holder, key, value (untyped); DynDelete, DynHas (its own) \
-	   and DynIn (its own, or its prototype's): out (Boolean), holder, key. DynCall: out (untyped, or NONE), \
+	   DynGet out (untyped), holder, key; DynSet holder, key, value (untyped); DynDelete \
+	   and DynIn (`in`: its own, or its prototype's): out (Boolean), holder, key. DynCall: out (untyped, or NONE), \
 	   the holder, [the key, then the arguments, untyped], the property called once the arguments are \
 	   worked out. A loop over the properties: DynKeys out (the keys there are now, or null), the holder; \
 	   DynNext out (Boolean: one more), the cursor (a Number, moved on), [holder, keys]; DynKey out \
 	   (untyped: the one DynNext found), the cursor, [holder, keys]. */ \
-	X(TableNew, "RCr") X(DynGet, "RRR") X(DynSet, "RRR") X(DynDelete, "RRR") X(DynHas, "RRR") X(DynIn, "RRR") \
+	X(TableNew, "RCr") X(DynGet, "RRR") X(DynSet, "RRR") X(DynDelete, "RRR") X(DynIn, "RRR") \
 	X(DynCall, "rRA") X(DynKeys, "RR-") X(DynNext, "RRA") X(DynKey, "RRA") \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")

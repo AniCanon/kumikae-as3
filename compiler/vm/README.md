@@ -49,8 +49,8 @@ host differs.
 An Object or a Dictionary (`klass.table`), and an Array's `properties` when the pointer is not null, hold
 their keys and values in `Entries` (vm/table.h). `each_held()` visits them through `each_entry()`: for each
 entry whose key is not undefined, the key (a String, or a Dictionary's object key, held strongly) and the
-value, both untyped. A deleted entry has both undefined and holds nothing. After the collector has let go
-of a garbage table's slots, `emptied()` makes it an empty table, so that one the engine still reaches names
-no key it no longer holds.
+value, both untyped. A deleted entry has both undefined and holds nothing. Before freeing an object, or the
+collector emptying its garbage, `take_entries()` takes the properties out and the caller lets go of them:
+engine code run meanwhile finds the table empty, never half emptied.
 
 Tests: `test_vm`, `test_runtime`, the `programs` group, and the sanitizer build.

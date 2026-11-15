@@ -445,12 +445,17 @@ bool Collector::free_garbage() {
 	const std::vector<Object *> garbage = std::move(found_);
 	found_.clear();
 	for (Object *object : garbage) {
-		each_held(interpreter_.module_.classes[object->klass], object, [this](Kind p_kind, Slot &p_slot) {
+		const ir::Class &klass = interpreter_.module_.classes[object->klass];
+		std::vector<Entry> taken = take_entries(klass, object);
+		each_held(klass, object, [this](Kind p_kind, Slot &p_slot) {
 			Slot value = p_slot;
 			p_slot.bits = 0;
 			interpreter_.drop(p_kind, value);
 		});
-		emptied(interpreter_.module_.classes[object->klass], object);
+		for (Entry &entry : taken) {
+			interpreter_.drop(Kind::Any, entry.key);
+			interpreter_.drop(Kind::Any, entry.value);
+		}
 	}
 	for (Object *object : garbage) {
 		// Back on the list first: something the engine ran while they were emptied may hold it still.

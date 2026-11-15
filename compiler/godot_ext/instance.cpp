@@ -112,7 +112,7 @@ static GDExtensionBool instance_get(GDExtensionScriptInstanceDataPtr p_data, GDE
 		std::string why;
 		if (held && !kas3::object_element(held, &owner, &why)) {
 			UtilityFunctions::push_error(String("ActionScript: the field '") + String::utf8(name.get_data()) +
-					"' holds a script object of a class that extends none of Godot's, which Godot can't hold. Godot gets null.");
+					"' holds a script object Godot can't hold (" + String::utf8(why.c_str()) + "). Godot gets null.");
 		}
 		*reinterpret_cast<Variant *>(r_value) = owner;
 		return true;
@@ -269,7 +269,7 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 		*r_return = owner; // A script object that is one of Godot's: its Godot object; an Array: Godot's Array.
 	} else if (ok && returned) {
 		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(function.name.c_str()) +
-				" returns a script object of a class that extends none of Godot's, which Godot can't hold. The caller gets null.");
+				" returns a script object Godot can't hold (" + String::utf8(why.c_str()) + "). The caller gets null.");
 	} else if (ok && function.result != ir::Kind::Void && function.result != ir::Kind::Obj) {
 		*r_return = kas3::to_variant(function.result, result);
 	}
