@@ -134,7 +134,7 @@ def compare(script, names):
 
 # Godot's values: operators, as GDScript works them out.
 output = compare("values.gd", [
-    "add", "sub", "times", "times int", "number first", "divide", "negate", "cells", "cells by number", "cells over",
+    "add", "a freed object arrives as null", "sub", "times", "times int", "number first", "divide", "negate", "cells", "cells by number", "cells over",
     "tint", "same", "not same", "differs", "same node", "not same node", "other node", "chain", "compound", "moved",
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",

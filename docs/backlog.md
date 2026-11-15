@@ -119,8 +119,6 @@ any Godot value passing as a condition):
 - A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
   `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
   **decision**
-- A freed object arriving from Godot for a `Node` parameter of a script's method is refused, not null.
-  **2d**
 - A Number variable that holds a whole value reaches a parameter that takes anything as a float
   (`str(x)` gives `2.0`, as GDScript does for a float). Only expressions that are whole by their form are
   sent as integers. **decision**

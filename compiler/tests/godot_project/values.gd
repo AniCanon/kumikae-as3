@@ -28,6 +28,9 @@ func _physics_process(_delta: float) -> bool:
 	var cell := Vector2i(7, -3)
 	# Operators.
 	show("add", ask("add", [a, b]), a + b)
+	var freed_one := Node.new()
+	freed_one.free()
+	show("a freed object arrives as null", ask("nothingThere", [freed_one]), true)
 	show("sub", ask("sub", [a, b]), a - b)
 	show("times", ask("times", [a, 2.5]), a * 2.5)
 	show("times int", ask("scaleInt", [a, 3]), a * 3)

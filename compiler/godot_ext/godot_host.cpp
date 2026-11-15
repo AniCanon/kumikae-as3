@@ -141,6 +141,9 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 				return true;
 			}
 			Object *object = type == Variant::OBJECT ? p_value.get_validated_object() : nullptr;
+			if (type == Variant::OBJECT && !object) {
+				return true; // An object that has been freed: null, as it is to a script everywhere.
+			}
 			return object && (p_godot_type.empty() || object->is_class(to_godot(p_godot_type)));
 		}
 		case ir::Kind::Any:
@@ -218,9 +221,9 @@ std::optional<vm::Slot> from_variant(ir::Kind p_kind, const Variant &p_value) {
 			return untyped_from_variant(p_value);
 		case ir::Kind::Val:
 		case ir::Kind::Ref:
-			// An object-typed value that holds no object is null, like null itself.
+			// An object-typed value that holds no object, or one that has been freed, is null, like null itself.
 			if (p_value.get_type() != Variant::NIL &&
-					!(p_value.get_type() == Variant::OBJECT && ((ObjectID)p_value).is_null())) {
+					!(p_value.get_type() == Variant::OBJECT && (((ObjectID)p_value).is_null() || !p_value.get_validated_object()))) {
 				slot.p = new Variant(p_value);
 			}
 			break;
