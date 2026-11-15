@@ -133,7 +133,6 @@ the review of the clean-up put off.
   671, `godot_host.cpp` 647) and three headers over 300 (`ast.h`, `lowerer.h`, `names.h`). **clean-up**
 - Planned and not done: the listener sweep in a file of its own, `godot_values.cpp`, a table of handlers
   in the language server. **clean-up**
-- The syntax-tree printer's cases print inline; 28 of its 48 are over five lines. **clean-up**
 - The interpreter makes a new handle for every value Godot gives back, which is most of what a call into
   Godot now costs. A design change, for the native backend's stage. **clean-up**
 
