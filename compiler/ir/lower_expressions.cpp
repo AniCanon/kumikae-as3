@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_library.h"
 
 namespace kas3 {
 namespace ir {
@@ -323,6 +324,9 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 	if (is_vector(made->type)) {
 		return vector_new(made->type, made->arguments, made->callee->offset);
 	}
+	if (const std::optional<uint32_t> library = Library::construct(*this, made)) {
+		return *library;
+	}
 	Symbol *symbol = named_class(made->callee);
 	uint32_t index = 0;
 	uint32_t type_name = 0;
@@ -449,16 +453,11 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 			return out;
 		}
 		case NodeKind::ThisExpr:
-			if (received_env_) {
-				// In a function expression AS3's `this` is not the object the function was written in.
-				refuse(position, "'this' in a function expression");
-				return default_value(Kind::Obj, position);
-			}
-			if (fn().is_static) {
+			if (fn().is_static && !received_env_) {
 				refuse(position, "'this' here");
 				return default_value(Kind::Obj, position);
 			}
-			return 0;
+			return self(position, true);
 		case NodeKind::Name:
 			return name_value(p_expression);
 		case NodeKind::Member:
@@ -481,8 +480,7 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 			refuse(position, "'super' used as a value");
 			break;
 		case NodeKind::RegexLit:
-			refuse(position, "a regular expression");
-			break;
+			return Library::regex_literal(*this, static_cast<RegexLit *>(p_expression));
 		case NodeKind::ArrayLit:
 			return vector_literal(p_expression, static_cast<ArrayLit *>(p_expression)->elements);
 		case NodeKind::ObjectLit:
@@ -620,17 +618,20 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 		store(place, value, position);
 		patch(skip, here());
 		return value;
-	} else if (p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Any || untyped(p_assign->value))) {
-		// `+=` with an untyped side: text or numbers, by what each holds when it runs.
+	} else if (p_assign->op == TokenKind::PlusAssign &&
+			(place.kind == Kind::Any || untyped(p_assign->value) ||
+					(natural(p_assign->value) == Kind::Obj && (place.kind != Kind::Str || Library::own_value_of(p_assign->value))))) {
+		// `+=` with an untyped side, or an object as `+` takes one: text or numbers, by what each holds when
+		// it runs.
 		uint32_t old = settled(convert(load(place, position), Kind::Any, position), p_assign->value, position);
 		uint32_t sum = reg(Kind::Any);
 		emit(Op::AnyAdd, position, sum, old, any_value(p_assign->value));
 		value = convert(sum, place.kind, position);
 	} else {
 		uint32_t old = settled(load(place, position), p_assign->value, position);
-		bool strings = p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Str || is_string_type(p_assign->value->type));
 		Kind right_kind = Kind::Void;
 		kind_of(p_assign->value->type, &right_kind);
+		bool strings = p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Str || is_string_type(p_assign->value->type));
 		bool engine = !strings && (is_engine(kind_at(old)) || is_engine(right_kind));
 		uint32_t right = engine ? operand(p_assign->value, p_assign->target->type) : wide_operand(p_assign->value, strings || p_assign->op == TokenKind::SlashAssign ? Kind::Void : place.kind);
 		if (engine) {

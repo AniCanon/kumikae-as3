@@ -17,6 +17,9 @@ namespace vm {
 // The code point that starts at byte p_at, and how many bytes it takes. A half held alone is read as the
 // unit it is. Text that is not well-formed is read a byte at a time.
 uint32_t code_point_at(std::string_view p_text, size_t p_at, size_t *r_size);
+// The text as UTF-16 units, and units as text again (two halves side by side become their character).
+std::u16string units_of(std::string_view p_text);
+std::string text_of_units(std::u16string_view p_units);
 // Adds the UTF-8 of one code point (a half held alone included) as it is, joining nothing.
 void encode(std::string *r_text, uint32_t p_code_point);
 // The UTF-16 unit at p_index, if the text has one there.

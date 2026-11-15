@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_library.h"
 #include "lower_members.h"
 
 namespace kas3 {
@@ -86,12 +87,16 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 	if (std::optional<Place> of_vector = vector_place(p_target, p_later)) {
 		return *of_vector;
 	}
+	if (std::optional<Place> of_library = Library::place(*this, p_target, p_later)) {
+		return *of_library;
+	}
 	if (p_target->kind == NodeKind::Name) {
 		Name *name = static_cast<Name *>(p_target);
 		if (name->symbol && is_godot(name->symbol) && (name->symbol->kind == SymbolKind::Property || name->symbol->kind == SymbolKind::Field)) {
 			return engine_place(name->symbol, nullptr, name->offset);
 		}
-		if (name->symbol && name->symbol->is_instance_member() && fn().is_static) {
+		const bool member = name->symbol && name->symbol->is_instance_member();
+		if (member && fn().is_static) {
 			refuse(name->offset, "this name");
 			return Place();
 		}
@@ -200,6 +205,8 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 			emit(Op::DynGet, p_position, out, p_place.object, p_place.key);
 			return out;
 		}
+		case Place::Library:
+			return Library::load(*this, p_place, p_position);
 		default:
 			return default_value(Kind::F64, p_position);
 	}
@@ -259,6 +266,9 @@ void Lowerer::store(const Place &p_place, uint32_t p_value, uint32_t p_position)
 			break;
 		case Place::Property:
 			emit(Op::DynSet, p_position, p_place.object, p_place.key, convert(p_value, Kind::Any, p_position));
+			break;
+		case Place::Library:
+			Library::store(*this, p_place, p_value, p_position);
 			break;
 		default:
 			break;

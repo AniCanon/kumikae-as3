@@ -220,7 +220,11 @@ static int run_run(int p_argc, char **p_argv) {
 	bool ok = false;
 	{
 		kas3::vm::StandaloneOutput output;
-		kas3::vm::Interpreter interpreter(module, output);
+		// KAS3_NOW fixes the time Date takes as now, in milliseconds since 1970 (for tests); TZ sets the zone,
+		// as the C library reads it.
+		const char *fixed = std::getenv("KAS3_NOW");
+		kas3::vm::SystemClock clock(fixed ? std::optional<double>(std::strtod(fixed, nullptr)) : std::nullopt);
+		kas3::vm::Interpreter interpreter(module, kas3::vm::Host(output, kas3::vm::NoEngine::instance(), kas3::vm::NoEngine::instance(), clock));
 		ok = interpreter.run_program();
 	}
 	std::fflush(stdout);

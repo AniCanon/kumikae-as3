@@ -65,7 +65,7 @@ uint32_t Lowerer::super_call(Call *p_call) {
 	Symbol *base = class_ && class_->klass ? class_->klass->base : nullptr;
 	uint32_t base_index = 0;
 	if (base && base != object_ && class_index(base, &base_index)) {
-		std::vector<uint32_t> list = { 0 };
+		std::vector<uint32_t> list = { self(p_call->offset, true) };
 		constructor_arguments(base, p_call->arguments, p_call->offset, list);
 		emit(Op::Call, p_call->offset, NONE, module_.classes[base_index].constructor, arguments(std::move(list)));
 	}
@@ -411,7 +411,7 @@ uint32_t Lowerer::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t *r_
 	// Another script object goes as the Godot object behind it: its fields are its own business.
 	bool of_value = false;
 	uint32_t object_reg = script && index->object->kind == NodeKind::ThisExpr && !fn().is_static
-			? 0u
+			? self(p_expression->offset, true)
 			: engine_receiver(index->object, p_expression->offset, &of_value);
 	*r_object = settled(object_reg, index->index, p_expression->offset);
 	*r_object = settled(*r_object, p_later, p_expression->offset);

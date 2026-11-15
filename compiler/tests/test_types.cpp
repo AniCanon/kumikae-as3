@@ -198,9 +198,9 @@ static void test_operators() {
 			{ "ratio += 1", "Number" },
 			{ "label += 1", "String" },
 			{ "(count, label)", "String" },
-			// Arithmetic on class types waits for the Godot math types: unknown, and no error.
-			{ "other + other", "?" },
-			{ "other * 2", "?" },
+			// An object of the program becomes a primitive as the line runs: beside `+` a String or a Number, else a Number.
+			{ "other + other", "*" },
+			{ "other * 2", "Number" },
 			{ "-other", "?" },
 	});
 }

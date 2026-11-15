@@ -145,7 +145,7 @@ class Lowerer {
 	// The kind a written type names; refused if the interpreter has no such values yet.
 	Kind written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing);
 
-	// A built-in class that is Error or extends it. These are the only built-in classes with objects so far.
+	// A built-in class that is Error or extends it.
 	bool is_error(const Symbol *p_class) const;
 
 	// The class's index, creating the built-in Error classes on first use.
@@ -261,6 +261,7 @@ class Lowerer {
 
 	// The object a member is reached through, checked for null unless it is `this` or `super`.
 	uint32_t receiver(Expr *p_object);
+	uint32_t self(uint32_t p_position, bool p_written = false); // `this`; in a function expression, the method's object (lower_closures).
 
 	using Place = ir::Place; // lower_env.h
 	using Part = ir::Part;
@@ -378,7 +379,6 @@ class Lowerer {
 	// Function expressions and what they capture (lower_closures.cpp).
 	void make_environment(FunctionDecl *p_decl);
 	std::optional<Place> captured_place(const Symbol *p_symbol, uint32_t p_position);
-	uint32_t self(uint32_t p_position);
 	uint32_t closure_value(FunctionExpr *p_expression);
 	void lower_pending_functions();
 	// Function values (lower_functions.cpp).

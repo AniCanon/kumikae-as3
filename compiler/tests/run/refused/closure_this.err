@@ -1,0 +1,1 @@
+closure_this.as:1:132: error: 'this' in a function expression is not supported by the interpreter yet

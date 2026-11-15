@@ -2,6 +2,7 @@
 
 #include "number_text.h"
 #include "text_units.h"
+#include "uri_text.h"
 
 #include <cmath>
 
@@ -30,6 +31,20 @@ uint32_t within(double p_index, uint32_t p_length) {
 uint32_t from_end(double p_index, uint32_t p_length) {
 	return within(p_index < 0 ? p_length + p_index : p_index, p_length);
 }
+
+std::string_view text_in(Slot p_string) {
+	const Str *string = static_cast<const Str *>(p_string.p);
+	return string ? string->view() : std::string_view();
+}
+
+Slot of_pointer(void *p_value) {
+	Slot slot;
+	slot.bits = 0;
+	slot.p = p_value;
+	return slot;
+}
+
+constexpr std::string_view URI_FUNCTIONS[] = { "encodeURI", "encodeURIComponent", "decodeURI", "decodeURIComponent" };
 
 } // namespace
 
@@ -62,6 +77,10 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 	}
 	const std::string_view self = text(0);
 	const uint32_t length = static_cast<uint32_t>(utf16_length(self));
+	if (which >= StringFunction::Escape) {
+		uri_function(which, self, out);
+		return;
+	}
 	switch (which) {
 		case StringFunction::CharAt:
 		case StringFunction::CharCodeAt: {
@@ -138,6 +157,22 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 	}
 }
 
+// escape, unescape and the URI functions. One that can't read or write its text is AS3's URIError #1052.
+void Interpreter::uri_function(StringFunction p_which, std::string_view p_text, Slot &r_out) {
+	if (p_which == StringFunction::Escape || p_which == StringFunction::Unescape) {
+		assign(Kind::Str, r_out, text(p_which == StringFunction::Escape ? escape_text(p_text) : unescape_text(p_text)));
+		return;
+	}
+	const size_t uri = static_cast<size_t>(p_which) - static_cast<size_t>(StringFunction::EncodeURI);
+	const bool component = p_which == StringFunction::EncodeURIComponent || p_which == StringFunction::DecodeURIComponent;
+	const std::optional<std::string> made = uri < 2 ? encode_uri(p_text, component) : decode_uri(p_text, component);
+	if (made) {
+		assign(Kind::Str, r_out, text(*made));
+	} else {
+		raise(module_.uri_error_class != ir::NONE ? module_.uri_error_class : module_.error_class, uri_error(URI_FUNCTIONS[uri]));
+	}
+}
+
 namespace {
 
 // A number in the digits asked for, which are in range: from a Number, or from an Int64's own digits.
@@ -192,7 +227,7 @@ void Interpreter::any_null_check(Slot p_value) {
 	}
 }
 
-// split(delimiter, limit), as ECMAScript 3 has it for a delimiter that is not a regular expression: none
+// split(delimiter, limit), as ECMAScript 3 has it: a RegExp splits as split_by_pattern() says; none
 // (null or undefined) is the whole string; an empty one gives each UTF-16 unit; at most `limit` pieces. A
 // delimiter that is neither a String nor null becomes its text, which may run the program: the registers
 // are read again after.
@@ -200,6 +235,13 @@ void Interpreter::string_split(const Function &p_function, const Instruction &p_
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 	const size_t base = frames_.back().base;
 	const auto at = [&](size_t p_index) -> Slot & { return stack_[base + list[p_index]]; };
+	if (is_regexp(at(1))) {
+		Vector *made = split_by_pattern(static_cast<Object *>(any::pointer(at(1))), text_in(at(0)), to_uint32(at(2).d));
+		if (made) {
+			put(Kind::Obj, stack_[base + p_in.a], of_pointer(made));
+		}
+		return;
+	}
 	const AnyTag tag = any::tag(at(1));
 	const bool whole = tag == AnyTag::Null || tag == AnyTag::Undefined;
 	std::string by;
@@ -251,10 +293,7 @@ void Interpreter::string_split(const Function &p_function, const Instruction &p_
 		made->data[i] = any::string(piece);
 	}
 	if (made) {
-		Slot out;
-		out.bits = 0;
-		out.p = made;
-		put(Kind::Obj, stack_[base + p_in.a], out);
+		put(Kind::Obj, stack_[base + p_in.a], of_pointer(made));
 	}
 }
 

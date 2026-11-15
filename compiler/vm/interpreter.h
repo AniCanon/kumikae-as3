@@ -11,6 +11,7 @@
 #include "runtime.h"
 
 #include <array>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -19,6 +20,10 @@
 
 namespace kas3 {
 namespace vm {
+
+namespace regex {
+struct Program;
+}
 
 class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
@@ -120,7 +125,8 @@ private:
 	bool engine_dictionary(Slot p_value, uint32_t p_class) const;
 	Object *table_of_engine(void *p_dictionary, uint32_t p_class);
 	bool any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
-	bool any_primitive(Slot p_value, Slot *r_out);
+	// ECMAScript's ToPrimitive: an object's text, or with p_number (where a Number is wanted) a Date's time.
+	bool any_primitive(Slot p_value, Slot *r_out, bool p_number = false);
 	Slot present_or_null(Slot p_value); // A freed Godot object is null; anything else is as it is.
 	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
@@ -150,10 +156,44 @@ private:
 	void trace(const std::vector<uint32_t> &p_list, const Slot *p_registers);
 	void leave(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result);
 	void object_to_text(const ir::Instruction &p_in, Slot *p_registers);
-	// The standard library (vm/string_methods.cpp): StrCall and NumText. Neither runs the program.
+	void object_to_number(const ir::Instruction &p_in, Slot *p_registers);
+	// The standard library (vm/string_methods.cpp): StrCall and NumText. Only split() may run the program (a delimiter's text).
 	void string_call(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void string_split(const ir::Function &p_function, const ir::Instruction &p_in);
+	void uri_function(ir::StringFunction p_which, std::string_view p_text, Slot &r_out);
 	void number_text(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	// RegExp (vm/regexp_methods.cpp, vm/regexp_strings.cpp). A pattern is read once for each source and
+	// flags, and kept while anything uses it: a replacement function may make the cache forget it.
+	std::unordered_map<std::string, std::shared_ptr<const regex::Program>> patterns_;
+	std::shared_ptr<const regex::Program> pattern(std::string_view p_source, uint8_t p_flags);
+	std::shared_ptr<const regex::Program> pattern_of(const Object *p_regexp);
+	bool is_regexp(Slot p_any) const;
+	void regexp_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	void regexp_new(const ir::Function &p_function, const ir::Instruction &p_in);
+	void regexp_exec(const ir::Function &p_function, const ir::Instruction &p_in);
+	// A match: where it and each group start and end, by unit (-1 for a group that took no part).
+	struct Found {
+		std::vector<int32_t> captures;
+	};
+	std::optional<Found> find_match(const regex::Program &p_program, std::string_view p_source, const std::u16string &p_text, uint32_t p_from);
+	Vector *match_array(const Found &p_found, const std::u16string &p_text);
+	std::shared_ptr<const regex::Program> pattern_argument(Slot p_pattern, Object **r_regexp, std::string *r_source);
+	void string_match(const ir::Function &p_function, const ir::Instruction &p_in);
+	void string_search(const ir::Function &p_function, const ir::Instruction &p_in);
+	void string_replace(const ir::Function &p_function, const ir::Instruction &p_in);
+	// Every match a global pattern finds, one after another as match() finds them; the first only otherwise.
+	std::optional<std::vector<Found>> all_matches(const regex::Program &p_program, std::string_view p_source, const std::u16string &p_text);
+	bool replacement(Object *p_function, const std::u16string &p_with, bool p_expand, const Found &p_found, const std::u16string &p_text,
+			std::u16string *r_out);
+	Vector *split_by_pattern(Object *p_regexp, std::string_view p_text, uint32_t p_most);
+	// Date (vm/date_methods.cpp).
+	void date_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	void date_new(const ir::Function &p_function, const ir::Instruction &p_in);
+	double date_from_parts(const std::vector<uint32_t> &p_list, size_t p_first, bool p_local);
+	double date_set(double p_time, uint32_t p_code, const std::vector<uint32_t> &p_list);
+	double local_time(double p_time);
+	double utc_time(double p_local);
+	std::string date_text(const Object *p_date, ir::DateText p_which) const;
 	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
 	void any_null_check(Slot p_value);
 	// Vectors. An index outside the vector is AS3's RangeError #1125.

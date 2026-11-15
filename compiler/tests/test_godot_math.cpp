@@ -198,7 +198,7 @@ static void test_silence() {
 			{ "any * a", "*" },
 			{ "a + obj", "*" },
 			{ "a + null", "*" },
-			{ "mine + mine", "?" },
+			{ "mine + mine", "*" }, // A script object becomes a primitive as the line runs.
 			{ "node * 2", "?" },
 			{ "-node", "?" },
 			{ "rid < rid", "Boolean" },
@@ -237,7 +237,7 @@ static void test_tags_outside_declarations() {
 	Unit *unit = compilation.add("Main.as", source.text);
 	compilation.check();
 	CHECK_EQ(compilation.format_diagnostics(false), std::string());
-	CHECK_EQ(compilation.type_name(unit->typed[0].type), std::string("?"));
+	CHECK_EQ(compilation.type_name(unit->typed[0].type), std::string("*")); // As any object of the program: what it becomes.
 	CHECK_EQ(compilation.type_name(unit->typed[1].type), std::string("*"));
 }
 

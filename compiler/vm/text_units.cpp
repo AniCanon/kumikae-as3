@@ -46,25 +46,6 @@ UnitPlace place_of_unit(std::string_view p_text, uint32_t p_unit) {
 	return { at, false };
 }
 
-// The text as UTF-16 units: for the searches whose needle begins or ends with a half held alone, which
-// may be one half of a character in the text.
-std::u16string units_of(std::string_view p_text) {
-	std::u16string units;
-	units.reserve(p_text.size());
-	for (size_t at = 0; at < p_text.size();) {
-		size_t size = 0;
-		const uint32_t code = code_point_at(p_text, at, &size);
-		if (code >= 0x10000) {
-			units += static_cast<char16_t>(high_half(code));
-			units += static_cast<char16_t>(low_half(code));
-		} else {
-			units += static_cast<char16_t>(code);
-		}
-		at += size;
-	}
-	return units;
-}
-
 // Whether a byte search finds the needle exactly where a search by units would: it does unless the
 // needle starts with a low half or ends with a high half, which in the text may belong to a character.
 bool bytes_will_do(std::string_view p_needle) {
@@ -98,6 +79,32 @@ std::string changed_case(std::string_view p_text, Map p_map) {
 }
 
 } // namespace
+
+std::u16string units_of(std::string_view p_text) {
+	std::u16string units;
+	units.reserve(p_text.size());
+	for (size_t at = 0; at < p_text.size();) {
+		size_t size = 0;
+		const uint32_t code = code_point_at(p_text, at, &size);
+		if (code >= 0x10000) {
+			units += static_cast<char16_t>(high_half(code));
+			units += static_cast<char16_t>(low_half(code));
+		} else {
+			units += static_cast<char16_t>(code);
+		}
+		at += size;
+	}
+	return units;
+}
+
+std::string text_of_units(std::u16string_view p_units) {
+	std::string text;
+	text.reserve(p_units.size());
+	for (const char16_t unit : p_units) {
+		append_unit(&text, unit);
+	}
+	return text;
+}
 
 uint32_t code_point_at(std::string_view p_text, size_t p_at, size_t *r_size) {
 	const unsigned char lead = static_cast<unsigned char>(p_text[p_at]);

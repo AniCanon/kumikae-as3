@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_library.h"
 #include "lower_members.h"
 
 namespace kas3 {
@@ -27,7 +28,8 @@ Class Lowerer::inherited_class(ClassDecl *p_decl) {
 		klass.native_base = godot_base;
 		klass.fields.push_back({ "$owner", Kind::Ref });
 	} else if (base && base != object_) {
-		if (is_dictionary(base) || !class_index(base, &klass.base)) { // A Dictionary's objects are tables, with no fields to add to.
+		// A Dictionary's objects are tables, with no fields to add to; a RegExp's or a Date's are the library's.
+		if (is_dictionary(base) || Library::holds(base) || !class_index(base, &klass.base)) {
 			refuse(p_decl->extends ? p_decl->extends->offset : p_decl->name_offset, "extending '" + std::string(base->name) + "'");
 		} else {
 			const Class &from = module_.classes[klass.base];
@@ -302,7 +304,7 @@ uint32_t Lowerer::own_signal(std::string_view p_name, uint32_t p_position) {
 		return default_value(Kind::Val, p_position);
 	}
 	const uint32_t owner = reg(Kind::Ref);
-	emit(Op::OwnerOf, p_position, owner, 0);
+	emit(Op::OwnerOf, p_position, owner, self(p_position, true));
 	const uint32_t name = reg(Kind::Str);
 	emit(Op::ConstStr, p_position, name, string(std::string(p_name)));
 	const uint32_t out = reg(Kind::Val);

@@ -15,7 +15,8 @@ Expected output for numbers, strings and evaluation order was produced by Node f
 JavaScript copy of the program, since AS3 and JavaScript share those rules. Stack traces and anything about
 classes follow the AS3 language and were read by hand.
 
-Nothing a program makes may be left alive when it ends: kas3c reports that with status 3.
+Nothing a program makes may be left alive when it ends: kas3c reports that with status 3. Date's now and the
+zone are fixed (see `environment` below).
 
 --update rewrites the .out, .err and .ir files. Read the result before committing it.
 """
@@ -29,7 +30,9 @@ tests = os.path.abspath(sys.argv[2])
 update = "--update" in sys.argv[3:]
 failures = []
 passed = 0
-environment = dict(os.environ, KAS3_REPORT_LEAKS="1")
+# Date's now is fixed (2025-11-15 14:39:11.123 UTC), and its zone is the US Pacific one as a POSIX rule,
+# which every C library reads without a zone database: no output depends on this machine's clock or zone.
+environment = dict(os.environ, KAS3_REPORT_LEAKS="1", KAS3_NOW="1763217551123", TZ="PST8PDT,M3.2.0,M11.1.0")
 
 
 def run(command, files, cwd):

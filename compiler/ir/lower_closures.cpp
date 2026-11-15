@@ -81,6 +81,31 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 	}
 }
 
+// `this` is register 0 of a method. In a function expression register 0 is the environment: a member named
+// without `this` is of the object the function was written in, kept in an environment; AS3's own `this`
+// there is the caller's object, which the interpreter has not got, and is refused.
+uint32_t Lowerer::self(uint32_t p_position, bool p_written) {
+	if (!received_env_) {
+		return 0;
+	}
+	for (size_t depth = 0; !p_written && depth < chain_.size(); depth++) {
+		if (chain_[depth].this_field == NONE) {
+			continue;
+		}
+		uint32_t at = 0;
+		for (size_t step = 0; step < depth; step++) {
+			const uint32_t outer = reg(Kind::Obj);
+			emit(Op::GetField, p_position, outer, at, 0);
+			at = outer;
+		}
+		const uint32_t object = reg(Kind::Obj);
+		emit(Op::GetField, p_position, object, at, chain_[depth].this_field);
+		return object;
+	}
+	refuse(p_position, p_written ? "'this' in a function expression" : "an instance member named inside this function expression");
+	return default_value(Kind::Obj, p_position);
+}
+
 // A variable a function written inside this one shares, or one of an enclosing function's that this one
 // uses: its field in an environment. Nothing for any other variable.
 std::optional<Lowerer::Place> Lowerer::captured_place(const Symbol *p_symbol, uint32_t p_position) {
@@ -112,30 +137,6 @@ std::optional<Lowerer::Place> Lowerer::captured_place(const Symbol *p_symbol, ui
 		return place;
 	}
 	return std::nullopt;
-}
-
-// The object a bare member names: `this` in a method; in a function written in one, the method's object,
-// from the environment that keeps it.
-uint32_t Lowerer::self(uint32_t p_position) {
-	if (!received_env_) {
-		return 0;
-	}
-	for (size_t depth = 0; depth < chain_.size(); depth++) {
-		if (chain_[depth].this_field == NONE) {
-			continue;
-		}
-		uint32_t at = 0;
-		for (size_t step = 0; step < depth; step++) {
-			const uint32_t outer = reg(Kind::Obj);
-			emit(Op::GetField, p_position, outer, at, 0);
-			at = outer;
-		}
-		const uint32_t object = reg(Kind::Obj);
-		emit(Op::GetField, p_position, object, at, chain_[depth].this_field);
-		return object;
-	}
-	refuse(p_position, "an instance member named inside this function expression");
-	return default_value(Kind::Obj, p_position);
 }
 
 // `function (a:int):int { ... }`: a function value of a function of its own, given the environment it may

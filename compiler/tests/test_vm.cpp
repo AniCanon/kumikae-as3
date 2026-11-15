@@ -118,12 +118,48 @@ static void test_statement_hook() {
 
 static void test_refused_program() {
 	Compilation compilation;
-	Unit *unit = compilation.add("Main.as", "package { public class Main { public function Main() { var r:* = /a+/; } } }");
+	Unit *unit = compilation.add("Main.as", "package { public class Main { public function Main() { var f:* = function():void { trace(this); }; } } }");
 	compilation.check();
 	ir::Module module;
 	CHECK(!ir::lower(compilation, &module));
 	CHECK(unit->diagnostics.has_errors());
 	CHECK(compilation.format_diagnostics(false).find("is not supported by the interpreter yet") != std::string::npos);
+}
+
+// Date asks the host the time and its zone: a host that keeps a clock gives both, whatever the system's are.
+struct Clocked : vm::Output, vm::Clock {
+	std::string printed, errors;
+	std::vector<double> asked; // The moments the zone was asked about.
+	void print(std::string_view p_text) override { printed += std::string(p_text) + "\n"; }
+	void error(std::string_view p_text) override { errors += std::string(p_text) + "\n"; }
+	double now() override { return 31536000000.0; } // 1971 begins, in UTC.
+	double local_offset(double p_utc) override {
+		asked.push_back(p_utc);
+		return 5.5 * 3600000; // Half an hour past a whole number of hours, as in India.
+	}
+};
+
+static void test_host_clock() {
+	Compilation compilation;
+	compilation.add("Main.as", "package { public class Main { public function Main() {\n"
+							   "var now:Date = new Date(); var start:Date = new Date(0);\n"
+							   "trace(now.time, now, start.hours, start.minutes, start.timezoneOffset);\n"
+							   "trace(new Date(1971, 0, 1, 5, 30).time, Date.parse(\"Jan 1 1971\"));\n"
+							   "} } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module));
+	Clocked host;
+	{
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.run_program());
+	}
+	CHECK_EQ(host.errors, std::string());
+	CHECK_EQ(host.printed, std::string("31536000000 Fri Jan 1 05:30:00 GMT+0530 1971 5 30 -330\n31536000000 31516200000\n"));
+	CHECK(!host.asked.empty());
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
 // The engine will call into one interpreter again and again, and a script's call out may come back in.
@@ -1123,6 +1159,7 @@ static void test_engine_calls() {
 		"function f():void { var n:int = 1; trace(delete n); }",
 		"function f():Boolean { return \"length\" in \"text\"; }",
 		"function f(v:Vector2):void { for (var k:* in v) { trace(k); } }",
+		"function f():void { var g:Function = function():void { trace(this.name); }; }",
 	};
 	for (const char *body : bodies) {
 		std::string result = refused(body);
@@ -2177,5 +2214,6 @@ int main() {
 	test_entry_points();
 	test_statement_hook();
 	test_refused_program();
+	test_host_clock();
 	return check::finish();
 }

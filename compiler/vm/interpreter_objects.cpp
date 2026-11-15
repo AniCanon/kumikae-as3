@@ -1,5 +1,6 @@
 #include "interpreter_internal.h"
 
+#include "regex.h"
 #include "table.h"
 
 #include <algorithm>
@@ -208,6 +209,13 @@ std::string Interpreter::object_text(Object *p_object) const {
 	std::string simple = name.substr(name.rfind('.') == std::string::npos ? 0 : name.rfind('.') + 1);
 	if (module_.error_class != NONE && is_class(p_object, module_.error_class)) {
 		return error_heading(p_object); // A class of the program's that extends Error is named "Error".
+	}
+	if (p_object->klass == module_.date_class) {
+		return date_text(p_object, ir::DateText::Full);
+	}
+	if (p_object->klass == module_.regexp_class) {
+		const Str *source = static_cast<const Str *>(p_object->fields()[ir::REGEXP_SOURCE].p);
+		return regex::regexp_text(source ? source->view() : std::string_view(), static_cast<uint8_t>(p_object->fields()[ir::REGEXP_FLAGS].i));
 	}
 	return "[object " + simple + "]";
 }

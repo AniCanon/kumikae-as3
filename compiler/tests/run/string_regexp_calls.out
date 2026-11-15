@@ -1,0 +1,6 @@
+a<true|x#>b<true|x#>c<true|x#> changed 0
+from the function
+Error #1063: Argument count mismatch on string_regexp_calls/function(). Expected 1, got 3.
+a[b]c aXc c
+13 x1 1y 6
+123 3

@@ -19,9 +19,9 @@ anyone changing the repository are in [AGENTS.md](../AGENTS.md).
 |---|---|---|
 | `src/` | The front end: source text to a checked syntax tree | `lexer`, `parser*` (one file per kind of syntax), `names*` (packages, scopes, links), `typer.h` and `typer_*.cpp` (the type of every expression and what fits where), `type_table.cpp`, `whole_numbers` (rules the checker and the lowerer share), `query` (what the language server asks) |
 | `ir/` | The typed IR and the lowerer that produces it | `ir.h`, `ir_print.cpp`, `lowerer.h` and `lower_*.cpp`, by what each lowers: types, places, Godot's members, expressions, operators, calls, statements, classes |
-| `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `held.h` (what a container holds), `collector` (the cycle collector), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
-| `vm/` host | What the interpreter needs from where it runs | `host.h` holds three interfaces: `output.h`, `engine_handles.h` (what is done to a value the interpreter holds), `engine_source.h` (where values come from). `no_engine.h` answers where there is no engine |
-| `godot_ext/` | The GDExtension | `godot_host` (the three interfaces, with Godot's calls), `callable` (a method as a Godot function, and listeners as the cycle collector sees them), `instance`, `script`, `program`, `language`, `register` |
+| `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
+| `vm/` host | What the interpreter needs from where it runs | `host.h` holds four interfaces: `output.h`, `engine_handles.h` (what is done to a value the interpreter holds), `engine_source.h` (where values come from), `clock.h` (the time and the zone, for Date). `no_engine.h` answers where there is no engine |
+| `godot_ext/` | The GDExtension | `godot_host` (the four interfaces, with Godot's calls), `callable` (a method as a Godot function, and listeners as the cycle collector sees them), `instance`, `script`, `program`, `language`, `register` |
 | `lsp/` | The language server | `server`, `workspace`, `json` |
 | `godot/` | The generator of Godot's API as AS3 declarations | `generate.py`, `naming.py`, the generated `godot.as` and `godot_names.txt` |
 | `tests/` | Tests, and `bench/` for the timings | See [Tests](#tests) |
@@ -99,18 +99,22 @@ files, packages, and package-level functions and variables. `String`'s methods, 
 `toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `split` and `Math`.
 `Vector.<T>` (`Vector.<*>` too) and `Array`, with their methods, those that take a function included;
 function values (a method or a function as a value, `f(a, b)`) and function expressions that capture
-their variables, and the members of the object of the method they are written in; `[Signal]` on a field of
-a class that extends one of Godot's; getters and setters, static ones too, overridden and reached with
-`super` (`o.x += 1` and `o.x++` call each half once). In a stack trace a getter is `Class/get x()`, as in
-Flash. Interfaces, with their getters and setters: a value typed as one calls the method of whatever class
-the object is, found by name as AVM2 finds it; `is`, `as`, parameters, fields and vectors of an interface
-type; a class may implement several, and an interface extend several. Object literals
-(`{a: 1, "b": 2, 3: x}`) and `new Object()`; `flash.utils.Dictionary`, whose keys are objects by their
-identity and anything else by its text; properties by name on an `Object`, a `*`, a Dictionary and an Array
-(`o.a`, `o["a"]`, `o.a = v`, `delete`, `in`, `hasOwnProperty`, a property that holds a function called as
-one); `for in` and `for each` over any of these; an untyped value that holds an object of a class of the
-program, by the names of its public fields and methods (Flash's ReferenceErrors #1069, #1056 and #1037 for
-the rest); Array's `sortOn`.
+their variables, and the members of the object of the method they are written in (`count++`, `update()`);
+`[Signal]` on a field of a class that extends one of Godot's; getters and setters, static ones too,
+overridden and reached with `super` (`o.x += 1` and `o.x++` call each half once). In a stack trace a getter
+is `Class/get x()`, as in Flash. Interfaces, with their getters and setters: a value typed as one calls the
+method of whatever class the object is, found by name as AVM2 finds it; `is`, `as`, parameters, fields and
+vectors of an interface type; a class may implement several, and an interface extend several. Object
+literals (`{a: 1, "b": 2, 3: x}`) and `new Object()`; `flash.utils.Dictionary`, whose keys are objects by
+their identity and anything else by its text; properties by name on an `Object`, a `*`, a Dictionary and an
+Array (`o.a`, `o["a"]`, `o.a = v`, `delete`, `in`, `hasOwnProperty`, a property that holds a function called
+as one); `for in` and `for each` over any of these; an untyped value that holds an object of a class of the
+program, by the names of its public fields, methods, getters and setters (Flash's ReferenceErrors #1069,
+#1056, #1037, #1074 and #1077 for the rest); Array's `sortOn`. `RegExp` (literals, `new RegExp`, the flags
+`g i m s x`, its properties, `exec` and `test` with `lastIndex`) and String's `match`, `search`, `replace`
+(with `$1`, `$&` and the rest, or a function) and `split` by one; `Date`, with the host's clock and zone
+(its getters and setters, local and UTC, its texts, `Date.parse` and `Date.UTC`); `escape`, `unescape`,
+`encodeURI`, `encodeURIComponent`, `decodeURI` and `decodeURIComponent`.
 
 Keys go in the order each was first set, in an Object, a Dictionary and an Array's properties beyond its
 indices: AS3 leaves the order unspecified, and this is the interpreter's ruling, so that what a program
@@ -120,11 +124,10 @@ were when it began: one deleted on the way is passed over, one added is not reac
 
 **What is refused, by name, until later slices:** `new Dictionary(true)` (weak keys, said when the program
 runs), a method of an Array, a Vector, a String or a number called or read by name on an untyped value
-(`u.push(1)`, said when it runs), a property of one of Godot's values held untyped, by name,
-`this` and `super` inside a function expression, an interface's method that a class has only from Godot's
-API or the built-in library, regular expressions and the `String`
-methods that take one (`match`, `search`, `split` by one, and `replace` with anything but two strings), the library's other functions (`escape`, `encodeURI`, `JSON`,
-`Date`), and the `godot` package. A program that uses one of these does not run: the compiler says
+(`u.push(1)`, said when it runs), a property of one of Godot's values held untyped, by name, `this` and
+`super` written inside a function expression (AS3's `this` there is not the method's object), an
+interface's method that a class has only from Godot's API or the built-in library, a class that extends
+`RegExp`, `JSON`, and the `godot` package. A program that uses one of these does not run: the compiler says
 `... is not supported by the interpreter yet` at the place.
 
 How it works:
@@ -152,8 +155,20 @@ character, by Unicode's mappings within U+0000 to U+FFFF (`"ß".toUpperCase()` s
 
 Where Flash and ECMAScript part, Flash is followed as far as it is known, and each test says so where it
 does: `toString(radix)` writes only the whole part of a number in a radix other than 10, a
-digit count left out is the declared 0 (`toPrecision()` is a `RangeError`), `replace` inserts its
-replacement as it is written, and `localeCompare` orders by UTF-16 unit.
+digit count left out is the declared 0 (`toPrecision()` is a `RangeError`), `replace` with a String to
+find inserts its replacement as it is written, and `localeCompare` orders by UTF-16 unit.
+
+**Regular expressions** are read and run by the interpreter's own engine (`vm/regex*`), over UTF-16 units
+as AS3 indexes strings: ECMAScript 3's syntax and meaning, with what AS3 takes from PCRE (the flags `s`
+and `x`, named groups `(?P<name>...)`, lookbehind of a fixed length, atomic groups, possessive
+quantifiers). A pattern that can't be read is a `SyntaxError` where the RegExp is made (ECMAScript's rule;
+Flash, by recollection, makes one that never matches). A search that backtracks without end stops after
+ten million steps, plus a thousand for each unit of the text, with an `Error` that says so.
+
+**Date** asks the host for the time and for the zone's offset at a moment (`vm/clock.h`): Godot's clock in
+the extension, the system's in `kas3c run`, where `KAS3_NOW` fixes the time and `TZ` the zone. Its texts
+are AS3's: `Thu Feb 29 13:05:09 GMT-0800 2024`, `Thu Feb 29 21:05:09 2024 UTC`, and the rest, written
+from recollection of avmplus, not checked against Flash.
 
 ## Inside Godot
 
@@ -250,7 +265,7 @@ How it works:
 
 - **One program per project.** Every `.as` file under the project is compiled together when the first
   script loads. A script that fails to compile is reported once, and no script loads.
-- **The interpreter does not know Godot.** `vm/host.h` is the whole boundary: three small interfaces. The extension implements them
+- **The interpreter does not know Godot.** `vm/host.h` is the whole boundary: four small interfaces. The extension implements them
   with Godot's own calls; the tests implement it with a recorder.
 - **Godot's names come from Godot.** `godot/godot_names.txt` (21,519 names, written by the generator from
   Godot's API description) says that `moveAndSlide` is `move_and_slide`. Nothing is worked out backwards
@@ -546,8 +561,11 @@ public final native class Vector2 { ... }
   from them are not dynamic.
 - **Calling, or using `new` on, a value typed `Function`, `Class` or `Object` gives `*`.**
 - **`this` inside a nested function is `*`,** because AS3 decides it when the function is called.
-- **Arithmetic on anything but numbers, strings and Booleans has no type yet (`?`).** Godot's math types get
-  their operators in a later part.
+- **An object of AS3's in arithmetic (a `Date`, a vector, a class of the program) is made a primitive as
+  the line runs,** by its class's own `valueOf()` or else its text: beside `+` the result is `*` (a String
+  or a Number), with `-`, `*`, `/` and `%` a `Number`. A `Date` is its time where a Number is wanted, and
+  its text beside `+`. Arithmetic on anything else that is not a number, a string or a Boolean has no type
+  yet (`?`), unless Godot's declarations give the operator.
 - **"has no member" is reported only when every member of the type is known.** Nothing is reported on `*`,
   on a type that failed to resolve, or on a class whose base class is unknown.
 

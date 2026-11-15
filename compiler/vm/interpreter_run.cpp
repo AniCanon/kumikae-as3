@@ -188,6 +188,17 @@ void Interpreter::object_to_text(const Instruction &p_in, Slot *p_registers) {
 	}
 }
 
+// An object as a Number: what an untyped value holding it converts to (a Date's time; null is 0).
+void Interpreter::object_to_number(const Instruction &p_in, Slot *p_registers) {
+	const Slot value = to_any(Kind::Obj, p_registers[p_in.b]);
+	Slot number;
+	const bool done = from_any(value, Kind::F64, NONE, &number); // An object's text may run the program.
+	drop_any(value);
+	if (done) {
+		stack_[frames_.back().base + p_in.a].d = number.d;
+	}
+}
+
 void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_registers) {
 	std::string line;
 	for (size_t i = 0; i < p_list.size(); i++) {
@@ -409,6 +420,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::ObjToStr:
 				object_to_text(in, r); // `frame` and `r` may be stale after this.
 				break;
+			case Op::ObjToF64:
+				object_to_number(in, r); // `frame` and `r` may be stale after this.
+				break;
 			case Op::StrToStr: {
 				Str *string = r[in.b].p ? static_cast<Str *>(r[in.b].p) : null_text_;
 				retain(string);
@@ -514,6 +528,12 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::NumText:
 				number_text(function, in, r);
+				break;
+			case Op::RegExpCall:
+				regexp_call(function, in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::DateCall:
+				date_call(function, in); // `frame` and `r` may be stale after this.
 				break;
 			case Op::Jump:
 				frame.pc = in.a;

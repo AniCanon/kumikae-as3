@@ -38,7 +38,7 @@ uint32_t Lowerer::function_value(Expr *p_expression) {
 			refuse(position, "a method of 'super' used as a value");
 			return default_value(Kind::Obj, position);
 		}
-		object = written->kind == NodeKind::ThisExpr ? 0 : receiver(written);
+		object = receiver(written);
 	} else if (fn().is_static) {
 		refuse(position, "this name");
 		return default_value(Kind::Obj, position);
