@@ -1,0 +1,346 @@
+#include "members.h"
+
+#include "any.h"
+#include "godot_host.h"
+#include "program.h"
+
+#include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
+#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
+
+#include <godot_cpp/core/gdextension_interface_loader.hpp>
+
+#include <cmath>
+#include <unordered_set>
+#include <vector>
+
+using namespace godot;
+
+namespace kas3 {
+
+namespace {
+
+std::string_view text_of(const CharString &p_utf8) {
+	return std::string_view(p_utf8.get_data(), (size_t)p_utf8.length());
+}
+
+// The name a method has in AS3: its function's name after the class ("Player/jump").
+std::string_view own_name(const ir::Function &p_function) {
+	const size_t slash = p_function.name.rfind('/');
+	return std::string_view(p_function.name).substr(slash == std::string::npos ? 0 : slash + 1);
+}
+
+bool is_signal(const ir::Module &p_module, uint32_t p_class, std::string_view p_field) {
+	for (uint32_t at = p_class; at < p_module.classes.size(); at = p_module.classes[at].base) {
+		for (const std::string &name : p_module.classes[at].signals) {
+			if (name == p_field) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool inherits(const std::string &p_class, const char *p_base) {
+	return ClassDBSingleton::get_singleton()->is_parent_class(StringName(p_class.c_str()), StringName(p_base));
+}
+
+// How Godot describes a value of this kind: its type, class, hint and usage.
+Dictionary describe(const ir::Module &p_module, std::string_view p_name, ir::Kind p_kind, const std::string &p_engine_type, uint32_t p_class,
+		bool p_exported) {
+	int type = Variant::NIL;
+	String class_name;
+	int hint = PROPERTY_HINT_NONE;
+	String hint_string;
+	int usage = p_exported ? PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE : PROPERTY_USAGE_SCRIPT_VARIABLE;
+	switch (p_kind) {
+		case ir::Kind::F64:
+			type = Variant::FLOAT;
+			break;
+		case ir::Kind::I32:
+		case ir::Kind::U32:
+		case ir::Kind::I64:
+			type = Variant::INT;
+			break;
+		case ir::Kind::Bool:
+			type = Variant::BOOL;
+			break;
+		case ir::Kind::Str:
+			type = Variant::STRING;
+			break;
+		case ir::Kind::Val:
+			type = p_engine_type.empty() ? -1 : value_type(p_engine_type);
+			break;
+		case ir::Kind::Ref:
+			type = Variant::OBJECT;
+			class_name = String::utf8(p_engine_type.c_str());
+			if (!p_engine_type.empty() && inherits(p_engine_type, "Resource")) {
+				hint = PROPERTY_HINT_RESOURCE_TYPE;
+				hint_string = class_name;
+			} else if (!p_engine_type.empty() && inherits(p_engine_type, "Node")) {
+				hint = PROPERTY_HINT_NODE_TYPE;
+				hint_string = class_name;
+			}
+			break;
+		case ir::Kind::Obj:
+			// An Array is Godot's Array; a script object is its Godot object, when it has one.
+			if (p_class < p_module.classes.size() && p_module.classes[p_class].array) {
+				type = Variant::ARRAY;
+			} else if (p_class < p_module.classes.size() && !p_module.classes[p_class].native_base.empty()) {
+				type = Variant::OBJECT;
+				class_name = String::utf8(p_module.classes[p_class].native_base.c_str());
+			}
+			break;
+		default:
+			type = -1; // Any value.
+			break;
+	}
+	if (type < 0) {
+		type = Variant::NIL;
+		usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
+	}
+	Dictionary property;
+	property["name"] = String::utf8(p_name.data(), (int64_t)p_name.size());
+	property["type"] = type;
+	property["class_name"] = StringName(class_name);
+	property["hint"] = hint;
+	property["hint_string"] = hint_string;
+	property["usage"] = usage;
+	return property;
+}
+
+Dictionary method_info(const ir::Module &p_module, const ir::Function &p_function, std::string_view p_name) {
+	Array arguments;
+	const uint32_t first = p_function.is_static ? 0 : 1;
+	const uint32_t fixed = p_function.rest ? p_function.parameters - 1 : p_function.parameters;
+	for (uint32_t reg = first; reg < fixed; reg++) {
+		std::string_view name;
+		for (const ir::Local &local : p_function.locals) {
+			name = local.reg == reg ? std::string_view(local.name) : name;
+		}
+		const std::string &engine = reg < p_function.engine_types.size() ? p_function.engine_types[reg] : std::string();
+		const uint32_t klass = reg < p_function.parameter_classes.size() ? p_function.parameter_classes[reg] : ir::NONE;
+		Dictionary argument = describe(p_module, name, p_function.registers[reg], engine, klass, false);
+		argument["usage"] = PROPERTY_USAGE_DEFAULT | ((int)argument["usage"] & PROPERTY_USAGE_NIL_IS_VARIANT);
+		arguments.push_back(argument);
+	}
+	// What a default is, is worked out when the method runs: Godot is told how many there are.
+	Array defaults;
+	for (uint32_t i = p_function.required; i < fixed; i++) {
+		defaults.push_back(Variant());
+	}
+	Dictionary returned = p_function.result == ir::Kind::Void ? describe(p_module, "", ir::Kind::Void, "", ir::NONE, false)
+															   : describe(p_module, "", p_function.result, "", ir::NONE, false);
+	if (p_function.result == ir::Kind::Void) {
+		returned["type"] = Variant::NIL;
+		returned["usage"] = PROPERTY_USAGE_DEFAULT;
+	} else {
+		returned["usage"] = PROPERTY_USAGE_DEFAULT | ((int)returned["usage"] & PROPERTY_USAGE_NIL_IS_VARIANT);
+	}
+	Dictionary method;
+	method["name"] = String::utf8(p_name.data(), (int64_t)p_name.size());
+	method["args"] = arguments;
+	method["default_args"] = defaults;
+	method["return"] = returned;
+	method["flags"] = p_function.rest ? METHOD_FLAG_NORMAL | METHOD_FLAG_VARARG : METHOD_FLAG_NORMAL;
+	method["id"] = 0;
+	return method;
+}
+
+// One of Godot's values made from numbers, as `new` makes it: a whole number goes as an integer.
+bool made_value(const ir::Constant &p_first, Variant *r_value) {
+	const int type = value_type(p_first.text);
+	if (type <= 0) {
+		return false;
+	}
+	std::vector<Variant> parts;
+	for (double part : p_first.parts) {
+		parts.push_back(std::trunc(part) == part && std::fabs(part) < 9007199254740992.0 ? Variant((int64_t)part) : Variant(part));
+	}
+	std::vector<GDExtensionConstVariantPtr> pointers;
+	for (const Variant &part : parts) {
+		pointers.push_back(part._native_ptr());
+	}
+	GDExtensionCallError error;
+	error.error = GDEXTENSION_CALL_OK;
+	Variant made;
+	gdextension_interface::variant_construct((GDExtensionVariantType)type, made._native_ptr(), pointers.data(), (int32_t)pointers.size(), &error);
+	*r_value = made;
+	return error.error == GDEXTENSION_CALL_OK;
+}
+
+} // namespace
+
+Member find_member(uint32_t p_class, const StringName &p_name) {
+	Member found;
+	Project &program = Project::get();
+	if (!program.valid() || p_class >= program.module().classes.size()) {
+		return found;
+	}
+	const ir::Module &module = program.module();
+	const ir::Class &klass = module.classes[p_class];
+	const CharString utf8 = String(p_name).utf8();
+	const std::string_view name = text_of(utf8);
+	for (const auto &[godot, function] : klass.virtuals) {
+		if (godot == name) {
+			return Member{ Member::What::Method, function };
+		}
+	}
+	const uint32_t method = program.interpreter().find_method(p_class, name);
+	if (method != ir::NONE && module.functions[method].is_public) {
+		return Member{ Member::What::Method, method };
+	}
+	for (size_t i = klass.fields.size(); i-- > 0;) {
+		if (klass.fields[i].name == name && klass.fields[i].is_public) {
+			return Member{ Member::What::Field, (uint32_t)i };
+		}
+	}
+	return found;
+}
+
+Variant read_field(const vm::Object *p_object, uint32_t p_field) {
+	const ir::Field &field = Project::get().module().classes[p_object->klass].fields[p_field];
+	const vm::Slot value = const_cast<vm::Object *>(p_object)->fields()[p_field];
+	const vm::Object *held = field.kind == ir::Kind::Obj ? static_cast<const vm::Object *>(value.p)
+			: field.kind == ir::Kind::Any && vm::any::tag(value) == vm::AnyTag::Object ? static_cast<const vm::Object *>(vm::any::pointer(value))
+																						 : nullptr;
+	if (!held && !(field.kind == ir::Kind::Obj && !value.p)) {
+		return to_variant(field.kind, value);
+	}
+	Variant owner;
+	std::string why;
+	if (held && !object_element(held, &owner, &why)) {
+		UtilityFunctions::push_error(String("ActionScript: the field '") + String::utf8(field.name.c_str()) +
+				"' holds a script object of a class that extends none of Godot's, which Godot can't hold. Godot gets null.");
+	}
+	return owner;
+}
+
+bool write_field(vm::Object *p_object, uint32_t p_field, const Variant &p_value) {
+	Project &program = Project::get();
+	const ir::Module &module = program.module();
+	const ir::Field &field = module.classes[p_object->klass].fields[p_field];
+	if (!field.is_public || field.constant || is_signal(module, p_object->klass, field.name)) {
+		return false;
+	}
+	vm::Slot taken;
+	taken.bits = 0;
+	if (field.kind == ir::Kind::Obj) {
+		// Only an Array comes from Godot, copied: a script object can't.
+		if (field.klass >= module.classes.size() || !module.classes[field.klass].array ||
+				(p_value.get_type() != Variant::ARRAY && p_value.get_type() != Variant::NIL)) {
+			return false;
+		}
+		if (p_value.get_type() == Variant::ARRAY) {
+			Variant held = p_value;
+			taken.p = program.interpreter().copy_engine_array(&held, field.klass);
+			if (!taken.p) {
+				return false; // The error has been reported.
+			}
+		}
+	} else {
+		if (!arrives(field.kind, field.engine_type, p_value)) {
+			return false;
+		}
+		const std::optional<vm::Slot> made = from_variant(field.kind, p_value);
+		if (!made) {
+			UtilityFunctions::push_error(String("Error: ") + String::utf8(vm::OUT_OF_MEMORY.data(), (int64_t)vm::OUT_OF_MEMORY.size()));
+			return false;
+		}
+		taken = *made;
+	}
+	program.interpreter().set_field(p_object, p_field, taken);
+	return true;
+}
+
+TypedArray<Dictionary> property_list(uint32_t p_class) {
+	TypedArray<Dictionary> list;
+	Project &program = Project::get();
+	if (!program.valid() || p_class >= program.module().classes.size()) {
+		return list;
+	}
+	const ir::Module &module = program.module();
+	const ir::Class &klass = module.classes[p_class];
+	for (size_t i = 0; i < klass.fields.size(); i++) {
+		const ir::Field &field = klass.fields[i];
+		const StringName name(String::utf8(field.name.c_str()));
+		// One entry for each name Godot can reach: the field find_member() would give.
+		const Member member = find_member(p_class, name);
+		if (member.what == Member::What::Field && member.index == i && !is_signal(module, p_class, field.name)) {
+			list.push_back(describe(module, field.name, field.kind, field.engine_type, field.klass, field.exported));
+		}
+	}
+	return list;
+}
+
+TypedArray<Dictionary> method_list(uint32_t p_class) {
+	TypedArray<Dictionary> list;
+	Project &program = Project::get();
+	if (!program.valid() || p_class >= program.module().classes.size()) {
+		return list;
+	}
+	const ir::Module &module = program.module();
+	const ir::Class &klass = module.classes[p_class];
+	std::unordered_set<uint32_t> virtuals;
+	for (const auto &[godot, function] : klass.virtuals) {
+		virtuals.insert(function);
+		list.push_back(method_info(module, module.functions[function], godot));
+	}
+	std::unordered_set<std::string_view> seen;
+	for (uint32_t function : klass.methods) {
+		const ir::Function &method = module.functions[function];
+		const std::string_view name = own_name(method);
+		if (method.is_public && !virtuals.count(function) && seen.insert(name).second &&
+				program.interpreter().find_method(p_class, name) == function) {
+			list.push_back(method_info(module, method, name));
+		}
+	}
+	return list;
+}
+
+bool field_default(uint32_t p_class, const StringName &p_name, Variant *r_value) {
+	const Member member = find_member(p_class, p_name);
+	if (member.what != Member::What::Field) {
+		return false;
+	}
+	const ir::Field &field = Project::get().module().classes[p_class].fields[member.index];
+	const ir::Constant &first = field.first;
+	if (!field.exported || first.form == ir::Constant::Form::None) {
+		return false;
+	}
+	vm::Slot slot = vm::empty_value(field.kind == ir::Kind::F64, field.starts_null);
+	switch (first.form) {
+		case ir::Constant::Form::Empty:
+			break;
+		case ir::Constant::Form::Value:
+			return made_value(first, r_value);
+		case ir::Constant::Form::Number:
+			slot.bits = 0;
+			if (field.kind == ir::Kind::F64) {
+				slot.d = first.number;
+			} else if (field.kind == ir::Kind::I32) {
+				slot.i = vm::to_int32(first.number);
+			} else if (field.kind == ir::Kind::U32) {
+				slot.u = vm::to_uint32(first.number);
+			} else if (field.kind == ir::Kind::I64 && std::isfinite(first.number)) {
+				slot.l = (int64_t)first.number;
+			} else {
+				return false;
+			}
+			break;
+		case ir::Constant::Form::Boolean:
+			*r_value = first.number != 0;
+			return true;
+		case ir::Constant::Form::Text:
+			*r_value = String::utf8(first.text.c_str(), (int64_t)first.text.size());
+			return true;
+		default:
+			*r_value = Variant();
+			return true;
+	}
+	*r_value = to_variant(field.kind, slot);
+	return true;
+}
+
+} // namespace kas3

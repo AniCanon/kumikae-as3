@@ -140,6 +140,10 @@ How it works:
   stored in an `int`, which is what the checker's types say.
 - **The interpreter** (`vm/interpreter.h`) keeps its own stack of frames and never recurses in C++ for an AS3
   call. Runaway recursion is therefore an AS3 error, not a crash, and a debugger can walk the frames.
+- **An endless loop is stopped,** as Flash stops one: a run that lasts longer than 15 seconds ends with
+  `Error #1502: A script has executed for longer than the default timeout period of 15 seconds.`, which no
+  `catch` or `finally` stops. Every loop goes round through a statement's marker, where the clock is
+  looked at once in 4096 statements; `KAS3_TIME_LIMIT_MS` gives `kas3c run` another limit (0 for none).
 - **For a debugger:** every instruction has a source position, every function lists its named locals, and
   each statement begins with a marker where a hook can stop the program.
 - **Static fields** get their values the first time their class is used, a base class before its
@@ -212,13 +216,21 @@ package {
 ```
 
 - A script class extends a Godot class. Godot calls the virtual methods it overrides (`_physicsProcess` is
-  Godot's `_physics_process`), and any other method by its AS3 name, from GDScript too.
+  Godot's `_physics_process`), and any other public method by its AS3 name, from GDScript too.
 - The script reads and writes the node's properties, calls its methods, and makes Godot values with `new`.
-- Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript can read a
-  script's fields, and reads its getters and writes its setters as properties (`node.health += 1`). A call from GDScript with too few arguments, the wrong kind of argument, or a number that
-  does not fit an `int` is refused, never bent to fit.
-- A script class may extend another script class, and may be attached to a reference-counted object
-  without keeping it alive.
+- Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript reads and
+  writes a script's public fields (`node.speed = 2`) and reads its public getters and writes its setters as
+  properties (`node.health += 1`), a field converted as a store into the field converts: an
+  `Array` field takes a copy of Godot's Array. A `const`, a signal or a script object is not written from
+  Godot. A call from GDScript with too few arguments, the wrong kind of argument, or a number that does not
+  fit an `int` is refused, never bent to fit; so is a value that does not fit a field.
+- Only public members are reached from Godot. A private, protected or internal field or method is not
+  there for GDScript, `get`, `set`, `call` or `has_method`: Godot's code is neither a subclass nor in the
+  package. Godot's lists of a script's properties and methods give the public ones, with Godot's types.
+- A script class may extend another script class. One that extends a reference-counted class (`RefCounted`,
+  a `Resource`) may be attached from GDScript or made with `new` in AS3: the object lives while AS3 or
+  Godot holds it, and goes when neither does. Neither keeps the other alive in a loop, and a listener it
+  adds does not keep it, as a Godot callable does not keep its object.
 - A Godot object can be compared with `null`. Calling a method on one that Godot has freed is an AS3 error.
 - Operators on Godot's values are Godot's own: `position + velocity * delta`, `-v`, `v == w`, `v += w`. Two
   Godot objects are equal when they are the same object.
@@ -228,6 +240,15 @@ package {
 - An argument left out takes Godot's default. So does a `null` written last for a parameter declared
   `= null`.
 - A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
+- `[Export] public var speed:Number = 5;` shows the field in Godot's inspector, and a value a scene saved
+  is given to the script after its constructor has run. The field is a public instance field of a type
+  Godot can store (a number, `Boolean`, `String`, `Array`, one of Godot's values, a `Resource`, or a `Node`
+  in a node's script), and its first value is a constant Godot is told of: a number, a string, a Boolean,
+  `null`, nothing, or one of Godot's values made from numbers (`new Vector2(1, 2)`). A scene saves only
+  what differs from it. The checker says which rule a field breaks.
+- In the editor no script object is made and no method runs: an object Godot edits holds a stand-in with
+  the exported fields, starting at their first values, as GDScript's does for a script that is not a tool.
+  A script saved while the editor is open is compiled again, and the stand-ins get its exported fields.
 - Signals are listened to the AS3 way: `timer.timeout.add(onTimeout)`, `add(f, true)` for the end of the
   frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`. Adding a listener twice does
   nothing. `removeAll` and `numListeners` are about the listeners scripts added, not the engine's own. A
@@ -257,9 +278,13 @@ package {
   never taken as if it fitted.
 - An AS3 error inside a call from the engine is reported as Godot reports a script's own error, with the
   `.as` file and line as its source and the AS3 stack trace, and the engine carries on.
+- A call from the engine that runs longer than 15 seconds, with what it calls, is stopped with Flash's
+  `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
+  gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.
 
-**Refused by name until the next slices:** elements of Godot's untyped collections, creating
-Godot objects with `new`, passing a script object to Godot, and everything `kas3c run` refuses.
+**Refused by name until the next slices:** elements of Godot's untyped collections, passing Godot a
+script object of a class that extends none of Godot's, `as` from one of Godot's objects to a script class,
+and everything `kas3c run` refuses.
 
 How it works:
 
@@ -275,9 +300,21 @@ How it works:
 - **Calls can nest.** The engine calls a script, which calls the engine, which may call a script again,
   up to 64 levels deep.
 
-Known fault: the first time Godot's editor scans a project that has the extension (for example
-`godot --headless --import`), Godot crashes as it exits, after the scan has done its work. Later runs are
-clean. The speed spike's extension does the same; the cause is not yet known.
+Known fault, Godot's: the first time Godot's editor scans a project that has the extension and is told to
+quit at once (`godot --headless --import`, or `--editor --quit`), Godot crashes as it exits, after the scan
+has done its work. The cause, read from Godot's source and borne out by experiments (Godot's binary has
+no symbols to show it in a trace): loading an extension with a class makes the editor document it on a thread, which
+queues a call (`EditorHelp::_gen_extensions_docs`); quitting in the same frame frees the documentation,
+and the call then runs on nothing in Godot's last flush. Any extension that registers a class does the
+same. Give the thread time (`--headless --editor --quit-after 300`), as `tests/run_godot.py` does; later
+runs are clean.
+
+godot-cpp is built as `template_release`, and Godot's editor loads that library too. That is enough for
+the editor: godot-cpp compiles nothing differently for it (its `editor` target only adds `DEBUG_ENABLED`,
+as `template_debug` does: argument checks for methods an extension binds, which this one does not, and
+godot-cpp's own bounds checks). The editor's features run on it, and the tests run them in the editor:
+the inspector's stand-ins and a script edited while the editor is open (`exported_editor.gd`,
+`exported_reload.gd`).
 
 ## Editing a script while the game runs
 

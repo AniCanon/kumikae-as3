@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Exported.as" id="1_exported"]
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_1"]
+size = Vector2(4, 8)
+
+[node name="Exported" type="Node2D" node_paths=PackedStringArray("target")]
+script = ExtResource("1_exported")
+speed = 12.5
+spot = Vector2(3, 4)
+items = [1, 2, 3]
+texture = SubResource("PlaceholderTexture2D_1")
+target = NodePath("Child")
+
+[node name="Child" type="Node" parent="."]

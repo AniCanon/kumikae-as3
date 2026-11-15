@@ -1,9 +1,12 @@
 #include "script.h"
 
 #include "language.h"
+#include "members.h"
 #include "program.h"
 
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -43,6 +46,42 @@ void AS3Script::set_file(const String &p_resource_path) {
 		UtilityFunctions::push_error(String("ActionScript: ") + p_resource_path +
 				": its class does not extend a Godot class, so it can't be attached to anything.");
 		class_ = kas3::ir::NONE;
+	}
+	_update_exports();
+}
+
+bool AS3Script::_can_instantiate() const {
+	return class_ != kas3::ir::NONE && !Engine::get_singleton()->is_editor_hint();
+}
+
+void *AS3Script::_placeholder_instance_create(Object *p_for_object) const {
+	void *placeholder = gdextension_interface::placeholder_script_instance_create(AS3Language::singleton->_owner, _owner, p_for_object->_owner);
+	placeholders_.insert(placeholder);
+	const_cast<AS3Script *>(this)->_update_exports();
+	return placeholder;
+}
+
+// The stand-ins are told of the exported fields and their first values. While the scripts have errors there
+// is no class to tell of: the stand-ins keep what they hold.
+void AS3Script::_update_exports() {
+	if (class_ == kas3::ir::NONE) {
+		return;
+	}
+	Array exported;
+	Dictionary values;
+	const TypedArray<Dictionary> properties = kas3::property_list(class_);
+	for (int64_t i = 0; i < properties.size(); i++) {
+		const Dictionary property = properties[i];
+		if ((int)property["usage"] & PROPERTY_USAGE_EDITOR) {
+			exported.push_back(property);
+			Variant first;
+			if (kas3::field_default(class_, property["name"], &first)) {
+				values[property["name"]] = first;
+			}
+		}
+	}
+	for (void *placeholder : placeholders_) {
+		gdextension_interface::placeholder_script_instance_update(placeholder, &exported, &values);
 	}
 }
 
@@ -128,18 +167,27 @@ ScriptLanguage *AS3Script::_get_language() const {
 }
 
 uint32_t script_method(uint32_t p_class, const StringName &p_name) {
-	Project &program = Project::get();
-	if (!program.valid() || p_class >= program.module().classes.size()) {
-		return kas3::ir::NONE;
-	}
-	CharString utf8 = String(p_name).utf8();
-	std::string_view name(utf8.get_data(), (size_t)utf8.length());
-	for (const auto &entry : program.module().classes[p_class].virtuals) {
-		if (entry.first == name) {
-			return entry.second;
-		}
-	}
-	return program.interpreter().find_method(p_class, name);
+	const kas3::Member member = kas3::find_member(p_class, p_name);
+	return member.what == kas3::Member::What::Method ? member.index : kas3::ir::NONE;
+}
+
+TypedArray<Dictionary> AS3Script::_get_script_method_list() const {
+	return kas3::method_list(class_);
+}
+
+TypedArray<Dictionary> AS3Script::_get_script_property_list() const {
+	return kas3::property_list(class_);
+}
+
+bool AS3Script::_has_property_default_value(const StringName &p_property) const {
+	Variant value;
+	return kas3::field_default(class_, p_property, &value);
+}
+
+Variant AS3Script::_get_property_default_value(const StringName &p_property) const {
+	Variant value;
+	kas3::field_default(class_, p_property, &value);
+	return value;
 }
 
 PackedStringArray AS3ScriptLoader::_get_recognized_extensions() const {

@@ -36,6 +36,7 @@ public:
 	[[nodiscard]] bool present(void *p_value) override { return p_value != nullptr; }
 	[[nodiscard]] bool is_class(void *, std::string_view) override { return false; }
 	[[nodiscard]] Str *text(void *) override { return nullptr; }
+	[[nodiscard]] bool keep(Object *) override { return false; }
 	[[nodiscard]] bool operate(std::string_view, const Argument *, size_t, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 	[[nodiscard]] bool index_get(void *, const Argument &, const Wanted &, Slot *, std::string *r_error) override { return refuse(r_error); }
 	[[nodiscard]] bool index_set(void *, const Argument &, const Argument &, std::string *r_error) override { return refuse(r_error); }

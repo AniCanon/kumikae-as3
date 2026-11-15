@@ -117,6 +117,9 @@ void Interpreter::drop_object(Object *p_object) {
 		Object *object = dying_.back();
 		dying_.pop_back();
 		const ir::Class &klass = module_.classes[object->klass];
+		if (klass.counted && host_.handles.keep(object)) {
+			continue; // The engine still holds its Godot object, and keeps it.
+		}
 		std::vector<Entry> taken = take_entries(klass, object);
 		each_held(klass, object, [this](Kind p_kind, Slot &p_slot) { let_go(p_kind, p_slot); });
 		for (Entry &entry : taken) {
@@ -236,6 +239,10 @@ bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_v
 		}
 	}
 	return false;
+}
+
+void Interpreter::set_field(Object *p_object, uint32_t p_field, Slot p_owned) {
+	put(module_.classes[p_object->klass].fields[p_field].kind, p_object->fields()[p_field], p_owned);
 }
 
 Object *Interpreter::construct(uint32_t p_class, void *p_owner) {

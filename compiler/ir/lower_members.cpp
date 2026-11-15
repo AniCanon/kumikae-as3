@@ -18,6 +18,7 @@ void Members::declare_accessor(uint32_t p_class, FunctionDecl *p_function) {
 	const bool is_static = (p_function->modifiers.bits & Modifiers::Static) != 0;
 	const uint32_t made = l_.add_function(p_class, l_.module_.classes[p_class].name + "/" + member_key(p_function), p_function->name_offset, is_static);
 	l_.functions_[p_function] = made;
+	l_.module_.functions[made].is_public = (p_function->modifiers.bits & Modifiers::Public) != 0; // Godot reaches it.
 	if (!is_static) {
 		l_.give_method_slot(p_class, p_function, made);
 	}

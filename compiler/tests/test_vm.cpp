@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <map>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -61,6 +62,69 @@ static bool on_statement(vm::Interpreter &p_interpreter, void *p_data) {
 		steps->seen += "(from " + std::to_string(p_interpreter.line_at(top - 1)) + ") ";
 	}
 	return ++steps->count < steps->limit;
+}
+
+// A run that goes on too long is stopped with Flash's Error #1502, which no catch stops; the limit is for
+// each call from outside, with what it calls.
+static void test_time_limit() {
+	Compilation compilation;
+	compilation.add("Spin.as", "package { public class Spin {\n"
+							   "  public var n:int;\n"
+							   "  public function forever():void { while (true) {} }\n"
+							   "  public function loops():void { for (var i:int = 0; ; i++) { n = i; } }\n"
+							   "  public function down():void { do { n++; } while (true); }\n"
+							   "  public function counting():void { for (var i:int = 0; ; i++) {} }\n"
+							   "  public function empty():void { for (var j:int = 0; j >= 0; ) ; }\n"
+							   "  public function skipping():void { while (true) { if (n > 0) continue; n++; } }\n"
+							   "  public function caught():String { while (true) { try { for (;;) {} } catch (e:*) { n++; } finally { n++; } } return \"out\"; }\n"
+							   "  public function quick():int { var s:int = 0; for (var i:int = 0; i < 1000; i++) { s += i; } return s; }\n"
+							   "} }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	uint32_t spin = 0;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		spin = module.classes[i].name == "Spin" ? (uint32_t)i : spin;
+	}
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		interpreter.set_time_limit(50);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(spin);
+		for (const char *method : { "forever", "loops", "down", "counting", "empty", "skipping", "caught" }) {
+			host.errors.clear();
+			const auto started = std::chrono::steady_clock::now();
+			vm::Slot result;
+			result.bits = 0;
+			CHECK(!interpreter.call_method(object, method, nullptr, 0, &result));
+			const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+			CHECK(took >= 50 && took < 5000);
+			CHECK_EQ(host.errors.substr(0, host.errors.find('\n')),
+					std::string("Error: Error #1502: A script has executed for longer than the timeout period of 0.05 seconds."));
+			CHECK(host.errors.find(std::string("at Spin/") + method + "()") != std::string::npos);
+		}
+		// The next call has its own time, and a short one is not stopped.
+		host.errors.clear();
+		vm::Slot sum;
+		sum.bits = 0;
+		CHECK(interpreter.call_method(object, "quick", nullptr, 0, &sum));
+		CHECK_EQ(sum.i, 499500);
+		CHECK_EQ(host.errors, std::string());
+		interpreter.release_object(object);
+	}
+	// Flash's own words for its own limit, 15 seconds.
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK_EQ(interpreter.time_limit(), (uint32_t)0);
+		CHECK_EQ(vm::Interpreter::FLASH_TIME_LIMIT, (uint32_t)15000);
+		CHECK_EQ(vm::timeout_message(vm::Interpreter::FLASH_TIME_LIMIT),
+				std::string("Error #1502: A script has executed for longer than the default timeout period of 15 seconds."));
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
 static void test_statement_hook() {
@@ -585,12 +649,79 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		}
 		return survivors;
 	}
+	// What keep() answers, and what it does first: free another object the engine kept, as Godot freeing one
+	// object can free another.
+	bool keeps = false;
+	vm::Interpreter *interpreter = nullptr;
+	vm::Object *free_first = nullptr;
+	[[nodiscard]] bool keep(vm::Object *p_object) override {
+		log += "keep " + (module ? module->classes[p_object->klass].name : std::string("?")) + "\n";
+		if (free_first && interpreter) {
+			vm::Object *other = free_first;
+			free_first = nullptr;
+			interpreter->free_kept(other);
+		}
+		return keeps;
+	}
 };
 
 // A host that only prints implements Output alone, and a program that asks for the engine is told
 // there is none.
 static_assert(!std::is_base_of<vm::EngineHandles, vm::StandaloneOutput>::value, "the stand-alone host answers no engine entry");
 static_assert(!std::is_base_of<vm::EngineSource, Recorder>::value, "nor does the tests' recorder");
+
+// A script object whose Godot object is reference-counted is kept when the program lets go of it, if the
+// engine says it still holds the object, and freed with what it holds when the engine lets go too.
+static void test_kept_by_the_engine() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Counted.as", "package { import godot.*; public class Counted extends RefCounted { public var text:String = \"kept\"; } }");
+	compilation.add("Plain.as", "package { import godot.*; public class Plain extends Node { public var text:String = \"plain\"; } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	uint32_t counted = 0, plain = 0;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		counted = module.classes[i].name == "Counted" ? (uint32_t)i : counted;
+		plain = module.classes[i].name == "Plain" ? (uint32_t)i : plain;
+	}
+	CHECK(module.classes[counted].counted);
+	CHECK(!module.classes[plain].counted);
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		engine.interpreter = &interpreter;
+		CHECK(interpreter.start());
+		const size_t before = vm::live_objects();
+		// Kept: the object and its field stay until the engine lets go.
+		engine.keeps = true;
+		vm::Object *object = interpreter.construct(counted, engine.box());
+		vm::Object *second = interpreter.construct(counted, engine.box());
+		interpreter.release_object(object);
+		interpreter.release_object(second);
+		CHECK_EQ(engine.log, std::string("keep Counted\nkeep Counted\n"));
+		CHECK_EQ(vm::live_objects(), before + 2);
+		CHECK_EQ(std::string(static_cast<vm::Str *>(object->fields()[1].p)->view()), std::string("kept"));
+		// The engine lets go of the first; the engine's freeing it frees the second on the way.
+		engine.keeps = false;
+		engine.free_first = second;
+		engine.log.clear();
+		interpreter.free_kept(object);
+		CHECK_EQ(engine.log, std::string("keep Counted\nkeep Counted\n"));
+		CHECK_EQ(vm::live_objects(), before);
+		// Not kept: freed at once. Another class is never asked.
+		engine.log.clear();
+		interpreter.release_object(interpreter.construct(counted, engine.box()));
+		interpreter.release_object(interpreter.construct(plain, engine.box()));
+		CHECK_EQ(engine.log, std::string("keep Counted\n"));
+		CHECK_EQ(vm::live_objects(), before);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
 
 static void test_no_engine() {
 	const char *source = "package { import godot.*; public class Maker extends Node {\n"
@@ -2208,10 +2339,12 @@ int main() {
 	test_loop_markers();
 	test_engine_calls();
 	test_engine_operators();
+	test_kept_by_the_engine();
 	test_no_engine();
 	test_engine_listeners();
 	test_engine_statics();
 	test_entry_points();
+	test_time_limit();
 	test_statement_hook();
 	test_refused_program();
 	test_host_clock();

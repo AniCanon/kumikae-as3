@@ -153,6 +153,16 @@ static uint64_t scripts_signature() {
 	return mixed;
 }
 
+// Flash stops a script that runs too long, after 15 seconds; so does this, after the project's setting
+// `actionscript/limits/script_timeout_seconds` (0 for no limit).
+static std::unique_ptr<vm::Interpreter> new_interpreter(const ir::Module &p_module, GodotHost &p_host) {
+	auto made = std::make_unique<vm::Interpreter>(p_module, p_host);
+	const double seconds = ProjectSettings::get_singleton()->get_setting("actionscript/limits/script_timeout_seconds",
+			vm::Interpreter::FLASH_TIME_LIMIT / 1000.0);
+	made->set_time_limit(seconds > 0 ? (uint32_t)std::min(seconds * 1000.0, 4.0e9) : 0);
+	return made;
+}
+
 // What the running scripts were compiled from, and what was found at the last look.
 static uint64_t watch_loaded = 0;
 static uint64_t watch_seen = 0;
@@ -174,7 +184,7 @@ Project &Project::get() {
 				String::utf8(errors.c_str()));
 		return *program;
 	}
-	program->interpreter_ = std::make_unique<vm::Interpreter>(*program->module_, program->host_);
+	program->interpreter_ = new_interpreter(*program->module_, program->host_);
 	program->valid_ = program->interpreter_->start();
 	static bool watching = false;
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
@@ -257,7 +267,7 @@ void Project::reload() {
 	// objects that are alive: for an edit there to show, the scene is made again from its file.
 	const std::vector<std::string> run_once = ir::run_once_changes(*program->module_, *module);
 	bool restart = false;
-	auto fresh = std::make_unique<vm::Interpreter>(*module, program->host_);
+	auto fresh = new_interpreter(*module, program->host_);
 	{
 		vm::Reload moving(*program->interpreter_, *fresh);
 		if (!instances_can_move(moving) || !listeners_can_move(moving)) {

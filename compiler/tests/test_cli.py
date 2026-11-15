@@ -228,6 +228,19 @@ with tempfile.TemporaryDirectory() as warned:
     result = run("run", rounded)
     check("a program with a warning runs", result.returncode == 0 and result.stdout == "9007199254740992\n", repr(result.stdout[:200]))
 
+# An endless loop is stopped after Flash's time, or the one KAS3_TIME_LIMIT_MS gives, with Flash's error.
+with tempfile.TemporaryDirectory() as looping:
+    spin = os.path.join(looping, "Spin.as")
+    with open(spin, "w") as handle:
+        handle.write("package { public class Spin { public function Spin() { try { while (true) {} } catch (e:*) { trace(\"caught\"); } } } }\n")
+    started = time.monotonic()
+    result = subprocess.run([KAS3C, "run", spin], capture_output=True, text=True, timeout=60,
+                            env=dict(os.environ, KAS3_TIME_LIMIT_MS="200"))
+    took = time.monotonic() - started
+    check("an endless loop is stopped", result.returncode == 1 and result.stdout == "" and 0.2 <= took < 20 and
+          result.stderr.startswith("Error: Error #1502: A script has executed for longer than the timeout period of 0.2 seconds.\n\tat Spin()"),
+          repr((result.returncode, result.stdout, result.stderr[:300], took)))
+
 # A finally is written once, however many ways lead out of its try.
 once = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "finally_once.as")
 result = run("ir", once)

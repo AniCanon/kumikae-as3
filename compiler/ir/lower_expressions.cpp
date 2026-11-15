@@ -364,11 +364,6 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 		refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
 		return default_value(Kind::Obj, position);
 	}
-	if (!module_.classes[index].native_base.empty() && extends_counted(symbol)) {
-		// Who keeps a counted Godot object alive when a script made it is not settled yet.
-		refuse(made->callee->offset, "creating with 'new' a script class that extends a reference-counted Godot class");
-		return default_value(Kind::Obj, position);
-	}
 	touch(symbol, position);
 	uint32_t out = reg(Kind::Obj);
 	emit(Op::New, position, out, index);

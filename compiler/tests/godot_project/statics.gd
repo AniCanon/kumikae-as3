@@ -107,5 +107,9 @@ func _physics_process(_delta: float) -> bool:
 	show("static read early", ask("earlyStaticField"), Vector2())
 	# Worker threads.
 	show("race", ask("race"), 200000)
+	var seen := []
+	var task := WorkerThreadPool.add_task(func(): node.set("shared", 5); seen.append(node.get("shared")))
+	WorkerThreadPool.wait_for_task_completion(task)
+	show("a field from another thread is refused", [seen, node.get("shared")], [[null], 1])
 	node.free()
 	return false

@@ -8,6 +8,8 @@ called by the engine.
 | `register.cpp`, `language.h` | Entry point; the script language Godot sees |
 | `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
+| `counted` | A script object whose Godot object is reference-counted: each lives while AS3 or Godot holds it |
+| `members` | What Godot reaches of a script by name: public fields to read and write, public methods, and the lists of both with Godot's types |
 | `godot_host` | The interpreter's four interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_source.cpp` | Where values come from (`EngineSource`): defaults, constants, constructors, singletons, static methods; and the time (`Clock`: Godot's clock, the C library's zone) |
 | `godot_calls.h` | What the two host files share: the arguments of a call, a failed call in AS3's words |
@@ -32,6 +34,9 @@ called by the engine.
 - **Every behaviour is compared with GDScript's** in `tests/godot_project/`: the driver prints what the AS3
   script gave beside what GDScript gives, and `tests/run_godot.py` checks they agree.
 - An Array or a Dictionary handed to Godot may be written by it: never hand the same one to two calls.
+- Godot reaches a script's members by name only through `members.h` (`find_member`), so that get, set,
+  calls and the lists agree. Every place that runs AS3 on a script object for Godot calls
+  `hold_if_referenced` after it (`instance.h`): that is how a reference-counted object learns AS3 holds it.
 
 Build and test: `cmake --build compiler/build-godot -j8 && python3 compiler/tests/run_godot.py compiler/tests`
 (needs `godot` 4.7 on the `PATH`). iOS: `tests/build_ios.sh`.

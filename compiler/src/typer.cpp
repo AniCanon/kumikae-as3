@@ -188,6 +188,7 @@ void Typer::definition(Node *p_node) {
 					static_ = (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static) != 0;
 					declarators(static_cast<VarDecl *>(member));
 					signal_field(static_cast<VarDecl *>(member));
+					export_field(static_cast<VarDecl *>(member));
 				} else if (member->kind == NodeKind::FunctionDecl) {
 					static_ = (static_cast<FunctionDecl *>(member)->modifiers.bits & Modifiers::Static) != 0;
 					function(static_cast<FunctionDecl *>(member));

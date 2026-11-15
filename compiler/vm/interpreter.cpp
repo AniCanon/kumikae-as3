@@ -369,6 +369,7 @@ bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size
 		return false;
 	}
 	const size_t depth = frames_.size();
+	entering();
 	entries_++;
 	const bool ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
 	entries_--;
@@ -394,6 +395,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	if (entries_ >= MAX_ENTRIES) {
 		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
 	} else {
+		entering();
 		entries_++;
 		ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
 		entries_--;
