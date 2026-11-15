@@ -1,1 +1,0 @@
-vector_untyped.as:1:82: error: the type 'Vector.<*>' is not supported by the interpreter yet

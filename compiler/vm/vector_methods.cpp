@@ -98,6 +98,10 @@ Slot of_number(uint32_t p_value) {
 // Whether an element is the value looked for. One of Godot's values or objects is the same as Godot says:
 // the same object, or an equal value. Null is only null.
 bool Interpreter::element_is(Kind p_kind, Slot p_element, Slot p_value) {
+	if (p_kind == Kind::Any) {
+		bool equal = false;
+		return any_equal(p_element, p_value, true, &equal) && equal;
+	}
 	if (!is_engine(p_kind)) {
 		return same_element(p_kind, p_element, p_value);
 	}
@@ -222,8 +226,8 @@ void Interpreter::vector_take(Vector *p_vector, const VectorCall &p_call) {
 		}
 	}
 	// From an empty vector: undefined, made the element type, as AVM2 does: NaN for a Number, 0 for the
-	// other numbers, false, and null for the rest.
-	Slot element = empty_value(kind == Kind::F64, kind == Kind::Any);
+	// other numbers, false, null for the rest, and undefined itself for untyped elements.
+	Slot element = empty_value(kind == Kind::F64, false);
 	if (length != 0) {
 		element = p_vector->data[at];
 		shift_slots(p_vector, static_cast<uint32_t>(at) + 1, length - static_cast<uint32_t>(at) - 1, -1);

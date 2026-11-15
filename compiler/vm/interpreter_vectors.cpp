@@ -168,6 +168,23 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 			case Kind::Str:
 				append_text(r_text, element.p ? static_cast<Str *>(element.p)->view() : std::string_view("null"));
 				break;
+			case Kind::Any: {
+				// Null and undefined are left out, as join() leaves them (ECMAScript, and avmplus's generic
+				// join that Vector shares). Held while it speaks, for the reason below.
+				const AnyTag tag = any::tag(element);
+				if (tag == AnyTag::Null || tag == AnyTag::Undefined) {
+					break;
+				}
+				const Slot held = share(Kind::Any, element);
+				std::string said;
+				const bool done = any_text(held, &said);
+				drop_any(held);
+				if (!done) {
+					return false;
+				}
+				append_text(r_text, said);
+				break;
+			}
 			case Kind::Obj: {
 				// Held while it speaks: what it says may run the program, which may take it out of
 				// this vector, and then nothing else would be holding it.
