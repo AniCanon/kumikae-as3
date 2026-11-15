@@ -42,7 +42,7 @@ extension AppleSimulator {
     }
     xpc_connection_activate(connection)
     hid = connection
-    try await inputBarrier()
+    try await InputReadiness.check { try await self.inputBarrier() }
   }
 
   // A reply establishes daemon liveness and ordered transport progress, not application handling.
