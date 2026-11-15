@@ -223,6 +223,11 @@ ignored JetBrains build directory; compiler logs are `recovery-*.log` in their b
 The original server benchmarks and ten-minute
 retention measurements were not repeated for these correctness fixes.
 
+Agy reviewed `b4a443e..ba9f26c` and reported no actionable findings. It confirmed both fixes and their
+documented scope, independently passed the override group (384 checks), parser group in Release and
+ASan/UBSan (503 checks each), and style check, and verified binary matching and probe exclusion. It
+inspected the broader compiler, Gradle and sandbox results from logs rather than rerunning those suites.
+
 ## Timing and retention method
 
 ```sh
