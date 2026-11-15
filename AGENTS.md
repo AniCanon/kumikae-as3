@@ -7,7 +7,8 @@ consoles, with editor support in JetBrains IDEs and VS Code. The plan is [docs/r
 **Fix what you find, now.** The owner's rule (2026-11-15), for every person and every agent: a problem you
 find (in a review, a test, or while reading) is fixed in the same branch, with a test, before the work is
 called done. Nothing is ever added to `docs/backlog.md`, whatever its size. A question only the owner can
-answer is asked, not filed.
+answer is asked, not filed. Nothing waits for "its stage" or a smaller slice: one branch may carry as many
+fixes as it takes (this is an alpha repository).
 
 **Before you change a folder, read its README.** Each one says what the folder is for, what it may depend
 on, where a new thing goes and how it is tested. A change that ignores it will be sent back.

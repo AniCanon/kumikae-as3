@@ -20,8 +20,8 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 130 items; each
-is marked with its stage, and stage 3 does not start while one of them is open.
+**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 130 items;
+none waits for a later stage (the owner, 2026-11-15), and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
 
@@ -219,9 +219,8 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) gives every deferred item a stage:** none left in 2b-3, 22 in 2c, 13 in the
-  language server's second slice, 21 in 2d, 50 in a clean-up pass that closes stage 2, and 8 that wait on
-  the owner.
+- **The [backlog](backlog.md) is being worked off in full, now:** 130 items, of which 11 wait on the
+  owner's answer.
 - **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
   waits for the cycle collector (2d).
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs

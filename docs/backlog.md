@@ -14,23 +14,11 @@ The [roadmap](roadmap.md) says what is being built now. This page says what is o
 - When an item is fixed, its line is removed and the commit says so.
 - An item marked **decision** needs the owner's answer, not code.
 
-## When each item is fixed
+## How it is worked off
 
-Every item ends with the stage that fixes it. The rule: an item is fixed by the stage that already works
-on the same code, so that nothing is opened twice. What no stage touches is fixed in one clean-up pass that
-closes stage 2. Stage 3 does not start while an item of stages 1 and 2 is open, unless the owner rules that
-it stands.
-
-| Mark | Stage | Items | What it takes on |
-|---|---|---|---|
-| **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 29 | Closures as listeners, `object[name]` in general, collections, strings |
-| **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
-| **2d** | Editor features | 25 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
-| **clean-up** | A pass that closes stage 2 | 51 | What is left |
-| **decision** | The owner | 11 | See each item |
-
-A stage's plan lists its backlog items as tasks, and its "done when" includes them.
+All of it now, on one branch, whatever the size of the item: nothing waits for a later stage (the owner,
+2026-11-15). The mark after each item says only what part of the work it belongs to. **decision** items
+need the owner's answer, not code.
 
 ## Decided by the owner, to build
 
