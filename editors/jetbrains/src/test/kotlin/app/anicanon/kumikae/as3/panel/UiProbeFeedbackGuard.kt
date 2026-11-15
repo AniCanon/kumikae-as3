@@ -8,7 +8,7 @@ import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.Timer
 
-/** Cancels only the unsolicited evaluation survey in this test JVM, without changing IDE settings. */
+/** Cancels only unsolicited feedback and onboarding dialogs in this test JVM, without changing IDE settings. */
 internal object UiProbeFeedbackGuard {
     fun run(destination: Path, work: () -> Unit) {
         val failure = AtomicReference<Throwable>()
@@ -16,11 +16,11 @@ internal object UiProbeFeedbackGuard {
             runCatching {
                 Window.getWindows().filter { it.isShowing }.forEach { window ->
                     val dialog = DialogWrapper.findInstance(window)
-                    if (dialog != null && dialog.javaClass.name == SURVEY_CLASS) {
+                    if (dialog != null && dialog.javaClass.name in DISMISSIBLE_DIALOGS) {
                         dialog.close(DialogWrapper.CANCEL_EXIT_CODE)
                         Files.writeString(
-                            destination.resolve("feedback-survey.txt"),
-                            "Evaluation feedback survey cancelled by sandbox probe\n",
+                            destination.resolve("dismissed-dialogs.txt"),
+                            "${dialog.javaClass.name} cancelled by sandbox probe\n",
                         )
                     }
                 }
@@ -35,6 +35,8 @@ internal object UiProbeFeedbackGuard {
         failure.get()?.let { throw it }
     }
 
-    private const val SURVEY_CLASS =
-        "com.jetbrains.rider.plugins.appender.feedback.general.evaluation.LongEvaluationFeedbackDialog"
+    private val DISMISSIBLE_DIALOGS = setOf(
+        "com.jetbrains.rider.plugins.appender.feedback.general.evaluation.LongEvaluationFeedbackDialog",
+        "com.intellij.platform.ide.newUiOnboarding.newUi.NewUiOnboardingDialog",
+    )
 }

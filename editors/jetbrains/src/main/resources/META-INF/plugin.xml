@@ -5,9 +5,9 @@
     <description>ActionScript 3 for Godot: colours, errors as you type, go to definition, find usages and hover from kas3c, and an iOS Simulator panel. AS3 breakpoints are planned.</description>
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.textmate</depends>
-    <depends>com.intellij.modules.lsp</depends>
+    <depends optional="true" config-file="as3-rider.xml">com.intellij.modules.rider</depends>
+    <depends optional="true" config-file="as3-idea.xml">com.intellij.modules.idea</depends>
     <extensions defaultExtensionNs="com.intellij">
-        <platform.lsp.integrationProvider implementation="app.anicanon.kumikae.as3.language.As3LspSupportProvider"/>
         <textmate.bundleProvider implementation="app.anicanon.kumikae.as3.language.As3Grammar"/>
         <notificationGroup id="Kumikae AS3" displayType="BALLOON"/>
         <configurationType implementation="app.anicanon.kumikae.as3.run.SimulatorConfigurationType"/>
@@ -18,7 +18,6 @@
                   fieldName="INSTANCE" language="KumikaeAS3" extensions="as"/>
         <lang.parserDefinition language="KumikaeAS3"
                                implementationClass="app.anicanon.kumikae.as3.language.As3ParserDefinition"/>
-        <gotoDeclarationHandler implementation="app.anicanon.kumikae.as3.language.As3GotoDeclaration"/>
         <lang.commenter language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.language.As3Commenter"/>
         <enterHandlerDelegate implementation="app.anicanon.kumikae.as3.language.As3EnterHandler"/>
         <lineIndentProvider implementation="app.anicanon.kumikae.as3.language.As3LineIndentProvider" order="first"/>
@@ -38,6 +37,10 @@
         <toolWindow id="iOS Simulator" anchor="right" icon="/META-INF/brandMark.svg"
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
+    <projectListeners>
+        <listener class="app.anicanon.kumikae.as3.language.As3LspDependencyListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
     <actions>
         <action id="KumikaeAs3.NewClass" class="app.anicanon.kumikae.as3.project.NewAs3FileAction">
             <add-to-group group-id="NewGroup" anchor="first"/>

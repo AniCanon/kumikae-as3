@@ -34,26 +34,13 @@ class As3LspSupportProvider : LspIntegrationProvider {
     }
 }
 
-/**
- * What the server is told at the start. Code in a hover is marked as this plugin's own language: marked
- * `actionscript`, Rider hands it to a JavaScript dialect of its own, which fails on it.
- */
-internal fun serverOptions(): Map<String, String> = mapOf("codeLanguage" to As3Language.id)
-
 private class As3LspClientDescriptor(project: Project, private val compiler: Path) :
     ProjectWideLspClientDescriptor(project, "ActionScript 3") {
     override fun isSupportedFile(file: VirtualFile) = file.extension == EXTENSION
 
     override fun createInitializationOptions(): Any = serverOptions()
 
-    override fun createCommandLine(): GeneralCommandLine {
-        // For looking into a feature that does not work in the editor: with this set to a folder, every
-        // message to and from the server is also written there, as it went over the wire.
-        val trace =
-            System.getenv(TRACE)?.takeIf { it.isNotBlank() } ?: return GeneralCommandLine(compiler.toString(), "lsp")
-        val script = "tee \"\$1/to-server.log\" | \"\$2\" lsp | tee \"\$1/from-server.log\""
-        return GeneralCommandLine("/bin/sh", "-c", script, "sh", trace, compiler.toString())
-    }
+    override fun createCommandLine(): GeneralCommandLine = serverCommandLine(compiler)
 
     /**
      * A definition in Godot's API is in a file the server keeps outside the project, which the IDE has
@@ -72,5 +59,3 @@ private class As3LspClientDescriptor(project: Project, private val compiler: Pat
         return files.refreshAndFindFileByPath(path)
     }
 }
-
-private const val TRACE = "KUMIKAE_AS3_LSP_TRACE"

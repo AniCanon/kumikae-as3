@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Service(Service.Level.PROJECT)
 internal class As3ProjectLanguageService(private val project: Project) : Disposable {
     private val warned = AtomicBoolean()
+    private val warnedClient = AtomicBoolean()
     private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
     private val declarations = DeclarationRefresh(
         schedule = { delay, work -> alarm.addRequest(Runnable(work), delay) },
@@ -40,12 +41,23 @@ internal class As3ProjectLanguageService(private val project: Project) : Disposa
 
     fun refreshDeclarations() = declarations.start()
 
-    fun warnMissingCompiler() {
-        if (project.isDisposed || !warned.compareAndSet(false, true)) return
+    fun warnMissingCompiler() = warnOnce(
+        warned,
+        "The compiler, kas3c, was not found, so there are no errors, navigation or hover for .as files. " +
+            "Build it (cmake --build compiler/build) or put it on the search path.",
+    )
+
+    fun warnMissingClient() = warnOnce(
+        warnedClient,
+        "Install and enable LSP4IJ in Settings → Plugins for ActionScript 3 completion, errors and navigation. " +
+            "Local syntax highlighting and paired typing remain available.",
+    )
+
+    private fun warnOnce(flag: AtomicBoolean, message: String) {
+        if (project.isDisposed || !flag.compareAndSet(false, true)) return
         NotificationGroupManager.getInstance().getNotificationGroup("Kumikae AS3").createNotification(
             "ActionScript 3",
-            "The compiler, kas3c, was not found, so there are no errors, navigation or hover for .as files. " +
-                "Build it (cmake --build compiler/build) or put it on the search path.",
+            message,
             NotificationType.WARNING,
         ).notify(project)
     }

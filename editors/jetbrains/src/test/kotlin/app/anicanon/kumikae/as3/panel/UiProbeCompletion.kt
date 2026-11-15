@@ -1,10 +1,10 @@
 package app.anicanon.kumikae.as3.panel
 
-import app.anicanon.kumikae.as3.language.As3LspSupportProvider
 import com.intellij.codeInsight.CodeInsightSettings
 import com.intellij.codeInsight.completion.CodeCompletionHandlerBase
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.lookup.LookupManager
+import com.intellij.codeInsight.template.TemplateManager
 import com.intellij.ide.ApplicationActivationStateManager
 import com.intellij.ide.DataManager
 import com.intellij.ide.impl.OpenProjectTask
@@ -22,7 +22,6 @@ import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.WindowManager
-import com.intellij.platform.lsp.api.LspClientManager
 import com.intellij.psi.PsiDocumentManager
 import java.awt.event.WindowEvent
 import java.lang.management.ManagementFactory
@@ -35,13 +34,21 @@ import java.util.concurrent.TimeUnit
 object UiProbeCompletion {
     private val projects = mutableListOf<WeakReference<com.intellij.openapi.project.Project>>()
 
-    fun run(destination: Path, plainText: Boolean = false) {
+    fun run(destination: Path, plainText: Boolean = false, missingClient: Boolean = false) {
         projects.clear()
         val endurance = System.getenv("KUMIKAE_COMPLETION_RETENTION_PROBE") == "1"
         val heap = mutableListOf<String>()
         val started = System.nanoTime()
-        repeat(if (endurance) 10 else 3) { cycle ->
-            runProject(destination, cycle, plainText)
+        repeat(
+            if (missingClient) {
+                1
+            } else if (endurance) {
+                10
+            } else {
+                3
+            },
+        ) { cycle ->
+            runProject(destination, cycle, plainText, missingClient)
             if (endurance) {
                 val histogram = UiProbeHeap.collect()
                 Files.writeString(destination.resolve("completion-$cycle.histo"), histogram)
@@ -67,7 +74,7 @@ object UiProbeCompletion {
         projects.clear()
     }
 
-    private fun runProject(destination: Path, cycle: Int, plainText: Boolean) {
+    private fun runProject(destination: Path, cycle: Int, plainText: Boolean, missingClient: Boolean) {
         val folder = Files.createTempDirectory("kas3-completion-probe")
         val source = "package { import godot.*; public class CompletionProbe extends Node2D {\n" +
             "public function run():void { transform.origin.normsuffix; } } }"
@@ -75,7 +82,7 @@ object UiProbeCompletion {
         val trustedPaths = trust.getTrustedPaths().toList()
         try {
             trust.addTrustedPath(folder.toString())
-            checkProject(destination, cycle, folder, source, plainText)
+            checkProject(destination, cycle, folder, source, plainText, missingClient)
         } finally {
             try {
                 trust.setTrustedPaths(trustedPaths)
@@ -85,7 +92,14 @@ object UiProbeCompletion {
         }
     }
 
-    private fun checkProject(destination: Path, cycle: Int, folder: Path, source: String, plainText: Boolean) {
+    private fun checkProject(
+        destination: Path,
+        cycle: Int,
+        folder: Path,
+        source: String,
+        plainText: Boolean,
+        missingClient: Boolean,
+    ) {
         val path = folder.resolve(if (plainText) "Control.txt" else "CompletionProbe.as")
         Files.writeString(path, source)
         val project = checkNotNull(
@@ -109,6 +123,11 @@ object UiProbeCompletion {
                 editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
                 editor.caretModel.moveToOffset(source.indexOf("normsuffix") + 4)
             }
+            if (missingClient) {
+                UiProbeMissingClient.checkNotice(project)
+                observations += "Missing LSP4IJ is reported once with installation guidance"
+                return
+            }
             if (plainText) {
                 await("plain-text indexing") { !DumbService.getInstance(project).isDumb }
                 Thread.sleep(1000)
@@ -116,21 +135,27 @@ object UiProbeCompletion {
                 return
             }
             await("LSP initialization") {
-                LspClientManager.getInstance(project).getClients(As3LspSupportProvider::class.java)
-                    .any { it.initializeResult != null }
+                UiProbeLsp.ready(project)
             }
             await("indexing") { !DumbService.getInstance(project).isDumb }
             edt {
+                // First-run What's New can select a non-text tab while the project initializes.
+                FileEditorManager.getInstance(project).openFile(file, true)
                 editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
                 editor.caretModel.moveToOffset(source.indexOf("normsuffix") + 4)
             }
             val times = mutableListOf<Double>()
             repeat(21) { sample ->
                 val start = System.nanoTime()
-                edt {
-                    invokeCompletion(project, editor)
+                await("client completion readiness") {
+                    if (!UiProbeLsp.canComplete(project, editor)) {
+                        false
+                    } else {
+                        invokeCompletion(project, editor)
+                        true
+                    }
                 }
-                await("normalized lookup") {
+                await("normalized lookup sample $sample") {
                     LookupManager.getActiveLookup(editor)?.items?.any { it.lookupString.startsWith("normalized") } ==
                         true
                 }
@@ -193,9 +218,11 @@ object UiProbeCompletion {
                 LookupManager.getInstance(project).hideActiveLookup()
                 observations += "Changed document cancels the old lookup and offers x"
             }
+            UiProbeContinuedTyping.run(project, editor, observations)
             UiProbeGeneratedCompletion.run(project, editor, observations)
             checkSnippet(project, editor, source)
             observations += "Required argument is selected; Tab exits the snippet after the call"
+            UiProbeLanguageFeatures.run(project, editor, observations)
         } finally {
             settings.AUTOCOMPLETE_ON_CODE_COMPLETION = autoComplete
             try {
@@ -223,17 +250,18 @@ object UiProbeCompletion {
             invokeCompletion(project, editor)
         }
         await("call snippet") {
-            LookupManager.getActiveLookup(editor)?.items?.any { it.lookupString.startsWith("move(") } == true
+            LookupManager.getActiveLookup(editor)?.items?.any { it.lookupString.substringBefore('(') == "move" } == true
         }
         edt {
             val lookup = checkNotNull(LookupManager.getActiveLookup(editor))
-            lookup.currentItem = lookup.items.single { it.lookupString.startsWith("move(") }
+            lookup.currentItem = lookup.items.single { it.lookupString.substringBefore('(') == "move" }
             action(editor, IdeActions.ACTION_CHOOSE_LOOKUP_ITEM_REPLACE)
             check(editor.selectionModel.selectedText == "amount") { "Required argument is not selected" }
             action(editor, IdeActions.ACTION_EDITOR_NEXT_TEMPLATE_VARIABLE)
         }
         await("snippet end") {
-            editor.caretModel.offset == editor.document.text.indexOf("move(amount)") + "move(amount)".length
+            editor.caretModel.offset == editor.document.text.indexOf("move(amount)") + "move(amount)".length &&
+                TemplateManager.getInstance(project).getActiveTemplate(editor) == null
         }
     }
 
@@ -247,10 +275,14 @@ object UiProbeCompletion {
     internal fun invokeCompletion(project: com.intellij.openapi.project.Project, editor: Editor) {
         // A Gradle sandbox can start in the background. Deliver activation to its own frame so the
         // platform's hint manager permits showing the real lookup without stealing desktop focus.
-        val frame = checkNotNull(WindowManager.getInstance().getFrame(project))
-        ApplicationActivationStateManager.updateState(WindowEvent(frame, WindowEvent.WINDOW_ACTIVATED))
+        activate(project)
         PsiDocumentManager.getInstance(project).commitAllDocuments()
         CodeCompletionHandlerBase(CompletionType.BASIC).invokeCompletion(project, editor)
+    }
+
+    internal fun activate(project: com.intellij.openapi.project.Project) {
+        val frame = checkNotNull(WindowManager.getInstance().getFrame(project))
+        ApplicationActivationStateManager.updateState(WindowEvent(frame, WindowEvent.WINDOW_ACTIVATED))
     }
 
     private fun editorText(project: com.intellij.openapi.project.Project): String =

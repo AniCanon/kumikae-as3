@@ -31,7 +31,10 @@ class UiProbeStarter : ApplicationStarter {
         Files.createDirectories(destination)
         val failure = runCatching {
             UiProbeFeedbackGuard.run(destination) {
-                if (System.getenv("KUMIKAE_COMPLETION_CONTROL_PROBE") == "1") {
+                if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
+                    UiProbeLanguage.run(destination)
+                    UiProbeCompletion.run(destination, missingClient = true)
+                } else if (System.getenv("KUMIKAE_COMPLETION_CONTROL_PROBE") == "1") {
                     UiProbeCompletion.run(destination, plainText = true)
                 } else {
                     UiProbeLanguage.run(destination)
