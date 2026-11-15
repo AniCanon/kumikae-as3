@@ -100,9 +100,11 @@ public:
 	[[nodiscard]] vm::Str *text(void *p_value) override;
 	[[nodiscard]] void *copy(void *p_value) override;
 	void drop(void *p_value) override;
-	[[nodiscard]] uint64_t node(void *) override { return 0; }
-	[[nodiscard]] bool node_edges(uint64_t, vm::EngineNode *) override { return false; }
-	[[nodiscard]] std::vector<uint64_t> let_go(const std::vector<uint64_t> &) override { return {}; }
+	// For the cycle collector: a reference-counted object that a script listens to or that has a script
+	// is a node (by its id), and so is a listener (callable.h).
+	[[nodiscard]] uint64_t node(void *p_value) override;
+	[[nodiscard]] bool node_edges(uint64_t p_node, vm::EngineNode *r_node) override;
+	[[nodiscard]] std::vector<uint64_t> let_go(const std::vector<uint64_t> &p_nodes) override;
 };
 
 // An interpreter value as a Variant, and back. A string or an engine value coming back is the caller's

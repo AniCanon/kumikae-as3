@@ -66,7 +66,7 @@ void Collector::each_reference(Object *p_object, OnObject &&p_on_object, OnNode 
 			if (held && held->gc_next) {
 				p_on_object(held);
 			}
-		} else if ((p_kind == Kind::Ref && p_slot.p) || tag == AnyTag::Godot) {
+		} else if (engine_ && ((p_kind == Kind::Ref && p_slot.p) || tag == AnyTag::Godot)) {
 			if (const uint64_t node = engine.node(p_kind == Kind::Ref ? p_slot.p : any::pointer(p_slot))) {
 				p_on_node(node);
 			}

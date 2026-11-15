@@ -255,6 +255,9 @@ public:
 	// at a statement (from the statement hook). When the interpreter goes, it collects once more.
 	bool collect_step(size_t p_work) { return entries_ == 0 && collector_.step(p_work); }
 	void collect() { collector_.collect(); }
+	// Another interpreter has taken over the program (a reload): the engine's objects hold its script
+	// objects now, not this one's, so this one's collector no longer looks through them.
+	void superseded() { collector_.ignore_engine(); }
 
 	// How many traces finallies are keeping for errors they will throw again: one at most for each.
 	size_t kept_traces() const { return kept_traces_.size(); }

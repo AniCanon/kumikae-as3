@@ -51,6 +51,8 @@ public:
 	bool step(size_t p_work);
 	// Ends the collection under way, then makes a whole one: every loop let go of before now is freed.
 	void collect();
+	// From now on a handle on one of the engine's objects is not looked past.
+	void ignore_engine() { engine_ = false; }
 
 private:
 	enum class Phase : uint8_t { Idle, Count, Mark };
@@ -75,6 +77,7 @@ private:
 	Phase phase_ = Phase::Idle;
 	uint32_t epoch_ = 0;
 	bool running_ = false;
+	bool engine_ = true;
 	size_t work_ = 0;
 	std::unordered_map<uint64_t, Node> nodes_;
 	std::vector<uint64_t> node_queue_; // Nodes to count, or found in use and not yet followed.
