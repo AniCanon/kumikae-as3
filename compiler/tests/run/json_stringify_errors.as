@@ -29,6 +29,8 @@ package {
 			trace(JSON.stringify(deep).length);
 			attempt(function():* { return JSON.stringify([deep]); });
 			attempt(function():* { return JSON.stringify({a: [deep]}, null, 1); });
+			// A toJSON() that writes its own object again goes down without end, until AS3's calls run out.
+			attempt(function():* { return JSON.stringify(new Again()); });
 		}
 
 		private function attempt(p_work:Function):void {
@@ -48,6 +50,12 @@ class Link {
 class Thrower {
 	public function toJSON(p_key:String):* {
 		throw new ArgumentError("from toJSON " + p_key);
+	}
+}
+
+class Again {
+	public function toJSON(p_key:String):* {
+		return JSON.stringify(this);
 	}
 }
 

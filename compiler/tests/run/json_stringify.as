@@ -2,8 +2,10 @@ package {
 	import flash.utils.Dictionary;
 
 	// JSON.stringify, by the steps of ECMA-262 5th edition (15.12.3). Every line was worked out by hand from
-	// the specification; Node agrees with each line that has no Date, Dictionary, Vector or class of the
-	// program in it, but for the key "3", which Node moves to the front (it orders integer-like keys first).
+	// the specification; the lines with no Date, Dictionary, Vector or class of the program in them were then
+	// run through Node as a line-by-line JavaScript copy, which gives the same but for the key "3", which
+	// Node moves to the front (it orders integer-like keys first), and the two lines where nothing is
+	// written, where Node gives undefined.
 	// Rulings of this interpreter: a class's object is written by its public fields, the base class's
 	// first, then its public getters, in the order declared (Flash's order is its traits', not known); a key
 	// of a replacer Array that such an object lacks is passed over, as ECMAScript's Get gives undefined; a

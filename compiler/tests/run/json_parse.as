@@ -1,8 +1,9 @@
 package {
 	// JSON.parse, by the grammar and the steps of ECMA-262 5th edition (15.12.1, 15.12.2), with what the
 	// interpreter's untyped values hold: a whole number is an int. Every line was worked out by hand from
-	// the specification. Node agrees with each, but for the order of the key "3", which Node moves to the
-	// front (it orders integer-like keys first) and this interpreter keeps where it was written.
+	// the specification, then run through Node as a line-by-line JavaScript copy, which gives the same but
+	// for two: the order of the key "3", which Node moves to the front (it orders integer-like keys first)
+	// and this interpreter keeps where it was written; and the last line, where Node gives undefined.
 	public class json_parse {
 		public function json_parse() {
 			var o:Object = JSON.parse(' {"b": 1, "a": [true, false, null], "c": {"d": "x"}, "3": -0.5e1} ');

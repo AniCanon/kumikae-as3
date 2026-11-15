@@ -1,9 +1,10 @@
 package {
 	// Text that ECMA-262 5th edition's JSON grammar (15.12.1) does not take is a SyntaxError. The message is
 	// avmplus's #1132, from recollection, not checked against Flash: it says no more than that, for any
-	// fault. Node rejects each of these too. A null text is the same error (avmplus's, from recollection;
-	// ECMAScript would read the text "null"). Deeper than 1,000 levels is Error #1023, the interpreter's ruling:
-	// the walk for a reviver and stringify() go down one level at a time.
+	// fault. Node, run on a JavaScript copy of the list, rejects each of these too, and reads the 1,000
+	// levels below. A null text is the same error (avmplus's, from recollection; ECMAScript would read the
+	// text "null"). Deeper than 1,000 levels is Error #1023, the interpreter's ruling, where Node has no
+	// limit: the walk for a reviver and stringify() go down one level at a time.
 	public class json_parse_errors {
 		public function json_parse_errors() {
 			var bad:Array = ["", " ", "01", "-01", "-", "1.", ".5", "+1", "1e", "1e+", "1.5e3.2", "0x10", "NaN", "Infinity",
