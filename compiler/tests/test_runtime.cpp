@@ -5,6 +5,7 @@
 #include "any.h"
 #include "number_text.h"
 #include "numeric.h"
+#include "regex.h"
 #include "runtime.h"
 #include "text_units.h"
 
@@ -331,6 +332,170 @@ static void test_text_units() {
 	CHECK_EQ(upper_case(face), std::string("A\xF0\x9F\x98\x80" "B"));
 }
 
+// A pattern's first match from unit p_from, as "start-end" for the match and each group ("_" for a group
+// that took no part); "none", "limit", or "error: why".
+static std::string regex_find(std::u16string_view p_pattern, const char *p_flags, std::u16string_view p_text, uint32_t p_from = 0,
+		regex::Limits p_limits = regex::Limits()) {
+	std::string error;
+	const std::optional<regex::Program> program = regex::compile(p_pattern, regex::read_flags(p_flags), &error);
+	if (!program) {
+		return "error: " + error;
+	}
+	std::vector<int32_t> captures;
+	const regex::Outcome outcome = regex::search(*program, p_text, p_from, &captures, p_limits);
+	if (outcome != regex::Outcome::Found) {
+		return outcome == regex::Outcome::Limit ? "limit" : "none";
+	}
+	std::string out;
+	for (size_t i = 0; i + 1 < captures.size(); i += 2) {
+		out += (i ? " " : "") + (captures[i] < 0 ? std::string("_") : std::to_string(captures[i]) + "-" + std::to_string(captures[i + 1]));
+	}
+	return out;
+}
+
+// Every case but the marked ones was checked against Node (`new RegExp(p, f + "gd")`, lastIndex set to the
+// start, then exec's indices), which keeps ECMAScript 3's rules for all of them.
+static void test_regex_matches() {
+	struct Case {
+		std::u16string_view pattern;
+		const char *flags;
+		std::u16string_view text;
+		uint32_t from;
+		const char *expected;
+	};
+	const Case cases[] = {
+		{ u"a+b", "", u"xaaab", 0, "1-5" },
+		{ u"a+?", "", u"aaa", 0, "0-1" },
+		{ u"a*?b", "", u"aab", 0, "0-3" },
+		{ u"(a|ab)(c|bcd)(d*)", "", u"abcd", 0, "0-4 0-1 1-4 4-4" },
+		{ u"((a)|b)+", "", u"ab", 0, "0-2 1-2 _" },
+		{ u"(z)((a+)?(b+)?(c))*", "", u"zaacbbbcac", 0, "0-10 0-1 8-10 8-9 _ 9-10" },
+		{ u"(a*)*", "", u"b", 0, "0-0 _" },
+		{ u"(a*)b\\1+", "", u"baaaac", 0, "0-1 0-0" },
+		{ u"(?=(a+))", "", u"baaabac", 0, "1-1 1-4" },
+		{ u"(?=(a+))a*b\\1", "", u"baaabac", 0, "3-6 3-4" },
+		{ u"(.*?)a(?!(a+)b\\2c)\\2(.*)", "", u"baaabaac", 0, "0-8 0-2 _ 3-8" },
+		{ u"^abc$", "", u"abc", 0, "0-3" },
+		{ u"^b", "m", u"a\nb", 0, "2-3" },
+		{ u"a$", "m", u"a\nb", 0, "0-1" },
+		{ u"a$", "", u"a\nb", 0, "none" },
+		{ u"\\bfoo\\b", "", u"a foo.", 0, "2-5" },
+		{ u"\\Boo", "", u"foo", 0, "1-3" },
+		{ u"[a-c]+", "", u"xxbcay", 0, "2-5" },
+		{ u"[^a-c]+", "", u"abcxyz", 0, "3-6" },
+		{ u"[\\d.]+", "", u"v1.25x", 0, "1-5" },
+		{ u"\\w+@\\w+\\.com", "", u"mail: joe@site.com!", 0, "6-18" },
+		{ u"\\s+", "", u"a \t\nb", 0, "1-4" },
+		{ u"\\S+", "", u"  ab ", 0, "2-4" },
+		{ u"\\D\\W", "", u"1a!", 0, "1-3" },
+		{ u"ABC", "i", u"xabcx", 0, "1-4" },
+		{ u"[a-z]+", "i", u"12HeLLo", 0, "2-7" },
+		{ u"\\u0041\\x42C", "", u"ABC", 0, "0-3" },
+		{ u"\\cJ", "", u"a\nb", 0, "1-2" },
+		{ u"a{2}", "", u"aaaa", 0, "0-2" },
+		{ u"a{2,}", "", u"aaaa", 0, "0-4" },
+		{ u"a{1,3}", "", u"aaaa", 0, "0-3" },
+		{ u"a{1,3}?", "", u"aaaa", 0, "0-1" },
+		{ u"x{0}y", "", u"xy", 0, "1-2" },
+		{ u"a.c", "", u"a\nc abc", 0, "4-7" },
+		{ u"a.c", "s", u"a\nc", 0, "0-3" },
+		{ u"b", "", u"abcb", 2, "3-4" },
+		{ u"", "", u"abc", 1, "1-1" },
+		{ u"(a)|(b)", "", u"b", 0, "0-1 _ 0-1" },
+		{ u"[]a", "", u"a", 0, "none" },
+		{ u"[^]", "", u"\n", 0, "0-1" },
+		{ u"(?:ab)+", "", u"ababx", 0, "0-4" },
+		{ u"\\1(a)", "", u"aa", 0, "0-1 0-1" },
+		{ u"(a)\\1", "i", u"aA", 0, "0-2 0-1" },
+		{ u"[\\u00e0-\\u00ff]+", "i", u"Àé", 0, "0-2" },
+		{ u"(?<=\\$)\\d+", "", u"cost $42", 0, "6-8" },
+		{ u"(?<!\\$)\\b\\d+", "", u"$4 and 5", 0, "7-8" },
+		{ u"\\d+(?=%)", "", u"50 60%", 0, "3-5" },
+		{ u"s", "i", u"ſ", 0, "none" }, // A long s is not an s: its capital is ASCII, and it is not.
+		{ u"ſ", "i", u"S", 0, "none" },
+		{ u"(a+)+b", "", u"aaab", 0, "0-4 0-3" },
+		{ u"[-a]+", "", u"-a-", 0, "0-3" },
+		{ u"[a-]+", "", u"a--", 0, "0-3" },
+		{ u"[\\w-]+", "", u"a-b c", 0, "0-3" },
+		{ std::u16string_view(u"\\0", 2), "", std::u16string_view(u"a\0", 2), 0, "1-2" },
+		{ u"\\$\\.\\^", "", u"$.^", 0, "0-3" },
+		{ u"\U0001F600", "", u"x\U0001F600", 0, "1-3" }, // By unit: a character past U+FFFF is two.
+		{ u".", "", u"\U0001F600", 0, "0-1" },
+		{ u"(a)|b", "", u"b", 0, "0-1 _" },
+		{ u"(?:(a)|b)+", "", u"ab", 0, "0-2 _" }, // Each turn of a loop starts with its groups unset.
+		{ u"(a)?\\1b", "", u"b", 0, "0-1 _" }, // A group that took no part is empty to refer back to.
+		{ u"a|", "", u"b", 0, "0-0" },
+		{ u"[\\b]", "", u"a\bb", 0, "1-2" },
+		{ u"\\ ", "", u" ", 0, "0-1" },
+		{ u"a.b", "", u"a b a\rb axb", 0, "8-11" },
+		{ u"x*", "", u"xxa", 3, "3-3" },
+		// What AS3 takes from PCRE, which Node does not have: from PCRE's and AS3's documentation, not run.
+		{ u"(?P<year>\\d{4})-(?P<month>\\d\\d)", "", u"on 2024-05", 0, "3-10 3-7 8-10" },
+		{ u"(?P<twice>a)(?P=twice)", "", u"xaa", 0, "1-3 1-2" },
+		{ u"a b # a comment\n c", "x", u"abc", 0, "0-3" },
+		{ u"[ ]a\\ b", "x", u" a b", 0, "0-4" },
+		{ u"(?>a+)b", "", u"aaab", 0, "0-4" },
+		{ u"(?>a+)ab", "", u"aaab", 0, "none" },
+		{ u"a++b", "", u"aaab", 0, "0-4" },
+		{ u"a++ab", "", u"aaab", 0, "none" },
+		{ u"a{,2}", "", u"a{,2}", 0, "0-5" }, // A brace that begins no quantifier is itself.
+		{ u"x{", "", u"x{", 0, "0-2" },
+	};
+	for (const Case &one : cases) {
+		check::checks()++;
+		const std::string found = regex_find(one.pattern, one.flags, one.text, one.from);
+		if (found != one.expected) {
+			check::failures()++;
+			std::printf("FAIL regex case %d: expected %s, found %s\n", static_cast<int>(&one - cases), one.expected, found.c_str());
+		}
+	}
+}
+
+// Patterns the engine does not read, and searches that would not end.
+static void test_regex_limits() {
+	CHECK_EQ(regex_find(u"(", "", u""), std::string("error: a group is not closed"));
+	CHECK_EQ(regex_find(u"a)", "", u""), std::string("error: a ')' closes no group"));
+	CHECK_EQ(regex_find(u"[b-a]", "", u""), std::string("error: a range in a class goes backwards"));
+	CHECK_EQ(regex_find(u"[a", "", u""), std::string("error: a class is not closed"));
+	CHECK_EQ(regex_find(u"*", "", u""), std::string("error: a quantifier with nothing to repeat"));
+	CHECK_EQ(regex_find(u"a**", "", u""), std::string("error: a quantifier with nothing to repeat"));
+	CHECK_EQ(regex_find(u"a{3,2}", "", u""), std::string("error: a quantifier's counts are in the wrong order"));
+	CHECK_EQ(regex_find(u"a{65536}", "", u""), std::string("error: a quantifier's count is too large"));
+	CHECK_EQ(regex_find(u"\\", "", u""), std::string("error: the pattern ends with a backslash"));
+	CHECK_EQ(regex_find(u"(?<=a+)b", "", u""), std::string("error: a lookbehind must have a fixed length"));
+	CHECK_EQ(regex_find(u"(?i)a", "", u""), std::string("error: this kind of group is not supported"));
+	CHECK_EQ(regex_find(u"(?P=none)", "", u""), std::string("error: no group is named 'none'"));
+	CHECK_EQ(regex_find(u"(?P<a>x)(?P<a>y)", "", u""), std::string("error: two groups are named 'a'"));
+	CHECK_EQ(regex_find(u"(?=a)*", "", u""), std::string("error: a quantifier with nothing to repeat"));
+	CHECK_EQ(regex_find(std::u16string(300, u'(') + std::u16string(300, u')'), "", u""), std::string("error: groups are nested too deeply"));
+	CHECK_EQ(regex_find(u"(?:a{1000}){1000}", "", u""), std::string("error: the pattern is too large"));
+	CHECK_EQ(regex_find(u"(?:(?:(?:a))){2}", "", u"aa"), std::string("0-2"));
+	// Backtracking that grows exponentially with the text stops at the limit, in well under a second.
+	const std::u16string many(30, u'a');
+	CHECK_EQ(regex_find(u"(a+)+b", "", many), std::string("limit"));
+	CHECK_EQ(regex_find(u"(x+x+)+y", "", std::u16string(40, u'x')), std::string("limit"));
+	CHECK_EQ(regex_find(u"(a|aa)+$", "", many + u"!"), std::string("limit"));
+	CHECK_EQ(regex_find(u"(?:x*)*b", "", many), std::string("none")); // A turn that takes nothing ends a loop.
+	CHECK_EQ(regex_find(u"a+b", "", many, 0, regex::Limits{ 100, regex::MAX_BACKTRACK }), std::string("limit"));
+	CHECK_EQ(regex_find(u"(?:a|b)*", "", many, 0, regex::Limits{ regex::STEPS, 10 }), std::string("limit"));
+	CHECK_EQ(regex_find(u"(?:a|b)*", "", many, 0, regex::Limits{ regex::STEPS, 100 }), std::string("0-30"));
+	CHECK_EQ(regex::read_flags("gimsxq"), static_cast<uint8_t>(regex::GLOBAL | regex::IGNORE_CASE | regex::MULTILINE | regex::DOTALL | regex::EXTENDED));
+	CHECK_EQ(regex::flags_text(regex::EXTENDED | regex::GLOBAL | regex::DOTALL), std::string("gsx"));
+	std::string error;
+	// `\s` is the white space that turning text into a number skips, unit for unit.
+	const std::optional<regex::Program> space = regex::compile(u"\\s", 0, &error);
+	std::string disagree;
+	for (uint32_t unit = 0; space && unit <= 0xFFFF; unit++) {
+		std::vector<int32_t> captures;
+		const char16_t one = static_cast<char16_t>(unit);
+		const bool found = regex::search(*space, std::u16string_view(&one, 1), 0, &captures, regex::Limits()) == regex::Outcome::Found;
+		disagree += found != is_text_space(unit) ? std::to_string(unit) + " " : "";
+	}
+	CHECK_EQ(disagree, std::string());
+	const std::optional<regex::Program> named = regex::compile(u"(a)(?P<b>c)", 0, &error);
+	CHECK(named && named->groups == 2 && named->names.size() == 2 && named->names[0].empty() && named->names[1] == u"b");
+}
+
 // Checked against Node, except where AS3 differs (said at each).
 static void test_number_methods() {
 	CHECK_EQ(radix_text(255, 16), std::string("ff"));
@@ -387,6 +552,8 @@ static void test_number_methods() {
 }
 
 int main() {
+	test_regex_matches();
+	test_regex_limits();
 	test_text_units();
 	test_number_methods();
 	test_tagged_addresses();

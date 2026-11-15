@@ -14,6 +14,7 @@ host differs.
 | `any`, `interpreter_any.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, equality, `+`, `<` |
 | `numeric`, `math.cpp` | Conversions C++ alone would leave undefined; `Math` where AS3 and C's library differ |
 | `text_units`, `case_table.cpp` | Strings by UTF-16 unit: indexing, cutting, searching and joining text held as UTF-8, and changing case (the table is written by `tools/case_table.py`) |
+| `regex.h`, `regex_tree.h`, `regex_parse.cpp`, `regex_compile.cpp`, `regex_match.cpp` | Regular expressions on their own: a pattern read into a tree, the tree written as a small program, and a backtracking matcher over UTF-16 units that counts its steps and stops at a limit |
 | `number_text`, `string_methods.cpp` | Numbers as text and text as numbers (radix, `toFixed` and the rest, `parseInt`, `parseFloat`); the instructions that run `String`'s methods and those |
 | `host.h` | What the interpreter is given: `Output`, `EngineHandles`, `EngineSource` |
 | `output.h`, `engine_handles.h`, `engine_source.h`, `engine_types.h` | The three interfaces and the values they pass |
