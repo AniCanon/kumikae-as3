@@ -14,6 +14,17 @@ package {
 		public function strength(action:String):Number { return Input.getActionStrength(action); }
 		public function stick():Vector2 { return Input.getVector("ui_left", "ui_right", "ui_up", "ui_down"); }
 		public function system():String { return OS.getName(); }
+		// A class's static method, called through its own entry: a call Godot refused would be the script's error.
+		public function staticWorks():String { return GodotJSON.stringify(3); }
+		// Its arguments are worked out left to right, and what it gives back is checked where it is stored.
+		private var order:String = "";
+		private function noted(p_text:String):String { order += p_text; return p_text; }
+		public function staticOrder():String { GodotJSON.stringify(noted("a"), noted("b")); return order; }
+		public function staticWrongType():String {
+			try { var node:Node = GodotJSON.parseString("[1]"); } catch (e:TypeError) { return "caught"; }
+			return "carried on";
+		}
+		public function orphansShown():Boolean { Node.printOrphanNodes(); return true; }
 		// A variable that holds a singleton reaches its members, on that object.
 		public function viaObject():Boolean {
 			var i:Input = Input.singleton;

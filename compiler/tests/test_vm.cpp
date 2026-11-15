@@ -698,7 +698,7 @@ static void test_engine_statics() {
 		engine.drop(result.p);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "shown", nullptr, 0, nullptr));
-		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes()\n"));
+		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes 3218959716()\n"));
 		// A global function is called on no class, with its signature for the engine's side.
 		engine.log.clear();
 		arguments[0].d = 1;

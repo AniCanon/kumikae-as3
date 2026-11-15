@@ -386,30 +386,39 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 	if (p_class.empty()) {
 		return call_utility(p_method, p_arguments, p_count, p_result, r_result, r_error);
 	}
-	// For a class, the call goes through Godot's list of classes, which takes the two names first.
-	const StringName &class_name = name(p_class);
-	const StringName &method_name = name(p_method);
-	Arguments arguments(p_arguments, p_count, { Variant(class_name), Variant(method_name) });
+	// A class's static method comes with its hash ("print_orphan_nodes 2648703342").
+	const size_t space = p_method.find(' ');
+	const std::string_view method = p_method.substr(0, space);
+	const StringName &method_name = name(method);
+	Arguments arguments(p_arguments, p_count);
 	Variant result;
 	GDExtensionCallError error;
 	error.error = GDEXTENSION_CALL_OK;
 	int type = value_type(p_class);
 	if (type >= 0) {
-		Variant::callp_static((Variant::Type)type, method_name, arguments.pointers() + 2, (int)p_count, result, error);
+		Variant::callp_static((Variant::Type)type, method_name, arguments.pointers(), (int)p_count, result, error);
 	} else {
-		ClassDBSingleton *classes = ClassDBSingleton::get_singleton();
-		if (!classes || !classes->class_exists(class_name) || !classes->class_has_method(class_name, method_name)) {
-			*r_error = "Godot has no '" + std::string(p_method) + "' in '" + std::string(p_class) + "'";
+		const std::string key = std::string(p_class) + "." + std::string(p_method);
+		auto found = static_methods_.find(key);
+		if (found == static_methods_.end()) {
+			const GDExtensionInt hash = space == std::string_view::npos ? 0 : std::strtoll(key.c_str() + p_class.size() + 1 + space + 1, nullptr, 10);
+			const StringName class_name(String::utf8(p_class.data(), (int64_t)p_class.size()));
+			GDExtensionMethodBindPtr bound = space == std::string_view::npos ? nullptr
+					: gdextension_interface::classdb_get_method_bind(class_name._native_ptr(), method_name._native_ptr(), hash);
+			found = static_methods_.emplace(key, bound).first;
+		}
+		if (!found->second) {
+			*r_error = "Godot has no '" + std::string(method) + "' in '" + std::string(p_class) + "'";
 			return false;
 		}
-		// The name is kept with the others, and so is let go when the program is unloaded.
-		Variant(classes).callp(name("class_call_static"), arguments.pointers(), (int)arguments.count(), result, error);
+		gdextension_interface::object_method_bind_call(found->second, nullptr, reinterpret_cast<GDExtensionConstVariantPtr *>(arguments.pointers()),
+				(GDExtensionInt)p_count, result._native_ptr(), &error);
 	}
 	if (error.error != GDEXTENSION_CALL_OK) {
-		*r_error = describe(error, std::string(p_class) + "." + std::string(p_method));
+		*r_error = describe(error, std::string(p_class) + "." + std::string(method));
 		return false;
 	}
-	return take(p_result, result, p_method, r_result, r_error);
+	return take(p_result, result, method, r_result, r_error);
 }
 
 void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) {

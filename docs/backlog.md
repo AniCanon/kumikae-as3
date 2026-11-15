@@ -107,10 +107,6 @@ Found by the review of the clean-up pass itself.
   guarded: a property read or a notification from another thread is not. **2d**
 - `removeAll()` on a singleton's signal removes every script's listeners, not only the caller's.
   **decision**
-- Tests are missing for: a static call's arguments worked out left to right, a static call that gives
-  the wrong type, and a failing `Node.printOrphanNodes()`. The review ran the first two by hand. **clean-up**
-- A class's static method that fails inside Godot (wrong arguments) is reported by Godot only: the script
-  carries on with nothing. **clean-up**
 
 ## Stage 2b-3, part B: `Int64`
 

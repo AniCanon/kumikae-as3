@@ -471,6 +471,10 @@ class Generator:
                 self.left_out.append(where)
                 continue
             self.claim(owner, name, "the method " + method["name"], inherited)
+            if method["is_static"] and not static:
+                # Called through its own entry, which needs the hash, so that a wrong call is an error the
+                # script is told of: through ClassDB it would only be printed.
+                self.godot_names["%s.%s" % (naming.class_name(owner), name)] += " %d" % method["hash"]
             out.extend(lines)
 
         self.lines.extend(self.enum_lines(entry))

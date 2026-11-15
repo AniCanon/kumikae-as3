@@ -70,6 +70,13 @@ class Fixture(unittest.TestCase):
             self.assertNotIn(" class %s " % name, self.text)
         self.assertNotIn("toUpper", self.text)
 
+    def test_a_static_method_carries_its_hash(self):
+        # Called through its own entry, so that a wrong call is Godot's error to the script, not a message.
+        names = generate.Generator(fixture())
+        names.run()
+        self.assertEqual(names.godot_names["Node.printOrphanNodes"], "print_orphan_nodes 1")
+        self.assertEqual(names.godot_names["Node.getNode"], "get_node")
+
     def test_constructor_forms(self):
         # The merged constructor takes any of them; each form Godot has is written down, so that the
         # checker can refuse a call that matches none.
