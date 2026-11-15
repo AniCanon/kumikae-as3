@@ -604,6 +604,29 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::ReturnVoid:
 				leave(function, in, r, p_depth, r_result); // `frame` and `r` are stale after this.
 				break;
+			case Op::ErrorStack: {
+				// In an Error's constructor: the frames below it, and below any constructor of an error
+				// class that called it with `super`.
+				Object *error = static_cast<Object *>(r[in.b].p);
+				size_t skip = 0;
+				const auto error_constructor = [&](uint32_t p_function) {
+					const uint32_t owner = module_.functions[p_function].owner;
+					if (owner == NONE || module_.classes[owner].constructor != p_function) {
+						return false;
+					}
+					for (uint32_t at = owner; at != NONE; at = module_.classes[at].base) {
+						if (at == module_.error_class) {
+							return true;
+						}
+					}
+					return false;
+				};
+				while (skip < frames_.size() && error_constructor(frames_[frames_.size() - 1 - skip].function)) {
+					skip++;
+				}
+				assign(Kind::Str, r[in.a], stack_text(error, skip));
+				break;
+			}
 			case Op::OwnerOf: {
 				Object *object = static_cast<Object *>(r[in.b].p);
 				const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;

@@ -109,6 +109,7 @@ private:
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
+	Str *stack_text(const Object *p_error, size_t p_skip);
 	void out_of_memory();
 	void throw_new(uint32_t p_class, Str *p_message, std::string_view p_words);
 	// A member of nothing was asked for: AS3's TypeError #1009.

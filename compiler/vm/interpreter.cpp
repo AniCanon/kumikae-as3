@@ -1,6 +1,7 @@
 #include "interpreter_internal.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <limits>
 
@@ -96,6 +97,22 @@ int Interpreter::line_at(size_t p_frame) const {
 }
 
 // "\tat Main/update()[Main.as:12]"
+// What an Error's getStackTrace() gives: "Name: message", then a line for each frame, innermost first,
+// from p_skip frames below the top. Null if there is no memory for it.
+Str *Interpreter::stack_text(const Object *p_error, size_t p_skip) {
+	const Str *name = static_cast<const Str *>(const_cast<Object *>(p_error)->fields()[ir::ERROR_NAME].p);
+	const Str *message = static_cast<const Str *>(const_cast<Object *>(p_error)->fields()[ir::ERROR_MESSAGE].p);
+	std::string text = name ? std::string(name->view()) : module_.classes[p_error->klass].name;
+	if (message && message->size > 0) {
+		text += ": " + std::string(message->view());
+	}
+	size_t lines = 0;
+	for (size_t i = frames_.size() > p_skip ? frames_.size() - p_skip : 0; i-- > 0 && lines < MAX_TRACE; lines++) {
+		text += "\n" + site(frames_[i]);
+	}
+	return new_string(text);
+}
+
 // A frame that an error leaves, added to its trace; the first one is where it was thrown.
 void Interpreter::traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const {
 	if (*r_lines == 0) {
@@ -202,7 +219,12 @@ void Interpreter::out_of_memory() {
 void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
 	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size()) : nullptr;
 	if (error) {
-		error->fields()[0].p = p_message;
+		// What a script reads of it: its name, its number ("Error #1009: ..." is 1009), and the stack.
+		error->fields()[ir::ERROR_MESSAGE].p = p_message;
+		error->fields()[ir::ERROR_NAME].p = new_string(module_.classes[p_class].name);
+		const std::string_view words = p_message ? p_message->view() : std::string_view();
+		error->fields()[ir::ERROR_ID].i = words.compare(0, 7, "Error #") == 0 ? std::atoi(std::string(words.substr(7, 6)).c_str()) : 0;
+		error->fields()[ir::ERROR_STACK].p = stack_text(error, 0);
 		pending_ = any::object(error);
 		failing_ = true;
 		return;

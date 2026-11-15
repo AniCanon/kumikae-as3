@@ -1,24 +1,48 @@
 class Error
   .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
   new Error
 class TypeError extends Error
   .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
   new TypeError
 class RangeError extends Error
   .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
   new RangeError
 class try_ir
   new try_ir
 entry try_ir
-function Error(r0:Object, r1:String):void
+function Error(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
-  @1 ReturnVoid
-function TypeError(r0:Object, r1:String):void
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "Error"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function TypeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
-  @1 ReturnVoid
-function RangeError(r0:Object, r1:String):void
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "TypeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function RangeError(r0:Object, r1:String, r2:int):void
   @0 SetField r0 .0 r1
-  @1 ReturnVoid
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "RangeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
 function try_ir(r0:Object):void
   @2 ConstStr r3 "body"
   @3 StrToStr r4 r3

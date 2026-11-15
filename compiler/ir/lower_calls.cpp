@@ -300,6 +300,14 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	if (const std::optional<uint32_t> math = math_call(p_call, symbol)) {
 		return *math;
 	}
+	if (symbol->name == "getStackTrace" && symbol->owner == error_ && callee->kind == NodeKind::Member && p_call->arguments.count == 0) {
+		// An Error's stack trace, taken when it was made.
+		const uint32_t object = receiver(static_cast<Member *>(callee)->object);
+		emit(Op::NullCheck, position, object);
+		uint32_t out = reg(Kind::Str);
+		emit(Op::GetField, position, out, object, ERROR_STACK);
+		return out;
+	}
 	auto function = functions_.find(symbol);
 	if (function == functions_.end() || !symbol->node || symbol->node->kind != NodeKind::FunctionDecl) {
 		refuse(callee->offset, "calling '" + std::string(symbol->name) + "'");
@@ -515,16 +523,17 @@ uint32_t Lowerer::static_call(Call *p_call, Symbol *p_method) {
 
 void Lowerer::constructor_arguments(Symbol *p_class, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
 	if (is_error(p_class) && p_class->unit->is_builtin) {
-		// Error(message = ""): the one parameter the interpreter keeps.
-		if (p_arguments.count > 1) {
-			refuse(p_position, "an Error with an id");
-		}
+		// Error(message = "", id = 0).
 		if (p_arguments.count >= 1) {
-			r_list.push_back(expression(p_arguments[0], Kind::Str));
+			r_list.push_back(settled(expression(p_arguments[0], Kind::Str), p_arguments.count > 1 ? p_arguments[1] : nullptr, p_position));
 		} else {
 			uint32_t empty = reg(Kind::Str);
 			emit(Op::ConstStr, p_position, empty, string(""));
 			r_list.push_back(empty);
+		}
+		r_list.push_back(p_arguments.count >= 2 ? expression(p_arguments[1], Kind::I32) : default_value(Kind::I32, p_position));
+		if (p_arguments.count > 2) {
+			refuse(p_position, "an Error with more than a message and an id");
 		}
 		return;
 	}

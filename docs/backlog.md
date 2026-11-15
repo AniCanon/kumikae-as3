@@ -190,7 +190,6 @@ any Godot value passing as a condition):
 
 - An error inside a script method that Godot called is reported there: a `try` in AS3 around the Godot
   call that led to it does not see it. **2d**
-- An `Error`'s `errorID`, `name` and `getStackTrace()` wait for the standard library. **2c**
 
 ## Stage 2c-2: the untyped value
 

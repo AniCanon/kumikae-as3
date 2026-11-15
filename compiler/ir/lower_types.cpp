@@ -112,7 +112,9 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	if (!p_class || !p_class->unit || !p_class->unit->is_builtin || !is_error(p_class)) {
 		return false;
 	}
-	// Error and its built-in subclasses: one field, and a constructor that stores the message.
+	// Error and its built-in subclasses: message, name, errorID and the stack trace (ERROR_FIELDS in ir.h),
+	// and a constructor that stores the message and the id, and takes the trace where it is made, as
+	// Flash does.
 	uint32_t base = NONE;
 	if (p_class != error_ && !class_index(p_class->klass->base, &base)) {
 		return false;
@@ -120,21 +122,27 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	Class klass;
 	klass.name = class_name(p_class);
 	klass.base = base;
-	klass.fields.push_back({ "message", Kind::Str });
+	klass.fields = { { "message", Kind::Str }, { "name", Kind::Str }, { "errorID", Kind::I32 }, { "stack", Kind::Str } };
 	Function constructor;
 	constructor.name = klass.name;
 	constructor.owner = (uint32_t)module_.classes.size();
-	constructor.parameters = 2;
-	constructor.registers = { Kind::Obj, Kind::Str };
-	Instruction store;
-	store.op = Op::SetField;
-	store.a = 0;
-	store.b = 0;
-	store.c = 1;
-	constructor.code.push_back(store);
-	Instruction done;
-	done.op = Op::ReturnVoid;
-	constructor.code.push_back(done);
+	constructor.parameters = 3;
+	constructor.registers = { Kind::Obj, Kind::Str, Kind::I32, Kind::Str, Kind::Str };
+	const auto op = [&](Op p_op, uint32_t p_a, uint32_t p_b, uint32_t p_c) {
+		Instruction made;
+		made.op = p_op;
+		made.a = p_a;
+		made.b = p_b;
+		made.c = p_c;
+		constructor.code.push_back(made);
+	};
+	op(Op::SetField, 0, ERROR_MESSAGE, 1);
+	op(Op::SetField, 0, ERROR_ID, 2);
+	op(Op::ConstStr, 3, string(std::string(p_class->name)), 0);
+	op(Op::SetField, 0, ERROR_NAME, 3);
+	op(Op::ErrorStack, 4, 0, 0);
+	op(Op::SetField, 0, ERROR_STACK, 4);
+	op(Op::ReturnVoid, 0, 0, 0);
 	klass.constructor = (uint32_t)module_.functions.size();
 	module_.functions.push_back(std::move(constructor));
 	module_.classes.push_back(std::move(klass));
@@ -143,11 +151,12 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	if (p_class->klass->constructor) {
 		functions_[p_class->klass->constructor] = module_.classes[index].constructor;
 	}
-	Symbol *message = nullptr;
-	auto member = error_->klass->members.find("message");
-	if (member != error_->klass->members.end()) {
-		message = member->second;
-		fields_[message] = 0;
+	// What AS3 reads of an Error: its message, its name, and errorID (a getter, read as the field).
+	for (const auto &[name, field] : { std::pair<const char *, uint32_t>{ "message", ERROR_MESSAGE }, { "name", ERROR_NAME }, { "errorID", ERROR_ID } }) {
+		auto member = error_->klass->members.find(name);
+		if (member != error_->klass->members.end()) {
+			fields_[member->second] = field;
+		}
 	}
 	*r_index = index;
 	return true;

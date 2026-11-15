@@ -117,6 +117,7 @@ inline bool is_held(Kind p_kind) {
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") /* An untyped value: AS3 throws any value. */ \
 	X(OwnerOf, "RR-") /* A script object as the Godot object it is attached to; null for null. */ \
+	X(ErrorStack, "RR-") /* What an Error's getStackTrace() gives, for the error in b being made now. */ \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
 
@@ -128,6 +129,9 @@ enum class Op : uint8_t {
 
 // The functions of Math that take one Number, in MathUnary's third operand.
 enum class MathFunction : uint8_t { Abs, Acos, Asin, Atan, Ceil, Cos, Exp, Floor, Log, Round, Sin, Sqrt, Tan };
+
+// The fields of Error and of its built-in subclasses, which the interpreter fills in for an error it raises.
+constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK = 3;
 
 // A vector's methods, in VecCall's second operand. After the vector, the arguments are:
 //   Push, Unshift   elements                         -> the new length (uint)
