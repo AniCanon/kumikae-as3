@@ -5,7 +5,6 @@ import com.intellij.ide.structureView.StructureViewTreeElement
 import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.lang.LanguageStructureViewBuilder
 import com.intellij.openapi.actionSystem.IdeActions
-import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -14,16 +13,13 @@ import com.intellij.psi.PsiDocumentManager
 /** Exercises feature routing when both client dependencies are available. */
 internal object UiProbeLanguageFeatures {
     fun run(project: Project, editor: Editor, observations: MutableList<String>) {
-        val source = "package { public class CompletionProbe { " +
-            "public function move(amount:int):void {} " +
-            "public function run():void { move(1); } } }"
+        // Continue from the accepted snippet, as a user asking about the inserted call would.
+        lateinit var source: String
+        UiProbeCompletion.edt { source = editor.document.text }
         val call = source.lastIndexOf("move(")
+        check(call > source.indexOf("move(")) { "Expected both a method declaration and its completed call" }
         UiProbeCompletion.edt {
-            WriteCommandAction.runWriteCommandAction(project) { editor.document.setText(source) }
-            PsiDocumentManager.getInstance(project).commitAllDocuments()
             editor.caretModel.moveToOffset(call + "move(".length)
-        }
-        UiProbeCompletion.edt {
             UiProbeCompletion.activate(project)
             UiProbeCompletion.action(editor, IdeActions.ACTION_EDITOR_SHOW_PARAMETER_INFO)
         }
@@ -31,7 +27,7 @@ internal object UiProbeLanguageFeatures {
             ParameterInfoControllerBase.existsWithVisibleHintForEditor(editor, false)
         }
         UiProbeCompletion.edt {
-            val controllers = (call..call + "move(1)".length).mapNotNull {
+            val controllers = (call..call + "move(amount)".length).mapNotNull {
                 ParameterInfoControllerBase.findControllerAtOffset(editor, it)
             }.distinct()
             check(controllers.isNotEmpty()) { "Parameter help has no controller at the call" }
