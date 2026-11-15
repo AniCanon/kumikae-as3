@@ -58,6 +58,10 @@ inline bool release(Counted *p_value) {
 	return p_value && --p_value->references == 0;
 }
 
+// What a field or a static field holds before anything is written to it: NaN for a Number, `null` for a
+// value declared `Object`, and zero (no reference, `undefined`, 0, false) for the rest.
+Slot empty_value(bool p_number, bool p_null);
+
 // How many strings and objects are alive, for finding leaks.
 size_t live_strings();
 size_t live_objects();

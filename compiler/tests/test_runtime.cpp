@@ -2,6 +2,7 @@
 // same ECMAScript rules:  node -e 'console.log(String(x), x | 0, x >>> 0, Number(s))'
 #include "check.h"
 
+#include "any.h"
 #include "numeric.h"
 #include "runtime.h"
 
@@ -165,7 +166,86 @@ static void test_vectors() {
 	CHECK_EQ(live_objects(), objects);
 }
 
+// The untyped value. Expected values checked against Node:
+//   node -e 'for (const x of [undefined, null, true, 0, -0, 1.5, NaN, "", "12", "abc"])
+//              console.log(String(x), typeof x, Number(x), Boolean(x))'
+static void test_any() {
+	using namespace kas3::vm;
+	Slot fresh;
+	fresh.bits = 0;
+	CHECK(any::tag(fresh) == AnyTag::Undefined); // A slot no one has written is undefined.
+	CHECK(any::tag(any::null()) == AnyTag::Null);
+	CHECK(any::tag(any::boolean(true)) == AnyTag::Boolean && any::to_bool_payload(any::boolean(true)));
+	CHECK(!any::to_bool_payload(any::boolean(false)));
+	for (double value : { 0.0, -0.0, 1.5, -1e308, 5e-324, double(INFINITY), -double(INFINITY) }) {
+		const Slot held = any::number(value);
+		CHECK(any::tag(held) == AnyTag::Number);
+		CHECK_EQ(any::to_number_payload(held), value);
+		CHECK_EQ(std::signbit(any::to_number_payload(held)), std::signbit(value));
+	}
+	CHECK(std::isnan(any::to_number_payload(any::number(NAN))) && any::tag(any::number(-NAN)) == AnyTag::Number);
+	// An int whose low bits look like a pointer's tag is still an int.
+	for (int32_t value : { 0, -1, 1, 2, 3, 4, 5, 8, 16, 24, INT32_MIN, INT32_MAX }) {
+		CHECK(any::tag(any::integer(value)) == AnyTag::Int);
+		CHECK_EQ(any::to_int_payload(any::integer(value)), value);
+	}
+	Str *text = new_string("12");
+	Str *word = new_string("abc");
+	Str *empty = new_string("");
+	CHECK(any::tag(any::string(text)) == AnyTag::String && any::pointer(any::string(text)) == text);
+	CHECK(any::counted(any::string(text)) == text && any::counted(any::number(1)) == nullptr);
+
+	CHECK_EQ(any::text(fresh).value_or("?"), std::string("undefined"));
+	CHECK_EQ(any::text(any::null()).value_or("?"), std::string("null"));
+	CHECK_EQ(any::text(any::boolean(false)).value_or("?"), std::string("false"));
+	CHECK_EQ(any::text(any::number(-0.0)).value_or("?"), std::string("0"));
+	CHECK_EQ(any::text(any::number(1.5)).value_or("?"), std::string("1.5"));
+	CHECK_EQ(any::text(any::integer(-7)).value_or("?"), std::string("-7"));
+	CHECK_EQ(any::text(any::string(word)).value_or("?"), std::string("abc"));
+	CHECK(!any::text(any::godot_value(reinterpret_cast<void *>(0x1000))).has_value());
+
+	CHECK(std::isnan(any::to_number(fresh)));
+	CHECK_EQ(any::to_number(any::null()), 0.0);
+	CHECK_EQ(any::to_number(any::boolean(true)), 1.0);
+	CHECK_EQ(any::to_number(any::string(text)), 12.0);
+	CHECK(std::isnan(any::to_number(any::string(word))));
+	CHECK_EQ(any::to_number(any::string(empty)), 0.0);
+	CHECK(!any::to_boolean(fresh) && !any::to_boolean(any::null()) && !any::to_boolean(any::number(-0.0)));
+	CHECK(!any::to_boolean(any::number(NAN)) && !any::to_boolean(any::string(empty)));
+	CHECK(any::to_boolean(any::string(word)) && any::to_boolean(any::integer(-1)));
+
+	CHECK_EQ(std::string(any::type_of(fresh)), std::string("undefined"));
+	CHECK_EQ(std::string(any::type_of(any::null())), std::string("object"));
+	CHECK_EQ(std::string(any::type_of(any::integer(3))), std::string("number"));
+	CHECK_EQ(std::string(any::type_of(any::string(word))), std::string("string"));
+	CHECK_EQ(std::string(any::type_of(any::boolean(true))), std::string("boolean"));
+
+	// === and ==, as ECMAScript has them: node -e 'console.log(null == undefined, null === undefined, ...)'
+	Str *other_word = new_string("abc");
+	CHECK(*any::strict_equal(any::string(word), any::string(other_word)));
+	CHECK(*any::strict_equal(any::integer(5), any::number(5)));
+	CHECK(!*any::strict_equal(any::null(), fresh));
+	CHECK(*any::loose_equal(any::null(), fresh));
+	CHECK(!*any::loose_equal(any::null(), any::number(0)));
+	CHECK(*any::loose_equal(any::string(text), any::integer(12)));
+	CHECK(*any::loose_equal(any::boolean(true), any::number(1)));
+	CHECK(!*any::strict_equal(any::number(NAN), any::number(NAN)));
+	CHECK(*any::strict_equal(any::number(0.0), any::number(-0.0)));
+	CHECK(!*any::loose_equal(any::string(empty), fresh));
+	CHECK(!any::strict_equal(any::godot_value(reinterpret_cast<void *>(0x1000)), any::godot_value(reinterpret_cast<void *>(0x2000))).has_value());
+
+	Wide *big = new_wide(9007199254740993);
+	CHECK(any::tag(any::wide(big)) == AnyTag::Wide && any::counted(any::wide(big)) == big);
+	CHECK_EQ(any::text(any::wide(big)).value_or("?"), std::string("9007199254740993"));
+	CHECK_EQ(std::string(any::type_of(any::wide(big))), std::string("number"));
+	free_wide(big);
+	for (Str *each : { text, word, empty, other_word }) {
+		free_string(each);
+	}
+}
+
 int main() {
+	test_any();
 	test_vectors();
 	test_math();
 	test_integers();

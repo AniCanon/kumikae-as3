@@ -61,6 +61,7 @@ class Lowerer {
 	uint32_t function_index_ = 0; // By index: the list of functions can grow while a body is lowered.
 	Symbol *class_ = nullptr;
 	bool constructor_ = false;
+	const Type *result_type_ = nullptr; // What the function being lowered says it returns, if it says.
 	std::unordered_map<const Symbol *, uint32_t> locals_;
 	std::vector<Loop> loops_;
 	// Expressions whose value is already in a register and must not be worked out again: the subject of
@@ -174,6 +175,23 @@ class Lowerer {
 	uint32_t vector_literal(VectorLit *p_literal);
 	uint32_t vector_call(Call *p_call);
 	uint32_t godot_object_of(uint32_t p_object, Expr *p_written, uint32_t p_position);
+	// The untyped value: ir/lower_any.cpp.
+	bool untyped(const Expr *p_expression) const;
+	bool untyped_type(const Type *p_type) const;
+	// A place of this kind and type starts null: an untyped one declared `Object` (a `*` starts undefined).
+	bool starts_null_type(Kind p_kind, const Type *p_type) const { return p_kind == Kind::Any && !untyped_type(p_type); }
+	// The empty value of an untyped place of this type: null for `Object`, undefined for `*`.
+	uint32_t empty_untyped(const Type *p_type, uint32_t p_position);
+	uint32_t any_value(Expr *p_expression);
+	uint32_t any_text(Expr *p_expression);
+	uint32_t any_equality(Binary *p_binary);
+	uint32_t any_comparison(Binary *p_binary);
+	uint32_t any_add(Binary *p_binary);
+	uint32_t any_typeof(Expr *p_operand, uint32_t p_position);
+	std::optional<uint32_t> any_type_test(Binary *p_binary);
+	// An expression stored where a type is declared: a value from an untyped one is checked against the
+	// class the place holds.
+	uint32_t typed(Expr *p_expression, const Type *p_type, Kind p_kind);
 	// A vector where Godot takes one of its own collections: converted, element by element, to the type
 	// wanted (an Array where Godot takes anything). Nothing if the value is not a vector.
 	std::optional<uint32_t> vector_to_engine(Expr *p_value, const Type *p_wanted);

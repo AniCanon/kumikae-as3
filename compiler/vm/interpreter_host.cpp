@@ -344,8 +344,34 @@ Outcome perform(Request &p_request) {
 } // namespace
 
 // One request to the engine. Raises an AS3 error if the engine refuses.
+// A script object inside an untyped value has no form Godot can hold: said before Godot is asked.
+static bool hands_script_object(const Function &p_function, const Instruction &p_in, const Slot *p_registers) {
+	const char *shape = ir::op_shape(p_in.op);
+	const uint32_t operands[3] = { p_in.a, p_in.b, p_in.c };
+	const auto object = [&](uint32_t p_register) {
+		return p_function.registers[p_register] == Kind::Any && any::tag(p_registers[p_register]) == AnyTag::Object;
+	};
+	for (int n = 1; n < 3; n++) {
+		if (shape[n] == 'R' && object(operands[n])) {
+			return true;
+		}
+		if (shape[n] == 'A') {
+			for (uint32_t each : p_function.argument_lists[operands[n]]) {
+				if (object(each)) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
 void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	const size_t frame_index = frames_.size() - 1;
+	if (hands_script_object(p_function, p_in, stack_.data() + frames_.back().base)) {
+		raise(module_.type_error_class, "a script object can't be given to Godot: only Godot's own values and objects can.");
+		return;
+	}
 	Request request(module_, host_, p_function, p_in, stack_.data() + frames_.back().base, null_text_);
 	switch (perform(request)) {
 		case Outcome::Missing:

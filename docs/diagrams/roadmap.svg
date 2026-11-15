@@ -53,19 +53,19 @@
 <text x="136" y="558" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Arithmetic on Godot&#x27;s value types has a type.</text>
 <rect x="832" y="510" width="112" height="24" rx="12.0" fill="#1E8E3E"/>
 <text x="888.0" y="526.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
-<rect x="116" y="580" width="844" height="68" rx="10" fill="#FFF1CC" stroke="#C77700" stroke-width="1.5"/>
-<circle cx="76" cy="614.0" r="22" fill="#C77700"/>
+<rect x="116" y="580" width="844" height="68" rx="10" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
+<circle cx="76" cy="614.0" r="22" fill="#1E8E3E"/>
 <text x="76" y="619.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">L1</text>
 <text x="136" y="602" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Language server, first slice</text>
-<text x="136" y="621" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">kas3c lsp: errors as you type, go to definition. Works in VS Code; Rider pending.</text>
+<text x="136" y="621" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">kas3c lsp: errors as you type, go to definition, completion. Works in VS Code and Rider.</text>
 <text x="136" y="638" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: A typing mistake shows up in VS Code and Rider at once.</text>
-<rect x="832" y="590" width="112" height="24" rx="12.0" fill="#C77700"/>
-<text x="888.0" y="606.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">In progress</text>
+<rect x="832" y="590" width="112" height="24" rx="12.0" fill="#1E8E3E"/>
+<text x="888.0" y="606.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Built</text>
 <rect x="116" y="660" width="844" height="68" rx="10" fill="#FFF1CC" stroke="#C77700" stroke-width="1.5"/>
 <circle cx="76" cy="694.0" r="22" fill="#C77700"/>
 <text x="76" y="699.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">2</text>
 <text x="136" y="682" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Interpreter in Godot</text>
-<text x="136" y="701" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Built so far: kas3c run; in headless Godot a script uses Godot&#x27;s values, signals and singletons.</text>
+<text x="136" y="701" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">Built so far: Godot&#x27;s whole API, vectors, switch, Math, is/as, untyped values, hot reload. Next: try/catch, Array.</text>
 <text x="136" y="718" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: An AS3 script on a CharacterBody2D moves a character.</text>
 <rect x="832" y="670" width="112" height="24" rx="12.0" fill="#C77700"/>
 <text x="888.0" y="686.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">In progress</text>
@@ -81,7 +81,7 @@
 <circle cx="76" cy="854.0" r="22" fill="#3D6FB6"/>
 <text x="76" y="859.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">4</text>
 <text x="136" y="842" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Mobile</text>
-<text x="136" y="861" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">iOS and Android, debug and release builds.</text>
+<text x="136" y="861" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">iOS and Android, debug and release builds. Built ahead: debug on the iOS Simulator, with hot reload.</text>
 <text x="136" y="878" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: The same game runs on both, and the speed gate passes on devices.</text>
 <rect x="832" y="830" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
 <text x="888.0" y="846.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>
@@ -97,7 +97,7 @@
 <circle cx="76" cy="1014.0" r="22" fill="#3D6FB6"/>
 <text x="76" y="1019.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#FFFFFF">6</text>
 <text x="136" y="1002" font-size="15" text-anchor="start" font-weight="bold" fill="#202124">Tooling</text>
-<text x="136" y="1021" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">The rest of the language server, the debugger and the JetBrains plugin.</text>
+<text x="136" y="1021" font-size="12.5" text-anchor="start" font-weight="normal" fill="#202124">The debugger and the rest of the language server. Built ahead: the Rider plugin with its Simulator panel.</text>
 <text x="136" y="1038" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">Done when: Breakpoints and stepping from Rider, on a device too.</text>
 <rect x="832" y="990" width="112" height="24" rx="12.0" fill="#3D6FB6"/>
 <text x="888.0" y="1006.5" font-size="12" text-anchor="middle" font-weight="bold" fill="#FFFFFF">Planned</text>

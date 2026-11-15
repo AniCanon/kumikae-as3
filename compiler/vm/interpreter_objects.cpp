@@ -32,11 +32,58 @@ void Interpreter::drop(Kind p_kind, Slot &p_slot) {
 		p_slot.bits = 0;
 		host_.handles.drop(handle);
 		return;
+	} else if (p_kind == Kind::Any) {
+		const Slot value = p_slot;
+		p_slot.bits = 0; // For the same reason.
+		drop_any(value);
+		return;
 	}
 	p_slot.bits = 0;
 }
 
+void Interpreter::drop_any(Slot p_value) {
+	switch (any::tag(p_value)) {
+		case AnyTag::String: {
+			Str *string = static_cast<Str *>(any::pointer(p_value));
+			if (release(string)) {
+				free_string(string);
+			}
+			break;
+		}
+		case AnyTag::Object: {
+			Object *object = static_cast<Object *>(any::pointer(p_value));
+			if (release(object)) {
+				drop_object(object);
+			}
+			break;
+		}
+		case AnyTag::Wide: {
+			Wide *wide = static_cast<Wide *>(any::pointer(p_value));
+			if (release(wide)) {
+				free_wide(wide);
+			}
+			break;
+		}
+		case AnyTag::Value:
+		case AnyTag::Godot:
+			host_.handles.drop(any::pointer(p_value));
+			break;
+		default:
+			break;
+	}
+}
+
 Slot Interpreter::share(Kind p_kind, Slot p_value) {
+	if (p_kind == Kind::Any) {
+		retain(any::counted(p_value));
+		if (any::tag(p_value) == AnyTag::Value) {
+			return any::godot_value(host_.handles.copy(any::pointer(p_value)));
+		}
+		if (any::tag(p_value) == AnyTag::Godot) {
+			return any::godot_object(host_.handles.copy(any::pointer(p_value)));
+		}
+		return p_value;
+	}
 	if (ir::is_reference(p_kind)) {
 		retain(static_cast<Counted *>(p_value.p));
 	} else if (ir::is_engine(p_kind) && p_value.p) {
@@ -95,6 +142,15 @@ void Interpreter::drop_object(Object *p_object) {
 				void *handle = field.p;
 				field.p = nullptr;
 				host_.handles.drop(handle);
+			} else if (klass.fields[i].kind == Kind::Any) {
+				const Slot value = field;
+				field.bits = 0;
+				Object *other = any::tag(value) == AnyTag::Object ? static_cast<Object *>(any::pointer(value)) : nullptr;
+				if (!other) {
+					drop_any(value);
+				} else if (release(other)) {
+					dead.push_back(other); // On the list, as an object field is: no recursion.
+				}
 			}
 		}
 		free_object(object);
@@ -175,9 +231,7 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		return nullptr;
 	}
 	for (size_t i = 0; i < klass.fields.size(); i++) {
-		if (klass.fields[i].kind == Kind::F64) {
-			object->fields()[i].d = std::numeric_limits<double>::quiet_NaN();
-		}
+		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
 	}
 	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref && p_owner) {
 		object->fields()[0].p = p_owner; // The object's own from here on.

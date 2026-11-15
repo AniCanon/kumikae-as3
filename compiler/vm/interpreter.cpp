@@ -19,6 +19,9 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 		strings_.push_back(new_string(constant));
 	}
 	null_text_ = new_string("null");
+	for (const char *name : { "undefined", "boolean", "number", "string", "object" }) {
+		type_names_.push_back(new_string(name));
+	}
 	// A method's function by name, for calls from outside: the class's own and what it inherits.
 	methods_.resize(module_.classes.size());
 	for (size_t i = 0; i < module_.classes.size(); i++) {
@@ -30,10 +33,7 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 	class_used_.assign(module_.classes.size(), 0);
 	globals_.resize(module_.globals.size());
 	for (size_t i = 0; i < globals_.size(); i++) {
-		globals_[i].bits = 0;
-		if (module_.globals[i].kind == Kind::F64) {
-			globals_[i].d = std::numeric_limits<double>::quiet_NaN();
-		}
+		globals_[i] = empty_value(module_.globals[i].kind == Kind::F64, module_.globals[i].starts_null);
 	}
 }
 
@@ -50,6 +50,11 @@ Interpreter::~Interpreter() {
 	for (Str *constant : strings_) {
 		if (release(constant)) {
 			free_string(constant);
+		}
+	}
+	for (Str *name : type_names_) {
+		if (release(name)) {
+			free_string(name);
 		}
 	}
 	if (release(null_text_)) {

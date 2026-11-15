@@ -1,0 +1,22 @@
+undefined null true false undefined null undefined
+undefined object number string boolean
+5 number true true false
+5.5 false true
+12 string true 121 11 24
+true boolean true 2
+null object true false true
+7 7 7 true 7
+null true null null
+null 0 NaN false undefined [undefined]
+true false false true
+33 33 7 4
+true true true false true false
+Item(held) Item(held) true true true true object
+held null held null
+held
+42 true number true
+1 12null 3.5
+7 seven null null Item(e)
+no no true true fallback undefined
+zero is false
+0 NaN Item(held) true
