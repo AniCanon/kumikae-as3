@@ -6,11 +6,13 @@ its measurements are described in the results below.
 
 | Checked | By | Result |
 |---|---|---|
-| Compilation, style check and plugin zip | Automated build, 2026-11-14 | `./gradlew check buildPlugin` succeeds. |
-| Service tests (`core`) | Automated build | 62 pass. |
-| Panel tests (repository, controller, service adapter) | Automated build | 105 pass. |
+| Compilation, style check and plugin zip | Automated build, 2026-11-15 | `./gradlew check buildPlugin` succeeds. |
+| Service tests (`core`) | Automated build | 67 pass; one opt-in live probe skips in ordinary checks and passed separately. |
+| Panel tests (repository, controller, service adapter) | Automated build | 115 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
 | Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
-| Native Swift tests | `swift test` | 16 pass. |
+| Native Swift tests | `swift test` | 21 pass. |
+| Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
+| Standalone frame retention | Production repository/controller/screen, synthetic frames | 7,800 distinct paints; full-GC heap 48.023–48.097 MiB, one retained stream image; zero images and 35.097 MiB hidden. Whole IDE/Compose not measured. |
 | Agent client tests | `python3 -m unittest` | 7 pass. |
 | Service and agent client against a booted Simulator | Run by hand through `simulator.py` | Devices, select, launch of `org.kumikae.as3test`, a 2622x1206 PNG screenshot, console log, and the test report "14 passed, 0 failed". |
 | The panel's own repository against a booted Simulator | One throwaway test, read-only | Select, a decoded 1206x2622 JPEG picture in 403 ms, an empty console page and status. |
@@ -41,7 +43,8 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   helper cannot start, the panel tries installed idb MJPEG, then public screenshots
   and names the route in its status line. With input off, the panel retains JPEG
   snapshots, capped at two requests per second. Hidden windows and the Simulators list stop pictures.
-  Failed live streams report a retry with bounded backoff.
+  Failed live streams report a retry with bounded backoff. A guest input service
+  still starting after reboot keeps the native route available for that retry.
 - One action at a time. A button pressed while another action runs is refused
   with a message, never queued. A picture that arrives after the device changed,
   or after a boot, launch or rotation, is thrown away. A device picked while an
@@ -58,8 +61,10 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   cursor, input permission, hidden windows and late results after closing.
 
 The bundled helper needs no idb at runtime. It loads private Apple interfaces only
-after the existing opt-in. It currently accepts the measured Apple-silicon Xcode
-27.0 build 27A266a and iPhone devices. Other builds/devices fall back. The plugin
+after the existing opt-in. It accepts Apple-silicon iPhone devices when the selected Xcode passes the
+runtime capability checks; a build deny list can reject a known incompatibility
+with its reason. Only Xcode 27.0 build 27A266a has been measured. Missing or
+changed capabilities and unsupported devices fall back. The plugin
 installs idb only when you explicitly choose Install idb… and agree to its dialog.
 
 This is the beginning of the one plugin planned in roadmap stage 6. It does not
@@ -126,6 +131,30 @@ demo device's Home and Settings, real Swing pointer phases and native input. Add
 `KUMIKAE_SIMULATOR_ENDURANCE_PROBE=1` extends that run by ten minutes, sampling CPU,
 heap and RSS. The live run requires the native route, checks that hiding the panel
 releases its helper, and reports measurements without asserting performance targets.
+
+## Isolated native checks
+
+No probe starts as part of an ordinary test run. With the release helper already
+built, `KUMIKAE_NATIVE_LIFECYCLE_PROBE=1 ./gradlew --offline :core:test --tests '*NativeLifecycleProbe'`
+creates one disposable iPhone using an installed runtime. It checks external
+shutdown, reboot, session shutdown/boot and selection recovery. It captures frames
+from an already booted Simulator for the selection check, sends it no input, and
+deletes only the device it created, including after failures. A pre-existing probe
+name is refused. `ProbeDeviceOwnerTest` covers lost creation replies and cleanup
+errors with fake commands.
+
+`KUMIKAE_FRAME_RETENTION_PROBE=1 ./gradlew --offline :test --tests '*FrameRetentionProbe'`
+paints 7,800 fresh 1206×2622 images through the production repository, controller
+and native screen in a standalone test JVM. It shows no window and uses no
+Simulator. Live heap histograms force full collections; samples include the GC's
+recorded after-collection heap, weak image counts and verified distinct paints.
+It covers these objects, not a mounted Compose view or the whole IDE.
+
+`KUMIKAE_SIMULATOR_MEMORY_PROBE=1 ./gradlew --offline runIde -PuiProbe` is a separate
+ten-minute IDE probe with synthetic frames and a mounted, undisplayed production
+view. It writes `memory.csv` and live histograms under `build/reports/ui/`, including
+hidden/disposed samples. **This probe was prepared but not run in the follow-up:**
+the owner's sandbox IDE was in use. Do not run it beside another sandbox session.
 
 ## Use the panel
 

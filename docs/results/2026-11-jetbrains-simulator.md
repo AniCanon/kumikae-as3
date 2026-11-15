@@ -615,3 +615,181 @@ its worker and does not wait for that lock on the EDT.
 The root Gradle change is one separate native-helper/probe block; the core build
 adds the shared frame resources. No language/project/run source folder or
 `plugin.xml` was changed.
+
+## Native follow-up: capabilities, recovery and retention — 2026-11-15
+
+This pass stopped after the first three requested items. It used the installed
+Apple-silicon Xcode 27.0 build 27A266a, iOS 26.4 and JDK 25. No IDE was started,
+no host window, keyboard or pointer was driven, and nothing was downloaded.
+The already booted Simulator was used only for frames in a selection check.
+All boot/shutdown operations targeted a disposable device created by the probe.
+No input was sent to the person's Simulator. No application was installed.
+
+### 1. Capability gate: done
+
+The single-build allowlist is removed. Classes, Objective-C method signatures
+and export presence gate startup. The build deny list is empty; entries require
+a reason that is included in the failure message. Missing-capability messages
+still name the Xcode version/build and symbol. Apple-silicon and iPhone limits
+remain. C export signatures cannot be introspected: their presence is checked,
+which is weaker than proving their ABI on a different Xcode build. No other
+Xcode installation was tested live.
+
+Before the change, `unlistedBuildPassesWhenEverySymbolExists` failed with the old
+build refusal, and `unlistedBuildStillNamesMissingCapability` failed because the
+message omitted the missing export. Disabling the deny check produced the
+assertion **`Denied build was accepted`**; the check was restored. All five guard
+tests then passed, including changed-signature refusal.
+
+### 2. Real lifecycle recovery: done
+
+`NativeLifecycleProbe` uses the production `SimulatorSession`, `FallbackInput`,
+`NativeInput`, helper and mapped reader. It creates an iPhone using an installed
+runtime, attempts startup while stopped, boots, reads a **1206×2622** frame,
+shuts down externally while streaming, refuses stale touch, reboots, changes to
+the already booted Simulator for frames only, returns to its own device, and
+checks session-driven shutdown/boot too. No successful touch is needed: the
+stale-touch assertions must fail before sending input.
+
+The first real run failed after reboot: **`Simulator input timed out; delivery
+is unknown`** caused the fallback chooser to exhaust the native candidate.
+Framebuffer readiness did not imply guest input-service readiness. The empty
+startup barrier now reports `DEVICE_UNAVAILABLE`, preserving native input for a
+later retry. Actual input delivery failures are unchanged and are never replayed.
+The new Swift regression first failed with `INPUT_UNAVAILABLE` instead of
+`DEVICE_UNAVAILABLE`; cancellation and successful readiness are tested separately.
+
+The successful live run printed:
+
+```text
+stopped_start=DEVICE_UNAVAILABLE; native_route_retained=true
+first_frame=1206x2622
+external_shutdown=feed_ended; stale_touch_refused=true; native_route_retained=true
+reboot=new_frame; generation_advanced=true
+selection=read_only_other_frame_then_owned_frame; stale_device_refused=true
+session_shutdown_boot=new_frame
+session_close=all_helper_slots_removed
+owned_device_deleted=true
+```
+
+The initial failure and both successful runs deleted their owned devices.
+Independent review found two cleanup gaps in the probe itself: a state-list
+failure before deletion, and a lost creation reply. The delete is now in a
+`finally` that covers state lookup/shutdown. After a lost reply, the owner adopts
+only a sole newly appearing probe after first refusing an occupied probe name;
+ambiguous ownership fails explicitly. `ProbeDeviceOwnerTest` first failed its
+lost-reply assertion, then all three fake-command cleanup tests passed. The final
+live/cleanup run printed **`BUILD SUCCESSFUL in 1m 4s`**, four tests passed.
+
+### 3. Memory: partly done
+
+A forced-collection regression found that clearing the native screen left its
+last painted image in `SimulatorScreen.presented`. The failing assertion retained
+a **1206×2622** `BufferedImage`, whose pixel array alone is **12,648,528 bytes**.
+Clearing the screen now clears that reference. This was bounded retention after
+hiding, not evidence of an ever-growing streaming leak.
+
+The standalone probe sends fresh full-size images through `LatestValue`, the
+production API repository, controller and native screen. Every generated image
+must produce a distinct paint callback. At each sample, a live heap histogram
+forces a full GC; heap values come from the collector's recorded after-GC heap
+pools. Weak references count surviving input images and cleared references are
+pruned. The native screen is painted into an offscreen image; no window appears.
+This does not exercise the mapped reader, mounted Compose view, or the whole IDE.
+
+The final run painted **7,800 of 7,800 generated frames in 162.902 seconds**.
+Every streaming sample retained **one** input image. After hiding, **zero** input
+images survived. After-GC heap was **48.023–48.097 MiB**, then **35.097 MiB** hidden.
+There was no accumulating frame retention in this exercised path over the run.
+This is neither a ten-minute run nor evidence of whole-IDE leak freedom.
+
+| Frames produced and painted | Seconds | Retained input images | Heap after full GC, MiB |
+|---:|---:|---:|---:|
+| 600 | 12.528 | 1 | 48.023 |
+| 1800 | 37.392 | 1 | 48.085 |
+| 3000 | 62.448 | 1 | 48.093 |
+| 4200 | 87.742 | 1 | 48.094 |
+| 5400 | 112.802 | 1 | 48.096 |
+| 6600 | 137.978 | 1 | 48.097 |
+| 7800 | 162.902 | 1 | 48.097 |
+| Hidden | 162.915 | 0 | 35.097 |
+
+Live histograms independently counted **three BufferedImages** at both the first
+and last streaming samples (input, offscreen target and decoration cache), then
+**two** hidden. All JVM `int[]` payloads were **16,104,032 / 16,103,968 bytes** at
+those streaming endpoints and **3,455,200 bytes** hidden. The measured input pixel
+array is absent after hiding. Histogram files and CSV remain under ignored
+`build/reports/frame-retention/`. The two standalone tests passed, with
+**`BUILD SUCCESSFUL in 2m 58s`** (18 tasks: 5 executed, 13 up-to-date).
+Lifecycle verification and small offline builds overlapped part of the run;
+this workload is a retention measurement, not a frame-rate benchmark.
+
+The separate `KUMIKAE_SIMULATOR_MEMORY_PROBE=1` IDE probe is implemented and
+compiled, but **not run**. It mounts the production Compose view with synthetic
+frames for ten minutes and records live histograms, after-GC heap, produced and
+painted counts, plus hidden/disposed samples. It shows no host window and sends
+no Simulator input. Absence of IDE/Compose memory growth remains unverified.
+
+Review changed the measurement: the first standalone version retained all its
+weak-reference bookkeeping and sampled heap after writing a histogram. It also
+lacked an assertion that frames were painted. Those measurements were replaced
+with pruned bookkeeping, actual paint counts and the collector's recorded heap.
+
+### Items not done
+
+4. Native rotation is unchanged and explicitly unsupported.
+5. Text remains printable US ASCII; Unicode/pasteboard input was not implemented.
+6. The older mapped-sink, ASCII-keyboard and shared-repository touch tests were
+   not mutation-checked in this pass. The guard mutation above is a different test.
+7. No new ten-minute frame-rate or input-latency investigation was performed.
+   The earlier dips and 82 ms maximum remain unexplained by this pass.
+8. Two-finger gestures, iPad support and synchronous legacy session actions were
+   not changed.
+
+### Reproduction and boundaries
+
+Commands ran in `editors/jetbrains`, except Swift commands in
+`native/SimulatorBridge`. Gradle used `JAVA_HOME=/opt/homebrew/opt/openjdk@25`,
+`GRADLE_USER_HOME=<this-worktree>/editors/jetbrains/.gradle-home`, and the requested
+`GRADLE_RO_DEP_CACHE=<cache-worktree>/editors/jetbrains/.gradle-home/caches`.
+The local home was seeded from already installed wrapper/dependency files; the
+read-only cache alone lacked the Kotlin 2.4.10 plugin marker. Initial sandbox
+attempts refused the Gradle lock/socket, Swift module cache and Python loopback
+socket. The authorized execution context resolved those access restrictions.
+No network build or dependency download was used.
+
+```sh
+./gradlew --offline --no-daemon -Pkas3Root=<repository> check buildPlugin verifyPlugin
+KUMIKAE_NATIVE_LIFECYCLE_PROBE=1 ./gradlew --offline --no-daemon :core:test \
+  --tests '*NativeLifecycleProbe' --tests '*ProbeDeviceOwnerTest'
+KUMIKAE_FRAME_RETENTION_PROBE=1 ./gradlew --offline --no-daemon :test \
+  --tests '*ScreenRetentionTest' --tests '*FrameRetentionProbe'
+./gradlew --offline --no-daemon ktlintFormat
+python3 -m unittest discover -s tests
+swift test --filter PrivateAPIGuardTests
+swift test --filter InputReadinessTests
+swift build -c release && swift test
+```
+
+Focused failing runs, temporary deny-check mutation, and the initial live failure
+are described above. Live probes are opt-in and skip during ordinary `check`.
+No `runIde` command was run. The hot-reload `sources(params)` forwarding and its
+`SessionStateTest` regression were preserved unchanged. Designs and plans remain
+local ignored files under `docs/superpowers/`; none are committed. Independent
+review covered compatibility, recovery, ownership and the retention measurement;
+all findings described above were addressed.
+
+The final full offline build printed **`BUILD SUCCESSFUL in 30s`**, 37 tasks
+(18 executed, 19 up-to-date). XML reports show **116 panel tests: 115 passed,
+1 opt-in probe skipped**, and **68 core tests: 67 passed, 1 opt-in probe skipped**;
+zero failures or errors. The two skipped probes were run explicitly as recorded
+above. The verifier reports **Compatible** with **RD-262.10968.170**, four
+existing deprecated-API and six experimental-API notices, and **0 B downloaded**.
+Python printed **`Ran 7 tests in 3.547s`**, **`OK`**. Swift release printed
+**`Build complete! (2.70 sec)`**; the final Swift Testing result was
+**`Test run with 21 tests in 9 suites passed after 0.012 seconds`**.
+The XCTest compatibility runner's zero-test line is not that test result.
+
+A final read-only device/process check printed **`remaining_probe_devices=0`**
+and **`remaining_worktree_processes=0`**. Owned helpers and single-use Gradle/test
+processes had exited. No process belonging to the person was killed or signalled.

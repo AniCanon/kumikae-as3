@@ -140,8 +140,10 @@ It owns stdin and the temporary directory. The helper creates the slot with mode
 0600, refuses existing files/symlinks, connects to the selected boot generation,
 and validates/publishes its first frame before writing a ready JSON line containing
 `ready`, `width`, `height`, and `density`. A startup error writes an `error` and `code` line and exits nonzero.
-`DEVICE_UNAVAILABLE` means the selected device is stopped or restarting: retain
-the native route for a later reconnect. Other startup failures permit fallback. Closing stdin cancels input even while a command is in flight,
+`DEVICE_UNAVAILABLE` means the selected device is stopped, restarting, or its
+input service has not acknowledged the empty startup barrier: retain the native
+route for a later reconnect. Other startup failures, including missing capabilities,
+permit fallback. Closing stdin cancels input even while a command is in flight,
 releases held controls, unmaps the slot and releases device objects. The service
 reaps the child before deleting its files. Closing a picture only signals its
 worker; file and process cleanup happen away from the EDT.

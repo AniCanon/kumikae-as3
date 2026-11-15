@@ -20,9 +20,10 @@ binaries, device identifiers or captured screen contents belong in this folder.
 `AppleSimulator` is the private adapter, split into files for display lookup,
 connection ownership, and input messages. `RuntimeSymbols` only implements public
 `dlopen`/`dlsym` and Objective-C runtime operations. Private frameworks are not
-linked at build time. The adapter deliberately accepts only Apple silicon and
-Xcode 27.0 build 27A266a, measured on macOS 27.2.1 with iOS 26.4. A changed build
-requires inspection and measurements before widening that guard.
+linked at build time. The adapter accepts Apple silicon and gates Xcode support on
+its runtime capabilities. A small build deny list can refuse a demonstrated
+incompatibility with its reason; it is currently empty. Xcode 27.0 build 27A266a
+is the only build measured so far, on macOS 27.2.1 with iOS 26.4.
 
 The complete private surface used by the helper is:
 
@@ -41,12 +42,16 @@ The complete private surface used by the helper is:
 Every callable class, selector and export is checked before use; Objective-C
 argument and result encodings must match. Guard failures name the selected Xcode
 version/build and missing or changed symbol. C export signatures have no runtime
-introspection: the strict build guard covers that limitation. Missing display,
+introspection: only their presence is checked. Acceptance of another build is
+not evidence of a live test on that build. Missing display,
 service or endpoint also fails startup. The service falls back to installed idb,
 then screenshots. A later device failure ends the feed and revokes its geometry;
 reopening starts a new process. A typed `DEVICE_UNAVAILABLE` startup error keeps
 the native backend available for a later boot/reconnect; it does not exhaust the
-fallback list. Unknown input delivery is never replayed.
+fallback list. An empty input-service startup barrier that times out after reboot
+also reports `DEVICE_UNAVAILABLE`. This classification applies before any real
+input is submitted; capability failures still permit fallback. Unknown input
+delivery is never replayed.
 
 The XPC envelope uses `messageType`, `featureIdentifier`, `isBarrier` and `payload`.
 Touch payloads use normalized `pointOne.x/y`, `eventType` (down/move/up), `edge`
@@ -71,5 +76,6 @@ seed-observation-to-paint timing from actual presentation latency. No authoritat
 presentation timestamp is available. The current route reads full-size BGRA and
 polls seeds every 8 ms; it has no private screen callback ABI. The mapped slot drops
 a frame under lock contention. Only iPhone, printable US ASCII, single touch, Home
-and Lock are implemented; native rotation fails explicitly. Lock and device reboot
-recovery remain live-device checks for a later authorized session.
+and Lock are implemented; native rotation fails explicitly. Shutdown, reboot and
+selection recovery were checked on a disposable device, including a startup
+readiness failure fixed in this pass. Lock remains a separate live-device check.

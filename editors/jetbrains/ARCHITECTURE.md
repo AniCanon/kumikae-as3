@@ -42,7 +42,10 @@ helper and removes the mapping. No image crosses JSON and no image copy runs on 
 The Swift library has device, frame source, frame sink and input protocols. Its
 `AppleSimulator` actor alone knows private Apple names, with separate extensions
 for the input connection and messages. It runtime-loads CoreSimulator and checks
-Objective-C signatures and private XPC exports. Capture polls the IOSurface seed
+Objective-C signatures and private XPC export presence. Runtime capabilities
+are the Xcode compatibility gate; an empty-by-default build deny list records
+reasons for any known incompatibilities. A failed empty startup barrier is
+retryable after reboot, without replaying input. Capture polls the IOSurface seed
 at 8 ms and only copies changes. DTUHID sends down/move/up and waits for a separate
 guest-service barrier reply. The actor is single-use; reconnection creates another
 helper. Stdin EOF cancels active work and releases input and device references.
@@ -134,6 +137,7 @@ The controller owns picture state. Normal frame replacement repaints only
 `DeviceBodyCache` retains one decoration image at the current display density;
 geometry or density changes replace it, so live frames do not rasterize the static bezel.
 The cache is capped at 16 MiB; larger zoomed views paint decoration directly.
+Clearing a screen also releases its last-presented frame used by paint instrumentation.
 A settled native screen still has cheap seed polls, but no pixel copy or repaint.
 The idb fallback asks its source for changes dynamically.
 
