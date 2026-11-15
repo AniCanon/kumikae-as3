@@ -26,24 +26,48 @@ import com.intellij.platform.lsp.api.LspClientManager
 import com.intellij.psi.PsiDocumentManager
 import java.awt.event.WindowEvent
 import java.lang.management.ManagementFactory
+import java.lang.ref.WeakReference
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 /** Native LSP lookup and acceptance in a disposable sandbox project. */
 object UiProbeCompletion {
-    fun run(destination: Path) {
+    private val projects = mutableListOf<WeakReference<com.intellij.openapi.project.Project>>()
+
+    fun run(destination: Path, plainText: Boolean = false) {
+        projects.clear()
+        val endurance = System.getenv("KUMIKAE_COMPLETION_RETENTION_PROBE") == "1"
         val heap = mutableListOf<String>()
-        repeat(3) { cycle ->
-            runProject(destination, cycle)
-            System.gc()
-            Thread.sleep(100)
-            heap += "closed project $cycle heap=${ManagementFactory.getMemoryMXBean().heapMemoryUsage.used} bytes"
+        val started = System.nanoTime()
+        repeat(if (endurance) 10 else 3) { cycle ->
+            runProject(destination, cycle, plainText)
+            if (endurance) {
+                val histogram = UiProbeHeap.collect()
+                Files.writeString(destination.resolve("completion-$cycle.histo"), histogram)
+                heap += "cycle=$cycle seconds=${(System.nanoTime() - started) / 1e9} " +
+                    "heap_after_gc_mib=${UiProbeHeap.usedMiB()} retained_projects=${projects.count {
+                        it.get() != null
+                    }}"
+                Files.write(destination.resolve("completion-heap.txt"), heap)
+                val nextCycle = started + TimeUnit.SECONDS.toNanos((cycle + 1L) * 60)
+                while (System.nanoTime() < nextCycle) Thread.sleep(100)
+            } else {
+                System.gc()
+                Thread.sleep(100)
+                heap += "closed project $cycle heap=${ManagementFactory.getMemoryMXBean().heapMemoryUsage.used} bytes"
+            }
+        }
+        if (endurance) {
+            Files.writeString(destination.resolve("completion-final.histo"), UiProbeHeap.collect())
+            heap += "final seconds=${(System.nanoTime() - started) / 1e9} " +
+                "heap_after_gc_mib=${UiProbeHeap.usedMiB()} retained_projects=${projects.count { it.get() != null }}"
         }
         Files.write(destination.resolve("completion-heap.txt"), heap)
+        projects.clear()
     }
 
-    private fun runProject(destination: Path, cycle: Int) {
+    private fun runProject(destination: Path, cycle: Int, plainText: Boolean) {
         val folder = Files.createTempDirectory("kas3-completion-probe")
         val source = "package { import godot.*; public class CompletionProbe extends Node2D {\n" +
             "public function run():void { transform.origin.normsuffix; } } }"
@@ -51,7 +75,7 @@ object UiProbeCompletion {
         val trustedPaths = trust.getTrustedPaths().toList()
         try {
             trust.addTrustedPath(folder.toString())
-            checkProject(destination, cycle, folder, source)
+            checkProject(destination, cycle, folder, source, plainText)
         } finally {
             try {
                 trust.setTrustedPaths(trustedPaths)
@@ -61,8 +85,8 @@ object UiProbeCompletion {
         }
     }
 
-    private fun checkProject(destination: Path, cycle: Int, folder: Path, source: String) {
-        val path = folder.resolve("CompletionProbe.as")
+    private fun checkProject(destination: Path, cycle: Int, folder: Path, source: String, plainText: Boolean) {
+        val path = folder.resolve(if (plainText) "Control.txt" else "CompletionProbe.as")
         Files.writeString(path, source)
         val project = checkNotNull(
             ProjectUtil.openOrImport(
@@ -72,6 +96,7 @@ object UiProbeCompletion {
                 },
             ),
         )
+        projects += WeakReference(project)
         val observations = mutableListOf<String>()
         val settings = CodeInsightSettings.getInstance()
         val autoComplete = settings.AUTOCOMPLETE_ON_CODE_COMPLETION
@@ -83,6 +108,12 @@ object UiProbeCompletion {
                 FileEditorManager.getInstance(project).openFile(file, true)
                 editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
                 editor.caretModel.moveToOffset(source.indexOf("normsuffix") + 4)
+            }
+            if (plainText) {
+                await("plain-text indexing") { !DumbService.getInstance(project).isDumb }
+                Thread.sleep(1000)
+                observations += "Plain-text control opened without AS3 completion"
+                return
             }
             await("LSP initialization") {
                 LspClientManager.getInstance(project).getClients(As3LspSupportProvider::class.java)
@@ -162,6 +193,7 @@ object UiProbeCompletion {
                 LookupManager.getInstance(project).hideActiveLookup()
                 observations += "Changed document cancels the old lookup and offers x"
             }
+            UiProbeGeneratedCompletion.run(project, editor, observations)
             checkSnippet(project, editor, source)
             observations += "Required argument is selected; Tab exits the snippet after the call"
         } finally {
@@ -170,7 +202,11 @@ object UiProbeCompletion {
                 edt { observations += "final text: ${editorText(project)}" }
             } finally {
                 try {
-                    edt { ProjectManagerEx.getInstanceEx().forceCloseProject(project, false) }
+                    edt {
+                        check(ProjectManagerEx.getInstanceEx().forceCloseProject(project, false))
+                        check(project.isDisposed) { "Closed probe project was not disposed" }
+                        observations += "Project closed and disposed"
+                    }
                 } finally {
                     Files.write(destination.resolve("completion-$cycle.txt"), observations)
                 }
@@ -201,14 +237,14 @@ object UiProbeCompletion {
         }
     }
 
-    private fun action(editor: Editor, id: String) {
+    internal fun action(editor: Editor, id: String) {
         val context = DataManager.getInstance().getDataContext(editor.contentComponent)
         ActionManager.getInstance().getAction(id).actionPerformed(
             AnActionEvent.createFromDataContext("UI probe", null, context),
         )
     }
 
-    private fun invokeCompletion(project: com.intellij.openapi.project.Project, editor: Editor) {
+    internal fun invokeCompletion(project: com.intellij.openapi.project.Project, editor: Editor) {
         // A Gradle sandbox can start in the background. Deliver activation to its own frame so the
         // platform's hint manager permits showing the real lookup without stealing desktop focus.
         val frame = checkNotNull(WindowManager.getInstance().getFrame(project))
@@ -223,9 +259,9 @@ object UiProbeCompletion {
                 "lookup=${LookupManager.getActiveLookup(it)?.items?.map { item -> item.lookupString }}"
         }.orEmpty()
 
-    private fun edt(action: () -> Unit) = ApplicationManager.getApplication().invokeAndWait(action)
+    internal fun edt(action: () -> Unit) = ApplicationManager.getApplication().invokeAndWait(action)
 
-    private fun await(name: String, condition: () -> Boolean) {
+    internal fun await(name: String, condition: () -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
         while (System.nanoTime() < deadline) {
             var ready = false

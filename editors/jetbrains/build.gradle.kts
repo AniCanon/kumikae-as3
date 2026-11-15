@@ -80,7 +80,16 @@ if (providers.gradleProperty("uiProbe").isPresent) {
     tasks.runIde {
         val report = layout.buildDirectory.dir("reports/ui").get().asFile
         args("kumikae-as3-ui-check", report.absolutePath)
-        timeout = Duration.ofMinutes(2)
+        timeout =
+            Duration.ofMinutes(
+                if (providers.environmentVariable("KUMIKAE_COMPLETION_RETENTION_PROBE").orNull ==
+                    "1"
+                ) {
+                    15
+                } else {
+                    2
+                },
+            )
         doFirst { report.resolve("result.txt").delete() }
         doLast {
             check(report.resolve("result.txt").takeIf { it.isFile }?.readText()?.trim() == "passed") {
@@ -97,7 +106,7 @@ val kas3Root = providers.gradleProperty("kas3Root").orElse(rootDir.resolve("../.
 tasks.withType<PrepareSandboxTask>().configureEach {
     val root = file(kas3Root.get())
     from(root.resolve("compiler/build")) {
-        include("kas3c")
+        include("kas3c", "kas3c.exe")
         into("${intellijPlatform.projectName.get()}/native")
     }
     from(root.resolve("compiler/tests/godot_project/bin")) {
