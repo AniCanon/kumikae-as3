@@ -4,6 +4,7 @@ namespace kas3 {
 
 const Type *Typer::unary(Unary *p_unary) {
 	const Type *operand = expression(p_unary->operand);
+	operand = operand == object_ ? any_ : operand; // As in arithmetic().
 	if (p_unary->op == TokenKind::Minus || p_unary->op == TokenKind::Plus) {
 		if (const Type *result = described_unary(p_unary->op, operand, p_unary->offset)) {
 			return result;
@@ -51,6 +52,9 @@ const Type *Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_
 	if (p_left->kind == Type::Unknown || p_right->kind == Type::Unknown) {
 		return unknown_;
 	}
+	// An Object may hold anything, as a `*` does: what it holds decides when the line runs.
+	p_left = p_left == object_ ? any_ : p_left;
+	p_right = p_right == object_ ? any_ : p_right;
 	// A string plus anything is a string: the other side is converted.
 	if ((p_op == TokenKind::Plus || p_op == TokenKind::PlusAssign) && (p_left == string_ || p_right == string_)) {
 		return string_;

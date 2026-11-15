@@ -206,8 +206,6 @@ any Godot value passing as a condition):
 
 - Members of an untyped value are refused: `x.name`, `x.method()`, `x[key]` wait for Object literals and
   dynamic access. **2c**
-- The checker gives no type to arithmetic on an `Object` (`o + 1`), so it is refused; on a `*` it works.
-  **2c**
 - An untyped value that holds a script object is an AS3 error when an AS3 call gives it to Godot; when
   Godot reads it (a return, a field), Godot gets null and an error is printed. Nothing converts it.
   **decision**
