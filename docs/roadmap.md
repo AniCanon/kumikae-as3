@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 120 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 119 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -160,8 +160,10 @@ Completion improvements are described in the [editor guide](../editors/completio
 typing, lexical scopes, import paths, replacement edits, callable snippets and signature help. The
 [results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
 complete stage 6. The [follow-up results](results/2026-11-completion-followup.md) cover auto-imports,
-override stubs, body-only incremental checking and lifecycle controls. Windows runtime validation and
-IntelliJ IDEA Community integration remain pending; Android Studio is outside the scope.
+override stubs, body-only incremental checking and lifecycle controls. The optional LSP4IJ adapter
+supports IntelliJ IDEA Community/free unified IDEA alongside Rider's native client. The installed
+IDEA and Rider endpoints pass sandbox editing checks; older Community builds and Windows runtime
+validation remain unverified. Android Studio is outside the scope.
 
 Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
@@ -219,15 +221,15 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) gives every deferred item a stage:** none left in 2b-3, 22 in 2c, 13 in the
-  language server's second slice, 21 in 2d, 50 in a clean-up pass that closes stage 2, and 8 that wait on
+- **The [backlog](backlog.md) gives every deferred item a stage:** none left in 2b-3, 23 in 2c, 14 in the
+  language server's second slice, 24 in 2d, 50 in a clean-up pass that closes stage 2, and 8 that wait on
   the owner.
 - **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
   waits for the cycle collector (2d).
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
-- **Language server:** Rider passes automated sandbox editing checks; manual acceptance, Community
-  integration and Windows runtime validation remain pending.
+- **Language server:** Rider and free unified IDEA pass automated sandbox editing checks. Manual
+  acceptance, older Community builds and Windows runtime validation remain unverified.
 
 ## Decisions made
 

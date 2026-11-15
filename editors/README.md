@@ -26,6 +26,9 @@ part of the program.
 > - **Rider RD-262.10968.170:** the native plugin passes automated sandbox checks for pairing,
 >   completion lookup, Tab/Enter acceptance, undo and changed-document cancellation (2026-11-15).
 >   See [completion results](../docs/results/2026-11-completion.md) for measurements and limits.
+> - **Free unified IDEA IU-261.22158.277 with LSP4IJ 0.21.0:** automated sandbox checks cover Enter/Tab,
+>   snippets, imports, overrides, parameter help, navigation and outline. See the
+>   [follow-up results](../docs/results/2026-11-completion-followup.md) for the compatibility matrix.
 
 > **Windows validation is pending.** Binary transport, pipe readiness, UTF-8 filesystem paths and
 > `.exe` discovery are implemented, but these runtime branches have not been exercised on Windows.
@@ -53,15 +56,19 @@ The colouring is a small grammar: keywords, strings, comments and numbers.
 
 ## Rider and IntelliJ IDEA Community
 
-The [Kumikae JetBrains plugin](jetbrains/) connects `kas3c lsp` through the IDE's native LSP client.
+The [Kumikae JetBrains plugin](jetbrains/) connects `kas3c lsp` through Rider's native LSP client or
+LSP4IJ in IntelliJ IDEA.
 It provides AS3 highlighting, completion, argument help, navigation and local bracket/quote assistance,
 as well as project/run tools and the Simulator panel. Install the plugin ZIP built from the same
 compiler revision; it bundles `kas3c` when a compiler build is available. See the plugin README for the
 supported Rider build and build commands.
 
-Rider uses its native LSP client. IntelliJ IDEA Community is the other intended target, but needs an
-optional LSP4IJ adapter and separate verification; the current package still requires the native LSP
-module. Android Studio is outside the scope.
+For IntelliJ IDEA, install and enable **LSP4IJ 0.21.0** from Settings → Plugins, then install Kumikae.
+IDEA's [unified distribution](https://www.jetbrains.com/help/idea/intellij-idea-single-distribution.html)
+includes the free features that replaced Community Edition; this adapter
+does not use an Ultimate API or require a paid subscription. Rider uses its native client and does not
+require LSP4IJ. Installing LSP4IJ in Rider does not start a second AS3 server. Android Studio is outside
+the scope. See the plugin README for the specific builds checked.
 
 ## Any other editor
 

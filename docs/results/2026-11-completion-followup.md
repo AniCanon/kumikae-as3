@@ -4,9 +4,10 @@ Measured on 2026-11-15 on macOS arm64, using C++17 Release builds and Apple Clan
 The comparison binary is the merged first completion PR, revision `c38c55a`. The measured compiler
 contents are committed in `dfc33c9`, and the production editor and probe in `a726bfc`; both builds embed
 the same Godot declarations. The survey guard used for sustained IDE runs is recorded in `fd1b98c`.
-The IDE is Rider RD-262.10968.170 with JDK 25, launched only in a separate sandbox.
-Rider and IntelliJ IDEA Community are the intended targets. Community integration is pending dependency
-approval and validation. Android Studio is outside the scope. No new dependency was added.
+The original IDE measurements use Rider RD-262.10968.170 with JDK 25, launched only in a separate
+sandbox. The approved LSP4IJ 0.21.0 adapter adds IntelliJ IDEA's free unified distribution as the
+Community target in revision `d6c1a6e`; adapter validation is described below. No IDE was downloaded. Android Studio is
+outside the scope.
 
 ## What was verified
 
@@ -58,8 +59,8 @@ python3 -m unittest discover -s tests -v
 KUMIKAE_COMPLETION_CONTROL_PROBE=1 ./gradlew --offline runIde -PuiProbe
 ```
 
-Plugin checks: 126 tests pass and one opt-in probe skips. Core: 82 pass and three opt-in probes skip.
-Python: nine tests pass. Build and verifier succeed against the pinned Rider. The regular editor probe
+Plugin checks: 134 tests pass and one opt-in probe skips. Core: 82 pass and three opt-in probes skip.
+Python: nine tests pass. Build and verifier succeed against both installed IDE endpoints. The regular editor probe
 passes; light/dark screenshots were inspected. The control opens only plain text and confirms all three
 projects close and are disposed. Both reproduce the same `HighlightingPanel` shutdown warning from
 Rider's Problems View alarm. This control narrows the warning's source; it is not proof of zero IDE leaks.
@@ -67,6 +68,61 @@ Rider's Problems View alarm. This control narrows the warning's source; it is no
 Formatting and checks run separately: an earlier combined format/check invocation raced on the same
 files and failed; the sequential rerun passed. Review regressions and an initial diagnostic-version
 capability failure were fixed before the passing suites.
+
+## IDEA and Rider adapter validation
+
+The same artifact uses optional descriptors to select the client. IDEA is the outer condition around
+LSP4IJ: Rider never gains that dependency's class-loader parent. A failing native navigation probe
+exposed the earlier reversed nesting, which mixed LSP4J classes from two loaders. The regression now
+checks real go-to-declaration with LSP4IJ installed in Rider, as well as descriptor isolation.
+
+| Sandbox | Client | Result |
+|---|---|---|
+| IDEA 2026.1, IU-261.22158.277, free unified distribution | LSP4IJ 0.21.0 | Completion and language-feature assertions pass in three disposable projects |
+| Same IDEA, LSP4IJ disabled | Local editor handlers | Pairing/indentation and one actionable install notification pass |
+| Rider 2026.2.3.1, RD-262.10968.170, LSP4IJ installed | Native Rider LSP | Completion and language-feature assertions pass in three disposable projects |
+| Same Rider, LSP4IJ disabled | Native Rider LSP | The same semantic assertions pass |
+
+Each semantic run checks Enter insertion, Tab replacement, continued typing and Backspace while the
+lookup is open, snippets and argument selection, prefix refresh, auto-imports, override stubs and atomic
+Undo. Real IDE actions check parameter help and go to declaration; the outline must include the method.
+All fixture projects close and report disposed. These short runs are functional checks, not sustained
+memory measurements. Light/dark panel images were inspected. The ZIP contains no UI probe classes or
+bundled LSP4IJ/LSP4J JARs. Python's nine tests also pass.
+
+Fail-first regressions cover descriptor isolation, missing-dependency guidance, Enter/Tab ranges,
+position copying after lookup typing, prefix refresh and diagnostic-version negotiation. The adapter
+uses public completion and lookup-listener hooks; it keeps the client's insertion, snippets, additional
+edits and Undo. It advertises LSP4IJ's existing diagnostic-version filtering. Verifier reports no
+compatibility failures or internal API usages at either endpoint; existing experimental platform APIs
+are reported without a suppression.
+
+Run the four sandbox tasks sequentially:
+
+```sh
+./gradlew --offline runIdeaWithoutLsp4ij -PuiProbe
+./gradlew --offline runIdea -PuiProbe
+./gradlew --offline runIde -PuiProbe
+./gradlew --offline runRiderWithoutLsp4ij -PuiProbe
+```
+
+The [contributor guide](../../editors/jetbrains/CONTRIBUTING.md#language-client-compatibility-checks)
+locates the reports and describes readiness checks and sandbox-only dialog handling. IDEA initialization
+must pass LSP4IJ's indexing gate before the first lookup; merely leaving IDEA's dumb mode is insufficient.
+An initial probe race was fixed by checking that gate and invoking completion in one UI-thread turn.
+The parameter-help probe waits for the live template to finish, then asks about the completed call and
+reactivates the sandbox before showing its hint. An intermediate Rider run that shrank the entire
+document immediately after completion intermittently failed parameter help; that separate sequence
+remains unresolved. Passing the normal post-completion flow does not establish that it was fixed.
+
+LSP4IJ reports `Read end dead` during project shutdown in these probes. Its process listener logs any
+broken stdout pipe as a crash, including queued output after its reader stops. That warning alone does
+not establish a compiler crash. Rapid whole-document replacement also exposed stale diagnostic ranges:
+LSP4IJ catches an invalid-range exception and logs a warning; Rider logged an uncaught
+`IndexOutOfBoundsException` at SEVERE level in its native diagnostic cache after the document shrank.
+Version negotiation rejects mismatched publications but does not prove that every previously accepted
+diagnostic is invalidated before rendering. These client issues remain unresolved and tracked in LS-2;
+passing completion assertions do not establish error-free diagnostic handling or leak-free IDE behavior.
 
 ## Timing and retention method
 
@@ -206,8 +262,9 @@ passing functional result is not a passing leak check.
 
 ## Remaining limits
 
-- Community's optional LSP4IJ adapter and sandbox validation await owner approval for the new dependency
-  and any required IDE download. The current plugin still requires Rider's native LSP module.
+- Compatibility is verified at IDEA IU-261.22158.277 and Rider RD-262.10968.170 on macOS arm64.
+  Other builds inside the descriptor range and the older standalone Community distribution are unverified.
+  IDEA requires LSP4IJ 0.21.0; Rider uses its native client.
 - Windows binary I/O, pipe readiness and UTF-8 filesystem branches have not run on Windows. Host-side
   path fixtures do not establish Windows compatibility. Case/symlink/Unicode-normalization identity
   remains separate work.

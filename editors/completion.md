@@ -111,9 +111,10 @@ See the [follow-up results](../docs/results/2026-11-completion-followup.md) for 
   discovery. Windows runtime validation is still pending; the macOS tests do not establish Windows support.
 - Unknown callable signatures cannot show argument help. General incremental declaration checking and
   interruption of a running check remain pending.
-- Rider and IntelliJ IDEA Community are the intended JetBrains targets. The current package uses Rider's
-  native LSP module and remains pinned to its verified build. Community integration needs an optional
-  LSP4IJ adapter and separate validation; it is not yet included. Android Studio is outside the scope.
+- Rider uses its native LSP client. IntelliJ IDEA Community/free unified IDEA uses the optional LSP4IJ
+  plugin (0.21.0); install and enable it in **Settings > Plugins**. A project notification explains this
+  requirement if it is missing. Local syntax, punctuation pairing and indentation work without it.
+  Android Studio is outside the scope. See the [tested builds](jetbrains/README.md#names-and-compatibility-the-owners-to-change).
 
 The [IntelliJ LSP documentation](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html)
 describes the supported products. The [editor extension documentation](https://plugins.jetbrains.com/docs/intellij/additional-minor-features.html)

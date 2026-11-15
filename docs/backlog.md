@@ -25,7 +25,7 @@ it stands.
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
 | **2c** | The rest of the language | 23 | Closures as listeners, `object[name]` in general, collections, strings |
-| **LS-2** | Language server, second slice (after 2c) | 15 | Windows, Rider, Community, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
+| **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, Community, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 24 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 50 | What is left |
 | **decision** | The owner | 8 | See each item |
@@ -63,12 +63,12 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Language server, first slice
 
-- IntelliJ IDEA Community needs an optional LSP4IJ adapter and a verified sandbox build. Approval for
-  the new dependency and any required IDE download is pending; the current package requires Rider's
-  native LSP module. Android Studio is outside the scope. **LS-2**
-- **Manual Rider acceptance remains pending.** The native plugin passes sandbox completion and typing
+- **Manual editor acceptance remains pending.** Rider and free unified IDEA pass sandbox editing
   checks; a person still needs to accept the full editing and navigation workflow. Paired ten-minute
   AS3/plain-text probes retain all ten disposed projects and reproduce the `HighlightingPanel` warning.
+  Rapid whole-document shrinking also exposed stale diagnostic ranges: Rider logs an uncaught
+  `IndexOutOfBoundsException` from its diagnostic cache; LSP4IJ logs a caught invalid-range warning.
+  Diagnostic version negotiation does not establish rendering-time invalidation.
   The exact GC root and platform resolution remain pending; see the
   [retention results](results/2026-11-completion-followup.md#ide-lifecycle-investigation). **LS-2**
 - **Windows runtime validation is pending.** Binary stdio, pipe readiness, UTF-8 filesystem paths, network

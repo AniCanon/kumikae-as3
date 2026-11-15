@@ -1,7 +1,9 @@
 # Kumikae AS3 for JetBrains IDEs
 
-The plugin integrates ActionScript 3 with Rider through the compiler's language server and native
-editor handlers. It also provides project/run tools and an iOS Simulator panel. See
+The plugin integrates ActionScript 3 with Rider's native LSP client and IntelliJ IDEA Community/free
+unified IDEA through LSP4IJ. Both use the same compiler language server and local typing handlers.
+In IDEA, install and enable **LSP4IJ** (tested version 0.21.0) in **Settings > Plugins**; Rider does not
+require it. It also provides project/run tools and an iOS Simulator panel. See
 [completion and typing assistance](../completion.md) for editor behavior, settings and limits, and
 [completion results](../../docs/results/2026-11-completion.md) for the checks and measurements.
 The Simulator's own measurements are described below. The [completion follow-up](../../docs/results/2026-11-completion-followup.md)
@@ -12,8 +14,9 @@ controls retain all ten disposed projects in the pinned sandbox; the exact GC ro
 |---|---|---|
 | Compilation, style check and plugin zip | Automated build, 2026-11-15 | `./gradlew check buildPlugin` succeeds. |
 | Service tests (`core`) | Automated build | 82 pass; three opt-in live probes skip in ordinary checks and passed separately. |
-| Plugin tests (language, project tools, panel and adapters) | Automated build | 126 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
-| Plugin verifier against the installed Rider | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170. |
+| Plugin tests (language, project tools, panel and adapters) | Automated build | 134 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
+| Plugin verifier against installed Rider and IDEA | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170 and IU-261.22158.277, including LSP4IJ 0.21.0. |
+| Editor compatibility matrix | Four isolated sandbox probes | IDEA with/without LSP4IJ; Rider with/without LSP4IJ. Completion, parameter help, navigation and outline pass where the client is enabled; missing IDEA dependency is reported. |
 | Native Swift tests | `swift test` | 38 pass in 20 suites. |
 | Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
 | Native rotation and text | Owned iPhone and iPad fixtures, 2026-11-15 | Four orientation commands and target taps passed on each family; exact ASCII, accents, Japanese, Arabic and emoji reached the app. Interface orientation policy still applies. |
@@ -79,16 +82,17 @@ installs idb only when you explicitly choose Install idb… and agree to its dia
 
 This is the beginning of the one plugin planned in roadmap stage 6. It connects `kas3c lsp` for
 completion, argument help, errors and navigation; AS3 breakpoints and stepping remain planned.
-The Simulator panel is absent on Windows and Linux. The descriptor accepts only platform build
-262.10968.170; IntelliJ IDEA Community integration and other operating systems remain unverified.
-Community is the second intended target and needs an optional LSP4IJ adapter; Android Studio is outside the scope.
+The Simulator panel is absent on Windows and Linux. The supported targets are Rider and IntelliJ IDEA
+Community/free unified IDEA. Android Studio is outside the scope. Other operating systems remain
+unverified; the compatibility range and exact tested builds are listed below.
 
 ## Build
 
 The build needs JDK 25 and an installed Rider 2026.2 (build 262.10968.170). It uses
 the Gradle wrapper (Gradle 9.8.1), Kotlin 2.4.10 with the Compose compiler plugin,
 the IntelliJ Platform Gradle Plugin 2.20.0, ktlint 1.8.0 and Compose Swing UI
-0.1.0-alpha06. It compiles against the installed IDE and never downloads one.
+0.1.0-alpha06, plus LSP4IJ 0.21.0 for the optional IDEA adapter. It compiles against the installed IDE
+and never downloads one.
 Rider's own runtime is a JDK 25. Building the native helper also needs installed
 Swift 6; `buildSimulatorBridge` runs `swift build -c release` and bundles the
 executable and its resource bundle in `native/`. Without installed Swift on macOS
@@ -108,7 +112,8 @@ formats native Swift with Xcode’s installed swift-format. Native builds and pl
 packaging also require this lint check. `buildPlugin`
 refuses to build while the style check fails, and puts a zip in
 `build/distributions/`. `./gradlew ktlintFormat` fixes most style findings.
-`./gradlew verifyPlugin` runs JetBrains' plugin verifier against the installed Rider.
+`./gradlew verifyPlugin` runs JetBrains' plugin verifier against installed Rider and IDEA, including
+the LSP4IJ dependency. `IDEA_HOME` selects IDEA; its default is `/Applications/IntelliJ IDEA.app`.
 
 Rider is found through the `RIDER_HOME` environment variable, or at
 `/Applications/Rider.app` when it is not set. The wrapper uses your normal Gradle
@@ -298,11 +303,12 @@ owner's other JetBrains plugin. They are recorded here so they are easy to revis
 
 - Plugin id and package root: `app.anicanon.kumikae.as3`. The service's package is
   `app.anicanon.kumikae.as3.simulator`. Vendor: AniCanon. Name: Kumikae AS3.
-- The plugin depends on `com.intellij.modules.platform` only, not on a Rider
-  module. It is meant for every JetBrains IDE, Rider first.
-- It installs only into platform build 262.10968.170, the installed Rider. The
-  Compose Swing library is an alpha and is only known to work there. Widening
-  the range means trying the panel in each other IDE or build first.
+- The base plugin requires platform and TextMate support. Optional descriptors isolate Rider's native
+  LSP integration from IDEA's LSP4IJ integration; neither client is required to load local editor tools.
+- The descriptor accepts builds 261.22158.277 through 262.10968.170. Validation covers the endpoints:
+  IDEA 2026.1 (IU-261.22158.277, free unified distribution) and Rider 2026.2.3.1 (RD-262.10968.170).
+  Other builds in that range and the older standalone Community distribution are unverified.
+  Compose Swing is an alpha; widening the range requires runtime panel and editor checks.
 - The Simulator tool window is offered on macOS only.
 - The service and the plugin both target Java 25.
 - The default bundle in the panel stays `org.kumikae.as3test`, the test app's

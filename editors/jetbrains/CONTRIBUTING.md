@@ -99,6 +99,34 @@ signatures are accepted and undone atomically.
 
 Add `KUMIKAE_COMPLETION_RETENTION_PROBE=1` for ten projects across ten minutes, with live-GC histograms
 and weak closed-project counts. Combine it with the control flag for the same plain-text workload.
-The test plugin cancels the pinned Rider's unsolicited evaluation feedback survey, which otherwise
-blocks project opening during longer runs. It matches only that survey class and uses Cancel; license
-dialogs and production IDE settings are untouched. Callback failures are propagated to the probe result.
+The test plugin cancels the pinned Rider's evaluation feedback survey and IDEA's first-run UI onboarding
+dialog, which otherwise block project opening. It matches those two exact classes and uses Cancel;
+license dialogs and production IDE settings are untouched. Callback failures fail the probe.
+
+
+## Language-client compatibility checks
+
+After changing a client adapter, run the following sequentially with installed JDK 25, Rider and IDEA.
+The build resolves the declared LSP4IJ 0.21.0 dependency; use `--offline` after caching it. IDE binaries
+come from `RIDER_HOME` and `IDEA_HOME` (or the application defaults in the build), never a download task.
+
+```sh
+./gradlew --offline check buildPlugin verifyPlugin
+./gradlew --offline runIdeaWithoutLsp4ij -PuiProbe
+./gradlew --offline runIdea -PuiProbe
+./gradlew --offline runIde -PuiProbe
+./gradlew --offline runRiderWithoutLsp4ij -PuiProbe
+```
+
+`runIdea` uses LSP4IJ; `runIde` checks Rider's native client with LSP4IJ installed but no competing AS3
+server or handlers. The two `WithoutLsp4ij` tasks disable that plugin in separate sandboxes. IDEA then
+checks the install notification and local editing; Rider still runs the complete semantic probe.
+Reports are under `build/reports/ui-idea`, `ui`, `ui-runIdeaWithoutLsp4ij` and
+`ui-runRiderWithoutLsp4ij`, respectively. Preserve them before another run.
+
+Each semantic run opens and disposes three projects. It checks Enter/Tab, continued typing and
+Backspace, snippet navigation, prefix refresh, generated edits and Undo, parameter help, go to
+declaration and outline. The probe waits for each client's indexing gate before invoking the first
+completion; IDEA checks LSP4IJ's readiness in the same UI-thread turn as invocation. Parameter help
+waits for the live template to finish and activates the sandbox before displaying its hint. No fixed
+delay stands in for readiness. It also mounts the panel and writes light/dark images for inspection.

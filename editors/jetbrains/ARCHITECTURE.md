@@ -176,8 +176,8 @@ The idb fallback asks its source for changes dynamically.
 Compose Swing UI is pinned to 0.1.0-alpha06 from JetBrains' Compose Maven
 repository; the Compose compiler matches the Kotlin compiler. It is Compose
 Runtime driving Swing components, with no separate renderer. Because the
-library is an alpha, the plugin accepts only the platform build it has been
-tried on. `ui/ComposeUi.kt` holds the few shared composables (`IconButton`,
+library is an alpha, the plugin limits its platform range to the tested IDEA and Rider endpoints;
+builds between them are not individually verified. `ui/ComposeUi.kt` holds the few shared composables (`IconButton`,
 `TitleButton`, `Pill`, `StatusLine`, `Native`, `NativeScrollPane`) and
 `ui/Controls.kt` the small painted controls behind them. `DeviceFrame` works out
 where the device and its screen sit in the view and draws the body around the
@@ -231,3 +231,25 @@ prefix replay sentinel instead of keeping old document states. The UI probe chec
 override additional edits through native completion acceptance and one Undo. Its plain-text-only mode
 (`KUMIKAE_COMPLETION_CONTROL_PROBE=1`) opens the same temporary projects without an AS3 session, to
 separate platform lifecycle warnings from completion activity.
+
+## Language-client adapters
+
+The base descriptor contains local typing, syntax and project tools. Optional descriptors load Rider's
+native integration only in Rider, and LSP4IJ's server, parameter help and outline only in IDEA. The
+IDEA condition is the outer dependency and LSP4IJ is nested inside it. Rider therefore has no LSP4IJ
+class-loader dependency, even when that plugin is installed. This keeps protocol classes and editor
+handlers isolated. No native LSP class is loaded on the IDEA path.
+
+`As3ServerLaunch` owns compiler launch arguments and initialization options. Both clients use the same
+project language service for compiler discovery and bounded declaration refresh. LSP4IJ owns its
+connection provider and process shutdown; there is no additional worker or response cache.
+`As3Lsp4ijCompletion` uses LSP4IJ's public completion feature extension to refresh suggestions after
+prefix changes. Its lookup data stores the request-time caret and server item. A public lookup listener
+selects Enter's insert range or Tab's replacement range before insertion and copies positions before the
+client adjusts them. The lookup owns that data and listener; there is no project or global item cache.
+All snippet insertion, additional edits, cancellation and Undo remain in the client. Initialization
+advertises the diagnostic-version filtering that LSP4IJ already implements, so the server can tag its
+publications and the client can reject mismatched versions.
+
+An IDEA project without enabled LSP4IJ receives one actionable notification when an AS3 file opens.
+That listener imports no optional client classes, so missing dependencies cannot break local typing.
