@@ -108,6 +108,8 @@ class SimulatorSession(
 
             "tap", "swipe", "text", "button", "rotate" -> sendInput(method, params)
 
+            "report" -> report(params)
+
             else -> synchronized(this) { quickly(method, params) }
         }
     }
@@ -132,8 +134,6 @@ class SimulatorSession(
                 runCatching { runner.run(Commands.terminate(device, bundle(params)), LIST_MILLIS) }
                 mapOf("terminated" to true)
             }
-
-            "report" -> report(device, bundle(params))
 
             else -> throw IllegalArgumentException("Unknown method")
         }
@@ -372,6 +372,22 @@ class SimulatorSession(
 
     private fun bundle(params: JsonObject) = params["bundle"].asString.also {
         require(it.matches(Regex("[A-Za-z0-9][A-Za-z0-9.-]{0,254}"))) { "Invalid bundle identifier" }
+    }
+
+    private fun report(params: JsonObject): Any {
+        val (device, stamp, bundle) = synchronized(this) {
+            ensureOpen()
+            requireInputIdle()
+            Triple(chosen(params), geometry.generation, bundle(params))
+        }
+        val result = report(device, bundle)
+        return synchronized(this) {
+            checkDevice(device)
+            if (geometry.generation != stamp) {
+                throw SimulatorException("STALE_REPORT", "The Simulator changed while reading the report")
+            }
+            result
+        }
     }
 
     private fun report(device: String, bundle: String): Any {
