@@ -64,6 +64,7 @@ func _physics_process(_delta: float) -> bool:
 	node.position = Vector2(1, 1)
 	show("an int plus one stays an int", [ask("increment", [5]), typeof(ask("increment", [5]))], [6, TYPE_INT])
 	show("a Godot value and an untyped one", ask("moveBy", [Vector2(2, 3)]), Vector2(3, 4))
+	show("a value read above its line is its zero", ask("readEarly", []), "(0.0, 0.0) (0.0, 0.0) (0.0, 0.0) (0.0, 0.0)")
 	var one := Node2D.new()
 	var two := Node2D.new()
 	show("a part is written to the object named before the value", ask("writeOrder", [one, two]), Vector2(5, 0))

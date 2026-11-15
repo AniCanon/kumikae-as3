@@ -89,6 +89,7 @@ class Lowerer {
 	std::vector<std::string_view> next_labels_; // Labels written just before the statement being lowered.
 	// Types already refused where they were written: a value of one is not refused again at each use.
 	std::unordered_set<const Type *> refused_types_;
+	size_t zeroes_ = 0; // How many package variables are zeroed, first of all the initializers.
 	// The `try` statements around the code being lowered, outermost first: a `break`, `continue` or
 	// `return` that leaves one runs its `finally` on the way.
 	std::vector<TryBlock> tries_;

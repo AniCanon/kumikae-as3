@@ -28,6 +28,26 @@ void Lowerer::declare_locals(Node *p_body) {
 			}
 		}
 	}
+	// One that is read above its line (it exists from the top of the function) needs its zero after all.
+	if (!valued.empty()) {
+		std::unordered_map<const Symbol *, uint32_t> line_of;
+		walk(p_body, [&](Node *p_node) {
+			if (p_node->kind == NodeKind::VarDecl) {
+				for (Declarator &declarator : static_cast<VarDecl *>(p_node)->declarators) {
+					line_of[declarator.symbol] = declarator.offset;
+				}
+			}
+		});
+		walk(p_body, [&](Node *p_node) {
+			if (p_node->kind == NodeKind::Name) {
+				const Symbol *symbol = static_cast<Name *>(p_node)->symbol;
+				const auto found = line_of.find(symbol);
+				if (found != line_of.end() && p_node->offset < found->second) {
+					valued.erase(symbol);
+				}
+			}
+		});
+	}
 	walk(p_body, [&](Node *p_node) {
 		if (p_node->kind == NodeKind::Try) {
 			// A catch's variable: a register of the kind it is declared, untyped when it says none.

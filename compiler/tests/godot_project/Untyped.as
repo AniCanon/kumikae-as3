@@ -40,6 +40,18 @@ package {
 			a.visible = (a = b, false);
 			return new Vector2(first.position.x, first.visible ? 1 : 0);
 		}
+		// A Godot value read above the line that gives it a value is its zero, not null.
+		public var early:String = seen();
+		public var later:Vector2 = Vector2.ONE;
+		public static var seenStatic:String = seenStatics();
+		public static var laterStatic:Vector2 = Vector2.ONE;
+		private function seen():String { return "" + later; }
+		private static function seenStatics():String { return "" + laterStatic; }
+		public function readEarly():String {
+			var before:String = "" + v;
+			var v:Vector2 = Vector2.ONE;
+			return before + " " + early + " " + seenStatic + " " + origin;
+		}
 		public function minusOne(value:*):* { return value - 1; }
 		public function twice(value:*):* { return value * 2; }
 		public function stepped(value:*):* { value++; return value; }

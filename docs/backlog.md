@@ -102,9 +102,6 @@ Found by the review of the clean-up pass itself.
 
 ## Stage 2b-3, part A: singletons, constants, static methods
 
-- A local, a field or a static field with a value written (`var v:Vector2 = position;`) that is read
-  above that line is null there, not the type's zero. So is a variable declared at package level.
-  **clean-up**
 - Godot calling a script from another thread (a method given to `WorkerThreadPool.addTask`) is refused
   with an error. Running AS3 off the main thread waits for the `async` research. Only method calls are
   guarded: a property read or a notification from another thread is not. **2d**
