@@ -176,7 +176,6 @@ any Godot value passing as a condition):
 ## Stage 2a: interpreter core
 
 - Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
-- An endless loop has no stop. **2d**
 
 ## Stage 2b-1: AS3 inside Godot, first slice
 

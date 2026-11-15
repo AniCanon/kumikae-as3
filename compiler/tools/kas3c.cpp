@@ -40,7 +40,9 @@ static const char *const USAGE =
 		"\n"
 		"run    Check the files as one program and run it: the first file's class is\n"
 		"       constructed, and what it traces goes to standard output. An error that\n"
-		"       nothing catches goes to standard error with its stack trace.\n"
+		"       nothing catches goes to standard error with its stack trace. A run that\n"
+		"       lasts longer than 15 seconds is stopped with Error #1502, as in Flash\n"
+		"       (KAS3_TIME_LIMIT_MS gives another limit, 0 none).\n"
 		"\n"
 		"ir     Check the files as one program and print the typed IR the interpreter runs.\n"
 		"       --godot  the files are scripts for Godot: load Godot's API, and expect no\n"
@@ -221,6 +223,8 @@ static int run_run(int p_argc, char **p_argv) {
 	{
 		kas3::vm::StandaloneOutput output;
 		kas3::vm::Interpreter interpreter(module, output);
+		const char *limit = std::getenv("KAS3_TIME_LIMIT_MS");
+		interpreter.set_time_limit(limit ? (uint32_t)std::strtoul(limit, nullptr, 10) : kas3::vm::Interpreter::FLASH_TIME_LIMIT);
 		ok = interpreter.run_program();
 	}
 	std::fflush(stdout);

@@ -335,6 +335,22 @@ compare("kept.gd", [
     "attached, kept while AS3 holds it", "attached, freed when AS3 lets go too",
 ])
 
+# A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give.
+with tempfile.TemporaryDirectory() as limited:
+    copy = os.path.join(limited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    with open(os.path.join(copy, "project.godot"), "a") as settings:
+        settings.write("\n[actionscript]\n\nlimits/script_timeout_seconds=0.5\n")
+    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "timeout.gd"], capture_output=True, text=True, timeout=300)
+    output = run.stdout + run.stderr
+    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+    check("timeout.gd ran to its end", run.returncode == 0 and len(values) == 5, output[-1500:])
+    for name, got, want in values:
+        check("timeout.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+    check("timeout.gd: Flash's error, where the loop is", output.count(
+        "Error #1502: A script has executed for longer than the timeout period of 0.5 seconds.") == 2 and
+        "at Spin/forever()" in output and "at Spin/caught()" in output, output[-1500:])
+
 # Godot's own classes with `is` and `as`, and input events as a script receives them.
 compare("events.gd", [
     "kind of InputEventScreenTouch", "kind of InputEventScreenDrag", "kind of InputEventMouseButton", "kind of InputEventKey",

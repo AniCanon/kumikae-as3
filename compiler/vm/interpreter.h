@@ -10,6 +10,7 @@
 #include "runtime.h"
 
 #include <array>
+#include <chrono>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -30,6 +31,11 @@ public:
 	// A call from outside may be made while another is in progress (the engine calls a script, which calls
 	// the engine, which calls a script) this many levels deep.
 	static const int MAX_ENTRIES = 64;
+
+	// Flash's limit on how long one run may last, in milliseconds.
+	static constexpr uint32_t FLASH_TIME_LIMIT = 15000;
+	// The clock is looked at once in this many statements.
+	static constexpr uint32_t STATEMENTS_PER_LOOK = 4096;
 
 	// Called at each statement, when set: where a debugger stops. Returning false ends the run.
 	typedef bool (*StatementHook)(Interpreter &p_interpreter, void *p_data);
@@ -90,6 +96,11 @@ private:
 	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
 	StatementHook hook_ = nullptr;
 	void *hook_data_ = nullptr;
+	uint32_t time_limit_ = 0; // In milliseconds; 0 for none.
+	uint32_t countdown_ = STATEMENTS_PER_LOOK; // Statements until the clock is looked at.
+	std::chrono::steady_clock::time_point entered_; // When the call from outside that is running began.
+	void look_at_clock();
+	void entering(); // A call from outside begins: one that no other is running inside starts the clock.
 
 	void drop(ir::Kind p_kind, Slot &p_slot);
 	void drop_object(Object *p_object);
@@ -214,6 +225,11 @@ public:
 		hook_ = p_hook;
 		hook_data_ = p_data;
 	}
+	// A call from outside that runs, with all it calls, for longer than this (in milliseconds) is stopped
+	// with Flash's Error #1502, which no catch or finally stops: an endless loop ends. 0, as an interpreter
+	// starts, for no limit. Time a debugger's hook keeps the program stopped is not counted.
+	void set_time_limit(uint32_t p_milliseconds) { time_limit_ = p_milliseconds; }
+	uint32_t time_limit() const { return time_limit_; }
 	// Runs the static initializers, then constructs the entry class. False if an error reached the top:
 	// the host has been given it.
 	bool run_program();
@@ -270,6 +286,9 @@ public:
 	// kind. False if the frame's function has no such local.
 	bool local_at(size_t p_frame, std::string_view p_name, Slot *r_value, ir::Kind *r_kind) const;
 };
+
+// Flash's words for a run stopped after that many milliseconds.
+std::string timeout_message(uint32_t p_milliseconds);
 
 } // namespace vm
 } // namespace kas3

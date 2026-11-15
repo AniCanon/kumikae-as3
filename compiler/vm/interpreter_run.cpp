@@ -67,18 +67,48 @@ void Interpreter::convert_checked(const Instruction &p_in, Slot *p_registers) {
 	}
 }
 
-// A statement is about to run: the debugger's hook, if there is one, sees it and may stop the program.
+// A statement is about to run: once in a while the clock is looked at, and the debugger's hook, if there is
+// one, sees it and may stop the program.
 void Interpreter::at_statement() {
+	if (--countdown_ == 0) {
+		look_at_clock();
+	}
 	if (!hook_) {
 		return;
 	}
 	frames_.back().pc--; // The hook sees the statement about to run.
 	const bool carry_on = hook_(*this, hook_data_);
 	frames_.back().pc++;
+	if (time_limit_) {
+		entered_ = std::chrono::steady_clock::now(); // A debugger's stop is not the program's time.
+	}
 	if (!carry_on) {
 		stopped_ = true;
 		halted_ = true;
 	}
+}
+
+// A run that has gone on too long ends with Flash's error, which nothing catches.
+void Interpreter::look_at_clock() {
+	countdown_ = STATEMENTS_PER_LOOK;
+	if (!time_limit_ || failing_ || stopped_ || std::chrono::steady_clock::now() - entered_ <= std::chrono::milliseconds(time_limit_)) {
+		return;
+	}
+	raise(module_.error_class, timeout_message(time_limit_));
+	stopped_ = true;
+}
+
+void Interpreter::entering() {
+	if (entries_ == 0 && time_limit_) {
+		entered_ = std::chrono::steady_clock::now();
+		countdown_ = STATEMENTS_PER_LOOK;
+	}
+}
+
+std::string timeout_message(uint32_t p_milliseconds) {
+	return std::string("Error #1502: A script has executed for longer than the ") +
+			(p_milliseconds == Interpreter::FLASH_TIME_LIMIT ? "default " : "") + "timeout period of " +
+			number_to_string(p_milliseconds / 1000.0) + " seconds.";
 }
 
 // A new object of a class, its Number fields not yet a number.

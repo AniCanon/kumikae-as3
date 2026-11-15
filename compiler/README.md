@@ -118,6 +118,10 @@ How it works:
   stored in an `int`, which is what the checker's types say.
 - **The interpreter** (`vm/interpreter.h`) keeps its own stack of frames and never recurses in C++ for an AS3
   call. Runaway recursion is therefore an AS3 error, not a crash, and a debugger can walk the frames.
+- **An endless loop is stopped,** as Flash stops one: a run that lasts longer than 15 seconds ends with
+  `Error #1502: A script has executed for longer than the default timeout period of 15 seconds.`, which no
+  `catch` or `finally` stops. Every loop goes round through a statement's marker, where the clock is
+  looked at once in 4096 statements; `KAS3_TIME_LIMIT_MS` gives `kas3c run` another limit (0 for none).
 - **For a debugger:** every instruction has a source position, every function lists its named locals, and
   each statement begins with a marker where a hook can stop the program.
 - **Static fields** get their values the first time their class is used, a base class before its
@@ -239,6 +243,9 @@ package {
   never taken as if it fitted.
 - An AS3 error inside a call from the engine is reported as Godot reports a script's own error, with the
   `.as` file and line as its source and the AS3 stack trace, and the engine carries on.
+- A call from the engine that runs longer than 15 seconds, with what it calls, is stopped with Flash's
+  `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
+  gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.
 
 **Refused by name until the next slices:** elements of Godot's untyped collections, creating
 Godot objects with `new`, passing a script object to Godot, and everything `kas3c run` refuses.
