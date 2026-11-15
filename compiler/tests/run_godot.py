@@ -334,6 +334,12 @@ with tempfile.TemporaryDirectory() as folder:
     check("corpus.gd: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
     for name in runs:
         check("corpus.gd: %s ran" % name, "RAN %s\n" % name in output, output[-800:])
+    # And did what it does: the checksums of those whose work does not depend on the time between frames.
+    with open(os.path.join(tests, "corpus", "checksums.txt")) as listed:
+        wanted = [line.split() for line in listed if line.strip() and not line.startswith("#")]
+    for name, value in wanted:
+        check("corpus.gd: %s worked out %s" % (name, value), "CHECKSUM %s %s\n" % (name, value) in output,
+              re.findall(r"CHECKSUM %s .*" % name, output))
     check("corpus.gd: no AS3 error", "Error" not in output and "ERROR" not in output and "ActionScript:" not in output, output[-1500:])
 
 # Scripts edited while the game runs. In a copy of the project: the test rewrites a script.
