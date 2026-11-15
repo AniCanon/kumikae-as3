@@ -7,6 +7,8 @@ package {
 			trace("abc".match("b"));
 			trace("abc".replace(p, "x"));
 			trace("abc".replace("a", q));
+			trace("abc".replace("a"));
+			trace("abc".replace());
 		}
 	}
 }

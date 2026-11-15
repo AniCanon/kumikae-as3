@@ -1,4 +1,6 @@
 string_regex.as:6:10: error: calling 'search' (it takes a regular expression) is not supported by the interpreter yet
 string_regex.as:7:10: error: calling 'match' (it takes a regular expression) is not supported by the interpreter yet
-string_regex.as:8:10: error: calling 'replace' with a value that is not a String (a regular expression or a function) is not supported by the interpreter yet
-string_regex.as:9:10: error: calling 'replace' with a value that is not a String (a regular expression or a function) is not supported by the interpreter yet
+string_regex.as:8:10: error: calling 'replace' with anything but two Strings is not supported by the interpreter yet
+string_regex.as:9:10: error: calling 'replace' with anything but two Strings is not supported by the interpreter yet
+string_regex.as:10:10: error: calling 'replace' with anything but two Strings is not supported by the interpreter yet
+string_regex.as:11:10: error: calling 'replace' with anything but two Strings is not supported by the interpreter yet

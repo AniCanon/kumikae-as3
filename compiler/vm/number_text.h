@@ -25,6 +25,10 @@ std::string wide_radix_text(int64_t p_value, int p_radix);
 std::string fixed_text(double p_value, int p_digits);
 std::string exponential_text(double p_value, int p_digits);
 std::string precision_text(double p_value, int p_digits);
+// The same for an Int64, from its own digits: exact past 2^53, where a Number is not.
+std::string wide_fixed_text(int64_t p_value, int p_digits);
+std::string wide_exponential_text(int64_t p_value, int p_digits);
+std::string wide_precision_text(int64_t p_value, int p_digits);
 
 // Whether ECMAScript's String-to-Number rules take the character as white space: ASCII's, the no-break
 // space, Unicode's other spaces and the line and paragraph separators.

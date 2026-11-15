@@ -171,8 +171,8 @@ enum class StringFunction : uint8_t {
 };
 
 // toString(radix), toFixed, toExponential and toPrecision, in NumText's second operand. The number is a
-// Number, or an Int64 for WideRadix.
-enum class NumberFormat : uint8_t { Radix, WideRadix, Fixed, Exponential, Precision };
+// Number, or an Int64 (its register says which), written from its own digits.
+enum class NumberFormat : uint8_t { Radix, Fixed, Exponential, Precision };
 
 const char *op_name(Op p_op);
 const char *op_shape(Op p_op); // Three letters from the table above.

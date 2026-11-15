@@ -14,6 +14,7 @@ package {
 			trace(face.replace("😀", "-"), face.replace(low, "") == "a" + high + "b", (high + "!" + low).length, face.lastIndexOf("\uD83D", 1));
 			trace(face.indexOf("\uDE00b"), face.indexOf("😀", 2), face.lastIndexOf("a\uD83D"), "\uDE00".charCodeAt(0), "\uD83D" + "x" == "\uD83Dx");
 			trace(new <String>[high, low].join("") == "😀", new <String>[high, low].join(low + high) == "😀😀😀".substring(0, 4));
+			trace("\uD83D" + "\uDE00" == "😀", ("\uD83D" + "\uDE00").length, "x\uD83D".concat("\uDE00") == "x😀");
 		}
 	}
 }

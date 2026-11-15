@@ -167,21 +167,89 @@ std::string with_exponent(const std::string &p_digits, int p_exponent) {
 	return out + (p_exponent < 0 ? "e-" : "e+") + std::to_string(std::abs(p_exponent));
 }
 
+// A number as toFixed, toExponential and toPrecision see it: its sign, and its exact digits if it is not 0.
+struct Decimal {
+	bool negative = false;
+	bool zero = true;
+	Exact exact;
+};
+
+Decimal decimal_of(double p_value) {
+	Decimal decimal;
+	decimal.negative = p_value < 0;
+	decimal.zero = p_value == 0;
+	if (!decimal.zero) {
+		decimal.exact = exact_digits(std::fabs(p_value));
+	}
+	return decimal;
+}
+
+// An Int64's own digits, every one of them: no Number holds them all past 2^53.
+Decimal decimal_of(int64_t p_value) {
+	Decimal decimal;
+	decimal.negative = p_value < 0;
+	decimal.zero = p_value == 0;
+	const std::string digits = magnitude_text(p_value < 0 ? 0 - (uint64_t)p_value : (uint64_t)p_value, 10);
+	decimal.exact.exponent = (int)digits.size() - 1;
+	for (char digit : digits) {
+		decimal.exact.digits[decimal.exact.count++] = digit;
+	}
+	while (decimal.exact.count > 1 && decimal.exact.digits[decimal.exact.count - 1] == '0') {
+		decimal.exact.count--;
+	}
+	return decimal;
+}
+
 // The p_count digits of n and the exponent e, for toExponential and toPrecision: n x 10^(e - count + 1)
 // is the nearest to the magnitude.
-std::string significant(double p_magnitude, int p_count, int *r_exponent) {
-	if (p_magnitude == 0) {
+std::string significant(const Decimal &p_decimal, int p_count, int *r_exponent) {
+	if (p_decimal.zero) {
 		*r_exponent = 0;
 		return std::string((size_t)p_count, '0');
 	}
-	const Exact exact = exact_digits(p_magnitude);
-	std::string digits = rounded(exact, p_count);
-	*r_exponent = exact.exponent;
+	std::string digits = rounded(p_decimal.exact, p_count);
+	*r_exponent = p_decimal.exact.exponent;
 	if ((int)digits.size() > p_count) {
 		digits.pop_back(); // "1000" for three digits is "100", ten times as much.
 		(*r_exponent)++;
 	}
 	return digits;
+}
+
+std::string fixed_digits(const Decimal &p_decimal, int p_digits) {
+	const std::string sign = p_decimal.negative ? "-" : "";
+	// n is the whole number nearest to magnitude x 10^digits: the digits down to the last one wanted.
+	std::string n = p_decimal.zero ? "" : rounded(p_decimal.exact, p_decimal.exact.exponent + 1 + p_digits);
+	n = n.empty() ? "0" : n;
+	if (p_digits == 0) {
+		return sign + n;
+	}
+	if ((int)n.size() <= p_digits) {
+		n = std::string((size_t)(p_digits + 1) - n.size(), '0') + n;
+	}
+	return sign + n.substr(0, n.size() - (size_t)p_digits) + "." + n.substr(n.size() - (size_t)p_digits);
+}
+
+std::string exponential_digits(const Decimal &p_decimal, int p_digits) {
+	int exponent = 0;
+	const std::string digits = significant(p_decimal, p_digits + 1, &exponent);
+	return (p_decimal.negative ? "-" : "") + with_exponent(digits, exponent);
+}
+
+std::string precision_digits(const Decimal &p_decimal, int p_digits) {
+	int e = 0;
+	const std::string digits = significant(p_decimal, p_digits, &e);
+	const std::string sign = p_decimal.negative ? "-" : "";
+	if (e < -6 || e >= p_digits) {
+		return sign + with_exponent(digits, e);
+	}
+	if (e == p_digits - 1) {
+		return sign + digits;
+	}
+	if (e >= 0) {
+		return sign + digits.substr(0, (size_t)e + 1) + "." + digits.substr((size_t)e + 1);
+	}
+	return sign + "0." + std::string((size_t)(-(e + 1)), '0') + digits;
 }
 
 } // namespace
@@ -202,56 +270,30 @@ std::string wide_radix_text(int64_t p_value, int p_radix) {
 }
 
 std::string fixed_text(double p_value, int p_digits) {
-	if (std::isnan(p_value)) {
-		return "NaN";
-	}
-	const std::string sign = p_value < 0 ? "-" : "";
-	const double magnitude = std::fabs(p_value);
-	if (magnitude >= 1e21) {
+	if (std::isnan(p_value) || std::fabs(p_value) >= 1e21) {
 		return number_to_string(p_value);
 	}
-	// n is the whole number nearest to magnitude x 10^digits: the digits down to the last one wanted.
-	std::string n = "0";
-	if (magnitude != 0) {
-		const Exact exact = exact_digits(magnitude);
-		n = rounded(exact, exact.exponent + 1 + p_digits);
-		n = n.empty() ? "0" : n;
-	}
-	if (p_digits == 0) {
-		return sign + n;
-	}
-	if ((int)n.size() <= p_digits) {
-		n = std::string((size_t)(p_digits + 1) - n.size(), '0') + n;
-	}
-	return sign + n.substr(0, n.size() - (size_t)p_digits) + "." + n.substr(n.size() - (size_t)p_digits);
+	return fixed_digits(decimal_of(p_value), p_digits);
 }
 
 std::string exponential_text(double p_value, int p_digits) {
-	if (!std::isfinite(p_value)) {
-		return number_to_string(p_value);
-	}
-	int exponent = 0;
-	const std::string digits = significant(std::fabs(p_value), p_digits + 1, &exponent);
-	return (p_value < 0 ? "-" : "") + with_exponent(digits, exponent);
+	return std::isfinite(p_value) ? exponential_digits(decimal_of(p_value), p_digits) : number_to_string(p_value);
 }
 
 std::string precision_text(double p_value, int p_digits) {
-	if (!std::isfinite(p_value)) {
-		return number_to_string(p_value);
-	}
-	int e = 0;
-	const std::string digits = significant(std::fabs(p_value), p_digits, &e);
-	const std::string sign = p_value < 0 ? "-" : "";
-	if (e < -6 || e >= p_digits) {
-		return sign + with_exponent(digits, e);
-	}
-	if (e == p_digits - 1) {
-		return sign + digits;
-	}
-	if (e >= 0) {
-		return sign + digits.substr(0, (size_t)e + 1) + "." + digits.substr((size_t)e + 1);
-	}
-	return sign + "0." + std::string((size_t)(-(e + 1)), '0') + digits;
+	return std::isfinite(p_value) ? precision_digits(decimal_of(p_value), p_digits) : number_to_string(p_value);
+}
+
+std::string wide_fixed_text(int64_t p_value, int p_digits) {
+	return fixed_digits(decimal_of(p_value), p_digits);
+}
+
+std::string wide_exponential_text(int64_t p_value, int p_digits) {
+	return exponential_digits(decimal_of(p_value), p_digits);
+}
+
+std::string wide_precision_text(int64_t p_value, int p_digits) {
+	return precision_digits(decimal_of(p_value), p_digits);
 }
 
 bool is_text_space(uint32_t p_code) {

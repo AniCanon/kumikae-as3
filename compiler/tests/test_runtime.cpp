@@ -365,6 +365,10 @@ static void test_number_methods() {
 	CHECK_EQ(precision_text(1e-7, 1), std::string("1e-7"));
 	CHECK_EQ(precision_text(123456, 2), std::string("1.2e+5"));
 	CHECK_EQ(precision_text(0, 3), std::string("0.00"));
+	CHECK_EQ(wide_fixed_text(INT64_MIN, 1), std::string("-9223372036854775808.0"));
+	CHECK_EQ(wide_exponential_text(9007199254740993, 15), std::string("9.007199254740993e+15"));
+	CHECK_EQ(wide_precision_text(-95, 1), std::string("-1e+2"));
+	CHECK_EQ(wide_precision_text(1000, 2), std::string("1.0e+3"));
 	CHECK(std::isnan(parse_int("x", 10)));
 	CHECK_EQ(parse_int("  -0x1F", 0), -31.0);
 	CHECK_EQ(parse_int("9007199254740993", 0), 9007199254740992.0);

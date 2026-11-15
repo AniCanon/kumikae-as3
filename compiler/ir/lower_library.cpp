@@ -106,8 +106,10 @@ public:
 			} else {
 				l_.emit(p_kind == Kind::U32 ? Op::ConstU32 : Op::ConstI32, position_, out, static_cast<uint32_t>(static_cast<int64_t>(value)));
 			}
-		} else {
+		} else if (written && written->kind == NodeKind::Name && static_cast<const Name *>(written)->text == "undefined" && p_kind == Kind::F64) {
 			l_.emit(Op::ConstF64, position_, out, l_.number(std::nan("")));
+		} else {
+			l_.refuse(call_->callee->offset, "leaving out an argument of '" + std::string(function_->name) + "'");
 		}
 		return out;
 	}
@@ -158,9 +160,14 @@ public:
 		if (!method) {
 			return refused(" (it takes a regular expression)", Kind::Str);
 		}
-		for (Expr *argument : call_->arguments) {
-			if (method->function == StringFunction::Replace && !l_.is_string_type(argument->type)) {
-				return refused(" with a value that is not a String (a regular expression or a function)", Kind::Str);
+		if (method->function == StringFunction::Replace) {
+			// Two strings: what else AS3 takes there (a regular expression, a function) waits for those.
+			bool strings = call_->arguments.count == 2;
+			for (Expr *argument : call_->arguments) {
+				strings = strings && l_.is_string_type(argument->type);
+			}
+			if (!strings) {
+				return refused(" with anything but two Strings", Kind::Str);
 			}
 		}
 		const uint32_t text = l_.expression(object(), Kind::Str);
@@ -170,7 +177,7 @@ public:
 	}
 
 	uint32_t number_method(Kind p_kind) {
-		Kind own = p_kind == Kind::I64 ? Kind::I64 : Kind::F64;
+		const Kind own = p_kind == Kind::I64 ? Kind::I64 : Kind::F64;
 		const NumberMethod *method = find(NUMBER_METHODS, function_->name);
 		if (function_->name == "valueOf" || (function_->name == "toString" && call_->arguments.count == 0)) {
 			const uint32_t value = l_.expression(object(), p_kind);
@@ -181,8 +188,7 @@ public:
 		}
 		std::vector<uint32_t> list = arguments(l_.expression(object(), own));
 		list[1] = l_.convert(list[1], Kind::F64, position_);
-		const NumberFormat format = own == Kind::I64 ? NumberFormat::WideRadix : method->format;
-		return emit(Op::NumText, static_cast<uint32_t>(format), std::move(list), Kind::Str);
+		return emit(Op::NumText, static_cast<uint32_t>(method->format), std::move(list), Kind::Str);
 	}
 
 	uint32_t top_level() {

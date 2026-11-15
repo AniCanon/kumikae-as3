@@ -61,7 +61,7 @@ function string_ir(r0:Object):void
   @17 ConstF64 r13 2.5
   @18 ConstU32 r14 0
   @19 U32ToF64 r15 r14
-  @20 NumText r16 2 (r13, r15)
+  @20 NumText r16 1 (r13, r15)
   @21 I32ToF64 r17 r2
   @22 EqF64 r19 r17 r17
   @23 Not r18 r19

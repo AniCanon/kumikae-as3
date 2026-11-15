@@ -174,6 +174,7 @@ private:
 	bool use_class_now(uint32_t p_class); // From outside: runs it.
 	std::string site(const Frame &p_frame) const;
 	std::string object_text(Object *p_object) const;
+	std::string error_heading(const Object *p_error) const; // "Name: message", as Error's toString() gives it.
 	bool is_class(const Object *p_object, uint32_t p_class) const;
 	Str *text(const std::string &p_text);
 

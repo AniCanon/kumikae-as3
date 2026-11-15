@@ -22,6 +22,11 @@ package {
 			trace((25).toPrecision(1), (123.456).toPrecision(4), (0.000123).toPrecision(2), (0.0000001234).toPrecision(2), (123456).toPrecision(2));
 			trace((99.99).toPrecision(3), (0).toPrecision(3), (1e21).toPrecision(3), (-1.5).toPrecision(1), (123).toPrecision(3), (1.5).toPrecision(21));
 			trace(NaN.toPrecision(0), (-Infinity).toPrecision(50), (0.000001).toPrecision(1), (1e-7).toPrecision(1), u.toPrecision(3));
+			var big:Int64 = 9007199254740993;
+			// An Int64 is written from its own digits: exact past 2^53, where a Number would round.
+			trace(Int64.MAX_VALUE.toFixed(2), Int64.MIN_VALUE.toExponential(3), Int64.MAX_VALUE.toPrecision(21), Int64.MAX_VALUE.toPrecision(3), big.toExponential(15));
+			trace(Int64(-5).toFixed(0), Int64(0).toExponential(1), Int64(15).toPrecision(1), Int64(-95).toPrecision(1), big.toFixed(1), Int64(0).toPrecision(2));
+			try { trace(big.toFixed(21)); } catch (e:RangeError) { trace(e.errorID); }
 			trace((5).valueOf(), (1.5).valueOf(), w.valueOf() == w, u.valueOf(), true.toString(), false.valueOf());
 			try { trace((5).toString(1)); } catch (e:RangeError) { trace(e); }
 			try { trace(i.toString(37)); } catch (e:RangeError) { trace(e); }

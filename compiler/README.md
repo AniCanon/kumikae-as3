@@ -95,7 +95,7 @@ every arithmetic, comparison, logical and bitwise operator; assignment and `++`/
 `for`, `break`, `continue`, `return`; calls with default parameters; `new`, `is`, `as`; `trace`; `throw`;
 `toString()` on any object (its class's own, or `[object Name]`; an `Error`'s name and message);
 `Error` and its subclasses; `NaN`, `Infinity` and the limits of the number types (`int.MAX_VALUE`); several
-files, packages, and package-level functions and variables. `String`'s methods, the numbers' `toString(radix)`,
+files, packages, and package-level functions and variables. `String`'s methods, the numbers' (and `Int64`'s) `toString(radix)`,
 `toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite` and `Math`.
 
 **What is refused, by name, until later slices:** function values and closures, `Array`, `Object` literals

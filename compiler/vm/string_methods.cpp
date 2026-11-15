@@ -134,33 +134,49 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 	}
 }
 
+namespace {
+
+// A number in the digits asked for, which are in range: from a Number, or from an Int64's own digits.
+std::string formatted(NumberFormat p_format, Slot p_value, bool p_wide, int p_digits) {
+	switch (p_format) {
+		case NumberFormat::Radix:
+			return p_wide ? wide_radix_text(p_value.l, p_digits) : radix_text(p_value.d, p_digits);
+		case NumberFormat::Fixed:
+			return p_wide ? wide_fixed_text(p_value.l, p_digits) : fixed_text(p_value.d, p_digits);
+		case NumberFormat::Exponential:
+			return p_wide ? wide_exponential_text(p_value.l, p_digits) : exponential_text(p_value.d, p_digits);
+		case NumberFormat::Precision:
+			return p_wide ? wide_precision_text(p_value.l, p_digits) : precision_text(p_value.d, p_digits);
+	}
+	return std::string();
+}
+
+} // namespace
+
 void Interpreter::number_text(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 	const Slot value = p_registers[list[0]];
+	const bool wide = p_function.registers[list[0]] == Kind::I64;
 	const double digits = whole(p_registers[list[1]].d);
 	const NumberFormat format = static_cast<NumberFormat>(p_in.b);
-	std::string made;
-	if (format == NumberFormat::Radix || format == NumberFormat::WideRadix) {
-		if (digits < 2 || digits > 36) {
-			raise(module_.range_error_class, radix_error(digits));
-			return;
-		}
-		made = format == NumberFormat::Radix ? radix_text(value.d, static_cast<int>(digits)) : wide_radix_text(value.l, static_cast<int>(digits));
-	} else if (format != NumberFormat::Fixed && !std::isfinite(value.d)) {
-		made = number_to_string(value.d); // toExponential and toPrecision look at NaN and Infinity before the digits.
-	} else {
-		const double least = format == NumberFormat::Precision ? 1 : 0;
-		const double most = format == NumberFormat::Precision ? MAX_PRECISION : MAX_FIXED_DIGITS;
-		if (digits < least || digits > most) {
-			raise(module_.range_error_class, digits_error());
-			return;
-		}
-		const int count = static_cast<int>(digits);
-		made = format == NumberFormat::Fixed ? fixed_text(value.d, count)
-				: format == NumberFormat::Exponential ? exponential_text(value.d, count)
-													   : precision_text(value.d, count);
+	double least = 0, most = MAX_FIXED_DIGITS;
+	if (format == NumberFormat::Radix) {
+		least = 2;
+		most = 36;
+	} else if (format == NumberFormat::Precision) {
+		least = 1;
+		most = MAX_PRECISION;
 	}
-	assign(Kind::Str, p_registers[p_in.a], text(made));
+	if (!wide && (format == NumberFormat::Exponential || format == NumberFormat::Precision) && !std::isfinite(value.d)) {
+		// toExponential and toPrecision look at NaN and Infinity before the digits.
+		assign(Kind::Str, p_registers[p_in.a], text(number_to_string(value.d)));
+		return;
+	}
+	if (digits < least || digits > most) {
+		raise(module_.range_error_class, format == NumberFormat::Radix ? radix_error(digits) : digits_error());
+		return;
+	}
+	assign(Kind::Str, p_registers[p_in.a], text(formatted(format, value, wide, static_cast<int>(digits))));
 }
 
 void Interpreter::any_null_check(Slot p_value) {
