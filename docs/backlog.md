@@ -112,7 +112,6 @@ Found by the review of the clean-up pass itself.
   their value; `Array`'s `removeAt`, `popAt`, `slice` and `find` cut an index; `Basis.getEuler` and
   `Quaternion.getEuler` cut the order; `Callable.unbind` its count. Guarding each needs a list kept by
   hand, which the owner chose against; the choice is whether a short one is worth it.
-- `x.toString(radix)` on an `Int64` waits for the standard library. **2c**
 - `Vector.<Int64>` and an `Int64` in an `Array` wait for those types. **2c**
 - Every program's IR now carries the `RangeError` class, used or not. **clean-up**
 
