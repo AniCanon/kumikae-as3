@@ -82,6 +82,12 @@ class IdbInput(
     }
 
     override fun send(device: String, operation: String, args: List<String>) {
+        if (operation == "text" && !SimulatorText.isAscii(args.single())) {
+            throw SimulatorException(
+                "INPUT_UNAVAILABLE",
+                "Unicode text needs the native helper; idb accepts printable ASCII only",
+            )
+        }
         if (persistent != null) {
             persistent.device(device).send(operation, args)
         } else {

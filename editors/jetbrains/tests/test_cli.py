@@ -56,6 +56,11 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(request["params"]["text"], "a; $(false)")
         self.assertEqual(request["version"], 1)
 
+    def test_unicode_text_is_preserved(self):
+        text = "é e\u0301 日本語 العربية 👩🏽‍💻"
+        cli.Client(self.endpoint).call("text", {"device": "phone", "text": text})
+        self.assertEqual(Handler.received[2]["params"]["text"], text)
+
     def test_service_errors_are_failures(self):
         Handler.response = lambda r: {"version": 1, "id": r["id"], "error": {"code": "INPUT_DISABLED", "message": "Viewer"}}
         with self.assertRaisesRegex(cli.ClientError, "INPUT_DISABLED"):

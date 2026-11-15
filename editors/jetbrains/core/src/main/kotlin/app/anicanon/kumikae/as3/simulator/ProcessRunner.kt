@@ -2,14 +2,26 @@ package app.anicanon.kumikae.as3.simulator
 
 import java.io.InputStream
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 fun interface CommandRunner {
     fun run(command: List<String>, timeoutMs: Long): String
+
+    fun runWithInput(command: List<String>, timeoutMs: Long, input: ByteArray): String =
+        throw SimulatorException("PROCESS_FAILED", "Command input is unavailable")
 }
 
 class ProcessRunner : CommandRunner {
-    override fun run(command: List<String>, timeoutMs: Long): String {
+    override fun run(command: List<String>, timeoutMs: Long): String = execute(command, timeoutMs, byteArrayOf())
+
+    override fun runWithInput(command: List<String>, timeoutMs: Long, input: ByteArray): String {
+        require(input.size <= 16384) { "Command input exceeds 16384 bytes" }
+        return execute(command, timeoutMs, input)
+    }
+
+    private fun execute(command: List<String>, timeoutMs: Long, input: ByteArray): String {
         val process = try {
             ProcessBuilder(command).start()
         } catch (
@@ -17,9 +29,12 @@ class ProcessRunner : CommandRunner {
         ) {
             throw SimulatorException("PROCESS_FAILED", "Cannot start ${command.first()}: ${e.message}")
         }
-        process.outputStream.close()
-        val out = drain(process.inputStream)
-        val err = drain(process.errorStream)
+        val io = Executors.newFixedThreadPool(3) { work ->
+            Thread(work, "kumikae-command-pipe").apply { isDaemon = true }
+        }
+        val out = drain(process.inputStream, io)
+        val err = drain(process.errorStream, io)
+        val writer = CompletableFuture.runAsync({ process.outputStream.use { it.write(input) } }, io)
         try {
             if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
                 throw SimulatorException("TIMEOUT", "Command exceeded ${timeoutMs}ms")
@@ -33,17 +48,27 @@ class ProcessRunner : CommandRunner {
                         .ifBlank { "Command exited ${process.exitValue()}" },
                 )
             }
+            writer.get(2, TimeUnit.SECONDS)
             return output
         } finally {
-            process.descendants().forEach { if (it.isAlive) it.destroyForcibly() }
-            if (process.isAlive) process.destroyForcibly()
-            process.waitFor(1, TimeUnit.SECONDS)
-            process.inputStream.close()
-            process.errorStream.close()
+            try {
+                process.descendants().forEach { if (it.isAlive) it.destroyForcibly() }
+                if (process.isAlive) process.destroyForcibly()
+                process.waitFor(1, TimeUnit.SECONDS)
+            } finally {
+                try {
+                    process.inputStream.close()
+                    process.errorStream.close()
+                    process.outputStream.close()
+                } finally {
+                    io.shutdownNow()
+                    check(io.awaitTermination(2, TimeUnit.SECONDS)) { "Command pipe workers did not stop" }
+                }
+            }
         }
     }
 
-    private fun drain(stream: InputStream) = CompletableFuture.supplyAsync {
+    private fun drain(stream: InputStream, io: ExecutorService) = CompletableFuture.supplyAsync({
         stream.use {
             val bytes = java.io.ByteArrayOutputStream()
             val buffer = ByteArray(8192)
@@ -56,5 +81,5 @@ class ProcessRunner : CommandRunner {
             }
             bytes.toString(Charsets.UTF_8)
         }
-    }
+    }, io)
 }
