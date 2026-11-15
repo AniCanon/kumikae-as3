@@ -105,8 +105,6 @@ Found by the review of the clean-up pass itself.
 - Godot calling a script from another thread (a method given to `WorkerThreadPool.addTask`) is refused
   with an error. Running AS3 off the main thread waits for the `async` research. Only method calls are
   guarded: a property read or a notification from another thread is not. **2d**
-- A variable typed as a singleton class (`var i:Input = Input.singleton`) reaches only `GodotObject`'s
-  members: the class's own are static. **clean-up**
 - `removeAll()` on a singleton's signal removes every script's listeners, not only the caller's.
   **decision**
 - Tests are missing for: a static call's arguments worked out left to right, a static call that gives

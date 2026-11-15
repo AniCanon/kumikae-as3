@@ -98,6 +98,15 @@ bool Lowerer::is_singleton(const Symbol *p_class) {
 	return has_tag(p_class, "Singleton");
 }
 
+// A member reached through an object (`i.mouseMode`), not through the class (`Input.mouseMode`).
+bool Lowerer::on_object(const Expr *p_member) {
+	if (!p_member || p_member->kind != NodeKind::Member) {
+		return false;
+	}
+	const Expr *object = static_cast<const Member *>(p_member)->object;
+	return object && object->type && object->type->kind == Type::Instance;
+}
+
 uint32_t Lowerer::singleton(const Symbol *p_class, uint32_t p_position) {
 	uint32_t name = 0;
 	if (!engine_name(p_class, std::string_view(), &name)) {
@@ -173,7 +182,7 @@ auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position
 	place.index = name;
 	place.kind = kind;
 	place.type = compilation_.type_of(type);
-	if (of_singleton) {
+	if (of_singleton && !(p_object && p_object->type && p_object->type->kind == Type::Instance)) {
 		place.object = singleton(p_symbol->owner, p_position);
 		return place;
 	}

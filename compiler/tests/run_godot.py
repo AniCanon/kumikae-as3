@@ -185,7 +185,8 @@ check("an empty signal says so", "the signal is empty" in output and "at Signals
 
 # Singletons, constants and static methods, as GDScript works them out.
 output = compare("statics.gd", [
-    "pressed", "strength", "stick", "system", "an editor-only singleton is an AS3 error", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
+    "pressed", "strength", "stick", "system", "an editor-only singleton is an AS3 error",
+    "a singleton's members through a variable", "a singleton variable that is null", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
     "listening", "heard", "cleared", "others still listen", "not listening", "input class", "same singleton",
     "singleton object",
     "escape", "captured", "ready notice", "axis", "zero", "up", "red", "forward", "identity", "sum", "up y",

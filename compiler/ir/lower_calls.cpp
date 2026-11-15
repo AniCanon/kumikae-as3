@@ -150,6 +150,9 @@ uint32_t Lowerer::engine_text(Call *p_call) {
 uint32_t Lowerer::godot_call(Call *p_call, Symbol *p_method) {
 	uint32_t position = p_call->offset;
 	if (p_method->is_static()) {
+		if (is_singleton(p_method->owner) && on_object(p_call->callee)) {
+			return engine_call(p_call, p_method); // `i.isActionPressed()`: on the object `i` holds.
+		}
 		return is_singleton(p_method->owner) ? engine_call(p_call, p_method, singleton(p_method->owner, position)) : static_call(p_call, p_method);
 	}
 	Expr *callee = p_call->callee;
