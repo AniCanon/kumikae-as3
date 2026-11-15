@@ -22,6 +22,13 @@ package {
 		private var order:String = "";
 		private function noted(p_text:String):String { order += p_text; return p_text; }
 		public function staticOrder():String { GodotJSON.stringify(noted("a"), noted("b")); return order; }
+		// A Godot property written through a missing script object: the value first, then AS3's null error.
+		public function writeMissing():String {
+			order = "";
+			var none:Statics = null;
+			try { none.visible = noted("value") == "value"; } catch (e:TypeError) { return order + " caught"; }
+			return order;
+		}
 		public function staticWrongType():String {
 			try { var node:Node = GodotJSON.parseString("[1]"); } catch (e:TypeError) { return "caught"; }
 			return "carried on";

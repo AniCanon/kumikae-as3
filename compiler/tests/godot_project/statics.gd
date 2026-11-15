@@ -36,6 +36,7 @@ func _physics_process(_delta: float) -> bool:
 	show("orphan nodes printed", ask("orphansShown"), true)
 	ask("fakeTrace")
 	show("a static call's arguments in order", ask("staticOrder"), "ab")
+	show("the value before the missing object", ask("writeMissing"), "value caught")
 	show("a static call's result of the wrong type", ask("staticWrongType"), "caught")
 	show("a singleton's members through a variable", ask("viaObject"), true)
 	show("a singleton variable that is null", ask("viaNull"), true)

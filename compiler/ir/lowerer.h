@@ -253,6 +253,9 @@ class Lowerer {
 		const Type *type = nullptr; // For Engine: what the member is declared to be.
 		uint32_t key = NONE; // For Engine: the place is an element (`value[key]`); the register holding the key.
 		bool constant = false; // One of Godot's constants: read from a register, and never written.
+		// For Engine: the script object whose Godot object `object` is, fetched when the place is read or
+		// written, so that a missing one is reported after the value is worked out, as in AS3.
+		uint32_t script_object = NONE;
 		// For Engine: the member is one part of a Godot value that is itself stored somewhere
 		// (`position.x`). Godot's values are copies, so writing the part is: read the whole value, change
 		// the part, write the whole value back.

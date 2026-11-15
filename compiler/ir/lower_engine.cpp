@@ -203,7 +203,12 @@ auto Lowerer::engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position
 		whole_of(place, p_position);
 		return place;
 	}
-	place.object = settled(engine_receiver(p_object, p_position, &place.of_value), p_later, p_position);
+	place.object = engine_receiver(p_object, p_position, &place.of_value, &place.script_object);
+	if (place.script_object != NONE) {
+		place.script_object = settled(place.script_object, p_later, p_position);
+	} else {
+		place.object = settled(place.object, p_later, p_position);
+	}
 	return place;
 }
 
