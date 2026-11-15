@@ -19,9 +19,9 @@ anyone changing the repository are in [AGENTS.md](../AGENTS.md).
 |---|---|---|
 | `src/` | The front end: source text to a checked syntax tree | `lexer`, `parser*` (one file per kind of syntax), `names*` (packages, scopes, links), `typer.h` and `typer_*.cpp` (the type of every expression and what fits where), `type_table.cpp`, `whole_numbers` (rules the checker and the lowerer share), `query` (what the language server asks) |
 | `ir/` | The typed IR and the lowerer that produces it | `ir.h`, `ir_print.cpp`, `lowerer.h` and `lower_*.cpp`, by what each lowers: types, places, Godot's members, expressions, operators, calls, statements, classes |
-| `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
+| `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `held.h` (what a container holds), `collector` (the cycle collector), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
 | `vm/` host | What the interpreter needs from where it runs | `host.h` holds three interfaces: `output.h`, `engine_handles.h` (what is done to a value the interpreter holds), `engine_source.h` (where values come from). `no_engine.h` answers where there is no engine |
-| `godot_ext/` | The GDExtension | `godot_host` (the three interfaces, with Godot's calls), `callable` (a method as a Godot function, and the look for listener loops), `instance`, `script`, `program`, `language`, `register` |
+| `godot_ext/` | The GDExtension | `godot_host` (the three interfaces, with Godot's calls), `callable` (a method as a Godot function, and listeners as the cycle collector sees them), `instance`, `script`, `program`, `language`, `register` |
 | `lsp/` | The language server | `server`, `workspace`, `json` |
 | `godot/` | The generator of Godot's API as AS3 declarations | `generate.py`, `naming.py`, the generated `godot.as` and `godot_names.txt` |
 | `tests/` | Tests, and `bench/` for the timings | See [Tests](#tests) |

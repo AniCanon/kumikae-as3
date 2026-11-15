@@ -55,16 +55,10 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 - A signal's own `numListeners` and `emit` can't follow `object[name]` as a property read: only its
   methods can (`timer[name].add(f)`). **2c**
-- Objects that hold each other in a loop are freed only when a listener is part of the loop, or reaches
-  it. A loop of script objects with no listener in it stays (the cycle collector). So does a loop
-  that passes through a Godot collection. **2d**
-- The look for such loops walks everything the listeners without a Godot object of their own can reach.
-  It is paced by its own cost (at most four times a second, about a fiftieth of the time), but one look
-  over 100,000 objects takes about 30 ms in one go. The cycle collector should work in steps. **2d**
-- When GDScript holds a copy of a listener's callable, the look moves that listener behind listeners added
-  after it. **2d**
-- A loop whose own field holds its listener's callable (in a Godot collection), or whose one callable is
-  in two signals, is never freed. **2d**
+- A loop that passes through a Godot collection (a `GodotArray` or `GodotDictionary` in a field, such as
+  one that holds the loop's own listener's callable) is never freed: Godot tells an extension how many
+  hold a reference-counted object, but not how many hold an Array or a Dictionary, which GDScript may
+  share. **2d**
 - `other[name].add(f)` on another script object reaches only the Godot object's signals, not a signal the
   other script keeps in a public field. `this[name]` finds a subclass's field before a base class's
   private one of the same name. **2c**
@@ -178,7 +172,6 @@ any Godot value passing as a condition):
 
 ## Stage 2a: interpreter core
 
-- Objects that refer to each other in a loop are never freed (the cycle collector). **2d**
 - 1 of the 14 corpus programs does not run yet, ArrayConversion, which needs `Array`:
   `tests/run_corpus.py` prints what stops it. **2c**
 - An endless loop has no stop. **2d**
