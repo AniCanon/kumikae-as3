@@ -45,9 +45,7 @@ fields are set on a class's first use, and a call on a null object evaluates its
 ## Language server, first slice
 
 - **Manual Rider acceptance remains pending.** The native plugin passes sandbox completion and typing
-  checks; a person still needs to accept the full editing and navigation workflow. The completion probe
-  also reports a platform `HighlightingPanel` retained on rapid project close; isolate it in a sustained
-  IDE heap profile. **LS-2**
+  checks; a person still needs to accept the full editing and navigation workflow. **LS-2**
 
 ## Stage 2b-2, part A: Godot's values
 
