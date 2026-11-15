@@ -33,7 +33,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 ## Stage 1d: Godot's API in AS3
 
 - A script class named like a Godot class is ambiguous in the default package. **clean-up**
-- Four properties lose their element type. **2c**
 - **decision** 60 methods that take raw pointers are left out. AS3 has nothing to pass them, so the
   proposal is that this stands.
 

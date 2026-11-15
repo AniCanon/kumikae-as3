@@ -77,6 +77,12 @@ class Fixture(unittest.TestCase):
         self.assertEqual(names.godot_names["Node.printOrphanNodes"], "print_orphan_nodes 1")
         self.assertEqual(names.godot_names["Node.getNode"], "get_node")
 
+    def test_a_setter_keeps_the_element_type(self):
+        # What the getter says of a typed array, the setter says of what it takes.
+        control = self.members("Control")
+        at = control.index("public final native function set data(value:GodotArray):void;")
+        self.assertEqual(control[at - 1], '[Godot(value="Array[Node]")]')
+
     def test_constructor_forms(self):
         # The merged constructor takes any of them; each form Godot has is written down, so that the
         # checker can refuse a call that matches none.

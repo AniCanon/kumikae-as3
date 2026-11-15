@@ -442,6 +442,8 @@ class Generator:
                     out.append('[Godot(returns="%s")]' % note)
                 out.append("public %snative function get %s():%s;" % (sealed, name, as3))
             if setter:
+                if note:
+                    out.append('[Godot(value="%s")]' % note)
                 out.append("public %snative function set %s(value:%s):void;" % (sealed, name, as3))
 
         for signal in entry.get("signals", []):

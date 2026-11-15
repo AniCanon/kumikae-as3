@@ -97,6 +97,7 @@ package godot {
 		public final native function set name(value:String):void;
 		[Godot(returns="enum:Node.ProcessMode")]
 		public final native function get processMode():int;
+		[Godot(value="enum:Node.ProcessMode")]
 		public final native function set processMode(value:int):void;
 		public final native function get owner():Node;
 		public final native function set owner(value:Node):void;
@@ -126,6 +127,7 @@ package godot {
 		public final native function set theme(value:Texture2D):void;
 		[Godot(returns="Array[Node]")]
 		public final native function get data():GodotArray;
+		[Godot(value="Array[Node]")]
 		public final native function set data(value:GodotArray):void;
 		[Godot(side="enum:Side")]
 		public final native function setAnchor(side:int, anchor:Number):void;

@@ -1688,17 +1688,21 @@ package godot {
 		public final native function set cellSize(value:Vector2):void;
 		[Godot(returns="enum:AStarGrid2D.CellShape")]
 		public final native function get cellShape():int;
+		[Godot(value="enum:AStarGrid2D.CellShape")]
 		public final native function set cellShape(value:int):void;
 		public final native function get jumpingEnabled():Boolean;
 		public final native function set jumpingEnabled(value:Boolean):void;
 		[Godot(returns="enum:AStarGrid2D.Heuristic")]
 		public final native function get defaultComputeHeuristic():int;
+		[Godot(value="enum:AStarGrid2D.Heuristic")]
 		public final native function set defaultComputeHeuristic(value:int):void;
 		[Godot(returns="enum:AStarGrid2D.Heuristic")]
 		public final native function get defaultEstimateHeuristic():int;
+		[Godot(value="enum:AStarGrid2D.Heuristic")]
 		public final native function set defaultEstimateHeuristic(value:int):void;
 		[Godot(returns="enum:AStarGrid2D.DiagonalMode")]
 		public final native function get diagonalMode():int;
+		[Godot(value="enum:AStarGrid2D.DiagonalMode")]
 		public final native function set diagonalMode(value:int):void;
 		public native function _estimateCost(fromID:Vector2i, endID:Vector2i):Number;
 		public native function _computeCost(fromID:Vector2i, toID:Vector2i):Number;
@@ -1815,6 +1819,7 @@ package godot {
 		public final native function get multiplayer():MultiplayerAPI;
 		[Godot(returns="enum:Node.ProcessMode")]
 		public final native function get processMode():int;
+		[Godot(value="enum:Node.ProcessMode")]
 		public final native function set processMode(value:int):void;
 		public final native function get processPriority():int;
 		public final native function set processPriority(value:int):void;
@@ -1822,17 +1827,21 @@ package godot {
 		public final native function set processPhysicsPriority(value:int):void;
 		[Godot(returns="enum:Node.ProcessThreadGroup")]
 		public final native function get processThreadGroup():int;
+		[Godot(value="enum:Node.ProcessThreadGroup")]
 		public final native function set processThreadGroup(value:int):void;
 		public final native function get processThreadGroupOrder():int;
 		public final native function set processThreadGroupOrder(value:int):void;
 		[Godot(returns="bitfield:Node.ProcessThreadMessages")]
 		public final native function get processThreadMessages():int;
+		[Godot(value="bitfield:Node.ProcessThreadMessages")]
 		public final native function set processThreadMessages(value:int):void;
 		[Godot(returns="enum:Node.PhysicsInterpolationMode")]
 		public final native function get physicsInterpolationMode():int;
+		[Godot(value="enum:Node.PhysicsInterpolationMode")]
 		public final native function set physicsInterpolationMode(value:int):void;
 		[Godot(returns="enum:Node.AutoTranslateMode")]
 		public final native function get autoTranslateMode():int;
+		[Godot(value="enum:Node.AutoTranslateMode")]
 		public final native function set autoTranslateMode(value:int):void;
 		public final native function get editorDescription():String;
 		public final native function set editorDescription(value:String):void;
@@ -2092,12 +2101,15 @@ package godot {
 		public final native function set snap2DVerticesToPixel(value:Boolean):void;
 		[Godot(returns="enum:Viewport.MSAA")]
 		public final native function get msaa2D():int;
+		[Godot(value="enum:Viewport.MSAA")]
 		public final native function set msaa2D(value:int):void;
 		[Godot(returns="enum:Viewport.MSAA")]
 		public final native function get msaa3D():int;
+		[Godot(value="enum:Viewport.MSAA")]
 		public final native function set msaa3D(value:int):void;
 		[Godot(returns="enum:Viewport.ScreenSpaceAA")]
 		public final native function get screenSpaceAa():int;
+		[Godot(value="enum:Viewport.ScreenSpaceAA")]
 		public final native function set screenSpaceAa(value:int):void;
 		public final native function get useTAA():Boolean;
 		public final native function set useTAA(value:Boolean):void;
@@ -2109,11 +2121,13 @@ package godot {
 		public final native function set meshLODThreshold(value:Number):void;
 		[Godot(returns="enum:Viewport.DebugDraw")]
 		public final native function get debugDraw():int;
+		[Godot(value="enum:Viewport.DebugDraw")]
 		public final native function set debugDraw(value:int):void;
 		public final native function get useHDR2D():Boolean;
 		public final native function set useHDR2D(value:Boolean):void;
 		[Godot(returns="enum:Viewport.Scaling3DMode")]
 		public final native function get scaling3DMode():int;
+		[Godot(value="enum:Viewport.Scaling3DMode")]
 		public final native function set scaling3DMode(value:int):void;
 		public final native function get scaling3DScale():Number;
 		public final native function set scaling3DScale(value:Number):void;
@@ -2121,22 +2135,27 @@ package godot {
 		public final native function set textureMipmapBias(value:Number):void;
 		[Godot(returns="enum:Viewport.AnisotropicFiltering")]
 		public final native function get anisotropicFilteringLevel():int;
+		[Godot(value="enum:Viewport.AnisotropicFiltering")]
 		public final native function set anisotropicFilteringLevel(value:int):void;
 		public final native function get fsrSharpness():Number;
 		public final native function set fsrSharpness(value:Number):void;
 		[Godot(returns="enum:Viewport.VRSMode")]
 		public final native function get vrsMode():int;
+		[Godot(value="enum:Viewport.VRSMode")]
 		public final native function set vrsMode(value:int):void;
 		[Godot(returns="enum:Viewport.VRSUpdateMode")]
 		public final native function get vrsUpdateMode():int;
+		[Godot(value="enum:Viewport.VRSUpdateMode")]
 		public final native function set vrsUpdateMode(value:int):void;
 		public final native function get vrsTexture():Texture2D;
 		public final native function set vrsTexture(value:Texture2D):void;
 		[Godot(returns="enum:Viewport.DefaultCanvasItemTextureFilter")]
 		public final native function get canvasItemDefaultTextureFilter():int;
+		[Godot(value="enum:Viewport.DefaultCanvasItemTextureFilter")]
 		public final native function set canvasItemDefaultTextureFilter(value:int):void;
 		[Godot(returns="enum:Viewport.DefaultCanvasItemTextureRepeat")]
 		public final native function get canvasItemDefaultTextureRepeat():int;
+		[Godot(value="enum:Viewport.DefaultCanvasItemTextureRepeat")]
 		public final native function set canvasItemDefaultTextureRepeat(value:int):void;
 		public final native function get audioListenerEnable2D():Boolean;
 		public final native function set audioListenerEnable2D(value:Boolean):void;
@@ -2158,9 +2177,11 @@ package godot {
 		public final native function set guiDragThreshold(value:int):void;
 		[Godot(returns="enum:Viewport.SDFOversize")]
 		public final native function get sdfOversize():int;
+		[Godot(value="enum:Viewport.SDFOversize")]
 		public final native function set sdfOversize(value:int):void;
 		[Godot(returns="enum:Viewport.SDFScale")]
 		public final native function get sdfScale():int;
+		[Godot(value="enum:Viewport.SDFScale")]
 		public final native function set sdfScale(value:int):void;
 		public final native function get positionalShadowAtlasSize():int;
 		public final native function set positionalShadowAtlasSize(value:int):void;
@@ -2168,15 +2189,19 @@ package godot {
 		public final native function set positionalShadowAtlas16Bits(value:Boolean):void;
 		[Godot(returns="enum:Viewport.PositionalShadowAtlasQuadrantSubdiv")]
 		public final native function get positionalShadowAtlasQuad0():int;
+		[Godot(value="enum:Viewport.PositionalShadowAtlasQuadrantSubdiv")]
 		public final native function set positionalShadowAtlasQuad0(value:int):void;
 		[Godot(returns="enum:Viewport.PositionalShadowAtlasQuadrantSubdiv")]
 		public final native function get positionalShadowAtlasQuad1():int;
+		[Godot(value="enum:Viewport.PositionalShadowAtlasQuadrantSubdiv")]
 		public final native function set positionalShadowAtlasQuad1(value:int):void;
 		[Godot(returns="enum:Viewport.PositionalShadowAtlasQuadrantSubdiv")]
 		public final native function get positionalShadowAtlasQuad2():int;
+		[Godot(value="enum:Viewport.PositionalShadowAtlasQuadrantSubdiv")]
 		public final native function set positionalShadowAtlasQuad2(value:int):void;
 		[Godot(returns="enum:Viewport.PositionalShadowAtlasQuadrantSubdiv")]
 		public final native function get positionalShadowAtlasQuad3():int;
+		[Godot(value="enum:Viewport.PositionalShadowAtlasQuadrantSubdiv")]
 		public final native function set positionalShadowAtlasQuad3(value:int):void;
 		public final native function get canvasTransform():Transform2D;
 		public final native function set canvasTransform(value:Transform2D):void;
@@ -2288,11 +2313,13 @@ package godot {
 		public native function Window();
 		[Godot(returns="enum:Window.Mode")]
 		public final native function get mode():int;
+		[Godot(value="enum:Window.Mode")]
 		public final native function set mode(value:int):void;
 		public final native function get title():String;
 		public final native function set title(value:String):void;
 		[Godot(returns="enum:Window.WindowInitialPosition")]
 		public final native function get initialPosition():int;
+		[Godot(value="enum:Window.WindowInitialPosition")]
 		public final native function set initialPosition(value:int):void;
 		public final native function get position():Vector2i;
 		public final native function set position(value:Vector2i):void;
@@ -2352,12 +2379,15 @@ package godot {
 		public final native function set contentScaleSize(value:Vector2i):void;
 		[Godot(returns="enum:Window.ContentScaleMode")]
 		public final native function get contentScaleMode():int;
+		[Godot(value="enum:Window.ContentScaleMode")]
 		public final native function set contentScaleMode(value:int):void;
 		[Godot(returns="enum:Window.ContentScaleAspect")]
 		public final native function get contentScaleAspect():int;
+		[Godot(value="enum:Window.ContentScaleAspect")]
 		public final native function set contentScaleAspect(value:int):void;
 		[Godot(returns="enum:Window.ContentScaleStretch")]
 		public final native function get contentScaleStretch():int;
+		[Godot(value="enum:Window.ContentScaleStretch")]
 		public final native function set contentScaleStretch(value:int):void;
 		public final native function get contentScaleFactor():Number;
 		public final native function set contentScaleFactor(value:Number):void;
@@ -2716,9 +2746,11 @@ package godot {
 		public final native function set scale(value:Vector3):void;
 		[Godot(returns="enum:Node3D.RotationEditMode")]
 		public final native function get rotationEditMode():int;
+		[Godot(value="enum:Node3D.RotationEditMode")]
 		public final native function set rotationEditMode(value:int):void;
 		[Godot(returns="enum:EulerOrder")]
 		public final native function get rotationOrder():int;
+		[Godot(value="enum:EulerOrder")]
 		public final native function set rotationOrder(value:int):void;
 		public final native function get topLevel():Boolean;
 		public final native function set topLevel(value:Boolean):void;
@@ -2907,9 +2939,11 @@ package godot {
 		public final native function set topLevel(value:Boolean):void;
 		[Godot(returns="enum:CanvasItem.ClipChildrenMode")]
 		public final native function get clipChildren():int;
+		[Godot(value="enum:CanvasItem.ClipChildrenMode")]
 		public final native function set clipChildren(value:int):void;
 		[Godot(returns="enum:CanvasItem.OversamplingWithScale")]
 		public final native function get oversamplingWithScale():int;
+		[Godot(value="enum:CanvasItem.OversamplingWithScale")]
 		public final native function set oversamplingWithScale(value:int):void;
 		public final native function get lightMask():int;
 		public final native function set lightMask(value:int):void;
@@ -2923,9 +2957,11 @@ package godot {
 		public final native function set ySortEnabled(value:Boolean):void;
 		[Godot(returns="enum:CanvasItem.TextureFilter")]
 		public final native function get textureFilter():int;
+		[Godot(value="enum:CanvasItem.TextureFilter")]
 		public final native function set textureFilter(value:int):void;
 		[Godot(returns="enum:CanvasItem.TextureRepeat")]
 		public final native function get textureRepeat():int;
+		[Godot(value="enum:CanvasItem.TextureRepeat")]
 		public final native function set textureRepeat(value:int):void;
 		public final native function get material():Material;
 		public final native function set material(value:Material):void;
@@ -3048,6 +3084,7 @@ package godot {
 		public static const DISABLE_MODE_KEEP_ACTIVE:int = 2;
 		[Godot(returns="enum:CollisionObject2D.DisableMode")]
 		public final native function get disableMode():int;
+		[Godot(value="enum:CollisionObject2D.DisableMode")]
 		public final native function set disableMode(value:int):void;
 		public final native function get collisionLayer():uint;
 		public final native function set collisionLayer(value:uint):void;
@@ -3126,6 +3163,7 @@ package godot {
 		public static const DISABLE_MODE_KEEP_ACTIVE:int = 2;
 		[Godot(returns="enum:CollisionObject3D.DisableMode")]
 		public final native function get disableMode():int;
+		[Godot(value="enum:CollisionObject3D.DisableMode")]
 		public final native function set disableMode(value:int):void;
 		public final native function get collisionLayer():uint;
 		public final native function set collisionLayer(value:uint):void;
@@ -3284,6 +3322,7 @@ package godot {
 		public final native function set transparency(value:Number):void;
 		[Godot(returns="enum:GeometryInstance3D.ShadowCastingSetting")]
 		public final native function get castShadow():int;
+		[Godot(value="enum:GeometryInstance3D.ShadowCastingSetting")]
 		public final native function set castShadow(value:int):void;
 		public final native function get extraCullMargin():Number;
 		public final native function set extraCullMargin(value:Number):void;
@@ -3295,11 +3334,13 @@ package godot {
 		public final native function set ignoreOcclusionCulling(value:Boolean):void;
 		[Godot(returns="enum:GeometryInstance3D.GIMode")]
 		public final native function get giMode():int;
+		[Godot(value="enum:GeometryInstance3D.GIMode")]
 		public final native function set giMode(value:int):void;
 		public final native function get giLightmapTexelScale():Number;
 		public final native function set giLightmapTexelScale(value:Number):void;
 		[Godot(returns="enum:GeometryInstance3D.LightmapScale")]
 		public final native function get giLightmapScale():int;
+		[Godot(value="enum:GeometryInstance3D.LightmapScale")]
 		public final native function set giLightmapScale(value:int):void;
 		public final native function get visibilityRangeBegin():Number;
 		public final native function set visibilityRangeBegin(value:Number):void;
@@ -3311,6 +3352,7 @@ package godot {
 		public final native function set visibilityRangeEndMargin(value:Number):void;
 		[Godot(returns="enum:GeometryInstance3D.VisibilityRangeFadeMode")]
 		public final native function get visibilityRangeFadeMode():int;
+		[Godot(value="enum:GeometryInstance3D.VisibilityRangeFadeMode")]
 		public final native function set visibilityRangeFadeMode(value:int):void;
 		public final native function setInstanceShaderParameter(name:String, value:*):void;
 		public final native function getInstanceShaderParameter(name:String):*;
@@ -3343,9 +3385,11 @@ package godot {
 		public final native function set pixelSize(value:Number):void;
 		[Godot(returns="enum:Vector3.Axis")]
 		public final native function get axis():int;
+		[Godot(value="enum:Vector3.Axis")]
 		public final native function set axis(value:int):void;
 		[Godot(returns="enum:BaseMaterial3D.BillboardMode")]
 		public final native function get billboard():int;
+		[Godot(value="enum:BaseMaterial3D.BillboardMode")]
 		public final native function set billboard(value:int):void;
 		public final native function get transparent():Boolean;
 		public final native function set transparent(value:Boolean):void;
@@ -3359,6 +3403,7 @@ package godot {
 		public final native function set fixedSize(value:Boolean):void;
 		[Godot(returns="enum:SpriteBase3D.AlphaCutMode")]
 		public final native function get alphaCut():int;
+		[Godot(value="enum:SpriteBase3D.AlphaCutMode")]
 		public final native function set alphaCut(value:int):void;
 		public final native function get alphaScissorThreshold():Number;
 		public final native function set alphaScissorThreshold(value:Number):void;
@@ -3366,11 +3411,13 @@ package godot {
 		public final native function set alphaHashScale(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.AlphaAntiAliasing")]
 		public final native function get alphaAntialiasingMode():int;
+		[Godot(value="enum:BaseMaterial3D.AlphaAntiAliasing")]
 		public final native function set alphaAntialiasingMode(value:int):void;
 		public final native function get alphaAntialiasingEdge():Number;
 		public final native function set alphaAntialiasingEdge(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.TextureFilter")]
 		public final native function get textureFilter():int;
+		[Godot(value="enum:BaseMaterial3D.TextureFilter")]
 		public final native function set textureFilter(value:int):void;
 		public final native function get renderPriority():int;
 		public final native function set renderPriority(value:int):void;
@@ -3532,6 +3579,7 @@ package godot {
 		public final native function set length(value:Number):void;
 		[Godot(returns="enum:Animation.LoopMode")]
 		public final native function get loopMode():int;
+		[Godot(value="enum:Animation.LoopMode")]
 		public final native function set loopMode(value:int):void;
 		public final native function get step():Number;
 		public final native function set step(value:Number):void;
@@ -3668,12 +3716,15 @@ package godot {
 		public final native function set audioMaxPolyphony(value:int):void;
 		[Godot(returns="enum:AnimationMixer.AnimationCallbackModeProcess")]
 		public final native function get callbackModeProcess():int;
+		[Godot(value="enum:AnimationMixer.AnimationCallbackModeProcess")]
 		public final native function set callbackModeProcess(value:int):void;
 		[Godot(returns="enum:AnimationMixer.AnimationCallbackModeMethod")]
 		public final native function get callbackModeMethod():int;
+		[Godot(value="enum:AnimationMixer.AnimationCallbackModeMethod")]
 		public final native function set callbackModeMethod(value:int):void;
 		[Godot(returns="enum:AnimationMixer.AnimationCallbackModeDiscrete")]
 		public final native function get callbackModeDiscrete():int;
+		[Godot(value="enum:AnimationMixer.AnimationCallbackModeDiscrete")]
 		public final native function set callbackModeDiscrete(value:int):void;
 		public final native function get animationListChanged():Signal;
 		public final native function get animationLibrariesUpdated():Signal;
@@ -3772,6 +3823,7 @@ package godot {
 		public final native function set animation(value:String):void;
 		[Godot(returns="enum:AnimationNodeAnimation.PlayMode")]
 		public final native function get playMode():int;
+		[Godot(value="enum:AnimationNodeAnimation.PlayMode")]
 		public final native function set playMode(value:int):void;
 		public final native function get advanceOnStart():Boolean;
 		public final native function set advanceOnStart(value:Boolean):void;
@@ -3785,6 +3837,7 @@ package godot {
 		public final native function set startOffset(value:Number):void;
 		[Godot(returns="enum:Animation.LoopMode")]
 		public final native function get loopMode():int;
+		[Godot(value="enum:Animation.LoopMode")]
 		public final native function set loopMode(value:int):void;
 	}
 	public native class AnimationNodeBlend2 extends AnimationNodeSync {
@@ -3814,11 +3867,13 @@ package godot {
 		public final native function set valueLabel(value:String):void;
 		[Godot(returns="enum:AnimationNodeBlendSpace1D.BlendMode")]
 		public final native function get blendMode():int;
+		[Godot(value="enum:AnimationNodeBlendSpace1D.BlendMode")]
 		public final native function set blendMode(value:int):void;
 		public final native function get sync():Boolean;
 		public final native function set sync(value:Boolean):void;
 		[Godot(returns="enum:AnimationNodeBlendSpace1D.SyncMode")]
 		public final native function get syncMode():int;
+		[Godot(value="enum:AnimationNodeBlendSpace1D.SyncMode")]
 		public final native function set syncMode(value:int):void;
 		public final native function get cyclicLength():Number;
 		public final native function set cyclicLength(value:Number):void;
@@ -3861,11 +3916,13 @@ package godot {
 		public final native function set yLabel(value:String):void;
 		[Godot(returns="enum:AnimationNodeBlendSpace2D.BlendMode")]
 		public final native function get blendMode():int;
+		[Godot(value="enum:AnimationNodeBlendSpace2D.BlendMode")]
 		public final native function set blendMode(value:int):void;
 		public final native function get sync():Boolean;
 		public final native function set sync(value:Boolean):void;
 		[Godot(returns="enum:AnimationNodeBlendSpace2D.SyncMode")]
 		public final native function get syncMode():int;
+		[Godot(value="enum:AnimationNodeBlendSpace2D.SyncMode")]
 		public final native function set syncMode(value:int):void;
 		public final native function get cyclicLength():Number;
 		public final native function set cyclicLength(value:Number):void;
@@ -3927,6 +3984,7 @@ package godot {
 		public native function AnimationNodeOneShot();
 		[Godot(returns="enum:AnimationNodeOneShot.MixMode")]
 		public final native function get mixMode():int;
+		[Godot(value="enum:AnimationNodeOneShot.MixMode")]
 		public final native function set mixMode(value:int):void;
 		public final native function get fadeinTime():Number;
 		public final native function set fadeinTime(value:Number):void;
@@ -3958,6 +4016,7 @@ package godot {
 		public native function AnimationNodeStateMachine();
 		[Godot(returns="enum:AnimationNodeStateMachine.StateMachineType")]
 		public final native function get stateMachineType():int;
+		[Godot(value="enum:AnimationNodeStateMachine.StateMachineType")]
 		public final native function set stateMachineType(value:int):void;
 		public final native function get allowTransitionToSelf():Boolean;
 		public final native function set allowTransitionToSelf(value:Boolean):void;
@@ -4027,9 +4086,11 @@ package godot {
 		public final native function set priority(value:int):void;
 		[Godot(returns="enum:AnimationNodeStateMachineTransition.SwitchMode")]
 		public final native function get switchMode():int;
+		[Godot(value="enum:AnimationNodeStateMachineTransition.SwitchMode")]
 		public final native function set switchMode(value:int):void;
 		[Godot(returns="enum:AnimationNodeStateMachineTransition.AdvanceMode")]
 		public final native function get advanceMode():int;
+		[Godot(value="enum:AnimationNodeStateMachineTransition.AdvanceMode")]
 		public final native function set advanceMode(value:int):void;
 		public final native function get advanceCondition():String;
 		public final native function set advanceCondition(value:String):void;
@@ -4088,9 +4149,11 @@ package godot {
 		public final native function set playbackAutoCaptureDuration(value:Number):void;
 		[Godot(returns="enum:Tween.TransitionType")]
 		public final native function get playbackAutoCaptureTransitionType():int;
+		[Godot(value="enum:Tween.TransitionType")]
 		public final native function set playbackAutoCaptureTransitionType(value:int):void;
 		[Godot(returns="enum:Tween.EaseType")]
 		public final native function get playbackAutoCaptureEaseType():int;
+		[Godot(value="enum:Tween.EaseType")]
 		public final native function set playbackAutoCaptureEaseType(value:int):void;
 		public final native function get playbackDefaultBlendTime():Number;
 		public final native function set playbackDefaultBlendTime(value:Number):void;
@@ -4173,6 +4236,7 @@ package godot {
 		public final native function set priority(value:int):void;
 		[Godot(returns="enum:Area2D.SpaceOverride")]
 		public final native function get gravitySpaceOverride():int;
+		[Godot(value="enum:Area2D.SpaceOverride")]
 		public final native function set gravitySpaceOverride(value:int):void;
 		public final native function get gravityPoint():Boolean;
 		public final native function set gravityPoint(value:Boolean):void;
@@ -4186,11 +4250,13 @@ package godot {
 		public final native function set gravity(value:Number):void;
 		[Godot(returns="enum:Area2D.SpaceOverride")]
 		public final native function get linearDampSpaceOverride():int;
+		[Godot(value="enum:Area2D.SpaceOverride")]
 		public final native function set linearDampSpaceOverride(value:int):void;
 		public final native function get linearDamp():Number;
 		public final native function set linearDamp(value:Number):void;
 		[Godot(returns="enum:Area2D.SpaceOverride")]
 		public final native function get angularDampSpaceOverride():int;
+		[Godot(value="enum:Area2D.SpaceOverride")]
 		public final native function set angularDampSpaceOverride(value:int):void;
 		public final native function get angularDamp():Number;
 		public final native function set angularDamp(value:Number):void;
@@ -4231,6 +4297,7 @@ package godot {
 		public final native function set priority(value:int):void;
 		[Godot(returns="enum:Area3D.SpaceOverride")]
 		public final native function get gravitySpaceOverride():int;
+		[Godot(value="enum:Area3D.SpaceOverride")]
 		public final native function set gravitySpaceOverride(value:int):void;
 		public final native function get gravityPoint():Boolean;
 		public final native function set gravityPoint(value:Boolean):void;
@@ -4244,11 +4311,13 @@ package godot {
 		public final native function set gravity(value:Number):void;
 		[Godot(returns="enum:Area3D.SpaceOverride")]
 		public final native function get linearDampSpaceOverride():int;
+		[Godot(value="enum:Area3D.SpaceOverride")]
 		public final native function set linearDampSpaceOverride(value:int):void;
 		public final native function get linearDamp():Number;
 		public final native function set linearDamp(value:Number):void;
 		[Godot(returns="enum:Area3D.SpaceOverride")]
 		public final native function get angularDampSpaceOverride():int;
+		[Godot(value="enum:Area3D.SpaceOverride")]
 		public final native function set angularDampSpaceOverride(value:int):void;
 		public final native function get angularDamp():Number;
 		public final native function set angularDamp(value:Number):void;
@@ -4342,6 +4411,7 @@ package godot {
 		public final native function set lightSpecular(value:Number):void;
 		[Godot(returns="enum:Light3D.BakeMode")]
 		public final native function get lightBakeMode():int;
+		[Godot(value="enum:Light3D.BakeMode")]
 		public final native function set lightBakeMode(value:int):void;
 		public final native function get lightCullMask():uint;
 		public final native function set lightCullMask(value:uint):void;
@@ -4489,6 +4559,7 @@ package godot {
 		public native function ArrayMesh();
 		[Godot(returns="enum:Mesh.BlendShapeMode")]
 		public final native function get blendShapeMode():int;
+		[Godot(value="enum:Mesh.BlendShapeMode")]
 		public final native function set blendShapeMode(value:int):void;
 		public final native function get customAABB():AABB;
 		public final native function set customAABB(value:AABB):void;
@@ -4659,9 +4730,11 @@ package godot {
 		public final native function set offsetBottom(value:Number):void;
 		[Godot(returns="enum:Control.GrowDirection")]
 		public final native function get growHorizontal():int;
+		[Godot(value="enum:Control.GrowDirection")]
 		public final native function set growHorizontal(value:int):void;
 		[Godot(returns="enum:Control.GrowDirection")]
 		public final native function get growVertical():int;
+		[Godot(value="enum:Control.GrowDirection")]
 		public final native function set growVertical(value:int):void;
 		public final native function get size():Vector2;
 		public final native function set size(value:Vector2):void;
@@ -4681,9 +4754,11 @@ package godot {
 		public final native function set pivotOffsetRatio(value:Vector2):void;
 		[Godot(returns="bitfield:Control.SizeFlags")]
 		public final native function get sizeFlagsHorizontal():int;
+		[Godot(value="bitfield:Control.SizeFlags")]
 		public final native function set sizeFlagsHorizontal(value:int):void;
 		[Godot(returns="bitfield:Control.SizeFlags")]
 		public final native function get sizeFlagsVertical():int;
+		[Godot(value="bitfield:Control.SizeFlags")]
 		public final native function set sizeFlagsVertical(value:int):void;
 		public final native function get sizeFlagsStretchRatio():Number;
 		public final native function set sizeFlagsStretchRatio(value:Number):void;
@@ -4707,6 +4782,7 @@ package godot {
 		public final native function set localizeNumeralSystem(value:Boolean):void;
 		[Godot(returns="enum:Control.LayoutDirection")]
 		public final native function get layoutDirection():int;
+		[Godot(value="enum:Control.LayoutDirection")]
 		public final native function set layoutDirection(value:int):void;
 		public final native function get translationContext():String;
 		public final native function set translationContext(value:String):void;
@@ -4716,6 +4792,7 @@ package godot {
 		public final native function set tooltipText(value:String):void;
 		[Godot(returns="enum:Node.AutoTranslateMode")]
 		public final native function get tooltipAutoTranslateMode():int;
+		[Godot(value="enum:Node.AutoTranslateMode")]
 		public final native function set tooltipAutoTranslateMode(value:int):void;
 		public final native function get focusNeighborLeft():String;
 		public final native function set focusNeighborLeft(value:String):void;
@@ -4731,20 +4808,25 @@ package godot {
 		public final native function set focusPrevious(value:String):void;
 		[Godot(returns="enum:Control.FocusMode")]
 		public final native function get focusMode():int;
+		[Godot(value="enum:Control.FocusMode")]
 		public final native function set focusMode(value:int):void;
 		[Godot(returns="enum:Control.FocusBehaviorRecursive")]
 		public final native function get focusBehaviorRecursive():int;
+		[Godot(value="enum:Control.FocusBehaviorRecursive")]
 		public final native function set focusBehaviorRecursive(value:int):void;
 		[Godot(returns="enum:Control.MouseFilter")]
 		public final native function get mouseFilter():int;
+		[Godot(value="enum:Control.MouseFilter")]
 		public final native function set mouseFilter(value:int):void;
 		[Godot(returns="enum:Control.MouseBehaviorRecursive")]
 		public final native function get mouseBehaviorRecursive():int;
+		[Godot(value="enum:Control.MouseBehaviorRecursive")]
 		public final native function set mouseBehaviorRecursive(value:int):void;
 		public final native function get mouseForcePassScrollEvents():Boolean;
 		public final native function set mouseForcePassScrollEvents(value:Boolean):void;
 		[Godot(returns="enum:Control.CursorShape")]
 		public final native function get mouseDefaultCursorShape():int;
+		[Godot(value="enum:Control.CursorShape")]
 		public final native function set mouseDefaultCursorShape(value:int):void;
 		public final native function get shortcutContext():Node;
 		public final native function set shortcutContext(value:Node):void;
@@ -4754,18 +4836,23 @@ package godot {
 		public final native function set accessibilityDescription(value:String):void;
 		[Godot(returns="enum:AccessibilityServer.AccessibilityLiveMode")]
 		public final native function get accessibilityLive():int;
+		[Godot(value="enum:AccessibilityServer.AccessibilityLiveMode")]
 		public final native function set accessibilityLive(value:int):void;
 		[Godot(returns="Array[String]")]
 		public final native function get accessibilityControlsNodes():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set accessibilityControlsNodes(value:GodotArray):void;
 		[Godot(returns="Array[String]")]
 		public final native function get accessibilityDescribedByNodes():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set accessibilityDescribedByNodes(value:GodotArray):void;
 		[Godot(returns="Array[String]")]
 		public final native function get accessibilityLabeledByNodes():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set accessibilityLabeledByNodes(value:GodotArray):void;
 		[Godot(returns="Array[String]")]
 		public final native function get accessibilityFlowToNodes():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set accessibilityFlowToNodes(value:GodotArray):void;
 		public final native function get theme():Theme;
 		public final native function set theme(value:Theme):void;
@@ -4926,12 +5013,15 @@ package godot {
 		public final native function set ratio(value:Number):void;
 		[Godot(returns="enum:AspectRatioContainer.StretchMode")]
 		public final native function get stretchMode():int;
+		[Godot(value="enum:AspectRatioContainer.StretchMode")]
 		public final native function set stretchMode(value:int):void;
 		[Godot(returns="enum:AspectRatioContainer.AlignmentMode")]
 		public final native function get alignmentHorizontal():int;
+		[Godot(value="enum:AspectRatioContainer.AlignmentMode")]
 		public final native function set alignmentHorizontal(value:int):void;
 		[Godot(returns="enum:AspectRatioContainer.AlignmentMode")]
 		public final native function get alignmentVertical():int;
+		[Godot(value="enum:AspectRatioContainer.AlignmentMode")]
 		public final native function set alignmentVertical(value:int):void;
 	}
 	public native class AtlasTexture extends Texture2D {
@@ -4974,6 +5064,7 @@ package godot {
 		public final native function set gain(value:Number):void;
 		[Godot(returns="enum:AudioEffectFilter.FilterDB")]
 		public final native function get db():int;
+		[Godot(value="enum:AudioEffectFilter.FilterDB")]
 		public final native function set db(value:int):void;
 	}
 	public native class AudioEffectBandLimitFilter extends AudioEffectFilter {
@@ -5071,6 +5162,7 @@ package godot {
 		public native function AudioEffectDistortion();
 		[Godot(returns="enum:AudioEffectDistortion.Mode")]
 		public final native function get mode():int;
+		[Godot(value="enum:AudioEffectDistortion.Mode")]
 		public final native function set mode(value:int):void;
 		public final native function get preGain():Number;
 		public final native function set preGain(value:Number):void;
@@ -5168,12 +5260,14 @@ package godot {
 		public final native function set oversampling(value:int):void;
 		[Godot(returns="enum:AudioEffectPitchShift.FFTSize")]
 		public final native function get fftSize():int;
+		[Godot(value="enum:AudioEffectPitchShift.FFTSize")]
 		public final native function set fftSize(value:int):void;
 	}
 	public native class AudioEffectRecord extends AudioEffect {
 		public native function AudioEffectRecord();
 		[Godot(returns="enum:AudioStreamWAV.Format")]
 		public final native function get format():int;
+		[Godot(value="enum:AudioStreamWAV.Format")]
 		public final native function set format(value:int):void;
 		public final native function setRecordingActive(record:Boolean):void;
 		public final native function isRecordingActive():Boolean;
@@ -5211,6 +5305,7 @@ package godot {
 		public final native function set bufferLength(value:Number):void;
 		[Godot(returns="enum:AudioEffectSpectrumAnalyzer.FFTSize")]
 		public final native function get fftSize():int;
+		[Godot(value="enum:AudioEffectSpectrumAnalyzer.FFTSize")]
 		public final native function set fftSize(value:int):void;
 	}
 	[GodotEnum(name="MagnitudeMode", values="MAGNITUDE_AVERAGE,MAGNITUDE_MAX")]
@@ -5244,6 +5339,7 @@ package godot {
 		public native function AudioListener3D();
 		[Godot(returns="enum:AudioListener3D.DopplerTracking")]
 		public final native function get dopplerTracking():int;
+		[Godot(value="enum:AudioListener3D.DopplerTracking")]
 		public final native function set dopplerTracking(value:int):void;
 		public final native function makeCurrent():void;
 		public final native function clearCurrent():void;
@@ -5362,6 +5458,7 @@ package godot {
 		public native function AudioStreamGenerator();
 		[Godot(returns="enum:AudioStreamGenerator.AudioStreamGeneratorMixRate")]
 		public final native function get mixRateMode():int;
+		[Godot(value="enum:AudioStreamGenerator.AudioStreamGeneratorMixRate")]
 		public final native function set mixRateMode(value:int):void;
 		public final native function get mixRate():Number;
 		public final native function set mixRate(value:Number):void;
@@ -5541,6 +5638,7 @@ package godot {
 		public final native function set streamPaused(value:Boolean):void;
 		[Godot(returns="enum:AudioStreamPlayer.MixTarget")]
 		public final native function get mixTarget():int;
+		[Godot(value="enum:AudioStreamPlayer.MixTarget")]
 		public final native function set mixTarget(value:int):void;
 		public final native function get maxPolyphony():int;
 		public final native function set maxPolyphony(value:int):void;
@@ -5548,6 +5646,7 @@ package godot {
 		public final native function set bus(value:String):void;
 		[Godot(returns="enum:AudioServer.PlaybackType")]
 		public final native function get playbackType():int;
+		[Godot(value="enum:AudioServer.PlaybackType")]
 		public final native function set playbackType(value:int):void;
 		public final native function get finished():Signal;
 		public final native function play(fromPosition:Number = 0.0):void;
@@ -5587,6 +5686,7 @@ package godot {
 		public final native function set areaMask(value:uint):void;
 		[Godot(returns="enum:AudioServer.PlaybackType")]
 		public final native function get playbackType():int;
+		[Godot(value="enum:AudioServer.PlaybackType")]
 		public final native function set playbackType(value:int):void;
 		public final native function get finished():Signal;
 		public final native function play(fromPosition:Number = 0.0):void;
@@ -5611,6 +5711,7 @@ package godot {
 		public final native function set stream(value:AudioStream):void;
 		[Godot(returns="enum:AudioStreamPlayer3D.AttenuationModel")]
 		public final native function get attenuationModel():int;
+		[Godot(value="enum:AudioStreamPlayer3D.AttenuationModel")]
 		public final native function set attenuationModel(value:int):void;
 		public final native function get volumeDb():Number;
 		public final native function set volumeDb(value:Number):void;
@@ -5640,6 +5741,7 @@ package godot {
 		public final native function set areaMask(value:uint):void;
 		[Godot(returns="enum:AudioServer.PlaybackType")]
 		public final native function get playbackType():int;
+		[Godot(value="enum:AudioServer.PlaybackType")]
 		public final native function set playbackType(value:int):void;
 		public final native function get emissionAngleEnabled():Boolean;
 		public final native function set emissionAngleEnabled(value:Boolean):void;
@@ -5653,6 +5755,7 @@ package godot {
 		public final native function set attenuationFilterDb(value:Number):void;
 		[Godot(returns="enum:AudioStreamPlayer3D.DopplerTracking")]
 		public final native function get dopplerTracking():int;
+		[Godot(value="enum:AudioStreamPlayer3D.DopplerTracking")]
 		public final native function set dopplerTracking(value:int):void;
 		public final native function get finished():Signal;
 		public final native function play(fromPosition:Number = 0.0):void;
@@ -5818,6 +5921,7 @@ package godot {
 		public native function AudioStreamRandomizer();
 		[Godot(returns="enum:AudioStreamRandomizer.PlaybackMode")]
 		public final native function get playbackMode():int;
+		[Godot(value="enum:AudioStreamRandomizer.PlaybackMode")]
 		public final native function set playbackMode(value:int):void;
 		public final native function get randomPitch():Number;
 		public final native function set randomPitch(value:Number):void;
@@ -5861,9 +5965,11 @@ package godot {
 		public final native function set data(value:PackedByteArray):void;
 		[Godot(returns="enum:AudioStreamWAV.Format")]
 		public final native function get format():int;
+		[Godot(value="enum:AudioStreamWAV.Format")]
 		public final native function set format(value:int):void;
 		[Godot(returns="enum:AudioStreamWAV.LoopMode")]
 		public final native function get loopMode():int;
+		[Godot(value="enum:AudioStreamWAV.LoopMode")]
 		public final native function set loopMode(value:int):void;
 		public final native function get loopBegin():int;
 		public final native function set loopBegin(value:int):void;
@@ -5896,6 +6002,7 @@ package godot {
 		public native function BackBufferCopy();
 		[Godot(returns="enum:BackBufferCopy.CopyMode")]
 		public final native function get copyMode():int;
+		[Godot(value="enum:BackBufferCopy.CopyMode")]
 		public final native function set copyMode(value:int):void;
 		public final native function get rect():Rect2;
 		public final native function set rect(value:Rect2):void;
@@ -5919,9 +6026,11 @@ package godot {
 		public final native function set buttonPressed(value:Boolean):void;
 		[Godot(returns="enum:BaseButton.ActionMode")]
 		public final native function get actionMode():int;
+		[Godot(value="enum:BaseButton.ActionMode")]
 		public final native function set actionMode(value:int):void;
 		[Godot(returns="bitfield:MouseButtonMask")]
 		public final native function get buttonMask():int;
+		[Godot(value="bitfield:MouseButtonMask")]
 		public final native function set buttonMask(value:int):void;
 		public final native function get keepPressedOutside():Boolean;
 		public final native function set keepPressedOutside(value:Boolean):void;
@@ -6116,6 +6225,7 @@ package godot {
 		public static const STENCIL_COMPARE_GREATER_OR_EQUAL:int = 6;
 		[Godot(returns="enum:BaseMaterial3D.Transparency")]
 		public final native function get transparency():int;
+		[Godot(value="enum:BaseMaterial3D.Transparency")]
 		public final native function set transparency(value:int):void;
 		public final native function get alphaScissorThreshold():Number;
 		public final native function set alphaScissorThreshold(value:Number):void;
@@ -6123,31 +6233,39 @@ package godot {
 		public final native function set alphaHashScale(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.AlphaAntiAliasing")]
 		public final native function get alphaAntialiasingMode():int;
+		[Godot(value="enum:BaseMaterial3D.AlphaAntiAliasing")]
 		public final native function set alphaAntialiasingMode(value:int):void;
 		public final native function get alphaAntialiasingEdge():Number;
 		public final native function set alphaAntialiasingEdge(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.BlendMode")]
 		public final native function get blendMode():int;
+		[Godot(value="enum:BaseMaterial3D.BlendMode")]
 		public final native function set blendMode(value:int):void;
 		[Godot(returns="enum:BaseMaterial3D.CullMode")]
 		public final native function get cullMode():int;
+		[Godot(value="enum:BaseMaterial3D.CullMode")]
 		public final native function set cullMode(value:int):void;
 		[Godot(returns="enum:BaseMaterial3D.DepthDrawMode")]
 		public final native function get depthDrawMode():int;
+		[Godot(value="enum:BaseMaterial3D.DepthDrawMode")]
 		public final native function set depthDrawMode(value:int):void;
 		public final native function get noDepthTest():Boolean;
 		public final native function set noDepthTest(value:Boolean):void;
 		[Godot(returns="enum:BaseMaterial3D.DepthTest")]
 		public final native function get depthTest():int;
+		[Godot(value="enum:BaseMaterial3D.DepthTest")]
 		public final native function set depthTest(value:int):void;
 		[Godot(returns="enum:BaseMaterial3D.ShadingMode")]
 		public final native function get shadingMode():int;
+		[Godot(value="enum:BaseMaterial3D.ShadingMode")]
 		public final native function set shadingMode(value:int):void;
 		[Godot(returns="enum:BaseMaterial3D.DiffuseMode")]
 		public final native function get diffuseMode():int;
+		[Godot(value="enum:BaseMaterial3D.DiffuseMode")]
 		public final native function set diffuseMode(value:int):void;
 		[Godot(returns="enum:BaseMaterial3D.SpecularMode")]
 		public final native function get specularMode():int;
+		[Godot(value="enum:BaseMaterial3D.SpecularMode")]
 		public final native function set specularMode(value:int):void;
 		public final native function get disableAmbientLight():Boolean;
 		public final native function set disableAmbientLight(value:Boolean):void;
@@ -6177,6 +6295,7 @@ package godot {
 		public final native function set metallicTexture(value:Texture2D):void;
 		[Godot(returns="enum:BaseMaterial3D.TextureChannel")]
 		public final native function get metallicTextureChannel():int;
+		[Godot(value="enum:BaseMaterial3D.TextureChannel")]
 		public final native function set metallicTextureChannel(value:int):void;
 		public final native function get roughness():Number;
 		public final native function set roughness(value:Number):void;
@@ -6184,6 +6303,7 @@ package godot {
 		public final native function set roughnessTexture(value:Texture2D):void;
 		[Godot(returns="enum:BaseMaterial3D.TextureChannel")]
 		public final native function get roughnessTextureChannel():int;
+		[Godot(value="enum:BaseMaterial3D.TextureChannel")]
 		public final native function set roughnessTextureChannel(value:int):void;
 		public final native function get emissionEnabled():Boolean;
 		public final native function set emissionEnabled(value:Boolean):void;
@@ -6195,6 +6315,7 @@ package godot {
 		public final native function set emissionIntensity(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.EmissionOperator")]
 		public final native function get emissionOperator():int;
+		[Godot(value="enum:BaseMaterial3D.EmissionOperator")]
 		public final native function set emissionOperator(value:int):void;
 		public final native function get emissionOnUV2():Boolean;
 		public final native function set emissionOnUV2(value:Boolean):void;
@@ -6242,6 +6363,7 @@ package godot {
 		public final native function set aoOnUV2(value:Boolean):void;
 		[Godot(returns="enum:BaseMaterial3D.TextureChannel")]
 		public final native function get aoTextureChannel():int;
+		[Godot(value="enum:BaseMaterial3D.TextureChannel")]
 		public final native function set aoTextureChannel(value:int):void;
 		public final native function get heightmapEnabled():Boolean;
 		public final native function set heightmapEnabled(value:Boolean):void;
@@ -6293,6 +6415,7 @@ package godot {
 		public final native function set refractionTexture(value:Texture2D):void;
 		[Godot(returns="enum:BaseMaterial3D.TextureChannel")]
 		public final native function get refractionTextureChannel():int;
+		[Godot(value="enum:BaseMaterial3D.TextureChannel")]
 		public final native function set refractionTextureChannel(value:int):void;
 		public final native function get detailEnabled():Boolean;
 		public final native function set detailEnabled(value:Boolean):void;
@@ -6300,9 +6423,11 @@ package godot {
 		public final native function set detailMask(value:Texture2D):void;
 		[Godot(returns="enum:BaseMaterial3D.BlendMode")]
 		public final native function get detailBlendMode():int;
+		[Godot(value="enum:BaseMaterial3D.BlendMode")]
 		public final native function set detailBlendMode(value:int):void;
 		[Godot(returns="enum:BaseMaterial3D.DetailUV")]
 		public final native function get detailUVLayer():int;
+		[Godot(value="enum:BaseMaterial3D.DetailUV")]
 		public final native function set detailUVLayer(value:int):void;
 		public final native function get detailAlbedo():Texture2D;
 		public final native function set detailAlbedo(value:Texture2D):void;
@@ -6330,6 +6455,7 @@ package godot {
 		public final native function set uv2WorldTriplanar(value:Boolean):void;
 		[Godot(returns="enum:BaseMaterial3D.TextureFilter")]
 		public final native function get textureFilter():int;
+		[Godot(value="enum:BaseMaterial3D.TextureFilter")]
 		public final native function set textureFilter(value:int):void;
 		public final native function get textureRepeat():Boolean;
 		public final native function set textureRepeat(value:Boolean):void;
@@ -6339,6 +6465,7 @@ package godot {
 		public final native function set shadowToOpacity(value:Boolean):void;
 		[Godot(returns="enum:BaseMaterial3D.BillboardMode")]
 		public final native function get billboardMode():int;
+		[Godot(value="enum:BaseMaterial3D.BillboardMode")]
 		public final native function set billboardMode(value:int):void;
 		public final native function get billboardKeepScale():Boolean;
 		public final native function set billboardKeepScale(value:Boolean):void;
@@ -6378,6 +6505,7 @@ package godot {
 		public final native function set msdfOutlineSize(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.DistanceFadeMode")]
 		public final native function get distanceFadeMode():int;
+		[Godot(value="enum:BaseMaterial3D.DistanceFadeMode")]
 		public final native function set distanceFadeMode(value:int):void;
 		public final native function get distanceFadeMinDistance():Number;
 		public final native function set distanceFadeMinDistance(value:Number):void;
@@ -6385,11 +6513,13 @@ package godot {
 		public final native function set distanceFadeMaxDistance(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.StencilMode")]
 		public final native function get stencilMode():int;
+		[Godot(value="enum:BaseMaterial3D.StencilMode")]
 		public final native function set stencilMode(value:int):void;
 		public final native function get stencilFlags():int;
 		public final native function set stencilFlags(value:int):void;
 		[Godot(returns="enum:BaseMaterial3D.StencilCompare")]
 		public final native function get stencilCompare():int;
+		[Godot(value="enum:BaseMaterial3D.StencilCompare")]
 		public final native function set stencilCompare(value:int):void;
 		public final native function get stencilReference():int;
 		public final native function set stencilReference(value:int):void;
@@ -6439,6 +6569,7 @@ package godot {
 		public native function BlitMaterial();
 		[Godot(returns="enum:BlitMaterial.BlendMode")]
 		public final native function get blendMode():int;
+		[Godot(value="enum:BlitMaterial.BlendMode")]
 		public final native function set blendMode(value:int):void;
 	}
 	public native class Bone2D extends Node2D {
@@ -6533,6 +6664,7 @@ package godot {
 		public native function BoxContainer();
 		[Godot(returns="enum:BoxContainer.AlignmentMode")]
 		public final native function get alignment():int;
+		[Godot(value="enum:BoxContainer.AlignmentMode")]
 		public final native function set alignment(value:int):void;
 		public final native function get vertical():Boolean;
 		public final native function set vertical(value:Boolean):void;
@@ -6593,28 +6725,35 @@ package godot {
 		public final native function set flat(value:Boolean):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get alignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set alignment(value:int):void;
 		[Godot(returns="enum:TextServer.OverrunBehavior")]
 		public final native function get textOverrunBehavior():int;
+		[Godot(value="enum:TextServer.OverrunBehavior")]
 		public final native function set textOverrunBehavior(value:int):void;
 		[Godot(returns="enum:TextServer.AutowrapMode")]
 		public final native function get autowrapMode():int;
+		[Godot(value="enum:TextServer.AutowrapMode")]
 		public final native function set autowrapMode(value:int):void;
 		[Godot(returns="bitfield:TextServer.LineBreakFlag")]
 		public final native function get autowrapTrimFlags():int;
+		[Godot(value="bitfield:TextServer.LineBreakFlag")]
 		public final native function set autowrapTrimFlags(value:int):void;
 		public final native function get clipText():Boolean;
 		public final native function set clipText(value:Boolean):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get iconAlignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set iconAlignment(value:int):void;
 		[Godot(returns="enum:VerticalAlignment")]
 		public final native function get verticalIconAlignment():int;
+		[Godot(value="enum:VerticalAlignment")]
 		public final native function set verticalIconAlignment(value:int):void;
 		public final native function get expandIcon():Boolean;
 		public final native function set expandIcon(value:Boolean):void;
 		[Godot(returns="enum:Control.TextDirection")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:Control.TextDirection")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
@@ -6758,9 +6897,11 @@ package godot {
 		public final native function set localCoords(value:Boolean):void;
 		[Godot(returns="enum:CPUParticles2D.DrawOrder")]
 		public final native function get drawOrder():int;
+		[Godot(value="enum:CPUParticles2D.DrawOrder")]
 		public final native function set drawOrder(value:int):void;
 		[Godot(returns="enum:CPUParticles2D.EmissionShape")]
 		public final native function get emissionShape():int;
+		[Godot(value="enum:CPUParticles2D.EmissionShape")]
 		public final native function set emissionShape(value:int):void;
 		public final native function get emissionSphereRadius():Number;
 		public final native function set emissionSphereRadius(value:Number):void;
@@ -6953,11 +7094,13 @@ package godot {
 		public final native function set localCoords(value:Boolean):void;
 		[Godot(returns="enum:CPUParticles3D.DrawOrder")]
 		public final native function get drawOrder():int;
+		[Godot(value="enum:CPUParticles3D.DrawOrder")]
 		public final native function set drawOrder(value:int):void;
 		public final native function get mesh():Mesh;
 		public final native function set mesh(value:Mesh):void;
 		[Godot(returns="enum:CPUParticles3D.EmissionShape")]
 		public final native function get emissionShape():int;
+		[Godot(value="enum:CPUParticles3D.EmissionShape")]
 		public final native function set emissionShape(value:int):void;
 		public final native function get emissionSphereRadius():Number;
 		public final native function set emissionSphereRadius(value:Number):void;
@@ -7111,6 +7254,7 @@ package godot {
 		public final native function set smoothingAngle(value:Number):void;
 		[Godot(returns="enum:CSGShape3D.Operation")]
 		public final native function get operation():int;
+		[Godot(value="enum:CSGShape3D.Operation")]
 		public final native function set operation(value:int):void;
 		public final native function get snap():Number;
 		public final native function set snap(value:Number):void;
@@ -7187,6 +7331,7 @@ package godot {
 		public final native function set polygon(value:PackedVector2Array):void;
 		[Godot(returns="enum:CSGPolygon3D.Mode")]
 		public final native function get mode():int;
+		[Godot(value="enum:CSGPolygon3D.Mode")]
 		public final native function set mode(value:int):void;
 		public final native function get depth():Number;
 		public final native function set depth(value:Number):void;
@@ -7198,6 +7343,7 @@ package godot {
 		public final native function set pathNode(value:String):void;
 		[Godot(returns="enum:CSGPolygon3D.PathIntervalType")]
 		public final native function get pathIntervalType():int;
+		[Godot(value="enum:CSGPolygon3D.PathIntervalType")]
 		public final native function set pathIntervalType(value:int):void;
 		public final native function get pathInterval():Number;
 		public final native function set pathInterval(value:Number):void;
@@ -7205,6 +7351,7 @@ package godot {
 		public final native function set pathSimplifyAngle(value:Number):void;
 		[Godot(returns="enum:CSGPolygon3D.PathRotation")]
 		public final native function get pathRotation():int;
+		[Godot(value="enum:CSGPolygon3D.PathRotation")]
 		public final native function set pathRotation(value:int):void;
 		public final native function get pathRotationAccurate():Boolean;
 		public final native function set pathRotationAccurate(value:Boolean):void;
@@ -7265,6 +7412,7 @@ package godot {
 		public final native function set offset(value:Vector2):void;
 		[Godot(returns="enum:Camera2D.AnchorMode")]
 		public final native function get anchorMode():int;
+		[Godot(value="enum:Camera2D.AnchorMode")]
 		public final native function set anchorMode(value:int):void;
 		public final native function get ignoreRotation():Boolean;
 		public final native function set ignoreRotation(value:Boolean):void;
@@ -7276,6 +7424,7 @@ package godot {
 		public final native function set customViewport(value:Node):void;
 		[Godot(returns="enum:Camera2D.Camera2DProcessCallback")]
 		public final native function get processCallback():int;
+		[Godot(value="enum:Camera2D.Camera2DProcessCallback")]
 		public final native function set processCallback(value:int):void;
 		public final native function get limitEnabled():Boolean;
 		public final native function set limitEnabled(value:Boolean):void;
@@ -7351,6 +7500,7 @@ package godot {
 		public native function Camera3D();
 		[Godot(returns="enum:Camera3D.KeepAspect")]
 		public final native function get keepAspect():int;
+		[Godot(value="enum:Camera3D.KeepAspect")]
 		public final native function set keepAspect(value:int):void;
 		public final native function get cullMask():uint;
 		public final native function set cullMask(value:uint):void;
@@ -7366,9 +7516,11 @@ package godot {
 		public final native function set vOffset(value:Number):void;
 		[Godot(returns="enum:Camera3D.DopplerTracking")]
 		public final native function get dopplerTracking():int;
+		[Godot(value="enum:Camera3D.DopplerTracking")]
 		public final native function set dopplerTracking(value:int):void;
 		[Godot(returns="enum:Camera3D.ProjectionType")]
 		public final native function get projection():int;
+		[Godot(value="enum:Camera3D.ProjectionType")]
 		public final native function set projection(value:int):void;
 		public final native function get current():Boolean;
 		public final native function set current(value:Boolean):void;
@@ -7524,6 +7676,7 @@ package godot {
 		public final native function set cameraFeedID(value:int):void;
 		[Godot(returns="enum:CameraServer.FeedImage")]
 		public final native function get whichFeed():int;
+		[Godot(value="enum:CameraServer.FeedImage")]
 		public final native function set whichFeed(value:int):void;
 		public final native function get cameraIsActive():Boolean;
 		public final native function set cameraIsActive(value:Boolean):void;
@@ -7551,9 +7704,11 @@ package godot {
 		public native function CanvasItemMaterial();
 		[Godot(returns="enum:CanvasItemMaterial.BlendMode")]
 		public final native function get blendMode():int;
+		[Godot(value="enum:CanvasItemMaterial.BlendMode")]
 		public final native function set blendMode(value:int):void;
 		[Godot(returns="enum:CanvasItemMaterial.LightMode")]
 		public final native function get lightMode():int;
+		[Godot(value="enum:CanvasItemMaterial.LightMode")]
 		public final native function set lightMode(value:int):void;
 		public final native function get particlesAnimation():Boolean;
 		public final native function set particlesAnimation(value:Boolean):void;
@@ -7609,9 +7764,11 @@ package godot {
 		public final native function set specularShininess(value:Number):void;
 		[Godot(returns="enum:CanvasItem.TextureFilter")]
 		public final native function get textureFilter():int;
+		[Godot(value="enum:CanvasItem.TextureFilter")]
 		public final native function set textureFilter(value:int):void;
 		[Godot(returns="enum:CanvasItem.TextureRepeat")]
 		public final native function get textureRepeat():int;
+		[Godot(value="enum:CanvasItem.TextureRepeat")]
 		public final native function set textureRepeat(value:int):void;
 	}
 	public native class CapsuleMesh extends PrimitiveMesh {
@@ -7699,6 +7856,7 @@ package godot {
 		public native function CharacterBody2D();
 		[Godot(returns="enum:CharacterBody2D.MotionMode")]
 		public final native function get motionMode():int;
+		[Godot(value="enum:CharacterBody2D.MotionMode")]
 		public final native function set motionMode(value:int):void;
 		public final native function get upDirection():Vector2;
 		public final native function set upDirection(value:Vector2):void;
@@ -7722,6 +7880,7 @@ package godot {
 		public final native function set floorSnapLength(value:Number):void;
 		[Godot(returns="enum:CharacterBody2D.PlatformOnLeave")]
 		public final native function get platformOnLeave():int;
+		[Godot(value="enum:CharacterBody2D.PlatformOnLeave")]
 		public final native function set platformOnLeave(value:int):void;
 		public final native function get platformFloorLayers():uint;
 		public final native function set platformFloorLayers(value:uint):void;
@@ -7759,6 +7918,7 @@ package godot {
 		public native function CharacterBody3D();
 		[Godot(returns="enum:CharacterBody3D.MotionMode")]
 		public final native function get motionMode():int;
+		[Godot(value="enum:CharacterBody3D.MotionMode")]
 		public final native function set motionMode(value:int):void;
 		public final native function get upDirection():Vector3;
 		public final native function set upDirection(value:Vector3):void;
@@ -7782,6 +7942,7 @@ package godot {
 		public final native function set floorSnapLength(value:Number):void;
 		[Godot(returns="enum:CharacterBody3D.PlatformOnLeave")]
 		public final native function get platformOnLeave():int;
+		[Godot(value="enum:CharacterBody3D.PlatformOnLeave")]
 		public final native function set platformOnLeave(value:int):void;
 		public final native function get platformFloorLayers():uint;
 		public final native function set platformFloorLayers(value:uint):void;
@@ -7952,9 +8113,11 @@ package godot {
 		public final native function set emptySelectionClipboardEnabled(value:Boolean):void;
 		[Godot(returns="enum:TextEdit.LineWrappingMode")]
 		public final native function get wrapMode():int;
+		[Godot(value="enum:TextEdit.LineWrappingMode")]
 		public final native function set wrapMode(value:int):void;
 		[Godot(returns="enum:TextServer.AutowrapMode")]
 		public final native function get autowrapMode():int;
+		[Godot(value="enum:TextServer.AutowrapMode")]
 		public final native function set autowrapMode(value:int):void;
 		public final native function get indentWrappedLines():Boolean;
 		public final native function set indentWrappedLines(value:Boolean):void;
@@ -7984,6 +8147,7 @@ package godot {
 		public final native function set minimapWidth(value:int):void;
 		[Godot(returns="enum:TextEdit.CaretType")]
 		public final native function get caretType():int;
+		[Godot(value="enum:TextEdit.CaretType")]
 		public final native function set caretType(value:int):void;
 		public final native function get caretBlink():Boolean;
 		public final native function set caretBlink(value:Boolean):void;
@@ -8017,11 +8181,13 @@ package godot {
 		public final native function set drawSpaces(value:Boolean):void;
 		[Godot(returns="enum:Control.TextDirection")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:Control.TextDirection")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
 		[Godot(returns="enum:TextServer.StructuredTextParser")]
 		public final native function get structuredTextBidiOverride():int;
+		[Godot(value="enum:TextServer.StructuredTextParser")]
 		public final native function set structuredTextBidiOverride(value:int):void;
 		public final native function get structuredTextBidiOverrideOptions():GodotArray;
 		public final native function set structuredTextBidiOverrideOptions(value:GodotArray):void;
@@ -8227,6 +8393,7 @@ package godot {
 		public final native function set lineFolding(value:Boolean):void;
 		[Godot(returns="Array[int]")]
 		public final native function get lineLengthGuidelines():GodotArray;
+		[Godot(value="Array[int]")]
 		public final native function set lineLengthGuidelines(value:GodotArray):void;
 		public final native function get guttersDrawBreakpointsGutter():Boolean;
 		public final native function set guttersDrawBreakpointsGutter(value:Boolean):void;
@@ -8244,14 +8411,17 @@ package godot {
 		public final native function set guttersDrawFoldGutter(value:Boolean):void;
 		[Godot(returns="Array[String]")]
 		public final native function get delimiterStrings():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set delimiterStrings(value:GodotArray):void;
 		[Godot(returns="Array[String]")]
 		public final native function get delimiterComments():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set delimiterComments(value:GodotArray):void;
 		public final native function get codeCompletionEnabled():Boolean;
 		public final native function set codeCompletionEnabled(value:Boolean):void;
 		[Godot(returns="Array[String]")]
 		public final native function get codeCompletionPrefixes():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set codeCompletionPrefixes(value:GodotArray):void;
 		public final native function get indentSize():int;
 		public final native function set indentSize(value:int):void;
@@ -8261,6 +8431,7 @@ package godot {
 		public final native function set indentAutomatic(value:Boolean):void;
 		[Godot(returns="Array[String]")]
 		public final native function get indentAutomaticPrefixes():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set indentAutomaticPrefixes(value:GodotArray):void;
 		public final native function get autoBraceCompletionEnabled():Boolean;
 		public final native function set autoBraceCompletionEnabled(value:Boolean):void;
@@ -8399,6 +8570,7 @@ package godot {
 		public native function CollisionPolygon2D();
 		[Godot(returns="enum:CollisionPolygon2D.BuildMode")]
 		public final native function get buildMode():int;
+		[Godot(value="enum:CollisionPolygon2D.BuildMode")]
 		public final native function set buildMode(value:int):void;
 		public final native function get polygon():PackedVector2Array;
 		public final native function set polygon(value:PackedVector2Array):void;
@@ -8486,11 +8658,13 @@ package godot {
 		public final native function set editIntensity(value:Boolean):void;
 		[Godot(returns="enum:ColorPicker.ColorModeType")]
 		public final native function get colorMode():int;
+		[Godot(value="enum:ColorPicker.ColorModeType")]
 		public final native function set colorMode(value:int):void;
 		public final native function get deferredMode():Boolean;
 		public final native function set deferredMode(value:Boolean):void;
 		[Godot(returns="enum:ColorPicker.PickerShapeType")]
 		public final native function get pickerShape():int;
+		[Godot(value="enum:ColorPicker.PickerShapeType")]
 		public final native function set pickerShape(value:int):void;
 		public final native function get canAddSwatches():Boolean;
 		public final native function set canAddSwatches(value:Boolean):void;
@@ -8537,6 +8711,7 @@ package godot {
 		public native function Compositor();
 		[Godot(returns="Array[CompositorEffect]")]
 		public final native function get compositorEffects():GodotArray;
+		[Godot(value="Array[CompositorEffect]")]
 		public final native function set compositorEffects(value:GodotArray):void;
 	}
 	[GodotEnum(name="EffectCallbackType", values="EFFECT_CALLBACK_TYPE_PRE_OPAQUE,EFFECT_CALLBACK_TYPE_POST_OPAQUE,EFFECT_CALLBACK_TYPE_POST_SKY,EFFECT_CALLBACK_TYPE_PRE_TRANSPARENT,EFFECT_CALLBACK_TYPE_POST_TRANSPARENT,EFFECT_CALLBACK_TYPE_MAX")]
@@ -8552,6 +8727,7 @@ package godot {
 		public final native function set enabled(value:Boolean):void;
 		[Godot(returns="enum:CompositorEffect.EffectCallbackType")]
 		public final native function get effectCallbackType():int;
+		[Godot(value="enum:CompositorEffect.EffectCallbackType")]
 		public final native function set effectCallbackType(value:int):void;
 		public final native function get accessResolvedColor():Boolean;
 		public final native function set accessResolvedColor(value:Boolean):void;
@@ -8967,6 +9143,7 @@ package godot {
 		public final native function set width(value:int):void;
 		[Godot(returns="enum:CurveTexture.TextureMode")]
 		public final native function get textureMode():int;
+		[Godot(value="enum:CurveTexture.TextureMode")]
 		public final native function set textureMode(value:int):void;
 		public final native function get curve():Curve;
 		public final native function set curve(value:Curve):void;
@@ -9175,6 +9352,7 @@ package godot {
 		public final native function set energy(value:Number):void;
 		[Godot(returns="enum:Light2D.BlendMode")]
 		public final native function get blendMode():int;
+		[Godot(value="enum:Light2D.BlendMode")]
 		public final native function set blendMode(value:int):void;
 		public final native function get rangeZMin():int;
 		public final native function set rangeZMin(value:int):void;
@@ -9192,6 +9370,7 @@ package godot {
 		public final native function set shadowColor(value:Color):void;
 		[Godot(returns="enum:Light2D.ShadowFilter")]
 		public final native function get shadowFilter():int;
+		[Godot(value="enum:Light2D.ShadowFilter")]
 		public final native function set shadowFilter(value:int):void;
 		public final native function get shadowFilterSmooth():Number;
 		public final native function set shadowFilterSmooth(value:Number):void;
@@ -9219,6 +9398,7 @@ package godot {
 		public native function DirectionalLight3D();
 		[Godot(returns="enum:DirectionalLight3D.ShadowMode")]
 		public final native function get directionalShadowMode():int;
+		[Godot(value="enum:DirectionalLight3D.ShadowMode")]
 		public final native function set directionalShadowMode(value:int):void;
 		public final native function get directionalShadowSplit1():Number;
 		public final native function set directionalShadowSplit1(value:Number):void;
@@ -9236,6 +9416,7 @@ package godot {
 		public final native function set directionalShadowPancakeSize(value:Number):void;
 		[Godot(returns="enum:DirectionalLight3D.SkyMode")]
 		public final native function get skyMode():int;
+		[Godot(value="enum:DirectionalLight3D.SkyMode")]
 		public final native function set skyMode(value:int):void;
 	}
 	[GodotEnum(name="Feature", values="FEATURE_GLOBAL_MENU,FEATURE_SUBWINDOWS,FEATURE_TOUCHSCREEN,FEATURE_MOUSE,FEATURE_MOUSE_WARP,FEATURE_CLIPBOARD,FEATURE_VIRTUAL_KEYBOARD,FEATURE_CURSOR_SHAPE,FEATURE_CUSTOM_CURSOR_SHAPE,FEATURE_NATIVE_DIALOG,FEATURE_IME,FEATURE_WINDOW_TRANSPARENCY,FEATURE_HIDPI,FEATURE_ICON,FEATURE_NATIVE_ICON,FEATURE_ORIENTATION,FEATURE_SWAP_BUFFERS,FEATURE_CLIPBOARD_PRIMARY,FEATURE_TEXT_TO_SPEECH,FEATURE_EXTEND_TO_TITLE,FEATURE_SCREEN_CAPTURE,FEATURE_STATUS_INDICATOR,FEATURE_NATIVE_HELP,FEATURE_NATIVE_DIALOG_INPUT,FEATURE_NATIVE_DIALOG_FILE,FEATURE_NATIVE_DIALOG_FILE_EXTRA,FEATURE_WINDOW_DRAG,FEATURE_SCREEN_EXCLUDE_FROM_CAPTURE,FEATURE_WINDOW_EMBEDDING,FEATURE_NATIVE_DIALOG_FILE_MIME,FEATURE_EMOJI_AND_SYMBOL_PICKER,FEATURE_NATIVE_COLOR_PICKER,FEATURE_SELF_FITTING_WINDOWS,FEATURE_ACCESSIBILITY_SCREEN_READER,FEATURE_HDR_OUTPUT,FEATURE_PIP_MODE")]
@@ -9933,6 +10114,7 @@ package godot {
 		public final native function set refuseNewConnections(value:Boolean):void;
 		[Godot(returns="enum:MultiplayerPeer.TransferMode")]
 		public final native function get transferMode():int;
+		[Godot(value="enum:MultiplayerPeer.TransferMode")]
 		public final native function set transferMode(value:int):void;
 		public final native function get transferChannel():int;
 		public final native function set transferChannel(value:int):void;
@@ -10113,9 +10295,11 @@ package godot {
 		public final native function set dockShortcut(value:Shortcut):void;
 		[Godot(returns="enum:EditorDock.DockSlot")]
 		public final native function get defaultSlot():int;
+		[Godot(value="enum:EditorDock.DockSlot")]
 		public final native function set defaultSlot(value:int):void;
 		[Godot(returns="bitfield:EditorDock.DockLayout")]
 		public final native function get availableLayouts():int;
+		[Godot(value="bitfield:EditorDock.DockLayout")]
 		public final native function set availableLayouts(value:int):void;
 		public final native function get opened():Signal;
 		public final native function get closed():Signal;
@@ -10409,12 +10593,15 @@ package godot {
 		public final native function set modeOverridesTitle(value:Boolean):void;
 		[Godot(returns="enum:FileDialog.FileMode")]
 		public final native function get fileMode():int;
+		[Godot(value="enum:FileDialog.FileMode")]
 		public final native function set fileMode(value:int):void;
 		[Godot(returns="enum:FileDialog.DisplayMode")]
 		public final native function get displayMode():int;
+		[Godot(value="enum:FileDialog.DisplayMode")]
 		public final native function set displayMode(value:int):void;
 		[Godot(returns="enum:FileDialog.Access")]
 		public final native function get access():int;
+		[Godot(value="enum:FileDialog.Access")]
 		public final native function set access(value:int):void;
 		public final native function get rootSubfolder():String;
 		public final native function set rootSubfolder(value:String):void;
@@ -10587,9 +10774,11 @@ package godot {
 		public final native function set scrollVerticalCustomStep(value:Number):void;
 		[Godot(returns="enum:ScrollContainer.ScrollMode")]
 		public final native function get horizontalScrollMode():int;
+		[Godot(value="enum:ScrollContainer.ScrollMode")]
 		public final native function set horizontalScrollMode(value:int):void;
 		[Godot(returns="enum:ScrollContainer.ScrollMode")]
 		public final native function get verticalScrollMode():int;
+		[Godot(value="enum:ScrollContainer.ScrollMode")]
 		public final native function set verticalScrollMode(value:int):void;
 		public final native function get scrollHorizontalByDefault():Boolean;
 		public final native function set scrollHorizontalByDefault(value:Boolean):void;
@@ -10597,6 +10786,7 @@ package godot {
 		public final native function set scrollDeadzone(value:int):void;
 		[Godot(returns="enum:ScrollContainer.ScrollHintMode")]
 		public final native function get scrollHintMode():int;
+		[Godot(value="enum:ScrollContainer.ScrollHintMode")]
 		public final native function set scrollHintMode(value:int):void;
 		public final native function get tileScrollHint():Boolean;
 		public final native function set tileScrollHint(value:Boolean):void;
@@ -11172,6 +11362,7 @@ package godot {
 		public final native function set flat(value:Boolean):void;
 		[Godot(returns="enum:EditorSpinSlider.ControlState")]
 		public final native function get controlState():int;
+		[Godot(value="enum:EditorSpinSlider.ControlState")]
 		public final native function set controlState(value:int):void;
 		public final native function get hideSlider():Boolean;
 		public final native function set hideSlider(value:Boolean):void;
@@ -11415,6 +11606,7 @@ package godot {
 		public native function Environment();
 		[Godot(returns="enum:Environment.BGMode")]
 		public final native function get backgroundMode():int;
+		[Godot(value="enum:Environment.BGMode")]
 		public final native function set backgroundMode(value:int):void;
 		public final native function get backgroundColor():Color;
 		public final native function set backgroundColor(value:Color):void;
@@ -11434,6 +11626,7 @@ package godot {
 		public final native function set skyRotation(value:Vector3):void;
 		[Godot(returns="enum:Environment.AmbientSource")]
 		public final native function get ambientLightSource():int;
+		[Godot(value="enum:Environment.AmbientSource")]
 		public final native function set ambientLightSource(value:int):void;
 		public final native function get ambientLightColor():Color;
 		public final native function set ambientLightColor(value:Color):void;
@@ -11443,9 +11636,11 @@ package godot {
 		public final native function set ambientLightEnergy(value:Number):void;
 		[Godot(returns="enum:Environment.ReflectionSource")]
 		public final native function get reflectedLightSource():int;
+		[Godot(value="enum:Environment.ReflectionSource")]
 		public final native function set reflectedLightSource(value:int):void;
 		[Godot(returns="enum:Environment.ToneMapper")]
 		public final native function get tonemapMode():int;
+		[Godot(value="enum:Environment.ToneMapper")]
 		public final native function set tonemapMode(value:int):void;
 		public final native function get tonemapExposure():Number;
 		public final native function set tonemapExposure(value:Number):void;
@@ -11511,6 +11706,7 @@ package godot {
 		public final native function set sdfgiMaxDistance(value:Number):void;
 		[Godot(returns="enum:Environment.SDFGIYScale")]
 		public final native function get sdfgiYScale():int;
+		[Godot(value="enum:Environment.SDFGIYScale")]
 		public final native function set sdfgiYScale(value:int):void;
 		public final native function get sdfgiEnergy():Number;
 		public final native function set sdfgiEnergy(value:Number):void;
@@ -11532,6 +11728,7 @@ package godot {
 		public final native function set glowBloom(value:Number):void;
 		[Godot(returns="enum:Environment.GlowBlendMode")]
 		public final native function get glowBlendMode():int;
+		[Godot(value="enum:Environment.GlowBlendMode")]
 		public final native function set glowBlendMode(value:int):void;
 		public final native function get glowHDRThreshold():Number;
 		public final native function set glowHDRThreshold(value:Number):void;
@@ -11547,6 +11744,7 @@ package godot {
 		public final native function set fogEnabled(value:Boolean):void;
 		[Godot(returns="enum:Environment.FogMode")]
 		public final native function get fogMode():int;
+		[Godot(value="enum:Environment.FogMode")]
 		public final native function set fogMode(value:int):void;
 		public final native function get fogLightColor():Color;
 		public final native function set fogLightColor(value:Color):void;
@@ -11655,12 +11853,15 @@ package godot {
 		public final native function set fallbackImageQuality(value:Number):void;
 		[Godot(returns="enum:GLTFDocument.RootNodeMode")]
 		public final native function get rootNodeMode():int;
+		[Godot(value="enum:GLTFDocument.RootNodeMode")]
 		public final native function set rootNodeMode(value:int):void;
 		[Godot(returns="enum:GLTFDocument.TextureMapMode")]
 		public final native function get textureMapMode():int;
+		[Godot(value="enum:GLTFDocument.TextureMapMode")]
 		public final native function set textureMapMode(value:int):void;
 		[Godot(returns="enum:GLTFDocument.VisibilityMode")]
 		public final native function get visibilityMode():int;
+		[Godot(value="enum:GLTFDocument.VisibilityMode")]
 		public final native function set visibilityMode(value:int):void;
 		[Godot(returns="enum:GodotError")]
 		public final native function appendFromFile(path:String, state:GLTFState, flags:uint = 0, basePath:String = ""):int;
@@ -11706,21 +11907,27 @@ package godot {
 		public final native function set useNamedSkinBinds(value:Boolean):void;
 		[Godot(returns="Array[GLTFNode]")]
 		public final native function get nodes():GodotArray;
+		[Godot(value="Array[GLTFNode]")]
 		public final native function set nodes(value:GodotArray):void;
 		[Godot(returns="Array[PackedByteArray]")]
 		public final native function get buffers():GodotArray;
+		[Godot(value="Array[PackedByteArray]")]
 		public final native function set buffers(value:GodotArray):void;
 		[Godot(returns="Array[GLTFBufferView]")]
 		public final native function get bufferViews():GodotArray;
+		[Godot(value="Array[GLTFBufferView]")]
 		public final native function set bufferViews(value:GodotArray):void;
 		[Godot(returns="Array[GLTFAccessor]")]
 		public final native function get accessors():GodotArray;
+		[Godot(value="Array[GLTFAccessor]")]
 		public final native function set accessors(value:GodotArray):void;
 		[Godot(returns="Array[GLTFMesh]")]
 		public final native function get meshes():GodotArray;
+		[Godot(value="Array[GLTFMesh]")]
 		public final native function set meshes(value:GodotArray):void;
 		[Godot(returns="Array[Material]")]
 		public final native function get materials():GodotArray;
+		[Godot(value="Array[Material]")]
 		public final native function set materials(value:GodotArray):void;
 		public final native function get sceneName():String;
 		public final native function set sceneName(value:String):void;
@@ -11732,30 +11939,39 @@ package godot {
 		public final native function set rootNodes(value:PackedInt32Array):void;
 		[Godot(returns="Array[GLTFTexture]")]
 		public final native function get textures():GodotArray;
+		[Godot(value="Array[GLTFTexture]")]
 		public final native function set textures(value:GodotArray):void;
 		[Godot(returns="Array[GLTFTextureSampler]")]
 		public final native function get textureSamplers():GodotArray;
+		[Godot(value="Array[GLTFTextureSampler]")]
 		public final native function set textureSamplers(value:GodotArray):void;
 		[Godot(returns="Array[Texture2D]")]
 		public final native function get images():GodotArray;
+		[Godot(value="Array[Texture2D]")]
 		public final native function set images(value:GodotArray):void;
 		[Godot(returns="Array[GLTFSkin]")]
 		public final native function get skins():GodotArray;
+		[Godot(value="Array[GLTFSkin]")]
 		public final native function set skins(value:GodotArray):void;
 		[Godot(returns="Array[GLTFCamera]")]
 		public final native function get cameras():GodotArray;
+		[Godot(value="Array[GLTFCamera]")]
 		public final native function set cameras(value:GodotArray):void;
 		[Godot(returns="Array[GLTFLight]")]
 		public final native function get lights():GodotArray;
+		[Godot(value="Array[GLTFLight]")]
 		public final native function set lights(value:GodotArray):void;
 		[Godot(returns="Array[String]")]
 		public final native function get uniqueNames():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set uniqueNames(value:GodotArray):void;
 		[Godot(returns="Array[String]")]
 		public final native function get uniqueAnimationNames():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set uniqueAnimationNames(value:GodotArray):void;
 		[Godot(returns="Array[GLTFSkeleton]")]
 		public final native function get skeletons():GodotArray;
+		[Godot(value="Array[GLTFSkeleton]")]
 		public final native function set skeletons(value:GodotArray):void;
 		public final native function get createAnimations():Boolean;
 		public final native function set createAnimations(value:Boolean):void;
@@ -11763,9 +11979,11 @@ package godot {
 		public final native function set importAsSkeletonBones(value:Boolean):void;
 		[Godot(returns="Array[GLTFAnimation]")]
 		public final native function get animations():GodotArray;
+		[Godot(value="Array[GLTFAnimation]")]
 		public final native function set animations(value:GodotArray):void;
 		[Godot(returns="enum:GLTFState.HandleBinaryImageMode")]
 		public final native function get handleBinaryImageMode():int;
+		[Godot(value="enum:GLTFState.HandleBinaryImageMode")]
 		public final native function set handleBinaryImageMode(value:int):void;
 		public final native function get bakeFPS():Number;
 		public final native function set bakeFPS(value:Number):void;
@@ -11837,6 +12055,7 @@ package godot {
 		public native function FastNoiseLite();
 		[Godot(returns="enum:FastNoiseLite.NoiseType")]
 		public final native function get noiseType():int;
+		[Godot(value="enum:FastNoiseLite.NoiseType")]
 		public final native function set noiseType(value:int):void;
 		public final native function get seed():int;
 		public final native function set seed(value:int):void;
@@ -11846,6 +12065,7 @@ package godot {
 		public final native function set offset(value:Vector3):void;
 		[Godot(returns="enum:FastNoiseLite.FractalType")]
 		public final native function get fractalType():int;
+		[Godot(value="enum:FastNoiseLite.FractalType")]
 		public final native function set fractalType(value:int):void;
 		public final native function get fractalOctaves():int;
 		public final native function set fractalOctaves(value:int):void;
@@ -11859,16 +12079,19 @@ package godot {
 		public final native function set fractalPingPongStrength(value:Number):void;
 		[Godot(returns="enum:FastNoiseLite.CellularDistanceFunction")]
 		public final native function get cellularDistanceFunction():int;
+		[Godot(value="enum:FastNoiseLite.CellularDistanceFunction")]
 		public final native function set cellularDistanceFunction(value:int):void;
 		public final native function get cellularJitter():Number;
 		public final native function set cellularJitter(value:Number):void;
 		[Godot(returns="enum:FastNoiseLite.CellularReturnType")]
 		public final native function get cellularReturnType():int;
+		[Godot(value="enum:FastNoiseLite.CellularReturnType")]
 		public final native function set cellularReturnType(value:int):void;
 		public final native function get domainWarpEnabled():Boolean;
 		public final native function set domainWarpEnabled(value:Boolean):void;
 		[Godot(returns="enum:FastNoiseLite.DomainWarpType")]
 		public final native function get domainWarpType():int;
+		[Godot(value="enum:FastNoiseLite.DomainWarpType")]
 		public final native function set domainWarpType(value:int):void;
 		public final native function get domainWarpAmplitude():Number;
 		public final native function set domainWarpAmplitude(value:Number):void;
@@ -11876,6 +12099,7 @@ package godot {
 		public final native function set domainWarpFrequency(value:Number):void;
 		[Godot(returns="enum:FastNoiseLite.DomainWarpFractalType")]
 		public final native function get domainWarpFractalType():int;
+		[Godot(value="enum:FastNoiseLite.DomainWarpFractalType")]
 		public final native function set domainWarpFractalType(value:int):void;
 		public final native function get domainWarpFractalOctaves():int;
 		public final native function set domainWarpFractalOctaves(value:int):void;
@@ -12023,9 +12247,11 @@ package godot {
 		public native function FlowContainer();
 		[Godot(returns="enum:FlowContainer.AlignmentMode")]
 		public final native function get alignment():int;
+		[Godot(value="enum:FlowContainer.AlignmentMode")]
 		public final native function set alignment(value:int):void;
 		[Godot(returns="enum:FlowContainer.LastWrapAlignmentMode")]
 		public final native function get lastWrapAlignment():int;
+		[Godot(value="enum:FlowContainer.LastWrapAlignmentMode")]
 		public final native function set lastWrapAlignment(value:int):void;
 		public final native function get vertical():Boolean;
 		public final native function set vertical(value:Boolean):void;
@@ -12054,6 +12280,7 @@ package godot {
 		public final native function set size(value:Vector3):void;
 		[Godot(returns="enum:RenderingServer.FogVolumeShape")]
 		public final native function get shape():int;
+		[Godot(value="enum:RenderingServer.FogVolumeShape")]
 		public final native function set shape(value:int):void;
 		public final native function get material():Material;
 		public final native function set material(value:Material):void;
@@ -12069,17 +12296,21 @@ package godot {
 		public final native function set title(value:String):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get titleAlignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set titleAlignment(value:int):void;
 		[Godot(returns="enum:FoldableContainer.TitlePosition")]
 		public final native function get titlePosition():int;
+		[Godot(value="enum:FoldableContainer.TitlePosition")]
 		public final native function set titlePosition(value:int):void;
 		[Godot(returns="enum:TextServer.OverrunBehavior")]
 		public final native function get titleTextOverrunBehavior():int;
+		[Godot(value="enum:TextServer.OverrunBehavior")]
 		public final native function set titleTextOverrunBehavior(value:int):void;
 		public final native function get foldableGroup():FoldableGroup;
 		public final native function set foldableGroup(value:FoldableGroup):void;
 		[Godot(returns="enum:Control.TextDirection")]
 		public final native function get titleTextDirection():int;
+		[Godot(value="enum:Control.TextDirection")]
 		public final native function set titleTextDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
@@ -12102,6 +12333,7 @@ package godot {
 	public native class Font extends Resource {
 		[Godot(returns="Array[Font]")]
 		public final native function get fallbacks():GodotArray;
+		[Godot(value="Array[Font]")]
 		public final native function set fallbacks(value:GodotArray):void;
 		public final native function findVariation(variationCoordinates:GodotDictionary, faceIndex:int = 0, strength:Number = 0.0, transform:Transform2D = null, spacingTop:int = 0, spacingBottom:int = 0, spacingSpace:int = 0, spacingGlyph:int = 0, baselineOffset:Number = 0.0, paletteIndex:Int64 = 0, customColors:PackedColorArray = null):RID;
 		[Godot(returns="Array[RID]")]
@@ -12158,6 +12390,7 @@ package godot {
 		public final native function set disableEmbeddedBitmaps(value:Boolean):void;
 		[Godot(returns="enum:TextServer.FontAntialiasing")]
 		public final native function get antialiasing():int;
+		[Godot(value="enum:TextServer.FontAntialiasing")]
 		public final native function set antialiasing(value:int):void;
 		public final native function get fontName():String;
 		public final native function set fontName(value:String):void;
@@ -12165,6 +12398,7 @@ package godot {
 		public final native function set styleName(value:String):void;
 		[Godot(returns="bitfield:TextServer.FontStyle")]
 		public final native function get fontStyle():int;
+		[Godot(value="bitfield:TextServer.FontStyle")]
 		public final native function set fontStyle(value:int):void;
 		public final native function get fontWeight():int;
 		public final native function set fontWeight(value:int):void;
@@ -12172,6 +12406,7 @@ package godot {
 		public final native function set fontStretch(value:int):void;
 		[Godot(returns="enum:TextServer.SubpixelPositioning")]
 		public final native function get subpixelPositioning():int;
+		[Godot(value="enum:TextServer.SubpixelPositioning")]
 		public final native function set subpixelPositioning(value:int):void;
 		public final native function get keepRoundingRemainders():Boolean;
 		public final native function set keepRoundingRemainders(value:Boolean):void;
@@ -12189,11 +12424,13 @@ package godot {
 		public final native function set modulateColorGlyphs(value:Boolean):void;
 		[Godot(returns="enum:TextServer.Hinting")]
 		public final native function get hinting():int;
+		[Godot(value="enum:TextServer.Hinting")]
 		public final native function set hinting(value:int):void;
 		public final native function get fixedSize():int;
 		public final native function set fixedSize(value:int):void;
 		[Godot(returns="enum:TextServer.FixedSizeScaleMode")]
 		public final native function get fixedSizeScaleMode():int;
+		[Godot(value="enum:TextServer.FixedSizeScaleMode")]
 		public final native function set fixedSizeScaleMode(value:int):void;
 		public final native function get opentypeFeatureOverrides():GodotDictionary;
 		public final native function set opentypeFeatureOverrides(value:GodotDictionary):void;
@@ -12473,6 +12710,7 @@ package godot {
 		public final native function set byteOffset(value:Int64):void;
 		[Godot(returns="enum:GLTFAccessor.GLTFComponentType")]
 		public final native function get componentType():int;
+		[Godot(value="enum:GLTFAccessor.GLTFComponentType")]
 		public final native function set componentType(value:int):void;
 		public final native function get normalized():Boolean;
 		public final native function set normalized(value:Boolean):void;
@@ -12480,6 +12718,7 @@ package godot {
 		public final native function set count(value:Int64):void;
 		[Godot(returns="enum:GLTFAccessor.GLTFAccessorType")]
 		public final native function get accessorType():int;
+		[Godot(value="enum:GLTFAccessor.GLTFAccessorType")]
 		public final native function set accessorType(value:int):void;
 		public final native function get type():int;
 		public final native function set type(value:int):void;
@@ -12495,6 +12734,7 @@ package godot {
 		public final native function set sparseIndicesByteOffset(value:Int64):void;
 		[Godot(returns="enum:GLTFAccessor.GLTFComponentType")]
 		public final native function get sparseIndicesComponentType():int;
+		[Godot(value="enum:GLTFAccessor.GLTFComponentType")]
 		public final native function set sparseIndicesComponentType(value:int):void;
 		public final native function get sparseValuesBufferView():int;
 		public final native function set sparseValuesBufferView(value:int):void;
@@ -12625,6 +12865,7 @@ package godot {
 		public final native function set blendWeights(value:PackedFloat32Array):void;
 		[Godot(returns="Array[Material]")]
 		public final native function get instanceMaterials():GodotArray;
+		[Godot(value="Array[Material]")]
 		public final native function set instanceMaterials(value:GodotArray):void;
 		public final native function getAdditionalData(extensionName:String):*;
 		public final native function setAdditionalData(extensionName:String, additionalData:*):void;
@@ -12684,15 +12925,19 @@ package godot {
 		public final native function set godotToGLTFExpression(value:Expression):void;
 		[Godot(returns="Array[String]")]
 		public final native function get nodePaths():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set nodePaths(value:GodotArray):void;
 		[Godot(returns="enum:GLTFObjectModelProperty.GLTFObjectModelType")]
 		public final native function get objectModelType():int;
+		[Godot(value="enum:GLTFObjectModelProperty.GLTFObjectModelType")]
 		public final native function set objectModelType(value:int):void;
 		[Godot(returns="Array[PackedStringArray]")]
 		public final native function get jsonPointers():GodotArray;
+		[Godot(value="Array[PackedStringArray]")]
 		public final native function set jsonPointers(value:GodotArray):void;
 		[Godot(returns="enum:VariantType")]
 		public final native function get variantType():int;
+		[Godot(value="enum:VariantType")]
 		public final native function set variantType(value:int):void;
 		public final native function appendNodePath(nodePath:String):void;
 		public final native function appendPathToProperty(nodePath:String, propName:String):void;
@@ -12757,6 +13002,7 @@ package godot {
 		public final native function set roots(value:PackedInt32Array):void;
 		[Godot(returns="Array[String]")]
 		public final native function get uniqueNames():GodotArray;
+		[Godot(value="Array[String]")]
 		public final native function set uniqueNames(value:GodotArray):void;
 		public final native function get godotBoneNode():GodotDictionary;
 		public final native function set godotBoneNode(value:GodotDictionary):void;
@@ -12772,6 +13018,7 @@ package godot {
 		public final native function set jointsOriginal(value:PackedInt32Array):void;
 		[Godot(returns="Array[Transform3D]")]
 		public final native function get inverseBinds():GodotArray;
+		[Godot(value="Array[Transform3D]")]
 		public final native function set inverseBinds(value:GodotArray):void;
 		public final native function get joints():PackedInt32Array;
 		public final native function set joints(value:PackedInt32Array):void;
@@ -12873,6 +13120,7 @@ package godot {
 		public final native function set localCoords(value:Boolean):void;
 		[Godot(returns="enum:GPUParticles2D.DrawOrder")]
 		public final native function get drawOrder():int;
+		[Godot(value="enum:GPUParticles2D.DrawOrder")]
 		public final native function set drawOrder(value:int):void;
 		public final native function get trailEnabled():Boolean;
 		public final native function set trailEnabled(value:Boolean):void;
@@ -12951,15 +13199,19 @@ package godot {
 		public final native function set localCoords(value:Boolean):void;
 		[Godot(returns="enum:GPUParticles3D.DrawOrder")]
 		public final native function get drawOrder():int;
+		[Godot(value="enum:GPUParticles3D.DrawOrder")]
 		public final native function set drawOrder(value:int):void;
 		[Godot(returns="enum:GPUParticles3D.TransformAlign")]
 		public final native function get transformAlign():int;
+		[Godot(value="enum:GPUParticles3D.TransformAlign")]
 		public final native function set transformAlign(value:int):void;
 		[Godot(returns="enum:RenderingServer.ParticlesTransformAlignAxis")]
 		public final native function get transformAlignAxis():int;
+		[Godot(value="enum:RenderingServer.ParticlesTransformAlignAxis")]
 		public final native function set transformAlignAxis(value:int):void;
 		[Godot(returns="enum:RenderingServer.ParticlesTransformAlignCustomSrc")]
 		public final native function get transformAlignChannelFilter():int;
+		[Godot(value="enum:RenderingServer.ParticlesTransformAlignCustomSrc")]
 		public final native function set transformAlignChannelFilter(value:int):void;
 		public final native function get trailEnabled():Boolean;
 		public final native function set trailEnabled(value:Boolean):void;
@@ -13043,9 +13295,11 @@ package godot {
 		public final native function set size(value:Vector3):void;
 		[Godot(returns="enum:GPUParticlesCollisionHeightField3D.Resolution")]
 		public final native function get resolution():int;
+		[Godot(value="enum:GPUParticlesCollisionHeightField3D.Resolution")]
 		public final native function set resolution(value:int):void;
 		[Godot(returns="enum:GPUParticlesCollisionHeightField3D.UpdateMode")]
 		public final native function get updateMode():int;
+		[Godot(value="enum:GPUParticlesCollisionHeightField3D.UpdateMode")]
 		public final native function set updateMode(value:int):void;
 		public final native function get followCameraEnabled():Boolean;
 		public final native function set followCameraEnabled(value:Boolean):void;
@@ -13068,6 +13322,7 @@ package godot {
 		public final native function set size(value:Vector3):void;
 		[Godot(returns="enum:GPUParticlesCollisionSDF3D.Resolution")]
 		public final native function get resolution():int;
+		[Godot(value="enum:GPUParticlesCollisionSDF3D.Resolution")]
 		public final native function set resolution(value:int):void;
 		public final native function get thickness():Number;
 		public final native function set thickness(value:Number):void;
@@ -13243,9 +13498,11 @@ package godot {
 		public native function Gradient();
 		[Godot(returns="enum:Gradient.InterpolationMode")]
 		public final native function get interpolationMode():int;
+		[Godot(value="enum:Gradient.InterpolationMode")]
 		public final native function set interpolationMode(value:int):void;
 		[Godot(returns="enum:Gradient.ColorSpace")]
 		public final native function get interpolationColorSpace():int;
+		[Godot(value="enum:Gradient.ColorSpace")]
 		public final native function set interpolationColorSpace(value:int):void;
 		public final native function get offsets():PackedFloat32Array;
 		public final native function set offsets(value:PackedFloat32Array):void;
@@ -13291,6 +13548,7 @@ package godot {
 		public final native function set useHDR(value:Boolean):void;
 		[Godot(returns="enum:GradientTexture2D.Fill")]
 		public final native function get fill():int;
+		[Godot(value="enum:GradientTexture2D.Fill")]
 		public final native function set fill(value:int):void;
 		public final native function get fillFrom():Vector2;
 		public final native function set fillFrom(value:Vector2):void;
@@ -13298,6 +13556,7 @@ package godot {
 		public final native function set fillTo(value:Vector2):void;
 		[Godot(returns="enum:GradientTexture2D.Repeat")]
 		public final native function get repeat():int;
+		[Godot(value="enum:GradientTexture2D.Repeat")]
 		public final native function set repeat(value:int):void;
 	}
 	[GodotEnum(name="PanningScheme", values="SCROLL_ZOOMS,SCROLL_PANS")]
@@ -13314,6 +13573,7 @@ package godot {
 		public final native function set showGrid(value:Boolean):void;
 		[Godot(returns="enum:GraphEdit.GridPattern")]
 		public final native function get gridPattern():int;
+		[Godot(value="enum:GraphEdit.GridPattern")]
 		public final native function set gridPattern(value:int):void;
 		public final native function get snappingEnabled():Boolean;
 		public final native function set snappingEnabled(value:Boolean):void;
@@ -13321,6 +13581,7 @@ package godot {
 		public final native function set snappingDistance(value:int):void;
 		[Godot(returns="enum:GraphEdit.PanningScheme")]
 		public final native function get panningScheme():int;
+		[Godot(value="enum:GraphEdit.PanningScheme")]
 		public final native function set panningScheme(value:int):void;
 		public final native function get rightDisconnects():Boolean;
 		public final native function set rightDisconnects(value:Boolean):void;
@@ -13334,6 +13595,7 @@ package godot {
 		public final native function set connectionLinesAntialiased(value:Boolean):void;
 		[Godot(returns="Array[GodotDictionary]")]
 		public final native function get connections():GodotArray;
+		[Godot(value="Array[GodotDictionary]")]
 		public final native function set connections(value:GodotArray):void;
 		public final native function get zoom():Number;
 		public final native function set zoom(value:Number):void;
@@ -13462,6 +13724,7 @@ package godot {
 		public final native function set ignoreInvalidConnectionType(value:Boolean):void;
 		[Godot(returns="enum:Control.FocusMode")]
 		public final native function get slotsFocusMode():int;
+		[Godot(value="enum:Control.FocusMode")]
 		public final native function set slotsFocusMode(value:int):void;
 		public final native function get slotUpdated():Signal;
 		public final native function get slotSizesChanged():Signal;
@@ -13539,6 +13802,7 @@ package godot {
 		public final native function set collisionPriority(value:Number):void;
 		[Godot(returns="enum:GridMap.DebugVisibilityMode")]
 		public final native function get collisionVisibilityMode():int;
+		[Godot(value="enum:GridMap.DebugVisibilityMode")]
 		public final native function set collisionVisibilityMode(value:int):void;
 		public final native function get bakeNavigation():Boolean;
 		public final native function set bakeNavigation(value:Boolean):void;
@@ -13644,6 +13908,7 @@ package godot {
 		public final native function set ticksOnBorders(value:Boolean):void;
 		[Godot(returns="enum:Slider.TickPosition")]
 		public final native function get ticksPosition():int;
+		[Godot(value="enum:Slider.TickPosition")]
 		public final native function set ticksPosition(value:int):void;
 		public final native function get dragStarted():Signal;
 		public final native function get dragEnded():Signal;
@@ -13665,6 +13930,7 @@ package godot {
 		public final native function set draggingEnabled(value:Boolean):void;
 		[Godot(returns="enum:SplitContainer.DraggerVisibility")]
 		public final native function get draggerVisibility():int;
+		[Godot(value="enum:SplitContainer.DraggerVisibility")]
 		public final native function set draggerVisibility(value:int):void;
 		public final native function get vertical():Boolean;
 		public final native function set vertical(value:Boolean):void;
@@ -14217,6 +14483,7 @@ package godot {
 		public final native function set layerMask(value:uint):void;
 		[Godot(returns="enum:GeometryInstance3D.ShadowCastingSetting")]
 		public final native function get castShadow():int;
+		[Godot(value="enum:GeometryInstance3D.ShadowCastingSetting")]
 		public final native function set castShadow(value:int):void;
 		public final native function get visibilityRangeBegin():Number;
 		public final native function set visibilityRangeBegin(value:Number):void;
@@ -14228,6 +14495,7 @@ package godot {
 		public final native function set visibilityRangeEndMargin(value:Number):void;
 		[Godot(returns="enum:GeometryInstance3D.VisibilityRangeFadeMode")]
 		public final native function get visibilityRangeFadeMode():int;
+		[Godot(value="enum:GeometryInstance3D.VisibilityRangeFadeMode")]
 		public final native function set visibilityRangeFadeMode(value:int):void;
 	}
 	[GodotEnum(name="MouseMode", values="MOUSE_MODE_VISIBLE,MOUSE_MODE_HIDDEN,MOUSE_MODE_CAPTURED,MOUSE_MODE_CONFINED,MOUSE_MODE_CONFINED_HIDDEN,MOUSE_MODE_MAX")]
@@ -14260,6 +14528,7 @@ package godot {
 		public static const CURSOR_HELP:int = 16;
 		[Godot(returns="enum:Input.MouseMode")]
 		public static native function get mouseMode():int;
+		[Godot(value="enum:Input.MouseMode")]
 		public static native function set mouseMode(value:int):void;
 		public static native function get useAccumulatedInput():Boolean;
 		public static native function set useAccumulatedInput(value:Boolean):void;
@@ -14412,6 +14681,7 @@ package godot {
 		public native function InputEventJoypadButton();
 		[Godot(returns="enum:JoyButton")]
 		public final native function get buttonIndex():int;
+		[Godot(value="enum:JoyButton")]
 		public final native function set buttonIndex(value:int):void;
 		public final native function get pressure():Number;
 		public final native function set pressure(value:Number):void;
@@ -14422,6 +14692,7 @@ package godot {
 		public native function InputEventJoypadMotion();
 		[Godot(returns="enum:JoyAxis")]
 		public final native function get axis():int;
+		[Godot(value="enum:JoyAxis")]
 		public final native function set axis(value:int):void;
 		public final native function get axisValue():Number;
 		public final native function set axisValue(value:Number):void;
@@ -14432,17 +14703,21 @@ package godot {
 		public final native function set pressed(value:Boolean):void;
 		[Godot(returns="enum:Key")]
 		public final native function get keycode():int;
+		[Godot(value="enum:Key")]
 		public final native function set keycode(value:int):void;
 		[Godot(returns="enum:Key")]
 		public final native function get physicalKeycode():int;
+		[Godot(value="enum:Key")]
 		public final native function set physicalKeycode(value:int):void;
 		[Godot(returns="enum:Key")]
 		public final native function get keyLabel():int;
+		[Godot(value="enum:Key")]
 		public final native function set keyLabel(value:int):void;
 		public final native function get unicode():int;
 		public final native function set unicode(value:int):void;
 		[Godot(returns="enum:KeyLocation")]
 		public final native function get location():int;
+		[Godot(value="enum:KeyLocation")]
 		public final native function set location(value:int):void;
 		public final native function get echo():Boolean;
 		public final native function set echo(value:Boolean):void;
@@ -14463,6 +14738,7 @@ package godot {
 		public final native function set channel(value:int):void;
 		[Godot(returns="enum:MIDIMessage")]
 		public final native function get message():int;
+		[Godot(value="enum:MIDIMessage")]
 		public final native function set message(value:int):void;
 		public final native function get pitch():int;
 		public final native function set pitch(value:int):void;
@@ -14486,6 +14762,7 @@ package godot {
 	public native class InputEventMouse extends InputEventWithModifiers {
 		[Godot(returns="bitfield:MouseButtonMask")]
 		public final native function get buttonMask():int;
+		[Godot(value="bitfield:MouseButtonMask")]
 		public final native function set buttonMask(value:int):void;
 		public final native function get position():Vector2;
 		public final native function set position(value:Vector2):void;
@@ -14498,6 +14775,7 @@ package godot {
 		public final native function set factor(value:Number):void;
 		[Godot(returns="enum:MouseButton")]
 		public final native function get buttonIndex():int;
+		[Godot(value="enum:MouseButton")]
 		public final native function set buttonIndex(value:int):void;
 		public final native function get canceled():Boolean;
 		public final native function set canceled(value:Boolean):void;
@@ -14614,6 +14892,7 @@ package godot {
 		public native function ItemList();
 		[Godot(returns="enum:ItemList.SelectMode")]
 		public final native function get selectMode():int;
+		[Godot(value="enum:ItemList.SelectMode")]
 		public final native function set selectMode(value:int):void;
 		public final native function get allowReselect():Boolean;
 		public final native function set allowReselect(value:Boolean):void;
@@ -14629,11 +14908,13 @@ package godot {
 		public final native function set autoHeight(value:Boolean):void;
 		[Godot(returns="enum:TextServer.OverrunBehavior")]
 		public final native function get textOverrunBehavior():int;
+		[Godot(value="enum:TextServer.OverrunBehavior")]
 		public final native function set textOverrunBehavior(value:int):void;
 		public final native function get wraparoundItems():Boolean;
 		public final native function set wraparoundItems(value:Boolean):void;
 		[Godot(returns="enum:ItemList.ScrollHintMode")]
 		public final native function get scrollHintMode():int;
+		[Godot(value="enum:ItemList.ScrollHintMode")]
 		public final native function set scrollHintMode(value:int):void;
 		public final native function get tileScrollHint():Boolean;
 		public final native function set tileScrollHint(value:Boolean):void;
@@ -14647,6 +14928,7 @@ package godot {
 		public final native function set fixedColumnWidth(value:int):void;
 		[Godot(returns="enum:ItemList.IconMode")]
 		public final native function get iconMode():int;
+		[Godot(value="enum:ItemList.IconMode")]
 		public final native function set iconMode(value:int):void;
 		public final native function get iconScale():Number;
 		public final native function set iconScale(value:Number):void;
@@ -14823,18 +15105,23 @@ package godot {
 		public final native function set labelSettings(value:LabelSettings):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get horizontalAlignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set horizontalAlignment(value:int):void;
 		[Godot(returns="enum:VerticalAlignment")]
 		public final native function get verticalAlignment():int;
+		[Godot(value="enum:VerticalAlignment")]
 		public final native function set verticalAlignment(value:int):void;
 		[Godot(returns="enum:TextServer.AutowrapMode")]
 		public final native function get autowrapMode():int;
+		[Godot(value="enum:TextServer.AutowrapMode")]
 		public final native function set autowrapMode(value:int):void;
 		[Godot(returns="bitfield:TextServer.LineBreakFlag")]
 		public final native function get autowrapTrimFlags():int;
+		[Godot(value="bitfield:TextServer.LineBreakFlag")]
 		public final native function set autowrapTrimFlags(value:int):void;
 		[Godot(returns="bitfield:TextServer.JustificationFlag")]
 		public final native function get justificationFlags():int;
+		[Godot(value="bitfield:TextServer.JustificationFlag")]
 		public final native function set justificationFlags(value:int):void;
 		public final native function get paragraphSeparator():String;
 		public final native function set paragraphSeparator(value:String):void;
@@ -14842,6 +15129,7 @@ package godot {
 		public final native function set clipText(value:Boolean):void;
 		[Godot(returns="enum:TextServer.OverrunBehavior")]
 		public final native function get textOverrunBehavior():int;
+		[Godot(value="enum:TextServer.OverrunBehavior")]
 		public final native function set textOverrunBehavior(value:int):void;
 		public final native function get ellipsisChar():String;
 		public final native function set ellipsisChar(value:String):void;
@@ -14857,16 +15145,19 @@ package godot {
 		public final native function set visibleCharacters(value:int):void;
 		[Godot(returns="enum:TextServer.VisibleCharactersBehavior")]
 		public final native function get visibleCharactersBehavior():int;
+		[Godot(value="enum:TextServer.VisibleCharactersBehavior")]
 		public final native function set visibleCharactersBehavior(value:int):void;
 		public final native function get visibleRatio():Number;
 		public final native function set visibleRatio(value:Number):void;
 		[Godot(returns="enum:Control.TextDirection")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:Control.TextDirection")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
 		[Godot(returns="enum:TextServer.StructuredTextParser")]
 		public final native function get structuredTextBidiOverride():int;
+		[Godot(value="enum:TextServer.StructuredTextParser")]
 		public final native function set structuredTextBidiOverride(value:int):void;
 		public final native function get structuredTextBidiOverrideOptions():GodotArray;
 		public final native function set structuredTextBidiOverrideOptions(value:GodotArray):void;
@@ -14895,6 +15186,7 @@ package godot {
 		public final native function set offset(value:Vector2):void;
 		[Godot(returns="enum:BaseMaterial3D.BillboardMode")]
 		public final native function get billboard():int;
+		[Godot(value="enum:BaseMaterial3D.BillboardMode")]
 		public final native function set billboard(value:int):void;
 		public final native function get shaded():Boolean;
 		public final native function set shaded(value:Boolean):void;
@@ -14906,6 +15198,7 @@ package godot {
 		public final native function set fixedSize(value:Boolean):void;
 		[Godot(returns="enum:Label3D.AlphaCutMode")]
 		public final native function get alphaCut():int;
+		[Godot(value="enum:Label3D.AlphaCutMode")]
 		public final native function set alphaCut(value:int):void;
 		public final native function get alphaScissorThreshold():Number;
 		public final native function set alphaScissorThreshold(value:Number):void;
@@ -14913,11 +15206,13 @@ package godot {
 		public final native function set alphaHashScale(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.AlphaAntiAliasing")]
 		public final native function get alphaAntialiasingMode():int;
+		[Godot(value="enum:BaseMaterial3D.AlphaAntiAliasing")]
 		public final native function set alphaAntialiasingMode(value:int):void;
 		public final native function get alphaAntialiasingEdge():Number;
 		public final native function set alphaAntialiasingEdge(value:Number):void;
 		[Godot(returns="enum:BaseMaterial3D.TextureFilter")]
 		public final native function get textureFilter():int;
+		[Godot(value="enum:BaseMaterial3D.TextureFilter")]
 		public final native function set textureFilter(value:int):void;
 		public final native function get renderPriority():int;
 		public final native function set renderPriority(value:int):void;
@@ -14937,9 +15232,11 @@ package godot {
 		public final native function set outlineSize(value:int):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get horizontalAlignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set horizontalAlignment(value:int):void;
 		[Godot(returns="enum:VerticalAlignment")]
 		public final native function get verticalAlignment():int;
+		[Godot(value="enum:VerticalAlignment")]
 		public final native function set verticalAlignment(value:int):void;
 		public final native function get uppercase():Boolean;
 		public final native function set uppercase(value:Boolean):void;
@@ -14947,22 +15244,27 @@ package godot {
 		public final native function set lineSpacing(value:Number):void;
 		[Godot(returns="enum:TextServer.AutowrapMode")]
 		public final native function get autowrapMode():int;
+		[Godot(value="enum:TextServer.AutowrapMode")]
 		public final native function set autowrapMode(value:int):void;
 		[Godot(returns="bitfield:TextServer.LineBreakFlag")]
 		public final native function get autowrapTrimFlags():int;
+		[Godot(value="bitfield:TextServer.LineBreakFlag")]
 		public final native function set autowrapTrimFlags(value:int):void;
 		[Godot(returns="bitfield:TextServer.JustificationFlag")]
 		public final native function get justificationFlags():int;
+		[Godot(value="bitfield:TextServer.JustificationFlag")]
 		public final native function set justificationFlags(value:int):void;
 		public final native function get width():Number;
 		public final native function set width(value:Number):void;
 		[Godot(returns="enum:TextServer.Direction")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:TextServer.Direction")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
 		[Godot(returns="enum:TextServer.StructuredTextParser")]
 		public final native function get structuredTextBidiOverride():int;
+		[Godot(value="enum:TextServer.StructuredTextParser")]
 		public final native function set structuredTextBidiOverride(value:int):void;
 		public final native function get structuredTextBidiOverrideOptions():GodotArray;
 		public final native function set structuredTextBidiOverrideOptions(value:GodotArray):void;
@@ -15057,6 +15359,7 @@ package godot {
 		public native function LightmapGI();
 		[Godot(returns="enum:LightmapGI.BakeQuality")]
 		public final native function get quality():int;
+		[Godot(value="enum:LightmapGI.BakeQuality")]
 		public final native function set quality(value:int):void;
 		public final native function get supersampling():Boolean;
 		public final native function set supersampling(value:Boolean):void;
@@ -15070,6 +15373,7 @@ package godot {
 		public final native function set directional(value:Boolean):void;
 		[Godot(returns="enum:LightmapGIData.ShadowmaskMode")]
 		public final native function get shadowmaskMode():int;
+		[Godot(value="enum:LightmapGIData.ShadowmaskMode")]
 		public final native function set shadowmaskMode(value:int):void;
 		public final native function get useTextureForBounces():Boolean;
 		public final native function set useTextureForBounces(value:Boolean):void;
@@ -15089,6 +15393,7 @@ package godot {
 		public final native function set maxTextureSize(value:int):void;
 		[Godot(returns="enum:LightmapGI.EnvironmentMode")]
 		public final native function get environmentMode():int;
+		[Godot(value="enum:LightmapGI.EnvironmentMode")]
 		public final native function set environmentMode(value:int):void;
 		public final native function get environmentCustomSky():Sky;
 		public final native function set environmentCustomSky(value:Sky):void;
@@ -15100,6 +15405,7 @@ package godot {
 		public final native function set cameraAttributes(value:CameraAttributes):void;
 		[Godot(returns="enum:LightmapGI.GenerateProbes")]
 		public final native function get generateProbesSubdiv():int;
+		[Godot(value="enum:LightmapGI.GenerateProbes")]
 		public final native function set generateProbesSubdiv(value:int):void;
 		public final native function get lightData():LightmapGIData;
 		public final native function set lightData(value:LightmapGIData):void;
@@ -15112,9 +15418,11 @@ package godot {
 		public native function LightmapGIData();
 		[Godot(returns="Array[TextureLayered]")]
 		public final native function get lightmapTextures():GodotArray;
+		[Godot(value="Array[TextureLayered]")]
 		public final native function set lightmapTextures(value:GodotArray):void;
 		[Godot(returns="Array[TextureLayered]")]
 		public final native function get shadowmaskTextures():GodotArray;
+		[Godot(value="Array[TextureLayered]")]
 		public final native function set shadowmaskTextures(value:GodotArray):void;
 		public final native function get usesSphericalHarmonics():Boolean;
 		public final native function set usesSphericalHarmonics(value:Boolean):void;
@@ -15190,15 +15498,19 @@ package godot {
 		public final native function set texture(value:Texture2D):void;
 		[Godot(returns="enum:Line2D.LineTextureMode")]
 		public final native function get textureMode():int;
+		[Godot(value="enum:Line2D.LineTextureMode")]
 		public final native function set textureMode(value:int):void;
 		[Godot(returns="enum:Line2D.LineJointMode")]
 		public final native function get jointMode():int;
+		[Godot(value="enum:Line2D.LineJointMode")]
 		public final native function set jointMode(value:int):void;
 		[Godot(returns="enum:Line2D.LineCapMode")]
 		public final native function get beginCapMode():int;
+		[Godot(value="enum:Line2D.LineCapMode")]
 		public final native function set beginCapMode(value:int):void;
 		[Godot(returns="enum:Line2D.LineCapMode")]
 		public final native function get endCapMode():int;
+		[Godot(value="enum:Line2D.LineCapMode")]
 		public final native function set endCapMode(value:int):void;
 		public final native function get sharpLimit():Number;
 		public final native function set sharpLimit(value:Number):void;
@@ -15267,6 +15579,7 @@ package godot {
 		public final native function set placeholderText(value:String):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get alignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set alignment(value:int):void;
 		public final native function get maxLength():int;
 		public final native function set maxLength(value:int):void;
@@ -15306,6 +15619,7 @@ package godot {
 		public final native function set virtualKeyboardShowOnFocus(value:Boolean):void;
 		[Godot(returns="enum:LineEdit.VirtualKeyboardType")]
 		public final native function get virtualKeyboardType():int;
+		[Godot(value="enum:LineEdit.VirtualKeyboardType")]
 		public final native function set virtualKeyboardType(value:int):void;
 		public final native function get caretBlink():Boolean;
 		public final native function set caretBlink(value:Boolean):void;
@@ -15323,11 +15637,13 @@ package godot {
 		public final native function set secretCharacter(value:String):void;
 		[Godot(returns="enum:Control.TextDirection")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:Control.TextDirection")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
 		[Godot(returns="enum:TextServer.StructuredTextParser")]
 		public final native function get structuredTextBidiOverride():int;
+		[Godot(value="enum:TextServer.StructuredTextParser")]
 		public final native function set structuredTextBidiOverride(value:int):void;
 		public final native function get structuredTextBidiOverrideOptions():GodotArray;
 		public final native function set structuredTextBidiOverrideOptions(value:GodotArray):void;
@@ -15335,6 +15651,7 @@ package godot {
 		public final native function set rightIcon(value:Texture2D):void;
 		[Godot(returns="enum:LineEdit.ExpandMode")]
 		public final native function get iconExpandMode():int;
+		[Godot(value="enum:LineEdit.ExpandMode")]
 		public final native function set iconExpandMode(value:int):void;
 		public final native function get rightIconScale():Number;
 		public final native function set rightIconScale(value:Number):void;
@@ -15378,21 +15695,25 @@ package godot {
 		public final native function set text(value:String):void;
 		[Godot(returns="enum:LinkButton.UnderlineMode")]
 		public final native function get underline():int;
+		[Godot(value="enum:LinkButton.UnderlineMode")]
 		public final native function set underline(value:int):void;
 		public final native function get uri():String;
 		public final native function set uri(value:String):void;
 		[Godot(returns="enum:TextServer.OverrunBehavior")]
 		public final native function get textOverrunBehavior():int;
+		[Godot(value="enum:TextServer.OverrunBehavior")]
 		public final native function set textOverrunBehavior(value:int):void;
 		public final native function get ellipsisChar():String;
 		public final native function set ellipsisChar(value:String):void;
 		[Godot(returns="enum:Control.TextDirection")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:Control.TextDirection")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
 		[Godot(returns="enum:TextServer.StructuredTextParser")]
 		public final native function get structuredTextBidiOverride():int;
+		[Godot(value="enum:TextServer.StructuredTextParser")]
 		public final native function set structuredTextBidiOverride(value:int):void;
 		public final native function get structuredTextBidiOverrideOptions():GodotArray;
 		public final native function set structuredTextBidiOverrideOptions(value:GodotArray):void;
@@ -15422,9 +15743,11 @@ package godot {
 		public final native function set bone(value:int):void;
 		[Godot(returns="enum:SkeletonModifier3D.BoneAxis")]
 		public final native function get forwardAxis():int;
+		[Godot(value="enum:SkeletonModifier3D.BoneAxis")]
 		public final native function set forwardAxis(value:int):void;
 		[Godot(returns="enum:Vector3.Axis")]
 		public final native function get primaryRotationAxis():int;
+		[Godot(value="enum:Vector3.Axis")]
 		public final native function set primaryRotationAxis(value:int):void;
 		public final native function get useSecondaryRotation():Boolean;
 		public final native function set useSecondaryRotation(value:Boolean):void;
@@ -15432,6 +15755,7 @@ package godot {
 		public final native function set relative(value:Boolean):void;
 		[Godot(returns="enum:LookAtModifier3D.OriginFrom")]
 		public final native function get originFrom():int;
+		[Godot(value="enum:LookAtModifier3D.OriginFrom")]
 		public final native function set originFrom(value:int):void;
 		public final native function get originBoneName():String;
 		public final native function set originBoneName(value:String):void;
@@ -15447,9 +15771,11 @@ package godot {
 		public final native function set duration(value:Number):void;
 		[Godot(returns="enum:Tween.TransitionType")]
 		public final native function get transitionType():int;
+		[Godot(value="enum:Tween.TransitionType")]
 		public final native function set transitionType(value:int):void;
 		[Godot(returns="enum:Tween.EaseType")]
 		public final native function get easeType():int;
+		[Godot(value="enum:Tween.EaseType")]
 		public final native function set easeType(value:int):void;
 		public final native function get useAngleLimitation():Boolean;
 		public final native function set useAngleLimitation(value:Boolean):void;
@@ -15536,6 +15862,7 @@ package godot {
 		public final native function set preferGlobalMenu(value:Boolean):void;
 		[Godot(returns="enum:Control.TextDirection")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:Control.TextDirection")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
@@ -15588,6 +15915,7 @@ package godot {
 		public final native function set normalizeMesh(value:Boolean):void;
 		[Godot(returns="enum:MeshConvexDecompositionSettings.Mode")]
 		public final native function get mode():int;
+		[Godot(value="enum:MeshConvexDecompositionSettings.Mode")]
 		public final native function set mode(value:int):void;
 		public final native function get convexHullApproximation():Boolean;
 		public final native function set convexHullApproximation(value:Boolean):void;
@@ -15771,9 +16099,11 @@ package godot {
 		public final native function set interfaceIsPrimary(value:Boolean):void;
 		[Godot(returns="enum:XRInterface.PlayAreaMode")]
 		public final native function get xrPlayAreaMode():int;
+		[Godot(value="enum:XRInterface.PlayAreaMode")]
 		public final native function set xrPlayAreaMode(value:int):void;
 		[Godot(returns="enum:XRInterface.EnvironmentBlendMode")]
 		public final native function get environmentBlendMode():int;
+		[Godot(value="enum:XRInterface.EnvironmentBlendMode")]
 		public final native function set environmentBlendMode(value:int):void;
 		public final native function get arIsAnchorDetectionEnabled():Boolean;
 		public final native function set arIsAnchorDetectionEnabled(value:Boolean):void;
@@ -15853,6 +16183,7 @@ package godot {
 		public native function MultiMesh();
 		[Godot(returns="enum:MultiMesh.TransformFormat")]
 		public final native function get transformFormat():int;
+		[Godot(value="enum:MultiMesh.TransformFormat")]
 		public final native function set transformFormat(value:int):void;
 		public final native function get useColors():Boolean;
 		public final native function set useColors(value:Boolean):void;
@@ -15878,6 +16209,7 @@ package godot {
 		public final native function set customDataArray(value:PackedColorArray):void;
 		[Godot(returns="enum:MultiMesh.PhysicsInterpolationQuality")]
 		public final native function get physicsInterpolationQuality():int;
+		[Godot(value="enum:MultiMesh.PhysicsInterpolationQuality")]
 		public final native function set physicsInterpolationQuality(value:int):void;
 		public final native function setInstanceTransform(instance:int, transform:Transform3D):void;
 		public final native function setInstanceTransform2D(instance:int, transform:Transform2D):void;
@@ -16012,6 +16344,7 @@ package godot {
 		public final native function set replicationConfig(value:SceneReplicationConfig):void;
 		[Godot(returns="enum:MultiplayerSynchronizer.VisibilityUpdateMode")]
 		public final native function get visibilityUpdateMode():int;
+		[Godot(value="enum:MultiplayerSynchronizer.VisibilityUpdateMode")]
 		public final native function set visibilityUpdateMode(value:int):void;
 		public final native function get publicVisibility():Boolean;
 		public final native function set publicVisibility(value:Boolean):void;
@@ -16146,12 +16479,15 @@ package godot {
 		public final native function set navigationLayers(value:uint):void;
 		[Godot(returns="enum:NavigationPathQueryParameters2D.PathfindingAlgorithm")]
 		public final native function get pathfindingAlgorithm():int;
+		[Godot(value="enum:NavigationPathQueryParameters2D.PathfindingAlgorithm")]
 		public final native function set pathfindingAlgorithm(value:int):void;
 		[Godot(returns="enum:NavigationPathQueryParameters2D.PathPostProcessing")]
 		public final native function get pathPostprocessing():int;
+		[Godot(value="enum:NavigationPathQueryParameters2D.PathPostProcessing")]
 		public final native function set pathPostprocessing(value:int):void;
 		[Godot(returns="bitfield:NavigationPathQueryParameters2D.PathMetadataFlags")]
 		public final native function get pathMetadataFlags():int;
+		[Godot(value="bitfield:NavigationPathQueryParameters2D.PathMetadataFlags")]
 		public final native function set pathMetadataFlags(value:int):void;
 		public final native function get simplifyPath():Boolean;
 		public final native function set simplifyPath(value:Boolean):void;
@@ -16240,12 +16576,15 @@ package godot {
 		public final native function set navigationLayers(value:uint):void;
 		[Godot(returns="enum:NavigationPathQueryParameters3D.PathfindingAlgorithm")]
 		public final native function get pathfindingAlgorithm():int;
+		[Godot(value="enum:NavigationPathQueryParameters3D.PathfindingAlgorithm")]
 		public final native function set pathfindingAlgorithm(value:int):void;
 		[Godot(returns="enum:NavigationPathQueryParameters3D.PathPostProcessing")]
 		public final native function get pathPostprocessing():int;
+		[Godot(value="enum:NavigationPathQueryParameters3D.PathPostProcessing")]
 		public final native function set pathPostprocessing(value:int):void;
 		[Godot(returns="bitfield:NavigationPathQueryParameters3D.PathMetadataFlags")]
 		public final native function get pathMetadataFlags():int;
+		[Godot(value="bitfield:NavigationPathQueryParameters3D.PathMetadataFlags")]
 		public final native function set pathMetadataFlags(value:int):void;
 		public final native function get simplifyPath():Boolean;
 		public final native function set simplifyPath(value:Boolean):void;
@@ -16397,14 +16736,17 @@ package godot {
 		public final native function set polygons(value:GodotArray):void;
 		[Godot(returns="enum:NavigationMesh.SamplePartitionType")]
 		public final native function get samplePartitionType():int;
+		[Godot(value="enum:NavigationMesh.SamplePartitionType")]
 		public final native function set samplePartitionType(value:int):void;
 		[Godot(returns="enum:NavigationMesh.ParsedGeometryType")]
 		public final native function get geometryParsedGeometryType():int;
+		[Godot(value="enum:NavigationMesh.ParsedGeometryType")]
 		public final native function set geometryParsedGeometryType(value:int):void;
 		public final native function get geometryCollisionMask():uint;
 		public final native function set geometryCollisionMask(value:uint):void;
 		[Godot(returns="enum:NavigationMesh.SourceGeometryMode")]
 		public final native function get geometrySourceGeometryMode():int;
+		[Godot(value="enum:NavigationMesh.SourceGeometryMode")]
 		public final native function set geometrySourceGeometryMode(value:int):void;
 		public final native function get geometrySourceGroupName():String;
 		public final native function set geometrySourceGroupName(value:String):void;
@@ -16468,9 +16810,11 @@ package godot {
 		public native function NavigationMeshSourceGeometryData2D();
 		[Godot(returns="Array[PackedVector2Array]")]
 		public final native function get traversableOutlines():GodotArray;
+		[Godot(value="Array[PackedVector2Array]")]
 		public final native function set traversableOutlines(value:GodotArray):void;
 		[Godot(returns="Array[PackedVector2Array]")]
 		public final native function get obstructionOutlines():GodotArray;
+		[Godot(value="Array[PackedVector2Array]")]
 		public final native function set obstructionOutlines(value:GodotArray):void;
 		public final native function get projectedObstructions():GodotArray;
 		public final native function set projectedObstructions(value:GodotArray):void;
@@ -16578,12 +16922,15 @@ package godot {
 		public final native function set navigationLayers(value:uint):void;
 		[Godot(returns="enum:NavigationPathQueryParameters2D.PathfindingAlgorithm")]
 		public final native function get pathfindingAlgorithm():int;
+		[Godot(value="enum:NavigationPathQueryParameters2D.PathfindingAlgorithm")]
 		public final native function set pathfindingAlgorithm(value:int):void;
 		[Godot(returns="enum:NavigationPathQueryParameters2D.PathPostProcessing")]
 		public final native function get pathPostprocessing():int;
+		[Godot(value="enum:NavigationPathQueryParameters2D.PathPostProcessing")]
 		public final native function set pathPostprocessing(value:int):void;
 		[Godot(returns="bitfield:NavigationPathQueryParameters2D.PathMetadataFlags")]
 		public final native function get metadataFlags():int;
+		[Godot(value="bitfield:NavigationPathQueryParameters2D.PathMetadataFlags")]
 		public final native function set metadataFlags(value:int):void;
 		public final native function get simplifyPath():Boolean;
 		public final native function set simplifyPath(value:Boolean):void;
@@ -16591,9 +16938,11 @@ package godot {
 		public final native function set simplifyEpsilon(value:Number):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get excludedRegions():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set excludedRegions(value:GodotArray):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get includedRegions():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set includedRegions(value:GodotArray):void;
 		public final native function get pathReturnMaxLength():Number;
 		public final native function set pathReturnMaxLength(value:Number):void;
@@ -16628,12 +16977,15 @@ package godot {
 		public final native function set navigationLayers(value:uint):void;
 		[Godot(returns="enum:NavigationPathQueryParameters3D.PathfindingAlgorithm")]
 		public final native function get pathfindingAlgorithm():int;
+		[Godot(value="enum:NavigationPathQueryParameters3D.PathfindingAlgorithm")]
 		public final native function set pathfindingAlgorithm(value:int):void;
 		[Godot(returns="enum:NavigationPathQueryParameters3D.PathPostProcessing")]
 		public final native function get pathPostprocessing():int;
+		[Godot(value="enum:NavigationPathQueryParameters3D.PathPostProcessing")]
 		public final native function set pathPostprocessing(value:int):void;
 		[Godot(returns="bitfield:NavigationPathQueryParameters3D.PathMetadataFlags")]
 		public final native function get metadataFlags():int;
+		[Godot(value="bitfield:NavigationPathQueryParameters3D.PathMetadataFlags")]
 		public final native function set metadataFlags(value:int):void;
 		public final native function get simplifyPath():Boolean;
 		public final native function set simplifyPath(value:Boolean):void;
@@ -16641,9 +16993,11 @@ package godot {
 		public final native function set simplifyEpsilon(value:Number):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get excludedRegions():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set excludedRegions(value:GodotArray):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get includedRegions():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set includedRegions(value:GodotArray):void;
 		public final native function get pathReturnMaxLength():Number;
 		public final native function set pathReturnMaxLength(value:Number):void;
@@ -16665,6 +17019,7 @@ package godot {
 		public final native function set pathTypes(value:PackedInt32Array):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get pathRids():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set pathRids(value:GodotArray):void;
 		public final native function get pathOwnerIds():PackedInt64Array;
 		public final native function set pathOwnerIds(value:PackedInt64Array):void;
@@ -16683,6 +17038,7 @@ package godot {
 		public final native function set pathTypes(value:PackedInt32Array):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get pathRids():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set pathRids(value:GodotArray):void;
 		public final native function get pathOwnerIds():PackedInt64Array;
 		public final native function set pathOwnerIds(value:PackedInt64Array):void;
@@ -16714,14 +17070,17 @@ package godot {
 		public final native function set outlines(value:GodotArray):void;
 		[Godot(returns="enum:NavigationPolygon.SamplePartitionType")]
 		public final native function get samplePartitionType():int;
+		[Godot(value="enum:NavigationPolygon.SamplePartitionType")]
 		public final native function set samplePartitionType(value:int):void;
 		[Godot(returns="enum:NavigationPolygon.ParsedGeometryType")]
 		public final native function get parsedGeometryType():int;
+		[Godot(value="enum:NavigationPolygon.ParsedGeometryType")]
 		public final native function set parsedGeometryType(value:int):void;
 		public final native function get parsedCollisionMask():uint;
 		public final native function set parsedCollisionMask(value:uint):void;
 		[Godot(returns="enum:NavigationPolygon.SourceGeometryMode")]
 		public final native function get sourceGeometryMode():int;
+		[Godot(value="enum:NavigationPolygon.SourceGeometryMode")]
 		public final native function set sourceGeometryMode(value:int):void;
 		public final native function get sourceGeometryGroupName():String;
 		public final native function set sourceGeometryGroupName(value:String):void;
@@ -17181,9 +17540,11 @@ package godot {
 		public final native function set patchMarginBottom(value:int):void;
 		[Godot(returns="enum:NinePatchRect.AxisStretchMode")]
 		public final native function get axisStretchHorizontal():int;
+		[Godot(value="enum:NinePatchRect.AxisStretchMode")]
 		public final native function set axisStretchHorizontal(value:int):void;
 		[Godot(returns="enum:NinePatchRect.AxisStretchMode")]
 		public final native function get axisStretchVertical():int;
+		[Godot(value="enum:NinePatchRect.AxisStretchMode")]
 		public final native function set axisStretchVertical(value:int):void;
 		public final native function get textureChanged():Signal;
 		[Godot(margin="enum:Side")]
@@ -17383,6 +17744,7 @@ package godot {
 		public final native function set closed(value:Boolean):void;
 		[Godot(returns="enum:OccluderPolygon2D.CullMode")]
 		public final native function get cullMode():int;
+		[Godot(value="enum:OccluderPolygon2D.CullMode")]
 		public final native function set cullMode(value:int):void;
 		public final native function get polygon():PackedVector2Array;
 		public final native function set polygon(value:PackedVector2Array):void;
@@ -17394,6 +17756,7 @@ package godot {
 		public native function OggPacketSequence();
 		[Godot(returns="Array[GodotArray]")]
 		public final native function get packetData():GodotArray;
+		[Godot(value="Array[GodotArray]")]
 		public final native function set packetData(value:GodotArray):void;
 		public final native function get granulePositions():PackedInt64Array;
 		public final native function set granulePositions(value:PackedInt64Array):void;
@@ -17415,6 +17778,7 @@ package godot {
 		public final native function set omniAttenuation(value:Number):void;
 		[Godot(returns="enum:OmniLight3D.ShadowMode")]
 		public final native function get omniShadowMode():int;
+		[Godot(value="enum:OmniLight3D.ShadowMode")]
 		public final native function set omniShadowMode(value:int):void;
 	}
 	[GodotEnum(name="OpenXRAlphaBlendModeSupport", values="OPENXR_ALPHA_BLEND_MODE_SUPPORT_NONE,OPENXR_ALPHA_BLEND_MODE_SUPPORT_REAL,OPENXR_ALPHA_BLEND_MODE_SUPPORT_EMULATING")]
@@ -17485,6 +17849,7 @@ package godot {
 		public final native function set localizedName(value:String):void;
 		[Godot(returns="enum:OpenXRAction.ActionType")]
 		public final native function get actionType():int;
+		[Godot(value="enum:OpenXRAction.ActionType")]
 		public final native function set actionType(value:int):void;
 		public final native function get toplevelPaths():PackedStringArray;
 		public final native function set toplevelPaths(value:PackedStringArray):void;
@@ -17542,6 +17907,7 @@ package godot {
 	public native class XRTracker extends RefCounted {
 		[Godot(returns="enum:XRServer.TrackerType")]
 		public final native function get type():int;
+		[Godot(value="enum:XRServer.TrackerType")]
 		public final native function set type(value:int):void;
 		public final native function get name():String;
 		public final native function set name(value:String):void;
@@ -17559,6 +17925,7 @@ package godot {
 		public final native function set profile(value:String):void;
 		[Godot(returns="enum:XRPositionalTracker.TrackerHand")]
 		public final native function get hand():int;
+		[Godot(value="enum:XRPositionalTracker.TrackerHand")]
 		public final native function set hand(value:int):void;
 		public final native function get poseChanged():Signal;
 		public final native function get poseLostTracking():Signal;
@@ -17585,6 +17952,7 @@ package godot {
 		public final native function set entity(value:RID):void;
 		[Godot(returns="enum:OpenXRSpatialEntityTracker.EntityTrackingState")]
 		public final native function get spatialTrackingState():int;
+		[Godot(value="enum:OpenXRSpatialEntityTracker.EntityTrackingState")]
 		public final native function set spatialTrackingState(value:int):void;
 		public final native function get nextChanged():Signal;
 		public final native function get spatialTrackingStateChanged():Signal;
@@ -17698,33 +18066,43 @@ package godot {
 		public final native function set enableHolePunch(value:Boolean):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.EyeVisibility")]
 		public final native function get eyeVisibility():int;
+		[Godot(value="enum:OpenXRCompositionLayer.EyeVisibility")]
 		public final native function set eyeVisibility(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.Filter")]
 		public final native function get swapchainStateMinFilter():int;
+		[Godot(value="enum:OpenXRCompositionLayer.Filter")]
 		public final native function set swapchainStateMinFilter(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.Filter")]
 		public final native function get swapchainStateMagFilter():int;
+		[Godot(value="enum:OpenXRCompositionLayer.Filter")]
 		public final native function set swapchainStateMagFilter(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.MipmapMode")]
 		public final native function get swapchainStateMipmapMode():int;
+		[Godot(value="enum:OpenXRCompositionLayer.MipmapMode")]
 		public final native function set swapchainStateMipmapMode(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.Wrap")]
 		public final native function get swapchainStateHorizontalWrap():int;
+		[Godot(value="enum:OpenXRCompositionLayer.Wrap")]
 		public final native function set swapchainStateHorizontalWrap(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.Wrap")]
 		public final native function get swapchainStateVerticalWrap():int;
+		[Godot(value="enum:OpenXRCompositionLayer.Wrap")]
 		public final native function set swapchainStateVerticalWrap(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.Swizzle")]
 		public final native function get swapchainStateRedSwizzle():int;
+		[Godot(value="enum:OpenXRCompositionLayer.Swizzle")]
 		public final native function set swapchainStateRedSwizzle(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.Swizzle")]
 		public final native function get swapchainStateGreenSwizzle():int;
+		[Godot(value="enum:OpenXRCompositionLayer.Swizzle")]
 		public final native function set swapchainStateGreenSwizzle(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.Swizzle")]
 		public final native function get swapchainStateBlueSwizzle():int;
+		[Godot(value="enum:OpenXRCompositionLayer.Swizzle")]
 		public final native function set swapchainStateBlueSwizzle(value:int):void;
 		[Godot(returns="enum:OpenXRCompositionLayer.Swizzle")]
 		public final native function get swapchainStateAlphaSwizzle():int;
+		[Godot(value="enum:OpenXRCompositionLayer.Swizzle")]
 		public final native function set swapchainStateAlphaSwizzle(value:int):void;
 		public final native function get swapchainStateMaxAnisotropy():Number;
 		public final native function set swapchainStateMaxAnisotropy(value:Number):void;
@@ -17839,17 +18217,21 @@ package godot {
 		public native function OpenXRHand();
 		[Godot(returns="enum:OpenXRHand.Hands")]
 		public final native function get hand():int;
+		[Godot(value="enum:OpenXRHand.Hands")]
 		public final native function set hand(value:int):void;
 		[Godot(returns="enum:OpenXRHand.MotionRange")]
 		public final native function get motionRange():int;
+		[Godot(value="enum:OpenXRHand.MotionRange")]
 		public final native function set motionRange(value:int):void;
 		public final native function get handSkeleton():String;
 		public final native function set handSkeleton(value:String):void;
 		[Godot(returns="enum:OpenXRHand.SkeletonRig")]
 		public final native function get skeletonRig():int;
+		[Godot(value="enum:OpenXRHand.SkeletonRig")]
 		public final native function set skeletonRig(value:int):void;
 		[Godot(returns="enum:OpenXRHand.BoneUpdate")]
 		public final native function get boneUpdate():int;
+		[Godot(value="enum:OpenXRHand.BoneUpdate")]
 		public final native function set boneUpdate(value:int):void;
 	}
 	[Abstract]
@@ -18051,6 +18433,7 @@ package godot {
 		public final native function set boundsSize(value:Vector2):void;
 		[Godot(returns="enum:OpenXRSpatialComponentMarkerList.MarkerType")]
 		public final native function get markerType():int;
+		[Godot(value="enum:OpenXRSpatialComponentMarkerList.MarkerType")]
 		public final native function set markerType(value:int):void;
 		public final native function get markerID():uint;
 		public final native function set markerID(value:uint):void;
@@ -18063,6 +18446,7 @@ package godot {
 		public final native function set boundsSize(value:Vector2):void;
 		[Godot(returns="enum:OpenXRSpatialComponentPlaneAlignmentList.PlaneAlignment")]
 		public final native function get planeAlignment():int;
+		[Godot(value="enum:OpenXRSpatialComponentPlaneAlignmentList.PlaneAlignment")]
 		public final native function set planeAlignment(value:int):void;
 		public final native function get planeLabel():String;
 		public final native function set planeLabel(value:String):void;
@@ -18110,6 +18494,7 @@ package godot {
 		public native function OpenXRRenderModelManager();
 		[Godot(returns="enum:OpenXRRenderModelManager.RenderModelTracker")]
 		public final native function get tracker():int;
+		[Godot(value="enum:OpenXRRenderModelManager.RenderModelTracker")]
 		public final native function set tracker(value:int):void;
 		public final native function get makeLocalToPose():String;
 		public final native function set makeLocalToPose(value:String):void;
@@ -18159,6 +18544,7 @@ package godot {
 		public native function OpenXRSpatialCapabilityConfigurationAprilTag();
 		[Godot(returns="enum:OpenXRSpatialCapabilityConfigurationAprilTag.AprilTagDict")]
 		public final native function get aprilDict():int;
+		[Godot(value="enum:OpenXRSpatialCapabilityConfigurationAprilTag.AprilTagDict")]
 		public final native function set aprilDict(value:int):void;
 		public final native function getEnabledComponents():PackedInt64Array;
 	}
@@ -18183,6 +18569,7 @@ package godot {
 		public native function OpenXRSpatialCapabilityConfigurationAruco();
 		[Godot(returns="enum:OpenXRSpatialCapabilityConfigurationAruco.ArucoDict")]
 		public final native function get arucoDict():int;
+		[Godot(value="enum:OpenXRSpatialCapabilityConfigurationAruco.ArucoDict")]
 		public final native function set arucoDict(value:int):void;
 		public final native function getEnabledComponents():PackedInt64Array;
 	}
@@ -18668,6 +19055,7 @@ package godot {
 		public final native function set emissionShapeScale(value:Vector3):void;
 		[Godot(returns="enum:ParticleProcessMaterial.EmissionShape")]
 		public final native function get emissionShape():int;
+		[Godot(value="enum:ParticleProcessMaterial.EmissionShape")]
 		public final native function set emissionShape(value:int):void;
 		public final native function get emissionSphereRadius():Number;
 		public final native function set emissionSphereRadius(value:Number):void;
@@ -18881,6 +19269,7 @@ package godot {
 		public final native function set turbulenceInfluenceOverLife(value:Texture2D):void;
 		[Godot(returns="enum:ParticleProcessMaterial.CollisionMode")]
 		public final native function get collisionMode():int;
+		[Godot(value="enum:ParticleProcessMaterial.CollisionMode")]
 		public final native function set collisionMode(value:int):void;
 		public final native function get collisionFriction():Number;
 		public final native function set collisionFriction(value:Number):void;
@@ -18890,6 +19279,7 @@ package godot {
 		public final native function set collisionUseScale(value:Boolean):void;
 		[Godot(returns="enum:ParticleProcessMaterial.SubEmitterMode")]
 		public final native function get subEmitterMode():int;
+		[Godot(value="enum:ParticleProcessMaterial.SubEmitterMode")]
 		public final native function set subEmitterMode(value:int):void;
 		public final native function get subEmitterFrequency():Number;
 		public final native function set subEmitterFrequency(value:Number):void;
@@ -18972,6 +19362,7 @@ package godot {
 		public final native function set vOffset(value:Number):void;
 		[Godot(returns="enum:PathFollow3D.RotationMode")]
 		public final native function get rotationMode():int;
+		[Godot(value="enum:PathFollow3D.RotationMode")]
 		public final native function set rotationMode(value:int):void;
 		public final native function get useModelFront():Boolean;
 		public final native function set useModelFront(value:Boolean):void;
@@ -19089,6 +19480,7 @@ package godot {
 		public final native function set gravityScale(value:Number):void;
 		[Godot(returns="enum:RigidBody2D.CenterOfMassMode")]
 		public final native function get centerOfMassMode():int;
+		[Godot(value="enum:RigidBody2D.CenterOfMassMode")]
 		public final native function set centerOfMassMode(value:int):void;
 		public final native function get centerOfMass():Vector2;
 		public final native function set centerOfMass(value:Vector2):void;
@@ -19104,11 +19496,13 @@ package godot {
 		public final native function set freeze(value:Boolean):void;
 		[Godot(returns="enum:RigidBody2D.FreezeMode")]
 		public final native function get freezeMode():int;
+		[Godot(value="enum:RigidBody2D.FreezeMode")]
 		public final native function set freezeMode(value:int):void;
 		public final native function get customIntegrator():Boolean;
 		public final native function set customIntegrator(value:Boolean):void;
 		[Godot(returns="enum:RigidBody2D.CCDMode")]
 		public final native function get continuousCd():int;
+		[Godot(value="enum:RigidBody2D.CCDMode")]
 		public final native function set continuousCd(value:int):void;
 		public final native function get contactMonitor():Boolean;
 		public final native function set contactMonitor(value:Boolean):void;
@@ -19118,6 +19512,7 @@ package godot {
 		public final native function set linearVelocity(value:Vector2):void;
 		[Godot(returns="enum:RigidBody2D.DampMode")]
 		public final native function get linearDampMode():int;
+		[Godot(value="enum:RigidBody2D.DampMode")]
 		public final native function set linearDampMode(value:int):void;
 		public final native function get linearDamp():Number;
 		public final native function set linearDamp(value:Number):void;
@@ -19125,6 +19520,7 @@ package godot {
 		public final native function set angularVelocity(value:Number):void;
 		[Godot(returns="enum:RigidBody2D.DampMode")]
 		public final native function get angularDampMode():int;
+		[Godot(value="enum:RigidBody2D.DampMode")]
 		public final native function set angularDampMode(value:int):void;
 		public final native function get angularDamp():Number;
 		public final native function set angularDamp(value:Number):void;
@@ -19181,6 +19577,7 @@ package godot {
 		public native function PhysicalBone3D();
 		[Godot(returns="enum:PhysicalBone3D.JointType")]
 		public final native function get jointType():int;
+		[Godot(value="enum:PhysicalBone3D.JointType")]
 		public final native function set jointType(value:int):void;
 		public final native function get jointOffset():Transform3D;
 		public final native function set jointOffset(value:Transform3D):void;
@@ -19200,11 +19597,13 @@ package godot {
 		public final native function set customIntegrator(value:Boolean):void;
 		[Godot(returns="enum:PhysicalBone3D.DampMode")]
 		public final native function get linearDampMode():int;
+		[Godot(value="enum:PhysicalBone3D.DampMode")]
 		public final native function set linearDampMode(value:int):void;
 		public final native function get linearDamp():Number;
 		public final native function set linearDamp(value:Number):void;
 		[Godot(returns="enum:PhysicalBone3D.DampMode")]
 		public final native function get angularDampMode():int;
+		[Godot(value="enum:PhysicalBone3D.DampMode")]
 		public final native function set angularDampMode(value:int):void;
 		public final native function get angularDamp():Number;
 		public final native function set angularDamp(value:Number):void;
@@ -19517,6 +19916,7 @@ package godot {
 		public final native function set collisionMask(value:uint):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get exclude():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set exclude(value:GodotArray):void;
 		public final native function get collideWithBodies():Boolean;
 		public final native function set collideWithBodies(value:Boolean):void;
@@ -19531,6 +19931,7 @@ package godot {
 		public final native function set collisionMask(value:uint):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get exclude():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set exclude(value:GodotArray):void;
 		public final native function get collideWithBodies():Boolean;
 		public final native function set collideWithBodies(value:Boolean):void;
@@ -19547,6 +19948,7 @@ package godot {
 		public final native function set collisionMask(value:uint):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get exclude():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set exclude(value:GodotArray):void;
 		public final native function get collideWithBodies():Boolean;
 		public final native function set collideWithBodies(value:Boolean):void;
@@ -19567,6 +19969,7 @@ package godot {
 		public final native function set collisionMask(value:uint):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get exclude():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set exclude(value:GodotArray):void;
 		public final native function get collideWithBodies():Boolean;
 		public final native function set collideWithBodies(value:Boolean):void;
@@ -20623,6 +21026,7 @@ package godot {
 		public final native function set collisionMask(value:uint):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get exclude():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set exclude(value:GodotArray):void;
 		public final native function get margin():Number;
 		public final native function set margin(value:Number):void;
@@ -20645,6 +21049,7 @@ package godot {
 		public final native function set collisionMask(value:uint):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get exclude():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set exclude(value:GodotArray):void;
 		public final native function get margin():Number;
 		public final native function set margin(value:Number):void;
@@ -20673,9 +21078,11 @@ package godot {
 		public final native function set collideSeparationRay(value:Boolean):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get excludeBodies():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set excludeBodies(value:GodotArray):void;
 		[Godot(returns="Array[int]")]
 		public final native function get excludeObjects():GodotArray;
+		[Godot(value="Array[int]")]
 		public final native function set excludeObjects(value:GodotArray):void;
 		public final native function get recoveryAsCollision():Boolean;
 		public final native function set recoveryAsCollision(value:Boolean):void;
@@ -20694,9 +21101,11 @@ package godot {
 		public final native function set collideSeparationRay(value:Boolean):void;
 		[Godot(returns="Array[RID]")]
 		public final native function get excludeBodies():GodotArray;
+		[Godot(value="Array[RID]")]
 		public final native function set excludeBodies(value:GodotArray):void;
 		[Godot(returns="Array[int]")]
 		public final native function get excludeObjects():GodotArray;
+		[Godot(value="Array[int]")]
 		public final native function set excludeObjects(value:GodotArray):void;
 		public final native function get recoveryAsCollision():Boolean;
 		public final native function set recoveryAsCollision(value:Boolean):void;
@@ -20810,6 +21219,7 @@ package godot {
 		public final native function set centerOffset(value:Vector3):void;
 		[Godot(returns="enum:PlaneMesh.Orientation")]
 		public final native function get orientation():int;
+		[Godot(value="enum:PlaneMesh.Orientation")]
 		public final native function set orientation(value:int):void;
 	}
 	public native class PointLight2D extends Light2D {
@@ -20905,6 +21315,7 @@ package godot {
 		public final native function set allowSearch(value:Boolean):void;
 		[Godot(returns="enum:NativeMenu.SystemMenus")]
 		public final native function get systemMenuID():int;
+		[Godot(value="enum:NativeMenu.SystemMenus")]
 		public final native function set systemMenuID(value:int):void;
 		public final native function get preferNativeMenu():Boolean;
 		public final native function set preferNativeMenu(value:Boolean):void;
@@ -21153,6 +21564,7 @@ package godot {
 		public native function RDAccelerationStructureGeometry();
 		[Godot(returns="bitfield:RenderingDevice.AccelerationStructureGeometryFlagBits")]
 		public final native function get flags():int;
+		[Godot(value="bitfield:RenderingDevice.AccelerationStructureGeometryFlagBits")]
 		public final native function set flags(value:int):void;
 		public final native function get vertexBuffer():RID;
 		public final native function set vertexBuffer(value:RID):void;
@@ -21164,6 +21576,7 @@ package godot {
 		public final native function set vertexCount(value:uint):void;
 		[Godot(returns="enum:RenderingDevice.DataFormat")]
 		public final native function get vertexFormat():int;
+		[Godot(value="enum:RenderingDevice.DataFormat")]
 		public final native function set vertexFormat(value:int):void;
 		public final native function get indexBuffer():RID;
 		public final native function set indexBuffer(value:RID):void;
@@ -21184,6 +21597,7 @@ package godot {
 		public final native function set hitSbtRange(value:Int64):void;
 		[Godot(returns="bitfield:RenderingDevice.AccelerationStructureInstanceFlagBits")]
 		public final native function get flags():int;
+		[Godot(value="bitfield:RenderingDevice.AccelerationStructureInstanceFlagBits")]
 		public final native function set flags(value:int):void;
 		public final native function get blas():RID;
 		public final native function set blas(value:RID):void;
@@ -21192,9 +21606,11 @@ package godot {
 		public native function RDAttachmentFormat();
 		[Godot(returns="enum:RenderingDevice.DataFormat")]
 		public final native function get format():int;
+		[Godot(value="enum:RenderingDevice.DataFormat")]
 		public final native function set format(value:int):void;
 		[Godot(returns="enum:RenderingDevice.TextureSamples")]
 		public final native function get samples():int;
+		[Godot(value="enum:RenderingDevice.TextureSamples")]
 		public final native function set samples(value:int):void;
 		public final native function get usageFlags():uint;
 		public final native function set usageFlags(value:uint):void;
@@ -21228,11 +21644,13 @@ package godot {
 		public final native function set enableLogicOp(value:Boolean):void;
 		[Godot(returns="enum:RenderingDevice.LogicOperation")]
 		public final native function get logicOp():int;
+		[Godot(value="enum:RenderingDevice.LogicOperation")]
 		public final native function set logicOp(value:int):void;
 		public final native function get blendConstant():Color;
 		public final native function set blendConstant(value:Color):void;
 		[Godot(returns="Array[RDPipelineColorBlendStateAttachment]")]
 		public final native function get attachments():GodotArray;
+		[Godot(value="Array[RDPipelineColorBlendStateAttachment]")]
 		public final native function set attachments(value:GodotArray):void;
 	}
 	public native class RDPipelineColorBlendStateAttachment extends RefCounted {
@@ -21241,21 +21659,27 @@ package godot {
 		public final native function set enableBlend(value:Boolean):void;
 		[Godot(returns="enum:RenderingDevice.BlendFactor")]
 		public final native function get srcColorBlendFactor():int;
+		[Godot(value="enum:RenderingDevice.BlendFactor")]
 		public final native function set srcColorBlendFactor(value:int):void;
 		[Godot(returns="enum:RenderingDevice.BlendFactor")]
 		public final native function get dstColorBlendFactor():int;
+		[Godot(value="enum:RenderingDevice.BlendFactor")]
 		public final native function set dstColorBlendFactor(value:int):void;
 		[Godot(returns="enum:RenderingDevice.BlendOperation")]
 		public final native function get colorBlendOp():int;
+		[Godot(value="enum:RenderingDevice.BlendOperation")]
 		public final native function set colorBlendOp(value:int):void;
 		[Godot(returns="enum:RenderingDevice.BlendFactor")]
 		public final native function get srcAlphaBlendFactor():int;
+		[Godot(value="enum:RenderingDevice.BlendFactor")]
 		public final native function set srcAlphaBlendFactor(value:int):void;
 		[Godot(returns="enum:RenderingDevice.BlendFactor")]
 		public final native function get dstAlphaBlendFactor():int;
+		[Godot(value="enum:RenderingDevice.BlendFactor")]
 		public final native function set dstAlphaBlendFactor(value:int):void;
 		[Godot(returns="enum:RenderingDevice.BlendOperation")]
 		public final native function get alphaBlendOp():int;
+		[Godot(value="enum:RenderingDevice.BlendOperation")]
 		public final native function set alphaBlendOp(value:int):void;
 		public final native function get writeR():Boolean;
 		public final native function set writeR(value:Boolean):void;
@@ -21275,6 +21699,7 @@ package godot {
 		public final native function set enableDepthWrite(value:Boolean):void;
 		[Godot(returns="enum:RenderingDevice.CompareOperator")]
 		public final native function get depthCompareOperator():int;
+		[Godot(value="enum:RenderingDevice.CompareOperator")]
 		public final native function set depthCompareOperator(value:int):void;
 		public final native function get enableDepthRange():Boolean;
 		public final native function set enableDepthRange(value:Boolean):void;
@@ -21286,15 +21711,19 @@ package godot {
 		public final native function set enableStencil(value:Boolean):void;
 		[Godot(returns="enum:RenderingDevice.StencilOperation")]
 		public final native function get frontOpFail():int;
+		[Godot(value="enum:RenderingDevice.StencilOperation")]
 		public final native function set frontOpFail(value:int):void;
 		[Godot(returns="enum:RenderingDevice.StencilOperation")]
 		public final native function get frontOpPass():int;
+		[Godot(value="enum:RenderingDevice.StencilOperation")]
 		public final native function set frontOpPass(value:int):void;
 		[Godot(returns="enum:RenderingDevice.StencilOperation")]
 		public final native function get frontOpDepthFail():int;
+		[Godot(value="enum:RenderingDevice.StencilOperation")]
 		public final native function set frontOpDepthFail(value:int):void;
 		[Godot(returns="enum:RenderingDevice.CompareOperator")]
 		public final native function get frontOpCompare():int;
+		[Godot(value="enum:RenderingDevice.CompareOperator")]
 		public final native function set frontOpCompare(value:int):void;
 		public final native function get frontOpCompareMask():uint;
 		public final native function set frontOpCompareMask(value:uint):void;
@@ -21304,15 +21733,19 @@ package godot {
 		public final native function set frontOpReference(value:uint):void;
 		[Godot(returns="enum:RenderingDevice.StencilOperation")]
 		public final native function get backOpFail():int;
+		[Godot(value="enum:RenderingDevice.StencilOperation")]
 		public final native function set backOpFail(value:int):void;
 		[Godot(returns="enum:RenderingDevice.StencilOperation")]
 		public final native function get backOpPass():int;
+		[Godot(value="enum:RenderingDevice.StencilOperation")]
 		public final native function set backOpPass(value:int):void;
 		[Godot(returns="enum:RenderingDevice.StencilOperation")]
 		public final native function get backOpDepthFail():int;
+		[Godot(value="enum:RenderingDevice.StencilOperation")]
 		public final native function set backOpDepthFail(value:int):void;
 		[Godot(returns="enum:RenderingDevice.CompareOperator")]
 		public final native function get backOpCompare():int;
+		[Godot(value="enum:RenderingDevice.CompareOperator")]
 		public final native function set backOpCompare(value:int):void;
 		public final native function get backOpCompareMask():uint;
 		public final native function set backOpCompareMask(value:uint):void;
@@ -21325,6 +21758,7 @@ package godot {
 		public native function RDPipelineMultisampleState();
 		[Godot(returns="enum:RenderingDevice.TextureSamples")]
 		public final native function get sampleCount():int;
+		[Godot(value="enum:RenderingDevice.TextureSamples")]
 		public final native function set sampleCount(value:int):void;
 		public final native function get enableSampleShading():Boolean;
 		public final native function set enableSampleShading(value:Boolean):void;
@@ -21336,6 +21770,7 @@ package godot {
 		public final native function set enableAlphaToOne(value:Boolean):void;
 		[Godot(returns="Array[int]")]
 		public final native function get sampleMasks():GodotArray;
+		[Godot(value="Array[int]")]
 		public final native function set sampleMasks(value:GodotArray):void;
 	}
 	public native class RDPipelineRasterizationState extends RefCounted {
@@ -21348,9 +21783,11 @@ package godot {
 		public final native function set wireframe(value:Boolean):void;
 		[Godot(returns="enum:RenderingDevice.PolygonCullMode")]
 		public final native function get cullMode():int;
+		[Godot(value="enum:RenderingDevice.PolygonCullMode")]
 		public final native function set cullMode(value:int):void;
 		[Godot(returns="enum:RenderingDevice.PolygonFrontFace")]
 		public final native function get frontFace():int;
+		[Godot(value="enum:RenderingDevice.PolygonFrontFace")]
 		public final native function set frontFace(value:int):void;
 		public final native function get depthBiasEnabled():Boolean;
 		public final native function set depthBiasEnabled(value:Boolean):void;
@@ -21371,6 +21808,7 @@ package godot {
 		public final native function set shader(value:RID):void;
 		[Godot(returns="Array[RDPipelineSpecializationConstant]")]
 		public final native function get specializationConstants():GodotArray;
+		[Godot(value="Array[RDPipelineSpecializationConstant]")]
 		public final native function set specializationConstants(value:GodotArray):void;
 	}
 	public native class RDPipelineSpecializationConstant extends RefCounted {
@@ -21384,21 +21822,27 @@ package godot {
 		public native function RDSamplerState();
 		[Godot(returns="enum:RenderingDevice.SamplerFilter")]
 		public final native function get magFilter():int;
+		[Godot(value="enum:RenderingDevice.SamplerFilter")]
 		public final native function set magFilter(value:int):void;
 		[Godot(returns="enum:RenderingDevice.SamplerFilter")]
 		public final native function get minFilter():int;
+		[Godot(value="enum:RenderingDevice.SamplerFilter")]
 		public final native function set minFilter(value:int):void;
 		[Godot(returns="enum:RenderingDevice.SamplerFilter")]
 		public final native function get mipFilter():int;
+		[Godot(value="enum:RenderingDevice.SamplerFilter")]
 		public final native function set mipFilter(value:int):void;
 		[Godot(returns="enum:RenderingDevice.SamplerRepeatMode")]
 		public final native function get repeatU():int;
+		[Godot(value="enum:RenderingDevice.SamplerRepeatMode")]
 		public final native function set repeatU(value:int):void;
 		[Godot(returns="enum:RenderingDevice.SamplerRepeatMode")]
 		public final native function get repeatV():int;
+		[Godot(value="enum:RenderingDevice.SamplerRepeatMode")]
 		public final native function set repeatV(value:int):void;
 		[Godot(returns="enum:RenderingDevice.SamplerRepeatMode")]
 		public final native function get repeatW():int;
+		[Godot(value="enum:RenderingDevice.SamplerRepeatMode")]
 		public final native function set repeatW(value:int):void;
 		public final native function get lodBias():Number;
 		public final native function set lodBias(value:Number):void;
@@ -21410,6 +21854,7 @@ package godot {
 		public final native function set enableCompare(value:Boolean):void;
 		[Godot(returns="enum:RenderingDevice.CompareOperator")]
 		public final native function get compareOp():int;
+		[Godot(value="enum:RenderingDevice.CompareOperator")]
 		public final native function set compareOp(value:int):void;
 		public final native function get minLOD():Number;
 		public final native function set minLOD(value:Number):void;
@@ -21417,6 +21862,7 @@ package godot {
 		public final native function set maxLOD(value:Number):void;
 		[Godot(returns="enum:RenderingDevice.SamplerBorderColor")]
 		public final native function get borderColor():int;
+		[Godot(value="enum:RenderingDevice.SamplerBorderColor")]
 		public final native function set borderColor(value:int):void;
 		public final native function get unnormalizedUvw():Boolean;
 		public final native function set unnormalizedUvw(value:Boolean):void;
@@ -21505,6 +21951,7 @@ package godot {
 		public final native function set sourceIntersection(value:String):void;
 		[Godot(returns="enum:RenderingDevice.ShaderLanguage")]
 		public final native function get language():int;
+		[Godot(value="enum:RenderingDevice.ShaderLanguage")]
 		public final native function set language(value:int):void;
 		[Godot(stage="enum:RenderingDevice.ShaderStage")]
 		public final native function setStageSource(stage:int, source:String):void;
@@ -21515,6 +21962,7 @@ package godot {
 		public native function RDTextureFormat();
 		[Godot(returns="enum:RenderingDevice.DataFormat")]
 		public final native function get format():int;
+		[Godot(value="enum:RenderingDevice.DataFormat")]
 		public final native function set format(value:int):void;
 		public final native function get width():uint;
 		public final native function set width(value:uint):void;
@@ -21528,12 +21976,15 @@ package godot {
 		public final native function set mipmaps(value:uint):void;
 		[Godot(returns="enum:RenderingDevice.TextureType")]
 		public final native function get textureType():int;
+		[Godot(value="enum:RenderingDevice.TextureType")]
 		public final native function set textureType(value:int):void;
 		[Godot(returns="enum:RenderingDevice.TextureSamples")]
 		public final native function get samples():int;
+		[Godot(value="enum:RenderingDevice.TextureSamples")]
 		public final native function set samples(value:int):void;
 		[Godot(returns="bitfield:RenderingDevice.TextureUsageBits")]
 		public final native function get usageBits():int;
+		[Godot(value="bitfield:RenderingDevice.TextureUsageBits")]
 		public final native function set usageBits(value:int):void;
 		public final native function get isResolveBuffer():Boolean;
 		public final native function set isResolveBuffer(value:Boolean):void;
@@ -21548,24 +21999,30 @@ package godot {
 		public native function RDTextureView();
 		[Godot(returns="enum:RenderingDevice.DataFormat")]
 		public final native function get formatOverride():int;
+		[Godot(value="enum:RenderingDevice.DataFormat")]
 		public final native function set formatOverride(value:int):void;
 		[Godot(returns="enum:RenderingDevice.TextureSwizzle")]
 		public final native function get swizzleR():int;
+		[Godot(value="enum:RenderingDevice.TextureSwizzle")]
 		public final native function set swizzleR(value:int):void;
 		[Godot(returns="enum:RenderingDevice.TextureSwizzle")]
 		public final native function get swizzleG():int;
+		[Godot(value="enum:RenderingDevice.TextureSwizzle")]
 		public final native function set swizzleG(value:int):void;
 		[Godot(returns="enum:RenderingDevice.TextureSwizzle")]
 		public final native function get swizzleB():int;
+		[Godot(value="enum:RenderingDevice.TextureSwizzle")]
 		public final native function set swizzleB(value:int):void;
 		[Godot(returns="enum:RenderingDevice.TextureSwizzle")]
 		public final native function get swizzleA():int;
+		[Godot(value="enum:RenderingDevice.TextureSwizzle")]
 		public final native function set swizzleA(value:int):void;
 	}
 	public native class RDUniform extends RefCounted {
 		public native function RDUniform();
 		[Godot(returns="enum:RenderingDevice.UniformType")]
 		public final native function get uniformType():int;
+		[Godot(value="enum:RenderingDevice.UniformType")]
 		public final native function set uniformType(value:int):void;
 		public final native function get binding():int;
 		public final native function set binding(value:int):void;
@@ -21584,11 +22041,13 @@ package godot {
 		public final native function set offset(value:uint):void;
 		[Godot(returns="enum:RenderingDevice.DataFormat")]
 		public final native function get format():int;
+		[Godot(value="enum:RenderingDevice.DataFormat")]
 		public final native function set format(value:int):void;
 		public final native function get stride():uint;
 		public final native function set stride(value:uint):void;
 		[Godot(returns="enum:RenderingDevice.VertexFrequency")]
 		public final native function get frequency():int;
+		[Godot(value="enum:RenderingDevice.VertexFrequency")]
 		public final native function set frequency(value:int):void;
 	}
 	public native class RandomNumberGenerator extends RefCounted {
@@ -21699,6 +22158,7 @@ package godot {
 		public native function ReflectionProbe();
 		[Godot(returns="enum:ReflectionProbe.UpdateMode")]
 		public final native function get updateMode():int;
+		[Godot(value="enum:ReflectionProbe.UpdateMode")]
 		public final native function set updateMode(value:int):void;
 		public final native function get intensity():Number;
 		public final native function set intensity(value:Number):void;
@@ -21724,6 +22184,7 @@ package godot {
 		public final native function set meshLODThreshold(value:Number):void;
 		[Godot(returns="enum:ReflectionProbe.AmbientMode")]
 		public final native function get ambientMode():int;
+		[Godot(value="enum:ReflectionProbe.AmbientMode")]
 		public final native function set ambientMode(value:int):void;
 		public final native function get ambientColor():Color;
 		public final native function set ambientColor(value:Color):void;
@@ -21816,12 +22277,15 @@ package godot {
 		public final native function set viewCount(value:uint):void;
 		[Godot(returns="enum:RenderingServer.ViewportScaling3DMode")]
 		public final native function get scaling3DMode():int;
+		[Godot(value="enum:RenderingServer.ViewportScaling3DMode")]
 		public final native function set scaling3DMode(value:int):void;
 		[Godot(returns="enum:RenderingServer.ViewportMSAA")]
 		public final native function get msaa3D():int;
+		[Godot(value="enum:RenderingServer.ViewportMSAA")]
 		public final native function set msaa3D(value:int):void;
 		[Godot(returns="enum:RenderingServer.ViewportScreenSpaceAA")]
 		public final native function get screenSpaceAa():int;
+		[Godot(value="enum:RenderingServer.ViewportScreenSpaceAA")]
 		public final native function set screenSpaceAa(value:int):void;
 		public final native function get fsrSharpness():Number;
 		public final native function set fsrSharpness(value:Number):void;
@@ -21829,6 +22293,7 @@ package godot {
 		public final native function set textureMipmapBias(value:Number):void;
 		[Godot(returns="enum:RenderingServer.ViewportAnisotropicFiltering")]
 		public final native function get anisotropicFilteringLevel():int;
+		[Godot(value="enum:RenderingServer.ViewportAnisotropicFiltering")]
 		public final native function set anisotropicFilteringLevel(value:int):void;
 	}
 	public native class RenderSceneBuffersExtension extends RenderSceneBuffers {
@@ -24121,6 +24586,7 @@ package godot {
 		public final native function set useGlobalPose(value:Boolean):void;
 		[Godot(returns="bitfield:RetargetModifier3D.TransformFlag")]
 		public final native function get enable():int;
+		[Godot(value="bitfield:RetargetModifier3D.TransformFlag")]
 		public final native function set enable(value:int):void;
 		public final native function setPositionEnabled(enabled:Boolean):void;
 		public final native function isPositionEnabled():Boolean;
@@ -24136,6 +24602,7 @@ package godot {
 		public native function RibbonTrailMesh();
 		[Godot(returns="enum:RibbonTrailMesh.Shape")]
 		public final native function get shape():int;
+		[Godot(value="enum:RibbonTrailMesh.Shape")]
 		public final native function set shape(value:int):void;
 		public final native function get size():Number;
 		public final native function set size(value:Number):void;
@@ -24194,9 +24661,11 @@ package godot {
 		public final native function set scrollFollowingVisibleCharacters(value:Boolean):void;
 		[Godot(returns="enum:TextServer.AutowrapMode")]
 		public final native function get autowrapMode():int;
+		[Godot(value="enum:TextServer.AutowrapMode")]
 		public final native function set autowrapMode(value:int):void;
 		[Godot(returns="bitfield:TextServer.LineBreakFlag")]
 		public final native function get autowrapTrimFlags():int;
+		[Godot(value="bitfield:TextServer.LineBreakFlag")]
 		public final native function set autowrapTrimFlags(value:int):void;
 		public final native function get tabSize():int;
 		public final native function set tabSize(value:int):void;
@@ -24206,12 +24675,15 @@ package godot {
 		public final native function set shortcutKeysEnabled(value:Boolean):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get horizontalAlignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set horizontalAlignment(value:int):void;
 		[Godot(returns="enum:VerticalAlignment")]
 		public final native function get verticalAlignment():int;
+		[Godot(value="enum:VerticalAlignment")]
 		public final native function set verticalAlignment(value:int):void;
 		[Godot(returns="bitfield:TextServer.JustificationFlag")]
 		public final native function get justificationFlags():int;
+		[Godot(value="bitfield:TextServer.JustificationFlag")]
 		public final native function set justificationFlags(value:int):void;
 		public final native function get tabStops():PackedFloat32Array;
 		public final native function set tabStops(value:PackedFloat32Array):void;
@@ -24235,16 +24707,19 @@ package godot {
 		public final native function set visibleCharacters(value:int):void;
 		[Godot(returns="enum:TextServer.VisibleCharactersBehavior")]
 		public final native function get visibleCharactersBehavior():int;
+		[Godot(value="enum:TextServer.VisibleCharactersBehavior")]
 		public final native function set visibleCharactersBehavior(value:int):void;
 		public final native function get visibleRatio():Number;
 		public final native function set visibleRatio(value:Number):void;
 		[Godot(returns="enum:Control.TextDirection")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:Control.TextDirection")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
 		[Godot(returns="enum:TextServer.StructuredTextParser")]
 		public final native function get structuredTextBidiOverride():int;
+		[Godot(value="enum:TextServer.StructuredTextParser")]
 		public final native function set structuredTextBidiOverride(value:int):void;
 		public final native function get structuredTextBidiOverrideOptions():GodotArray;
 		public final native function set structuredTextBidiOverrideOptions(value:GodotArray):void;
@@ -24357,6 +24832,7 @@ package godot {
 		public final native function set gravityScale(value:Number):void;
 		[Godot(returns="enum:RigidBody3D.CenterOfMassMode")]
 		public final native function get centerOfMassMode():int;
+		[Godot(value="enum:RigidBody3D.CenterOfMassMode")]
 		public final native function set centerOfMassMode(value:int):void;
 		public final native function get centerOfMass():Vector3;
 		public final native function set centerOfMass(value:Vector3):void;
@@ -24372,6 +24848,7 @@ package godot {
 		public final native function set freeze(value:Boolean):void;
 		[Godot(returns="enum:RigidBody3D.FreezeMode")]
 		public final native function get freezeMode():int;
+		[Godot(value="enum:RigidBody3D.FreezeMode")]
 		public final native function set freezeMode(value:int):void;
 		public final native function get customIntegrator():Boolean;
 		public final native function set customIntegrator(value:Boolean):void;
@@ -24385,6 +24862,7 @@ package godot {
 		public final native function set linearVelocity(value:Vector3):void;
 		[Godot(returns="enum:RigidBody3D.DampMode")]
 		public final native function get linearDampMode():int;
+		[Godot(value="enum:RigidBody3D.DampMode")]
 		public final native function set linearDampMode(value:int):void;
 		public final native function get linearDamp():Number;
 		public final native function set linearDamp(value:Number):void;
@@ -24392,6 +24870,7 @@ package godot {
 		public final native function set angularVelocity(value:Vector3):void;
 		[Godot(returns="enum:RigidBody3D.DampMode")]
 		public final native function get angularDampMode():int;
+		[Godot(value="enum:RigidBody3D.DampMode")]
 		public final native function set angularDampMode(value:int):void;
 		public final native function get angularDamp():Number;
 		public final native function set angularDamp(value:Number):void;
@@ -24986,6 +25465,7 @@ package godot {
 		public final native function set showRestOnly(value:Boolean):void;
 		[Godot(returns="enum:Skeleton3D.ModifierCallbackModeProcess")]
 		public final native function get modifierCallbackModeProcess():int;
+		[Godot(value="enum:Skeleton3D.ModifierCallbackModeProcess")]
 		public final native function set modifierCallbackModeProcess(value:int):void;
 		public final native function get animatePhysicalBones():Boolean;
 		public final native function set animatePhysicalBones(value:Boolean):void;
@@ -25319,9 +25799,11 @@ package godot {
 		public final native function set skyMaterial(value:Material):void;
 		[Godot(returns="enum:Sky.ProcessMode")]
 		public final native function get processMode():int;
+		[Godot(value="enum:Sky.ProcessMode")]
 		public final native function set processMode(value:int):void;
 		[Godot(returns="enum:Sky.RadianceSize")]
 		public final native function get radianceSize():int;
+		[Godot(value="enum:Sky.RadianceSize")]
 		public final native function set radianceSize(value:int):void;
 	}
 	[GodotEnum(name="Param", values="PARAM_LINEAR_LIMIT_UPPER,PARAM_LINEAR_LIMIT_LOWER,PARAM_LINEAR_LIMIT_SOFTNESS,PARAM_LINEAR_LIMIT_RESTITUTION,PARAM_LINEAR_LIMIT_DAMPING,PARAM_LINEAR_MOTION_SOFTNESS,PARAM_LINEAR_MOTION_RESTITUTION,PARAM_LINEAR_MOTION_DAMPING,PARAM_LINEAR_ORTHOGONAL_SOFTNESS,PARAM_LINEAR_ORTHOGONAL_RESTITUTION,PARAM_LINEAR_ORTHOGONAL_DAMPING,PARAM_ANGULAR_LIMIT_UPPER,PARAM_ANGULAR_LIMIT_LOWER,PARAM_ANGULAR_LIMIT_SOFTNESS,PARAM_ANGULAR_LIMIT_RESTITUTION,PARAM_ANGULAR_LIMIT_DAMPING,PARAM_ANGULAR_MOTION_SOFTNESS,PARAM_ANGULAR_MOTION_RESTITUTION,PARAM_ANGULAR_MOTION_DAMPING,PARAM_ANGULAR_ORTHOGONAL_SOFTNESS,PARAM_ANGULAR_ORTHOGONAL_RESTITUTION,PARAM_ANGULAR_ORTHOGONAL_DAMPING,PARAM_MAX")]
@@ -25391,6 +25873,7 @@ package godot {
 		public final native function set rayPickable(value:Boolean):void;
 		[Godot(returns="enum:SoftBody3D.DisableMode")]
 		public final native function get disableMode():int;
+		[Godot(value="enum:SoftBody3D.DisableMode")]
 		public final native function set disableMode(value:int):void;
 		public final native function getPhysicsRID():RID;
 		public final native function setCollisionMaskValue(layerNumber:int, value:Boolean):void;
@@ -25436,6 +25919,7 @@ package godot {
 		public native function SpinBox();
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get alignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set alignment(value:int):void;
 		public final native function get editable():Boolean;
 		public final native function set editable(value:Boolean):void;
@@ -25969,9 +26453,11 @@ package godot {
 		public final native function set expandMarginBottom(value:Number):void;
 		[Godot(returns="enum:StyleBoxTexture.AxisStretchMode")]
 		public final native function get axisStretchHorizontal():int;
+		[Godot(value="enum:StyleBoxTexture.AxisStretchMode")]
 		public final native function set axisStretchHorizontal(value:int):void;
 		[Godot(returns="enum:StyleBoxTexture.AxisStretchMode")]
 		public final native function get axisStretchVertical():int;
+		[Godot(value="enum:StyleBoxTexture.AxisStretchMode")]
 		public final native function set axisStretchVertical(value:int):void;
 		public final native function get regionRect():Rect2;
 		public final native function set regionRect(value:Rect2):void;
@@ -26012,9 +26498,11 @@ package godot {
 		public final native function set viewCount(value:int):void;
 		[Godot(returns="enum:SubViewport.ClearMode")]
 		public final native function get renderTargetClearMode():int;
+		[Godot(value="enum:SubViewport.ClearMode")]
 		public final native function set renderTargetClearMode(value:int):void;
 		[Godot(returns="enum:SubViewport.UpdateMode")]
 		public final native function get renderTargetUpdateMode():int;
+		[Godot(value="enum:SubViewport.UpdateMode")]
 		public final native function set renderTargetUpdateMode(value:int):void;
 	}
 	public native class SubViewportContainer extends Container {
@@ -26100,6 +26588,7 @@ package godot {
 		public final native function set fontStretch(value:int):void;
 		[Godot(returns="enum:TextServer.FontAntialiasing")]
 		public final native function get antialiasing():int;
+		[Godot(value="enum:TextServer.FontAntialiasing")]
 		public final native function set antialiasing(value:int):void;
 		public final native function get generateMipmaps():Boolean;
 		public final native function set generateMipmaps(value:Boolean):void;
@@ -26113,9 +26602,11 @@ package godot {
 		public final native function set modulateColorGlyphs(value:Boolean):void;
 		[Godot(returns="enum:TextServer.Hinting")]
 		public final native function get hinting():int;
+		[Godot(value="enum:TextServer.Hinting")]
 		public final native function set hinting(value:int):void;
 		[Godot(returns="enum:TextServer.SubpixelPositioning")]
 		public final native function get subpixelPositioning():int;
+		[Godot(value="enum:TextServer.SubpixelPositioning")]
 		public final native function set subpixelPositioning(value:int):void;
 		public final native function get keepRoundingRemainders():Boolean;
 		public final native function set keepRoundingRemainders(value:Boolean):void;
@@ -26163,6 +26654,7 @@ package godot {
 		public final native function set currentTab(value:int):void;
 		[Godot(returns="enum:TabBar.AlignmentMode")]
 		public final native function get tabAlignment():int;
+		[Godot(value="enum:TabBar.AlignmentMode")]
 		public final native function set tabAlignment(value:int):void;
 		public final native function get clipTabs():Boolean;
 		public final native function set clipTabs(value:Boolean):void;
@@ -26170,6 +26662,7 @@ package godot {
 		public final native function set closeWithMiddleMouse(value:Boolean):void;
 		[Godot(returns="enum:TabBar.CloseButtonDisplayPolicy")]
 		public final native function get tabCloseDisplayPolicy():int;
+		[Godot(value="enum:TabBar.CloseButtonDisplayPolicy")]
 		public final native function set tabCloseDisplayPolicy(value:int):void;
 		public final native function get maxTabWidth():int;
 		public final native function set maxTabWidth(value:int):void;
@@ -26240,11 +26733,13 @@ package godot {
 		public native function TabContainer();
 		[Godot(returns="enum:TabBar.AlignmentMode")]
 		public final native function get tabAlignment():int;
+		[Godot(value="enum:TabBar.AlignmentMode")]
 		public final native function set tabAlignment(value:int):void;
 		public final native function get currentTab():int;
 		public final native function set currentTab(value:int):void;
 		[Godot(returns="enum:TabContainer.TabPosition")]
 		public final native function get tabsPosition():int;
+		[Godot(value="enum:TabContainer.TabPosition")]
 		public final native function set tabsPosition(value:int):void;
 		public final native function get clipTabs():Boolean;
 		public final native function set clipTabs(value:Boolean):void;
@@ -26262,6 +26757,7 @@ package godot {
 		public final native function set useHiddenTabsForMinSize(value:Boolean):void;
 		[Godot(returns="enum:Control.FocusMode")]
 		public final native function get tabFocusMode():int;
+		[Godot(value="enum:Control.FocusMode")]
 		public final native function set tabFocusMode(value:int):void;
 		public final native function get deselectEnabled():Boolean;
 		public final native function set deselectEnabled(value:Boolean):void;
@@ -26304,9 +26800,11 @@ package godot {
 		public native function TextLine();
 		[Godot(returns="enum:TextServer.Direction")]
 		public final native function get direction():int;
+		[Godot(value="enum:TextServer.Direction")]
 		public final native function set direction(value:int):void;
 		[Godot(returns="enum:TextServer.Orientation")]
 		public final native function get orientation():int;
+		[Godot(value="enum:TextServer.Orientation")]
 		public final native function set orientation(value:int):void;
 		public final native function get preserveInvalid():Boolean;
 		public final native function set preserveInvalid(value:Boolean):void;
@@ -26316,12 +26814,15 @@ package godot {
 		public final native function set width(value:Number):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get alignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set alignment(value:int):void;
 		[Godot(returns="bitfield:TextServer.JustificationFlag")]
 		public final native function get flags():int;
+		[Godot(value="bitfield:TextServer.JustificationFlag")]
 		public final native function set flags(value:int):void;
 		[Godot(returns="enum:TextServer.OverrunBehavior")]
 		public final native function get textOverrunBehavior():int;
+		[Godot(value="enum:TextServer.OverrunBehavior")]
 		public final native function set textOverrunBehavior(value:int):void;
 		public final native function get ellipsisChar():String;
 		public final native function set ellipsisChar(value:String):void;
@@ -26360,9 +26861,11 @@ package godot {
 		public final native function set fontSize(value:int):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get horizontalAlignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set horizontalAlignment(value:int):void;
 		[Godot(returns="enum:VerticalAlignment")]
 		public final native function get verticalAlignment():int;
+		[Godot(value="enum:VerticalAlignment")]
 		public final native function set verticalAlignment(value:int):void;
 		public final native function get uppercase():Boolean;
 		public final native function set uppercase(value:Boolean):void;
@@ -26370,9 +26873,11 @@ package godot {
 		public final native function set lineSpacing(value:Number):void;
 		[Godot(returns="enum:TextServer.AutowrapMode")]
 		public final native function get autowrapMode():int;
+		[Godot(value="enum:TextServer.AutowrapMode")]
 		public final native function set autowrapMode(value:int):void;
 		[Godot(returns="bitfield:TextServer.JustificationFlag")]
 		public final native function get justificationFlags():int;
+		[Godot(value="bitfield:TextServer.JustificationFlag")]
 		public final native function set justificationFlags(value:int):void;
 		public final native function get pixelSize():Number;
 		public final native function set pixelSize(value:Number):void;
@@ -26386,11 +26891,13 @@ package godot {
 		public final native function set offset(value:Vector2):void;
 		[Godot(returns="enum:TextServer.Direction")]
 		public final native function get textDirection():int;
+		[Godot(value="enum:TextServer.Direction")]
 		public final native function set textDirection(value:int):void;
 		public final native function get language():String;
 		public final native function set language(value:String):void;
 		[Godot(returns="enum:TextServer.StructuredTextParser")]
 		public final native function get structuredTextBidiOverride():int;
+		[Godot(value="enum:TextServer.StructuredTextParser")]
 		public final native function set structuredTextBidiOverride(value:int):void;
 		public final native function get structuredTextBidiOverrideOptions():GodotArray;
 		public final native function set structuredTextBidiOverrideOptions(value:GodotArray):void;
@@ -26399,11 +26906,13 @@ package godot {
 		public native function TextParagraph();
 		[Godot(returns="enum:TextServer.Direction")]
 		public final native function get direction():int;
+		[Godot(value="enum:TextServer.Direction")]
 		public final native function set direction(value:int):void;
 		public final native function get customPunctuation():String;
 		public final native function set customPunctuation(value:String):void;
 		[Godot(returns="enum:TextServer.Orientation")]
 		public final native function get orientation():int;
+		[Godot(value="enum:TextServer.Orientation")]
 		public final native function set orientation(value:int):void;
 		public final native function get preserveInvalid():Boolean;
 		public final native function set preserveInvalid(value:Boolean):void;
@@ -26411,15 +26920,19 @@ package godot {
 		public final native function set preserveControl(value:Boolean):void;
 		[Godot(returns="enum:HorizontalAlignment")]
 		public final native function get alignment():int;
+		[Godot(value="enum:HorizontalAlignment")]
 		public final native function set alignment(value:int):void;
 		[Godot(returns="bitfield:TextServer.LineBreakFlag")]
 		public final native function get breakFlags():int;
+		[Godot(value="bitfield:TextServer.LineBreakFlag")]
 		public final native function set breakFlags(value:int):void;
 		[Godot(returns="bitfield:TextServer.JustificationFlag")]
 		public final native function get justificationFlags():int;
+		[Godot(value="bitfield:TextServer.JustificationFlag")]
 		public final native function set justificationFlags(value:int):void;
 		[Godot(returns="enum:TextServer.OverrunBehavior")]
 		public final native function get textOverrunBehavior():int;
+		[Godot(value="enum:TextServer.OverrunBehavior")]
 		public final native function set textOverrunBehavior(value:int):void;
 		public final native function get ellipsisChar():String;
 		public final native function set ellipsisChar(value:String):void;
@@ -27241,6 +27754,7 @@ package godot {
 		public final native function set ignoreTextureSize(value:Boolean):void;
 		[Godot(returns="enum:TextureButton.StretchMode")]
 		public final native function get stretchMode():int;
+		[Godot(value="enum:TextureButton.StretchMode")]
 		public final native function set stretchMode(value:int):void;
 		public final native function get flipH():Boolean;
 		public final native function set flipH(value:Boolean):void;
@@ -27323,9 +27837,11 @@ package godot {
 		public final native function set texture(value:Texture2D):void;
 		[Godot(returns="enum:TextureRect.ExpandMode")]
 		public final native function get expandMode():int;
+		[Godot(value="enum:TextureRect.ExpandMode")]
 		public final native function set expandMode(value:int):void;
 		[Godot(returns="enum:TextureRect.StretchMode")]
 		public final native function get stretchMode():int;
+		[Godot(value="enum:TextureRect.StretchMode")]
 		public final native function set stretchMode(value:int):void;
 		public final native function get flipH():Boolean;
 		public final native function set flipH(value:Boolean):void;
@@ -27527,9 +28043,11 @@ package godot {
 		public final native function set collisionAnimatable(value:Boolean):void;
 		[Godot(returns="enum:TileMap.VisibilityMode")]
 		public final native function get collisionVisibilityMode():int;
+		[Godot(value="enum:TileMap.VisibilityMode")]
 		public final native function set collisionVisibilityMode(value:int):void;
 		[Godot(returns="enum:TileMap.VisibilityMode")]
 		public final native function get navigationVisibilityMode():int;
+		[Godot(value="enum:TileMap.VisibilityMode")]
 		public final native function set navigationVisibilityMode(value:int):void;
 		public final native function get changed():Signal;
 		public native function _useTileDataRuntimeUpdate(layer:int, coords:Vector2i):Boolean;
@@ -27619,6 +28137,7 @@ package godot {
 		public final native function set useKinematicBodies(value:Boolean):void;
 		[Godot(returns="enum:TileMapLayer.DebugVisibilityMode")]
 		public final native function get collisionVisibilityMode():int;
+		[Godot(value="enum:TileMapLayer.DebugVisibilityMode")]
 		public final native function set collisionVisibilityMode(value:int):void;
 		public final native function get physicsQuadrantSize():int;
 		public final native function set physicsQuadrantSize(value:int):void;
@@ -27626,6 +28145,7 @@ package godot {
 		public final native function set navigationEnabled(value:Boolean):void;
 		[Godot(returns="enum:TileMapLayer.DebugVisibilityMode")]
 		public final native function get navigationVisibilityMode():int;
+		[Godot(value="enum:TileMapLayer.DebugVisibilityMode")]
 		public final native function set navigationVisibilityMode(value:int):void;
 		public final native function get changed():Signal;
 		public native function _useTileDataRuntimeUpdate(coords:Vector2i):Boolean;
@@ -27723,12 +28243,15 @@ package godot {
 		public native function TileSet();
 		[Godot(returns="enum:TileSet.TileShape")]
 		public final native function get tileShape():int;
+		[Godot(value="enum:TileSet.TileShape")]
 		public final native function set tileShape(value:int):void;
 		[Godot(returns="enum:TileSet.TileLayout")]
 		public final native function get tileLayout():int;
+		[Godot(value="enum:TileSet.TileLayout")]
 		public final native function set tileLayout(value:int):void;
 		[Godot(returns="enum:TileSet.TileOffsetAxis")]
 		public final native function get tileOffsetAxis():int;
+		[Godot(value="enum:TileSet.TileOffsetAxis")]
 		public final native function set tileOffsetAxis(value:int):void;
 		public final native function get tileSize():Vector2i;
 		public final native function set tileSize(value:Vector2i):void;
@@ -27949,6 +28472,7 @@ package godot {
 		public native function Timer();
 		[Godot(returns="enum:Timer.TimerProcessCallback")]
 		public final native function get processCallback():int;
+		[Godot(value="enum:Timer.TimerProcessCallback")]
 		public final native function set processCallback(value:int):void;
 		public final native function get waitTime():Number;
 		public final native function set waitTime(value:Number):void;
@@ -28000,6 +28524,7 @@ package godot {
 		public final native function set action(value:String):void;
 		[Godot(returns="enum:TouchScreenButton.VisibilityMode")]
 		public final native function get visibilityMode():int;
+		[Godot(value="enum:TouchScreenButton.VisibilityMode")]
 		public final native function set visibilityMode(value:int):void;
 		public final native function get pressed():Signal;
 		public final native function get released():Signal;
@@ -28121,6 +28646,7 @@ package godot {
 		public final native function set dropModeFlags(value:int):void;
 		[Godot(returns="enum:Tree.SelectMode")]
 		public final native function get selectMode():int;
+		[Godot(value="enum:Tree.SelectMode")]
 		public final native function set selectMode(value:int):void;
 		public final native function get autoTooltip():Boolean;
 		public final native function set autoTooltip(value:Boolean):void;
@@ -28130,6 +28656,7 @@ package godot {
 		public final native function set scrollVerticalEnabled(value:Boolean):void;
 		[Godot(returns="enum:Tree.ScrollHintMode")]
 		public final native function get scrollHintMode():int;
+		[Godot(value="enum:Tree.ScrollHintMode")]
 		public final native function set scrollHintMode(value:int):void;
 		public final native function get tileScrollHint():Boolean;
 		public final native function set tileScrollHint(value:Boolean):void;
@@ -28566,6 +29093,7 @@ package godot {
 		public final native function set igdOurAddr(value:String):void;
 		[Godot(returns="enum:UPNPDevice.IGDStatus")]
 		public final native function get igdStatus():int;
+		[Godot(value="enum:UPNPDevice.IGDStatus")]
 		public final native function set igdStatus(value:int):void;
 		public final native function isValidGateway():Boolean;
 		public final native function queryExternalAddress():String;
@@ -28746,6 +29274,7 @@ package godot {
 		public native function VirtualJoystick();
 		[Godot(returns="enum:VirtualJoystick.JoystickMode")]
 		public final native function get joystickMode():int;
+		[Godot(value="enum:VirtualJoystick.JoystickMode")]
 		public final native function set joystickMode(value:int):void;
 		public final native function get joystickSize():Number;
 		public final native function set joystickSize(value:Number):void;
@@ -28767,6 +29296,7 @@ package godot {
 		public final native function set actionDown(value:String):void;
 		[Godot(returns="enum:VirtualJoystick.VisibilityMode")]
 		public final native function get visibilityMode():int;
+		[Godot(value="enum:VirtualJoystick.VisibilityMode")]
 		public final native function set visibilityMode(value:int):void;
 		public final native function get pressed():Signal;
 		public final native function get tapped():Signal;
@@ -28792,6 +29322,7 @@ package godot {
 		public native function VisibleOnScreenEnabler2D();
 		[Godot(returns="enum:VisibleOnScreenEnabler2D.EnableMode")]
 		public final native function get enableMode():int;
+		[Godot(value="enum:VisibleOnScreenEnabler2D.EnableMode")]
 		public final native function set enableMode(value:int):void;
 		public final native function get enableNodePath():String;
 		public final native function set enableNodePath(value:String):void;
@@ -28812,6 +29343,7 @@ package godot {
 		public native function VisibleOnScreenEnabler3D();
 		[Godot(returns="enum:VisibleOnScreenEnabler3D.EnableMode")]
 		public final native function get enableMode():int;
+		[Godot(value="enum:VisibleOnScreenEnabler3D.EnableMode")]
 		public final native function set enableMode(value:int):void;
 		public final native function get enableNodePath():String;
 		public final native function set enableNodePath(value:String):void;
@@ -28926,6 +29458,7 @@ package godot {
 		public native function VisualShaderNodeBillboard();
 		[Godot(returns="enum:VisualShaderNodeBillboard.BillboardType")]
 		public final native function get billboardType():int;
+		[Godot(value="enum:VisualShaderNodeBillboard.BillboardType")]
 		public final native function set billboardType(value:int):void;
 		public final native function get keepScale():Boolean;
 		public final native function set keepScale(value:Boolean):void;
@@ -28950,6 +29483,7 @@ package godot {
 		public final native function set parameterName(value:String):void;
 		[Godot(returns="enum:VisualShaderNodeParameter.Qualifier")]
 		public final native function get qualifier():int;
+		[Godot(value="enum:VisualShaderNodeParameter.Qualifier")]
 		public final native function set qualifier(value:int):void;
 		public final native function get instanceIndex():int;
 		public final native function set instanceIndex(value:int):void;
@@ -28973,6 +29507,7 @@ package godot {
 		public native function VisualShaderNodeClamp();
 		[Godot(returns="enum:VisualShaderNodeClamp.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeClamp.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	public native class VisualShaderNodeColorConstant extends VisualShaderNodeConstant {
@@ -28992,6 +29527,7 @@ package godot {
 		public native function VisualShaderNodeColorFunc();
 		[Godot(returns="enum:VisualShaderNodeColorFunc.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeColorFunc.Function")]
 		public final native function set function_(value:int):void;
 	}
 	[GodotEnum(name="Operator", values="OP_SCREEN,OP_DIFFERENCE,OP_DARKEN,OP_LIGHTEN,OP_OVERLAY,OP_DODGE,OP_BURN,OP_SOFT_LIGHT,OP_HARD_LIGHT,OP_MAX")]
@@ -29009,6 +29545,7 @@ package godot {
 		public native function VisualShaderNodeColorOp();
 		[Godot(returns="enum:VisualShaderNodeColorOp.Operator")]
 		public final native function get operator():int;
+		[Godot(value="enum:VisualShaderNodeColorOp.Operator")]
 		public final native function set operator(value:int):void;
 	}
 	public native class VisualShaderNodeColorParameter extends VisualShaderNodeParameter {
@@ -29069,12 +29606,15 @@ package godot {
 		public native function VisualShaderNodeCompare();
 		[Godot(returns="enum:VisualShaderNodeCompare.ComparisonType")]
 		public final native function get type():int;
+		[Godot(value="enum:VisualShaderNodeCompare.ComparisonType")]
 		public final native function set type(value:int):void;
 		[Godot(returns="enum:VisualShaderNodeCompare.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeCompare.Function")]
 		public final native function set function_(value:int):void;
 		[Godot(returns="enum:VisualShaderNodeCompare.Condition")]
 		public final native function get condition():int;
+		[Godot(value="enum:VisualShaderNodeCompare.Condition")]
 		public final native function set condition(value:int):void;
 	}
 	[GodotEnum(name="Source", values="SOURCE_TEXTURE,SOURCE_PORT,SOURCE_MAX")]
@@ -29090,11 +29630,13 @@ package godot {
 		public native function VisualShaderNodeCubemap();
 		[Godot(returns="enum:VisualShaderNodeCubemap.Source")]
 		public final native function get source():int;
+		[Godot(value="enum:VisualShaderNodeCubemap.Source")]
 		public final native function set source(value:int):void;
 		public final native function get cubeMap():TextureLayered;
 		public final native function set cubeMap(value:TextureLayered):void;
 		[Godot(returns="enum:VisualShaderNodeCubemap.TextureType")]
 		public final native function get textureType():int;
+		[Godot(value="enum:VisualShaderNodeCubemap.TextureType")]
 		public final native function set textureType(value:int):void;
 	}
 	[GodotEnum(name="TextureType", values="TYPE_DATA,TYPE_COLOR,TYPE_NORMAL_MAP,TYPE_ANISOTROPY,TYPE_MAX")]
@@ -29132,18 +29674,23 @@ package godot {
 		public static const SOURCE_MAX:int = 4;
 		[Godot(returns="enum:VisualShaderNodeTextureParameter.TextureType")]
 		public final native function get textureType():int;
+		[Godot(value="enum:VisualShaderNodeTextureParameter.TextureType")]
 		public final native function set textureType(value:int):void;
 		[Godot(returns="enum:VisualShaderNodeTextureParameter.ColorDefault")]
 		public final native function get colorDefault():int;
+		[Godot(value="enum:VisualShaderNodeTextureParameter.ColorDefault")]
 		public final native function set colorDefault(value:int):void;
 		[Godot(returns="enum:VisualShaderNodeTextureParameter.TextureFilter")]
 		public final native function get textureFilter():int;
+		[Godot(value="enum:VisualShaderNodeTextureParameter.TextureFilter")]
 		public final native function set textureFilter(value:int):void;
 		[Godot(returns="enum:VisualShaderNodeTextureParameter.TextureRepeat")]
 		public final native function get textureRepeat():int;
+		[Godot(value="enum:VisualShaderNodeTextureParameter.TextureRepeat")]
 		public final native function set textureRepeat(value:int):void;
 		[Godot(returns="enum:VisualShaderNodeTextureParameter.TextureSource")]
 		public final native function get textureSource():int;
+		[Godot(value="enum:VisualShaderNodeTextureParameter.TextureSource")]
 		public final native function set textureSource(value:int):void;
 	}
 	public native class VisualShaderNodeCubemapParameter extends VisualShaderNodeTextureParameter {
@@ -29216,12 +29763,15 @@ package godot {
 		public native function VisualShaderNodeDerivativeFunc();
 		[Godot(returns="enum:VisualShaderNodeDerivativeFunc.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeDerivativeFunc.OpType")]
 		public final native function set opType(value:int):void;
 		[Godot(returns="enum:VisualShaderNodeDerivativeFunc.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeDerivativeFunc.Function")]
 		public final native function set function_(value:int):void;
 		[Godot(returns="enum:VisualShaderNodeDerivativeFunc.Precision")]
 		public final native function get precision():int;
+		[Godot(value="enum:VisualShaderNodeDerivativeFunc.Precision")]
 		public final native function set precision(value:int):void;
 	}
 	public native class VisualShaderNodeDeterminant extends VisualShaderNode {
@@ -29271,6 +29821,7 @@ package godot {
 		public static const OP_TYPE_MAX:int = 3;
 		[Godot(returns="enum:VisualShaderNodeVectorBase.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeVectorBase.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	public native class VisualShaderNodeFaceForward extends VisualShaderNodeVectorBase {
@@ -29319,6 +29870,7 @@ package godot {
 		public native function VisualShaderNodeFloatFunc();
 		[Godot(returns="enum:VisualShaderNodeFloatFunc.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeFloatFunc.Function")]
 		public final native function set function_(value:int):void;
 	}
 	[GodotEnum(name="Operator", values="OP_ADD,OP_SUB,OP_MUL,OP_DIV,OP_MOD,OP_POW,OP_MAX,OP_MIN,OP_ATAN2,OP_STEP,OP_ENUM_SIZE")]
@@ -29337,6 +29889,7 @@ package godot {
 		public native function VisualShaderNodeFloatOp();
 		[Godot(returns="enum:VisualShaderNodeFloatOp.Operator")]
 		public final native function get operator():int;
+		[Godot(value="enum:VisualShaderNodeFloatOp.Operator")]
 		public final native function set operator(value:int):void;
 	}
 	[GodotEnum(name="Hint", values="HINT_NONE,HINT_RANGE,HINT_RANGE_STEP,HINT_MAX")]
@@ -29348,6 +29901,7 @@ package godot {
 		public native function VisualShaderNodeFloatParameter();
 		[Godot(returns="enum:VisualShaderNodeFloatParameter.Hint")]
 		public final native function get hint():int;
+		[Godot(value="enum:VisualShaderNodeFloatParameter.Hint")]
 		public final native function set hint(value:int):void;
 		public final native function get min():Number;
 		public final native function set min(value:Number):void;
@@ -29391,6 +29945,7 @@ package godot {
 		public native function VisualShaderNodeIntFunc();
 		[Godot(returns="enum:VisualShaderNodeIntFunc.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeIntFunc.Function")]
 		public final native function set function_(value:int):void;
 	}
 	[GodotEnum(name="Operator", values="OP_ADD,OP_SUB,OP_MUL,OP_DIV,OP_MOD,OP_MAX,OP_MIN,OP_BITWISE_AND,OP_BITWISE_OR,OP_BITWISE_XOR,OP_BITWISE_LEFT_SHIFT,OP_BITWISE_RIGHT_SHIFT,OP_ENUM_SIZE")]
@@ -29411,6 +29966,7 @@ package godot {
 		public native function VisualShaderNodeIntOp();
 		[Godot(returns="enum:VisualShaderNodeIntOp.Operator")]
 		public final native function get operator():int;
+		[Godot(value="enum:VisualShaderNodeIntOp.Operator")]
 		public final native function set operator(value:int):void;
 	}
 	[GodotEnum(name="Hint", values="HINT_NONE,HINT_RANGE,HINT_RANGE_STEP,HINT_ENUM,HINT_MAX")]
@@ -29423,6 +29979,7 @@ package godot {
 		public native function VisualShaderNodeIntParameter();
 		[Godot(returns="enum:VisualShaderNodeIntParameter.Hint")]
 		public final native function get hint():int;
+		[Godot(value="enum:VisualShaderNodeIntParameter.Hint")]
 		public final native function set hint(value:int):void;
 		public final native function get min():int;
 		public final native function set min(value:int):void;
@@ -29445,6 +30002,7 @@ package godot {
 		public native function VisualShaderNodeIs();
 		[Godot(returns="enum:VisualShaderNodeIs.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeIs.Function")]
 		public final native function set function_(value:int):void;
 	}
 	public native class VisualShaderNodeLinearSceneDepth extends VisualShaderNode {
@@ -29463,6 +30021,7 @@ package godot {
 		public native function VisualShaderNodeMix();
 		[Godot(returns="enum:VisualShaderNodeMix.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeMix.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	[GodotEnum(name="OpType", values="OP_TYPE_SCALAR,OP_TYPE_VECTOR_2D,OP_TYPE_VECTOR_3D,OP_TYPE_VECTOR_4D,OP_TYPE_MAX")]
@@ -29475,6 +30034,7 @@ package godot {
 		public native function VisualShaderNodeMultiplyAdd();
 		[Godot(returns="enum:VisualShaderNodeMultiplyAdd.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeMultiplyAdd.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	public native class VisualShaderNodeOuterProduct extends VisualShaderNode {
@@ -29499,6 +30059,7 @@ package godot {
 		public native function VisualShaderNodeParticleAccelerator();
 		[Godot(returns="enum:VisualShaderNodeParticleAccelerator.Mode")]
 		public final native function get mode():int;
+		[Godot(value="enum:VisualShaderNodeParticleAccelerator.Mode")]
 		public final native function set mode(value:int):void;
 	}
 	[Abstract]
@@ -29522,6 +30083,7 @@ package godot {
 		public native function VisualShaderNodeParticleEmit();
 		[Godot(returns="enum:VisualShaderNodeParticleEmit.EmitFlags")]
 		public final native function get flags():int;
+		[Godot(value="enum:VisualShaderNodeParticleEmit.EmitFlags")]
 		public final native function set flags(value:int):void;
 	}
 	public native class VisualShaderNodeParticleMeshEmitter extends VisualShaderNodeParticleEmitter {
@@ -29551,6 +30113,7 @@ package godot {
 		public native function VisualShaderNodeParticleRandomness();
 		[Godot(returns="enum:VisualShaderNodeParticleRandomness.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeParticleRandomness.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	public native class VisualShaderNodeParticleRingEmitter extends VisualShaderNodeParticleEmitter {
@@ -29578,12 +30141,14 @@ package godot {
 		public native function VisualShaderNodeRemap();
 		[Godot(returns="enum:VisualShaderNodeRemap.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeRemap.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	public native class VisualShaderNodeReroute extends VisualShaderNode {
 		public native function VisualShaderNodeReroute();
 		[Godot(returns="enum:VisualShaderNode.PortType")]
 		public final native function get portType():int;
+		[Godot(value="enum:VisualShaderNode.PortType")]
 		public final native function set portType(value:int):void;
 	}
 	public native class VisualShaderNodeRotationByAxis extends VisualShaderNode {
@@ -29603,6 +30168,7 @@ package godot {
 		public static const SOURCE_MAX:int = 2;
 		[Godot(returns="enum:VisualShaderNodeSample3D.Source")]
 		public final native function get source():int;
+		[Godot(value="enum:VisualShaderNodeSample3D.Source")]
 		public final native function set source(value:int):void;
 	}
 	public native class VisualShaderNodeScreenNormalWorldSpace extends VisualShaderNode {
@@ -29624,6 +30190,7 @@ package godot {
 		public native function VisualShaderNodeSmoothStep();
 		[Godot(returns="enum:VisualShaderNodeSmoothStep.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeSmoothStep.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	[GodotEnum(name="OpType", values="OP_TYPE_SCALAR,OP_TYPE_VECTOR_2D,OP_TYPE_VECTOR_2D_SCALAR,OP_TYPE_VECTOR_3D,OP_TYPE_VECTOR_3D_SCALAR,OP_TYPE_VECTOR_4D,OP_TYPE_VECTOR_4D_SCALAR,OP_TYPE_MAX")]
@@ -29639,6 +30206,7 @@ package godot {
 		public native function VisualShaderNodeStep();
 		[Godot(returns="enum:VisualShaderNodeStep.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeStep.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	[GodotEnum(name="OpType", values="OP_TYPE_FLOAT,OP_TYPE_INT,OP_TYPE_UINT,OP_TYPE_VECTOR_2D,OP_TYPE_VECTOR_3D,OP_TYPE_VECTOR_4D,OP_TYPE_BOOLEAN,OP_TYPE_TRANSFORM,OP_TYPE_MAX")]
@@ -29655,6 +30223,7 @@ package godot {
 		public native function VisualShaderNodeSwitch();
 		[Godot(returns="enum:VisualShaderNodeSwitch.OpType")]
 		public final native function get opType():int;
+		[Godot(value="enum:VisualShaderNodeSwitch.OpType")]
 		public final native function set opType(value:int):void;
 	}
 	[GodotEnum(name="Source", values="SOURCE_TEXTURE,SOURCE_SCREEN,SOURCE_2D_TEXTURE,SOURCE_2D_NORMAL,SOURCE_DEPTH,SOURCE_PORT,SOURCE_3D_NORMAL,SOURCE_ROUGHNESS,SOURCE_MAX")]
@@ -29676,11 +30245,13 @@ package godot {
 		public native function VisualShaderNodeTexture();
 		[Godot(returns="enum:VisualShaderNodeTexture.Source")]
 		public final native function get source():int;
+		[Godot(value="enum:VisualShaderNodeTexture.Source")]
 		public final native function set source(value:int):void;
 		public final native function get texture():Texture2D;
 		public final native function set texture(value:Texture2D):void;
 		[Godot(returns="enum:VisualShaderNodeTexture.TextureType")]
 		public final native function get textureType():int;
+		[Godot(value="enum:VisualShaderNodeTexture.TextureType")]
 		public final native function set textureType(value:int):void;
 	}
 	public native class VisualShaderNodeTexture2DArray extends VisualShaderNodeSample3D {
@@ -29730,6 +30301,7 @@ package godot {
 		public native function VisualShaderNodeTransformFunc();
 		[Godot(returns="enum:VisualShaderNodeTransformFunc.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeTransformFunc.Function")]
 		public final native function set function_(value:int):void;
 	}
 	[GodotEnum(name="Operator", values="OP_AxB,OP_BxA,OP_AxB_COMP,OP_BxA_COMP,OP_ADD,OP_A_MINUS_B,OP_B_MINUS_A,OP_A_DIV_B,OP_B_DIV_A,OP_MAX")]
@@ -29747,6 +30319,7 @@ package godot {
 		public native function VisualShaderNodeTransformOp();
 		[Godot(returns="enum:VisualShaderNodeTransformOp.Operator")]
 		public final native function get operator():int;
+		[Godot(value="enum:VisualShaderNodeTransformOp.Operator")]
 		public final native function set operator(value:int):void;
 	}
 	public native class VisualShaderNodeTransformParameter extends VisualShaderNodeParameter {
@@ -29766,6 +30339,7 @@ package godot {
 		public native function VisualShaderNodeTransformVecMult();
 		[Godot(returns="enum:VisualShaderNodeTransformVecMult.Operator")]
 		public final native function get operator():int;
+		[Godot(value="enum:VisualShaderNodeTransformVecMult.Operator")]
 		public final native function set operator(value:int):void;
 	}
 	public native class VisualShaderNodeUIntConstant extends VisualShaderNodeConstant {
@@ -29781,6 +30355,7 @@ package godot {
 		public native function VisualShaderNodeUIntFunc();
 		[Godot(returns="enum:VisualShaderNodeUIntFunc.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeUIntFunc.Function")]
 		public final native function set function_(value:int):void;
 	}
 	[GodotEnum(name="Operator", values="OP_ADD,OP_SUB,OP_MUL,OP_DIV,OP_MOD,OP_MAX,OP_MIN,OP_BITWISE_AND,OP_BITWISE_OR,OP_BITWISE_XOR,OP_BITWISE_LEFT_SHIFT,OP_BITWISE_RIGHT_SHIFT,OP_ENUM_SIZE")]
@@ -29801,6 +30376,7 @@ package godot {
 		public native function VisualShaderNodeUIntOp();
 		[Godot(returns="enum:VisualShaderNodeUIntOp.Operator")]
 		public final native function get operator():int;
+		[Godot(value="enum:VisualShaderNodeUIntOp.Operator")]
 		public final native function set operator(value:int):void;
 	}
 	public native class VisualShaderNodeUIntParameter extends VisualShaderNodeParameter {
@@ -29818,6 +30394,7 @@ package godot {
 		public native function VisualShaderNodeUVFunc();
 		[Godot(returns="enum:VisualShaderNodeUVFunc.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeUVFunc.Function")]
 		public final native function set function_(value:int):void;
 	}
 	public native class VisualShaderNodeUVPolarCoord extends VisualShaderNode {
@@ -29829,6 +30406,7 @@ package godot {
 		public final native function set varyingName(value:String):void;
 		[Godot(returns="enum:VisualShader.VaryingType")]
 		public final native function get varyingType():int;
+		[Godot(value="enum:VisualShader.VaryingType")]
 		public final native function set varyingType(value:int):void;
 	}
 	public native class VisualShaderNodeVaryingGetter extends VisualShaderNodeVarying {
@@ -29923,6 +30501,7 @@ package godot {
 		public native function VisualShaderNodeVectorFunc();
 		[Godot(returns="enum:VisualShaderNodeVectorFunc.Function")]
 		public final native function get function_():int;
+		[Godot(value="enum:VisualShaderNodeVectorFunc.Function")]
 		public final native function set function_(value:int):void;
 	}
 	public native class VisualShaderNodeVectorLen extends VisualShaderNodeVectorBase {
@@ -29946,6 +30525,7 @@ package godot {
 		public native function VisualShaderNodeVectorOp();
 		[Godot(returns="enum:VisualShaderNodeVectorOp.Operator")]
 		public final native function get operator():int;
+		[Godot(value="enum:VisualShaderNodeVectorOp.Operator")]
 		public final native function set operator(value:int):void;
 	}
 	public native class VisualShaderNodeVectorRefract extends VisualShaderNodeVectorBase {
@@ -29964,6 +30544,7 @@ package godot {
 		public native function VoxelGI();
 		[Godot(returns="enum:VoxelGI.Subdiv")]
 		public final native function get subdiv():int;
+		[Godot(value="enum:VoxelGI.Subdiv")]
 		public final native function set subdiv(value:int):void;
 		public final native function get size():Vector3;
 		public final native function set size(value:Vector3):void;
@@ -30014,6 +30595,7 @@ package godot {
 		public static const STATE_CLOSED:int = 3;
 		[Godot(returns="enum:WebRTCDataChannel.WriteMode")]
 		public final native function get writeMode():int;
+		[Godot(value="enum:WebRTCDataChannel.WriteMode")]
 		public final native function set writeMode(value:int):void;
 		[Godot(returns="enum:GodotError")]
 		public final native function poll():int;
@@ -30374,9 +30956,11 @@ package godot {
 		public final native function set bodyTracker(value:String):void;
 		[Godot(returns="bitfield:XRBodyModifier3D.BodyUpdate")]
 		public final native function get bodyUpdate():int;
+		[Godot(value="bitfield:XRBodyModifier3D.BodyUpdate")]
 		public final native function set bodyUpdate(value:int):void;
 		[Godot(returns="enum:XRBodyModifier3D.BoneUpdate")]
 		public final native function get boneUpdate():int;
+		[Godot(value="enum:XRBodyModifier3D.BoneUpdate")]
 		public final native function set boneUpdate(value:int):void;
 	}
 	[GodotEnum(name="BodyFlags", values="BODY_FLAG_UPPER_BODY_SUPPORTED,BODY_FLAG_LOWER_BODY_SUPPORTED,BODY_FLAG_HANDS_SUPPORTED")]
@@ -30483,6 +31067,7 @@ package godot {
 		public final native function set hasTrackingData(value:Boolean):void;
 		[Godot(returns="bitfield:XRBodyTracker.BodyFlags")]
 		public final native function get bodyFlags():int;
+		[Godot(value="bitfield:XRBodyTracker.BodyFlags")]
 		public final native function set bodyFlags(value:int):void;
 		[Godot(joint="enum:XRBodyTracker.Joint", flags="bitfield:XRBodyTracker.JointFlags")]
 		public final native function setJointFlags(joint:int, flags:int):void;
@@ -30684,6 +31269,7 @@ package godot {
 		public final native function set handTracker(value:String):void;
 		[Godot(returns="enum:XRHandModifier3D.BoneUpdate")]
 		public final native function get boneUpdate():int;
+		[Godot(value="enum:XRHandModifier3D.BoneUpdate")]
 		public final native function set boneUpdate(value:int):void;
 	}
 	[GodotEnum(name="HandTrackingSource", values="HAND_TRACKING_SOURCE_UNKNOWN,HAND_TRACKING_SOURCE_UNOBSTRUCTED,HAND_TRACKING_SOURCE_CONTROLLER,HAND_TRACKING_SOURCE_NOT_TRACKED,HAND_TRACKING_SOURCE_MAX")]
@@ -30733,6 +31319,7 @@ package godot {
 		public final native function set hasTrackingData(value:Boolean):void;
 		[Godot(returns="enum:XRHandTracker.HandTrackingSource")]
 		public final native function get handTrackingSource():int;
+		[Godot(value="enum:XRHandTracker.HandTrackingSource")]
 		public final native function set handTrackingSource(value:int):void;
 		[Godot(joint="enum:XRHandTracker.HandJoint", flags="bitfield:XRHandTracker.HandJointFlags")]
 		public final native function setHandJointFlags(joint:int, flags:int):void;
@@ -30825,6 +31412,7 @@ package godot {
 		public final native function set angularVelocity(value:Vector3):void;
 		[Godot(returns="enum:XRPose.TrackingConfidence")]
 		public final native function get trackingConfidence():int;
+		[Godot(value="enum:XRPose.TrackingConfidence")]
 		public final native function set trackingConfidence(value:int):void;
 		public final native function getAdjustedTransform():Transform3D;
 	}
