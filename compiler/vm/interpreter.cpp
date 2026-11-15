@@ -21,7 +21,7 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 	}
 	null_text_ = new_string("null");
 	memory_text_ = new_string(OUT_OF_MEMORY);
-	for (const char *name : { "undefined", "boolean", "number", "string", "object" }) {
+	for (const char *name : { "undefined", "boolean", "number", "string", "object", "function" }) {
 		type_names_.push_back(new_string(name));
 	}
 	// A method's function by name, for calls from outside: the class's own and what it inherits.

@@ -76,8 +76,10 @@ uint32_t Lowerer::any_add(Binary *p_binary) {
 // typeof: of an untyped value, asked as the program runs; of anything else, known now.
 uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 	uint32_t out = reg(Kind::Str);
-	// Asked as it runs of an untyped value, and of a String, which is "object" when it holds null.
-	if (untyped(p_operand) || (!is_null(p_operand) && natural(p_operand) == Kind::Str)) {
+	// Asked as it runs of an untyped value, of a String, which is "object" when it holds null, and of a
+	// Function, which is "function" unless it holds null.
+	const bool function = p_operand && p_operand->type && p_operand->type->kind == Type::Instance && p_operand->type->symbol == function_;
+	if (untyped(p_operand) || function || (!is_null(p_operand) && natural(p_operand) == Kind::Str)) {
 		emit(Op::AnyTypeof, p_position, out, any_value(p_operand));
 		return out;
 	}

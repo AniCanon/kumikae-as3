@@ -379,6 +379,10 @@ class Lowerer {
 	uint32_t number_literal(Expr *p_expression, Kind p_want);
 	uint32_t number_constant(double p_value, Kind p_kind, Kind p_want, uint32_t p_position);
 	uint32_t written_value(Expr *p_value, Kind p_conversion, uint32_t p_position);
+	// Function values (lower_functions.cpp).
+	uint32_t function_value(Expr *p_expression);
+	static bool called_value(const Symbol *p_symbol);
+	uint32_t value_call(Call *p_call, Kind p_want);
 	uint32_t wide_order(Expr *p_left, Expr *p_right, uint32_t p_position);
 	uint32_t number_zero(uint32_t p_position);
 	uint32_t name_value(Expr *p_expression);

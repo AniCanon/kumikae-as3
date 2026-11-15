@@ -118,6 +118,11 @@ inline bool is_held(Kind p_kind) {
 	X(Throw, "R--") /* An untyped value: AS3 throws any value. */ \
 	X(OwnerOf, "RR-") /* A script object as the Godot object it is attached to; null for null. */ \
 	X(ErrorStack, "RR-") /* What an Error's getStackTrace() gives, for the error in b being made now. */ \
+	/* Function values. MakeFunction: out, the function, what it is called with first (a register, or \
+	   NONE). MakeMethod: out, a method-table slot, the object: its class's method, bound to it. \
+	   CallFunction: out (untyped, or NONE), the function value (a Function or an untyped value), its \
+	   arguments, each untyped. */ \
+	X(MakeFunction, "RFr") X(MakeMethod, "RVR") X(CallFunction, "rRA") \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
 	X(Trace, "A--")
 
@@ -129,6 +134,10 @@ enum class Op : uint8_t {
 
 // The functions of Math that take one Number, in MathUnary's third operand.
 enum class MathFunction : uint8_t { Abs, Acos, Asin, Atan, Ceil, Cos, Exp, Floor, Log, Round, Sin, Sqrt, Tan };
+
+// The fields of a function value: the function, and what it is called with first (the object of a method,
+// or the environment of a function expression), or null for a function that takes nothing first.
+constexpr uint32_t FUNCTION_INDEX = 0, FUNCTION_FIRST = 1;
 
 // The fields of Error and of its built-in subclasses, which the interpreter fills in for an error it raises.
 constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK = 3;
@@ -199,6 +208,9 @@ struct Function {
 	// request to the engine): Godot's name for its type ("Vector2", "CharacterBody2D"), by register. Empty
 	// for the others, and the vector may be shorter than the registers. A host checks what arrives against it.
 	std::vector<std::string> engine_types;
+	// For each parameter that holds a script object: the class it is declared to hold, by register (NONE
+	// for the others; the vector may be shorter). A call through a function value checks what it passes.
+	std::vector<uint32_t> parameter_classes;
 	std::vector<Kind> registers;
 	std::vector<Instruction> code;
 	std::vector<std::vector<uint32_t>> argument_lists;
@@ -256,6 +268,9 @@ struct Module {
 	uint32_t error_class = NONE; // Error, and TypeError: the classes of the errors the interpreter raises.
 	uint32_t type_error_class = NONE;
 	uint32_t range_error_class = NONE;
+	uint32_t argument_error_class = NONE; // Made when a program calls a function value: too many arguments.
+	// The built-in class of function values (FUNCTION_FIELDS), when the program has any.
+	uint32_t function_class = NONE;
 };
 
 // The module as text, for tests and for reading.

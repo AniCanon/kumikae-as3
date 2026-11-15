@@ -126,6 +126,13 @@ private:
 	void raise_range(double p_index, uint32_t p_length);
 	bool resize_vector(Vector *p_vector, uint32_t p_length);
 	bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value);
+	// Function values (interpreter_functions.cpp).
+	Object *make_function(uint32_t p_function, Object *p_first);
+	void function_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	Object *function_in(ir::Kind p_kind, Slot p_value);
+	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
+	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
+	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	// A call of one of a vector's methods: its arguments (the vector first) by register, where the
 	// frame's registers start, and the register for what it gives back, or NONE.

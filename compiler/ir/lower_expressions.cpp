@@ -239,6 +239,9 @@ uint32_t Lowerer::name_value(Expr *p_expression) {
 	if (builtin_constant(name->symbol, position, &constant)) {
 		return constant;
 	}
+	if (name->symbol && (name->symbol->kind == SymbolKind::Method || name->symbol->kind == SymbolKind::Function)) {
+		return function_value(p_expression); // A method or a function as a value, not called.
+	}
 	natural(p_expression);
 	return load(place_of(name), position);
 }
@@ -258,6 +261,9 @@ uint32_t Lowerer::member_value(Expr *p_expression) {
 	uint32_t constant = 0;
 	if (builtin_constant(symbol, position, &constant)) {
 		return constant;
+	}
+	if (symbol && (symbol->kind == SymbolKind::Method || symbol->kind == SymbolKind::Function)) {
+		return function_value(p_expression); // A method or a function as a value, not called.
 	}
 	natural(p_expression);
 	return load(place_of(member), member->name_offset);

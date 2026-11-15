@@ -45,7 +45,7 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Str;
 	} else if (symbol == object_) {
 		*r_kind = Kind::Any; // An Object may hold any value, numbers too.
-	} else if (classes_.count(symbol) || is_error(symbol)) {
+	} else if (classes_.count(symbol) || is_error(symbol) || (symbol == function_ && function_)) {
 		*r_kind = Kind::Obj;
 	} else if (is_godot(symbol) && symbol->kind == SymbolKind::Class) {
 		*r_kind = is_godot_object(symbol) ? Kind::Ref : Kind::Val;
@@ -107,6 +107,16 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	auto found = classes_.find(p_class);
 	if (found != classes_.end()) {
 		*r_index = found->second;
+		return true;
+	}
+	if (p_class && p_class == function_) {
+		// Function: the built-in class of function values (FUNCTION_FIELDS in ir.h).
+		Class klass;
+		klass.name = "Function";
+		klass.fields = { { "function", Kind::I32 }, { "first", Kind::Obj } };
+		module_.classes.push_back(std::move(klass));
+		module_.function_class = *r_index = (uint32_t)module_.classes.size() - 1;
+		classes_[p_class] = module_.function_class;
 		return true;
 	}
 	if (!p_class || !p_class->unit || !p_class->unit->is_builtin || !is_error(p_class)) {

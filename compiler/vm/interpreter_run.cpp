@@ -146,7 +146,14 @@ void Interpreter::leave(const Function &p_function, const Instruction &p_in, con
 	pop();
 	if (gives && result != NONE && frames_.size() > p_depth) {
 		const Frame &caller = frames_.back();
-		put(kind, stack_[caller.base + result], value);
+		const Kind wanted = module_.functions[caller.function].registers[result];
+		if (wanted == Kind::Any && kind != Kind::Any) {
+			// Called through a function value: what it gives is untyped.
+			Slot typed = value;
+			value = to_any(kind, typed);
+			drop(kind, typed);
+		}
+		put(wanted, stack_[caller.base + result], value);
 	} else if (gives && frames_.size() == p_depth && r_result) {
 		*r_result = value; // The caller from outside takes it, with its reference.
 	} else if (gives && held(kind)) {
@@ -478,7 +485,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				flag(r[in.b].b == r[in.c].b);
 				break;
 			case Op::EqRef:
-				flag(r[in.b].p == r[in.c].p);
+				flag(r[in.b].p == r[in.c].p || same_function(static_cast<const Object *>(r[in.b].p), static_cast<const Object *>(r[in.c].p)));
 				break;
 			case Op::Not:
 				flag(!r[in.b].b);
@@ -627,6 +634,11 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				assign(Kind::Str, r[in.a], stack_text(error, skip));
 				break;
 			}
+			case Op::MakeFunction:
+			case Op::MakeMethod:
+			case Op::CallFunction:
+				function_op(function, in); // `frame` and `r` may be stale after this.
+				break;
 			case Op::OwnerOf: {
 				Object *object = static_cast<Object *>(r[in.b].p);
 				const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;

@@ -278,8 +278,10 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 		if (const std::optional<uint32_t> by_name = signal_call_by_name(p_call)) {
 			return *by_name;
 		}
-		refuse(callee->offset, "calling a value");
-		return default_value(p_want, position);
+		return value_call(p_call, p_want); // `make()(1)`, `table[name](2)`: whatever it gives is called.
+	}
+	if (called_value(symbol)) {
+		return value_call(p_call, p_want); // A variable, a field or a parameter that holds a function.
 	}
 	if (symbol->is_type()) {
 		return cast(p_call, symbol, p_want);

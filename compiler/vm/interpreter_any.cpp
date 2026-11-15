@@ -328,7 +328,8 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 		case Op::AnyTypeof: {
 			Slot out;
 			out.bits = 0;
-			const std::string_view name = any::type_of(b);
+			const bool function = any::tag(b) == AnyTag::Object && static_cast<const Object *>(any::pointer(b))->klass == module_.function_class;
+			const std::string_view name = function ? std::string_view("function") : any::type_of(b);
 			for (Str *each : type_names_) {
 				out.p = each->view() == name ? each : out.p;
 			}

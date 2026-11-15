@@ -1,0 +1,6 @@
+13 function true
+17
+10 12
+Error #1063: Argument count mismatch on function_values/add(). Expected 2, got 1.
+null function
+other
