@@ -235,6 +235,8 @@ static void test_errors_beside_a_syntax_error() {
 			// Uses the broken file's class directly.
 			{ "Uses.as", "package { public class Uses { var b:Broken; var n:int = \"s\"; var w:Number = 9007199254740993;\n"
 						 "function f():void { b.lost(); b.nothing; var l:Living = b; b.kept = \"t\"; } } }" },
+			// Has only a warning, which rests on the broken file as much as an error would.
+			{ "Warns.as", "package { public class Warns { var b:Broken; var w:Number = 9007199254740993; } }" },
 			// Extends a class that extends it.
 			{ "Middle.as", "package { public class Middle extends Broken { override public function gone():void {} } }" },
 			{ "Through.as", "package { public class Through extends Middle { var n:int = \"s\"; } }" },
@@ -266,7 +268,7 @@ static void test_errors_beside_a_syntax_error() {
 	CHECK_EQ(reported(wrong, false), std::string("Broken.as:1:119: error: expected an expression but found ';'\n"));
 	// With the file mended everything is said, in every file.
 	const std::string mended = reported("", true);
-	for (const char *file : { "Broken.as:", "Uses.as:1:", "Uses.as:2:", "Middle.as:", "Through.as:", "Flow.as:", "Alone.as:1:55",
+	for (const char *file : { "Broken.as:", "Uses.as:1:", "Uses.as:2:", "Warns.as:1:61: warning", "Middle.as:", "Through.as:", "Flow.as:", "Alone.as:1:55",
 				 "Alone.as:2:29" }) {
 		CHECK(mended.find(file) != std::string::npos);
 	}
