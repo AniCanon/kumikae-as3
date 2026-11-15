@@ -24,11 +24,11 @@ it stands.
 | Mark | Stage | Items | What it takes on |
 |---|---|---|---|
 | **2b-3** | The rest of Godot's API | 0 | Done: every item of this stage is closed |
-| **2c** | The rest of the language | 23 | Closures as listeners, `object[name]` in general, collections, strings |
+| **2c** | The rest of the language | 29 | Closures as listeners, `object[name]` in general, collections, strings |
 | **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 24 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 50 | What is left |
-| **decision** | The owner | 8 | See each item |
+| **decision** | The owner | 11 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -169,7 +169,7 @@ Found by the review of the clean-up pass itself.
 - A whole number written out is an `Int64` only where one is expected or beside one. Elsewhere it is a
   `Number`, as in Flash: `var n:Number = 9007199254740993` rounds. **clean-up**
 - `x.toString(radix)` on an `Int64` waits for the standard library. **2c**
-- `Vector.<Int64>` and an `Int64` in an `Array` or `Object` wait for those types. **2c**
+- `Vector.<Int64>` and an `Int64` in an `Array` wait for those types. **2c**
 - Every program's IR now carries the `RangeError` class, used or not. **clean-up**
 
 ## C++ clean-up, November 2026
@@ -264,6 +264,24 @@ any Godot value passing as a condition):
   it needs the edits sent to it. **2d**
 - Not tried: a reload while a debugger is stopped, in the Godot editor's own play mode with the editor
   attached, or with more than a few hundred scripts. **2d**
+
+## Stage 2c-2: the untyped value
+
+- Members of an untyped value are refused: `x.name`, `x.method()`, `x[key]` wait for Object literals and
+  dynamic access. **2c**
+- `x is Node` and `x as Node` with one of Godot's classes are refused on an untyped value; `x as int`
+  (and `uint`, `Number`, `Boolean`) is refused, as its result is a number or null. **2c**
+- The checker gives no type to arithmetic on an `Object` (`o + 1`), so it is refused; on a `*` it works.
+  **2c**
+- `var y = 2`, a declaration with no type, is refused rather than taken as `*`. **2c**
+- `typeof` of a String variable that holds null says "string"; AS3 says "object". **2c**
+- An untyped value that holds a script object is an AS3 error when given to Godot; nothing converts it.
+  **decision**
+- A Godot `StringName` or `NodePath` in an untyped value is held as Godot's own value, not as a String:
+  `typeof` says "object". **2c**
+- Godot's integers in an untyped value: one that fits an `int` is held as one, a larger one as an `Int64`;
+  a whole float stays a float. My ruling, beside the Int64 rule the owner approved for typed values.
+  **decision**
 
 ## Stage 2c-1: vectors, `switch` and `Math`
 
