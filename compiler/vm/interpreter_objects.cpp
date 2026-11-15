@@ -213,7 +213,7 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		}
 		return nullptr;
 	}
-	Object *object = new_object(p_class, klass.fields.size());
+	Object *object = new_object(p_class, klass.fields.size(), collector_.list_for(p_class));
 	if (!object) {
 		if (p_owner) {
 			host_.handles.drop(p_owner);

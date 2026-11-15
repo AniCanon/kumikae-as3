@@ -5,6 +5,7 @@
 // resumed.
 #pragma once
 
+#include "collector.h"
 #include "host.h"
 #include "ir.h"
 #include "runtime.h"
@@ -21,6 +22,7 @@ namespace vm {
 
 class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
+	friend class Collector; // Frees objects that refer to each other in a loop.
 
 public:
 	// Calls may nest this deep. One more is an AS3 error.
@@ -46,6 +48,7 @@ private:
 
 	const ir::Module &module_;
 	Host host_;
+	Collector collector_; // After the module: it reads the classes.
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
 	std::vector<Slot> globals_;
@@ -244,6 +247,14 @@ public:
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
 	void release_object(Object *p_object);
+
+	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
+	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of
+	// work, about as many objects and references to look at; it does nothing while a call from outside is
+	// in progress. True if a collection ended. collect() makes a whole collection at once: between calls, or
+	// at a statement (from the statement hook). When the interpreter goes, it collects once more.
+	bool collect_step(size_t p_work) { return entries_ == 0 && collector_.step(p_work); }
+	void collect() { collector_.collect(); }
 
 	// How many traces finallies are keeping for errors they will throw again: one at most for each.
 	size_t kept_traces() const { return kept_traces_.size(); }

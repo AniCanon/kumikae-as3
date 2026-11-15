@@ -84,7 +84,7 @@ void Interpreter::at_statement() {
 // A new object of a class, its Number fields not yet a number.
 void Interpreter::make(uint32_t p_class, Slot &r_out) {
 	const ir::Class &klass = module_.classes[p_class];
-	Object *object = new_object(p_class, klass.fields.size());
+	Object *object = new_object(p_class, klass.fields.size(), collector_.list_for(p_class));
 	if (!object) {
 		out_of_memory();
 		return;
