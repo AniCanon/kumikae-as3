@@ -341,7 +341,9 @@ uint32_t Lowerer::vector_call(Call *p_call) {
 }
 
 // for each (x in vector) and for (i in vector): the elements, or their indices, first to last. The length
-// is read again each time round, as in Flash: an element added inside the loop is reached.
+// is read again each time round, as in Flash: an element added inside the loop is reached. An Array's
+// indices are Strings, as its keys are in AS3, and an element that is undefined is passed over: an Array
+// here does not tell a hole (`new Array(3)`) from undefined, and a hole is no property to go through.
 void Lowerer::vector_loop(ForIn *p_loop) {
 	const uint32_t position = p_loop->offset;
 	if (!vector_class(p_loop->collection->type)) {
@@ -370,15 +372,27 @@ void Lowerer::vector_loop(ForIn *p_loop) {
 	const uint32_t more = reg(Kind::Bool);
 	emit(Op::LtF64, position, more, at, convert(length, Kind::F64, position));
 	const uint32_t out = emit(Op::JumpIfNot, position, more, 0);
-	uint32_t value = at;
-	if (p_loop->each) {
-		value = reg(module_.classes[*vector_class(p_loop->collection->type)].element);
-		emit(Op::VecGet, position, value, vector, at);
+	const bool array = module_.classes[*vector_class(p_loop->collection->type)].array;
+	uint32_t value = array ? convert(at, Kind::Str, position) : at;
+	uint32_t hole = NONE;
+	if (p_loop->each || array) {
+		const uint32_t element = reg(module_.classes[*vector_class(p_loop->collection->type)].element);
+		emit(Op::VecGet, position, element, vector, at);
+		value = p_loop->each ? element : value;
+		if (array) {
+			const uint32_t missing = reg(Kind::Any), is_missing = reg(Kind::Bool);
+			emit(Op::AnyConst, position, missing, 0);
+			emit(Op::AnyStrictEq, position, is_missing, element, missing);
+			hole = emit(Op::JumpIf, position, is_missing, 0);
+		}
 	}
 	store(target, convert(value, target.kind, position), position);
 	open_loop();
 	statement(p_loop->body);
 	const uint32_t next_at = here();
+	if (hole != NONE) {
+		patch(hole, next_at);
+	}
 	const uint32_t one = reg(Kind::F64);
 	emit(Op::ConstF64, position, one, number(1));
 	emit(Op::AddF64, position, at, at, one);
