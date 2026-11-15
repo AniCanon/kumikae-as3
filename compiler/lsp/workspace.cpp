@@ -21,6 +21,13 @@ bool starts_with(const std::string &p_text, const std::string &p_prefix) {
 	return p_text.compare(0, p_prefix.size(), p_prefix) == 0;
 }
 
+// True if the source was made from exactly this text.
+bool made_from(const Source &p_source, const std::string &p_text) {
+	size_t mark = p_source.has_mark() ? BYTE_ORDER_MARK.size() : 0;
+	return p_text.size() == p_source.text().size() + mark && p_text.compare(0, mark, BYTE_ORDER_MARK.substr(0, mark)) == 0 &&
+			p_text.compare(mark, std::string::npos, p_source.text()) == 0;
+}
+
 // True if the file holds exactly this text.
 bool holds(const std::string &p_path, const std::string &p_text) {
 	std::string found;
@@ -186,7 +193,7 @@ bool Workspace::load(const std::string &p_path) {
 		return false;
 	}
 	File &file = files_[p_path];
-	if (file.parsed && !file.open && file.parsed->source.text() == text) {
+	if (file.parsed && !file.open && made_from(file.parsed->source, text)) {
 		return true;
 	}
 	file.parsed = parse_file(p_path, std::move(text));
@@ -202,14 +209,14 @@ void Workspace::open(const std::string &p_path, std::string p_text) {
 	}
 	int declared = declaration(path);
 	if (declared >= 0) {
-		if (declarations_[(size_t)declared]->source.text() != p_text) {
+		if (!made_from(declarations_[(size_t)declared]->source, p_text)) {
 			declarations_[(size_t)declared] = parse_file(path, std::move(p_text));
 			stale_ = true;
 		}
 		return;
 	}
 	File &file = files_[path];
-	if (file.parsed && file.open && file.parsed->source.text() == p_text) {
+	if (file.parsed && file.open && made_from(file.parsed->source, p_text)) {
 		return;
 	}
 	file.parsed = parse_file(path, std::move(p_text));
@@ -243,7 +250,7 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 	int declared = declaration(path);
 	if (declared >= 0) {
 		std::string text;
-		if (read_file(path, &text) && text != declarations_[(size_t)declared]->source.text()) {
+		if (read_file(path, &text) && !made_from(declarations_[(size_t)declared]->source, text)) {
 			declarations_[(size_t)declared] = parse_file(path, std::move(text));
 			stale_ = true;
 		}
@@ -290,6 +297,11 @@ const std::string *Workspace::text(const std::string &p_path) const {
 	}
 	auto found = files_.find(path);
 	return found == files_.end() || !found->second.parsed ? nullptr : &found->second.parsed->source.text();
+}
+
+bool Workspace::sent_with_mark(const std::string &p_path) const {
+	auto found = files_.find(normal(p_path));
+	return found != files_.end() && found->second.open && found->second.parsed && found->second.parsed->source.has_mark();
 }
 
 void Workspace::check() {

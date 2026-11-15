@@ -14,10 +14,14 @@ struct Position {
 	int column;
 };
 
+// The UTF-8 byte-order mark some editors put at the start of a file.
+constexpr std::string_view BYTE_ORDER_MARK = "\xEF\xBB\xBF";
+
 class Source {
 	std::string path_;
 	std::string text_;
 	std::vector<uint32_t> line_starts_;
+	bool has_mark_ = false;
 
 public:
 	// A leading UTF-8 byte-order mark is skipped.
@@ -25,6 +29,8 @@ public:
 
 	const std::string &path() const { return path_; }
 	const std::string &text() const { return text_; }
+	// Whether the text given began with a byte-order mark. The mark is not part of text().
+	bool has_mark() const { return has_mark_; }
 	// Offsets past the end clamp to the end.
 	Position position(uint32_t p_offset) const;
 	// The line without its line break; empty if the line number is out of range.

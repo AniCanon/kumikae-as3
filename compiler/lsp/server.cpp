@@ -118,8 +118,10 @@ Unit *Server::unit_of(const Json &p_params) {
 Json Server::position(const Unit &p_unit, uint32_t p_offset) const {
 	Position at = p_unit.source.position(p_offset);
 	std::string_view line = p_unit.source.line_text(at.line);
-	size_t bytes = (size_t)(at.column - 1) < line.size() ? (size_t)(at.column - 1) : line.size();
-	int character = utf8_ ? (int)bytes : utf16_units(line.substr(0, bytes));
+	int character = character_at(line, (size_t)(at.column - 1), utf8_);
+	if (at.line == 1) {
+		character += mark_width(p_unit.source);
+	}
 	return Json::object().set("line", at.line - 1).set("character", character);
 }
 
@@ -152,13 +154,19 @@ uint32_t Server::offset_in(const Source &p_source, const Json &p_position) const
 	if (line >= source.line_count()) {
 		return (uint32_t)source.text().size();
 	}
-	std::string_view text = source.line_text((int)line + 1);
-	if (character < 0) {
-		character = 0;
+	if (line == 0) {
+		character -= mark_width(source);
 	}
-	uint32_t bytes = utf8_ ? (uint32_t)(character < (int64_t)text.size() ? character : (int64_t)text.size())
-						   : bytes_for_units(text, character);
-	return source.line_start((int)line + 1) + bytes;
+	return source.line_start((int)line + 1) + bytes_before(source.line_text((int)line + 1), character, utf8_);
+}
+
+// What the editor counts before the first line's text: the byte-order mark it sent, if it sent one. A
+// file it has not opened is counted without: an editor shows a file from disk without its mark.
+int Server::mark_width(const Source &p_source) const {
+	if (!p_source.has_mark() || !workspace_.sent_with_mark(p_source.path())) {
+		return 0;
+	}
+	return utf8_ ? (int)BYTE_ORDER_MARK.size() : 1;
 }
 
 const Occurrence *Server::occurrence_at(const Json &p_params, Unit **r_unit) {
@@ -410,6 +418,9 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 		const Json &changes = p_params.get("contentChanges");
 		bool any = false;
 		std::string text = held ? *held : std::string();
+		if (held && workspace_.sent_with_mark(path)) {
+			text.insert(0, BYTE_ORDER_MARK); // Changed as the editor has it: the workspace keeps the mark out of the text.
+		}
 		for (const Json &change : changes.items()) {
 			if (!change.get("text").is_string()) {
 				continue;
@@ -421,13 +432,15 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 			} else if (!held) {
 				continue; // A piece of a document the server was never given.
 			} else {
-				Source before(std::string(), text);
-				uint32_t from = offset_in(before, range.get("start"));
-				uint32_t to = offset_in(before, range.get("end"));
+				auto offset = [&](const Json &p_position) {
+					return offset_in_text(text, p_position.get("line").integer(-1), p_position.get("character").integer(0), utf8_);
+				};
+				uint32_t from = offset(range.get("start"));
+				uint32_t to = offset(range.get("end"));
 				if (to < from) {
 					std::swap(from, to);
 				}
-				text = before.text().substr(0, from) + change.get("text").string() + before.text().substr(to);
+				text.replace(from, to - from, change.get("text").string());
 			}
 			any = true;
 		}

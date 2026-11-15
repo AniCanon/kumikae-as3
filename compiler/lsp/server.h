@@ -38,6 +38,7 @@ class Server {
 	Json location(const Place &p_place);
 	uint32_t offset_at(const Unit &p_unit, const Json &p_position) const;
 	uint32_t offset_in(const Source &p_source, const Json &p_position) const;
+	int mark_width(const Source &p_source) const;
 	const Occurrence *occurrence_at(const Json &p_params, Unit **r_unit);
 	void publish(std::vector<std::string> &r_out);
 

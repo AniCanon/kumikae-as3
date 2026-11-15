@@ -847,7 +847,87 @@ static void test_signature_contexts() {
 	}
 }
 
+static Json span(int p_line, int p_from, int p_to_line, int p_to) {
+	return Json::object()
+			.set("start", Json::object().set("line", p_line).set("character", p_from))
+			.set("end", Json::object().set("line", p_to_line).set("character", p_to));
+}
+
+static void change_range(Session &p_session, Json p_range, const char *p_text) {
+	p_session.notify("textDocument/didChange",
+			Json::object()
+					.set("textDocument", Json::object().set("uri", MAIN).set("version", 2))
+					.set("contentChanges", Json::array().push(Json::object().set("range", std::move(p_range)).set("text", p_text))));
+	p_session.settle();
+}
+
+// An editor that sends a byte-order mark counts it as the first character of the first line: one UTF-16
+// unit, three bytes.
+static void test_byte_order_mark() {
+	for (int encoding = 0; encoding < 2; encoding++) {
+		bool utf8 = encoding == 1;
+		int mark = utf8 ? 3 : 1;
+		Session session;
+		session.initialize(std::string(), utf8);
+		session.open(MAIN, "\xEF\xBB\xBFpackage { public class Main { var a:int; } }\n");
+		session.settle();
+		CHECK_EQ(session.published(), std::string());
+		auto at = [&](int p_character) { return std::to_string(p_character + mark); };
+		// The type, by the editor's count; what comes back is in the editor's count too.
+		change_range(session, span(0, 36 + mark, 0, 39 + mark), "Nope");
+		CHECK_EQ(session.published(), MAIN + " 0:" + at(36) + "-0:" + at(40) + " unknown type 'Nope'\n");
+		// A second change is applied to what the first left, mark and all.
+		change_range(session, span(0, 36 + mark, 0, 40 + mark), "Nah");
+		CHECK_EQ(session.published(), MAIN + " 0:" + at(36) + "-0:" + at(39) + " unknown type 'Nah'\n");
+		Json hover = session.request("textDocument/hover", Session::at(MAIN, 0, 23 + mark));
+		CHECK_EQ(spot(Json::object().set("uri", MAIN).set("range", hover.get("result").get("range"))),
+				"Main.as 0:" + at(23) + "-0:" + at(27));
+		// Lines after the first are not moved.
+		change_range(session, span(0, 40 + mark, 0, 40 + mark), "\nvar b:Nope;");
+		CHECK_EQ(session.published(), MAIN + " 0:" + at(36) + "-0:" + at(39) + " unknown type 'Nah'\n" + MAIN +
+											   " 1:6-1:10 unknown type 'Nope'\n");
+		change_range(session, span(0, 40 + mark, 1, 11), "");
+		// A position inside the mark is at the start of the text.
+		CHECK(session.request("textDocument/hover", Session::at(MAIN, 0, 0)).get("result").is_null());
+		// The mark deleted: the same text, counted from its first letter.
+		change_range(session, span(0, 0, 0, mark), "");
+		CHECK_EQ(session.published(), MAIN + " 0:36-0:39 unknown type 'Nah'\n");
+		change_range(session, span(0, 36, 0, 39), "int");
+		CHECK_EQ(session.published(), MAIN + " clear\n");
+		// And typed back in.
+		change_range(session, span(0, 0, 0, 0), "\xEF\xBB\xBF");
+		change_range(session, span(0, 36 + mark, 0, 39 + mark), "No");
+		CHECK_EQ(session.published(), MAIN + " 0:" + at(36) + "-0:" + at(38) + " unknown type 'No'\n");
+	}
+	// A file read from disk is shown by an editor without its mark: nothing is added.
+	fs::path root = fresh_folder("mark");
+	write(root / "Marked.as", "\xEF\xBB\xBFpackage { public class Marked { var a:Nope; } }\n");
+	Session session;
+	session.initialize(root.string());
+	session.settle();
+	CHECK_EQ(session.published(), uri_from_path((root / "Marked.as").string()) + " 0:38-0:42 unknown type 'Nope'\n");
+}
+
+// In UTF-8 mode a position is a count of bytes. One that falls inside a character means the whole
+// character, as it does in UTF-16 mode: a character is never cut in two.
+static void test_inside_a_character() {
+	// "é" is bytes 17 and 18 of the line; "😀" is 19 to 22.
+	const std::string text = "var s:String = \"e\xC3\xA9\xF0\x9F\x98\x80\";\n";
+	Session session;
+	session.initialize(std::string(), true);
+	session.open(MAIN, text);
+	// From inside "é" to inside "😀": each end is after its character, so "é" stays and "😀" goes, whole.
+	change_range(session, span(0, 18, 0, 21), "x");
+	CHECK_EQ(*session.server.workspace().text("/work/Main.as"), std::string("var s:String = \"e\xC3\xA9x\";\n"));
+	session.change(MAIN, text);
+	// An insertion inside "😀" goes after it.
+	change_range(session, span(0, 20, 0, 20), "!");
+	CHECK_EQ(*session.server.workspace().text("/work/Main.as"), std::string("var s:String = \"e\xC3\xA9\xF0\x9F\x98\x80!\";\n"));
+}
+
 int main() {
+	test_byte_order_mark();
+	test_inside_a_character();
 	test_completion_unicode_boundaries();
 	test_signature_contexts();
 	test_completion_default_range();

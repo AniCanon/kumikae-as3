@@ -7,9 +7,9 @@ namespace kas3 {
 
 Source::Source(std::string p_path, std::string p_text) :
 		path_(std::move(p_path)), text_(std::move(p_text)) {
-	if (text_.size() >= 3 && (unsigned char)text_[0] == 0xEF && (unsigned char)text_[1] == 0xBB &&
-			(unsigned char)text_[2] == 0xBF) {
-		text_.erase(0, 3);
+	if (text_.compare(0, BYTE_ORDER_MARK.size(), BYTE_ORDER_MARK) == 0) {
+		text_.erase(0, BYTE_ORDER_MARK.size());
+		has_mark_ = true;
 	}
 	// "\n", "\r\n" and "\r" each end one line.
 	line_starts_.push_back(0);
