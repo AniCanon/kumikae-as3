@@ -1,5 +1,6 @@
 #include "server.h"
 
+#include "positions.h"
 #include "uri.h"
 
 #include <algorithm>
@@ -73,33 +74,6 @@ uint32_t extent(const std::string &p_text, uint32_t p_offset) {
 		end++;
 	}
 	return end - p_offset;
-}
-
-// UTF-16 code units in a stretch of UTF-8.
-int utf16_units(std::string_view p_text) {
-	int units = 0;
-	for (unsigned char c : p_text) {
-		if ((c & 0xC0) != 0x80) {
-			units += c >= 0xF0 ? 2 : 1;
-		}
-	}
-	return units;
-}
-
-// The bytes that hold the first p_units UTF-16 code units of the line. A position inside a character
-// counts the whole character.
-uint32_t bytes_for_units(std::string_view p_line, int64_t p_units) {
-	uint32_t at = 0;
-	int64_t units = 0;
-	while (at < p_line.size() && units < p_units) {
-		unsigned char c = (unsigned char)p_line[at];
-		units += c >= 0xF0 ? 2 : 1;
-		at++;
-		while (at < p_line.size() && ((unsigned char)p_line[at] & 0xC0) == 0x80) {
-			at++;
-		}
-	}
-	return at;
 }
 
 int symbol_kind(SymbolKind p_kind, bool p_const, bool p_constructor) {
