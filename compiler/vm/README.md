@@ -20,6 +20,8 @@ host differs.
 | `regex.h`, `regex_tree.h`, `regex_parse.cpp`, `regex_classes.cpp`, `regex_compile.cpp`, `regex_match.cpp` | Regular expressions on their own: a pattern read into a tree, the tree written as a small program, and a backtracking matcher over UTF-16 units that counts its steps and stops at a limit |
 | `regexp_methods.cpp`, `regexp_strings.cpp` | The instructions of RegExp (`new`, `exec`, `test`, its properties) and of String's methods that take one (`match`, `search`, `replace`, `split`); the patterns read, kept by source and flags |
 | `date_time`, `date_parse.cpp`, `date_methods.cpp` | Date: ECMAScript's arithmetic of times, AS3's texts and what `Date.parse` reads, and the instructions, with local time from the host's clock |
+| `json_text` | JSON text on its own: the grammar read into a builder's calls, with a stack of its own (no recursion), and a String written as Quote() writes it |
+| `json_work.h`, `json_methods.cpp`, `json_stringify.cpp` | JsonCall: what is read made into Objects and Arrays and revived, and stringify, by one helper class (`Json`), a friend of the interpreter |
 | `uri_text` | `escape`, `unescape` and the four URI functions |
 | `number_text`, `string_methods.cpp` | Numbers as text and text as numbers (radix, `toFixed` and the rest, `parseInt`, `parseFloat`); the instructions that run `String`'s methods and those |
 | `host.h` | What the interpreter is given: `Output`, `EngineHandles`, `EngineSource`, `Clock` |

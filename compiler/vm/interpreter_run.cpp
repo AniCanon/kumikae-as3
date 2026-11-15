@@ -565,6 +565,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::DateCall:
 				date_call(function, in); // `frame` and `r` may be stale after this.
 				break;
+			case Op::JsonCall:
+				json_call(function, in); // `frame` and `r` may be stale after this.
+				break;
 			case Op::Jump:
 				frame.pc = in.a;
 				break;

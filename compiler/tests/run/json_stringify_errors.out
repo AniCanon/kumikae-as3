@@ -1,0 +1,13 @@
+TypeError: Error #1129: Cyclic structure cannot be converted to JSON string.
+TypeError: Error #1129: Cyclic structure cannot be converted to JSON string.
+TypeError: Error #1129: Cyclic structure cannot be converted to JSON string.
+TypeError: Error #1131: Replacer argument to JSON stringifier must be an array or a two parameter function.
+TypeError: Error #1131: Replacer argument to JSON stringifier must be an array or a two parameter function.
+Error: from the replacer
+ArgumentError: from toJSON 0
+Error: from a getter
+RangeError: from the reviver
+2000
+Error: Error #1023: Stack overflow occurred.
+Error: Error #1023: Stack overflow occurred.
+Error: Error #1023: Stack overflow occurred.

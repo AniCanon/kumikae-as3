@@ -79,6 +79,16 @@ package {
 		// A script object does not reach Godot as a null with nothing said.
 		public var keep:* = new Thing();
 		public function giveScript():* { return new Thing(); }
+		// JSON has no form for one of Godot's values or objects: stringify() refuses one wherever it is, the
+		// interpreter's ruling, so that nothing is written as a text that can't be read back.
+		public function json(value:*):String {
+			try {
+				return JSON.stringify({p: [1, value]});
+			} catch (e:TypeError) {
+				return "refused: " + e.message;
+			}
+			return "never";
+		}
 		// A Godot object freed while an untyped value holds it is null, as a typed one is.
 		public function freed():String {
 			var n:Node = new Node();

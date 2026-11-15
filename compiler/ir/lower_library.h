@@ -46,6 +46,9 @@ public:
 	// Date's methods and its static ones (lower_date.cpp).
 	uint32_t date_method();
 	uint32_t date_static();
+	// JSON's two functions, and a Dictionary's toJSON() (lower_json.cpp).
+	static bool is_json(const Symbol *p_owner);
+	uint32_t json_call();
 
 	// RegExp and Date where no call is: their class, a literal, `new`, a property (lower_regexp.cpp).
 	// Whether a class is one of the two: the interpreter holds its objects.

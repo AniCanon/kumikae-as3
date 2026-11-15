@@ -1,3 +1,4 @@
+#include "lower_dynamic.h"
 #include "lower_library.h"
 
 #include <array>
@@ -305,6 +306,9 @@ std::optional<uint32_t> Lowerer::library_call(Call *p_call, Symbol *p_function) 
 			return library.regexp_method();
 		}
 		return p_function->is_static() ? library.date_static() : library.date_method();
+	}
+	if (Library::is_json(owner) || (is_dictionary(owner) && name == "toJSON")) {
+		return library.json_call();
 	}
 	if (owner && owner == object_ && name == "toString" && p_call->arguments.count == 0) {
 		return library.object_text();

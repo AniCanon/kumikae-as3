@@ -2319,6 +2319,94 @@ static void test_cycles_through_engine() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// A script object of a class that extends Godot's is written by its own public fields, as any other: the
+// Godot object it is attached to is not one of them. (One of Godot's values is refused: tests/godot_project.)
+static void test_json_script_object() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Writer.as", "package { import godot.*; public class Writer extends Node2D {\n"
+								 "  public var steps:int = 2;\n"
+								 "  private var secret:int = 3;\n"
+								 "  public function get twice():int { return steps * 2; }\n"
+								 "  public function write():String { return JSON.stringify(this); }\n"
+								 "} }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	{
+		FakeEngine engine;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(class_named(module, "Writer"), engine.box());
+		CHECK(object != nullptr);
+		engine.log.clear();
+		vm::Slot result;
+		CHECK(interpreter.call_method(object, "write", nullptr, 0, &result));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("{\"steps\":2,\"twice\":4}"));
+		CHECK_EQ(engine.log, std::string()); // Nothing is asked of the engine.
+		interpreter.discard(ir::Kind::Str, result);
+		CHECK_EQ(engine.errors, std::string());
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
+// Memory that runs out while JSON makes a value or its text is AS3's Error #1000, and nothing is left.
+static void test_json_out_of_memory() {
+	Compilation compilation;
+	compilation.add("Texts.as", "package { public class Texts {\n"
+								"public function read(t:String):String { try { JSON.parse(t); return 'read'; } catch (e:Error) { return e.message; } return ''; }\n"
+								"public function write(o:*):String { try { JSON.stringify(o); return 'written'; } catch (e:Error) { return e.message; } return ''; }\n"
+								"public function table():* { return {a: [1, 'b']}; }\n"
+								"} }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	const size_t strings = vm::live_strings();
+	{
+		Recorder host;
+		vm::Interpreter interpreter(module, host);
+		CHECK(interpreter.start());
+		vm::Object *object = interpreter.construct(class_named(module, "Texts"));
+		CHECK(object != nullptr);
+		const auto failing = [&](const char *p_method, vm::Slot p_argument, uint32_t p_allocations) {
+			vm::Slot result;
+			vm::fail_allocations(p_allocations);
+			const bool called = interpreter.call_method(object, p_method, &p_argument, 1, &result);
+			vm::fail_allocations(0);
+			const std::string said = called && result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : std::string("failed");
+			interpreter.discard(ir::Kind::Str, result);
+			return said;
+		};
+		const auto read = [&](const char *p_text, uint32_t p_allocations) {
+			vm::Slot text;
+			text.bits = 0;
+			text.p = vm::new_string(p_text);
+			const std::string said = failing("read", text, p_allocations);
+			interpreter.discard(ir::Kind::Str, text);
+			return said;
+		};
+		// The first thing each makes: the Object, the Array, the String, the Int64 the number is held in.
+		CHECK_EQ(read("{\"a\":[1]}", 1), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(read("[{}]", 1), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(read("\"text\"", 1), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(read("12345678901", 1), std::string(vm::OUT_OF_MEMORY));
+		CHECK_EQ(read("1", 1), std::string("read"));
+		CHECK_EQ(read("{\"a\":[1, \"b\"]}", 0), std::string("read"));
+		vm::Slot table;
+		CHECK(interpreter.call_method(object, "table", nullptr, 0, &table));
+		CHECK_EQ(failing("write", table, 1), std::string(vm::OUT_OF_MEMORY)); // The text, at the end.
+		CHECK_EQ(failing("write", table, 0), std::string("written"));
+		interpreter.discard(ir::Kind::Any, table);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_strings(), strings);
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 int main() {
 	test_cycles();
 	test_cycles_through_engine();
@@ -2348,5 +2436,7 @@ int main() {
 	test_statement_hook();
 	test_refused_program();
 	test_host_clock();
+	test_json_script_object();
+	test_json_out_of_memory();
 	return check::finish();
 }

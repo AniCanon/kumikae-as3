@@ -29,6 +29,7 @@ struct Program;
 class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
 	friend class Collector; // Frees objects that refer to each other in a loop.
+	friend class Json; // JSON.parse and JSON.stringify (vm/json_work.h).
 
 public:
 	// Calls may nest this deep. One more is an AS3 error.
@@ -205,6 +206,7 @@ private:
 	double local_time(double p_time);
 	double utc_time(double p_local);
 	std::string date_text(const Object *p_date, ir::DateText p_which) const;
+	void json_call(const ir::Function &p_function, const ir::Instruction &p_in); // vm/json_methods.cpp
 	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
 	void any_null_check(Slot p_value);
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
