@@ -251,9 +251,18 @@ uint32_t Lowerer::vector_call(Call *p_call) {
 	}
 	if ((*method == VectorMethod::IndexOf || *method == VectorMethod::LastIndexOf) && count > 0) {
 		const Kind searched = is_null(p_call->arguments[0]) ? Kind::Void : natural(p_call->arguments[0]);
-		if (is_engine(element) || !can_be_equal(element, searched)) {
-			refuse(p_call->arguments[0]->offset, is_engine(element) ? "searching a Vector of Godot's values or objects" : "searching a Vector for a value of another type");
-			return default_value(Kind::I32, position);
+		const bool engine_and_null = is_engine(element) && searched == Kind::Void;
+		if (!engine_and_null && !(is_engine(element) && searched == element) && !can_be_equal(element, searched)) {
+			// A value of another type is never one of its elements (the search is by ===): -1, once the
+			// vector and the arguments are worked out, as the call would.
+			const uint32_t vector = settled(expression(callee->object, Kind::Obj), writer(p_call->arguments), position);
+			for (Expr *argument : p_call->arguments) {
+				expression(argument, Kind::Void);
+			}
+			emit(Op::NullCheck, position, vector);
+			uint32_t none = reg(Kind::I32);
+			emit(Op::ConstI32, position, none, static_cast<uint32_t>(-1));
+			return none;
 		}
 	}
 	std::vector<uint32_t> list;

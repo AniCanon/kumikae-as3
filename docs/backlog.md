@@ -208,8 +208,6 @@ any Godot value passing as a condition):
 - A vector's methods that take a function (`forEach`, `map`, `filter`, `some`, `every`, `sort`) are refused:
   they wait for closures. **2c**
 - A vector of script objects, or of vectors, is not converted when it is handed to Godot: it is refused. **2c**
-- `indexOf` and `lastIndexOf` are refused on a vector of Godot's values or objects, and when the value
-  looked for is of another type than the elements (AS3 answers -1). **2c**
 - `new` of a script class that extends a Godot class is refused: the object needs a Godot object made
   and the script attached to it. `new Node2D()` and the rest of Godot's own classes work. **2c**
 - `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**

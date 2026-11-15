@@ -55,6 +55,13 @@ package {
 		public function keptCounts():Boolean { return kept ? true : false; }
 		public function keptNot():Boolean { return !kept; }
 		public function keptName():String { return kept.name; }
+		// Searching a vector of Godot's objects or values: the same object, or an equal value.
+		public function searchGodot(a:Node, b:Node):String {
+			var nodes:Vector.<Node> = new <Node>[a, b, a];
+			var points:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];
+			return nodes.indexOf(b) + "," + nodes.lastIndexOf(a) + "," + nodes.indexOf(null) + "," + points.indexOf(new Vector2(3, 4)) + "," +
+					points.indexOf(Vector2.ZERO);
+		}
 		// A part of an element of a packed array, written back into the array.
 		public function partOfElement(points:PackedVector2Array):PackedVector2Array {
 			points[0].x = 5;

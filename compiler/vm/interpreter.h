@@ -124,6 +124,7 @@ private:
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
 	void raise_range(double p_index, uint32_t p_length);
 	bool resize_vector(Vector *p_vector, uint32_t p_length);
+	bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value);
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	// A call of one of a vector's methods: its arguments (the vector first) by register, where the
 	// frame's registers start, and the register for what it gives back, or NONE.

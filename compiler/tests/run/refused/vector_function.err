@@ -1,3 +1,2 @@
 vector_function.as:1:118: error: calling 'sort' on a Vector is not supported by the interpreter yet
 vector_function.as:1:129: error: calling 'forEach' on a Vector is not supported by the interpreter yet
-vector_function.as:1:160: error: searching a Vector for a value of another type is not supported by the interpreter yet

@@ -95,6 +95,24 @@ Slot of_number(uint32_t p_value) {
 
 } // namespace
 
+// Whether an element is the value looked for. One of Godot's values or objects is the same as Godot says:
+// the same object, or an equal value. Null is only null.
+bool Interpreter::element_is(Kind p_kind, Slot p_element, Slot p_value) {
+	if (!is_engine(p_kind)) {
+		return same_element(p_kind, p_element, p_value);
+	}
+	if (!p_element.p || !p_value.p) {
+		return p_element.p == p_value.p;
+	}
+	const Argument both[2] = { Argument{ p_kind, p_element }, Argument{ p_kind, p_value } };
+	Wanted wanted;
+	wanted.kind = Kind::Bool;
+	Slot equal;
+	equal.bits = 0;
+	std::string error;
+	return host_.handles.operate("==", both, 2, wanted, &equal, &error) && equal.b;
+}
+
 void Interpreter::vector_call(const Function &p_function, const Instruction &p_in) {
 	VectorCall call{ p_function.argument_lists[p_in.c], frames_.back().base, p_in.a, static_cast<VectorMethod>(p_in.b) };
 	Vector *vector = static_cast<Vector *>(argument(call, 0).p);
@@ -118,7 +136,7 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		case VectorMethod::IndexOf: {
 			int32_t found = -1;
 			for (uint32_t i = clamped(argument(call, 2).i, length); i < length && found < 0; i++) {
-				found = same_element(kind, vector->data[i], argument(call, 1)) ? static_cast<int32_t>(i) : -1;
+				found = element_is(kind, vector->data[i], argument(call, 1)) ? static_cast<int32_t>(i) : -1;
 			}
 			give(call, Kind::I32, of_number(static_cast<uint32_t>(found)));
 			break;
@@ -130,7 +148,7 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 			int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
 			from = from >= length ? static_cast<int64_t>(length) - 1 : from;
 			for (int64_t i = from; i >= 0 && found < 0; i--) {
-				found = same_element(kind, vector->data[i], argument(call, 1)) ? static_cast<int32_t>(i) : -1;
+				found = element_is(kind, vector->data[i], argument(call, 1)) ? static_cast<int32_t>(i) : -1;
 			}
 			give(call, Kind::I32, of_number(static_cast<uint32_t>(found)));
 			break;
