@@ -321,6 +321,25 @@ with tempfile.TemporaryDirectory() as edited:
         check("restart.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
     check("restart.gd: Godot is told why the scene started again", "so the scene starts again" in output, output[-1500:])
 
+# The scene the iOS test app opens finishes and says so, here too; and when the scripts can't compile (a
+# library older than they are), it says why instead of never finishing.
+for broken in (False, True):
+    with tempfile.TemporaryDirectory() as folder:
+        copy = os.path.join(folder, "project")
+        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+        if broken:
+            with open(os.path.join(copy, "Broken.as"), "w") as file:
+                file.write("package { public class Broken { public function Broken() { nothing(); } } }\n")
+        run = subprocess.run([godot, "--headless", "--path", copy, "--quit-after", "200"], capture_output=True, text=True, timeout=300)
+        output = run.stdout + run.stderr
+        if broken:
+            check("ios_test: scripts that do not compile are reported, and the run finishes",
+                  "AS3TEST DONE passed=0 failed=1" in output and "did not load" in output, output[-1500:])
+        else:
+            done = re.search(r"AS3TEST DONE passed=(\d+) failed=(\d+)", output)
+            check("ios_test: the scene finishes with every check passed", done is not None and done.group(2) == "0" and int(done.group(1)) > 10,
+                  output[-1500:])
+
 # The corpus programs that are said to run (corpus/runs.txt) do run, in Godot, for some frames.
 with open(os.path.join(tests, "corpus", "runs.txt")) as listed:
     runs = listed.read().split()

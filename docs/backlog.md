@@ -148,8 +148,6 @@ the review of the clean-up put off.
   **clean-up**
 - A freed Godot object still reads as `<Freed Object>` as text, as in GDScript, though it is `null` in
   every test. **decision**
-- An iOS library built before a script used something new does not load the project, and the test scene
-  then never finishes, without reporting why. **clean-up**
 
 From the review of part C (its five important findings were fixed with it: `print()` with no arguments, a
 default `[]` shared between calls, a null answer taken silently as text, `-5` reaching Godot as `-5.0`, and
