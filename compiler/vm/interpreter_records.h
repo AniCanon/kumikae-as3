@@ -1,6 +1,5 @@
 // The records the interpreter keeps (vm/interpreter.h): its frames, where an error was thrown and what is
-// kept of one on its way, a match, a property's key, a call of a vector's method and a field sortOn() sorts
-// by. Each is known in the class by the same name. Nothing but interpreter.h includes this.
+// kept of one on its way, a match and a property's key. Each is known in the class by the same name. Nothing but interpreter.h includes this.
 #pragma once
 
 #include "ir.h"
@@ -67,15 +66,6 @@ struct PropertyKey {
 	std::string text;
 };
 
-// A call of one of a vector's methods: its arguments (the vector first) by register, where the
-// frame's registers start, and the register for what it gives back, or NONE.
-struct VectorCall {
-	const std::vector<uint32_t> &list;
-	size_t base;
-	uint32_t out;
-	ir::VectorMethod method;
-};
-
 // An operator an engine instruction names, worked out once from its entry: AS3's spelling ("-" for the
 // description's "unary-"), and whether it compares (== and !=, which take a missing value).
 struct OperatorName {
@@ -91,12 +81,6 @@ struct Prepared; // vm/engine_handles.h
 struct EngineStep {
 	const Prepared *prepared = nullptr;
 	bool untyped = false;
-};
-
-// A field sortOn() sorts by, and its options.
-struct SortField {
-	std::string name;
-	int32_t options;
 };
 
 } // namespace vm

@@ -110,7 +110,7 @@ struct Host final : vm::NativeCode {
 	// What the library's functions of plain values (vm/library.h) ask of whoever runs the program, answered
 	// for generated code (runtime/direct.cpp); and the library as those functions are handed it.
 	std::unique_ptr<vm::Runner> asked;
-	vm::Library library() { return vm::Library{ interpreter->heap(), *asked }; }
+	vm::Library library() { return vm::Library{ interpreter->heap(), *asked, interpreter->unmoved() }; }
 
 	Host(const Program &p_program, const Embedder &p_embedder);
 	~Host() override;

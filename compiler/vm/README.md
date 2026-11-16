@@ -15,7 +15,10 @@ host differs.
 | `interpreter_objects.cpp` | Objects made, their class asked, fields read by a host |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
-| `interpreter_vectors.cpp`, `vector_methods.cpp` | `Vector.<T>`: an object whose class says what its elements are; making, indexing, length, its methods, its text |
+| `library` | The standard library as functions of plain values (slots in, a slot out, no frame): what each is handed (`Library`: the heap, and `Runner`, the few things only whoever runs the program can do), and `Unmoved`, the parts still the interpreter's own that those functions ask for, which shrinks to nothing as each family moves |
+| `text_methods`, `text_calls.cpp` | A String's methods, and a number in a radix or in digits, as such functions |
+| `vector_elements.cpp`, `vector_methods.cpp`, `vector_sort.cpp`, `vector_calls.h` | `Vector.<T>` and Array as such functions: making, indexing, length, the methods, sort and sortOn |
+| `interpreter_vectors.cpp`, `interpreter_library.cpp` | The interpreter's side of those: its instructions handing registers to the functions (an element in range is read and written in place), a vector's text, and what it answers for `Unmoved` |
 | `table`, `interpreter_properties.cpp`, `interpreter_property_reads.cpp`, `interpreter_property_calls.cpp` | Objects and Dictionaries (`vm::Table`: an object whose one slot holds its `Entries`, keys and values in the order each key was first set) and an Array's properties beyond its indices; a property by name on anything (`DynGet` and the rest; reading one, and whether one is there, in its own file), a property called by its name, the loops over properties, and Godot's Dictionaries copied in |
 | `reload` | Moves a running program's objects, vectors and static fields onto a newer build, by name; what the program's static fields reach, and the container classes a newer build must keep |
 | `any`, `interpreter_any.cpp`, `interpreter_any_operators.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, then its equality, `+`, `<` |

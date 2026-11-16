@@ -43,6 +43,7 @@ struct Asked final : vm::Runner {
 	}
 
 	void out_of_memory() override { rt::out_of_memory(c); }
+	bool failing() const override { return c->failing; }
 
 	bool call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override {
 		if (call_value(c, p_function, p_arguments, static_cast<uint32_t>(p_count), r_result)) {

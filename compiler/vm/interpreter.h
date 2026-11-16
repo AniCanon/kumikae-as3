@@ -60,24 +60,32 @@ private:
 	using Kept = vm::Kept;
 	using Found = vm::Found;
 	using PropertyKey = vm::PropertyKey;
-	using VectorCall = vm::VectorCall;
-	using SortField = vm::SortField;
 
 	const ir::Module &module_;
 	Host host_;
 	Heap heap_; // Who holds what, and the cycle collector (vm/heap.h). After the module: it reads the classes.
 	// What the library's functions of plain values ask of whoever runs the program (vm/library.h), answered
 	// by this interpreter.
-	struct Asked final : Runner {
+	struct Asked final : Runner, Unmoved {
 		Interpreter &vm;
 		explicit Asked(Interpreter &p_vm) :
 				vm(p_vm) {}
 		void raise(uint32_t p_class, const std::string &p_message) override { vm.raise(p_class, p_message); }
 		void out_of_memory() override { vm.out_of_memory(); }
+		bool failing() const override { return vm.failing_ || vm.stopped_; }
 		bool call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override;
 		bool text(Slot p_value, std::string *r_text) override { return vm.any_text(p_value, r_text); }
+		// What is still the interpreter's own (vm/interpreter_library.cpp).
+		bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value) override;
+		Slot to_any(ir::Kind p_kind, Slot p_value) override;
+		bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out) override;
+		bool coercion_failed(Slot p_value, ir::Kind p_kind, uint32_t p_check) override;
+		bool array_number_get(Vector *p_array, double p_number, Slot *r_out) override;
+		bool array_number_set(Vector *p_array, double p_number, Slot p_value) override;
+		bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale) override;
+		bool sort_field(Slot p_element, Str *p_name, Slot *r_value) override;
 	} asked_{ *this };
-	Library library_{ heap_, asked_ };
+	Library library_{ heap_, asked_, asked_ };
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
 	std::vector<Slot> globals_;
@@ -244,9 +252,11 @@ private:
 	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
 	void any_null_check(Slot p_value);
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
-	void raise_range(double p_index, uint32_t p_length);
-	bool resize_vector(Vector *p_vector, uint32_t p_length);
-	bool fill_zeroes(Vector *p_vector, uint32_t p_from);
+	void raise_range(double p_index, uint32_t p_length) { vm::raise_range(library_, p_index, p_length); }
+	bool resize_vector(Vector *p_vector, uint32_t p_length) { return vm::resize_vector(library_, p_vector, p_length); }
+	bool fill_zeroes(Vector *p_vector, uint32_t p_from) { return vm::fill_zeroes(library_, p_vector, p_from); }
+	bool length_is_fixed(const Vector *p_vector) { return vm::length_is_fixed(library_, p_vector); }
+	Vector *fresh_vector(uint32_t p_class, uint64_t p_length) { return library_.fresh_vector(p_class, p_length); }
 	bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value);
 	// Function values (interpreter_functions.cpp).
 	Object *make_function(uint32_t p_function, Object *p_first);
@@ -312,37 +322,8 @@ private:
 	void to_callable(const ir::Instruction &p_in);
 	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
-	void vector_new(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
-	void get_outside(Vector *p_vector, double p_index, Slot &r_out);
-	void set_outside(Vector *p_vector, ir::Kind p_index_kind, const Slot &p_index, Slot p_value);
-	void array_new(const ir::Function &p_function, const ir::Instruction &p_in);
-	// Looked up each time it is wanted: putting an element into words can run the program, which may
-	// move the registers.
-	Slot &argument(const VectorCall &p_call, size_t p_index) { return stack_[p_call.base + p_call.list[p_index]]; }
-	void give(const VectorCall &p_call, ir::Kind p_kind, Slot p_owned);
-	bool length_is_fixed(const Vector *p_vector);
-	Vector *fresh_vector(uint32_t p_class, uint64_t p_length);
 	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
-	void vector_find(Vector *p_vector, const VectorCall &p_call);
-	void vector_join(Vector *p_vector, const VectorCall &p_call);
-	void vector_add(Vector *p_vector, const VectorCall &p_call);
-	void vector_take(Vector *p_vector, const VectorCall &p_call);
-	void vector_copy(Vector *p_vector, const VectorCall &p_call);
-	void array_concat(Vector *p_array, const VectorCall &p_call);
-	void splice(Vector *p_vector, const VectorCall &p_call);
-	void vector_sort(Vector *p_vector, const VectorCall &p_call);
-	void sorted(Vector *p_vector, const VectorCall &p_call, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, bool p_twins,
-			int32_t p_options);
-	bool sort_on_fields(const VectorCall &p_call, std::vector<SortField> *r_fields, int32_t *r_options);
 	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);
-	bool sort_on_keys(const std::vector<SortField> &p_fields, const std::vector<Slot> &p_elements, std::vector<double> *r_numbers,
-			std::vector<std::string> *r_texts);
-	void vector_sort_on(Vector *p_vector, const VectorCall &p_call);
-	bool sort_order(ir::Kind p_kind, const std::vector<Slot> &p_elements, Object *p_compare, int32_t p_options, std::vector<uint32_t> *r_order,
-			bool *r_twins);
-	bool sort_keys(ir::Kind p_kind, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, int32_t p_options,
-			std::vector<double> *r_numbers, std::vector<std::string> *r_texts);
-	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale = false);
 	bool locale_element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
 	void vector_from(const ir::Instruction &p_in);
@@ -449,6 +430,8 @@ public:
 	void free_kept(Object *p_object) { drop_object(p_object); }
 	// The heap its values live on, for whatever else runs the program over them (native code's host).
 	Heap &heap() { return heap_; }
+	// And what its library still asks of the interpreter itself (vm/library.h, Unmoved).
+	Unmoved &unmoved() { return asked_; }
 
 	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
 	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of

@@ -5,6 +5,7 @@
 
 #include "collector.h"
 #include "engine_handles.h"
+#include "engine_source.h"
 #include "ir.h"
 #include "runtime.h"
 
@@ -17,10 +18,11 @@ class Heap {
 public:
 	const ir::Module &module;
 	EngineHandles &handles;
+	EngineSource &source;
 	Collector collector; // After the module: it reads the classes.
 
-	Heap(const ir::Module &p_module, EngineHandles &p_handles) :
-			module(p_module), handles(p_handles), collector(*this) {}
+	Heap(const ir::Module &p_module, EngineHandles &p_handles, EngineSource &p_source) :
+			module(p_module), handles(p_handles), source(p_source), collector(*this) {}
 	Heap(const Heap &) = delete;
 	Heap &operator=(const Heap &) = delete;
 

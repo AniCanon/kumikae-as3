@@ -16,7 +16,7 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host), heap_(p_module, p_host.handles) {
+		module_(p_module), host_(p_host), heap_(p_module, p_host.handles, p_host.source) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}

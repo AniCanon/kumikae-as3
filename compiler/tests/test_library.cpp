@@ -17,7 +17,28 @@ using kas3::ir::StringFunction;
 namespace {
 
 // Answers as whoever runs the program would, and keeps what it was asked.
-struct Recorder final : Runner {
+struct Recorder final : Runner, Unmoved {
+	bool failing() const override { return !raised.empty() || memory > 0; }
+	// Nothing here is still the interpreter's: these answer plainly.
+	bool element_is(Kind, Slot p_element, Slot p_value) override { return p_element.bits == p_value.bits; }
+	Slot to_any(Kind p_kind, Slot p_value) override { return p_kind == Kind::I32 ? any::integer(p_value.i) : p_value; }
+	bool from_any(Slot p_value, Kind p_kind, uint32_t, Slot *r_out) override {
+		r_out->bits = 0;
+		if (p_kind == Kind::F64) {
+			r_out->d = any::to_number(p_value);
+		} else if (p_kind == Kind::I32) {
+			r_out->i = static_cast<int32_t>(any::to_number(p_value));
+		} else {
+			*r_out = p_value;
+		}
+		return true;
+	}
+	bool coercion_failed(Slot, Kind, uint32_t) override { return false; }
+	bool array_number_get(Vector *, double, Slot *) override { return true; }
+	bool array_number_set(Vector *, double, Slot) override { return true; }
+	bool vector_text(Vector *, std::string_view, std::string *, bool) override { return true; }
+	bool sort_field(Slot, Str *, Slot *) override { return true; }
+
 	std::vector<std::string> raised;
 	uint32_t raised_class = kas3::ir::NONE;
 	int memory = 0;
@@ -86,9 +107,9 @@ std::string element_text(const Vector *p_vector, uint32_t p_index) {
 
 void test_split() {
 	const kas3::ir::Module module = module_of_three();
-	Heap heap(module, NoEngine::instance());
+	Heap heap(module, NoEngine::instance(), NoEngine::instance());
 	Recorder recorder;
-	Library library{ heap, recorder };
+	Library library{ heap, recorder, recorder };
 	Str *text = new_string("a,b,,c");
 	Str *comma = new_string(",");
 	Slot out = of_number(0);
@@ -125,9 +146,9 @@ void test_split() {
 
 void test_uri() {
 	const kas3::ir::Module module = module_of_three();
-	Heap heap(module, NoEngine::instance());
+	Heap heap(module, NoEngine::instance(), NoEngine::instance());
 	Recorder recorder;
-	Library library{ heap, recorder };
+	Library library{ heap, recorder, recorder };
 	Str *spaced = new_string("a b");
 	Str *broken = new_string("%");
 	Slot out = of_number(0);
@@ -151,7 +172,7 @@ void test_uri() {
 
 void test_new_error() {
 	const kas3::ir::Module module = module_of_three();
-	Heap heap(module, NoEngine::instance());
+	Heap heap(module, NoEngine::instance(), NoEngine::instance());
 	Object *error = new_error(heap, URI_ERROR, new_string("Error #1052: Invalid URI passed to decodeURI function."));
 	CHECK(error != nullptr);
 	CHECK_EQ(error->fields()[kas3::ir::ERROR_ID].i, 1052);
@@ -170,9 +191,9 @@ void test_new_error() {
 void test_number_text() {
 	kas3::ir::Module module = module_of_three();
 	module.range_error_class = ERROR;
-	Heap heap(module, NoEngine::instance());
+	Heap heap(module, NoEngine::instance(), NoEngine::instance());
 	Recorder recorder;
-	Library library{ heap, recorder };
+	Library library{ heap, recorder, recorder };
 	Slot out = of_number(0);
 	const Slot hex[] = { of_number(255), of_number(16) };
 	CHECK(number_text(library, kas3::ir::NumberFormat::Radix, false, hex, 2, &out));
@@ -202,9 +223,81 @@ void test_number_text() {
 	CHECK_EQ(live_strings(), static_cast<size_t>(0));
 }
 
+Slot of_int(int32_t p_value) {
+	Slot slot;
+	slot.bits = 0;
+	slot.i = p_value;
+	return slot;
+}
+
+void test_vectors() {
+	using kas3::ir::VectorMethod;
+	kas3::ir::Module module = module_of_three();
+	module.range_error_class = ERROR;
+	kas3::ir::Class ints;
+	ints.name = "Vector.<int>";
+	ints.element = Kind::I32;
+	module.classes.push_back(ints);
+	const uint32_t INTS = 3;
+	Heap heap(module, NoEngine::instance(), NoEngine::instance());
+	Recorder recorder;
+	Library library{ heap, recorder, recorder };
+	Vector *vector = vector_new(library, INTS, 0, false);
+	CHECK(vector != nullptr);
+	Slot out = of_number(0);
+	const Slot push[] = { of_text(nullptr), of_int(7), of_int(9), of_int(11) };
+	Slot pushed[4] = { push[0], push[1], push[2], push[3] };
+	pushed[0].p = vector;
+	CHECK(vector_call(library, VectorMethod::Push, pushed, 4, &out));
+	CHECK_EQ(out.u, 3u);
+	CHECK(vector_call(library, VectorMethod::Push, pushed, 2, nullptr)); // Nobody wants the new length.
+	CHECK_EQ(vector->length, 4u);
+	const Slot find[] = { pushed[0], of_int(9), of_int(0) };
+	CHECK(vector_call(library, VectorMethod::IndexOf, find, 3, &out));
+	CHECK_EQ(out.i, 1);
+	CHECK(vector_call(library, VectorMethod::Pop, pushed, 1, &out));
+	CHECK_EQ(out.i, 7);
+	const Slot part[] = { pushed[0], of_int(1), of_int(16777215) };
+	CHECK(vector_call(library, VectorMethod::Slice, part, 3, &out));
+	Vector *sliced = static_cast<Vector *>(out.p);
+	CHECK_EQ(sliced->length, 2u);
+	CHECK_EQ(sliced->data[1].i, 11);
+	heap.release_object(sliced);
+	// An element by an index of any kind; one past the end is added, further out is the RangeError.
+	CHECK(vector_get(library, vector, Kind::F64, of_number(2), &out));
+	CHECK_EQ(out.i, 11);
+	CHECK(vector_set(library, vector, Kind::I32, of_int(3), of_int(13)));
+	CHECK_EQ(vector->length, 4u);
+	CHECK(!vector_set(library, vector, Kind::I32, of_int(9), of_int(1)));
+	CHECK(recorder.raised.back().find("Error #1125") == 0);
+	recorder.raised.clear();
+	// A fixed vector's length does not change.
+	vector->fixed = true;
+	CHECK(!vector_call(library, VectorMethod::Push, pushed, 2, &out));
+	CHECK(recorder.raised.back().find("Error #1126") == 0);
+	CHECK(!vector_set_length(library, vector, 4));
+	recorder.raised.clear();
+	// No vector at all is the TypeError.
+	module.type_error_class = ERROR;
+	const Slot none[] = { of_text(nullptr) };
+	CHECK(!vector_call(library, VectorMethod::Pop, none, 1, &out));
+	CHECK(recorder.raised.back().find("Error #1009") == 0);
+	heap.release_object(vector);
+	// new Array(3) is three empty places; new Array("3") holds the one String.
+	const Slot three[] = { any::integer(3) };
+	Vector *array = array_new(library, ARRAY, three, 1);
+	CHECK_EQ(array->length, 3u);
+	heap.release_object(array);
+	const Slot bad[] = { any::number(1.5) };
+	CHECK(array_new(library, ARRAY, bad, 1) == nullptr);
+	CHECK(recorder.raised.back().find("Error #1005") == 0);
+	CHECK_EQ(live_objects(), static_cast<size_t>(0));
+}
+
 } // namespace
 
 int main() {
+	test_vectors();
 	test_number_text();
 	test_split();
 	test_uri();
