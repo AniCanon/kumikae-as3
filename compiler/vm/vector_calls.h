@@ -15,12 +15,14 @@ struct VectorCall {
 	size_t count;
 	Slot *out; // Null where nobody wants what the method gives.
 	ir::VectorMethod method;
+	mutable ir::Kind gave = ir::Kind::Void; // The kind of what was written to `out`, once something was.
 };
 
 // What a method gives goes to whoever asked, or is let go of where nobody did.
 inline void give(Library &p_library, const VectorCall &p_call, ir::Kind p_kind, Slot p_owned) {
 	if (p_call.out) {
 		*p_call.out = p_owned;
+		p_call.gave = p_kind;
 	} else {
 		p_library.heap.drop(p_kind, p_owned);
 	}

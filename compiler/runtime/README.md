@@ -74,11 +74,11 @@ What this costs, until the split:
 - A thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
   most operations take. `fast.h` exists for that reason, and each family that becomes a function of plain
   values loses its thunks.
-- The interpreter lets entries nest only `MAX_ENTRIES` (64) deep. A recursion that passes through a thunk
-  that calls back on every level (a sort's comparison that sorts, a JSON reviver that parses, a getter
-  reached by name that reads another) ends with Error #1023 at the 63rd, where the interpreter would go
-  on to 10,000 calls. Calls through function values, `toString()` of an object of a class (typed or held
-  untyped) and interface calls do not pass through a thunk, for that reason.
+- The interpreter lets entries nest only `MAX_ENTRIES` (64) deep, its own library's callbacks among them
+  (a sort's comparison that sorts ends with Error #1023 at the 64th under `kas3c run` too). A thunk is an
+  entry, so a recursion that passes through one on every level ends at the 63rd; a library function
+  called directly is none, and such a recursion goes on natively where the interpreter stops (see the
+  list below: the two are to agree by the stack's depth).
 - Where the interpreter itself refuses an entry (its own library's calls count too), it keeps the error
   until the instruction beneath ends; generated functions in between are left without their handlers
   being offered it (`Host::carried`): a `finally` there does not run.

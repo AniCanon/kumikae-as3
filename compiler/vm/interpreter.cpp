@@ -269,7 +269,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	// This program's code is running an instruction beneath this call: the error goes back to it, as Flash
 	// has an error in a listener come out of the dispatch that ran it. Only the first: a later listener's
 	// error, with one already carried, is reported here, where it happened.
-	const bool carry = !ok && depth > 0 && failing_ && !outer_failing && !outer_stopped && !aside;
+	const bool carry = !ok && (depth > 0 || direct_ > 0) && failing_ && !outer_failing && !outer_stopped && !aside;
 	if (!ok && !carry) {
 		report();
 	}

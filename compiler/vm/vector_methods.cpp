@@ -239,7 +239,7 @@ void splice(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
 } // namespace
 
 bool vector_call(Library &p_library, VectorMethod p_method, const Slot *p_values, size_t p_count, Slot *r_out) {
-	const VectorCall call{ p_values, p_count, r_out, p_method };
+	const VectorCall call{ p_values, p_count, r_out, p_method, Kind::Void };
 	Vector *vector = static_cast<Vector *>(p_values[0].p);
 	if (!vector) {
 		p_library.raise_null();
@@ -282,7 +282,13 @@ bool vector_call(Library &p_library, VectorMethod p_method, const Slot *p_values
 			vector_sort_on(p_library, vector, call);
 			break;
 	}
-	return !p_library.runner.failing();
+	if (!p_library.runner.failing()) {
+		return true;
+	}
+	if (call.gave != Kind::Void) {
+		p_library.heap.drop(call.gave, *r_out); // It gave something and then raised: nobody takes it.
+	}
+	return false;
 }
 
 } // namespace vm

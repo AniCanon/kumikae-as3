@@ -118,6 +118,7 @@ private:
 	// How many errors have been carried: code that asked the engine for something sees whether its own
 	// request carried one by this count before and after, not by what another call left held.
 	uint32_t carries_ = 0;
+	uint32_t direct_ = 0; // Calls of the library a host is making itself (direct_began()).
 	void raise_carried();
 	void report_carried(); // Reports the error carried, leaving any error on its way out as it was.
 	void traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const;
@@ -436,8 +437,16 @@ public:
 		bool stopped = false;
 		Slot value{};
 	};
-	bool left_error() const { return failing_ || (stopped_ && !carried_.held); }
-	Left take_error();
+	bool left_error() const { return failing_ || stopped_; }
+	// With p_carried, an error carried back from a call the engine made beneath the host's own call of the
+	// library (carries() moved on meanwhile) is taken as well: there is no instruction of this
+	// interpreter's to raise it at.
+	Left take_error(bool p_carried);
+	uint32_t carries() const { return carries_; }
+	// The host is calling the library with none of this interpreter's code running: an error of a script
+	// the engine runs meanwhile is carried back to that call, as to an instruction.
+	void direct_began() { direct_++; }
+	void direct_ended() { direct_--; }
 
 	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
 	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of

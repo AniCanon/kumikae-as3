@@ -112,6 +112,30 @@ package {
 			throw new Error("from the second");
 		}
 
+		private var mute:Boolean = false;
+
+		public function toString():String {
+			if (mute) {
+				throw new Error("nothing to say");
+			}
+			return "the probe";
+		}
+
+		// Godot puts one of its objects into words by running its script: an error there comes out of the
+		// join() that asked, where it is caught.
+		public function speaks():String {
+			var nodes:Array = [getParent().getChild(getIndex())];
+			var said:String = nodes.join("+");
+			mute = true;
+			try {
+				said += nodes.join("+");
+			} catch (e:Error) {
+				said += " caught " + e.message;
+			}
+			mute = false;
+			return said + " " + nodes.join("+");
+		}
+
 		// An error nothing catches: Godot is told, with the trace, and carries on.
 		public function fail(depth:int):int {
 			if (depth == 0) {

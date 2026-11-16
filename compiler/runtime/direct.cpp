@@ -92,12 +92,12 @@ void hand_back(Context *c, Kind p_kind, Slot p_made, Slot *r_out) {
 
 // What is still the interpreter's own of the library (vm::Unmoved) may have left an error there: it is the
 // context's from here, as a thunk's catch makes it.
-void settle(Context *c) {
+void settle(Context *c, uint32_t p_carries) {
 	Host &host = *c->host;
 	if (!host.interpreter->left_error()) {
 		return;
 	}
-	const vm::Interpreter::Left left = host.interpreter->take_error();
+	const vm::Interpreter::Left left = host.interpreter->take_error(host.interpreter->carries() != p_carries);
 	if (left.stopped) {
 		host.stopped = true;
 		c->pending = empty();
@@ -119,13 +119,16 @@ void settle(Context *c) {
 // part that is still its own.
 struct Direct {
 	Context *const c;
+	const uint32_t carries; // How many errors the interpreter had carried back from the engine's calls.
 	explicit Direct(Context *p_context) :
-			c(p_context) {
+			c(p_context), carries(p_context->host->interpreter->carries()) {
 		c->host->direct++;
+		c->host->interpreter->direct_began();
 	}
 	~Direct() {
+		c->host->interpreter->direct_ended();
 		c->host->direct--;
-		settle(c);
+		settle(c, carries);
 	}
 	vm::Library library() const { return c->host->library(); }
 };

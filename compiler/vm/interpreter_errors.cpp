@@ -266,8 +266,11 @@ void Interpreter::report() {
 	trace_lines_ = 0;
 }
 
-Interpreter::Left Interpreter::take_error() {
+Interpreter::Left Interpreter::take_error(bool p_carried) {
 	Left left;
+	if (p_carried && carried_.held) {
+		raise_carried();
+	}
 	if (failing_) {
 		left.error = true;
 		left.value = pending_;
