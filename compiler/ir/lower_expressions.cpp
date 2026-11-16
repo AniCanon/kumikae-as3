@@ -220,6 +220,26 @@ uint32_t Expressions::conditional(Expr *p_expression, Kind p_want) {
 	return out;
 }
 
+uint32_t Expressions::string_literal(StringLit *p_literal) {
+	uint32_t out = l_.reg(Kind::Str);
+	l_.emit(Op::ConstStr, p_literal->offset, out, l_.string(Lowerer::unescape(p_literal->text)));
+	return out;
+}
+
+uint32_t Expressions::boolean_literal(BoolLit *p_literal) {
+	uint32_t out = l_.reg(Kind::Bool);
+	l_.emit(Op::ConstBool, p_literal->offset, out, p_literal->value ? 1 : 0);
+	return out;
+}
+
+uint32_t Expressions::this_value(uint32_t p_position) {
+	if (l_.fn().is_static && !l_.received_env_) {
+		l_.refuse(p_position, "'this' here");
+		return l_.default_value(Kind::Obj, p_position);
+	}
+	return l_.self(p_position, true);
+}
+
 uint32_t Expressions::evaluate(Expr *p_expression, Kind p_want) {
 	uint32_t position = p_expression->offset;
 	if (const auto held = l_.evaluated_.find(p_expression); held != l_.evaluated_.end()) {
@@ -228,22 +248,12 @@ uint32_t Expressions::evaluate(Expr *p_expression, Kind p_want) {
 	switch (p_expression->kind) {
 		case NodeKind::NumberLit:
 			return l_.number_literal(p_expression, p_want);
-		case NodeKind::StringLit: {
-			uint32_t out = l_.reg(Kind::Str);
-			l_.emit(Op::ConstStr, position, out, l_.string(Lowerer::unescape(static_cast<StringLit *>(p_expression)->text)));
-			return out;
-		}
-		case NodeKind::BoolLit: {
-			uint32_t out = l_.reg(Kind::Bool);
-			l_.emit(Op::ConstBool, position, out, static_cast<BoolLit *>(p_expression)->value ? 1 : 0);
-			return out;
-		}
+		case NodeKind::StringLit:
+			return string_literal(static_cast<StringLit *>(p_expression));
+		case NodeKind::BoolLit:
+			return boolean_literal(static_cast<BoolLit *>(p_expression));
 		case NodeKind::ThisExpr:
-			if (l_.fn().is_static && !l_.received_env_) {
-				l_.refuse(position, "'this' here");
-				return l_.default_value(Kind::Obj, position);
-			}
-			return l_.self(position, true);
+			return this_value(position);
 		case NodeKind::Name:
 			return name_value(p_expression);
 		case NodeKind::Member:
@@ -287,41 +297,68 @@ uint32_t Expressions::evaluate(Expr *p_expression, Kind p_want) {
 	return l_.default_value(p_want, position);
 }
 
+// `-x` and `+x`.
+uint32_t Expressions::sign(Unary *p_unary, Kind p_want) {
+	uint32_t position = p_unary->offset;
+	Kind result = Kind::Void;
+	if (is_engine(l_.natural(p_unary->operand)) && l_.kind_of(p_unary->type, &result) && result != Kind::Void) {
+		return Engine(l_).engine_operate(p_unary->op, { Engine(l_).operand(p_unary->operand) }, result, p_unary->type, position);
+	}
+	if (const std::optional<int64_t> exact = Lowerer::wide_literal(p_unary); exact && p_want == Kind::I64) {
+		uint32_t out = l_.reg(Kind::I64);
+		l_.emit(Op::ConstI64, position, out, l_.wide(*exact)); // The least Int64 has no positive to negate.
+		return out;
+	}
+	if (l_.kind_of(p_unary->operand->type, &result) && result == Kind::I64) {
+		uint32_t value = l_.expression(p_unary->operand, Kind::I64);
+		if (p_unary->op == TokenKind::Plus) {
+			return value;
+		}
+		uint32_t out = l_.reg(Kind::I64);
+		l_.emit(Op::NegI64, position, out, value);
+		return out;
+	}
+	if (p_unary->op == TokenKind::Plus) {
+		return l_.expression(p_unary->operand, Kind::F64);
+	}
+	if (p_unary->operand->kind == NodeKind::NumberLit) {
+		// `-1` is one constant, not a 1 negated as the program runs. -0 stays a Number.
+		const double value = -Lowerer::literal_value(static_cast<NumberLit *>(p_unary->operand));
+		return l_.number_constant(value, l_.natural(p_unary), value == 0 ? Kind::F64 : p_want, position);
+	}
+	uint32_t out = l_.reg(Kind::F64);
+	l_.emit(Op::NegF64, position, out, l_.expression(p_unary->operand, Kind::F64));
+	return out;
+}
+
+// `++x` and `--x`: the value is the new one.
+uint32_t Expressions::prefix(Unary *p_unary) {
+	uint32_t position = p_unary->offset;
+	Place place = l_.place_of(p_unary->operand);
+	if (place.kind == Kind::I64) {
+		uint32_t one = l_.reg(Kind::I64);
+		l_.emit(Op::ConstI64, position, one, l_.wide(1));
+		uint32_t next = l_.reg(Kind::I64);
+		l_.emit(p_unary->op == TokenKind::PlusPlus ? Op::AddI64 : Op::SubI64, position, next, l_.load(place, position), one);
+		l_.store(place, next, position);
+		return next;
+	}
+	uint32_t old = l_.convert(l_.load(place, position), Kind::F64, position);
+	uint32_t one = l_.reg(Kind::F64);
+	l_.emit(Op::ConstF64, position, one, l_.number(1));
+	uint32_t next = l_.reg(Kind::F64);
+	l_.emit(p_unary->op == TokenKind::PlusPlus ? Op::AddF64 : Op::SubF64, position, next, old, one);
+	uint32_t stored = l_.convert(next, place.kind, position);
+	l_.store(place, stored, position);
+	return stored;
+}
+
 uint32_t Expressions::unary(Unary *p_unary, Kind p_want) {
 	uint32_t position = p_unary->offset;
 	switch (p_unary->op) {
 		case TokenKind::Minus:
-		case TokenKind::Plus: {
-			Kind result = Kind::Void;
-			if (is_engine(l_.natural(p_unary->operand)) && l_.kind_of(p_unary->type, &result) && result != Kind::Void) {
-				return Engine(l_).engine_operate(p_unary->op, { Engine(l_).operand(p_unary->operand) }, result, p_unary->type, position);
-			}
-			if (const std::optional<int64_t> exact = Lowerer::wide_literal(p_unary); exact && p_want == Kind::I64) {
-				uint32_t out = l_.reg(Kind::I64);
-				l_.emit(Op::ConstI64, position, out, l_.wide(*exact)); // The least Int64 has no positive to negate.
-				return out;
-			}
-			if (l_.kind_of(p_unary->operand->type, &result) && result == Kind::I64) {
-				uint32_t value = l_.expression(p_unary->operand, Kind::I64);
-				if (p_unary->op == TokenKind::Plus) {
-					return value;
-				}
-				uint32_t out = l_.reg(Kind::I64);
-				l_.emit(Op::NegI64, position, out, value);
-				return out;
-			}
-			if (p_unary->op == TokenKind::Plus) {
-				return l_.expression(p_unary->operand, Kind::F64);
-			}
-			if (p_unary->operand->kind == NodeKind::NumberLit) {
-				// `-1` is one constant, not a 1 negated as the program runs. -0 stays a Number.
-				const double value = -Lowerer::literal_value(static_cast<NumberLit *>(p_unary->operand));
-				return l_.number_constant(value, l_.natural(p_unary), value == 0 ? Kind::F64 : p_want, position);
-			}
-			uint32_t out = l_.reg(Kind::F64);
-			l_.emit(Op::NegF64, position, out, l_.expression(p_unary->operand, Kind::F64));
-			return out;
-		}
+		case TokenKind::Plus:
+			return sign(p_unary, p_want);
 		case TokenKind::KwTypeof:
 			return l_.any_typeof(p_unary->operand, position);
 		case TokenKind::KwDelete:
@@ -343,25 +380,8 @@ uint32_t Expressions::unary(Unary *p_unary, Kind p_want) {
 			return out;
 		}
 		case TokenKind::PlusPlus:
-		case TokenKind::MinusMinus: {
-			Place place = l_.place_of(p_unary->operand);
-			if (place.kind == Kind::I64) {
-				uint32_t one = l_.reg(Kind::I64);
-				l_.emit(Op::ConstI64, position, one, l_.wide(1));
-				uint32_t next = l_.reg(Kind::I64);
-				l_.emit(p_unary->op == TokenKind::PlusPlus ? Op::AddI64 : Op::SubI64, position, next, l_.load(place, position), one);
-				l_.store(place, next, position);
-				return next;
-			}
-			uint32_t old = l_.convert(l_.load(place, position), Kind::F64, position);
-			uint32_t one = l_.reg(Kind::F64);
-			l_.emit(Op::ConstF64, position, one, l_.number(1));
-			uint32_t next = l_.reg(Kind::F64);
-			l_.emit(p_unary->op == TokenKind::PlusPlus ? Op::AddF64 : Op::SubF64, position, next, old, one);
-			uint32_t stored = l_.convert(next, place.kind, position);
-			l_.store(place, stored, position);
-			return stored;
-		}
+		case TokenKind::MinusMinus:
+			return prefix(p_unary);
 		default:
 			l_.refuse(position, "this operator");
 			return l_.default_value(Kind::F64, position);
