@@ -163,7 +163,7 @@ bool has_struct(const ir::Class &p_class) {
 }
 
 std::string write_header(const ir::Module &p_module) {
-	std::string out = generated_notice("the whole program") + "#pragma once\n\n#include \"kas3.h\"\n\n#include <cmath>\n#include <cstdint>\n#include <limits>\n\n";
+	std::string out = generated_notice("the whole program") + "#pragma once\n\n// The runtime's functions are reached through the host's table, never as symbols.\n#define KAS3_PROGRAM_LIBRARY 1\n#include \"kas3.h\"\n\n#include <cmath>\n#include <cstdint>\n#include <limits>\n\n";
 	out += "namespace " + std::string(PROGRAM_NAMESPACE) + " {\n\nusing namespace kas3::rt;\n\n";
 	for (uint32_t i = 0; i < p_module.classes.size(); i++) {
 		const ir::Class &klass = p_module.classes[i];

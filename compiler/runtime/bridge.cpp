@@ -34,6 +34,7 @@ bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, 
 		info.entry(&r_host.context, arguments, p_given, &result);
 	}
 	if (r_host.context.failing) {
+		r_host.context.listener_failed = true;
 		// The error stays the context's. What the interpreter raises in its place only leaves its frames,
 		// as far as the thunk that began this, whose catch finds the context failing and drops it.
 		r_host.later = pending;

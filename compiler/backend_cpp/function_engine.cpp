@@ -45,6 +45,15 @@ constexpr InlineOperation INLINE[] = {
 	{ Op::HostOperate, "@operator.OP_DIVIDE", { "Vector2", "float" }, "Vector2", "divide($0, $1)" },
 	{ Op::HostCall, "Vector2.normalized", { "Vector2", "" }, "Vector2", "normalized($0)" },
 	{ Op::HostCall, "Vector2.length", { "Vector2", "" }, "float", "length($0)" },
+	{ Op::HostCall, "Vector2.dot", { "Vector2", "Vector2" }, "float", "dot($0, $1)" },
+	{ Op::HostOperate, "@operator.OP_ADD", { "Vector3", "Vector3" }, "Vector3", "add($0, $1)" },
+	{ Op::HostOperate, "@operator.OP_SUBTRACT", { "Vector3", "Vector3" }, "Vector3", "subtract($0, $1)" },
+	{ Op::HostOperate, "@operator.OP_MULTIPLY", { "Vector3", "float" }, "Vector3", "multiply($0, $1)" },
+	{ Op::HostOperate, "@operator.OP_DIVIDE", { "Vector3", "float" }, "Vector3", "divide($0, $1)" },
+	{ Op::HostCall, "Vector3.normalized", { "Vector3", "" }, "Vector3", "normalized($0)" },
+	{ Op::HostCall, "Vector3.length", { "Vector3", "" }, "float", "length($0)" },
+	{ Op::HostCall, "Vector3.dot", { "Vector3", "Vector3" }, "float", "dot($0, $1)" },
+	{ Op::HostCall, "Vector3.cross", { "Vector3", "Vector3" }, "Vector3", "cross($0, $1)" },
 	{ Op::HostGet, "Vector2.x", { "Vector2", "" }, "float", "static_cast<double>($0.x)" },
 	{ Op::HostGet, "Vector2.y", { "Vector2", "" }, "float", "static_cast<double>($0.y)" },
 };
@@ -91,13 +100,9 @@ bool FunctionWriter::holds(uint32_t p_register, std::string_view p_type) const {
 
 void FunctionWriter::find_inline() {
 	inline_.assign(function_.registers.size(), false);
-	// Only a type the runtime has maths for: any other is quicker left in its handle than boxed into one
-	// for each thing Godot does with it.
-	const auto has_maths = [](std::string_view p_type) {
-		return std::any_of(std::begin(INLINE), std::end(INLINE), [&](const InlineOperation &p_each) { return p_each.result == p_type; });
-	};
+	// Every type with parts: what Godot does with one it does on the bare value (function_values.cpp).
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
-		inline_[i] = has_maths(parts_of(function_, i));
+		inline_[i] = !parts_of(function_, i).empty();
 	}
 	for (const ir::Handler &handler : function_.handlers) {
 		inline_[handler.reg] = false;
@@ -161,7 +166,7 @@ void FunctionWriter::find_aliases() {
 // singleton, asked of the host for any other handle (null for none, or for one Godot has freed).
 std::string FunctionWriter::object_behind(uint32_t p_register) {
 	if (alias_[p_register] == Alias::Owner) {
-		return "self";
+		return "owner_object(c, r0, self, self_seen)";
 	}
 	if (alias_[p_register] == Alias::Singleton) {
 		return "c->resolved[" + std::to_string(singleton_use_[p_register]) + "].object";
@@ -191,7 +196,7 @@ bool FunctionWriter::engine_alias(const Instruction &p_in) {
 	if (!given.empty()) {
 		line("\tconst Slot t[] = { " + given + " };");
 	}
-	line("\tconst Slot o = thunk(c, " + std::to_string(thunk) + ", " + (given.empty() ? "nullptr" : "t") + ");");
+	line("\tconst Slot o = thunk(c, " + std::to_string(thunk) + ", " + (given.empty() ? "nullptr" : "t") + ", nullptr);");
 	line("\tif (KAS3_UNLIKELY(c->failing)) { " + fail() + " }");
 	line("\trelease(c, Ref{ o.p });");
 	line("}");
@@ -349,6 +354,8 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 		line(type + " v{};");
 	}
 	line("c->engine->call(bind, on, " + std::string(parameters.empty() ? "nullptr" : "p") + ", " + (gives ? "&v" : "nullptr") + ");");
+	// What Godot ran meanwhile may have been a listener of the program's, and that may have raised.
+	line("if (KAS3_UNLIKELY(c->listener_failed) && call_failed(c)) { " + fail() + " }");
 	if (out != NONE) {
 		line(reg(out) + " = " + (result == "bool" ? "v != 0" : "v") + ";");
 	}
@@ -359,7 +366,7 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 }
 
 bool FunctionWriter::engine(const Instruction &p_in) {
-	return engine_alias(p_in) || engine_inline(p_in) || engine_bound(p_in);
+	return engine_alias(p_in) || engine_inline(p_in) || engine_value(p_in) || engine_bound(p_in);
 }
 
 } // namespace backend_cpp

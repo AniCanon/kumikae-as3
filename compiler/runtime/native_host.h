@@ -106,6 +106,12 @@ struct Host final : vm::NativeCode {
 	// The interpreter holds the error that is on its way out, until the instruction beneath ends: see thunk().
 	bool carried = false;
 	uint32_t nesting = 0; // Thunks in progress, one inside another.
+	// With KAS3_NATIVE_COUNTS set, how many times each thunk ran, and the program's uses of the engine
+	// that the host could not work out (each then goes by its thunk): said on standard error as the host
+	// goes, for the tests that hold generated code to its fast paths. Empty, and nothing said, otherwise.
+	std::vector<uint64_t> thunk_counts;
+	std::vector<uint32_t> unresolved;
+	void say_counts() const;
 	// Calls of the library's functions of plain values in progress (runtime/direct.cpp): like a thunk,
 	// generated code began what such a call leads to, and an error of a function called beneath it stays
 	// the context's.
@@ -127,7 +133,7 @@ struct Host final : vm::NativeCode {
 
 	uint32_t thunk_function(uint32_t p_thunk) const { return program.function_count + p_thunk; }
 	Slot builtin(Builtin p_which, const Slot *p_given) {
-		return thunk(&context, program.thunk_count + static_cast<uint32_t>(p_which), p_given);
+		return thunk(&context, program.thunk_count + static_cast<uint32_t>(p_which), p_given, nullptr);
 	}
 	// A class's first use (operations.h, use_class). From running code, initializers that had not begun
 	// when one failed are in the error's trace, as the interpreter has them; from the host, they are not.

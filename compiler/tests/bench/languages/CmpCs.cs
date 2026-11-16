@@ -50,4 +50,18 @@ public partial class CmpCs : Node2D
         }
         return v.X;
     }
+
+    public double Vec3(int n)
+    {
+        var v = Vector3.Zero;
+        var d = new Vector3(0.5f, 0.25f, 0.125f);
+        double sum = 0;
+        for (int i = 0; i < n; i++)
+        {
+            v = v + d * 0.5f;
+            v = v.Normalized() * 3.0f;
+            sum += v.Dot(d);
+        }
+        return sum;
+    }
 }

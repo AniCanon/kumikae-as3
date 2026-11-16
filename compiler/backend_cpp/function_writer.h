@@ -9,6 +9,7 @@
 //     through its handlers, or by `failed`, which puts its line into the trace.
 #pragma once
 
+#include "facts.h"
 #include "ir.h"
 #include "thunks.h"
 
@@ -37,6 +38,7 @@ class FunctionWriter {
 	// The program reads the stack of an error nothing threw: each function keeps a StackFrame, and says
 	// which line it is on before anything that may run code.
 	const bool keeps_stack_;
+	const Facts *const facts_; // Null while the facts themselves are being found: nothing is known of any callee.
 	std::string body_;
 	std::vector<bool> targets_; // Per instruction: a jump lands on it.
 	std::vector<bool> written_; // Per register: an instruction writes it.
@@ -48,6 +50,7 @@ class FunctionWriter {
 	// (function_whole.cpp): what it reads, so that it is forgotten when one of those is written.
 	struct Whole {
 		std::string expression; // Empty: nothing is known of the register.
+		std::string exact; // The same sum as a 64-bit integer, which holds it whole: what a comparison reads.
 		std::vector<uint32_t> sources;
 		uint32_t terms = 0;
 	};
@@ -70,6 +73,54 @@ class FunctionWriter {
 	// given null (a field read, a call's result, an untyped value) stays a handle, which can say so.
 	std::vector<bool> inline_;
 	void find_inline();
+	// function_fields.cpp: the fields of the method's own object that are locals while it runs.
+	struct Kept {
+		uint32_t slot = 0;
+		bool written = false; // The function writes it: the local is written back where memory must be right.
+	};
+	std::vector<Kept> kept_;
+	// What an instruction may do to a field of the slot other than through `this` in this function.
+	enum class Touch : uint8_t { None, Reads, Writes };
+	Touch touch(uint32_t p_pc, uint32_t p_slot) const;
+	void find_kept();
+	std::string own_field(uint32_t p_slot) const; // The field of `this` in memory.
+	std::optional<std::string> kept_local(uint32_t p_object, uint32_t p_slot) const; // The local, if the field is kept.
+	std::string kept_declared() const; // The locals, each given its field's value.
+	// Statements, on one line: the locals written back before an instruction that may see their fields, and
+	// read again after one that may change them. For NONE, all of them (the function's end, a handler).
+	std::string kept_written_back(uint32_t p_pc) const;
+	std::string kept_read_again(uint32_t p_pc) const;
+	// function_borrowed.cpp. Per register: the slot of the field of `this` it is read from and borrows (it
+	// counts no reference of its own), or NONE.
+	std::vector<uint32_t> borrowed_;
+	void find_borrowed();
+	// GetField written: from the local a kept field is in, with no reference counted into a register that
+	// borrows, or as any other read.
+	void read_field(const ir::Instruction &p_in, const std::string &p_field);
+	// may_run_code(), but that a field read into a register that borrows lets go of nothing.
+	bool runs_code(const ir::Instruction &p_in) const;
+	// Per instruction: it copies a register that nothing reads afterwards, so the reference is handed over
+	// and not shared (a Move, or a field or static field set).
+	std::vector<bool> hands_over_;
+	void find_last_uses();
+	// Stores a register's value where the instruction says; the register gives up its reference if this
+	// is its last use.
+	void keep(const std::string &p_place, uint32_t p_register, bool p_is_slot);
+	// function_loops.cpp: a loop over vectors of numbers, written twice.
+	struct Twice {
+		uint32_t from = 0; // The instruction its jump back goes to, and that jump.
+		uint32_t to = 0;
+		std::vector<uint32_t> vectors; // The registers whose vectors' length and elements are locals in the first copy.
+	};
+	std::vector<Twice> twice_;
+	const Twice *fast_ = nullptr; // The loop whose copy with locals is being written, if one is.
+	std::vector<bool> retried_; // Per instruction: the copy with locals leaves for it in the other (label S).
+	std::vector<uint32_t> loop_vectors(uint32_t p_from, uint32_t p_to) const;
+	void find_twice();
+	bool fast_vector(const ir::Instruction &p_in);
+	std::string label(uint32_t p_target) const; // "L12", or "V12" for a jump inside the copy with locals.
+	std::string fast_copy(const Twice &p_loop, const std::vector<bool> &p_landed);
+	std::string twice_declared() const;
 	uint32_t pc_ = 0;
 
 	std::string reg(uint32_t p_register) const;
@@ -93,7 +144,8 @@ class FunctionWriter {
 	bool object(const ir::Instruction &p_in); // function_objects.cpp: fields, globals, classes.
 	bool flow(const ir::Instruction &p_in); // Jumps, returns, throws.
 	bool call(const ir::Instruction &p_in); // function_calls.cpp
-	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target);
+	// p_direct: the callee is the very function p_callee, and not one found in a table as the call is made.
+	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target, bool p_direct);
 	void by_thunk(const ir::Instruction &p_in);
 	bool by_library(const ir::Instruction &p_in); // function_library.cpp: the library's function, called direct.
 	std::string_view parts(uint32_t p_register) const; // The value with parts the register holds inline, if it does.
@@ -109,8 +161,20 @@ class FunctionWriter {
 	bool engine_alias(const ir::Instruction &p_in);
 	bool engine_inline(const ir::Instruction &p_in);
 	bool engine_bound(const ir::Instruction &p_in);
+	// function_values.cpp: Godot's own code for a value type, called on bare values.
+	std::string_view value_type(uint32_t p_register) const;
+	std::optional<std::string> bare_operand(uint32_t p_register, size_t p_at, std::string *r_guard, std::string *r_inside);
+	bool value_call(const ir::Instruction &p_in, uint32_t p_out, std::string_view p_result, const std::string &p_guard, const std::string &p_inside,
+			const std::string &p_call);
+	void settle_use(const ir::Instruction &p_in, size_t p_from);
+	bool value_made(const ir::Instruction &p_in);
+	bool value_part(const ir::Instruction &p_in);
+	bool value_operation(const ir::Instruction &p_in);
+	bool value_constant(const ir::Instruction &p_in);
+	bool engine_value(const ir::Instruction &p_in);
 	void forget_whole(uint32_t p_register);
 	bool whole_conversion(const ir::Instruction &p_in);
+	bool whole_comparison(const ir::Instruction &p_in);
 	void remember_whole(const ir::Instruction &p_in);
 	// function_fast.cpp: an inline path for the usual case, and the thunk for the rest.
 	bool fast_object(const ir::Instruction &p_in); // A new object, a vector's elements and length.
@@ -126,9 +190,11 @@ class FunctionWriter {
 	std::string handlers() const;
 
 public:
-	FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack);
+	FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts);
 	// The function's definition, and after it its entry (the function called with slots).
 	std::string write();
+	// Once written: whether anything in it can raise an error.
+	bool fails() const { return fails_; }
 };
 
 } // namespace backend_cpp

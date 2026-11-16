@@ -110,13 +110,7 @@ if(KAS3_GODOT_CPP)
     add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES})
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
     target_compile_options(kas3_godot PRIVATE -fno-exceptions)
-    # The runtime and the interpreter go in whole: a program library (the C++ backend's output, built for
-    # the project) finds in this library every function generated code calls.
-    if(APPLE)
-        target_link_libraries(kas3_godot PRIVATE godot-cpp -Wl,-force_load,$<TARGET_FILE:kas3runtime> -Wl,-force_load,$<TARGET_FILE:kas3vm> kas3runtime kas3vm)
-    else()
-        target_link_libraries(kas3_godot PRIVATE godot-cpp -Wl,--whole-archive kas3runtime kas3vm -Wl,--no-whole-archive)
-    endif()
+    target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm)
     # On this machine's own system the library goes beside the test project, which loads it. Built for
     # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
     if(CMAKE_CROSSCOMPILING)
@@ -150,6 +144,9 @@ add_executable(bench_recheck tools/bench_recheck.cpp)
 target_link_libraries(bench_recheck PRIVATE kas3lsp)
 
 add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:kas3c>)
+# What `kas3c cpp` writes, where its shape is its speed.
+add_test(NAME generated COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_generated.py
+    $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME lsp_stdio COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp_stdio.py $<TARGET_FILE:kas3c>)
 add_test(NAME programs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_programs.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)

@@ -12,11 +12,11 @@ namespace rt {
 
 using vm::AnyTag;
 
-Object *holder_of(Slot p_any) {
+Object *holder_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::Object ? static_cast<Object *>(vm::any::pointer(p_any)) : nullptr;
 }
 
-Str *key_of(Slot p_any) {
+Str *key_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::String ? static_cast<Str *>(vm::any::pointer(p_any)) : nullptr;
 }
 
@@ -53,7 +53,7 @@ Object *new_array(Context *c, const Slot *p_values, uint32_t p_count) {
 	return made;
 }
 
-Slot *element_added(Object *p_vector, uint32_t p_index) {
+Slot *element_added(Context *, Object *p_vector, uint32_t p_index) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
 	if (!vector || p_index != vector->length || vector->fixed || p_index >= vm::MAX_VECTOR_LENGTH || !vm::vector_reserve(vector, p_index + 1)) {
 		return nullptr;

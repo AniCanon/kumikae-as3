@@ -399,6 +399,7 @@ static FreedElsewhere &freed_elsewhere() {
 
 static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+	Project::get().instance_freed();
 	if (kas3::on_main_thread()) {
 		free_instance(instance);
 		return;

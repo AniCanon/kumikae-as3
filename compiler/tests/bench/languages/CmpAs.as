@@ -44,5 +44,16 @@ package {
 			}
 			return v.x;
 		}
+		public function vec3(n:int):Number {
+			var v:Vector3 = new Vector3(0, 0, 0);
+			var d:Vector3 = new Vector3(0.5, 0.25, 0.125);
+			var sum:Number = 0;
+			for (var i:int = 0; i < n; i++) {
+				v = v + d * 0.5;
+				v = v.normalized() * 3.0;
+				sum += v.dot(d);
+			}
+			return sum;
+		}
 	}
 }

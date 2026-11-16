@@ -37,7 +37,7 @@ bool FunctionWriter::constant(const Instruction &p_in) {
 			put(p_in.a, std::string(zero_of(kind(p_in.a))));
 			return true;
 		case Op::AnyConst:
-			put(p_in.a, p_in.b == 0 ? "empty()" : "kas3::vm::any::null()");
+			put(p_in.a, p_in.b == 0 ? "empty()" : "any_null(c)");
 			return true;
 		default:
 			return false;

@@ -16,27 +16,27 @@ namespace rt {
 using ir::Kind;
 using vm::AnyTag;
 
-bool text_method(uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+bool text_method(Context *, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
 	return vm::text_method(static_cast<ir::StringFunction>(p_which), vm::Values{ p_values, nullptr, p_count }, nullptr, r_out);
 }
 
-Str *text_of(int32_t p_value) {
+Str *text_of_int(Context *, int32_t p_value) {
 	return vm::new_string(std::to_string(p_value));
 }
-Str *text_of(uint32_t p_value) {
+Str *text_of_uint(Context *, uint32_t p_value) {
 	return vm::new_string(std::to_string(p_value));
 }
-Str *text_of(int64_t p_value) {
+Str *text_of_wide(Context *, int64_t p_value) {
 	return vm::new_string(std::to_string(p_value));
 }
-Str *text_of(double p_value) {
+Str *text_of_number(Context *, double p_value) {
 	return vm::new_string(vm::number_to_string(p_value));
 }
-Str *text_of(bool p_value) {
+Str *text_of_flag(Context *, bool p_value) {
 	return vm::new_string(p_value ? "true" : "false");
 }
 
-bool number_to_any(double p_value, Slot *r_any) {
+bool number_to_any(Context *, double p_value, Slot *r_any) {
 	if (p_value != std::trunc(p_value)) {
 		*r_any = vm::any::number(p_value); // Not-a-number too: it is not equal to itself.
 		return true;
@@ -73,10 +73,11 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 			}
 			return number;
 		case Kind::F64:
-			if (number) {
+			// A whole number past an int is held in a box (number_to_any): a Number all the same.
+			if (number || tag == AnyTag::Wide) {
 				r_value->d = vm::any::to_number(p_any);
 			}
-			return number;
+			return number || tag == AnyTag::Wide;
 		case Kind::Bool:
 			r_value->b = vm::any::to_bool_payload(p_any);
 			return tag == AnyTag::Boolean;
@@ -97,12 +98,12 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 	}
 }
 
-bool has_members(Slot p_any) {
+bool has_members(Context *, Slot p_any) {
 	const AnyTag tag = vm::any::tag(p_any);
 	return tag != AnyTag::Null && tag != AnyTag::Undefined;
 }
 
-Object *function_of(Slot p_any) {
+Object *function_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::Object ? static_cast<Object *>(vm::any::pointer(p_any)) : nullptr;
 }
 
@@ -136,11 +137,18 @@ bool result_to_any(Context *c, Kind p_kind, Slot p_result, Slot *r_any) {
 			*r_any = p_result;
 			return true;
 		case Kind::F64:
-			if (number_to_any(p_result.d, r_any)) {
+			if (number_to_any(c, p_result.d, r_any)) {
 				return true;
 			}
 			*r_any = c->host->builtin(Builtin::NumberToAny, &p_result);
 			return !c->failing;
+		// One of Godot's: the handle goes with it. With no handle there is nothing, which is null.
+		case Kind::Val:
+			*r_any = p_result.p ? vm::any::godot_value(p_result.p) : vm::any::null();
+			return true;
+		case Kind::Ref:
+			*r_any = p_result.p ? vm::any::godot_object(p_result.p) : vm::any::null();
+			return true;
 		default:
 			*r_any = c->host->builtin(Builtin::WideToAny, &p_result);
 			return !c->failing;
@@ -163,7 +171,9 @@ Object *arguments_of(Context *c, uint32_t p_function, const Slot *p_parameters, 
 		} else if (kind == Kind::Obj) {
 			retain(c, static_cast<Object *>(held.p));
 		}
-		result_to_any(c, kind, kind == Kind::Any ? shared(c, held) : held, &values[i]);
+		// A handle of its own, likewise, for one of Godot's.
+		const Slot own = kind == Kind::Any ? shared(c, held) : ir::is_engine(kind) ? slot(shared(c, Ref{ held.p })) : held;
+		result_to_any(c, kind, own, &values[i]);
 	}
 	Object *made = c->failing ? nullptr : new_array(c, values.data(), count);
 	for (Slot each : values) {
@@ -228,6 +238,11 @@ bool object_text(Context *c, Object *p_object, Str **r_text) {
 	const FunctionInfo &own = c->program->functions[klass.to_string];
 	if (static_cast<Kind>(own.result) != Kind::Str || own.parameters != 1) {
 		return false;
+	}
+	// A function that cannot fail leaves the depth to its caller (the generator's facts.h): here, this.
+	if (KAS3_UNLIKELY(c->depth >= MAX_DEPTH)) {
+		stack_overflow(c);
+		return true;
 	}
 	*r_text = reinterpret_cast<Str *(*)(Context *, Object *)>(own.direct)(c, p_object);
 	return true;

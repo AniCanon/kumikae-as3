@@ -78,6 +78,32 @@ void raise_null(Context *c) {
 	c->host->builtin(Builtin::NullCheck, &nothing);
 }
 
+bool call_failed(Context *c) {
+	c->listener_failed = false;
+	Host &host = *c->host;
+	if (c->failing) {
+		return true; // It never left the context: the interpreter was not given it.
+	}
+	vm::NativeError carried;
+	if (!host.interpreter->take_carried(&carried)) {
+		return false; // It was reported where it happened, or a thunk has given it out already.
+	}
+	// The error is this function's now, with the trace it had: the reverse of Host::hand_over().
+	c->pending = carried.error;
+	c->failing = true;
+	host.trace = std::move(carried.trace);
+	host.trace_lines = carried.lines;
+	host.thrown_function = NONE;
+	for (uint32_t i = 0; i < host.program.function_count && !carried.function.empty(); i++) {
+		if (host.module.functions[i].name + "()" == carried.function) {
+			host.thrown_function = i;
+			host.thrown_line = static_cast<uint32_t>(carried.line);
+			break;
+		}
+	}
+	return true;
+}
+
 void out_of_memory(Context *c) {
 	// The library raises it, and words it: asked for an object's text with no memory to write it in.
 	vm::fail_allocations(1);
