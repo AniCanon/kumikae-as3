@@ -636,7 +636,7 @@ class RealApi(unittest.TestCase):
             members = " ".join(lines_of(self.text, name))
             self.assertNotIn(":Int64", members, name)
         self.assertIn("public var x:int;", lines_of(self.text, "Vector2i"))
-        self.assertIn('\t[Indexed(element="int")]\n\tpublic final native class PackedInt32Array', self.text)
+        self.assertRegex(self.text, r'\t\[Indexed\(element="int"\)\]\n(\t\[Constructor.*\n)*\tpublic final native class PackedInt32Array ')
         self.assertEqual(sorted(self.generator.narrow), ["PackedInt32Array", "Rect2i", "Vector2i", "Vector3i", "Vector4i"])
         self.assertIn("public native function decodeS64(byteOffset:Int64):Int64;", lines_of(self.text, "PackedByteArray"))
 
@@ -644,7 +644,7 @@ class RealApi(unittest.TestCase):
         self.assertIn("public native function append(value:Int64):Boolean;", lines_of(self.text, "PackedInt64Array"))
         self.assertIn("public native function toRgba64():Int64;", lines_of(self.text, "Color"))
         self.assertIn("public native function toRgba32():Int64;", lines_of(self.text, "Color"))
-        self.assertIn("public native function getId():Int64;", lines_of(self.text, "RID"))
+        self.assertIn("public native function getID():Int64;", lines_of(self.text, "RID"))
         self.assertIn("\tpublic native function randi():Int64;\n", self.text)
         self.assertIn("\tpublic native function clampi(value:Int64, min:Int64, max:Int64):Int64;\n", self.text)
         self.assertNotIn(":Number = 34359738368", self.text)
