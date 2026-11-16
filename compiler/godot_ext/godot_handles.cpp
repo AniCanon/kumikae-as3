@@ -97,7 +97,12 @@ void *GodotHost::copy(void *p_value) {
 }
 
 bool GodotHost::assign(void *p_to, const void *p_from) {
-	*static_cast<Variant *>(p_to) = *static_cast<const Variant *>(p_from);
+	// An object (a value held as any of Godot's) is copied as copy() copies one: a freed one goes as null.
+	const Variant *from = static_cast<const Variant *>(p_from);
+	if (from->get_type() == Variant::OBJECT) {
+		return false;
+	}
+	*static_cast<Variant *>(p_to) = *from;
 	return true;
 }
 
