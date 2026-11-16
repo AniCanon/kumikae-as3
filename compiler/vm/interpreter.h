@@ -84,7 +84,11 @@ private:
 	// (a listener that its emit() ran): kept, to be raised again at the end of the instruction that made the
 	// engine's call (run()), which stopped_ ends.
 	Carried carried_;
+	// How many errors have been carried: code that asked the engine for something sees whether its own
+	// request carried one by this count before and after, not by what another call left held.
+	uint32_t carries_ = 0;
 	void raise_carried();
+	void report_carried(); // Reports the error carried, leaving any error on its way out as it was.
 	void traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const;
 	std::vector<Kept> kept_traces_; // At most one for each finally: see Kept.
 	void keep_trace(Kept p_kept);
@@ -149,6 +153,7 @@ private:
 	void raise(uint32_t p_class, const std::string &p_message);
 	Str *stack_text(const Object *p_error, size_t p_skip);
 	void out_of_memory();
+	void stack_overflow(); // AS3's Error #1023: calls, or what they put into words, nest too deep.
 	void throw_new(uint32_t p_class, Str *p_message, std::string_view p_words);
 	// A member of nothing was asked for: AS3's TypeError #1009.
 	void raise_null();
@@ -178,8 +183,14 @@ private:
 	void regexp_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	void regexp_new(const ir::Function &p_function, const ir::Instruction &p_in);
 	void regexp_exec(const ir::Function &p_function, const ir::Instruction &p_in);
-	// exec() (untyped: the match's Array, or null) or test() (a Boolean). False if it raised.
-	bool regexp_run(Object *p_regexp, std::string_view p_text, bool p_test, Slot *r_out);
+	// exec() (untyped: the match's Array, or null) or test() (a Boolean) on p_text, not null. False if it raised.
+	bool regexp_run(Object *p_regexp, Str *p_text, bool p_test, Slot *r_out);
+	// The last text exec() or test() searched, held, and its UTF-16 units: a loop over a global RegExp's
+	// matches converts its text once, not once a match. A String never changes, so the one held is the key.
+	Str *subject_ = nullptr;
+	std::shared_ptr<const std::u16string> subject_units_;
+	std::shared_ptr<const std::u16string> subject_units(Str *p_text);
+	void forget_subject();
 	Slot regexp_read(Object *p_regexp, ir::RegExpFunction p_property); // source (a new reference), or a flag
 	// RegExp's and Date's members by name on a value held untyped (vm/library_members.cpp): nothing if the
 	// object is neither, or has no member of that name; false if it raised. A call's result goes to p_out.
@@ -188,7 +199,8 @@ private:
 	std::optional<bool> library_call(Object *p_object, std::string_view p_name, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool library_has(const Object *p_object, std::string_view p_name) const;
 	std::optional<Found> find_match(const regex::Program &p_program, std::string_view p_source, const std::u16string &p_text, uint32_t p_from);
-	Vector *match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program);
+	// p_input is the text searched (null for "null"), which the Array's `input` shares.
+	Vector *match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program, Str *p_input);
 	std::shared_ptr<const regex::Program> pattern_argument(Slot p_pattern, Object **r_regexp, std::string *r_source);
 	void string_match(const ir::Function &p_function, const ir::Instruction &p_in);
 	void string_search(const ir::Function &p_function, const ir::Instruction &p_in);
@@ -294,7 +306,14 @@ private:
 	bool sort_keys(ir::Kind p_kind, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, int32_t p_options,
 			std::vector<double> *r_numbers, std::vector<std::string> *r_texts);
 	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
-	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
+	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale = false);
+	bool locale_element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
+	// Vectors put into words inside one another's words (an Array in an Array, or one that holds itself)
+	// nest at most this deep, by recursion in C++; one more is Error #1023, as Flash's stack check gives.
+	// A level takes about 270 bytes of stack in a release build (measured): 500 fit in a third of the
+	// 512 KB a secondary thread gets on macOS.
+	static constexpr uint32_t MAX_TEXT_DEPTH = 500;
+	uint32_t text_depth_ = 0; // How many vector_text() calls are in progress.
 	bool element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
 	void leave_failed_frame(); // A frame the error leaves: its line goes into the trace.

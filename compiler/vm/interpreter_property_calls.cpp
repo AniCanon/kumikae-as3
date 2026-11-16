@@ -188,7 +188,8 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 	}
 	if (name == "toString" || name == "toLocaleString") {
 		std::string words;
-		if (any_text(p_holder, &words)) {
+		const bool said = name == "toLocaleString" ? locale_element_text(Kind::Any, p_holder, &words) : any_text(p_holder, &words);
+		if (said) {
 			if (Str *made = text(words)) {
 				give(Kind::Str, of_pointer(made));
 			}
@@ -264,19 +265,19 @@ void Interpreter::property_call(const Function &p_function, const Instruction &p
 	}
 	const Slot holder = to_any(p_function.registers[p_in.b], stack_[base + p_in.b]);
 	const Slot key = to_any(p_function.registers[list[0]], stack_[base + list[0]]);
-	std::vector<Slot> given;
+	SpareSlots given(spare_slots_); // No list is made for each call, as call_value() makes none.
 	for (size_t i = 1; i < list.size(); i++) {
-		given.push_back(share(Kind::Any, stack_[base + list[i]]));
+		given->push_back(share(Kind::Any, stack_[base + list[i]]));
 	}
 	PropertyKey found;
 	if (!held_object(holder) && (any::tag(holder) == AnyTag::Null || any::tag(holder) == AnyTag::Undefined)) {
 		any_null_check(holder);
 	} else if (property_key(holder, key, &found)) {
-		call_named(holder, found, given, p_in.a);
+		call_named(holder, found, *given, p_in.a);
 	}
 	drop_any(holder);
 	drop_any(key);
-	for (Slot each : given) {
+	for (Slot each : *given) {
 		drop_any(each);
 	}
 }

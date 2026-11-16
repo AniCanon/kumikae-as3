@@ -2596,6 +2596,86 @@ static void test_carried_errors() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// An emit with two listeners, the first of which throws. The error carried for the emit is that call's
+// alone: the second listener's own engine calls (a Godot value's text, a call whose listener throws in
+// turn) are judged by what they did, and an error of the second's is reported where it happened.
+static void test_carried_errors_per_call() {
+	const char *source = "package { import godot.*;\n"
+						 "public class Listeners extends Node {\n"
+						 "	public var held:*;\n"
+						 "	public var heard:String = \"none\";\n"
+						 "	public var keys:int = -1;\n"
+						 "	public function keep(u:*):void { held = u; }\n"
+						 "	public function boom():void { throw new Error(\"boom\"); }\n"
+						 "	public function second():void { throw new Error(\"second\"); }\n"
+						 "	public function speak():void { heard = \"t:\" + held; var o:Object = {}; o[held] = 1; var n:int = 0; for (var k:* in o) { n++; } keys = n; }\n"
+						 "	public function relay():void { setPhysicsProcess(false); heard = \"relayed\"; }\n"
+						 "	public function emit():String { try { setPhysicsProcess(true); } catch (e:Error) { return \"caught \" + e.message; } return \"out\"; }\n"
+						 "	public function said():String { return heard + \" \" + keys; }\n"
+						 "} }\n";
+	ir::Module module;
+	compile_cycles(&module, source, "Listeners.as");
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *listeners = interpreter.construct(class_named(module, "Listeners"), engine.box());
+		engine.next = (engine.next + 15) / 16 * 16; // An untyped value holds a handle 16-aligned.
+		vm::Slot node = vm::any::godot_object(engine.box());
+		vm::Slot ignored;
+		ignored.bits = 0;
+		CHECK(interpreter.call_method(listeners, "keep", &node, 1, &ignored));
+		interpreter.discard(ir::Kind::Any, node);
+		// What the engine runs at each depth of its own calls: the listeners of an emit, and those of an emit
+		// one of them makes. Deeper than the plan, it runs nothing (a plain Node's text).
+		std::vector<std::vector<const char *>> plan;
+		size_t depth = 0;
+		engine.calls_back = [&]() {
+			if (depth >= plan.size()) {
+				return;
+			}
+			const std::vector<const char *> methods = plan[depth];
+			depth++;
+			for (const char *method : methods) {
+				vm::Slot result;
+				result.bits = 0;
+				(void)interpreter.call_method(listeners, method, nullptr, 0, &result);
+			}
+			depth--;
+		};
+		auto call_text = [&](const char *p_method) {
+			vm::Slot result;
+			result.bits = 0;
+			const bool ok = interpreter.call_method(listeners, p_method, nullptr, 0, &result);
+			std::string text = ok && result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : "failed";
+			if (ok) {
+				interpreter.discard(ir::Kind::Str, result);
+			}
+			return text;
+		};
+		// The second listener puts the node into words, and keys an Object by it: both work.
+		plan = { { "boom", "speak" } };
+		CHECK_EQ(call_text("emit"), std::string("caught boom"));
+		CHECK_EQ(engine.errors, std::string());
+		plan.clear();
+		CHECK(call_text("said").find("t:<#") == 0);
+		CHECK(call_text("said").find(" 1") != std::string::npos);
+		// The second listener emits in turn, and that emit's listener throws: the error comes out of the
+		// second listener's call, which ends there and is reported; the first is still the outer emit's.
+		plan = { { "boom", "relay" }, { "second" } };
+		CHECK_EQ(call_text("emit"), std::string("caught boom"));
+		CHECK_EQ(engine.errors.substr(0, engine.errors.find('\n')), std::string("Error: second"));
+		CHECK(engine.errors.find("boom") == std::string::npos);
+		CHECK(engine.errors.find("at Listeners/relay()") != std::string::npos);
+		plan.clear();
+		CHECK(call_text("said").find("relayed") == std::string::npos);
+		interpreter.release_object(listeners);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // A script object of a class that extends Godot's is written by its own public fields, as any other: the
 // Godot object it is attached to is not one of them. (One of Godot's values is refused: tests/godot_project.)
 static void test_json_script_object() {
@@ -2689,6 +2769,7 @@ int main() {
 	test_cycles_through_engine();
 	test_counted_cycles();
 	test_carried_errors();
+	test_carried_errors_per_call();
 	test_host_construct_order();
 	test_interface_table();
 	test_kept_traces();

@@ -91,6 +91,7 @@ bool Interpreter::any_text(Slot p_value, std::string *r_text) {
 // Godot's text for one of its values or objects (null for no handle), by a handle of its own while the
 // engine speaks, which can run a script. False if memory ran out, or if that script's toString() failed.
 bool Interpreter::engine_text(void *p_handle, std::string *r_text) {
+	const uint32_t carried_before = carries_;
 	void *held = p_handle ? host_.handles.copy(p_handle) : nullptr;
 	Str *text = held ? host_.handles.text(held) : nullptr;
 	*r_text += text ? text->view() : std::string_view("null");
@@ -104,7 +105,8 @@ bool Interpreter::engine_text(void *p_handle, std::string *r_text) {
 			return false;
 		}
 	}
-	return !carried_.held; // The script's toString() Godot ran failed: Godot's own text is not the value's.
+	// A script's toString() Godot ran for this text failed: Godot's own text is not the value's.
+	return carries_ == carried_before;
 }
 
 // A store of an untyped value into a register of another kind: AS3's coercion. False if it raised.

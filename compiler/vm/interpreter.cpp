@@ -57,6 +57,7 @@ Interpreter::~Interpreter() {
 	if (failing_) {
 		drop_any(pending_);
 	}
+	forget_subject();
 	// With every root let go of, what is left in loops is held only by itself, or by the host.
 	collector_.collect();
 	for (Str *constant : strings_) {
@@ -88,6 +89,7 @@ void Interpreter::clear_globals() {
 		globals_[i].bits = 0;
 		drop(module_.globals[i].kind, value);
 	}
+	forget_subject();
 }
 
 int Interpreter::line_at(size_t p_frame) const {
@@ -109,7 +111,7 @@ int Interpreter::line_at(size_t p_frame) const {
 bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result) {
 	const Function &function = module_.functions[p_function];
 	if (frames_.size() >= MAX_FRAMES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 		return false;
 	}
 	Frame frame;
@@ -181,7 +183,7 @@ void Interpreter::pop() {
 // back afterwards.
 bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
 	if (entries_ >= MAX_ENTRIES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 		return false;
 	}
 	const size_t depth = frames_.size();
@@ -205,11 +207,19 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	trace_lines_ = 0;
 	stopped_ = false;
 	halted_ = false;
+	// An error already carried for the instruction beneath (an earlier listener's) is that call's: set
+	// aside, so that what this call's own engine calls carry is judged and raised on its own.
+	Carried outer_carried;
+	const bool aside = carried_.held;
+	if (aside) {
+		outer_carried = std::move(carried_);
+		carried_ = Carried();
+	}
 
 	size_t depth = frames_.size();
 	bool ok = false;
 	if (entries_ >= MAX_ENTRIES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 	} else {
 		entering();
 		entries_++;
@@ -217,8 +227,15 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		entries_--;
 	}
 	// This program's code is running an instruction beneath this call: the error goes back to it, as Flash
-	// has an error in a listener come out of the dispatch that ran it.
-	const bool carry = !ok && depth > 0 && failing_ && !outer_failing && !outer_stopped;
+	// has an error in a listener come out of the dispatch that ran it. Only the first: a later listener's
+	// error, with one already carried, is reported here, where it happened.
+	const bool carry = !ok && depth > 0 && failing_ && !outer_failing && !outer_stopped && !aside;
+	if (!ok && !carry) {
+		report();
+	}
+	if (carried_.held) {
+		report_carried(); // Carried inside this call and taken back by nothing: reported here, as it would have been.
+	}
 	if (carry) {
 		carried_.held = true;
 		carried_.error = pending_;
@@ -227,12 +244,9 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		carried_.at = thrown_at_;
 		carried_.stopped = stopped_;
 		carried_.frames = depth;
-	} else if (!ok) {
-		report();
-	}
-	if (depth == 0 && carried_.held) {
-		raise_carried(); // Nothing took it back: it is reported here, as it would have been.
-		report();
+		carries_++;
+	} else if (aside) {
+		carried_ = std::move(outer_carried);
 	}
 	pending_ = outer_error;
 	failing_ = outer_failing;

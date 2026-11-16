@@ -273,7 +273,7 @@ package {
 	}
 
 	public dynamic native class RegExp {
-		public var lastIndex:Number;
+		public var lastIndex:int;
 		public native function RegExp(re:* = null, flags:* = null);
 		public native function get dotall():Boolean;
 		public native function get extended():Boolean;

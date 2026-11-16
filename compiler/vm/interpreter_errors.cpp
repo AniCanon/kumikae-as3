@@ -74,6 +74,10 @@ void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
 }
 
 // Error #1000, with nothing more allocated than the error object itself.
+void Interpreter::stack_overflow() {
+	raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+}
+
 void Interpreter::out_of_memory() {
 	if (failing_) {
 		return;
@@ -207,6 +211,24 @@ void Interpreter::raise_carried() {
 	trace_lines_ = carried_.lines;
 	thrown_at_ = carried_.at;
 	carried_.error.bits = 0;
+}
+
+void Interpreter::report_carried() {
+	const Slot error = pending_;
+	const bool failing = failing_;
+	std::string trace = std::move(trace_);
+	const size_t lines = trace_lines_;
+	const Site at = thrown_at_;
+	const bool stopped = stopped_;
+	failing_ = false; // So that raise_carried() does not let go of it.
+	raise_carried();
+	report();
+	pending_ = error;
+	failing_ = failing;
+	trace_ = std::move(trace);
+	trace_lines_ = lines;
+	thrown_at_ = at;
+	stopped_ = stopped;
 }
 
 std::string Interpreter::error_text() {
