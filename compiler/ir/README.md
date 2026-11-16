@@ -15,7 +15,9 @@ turns the checked tree from `src/` into it.
 | `lowerer.h` | The one class: its state and every method's declaration |
 | `lower_flow.h` | What is kept of the loops and `try` statements around the code being lowered (`Loop`, `TryBlock`, `TryExit`) |
 | `lower_emit`, `lower_types`, `lower_places` | Registers and constants; kinds, conversions, default values; what can be read and written |
-| `lower_expressions`, `lower_operators`, `lower_calls`, `lower_statements`, `lower_classes` | By what each lowers |
+| `lower_expressions`, `lower_operators`, `lower_calls`, `lower_statements` | By what each lowers |
+| `lower_classes` | Each class's place in the module, before any body is lowered: what it inherits, its fields, its methods and their table slots, Godot's virtuals it answers |
+| `lower_bodies` | The body of each function: its start and end, its parameters, a method, a constructor (with the fields' first values), a class's static initializer, package variables |
 | `lower_literals` | Number and string literals (a string's escapes), and the built-in library's constants: `NaN`, `Infinity`, the limits of the number types, Array's sort options |
 | `lower_engine` | Godot's members: properties, constants, singletons, parts of a value |
 | `lower_try` | `try`, `catch`, `finally` (handlers in `ir::Function`; the `finally` written once, every way out going through it) and labels |
