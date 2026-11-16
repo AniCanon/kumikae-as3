@@ -84,12 +84,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 The limits of [the C++ guidelines](cpp-guidelines.md) hold and are checked. These are its aims, and what
 the review of the clean-up put off.
 
-- 38 functions are over the 60-line aim (none over 120 but the three dispatch switches). The longest:
-  `Lexer::lex_punctuation` 120, the resolver's `statement` 109, `Parser::parse_primary` 99. **clean-up**
-- Ten files are over the 500-line aim (`names_bodies.cpp` 714, `parser_expr.cpp` 673, `lsp/server.cpp`
-  671, `godot_host.cpp` 647) and three headers over 300 (`ast.h`, `lowerer.h`, `names.h`). **clean-up**
-- Planned and not done: the listener sweep in a file of its own, `godot_values.cpp`, a table of handlers
-  in the language server. **clean-up**
 - The interpreter makes a new handle for every value Godot gives back, which is most of what a call into
   Godot now costs. A design change, for the native backend's stage. **clean-up**
 
