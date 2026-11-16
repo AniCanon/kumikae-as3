@@ -17,6 +17,8 @@ holds every program of `tests/run/` to the same output under both.
 | `patterns.h`, `function_simple.cpp` | The operations that are one C++ statement, as a table (arithmetic, conversions, comparisons), and constants |
 | `function_objects.cpp` | Fields, static fields, classes, jumps, returns and throws |
 | `function_calls.cpp` | Calls: direct, through the class's method table, by interface |
+| `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, Strings, untyped values, properties under a String key, a call through a function value |
+| `function_whole.cpp` | A sum of ints or uints converted back to one, as 32-bit arithmetic (exact, and three times as fast on `loop.as`) |
 | `thunks.h`, `thunks.cpp` | The operations left to the library the interpreter has, each one instruction the host carries out |
 | `program_writer.h`, `program_writer.cpp` | `program.h` and the program's table |
 
@@ -30,8 +32,9 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
 - A call between the program's functions is a C++ call. A virtual call goes through the class's method
   table (`c->classes[object->klass].code[slot]`), an interface call through its interface table.
 - A register that holds a String, an object or an untyped value owns a reference, except a parameter
-  that is never written, which borrows its caller's. A result is the caller's. Counts change only in
-  `retain(c, x)` and `release(c, x)`.
+  that is never written, which borrows its caller's. A result is the caller's, and a register returned
+  hands its reference over. (That is the only move so far: a value's last use elsewhere still takes a
+  reference and gives one back.) Counts change only in `retain(c, x)` and `release(c, x)`.
 - An error is `c->failing`, tested after each operation that can raise one. The function then goes to
   its handlers, or leaves by `failed`, which puts its line into the trace: nothing about lines is kept
   while a program runs. (A program that reads `getStackTrace()` is the exception: its functions keep a

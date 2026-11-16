@@ -22,7 +22,7 @@ anyone changing the repository are in [AGENTS.md](../AGENTS.md).
 | `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
 | `vm/` host | What the interpreter needs from where it runs | `host.h` holds four interfaces: `output.h`, `engine_handles.h` (what is done to a value the interpreter holds), `engine_source.h` (where values come from), `clock.h` (the time and the zone, for Date). `no_engine.h` answers where there is no engine |
 | `backend_cpp/` | The C++ backend: the IR written as C++ source. Includes `ir/` only; writes text | `generate` (the entry point), `support` (what is refused), `function_writer` and `function_*.cpp` (a function, by kind of operation), `patterns.h` (the one-statement operations as a table), `thunks` (what is left to the shared library), `program_writer` (the header and the program's table) |
-| `runtime/` | What generated C++ is built against, and the host a program library runs in where there is no engine. Includes `vm/` and `ir/`; no Godot header yet | `kas3.h` and what it includes (`values.h`, `numbers.h`, `fast.h`, `operations.h`, `program.h`), `host`, `errors.cpp`, `calls.cpp`, `stub_module.cpp` and `bridge.cpp` (the interpreter kept for the shared library), `standalone_main.cpp` |
+| `runtime/` | What generated C++ is built against, and the host a program library runs in where there is no engine. Includes `vm/` and `ir/`; no Godot header yet | `kas3.h` and what it includes (`values.h`, `numbers.h`, `fast.h`, `operations.h`, `program.h`), `host`, `errors.cpp`, `calls.cpp` and `properties.cpp` (the fast paths that are not inline), `stub_module.cpp` and `bridge.cpp` (the interpreter kept for the shared library), `standalone.cpp` and `standalone_main.cpp` (a program run on its own) |
 | `godot_ext/` | The GDExtension | `godot_host` (the four interfaces, with Godot's calls), `callable` (a method as a Godot function, and listeners as the cycle collector sees them), `instance`, `script`, `program`, `language`, `register` |
 | `lsp/` | The language server | `server`, `workspace`, `json` |
 | `godot/` | The generator of Godot's API as AS3 declarations | `generate.py`, `naming.py`, the generated `godot.as` and `godot_names.txt` |
@@ -211,7 +211,8 @@ It writes one `.cpp` for each class, `program.h` (each class as a struct, every 
 The C++ is built against `runtime/` with `-O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops`,
 and builds without a warning under `-Wall -Wextra`. A program that uses something the backend does not
 translate yet is refused with `kas3c: not yet supported: <what>` and status 1, and nothing is written:
-today that is anything that asks Godot (this first step has no engine).
+today that is anything that asks Godot (this first step has no engine), which is every script given with
+`--godot` (the files are scripts for Godot, as for `kas3c ir --godot`).
 
 Linked with `libkas3runtime.a` and the interpreter's libraries, the C++ is a plain executable that runs the
 program as `kas3c run` does: the same traces, the same report of an error nothing catches, the same exit

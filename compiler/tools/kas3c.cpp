@@ -25,7 +25,7 @@ static const char *const USAGE =
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c run <file>...\n"
 		"       kas3c ir [--godot] <file>...\n"
-		"       kas3c cpp <file>... -o <folder>\n"
+		"       kas3c cpp [--godot] <file>... -o <folder>\n"
 		"       kas3c lsp [--stdio] [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
@@ -55,6 +55,8 @@ static const char *const USAGE =
 		"       .cpp for each class, program.h and program.cpp, to be built against\n"
 		"       compiler/runtime. A program that uses something not translated yet is\n"
 		"       refused with `not yet supported: <operation>`, and nothing is written.\n"
+		"       --godot  the files are scripts for Godot, as for `ir`: refused for now,\n"
+		"                since the backend does not ask the engine for anything yet\n"
 		"\n"
 		"lsp    Serve an editor over standard input and output with the Language Server\n"
 		"       Protocol: errors as you type, go to definition, find references, hover,\n"
@@ -278,7 +280,7 @@ static int run_cpp(int p_argc, char **p_argv) {
 	}
 	kas3::ir::Module module;
 	int status = 0;
-	if (!compile(static_cast<int>(rest.size()), rest.data(), &module, &status)) {
+	if (!compile(static_cast<int>(rest.size()), rest.data(), &module, &status, true)) {
 		return status;
 	}
 	const kas3::backend_cpp::Generated generated = kas3::backend_cpp::generate(module);

@@ -53,12 +53,20 @@ registers. Until they are split from it (the list below), the host keeps an inte
 - The host's own needs go the same way (`Builtin`): Error #1009 and #1023 are raised by the interpreter,
   never worded here.
 
-What this costs: a thunk is an entry into the interpreter (a frame, a few instructions), tens of times
-what the operation itself takes; and the interpreter lets entries nest only `MAX_ENTRIES` (64) deep, so
-a recursion that passes through a thunk that calls back on every level (an untyped value's `toString()`,
-a sort's comparison that sorts) ends with Error #1023 earlier than the interpreter would end it. Calls
-through function values, `toString()` of an object of a class, and interface calls do not pass through a
-thunk, for that reason.
+What this costs, until the split:
+
+- A thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
+  most operations take. `fast.h` exists for that reason.
+- The interpreter lets entries nest only `MAX_ENTRIES` (64) deep. A recursion that passes through a thunk
+  that calls back on every level (a sort's comparison that sorts, a JSON reviver that parses, a getter
+  reached by name that reads another) ends with Error #1023 at the 63rd, where the interpreter would go
+  on to 10,000 calls. Calls through function values, `toString()` of an object of a class (typed or held
+  untyped) and interface calls do not pass through a thunk, for that reason.
+- Where the interpreter itself refuses an entry (its own library's calls count too), it keeps the error
+  until the instruction beneath ends; generated functions in between are left without their handlers
+  being offered it (`Host::carried`): a `finally` there does not run.
+- A program run on its own has no limit on its time, where `kas3c run` stops one after 15 seconds
+  (Error #1502): the limit is the interpreter's loop's.
 
 ## To split out of `vm/`, so that no interpreter is needed
 
@@ -77,8 +85,9 @@ Each is used here through a thunk or a workaround, named so that the split can b
    `object_text` / `error_heading`. The host makes the interpreter raise each (`Builtin`).
 5. Lifetime: freeing an object with what it holds (`drop_object`, now reached through `free_kept()` and
    `discard()`), and making one on the collector's list (`Collector::list_for` is the interpreter's own:
-   `new` goes by thunk for that alone). With both, allocation can have the inline fast path the design asks
-   for.
+   `new` of a class the collector looks at, a new Array, Vector, Object or Dictionary go by thunk for that
+   alone; `new_object()` makes the others). With both, allocation can have the inline fast path the design
+   asks for: today there is none, each object is one `calloc`.
 6. `any.h`: the tag and the payloads as inline functions, so that an untyped value is kept and let go of
    inline.
 7. Classes as the host's descriptors (`ClassInfo`) where the library now takes `ir::Class`: `each_held()`,
