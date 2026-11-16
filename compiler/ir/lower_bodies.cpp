@@ -1,3 +1,4 @@
+#include "lower_engine.h"
 #include "lower_statements.h"
 
 namespace kas3 {
@@ -157,7 +158,7 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 			}
 			// Those with a written value too: a method that the values of the fields above call may read it.
 			if (field != fields_.end() && module_.classes[index].fields[field->second].kind == Kind::Val) {
-				uint32_t zero = zero_value(declarator.type, declarator.offset);
+				uint32_t zero = Engine(*this).zero_value(declarator.type, declarator.offset);
 				if (zero != NONE) {
 					emit(Op::SetField, declarator.offset, 0, field->second, zero);
 				}
@@ -223,7 +224,7 @@ void Lowerer::lower_statics(Unit &p_unit, ClassDecl *p_class) {
 			auto global = globals_.find(declarator.symbol);
 			// With a written value too: one worked out above it may read it.
 			if (global != globals_.end() && module_.globals[global->second].kind == Kind::Val) {
-				uint32_t zero = zero_value(declarator.type, declarator.offset);
+				uint32_t zero = Engine(*this).zero_value(declarator.type, declarator.offset);
 				if (zero != NONE) {
 					emit(Op::SetGlobal, declarator.offset, global->second, zero);
 				}
@@ -262,7 +263,7 @@ void Lowerer::lower_package_variables(Unit &p_unit, VarDecl *p_decl) {
 			module_.initializers.insert(module_.initializers.begin() + static_cast<std::ptrdiff_t>(zeroes_), index);
 			zeroes_++;
 			begin(index, p_unit, nullptr);
-			const uint32_t zero = zero_value(declarator.type, declarator.offset);
+			const uint32_t zero = Engine(*this).zero_value(declarator.type, declarator.offset);
 			if (zero != NONE) {
 				emit(Op::SetGlobal, declarator.offset, global->second, zero);
 			}

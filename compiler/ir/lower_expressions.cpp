@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_engine.h"
 #include "lower_engine_calls.h"
 #include "lower_library.h"
 #include "lower_operators.h"
@@ -124,11 +125,11 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 				: nullptr;
 		std::vector<uint32_t> list;
 		EngineCalls(*this).engine_arguments(decl, made->arguments, position, list);
-		if (stores_int32(made->type)) {
+		if (Engine(*this).stores_int32(made->type)) {
 			// Its constructor takes anything in its first places, so the width is checked here.
 			for (size_t i = 0; i < list.size() && i < made->arguments.count; i++) {
 				if (is_integral(kind_at(list[i])) || whole(made->arguments[i])) {
-					list[i] = as_int32(list[i], made->arguments[i]->offset);
+					list[i] = Engine(*this).as_int32(list[i], made->arguments[i]->offset);
 				}
 			}
 		}
@@ -289,7 +290,7 @@ uint32_t Lowerer::unary(Unary *p_unary, Kind p_want) {
 		case TokenKind::Plus: {
 			Kind result = Kind::Void;
 			if (is_engine(natural(p_unary->operand)) && kind_of(p_unary->type, &result) && result != Kind::Void) {
-				return engine_operate(p_unary->op, { operand(p_unary->operand) }, result, p_unary->type, position);
+				return Engine(*this).engine_operate(p_unary->op, { Engine(*this).operand(p_unary->operand) }, result, p_unary->type, position);
 			}
 			if (const std::optional<int64_t> exact = wide_literal(p_unary); exact && p_want == Kind::I64) {
 				uint32_t out = reg(Kind::I64);
@@ -414,9 +415,9 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 		kind_of(p_assign->value->type, &right_kind);
 		bool strings = p_assign->op == TokenKind::PlusAssign && (place.kind == Kind::Str || is_string_type(p_assign->value->type));
 		bool engine = !strings && (is_engine(kind_at(old)) || is_engine(right_kind));
-		uint32_t right = engine ? operand(p_assign->value, p_assign->target->type) : wide_operand(p_assign->value, strings || p_assign->op == TokenKind::SlashAssign ? Kind::Void : place.kind);
+		uint32_t right = engine ? Engine(*this).operand(p_assign->value, p_assign->target->type) : wide_operand(p_assign->value, strings || p_assign->op == TokenKind::SlashAssign ? Kind::Void : place.kind);
 		if (engine) {
-			value = convert(engine_operate(p_assign->op, { old, right }, place.kind, p_assign->target->type, position), place.kind, position);
+			value = convert(Engine(*this).engine_operate(p_assign->op, { old, right }, place.kind, p_assign->target->type, position), place.kind, position);
 		} else {
 			value = convert(Operators(*this).operate(p_assign->op, old, right, strings, position), place.kind, position);
 		}

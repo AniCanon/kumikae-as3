@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_engine.h"
 #include "lower_library.h"
 #include "lower_operators.h"
 
@@ -247,9 +248,9 @@ uint32_t Operators::comparison(Binary *p_binary) {
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
 	if (is_engine(l_.natural(left)) || is_engine(l_.natural(right))) {
-		uint32_t a = l_.settled(l_.operand(left), right, position);
-		uint32_t b = l_.operand(right);
-		return l_.engine_operate(p_binary->op, { a, b }, Kind::Bool, nullptr, position);
+		uint32_t a = l_.settled(Engine(l_).operand(left), right, position);
+		uint32_t b = Engine(l_).operand(right);
+		return Engine(l_).engine_operate(p_binary->op, { a, b }, Kind::Bool, nullptr, position);
 	}
 	bool swap_sides = p_binary->op == TokenKind::Greater || p_binary->op == TokenKind::GreaterEqual;
 	bool with_equal = p_binary->op == TokenKind::LessEqual || p_binary->op == TokenKind::GreaterEqual;
@@ -333,9 +334,9 @@ uint32_t Operators::equality(Binary *p_binary) {
 		op = kind == Kind::Str ? Op::EqStr : Op::EqRef;
 	} else if (is_engine(a) || is_engine(b)) {
 		// Godot's own equality: the same object, or equal values.
-		uint32_t x = l_.settled(l_.operand(left), right, position);
-		uint32_t y = l_.operand(right);
-		return l_.engine_operate(p_binary->op, { x, y }, Kind::Bool, nullptr, position);
+		uint32_t x = l_.settled(Engine(l_).operand(left), right, position);
+		uint32_t y = Engine(l_).operand(right);
+		return Engine(l_).engine_operate(p_binary->op, { x, y }, Kind::Bool, nullptr, position);
 	} else if (a == Kind::Str && b == Kind::Str) {
 		kind = Kind::Str;
 		op = Op::EqStr;
@@ -421,9 +422,9 @@ uint32_t Operators::arithmetic(Binary *p_binary, Kind p_want) {
 			l_.refuse(position, "this operator on a Godot value");
 			return l_.default_value(p_want, position);
 		}
-		uint32_t a = l_.settled(l_.operand(left, right->type), right, position);
-		uint32_t b = l_.operand(right, left->type);
-		return l_.engine_operate(p_binary->op, { a, b }, result, p_binary->type, position);
+		uint32_t a = l_.settled(Engine(l_).operand(left, right->type), right, position);
+		uint32_t b = Engine(l_).operand(right, left->type);
+		return Engine(l_).engine_operate(p_binary->op, { a, b }, result, p_binary->type, position);
 	}
 	// Division is done in Numbers, so a literal beside an Int64 stays the Number it is written as.
 	bool exact = !strings && p_binary->op != TokenKind::Slash;

@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_engine.h"
 #include "lower_engine_calls.h"
 
 namespace kas3 {
@@ -38,10 +39,10 @@ uint32_t EngineCalls::engine_text(Call *p_call) {
 uint32_t EngineCalls::godot_call(Call *p_call, Symbol *p_method) {
 	uint32_t position = p_call->offset;
 	if (p_method->is_static()) {
-		if (Lowerer::is_singleton(p_method->owner) && Lowerer::on_object(p_call->callee)) {
+		if (Engine::is_singleton(p_method->owner) && Engine::on_object(p_call->callee)) {
 			return engine_call(p_call, p_method); // `i.isActionPressed()`: on the object `i` holds.
 		}
-		return Lowerer::is_singleton(p_method->owner) ? engine_call(p_call, p_method, l_.singleton(p_method->owner, position)) : static_call(p_call, p_method);
+		return Engine::is_singleton(p_method->owner) ? engine_call(p_call, p_method, Engine(l_).singleton(p_method->owner, position)) : static_call(p_call, p_method);
 	}
 	Expr *callee = p_call->callee;
 	bool through_super = callee->kind == NodeKind::Member && static_cast<Member *>(callee)->object->kind == NodeKind::SuperExpr;
@@ -158,7 +159,7 @@ uint32_t EngineCalls::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t
 	const bool own = script && index->object->kind == NodeKind::ThisExpr && !l_.fn().is_static;
 	uint32_t object_reg = own ? l_.self(p_expression->offset, true)
 			: script && index->object->kind != NodeKind::ThisExpr ? l_.expression(index->object, Kind::Obj)
-			: l_.engine_receiver(index->object, p_expression->offset, &of_value);
+			: Engine(l_).engine_receiver(index->object, p_expression->offset, &of_value);
 	*r_object = l_.settled(object_reg, index->index, p_expression->offset);
 	*r_object = l_.settled(*r_object, p_later, p_expression->offset);
 	*r_name = l_.settled(l_.expression(index->index, Kind::Str), p_later, p_expression->offset);
@@ -261,7 +262,7 @@ uint32_t EngineCalls::engine_call(Call *p_call, Symbol *p_method, uint32_t p_rec
 	Expr *object = p_call->callee->kind == NodeKind::Member ? static_cast<Member *>(p_call->callee)->object : nullptr;
 	std::vector<uint32_t> list;
 	uint32_t script_object = NONE; // Set if the member is reached through another script object.
-	const uint32_t receiver = p_receiver != NONE ? p_receiver : l_.engine_receiver(object, position, &of_value, &script_object);
+	const uint32_t receiver = p_receiver != NONE ? p_receiver : Engine(l_).engine_receiver(object, position, &of_value, &script_object);
 	if (script_object != NONE) {
 		script_object = l_.settled(script_object, Lowerer::writer(p_call->arguments), position);
 		list.push_back(receiver); // Filled in below, after the arguments.
@@ -271,7 +272,7 @@ uint32_t EngineCalls::engine_call(Call *p_call, Symbol *p_method, uint32_t p_rec
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
 	engine_arguments(decl, p_call->arguments, position, list, defaults_key(p_method));
 	if (script_object != NONE) {
-		l_.owner_of(script_object, receiver, object->offset);
+		Engine(l_).owner_of(script_object, receiver, object->offset);
 	}
 	if (p_before) {
 		l_.emit(p_before->op, p_before->position, p_before->a, p_before->b, p_before->c); // What the receiver still needs.

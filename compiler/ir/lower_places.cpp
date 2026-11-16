@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_engine.h"
 #include "lower_library.h"
 #include "lower_members.h"
 
@@ -93,7 +94,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 	if (p_target->kind == NodeKind::Name) {
 		Name *name = static_cast<Name *>(p_target);
 		if (name->symbol && is_godot(name->symbol) && (name->symbol->kind == SymbolKind::Property || name->symbol->kind == SymbolKind::Field)) {
-			return engine_place(name->symbol, nullptr, name->offset);
+			return Engine(*this).engine_place(name->symbol, nullptr, name->offset);
 		}
 		const bool member = name->symbol && name->symbol->is_instance_member();
 		if (member && fn().is_static) {
@@ -110,7 +111,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 		Member *member = static_cast<Member *>(p_target);
 		Symbol *symbol = member->resolved();
 		if (symbol && is_godot(symbol) && (symbol->kind == SymbolKind::Property || symbol->kind == SymbolKind::Field)) {
-			return engine_place(symbol, member->object, member->name_offset, p_later);
+			return Engine(*this).engine_place(symbol, member->object, member->name_offset, p_later);
 		}
 		if (std::optional<Place> property = Members(*this).property(member, member->object, p_later)) {
 			return *property;
@@ -140,7 +141,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 			place.where = Place::Engine;
 			place.type = p_target->type;
 			place.of_value = true;
-			if (index->object->kind == NodeKind::Name || index->object->kind == NodeKind::Member || stored_element(index->object)) {
+			if (index->object->kind == NodeKind::Name || index->object->kind == NodeKind::Member || Engine(*this).stored_element(index->object)) {
 				place.part = &parts_.emplace_back();
 				place.part->whole = place_of(index->object);
 				whole_of(place, p_target->offset);
@@ -176,7 +177,7 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 		}
 		case Place::Engine: {
 			if (p_place.script_object != NONE) {
-				owner_of(p_place.script_object, p_place.object, p_position);
+				Engine(*this).owner_of(p_place.script_object, p_place.object, p_position);
 			}
 			uint32_t object = p_place.part ? whole_of(p_place, p_position) : p_place.object;
 			uint32_t out = engine_reg(p_place.kind, p_place.type);
@@ -247,7 +248,7 @@ void Lowerer::store(const Place &p_place, uint32_t p_value, uint32_t p_position)
 				refuse(p_position, "changing one part of a Godot value that is not stored anywhere");
 			} else {
 				if (p_place.script_object != NONE) {
-					owner_of(p_place.script_object, p_place.object, p_position);
+					Engine(*this).owner_of(p_place.script_object, p_place.object, p_position);
 				}
 				emit(Op::HostSet, p_position, p_place.object, p_place.index, p_value);
 			}

@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_engine.h"
 #include "lower_operators.h"
 #include "lower_statements.h"
 
@@ -85,7 +86,7 @@ void Statements::declare_locals(Node *p_body) {
 				l_.emit(Op::AnyConst, declarator.offset, local, 1); // An Object starts null; a `*` undefined.
 			} else if (kind == Kind::Val && !valued.count(declarator.symbol)) {
 				// One of Godot's values with parts starts at its zero.
-				l_.zero_value(declarator.type, declarator.offset, local);
+				Engine(l_).zero_value(declarator.type, declarator.offset, local);
 			}
 		}
 		return true;

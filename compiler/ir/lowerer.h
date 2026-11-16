@@ -223,6 +223,7 @@ class Lowerer {
 	friend class EngineCalls; // Calls of Godot's methods and functions: lower_engine_calls.h
 	friend class Statements; // Statements and where control goes: lower_statements.h
 	friend class Operators; // Operators on two values, and `is` and `as`: lower_operators.h
+	friend class Engine; // Godot's members, values and operators: lower_engine.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 
@@ -246,40 +247,7 @@ class Lowerer {
 	// An element of a vector, or its length or `fixed`, as a place. Nothing if the target is none of those.
 	std::optional<Place> vector_place(Expr *p_target, Expr *p_later);
 
-	// The engine object a Godot member is reached through: the script's own owner when nothing is
-	// written before the name, or the value of what is written.
-	uint32_t engine_receiver(Expr *p_object, uint32_t p_position, bool *r_of_value, uint32_t *r_script_object = nullptr);
-	void owner_of(uint32_t p_script_object, uint32_t p_owner, uint32_t p_position);
-
-	// One of Godot's values that is made of parts (a Vector2's x and y, a Color's r, g, b and a) is never
-	// missing unless a program says so: a variable of it with no value written starts at the type's zero,
-	// as it does in GDScript. This gives that zero in a new register, or NONE for any other type (an array,
-	// a signal, a function), which starts missing as an object does.
-	uint32_t zero_value(TypeRef *p_written, uint32_t p_position, uint32_t p_into = NONE);
-
-	// One of Godot's values that stores 32-bit integers: every part of it is an `int`, or is such a value
-	// (Vector2i; Rect2i, which is two of them). Godot cuts a wider integer off inside these without a
-	// word, so a whole number on its way into one goes as an `int`, and says so if it does not fit.
-	bool stores_int32(const Type *p_type) const;
-
-	// A whole number in p_reg, as the `int` a 32-bit value takes: checked, never cut.
-	uint32_t as_int32(uint32_t p_reg, uint32_t p_position);
-
-	// A class Godot keeps one object of (Input): tagged [Singleton] in the declarations.
-	static bool is_singleton(const Symbol *p_class);
-	static bool on_object(const Expr *p_member);
-	bool stored_element(const Expr *p_expression);
 	bool extends_counted(const Symbol *p_class) const;
-
-	// The engine's one object of a singleton class. Everything written `Input.x` is then a member of it.
-	uint32_t singleton(const Symbol *p_class, uint32_t p_position);
-
-	// One of Godot's constants. One with a value in the declarations (`Key.ESCAPE`) is that value; any
-	// other (`Vector2.ZERO`) is asked of the engine.
-	Place constant_place(Symbol *p_symbol, uint32_t p_position);
-
-	// A property or field of an engine object.
-	Place engine_place(Symbol *p_symbol, Expr *p_object, uint32_t p_position, Expr *p_later = nullptr);
 
 	Place place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_position);
 
@@ -345,18 +313,10 @@ class Lowerer {
 	// The kind an operand has for an operator: an Int64 for a whole number written beside one.
 	Kind operand_kind(Expr *p_expression, Expr *p_other);
 
-	// An operand for the engine, as the checker typed it: Godot tells a whole number from a fraction
-	// (`Vector2i * 2` is a Vector2i), and the interpreter's own arithmetic is all in fractions.
-	uint32_t operand(Expr *p_expression, const Type *p_beside = nullptr);
-
 	// The checker's rule for a whole number (names_types.cpp, `whole`): an int or uint, or sums,
 	// differences, products and remainders of such. AS3 works `i + 1` out as a Number, but the checker
 	// gave `cell * (i + 1)` the type Godot gives a whole number, so a whole number is what Godot must get.
 	bool whole(const Expr *p_expression);
-
-	// An operator that Godot carries out, because an operand is one of its values. The operator goes as
-	// AS3 writes it; `v += w` is `v + w`.
-	uint32_t engine_operate(TokenKind p_op, std::vector<uint32_t> p_operands, Kind p_result, const Type *p_type, uint32_t p_position);
 
 	bool is_string_type(const Type *p_type) const;
 
