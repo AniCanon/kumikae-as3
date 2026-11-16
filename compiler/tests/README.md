@@ -13,7 +13,7 @@ Every group runs under `ctest`. What each is, in more words, is in the
 | `godot_project/` | AS3 inside Godot, compared with GDScript | A method in a `.as` script, a `show(name, ask(...), <what GDScript gives>)` line in its `.gd` driver, the name in `run_godot.py` |
 | `corpus/`, `external/` | Real AS3 from elsewhere must still parse (`external/` is fetched, not committed). `run_corpus.py` says which corpus programs the interpreter takes and what stops the others; `run_godot.py` runs the ones in `corpus/runs.txt` inside Godot | A program that starts to run: its name in `corpus/runs.txt`, or in `corpus/waits.txt` with what it waits for |
 | `bench/` | Timings, not pass or fail | `run_bench.py <build> [--godot tests] [--against <other build>]`; `run_native_bench.py <build> [--against <other build>]` for native code against the interpreter; `languages/run.py [--against <other extension project>]` for the same workloads in Godot C#, GDScript and AS3; `recheck.py <build> --against <other> --lines 100000 1000000`; `completion.py` |
-| `test_incremental.cpp`, `test_server_incremental.cpp`, `oracle_project.h`, `oracle_edits.h` | Incremental checking against a fresh whole check | A named sequence in `test_directed`, or an edit kind in `oracle_edits.h` |
+| `test_incremental.cpp`, `test_incremental_named.cpp`, `test_server_incremental.cpp`, `oracle_project.h`, `oracle_edits.h`, `oracle_answers.h` | Incremental checking against a fresh whole check | A named sequence in `test_directed`, or an edit kind in `oracle_edits.h` |
 | `test_cli.py`, `test_lsp_stdio.py` | `kas3c` as a program | |
 | `build_ios.sh`, `build_ios_simulator_template.sh` | The extension for iOS, and a Simulator template from Godot's source | |
 
@@ -59,7 +59,7 @@ check that stops, a question about one file, or nothing. After them every file's
 `dump_types`, and completion, hover, definition and argument help at sampled places must equal a fresh,
 fully checked workspace's, with no rebuild at all: files copied in and removed, files moved between
 packages, accessor halves overridden along a chain and a declaration file with mistaken tags are among the
-edits. Named sequences cover what random edits seldom reach (an interface cycle cut elsewhere, the first
+edits. In `test_incremental_named`, named sequences cover what random edits seldom reach (an interface cycle cut elsewhere, the first
 definition of a name changing, halves across files and along a chain, more than 100 errors, broken files
 repaired, override defaults), and named tests a chain of 70 and of 1,000 classes, packages released, a
 declaration file's tag errors said once, and a tree checked twice. `test_scope` pins how
