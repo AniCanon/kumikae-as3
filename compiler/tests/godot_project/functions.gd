@@ -23,6 +23,7 @@ func _physics_process(_delta: float) -> bool:
 	if frames > 2:
 		return true
 	show("lerpf", ask("mix", [2.0, 6.0, 0.25]), lerpf(2.0, 6.0, 0.25))
+	show("rest from Godot", [ask("gather", [1]), ask("gather", [1, "a", 2])], ["1;0;", "1;2;a,2"])
 	show("clampf", ask("hold", [3.5]), clampf(3.5, -1, 1))
 	show("clampi", ask("holdWhole", [42]), clampi(42, 0, 10))
 	show("absi", ask("size", [-9007199254740993]), absi(-9007199254740993))
@@ -44,6 +45,13 @@ func _physics_process(_delta: float) -> bool:
 	ask("say", [4, Vector2(1, 2)])
 	show("lerp as a number", ask("mixAny", [2.0, 6.0, 0.25]), lerp(2.0, 6.0, 0.25))
 	show("max of three", ask("largest", [3, 9, 7]), max(3, 9, 7))
+	show("lerp of vectors", ask("lerpVector"), lerp(Vector2.ZERO, Vector2.ONE, 0.5))
+	show("int of lerp cuts", ask("lerpCut"), 1)
+	show("Boolean of max", ask("maxAsCondition"), true)
+	show("lerp and max as text", ask("lerpText"), "1.5 5")
+	show("lerp of anything", ask("lerpAnything", [Vector3.ZERO, Vector3.ONE]), lerp(Vector3.ZERO, Vector3.ONE, 0.5))
+	show("lerp into the wrong type", ask("lerpWrongType"), null)
+	show("max past what a Number holds", ask("widest", [9007199254740993, 1]), null)
 	show("wrong argument", ask("wrong", ["one"]), null)
 	show("in a loop", ask("count", [10]), 3 + 3 + 3 + 3 + 4 + 5 + 6 + 7 + 8 + 9)
 	show("no arguments", ask("nothing"), true)
@@ -53,5 +61,8 @@ func _physics_process(_delta: float) -> bool:
 	ask("run")
 	ask("run")
 	show("a default is not shared", ask("reached"), 1)
+	show("now", ask("since", [Time.get_unix_time_from_system() * 1000.0]), true)
+	show("zone", ask("zone"), Time.get_time_zone_from_system().bias)
+	show("a regular expression", ask("marked", ["a1 b22"]), "a<1> b<22> a1%20b22 %C3%A9")
 	node.free()
 	return false

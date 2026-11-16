@@ -4,6 +4,16 @@ import re
 PREFIX = "@kas3-test-v1 "
 
 
+def field(output, start, units):
+    end = start
+    while units > 0 and end < len(output):
+        units -= 2 if ord(output[end]) > 0xFFFF else 1
+        end += 1
+    if units != 0 or end >= len(output) or output[end] != "\n":
+        raise ValueError("Truncated AS3 test event")
+    return output[start:end], end + 1
+
+
 def parse(output):
     events = []
     cursor = 0
@@ -24,13 +34,8 @@ def parse(output):
         name_size, message_size = int(name_size), int(message_size)
         if name_size > 65536 or message_size > 1048576:
             raise ValueError("AS3 test event is too large")
-        name_start = end + 1
-        message_start = name_start + name_size + 1
-        cursor = message_start + message_size + 1
-        if cursor > len(output) or output[message_start - 1] != "\n" or output[cursor - 1] != "\n":
-            raise ValueError("Truncated AS3 test event")
-        name = output[name_start:message_start - 1]
-        message = output[message_start:cursor - 1]
+        name, cursor = field(output, end + 1, name_size)
+        message, cursor = field(output, cursor, message_size)
         if not name or "::" in name or "\n" in name or "\r" in name:
             raise ValueError("Test names must be single-line and cannot contain ::")
         if kind == "suiteStarted" and suite is None and test is None:

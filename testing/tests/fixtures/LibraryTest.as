@@ -10,7 +10,7 @@ package {
             var suite:Suite = new Suite("library");
             suite.add(new ProbeCase("pass", false));
             suite.add(new ProbeCase("failure", true));
-            suite.add(new ProbeCase("continues", false));
+            suite.add(new ProbeCase("continues 😀", false));
             var passed:Boolean = suite.run();
             if (passed || cleaned != 3) {
                 throw new Error("Suite must continue and clean up after failures");

@@ -2,6 +2,7 @@
 #include "godot_host.h"
 
 #include "any.h"
+#include "handles.h"
 
 #include <godot_cpp/core/object_id.hpp>
 
@@ -30,13 +31,19 @@ Variant untyped_to_variant(const vm::Slot &p_slot) {
 			handle.p = vm::any::pointer(p_slot);
 			return to_variant(ir::Kind::Ref, handle);
 		}
+		case vm::AnyTag::Object: {
+			// A script object, an Array or a vector: as Godot holds each; null for one Godot can't hold.
+			Variant made;
+			std::string error;
+			return object_element(static_cast<const vm::Object *>(vm::any::pointer(p_slot)), &made, &error) ? made : Variant();
+		}
 		default:
 			return Variant();
 	}
 }
 
 // What Godot gives, as an untyped value: an integer that fits an `int` as one, a larger one as an Int64.
-vm::Slot untyped_from_variant(const Variant &p_value) {
+std::optional<vm::Slot> untyped_from_variant(const Variant &p_value) {
 	switch (p_value.get_type()) {
 		case Variant::NIL:
 			return vm::any::null();
@@ -48,21 +55,32 @@ vm::Slot untyped_from_variant(const Variant &p_value) {
 				return vm::any::integer((int32_t)value);
 			}
 			vm::Wide *wide = vm::new_wide(value);
-			return wide ? vm::any::wide(wide) : vm::any::null();
+			if (!wide) {
+				return std::nullopt;
+			}
+			return vm::any::wide(wide);
 		}
 		case Variant::FLOAT:
 			return vm::any::number((double)p_value);
-		case Variant::STRING: {
+		case Variant::STRING:
+		case Variant::STRING_NAME:
+		case Variant::NODE_PATH: {
+			// AS3 has one kind of text: Godot's names and paths are Strings too. (Godot takes a String
+			// back wherever it takes one of them.)
 			CharString utf8 = String(p_value).utf8();
-			return vm::any::string(vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length())));
+			vm::Str *text = vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));
+			if (!text) {
+				return std::nullopt;
+			}
+			return vm::any::string(text);
 		}
 		case Variant::OBJECT:
 			if (((ObjectID)p_value).is_null()) {
 				return vm::any::null();
 			}
-			return vm::any::godot_object(new Variant(p_value));
+			return vm::any::godot_object(make_handle(p_value));
 		default:
-			return vm::any::godot_value(new Variant(p_value));
+			return vm::any::godot_value(make_handle(p_value));
 	}
 }
 

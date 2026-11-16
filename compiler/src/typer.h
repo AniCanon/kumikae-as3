@@ -12,11 +12,6 @@
 
 namespace kas3 {
 
-inline Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_table, std::string_view p_name) {
-	auto found = p_table.find(p_name);
-	return found == p_table.end() ? nullptr : found->second;
-}
-
 class Typer {
 	Compilation &compilation_;
 	Unit &unit_;
@@ -26,6 +21,7 @@ class Typer {
 	FunctionDecl *current_ = nullptr; // The innermost function being typed.
 	mutable std::map<std::pair<Symbol *, Symbol *>, std::pair<bool, bool>> related_; // is_a's answers.
 	bool leaves_ = false; // It has a `return <value>` or a `throw` somewhere in its own body.
+	Expr *assigned_ = nullptr; // The target of the `=` being typed: written, not read.
 
 	const Type *any_;
 	const Type *unknown_;
@@ -44,6 +40,8 @@ class Typer {
 	const Type *class_type_;
 
 	void error(uint32_t p_offset, std::string p_message) { unit_.diagnostics.error(p_offset, std::move(p_message)); }
+	void warning(uint32_t p_offset, std::string p_message) { unit_.diagnostics.warning(p_offset, std::move(p_message)); }
+	void no_type(uint32_t p_offset, std::string_view p_what);
 
 
 
@@ -84,6 +82,10 @@ class Typer {
 
 	// Reports a write to something that can't be written: `x = ...`, `x += ...`, `x++`.
 	void written(Expr *p_target);
+	// Reports a read of a property that has no getter: `x`, `o.x`, and the read in `x += 1` or `x++`.
+	void read(Expr *p_expression);
+	// The property a name or a member names, the interface or class it is reached through, and where.
+	Symbol *property_of(Expr *p_expression, Symbol **r_through, uint32_t *r_offset);
 
 	const Type *symbol_type(Symbol *p_symbol, const Type *p_element);
 
@@ -97,6 +99,7 @@ class Typer {
 
 	bool members_known(Symbol *p_class);
 
+	const Type *static_member_type(const Type *p_object, Member *p_member);
 	const Type *member_type(const Type *p_object, Member *p_member);
 
 	const Type *number_literal(const NumberLit *p_literal) const;
@@ -141,12 +144,23 @@ class Typer {
 		const Type *element = nullptr; // What indexing gives; null if the class is not indexed.
 		bool keyed = false; // Indexed by any key, not only by a number.
 		bool complete = false; // The operators listed are all it has: another use is an error.
+		// The forms of its constructor, each its parameters' types, when it has more than one. The
+		// declared constructor merges them, so it takes calls that none of them takes.
+		std::vector<std::vector<const Type *>> forms;
 	};
 	std::unordered_map<Symbol *, Described> described_;
 
 	// The type a tag names: `*`, or a class or interface in the tagged class's package, in the top-level
 	// package, or written with its package. An unknown name is reported where the tag is.
 	const Type *tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name);
+
+	struct TagArguments {
+		std::string_view op, left, right, returns, element, keyed;
+	};
+	static TagArguments tag_arguments(const Metadata &p_tag);
+	void constructor_tag(Symbol *p_class, const Metadata &p_tag, Described &r_result);
+	void operator_tag(Symbol *p_class, const Metadata &p_tag, const TagArguments &p_arguments, size_t p_inherited,
+			Described &r_result);
 
 	// What the class's declaration says about operators and indexing, or null if it says nothing.
 	const Described *described(const Type *p_type);
@@ -170,6 +184,8 @@ class Typer {
 	// if neither class describes any: the caller then does what it did before. Reports an operator that
 	// the classes don't have.
 	const Type *described_binary(TokenKind p_op, Expr *p_left, Expr *p_right, uint32_t p_offset);
+	// A `new` of a class whose constructor has forms: one of them must take the arguments.
+	void constructor_form(const Type *p_instance, const List<Expr *> &p_arguments, uint32_t p_offset);
 
 	// The same for `-x` and `+x`.
 	const Type *described_unary(TokenKind p_op, const Type *p_operand, uint32_t p_offset);
@@ -183,10 +199,17 @@ class Typer {
 
 	const Type *unary(Unary *p_unary);
 
+	const Type *object_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
+	const Type *int64_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
+	const Type *primitive_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
 	const Type *arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
 
 	const Type *binary(Binary *p_binary);
 
+	const Type *literal_type(Expr *p_expression);
+	const Type *applied_type(TypeApply *p_apply);
+	const Type *postfix_type(Postfix *p_postfix);
+	const Type *conditional_type(Conditional *p_choice);
 	const Type *compute(Expr *p_expression);
 	const Type *member_expression_type(Expr *p_expression);
 	const Type *index_type(Expr *p_expression);
@@ -199,7 +222,15 @@ class Typer {
 	void shown(Expr *p_expression);
 
 	void declarators(VarDecl *p_decl);
+	void signal_field(VarDecl *p_decl);
+	void export_field(VarDecl *p_decl);
+	bool godot_storable(const Type *p_type, bool p_in_node) const;
+	bool godot_value(const Type *p_type) const;
 
+	void loop_statement(Stmt *p_statement);
+	void for_in(ForIn *p_loop);
+	void switch_statement(Switch *p_switch);
+	void try_statement(Try *p_try);
 	void statement(Stmt *p_statement);
 
 	void returned(Return *p_return);

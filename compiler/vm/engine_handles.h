@@ -25,8 +25,13 @@ struct EngineHandles {
 	// Whether a handle is an object of the class of that name (Godot's), or of a class that extends it;
 	// for one of Godot's values, whether it is of the value type of that name. Not if null or freed.
 	[[nodiscard]] virtual bool is_class(void *p_value, std::string_view p_class) = 0;
-	// The engine's own text for a value or an object.
+	// The engine's own text for a value or an object. Null only when there was no memory for it.
 	[[nodiscard]] virtual Str *text(void *p_value) = 0;
+	// The program let go of its last reference to a script object whose Godot object is reference-counted
+	// (ir::Class::counted). True if the engine still holds that object: the script object is then kept,
+	// with what it holds, for as long as the engine does, and given back with Interpreter::free_kept().
+	// False to free it now.
+	[[nodiscard]] virtual bool keep(Object *p_object) = 0;
 
 	[[nodiscard]] virtual bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count,
 			const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
@@ -41,6 +46,19 @@ struct EngineHandles {
 	// value.
 	[[nodiscard]] virtual bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
 			Slot *r_result, std::string *r_error) = 0;
+
+	// For the cycle collector (vm/collector.h), which runs between calls into the program.
+	// The node a handle on one of the engine's objects holds a counted reference to (EngineNode), or 0 if
+	// it holds none: the collector then does not look past it.
+	[[nodiscard]] virtual uint64_t node(void *p_handle) = 0;
+	// What a node holds now. False if it is gone.
+	[[nodiscard]] virtual bool node_edges(uint64_t p_node, EngineNode *r_node) = 0;
+	// These nodes, whose counts were not exact, are held only by one another and by script objects that are
+	// about to be freed. The engine lets go of what holds them that it can't count (a listener's signal),
+	// and so of what they hold. If one of them outlives that (something else held a copy), everything is
+	// put back as it was, in the same order, and those that outlived it are returned; the collector then
+	// keeps them and what they hold.
+	[[nodiscard]] virtual std::vector<uint64_t> let_go(const std::vector<uint64_t> &p_nodes) = 0;
 };
 
 } // namespace vm

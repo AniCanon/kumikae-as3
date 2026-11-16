@@ -28,6 +28,46 @@ package {
 		public function asVector(value:*):Vector2 { var v:Vector2 = value; return v; }
 		public function asNode(value:*):Node { var n:Node = value; return n; }
 		public function throwValue(value:*):void { throw value; }
+		// The text of a node whose script's toString() throws: the error comes out here, where it is caught.
+		public function caughtText(value:*):String {
+			try { return "" + value; } catch (e:Error) { return "caught " + e.message; }
+			return "not caught";
+		}
+		public function increment(value:*):* { return value + 1; }
+		public function moveBy(by:*):Vector2 { var q:Vector2 = position + by; return q; }
+		// The object written is the one named before the value changes the local: AS3's order.
+		public function writeOrder(a:Node2D, b:Node2D):Vector2 {
+			var first:Node2D = a;
+			a.position.x = (a = b, 5);
+			first.visible = true;
+			b.visible = true;
+			a = first;
+			a.visible = (a = b, false);
+			return new Vector2(first.position.x, first.visible ? 1 : 0);
+		}
+		// A Godot value read above the line that gives it a value is its zero, not null.
+		public var early:String = seen();
+		public var later:Vector2 = Vector2.ONE;
+		public static var seenStatic:String = seenStatics();
+		public static var laterStatic:Vector2 = Vector2.ONE;
+		private function seen():String { return "" + later; }
+		private static function seenStatics():String { return "" + laterStatic; }
+		public function readEarly():String {
+			var before:String = "" + v;
+			var v:Vector2 = Vector2.ONE;
+			return before + " " + early + " " + seenStatic + " " + origin;
+		}
+		// `is` and `as` with one of Godot's classes, on an untyped value.
+		public function holdsNode(value:*):Boolean { return value is Node; }
+		public function holdsNode2D(value:*):Boolean { return value is Node2D; }
+		public function asNodeOrNull(value:*):Node { return value as Node; }
+		public function minusOne(value:*):* { return value - 1; }
+		public function twice(value:*):* { return value * 2; }
+		public function stepped(value:*):* { value++; return value; }
+		public function half(value:*):* { return value / 2; }
+		public function plusPosition(by:*):* { return position + by; }
+		public function positionAfter(by:*):* { return by + position; }
+		public function addPosition(x:*):* { x += position; return x; }
 		// An error raised for a Godot value is caught like any other.
 		public function guarded(value:*):String {
 			try {
@@ -44,6 +84,16 @@ package {
 		// A script object does not reach Godot as a null with nothing said.
 		public var keep:* = new Thing();
 		public function giveScript():* { return new Thing(); }
+		// JSON has no form for one of Godot's values or objects: stringify() refuses one wherever it is, the
+		// interpreter's ruling, so that nothing is written as a text that can't be read back.
+		public function json(value:*):String {
+			try {
+				return JSON.stringify({p: [1, value]});
+			} catch (e:TypeError) {
+				return "refused: " + e.message;
+			}
+			return "never";
+		}
 		// A Godot object freed while an untyped value holds it is null, as a typed one is.
 		public function freed():String {
 			var n:Node = new Node();

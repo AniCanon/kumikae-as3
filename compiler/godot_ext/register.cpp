@@ -34,6 +34,7 @@ static void terminate(ModuleInitializationLevel p_level) {
 	ResourceLoader::get_singleton()->remove_resource_format_loader(loader);
 	loader.unref();
 	kas3::Project::unload();
+	kas3::forget_defaults();
 	Engine::get_singleton()->unregister_script_language(AS3Language::singleton);
 	memdelete(AS3Language::singleton);
 	AS3Language::singleton = nullptr;
@@ -44,6 +45,7 @@ extern "C" GDExtensionBool GDE_EXPORT kas3_godot_init(GDExtensionInterfaceGetPro
 	GDExtensionBinding::InitObject init(p_get_proc_address, p_library, r_initialization);
 	init.register_initializer(initialize);
 	init.register_terminator(terminate);
+	init.register_shutdown_callback(&kas3::Project::before_shutdown);
 	init.set_minimum_library_initialization_level(MODULE_INITIALIZATION_LEVEL_SCENE);
 	return init.init();
 }

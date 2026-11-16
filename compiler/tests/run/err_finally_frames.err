@@ -1,0 +1,4 @@
+Error: from inner
+	at err_finally_frames/inner()[err_finally_frames.as:10]
+	at err_finally_frames/middle()[err_finally_frames.as:7]
+	at err_finally_frames()[err_finally_frames.as:4]

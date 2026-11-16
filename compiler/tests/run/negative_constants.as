@@ -1,0 +1,1 @@
+package { public class negative_constants { public function negative_constants() { var a:Number = -0; var b:int = -2147483648; var c:uint = -1; var d:Number = -1.5; var e:* = -3; trace(1/a, b, c, d, e, -(-2)); } } }

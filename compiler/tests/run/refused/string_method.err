@@ -1,2 +1,0 @@
-string_method.as:1:80: error: calling 'toUpperCase' is not supported by the interpreter yet
-string_method.as:1:101: error: calling 'charAt' is not supported by the interpreter yet

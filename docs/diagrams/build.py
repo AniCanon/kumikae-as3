@@ -39,7 +39,7 @@ ROADMAP = [
      "Arithmetic on Godot's value types has a type.", "done"),
     ("L1", "Language server, first slice", "kas3c lsp: errors as you type, go to definition, completion. Works in VS Code and Rider.",
      "A typing mistake shows up in VS Code and Rider at once.", "done"),
-    ("2", "Interpreter in Godot", "Built so far: Godot's whole API, vectors, switch, Math, untyped values, try/catch, hot reload. Next: Array.",
+    ("2", "Interpreter in Godot", "Built so far: Godot's whole API, vectors, Array, switch, Math, untyped values, try/catch, hot reload, RegExp, Date. Next: Object.",
      "An AS3 script on a CharacterBody2D moves a character.", "now"),
     ("3", "Native export on desktop", "Release builds compile AS3 to native code through C++.",
      "The speed gate passes on real compiled AS3.", "planned"),

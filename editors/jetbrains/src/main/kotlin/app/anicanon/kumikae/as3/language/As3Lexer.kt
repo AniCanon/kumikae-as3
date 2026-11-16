@@ -1,6 +1,8 @@
 package app.anicanon.kumikae.as3.language
 
 import com.intellij.lexer.LexerBase
+import com.intellij.lexer.RestartableLexer
+import com.intellij.lexer.TokenIterator
 import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
@@ -24,29 +26,47 @@ internal object As3Tokens {
  * Splits a file into names, strings, comments, brackets and everything else. It is what makes a name
  * one thing the IDE can ask about (go to declaration, hover) and lets brackets be matched; meaning comes
  * from `kas3c`, through the language server.
+ *
+ * The editor keeps and compares only a restartable lexer's state after an edit, so it is restartable: at
+ * any token whose state is not [As3LexicalContext.REPLAY] it may start again, and an edit inside a class
+ * is not lexed again from the top of the file.
  */
-internal class As3Lexer : LexerBase() {
+internal class As3Lexer :
+    LexerBase(),
+    RestartableLexer {
     private var text: CharSequence = ""
     private var end = 0
     private var start = 0
     private var stop = 0
     private var type: IElementType? = null
-    private var regexAllowed = true
+    private val context = As3LexicalContext()
     private var tokenState = 0
-    private var conditionDepth = 0
-    private var controlPending = false
 
     override fun start(buffer: CharSequence, startOffset: Int, endOffset: Int, initialState: Int) {
         text = buffer
         end = endOffset
         stop = startOffset
-        regexAllowed = initialState and 1 == 0
-        controlPending = initialState and 2 != 0
-        conditionDepth = initialState ushr 2
+        context.restore(if (initialState == As3LexicalContext.REPLAY) 0 else initialState)
+        if (initialState == As3LexicalContext.REPLAY) {
+            stop = 0
+            while (stop < startOffset) advance()
+        }
         advance()
     }
 
     override fun getState() = tokenState
+
+    override fun getStartState() = 0
+
+    override fun isRestartableState(state: Int) = state != As3LexicalContext.REPLAY
+
+    override fun start(
+        buffer: CharSequence,
+        startOffset: Int,
+        endOffset: Int,
+        initialState: Int,
+        tokenIterator: TokenIterator?,
+    ) = start(buffer, startOffset, endOffset, initialState)
 
     override fun getTokenType() = type
 
@@ -60,7 +80,7 @@ internal class As3Lexer : LexerBase() {
 
     override fun advance() {
         start = stop
-        tokenState = (conditionDepth shl 2) or (if (controlPending) 2 else 0) or (if (regexAllowed) 0 else 1)
+        tokenState = context.state
         if (start >= end) {
             type = null
             return
@@ -72,9 +92,7 @@ internal class As3Lexer : LexerBase() {
 
             isWord(first) -> {
                 take(As3Tokens.WORD, ::isWord)
-                val word = text.subSequence(start, stop).toString()
-                regexAllowed = word in EXPRESSION_PREFIXES
-                controlPending = word in CONTROL_PREFIXES || (controlPending && word == "each")
+                context.word(text.subSequence(start, stop).toString())
             }
 
             first == '/' && next == '/' -> take(As3Tokens.LINE_COMMENT) { it != '\n' }
@@ -83,10 +101,10 @@ internal class As3Lexer : LexerBase() {
 
             first == '"' || first == '\'' -> {
                 string(first)
-                regexAllowed = false
+                context.value()
             }
 
-            first == '/' && regexAllowed -> regex()
+            first == '/' && context.regexAllowed -> regex()
 
             (first == '+' || first == '-') && next == first -> {
                 type = As3Tokens.SYMBOL
@@ -96,25 +114,14 @@ internal class As3Lexer : LexerBase() {
             else -> {
                 type = BRACKETS[first] ?: As3Tokens.SYMBOL
                 stop = start + 1
-                regexAllowed = first !in ")]}."
-                if (first == '(') {
-                    if (conditionDepth > 0) {
-                        conditionDepth++
-                    } else if (controlPending) {
-                        conditionDepth = 1
-                    }
-                } else if (first == ')' && conditionDepth > 0) {
-                    conditionDepth--
-                    regexAllowed = conditionDepth == 0
-                }
-                controlPending = false
+                context.punctuation(first)
             }
         }
     }
 
     private fun regex() {
         type = As3Tokens.REGEX
-        regexAllowed = false
+        context.value()
         stop = start + 1
         var inClass = false
         while (stop < end && text[stop] != '\n' && text[stop] != '\r') {
@@ -163,9 +170,6 @@ internal class As3Lexer : LexerBase() {
     }
 
     private companion object {
-        val CONTROL_PREFIXES = setOf("if", "while", "for", "switch", "catch", "with")
-        val EXPRESSION_PREFIXES =
-            setOf("else", "do", "return", "throw", "case", "delete", "typeof", "void", "new", "in", "is", "as")
         val BRACKETS = mapOf(
             '{' to As3Tokens.LBRACE,
             '}' to As3Tokens.RBRACE,

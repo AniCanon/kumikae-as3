@@ -30,7 +30,7 @@ static void expect(const std::string &p_source, std::initializer_list<const char
 	Compilation compilation;
 	compilation.add("Main.as", source.text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), source.expected);
+	CHECK_EQ(compilation.format_diagnostics(false), source.expected);
 }
 
 #define UNRELATED(from, to) "can't use a value of type '" from "' where '" to "' is expected"
@@ -253,7 +253,7 @@ static void test_override_signatures() {
 							   "override public function f(t:lib.Thing):Thing { return t; }\n"
 							   "override public function g(t:int):void {} } }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string("lib/Base.as:2:21: error: unknown type 'Gone'\n"));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string("lib/Base.as:2:21: error: unknown type 'Gone'\n"));
 }
 
 static void test_interfaces() {
@@ -275,7 +275,7 @@ static void test_interfaces() {
 					"class B implements Sized { function get /*!*/width():int { return 0; } }\n"
 					"class C implements Sized { public function get /*!*/width():Number { return 0; } }\n"
 					"class D implements Shape { public function /*!*/area(scale:Number):Number { return 0; }\n"
-					"public function get name():String { return null; } public function set /*!*/name(v:Object):void {}\n"
+					"public function get /*!*/name():String { return null; } public function set /*!*/name(v:Object):void {}\n"
 					"public function get width():int { return 0; } }\n"
 					"class /*!*/E implements Sized { public static function get width():int { return 0; } }\n"
 					"class /*!*/F implements Shape { public function area(scale:Number = 1):Number { return 0; }\n"
@@ -283,7 +283,8 @@ static void test_interfaces() {
 			{ "'Main' must implement 'area' from Shape", "'Main' must implement the getter 'name' from Shape",
 					"'Main' must implement the setter 'name' from Shape", "'Main' must implement the getter 'width' from Sized",
 					"'A' must implement the getter 'width' from Sized", "'width' must be public to implement Sized",
-					SAME_AS("width", "Sized"), SAME_AS("area", "Shape"), SAME_AS("name", "Shape"),
+					SAME_AS("width", "Sized"), SAME_AS("area", "Shape"),
+					"the getter and the setter of 'name' must be of the same type", SAME_AS("name", "Shape"),
 					"'E' must implement the getter 'width' from Sized", "'F' must implement the setter 'name' from Shape" });
 	// A class in a declaration file is taken at its word.
 	Compilation compilation;
@@ -292,7 +293,7 @@ static void test_interfaces() {
 			true);
 	compilation.add("Main.as", "package { import lib.*; public class Main extends Disc {} }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 }
 
 static void test_constants() {
@@ -325,16 +326,55 @@ static void test_constants() {
 		   "class Sub extends Main { public function Sub() { super(null); /*!*/LIMIT = 6; } }\n",
 			{ "can't assign to the constant 'MAX'", "can't assign to the constant 'LIMIT'",
 					"can't assign to the constant 'LIMIT'", "can't assign to the constant 'LIMIT'" });
-	// A property whose other half may be in a base that did not resolve, or in an interface, is left alone.
+	// A property whose other half may be in a base that did not resolve, or in an interface that did not, is
+	// left alone. An interface whose own and extended members are all known has no other half to find.
 	expect("package { public class Main extends /*!*/Gone { public function get size():int { return 0; }\n"
-		   "public function f(s:Sized):void { size = 1; s.width = 2; } } }\n"
-		   "interface Sized { function get width():int; }\n",
-			{ "unknown type 'Gone'" });
+		   "public function f(s:Sized, t:Later):void { size = 1; s./*!*/width = 2; t.width = 3; } } }\n"
+		   "interface Sized { function get width():int; } interface Later extends Sized, /*!*/Missing {}\n",
+			{ "unknown type 'Gone'", "'width' is read-only", "unknown type 'Missing'" });
 	// A setter inherited beside a getter declared here.
 	expect("package { public class Main extends Base { override public function get size():int { return 0; }\n"
 		   "public function f():void { size = 1; } } }\n"
 		   "class Base { public function get size():int { return 0; } public function set size(v:int):void {} }\n",
 			{});
+}
+
+static void test_property_halves() {
+	// A property with only a setter can't be read, written as `x += 1`, `x++` or `x ||= y` included.
+	expect("package { public class Main { public function set only(v:int):void {} public function set on(v:Boolean):void {}\n"
+		   "public function f(m:Main):void { only = 1; m.only = 2; var a:int = /*!*/only; a = m./*!*/only;\n"
+		   "/*!*/only += 1; m./*!*/only++; --/*!*/only; /*!*/on ||= true; trace(this./*!*/only); } } }\n",
+			{ "'only' is write-only", "'only' is write-only", "'only' is write-only", "'only' is write-only",
+					"'only' is write-only", "'on' is write-only", "'only' is write-only" });
+	// Through an interface, the halves are looked for in every interface it extends.
+	expect("package { public class Main { public function f(s:Shape, w:Wide):void {\n"
+		   "s./*!*/width = 1; var a:int = s./*!*/height; s.height = 2; var b:int = s.width; w.size = w.size + 1; } } }\n"
+		   "interface Shape { function get width():int; function set height(v:int):void; }\n"
+		   "interface Reads { function get size():int; } interface Writes { function set size(v:int):void; }\n"
+		   "interface Wide extends Reads, Writes {}\n",
+			{ "'width' is read-only", "'height' is write-only" });
+	// The getter and the setter of one property have one type, in a class or across a base and a subclass.
+	expect("package { public class Main { public function get /*!*/size():int { return 0; }\n"
+		   "public function set size(v:Number):void {} public function get name():String { return null; }\n"
+		   "public function set name(v:String):void {} } }\n"
+		   "class Base { public function get count():int { return 0; } }\n"
+		   "class Sub extends Base { public function set /*!*/count(v:String):void {} }\n"
+		   "interface Shape { function get /*!*/width():int; function set width(v:uint):void; }\n",
+			{ "the getter and the setter of 'size' must be of the same type",
+					"the getter and the setter of 'count' must be of the same type",
+					"the getter and the setter of 'width' must be of the same type" });
+	// A getter takes nothing and gives a value; a setter takes one value, with no default, and gives nothing.
+	expect("package { public class Main { public function get /*!*/a(x:int):int { return x; }\n"
+		   "public function set /*!*/b():void {} public function set /*!*/c(x:int, y:int):void {}\n"
+		   "public function set /*!*/d(x:int = 1):void {} public function set /*!*/e(...rest):void {}\n"
+		   "public function get /*!*/f():void {} public function set /*!*/g(v:int):int { return 0; }\n"
+		   "public function get h():int { return 0; } public function set h(v:int) {} } }\n"
+		   "interface Shape { function get /*!*/width(x:int):int; function set /*!*/height():void; }\n",
+			{ "a getter takes no parameters", "a setter takes one parameter, with no default",
+					"a setter takes one parameter, with no default", "a setter takes one parameter, with no default",
+					"a setter takes one parameter, with no default", "a getter must give a value: its type can't be void",
+					"a setter gives nothing: its type must be void or not written", "a getter takes no parameters",
+					"a setter takes one parameter, with no default" });
 }
 
 // Valid programs that the first version of these checks rejected, found in review.
@@ -384,7 +424,7 @@ static void expect_godot(const std::string &p_source, std::initializer_list<cons
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Main.as", source.text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), source.expected);
+	CHECK_EQ(compilation.format_diagnostics(false), source.expected);
 }
 
 // AS3's own collections convert when they are passed to the engine (performance redesign, section 7).
@@ -448,6 +488,7 @@ int main() {
 	test_engine_collections();
 	test_review_findings();
 	test_constants();
+	test_property_halves();
 	test_override_signatures();
 	test_interfaces();
 	test_returns();

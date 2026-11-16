@@ -1,12 +1,12 @@
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>app.anicanon.kumikae.as3</id>
     <name>Kumikae AS3</name>
     <vendor>AniCanon</vendor>
     <description>ActionScript 3 for Godot: colours, errors as you type, go to definition, find usages and hover from kas3c, and an iOS Simulator panel. AS3 breakpoints are planned.</description>
     <depends>com.intellij.modules.platform</depends>
-    <depends>intellij.testRunner.plugin</depends>
     <depends>org.jetbrains.plugins.textmate</depends>
-    <depends>com.intellij.modules.lsp</depends>
+    <depends optional="true" config-file="as3-rider.xml">com.intellij.modules.rider</depends>
+    <depends optional="true" config-file="as3-idea.xml">com.intellij.modules.idea</depends>
     <extensions defaultExtensionNs="com.intellij">
         <codeInsight.lineMarkerProvider language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.scene.AttachedScenesLineMarker"/>
         <runConfigurationProducer implementation="app.anicanon.kumikae.as3.testing.As3TestProducer"/>
@@ -14,7 +14,6 @@
         <fileEditorProvider implementation="app.anicanon.kumikae.as3.scene.SceneEditorProvider"/>
         <configurationType implementation="app.anicanon.kumikae.as3.testing.As3TestsType"/>
         <fileEditorProvider implementation="app.anicanon.kumikae.as3.settings.ProjectSettingsEditorProvider"/>
-        <platform.lsp.integrationProvider implementation="app.anicanon.kumikae.as3.language.As3LspSupportProvider"/>
         <textmate.bundleProvider implementation="app.anicanon.kumikae.as3.language.As3Grammar"/>
         <notificationGroup id="Kumikae AS3" displayType="BALLOON"/>
         <configurationType implementation="app.anicanon.kumikae.as3.run.SimulatorConfigurationType"/>
@@ -25,7 +24,6 @@
                   fieldName="INSTANCE" language="KumikaeAS3" extensions="as"/>
         <lang.parserDefinition language="KumikaeAS3"
                                implementationClass="app.anicanon.kumikae.as3.language.As3ParserDefinition"/>
-        <gotoDeclarationHandler implementation="app.anicanon.kumikae.as3.language.As3GotoDeclaration"/>
         <lang.commenter language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.language.As3Commenter"/>
         <enterHandlerDelegate implementation="app.anicanon.kumikae.as3.language.As3EnterHandler"/>
         <lineIndentProvider implementation="app.anicanon.kumikae.as3.language.As3LineIndentProvider" order="first"/>
@@ -45,6 +43,10 @@
         <toolWindow id="iOS Simulator" anchor="right" icon="/META-INF/brandMark.svg"
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
+    <projectListeners>
+        <listener class="app.anicanon.kumikae.as3.language.As3LspDependencyListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
     <actions>
         <action id="KumikaeAs3.FindAttachedScenes" class="app.anicanon.kumikae.as3.scene.FindAttachedScenesAction" text="Find Attached Scene Nodes">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>

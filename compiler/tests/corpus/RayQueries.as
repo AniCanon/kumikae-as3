@@ -33,7 +33,7 @@ package {
 		}
 
 		override public function _physicsProcess(delta:Number):void {
-			var space:PhysicsDirectSpaceState2D = getWorld2d().directSpaceState;
+			var space:PhysicsDirectSpaceState2D = getWorld2D().directSpaceState;
 			for (var i:int = 0; i < RAYS; i++) {
 				params.from = new Vector2(-50, i % 800);
 				params.to = new Vector2(850, (i * 7) % 800);

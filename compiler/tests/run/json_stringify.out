@@ -1,0 +1,51 @@
+null true false 3 -7
+0.1 1e+21 1.5e-7 0 123456789012345680000
+null null null 0.6666666666666666
+"a\"b\\c/é\b\t\n\f\r\u0001\u001f😀"
+{"b":1,"a":[1,"x",null,true],"c":{},"3":"three"}
+[null,null,null,{},[]]
+[null,null,1]
+true null
+[1,-2,3] [0.5,null] ["a",null] [{"x":1,"y":2,"none":null,"sum":3},null]
+{"x":1,"y":2,"none":null,"z":3,"sum":3,"size":3}
+{"p":"tag p","q":["tag 0"]} "tag "
+"own "
+true ["Wed Dec 31 16:00:00 GMT-0800 1969"]
+"Dictionary" Dictionary {"d":"Dictionary"}
+[{},{},{"s":{}}]
+{"a":2,"b":"x","c":[2,4]}
+,a,b,c,0,1
+{"b":2}
+null
+[{"a":1},{"x":5,"y":6,"none":null,"sum":11}]
+{"a":2,"c":{"a":3},"5":5}
+[{"b":2},{"y":8}]
+{
+  "a": [
+    1,
+    {}
+  ],
+  "b": [],
+  "c": {
+    "d": "e"
+  }
+}
+[
+--1,
+--[
+----2
+--]
+]
+[
+          1
+]
+[
+abcdefghij1
+]
+[
+  1
+] [1] [1] [1]
+[1] [1]
+{
+	"a": 1
+}

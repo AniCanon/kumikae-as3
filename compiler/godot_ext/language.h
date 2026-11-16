@@ -5,15 +5,25 @@
 #include "callable.h"
 #include "program.h"
 
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/classes/script_language_extension.hpp>
 #include <godot_cpp/classes/script_language_extension_profiling_info.hpp>
+#include <godot_cpp/core/class_db.hpp>
 
 class AS3Language : public godot::ScriptLanguageExtension {
 	GDCLASS(AS3Language, godot::ScriptLanguageExtension)
 
 protected:
-	static void _bind_methods() {}
+	// reload_scripts(): the scripts compiled again now and the game moved onto them, as when the watch
+	// sees an edit (kas3::Project::reload_now). For a tool, or a test, that knows when it has written them.
+	static void _bind_methods() { godot::ClassDB::bind_method(godot::D_METHOD("reload_scripts"), &AS3Language::reload_scripts); }
+	// A game, never the editor: in the editor no AS3 runs, and an edit is seen when a script is opened.
+	void reload_scripts() {
+		if (!godot::Engine::get_singleton()->is_editor_hint()) {
+			kas3::Project::reload_now();
+		}
+	}
 
 public:
 	static AS3Language *singleton;
@@ -81,8 +91,9 @@ public:
 		return "";
 	}
 	godot::TypedArray<godot::Dictionary> _debug_get_current_stack_info() override { return {}; }
-	void _reload_all_scripts() override {}
-	void _reload_scripts(const godot::Array &, bool) override {}
+	// Godot's debugger asks when the editor that runs the game saw a script change.
+	void _reload_all_scripts() override { reload_scripts(); }
+	void _reload_scripts(const godot::Array &, bool) override { reload_scripts(); }
 	void _reload_tool_script(const godot::Ref<godot::Script> &, bool) override {}
 	godot::PackedStringArray _get_recognized_extensions() const override {
 		godot::PackedStringArray extensions;
@@ -99,7 +110,7 @@ public:
 		return 0;
 	}
 	int32_t _profiling_get_frame_data(godot::ScriptLanguageExtensionProfilingInfo *, int32_t) override { return 0; }
-	void _frame() override { kas3::sweep_listeners(); }
+	void _frame() override { kas3::Project::collect_step(); }
 	bool _handles_global_class_type(const godot::String &) const override { return false; }
 	godot::Dictionary _get_global_class_name(const godot::String &) const override { return {}; }
 };

@@ -43,8 +43,9 @@ between 40 and 100 for a function. These are ours:
 
 ## 2. One job each
 
-- **A class that is split across files keeps one header.** The lowerer is one class; its methods live in
-  `lower_expressions.cpp`, `lower_calls.cpp` and so on, by what they lower.
+- **A class that is split across files keeps one header.** The lowerer keeps its state in one class, and
+  each group of what it lowers (statements, operators, calls, vectors…) is a helper class it befriends, with
+  a header and a `lower_*.cpp` of its own, holding the lowerer by reference (`Lowerer &l_`).
 - **A function does one thing at one level.** If it needs a comment that says "now do the second part",
   the second part is a function with that name.
 - **Layers do not reach around each other.** `vm/` and `ir/` include no Godot header: everything goes

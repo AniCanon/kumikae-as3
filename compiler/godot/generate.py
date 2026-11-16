@@ -200,10 +200,20 @@ class Generator:
         self.enums = {}
         for entry in api["global_enums"]:
             self.enums[entry["name"]] = wide(entry["values"])
+        wide_flags = set()  # The names of flag enums that need more than 32 bits somewhere.
         for group in (api["classes"], api["builtin_classes"]):
             for entry in group:
                 for enum in entry.get("enums", []):
                     self.enums[entry["name"] + "." + enum["name"]] = wide(enum["values"])
+                    if enum.get("is_bitfield") and wide(enum["values"]):
+                        wide_flags.add(enum["name"])
+        # Flags of one name are one set of flags in two classes (Mesh.ArrayFormat holds
+        # RenderingServer.ArrayFormat's, version bits included): each is as wide as the widest.
+        for group in (api["classes"], api["builtin_classes"]):
+            for entry in group:
+                for enum in entry.get("enums", []):
+                    if enum.get("is_bitfield") and enum["name"] in wide_flags:
+                        self.enums[entry["name"] + "." + enum["name"]] = True
 
     # Types.
 
@@ -432,6 +442,8 @@ class Generator:
                     out.append('[Godot(returns="%s")]' % note)
                 out.append("public %snative function get %s():%s;" % (sealed, name, as3))
             if setter:
+                if note:
+                    out.append('[Godot(value="%s")]' % note)
                 out.append("public %snative function set %s(value:%s):void;" % (sealed, name, as3))
 
         for signal in entry.get("signals", []):
@@ -461,6 +473,10 @@ class Generator:
                 self.left_out.append(where)
                 continue
             self.claim(owner, name, "the method " + method["name"], inherited)
+            if method["is_static"] and not static:
+                # Called through its own entry, which needs the hash, so that a wrong call is an error the
+                # script is told of: through ClassDB it would only be printed.
+                self.godot_names["%s.%s" % (naming.class_name(owner), name)] += " %d" % method["hash"]
             out.extend(lines)
 
         self.lines.extend(self.enum_lines(entry))
@@ -490,6 +506,15 @@ class Generator:
                 text += " = " + ("0" if as3 in NUMERIC else "false" if as3 == "Boolean" else "null")
             written.append(text)
         return "public native function %s(%s);" % (as3_name, ", ".join(written))
+
+    def constructor_lines(self, entry):
+        """Each form of the constructor, as a tag: the merged one alone would take calls none of them takes."""
+        where = entry["name"] + " constructor"
+        overloads = [overload.get("arguments", []) for overload in entry["constructors"]]
+        if len(overloads) < 2:
+            return []
+        return ['\t[Constructor(args="%s")]' % ",".join(self.type(argument["type"], None, where)[0] for argument in overload)
+                for overload in overloads]
 
     def operand(self, name):
         """How an operator's operand or result type is written in a tag, or None if AS3 has no such operand."""
@@ -553,6 +578,7 @@ class Generator:
                 out.append(line)
         self.lines.extend(self.enum_lines(entry))
         self.lines.extend(self.operator_lines(entry))
+        self.lines.extend(self.constructor_lines(entry))
         self.block("public final native class %s" % as3_name, out)
         self.in_narrow = False
 

@@ -1,3 +1,0 @@
-closure.as:1:68: error: the type 'Function' is not supported by the interpreter yet
-closure.as:1:79: error: a function used as a value is not supported by the interpreter yet
-closure.as:1:99: error: calling 'f' is not supported by the interpreter yet

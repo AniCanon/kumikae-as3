@@ -21,7 +21,7 @@ static std::string check_files(std::initializer_list<File> p_files) {
 		compilation.add(file.path, file.text, file.declaration);
 	}
 	compilation.check();
-	return compilation.format_diagnostics();
+	return compilation.format_diagnostics(false);
 }
 
 // The source may mark where errors are expected with `/*!*/`, placed just before the offending text. The
@@ -77,7 +77,7 @@ static void test_model() {
 	Compilation builtins;
 	builtins.check();
 	CHECK(!builtins.has_errors());
-	CHECK_EQ(builtins.format_diagnostics(), std::string());
+	CHECK_EQ(builtins.format_diagnostics(false), std::string());
 
 	// A syntax error anywhere means only syntax errors are reported.
 	std::string output = check_files({
@@ -349,6 +349,15 @@ static void test_overrides() {
 	CHECK_GODOT(head + "public static function make():Node { return null; }\n"
 					   "public static function add_child():void {}\n} }");
 	CHECK_GODOT(head + "public function make():void {}\n} }");
+	// Between two script classes too: a base's private method and its static ones are not overridden.
+	CHECK_MAIN("package { public class Main extends Base { public function hidden():void {} public function made():void {} } }\n"
+			   "class Base { private function hidden():void {} public static function made():void {} }");
+	CHECK_MAIN("package { public class Main extends Base { override public function /*!*/hidden():void {} } }\n"
+			   "class Base { private function hidden():void {} }",
+			"'hidden' is marked 'override' but no base class has a method to override");
+	CHECK_MAIN("package { public class Main extends Base { override public function /*!*/made():void {} } }\n"
+			   "class Base { public static function made():void {} }",
+			"'made' is marked 'override' but no base class has a method to override");
 	// Through two levels.
 	CHECK_GODOT("package { import godot.Node; public class Main extends Middle {\n"
 				"public function /*!*/add_child(node:Node):void {}\n"
@@ -534,7 +543,7 @@ static std::string names_of(std::initializer_list<File> p_files) {
 		compilation.add(file.path, file.text, file.declaration);
 	}
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	return compilation.dump_names();
 }
 
@@ -613,7 +622,7 @@ static void test_bindings() {
 											"public function set v(x:int):void {} function f():int { return v; } } }\n"
 											"class Mid extends Base {}\nclass Base { public function get v():int { return 0; } }");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	const Symbol *property = nullptr;
 	for (const Reference &reference : unit->references) {
 		if (reference.name == "v") {
@@ -681,6 +690,9 @@ static void test_review_findings() {
 // crash or hang the checker, alone or beside the complete corpus.
 static void test_corpus_prefixes() {
 	const std::string godot = godot_declarations();
+	// Parsed once and handed to each check, as the language server does: every prefix gets Godot's API.
+	const std::shared_ptr<Parsed> parsed_godot = parse_file(GODOT_DECLARATIONS_PATH, godot);
+	const std::vector<std::shared_ptr<Parsed>> builtins = parse_builtins();
 	int files = 0;
 	Compilation whole; // The complete corpus as one program: its files refer to each other.
 	whole.add(GODOT_DECLARATIONS_PATH, godot, true);
@@ -694,12 +706,8 @@ static void test_corpus_prefixes() {
 		files++;
 		whole.add(name, text);
 		for (size_t length = 0; length < text.size(); length++) {
-			Compilation compilation;
-			// Godot's API takes far longer to load than a prefix takes to check, so only some prefixes get
-			// it. The others still run every pass, with the Godot names unknown.
-			if (length % 293 == 0) {
-				compilation.add(GODOT_DECLARATIONS_PATH, godot, true);
-			}
+			Compilation compilation(builtins);
+			compilation.add(parsed_godot, true);
 			compilation.add(name, text.substr(0, length));
 			compilation.check();
 			check::checks()++;
@@ -707,26 +715,21 @@ static void test_corpus_prefixes() {
 	}
 	CHECK_EQ(files, 14);
 	whole.check();
-	CHECK_EQ(whole.format_diagnostics(), std::string());
+	CHECK_EQ(whole.format_diagnostics(false), std::string());
 }
 
 static void test_godot_names() {
-	std::string name;
-	CHECK(godot_name("CharacterBody2D", "moveAndSlide", &name));
-	CHECK_EQ(name, std::string("move_and_slide"));
-	CHECK(godot_name("Node", "_physicsProcess", &name));
-	CHECK_EQ(name, std::string("_physics_process"));
-	CHECK(godot_name("GodotObject", "", &name));
-	CHECK_EQ(name, std::string("Object"));
-	CHECK(godot_name("Node2D", "position", &name));
-	CHECK_EQ(name, std::string("position"));
+	CHECK_EQ(godot_name("CharacterBody2D", "moveAndSlide").value_or("?"), std::string("move_and_slide"));
+	CHECK_EQ(godot_name("Node", "_physicsProcess").value_or("?"), std::string("_physics_process"));
+	CHECK_EQ(godot_name("GodotObject", "").value_or("?"), std::string("Object"));
+	CHECK_EQ(godot_name("Node2D", "position").value_or("?"), std::string("position"));
 	// The declaring class is asked, not a subclass; and nothing is made up.
-	CHECK(!godot_name("CharacterBody2D", "position", &name));
-	CHECK(!godot_name("Node", "noSuchThing", &name));
-	CHECK(!godot_name("NoSuchClass", "", &name));
+	CHECK(!godot_name("CharacterBody2D", "position"));
+	CHECK(!godot_name("Node", "noSuchThing"));
+	CHECK(!godot_name("NoSuchClass", ""));
 	// AS3's own addition: Godot has no one method for it, so the name is marked for the binding to compose.
-	CHECK(godot_name("Signal", "add", &name) && name == "@add");
-	CHECK(godot_name("Signal", "numListeners", &name) && name == "@numListeners");
+	CHECK(godot_name("Signal", "add") == std::string("@add"));
+	CHECK(godot_name("Signal", "numListeners") == std::string("@numListeners"));
 }
 
 int main() {

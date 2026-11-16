@@ -1,0 +1,3 @@
+Error: no size
+	at Box/get size()[err_accessor_stack.as:13]
+	at err_accessor_stack()[err_accessor_stack.as:6]

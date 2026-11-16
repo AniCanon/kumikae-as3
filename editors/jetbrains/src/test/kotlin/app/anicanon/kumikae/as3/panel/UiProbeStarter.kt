@@ -30,11 +30,20 @@ class UiProbeStarter : ApplicationStarter {
         val destination = Path.of(args[1])
         Files.createDirectories(destination)
         val failure = runCatching {
-            UiProbeLanguage.run(destination)
-            UiProbeCompletion.run(destination)
-            checkThemes(destination)
-            if (System.getenv("KUMIKAE_SIMULATOR_MEMORY_PROBE") == "1") UiProbeMemory.run(destination)
-            if (System.getenv("KUMIKAE_SIMULATOR_LIVE_PROBE") == "1") UiProbeLive.run(destination)
+            UiProbeFeedbackGuard.run(destination) {
+                if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
+                    UiProbeLanguage.run(destination)
+                    UiProbeCompletion.run(destination, missingClient = true)
+                } else if (System.getenv("KUMIKAE_COMPLETION_CONTROL_PROBE") == "1") {
+                    UiProbeCompletion.run(destination, plainText = true)
+                } else {
+                    UiProbeLanguage.run(destination)
+                    UiProbeCompletion.run(destination)
+                    checkThemes(destination)
+                    if (System.getenv("KUMIKAE_SIMULATOR_MEMORY_PROBE") == "1") UiProbeMemory.run(destination)
+                    if (System.getenv("KUMIKAE_SIMULATOR_LIVE_PROBE") == "1") UiProbeLive.run(destination)
+                }
+            }
         }.exceptionOrNull()
         Files.writeString(destination.resolve("result.txt"), failure?.stackTraceToString() ?: "passed\n")
         val application = ApplicationManager.getApplication()
@@ -114,6 +123,7 @@ class UiProbeStarter : ApplicationStarter {
             press(view, "Show console")
             await("the console to open") { console.parent?.parent?.parent != null }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-6-console.png"))
+            checkConsoleWraps(console)
             press(view, "Copy screenshot")
             check(prompts.copiedImages == 1) { "The screenshot was not copied" }
             check(!controller.inputEnabled) { "Input is on before the owner agreed" }
@@ -127,6 +137,12 @@ class UiProbeStarter : ApplicationStarter {
             await("the failure") { shows(view, "An application bundle was not found") && screen(view).frame == null }
             check(console.text.contains("[Error] An application bundle")) { "The failure is missing from the console" }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-7-failed-input-on.png"))
+            checkConsoleWraps(console)
+            onEdt {
+                check(UiProbeText.whole(view.component, "An application bundle was not found")) {
+                    "The status line cuts the failure off at the panel's narrow width"
+                }
+            }
             onEdt { tab(view, "Probe Phone 17 Pro").doClose() }
             await("the shutdown") { shows(view, "Probe Phone 17 Pro is shut down.") }
             check("shutdown probe-phone" in repository.calls) { "Closing the tab sent ${repository.calls}" }
@@ -143,6 +159,11 @@ class UiProbeStarter : ApplicationStarter {
         await("the composition to be released") { view.component.componentCount == 0 }
     }
 
+    private fun checkConsoleWraps(console: JTextArea) = onEdt {
+        val broken = UiProbeText.brokenWords(console)
+        check(broken.isEmpty()) { "The console breaks words although a space was free: $broken" }
+    }
+
     private fun tab(view: SimulatorToolWindow, name: String) =
         descendants(view.component).filterIsInstance<TabControl>().single { it.name == name }
 
@@ -153,8 +174,10 @@ class UiProbeStarter : ApplicationStarter {
     private fun screen(view: SimulatorToolWindow) = view.screen
 
     /** What the composed view displays, which can lag behind the controller's state by one recomposition. */
-    private fun shows(view: SimulatorToolWindow, text: String) =
-        descendants(view.component).filterIsInstance<JLabel>().any { it.text.startsWith(text) }
+    private fun shows(view: SimulatorToolWindow, text: String) = descendants(view.component).any {
+        (it is JLabel && it.text.startsWith(text)) ||
+            (it is JTextArea && it !== view.console && it.text.startsWith(text))
+    }
 
     private fun icon(view: SimulatorToolWindow, name: String) =
         descendants(view.component).filterIsInstance<IconButtonControl>().single { it.name == name }

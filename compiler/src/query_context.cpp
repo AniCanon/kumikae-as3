@@ -12,6 +12,7 @@ const std::vector<Node *> &Queries::context_nodes(const Unit &p_unit) const {
 		auto &nodes = entry->second;
 		walk(p_unit.tree, [&](Node *p_node) {
 			switch (p_node->kind) {
+				case NodeKind::TypeRef:
 				case NodeKind::ClassDecl:
 				case NodeKind::InterfaceDecl:
 				case NodeKind::FunctionDecl:
@@ -19,6 +20,14 @@ const std::vector<Node *> &Queries::context_nodes(const Unit &p_unit) const {
 				case NodeKind::ExprStmt:
 				case NodeKind::Call:
 				case NodeKind::New:
+				case NodeKind::Block:
+				case NodeKind::If:
+				case NodeKind::While:
+				case NodeKind::DoWhile:
+				case NodeKind::For:
+				case NodeKind::ForIn:
+				case NodeKind::Switch:
+				case NodeKind::Labeled:
 					nodes.push_back(p_node);
 					break;
 				default:

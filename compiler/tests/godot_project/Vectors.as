@@ -100,6 +100,10 @@ package {
 			ramp.offsets = new <Number>[0, 0.5, 0.75, 1];
 			return ramp.getPointCount();
 		}
+		// AS3's Arrays and Godot's: copied element by element, each way.
+		public function toGodot(target:Node):void { target.setMeta("list", [1, "two", new Vector2(1, 2), [3]]); }
+		public function fromGodot(list:Array):String { return list.length + ":" + list.join(";"); }
+		public function asArray(target:Node):int { var got:Array = target.getMeta("list") as Array; return got.length; }
 		public function words():String {
 			var all:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];
 			return all.join(" ") + "/" + all + "/" + held.length;

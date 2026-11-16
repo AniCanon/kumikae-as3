@@ -1,6 +1,8 @@
 #include "check.h"
+#include "scratch.h"
 
 #include "builtins.h"
+#include "paths.h"
 #include "uri.h"
 #include "workspace.h"
 
@@ -17,16 +19,12 @@ static void write(const fs::path &p_path, const std::string &p_text) {
 	out << p_text;
 }
 
-static fs::path fresh_folder(const char *p_name) {
-	fs::path folder = fs::temp_directory_path() / (std::string("kas3-test-") + p_name);
-	fs::remove_all(folder);
-	fs::create_directories(folder);
-	return fs::canonical(folder);
-}
+using check::fresh_folder;
 
 static Workspace::Options plain() {
 	Workspace::Options options;
 	options.godot = false;
+	options.support_folder = (check::run_folder() / "support").string();
 	return options;
 }
 
@@ -39,12 +37,18 @@ static std::string paths(Workspace &p_workspace, const fs::path &p_root) {
 }
 
 static void test_uri() {
+	CHECK_EQ(path_from_uri("file://server/share/a%20b.as"), std::string("//server/share/a b.as"));
+	CHECK_EQ(uri_from_path("//server/share/a b.as"), std::string("file://server/share/a%20b.as"));
+	CHECK_EQ(uri_from_path("C:\\work\\Main.as", PathStyle::Windows), std::string("file:///C:/work/Main.as"));
+#ifndef _WIN32
+	CHECK_EQ(uri_from_path("/work/a\\b.as"), std::string("file:///work/a%5Cb.as"));
+#endif
 	CHECK_EQ(path_from_uri("file:///a/b.as"), std::string("/a/b.as"));
 	CHECK_EQ(path_from_uri("file:///a%20b/c%C3%A9.as"), std::string("/a b/c\xC3\xA9.as"));
 	CHECK_EQ(path_from_uri("file:///a%25b.as"), std::string("/a%b.as"));
 	CHECK_EQ(path_from_uri("file://localhost/a/b.as"), std::string("/a/b.as"));
-	CHECK_EQ(path_from_uri("file:///c%3A/dir/b.as"), std::string("c:/dir/b.as"));
-	CHECK_EQ(path_from_uri("file:///C:/dir/b.as"), std::string("C:/dir/b.as"));
+	CHECK_EQ(path_from_uri("file:///c%3A/dir/b.as", PathStyle::Posix), std::string("/c:/dir/b.as"));
+	CHECK_EQ(path_from_uri("file://server/share/a.as", PathStyle::Posix), std::string("//server/share/a.as"));
 	CHECK_EQ(path_from_uri("untitled:Untitled-1"), std::string());
 	CHECK_EQ(path_from_uri("http://example.com/a.as"), std::string());
 	CHECK_EQ(path_from_uri("file:///a%2"), std::string("/a%2")); // A broken escape is kept as written.
@@ -52,10 +56,60 @@ static void test_uri() {
 	CHECK_EQ(path_from_uri(""), std::string());
 	CHECK_EQ(uri_from_path("/a/b.as"), std::string("file:///a/b.as"));
 	CHECK_EQ(uri_from_path("/a b/c\xC3\xA9%.as"), std::string("file:///a%20b/c%C3%A9%25.as"));
-	CHECK_EQ(uri_from_path("C:/dir/b.as"), std::string("file:///C:/dir/b.as"));
-	for (const char *path : { "/x/y z/\xE6\x97\xA5\xE6\x9C\xAC.as", "/a#b?c/d&e=f.as", "/plain.as", "/%41.as" }) {
-		CHECK_EQ(path_from_uri(uri_from_path(path)), std::string(path));
+	// On a Mac or Linux a '\' is part of a name, not a separator.
+	CHECK_EQ(uri_from_path("/a\\b.as", PathStyle::Posix), std::string("file:///a%5Cb.as"));
+	for (const char *path : { "/x/y z/\xE6\x97\xA5\xE6\x9C\xAC.as", "/a#b?c/d&e=f.as", "/plain.as", "/%41.as", "/a\\b.as" }) {
+		CHECK_EQ(path_from_uri(uri_from_path(path, PathStyle::Posix), PathStyle::Posix), std::string(path));
 	}
+
+	// On Windows: a drive's letter however the editor writes it, '\' as a separator, and shares.
+	const PathStyle windows = PathStyle::Windows;
+	CHECK_EQ(path_from_uri("file:///c%3A/dir/b.as", windows), std::string("C:/dir/b.as"));
+	CHECK_EQ(path_from_uri("file:///C:/dir/b.as", windows), std::string("C:/dir/b.as"));
+	CHECK_EQ(path_from_uri("file:///c:/My%20Game/a.as", windows), std::string("C:/My Game/a.as"));
+	CHECK_EQ(path_from_uri("file://server/share/a.as", windows), std::string("//server/share/a.as"));
+	CHECK_EQ(path_from_uri("file://localhost/C:/a.as", windows), std::string("C:/a.as"));
+	CHECK_EQ(uri_from_path("C:\\proj\\a.as", windows), std::string("file:///C:/proj/a.as"));
+	CHECK_EQ(uri_from_path("C:/My Game/a.as", windows), std::string("file:///C:/My%20Game/a.as"));
+	CHECK_EQ(uri_from_path("\\\\server\\share\\a.as", windows), std::string("file://server/share/a.as"));
+	for (const char *path : { "C:/proj/a.as", "//server/share/dir/a.as", "D:/x y/\xE6\x97\xA5.as" }) {
+		CHECK_EQ(path_from_uri(uri_from_path(path, windows), windows), std::string(path));
+	}
+}
+
+// Comparing, joining and spelling paths, with the rules of both kinds of system.
+static void test_paths() {
+	const PathStyle posix = PathStyle::Posix;
+	const PathStyle windows = PathStyle::Windows;
+	CHECK_EQ(generic_path("/a//b/./c/../d/", posix), std::string("/a/b/d"));
+	CHECK_EQ(generic_path("/", posix), std::string("/"));
+	CHECK_EQ(generic_path("/..", posix), std::string("/"));
+	CHECK_EQ(generic_path("a/../../b", posix), std::string("../b"));
+	CHECK_EQ(generic_path("/a\\b", posix), std::string("/a\\b"));
+	CHECK_EQ(generic_path("", posix), std::string());
+	CHECK_EQ(generic_path("C:\\proj\\src\\..\\a.as", windows), std::string("C:/proj/a.as"));
+	CHECK_EQ(generic_path("c:\\", windows), std::string("C:/"));
+	CHECK_EQ(generic_path("c:/proj/", windows), std::string("C:/proj"));
+	CHECK_EQ(generic_path("C:/..", windows), std::string("C:/"));
+	CHECK_EQ(generic_path("\\\\server\\share\\a\\..\\..\\b", windows), std::string("//server/share/b"));
+
+	CHECK(path_within("/proj", "/proj/a.as", posix));
+	CHECK(path_within("/proj", "/proj", posix));
+	CHECK(!path_within("/proj", "/project/a.as", posix));
+	CHECK(!path_within("/proj", "/Proj/a.as", posix));
+	CHECK(!path_within("", "/proj/a.as", posix));
+	CHECK(path_within("/", "/a.as", posix));
+	// A project at a drive's root, and letters in either case.
+	CHECK(path_within("C:/", "C:/a.as", windows));
+	CHECK(path_within("C:/Proj", "C:/proj/Main.as", windows));
+	CHECK(!path_within("C:/proj", "D:/proj/Main.as", windows));
+	CHECK(!path_within("C:/proj", "C:/projects/Main.as", windows));
+	CHECK(path_within("//server/share", "//server/share/a.as", windows));
+
+	CHECK_EQ(path_join("/proj", "a.as"), std::string("/proj/a.as"));
+	CHECK_EQ(path_join("/", "a.as"), std::string("/a.as"));
+	CHECK_EQ(path_join("C:/", "a.as"), std::string("C:/a.as"));
+	CHECK_EQ(path_join("C:/proj", "builtins/a.as"), std::string("C:/proj/builtins/a.as"));
 }
 
 static void test_scan() {
@@ -71,7 +125,7 @@ static void test_scan() {
 	workspace.set_root((root / "scripts" / "deep").string());
 	CHECK_EQ(workspace.root(), root.string());
 	CHECK_EQ(paths(workspace, root), std::string("scripts/Player.as scripts/deep/Enemy.as "));
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 	CHECK(workspace.unit((root / "scripts" / "Player.as").string()) != nullptr);
 	CHECK(workspace.unit((root / "notes.txt").string()) == nullptr);
 
@@ -98,7 +152,7 @@ static void test_buffers() {
 	write(enemy, "package { public class Enemy {} }");
 	Workspace workspace(plain());
 	workspace.set_root(root.string());
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 	CHECK_EQ(workspace.checks(), 1);
 	workspace.compilation();
 	CHECK_EQ(workspace.checks(), 1); // Nothing changed: no second check.
@@ -108,26 +162,26 @@ static void test_buffers() {
 	workspace.open(player, "package { public class Player { public var other:Enemi; } }");
 	CHECK(workspace.stale());
 	CHECK_EQ(workspace.program_units().size(), (size_t)2);
-	CHECK_EQ(workspace.compilation().format_diagnostics(), player + ":1:50: error: unknown type 'Enemi'\n");
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), player + ":1:50: error: unknown type 'Enemi'\n");
 	CHECK_EQ(workspace.checks(), 2);
 	// The file that did not change kept its parse.
 	CHECK(workspace.unit(enemy)->parsed == enemy_parse);
 
 	workspace.change(player, "package { public class Player { public var other:Enemy; } }");
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 	// The same text again is not a change.
 	workspace.change(player, "package { public class Player { public var other:Enemy; } }");
 	CHECK(!workspace.stale());
 	// The disk copy changing under an open buffer changes nothing.
 	write(player, "package { public class Player { broken");
 	workspace.file_changed_on_disk(player);
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 	// Closing returns to what is on disk.
 	workspace.close(player);
 	CHECK(workspace.compilation().has_errors());
 	write(player, "package { public class Player {} }");
 	workspace.file_changed_on_disk(player);
-	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
 
 	// A new file on disk joins the program; a deleted one leaves it.
 	std::string extra = (root / "sub" / "Extra.as").string();
@@ -137,7 +191,7 @@ static void test_buffers() {
 	fs::remove(enemy);
 	workspace.file_changed_on_disk(enemy);
 	CHECK_EQ(paths(workspace, root), std::string("Player.as sub/Extra.as "));
-	CHECK_EQ(workspace.compilation().format_diagnostics(), extra + ":1:38: error: unknown type 'Enemy'\n");
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), extra + ":1:38: error: unknown type 'Enemy'\n");
 	// Files that are not .as, or are outside the project, are not picked up from disk.
 	write(root / "readme.md", "x");
 	workspace.file_changed_on_disk((root / "readme.md").string());
@@ -151,7 +205,7 @@ static void test_buffers() {
 	workspace.open((root / ".bak" / "Player.as").string(), "package { public class Player {} }");
 	CHECK_EQ(workspace.program_units().size(), (size_t)2);
 	CHECK(workspace.unit((outside / "Player.as").string()) == nullptr);
-	CHECK_EQ(workspace.compilation().format_diagnostics(), extra + ":1:38: error: unknown type 'Enemy'\n");
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), extra + ":1:38: error: unknown type 'Enemy'\n");
 	workspace.close((outside / "Player.as").string());
 	workspace.close((root / ".bak" / "Player.as").string());
 	CHECK_EQ(workspace.program_units().size(), (size_t)2);
@@ -208,7 +262,7 @@ static void test_godot() {
 	options.support_folder = support.string();
 	Workspace workspace(options);
 	workspace.set_root(root.string());
-	CHECK_EQ(workspace.compilation().format_diagnostics(),
+	CHECK_EQ(workspace.compilation().format_diagnostics(false),
 			player + ":2:67: error: can't use a value of type 'int' where 'String' is expected\n");
 	// Godot's API is not one of the program's files, but it has a file an editor can open.
 	CHECK_EQ(workspace.program_units().size(), (size_t)1);
@@ -242,12 +296,11 @@ static void test_godot() {
 	fs::path declared = root / "decl" / "engine.txt";
 	write(declared, "package engine { public native class Motor { public native function run():void; } }");
 	write(player, "package { import engine.Motor; public class Player { function f(m:Motor):void { m.run(); m.stop(); } } }");
-	Workspace::Options with;
-	with.godot = false;
+	Workspace::Options with = plain();
 	with.declarations.push_back(declared.string());
 	Workspace third(with);
 	third.set_root(root.string());
-	CHECK_EQ(third.compilation().format_diagnostics(), player + ":1:92: error: 'Motor' has no member 'stop'\n");
+	CHECK_EQ(third.compilation().format_diagnostics(false), player + ":1:92: error: 'Motor' has no member 'stop'\n");
 	CHECK_EQ(third.program_units().size(), (size_t)1);
 	// The declaration file is inside the project, but it is read once, as a declaration file: no
 	// "already defined", and errors in it are reported as `kas3c check` reports them.
@@ -255,14 +308,14 @@ static void test_godot() {
 	third.file_changed_on_disk(declared.string());
 	CHECK_EQ(third.program_units().size(), (size_t)1);
 	CHECK_EQ(third.reported_units().size(), (size_t)2);
-	CHECK_EQ(third.compilation().format_diagnostics(),
+	CHECK_EQ(third.compilation().format_diagnostics(false),
 			declared.string() + ":1:73: error: expected a parameter name but found ':'\n");
 	// The editor's text for it stands in, as for any file.
 	third.open(declared.string(), "package engine { public native class Motor { public native function run():void; } }");
 	CHECK_EQ(third.program_units().size(), (size_t)1);
-	CHECK_EQ(third.compilation().format_diagnostics(), player + ":1:92: error: 'Motor' has no member 'stop'\n");
+	CHECK_EQ(third.compilation().format_diagnostics(false), player + ":1:92: error: 'Motor' has no member 'stop'\n");
 	third.close(declared.string());
-	CHECK(third.compilation().format_diagnostics().find("expected a parameter name") != std::string::npos);
+	CHECK(third.compilation().format_diagnostics(false).find("expected a parameter name") != std::string::npos);
 
 	// With no folder for the embedded declarations, files still open.
 	Workspace::Options nowhere;
@@ -276,8 +329,7 @@ static void test_godot() {
 }
 
 static void test_completion_cache_lifetime() {
-	Workspace::Options options;
-	options.godot = false;
+	Workspace::Options options = plain();
 	Workspace workspace(options);
 	const std::string path = "/work/Main.as";
 	const std::string head = "package { class Main { var current:";
@@ -291,7 +343,7 @@ static void test_completion_cache_lifetime() {
 		CHECK_EQ(queries.cached_context_units(), size_t{0});
 		const auto caret = static_cast<uint32_t>(source.find("cur }") + 3);
 		for (int request = 0; request < 100; ++request) {
-			const auto items = queries.complete(*unit, caret);
+			const auto items = queries.complete(*unit, caret).items;
 			CHECK_EQ(items.size(), size_t{1});
 			CHECK_EQ(items.front().detail, "var current:" + type);
 			CHECK_EQ(queries.cached_completion_items(), size_t{1});
@@ -303,7 +355,180 @@ static void test_completion_cache_lifetime() {
 	CHECK_EQ(workspace.queries().cached_context_units(), size_t{0});
 }
 
+// A file has one place in the program, whatever name it is reached by: through a link to its folder or
+// to itself, and, where the file system does not tell them apart, in another letter case or with its
+// accented letters written another way.
+static void test_one_file_many_names() {
+	fs::path root = fresh_folder("names");
+	fs::path links = fresh_folder("names-links");
+	const std::string composed = "Caf\xC3\xA9.as"; // "é" as one character.
+	const std::string decomposed = "Cafe\xCC\x81.as"; // "e" and a combining accent.
+	write(root / "project.godot", "");
+	write(root / "game" / "Player.as", "package game { public class Player {} }");
+	write(root / "game" / composed, "package game { public class Caf\xC3\xA9 {} }");
+	write(links / "Outside.as", "package { public class Outside {} }");
+	std::error_code error;
+	fs::create_directory_symlink(root, links / "project", error);
+	CHECK(!error);
+	fs::create_symlink(root / "game" / "Player.as", root / "game" / "Alias.as", error);
+	CHECK(!error);
+	fs::create_symlink(links / "Outside.as", root / "Outside.as", error);
+	CHECK(!error);
+	const std::string real = (root / "game" / "Player.as").string();
+	const std::string changed = "package game { public class Player { var a:Nope; } }";
+
+	Workspace workspace(plain());
+	workspace.set_root((links / "project").string());
+	CHECK_EQ(workspace.root(), root.string());
+	// The link to a file of the project is that file, once. A link to a file outside it is a file here.
+	CHECK_EQ(paths(workspace, root), std::string("Outside.as game/" + composed + " game/Player.as "));
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+	Unit *player = workspace.unit(real);
+	CHECK(player != nullptr);
+	auto same = [&](const fs::path &p_name) {
+		const std::string name = p_name.string();
+		CHECK(workspace.unit(name) == workspace.unit(real));
+		workspace.open(name, changed);
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+		CHECK_EQ(workspace.compilation().format_diagnostics(false), real + ":1:44: error: unknown type 'Nope'\n");
+		CHECK(workspace.text(real) && *workspace.text(real) == changed);
+		CHECK(workspace.text(name) && *workspace.text(name) == changed);
+		CHECK(workspace.unit(name) == workspace.unit(real));
+		workspace.close(name);
+		CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+	};
+	same(links / "project" / "game" / "Player.as"); // Through a link to the folder.
+	same(root / "game" / "Alias.as"); // Through a link to the file.
+	same(root / "game" / ".." / "game" / "Player.as");
+	// Opened under one name, changed on disk under another: the editor's text stays.
+	workspace.open(real, changed);
+	workspace.file_changed_on_disk((links / "project" / "game" / "Player.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), real + ":1:44: error: unknown type 'Nope'\n");
+	workspace.close((root / "game" / "Alias.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+	// The link to a file outside the project keeps its own name: that is where the project has it.
+	CHECK(workspace.unit((root / "Outside.as").string()) != nullptr);
+	workspace.open((root / "Outside.as").string(), "package { public class Outside { var a:Nope; } }");
+	CHECK_EQ(workspace.program_units().size(), (size_t)3);
+	workspace.close((root / "Outside.as").string());
+	CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+	// A file that is not there yet has the name it was given.
+	workspace.open((links / "project" / "game" / "New.as").string(), "package game { public class New {} }");
+	CHECK(workspace.unit((root / "game" / "New.as").string()) != nullptr);
+	workspace.close((root / "game" / "New.as").string());
+	CHECK_EQ(workspace.program_units().size(), (size_t)3);
+
+	// Only where the file system itself takes the two names for one file.
+	if (fs::exists(root / "GAME" / "PLAYER.AS")) {
+		same(root / "GAME" / "PLAYER.AS");
+		same(root / "game" / "player.as");
+	} else {
+		std::printf("note: this file system tells letter case apart; that part was not run\n");
+	}
+	if (fs::exists(root / "game" / decomposed)) {
+		const std::string other = (root / "game" / composed).string();
+		const std::string name = (root / "game" / decomposed).string();
+		CHECK(workspace.unit(name) != nullptr);
+		CHECK(workspace.unit(name) == workspace.unit(other));
+		workspace.open(name, "package game { public class Caf\xC3\xA9 { var a:Nope; } }");
+		CHECK_EQ(workspace.program_units().size(), (size_t)3);
+		CHECK(workspace.compilation().format_diagnostics(false).find("unknown type 'Nope'") != std::string::npos);
+		workspace.close(other);
+		CHECK_EQ(workspace.compilation().format_diagnostics(false), std::string());
+	} else {
+		std::printf("note: this file system tells Unicode forms apart; that part was not run\n");
+	}
+	fs::remove_all(root);
+	fs::remove_all(links);
+}
+
+static void test_body_recheck() {
+	Workspace workspace(plain());
+	const std::string path = "/Main.as";
+	const std::string other = "package { public class Other { public var value:int; } }";
+	const std::string prefix = "package { public class Main { public function run():void { ";
+	const std::string suffix = " } public function later():int { return 1; } } }";
+	workspace.open("/Other.as", other);
+	workspace.open(path, prefix + "var local:Other; local.value;" + suffix);
+	CHECK(!workspace.compilation().has_errors());
+	const int initial = workspace.full_checks();
+	for (int i = 0; i < 40; ++i) {
+		std::weak_ptr<Parsed> previous = workspace.unit(path)->parsed;
+		const std::string body = i % 2 ? "var item:Other; item.value;" : "var item:Other; item.missing;";
+		const std::string text = prefix + body + suffix;
+		workspace.change(path, text);
+		Compilation clean;
+		clean.add(path, text);
+		clean.add("/Other.as", other);
+		clean.check(true);
+		CHECK_EQ(workspace.compilation().format_diagnostics(), clean.format_diagnostics());
+		CHECK_EQ(workspace.compilation().dump_names(), clean.dump_names());
+		CHECK_EQ(workspace.compilation().dump_types(), clean.dump_types());
+		CHECK_EQ(workspace.full_checks(), initial); // Body edits do not rebuild unrelated declarations.
+		CHECK(previous.expired());
+		CHECK(workspace.unit(path)->body_symbols.size() <= 5);
+	}
+	workspace.change(path, prefix + "var item:Other; item.value;" + " } public function later():Number { return 1; } } }");
+	CHECK(!workspace.compilation().has_errors());
+	CHECK_EQ(workspace.full_checks(), initial + 1); // A signature change takes the full-check path.
+}
+
+static void test_body_import_invalidates_signature() {
+	for (bool moved : { false, true }) {
+		Workspace workspace(plain());
+		const std::string a = "package a { public class Other {} }";
+		const std::string b = "package b { public class Other {} }";
+		const std::string caller = "package { public class Caller { public function run(m:Main, x:a.Other):void { m.run(x); } } }";
+		const std::string before = "package { public class Main { public function run(x:Other):void { import a.Other; } public function later():void {} } }";
+		const std::string after = moved ?
+			"package { public class Main { public function run(x:Other):void {} public function later():void { import a.Other; } } }" :
+			"package { public class Main { public function run(x:Other):void { import b.Other; } public function later():void {} } }";
+		workspace.open("/a/Other.as", a);
+		workspace.open("/b/Other.as", b);
+		workspace.open("/Caller.as", caller);
+		workspace.open("/Main.as", before);
+		CHECK(!workspace.compilation().has_errors());
+		workspace.change("/Main.as", after);
+		Compilation clean;
+		clean.add("/Caller.as", caller);
+		clean.add("/Main.as", after);
+		clean.add("/a/Other.as", a);
+		clean.add("/b/Other.as", b);
+		clean.check(true);
+		CHECK(clean.has_errors());
+		CHECK_EQ(workspace.compilation().format_diagnostics(), clean.format_diagnostics());
+		CHECK_EQ(workspace.full_checks(), 2);
+	}
+}
+
+static void test_batched_body_recheck() {
+	Workspace workspace(plain());
+	const std::string before_a = "package { public class A { public function run(b:B):void { b.take(1); } } }";
+	const std::string after_a = "package { public class A { public function run(b:B):void { b.take(\"bad\"); } } }";
+	const std::string before_b = "package { public class B { public function take(n:int):void {} } }";
+	const std::string after_b = "package { public class B { public function take(n:int):void { var local:int; } } }";
+	workspace.open("/A.as", before_a);
+	workspace.open("/B.as", before_b);
+	CHECK(!workspace.compilation().has_errors());
+	workspace.change("/A.as", after_a);
+	workspace.change("/B.as", after_b);
+	Compilation clean;
+	clean.add("/A.as", after_a);
+	clean.add("/B.as", after_b);
+	clean.check(true);
+	CHECK(clean.has_errors());
+	CHECK_EQ(workspace.compilation().format_diagnostics(), clean.format_diagnostics());
+	CHECK_EQ(workspace.compilation().dump_types(), clean.dump_types());
+	CHECK_EQ(workspace.full_checks(), 1);
+}
+
 int main() {
+	test_paths();
+	test_one_file_many_names();
+	test_batched_body_recheck();
+	test_body_import_invalidates_signature();
+	test_body_recheck();
 	test_completion_cache_lifetime();
 	test_uri();
 	test_scan();

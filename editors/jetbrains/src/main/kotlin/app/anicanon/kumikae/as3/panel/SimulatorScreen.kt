@@ -31,7 +31,7 @@ internal class SimulatorScreen(private val gesture: (SimulatorFrame, Pixel, Pixe
             val previous = field
             if (previous === value) return
             if (value == null || previous?.device != value.device ||
-                previous?.generation != value.generation
+                previous.generation != value.generation
             ) {
                 cancelTouch()
             }

@@ -1,4 +1,5 @@
 #include "interpreter_internal.h"
+#include "table.h"
 
 #include <algorithm>
 #include <cmath>
@@ -31,6 +32,7 @@ struct Request {
 	const Instruction &in;
 	Slot *registers;
 	Str *null_text;
+	void **singleton = nullptr; // For HostSingleton: where the singleton is kept once it is found.
 
 	std::string error;
 	Slot result{};
@@ -106,11 +108,7 @@ Outcome collection(Request &p_request) {
 		return Outcome::Done;
 	}
 	const Kind element = p_request.module.classes[vector->klass].element;
-	std::vector<Argument> elements(vector->length);
-	for (uint32_t i = 0; i < vector->length; i++) {
-		elements[i] = Argument{ element, vector->data[i] };
-	}
-	p_request.result.p = p_request.host.source.collection(p_request.text(p_request.in.c), elements.data(), elements.size(), &p_request.error);
+	p_request.result.p = p_request.host.source.collection(p_request.text(p_request.in.c), element, vector->data, vector->length, &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -142,11 +140,18 @@ Outcome operate(Request &p_request) {
 			&p_request.error));
 }
 
+// Looked up once, then kept: a singleton lives as long as the engine.
 Outcome singleton(Request &p_request) {
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Ref;
-	p_request.result.p = p_request.host.source.singleton(p_request.text(p_request.in.b), &p_request.error);
-	return p_request.done(p_request.result.p != nullptr);
+	if (!*p_request.singleton) {
+		*p_request.singleton = p_request.host.source.singleton(p_request.text(p_request.in.b), &p_request.error);
+		if (!*p_request.singleton) {
+			return Outcome::Refused;
+		}
+	}
+	p_request.result.p = p_request.host.handles.copy(*p_request.singleton);
+	return Outcome::Done;
 }
 
 Outcome evaluate(Request &p_request) {
@@ -198,10 +203,15 @@ Outcome to_text(Request &p_request) {
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Str;
 	void *value = p_request.handle(p_request.in.b);
-	p_request.result.p = value ? p_request.host.handles.text(value) : nullptr;
-	if (!p_request.result.p) {
+	if (!value) {
 		retain(p_request.null_text);
 		p_request.result.p = p_request.null_text;
+		return Outcome::Done;
+	}
+	p_request.result.p = p_request.host.handles.text(value);
+	if (!p_request.result.p) {
+		p_request.error = std::string(OUT_OF_MEMORY);
+		return Outcome::Refused;
 	}
 	return Outcome::Done;
 }
@@ -242,22 +252,65 @@ std::string not_a_signal(std::string_view p_name) {
 	return "'" + std::string(p_name) + "' is not a signal";
 }
 
-// `object[name]` on a script object: one of its own fields by that name, which must hold a signal.
-// Nothing if it has no such field: the Godot object behind the script object is then asked.
+// The class of the object's that declares its field `p_field`: the first, from the object's own class down
+// its bases, whose base has fewer fields.
+uint32_t declaring_class(const ir::Module &p_module, uint32_t p_class, size_t p_field) {
+	uint32_t at = p_class;
+	while (p_module.classes[at].base != NONE && p_module.classes[p_module.classes[at].base].fields.size() > p_field) {
+		at = p_module.classes[at].base;
+	}
+	return at;
+}
+
+bool extends_class(const ir::Module &p_module, uint32_t p_class, uint32_t p_base) {
+	for (uint32_t at = p_class; at != NONE; at = p_module.classes[at].base) {
+		if (at == p_base) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Whether the code running may reach the field by name, as AS3 sees names: a public one from anywhere, a
+// protected one from the code of its class and of subclasses, any other from the code of its class.
+bool field_seen(const Request &p_request, uint32_t p_class, size_t p_field) {
+	const ir::Field &field = p_request.module.classes[p_class].fields[p_field];
+	const uint32_t code = p_request.function.owner != NONE ? p_request.function.owner : p_request.function.written_in;
+	if (field.is_public || code == NONE) {
+		return field.is_public;
+	}
+	const uint32_t declared = declaring_class(p_request.module, p_class, p_field);
+	return declared == code || (field.is_protected && extends_class(p_request.module, code, declared));
+}
+
+// `object[name]` on a script object: one of its fields by that name that the code may see, which must hold
+// a signal. A public field comes first, a subclass's before a base's: a base's private field does not hide
+// a subclass's public one. Nothing if it has none: the Godot object behind the script object is asked.
 std::optional<Outcome> own_member(Request &p_request, Object *p_object, std::string_view p_name) {
 	const ir::Class &klass = p_request.module.classes[p_object->klass];
-	for (size_t i = klass.fields.size(); i-- > 0;) {
-		if (klass.fields[i].name != p_name) {
+	std::optional<size_t> found, hidden;
+	for (size_t i = klass.fields.size(); i-- > 0 && !found;) {
+		if (klass.fields[i].name != p_name || !field_seen(p_request, p_object->klass, i)) {
 			continue;
 		}
-		if (klass.fields[i].kind != Kind::Val) {
-			p_request.error = not_a_signal(p_name);
-			return Outcome::Refused;
+		if (klass.fields[i].is_public) {
+			found = i;
+		} else if (!hidden) {
+			hidden = i;
 		}
-		p_request.result.p = p_request.host.handles.copy(p_object->fields()[i].p);
-		return Outcome::Done;
 	}
-	return std::nullopt;
+	found = found ? found : hidden;
+	if (!found) {
+		return std::nullopt;
+	}
+	const ir::Field &field = klass.fields[*found];
+	if (field.kind != Kind::Val || (!field.engine_type.empty() && field.engine_type != "Signal")) {
+		p_request.error = not_a_signal(p_name);
+		return Outcome::Refused;
+	}
+	void *held = p_object->fields()[*found].p;
+	p_request.result.p = held ? p_request.host.handles.copy(held) : nullptr;
+	return Outcome::Done;
 }
 
 Outcome member(Request &p_request) {
@@ -344,36 +397,23 @@ Outcome perform(Request &p_request) {
 } // namespace
 
 // One request to the engine. Raises an AS3 error if the engine refuses.
-// A script object inside an untyped value has no form Godot can hold: said before Godot is asked.
-static bool hands_script_object(const Function &p_function, const Instruction &p_in, const Slot *p_registers) {
-	const char *shape = ir::op_shape(p_in.op);
-	const uint32_t operands[3] = { p_in.a, p_in.b, p_in.c };
-	const auto object = [&](uint32_t p_register) {
-		return p_function.registers[p_register] == Kind::Any && any::tag(p_registers[p_register]) == AnyTag::Object;
-	};
-	for (int n = 1; n < 3; n++) {
-		if (shape[n] == 'R' && object(operands[n])) {
-			return true;
-		}
-		if (shape[n] == 'A') {
-			for (uint32_t each : p_function.argument_lists[operands[n]]) {
-				if (object(each)) {
-					return true;
-				}
-			}
-		}
-	}
-	return false;
-}
-
 void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	const size_t frame_index = frames_.size() - 1;
-	if (hands_script_object(p_function, p_in, stack_.data() + frames_.back().base)) {
-		raise(module_.type_error_class, "a script object can't be given to Godot: only Godot's own values and objects can.");
+	if (const std::optional<std::string> why = refused_by_godot(p_function, p_in, stack_.data() + frames_.back().base)) {
+		raise(module_.type_error_class, *why);
 		return;
 	}
 	Request request(module_, host_, p_function, p_in, stack_.data() + frames_.back().base, null_text_);
-	switch (perform(request)) {
+	if (p_in.op == Op::HostSingleton) {
+		if (singletons_.size() <= p_in.b) {
+			singletons_.resize(module_.strings.size(), nullptr);
+		}
+		request.singleton = &singletons_[p_in.b];
+	}
+	// A call the engine made back into this program may have failed: run() raises that error at the end of
+	// this instruction, in place of any the outcome raises.
+	const Outcome outcome = perform(request);
+	switch (outcome) {
 		case Outcome::Missing:
 			raise_null();
 			return;

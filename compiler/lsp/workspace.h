@@ -32,6 +32,8 @@ private:
 
 	Options options_;
 	std::string root_; // The project folder; empty if there is none.
+	std::string opened_; // The folder the editor opened, by the editor's name for it.
+	std::string opened_real_; // The same folder with links followed.
 	std::map<std::string, File> files_; // By path: the order they are checked in.
 	std::vector<std::shared_ptr<Parsed>> builtins_;
 	std::shared_ptr<Parsed> godot_;
@@ -43,6 +45,7 @@ private:
 	bool stale_ = true;
 	bool cut_off_ = false; // The project has more files than are read.
 	int checks_ = 0;
+	int full_checks_ = 0;
 
 	void scan(const std::string &p_folder);
 	int declaration(const std::string &p_path) const; // Its place in declarations_, or -1.
@@ -51,6 +54,7 @@ private:
 	bool in_project(const std::string &p_path) const;
 	bool load(const std::string &p_path);
 	void check();
+	bool update_bodies();
 	const std::string &support_folder();
 
 public:
@@ -61,6 +65,14 @@ public:
 	// `project.godot`, or else the folder itself. Every .as file under the project is read.
 	void set_root(const std::string &p_folder);
 	const std::string &root() const { return root_; }
+
+	// The one name the workspace has a file by, whatever name it was reached by: links are followed, and
+	// where the file system takes two spellings for one file (letter case, the form of an accented
+	// letter) the spelling on disk is the name. A link in the project to a file outside it keeps its own
+	// name. A file that does not exist keeps the name given, with the folders above it resolved.
+	std::string resolve(const std::string &p_path) const;
+	// The name an editor has for a file the workspace names: under the folder as the editor opened it.
+	std::string shown_path(const std::string &p_path) const;
 
 	// The editor's text for a file. A file outside the project (or in a dot folder of it) is not part of
 	// the program, unless there is no project folder at all: then the open files are the program.
@@ -73,10 +85,14 @@ public:
 	// The text the workspace holds for a file right now (the editor's, if it is open), without checking
 	// anything. Null if it holds none.
 	const std::string *text(const std::string &p_path) const;
+	// True if the file is open and the editor's text for it begins with a byte-order mark, which text()
+	// leaves out.
+	bool sent_with_mark(const std::string &p_path) const;
 	bool stale() const { return stale_; }
 	// True if the project had more .as files than the limit, so some were left out.
 	bool cut_off() const { return cut_off_; }
 	size_t max_files() const { return options_.max_files; }
+	int full_checks() const { return full_checks_; } // Rebuilds of the whole semantic environment.
 	int checks() const { return checks_; } // How many times the program has been checked.
 	// All three check the program first if anything changed. What they return is good until the next
 	// change.

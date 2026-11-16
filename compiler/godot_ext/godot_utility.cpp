@@ -9,6 +9,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 
 #include <cstdlib>
+#include <optional>
 #include <vector>
 
 using namespace godot;
@@ -17,8 +18,10 @@ namespace kas3 {
 
 namespace {
 
-constexpr int ANYTHING = -1; // A parameter or result declared as Variant.
-constexpr int NOTHING = -2; // No result.
+// A parameter or result declared as Variant.
+constexpr int ANYTHING = -1;
+// No result.
+constexpr int NOTHING = -2;
 
 // A value of one of Godot's types as the entry takes it: the bare value, not a Variant. Large enough for
 // every type a global function uses (the largest are the packed arrays, two words).
@@ -26,7 +29,8 @@ struct alignas(16) Bare {
 	unsigned char bytes[64];
 };
 
-int type_of_name(std::string_view p_name) {
+// One of the signature's type names; nothing for a name Godot does not have.
+std::optional<int> type_of_name(std::string_view p_name) {
 	if (p_name == "Variant") {
 		return ANYTHING;
 	}
@@ -49,7 +53,8 @@ bool fits(const Variant &p_value, int p_type) {
 		case Variant::FLOAT:
 			return given == Variant::FLOAT || given == Variant::INT;
 		case Variant::INT:
-			return given == Variant::INT || (given == Variant::FLOAT && (double)p_value == (double)(int64_t)(double)p_value);
+			// A Number for an integer is converted, or refused, before the call.
+			return given == Variant::INT;
 		case Variant::STRING:
 			return given == Variant::STRING || given == Variant::STRING_NAME;
 		case Variant::OBJECT:
@@ -66,13 +71,15 @@ std::string type_name(int p_type) {
 } // namespace
 
 struct GodotHost::Utility {
-	std::string signature; // The key: the text the interpreter passes.
+	// The key: the text the interpreter passes.
+	std::string signature;
 	std::string name;
 	GDExtensionPtrUtilityFunction function = nullptr;
 	int result = NOTHING;
 	std::vector<int> parameters;
 	bool any_number = false;
-	bool reads_a_value = false; // Null is a proper answer from it.
+	// Null is a proper answer from it.
+	bool reads_a_value = false;
 };
 
 GodotHost::GodotHost() = default;
@@ -97,13 +104,24 @@ const GodotHost::Utility *GodotHost::utility(std::string_view p_signature, std::
 		return nullptr;
 	}
 	made->name = std::string(parts[0]);
-	made->result = type_of_name(parts[2]);
+	const std::optional<int> result = type_of_name(parts[2]);
+	if (!result) {
+		*r_error = "Godot's '" + made->name + "' gives back a '" + std::string(parts[2]) + "', which Godot has no type for here";
+		return nullptr;
+	}
+	made->result = *result;
 	made->any_number = parts.size() > 4 && parts[4] == "varargs";
 	// str_to_var, bytes_to_var and type_convert read a value out of their argument, and null is one.
 	made->reads_a_value = made->name.find("_to_var") != std::string::npos || made->name == "type_convert";
 	for (size_t at = 0; parts[3] != "-" && at <= parts[3].size();) {
 		const size_t comma = std::min(parts[3].find(',', at), parts[3].size());
-		made->parameters.push_back(type_of_name(parts[3].substr(at, comma - at)));
+		const std::string_view name = parts[3].substr(at, comma - at);
+		const std::optional<int> type = type_of_name(name);
+		if (!type) {
+			*r_error = "Godot's '" + made->name + "' takes a '" + std::string(name) + "', which Godot has no type for here";
+			return nullptr;
+		}
+		made->parameters.push_back(*type);
 		at = comma + 1;
 	}
 	const StringName godot_name(String::utf8(made->name.c_str()));
@@ -125,7 +143,8 @@ bool GodotHost::call_utility(std::string_view p_signature, const vm::Argument *p
 		return false;
 	}
 	if (p_count < function->parameters.size() || (!function->any_number && p_count > function->parameters.size())) {
-		*r_error = "Godot's '" + function->name + "' takes " + std::to_string(function->parameters.size()) + " arguments, not " +
+		const size_t wanted = function->parameters.size();
+		*r_error = "Godot's '" + function->name + "' takes " + std::to_string(wanted) + (wanted == 1 ? " argument" : " arguments") + ", not " +
 				std::to_string(p_count);
 		return false;
 	}
@@ -133,7 +152,8 @@ bool GodotHost::call_utility(std::string_view p_signature, const vm::Argument *p
 	std::vector<Variant> values(p_count);
 	std::vector<Bare> bare(p_count);
 	std::vector<GDExtensionConstTypePtr> pointers(p_count);
-	std::vector<int> made; // The bare values that were made, to be let go.
+	// The bare values that were made, to be let go.
+	std::vector<int> made;
 	bool ok = true;
 	for (size_t i = 0; i < p_count && ok; i++) {
 		values[i] = to_variant(p_arguments[i].kind, p_arguments[i].slot);

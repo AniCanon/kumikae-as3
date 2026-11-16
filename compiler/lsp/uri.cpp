@@ -1,6 +1,5 @@
 #include "uri.h"
 
-#include <filesystem>
 
 namespace kas3 {
 
@@ -25,7 +24,7 @@ bool is_letter(char p_c) {
 
 } // namespace
 
-std::string path_from_uri(std::string_view p_uri) {
+std::string path_from_uri(std::string_view p_uri, PathStyle p_style) {
 	const std::string_view scheme = "file://";
 	if (p_uri.compare(0, scheme.size(), scheme) != 0) {
 		return std::string();
@@ -35,7 +34,9 @@ std::string path_from_uri(std::string_view p_uri) {
 	if (slash == std::string_view::npos) {
 		return std::string();
 	}
-	std::string path;
+	// A host other than this machine names a share: "file://server/share/a.as" is "//server/share/a.as".
+	const std::string_view host = p_uri.substr(scheme.size(), slash - scheme.size());
+	std::string path = host.empty() || host == "localhost" ? std::string() : "//" + std::string(host);
 	for (size_t i = slash; i < p_uri.size(); i++) {
 		if (p_uri[i] == '%' && i + 2 < p_uri.size() + 0 && hex_value(p_uri[i + 1]) >= 0 && hex_value(p_uri[i + 2]) >= 0) {
 			path += (char)(hex_value(p_uri[i + 1]) * 16 + hex_value(p_uri[i + 2]));
@@ -45,29 +46,29 @@ std::string path_from_uri(std::string_view p_uri) {
 		}
 	}
 	// "/C:/dir" is the Windows path "C:/dir".
-	if (path.size() >= 3 && path[0] == '/' && is_letter(path[1]) && path[2] == ':') {
+	if (p_style == PathStyle::Windows && path.size() >= 3 && path[0] == '/' && is_letter(path[1]) && path[2] == ':') {
 		path.erase(0, 1);
 	}
-	return path;
+	// A NUL byte names no file: it would cut the path short wherever the path is used.
+	return path.find('\0') == std::string::npos ? generic_path(path, p_style) : std::string();
 }
 
-std::string normal_path(std::string_view p_path) {
-	return std::filesystem::path(p_path).lexically_normal().string();
-}
-
-std::string uri_from_path(std::string_view p_path) {
+std::string uri_from_path(std::string_view p_path, PathStyle p_style) {
 	static const char *const HEX = "0123456789ABCDEF";
+	const std::string generic = generic_path(p_path, p_style);
+	std::string_view path = generic;
 	std::string uri = "file://";
-	if (p_path.empty() || p_path[0] != '/') {
+	if (path.compare(0, 2, "//") == 0) {
+		path.remove_prefix(2); // A share: its server is the URI's host.
+	} else if (path.empty() || path[0] != '/') {
 		uri += '/';
 	}
-	for (size_t i = 0; i < p_path.size(); i++) {
-		unsigned char c = (unsigned char)p_path[i];
+	const bool drive = p_style == PathStyle::Windows && path.size() >= 2 && is_letter(path[0]) && path[1] == ':';
+	for (size_t i = 0; i < path.size(); i++) {
+		unsigned char c = (unsigned char)path[i];
 		bool plain = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '/' || c == '-' ||
-				c == '.' || c == '_' || c == '~' || (c == ':' && i == 1);
-		if (c == '\\') {
-			uri += '/';
-		} else if (plain) {
+				c == '.' || c == '_' || c == '~' || (c == ':' && i == 1 && drive);
+		if (plain) {
 			uri += (char)c;
 		} else {
 			uri += '%';

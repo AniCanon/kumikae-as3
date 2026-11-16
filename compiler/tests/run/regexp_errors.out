@@ -1,0 +1,6 @@
+SyntaxError: the regular expression /(a/ can't be read: a group is not closed.
+SyntaxError: the regular expression /a{2,1}/g can't be read: a quantifier's counts are in the wrong order.
+TypeError: Error #1100: Cannot supply flags when constructing one RegExp from another.
+Error: the regular expression /(a+)+b/ took too many steps, and was stopped.
+TypeError: Error #1009: Cannot access a property or method of a null object reference.
+TypeError: Error #1009: Cannot access a property or method of a null object reference.

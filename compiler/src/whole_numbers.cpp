@@ -62,6 +62,46 @@ WholeResult gives_whole_number(const Call *p_call) {
 	return by_arguments ? WholeResult::IfArgumentsAre : WholeResult::No;
 }
 
+static bool tagged(const VarDecl *p_decl, std::string_view p_tag) {
+	for (const Metadata &tag : p_decl->metadata) {
+		if (tag.name == p_tag) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool declares_signal(const VarDecl *p_decl) {
+	return tagged(p_decl, "Signal");
+}
+
+bool declares_export(const VarDecl *p_decl) {
+	return tagged(p_decl, "Export");
+}
+
+const NumberLit *written_number(const Expr *p_value, bool *r_negative) {
+	*r_negative = p_value && p_value->kind == NodeKind::Unary && static_cast<const Unary *>(p_value)->op == TokenKind::Minus;
+	const Expr *number = *r_negative ? static_cast<const Unary *>(p_value)->operand : p_value;
+	return number && number->kind == NodeKind::NumberLit ? static_cast<const NumberLit *>(number) : nullptr;
+}
+
+bool export_constant(const Expr *p_value) {
+	bool negative = false;
+	if (!p_value || written_number(p_value, &negative) || p_value->kind == NodeKind::StringLit || p_value->kind == NodeKind::BoolLit ||
+			p_value->kind == NodeKind::NullLit) {
+		return true;
+	}
+	if (p_value->kind != NodeKind::New) {
+		return false;
+	}
+	for (const Expr *argument : static_cast<const New *>(p_value)->arguments) {
+		if (!written_number(argument, &negative)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 bool has_tag(const Symbol *p_class, std::string_view p_tag) {
 	if (!p_class || p_class->kind != SymbolKind::Class || !p_class->unit || !p_class->unit->is_declaration || !p_class->node ||
 			p_class->node->kind != NodeKind::ClassDecl) {

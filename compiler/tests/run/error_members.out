@@ -1,0 +1,8 @@
+boom Error 42
+TypeError 1009
+RangeError: range
+	at error_members()[error_members.as:11]
+Error: mine
+	at error_members()[error_members.as:12]
+Error
+	at error_members()[error_members.as:13]

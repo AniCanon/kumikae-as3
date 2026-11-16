@@ -65,8 +65,8 @@ and [fixture lifecycle](https://flex.apache.org/flexunit/tutorial/flexunit/Unit-
 and [MSTest's setup and cleanup](https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-mstest-writing-tests-lifecycle).
 This is not a FlexUnit compatibility layer. `[Test]`/`[Before]` discovery, function
 callbacks, automatic expression capture and parallel execution are not implemented.
-The current interpreter cannot pass `Function` values, so explicit `TestCase`
-subclasses supply ordinary AS3 virtual dispatch without a compiler extension.
+Explicit `TestCase` subclasses use ordinary AS3 virtual dispatch and provide a
+portable, deliberate registration API without relying on metadata discovery.
 
 ## Register project targets
 
@@ -124,10 +124,10 @@ The adapter uses the IDE's bundled test-runner module, not an external dependenc
 
 ## Protocol and verification
 
-Version 1 events are length-framed text because the current interpreter does not
-provide JSON serialization or string indexing. A record starts with
+Version 1 events use length-framed text so labels and multiline failure messages
+need no escaping in AS3. A record starts with
 `@kas3-test-v1 EVENT NAME_LENGTH MESSAGE_LENGTH`, a newline, the name, a newline,
-the message, and a newline. Lengths count Unicode characters. The adapter validates
+the message, and a newline. Lengths count UTF-16 code units, matching AS3 String.length. The adapter validates
 ordering, names, size limits and complete lifecycles before emitting escaped
 TeamCity service messages. Raw program output cannot inject test events into Rider.
 

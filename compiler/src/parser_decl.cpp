@@ -5,16 +5,6 @@ namespace kas3 {
 
 namespace {
 
-struct Restore {
-	bool &flag;
-	bool saved;
-	Restore(bool &p_flag, bool p_value) :
-			flag(p_flag), saved(p_flag) {
-		flag = p_value;
-	}
-	~Restore() { flag = saved; }
-};
-
 const uint16_t ACCESS_BITS = Modifiers::Public | Modifiers::Private | Modifiers::Protected | Modifiers::Internal;
 
 } // namespace
@@ -149,6 +139,35 @@ Modifiers Parser::parse_modifiers() {
 	}
 }
 
+// One member of a class: its metadata and modifiers, then a variable or a function.
+void Parser::parse_class_member(uint32_t p_start, std::vector<Node *> &r_members) {
+	List<Metadata> metadata = parse_metadata_tags();
+	Modifiers modifiers = parse_modifiers();
+	if (at(TokenKind::KwVar) || at(TokenKind::KwConst)) {
+		// A `[` that starts the next line is the next member's metadata, not an index.
+		Restore brackets(bracket_ends_initializer_, true);
+		VarDecl *variable = parse_variable_declaration(modifiers, metadata, true);
+		variable->offset = p_start;
+		end_statement();
+		r_members.push_back(variable);
+	} else if (at(TokenKind::KwFunction)) {
+		advance();
+		bool is_native = (modifiers.bits & Modifiers::Native) != 0;
+		FunctionDecl *function = parse_function_rest(p_start, modifiers, metadata, !is_native, true, true);
+		if (!function->body) {
+			end_statement();
+		}
+		r_members.push_back(function);
+	} else if (!panic_ && !parse_unsupported_statement()) {
+		// (If the metadata or modifiers already failed, that error is the one to show.)
+		if (at_namespace_attribute()) {
+			error_at(current_.offset, "namespaces are not supported"); // `mx_internal function f()`
+		} else {
+			error_at(p_start, "expected a member definition");
+		}
+	}
+}
+
 ClassDecl *Parser::parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata) {
 	ClassDecl *decl = node<ClassDecl>(p_offset);
 	decl->modifiers = p_modifiers;
@@ -182,34 +201,13 @@ ClassDecl *Parser::parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Me
 			} else if (at(TokenKind::KwImport)) {
 				members.push_back(parse_import());
 			} else if (!parse_unsupported_statement()) {
-				List<Metadata> metadata = parse_metadata_tags();
-				Modifiers modifiers = parse_modifiers();
-				if (at(TokenKind::KwVar) || at(TokenKind::KwConst)) {
-					// A `[` that starts the next line is the next member's metadata, not an index.
-					Restore brackets(bracket_ends_initializer_, true);
-					VarDecl *variable = parse_variable_declaration(modifiers, metadata, true);
-					variable->offset = start;
-					end_statement();
-					members.push_back(variable);
-				} else if (at(TokenKind::KwFunction)) {
-					advance();
-					bool is_native = (modifiers.bits & Modifiers::Native) != 0;
-					FunctionDecl *function = parse_function_rest(start, modifiers, metadata, !is_native, true, true);
-					if (!function->body) {
-						end_statement();
-					}
-					members.push_back(function);
-				} else if (!panic_ && !parse_unsupported_statement()) {
-					// (If the metadata or modifiers already failed, that error is the one to show.)
-					if (at_namespace_attribute()) {
-						error_at(current_.offset, "namespaces are not supported"); // `mx_internal function f()`
-					} else {
-						error_at(start, "expected a member definition");
-					}
-				}
+				parse_class_member(start, members);
 			}
 			if (panic_) {
-				synchronize(level);
+				// Metadata on the next line starts another class member, not the failed declaration.
+				if (!at(TokenKind::LBracket) || !current_.newline_before) {
+					synchronize(level);
+				}
 				panic_ = false;
 			}
 			if (current_.offset == start && !at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
@@ -220,6 +218,30 @@ ClassDecl *Parser::parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Me
 	}
 	decl->members = to_list(members);
 	return finish(decl);
+}
+
+// One method signature of an interface, with its metadata.
+void Parser::parse_interface_member(uint32_t p_start, std::vector<FunctionDecl *> &r_methods) {
+	List<Metadata> metadata = parse_metadata_tags();
+	uint32_t modifiers_at = current_.offset;
+	if (parse_modifiers().bits) {
+		error_at(modifiers_at, "interface methods cannot have modifiers", false);
+	}
+	if (at(TokenKind::KwFunction)) {
+		advance();
+		uint32_t body_at = 0;
+		FunctionDecl *function = parse_function_rest(p_start, Modifiers(), metadata, false, true, true);
+		if (function->body) {
+			body_at = function->body->offset;
+			error_at(body_at, "interface methods cannot have a body", false);
+			function->body = nullptr;
+		} else {
+			end_statement();
+		}
+		r_methods.push_back(function);
+	} else if (!panic_) {
+		error_at(current_.offset, "expected a method signature");
+	}
 }
 
 InterfaceDecl *Parser::parse_interface(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata) {
@@ -250,26 +272,7 @@ InterfaceDecl *Parser::parse_interface(uint32_t p_offset, Modifiers p_modifiers,
 			if (at(TokenKind::Semicolon)) {
 				advance();
 			} else {
-				List<Metadata> metadata = parse_metadata_tags();
-				uint32_t modifiers_at = current_.offset;
-				if (parse_modifiers().bits) {
-					error_at(modifiers_at, "interface methods cannot have modifiers", false);
-				}
-				if (at(TokenKind::KwFunction)) {
-					advance();
-					uint32_t body_at = 0;
-					FunctionDecl *function = parse_function_rest(start, Modifiers(), metadata, false, true, true);
-					if (function->body) {
-						body_at = function->body->offset;
-						error_at(body_at, "interface methods cannot have a body", false);
-						function->body = nullptr;
-					} else {
-						end_statement();
-					}
-					methods.push_back(function);
-				} else if (!panic_) {
-					error_at(current_.offset, "expected a method signature");
-				}
+				parse_interface_member(start, methods);
 			}
 			if (panic_) {
 				synchronize(level);
@@ -294,6 +297,7 @@ PackageDecl *Parser::parse_package() {
 	std::vector<Node *> definitions;
 	Token open = expect(TokenKind::LBrace, "'{'");
 	if (open.length) {
+		package->body_offset = open.offset + open.length;
 		parse_definitions(true, imports, definitions, nullptr);
 		expect_close(TokenKind::RBrace, open);
 	}

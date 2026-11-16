@@ -1,0 +1,102 @@
+class Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new RangeError
+class classes_ir
+  new classes_ir
+class Shape
+  #0 Shape/area
+  static Shape$static
+  new Shape
+class Square extends Shape
+  .0 side:Number
+  #0 Square/area
+  new Square
+global Shape.count:int
+entry classes_ir
+function Error(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "Error"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function TypeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "TypeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function RangeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "RangeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function classes_ir(r0:Object):void
+  @1 InitClass Square
+  @2 New r2 Square
+  @3 ConstF64 r3 2
+  @4 Call _ Square (r2, r3)
+  @5 Move r1 r2
+  @7 NullCheck r1
+  @8 CallVirtual r4 #0 (r1)
+  @9 F64ToStr r5 r4
+  @10 InitClass Shape
+  @11 GetGlobal r6 Shape.count
+  @12 I32ToStr r7 r6
+  @13 InitClass Square
+  @14 IsClass r8 r1 Square
+  @15 BoolToStr r9 r8
+  @16 StrToStr r10 r5
+  @17 StrToStr r11 r7
+  @18 StrToStr r12 r9
+  @19 Trace (r10, r11, r12)
+  @20 ReturnVoid
+function Shape(r0:Object):void
+  @1 GetGlobal r1 Shape.count
+  @2 I32ToF64 r2 r1
+  @3 ConstF64 r3 1
+  @4 AddF64 r4 r2 r3
+  @5 F64ToI32 r5 r4
+  @6 SetGlobal Shape.count r5
+  @7 ReturnVoid
+function Shape/area(r0:Object):Number
+  @1 ConstF64 r1 0
+  @2 Return r1
+  @3 ConstF64 r2 nan
+  @4 Return r2
+function Square(r0:Object, r1:Number):void
+  @1 Call _ Shape (r0)
+  @3 SetField r0 .0 r1
+  @4 ReturnVoid
+function Square/area(r0:Object):Number
+  @1 GetField r1 r0 .0
+  @2 GetField r2 r0 .0
+  @3 MulF64 r3 r1 r2
+  @4 Return r3
+  @5 ConstF64 r4 nan
+  @6 Return r4
+static function Shape$static():void
+  @1 ConstI32 r0 0
+  @2 SetGlobal Shape.count r0
+  @3 ReturnVoid

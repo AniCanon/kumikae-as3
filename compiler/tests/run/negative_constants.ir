@@ -1,0 +1,79 @@
+class Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new Error
+class TypeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new TypeError
+class RangeError extends Error
+  .0 message:String
+  .1 name:String
+  .2 errorID:int
+  .3 stack:String
+  new RangeError
+class negative_constants
+  new negative_constants
+entry negative_constants
+function Error(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "Error"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function TypeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "TypeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function RangeError(r0:Object, r1:String, r2:int):void
+  @0 SetField r0 .0 r1
+  @1 SetField r0 .2 r2
+  @2 ConstStr r3 "RangeError"
+  @3 SetField r0 .1 r3
+  @4 ErrorStack r4 r0
+  @5 SetField r0 .3 r4
+  @6 ReturnVoid
+function negative_constants(r0:Object):void
+  @0 ConstF64 r1 nan
+  @1 ConstF64 r4 nan
+  @3 ConstF64 r6 -0
+  @4 Move r1 r6
+  @6 ConstI32 r7 -2147483648
+  @7 Move r2 r7
+  @9 ConstI32 r8 -1
+  @10 I32ToU32 r9 r8
+  @11 Move r3 r9
+  @13 ConstF64 r10 -1.5
+  @14 Move r4 r10
+  @16 ConstI32 r11 -3
+  @17 ToAny r12 r11
+  @18 Move r5 r12
+  @20 ConstI32 r13 1
+  @21 I32ToF64 r15 r13
+  @22 DivF64 r14 r15 r1
+  @23 F64ToStr r16 r14
+  @24 I32ToStr r17 r2
+  @25 U32ToStr r18 r3
+  @26 F64ToStr r19 r4
+  @27 ConstF64 r21 -2
+  @28 NegF64 r20 r21
+  @29 F64ToStr r22 r20
+  @30 StrToStr r23 r16
+  @31 StrToStr r24 r17
+  @32 StrToStr r25 r18
+  @33 StrToStr r26 r19
+  @34 AnyText r28 r5
+  @35 StrToStr r27 r28
+  @36 StrToStr r29 r22
+  @37 Trace (r23, r24, r25, r26, r27, r29)
+  @38 ReturnVoid

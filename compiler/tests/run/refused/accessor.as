@@ -1,1 +1,0 @@
-package { public class accessor { private var n:int; public function get value():int { return n; } public function set value(v:int):void { n = v; } public function accessor() { value = 2; trace(value); } } }

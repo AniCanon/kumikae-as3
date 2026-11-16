@@ -36,8 +36,16 @@ struct Str : Counted {
 
 struct Object : Counted {
 	uint32_t klass; // An index into the module's classes.
+	// For the cycle collector (vm/collector.h): the list it is on, or null for an object no collector looks
+	// at (its class can hold nothing that leads back to it), and what the collector last found of it.
+	Object *gc_previous;
+	Object *gc_next;
+	int32_t gc_count;
+	uint32_t gc_state;
 	Slot *fields() { return reinterpret_cast<Slot *>(this + 1); }
 };
+
+class Entries; // vm/table.h
 
 // A Vector.<T>: an object whose class says what its elements are. They are held like fields: untagged
 // slots of that one kind.
@@ -46,6 +54,7 @@ struct Vector : Object {
 	uint32_t capacity; // Slots there is room for; those from `length` on are zero.
 	bool fixed; // Its length may not change.
 	Slot *data;
+	Entries *properties; // An Array's properties other than its indices, once it has any (vm/table.h).
 };
 
 inline void retain(Counted *p_value) {
@@ -62,19 +71,46 @@ inline bool release(Counted *p_value) {
 // value declared `Object`, and zero (no reference, `undefined`, 0, false) for the rest.
 Slot empty_value(bool p_number, bool p_null);
 
+// The most elements a vector may have: more is refused as memory running out (a length that came from a
+// negative number, most likely). Every way a vector grows checks this one number.
+constexpr uint32_t MAX_VECTOR_LENGTH = 1u << 30;
+
+// What AS3 says when memory runs out, wherever it does.
+constexpr std::string_view OUT_OF_MEMORY = "Error #1000: The system is out of memory.";
+
+// For tests: the next p_count allocations of strings, objects, vectors and Int64 boxes fail, as they
+// would with no memory left.
+void fail_allocations(uint32_t p_count);
+bool allocation_fails(); // True, and one fewer to fail, while any are still to fail.
+
 // How many strings and objects are alive, for finding leaks.
 size_t live_strings();
 size_t live_objects();
 
-Str *new_string(std::string_view p_text); // One reference, the caller's.
+Str *new_string(std::string_view p_text); // One reference, the caller's. Null if out of memory.
+// The two, one after the other, made at once: nothing else is allocated. Two halves of a character that
+// meet there become the character (vm/text_units.h). Null if out of memory.
+Str *join_strings(std::string_view p_first, std::string_view p_second);
 void free_string(Str *p_string);
-Object *new_object(uint32_t p_class, size_t p_fields); // One reference; fields zeroed. Null if out of memory.
-void free_object(Object *p_object); // The fields must have been released.
+// One reference; fields zeroed. Null if out of memory. It is put on the list (the collector's list_for() its
+// class), or on none if that is null: the list is never left out by mistake.
+Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list);
+void free_object(Object *p_object); // The fields must have been released. It leaves the list it is on.
 // One reference; `p_length` elements, all zero. Null if out of memory.
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed);
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, Object *p_list);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
-void free_vector(Vector *p_vector); // The elements must have been released.
+void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.
+
+// The cycle collector's lists: circular, through gc_previous and gc_next, each with an Object of its own as
+// its head, which is never freed. An object is on one list at most.
+void list_init(Object *p_head);
+inline bool list_empty(const Object *p_head) {
+	return p_head->gc_next == p_head;
+}
+void list_insert(Object *p_head, Object *p_object); // At the end.
+void list_remove(Object *p_object); // From whichever list it is on; nothing if none.
+void list_splice(Object *p_head, Object *p_from); // All of p_from's at the end of p_head's; p_from is left empty.
 
 // Conversions, as ECMAScript and AS3 define them.
 
@@ -82,11 +118,13 @@ int32_t to_int32(double p_value);
 uint32_t to_uint32(double p_value);
 // "0.1", "1e+21", "NaN", "-Infinity": the shortest text that reads back as the same number.
 std::string number_to_string(double p_value);
-// Leading and trailing white space is allowed; an empty string is 0; anything else that is not a number
-// is NaN.
+// Leading and trailing white space (ECMAScript's, vm/number_text.h) is allowed; an empty string is 0;
+// anything else that is not a number is NaN.
 double string_to_number(std::string_view p_text);
-// The number of characters (Unicode code points) in UTF-8 text.
-int32_t character_count(std::string_view p_text);
+// AS3's length of UTF-8 text: its UTF-16 units, so a character past U+FFFF counts two.
+int32_t utf16_length(std::string_view p_text);
+// AS3's order of two texts held as UTF-8: by their UTF-16 units. Below 0, 0 or above.
+int compare_utf16(std::string_view p_a, std::string_view p_b);
 
 } // namespace vm
 } // namespace kas3

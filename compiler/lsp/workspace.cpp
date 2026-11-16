@@ -1,6 +1,7 @@
 #include "workspace.h"
 
 #include "builtins.h"
+#include "paths.h"
 #include "uri.h"
 
 #include <cstdio>
@@ -13,12 +14,38 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// Every path the workspace holds is spelled this way, whatever the system: see paths.h.
 std::string normal(const std::string &p_path) {
-	return normal_path(p_path);
+	return generic_path(p_path);
 }
 
-bool starts_with(const std::string &p_text, const std::string &p_prefix) {
-	return p_text.compare(0, p_prefix.size(), p_prefix) == 0;
+std::string normal(const fs::path &p_path) {
+	return generic_path(p_path.generic_u8string()); // Not string(): on Windows that loses what the code page lacks.
+}
+
+// True if the path is the folder or something in it.
+bool under(const std::string &p_folder, const std::string &p_path) {
+	return path_within(p_folder, p_path);
+}
+
+// True if the path is in the folder, and is not the folder itself.
+bool inside(const std::string &p_folder, const std::string &p_path) {
+	return p_path.size() > p_folder.size() && path_within(p_folder, p_path);
+}
+
+// The path as the file system has it: links followed, and each part spelled as it is on disk. What does
+// not exist keeps the name given.
+std::string followed(const std::string &p_path) {
+	std::error_code error;
+	fs::path real = fs::weakly_canonical(fs::u8path(p_path), error);
+	return error ? p_path : normal(real);
+}
+
+// True if the source was made from exactly this text.
+bool made_from(const Source &p_source, const std::string &p_text) {
+	size_t mark = p_source.has_mark() ? BYTE_ORDER_MARK.size() : 0;
+	return p_text.size() == p_source.text().size() + mark && p_text.compare(0, mark, BYTE_ORDER_MARK.substr(0, mark)) == 0 &&
+			p_text.compare(mark, std::string::npos, p_source.text()) == 0;
 }
 
 // True if the file holds exactly this text.
@@ -33,15 +60,19 @@ bool write_read_only(const std::string &p_path, const std::string &p_text) {
 		return true;
 	}
 	std::error_code error;
-	fs::create_directories(fs::path(p_path).parent_path(), error);
-	fs::permissions(p_path, fs::perms::owner_write, fs::perm_options::add, error);
+	fs::create_directories(fs::u8path(p_path).parent_path(), error);
+	fs::permissions(fs::u8path(p_path), fs::perms::owner_write, fs::perm_options::add, error);
+#ifdef _WIN32
+	FILE *file = _wfopen(fs::u8path(p_path).c_str(), L"wb");
+#else
 	FILE *file = std::fopen(p_path.c_str(), "wb");
+#endif
 	if (!file) {
 		return false;
 	}
 	bool written = std::fwrite(p_text.data(), 1, p_text.size(), file) == p_text.size();
 	written = std::fclose(file) == 0 && written;
-	fs::permissions(p_path, fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read,
+	fs::permissions(fs::u8path(p_path), fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read,
 			fs::perm_options::replace, error);
 	return written;
 }
@@ -64,8 +95,8 @@ Workspace::Workspace(Options p_options) :
 	std::error_code error;
 	for (const std::string &path : options_.declarations) {
 		// By absolute path, so that an editor can open it and the project scan can recognise it.
-		fs::path absolute = fs::absolute(fs::path(path), error);
-		std::string full = normal(error ? path : absolute.string());
+		fs::path absolute = fs::absolute(fs::u8path(path), error);
+		std::string full = followed(error ? normal(path) : normal(absolute));
 		std::string text;
 		if (read_file(full, &text)) {
 			declarations_.push_back(parse_file(full, std::move(text)));
@@ -76,24 +107,27 @@ Workspace::Workspace(Options p_options) :
 	if (options_.support_folder.empty()) {
 		fs::path temporary = fs::temp_directory_path(error);
 		if (!error) {
-			options_.support_folder = (temporary / "kas3c-declarations").string();
+			options_.support_folder = normal(temporary / "kas3c-declarations");
 		}
 	}
-	options_.support_folder = normal(options_.support_folder);
+	options_.support_folder = followed(normal(options_.support_folder));
 }
 
 Workspace::~Workspace() {}
 
 void Workspace::set_root(const std::string &p_folder) {
 	std::error_code error;
-	fs::path folder = fs::absolute(fs::path(p_folder), error).lexically_normal();
+	fs::path folder = fs::absolute(fs::u8path(p_folder), error).lexically_normal();
 	if (error) {
-		folder = fs::path(p_folder).lexically_normal();
+		folder = fs::u8path(p_folder).lexically_normal();
 	}
 	// A trailing separator would make the path's last part empty.
 	if (!folder.has_filename() && folder.has_parent_path()) {
 		folder = folder.parent_path();
 	}
+	opened_ = normal(folder);
+	opened_real_ = followed(opened_);
+	folder = fs::u8path(opened_real_);
 	fs::path project = folder;
 	for (fs::path at = folder; !at.empty(); at = at.parent_path()) {
 		if (fs::exists(at / "project.godot", error)) {
@@ -104,7 +138,7 @@ void Workspace::set_root(const std::string &p_folder) {
 			break;
 		}
 	}
-	root_ = project.string();
+	root_ = normal(project);
 	for (auto file = files_.begin(); file != files_.end();) {
 		file = file->second.open ? std::next(file) : files_.erase(file);
 	}
@@ -121,9 +155,25 @@ int Workspace::declaration(const std::string &p_path) const {
 	return -1;
 }
 
+std::string Workspace::resolve(const std::string &p_path) const {
+	std::string path = normal(p_path);
+	if (files_.count(path) || declaration(path) >= 0 || is_support(path)) {
+		return path;
+	}
+	std::string real = followed(path);
+	return under(root_, path) && !under(root_, real) ? path : real;
+}
+
+std::string Workspace::shown_path(const std::string &p_path) const {
+	if (opened_ == opened_real_ || !under(opened_real_, p_path)) {
+		return p_path;
+	}
+	return opened_ + p_path.substr(opened_real_.size());
+}
+
 bool Workspace::is_support(const std::string &p_path) const {
-	return !options_.support_folder.empty() && options_.support_folder != "/" &&
-			starts_with(p_path, options_.support_folder + "/");
+	// A root is never taken for the folder: everything would be in it.
+	return !options_.support_folder.empty() && options_.support_folder.back() != '/' && inside(options_.support_folder, p_path);
 }
 
 // Whether a file the workspace holds is part of the program.
@@ -133,11 +183,11 @@ bool Workspace::included(const std::string &p_path) const {
 
 void Workspace::scan(const std::string &p_folder) {
 	std::error_code error;
-	fs::recursive_directory_iterator at(p_folder, fs::directory_options::skip_permission_denied, error);
+	fs::recursive_directory_iterator at(fs::u8path(p_folder), fs::directory_options::skip_permission_denied, error);
 	const fs::recursive_directory_iterator end;
 	size_t count = 0;
 	for (; !error && at != end; at.increment(error)) {
-		std::string name = at->path().filename().string();
+		std::string name = at->path().filename().generic_u8string();
 		if (at->is_directory(error)) {
 			if (!name.empty() && name[0] == '.') {
 				at.disable_recursion_pending();
@@ -147,7 +197,10 @@ void Workspace::scan(const std::string &p_folder) {
 		if (at->path().extension() != ".as" || (!name.empty() && name[0] == '.')) {
 			continue;
 		}
-		std::string path = at->path().string();
+		std::string path = normal(at->path());
+		if (at->is_symlink(error) && in_project(followed(path))) {
+			continue; // A link to a file of the project: the file is read once, under its own name.
+		}
 		auto found = files_.find(path);
 		if ((found != files_.end() && found->second.open) || declaration(path) >= 0) {
 			continue;
@@ -164,10 +217,10 @@ void Workspace::scan(const std::string &p_folder) {
 }
 
 bool Workspace::in_project(const std::string &p_path) const {
-	if (root_.empty() || !starts_with(p_path, root_ + "/")) {
+	if (root_.empty() || !inside(root_, p_path)) {
 		return false;
 	}
-	if (fs::path(p_path).extension() != ".as") {
+	if (fs::u8path(p_path).extension() != ".as") {
 		return false;
 	}
 	// Folders and files whose name starts with a dot are not part of a project.
@@ -182,11 +235,11 @@ bool Workspace::in_project(const std::string &p_path) const {
 bool Workspace::load(const std::string &p_path) {
 	std::string text;
 	std::error_code error;
-	if (!fs::is_regular_file(p_path, error) || !read_file(p_path, &text)) {
+	if (!fs::is_regular_file(fs::u8path(p_path), error) || !read_file(p_path, &text)) {
 		return false;
 	}
 	File &file = files_[p_path];
-	if (file.parsed && !file.open && file.parsed->source.text() == text) {
+	if (file.parsed && !file.open && made_from(file.parsed->source, text)) {
 		return true;
 	}
 	file.parsed = parse_file(p_path, std::move(text));
@@ -196,20 +249,20 @@ bool Workspace::load(const std::string &p_path) {
 }
 
 void Workspace::open(const std::string &p_path, std::string p_text) {
-	std::string path = normal(p_path);
+	std::string path = resolve(p_path);
 	if (is_support(path)) {
 		return; // Our own copy of the embedded declarations: it is in the program already.
 	}
 	int declared = declaration(path);
 	if (declared >= 0) {
-		if (declarations_[(size_t)declared]->source.text() != p_text) {
+		if (!made_from(declarations_[(size_t)declared]->source, p_text)) {
 			declarations_[(size_t)declared] = parse_file(path, std::move(p_text));
 			stale_ = true;
 		}
 		return;
 	}
 	File &file = files_[path];
-	if (file.parsed && file.open && file.parsed->source.text() == p_text) {
+	if (file.parsed && file.open && made_from(file.parsed->source, p_text)) {
 		return;
 	}
 	file.parsed = parse_file(path, std::move(p_text));
@@ -222,7 +275,7 @@ void Workspace::change(const std::string &p_path, std::string p_text) {
 }
 
 void Workspace::close(const std::string &p_path) {
-	std::string path = normal(p_path);
+	std::string path = resolve(p_path);
 	if (declaration(path) >= 0) {
 		file_changed_on_disk(path); // Back to what is on disk.
 		return;
@@ -239,11 +292,11 @@ void Workspace::close(const std::string &p_path) {
 }
 
 void Workspace::file_changed_on_disk(const std::string &p_path) {
-	std::string path = normal(p_path);
+	std::string path = resolve(p_path);
 	int declared = declaration(path);
 	if (declared >= 0) {
 		std::string text;
-		if (read_file(path, &text) && text != declarations_[(size_t)declared]->source.text()) {
+		if (read_file(path, &text) && !made_from(declarations_[(size_t)declared]->source, text)) {
 			declarations_[(size_t)declared] = parse_file(path, std::move(text));
 			stale_ = true;
 		}
@@ -261,15 +314,15 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 		stale_ = true;
 		return;
 	}
-	if (root_.empty() || (path != root_ && !starts_with(path, root_ + "/"))) {
+	if (root_.empty() || !under(root_, path)) {
 		return;
 	}
 	// Not a file of the program: perhaps a folder. What was under it and is gone leaves the program, and
 	// what is under it now joins.
 	std::error_code error;
-	const std::string prefix = path + "/";
-	for (auto file = files_.lower_bound(prefix); file != files_.end() && starts_with(file->first, prefix);) {
-		if (!file->second.open && !fs::is_regular_file(file->first, error)) {
+	const std::string prefix = path_join(path, "");
+	for (auto file = files_.lower_bound(prefix); file != files_.end() && file->first.compare(0, prefix.size(), prefix) == 0;) {
+		if (!file->second.open && !fs::is_regular_file(fs::u8path(file->first), error)) {
 			file = files_.erase(file);
 			stale_ = true;
 		} else {
@@ -277,13 +330,13 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 		}
 	}
 	// A folder inside a dot folder holds nothing of the program: ask as if for a file in it.
-	if (fs::is_directory(path, error) && (path == root_ || in_project(prefix + "x.as"))) {
+	if (fs::is_directory(fs::u8path(path), error) && (path == root_ || in_project(prefix + "x.as"))) {
 		scan(path);
 	}
 }
 
 const std::string *Workspace::text(const std::string &p_path) const {
-	std::string path = normal(p_path);
+	std::string path = resolve(p_path);
 	int declared = declaration(path);
 	if (declared >= 0) {
 		return &declarations_[(size_t)declared]->source.text();
@@ -292,9 +345,54 @@ const std::string *Workspace::text(const std::string &p_path) const {
 	return found == files_.end() || !found->second.parsed ? nullptr : &found->second.parsed->source.text();
 }
 
+bool Workspace::sent_with_mark(const std::string &p_path) const {
+	auto found = files_.find(resolve(p_path));
+	return found != files_.end() && found->second.open && found->second.parsed && found->second.parsed->source.has_mark();
+}
+
+bool Workspace::update_bodies() {
+	if (!compilation_) {
+		return false;
+	}
+	std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> changes;
+	size_t present = 0;
+	for (const auto &[path, file] : files_) {
+		if (!included(path)) {
+			continue;
+		}
+		auto found = units_.find(path);
+		if (found == units_.end()) {
+			return false;
+		}
+		++present;
+		if (found->second->parsed != file.parsed) {
+			changes.emplace_back(found->second, file.parsed);
+		}
+	}
+	size_t expected = 0;
+	for (const Unit &unit : compilation_->units()) {
+		if (!unit.is_declaration) {
+			++expected;
+		}
+	}
+	for (const auto &parsed : declarations_) {
+		auto found = units_.find(parsed->source.path());
+		if (found == units_.end() || found->second->parsed != parsed) {
+			return false;
+		}
+	}
+	return present == expected && compilation_->update_bodies(changes);
+}
+
 void Workspace::check() {
 	// The old compilation goes first: the new one writes onto the same trees.
 	queries_.reset();
+	if (update_bodies()) {
+		queries_ = std::make_unique<Queries>(*compilation_);
+		stale_ = false;
+		++checks_;
+		return;
+	}
 	compilation_.reset();
 	units_.clear();
 	compilation_ = std::make_unique<Compilation>(builtins_);
@@ -315,10 +413,11 @@ void Workspace::check() {
 	for (Unit &unit : compilation_->units()) {
 		const std::string &path = unit.source.path();
 		bool embedded = unit.is_builtin || path == GODOT_DECLARATIONS_PATH;
-		units_[embedded ? options_.support_folder + "/" + support_name(path) : path] = &unit;
+		units_[embedded ? path_join(options_.support_folder, support_name(path)) : path] = &unit;
 	}
 	stale_ = false;
 	checks_++;
+	++full_checks_;
 }
 
 Compilation &Workspace::compilation() {
@@ -335,7 +434,7 @@ Queries &Workspace::queries() {
 
 Unit *Workspace::unit(const std::string &p_path) {
 	compilation();
-	auto found = units_.find(normal(p_path));
+	auto found = units_.find(resolve(p_path));
 	return found == units_.end() ? nullptr : found->second;
 }
 
@@ -363,11 +462,11 @@ const std::string &Workspace::support_folder() {
 	if (support_folder_.empty() && !options_.support_folder.empty()) {
 		bool written = true;
 		for (const std::shared_ptr<Parsed> &file : builtins_) {
-			written = write_read_only(options_.support_folder + "/" + support_name(file->source.path()), file->source.text()) &&
+			written = write_read_only(path_join(options_.support_folder, support_name(file->source.path())), file->source.text()) &&
 					written;
 		}
 		if (godot_) {
-			written = write_read_only(options_.support_folder + "/" + support_name(GODOT_DECLARATIONS_PATH),
+			written = write_read_only(path_join(options_.support_folder, support_name(GODOT_DECLARATIONS_PATH)),
 							  godot_->source.text()) &&
 					written;
 		}
@@ -384,7 +483,7 @@ std::string Workspace::real_path(const Unit &p_unit) {
 		return path;
 	}
 	const std::string &folder = support_folder();
-	return folder.empty() ? std::string() : folder + "/" + support_name(path);
+	return folder.empty() ? std::string() : path_join(folder, support_name(path));
 }
 
 } // namespace kas3

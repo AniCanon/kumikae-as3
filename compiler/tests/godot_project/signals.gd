@@ -7,7 +7,12 @@ var late: Node
 var looped: WeakRef
 var looped_far: WeakRef
 var looped_kept: WeakRef
+var looped_plain: WeakRef
+var looped_script: WeakRef
+var looped_untyped: WeakRef
+var looped_twice: Array
 var kept_listener: Callable
+var later_listener := func(): pass
 var removed_kept: WeakRef
 var frames := 0
 
@@ -52,10 +57,18 @@ func _physics_process(_delta: float) -> bool:
 		# A listener and the object it listens to, held only by each other, are both gone.
 		show("a loop is freed", looped.get_ref() == null, true)
 		show("a longer loop is freed", looped_far.get_ref() == null, true)
+		show("a loop with no listener is freed", looped_plain.get_ref() == null, true)
+		show("a loop through a script's Godot object is freed", looped_script.get_ref() == null, true)
+		show("a loop through an untyped field is freed", looped_untyped.get_ref() == null, true)
+		show("a loop whose listener is in two signals is freed", looped_twice.map(func(w): return w.get_ref() == null), [true, true])
 		show("a removed listener that is still held keeps what it holds", removed_kept.get_ref() != null, true)
 		# While GDScript holds the listener's callable, the listener stays where it was.
 		var still = looped_kept.get_ref()
-		show("a loop whose callable is held stays", [still != null, still.changed.get_connections().size() if still != null else -1, kept_listener.is_valid()], [true, 1, true])
+		var heard = still.changed.get_connections() if still != null else []
+		show("a loop whose callable is held stays", [still != null, heard.size(), kept_listener.is_valid()], [true, 2, true])
+		# Its listener was taken out of the signal and put back, in the place it had.
+		show("a held listener keeps its place", [str(heard[0].callable) if heard.size() == 2 else "", heard[1].callable == later_listener if heard.size() == 2 else false], ["Holder/heard", true])
+		heard = []
 		still = null
 		kept_listener = Callable()
 		# A listener that only its signal holds is still there, and still hears.
@@ -149,6 +162,15 @@ func _physics_process(_delta: float) -> bool:
 	node.listenByName(other, "nothingAtAll")
 	node.listenByName(other, "name")
 	show("by a wrong name", other.renamed.get_connections().size(), 1)
+	node.reset()
+	node.emitByName(other, "renamed")
+	show("listeners and emit by name", [node.listenersByName(other, "renamed"), node.count], [1, 1])
+	show("a listener's error comes back out of emit", node.catchesListener(), "caught 1009")
+	node.reset()
+	node.listenWithClosure()
+	rename(node)
+	show("a function written in a method sees its members", [node.count, node.last == node.name], [1000, true])
+	node.stopAll()
 	# A signal that GDScript defines, with an argument that is checked.
 	other.add_user_signal("hit", [{"name": "n", "type": TYPE_INT}])
 	node.reset()
@@ -158,6 +180,16 @@ func _physics_process(_delta: float) -> bool:
 	other.emit_signal("hit", "five")
 	other.emit_signal("hit", 1, 2)
 	show("user signal", node.count, 7)
+	# A signal the script declares: Godot knows it, GDScript and AS3 both listen, AS3 emits it.
+	node.reset()
+	var heard := []
+	node.scored.connect(func(n): heard.append(n))
+	node.listenOwn()
+	node.score(4)
+	node.emit_signal("scored", 3)
+	show("declared signal", [node.has_signal("scored"), node.ownSignalName(), heard, node.count], [true, "scored", [4, 3], 7])
+	show("declared signal listed", node.get_signal_list().any(func(s): return s.name == "scored"), true)
+	node.stopAll()
 	# A signal kept in a script's own field, reached by the field's name.
 	node.stopAll()
 	node.reset()
@@ -166,6 +198,39 @@ func _physics_process(_delta: float) -> bool:
 	node.byOwnField("count")
 	show("own signal field by name", node.count, 1)
 	node.stopAll()
+	# Signals in the fields of a script object, by name: the field each name reaches.
+	var fields: Node = node.makeFields()
+	root.add_child(fields)
+	fields.prepare()
+	fields.prepareDerived()
+	fields.listenFromBase("hit")
+	show("by name from a base: its own private field", [fields.renamed.get_connections().size(), fields.child_entered_tree.get_connections().size()], [1, 0])
+	fields.listenFromDerived("hit")
+	show("by name from a subclass: its own private field", fields.child_entered_tree.get_connections().size(), 1)
+	fields.listenFromDerived("secret")
+	show("by name from a subclass: a base's private field is not reached", fields.tree_exiting.get_connections().size(), 0)
+	fields.listenInFunction("secret")
+	show("by name in a function written in the base: its private field", fields.tree_exiting.get_connections().size(), 1)
+	fields.listenFromBase("shout")
+	show("by name from a base: a subclass's public field first", [fields.get_signal_connection_list("shout").size(), fields.renamed.get_connections().size()], [1, 1])
+	node.reset()
+	node.listenOther("shout")
+	fields.emit_signal("shout")
+	show("by name from outside: a public signal field", node.count, 1)
+	for c in fields.get_signal_connection_list("shout"):
+		if c.callable.get_object() == node:
+			fields.disconnect("shout", c.callable)
+	node.listenByName(fields, "shout")
+	fields.emit_signal("shout")
+	show("by name from outside, the object typed as a Node: a public signal field", node.count, 2)
+	fields.listenFromDerived("guarded")
+	show("by name from a subclass: a base's protected field", fields.tree_exited.get_connections().size(), 1)
+	node.listenOther("guarded")
+	node.listenOther("hit")
+	show("by name from outside: a private or protected field is not reached", [fields.renamed.get_connections().size(), fields.tree_exited.get_connections().size()], [1, 1])
+	node.forgetFields()
+	fields.free()
+	node.reset()
 	# A method as a function anywhere Godot takes one.
 	show("filter", node.filtered([1, 2, 3, 4]), [3, 4])
 	# The listener goes when its owner goes: nothing is left connected, and a kept callable fails cleanly.
@@ -199,6 +264,24 @@ func _physics_process(_delta: float) -> bool:
 	looped_kept = weakref(resource)
 	node.loop(resource)
 	kept_listener = resource.changed.get_connections()[0].callable
+	resource.changed.connect(later_listener)
+	resource = Resource.new()
+	looped_plain = weakref(resource)
+	node.plainLoop(resource)
+	var scripted := Resource.new()
+	scripted.set_script(load("res://Looped.as"))
+	looped_script = weakref(scripted)
+	scripted.hold()
+	scripted = null
+	resource = Resource.new()
+	looped_untyped = weakref(resource)
+	node.untypedLoop(resource)
+	resource = Resource.new()
+	var second := Resource.new()
+	looped_twice = [weakref(resource), weakref(second)]
+	node.loopTwice(resource, second)
+	second.changed.connect(resource.changed.get_connections()[0].callable)
+	second = null
 	resource = Resource.new()
 	removed_kept = weakref(resource)
 	node.removedButKept(resource)

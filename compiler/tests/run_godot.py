@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 tests = os.path.abspath(sys.argv[1])
 project = os.path.join(tests, "godot_project")
@@ -42,12 +43,19 @@ def check(name, condition, detail=""):
         failures.append("%s %s" % (name, detail))
 
 
-# Godot learns of a project's extensions when the editor first scans it. Known fault: that first scan ends
-# in a crash on exit when an extension registers a scripting language (the speed spike's does the same),
-# after the scan has done its work. So only the list it leaves behind is checked.
+# Godot learns of a project's extensions when the editor first scans it. Told to quit at once (--import),
+# Godot crashes as it exits after that first scan: its documentation thread for the new classes outlives
+# the documentation (see the compiler's README). Given time for the thread, the first scan is clean, and
+# is checked so in a copy that has never been scanned.
+FIRST_SCAN = ["--headless", "--editor", "--quit-after", "300"]
+with tempfile.TemporaryDirectory() as fresh:
+    copy = os.path.join(fresh, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", ".godot"))
+    run = subprocess.run([godot, *FIRST_SCAN, "--path", copy], capture_output=True, text=True, timeout=300)
+    check("the first editor scan exits cleanly", run.returncode == 0, "exit %d\n%s" % (run.returncode, (run.stdout + run.stderr)[-800:]))
 listed = os.path.join(project, ".godot", "extension_list.cfg")
 if not os.path.exists(listed):
-    subprocess.run([godot, "--headless", "--path", project, "--import"], capture_output=True, text=True, timeout=300)
+    subprocess.run([godot, *FIRST_SCAN, "--path", project], capture_output=True, text=True, timeout=300)
 check("the extension is listed", os.path.exists(listed) and "kas3.gdextension" in open(listed).read())
 
 run = subprocess.run([godot, "--headless", "--path", project, "-s", "driver.gd"], capture_output=True, text=True,
@@ -102,14 +110,14 @@ expected = {
     "null script object": "<null>",
     "wrong node has script": "false",
     "plain can attach": "false",
-    "returned script object": "<null>",
+    "returned script object": "true",
 }
 for name, value in expected.items():
     check("check: " + name, lines.get(name) == value, "got %r, expected %r" % (lines.get(name), value))
 check("a call on a freed object is an AS3 error", "CHECK survived freed object" in output and "freed" in output, output[-800:])
 check("says why a script won't attach to the wrong kind of object", "can only be attached to a CharacterBody2D" in output, output[-900:])
 check("says why a plain class is not a script", "Plain.as" in output and "does not extend a Godot class" in output, output[-900:])
-check("says a script object can't be returned to Godot", output.count("returns a script object") == 1, output[-900:])
+check("a script object that is one of Godot's is returned with no word", output.count("returns a script object") == 0, output[-900:])
 check("checks: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
 check("checks: nothing leaked", "leaked" not in output.lower(), output[-600:])
 
@@ -134,16 +142,17 @@ def compare(script, names):
 
 # Godot's values: operators, as GDScript works them out.
 output = compare("values.gd", [
-    "add", "sub", "times", "times int", "number first", "divide", "negate", "cells", "cells by number", "cells over",
+    "add", "a freed object arrives as null", "sub", "times", "times int", "number first", "divide", "negate", "cells", "cells by number", "cells over",
     "tint", "same", "not same", "differs", "same node", "not same node", "other node", "chain", "compound", "moved",
     "cells over zero", "after the error",
     "text", "text after", "cast", "own", "color text", "node text", "node joined", "null text", "null node", "null own",
     "freed text", "freed text after", "alive is not null", "alive is set", "alive counts", "freed is null", "freed is not set", "freed does not count",
-    "not freed", "freed name", "freed children", "freed as an argument",
+    "not freed", "freed name", "null as a Godot class", "for each over packed arrays", "new of a script class", "what new made, seen from GDScript", "a script object returned to Godot", "vectors of vectors and of script objects to Godot", "searching vectors of Godot's objects and values", "a part of an element", "a whole Number index", "a fraction as an index", "NaN as an index",
+    "a fraction as a part's index", "freed children", "freed as an argument",
     "set x", "add x", "bump x", "nested", "held part", "local part", "other part", "from itself",
     "first", "color part", "set second", "add element", "position element", "packed", "set packed",
     "packed out of range", "out of range",
-    "clamp default", "clamp one", "clamp trailing null", "clamp both null", "clamp middle null", "looking",
+    "clamp default", "clamp one", "clamp trailing null", "clamp both null", "clamp middle null", "clamp null variable", "looking",
     "looking null", "whole numbers", "to string", "to string in AS3", "no to string", "no to string in AS3",
     "negative cells", "cells plus", "cells compound", "plain order", "compound order", "mixed", "big hash", "decode",
 ])
@@ -151,7 +160,9 @@ check("a null that is not the last argument takes Godot's default, with no error
       output[-800:])
 check("a member of a freed object is AS3's null error, and says the object was freed",
       all(re.search(r"TypeError: Error #1009[^\n]*Godot has freed the object\.\n\s+at Values/%s\(\)" % name, output) for name in
-          ("keptName", "keptRename", "keptChildren")), output[-1500:])
+          ("keptName", "keptRename", "keptChildren", "keptSignal", "keptByName")), output[-1500:])
+check("a fraction as an index is AS3's RangeError", "RangeError: Error #1125: The index 1.5 is out of range 2." in output and
+      "The index NaN is out of range 2." in output and "The index 0.5 is out of range." in output, output[-1500:])
 check("an index out of range is an AS3 error", "at Values/outOfRange()" in output and "at Values/packed()" in output, output[-800:])
 traced = re.search(r"EXPECT TRACE (.*)", output)
 check("trace shows Godot's text", traced is not None and ("\n" + traced.group(1) + "\n") in output, output[-800:])
@@ -162,11 +173,17 @@ check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" 
 output = compare("signals.gd", [
     "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "counts what scripts added", "remove all leaves others", "lasting or once, not both",
     "null argument and order", "arguments", "removes itself",
-    "after a failing listener", "another object's signal", "by name", "by a wrong name", "user signal", "filter",
+    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "declared signal listed", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
-    "deferred with its owner freed", "own signal field by name", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
+    "deferred with its owner freed", "own signal field by name", "by name from a base: its own private field",
+    "by name from a subclass: its own private field", "by name from a subclass: a base's private field is not reached", "by name in a function written in the base: its private field",
+    "by name from a base: a subclass's public field first", "by name from outside: a public signal field",
+    "by name from outside, the object typed as a Node: a public signal field",
+    "by name from a subclass: a base's protected field", "by name from outside: a private or protected field is not reached", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
     "a removed listener that is still held keeps what it holds",
-    "a loop whose callable is held stays", "a loop goes when its callable is let go",
+    "a loop with no listener is freed", "a loop through a script's Godot object is freed", "a loop through an untyped field is freed",
+    "a loop whose listener is in two signals is freed",
+    "a loop whose callable is held stays", "a held listener keeps its place", "a loop goes when its callable is let go",
     "an unheld listener stays",
 ])
 check("a listener given the wrong kind of argument is an AS3 error that names it",
@@ -179,26 +196,70 @@ check("Godot is told that a listener given arguments that don't fit was not call
 check("a field that is not a signal, by name, is an AS3 error", "'count' is not a signal" in output, output[-1200:])
 check("an error inside a listener is reported", "at Signals/fails()" in output, output[-800:])
 check("a wrong signal name is an AS3 error", output.count("at Signals/listenByName()") == 2, output[-800:])
+check("a private field reached by name from where it can't be seen is an AS3 error",
+      output.count("at Signals/listenOther()") == 2 and "at SignalDerived/listenFromDerived()" in output, output[-800:])
 check("add after addOnce, and the reverse, are AS3 errors", "at Signals/mixed()" in output and "at Signals/mixedBack()" in output,
       output[-800:])
 check("an empty signal says so", "the signal is empty" in output and "at Signals/empty()" in output, output[-800:])
 
+# Godot closing. As the scene tree is taken down, AS3's listeners still run and its static fields still
+# hold their values; and with a main loop that is not a scene tree, an object a static field holds, with a
+# GDScript listener on it, is let go while Godot can still free it.
+run = subprocess.run([godot, "--headless", "--path", project, "-s", "exit_tree.gd"], capture_output=True, text=True, timeout=300)
+output = run.stdout + run.stderr
+check("exit_tree.gd: a listener runs as the tree goes, and sees the static field", "LATE static=kept" in output, output[-800:])
+check("exit_tree.gd: no crash", run.returncode == 0 and "leaked" not in output.lower(), "exit %d\n%s" % (run.returncode, output[-800:]))
+run = subprocess.run([godot, "--headless", "--path", project, "-s", "exit_loop.gd"], capture_output=True, text=True, timeout=300)
+output = run.stdout + run.stderr
+check("exit_loop.gd: no crash at exit", run.returncode == 0 and "EXIT LOOP ready" in output and "leaked" not in output.lower(),
+      "exit %d\n%s" % (run.returncode, output[-800:]))
+
 # Singletons, constants and static methods, as GDScript works them out.
 output = compare("statics.gd", [
-    "pressed", "strength", "stick", "system", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
-    "listening", "heard", "cleared", "others still listen", "not listening", "input class", "same singleton",
+    "pressed", "strength", "stick", "system", "an editor-only singleton is an AS3 error", "a class's static method",
+    "orphan nodes printed", "a static call's arguments in order", "the value before the missing object", "a static call's result of the wrong type",
+    "a singleton's members through a variable", "a singleton variable that is null", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
+    "listening", "heard", "cleared", "others still listen", "not listening", "a function written in place listens", "and is removed through its value", "input class", "same singleton",
     "singleton object",
     "escape", "captured", "ready notice", "axis", "zero", "up", "red", "forward", "identity", "sum", "up y",
     "default key", "given key",
     "from angle", "hsv", "html", "euler", "image", "after orphans",
     "unset", "unset tint", "unset spot", "unset list", "cleared local",
     "declared twice", "declared twice, value first", "declared twice, other order", "declaration skipped",
-    "field read early", "static read early", "race",
+    "field read early", "static read early", "race", "a field from another thread is refused",
 ])
+check("statics.gd: a field asked for from another thread is refused and says so",
+      output.count("Godot asked for the field 'shared' from another thread") == 2, output[-900:])
+check("statics.gd: an error's source is where it was thrown, whatever its message says",
+      re.search(r"at: Statics/fakeTrace\(\) \(res://Statics\.as:\d+\)", output) is not None and "at: fake()" not in output, output[-1500:])
+check("statics.gd: Godot says nothing of an editor-only singleton", "Can't retrieve singleton" not in output, output[-900:])
 check("statics.gd: a call from a worker thread is refused and says so",
       "Statics/spin() was called by Godot from another thread" in output, output[-900:])
 check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not in output and "Godot has no" not in output,
       output[-900:])
+
+# A script reached from Godot's worker threads: what would run AS3 there is refused, and said so; what Godot
+# frees there is freed on the main thread.
+output = compare("threads.gd", [
+    "toString on the main thread", "toString from a worker is refused: Godot's own text",
+    "attached on a worker is refused: no script, no constructor run", "lists asked for on workers and on the main thread at once",
+    "scripts loaded on workers at once",
+    "freed on a worker: nothing of AS3's freed there",
+    "freed on a worker: freed on the main thread",
+])
+check("threads.gd: toString from a worker is refused and says so",
+      "Threaded/toString() was called by Godot from another thread" in output, output[-900:])
+check("threads.gd: a script attached on a worker is refused and says so",
+      "res://Threaded.as was not attached to a RefCounted: Godot attached it from another thread" in output, output[-900:])
+
+# The names Godot asks a script about: only those that reach something are kept, and none is left at exit
+# (Godot lists a name still held then, with --verbose).
+compare("names.gd", ["names that reach nothing are not kept", "a field is still reached"])
+run = subprocess.run([godot, "--headless", "--verbose", "--path", project, "-s", "names.gd"], capture_output=True, text=True,
+                     timeout=300)
+left = re.findall(r"Orphan StringName: (\S+)", run.stdout + run.stderr)
+check("names.gd: no name the script was asked about is left at exit",
+      not [name for name in left if name in ("n", "hello", "heard") or "_unreached_" in name], left[:20])
 
 
 # Int64 at Godot's edge, as GDScript works it out.
@@ -206,7 +267,7 @@ output = compare("wide.gd", [
     "counted id", "node id", "same id", "rgba64", "rgba32", "count", "frames", "element", "negative element", "plus one",
     "stored", "narrow fits", "narrow refused", "echo most", "echo least", "wraps", "whole float", "fraction refused",
     "text refused", "int refused", "number exact", "number refused", "to number", "to number refused", "field", "flags",
-    "product", "heard", "product past int", "cell", "cell refused", "cell3 refused", "box", "box refused", "over", "over refused",
+    "product", "heard", "product past int", "a whole NaN goes as 0", "cell", "cell refused", "cell3 refused", "box", "box refused", "over", "over refused",
     "remainder", "remainder refused", "times", "times refused", "times left refused", "grow refused", "at least one",
     "at least its size",
 ])
@@ -215,16 +276,23 @@ check("wide.gd: a wide value for a 32-bit array is a RangeError before Godot see
 check("wide.gd: a wide value for an integer vector is a RangeError, eight times",
       output.count("RangeError: 4294967299 does not fit an int.") == 8 and "RangeError: 3000000000 does not fit an int." in output,
       output[-1500:])
+check("wide.gd: an int argument too wide is AS3's RangeError, not Godot's word",
+      "RangeError: 5000000000 does not fit an int.\n\tat Wide/asInt()" in output and "to int" not in output, output[-1500:])
 check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError: 9007199254740993 does not fit a Number exactly." in output,
       output[-1200:])
 
 # Godot's global functions, as GDScript works them out.
 output = compare("functions.gd", [
-    "lerpf", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
+    "lerpf", "rest from Godot", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
     "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
     "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
     "anything as text", "a default is not shared",
+    "max past what a Number holds", "lerp of vectors", "int of lerp cuts", "Boolean of max", "lerp and max as text",
+    "lerp of anything", "lerp into the wrong type", "now", "zone", "a regular expression",
 ])
+check("functions.gd: a wide whole number into a Number is a RangeError",
+      "RangeError: 9007199254740993 does not fit a Number exactly.\n\tat Functions/widest()" in output, output[-1500:])
+
 check("functions.gd: a function that could not answer is an AS3 error", "at Functions/noAnswer()" in output and "'max'" in output,
       output[-1200:])
 check("functions.gd: print, printerr and pushWarning reach Godot's output",
@@ -241,23 +309,125 @@ check("Godot reads every recorded default", read is not None and int(read.group(
 
 # Untyped values to and from Godot: an integer stays one, a whole float stays a float.
 output = compare("untyped.gd", [
-    "an int", "a float", "a whole float", "a string", "a bool", "null", "a vector", "a node",
+    "an int", "a float", "a whole float", "a string", "a string name", "a node path", "a bool", "null", "a vector", "a node",
     "round trip int", "round trip float", "round trip String", "round trip Vector2", "round trip Object", "round trip Nil",
     "round trip bool", "meta keeps an int", "meta keeps a float", "dictionary element", "dictionary number", "wrong type",
     "script object not given", "equal values", "unequal values", "large integers", "a vector stays a vector",
     "a color is not a vector", "a vector3 is not a vector2", "a resource is not a node", "a node is a node",
     "a property takes its type only", "a script object returned", "a script object in a field", "freed", "caught in AS3",
+    "a toString() that throws, caught where the text was asked for",
+    "an int plus one stays an int", "a Godot value and an untyped one",
+    "a value read above its line is its zero", "an untyped node is a Node", "an untyped value as a Node", "a part is written to the object named before the value", "the other object is untouched",
+    "minusOne of an int stays an int", "twice of an int stays an int", "stepped of an int stays an int",
+    "an Int64 minus one stays whole", "a half is a float", "a Godot value plus text joins them",
+    "text plus a Godot value joins them", "text plus-assigned a Godot value joins them",
+    "a Godot value plus a number joins them, as AS3 does", "a Godot value plus-assigned a Godot value",
+    "JSON refuses Godot's values",
 ])
 check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",
       output.count("Error #1034") >= 5 and "at Untyped/asVector()" in output and "at Untyped/asNode()" in output and
       "at Untyped/place()" in output, output[-2000:])
 check("untyped.gd: a script object reaching Godot is said", "giveScript returns a script object" in output and
-      "'keep' holds a script object" in output, output[-2000:])
+      "'keep' holds an object of 'Thing'" in output, output[-2000:])
 check("untyped.gd: a value of the wrong type is AS3's coercion error", "at Untyped/wrongType()" in output and "Error #1034" in output,
       output[-1500:])
 check("untyped.gd: a thrown Godot value nothing catches is reported as its text", "(3.0, 4.0)\n\tat Untyped/throwValue()" in output,
       output[-2000:])
 check("untyped.gd: a script object given to Godot is an AS3 error", "at Untyped/scriptObject()" in output, output[-1500:])
+
+# AS3's Objects and Dictionaries to Godot as its Dictionaries (keys as text), and a Dictionary of Godot's
+# copied where an AS3 Dictionary is wanted.
+output = compare("objects.gd", [
+    "an Object is a Dictionary", "a Dictionary is a Dictionary, its keys text", "Objects inside an Array", "an Object returned",
+    "an Object where Godot takes a Dictionary", "an untyped Object where Godot takes a Dictionary", "a Dictionary from Godot", "Godot's Dictionary as a Dictionary",
+    "a loop over Godot's Dictionary held untyped is not run", "an Object that holds itself is not given", "an Array with properties is not given", "a script object inside an Object is not given",
+])
+check("objects.gd: what Godot can't hold is an AS3 error that says why",
+      "holds itself, or nests too deep" in output and "at Objects/holdsItself()" in output and
+      "an Array with properties other than its indices" in output and "at Objects/plainInside()" in output and
+      "'for in' and 'for each' over one of Godot's values held untyped" in output, output[-2000:])
+
+# What GDScript reaches of a script by name: public fields to read and write, public methods, and the lists.
+compare("members.gd", [
+    "fields set", "fields read back", "ratio is a float", "refused", "a whole float into an int", "an array is copied",
+    "an array set to null", "an array refuses what is not one", "a dictionary is copied", "a dictionary set to null",
+    "a dictionary refuses what is not one", "an object field", "a date field is not set from Godot", "a setter and its getter",
+    "accessors and containers", "a node field", "a node field refuses another class",
+    "a node field set to null", "a const", "a script object field is not set from Godot", "hidden fields read",
+    "hidden fields are not written", "hidden methods", "public methods",
+    "the script's properties", "the instance's properties", "their types", "a node's class", "not shown or stored",
+    "untyped is any value", "the script's methods", "a method's arguments", "the instance's methods", "has_method agrees",
+])
+
+# [Export]: a scene's values reach the script; Godot is told each field's first value; a scene saved again
+# keeps what differs from it. In the editor, no AS3 runs and the object holds the exported values.
+compare("exported.gd", [
+    "the scene's values", "shown in the inspector", "stored and shown", "a resource's hint", "first values",
+    "one of Godot's values made from numbers", "a field that is not exported has none", "a node's hint", "saved again",
+    "a resource and a node let go", "a subclass's exports", "a subclass's methods",
+    "saved after a change",
+])
+run = subprocess.run([godot, "--headless", "--editor", "--path", project, "-s", "exported_editor.gd"], capture_output=True, text=True,
+                     timeout=300)
+output = run.stdout + run.stderr
+seen = dict(line[len("VALUE "):].split("=", 1) for line in output.split("\n") if line.startswith("VALUE ") and "=" in line)
+for name in ["in the editor", "no AS3 ran", "first values", "a value the inspector set", "what the editor saves",
+             "a scene opened in the editor"]:
+    pair = seen.get(name, "").split("|", 1)
+    check("exported_editor.gd: " + name, len(pair) == 2 and pair[0] == pair[1], "got %r" % seen.get(name))
+check("exported_editor.gd: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
+# A field exported by an edit shows in the editor without a restart. In a copy: the test rewrites a script.
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    run = subprocess.run([godot, "--headless", "--editor", "--path", copy, "-s", "exported_reload.gd"], capture_output=True, text=True,
+                         timeout=300)
+    output = run.stdout + run.stderr
+    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+    check("exported_reload.gd ran to its end", run.returncode == 0 and len(values) == 2, output[-1500:])
+    for name, got, want in values:
+        check("exported_reload.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+
+# A script object of a reference-counted class lives as long as AS3 or Godot holds it, and no longer.
+compare("kept.gd", [
+    "made", "alive while AS3 holds them", "still alive when Godot lets go", "and AS3 still sees them", "alive while Godot holds it",
+    "freed when both let go", "freed when AS3 lets go", "given to Godot, alive while Godot holds them", "freed when Godot lets go",
+    "made and forgotten in AS3", "a resource that listens to itself goes", "a listener on another node goes",
+    "attached, kept while AS3 holds it", "attached, freed when AS3 lets go too",
+    "detached, AS3's hold given back", "detached, freed when Godot lets go", "detached and freed, to AS3 and Godot it is a freed object",
+    "detached by itself, freed once nothing holds it",
+])
+# The cycle collector with such objects in loops: what nothing holds goes; what GDScript or AS3 holds stays
+# whole, its fields with it.
+compare("cycles.gd", [
+    "a getter read", "a loop held by nobody goes", "a loop through Godot's count goes", "a loop GDScript holds stays whole",
+    "a loop an AS3 static holds stays whole", "kept by Godot alone stays whole", "what a getter kept outlives GDScript's hold",
+    "what a setter kept outlives GDScript's hold", "a static's loop goes when the static lets go", "what a getter kept goes when AS3 lets go",
+    "what a setter kept goes when AS3 lets go", "a loop GDScript held goes when it lets go",
+    "a function listening to its own object's signal goes with it", "and stays, still listening, while GDScript holds the object",
+    "so does the listening one", "a script whose base is Object goes on a RefCounted",
+    "on a RefCounted, a loop through Godot's count held by nobody goes", "on a RefCounted, a loop held by nobody goes",
+    "on a RefCounted, a loop GDScript holds stays whole", "on a RefCounted, what an AS3 static holds stays whole",
+    "on a RefCounted, what an AS3 static holds keeps its Godot object", "on a RefCounted, a loop GDScript held goes when it lets go",
+    "on a RefCounted, what a static held goes when the static lets go", "on an Object, a loop GDScript holds stays whole",
+    "on an Object, what an AS3 static holds stays whole when Godot frees the Object",
+])
+
+# A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give.
+with tempfile.TemporaryDirectory() as limited:
+    copy = os.path.join(limited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    with open(os.path.join(copy, "project.godot"), "a") as settings:
+        settings.write("\n[actionscript]\n\nlimits/script_timeout_seconds=0.5\n")
+    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "timeout.gd"], capture_output=True, text=True, timeout=300)
+    output = run.stdout + run.stderr
+    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+    check("timeout.gd ran to its end", run.returncode == 0 and len(values) == 6, output[-1500:])
+    for name, got, want in values:
+        check("timeout.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+    check("timeout.gd: Flash's error, where the loop is", output.count(
+        "Error #1502: A script has executed for longer than the timeout period of 0.5 seconds.") == 3 and
+        "at Spin/forever()" in output and "at Spin/caught()" in output and "at Spin/spin()" in output, output[-1500:])
 
 # Godot's own classes with `is` and `as`, and input events as a script receives them.
 compare("events.gd", [
@@ -265,22 +435,27 @@ compare("events.gd", [
     "touch position", "drag position", "neither", "is Node", "as Sprite2D", "null", "the script's own object", "delivered",
 ])
 
+# A script's getters and setters, which GDScript reaches as its properties.
+output = compare("accessors.gd", [
+    "getter", "setter", "setter ran once", "get by name", "set by name", "getter alone", "no setter, no change",
+    "setter alone", "setter alone reads as nothing", "a Godot value", "a value of the wrong kind is refused", "compound",
+    "through an interface", "an accessor is no method by its AS3 name", "a getter's error reads as nothing", "a native property still", "a native property set",
+])
+check("a getter's error is reported as a script's own", re.search(r"SCRIPT ERROR: Error: broken getter[^\n]*\n(\s+at [^\n]+\n)*\s+at: Accessors/get broken\(\)", output) is not None, output[-900:])
+
 # AS3's vectors handed to Godot: packed arrays by the element's type, arrays for the rest.
 output = compare("vectors.gd", [
     "points", "points type", "hull", "bytes", "empty", "too big for a byte", "below a byte", "offsets", "colors", "filters",
     "polygons", "whole", "whole are integers", "fractions", "fractions are floats", "words", "flags", "nodes", "wide",
-    "keep", "spread", "moved", "words of values", "forget", "made a node", "the node is in the tree", "made a resource", "no vector", "no vector where Godot takes points",
+    "keep", "spread", "moved", "words of values", "forget", "array to Godot", "array from Godot", "Godot's array as an Array", "made a node", "the node is in the tree", "made a resource", "no vector", "no vector where Godot takes points",
     "added to while it is shortened", "what it let go of is freed, what was added is held", "and let go of in the end",
 ])
 check("vectors.gd: no vector where Godot takes a packed array is an AS3 error", "at Vectors/noPoints()" in output, output[-1500:])
 check("vectors.gd: a value that does not fit a byte is an AS3 error that says so",
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
 
-import tempfile
-
 # A scene edited while it runs: an edit to `_ready` (code that runs once) starts the scene again; an edit
-# elsewhere keeps the scene and its state. The versions differ in size: two saves of one size within a
-# second are seen as one (see the backlog).
+# elsewhere keeps the scene and its state.
 RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 	private var word:String;
 	override public function _ready():void { word = "%s"; }
@@ -290,19 +465,75 @@ RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 with tempfile.TemporaryDirectory() as edited:
     copy = os.path.join(edited, "project")
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
-    # The second version also adds a field before the one `_ready` sets: nothing that ran changed.
+    # The second version also adds a field before the one `_ready` sets: nothing that ran changed. The third
+    # edits `_ready` and a static field's first value. The fourth and fifth are saved one after the other,
+    # the fifth while the scene the fourth started is being made: its constructors have run, its `_ready` not.
     unused = "\n\tpublic var unused:int;"
-    for name, text in {"Restart.as": RESTART % ("", "one", ""), "restart_body.txt": RESTART % (unused, "one", ' + "!"'),
-                       "restart_ready.txt": RESTART % (unused, "three", ' + "!"')}.items():
+    first = "\n\tpublic static var first:String = \"%s\";"
+    made = "\n\tpublic var made:String = \"%s\";"
+    for name, text in {"Restart.as": RESTART % (first % "a", "one", ""), "restart_body.txt": RESTART % (unused + first % "a", "one", ' + "!"'),
+                       "restart_ready.txt": RESTART % (unused + first % "b", "three", ' + "!"'),
+                       "restart_four.txt": RESTART % (unused + first % "b" + made % "four", "four", ' + "!" + made'),
+                       "restart_five.txt": RESTART % (unused + first % "b" + made % "five", "five", ' + "!" + made')}.items():
         with open(os.path.join(copy, name), "w") as file:
             file.write(text)
     run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300)
     output = run.stdout + run.stderr
     values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 5, output[-1500:])
+    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 7, output[-1500:])
     for name, got, want in values:
         check("restart.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
     check("restart.gd: Godot is told why the scene started again", "so the scene starts again" in output, output[-1500:])
+    check("restart.gd: Godot is told what is kept outside the scene and not made again",
+          re.search(r"not made again[^\n]*/root/Keeper", output) is not None, output[-1500:])
+    check("restart.gd: Godot is told a static field's first value changed and is kept",
+          "the first values of static fields changed in Restart" in output, output[-1500:])
+    check("restart.gd: Godot is told the scene starts once more", "it starts once more when it is ready" in output and
+          "so it starts once more" in output and "restart it by hand" not in output and "restart the scene to see it" not in output, output[-1500:])
+
+# A game on a simulator is told where on this computer its files are edited (KAS3_SOURCE_DIR): a scene
+# edited there is read from there, and the scene starts again from it.
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    # As Godot's editor saves a scene: with a uid. (An AS3 script has none, so its ext_resource has none.)
+    with open(os.path.join(copy, "restart.tscn")) as file:
+        scene = file.read().replace("format=3]", 'format=3 uid="uid://b8kas3restart"]')
+    with open(os.path.join(copy, "restart.tscn"), "w") as file:
+        file.write(scene)
+    sources = os.path.join(edited, "sources")
+    shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
+    environment = dict(os.environ)
+    environment["KAS3_SOURCE_DIR"] = sources
+    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "scene_edit.gd"], capture_output=True, text=True, timeout=300,
+                         env=environment)
+    output = run.stdout + run.stderr
+    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+    check("scene_edit.gd ran to its end", run.returncode == 0 and len(values) == 3 and "leaked" not in output.lower(), output[-1500:])
+    for name, got, want in values:
+        check("scene_edit.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+    check("scene_edit.gd: no warning", "WARNING" not in output, re.findall(r"WARNING.*\n.*", output))
+    check("scene_edit.gd: Godot is told why the scene started again", "the scene's file changed, so the scene starts again" in output,
+          output[-1500:])
+
+# The scene the iOS test app opens finishes and says so, here too; and when the scripts can't compile (a
+# library older than they are), it says why instead of never finishing.
+for broken in (False, True):
+    with tempfile.TemporaryDirectory() as folder:
+        copy = os.path.join(folder, "project")
+        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+        if broken:
+            with open(os.path.join(copy, "Broken.as"), "w") as file:
+                file.write("package { public class Broken { public function Broken() { nothing(); } } }\n")
+        run = subprocess.run([godot, "--headless", "--path", copy, "--quit-after", "200"], capture_output=True, text=True, timeout=300)
+        output = run.stdout + run.stderr
+        if broken:
+            check("ios_test: scripts that do not compile are reported, and the run finishes",
+                  "AS3TEST DONE passed=0 failed=1" in output and "did not load" in output, output[-1500:])
+        else:
+            done = re.search(r"AS3TEST DONE passed=(\d+) failed=(\d+)", output)
+            check("ios_test: the scene finishes with every check passed", done is not None and done.group(2) == "0" and int(done.group(1)) > 10,
+                  output[-1500:])
 
 # The corpus programs that are said to run (corpus/runs.txt) do run, in Godot, for some frames.
 with open(os.path.join(tests, "corpus", "runs.txt")) as listed:
@@ -317,13 +548,22 @@ with tempfile.TemporaryDirectory() as folder:
     check("corpus.gd: no crash", run.returncode == 0, "exit %d\n%s" % (run.returncode, output[-800:]))
     for name in runs:
         check("corpus.gd: %s ran" % name, "RAN %s\n" % name in output, output[-800:])
+    # And did what it does: the checksums of those whose work does not depend on the time between frames.
+    with open(os.path.join(tests, "corpus", "checksums.txt")) as listed:
+        wanted = [line.split() for line in listed if line.strip() and not line.startswith("#")]
+    for name, value in wanted:
+        check("corpus.gd: %s worked out %s" % (name, value), "CHECKSUM %s %s\n" % (name, value) in output,
+              re.findall(r"CHECKSUM %s .*" % name, output))
     check("corpus.gd: no AS3 error", "Error" not in output and "ERROR" not in output and "ActionScript:" not in output, output[-1500:])
 
 # Scripts edited while the game runs. In a copy of the project: the test rewrites a script.
 HOT = """package { import godot.*; public class Hot extends Node2D {
-	private var n:int = 0; private var h:int = 0; public static var made:int = 0;%s
+	private var n:int = 0; private var h:int = 0; public static var made:int = 0; private var bag:*;%s
+	public function bagText():String { return String(bag.length); }
+	private var seen:Vector.<int> = new Vector.<int>();
 	public function value():int { return %s; }
-	public function bump():int { n++; made++; return n; }
+	public function bump():int { n++; made++; seen.push(n); return n; }
+	public function seenText():String { return seen.join(","); }
 	public function count():int { return n; }
 	public function heard():int { return h; }
 	public function total():int { return made; }
@@ -334,6 +574,8 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 """
 ADDED = "\n\tpublic function added():String { return \"new\"; }"
 
+HOLD = " public function holdLater():void { bag = new Later(); }"
+
 def reload_test(label, elsewhere):
     """Runs reload.gd in a copy of the project. With `elsewhere`, the scripts a person edits are in a
     folder outside the project, which the game is told of: what the project itself holds is stale."""
@@ -341,10 +583,14 @@ def reload_test(label, elsewhere):
         copy = os.path.join(edited, "project")
         shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
         versions = {
-            "Hot.as": HOT % ("", "1", "1", ""),
+            # A vector of a type that only this version names, kept in an untyped field.
+            "Hot.as": HOT % (" public function fill():void { bag = new <Vector.<Hot>>[new Vector.<Hot>(), new Vector.<Hot>()]; }", "1", "1", ""),
             "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
-            "hot_broken.txt": HOT % ("", "2 +", "10", ADDED),
-            "hot_v3.txt": HOT % (" private var extra:String = \"x\";", "3", "10", ADDED),
+            # Later is a class that reload.gd adds, alone, in a folder it makes: the watch must see it.
+            "hot_broken.txt": HOT % (" private var extra:String = \"x\";" + HOLD, "3 + Later.zero()", "10", ADDED),
+            "hot_v4.txt": HOT % (" private var extra:String = \"x\";" + HOLD, "4 + Later.zero()", "10", ADDED),
+            # Later is removed with it, while an untyped field holds one: the reload is refused.
+            "hot_v5.txt": HOT % (" private var extra:String = \"x\";", "5", "10", ADDED),
         }
         for name, text in versions.items():
             with open(os.path.join(copy, name), "w") as file:
@@ -361,10 +607,14 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 11, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 18, output[-1500:])
+        check("%s: a reload that would drop an object whose class is gone is refused, and names it" % label,
+              "an object of the class 'Later' is alive" in output, output[-1500:])
+        check("%s: a reload asked for while AS3 runs says it was not made" % label,
+              "can't be reloaded while AS3 runs" in output, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
-        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 2, output[-1500:])
+        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 3, output[-1500:])
         check("%s: a script with an error is reported and not loaded" % label,
               "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
 

@@ -8,7 +8,7 @@ spec.loader.exec_module(protocol)
 
 
 def event(kind, name, text=""):
-    return f"@kas3-test-v1 {kind} {len(name)} {len(text)}\n{name}\n{text}\n"
+    return f"@kas3-test-v1 {kind} {len(name.encode('utf-16-le')) // 2} {len(text.encode('utf-16-le')) // 2}\n{name}\n{text}\n"
 
 
 class ProtocolTest(unittest.TestCase):
@@ -28,3 +28,10 @@ class ProtocolTest(unittest.TestCase):
         for name in ["line\nbreak", "reserved::separator"]:
             with self.assertRaises(ValueError):
                 protocol.parse(event("suiteStarted", name) + event("testStarted", "case") + event("testFinished", "case") + event("suiteFinished", name))
+
+    def test_as3_utf16_lengths_preserve_astral_text(self):
+        name = "jump 😀"
+        data = event("suiteStarted", "suite") + event("testStarted", name)
+        data += event("testFailed", name, "failed 😀\nnext")
+        data += event("testFinished", name) + event("suiteFinished", "suite")
+        self.assertEqual(protocol.parse(data)[2], ("testFailed", name, "failed 😀\nnext"))

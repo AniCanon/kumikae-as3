@@ -1,0 +1,22 @@
+a(b+)c true true false 0
+false false
+/a(b+)c/gi /a(b+)c/gi is /a(b+)c/gi
+ABBC,BB 6
+abc,b 11
+null 0
+true 3 false 0
+555-,555, 0
+true 3
+false 3 null 3
+null 3
+null 0
+a 3
+a 4
+/a(b+)c/gi false 0 true
+/x/ /5/g null
+null true false
+b,,b
+object true true
+0
+0
+/a(b+)c/gi object true
