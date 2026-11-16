@@ -118,7 +118,12 @@ number's `toString(radix)`, `toFixed`, `toExponential` and `toPrecision`, a Vect
 Function's `length` by name on an untyped value (a Vector takes no other property: ReferenceError #1056);
 `toLocaleString()` of an Array and a Vector; `new String(x)`, `new Number(x)` and the like, which give the
 value itself (AS3 has no wrapper objects), `String()` and `int()` with nothing to convert, and `Object(x)`
-(the value, or a new Object for null). `RegExp` (literals, `new RegExp`, the flags
+(the value, or a new Object for null), which `new Object(x)` is too. The library's methods by name on an
+untyped value, each as its typed call (`u.push(1)`, `u.charAt(0)`, `u.forEach(f)`, `f.call(null, 1)`), and
+read without being called, as functions bound to their value (`u.push`, `list.sort`, `text.charAt`); an
+element written by name into a Vector, checked as a typed store is; `Vector.<T>(x)`; `Function(x)` and
+`Class(x)`; `instanceof`; `arguments`, with `arguments.callee`; classes as values (`var c:Class = Player`,
+`x is c`, `new c(a)`). `RegExp` (literals, `new RegExp`, the flags
 `g i m s x`, its properties, `exec` and `test` with `lastIndex`, which one that is not global keeps, as in
 avmplus) and String's `match`, `search`, `replace` (with `$1`, `$&` and the rest, or a function) and
 `split` by one; `Date`, with the host's clock and zone (its getters and setters, local and UTC, its texts,
@@ -132,17 +137,28 @@ prints does not depend on a hash. A number as a key is its text (`o[1]` is `o["1
 so is an object on an Object (its `toString()`), but not on a Dictionary. A loop goes through the keys there
 were when it began: one deleted on the way is passed over, one added is not reached.
 
-**What is refused, by name, until later slices:** `new Dictionary(true)` (weak keys, said when the program
-runs), a method of an Array, a Vector, a String or a Function called by name on an untyped value
-(`u.push(1)`, said when it runs), any method of the built-in library read by name and not called
-(`u.push`, `o.toString`), an element written by name into a Vector of objects held untyped, `instanceof`,
-`arguments`, the conversions `Vector.<T>(x)`, `Function(x)` and `Class(x)`, `concat` of a Vector with one of
-another type or an Array, a RegExp's or a Date's method read by name and not called, or a property
-neither declares (both are dynamic in AS3), a property of one of Godot's values held untyped, by name, `this` and
-`super` written inside a function expression (AS3's `this` there is not the method's object), an
-interface's method that a class has only from Godot's API or the built-in library, a class that extends
-`RegExp`, and the `godot` package. A program that uses one of these does not run: the compiler says
-`... is not supported by the interpreter yet` at the place.
+**What is refused, and why.** A program that uses one of these does not run, or stops where it is used:
+the compiler or the interpreter says `... is not supported by the interpreter yet` at the place.
+
+- **Outside the language as it is taken here:** E4X, namespaces, `with` and `include` (see "What parses");
+  `prototype`, and the `constructor` property of an object, which belong to AS3's prototype chain: classes
+  here are sealed, and the library's methods are found by the library's own table.
+- **AS3's `this` in a function expression** is the global object, not the method's object: `this` and
+  `super` written inside one are refused, so that neither silently means something else.
+- **Weak keys** (`new Dictionary(true)`): memory is reference-counted, and a key that does not count needs
+  the collector to clear it; a Dictionary that kept its keys alive would be silently wrong.
+- **A property added to a Date, a RegExp, an Error or a Function** (dynamic in AS3): these hold their
+  fields in fixed places; one read that the class does not declare is `undefined`.
+- **Through a class held in a variable:** its static members (`c.create()`), which the IR does not list
+  by name, and `new` of a Function. One of Godot's classes is no value (`var c:Class = Node`): Godot's
+  classes are not the program's.
+- **A function of the library that belongs to no value, as a value:** `Math.max`, `String.fromCharCode`,
+  `trace`. (A method of a value is one: `list.push`, `text.charAt`.)
+- **One of Godot's values held untyped, reached by name** (`u.x` where `u:*` holds a `Vector2`), and
+  `for in` over one: Godot's members are found by the declared type.
+- **An interface's method that a class has only from Godot's API or the built-in library,** and a class
+  that extends `RegExp`.
+- **In `kas3c run`,** the `godot` package: there is no engine.
 
 How it works:
 
