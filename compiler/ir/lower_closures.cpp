@@ -17,20 +17,11 @@ bool nested_function(const Node *p_node) {
 	return p_node->kind == NodeKind::FunctionExpr || p_node->kind == NodeKind::FunctionStmt;
 }
 
-} // namespace
-
-// After the function's parameters and locals are declared: the environment, if a function written inside
-// it uses any of them.
-void Functions::make_environment(FunctionDecl *p_decl) {
-	l_.own_env_reg_ = NONE;
-	l_.own_layout_ = EnvLayout();
-	if (!p_decl || !p_decl->body) {
-		return;
-	}
-	// What the functions written inside use, at any depth; and whether they name a member of the object.
+// What the functions written inside a body use, at any depth; and whether they name a member of the object.
+std::unordered_set<const Symbol *> used_inside(Node *p_body, bool *r_members) {
 	std::unordered_set<const Symbol *> used;
 	bool members = false;
-	walk(p_decl->body, [&](Node *p_node) -> bool {
+	walk(p_body, [&](Node *p_node) -> bool {
 		if (nested_function(p_node)) {
 			walk(p_node, [&](Node *p_inner) {
 				if (p_inner->kind == NodeKind::Name && static_cast<Name *>(p_inner)->symbol) {
@@ -42,6 +33,22 @@ void Functions::make_environment(FunctionDecl *p_decl) {
 		}
 		return true;
 	});
+	*r_members = members;
+	return used;
+}
+
+} // namespace
+
+// After the function's parameters and locals are declared: the environment, if a function written inside
+// it uses any of them.
+void Functions::make_environment(FunctionDecl *p_decl) {
+	l_.own_env_reg_ = NONE;
+	l_.own_layout_ = EnvLayout();
+	if (!p_decl || !p_decl->body) {
+		return;
+	}
+	bool members = false;
+	const std::unordered_set<const Symbol *> used = used_inside(p_decl->body, &members);
 	// A method's: the functions written in it see the object's members, as AS3's scope chain has it.
 	const bool keeps_this = members && !l_.fn().is_static && !l_.received_env_;
 	std::vector<const Symbol *> captured;

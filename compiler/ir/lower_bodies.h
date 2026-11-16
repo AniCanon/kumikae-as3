@@ -13,6 +13,7 @@ class Bodies {
 
 	static bool calls_super(Block *p_body);
 	uint32_t own_signal(std::string_view p_name, uint32_t p_position);
+	void first_values(ClassDecl *p_class, uint32_t p_index);
 
 public:
 	explicit Bodies(Lowerer &p_lowerer) :

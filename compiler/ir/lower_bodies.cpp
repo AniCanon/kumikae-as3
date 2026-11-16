@@ -132,23 +132,10 @@ uint32_t Bodies::own_signal(std::string_view p_name, uint32_t p_position) {
 	return out;
 }
 
-void Bodies::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
-	Symbol *symbol = p_class->symbol;
-	uint32_t index = l_.classes_[symbol];
-	Symbol *constructor = symbol->klass->constructor;
-	FunctionDecl *decl = constructor && constructor->node && constructor->node->kind == NodeKind::FunctionDecl
-			? static_cast<FunctionDecl *>(constructor->node)
-			: nullptr;
-	begin(l_.module_.classes[index].constructor, p_unit, symbol);
-	l_.constructor_ = true;
-	parameters(decl);
-	if (decl && decl->body) {
-		Statements(l_).declare_locals(decl->body);
-		Functions(l_).make_environment(decl);
-	}
-	// The class's own fields get their values first, before any constructor body runs. One of Godot's
-	// values with parts starts at its zero, and does so before any written value is worked out, since
-	// that may read it.
+// The class's own fields get their values first, before any constructor body runs. One of Godot's
+// values with parts starts at its zero, and does so before any written value is worked out, since
+// that may read it.
+void Bodies::first_values(ClassDecl *p_class, uint32_t p_index) {
 	for (Node *member : p_class->members) {
 		if (member->kind != NodeKind::VarDecl || (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static)) {
 			continue;
@@ -160,7 +147,7 @@ void Bodies::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 				continue;
 			}
 			// Those with a written value too: a method that the values of the fields above call may read it.
-			if (field != l_.fields_.end() && l_.module_.classes[index].fields[field->second].kind == Kind::Val) {
+			if (field != l_.fields_.end() && l_.module_.classes[p_index].fields[field->second].kind == Kind::Val) {
 				uint32_t zero = Engine(l_).zero_value(declarator.type, declarator.offset);
 				if (zero != NONE) {
 					l_.emit(Op::SetField, declarator.offset, 0, field->second, zero);
@@ -175,11 +162,28 @@ void Bodies::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 		for (Declarator &declarator : static_cast<VarDecl *>(member)->declarators) {
 			auto field = l_.fields_.find(declarator.symbol);
 			if (field != l_.fields_.end() && declarator.initializer) {
-				Kind kind = l_.module_.classes[index].fields[field->second].kind;
+				Kind kind = l_.module_.classes[p_index].fields[field->second].kind;
 				l_.emit(Op::SetField, declarator.offset, 0, field->second, l_.typed(declarator.initializer, l_.compilation_.type_of(declarator.type), kind));
 			}
 		}
 	}
+}
+
+void Bodies::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
+	Symbol *symbol = p_class->symbol;
+	uint32_t index = l_.classes_[symbol];
+	Symbol *constructor = symbol->klass->constructor;
+	FunctionDecl *decl = constructor && constructor->node && constructor->node->kind == NodeKind::FunctionDecl
+			? static_cast<FunctionDecl *>(constructor->node)
+			: nullptr;
+	begin(l_.module_.classes[index].constructor, p_unit, symbol);
+	l_.constructor_ = true;
+	parameters(decl);
+	if (decl && decl->body) {
+		Statements(l_).declare_locals(decl->body);
+		Functions(l_).make_environment(decl);
+	}
+	first_values(p_class, index);
 	// Then the base class's constructor, unless the body calls it itself.
 	Symbol *base = symbol->klass->base;
 	uint32_t base_index = 0;
