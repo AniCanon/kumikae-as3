@@ -3,6 +3,7 @@
 #include "lower_engine_calls.h"
 #include "lower_library.h"
 #include "lower_operators.h"
+#include "lower_vectors.h"
 
 namespace kas3 {
 namespace ir {
@@ -109,7 +110,7 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	New *made = static_cast<New *>(p_expression);
 	if (is_vector(made->type)) {
-		return vector_new(made->type, made->arguments, made->callee->offset);
+		return Vectors(*this).vector_new(made->type, made->arguments, made->callee->offset);
 	}
 	if (const std::optional<uint32_t> library = Library::construct(*this, made)) {
 		return *library;
@@ -264,11 +265,11 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 		case NodeKind::RegexLit:
 			return Library::regex_literal(*this, static_cast<RegexLit *>(p_expression));
 		case NodeKind::ArrayLit:
-			return vector_literal(p_expression, static_cast<ArrayLit *>(p_expression)->elements);
+			return Vectors(*this).vector_literal(p_expression, static_cast<ArrayLit *>(p_expression)->elements);
 		case NodeKind::ObjectLit:
 			return Dynamic(*this).literal(static_cast<ObjectLit *>(p_expression));
 		case NodeKind::VectorLit:
-			return vector_literal(p_expression, static_cast<VectorLit *>(p_expression)->elements);
+			return Vectors(*this).vector_literal(p_expression, static_cast<VectorLit *>(p_expression)->elements);
 		case NodeKind::FunctionExpr:
 			return closure_value(static_cast<FunctionExpr *>(p_expression));
 		case NodeKind::Index:
@@ -387,7 +388,7 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 	Place place = place_of(p_assign->target, p_assign->value);
 	uint32_t value = 0;
 	if (p_assign->op == TokenKind::Assign) {
-		std::optional<uint32_t> collection = place.where == Place::Engine ? vector_to_engine(p_assign->value, place.type) : std::nullopt;
+		std::optional<uint32_t> collection = place.where == Place::Engine ? Vectors(*this).vector_to_engine(p_assign->value, place.type) : std::nullopt;
 		collection = collection || place.where != Place::Engine ? collection : Dynamic(*this).to_engine(p_assign->value, place.type);
 		value = collection ? *collection : typed(p_assign->value, p_assign->target->type, place.kind);
 	} else if (p_assign->op == TokenKind::AmpAmpAssign || p_assign->op == TokenKind::PipePipeAssign) {

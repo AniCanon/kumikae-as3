@@ -1,6 +1,7 @@
 #include "lower_dynamic.h"
 #include "lower_engine.h"
 #include "lower_engine_calls.h"
+#include "lower_vectors.h"
 
 namespace kas3 {
 namespace ir {
@@ -227,7 +228,7 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 		if (kind == Kind::Void && l_.kind_of(p_arguments[i]->type, &own) && Lowerer::is_numeric(own) && l_.whole(p_arguments[i])) {
 			kind = Kind::I64; // Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
 		}
-		std::optional<uint32_t> collection = l_.vector_to_engine(p_arguments[i], type);
+		std::optional<uint32_t> collection = Vectors(l_).vector_to_engine(p_arguments[i], type);
 		collection = collection ? collection : Dynamic(l_).to_engine(p_arguments[i], type);
 		uint32_t value = collection ? *collection : l_.expression(p_arguments[i], kind);
 		if (l_.kind_at(value) == Kind::Obj) {

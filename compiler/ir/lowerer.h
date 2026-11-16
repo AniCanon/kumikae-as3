@@ -188,9 +188,6 @@ class Lowerer {
 	std::optional<uint32_t> vector_class(const Type *p_type);
 	// The class a declaration says its value is of: a class of the program or a vector's. NONE otherwise.
 	uint32_t declared_class(TypeRef *p_type);
-	uint32_t vector_new(const Type *p_type, const List<Expr *> &p_arguments, uint32_t p_position);
-	uint32_t vector_literal(Expr *p_literal, const List<Expr *> &p_elements);
-	uint32_t vector_call(Call *p_call);
 	// The untyped value: ir/lower_any.cpp.
 	bool untyped(const Expr *p_expression) const;
 	bool untyped_type(const Type *p_type) const;
@@ -205,11 +202,6 @@ class Lowerer {
 	// class the place holds.
 	uint32_t typed(Expr *p_expression, const Type *p_type, Kind p_kind);
 	uint32_t from_untyped(uint32_t p_any, const Type *p_type, Kind p_kind, uint32_t p_position);
-	// A vector where Godot takes one of its own collections: converted, element by element, to the type
-	// wanted (an Array where Godot takes anything). Nothing if the value is not a vector.
-	std::optional<uint32_t> vector_to_engine(Expr *p_value, const Type *p_wanted);
-	void vector_loop(ForIn *p_loop);
-	void engine_loop(ForIn *p_loop);
 	// What `===` can find equal: a number with a number, otherwise two values of one kind, and null with
 	// anything that can be null.
 	static bool can_be_equal(Kind p_a, Kind p_b);
@@ -224,6 +216,7 @@ class Lowerer {
 	friend class Statements; // Statements and where control goes: lower_statements.h
 	friend class Operators; // Operators on two values, and `is` and `as`: lower_operators.h
 	friend class Engine; // Godot's members, values and operators: lower_engine.h
+	friend class Vectors; // A vector's lowering, once its class is made: lower_vectors.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 
@@ -244,8 +237,6 @@ class Lowerer {
 	// The value a part belongs to. It is read where the place is worked out, before anything to the right
 	// of it runs, as GDScript does: `position.x = f()` keeps the `y` that `position` had before `f()`.
 	uint32_t whole_of(const Place &p_place, uint32_t p_position);
-	// An element of a vector, or its length or `fixed`, as a place. Nothing if the target is none of those.
-	std::optional<Place> vector_place(Expr *p_target, Expr *p_later);
 
 	bool extends_counted(const Symbol *p_class) const;
 
@@ -293,7 +284,6 @@ class Lowerer {
 	uint32_t function_value(Expr *p_expression);
 	static bool called_value(const Symbol *p_symbol);
 	uint32_t value_call(Call *p_call, Kind p_want);
-	uint32_t vector_each(Call *p_call);
 	std::optional<uint32_t> function_method(Call *p_call);
 	void use_argument_error();
 	uint32_t name_value(Expr *p_expression);

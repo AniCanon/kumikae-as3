@@ -2,6 +2,7 @@
 #include "lower_engine.h"
 #include "lower_operators.h"
 #include "lower_statements.h"
+#include "lower_vectors.h"
 
 #include <algorithm>
 
@@ -349,9 +350,9 @@ void Statements::statement(Stmt *p_statement) {
 			break;
 		case NodeKind::ForIn:
 			if (l_.is_vector(static_cast<ForIn *>(p_statement)->collection->type) && !(l_.array_ && static_cast<ForIn *>(p_statement)->collection->type->symbol == l_.array_)) {
-				l_.vector_loop(static_cast<ForIn *>(p_statement));
+				Vectors(l_).vector_loop(static_cast<ForIn *>(p_statement));
 			} else if (static_cast<ForIn *>(p_statement)->element) {
-				l_.engine_loop(static_cast<ForIn *>(p_statement));
+				Vectors(l_).engine_loop(static_cast<ForIn *>(p_statement));
 			} else {
 				Dynamic(l_).loop(static_cast<ForIn *>(p_statement)); // An Array's properties too.
 			}

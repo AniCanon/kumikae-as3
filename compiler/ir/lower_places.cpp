@@ -2,6 +2,7 @@
 #include "lower_engine.h"
 #include "lower_library.h"
 #include "lower_members.h"
+#include "lower_vectors.h"
 
 namespace kas3 {
 namespace ir {
@@ -85,7 +86,7 @@ auto Lowerer::place_of(Expr *p_target, Expr *p_later) -> Lowerer::Place {
 	if (std::optional<Place> by_name = Dynamic(*this).place(p_target, p_later)) {
 		return *by_name;
 	}
-	if (std::optional<Place> of_vector = vector_place(p_target, p_later)) {
+	if (std::optional<Place> of_vector = Vectors(*this).vector_place(p_target, p_later)) {
 		return *of_vector;
 	}
 	if (std::optional<Place> of_library = Library::place(*this, p_target, p_later)) {

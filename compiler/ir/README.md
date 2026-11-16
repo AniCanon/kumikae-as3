@@ -26,7 +26,7 @@ turns the checked tree from `src/` into it.
 | `lower_try` | For `Statements`: `try`, `catch`, `finally` (handlers in `ir::Function`; the `finally` written once, every way out going through it) and labels |
 | `lower_any` | The untyped value: coercion where a type is declared, `typeof`; for `Operators`, `==`, `<`, `+`, `is`/`as` |
 | `lower_dynamic` | Properties by name (`class Dynamic`, a friend of the lowerer): Object literals, `new Object()` and `flash.utils.Dictionary`, `o.a` and `o[k]` as places, `delete`, `in`, a property called by its name, `for in` and `for each` over anything that is not a vector |
-| `lower_vectors`, `lower_math` | `Vector.<T>` (a class per element type, places, methods, loops, handing one to Godot); `Math` |
+| `lower_vectors.h`, `lower_vectors`, `lower_math` | `Vector.<T>` (a class per element type; then, in the `Vectors` class, a friend of the lowerer: places, methods, loops, handing one to Godot); `Math` |
 | `lower_members` | Getters and setters (a property is a place; each half a function with a table slot of its own, `get x`), and interfaces (a class with no objects; each class's table from an interface method's name to its function, `CallInterface`). A helper class, `Members`, that the lowerer befriends |
 | `lower_regexp`, `lower_date` | RegExp and Date for the `Library` class: their classes (made on first use), a regular expression literal, `new`, their properties as places, their methods and String's that take a pattern |
 | `library_names.h` | RegExp's and Date's members by name and their codes in RegExpCall and DateCall: read by the lowerer, and by the interpreter for a member reached by name on an untyped value |

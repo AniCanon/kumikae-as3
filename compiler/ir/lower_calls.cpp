@@ -1,6 +1,7 @@
 #include "lower_dynamic.h"
 #include "lower_engine_calls.h"
 #include "lower_members.h"
+#include "lower_vectors.h"
 
 namespace kas3 {
 namespace ir {
@@ -93,7 +94,7 @@ uint32_t Lowerer::written_value(Expr *p_value, Kind p_conversion, uint32_t p_pos
 uint32_t Lowerer::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	uint32_t position = p_call->offset;
 	if (p_type == array_ && array_) {
-		return vector_new(compilation_.instance_type(array_), p_call->arguments, p_call->callee->offset); // Array(4) is new Array(4).
+		return Vectors(*this).vector_new(compilation_.instance_type(array_), p_call->arguments, p_call->callee->offset); // Array(4) is new Array(4).
 	}
 	Kind conversion = Kind::Void;
 	if (!kind_of_class(p_type, &conversion) || p_call->arguments.count != 1) {
@@ -196,7 +197,7 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 		return *by_name;
 	}
 	if (callee->kind == NodeKind::Member && is_vector(static_cast<Member *>(callee)->object->type)) {
-		return vector_call(p_call);
+		return Vectors(*this).vector_call(p_call);
 	}
 	if (const std::optional<uint32_t> called = function_method(p_call)) {
 		return *called; // f.call(), f.apply()

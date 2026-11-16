@@ -1,5 +1,6 @@
 // Function values: a method or a function taken as a value, and a call through one.
 #include "lower_members.h"
+#include "lower_vectors.h"
 
 namespace kas3 {
 namespace ir {
@@ -106,87 +107,87 @@ uint32_t Lowerer::value_call(Call *p_call, Kind p_want) {
 // for filter, some and every. No function at all is no call: a Vector's map gives a vector of empty
 // elements, an Array's an empty one (it pushes each answer), and filter an empty one. The object to call it on is checked (a method with one is a TypeError, but for map) and
 // set aside: a method keeps its own object, and a function expression can't use `this`.
-uint32_t Lowerer::vector_each(Call *p_call) {
+uint32_t Vectors::vector_each(Call *p_call) {
 	const uint32_t position = p_call->offset;
 	Member *callee = static_cast<Member *>(p_call->callee);
 	const std::string_view name = callee->name;
 	const uint32_t count = p_call->arguments.count;
-	const std::optional<uint32_t> klass = vector_class(callee->object->type);
+	const std::optional<uint32_t> klass = l_.vector_class(callee->object->type);
 	if (!klass || count < 1 || count > 2) {
-		refuse(callee->name_offset, "this call of '" + std::string(name) + "' on a Vector");
-		return default_value(Kind::Obj, position);
+		l_.refuse(callee->name_offset, "this call of '" + std::string(name) + "' on a Vector");
+		return l_.default_value(Kind::Obj, position);
 	}
 	const bool map = name == "map", filter = name == "filter", some = name == "some", every = name == "every";
-	const Kind element = module_.classes[*klass].element;
-	const uint32_t vector = settled(expression(callee->object, Kind::Obj), writer(p_call->arguments), position);
+	const Kind element = l_.module_.classes[*klass].element;
+	const uint32_t vector = l_.settled(l_.expression(callee->object, Kind::Obj), Lowerer::writer(p_call->arguments), position);
 	Expr *object = count > 1 ? p_call->arguments[1] : nullptr;
-	const uint32_t function = settled(expression(p_call->arguments[0], Kind::Any), object && writes_locals(object) ? object : nullptr, position);
-	const uint32_t given = object ? expression(object, Kind::Any) : NONE;
-	emit(Op::NullCheck, position, vector);
+	const uint32_t function = l_.settled(l_.expression(p_call->arguments[0], Kind::Any), object && Lowerer::writes_locals(object) ? object : nullptr, position);
+	const uint32_t given = object ? l_.expression(object, Kind::Any) : NONE;
+	l_.emit(Op::NullCheck, position, vector);
 	if (given != NONE && !map) {
-		emit(Op::CallbackThis, position, function, given);
+		l_.emit(Op::CallbackThis, position, function, given);
 	}
-	use_argument_error();
-	const uint32_t limit = reg(Kind::U32);
-	emit(Op::VecLength, position, limit, vector);
+	l_.use_argument_error();
+	const uint32_t limit = l_.reg(Kind::U32);
+	l_.emit(Op::VecLength, position, limit, vector);
 	uint32_t out = NONE;
 	if (map || filter) {
-		out = reg(Kind::Obj);
-		const bool sized = map && !module_.classes[*klass].array;
-		emit(Op::VecNew, position, out, *klass, arguments({ sized ? limit : default_value(Kind::U32, position), default_value(Kind::Bool, position) }));
+		out = l_.reg(Kind::Obj);
+		const bool sized = map && !l_.module_.classes[*klass].array;
+		l_.emit(Op::VecNew, position, out, *klass, l_.arguments({ sized ? limit : l_.default_value(Kind::U32, position), l_.default_value(Kind::Bool, position) }));
 	} else if (some || every) {
-		out = reg(Kind::Bool);
-		emit(Op::ConstBool, position, out, every ? 1 : 0);
+		out = l_.reg(Kind::Bool);
+		l_.emit(Op::ConstBool, position, out, every ? 1 : 0);
 	}
-	const uint32_t absent = emit(Op::JumpIfNot, position, convert(function, Kind::Bool, position), 0);
+	const uint32_t absent = l_.emit(Op::JumpIfNot, position, l_.convert(function, Kind::Bool, position), 0);
 	uint32_t yes = NONE;
 	if (filter || some || every) {
-		const uint32_t truth = reg(Kind::Bool);
-		emit(Op::ConstBool, position, truth, 1);
-		yes = convert(truth, Kind::Any, position);
+		const uint32_t truth = l_.reg(Kind::Bool);
+		l_.emit(Op::ConstBool, position, truth, 1);
+		yes = l_.convert(truth, Kind::Any, position);
 	}
 	// Whether the function answered true itself, not just something that is true as a condition.
 	const auto answered_true = [&](uint32_t p_answer) {
-		const uint32_t out = reg(Kind::Bool);
-		emit(Op::AnyStrictEq, position, out, p_answer, yes);
+		const uint32_t out = l_.reg(Kind::Bool);
+		l_.emit(Op::AnyStrictEq, position, out, p_answer, yes);
 		return out;
 	};
-	const uint32_t end = convert(limit, Kind::F64, position);
-	const uint32_t at = reg(Kind::F64);
-	emit(Op::ConstF64, position, at, number(0));
-	const uint32_t top = here();
-	const uint32_t more = reg(Kind::Bool);
-	emit(Op::LtF64, position, more, at, end);
-	const uint32_t exit = emit(Op::JumpIfNot, position, more, 0);
-	const uint32_t item = reg(element);
-	emit(Op::VecGet, position, item, vector, at);
-	const uint32_t index = convert(convert(at, Kind::I32, position), Kind::Any, position);
-	const uint32_t answer = map || filter || some || every ? reg(Kind::Any) : NONE;
-	emit(Op::CallFunction, position, answer, function, arguments({ convert(item, Kind::Any, position), index, convert(vector, Kind::Any, position) }));
+	const uint32_t end = l_.convert(limit, Kind::F64, position);
+	const uint32_t at = l_.reg(Kind::F64);
+	l_.emit(Op::ConstF64, position, at, l_.number(0));
+	const uint32_t top = l_.here();
+	const uint32_t more = l_.reg(Kind::Bool);
+	l_.emit(Op::LtF64, position, more, at, end);
+	const uint32_t exit = l_.emit(Op::JumpIfNot, position, more, 0);
+	const uint32_t item = l_.reg(element);
+	l_.emit(Op::VecGet, position, item, vector, at);
+	const uint32_t index = l_.convert(l_.convert(at, Kind::I32, position), Kind::Any, position);
+	const uint32_t answer = map || filter || some || every ? l_.reg(Kind::Any) : NONE;
+	l_.emit(Op::CallFunction, position, answer, function, l_.arguments({ l_.convert(item, Kind::Any, position), index, l_.convert(vector, Kind::Any, position) }));
 	uint32_t found = NONE;
-	if (map && module_.classes[*klass].array) {
-		emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), arguments({ out, answer }));
+	if (map && l_.module_.classes[*klass].array) {
+		l_.emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), l_.arguments({ out, answer }));
 	} else if (map) {
-		emit(Op::VecSet, position, out, at, from_untyped(answer, callee->object->type->element, element, position));
+		l_.emit(Op::VecSet, position, out, at, l_.from_untyped(answer, callee->object->type->element, element, position));
 	} else if (filter) {
-		const uint32_t skip = emit(Op::JumpIfNot, position, answered_true(answer), 0);
-		emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), arguments({ out, item }));
-		patch(skip, here());
+		const uint32_t skip = l_.emit(Op::JumpIfNot, position, answered_true(answer), 0);
+		l_.emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), l_.arguments({ out, item }));
+		l_.patch(skip, l_.here());
 	} else if (some || every) {
 		// The first that answers true for some(), false for every(), settles it.
-		const uint32_t carry_on = emit(every ? Op::JumpIf : Op::JumpIfNot, position, answered_true(answer), 0);
-		emit(Op::ConstBool, position, out, some ? 1 : 0);
-		found = emit(Op::Jump, position, 0);
-		patch(carry_on, here());
+		const uint32_t carry_on = l_.emit(every ? Op::JumpIf : Op::JumpIfNot, position, answered_true(answer), 0);
+		l_.emit(Op::ConstBool, position, out, some ? 1 : 0);
+		found = l_.emit(Op::Jump, position, 0);
+		l_.patch(carry_on, l_.here());
 	}
-	const uint32_t one = reg(Kind::F64);
-	emit(Op::ConstF64, position, one, number(1));
-	emit(Op::AddF64, position, at, at, one);
-	emit(Op::Jump, position, top);
-	patch(exit, here());
-	patch(absent, here());
+	const uint32_t one = l_.reg(Kind::F64);
+	l_.emit(Op::ConstF64, position, one, l_.number(1));
+	l_.emit(Op::AddF64, position, at, at, one);
+	l_.emit(Op::Jump, position, top);
+	l_.patch(exit, l_.here());
+	l_.patch(absent, l_.here());
 	if (found != NONE) {
-		patch(found, here());
+		l_.patch(found, l_.here());
 	}
 	return out == NONE ? 0 : out;
 }
