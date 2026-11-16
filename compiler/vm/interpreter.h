@@ -287,6 +287,9 @@ private:
 	void to_callable(const ir::Instruction &p_in);
 	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void vector_new(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void get_outside(Vector *p_vector, double p_index, Slot &r_out);
+	void set_outside(Vector *p_vector, ir::Kind p_index_kind, const Slot &p_index, Slot p_value);
 	void array_new(const ir::Function &p_function, const ir::Instruction &p_in);
 	// A call of one of a vector's methods: its arguments (the vector first) by register, where the
 	// frame's registers start, and the register for what it gives back, or NONE.

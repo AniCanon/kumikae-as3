@@ -105,21 +105,51 @@ bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 	return true;
 }
 
-void Interpreter::vector_op(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
+// ArrayNew, and VecNew: a vector of the length asked for, fixed or not.
+void Interpreter::vector_new(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	Slot *r = p_registers;
 	if (p_in.op == Op::ArrayNew) {
 		array_new(p_function, p_in);
 		return;
 	}
-	if (p_in.op == Op::VecNew) {
-		const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
-		const uint32_t length = r[list[0]].u;
-		Vector *made = length <= MAX_VECTOR_LENGTH ? new_vector(p_in.b, length, r[list[1]].b, collector_.list_for(p_in.b)) : nullptr;
-		if (!made) {
-			out_of_memory();
-			return;
-		}
-		assign(Kind::Obj, r[p_in.a], made);
+	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	const uint32_t length = r[list[0]].u;
+	Vector *made = length <= MAX_VECTOR_LENGTH ? new_vector(p_in.b, length, r[list[1]].b, collector_.list_for(p_in.b)) : nullptr;
+	if (!made) {
+		out_of_memory();
+		return;
+	}
+	assign(Kind::Obj, r[p_in.a], made);
+}
+
+// VecGet at an index that names no element: of an Array, the property named by the number; of a Vector,
+// AS3's RangeError.
+void Interpreter::get_outside(Vector *p_vector, double p_index, Slot &r_out) {
+	if (module_.classes[p_vector->klass].array) {
+		array_number_get(p_vector, p_index, r_out);
+		return;
+	}
+	raise_range(p_index, p_vector->length);
+}
+
+// VecSet at an index that names no element and is not the one past the end that a Vector may add.
+void Interpreter::set_outside(Vector *p_vector, Kind p_index_kind, const Slot &p_index, Slot p_value) {
+	const bool array = module_.classes[p_vector->klass].array;
+	if (array && !element_index(p_index_kind, p_index, UINT32_MAX)) {
+		array_number_set(p_vector, index_number(p_index_kind, p_index), p_value);
+		return;
+	}
+	if (array) {
+		out_of_memory(); // An index past the most elements an Array may hold here.
+		return;
+	}
+	raise_range(index_number(p_index_kind, p_index), p_vector->length);
+}
+
+void Interpreter::vector_op(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
+	Slot *r = p_registers;
+	if (p_in.op == Op::ArrayNew || p_in.op == Op::VecNew) {
+		vector_new(p_function, p_in, p_registers);
 		return;
 	}
 	const bool reads = p_in.op == Op::VecGet || p_in.op == Op::VecLength || p_in.op == Op::VecFixed;
@@ -133,12 +163,8 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		case Op::VecGet: {
 			const Kind index = p_function.registers[p_in.c];
 			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
-			if (!at && module_.classes[vector->klass].array) {
-				array_number_get(vector, index_number(index, r[p_in.c]), r[p_in.a]);
-				return;
-			}
 			if (!at) {
-				raise_range(index_number(index, r[p_in.c]), vector->length);
+				get_outside(vector, index_number(index, r[p_in.c]), r[p_in.a]);
 				return;
 			}
 			put(kind, r[p_in.a], share(kind, vector->data[*at]));
@@ -151,16 +177,8 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			const bool array = module_.classes[vector->klass].array;
 			const uint32_t limit = array ? MAX_VECTOR_LENGTH : vector->fixed ? vector->length : vector->length + 1;
 			const std::optional<uint32_t> at = element_index(index, r[p_in.b], limit);
-			if (!at && array && !element_index(index, r[p_in.b], UINT32_MAX)) {
-				array_number_set(vector, index_number(index, r[p_in.b]), r[p_in.c]);
-				return;
-			}
-			if (!at && array) {
-				out_of_memory(); // An index past the most elements an Array may hold here.
-				return;
-			}
 			if (!at) {
-				raise_range(index_number(index, r[p_in.b]), vector->length);
+				set_outside(vector, index, r[p_in.b], r[p_in.c]);
 				return;
 			}
 			if (*at >= vector->length && !resize_vector(vector, *at + 1)) {
@@ -179,8 +197,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			}
 			break;
 		case Op::VecFixed:
-			r[p_in.a].bits = 0;
-			r[p_in.a].b = vector->fixed;
+			r[p_in.a] = of_bool(vector->fixed);
 			break;
 		case Op::VecSetFixed:
 			vector->fixed = r[p_in.b].b;
