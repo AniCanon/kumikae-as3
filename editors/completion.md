@@ -143,7 +143,7 @@ or history of prefix results survives the generation.
 
 Clients advertising LSP completion-list edit defaults receive the shared range once. Older clients
 receive a range with each item. Snippets and separate insert/replace edits are also capability-gated.
-Every result describes the current document known to the server.
+Every result describes the document as it was when the request was made.
 
 After a clean check, edits confined to method/function bodies reuse stable declaration symbols and
 recheck the changed units. Sources are immutable shared snapshots; body symbols and scopes belong to
@@ -157,8 +157,10 @@ sent when the client advertises support, including empty diagnostic lists for ea
 version. If typing overtakes an earlier clear, the next clean version clears stale errors again.
 Rider receives diagnostic versions and ranges atomically with respect to document writes, so a reply
 cannot cache pre-edit offsets while a deletion is still in progress.
-A bounded lookahead batch cancels queued requests or rejects
-requests made obsolete by a newer document change before checking. Partial frames do not delay an
+A bounded lookahead batch skips a queued request that is cancelled, or whose document is closed, before
+checking. A request that a newer edit follows is still answered, for the text it was asked about: LSP 3.17
+says a server should not send ContentModified for a change it has only queued, and LSP4IJ does not ask again
+after one (which once left override suggestions unshown). Partial frames do not delay an
 already complete request. A check already running remains synchronous and cannot be interrupted.
 See the [follow-up results](../docs/results/2026-11-completion-followup.md) for latency, memory and validation.
 

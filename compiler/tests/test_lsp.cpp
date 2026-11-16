@@ -248,6 +248,20 @@ static void test_lifecycle() {
 	CHECK(unborn.server.exited());
 }
 
+// A file whose only mistakes are warnings is published, and cleared when they are fixed, for a client that
+// is given no versions (and for a file that is not open, which has none).
+static void test_warnings_alone() {
+	Session session;
+	session.initialize();
+	session.open(MAIN, "package {\npublic class Main {\n\tvar big:Number = 9007199254740993;\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(),
+			MAIN + " 2:18-2:34 warning: 9007199254740993 is rounded: a Number can't hold every digit of it. Store it in an Int64 to keep them\n");
+	session.change(MAIN, "package {\npublic class Main {\n\tvar big:Number = 3;\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(), MAIN + " clear\n");
+}
+
 static void test_diagnostics() {
 	Session session;
 	session.initialize();
@@ -1239,6 +1253,7 @@ int main() {
 	test_lifecycle();
 	test_code_language();
 	test_diagnostics();
+	test_warnings_alone();
 	test_positions();
 	test_navigation();
 	test_declaration_files();

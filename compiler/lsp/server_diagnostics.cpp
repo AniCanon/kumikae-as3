@@ -90,13 +90,15 @@ void Server::publish(std::vector<std::string> &r_out) {
 		present.insert(uri);
 		auto before = published_.find(uri);
 		const auto version = document_version(uri);
-		if (!unit->diagnostics.has_errors() && before == published_.end() && !version) {
+		// Warnings are shown as errors are: a file with either is published, and cleared when it has none.
+		const bool any = unit->diagnostics.has_errors() || unit->diagnostics.has_warnings();
+		if (!any && before == published_.end() && !version) {
 			continue;
 		}
 		std::string text = diagnostics_json(*unit);
 		if (before == published_.end() || before->second.diagnostics != text || before->second.version != version) {
 			send(uri, text);
-			if (!unit->diagnostics.has_errors() && !version) {
+			if (!any && !version) {
 				published_.erase(uri);
 			} else {
 				// A client typing ahead can discard a clear, so clean open versions need fresh clears too.
