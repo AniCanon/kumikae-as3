@@ -5,7 +5,10 @@ turns the checked tree from `src/` into it.
 
 | Files | Job |
 |---|---|
-| `ir.h` | Kinds of register, the table of operations (`KAS3_IR_OPS`: a name and three shape letters each), a module |
+| `ir.h` | The IR as a whole, for every includer: the three headers below, and printing and comparing a module |
+| `ir_ops.h` | Kinds of register, the table of operations (`KAS3_IR_OPS`: a name and three shape letters each), an instruction |
+| `ir_codes.h` | What the codes in some operations' operands mean: which of Math's, a vector's, String's, RegExp's, Date's or JSON's functions; the fields of the library's objects |
+| `ir_module.h` | A module: classes, fields, functions, handlers, globals |
 | `ir_print.cpp` | The text form the golden files hold |
 | `ir_compare.cpp` | What changed between two builds that a reload alone would not show (`run_once_changes`) |
 | `lower.h`, `lower.cpp` | The entry point, and units and classes in order |
