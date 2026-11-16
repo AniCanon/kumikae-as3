@@ -76,7 +76,7 @@ func _physics_process(_delta: float) -> bool:
 	ask("freedTraced")
 	show("str of a freed object and of null", ask("freedStr"), "null,nullnull,null,null,null,undefined,anull1")
 	ask("freedPrinted")
-	show("a freed object in locale text", ask("freedLocale"), ",|,,1|,2")
+	show("a freed object in locale text", ask("freedLocale"), ",;,,1;,2")
 	show("a script object of no Godot class is not written as null", ask("plainStr"), "refused")
 	node.free()
 	return false

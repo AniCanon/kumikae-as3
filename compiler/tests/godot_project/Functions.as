@@ -82,7 +82,7 @@ package {
 			var none:Node = null;
 			var nodes:Vector.<Node> = new <Node>[kept, none];
 			var held:* = [kept, 2];
-			return nodes.toLocaleString() + "|" + [kept, none, 1].toLocaleString() + "|" + held.toLocaleString();
+			return nodes.toLocaleString() + ";" + [kept, none, 1].toLocaleString() + ";" + held.toLocaleString();
 		}
 		public function freedPrinted():void { print("freed: ", kept, " ", null); }
 		// Only a null is written so: a script object Godot has no form for is still refused.
