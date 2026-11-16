@@ -125,7 +125,7 @@ void Interpreter::string_match(const Function &p_function, const Instruction &p_
 	}
 	const bool global = (program->flags & regex::GLOBAL) != 0;
 	if (regexp && global) { // One that is not global is left as it is, as its exec() leaves it.
-		regexp->fields()[ir::REGEXP_LAST_INDEX].d = 0;
+		set_int32(regexp->fields()[ir::REGEXP_LAST_INDEX], 0);
 	}
 	Vector *array = nullptr;
 	if (!global && !matches->empty()) {
@@ -275,7 +275,7 @@ void Interpreter::string_replace(const Function &p_function, const Instruction &
 		previous = static_cast<size_t>(matches[i].captures[1]);
 	}
 	if (done && regexp && (program->flags & regex::GLOBAL)) {
-		regexp->fields()[ir::REGEXP_LAST_INDEX].d = 0;
+		set_int32(regexp->fields()[ir::REGEXP_LAST_INDEX], 0);
 	}
 	release_object(function);
 	release_object(regexp);

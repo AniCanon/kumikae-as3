@@ -23,7 +23,7 @@ bool of_class(const Object *p_object, uint32_t p_class) {
 std::optional<bool> Interpreter::library_get(Object *p_object, std::string_view p_name, Slot *r_value) {
 	if (of_class(p_object, module_.regexp_class)) {
 		if (p_name == "lastIndex") {
-			*r_value = to_any(Kind::F64, p_object->fields()[ir::REGEXP_LAST_INDEX]);
+			*r_value = to_any(Kind::I32, p_object->fields()[ir::REGEXP_LAST_INDEX]);
 			return true;
 		}
 		if (const ir::RegExpProperty *property = ir::regexp_property(p_name)) {
@@ -70,11 +70,12 @@ std::optional<bool> Interpreter::library_set(Object *p_object, std::string_view 
 	}
 	const uint32_t write = regexp ? ir::NONE : access->write;
 	Slot number;
-	if (!from_any(p_value, Kind::F64, ir::NONE, &number)) {
+	// lastIndex is an int, as avmplus declares it: what is written is made one (ToInt32).
+	if (!from_any(p_value, write == ir::NONE ? Kind::I32 : Kind::F64, ir::NONE, &number)) {
 		return false;
 	}
 	if (write == ir::NONE) {
-		p_object->fields()[ir::REGEXP_LAST_INDEX].d = number.d;
+		set_int32(p_object->fields()[ir::REGEXP_LAST_INDEX], number.i);
 		return true;
 	}
 	Slot ignored;

@@ -30,7 +30,7 @@ std::optional<uint32_t> Library::class_of(Lowerer &p_lowerer, const Symbol *p_cl
 	Class klass;
 	klass.name = std::string(p_class->name);
 	if (regexp) {
-		klass.fields = { { "source", Kind::Str }, { "flags", Kind::I32 }, { "lastIndex", Kind::F64 } };
+		klass.fields = { { "source", Kind::Str }, { "flags", Kind::I32 }, { "lastIndex", Kind::I32 } };
 	} else {
 		klass.fields = { { "time", Kind::F64 } };
 	}

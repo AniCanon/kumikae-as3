@@ -4,7 +4,6 @@
 #include "regex.h"
 #include "text_units.h"
 
-#include <cmath>
 
 namespace kas3 {
 namespace vm {
@@ -289,17 +288,17 @@ bool Interpreter::regexp_run(Object *p_regexp, Str *p_text, bool p_test, Slot *r
 	const std::shared_ptr<const std::u16string> held = subject_units(p_text);
 	const std::u16string &units = *held;
 	const bool global = (program->flags & regex::GLOBAL) != 0;
-	double &last = p_regexp->fields()[ir::REGEXP_LAST_INDEX].d;
-	const double from = global && !std::isnan(last) ? std::trunc(last) : 0;
+	Slot &last = p_regexp->fields()[ir::REGEXP_LAST_INDEX];
+	const int32_t from = global ? last.i : 0;
 	std::optional<Found> found;
-	if (from >= 0 && from <= units.size()) {
+	if (from >= 0 && static_cast<uint32_t>(from) <= units.size()) {
 		found = find_match(*program, source, units, static_cast<uint32_t>(from));
 	}
 	if (failing_) {
 		return false;
 	}
 	if (global) {
-		last = found ? found->captures[1] : 0;
+		set_int32(last, found ? found->captures[1] : 0);
 	}
 	r_out->bits = 0;
 	if (p_test) {
