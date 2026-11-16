@@ -327,8 +327,8 @@ class Lowerer {
 	// The arguments of a call as the function's parameters expect them, defaults filled in.
 	void call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list);
 
-	// The first of the expressions that can change a local variable, or null.
-	static Expr * writer(const List<Expr *> &p_expressions);
+	// The first of the expressions from `p_from` up to `p_end` (all, by default) that can change a local, or null.
+	static Expr *writer(const List<Expr *> &p_expressions, uint32_t p_from = 0, uint32_t p_end = UINT32_MAX);
 
 	uint32_t call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind);
 

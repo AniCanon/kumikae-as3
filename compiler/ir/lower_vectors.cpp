@@ -63,10 +63,7 @@ uint32_t Lowerer::vector_new(const Type *p_type, const List<Expr *> &p_arguments
 		// new Array(...): each argument untyped; one number is the length, as it runs.
 		std::vector<uint32_t> list;
 		for (uint32_t i = 0; i < p_arguments.count; i++) {
-			Expr *later = nullptr;
-			for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
-				later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
-			}
+			Expr *later = writer(p_arguments, i + 1);
 			list.push_back(settled(any_value(p_arguments[i]), later, position));
 		}
 		const uint32_t out = reg(Kind::Obj);
@@ -325,10 +322,7 @@ uint32_t Lowerer::vector_call(Call *p_call) {
 	std::vector<uint32_t> list;
 	list.push_back(settled(expression(callee->object, Kind::Obj), writer(p_call->arguments), position));
 	for (uint32_t i = 0; i < count; i++) {
-		Expr *later = nullptr;
-		for (uint32_t next = i + 1; next < count && !later; next++) {
-			later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
-		}
+		Expr *later = writer(p_call->arguments, i + 1, count);
 		list.push_back(settled(expression(p_call->arguments[i], i < fixed.size() ? fixed[i] : *rest), later, position));
 	}
 	for (size_t i = count; i < fixed.size(); i++) {

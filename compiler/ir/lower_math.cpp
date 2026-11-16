@@ -60,10 +60,7 @@ std::optional<uint32_t> Lowerer::math_call(Call *p_call, const Symbol *p_functio
 	// The arguments, left to right, each a Number kept from what a later one may do.
 	std::vector<uint32_t> values;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
-		Expr *later = nullptr;
-		for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
-			later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
-		}
+		Expr *later = writer(p_call->arguments, i + 1);
 		values.push_back(settled(expression(p_call->arguments[i], Kind::F64), later, position));
 	}
 	const uint32_t out = reg(Kind::F64);

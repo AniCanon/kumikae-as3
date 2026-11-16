@@ -92,10 +92,7 @@ uint32_t Lowerer::value_call(Call *p_call, Kind p_want) {
 	use_argument_error();
 	std::vector<uint32_t> list;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
-		Expr *later = nullptr;
-		for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
-			later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
-		}
+		Expr *later = writer(p_call->arguments, i + 1);
 		list.push_back(settled(any_value(p_call->arguments[i]), later, position));
 	}
 	uint32_t out = reg(Kind::Any);
@@ -207,10 +204,7 @@ std::optional<uint32_t> Lowerer::function_method(Call *p_call) {
 	const List<Expr *> &given = p_call->arguments;
 	const uint32_t value = settled(expression(member->object, Kind::Obj), writer(given), position);
 	if (given.count > 0) {
-		Expr *later = nullptr;
-		for (uint32_t next = 1; next < given.count && !later; next++) {
-			later = writes_locals(given[next]) ? given[next] : nullptr;
-		}
+		Expr *later = writer(given, 1);
 		settled(expression(given[0], Kind::Void), later, position);
 	}
 	use_argument_error();
@@ -228,10 +222,7 @@ std::optional<uint32_t> Lowerer::function_method(Call *p_call) {
 	}
 	std::vector<uint32_t> list;
 	for (uint32_t i = 1; i < given.count; i++) {
-		Expr *later = nullptr;
-		for (uint32_t next = i + 1; next < given.count && !later; next++) {
-			later = writes_locals(given[next]) ? given[next] : nullptr;
-		}
+		Expr *later = writer(given, i + 1);
 		list.push_back(settled(any_value(given[i]), later, position));
 	}
 	emit(Op::CallFunction, position, out, value, arguments(std::move(list)));

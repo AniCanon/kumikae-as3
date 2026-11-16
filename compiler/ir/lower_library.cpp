@@ -80,12 +80,7 @@ uint32_t Library::refused(const std::string &p_why, Kind p_kind) {
 }
 
 Expr *Library::later(uint32_t p_from) const {
-	for (uint32_t next = p_from; next < call_->arguments.count; next++) {
-		if (Lowerer::writes_locals(call_->arguments[next])) {
-			return call_->arguments[next];
-		}
-	}
-	return nullptr;
+	return Lowerer::writer(call_->arguments, p_from);
 }
 
 uint32_t Library::left_out(const Parameter &p_parameter, Kind p_kind) {

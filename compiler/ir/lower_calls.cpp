@@ -15,10 +15,7 @@ void Lowerer::call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arg
 		if (parameter.is_rest) {
 			// What is left goes untyped: the function that is called makes them its Array.
 			for (uint32_t at = i; at < p_arguments.count; at++) {
-				Expr *later = nullptr;
-				for (uint32_t next = at + 1; next < p_arguments.count && !later; next++) {
-					later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
-				}
+				Expr *later = writer(p_arguments, at + 1);
 				r_list.push_back(settled(any_value(p_arguments[at]), later, p_position));
 			}
 			break;
@@ -33,18 +30,15 @@ void Lowerer::call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arg
 		if (i >= p_arguments.count) {
 			break; // Left out: the function that is called supplies its own default.
 		}
-		Expr *later = nullptr;
-		for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
-			later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
-		}
+		Expr *later = writer(p_arguments, i + 1);
 		r_list.push_back(settled(typed(p_arguments[i], type, kind), later, p_position));
 	}
 }
 
-Expr *Lowerer::writer(const List<Expr *> &p_expressions) {
-	for (Expr *expression : p_expressions) {
-		if (writes_locals(expression)) {
-			return expression;
+Expr *Lowerer::writer(const List<Expr *> &p_expressions, uint32_t p_from, uint32_t p_end) {
+	for (uint32_t at = p_from; at < p_end && at < p_expressions.count; at++) {
+		if (writes_locals(p_expressions[at])) {
+			return p_expressions[at];
 		}
 	}
 	return nullptr;
@@ -143,10 +137,7 @@ uint32_t Lowerer::trace_call(Call *p_call) {
 	// that a later argument changes is traced as it is after the change.
 	std::vector<uint32_t> values;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
-		Expr *later = nullptr;
-		for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
-			later = writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
-		}
+		Expr *later = writer(p_call->arguments, i + 1);
 		Kind kind = Kind::Void;
 		const bool spoken_later = !is_null(p_call->arguments[i]) && kind_of(p_call->arguments[i]->type, &kind) && (kind == Kind::Obj || kind == Kind::Any);
 		values.push_back(settled(expression(p_call->arguments[i], spoken_later ? kind : Kind::Str), later, p_call->offset));
@@ -446,10 +437,7 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 			type = compilation_.type_of(p_function->parameters[i].type);
 			if (type && type->kind == Type::Instance && type->symbol == function_ && function_) {
 				// Godot takes a function here: a method goes bound to its object.
-				Expr *later = nullptr;
-				for (uint32_t next = i + 1; next < written && !later; next++) {
-					later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
-				}
+				Expr *later = writer(p_arguments, i + 1, written);
 				r_list.push_back(settled(bound_method(p_arguments[i]), later, p_position));
 				continue;
 			}
@@ -480,10 +468,7 @@ void Lowerer::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_a
 				kind = Kind::Void;
 			}
 		}
-		Expr *later = nullptr;
-		for (uint32_t next = i + 1; next < p_arguments.count && !later; next++) {
-			later = writes_locals(p_arguments[next]) ? p_arguments[next] : nullptr;
-		}
+		Expr *later = writer(p_arguments, i + 1);
 		if (kind == Kind::Void && is_null(p_arguments[i])) {
 			kind = Kind::Ref; // `null` where Godot takes anything: nothing.
 		}

@@ -172,10 +172,7 @@ auto Dynamic::call(Call *p_call) -> std::optional<uint32_t> {
 	const uint32_t object = holder(callee->object, Lowerer::writer(p_call->arguments), position);
 	list.push_back(name(callee->name, callee->name_offset));
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
-		Expr *later = nullptr;
-		for (uint32_t next = i + 1; next < p_call->arguments.count && !later; next++) {
-			later = Lowerer::writes_locals(p_call->arguments[next]) ? p_call->arguments[next] : nullptr;
-		}
+		Expr *later = Lowerer::writer(p_call->arguments, i + 1);
 		list.push_back(l_.settled(l_.any_value(p_call->arguments[i]), later, position));
 	}
 	const uint32_t out = l_.reg(Kind::Any);
