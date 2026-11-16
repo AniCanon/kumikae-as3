@@ -1,6 +1,6 @@
 // Vectors (lower_vectors.cpp): a Vector.<T>, or an Array, once its class is made (Lowerer::vector_class):
-// `new`, a literal, an element as a place, a method, a loop over one, and handing one to Godot. forEach,
-// map, filter, some and every, which call a function, are in lower_functions.cpp. A helper the lowerer
+// `new`, a literal, an element as a place, a method (lower_vector_methods.cpp), a loop over one, and handing
+// one to Godot. forEach, map, filter, some and every, which call a function, are in lower_functions.cpp. A helper the lowerer
 // makes where it needs one, with the lowerer's own state.
 #pragma once
 
