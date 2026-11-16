@@ -126,6 +126,16 @@ earlier stages promised to this one.
 **Done when:** the conformance suite passes on both the interpreter and native builds, and the speed gate
 passes on real compiled AS3 (not hand-written code, as in stage 0).
 
+**Built ahead, on 2026-11-16:** `kas3c cpp` writes a program as C++; every program of the run tests gives
+the interpreter's output as native code; the Godot extension loads a program library and Godot calls its
+functions directly. Against Godot C# (rough: measured on a loaded machine) it is ahead on calls into Godot,
+script-only code and one array benchmark, about level on three, and behind on eight (1.2 to 4.9 times):
+the speed gate is not passed. Decided the same day: native code is to run in the editor's play too, not
+only in exports, with the interpreter kept for a machine with no C++ toolchain; and tests are to run on
+Steam Deck and Nintendo Switch once build targets are configurations. Left: the library called directly
+everywhere (part done), Godot's values held inline in fields and parameters, building on Play, reloading
+native code, threads.
+
 ### Stage 4: mobile
 
 **Delivers:** iOS and Android, as interpreted debug builds and native release builds.
