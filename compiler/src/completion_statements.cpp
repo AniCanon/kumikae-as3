@@ -51,6 +51,29 @@ uint32_t Queries::skip_trivia(const Unit &p_unit, uint32_t p_offset) {
 	return p_offset;
 }
 
+// In a block: at one of its statements, or in a gap between them where a statement may begin.
+bool Queries::block_start(const Unit &p_unit, const Block *p_block, uint32_t p_offset) {
+	uint32_t previous = p_block->offset + 1;
+	bool inside = false;
+	for (const Stmt *statement : p_block->statements) {
+		if (statement && statement->offset == p_offset) {
+			return true;
+		}
+		inside |= statement->offset < p_offset && p_offset < statement->end;
+		if (statement->end <= p_offset) {
+			previous = std::max(previous, statement->end);
+		}
+	}
+	const auto &text = p_unit.source.text();
+	const bool boundary = previous <= text.size() && previous > 0 &&
+			(previous == p_block->offset + 1 || text[previous - 1] == ';' || text[previous - 1] == '}');
+	if (!inside && boundary && p_block->offset < p_offset && p_block->offset < text.size() &&
+			text[p_block->offset] == '{' && skip_trivia(p_unit, previous) >= p_offset) {
+		return true;
+	}
+	return false;
+}
+
 bool Queries::statement_start(const Unit &p_unit, uint32_t p_offset) const {
 	const auto starts = [&](const Stmt *p_statement, bool p_after_header = false) {
 		return p_statement && p_statement->offset == p_offset && (!p_after_header || after_parenthesis(p_unit, p_offset));
@@ -60,28 +83,11 @@ bool Queries::statement_start(const Unit &p_unit, uint32_t p_offset) const {
 			continue;
 		}
 		switch (node->kind) {
-			case NodeKind::Block: {
-				const auto *block = static_cast<const Block *>(node);
-				uint32_t previous = block->offset + 1;
-				bool inside = false;
-				for (const Stmt *statement : block->statements) {
-					if (starts(statement)) {
-						return true;
-					}
-					inside |= statement->offset < p_offset && p_offset < statement->end;
-					if (statement->end <= p_offset) {
-						previous = std::max(previous, statement->end);
-					}
-				}
-				const auto &text = p_unit.source.text();
-				const bool boundary = previous <= text.size() && previous > 0 &&
-						(previous == block->offset + 1 || text[previous - 1] == ';' || text[previous - 1] == '}');
-				if (!inside && boundary && block->offset < p_offset && block->offset < text.size() &&
-						text[block->offset] == '{' && skip_trivia(p_unit, previous) >= p_offset) {
+			case NodeKind::Block:
+				if (block_start(p_unit, static_cast<const Block *>(node), p_offset)) {
 					return true;
 				}
 				break;
-			}
 			case NodeKind::If: {
 				const auto *branch = static_cast<const If *>(node);
 				if (starts(branch->then_branch, true) || starts(branch->else_branch)) {
