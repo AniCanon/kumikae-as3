@@ -19,13 +19,6 @@ struct Label {
 	bool loop;
 };
 
-std::string quoted(std::string_view p_name) {
-	std::string result = "'";
-	result += p_name;
-	result += '\'';
-	return result;
-}
-
 bool is_loop(const Stmt *p_statement) {
 	// `a: b: for (;;)` labels the loop twice.
 	while (p_statement->kind == NodeKind::Labeled && static_cast<const Labeled *>(p_statement)->body) {
