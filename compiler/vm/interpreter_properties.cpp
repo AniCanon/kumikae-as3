@@ -200,19 +200,12 @@ void Interpreter::array_number_set(Vector *p_array, double p_number, Slot p_valu
 	set_entry(properties_of(p_array), key, p_value);
 }
 
-// The named field a sealed object has under this name, or nothing.
-std::optional<uint32_t> Interpreter::named_field(const ir::Class &p_class, std::string_view p_name) const {
-	for (size_t i = p_class.fields.size(); i-- > 0;) {
-		if (p_class.fields[i].named && p_class.fields[i].name == p_name) {
-			return static_cast<uint32_t>(i);
-		}
-	}
-	return std::nullopt;
-}
-
-std::optional<uint32_t> Interpreter::named_method(const ir::Class &p_class, std::string_view p_name) const {
+// The public method of this name, or with `p_prefix` ("get ", "set ") the accessor: compared in place, so a
+// by-name read builds no text.
+std::optional<uint32_t> Interpreter::named_method(const ir::Class &p_class, std::string_view p_name, std::string_view p_prefix) const {
 	for (const auto &[name, slot] : p_class.named_methods) {
-		if (name == p_name) {
+		if (name.size() == p_prefix.size() + p_name.size() && name.compare(0, p_prefix.size(), p_prefix) == 0 &&
+				name.compare(p_prefix.size(), std::string::npos, p_name) == 0) {
 			return slot;
 		}
 	}
@@ -270,7 +263,7 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 		if (const std::optional<bool> done = library_get(object, p_key.text, r_value)) {
 			return *done;
 		}
-		if (const std::optional<uint32_t> field = named_field(*klass, p_key.text)) {
+		if (const std::optional<uint32_t> field = klass->field(p_key.text, true)) {
 			*r_value = to_any(klass->fields[*field].kind, object->fields()[*field]);
 			return true;
 		}
@@ -279,7 +272,7 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 			*r_value = made ? any::object(made) : any::undefined();
 			return made != nullptr;
 		}
-		if (const std::optional<uint32_t> getter = named_method(*klass, "get " + p_key.text)) {
+		if (const std::optional<uint32_t> getter = named_method(*klass, p_key.text, "get ")) {
 			// A public getter: called, on the object's class's own (it may be overridden).
 			const uint32_t function = klass->methods[*getter];
 			Slot self;
@@ -297,7 +290,7 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 			}
 			return ok;
 		}
-		if (named_method(*klass, "set " + p_key.text)) {
+		if (named_method(*klass, p_key.text, "set ")) {
 			raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
 					"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
 			return false;
@@ -360,7 +353,7 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 		if (const std::optional<bool> done = library_set(object, p_key.text, p_value)) {
 			return *done;
 		}
-		if (const std::optional<uint32_t> field = named_field(*klass, p_key.text)) {
+		if (const std::optional<uint32_t> field = klass->field(p_key.text, true)) {
 			const ir::Field &declared = klass->fields[*field];
 			if (ir::is_engine(declared.kind)) {
 				raise_unsupported("writing a field of one of Godot's types by its name");
@@ -376,7 +369,7 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 		if (named_method(*klass, p_key.text)) {
 			return cannot("1037", "Cannot assign to a method ");
 		}
-		if (const std::optional<uint32_t> setter = named_method(*klass, "set " + p_key.text)) {
+		if (const std::optional<uint32_t> setter = named_method(*klass, p_key.text, "set ")) {
 			// A public setter: given the value as its parameter takes it.
 			const uint32_t function = klass->methods[*setter];
 			const ir::Function &callee = module_.functions[function];
@@ -392,7 +385,7 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 			drop(callee.registers[1], both[1]);
 			return ok;
 		}
-		if (named_method(*klass, "get " + p_key.text)) {
+		if (named_method(*klass, p_key.text, "get ")) {
 			return cannot("1074", "Illegal write to read-only property ");
 		}
 		if (klass->built_in) {
@@ -471,7 +464,7 @@ bool Interpreter::delete_property(Slot p_holder, const PropertyKey &p_key, bool 
 		*r_done = klass->array && !p_key.index && p_key.text != "length";
 		entries = klass->array ? vector->properties : nullptr;
 	} else if (klass && !klass->table) {
-		*r_done = !named_field(*klass, p_key.text) && !named_method(*klass, p_key.text);
+		*r_done = !klass->field(p_key.text, true) && !named_method(*klass, p_key.text);
 	} else if (!klass && (any::tag(p_holder) == AnyTag::Null || any::tag(p_holder) == AnyTag::Undefined)) {
 		any_null_check(p_holder);
 		return false;
@@ -507,7 +500,7 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed") ||
 				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && listed(ARRAY_METHODS, p_key.text));
 	} else if (klass) {
-		has = has || named_field(*klass, p_key.text) || named_method(*klass, p_key.text) || library_has(object, p_key.text);
+		has = has || klass->field(p_key.text, true) || named_method(*klass, p_key.text) || library_has(object, p_key.text);
 	} else if (tag == AnyTag::String) {
 		has = has || p_key.text == "length" || (p_prototype && listed(STRING_METHODS, p_key.text));
 	} else if (tag != AnyTag::Boolean) {

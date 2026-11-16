@@ -248,8 +248,7 @@ private:
 	bool property_key(Slot p_holder, Slot p_key, PropertyKey *r_key);
 	std::optional<uint32_t> entry_of(const Entries *p_entries, const PropertyKey &p_key) const;
 	bool set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p_value);
-	std::optional<uint32_t> named_field(const ir::Class &p_class, std::string_view p_name) const;
-	std::optional<uint32_t> named_method(const ir::Class &p_class, std::string_view p_name) const;
+	std::optional<uint32_t> named_method(const ir::Class &p_class, std::string_view p_name, std::string_view p_prefix = {}) const;
 	bool get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	bool primitive_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	bool set_property(Slot p_holder, const PropertyKey &p_key, Slot p_value);

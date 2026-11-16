@@ -194,10 +194,8 @@ Member find_member(uint32_t p_class, const StringName &p_name) {
 	if (method != ir::NONE && module.functions[method].is_public) {
 		return Member{ Member::What::Method, method };
 	}
-	for (size_t i = klass.fields.size(); i-- > 0;) {
-		if (klass.fields[i].name == name && klass.fields[i].is_public) {
-			return Member{ Member::What::Field, (uint32_t)i };
-		}
+	if (const std::optional<uint32_t> field = klass.field(name, true)) {
+		return Member{ Member::What::Field, *field };
 	}
 	return found;
 }

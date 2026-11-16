@@ -228,17 +228,15 @@ bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_v
 		return false;
 	}
 	const ir::Class &klass = module_.classes[p_object->klass];
-	// The class's own field hides a base's of the same name: the last one wins.
-	for (size_t i = klass.fields.size(); i-- > 0;) {
-		if (klass.fields[i].name == p_name) {
-			*r_value = p_object->fields()[i];
-			if (r_kind) {
-				*r_kind = klass.fields[i].kind;
-			}
-			return true;
-		}
+	const std::optional<uint32_t> field = klass.field(p_name);
+	if (!field) {
+		return false;
 	}
-	return false;
+	*r_value = p_object->fields()[*field];
+	if (r_kind) {
+		*r_kind = klass.fields[*field].kind;
+	}
+	return true;
 }
 
 void Interpreter::set_field(Object *p_object, uint32_t p_field, Slot p_owned) {

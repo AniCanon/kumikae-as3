@@ -222,7 +222,7 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 	}
 	Slot value = any::undefined();
 	bool own = false;
-	if (klass && (klass->table || klass->array || (klass->element == Kind::Void && named_field(*klass, p_key.text)))) {
+	if (klass && (klass->table || klass->array || (klass->element == Kind::Void && klass->field(p_key.text, true)))) {
 		if (!has_property(p_holder, p_key, false, &own)) {
 			return;
 		}

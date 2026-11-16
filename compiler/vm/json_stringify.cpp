@@ -229,7 +229,7 @@ std::vector<std::string> Json::names_of(Object *p_object) const {
 		}
 	}
 	for (size_t i = fields; i < klass.fields.size(); i++) {
-		if (klass.fields[i].named) {
+		if (klass.fields[i].is_public) {
 			names.push_back(klass.fields[i].name);
 		}
 	}
@@ -254,11 +254,11 @@ bool Json::member_value(Object *p_object, const std::string &p_name, Slot *r_val
 		}
 		return true;
 	}
-	if (const std::optional<uint32_t> field = vm_.named_field(klass, p_name)) {
+	if (const std::optional<uint32_t> field = klass.field(p_name, true)) {
 		*r_value = vm_.to_any(klass.fields[*field].kind, p_object->fields()[*field]);
 		return !vm_.failing_;
 	}
-	if (vm_.named_method(klass, "get " + p_name)) {
+	if (vm_.named_method(klass, p_name, "get ")) {
 		return vm_.get_property(any::object(p_object), key, r_value);
 	}
 	return true;

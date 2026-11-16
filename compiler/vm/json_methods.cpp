@@ -281,7 +281,7 @@ bool Json::to_json(Slot *r_owned, std::string_view p_key) {
 				return false;
 			}
 			found = any::object(made);
-		} else if (const std::optional<uint32_t> field = vm_.named_field(*klass, name.text)) {
+		} else if (const std::optional<uint32_t> field = klass->field(name.text, true)) {
 			found = vm_.to_any(klass->fields[*field].kind, object->fields()[*field]);
 		}
 	}

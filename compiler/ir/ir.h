@@ -4,7 +4,9 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace kas3 {
@@ -348,9 +350,8 @@ struct Field {
 	// where that is not known. A reload keeps what a field held only if it is still of that class.
 	uint32_t klass = NONE;
 	bool starts_null = false; // An untyped field declared `Object`: it starts null, a `*` undefined.
-	bool named = false; // Public: reached by its name as the program runs (`x.name` on an untyped value).
-	// What Godot may do with it by name (`node.speed`): read a public field, and write one that is not a
-	// const. Godot is told of no other.
+	// Public: reached by its name as the program runs (`x.name` on an untyped value), and by Godot (`node.speed`),
+	// which may read it and write it unless it is a const. Godot is told of no other.
 	bool is_public = false;
 	// Protected: reached by name from the code of the class that declares it and of its subclasses. A field
 	// neither public nor protected is reached by name only from the code of the class that declares it.
@@ -406,6 +407,16 @@ struct Class {
 	// The signals the class declares itself (`[Signal] public var hit:Signal;`), by name: Godot is told of
 	// them, with the base classes' too. Each one's field holds the signal from the start.
 	std::vector<std::string> signals;
+
+	// The field of this name (public only, if asked), the class's own before a base's it hides.
+	std::optional<uint32_t> field(std::string_view p_name, bool p_public_only = false) const {
+		for (size_t i = fields.size(); i-- > 0;) {
+			if (fields[i].name == p_name && (fields[i].is_public || !p_public_only)) {
+				return static_cast<uint32_t>(i);
+			}
+		}
+		return std::nullopt;
+	}
 };
 
 struct Global {

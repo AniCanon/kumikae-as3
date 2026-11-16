@@ -105,8 +105,7 @@ void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 			module_.globals.push_back({ module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds, starts_null });
 		} else {
 			fields_[declarator.symbol] = (uint32_t)module_.classes[p_class].fields.size();
-			const bool named = (p_decl->modifiers.bits & Modifiers::Public) != 0;
-			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null, named });
+			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null });
 			Field &field = module_.classes[p_class].fields.back();
 			field.is_public = (p_decl->modifiers.bits & Modifiers::Public) != 0;
 			field.is_protected = (p_decl->modifiers.bits & Modifiers::Protected) != 0;
