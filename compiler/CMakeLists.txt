@@ -72,6 +72,13 @@ target_include_directories(kas3vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vm)
 target_link_libraries(kas3vm PUBLIC kas3ir)
 target_compile_options(kas3vm PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
+# The C++ backend: the IR written as C++ source. It includes ir/ only, and writes text.
+file(GLOB KAS3_BACKEND_CPP_SOURCES CONFIGURE_DEPENDS backend_cpp/*.cpp)
+add_library(kas3backend_cpp STATIC ${KAS3_BACKEND_CPP_SOURCES})
+target_include_directories(kas3backend_cpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/backend_cpp)
+target_link_libraries(kas3backend_cpp PUBLIC kas3ir)
+target_compile_options(kas3backend_cpp PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+
 # The language server: JSON, the workspace and the message loop. The Godot editor does not need it.
 file(GLOB KAS3_LSP_SOURCES CONFIGURE_DEPENDS lsp/*.cpp)
 add_library(kas3lsp STATIC ${KAS3_LSP_SOURCES})
@@ -116,7 +123,7 @@ endforeach()
 
 # The command-line tool.
 add_executable(kas3c tools/kas3c.cpp)
-target_link_libraries(kas3c PRIVATE kas3lsp kas3vm)
+target_link_libraries(kas3c PRIVATE kas3lsp kas3vm kas3backend_cpp)
 target_compile_options(kas3c PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
 # Not a test: prints how long a re-check takes (tests/bench/generate_project.py writes a project to try).
@@ -127,6 +134,14 @@ add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test
 add_test(NAME lsp_stdio COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp_stdio.py $<TARGET_FILE:kas3c>)
 add_test(NAME programs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_programs.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+# The same programs as native code: written as C++ by `kas3c cpp`, built and run (tests/run_native.py).
+set(KAS3_NATIVE_FLAGS "")
+if(KAS3_SANITIZE)
+    set(KAS3_NATIVE_FLAGS --flag -fsanitize=address,undefined --flag -fno-omit-frame-pointer --flag -g)
+endif()
+add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_native.py
+    $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR}/native
+    --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS})
 # Which corpus programs can run in Godot, and what stops the others.
 add_test(NAME corpus COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_corpus.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)

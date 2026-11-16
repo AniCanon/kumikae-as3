@@ -3,6 +3,7 @@
 #include "builtins.h"
 #include "ast_printer.h"
 #include "diagnostics.h"
+#include "generate.h"
 #include "interpreter.h"
 #include "lower.h"
 #include "names.h"
@@ -15,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -23,6 +25,7 @@ static const char *const USAGE =
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c run <file>...\n"
 		"       kas3c ir [--godot] <file>...\n"
+		"       kas3c cpp <file>... -o <folder>\n"
 		"       kas3c lsp [--stdio] [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
@@ -47,6 +50,11 @@ static const char *const USAGE =
 		"ir     Check the files as one program and print the typed IR the interpreter runs.\n"
 		"       --godot  the files are scripts for Godot: load Godot's API, and expect no\n"
 		"                class to start the program with\n"
+		"\n"
+		"cpp    Check the files as one program and write it as C++ into the folder: a\n"
+		"       .cpp for each class, program.h and program.cpp, to be built against\n"
+		"       compiler/runtime. A program that uses something not translated yet is\n"
+		"       refused with `not yet supported: <operation>`, and nothing is written.\n"
 		"\n"
 		"lsp    Serve an editor over standard input and output with the Language Server\n"
 		"       Protocol: errors as you type, go to definition, find references, hover,\n"
@@ -242,6 +250,53 @@ static int run_run(int p_argc, char **p_argv) {
 	return ok ? 0 : 1;
 }
 
+static bool write_file(const std::filesystem::path &p_path, const std::string &p_text) {
+	std::FILE *file = std::fopen(p_path.string().c_str(), "wb");
+	if (!file) {
+		return false;
+	}
+	const bool written = std::fwrite(p_text.data(), 1, p_text.size(), file) == p_text.size();
+	return std::fclose(file) == 0 && written;
+}
+
+static int run_cpp(int p_argc, char **p_argv) {
+	// compile() takes the files alone: `-o <folder>` is taken out first, wherever it is written.
+	std::vector<char *> rest(p_argv, p_argv + std::min(p_argc, 2));
+	const char *folder = nullptr;
+	for (int i = 2; i < p_argc; i++) {
+		if (std::strcmp(p_argv[i], "-o") == 0) {
+			if (folder || i + 1 >= p_argc) {
+				return usage_error();
+			}
+			folder = p_argv[++i];
+		} else {
+			rest.push_back(p_argv[i]);
+		}
+	}
+	if (!folder) {
+		return usage_error();
+	}
+	kas3::ir::Module module;
+	int status = 0;
+	if (!compile(static_cast<int>(rest.size()), rest.data(), &module, &status)) {
+		return status;
+	}
+	const kas3::backend_cpp::Generated generated = kas3::backend_cpp::generate(module);
+	if (!generated.unsupported.empty()) {
+		std::fprintf(stderr, "kas3c: not yet supported: %s\n", generated.unsupported.c_str());
+		return 1;
+	}
+	std::error_code failed;
+	std::filesystem::create_directories(folder, failed);
+	for (const kas3::backend_cpp::File &file : generated.files) {
+		if (failed || !write_file(std::filesystem::path(folder) / file.name, file.text)) {
+			std::fprintf(stderr, "kas3c: cannot write %s in %s\n", file.name.c_str(), folder);
+			return 2;
+		}
+	}
+	return 0;
+}
+
 static int run_lsp(int p_argc, char **p_argv) {
 	kas3::Workspace::Options options;
 	for (int i = 2; i < p_argc; i++) {
@@ -283,6 +338,9 @@ int main(int p_argc, char **p_argv) {
 	}
 	if (command == "ir") {
 		return run_ir(p_argc, p_argv);
+	}
+	if (command == "cpp") {
+		return run_cpp(p_argc, p_argv);
 	}
 	if (command == "lsp") {
 		return run_lsp(p_argc, p_argv);
