@@ -18,7 +18,9 @@ int64_t clamp_wide(double p_number) {
 	return (int64_t)p_number;
 }
 
-int64_t string_to_wide(std::string_view p_text) {
+// Whole digits, read exactly: the value if they fit an Int64, nothing for text that is not only digits or
+// for digits past the largest (r_past then says so).
+static std::optional<int64_t> wide_digits(std::string_view p_text, bool *r_past) {
 	size_t start = 0, end = p_text.size();
 	while (start < end && (p_text[start] == ' ' || p_text[start] == '\t' || p_text[start] == '\n' || p_text[start] == '\r')) {
 		start++;
@@ -52,10 +54,28 @@ int64_t string_to_wide(std::string_view p_text) {
 			value = past ? limit : value * base + digit;
 		}
 	}
-	if (!digits) {
-		return clamp_wide(string_to_number(p_text));
+	*r_past = digits && past;
+	if (!digits || past) {
+		return std::nullopt;
 	}
 	return negative ? (int64_t)(0 - value) : (int64_t)value;
+}
+
+int64_t string_to_wide(std::string_view p_text) {
+	bool past = false;
+	if (const std::optional<int64_t> exact = wide_digits(p_text, &past)) {
+		return *exact;
+	}
+	return clamp_wide(string_to_number(p_text)); // Past the largest, the number is too: it is held there.
+}
+
+std::optional<int64_t> string_to_wide_exact(std::string_view p_text) {
+	// Whole digits that fit read exactly; anything else is read as a Number, which must be whole and fit.
+	bool past = false;
+	if (const std::optional<int64_t> exact = wide_digits(p_text, &past)) {
+		return exact;
+	}
+	return past ? std::nullopt : number_to_wide(string_to_number(p_text));
 }
 
 double compare_wide(int64_t p_wide, double p_number) {

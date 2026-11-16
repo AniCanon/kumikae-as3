@@ -1,5 +1,6 @@
 // The language server, driven in process: one JSON message in, the messages it answers with out.
 #include "check.h"
+#include "scratch.h"
 
 #include "builtins.h"
 #include "json.h"
@@ -14,12 +15,7 @@
 using namespace kas3;
 namespace fs = std::filesystem;
 
-static fs::path fresh_folder(const char *p_name) {
-	fs::path folder = fs::temp_directory_path() / (std::string("kas3-lsp-") + p_name);
-	fs::remove_all(folder);
-	fs::create_directories(folder);
-	return fs::canonical(folder);
-}
+using check::fresh_folder;
 
 static void write(const fs::path &p_path, const std::string &p_text) {
 	fs::create_directories(p_path.parent_path());
@@ -30,7 +26,7 @@ static void write(const fs::path &p_path, const std::string &p_text) {
 static Workspace::Options options(bool p_godot) {
 	Workspace::Options result;
 	result.godot = p_godot;
-	result.support_folder = (fs::temp_directory_path() / "kas3-lsp-support").string();
+	result.support_folder = (check::run_folder() / "support").string();
 	return result;
 }
 
@@ -124,7 +120,8 @@ struct Session {
 				.set("position", Json::object().set("line", p_line).set("character", p_character));
 	}
 	// What was published since the last send, one line per diagnostic:
-	// "<uri> <line>:<character>-<line>:<character> <message>", or "<uri> clear".
+	// "<uri> <line>:<character>-<line>:<character> <message>", or "<uri> clear". A warning's message starts
+	// with "warning: ".
 	std::string published() const {
 		std::string out;
 		for (const Json &message : received) {
@@ -137,12 +134,14 @@ struct Session {
 			}
 			for (const Json &item : params.get("diagnostics").items()) {
 				const Json &range = item.get("range");
-				CHECK_EQ(item.get("severity").integer(), (int64_t)1);
+				const int64_t severity = item.get("severity").integer();
+				CHECK(severity == 1 || severity == 2);
 				CHECK_EQ(item.get("source").string(), std::string("kas3c"));
 				out += params.get("uri").string() + " " + std::to_string(range.get("start").get("line").integer()) + ":" +
 						std::to_string(range.get("start").get("character").integer()) + "-" +
 						std::to_string(range.get("end").get("line").integer()) + ":" +
-						std::to_string(range.get("end").get("character").integer()) + " " + item.get("message").string() + "\n";
+						std::to_string(range.get("end").get("character").integer()) + " " + (severity == 2 ? "warning: " : "") +
+						item.get("message").string() + "\n";
 			}
 		}
 		return out;
@@ -249,6 +248,20 @@ static void test_lifecycle() {
 	CHECK(unborn.server.exited());
 }
 
+// A file whose only mistakes are warnings is published, and cleared when they are fixed, for a client that
+// is given no versions (and for a file that is not open, which has none).
+static void test_warnings_alone() {
+	Session session;
+	session.initialize();
+	session.open(MAIN, "package {\npublic class Main {\n\tvar big:Number = 9007199254740993;\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(),
+			MAIN + " 2:18-2:34 warning: 9007199254740993 is rounded: a Number can't hold every digit of it. Store it in an Int64 to keep them\n");
+	session.change(MAIN, "package {\npublic class Main {\n\tvar big:Number = 3;\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(), MAIN + " clear\n");
+}
+
 static void test_diagnostics() {
 	Session session;
 	session.initialize();
@@ -269,6 +282,12 @@ static void test_diagnostics() {
 	CHECK_EQ(session.published(),
 			MAIN + " 2:17-2:24 can't use a value of type 'String' where 'int' is expected\n" + MAIN +
 					" 3:11-3:18 unknown type 'Missing'\n");
+	// A warning is published as one, beside the errors.
+	session.change(MAIN, "package {\npublic class Main {\n\tvar count:int = \"three\";\n\tvar big:Number = 9007199254740993;\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(),
+			MAIN + " 2:17-2:24 can't use a value of type 'String' where 'int' is expected\n" + MAIN +
+					" 3:18-3:34 warning: 9007199254740993 is rounded: a Number can't hold every digit of it. Store it in an Int64 to keep them\n");
 	// Fixed: an empty list clears the editor's markers.
 	session.change(MAIN, "package {\npublic class Main {\n\tvar count:int = 3;\n}\n}\n");
 	session.settle();
@@ -421,6 +440,14 @@ static void test_navigation() {
 	CHECK_EQ(hurt.get("uri").string(), enemy);
 	CHECK_EQ(spot(defined(5, 20)), std::string("Enemy.as 1:13-1:18"));
 	CHECK(session.request("textDocument/definition", Session::at(player, 0, 3)).get("result").is_null());
+	// `new X()` goes to the constructor X declares.
+	const std::string maker = uri_from_path((root / "game" / "Maker.as").string());
+	session.open(maker, "package game {\npublic class Maker {\n\tpublic function Maker(a:int = 0) {}\n\tfunction again():Maker { return new Maker(1); }\n}\n}\n");
+	Json made = session.request("textDocument/definition", Session::at(maker, 3, 38)).get("result");
+	CHECK_EQ(spot(made.at(0)), std::string("Maker.as 2:17-2:22"));
+	made = session.request("textDocument/definition", Session::at(maker, 3, 20)).get("result");
+	CHECK_EQ(spot(made.at(0)), std::string("Maker.as 1:13-1:18"));
+	session.close(maker);
 	// Into Godot's API: a file that exists, and that the server answers questions about.
 	Json move = defined(8, 5);
 	std::string godot_uri = move.get("uri").string();
@@ -485,11 +512,27 @@ static void test_navigation() {
 
 	// Workspace symbols.
 	Json symbols = session.request("workspace/symbol", Json::object().set("query", "hur")).get("result");
-	CHECK_EQ(symbols.size(), (size_t)1);
+	CHECK_EQ(symbols.size(), (size_t)2); // The project's, then one of Godot's constants.
+	CHECK_EQ(symbols.at(1).get("name").string(), std::string("WEEKDAY_THURSDAY"));
 	CHECK_EQ(symbols.at(0).get("name").string(), std::string("hurt"));
 	CHECK_EQ(symbols.at(0).get("containerName").string(), std::string("game.Enemy"));
 	CHECK_EQ(spot(symbols.at(0).get("location")), std::string("Enemy.as 2:17-2:21"));
 	CHECK(session.request("workspace/symbol", Json::object().set("query", "")).get("result").size() >= 6);
+	// Godot's classes are found too, after the project's own, in the copy of the API an editor can open.
+	symbols = session.request("workspace/symbol", Json::object().set("query", "Enemy")).get("result");
+	CHECK_EQ(symbols.at(0).get("containerName").string(), std::string("game"));
+	symbols = session.request("workspace/symbol", Json::object().set("query", "CharacterBody2D")).get("result");
+	CHECK(symbols.size() >= 1);
+	CHECK_EQ(symbols.at(0).get("name").string(), std::string("CharacterBody2D"));
+	CHECK_EQ(symbols.at(0).get("containerName").string(), std::string("godot"));
+	CHECK_EQ(symbols.at(0).get("kind").integer(), (int64_t)5);
+	CHECK_EQ(symbols.at(0).get("location").get("uri").string(), godot_uri);
+	const Json &found_at = symbols.at(0).get("location").get("range").get("start");
+	size_t found_line = 0;
+	for (int64_t i = 0; i < found_at.get("line").integer(); i++) {
+		found_line = godot_text.find('\n', found_line) + 1;
+	}
+	CHECK_EQ(godot_text.substr(found_line + (size_t)found_at.get("character").integer(), 15), std::string("CharacterBody2D"));
 
 	// A file changes on disk: the program follows, and the errors appear in the open file.
 	write(enemy_path, "package game {\npublic class Enemy {\n}\n}\n");
@@ -520,14 +563,15 @@ static void test_declaration_files() {
 	Session session(with);
 	session.initialize(root.string());
 	session.settle();
-	CHECK_EQ(session.published(), uri_from_path(declared.string()) + " 0:72-0:73 expected a parameter name but found ':'\n");
+	// Main.as uses nothing of the broken file, so its own error is certain and shown at once.
+	const std::string main_error =
+			uri_from_path((root / "Main.as").string()) + " 0:42-0:45 can't use a value of type 'String' where 'int' is expected\n";
+	CHECK_EQ(session.published(), uri_from_path(declared.string()) + " 0:72-0:73 expected a parameter name but found ':'\n" + main_error);
 	write(declared, "package engine { public native class Motor { public native function run():void; } }");
 	session.notify("workspace/didChangeWatchedFiles",
 			Json::object().set("changes", Json::array().push(Json::object().set("uri", uri_from_path(declared.string())).set("type", 2))));
 	session.settle();
-	CHECK_EQ(session.published(),
-			uri_from_path(declared.string()) + " clear\n" + uri_from_path((root / "Main.as").string()) +
-					" 0:42-0:45 can't use a value of type 'String' where 'int' is expected\n");
+	CHECK_EQ(session.published(), uri_from_path(declared.string()) + " clear\n");
 	fs::remove_all(root);
 }
 
@@ -559,6 +603,32 @@ static void test_file_limit() {
 
 // An editor sends the part of a document that changed. Several changes in one message apply in order, each
 // to the text the one before left, with positions counted as the editor counts them.
+// A document with Windows line endings: changed ranges and the positions sent back count lines as the
+// editor does, and a change at a line's end goes before its "\r\n".
+static void test_windows_line_endings() {
+	Session session;
+	session.initialize(std::string(), false);
+	session.open(MAIN, "package {\r\npublic class Main {\r\n\tvar n:int = 1;\r\n}\r\n}\r\n");
+	session.settle();
+	CHECK_EQ(session.published(), std::string());
+	auto range = [](int p_line, int p_from, int p_to) {
+		return Json::object()
+				.set("start", Json::object().set("line", p_line).set("character", p_from))
+				.set("end", Json::object().set("line", p_line).set("character", p_to));
+	};
+	auto change = [&](const Json &p_range, const char *p_text) {
+		session.notify("textDocument/didChange",
+				Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", ++session.versions[MAIN]))
+						.set("contentChanges", Json::array().push(Json::object().set("range", p_range).set("text", p_text))));
+		session.settle();
+	};
+	change(range(2, 13, 14), "\"x\"");
+	CHECK_EQ(session.published(), MAIN + " 2:13-2:16 can't use a value of type 'String' where 'int' is expected\n");
+	change(range(1, 19, 19), "\r\n\tvar extra:Missing;");
+	CHECK_EQ(session.published(), MAIN + " 2:11-2:18 unknown type 'Missing'\n" + MAIN +
+										   " 3:13-3:16 can't use a value of type 'String' where 'int' is expected\n");
+}
+
 static void test_ranged_changes() {
 	for (int encoding = 0; encoding < 2; encoding++) {
 		bool utf8 = encoding == 1;
@@ -700,6 +770,21 @@ static void test_completion() {
 			CHECK_EQ(item.get("detail").string(), std::string("function run():void"));
 		}
 	}
+
+	// Through an interface: its accessors as properties, its methods, and what every object has.
+	session.change(MAIN, "package {\npublic class Main {\n\tpublic function run(s:Shape):void {\n\t\ts.sides;\n\t\ts.\n\t}\n} }\n"
+						 "interface Shape { function area():Number; function get sides():int; }");
+	answer = session.request("textDocument/completion", Session::at(MAIN, 4, 4));
+	names.clear();
+	for (const Json &item : answer.get("result").get("items").items()) {
+		names += item.get("label").string() + ":" + std::to_string(item.get("kind").integer(0)) + " ";
+	}
+	CHECK(names.find("sides:10 ") != std::string::npos);
+	CHECK(names.find("area:2 ") != std::string::npos);
+	CHECK(names.find("toString:2 ") != std::string::npos);
+	Json shown = session.request("textDocument/hover", Session::at(MAIN, 3, 5)).get("result");
+	CHECK_EQ(shown.get("contents").get("value").string(),
+			std::string("```actionscript\nfunction get sides():int\n```\nproperty of Shape in this file"));
 
 	// A keyword has its own kind and no detail.
 	session.change(MAIN, "package {\npublic class Main {\n\tpublic function run():void {\n\t\tret\n\t}\n} }");
@@ -853,6 +938,48 @@ static void test_completion_default_range() {
 	CHECK(!answer.get("result").get("items").at(0).has("textEdit"));
 }
 
+// After the keyword alone, an override's declaration goes in whole, however the editor takes edits: the
+// access word before the keyword, the rest in place of the name.
+static void test_override_completion() {
+	for (int client = 0; client < 3; client++) {
+		Session session;
+		Json completion = Json::object();
+		if (client == 1) {
+			completion.set("completionItem", Json::object().set("snippetSupport", true).set("insertReplaceSupport", true));
+		} else if (client == 2) {
+			completion.set("completionList", Json::object().set("itemDefaults", Json::array().push("editRange")));
+		}
+		session.request("initialize",
+				Json::object().set("capabilities", Json::object().set("textDocument", Json::object().set("completion", completion))));
+		session.notify("initialized", Json::object());
+		session.open("file:///work/Base.as", "package { public class Base { public function done(by:int):Boolean { return true; } } }");
+		const std::string head = "package { public class Main extends Base {\noverride do";
+		session.open(MAIN, head + "\n} }");
+		const Json answer = session.request("textDocument/completion", Session::at(MAIN, 1, 11));
+		const Json &item = answer.get("result").get("items").at(0);
+		CHECK_EQ(item.get("label").string(), std::string("done"));
+		const std::string written = std::string("function done(by:int):Boolean {\n\t") + (client == 1 ? "$0" : "") +
+				"throw new Error(\"Not implemented\");\n}";
+		CHECK_EQ(item.get("textEdit").get("newText").string(), written);
+		CHECK_EQ(item.get("additionalTextEdits").at(0).get("newText").string(), std::string("public "));
+		CHECK_EQ(item.get("insertTextFormat").integer(1), client == 1 ? 2 : 1);
+	}
+}
+
+// In a call's argument, the name in reach that the parameter has is first and preselected.
+static void test_parameter_name_preselected() {
+	Session session;
+	session.request("initialize", Json::object().set("capabilities", Json::object()));
+	session.notify("initialized", Json::object());
+	const std::string head = "package { class Main { function move(power:int):void {} function run():void { var apple:int; var power:int; move(";
+	session.open(MAIN, head + "); } } }");
+	const Json answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size())));
+	const Json &first = answer.get("result").get("items").at(0);
+	CHECK_EQ(first.get("label").string(), std::string("power"));
+	CHECK(first.get("preselect").boolean());
+	CHECK(!answer.get("result").get("items").at(1).has("preselect"));
+}
+
 static void test_signature_contexts() {
 	Session session;
 	session.request("initialize", Json::object().set("capabilities", Json::object()));
@@ -870,6 +997,120 @@ static void test_signature_contexts() {
 		const Json answer = session.request("textDocument/signatureHelp", Session::at(MAIN, 0, static_cast<int>(caret)));
 		CHECK_EQ(answer.get("result").get("activeParameter").integer(-1), expected);
 	}
+}
+
+static Json span(int p_line, int p_from, int p_to_line, int p_to) {
+	return Json::object()
+			.set("start", Json::object().set("line", p_line).set("character", p_from))
+			.set("end", Json::object().set("line", p_to_line).set("character", p_to));
+}
+
+static void change_range(Session &p_session, Json p_range, const char *p_text) {
+	p_session.notify("textDocument/didChange",
+			Json::object()
+					.set("textDocument", Json::object().set("uri", MAIN).set("version", ++p_session.versions[MAIN]))
+					.set("contentChanges", Json::array().push(Json::object().set("range", std::move(p_range)).set("text", p_text))));
+	p_session.settle();
+}
+
+// An editor that sends a byte-order mark counts it as the first character of the first line: one UTF-16
+// unit, three bytes.
+static void test_byte_order_mark() {
+	for (int encoding = 0; encoding < 2; encoding++) {
+		bool utf8 = encoding == 1;
+		int mark = utf8 ? 3 : 1;
+		Session session;
+		session.initialize(std::string(), utf8);
+		session.open(MAIN, "\xEF\xBB\xBFpackage { public class Main { var a:int; } }\n");
+		session.settle();
+		CHECK_EQ(session.published(), std::string());
+		auto at = [&](int p_character) { return std::to_string(p_character + mark); };
+		// The type, by the editor's count; what comes back is in the editor's count too.
+		change_range(session, span(0, 36 + mark, 0, 39 + mark), "Nope");
+		CHECK_EQ(session.published(), MAIN + " 0:" + at(36) + "-0:" + at(40) + " unknown type 'Nope'\n");
+		// A second change is applied to what the first left, mark and all.
+		change_range(session, span(0, 36 + mark, 0, 40 + mark), "Nah");
+		CHECK_EQ(session.published(), MAIN + " 0:" + at(36) + "-0:" + at(39) + " unknown type 'Nah'\n");
+		Json hover = session.request("textDocument/hover", Session::at(MAIN, 0, 23 + mark));
+		CHECK_EQ(spot(Json::object().set("uri", MAIN).set("range", hover.get("result").get("range"))),
+				"Main.as 0:" + at(23) + "-0:" + at(27));
+		// Lines after the first are not moved.
+		change_range(session, span(0, 40 + mark, 0, 40 + mark), "\nvar b:Nope;");
+		CHECK_EQ(session.published(), MAIN + " 0:" + at(36) + "-0:" + at(39) + " unknown type 'Nah'\n" + MAIN +
+											   " 1:6-1:10 unknown type 'Nope'\n");
+		change_range(session, span(0, 40 + mark, 1, 11), "");
+		// A position inside the mark is at the start of the text.
+		CHECK(session.request("textDocument/hover", Session::at(MAIN, 0, 0)).get("result").is_null());
+		// The mark deleted: the same text, counted from its first letter.
+		change_range(session, span(0, 0, 0, mark), "");
+		CHECK_EQ(session.published(), MAIN + " 0:36-0:39 unknown type 'Nah'\n");
+		change_range(session, span(0, 36, 0, 39), "int");
+		CHECK_EQ(session.published(), MAIN + " clear\n");
+		// And typed back in.
+		change_range(session, span(0, 0, 0, 0), "\xEF\xBB\xBF");
+		change_range(session, span(0, 36 + mark, 0, 39 + mark), "No");
+		CHECK_EQ(session.published(), MAIN + " 0:" + at(36) + "-0:" + at(38) + " unknown type 'No'\n");
+	}
+	// A file read from disk is shown by an editor without its mark: nothing is added.
+	fs::path root = fresh_folder("mark");
+	write(root / "Marked.as", "\xEF\xBB\xBFpackage { public class Marked { var a:Nope; } }\n");
+	Session session;
+	session.initialize(root.string());
+	session.settle();
+	CHECK_EQ(session.published(), uri_from_path((root / "Marked.as").string()) + " 0:38-0:42 unknown type 'Nope'\n");
+}
+
+// In UTF-8 mode a position is a count of bytes. One that falls inside a character means the whole
+// character, as it does in UTF-16 mode: a character is never cut in two.
+static void test_inside_a_character() {
+	// "é" is bytes 17 and 18 of the line; "😀" is 19 to 22.
+	const std::string text = "var s:String = \"e\xC3\xA9\xF0\x9F\x98\x80\";\n";
+	Session session;
+	session.initialize(std::string(), true);
+	session.open(MAIN, text);
+	// From inside "é" to inside "😀": each end is after its character, so "é" stays and "😀" goes, whole.
+	change_range(session, span(0, 18, 0, 21), "x");
+	CHECK_EQ(*session.server.workspace().text("/work/Main.as"), std::string("var s:String = \"e\xC3\xA9x\";\n"));
+	session.change(MAIN, text);
+	// An insertion inside "😀" goes after it.
+	change_range(session, span(0, 20, 0, 20), "!");
+	CHECK_EQ(*session.server.workspace().text("/work/Main.as"), std::string("var s:String = \"e\xC3\xA9\xF0\x9F\x98\x80!\";\n"));
+}
+
+// A project opened through a link: the editor is answered with its own names for the files, and a file
+// it opens is the file the project already has.
+static void test_linked_project() {
+	fs::path root = fresh_folder("linked");
+	fs::path links = fresh_folder("linked-from");
+	std::error_code error;
+	fs::create_directory_symlink(root, links / "project", error);
+	CHECK(!error);
+	write(root / "project.godot", "");
+	write(root / "Main.as", "package { public class Main { var other:Other; var bad:Nope; } }");
+	write(root / "Other.as", "package { public class Other { var bad:Nah; } }");
+	const std::string main_uri = uri_from_path((links / "project" / "Main.as").string());
+	const std::string other_uri = uri_from_path((links / "project" / "Other.as").string());
+	Session session;
+	session.initialize((links / "project").string());
+	session.settle();
+	// Named as the editor will open them, not by where the link leads.
+	CHECK_EQ(session.published(), main_uri + " 0:55-0:59 unknown type 'Nope'\n" + other_uri + " 0:39-0:42 unknown type 'Nah'\n");
+	session.open(main_uri, "package { public class Main { var other:Other; } }");
+	session.settle();
+	CHECK_EQ(session.published(), main_uri + " clear\n"); // One Main, not a second one beside the first.
+	Json where = session.request("textDocument/definition", Session::at(main_uri, 0, 42)).get("result");
+	CHECK_EQ(where.at(0).get("uri").string(), other_uri);
+	// The same file by its real name is the same document.
+	const std::string real_uri = uri_from_path((root / "Main.as").string());
+	session.versions[real_uri] = session.versions[main_uri]; // One document, so one count of versions.
+	session.change(real_uri, "package { public class Main { var other:Nope; } }");
+	session.settle();
+	CHECK_EQ(session.published(), main_uri + " 0:40-0:44 unknown type 'Nope'\n");
+	session.close(real_uri);
+	session.settle();
+	CHECK_EQ(session.published(), main_uri + " 0:55-0:59 unknown type 'Nope'\n");
+	fs::remove_all(root);
+	fs::remove_all(links);
 }
 
 static void test_body_recheck_publishes_diagnostics() {
@@ -992,6 +1233,9 @@ static void test_completion_import_refresh() {
 }
 
 int main() {
+	test_linked_project();
+	test_byte_order_mark();
+	test_inside_a_character();
 	test_repeated_diagnostic_clear();
 	test_override_snippet_text();
 	test_completion_import_refresh();
@@ -1001,11 +1245,15 @@ int main() {
 	test_completion_unicode_boundaries();
 	test_signature_contexts();
 	test_completion_default_range();
+	test_override_completion();
+	test_windows_line_endings();
+	test_parameter_name_preselected();
 	test_completion_edits_and_signatures();
 	test_completion();
 	test_lifecycle();
 	test_code_language();
 	test_diagnostics();
+	test_warnings_alone();
 	test_positions();
 	test_navigation();
 	test_declaration_files();

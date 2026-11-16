@@ -125,84 +125,180 @@ std::optional<std::string> override_declaration(const Compilation &p_compilation
 	return type.empty() ? std::nullopt : std::optional<std::string>(text + "):" + type);
 }
 
-bool matches(std::string_view p_name, std::string_view p_prefix) {
-	return p_name.size() >= p_prefix.size() && std::equal(p_prefix.begin(), p_prefix.end(), p_name.begin(), [](char p_a, char p_b) {
-		return std::tolower(static_cast<unsigned char>(p_a)) == std::tolower(static_cast<unsigned char>(p_b));
-	});
+constexpr uint16_t ACCESS = Modifiers::Public | Modifiers::Protected | Modifiers::Private | Modifiers::Internal;
+
+// What is written of the declaration before the name being completed.
+struct Written {
+	uint16_t access = 0;
+	bool function = false;
+	FunctionDecl::Accessor accessor = FunctionDecl::None; // `get` or `set`, after `function`.
+	uint32_t modifiers_at = 0; // Where an access word goes when none is written.
+	bool after_metadata = false; // The access word follows metadata on the same declaration.
+	const FunctionDecl *self = nullptr; // The declaration the parser made of what is written, if any.
+};
+
+Written from_declaration(const FunctionDecl &p_function) {
+	Written written;
+	written.access = p_function.modifiers.bits & ACCESS;
+	written.function = true;
+	written.accessor = p_function.accessor;
+	const auto &metadata = p_function.metadata;
+	written.modifiers_at = metadata.count ? metadata[metadata.count - 1].end : p_function.offset;
+	written.after_metadata = metadata.count != 0;
+	written.self = &p_function;
+	return written;
+}
+
+// The words before the cursor's word, back to the end of the member before, when the parser made no
+// declaration of them: only modifiers with `override`, `function`, and `get` or `set` after it.
+std::optional<Written> words_before(const Queries &p_queries, const Unit &p_unit, uint32_t p_start) {
+	const std::string_view text = p_unit.source.text();
+	Written written;
+	bool is_override = false;
+	uint32_t at = p_start;
+	while (true) {
+		while (at > 0 && (std::isspace((unsigned char)text[at - 1]) || p_queries.text_byte(p_unit, at - 1))) {
+			at--;
+		}
+		uint32_t begin = at;
+		while (begin > 0 && is_identifier_at(text, begin - 1)) {
+			begin--;
+		}
+		if (begin == at) {
+			break;
+		}
+		const std::string_view word = text.substr(begin, at - begin);
+		if (word == "override") {
+			is_override = true;
+		} else if (word == "public" || word == "protected" || word == "internal" || word == "private") {
+			written.access = word == "public" ? Modifiers::Public : word == "protected" ? Modifiers::Protected :
+					word == "internal" ? Modifiers::Internal : Modifiers::Private;
+		} else if (word == "function") {
+			written.function = true;
+		} else if ((word == "get" || word == "set") && !written.function) {
+			written.accessor = word == "get" ? FunctionDecl::Getter : FunctionDecl::Setter;
+		} else if (word != "final") {
+			return std::nullopt;
+		}
+		at = begin;
+		written.modifiers_at = begin;
+	}
+	// `get` or `set` without `function` before it is not a declaration's start.
+	if (!is_override || (written.accessor != FunctionDecl::None && !written.function)) {
+		return std::nullopt;
+	}
+	// What comes before is the end of a member, the class's opening brace, or metadata.
+	if (at > 0 && text[at - 1] != '{' && text[at - 1] != '}' && text[at - 1] != ';' && text[at - 1] != ']') {
+		return std::nullopt;
+	}
+	return written;
 }
 
 const FunctionDecl *accessor_of(const Symbol *p_member, FunctionDecl::Accessor p_accessor) {
 	return p_accessor == FunctionDecl::Getter ? p_member->getter : p_member->setter;
 }
 
-bool already_declared(const Symbol *p_member, const FunctionDecl &p_function) {
-	if (p_member->kind != SymbolKind::Property || p_function.accessor == FunctionDecl::None) {
-		return p_member != p_function.symbol;
+bool already_declared(const Symbol *p_member, const Written &p_written) {
+	const FunctionDecl *self = p_written.self;
+	if (p_member->kind != SymbolKind::Property || p_written.accessor == FunctionDecl::None) {
+		return p_member != (self ? self->symbol : nullptr);
 	}
-	const auto *accessor = accessor_of(p_member, p_function.accessor);
+	const auto *accessor = accessor_of(p_member, p_written.accessor);
 	// Property linking copies the other half from the base; that is not a declaration in this class.
-	return accessor && accessor != &p_function && accessor->symbol == p_member;
+	return accessor && accessor != self && accessor->symbol == p_member;
+}
+
+// The function that would be overridden. Once `function` is written, what follows it says whether it is
+// a method or which half of a property; before that, either may still be written. p_method is the
+// member's declaration as a method.
+const FunctionDecl *overridable(const Symbol *p_member, const FunctionDecl *p_method, const Written &p_written) {
+	if (p_written.function) {
+		const FunctionDecl *function = p_written.accessor == FunctionDecl::None ? p_method : accessor_of(p_member, p_written.accessor);
+		return function && function->accessor == p_written.accessor ? function : nullptr;
+	}
+	if (p_member->kind == SymbolKind::Property) {
+		return p_member->getter ? p_member->getter : p_member->setter;
+	}
+	return p_member->kind == SymbolKind::Method ? p_method : nullptr;
+}
+
+// The item for one inherited method: its declaration as the edit, with the caret in a body that throws.
+Completion override_item(Completion p_item, const FunctionDecl &p_function, std::string p_text, const Written &p_written,
+		const CompletionRange &p_span, const std::string &p_newline, const std::string &p_indent) {
+	// Keep the filtering word in the primary single-line edit. Modifiers may span lines.
+	const size_t name_at = p_text.find(std::string(p_function.name) + "(");
+	if (!p_written.access) {
+		p_item.additional_edit = CompletionEdit{ p_written.modifiers_at, p_written.modifiers_at,
+			(p_written.after_metadata ? " " : "") + p_text.substr(0, p_text.find(' ') + 1) };
+	}
+	p_text.erase(0, name_at);
+	if (!p_written.function) {
+		const char *half = p_function.accessor == FunctionDecl::Getter ? "get " :
+				p_function.accessor == FunctionDecl::Setter ? "set " : "";
+		p_text.insert(0, std::string("function ") + half);
+	}
+	p_item.callable = false;
+	p_item.required_parameters.clear();
+	p_text += " {" + p_newline + p_indent + "\t";
+	const auto caret = static_cast<uint32_t>(p_text.size());
+	p_item.tab_stops.push_back({ caret, caret, 0 });
+	p_text += "throw new Error(\"Not implemented\");" + p_newline + p_indent + "}";
+	p_item.edit = CompletionEdit{ p_span.begin, p_span.end, std::move(p_text) };
+	return p_item;
 }
 
 } // namespace
 
-std::vector<Completion> Queries::overrides(const Unit &p_unit, const FunctionDecl &p_function, Symbol *p_class, uint32_t p_offset) {
-	std::vector<Completion> result;
+std::optional<OverrideOffer> Queries::overrides(const Unit &p_unit, const FunctionDecl *p_function, Symbol *p_class,
+		uint32_t p_start, uint32_t p_offset) {
+	if (!p_class || p_class->kind != SymbolKind::Class || !p_class->klass) {
+		return std::nullopt;
+	}
+	std::optional<Written> found = p_function ? from_declaration(*p_function) : words_before(*this, p_unit, p_start);
+	if (!found) {
+		return std::nullopt;
+	}
+	const Written &written = *found;
+	OverrideOffer offer;
+	offer.after_function = written.function;
 	// Completion edits replace one line only and must not duplicate an existing signature or body.
-	if (p_function.has_parameter_list || p_function.return_type || p_function.body) {
-		return result;
+	if (p_function && (p_function->has_parameter_list || p_function->return_type || p_function->body)) {
+		return offer;
 	}
 	std::unordered_set<std::string> seen;
 	std::unordered_set<const Symbol *> visited;
-	const auto prefix = p_function.name.substr(0, p_offset >= p_function.name_offset ? p_offset - p_function.name_offset : 0);
+	const std::string_view prefix = std::string_view(p_unit.source.text()).substr(p_start, p_offset - p_start);
 	const auto span = completion_range(p_unit, p_offset);
 	const std::string newline = line_break(p_unit);
-	const std::string indent = line_indent(p_unit, p_function.offset);
+	const std::string indent = line_indent(p_unit, p_function ? p_function->offset : written.modifiers_at);
 	for (Symbol *base = p_class->klass->base; base && base->klass && visited.insert(base).second; base = base->klass->base) {
 		for (const auto &[name, member] : base->klass->members) {
-			if (!matches(name, prefix) || member->is_static() ||
+			if (!starts_with_any_case(name, prefix) || member->is_static() ||
 					!inherited_visible(member, base, p_class->package) || !seen.insert(std::string(name)).second) {
 				continue;
 			}
 			auto own = p_class->klass->members.find(name);
-			if (own != p_class->klass->members.end() && already_declared(own->second, p_function)) {
+			if (own != p_class->klass->members.end() && already_declared(own->second, written)) {
 				continue;
 			}
-			const FunctionDecl *function = p_function.accessor == FunctionDecl::None ? function_declaration(member) :
-					accessor_of(member, p_function.accessor);
-			if (!function || function->accessor != p_function.accessor || (function->modifiers.bits & Modifiers::Final)) {
+			const FunctionDecl *function = overridable(member, function_declaration(member), written);
+			if (!function || (function->modifiers.bits & Modifiers::Final)) {
 				continue;
 			}
-			constexpr uint16_t ACCESS = Modifiers::Public | Modifiers::Protected | Modifiers::Private | Modifiers::Internal;
 			const uint16_t inherited_access = function->modifiers.bits & ACCESS;
-			const uint16_t written_access = p_function.modifiers.bits & ACCESS;
-			if (written_access && written_access != (inherited_access ? inherited_access : Modifiers::Internal)) {
+			if (written.access && written.access != (inherited_access ? inherited_access : Modifiers::Internal)) {
 				continue;
 			}
 			auto text = override_declaration(compilation_, *function, compilation_.context_of(p_class));
 			if (!text) {
 				continue;
 			}
-			Completion item = completion_item(member);
-			// Keep the filtering word in the primary single-line edit. Modifiers may span lines.
-			const size_t name_at = text->find(std::string(function->name) + "(");
-			if (!written_access) {
-				const auto &metadata = p_function.metadata;
-				const uint32_t at = metadata.count ? metadata[metadata.count - 1].end : p_function.offset;
-				item.additional_edit = CompletionEdit{ at, at, (metadata.count ? " " : "") + text->substr(0, text->find(' ') + 1) };
-			}
-			text->erase(0, name_at);
-			item.callable = false;
-			*text += " {" + newline + indent + "\t";
-			const auto caret = static_cast<uint32_t>(text->size());
-			item.tab_stops.push_back({ caret, caret, 0 });
-			*text += "throw new Error(\"Not implemented\");" + newline + indent + "}";
-			item.edit = CompletionEdit{ span.begin, span.end, std::move(*text) };
-			result.push_back(std::move(item));
+			offer.items.push_back(
+					override_item(completion_item(member), *function, std::move(*text), written, span, newline, indent));
 		}
 	}
-	std::sort(result.begin(), result.end(), [](const Completion &p_a, const Completion &p_b) { return p_a.name < p_b.name; });
-	return result;
+	std::sort(offer.items.begin(), offer.items.end(), [](const Completion &p_a, const Completion &p_b) { return p_a.name < p_b.name; });
+	return offer;
 }
 
 } // namespace kas3

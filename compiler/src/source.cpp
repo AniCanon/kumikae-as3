@@ -8,9 +8,9 @@ namespace kas3 {
 
 Source::Data::Data(std::string p_path, std::string p_text) :
 		path(std::move(p_path)), text(std::move(p_text)) {
-	if (text.size() >= 3 && (unsigned char)text[0] == 0xEF && (unsigned char)text[1] == 0xBB &&
-			(unsigned char)text[2] == 0xBF) {
-		text.erase(0, 3);
+	if (text.compare(0, BYTE_ORDER_MARK.size(), BYTE_ORDER_MARK) == 0) {
+		text.erase(0, BYTE_ORDER_MARK.size());
+		has_mark = true;
 	}
 	// "\n", "\r\n" and "\r" each end one line.
 	line_starts.push_back(0);

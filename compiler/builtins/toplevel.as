@@ -64,6 +64,10 @@ package {
 		public static const MAX_VALUE:Int64;
 		public static const MIN_VALUE:Int64;
 		public native function Int64(num:Object = 0);
+		// Written from its own digits, which a Number would round past 2^53.
+		public native function toExponential(fractionDigits:uint = 0):String;
+		public native function toFixed(fractionDigits:uint = 0):String;
+		public native function toPrecision(precision:uint = 0):String;
 		public native function toString(radix:uint = 10):String;
 		public native function valueOf():Int64;
 	}
@@ -131,8 +135,8 @@ package {
 		public native function shift():*;
 		public native function slice(startIndex:int = 0, endIndex:int = 16777215):Array;
 		public native function some(callback:Function, thisObject:* = null):Boolean;
-		public native function sort(...args):Array;
-		public native function sortOn(fieldName:Object, options:Object = null):Array;
+		public native function sort(...args):*;
+		public native function sortOn(fieldName:Object, options:Object = null):*;
 		public native function splice(startIndex:int, deleteCount:uint = 4294967295, ...values):Array;
 		public native function toLocaleString():String;
 		public native function toString():String;
@@ -269,7 +273,7 @@ package {
 	}
 
 	public dynamic native class RegExp {
-		public var lastIndex:Number;
+		public var lastIndex:int;
 		public native function RegExp(re:* = null, flags:* = null);
 		public native function get dotall():Boolean;
 		public native function get extended():Boolean;

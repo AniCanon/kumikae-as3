@@ -2,14 +2,16 @@
 //
 // Three passes run over the syntax trees:
 //   declare  packages, their definitions, and each class's members            (names.cpp)
-//   link     imports, the class hierarchy, and the override rules             (names_link.cpp)
-//   bodies   every type name and every name inside a function                 (names_bodies.cpp)
+//   link     imports, the class hierarchy, and the override rules             (names_link.cpp, names_lookup.cpp,
+//                                                                              names_members.cpp)
+//   bodies   every type name and every name inside a function                 (names_resolver.h lists its files)
 // The results are written onto the trees as `symbol` fields.
 #pragma once
 
 #include "arena.h"
 #include "ast.h"
 #include "diagnostics.h"
+#include "names_symbols.h"
 #include "source.h"
 
 #include <cstdint>
@@ -21,121 +23,6 @@
 #include <vector>
 
 namespace kas3 {
-
-struct ClassInfo;
-struct Package;
-struct Unit;
-
-enum class SymbolKind : uint8_t {
-	Class,
-	Interface,
-	Function, // At package level.
-	Variable, // At package level.
-	Field,
-	Method,
-	Property, // A getter, a setter, or both.
-	Parameter,
-	Local,
-	LocalFunction,
-	CatchVariable,
-	Arguments, // The implicit `arguments` of a function.
-};
-
-const char *symbol_kind_name(SymbolKind p_kind);
-
-struct Symbol {
-	SymbolKind kind = SymbolKind::Local;
-	std::string name; // Stable across replacement of a source snapshot.
-	Unit *unit = nullptr; // Null only for `arguments`.
-	uint32_t offset = 0; // Of the name where it is declared.
-	Node *node = nullptr; // ClassDecl, InterfaceDecl, FunctionDecl or VarDecl; null for the rest.
-	TypeRef *type = nullptr; // The declared type; for a function or method, the return type. May be null.
-	uint16_t modifiers = 0; // Modifiers bits.
-	bool is_const = false;
-	bool is_rest = false; // A `...rest` parameter.
-	bool file_private = false; // Declared outside the file's package block.
-	Package *package = nullptr; // For package-level definitions and file helpers.
-	Symbol *owner = nullptr; // The class or interface, for members.
-	ClassInfo *klass = nullptr; // For Class and Interface.
-	FunctionDecl *getter = nullptr; // For Property.
-	FunctionDecl *setter = nullptr;
-
-	bool is_static() const { return (modifiers & Modifiers::Static) != 0; }
-	bool is_type() const { return kind == SymbolKind::Class || kind == SymbolKind::Interface; }
-	bool is_instance_member() const {
-		return (kind == SymbolKind::Field || kind == SymbolKind::Method || kind == SymbolKind::Property) &&
-				!is_static();
-	}
-};
-
-// A static type. Interned: two equal types are the same object.
-struct Type {
-	enum Kind : uint8_t {
-		Any, // `*`
-		Void,
-		Null, // The type of `null`.
-		Unknown, // Could not be worked out; an error has been reported, or the rule is not built yet.
-		Instance, // An object of a class or interface.
-		Vector, // Vector.<element>
-		ClassObject, // The class itself, as in `Math` or `Player`: `element` is the type of its instances.
-	};
-	Kind kind = Any;
-	Symbol *symbol = nullptr; // For Instance.
-	const Type *element = nullptr; // For Vector and ClassObject.
-};
-
-// An expression whose type `--dump-types` prints: a statement's, or an initializer's.
-struct TypedExpression {
-	uint32_t offset;
-	const Type *type;
-};
-
-// One import, resolved: a single definition, or a whole package.
-struct ResolvedImport {
-	Symbol *symbol = nullptr;
-	Package *package = nullptr;
-};
-
-// The imports in force at some place in a file. A class body and a function body may add their own.
-struct ImportScope {
-	ImportScope *parent = nullptr;
-	std::vector<ResolvedImport> imports;
-	// Imports that named nothing. A name one of them could have supplied is not reported again.
-	std::vector<std::string_view> failed;
-	bool failed_wildcard = false;
-};
-
-struct ClassInfo {
-	Symbol *symbol = nullptr;
-	Symbol *base = nullptr; // Null for Object, for interfaces, and after an error.
-	std::vector<Symbol *> interfaces; // What a class implements, or what an interface extends.
-	// What the class's objects have. The constructor is not among them.
-	std::unordered_map<std::string_view, Symbol *> members;
-	// What the class itself has. A static member may share its name with an instance member.
-	std::unordered_map<std::string_view, Symbol *> statics;
-	std::unordered_map<std::string_view, Symbol *> &table(bool p_static) { return p_static ? statics : members; }
-	Symbol *constructor = nullptr;
-	ImportScope imports; // Imports written in the class body.
-	bool broken = false; // Its `extends` did not resolve, or it was part of a cycle.
-	bool incomplete = false; // A built-in class whose members are not declared yet: marked [Incomplete].
-	bool inherited = false; // Property halves have been filled in from the bases.
-	uint32_t mark = 0; // For cycle detection.
-	// Whether this class or a base is broken or incomplete, once the hierarchy is settled.
-	bool chain_known = false;
-	bool chain_broken = false;
-};
-
-struct Package {
-	std::string name; // Empty for the top-level package.
-	std::unordered_map<std::string_view, Symbol *> definitions;
-};
-
-// A resolved use of a name, kept for `--dump-names` and for tools.
-struct Reference {
-	uint32_t offset;
-	std::string_view name;
-	Symbol *symbol;
-};
 
 // A source file and its syntax tree. Parsing is most of the cost of a check, so a tool that checks again
 // and again keeps these and hands them to each new Compilation. The passes write onto the tree: only one
@@ -172,6 +59,8 @@ struct Unit {
 	Program *tree = nullptr;
 	bool is_declaration = false; // Declares what exists elsewhere: `native`, no bodies.
 	bool is_builtin = false; // Part of the embedded library.
+	bool broken = false; // It has a syntax error: what it declares may be read wrongly, or not at all.
+	bool failed_import = false; // One of its imports named nothing.
 	Package *package = nullptr; // The package its block names; the top-level package if it has no block.
 	std::unordered_map<std::string_view, Symbol *> helpers; // Definitions outside the package block.
 	ImportScope block_imports; // Imports inside the package block.
@@ -222,6 +111,7 @@ class Compilation {
 	// declare
 	void declare_unit(Unit &p_unit);
 	void declare_definition(Unit &p_unit, Node *p_node, bool p_in_block);
+	void declare_class(Unit &p_unit, ClassDecl *p_decl, bool p_in_block);
 	void declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_in_block);
 	void declare_class_members(Unit &p_unit, Symbol *p_class, ClassDecl *p_decl);
 	void declare_interface_members(Unit &p_unit, Symbol *p_interface, InterfaceDecl *p_decl);
@@ -237,6 +127,7 @@ class Compilation {
 	void cut_class_cycles();
 	void cut_interface_cycles();
 	void check_overrides(Symbol *p_class);
+	void drop_doubtful_errors();
 	void inherit_properties(Symbol *p_class);
 
 public:
@@ -251,7 +142,9 @@ public:
 	// Resolves names in every file added so far. Does nothing if any file has a syntax error, so that one
 	// mistake is not reported twice. Call once.
 	// With p_through_syntax_errors, names are resolved all the same, for tools that answer questions about
-	// code that is being typed. What is reported does not change: syntax errors only.
+	// code that is being typed, and what a syntax error can't have caused is still reported: nothing more
+	// in a file that has one, nothing in a file that uses what such a file declares, and nowhere that a
+	// name is missing (names_doubt.cpp).
 	void check(bool p_through_syntax_errors = false);
 	// Reuses declaration identities only when the source outside function bodies is unchanged.
 	// Drop queries before calling: a successful update invalidates changed units' body symbols,
@@ -259,7 +152,7 @@ public:
 	bool update_bodies(const std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> &p_changes);
 	bool has_errors() const;
 	// The diagnostics of every file, in the order the files were added.
-	std::string format_diagnostics() const;
+	std::string format_diagnostics(bool p_warnings = true) const; // Without the warnings when false.
 	// One line per resolved reference in each file that is not a declaration file.
 	std::string dump_names() const;
 	// One line per expression statement and initializer in each file that is not a declaration file.
@@ -311,6 +204,11 @@ public:
 	// True if the members that the class inherits are not all known: a base failed to resolve, or is a
 	// built-in class whose members are not declared yet.
 	bool hierarchy_broken(Symbol *p_class) const;
+	// The getter or the setter of a property reached through p_through (null: the property's own owner). A
+	// class's property holds both halves, inherited ones too; through an interface the other half may be
+	// declared in an interface it extends. *r_known: whether a missing half is certainly missing.
+	FunctionDecl *property_half(Symbol *p_through, const Symbol *p_property, FunctionDecl::Accessor p_half,
+			bool *r_known = nullptr);
 
 	// "a.b.C", "C", or "C in this file" for a helper; "Owner.name" for a member.
 	std::string qualified_name(const Symbol *p_symbol) const;
@@ -327,10 +225,28 @@ inline std::string quoted(std::string_view p_name) {
 	return result;
 }
 
-// Whether a derived class may name an inherited member.
+// The symbol a table holds under the name, or null.
+inline Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_table, std::string_view p_name) {
+	auto found = p_table.find(p_name);
+	return found == p_table.end() ? nullptr : found->second;
+}
+
+// What code in a class of package p_package may name on a base class p_base: p_member is not private, and
+// if it is internal, p_base is in that package.
 bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package);
 
 // Whether a class written in a declaration file carries a tag: [Abstract], [Singleton].
 bool has_tag(const Symbol *p_class, std::string_view p_tag);
+// Whether a field is written `[Signal] public var hit:Signal;`: it names a signal of the script's own.
+bool declares_signal(const VarDecl *p_decl);
+// Whether a field is written `[Export] public var speed:Number;`: Godot's inspector shows it.
+bool declares_export(const VarDecl *p_decl);
+// The number literal written, alone or after a `-` (`5`, `-1.5`), or null; r_negative says which.
+const NumberLit *written_number(const Expr *p_value, bool *r_negative);
+// Whether an [Export] field's first value is a constant Godot can be told: a number, a String, a Boolean or
+// null, or `new` with numbers only (the checker makes sure the class is one of Godot's values).
+bool export_constant(const Expr *p_value);
+// The first p_count parts of a name written with dots ("flash.utils"), joined again.
+std::string dotted_name(const List<std::string_view> &p_parts, uint32_t p_count);
 
 } // namespace kas3

@@ -40,7 +40,7 @@ static void types(std::initializer_list<Case> p_cases) {
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	Unit *unit = compilation.add("Main.as", program(body));
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	std::vector<std::string> found(p_cases.size(), "(none)");
 	for (const TypedExpression &typed : unit->typed) {
 		int line = unit->source.position(typed.offset).line - 9;
@@ -66,7 +66,7 @@ static void expect(const std::string &p_body, std::initializer_list<const char *
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Main.as", source.text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), source.expected);
+	CHECK_EQ(compilation.format_diagnostics(false), source.expected);
 }
 
 #define NO_OPERATOR(op, left, right) "can't use '" op "' on '" left "' and '" right "'"
@@ -184,18 +184,21 @@ static void test_never_operators() {
 	expect("/*!*/a++; /*!*/++a; /*!*/a--; /*!*/~a; /*!*/a <<= 1; /*!*/a &= 3; /*!*/gd++;",
 			{ NO_UNARY("++", "Vector2"), NO_UNARY("++", "Vector2"), NO_UNARY("--", "Vector2"), NO_UNARY("~", "Vector2"),
 					NO_UNARY("<<=", "Vector2"), NO_UNARY("&=", "Vector2"), NO_UNARY("++", "GodotDictionary") });
+	// On the right too: a number shifted by a vector.
+	expect("var n:int = 1; /*!*/n >>>= a; /*!*/n |= a; /*!*/n <<= gd;",
+			{ NO_UNARY(">>>=", "Vector2"), NO_UNARY("|=", "Vector2"), NO_UNARY("<<=", "GodotDictionary") });
 	// Numbers, and values that could be anything, are untouched.
 	expect("var n:int = 1; n++; ~n; n <<= 2; any++; ~any; mine++; node++;", {});
 }
 
-// Nothing is said where the operand could be anything, or where the class says nothing about operators.
+// Nothing is said where the operand could be anything (the result is then untyped), or where the class says nothing about operators.
 static void test_silence() {
 	types({
-			{ "a + any", "?" },
-			{ "any * a", "?" },
-			{ "a + obj", "?" },
-			{ "a + null", "?" },
-			{ "mine + mine", "?" },
+			{ "a + any", "*" },
+			{ "any * a", "*" },
+			{ "a + obj", "*" },
+			{ "a + null", "*" },
+			{ "mine + mine", "*" }, // A script object becomes a primitive as the line runs.
 			{ "node * 2", "?" },
 			{ "-node", "?" },
 			{ "rid < rid", "Boolean" },
@@ -233,8 +236,8 @@ static void test_tags_outside_declarations() {
 	Compilation compilation;
 	Unit *unit = compilation.add("Main.as", source.text);
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(), std::string());
-	CHECK_EQ(compilation.type_name(unit->typed[0].type), std::string("?"));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	CHECK_EQ(compilation.type_name(unit->typed[0].type), std::string("*")); // As any object of the program: what it becomes.
 	CHECK_EQ(compilation.type_name(unit->typed[1].type), std::string("*"));
 }
 
@@ -257,7 +260,7 @@ static void test_other_declarations() {
 			"public function run(a:Money, b:Money, r:Rate, u:uint, s:String, x:Bonus):void {\n"
 			"a + b;\na * 2;\na / r;\na % s;\na[0];\nx + a;\na + x;\n-x;\nx[1];\na > u;\na - b;\na * r;\n} } }\n");
 	compilation.check();
-	CHECK_EQ(compilation.format_diagnostics(),
+	CHECK_EQ(compilation.format_diagnostics(false),
 			std::string("lib.as:2:52: error: unknown type 'Ghost' in an [Operator] tag\n"
 						"Main.as:13:1: error: can't use '-' on 'Money' and 'Money'\n"
 						"Main.as:14:1: error: can't use '*' on 'Money' and 'Rate'\n"));
@@ -265,6 +268,42 @@ static void test_other_declarations() {
 	for (int i = 0; i < 10; i++) {
 		CHECK_EQ(compilation.type_name(unit->typed[i].type), std::string(expected[i]));
 	}
+}
+
+// A tag that says two things, or a second rule for the same operator and operand, is an error in the
+// declaration file, not a choice made silently.
+static void test_malformed_tags() {
+	Compilation compilation;
+	compilation.add("lib.as",
+			"package lib {\n"
+			"[Operator(op=\"+\", left=\"int\", right=\"int\", returns=\"Money\")]\n"
+			"[Operator(op=\"*\", right=\"int\", returns=\"Money\")] [Operator(op=\"*\", right=\"int\", returns=\"int\")]\n"
+			"public native class Money {} }\n",
+			true);
+	compilation.add("Main.as", "package { import lib.*; public class Main { public function run(a:Money):void { a * 2; } } }\n");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false),
+			std::string("lib.as:2:1: error: an [Operator] tag names both a left and a right operand\n"
+						"lib.as:3:50: error: a second [Operator] tag for '*' with 'int' on the right\n"));
+}
+
+// Godot's value types take only the forms of constructor Godot has, though AS3 sees one that merges them.
+static void test_constructor_forms() {
+	expect("new Vector3(); new Vector3(1, 2, 3); new Vector3(1.5, 2, 3); new Vector3(new Vector3()); new Vector3(any);"
+		   "new Vector3(new Vector3i()); new Vector2(1, 2); new Color(1, 0, 0, 0.5); new Color('red');",
+			{});
+	expect("new /*!*/Vector3(1, 2); new /*!*/Vector3('a', 1, 2); new /*!*/Vector2(new Vector3());",
+			{ "no constructor of 'Vector3' takes 'int', 'int'", "no constructor of 'Vector3' takes 'String', 'int', 'int'",
+					"no constructor of 'Vector2' takes 'Vector3'" });
+}
+
+// for each over a packed array stores each element as an assignment stores it, and is checked as one is.
+static void test_for_each_over_packed() {
+	expect("var i:int; var n:Number; for each (i in wide) {} for each (n in bytes) {} for each (var p:Vector2 in points) {}"
+		   "for each (var anything:* in points) {}",
+			{});
+	expect("for each (var s:String in /*!*/bytes) {} for each (var x:Number in /*!*/points) {}",
+			{ "can't use a value of type 'Int64' where 'String' is expected", "can't use a value of type 'Vector2' where 'Number' is expected" });
 }
 
 static void test_indexing() {
@@ -374,6 +413,9 @@ int main() {
 	test_compound_assignment();
 	test_tags_outside_declarations();
 	test_other_declarations();
+	test_malformed_tags();
+	test_constructor_forms();
+	test_for_each_over_packed();
 	test_indexing();
 	return check::finish();
 }

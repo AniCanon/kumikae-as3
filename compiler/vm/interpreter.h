@@ -5,10 +5,16 @@
 // resumed.
 #pragma once
 
+#include "collector.h"
+#include "interpreter_records.h"
 #include "host.h"
 #include "ir.h"
 #include "runtime.h"
 
+#include <array>
+#include <memory>
+#include <chrono>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -17,8 +23,14 @@
 namespace kas3 {
 namespace vm {
 
+namespace regex {
+struct Program;
+}
+
 class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
+	friend class Collector; // Frees objects that refer to each other in a loop.
+	friend class Json; // JSON.parse and JSON.stringify (vm/json_work.h).
 
 public:
 	// Calls may nest this deep. One more is an AS3 error.
@@ -29,29 +41,58 @@ public:
 	// the engine, which calls a script) this many levels deep.
 	static const int MAX_ENTRIES = 64;
 
+	// Flash's limit on how long one run may last, in milliseconds.
+	static constexpr uint32_t FLASH_TIME_LIMIT = 15000;
+	// The clock is looked at once in this many statements.
+	static constexpr uint32_t STATEMENTS_PER_LOOK = 4096;
+
 	// Called at each statement, when set: where a debugger stops. Returning false ends the run.
 	typedef bool (*StatementHook)(Interpreter &p_interpreter, void *p_data);
 
 private:
-	struct Frame {
-		uint32_t function;
-		uint32_t pc;
-		size_t base; // Where its registers start in stack_.
-		uint32_t result; // The caller's register for the value returned, or NONE.
-		uint32_t arguments; // How many the caller passed.
-	};
+	// The records it keeps: vm/interpreter_records.h.
+	using Frame = vm::Frame;
+	using Site = vm::Site;
+	using Carried = vm::Carried;
+	using Kept = vm::Kept;
+	using Found = vm::Found;
+	using PropertyKey = vm::PropertyKey;
+	using VectorCall = vm::VectorCall;
+	using SortField = vm::SortField;
 
 	const ir::Module &module_;
 	Host host_;
+	Collector collector_; // After the module: it reads the classes.
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
 	std::vector<Slot> globals_;
 	std::vector<Str *> strings_; // The module's string constants.
 	Str *null_text_ = nullptr; // "null"
+	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
+	std::vector<void *> singletons_; // The engine's singletons, by the string of their name, once found.
+	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
+	// The strings of one ASCII character each, made the first time charAt() gives one: a loop over a
+	// string's characters makes no string for each.
+	std::array<Str *, 128> characters_{};
 	bool failing_ = false; // An error is on its way out: pending_ holds it.
 	Slot pending_{}; // What was thrown, as an untyped value with a reference of its own.
 	std::string trace_; // Its stack trace, built as frames are left.
+	// Where it was thrown, as the trace's first line says it: what a host shows as the error's source.
+	Site thrown_at_;
+	// An error that ended a call from outside made while this program's own code was running beneath it
+	// (a listener that its emit() ran): kept, to be raised again at the end of the instruction that made the
+	// engine's call (run()), which stopped_ ends.
+	Carried carried_;
+	// How many errors have been carried: code that asked the engine for something sees whether its own
+	// request carried one by this count before and after, not by what another call left held.
+	uint32_t carries_ = 0;
+	void raise_carried();
+	void report_carried(); // Reports the error carried, leaving any error on its way out as it was.
+	void traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const;
+	std::vector<Kept> kept_traces_; // At most one for each finally: see Kept.
+	void keep_trace(Kept p_kept);
+	void take_trace(uint32_t p_reg); // For a Rethrow of what that register's finally caught.
 	size_t trace_lines_ = 0;
 	bool stopped_ = false; // Nothing more is to run.
 	bool halted_ = false; // Because the statement hook said so, not because of an error.
@@ -61,27 +102,59 @@ private:
 	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
 	StatementHook hook_ = nullptr;
 	void *hook_data_ = nullptr;
+	uint32_t time_limit_ = 0; // In milliseconds; 0 for none.
+	uint32_t countdown_ = STATEMENTS_PER_LOOK; // Statements until the clock is looked at.
+	std::chrono::steady_clock::time_point entered_; // When the call from outside that is running began.
+	void look_at_clock();
+	void entering(); // A call from outside begins: one that no other is running inside starts the clock.
 
 	void drop(ir::Kind p_kind, Slot &p_slot);
 	void drop_object(Object *p_object);
+	void let_go(ir::Kind p_kind, Slot &p_slot); // One slot of an object being freed.
+	std::vector<Object *> dying_; // Objects whose last reference is gone, still to be freed.
+	bool freeing_ = false; // drop_object() is freeing them: one called meanwhile adds to the list.
+	std::vector<std::vector<Slot>> spare_slots_; // For SpareSlots: argument lists of calls through values.
 	void drop_any(Slot p_value); // Gives up what an untyped value holds.
 	// The untyped value: vm/interpreter_any.cpp.
 	Slot to_any(ir::Kind p_kind, Slot p_value);
 	bool any_text(Slot p_value, std::string *r_text);
+	bool engine_text(void *p_handle, std::string *r_text);
 	bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
+	bool wide_from_any(Slot p_value, Slot *r_out);
+	bool text_from_any(Slot p_value, Slot *r_out);
+	bool object_from_any(Slot p_value, uint32_t p_check, Slot *r_out);
+	bool engine_from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
+	bool coercion_failed(Slot p_value, ir::Kind p_kind, uint32_t p_check);
 	bool any_is(Slot p_value, uint32_t p_type) const;
+	bool engine_array(Slot p_value, uint32_t p_class) const;
+	Vector *array_of_engine(void *p_array, uint32_t p_class);
+	bool engine_dictionary(Slot p_value, uint32_t p_class) const;
+	Object *table_of_engine(void *p_dictionary, uint32_t p_class);
 	bool any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
-	bool any_primitive(Slot p_value, Slot *r_out);
+	// ECMAScript's ToPrimitive: an object's text, or with p_number (where a Number is wanted) a Date's time.
+	bool any_primitive(Slot p_value, Slot *r_out, bool p_number = false);
 	Slot present_or_null(Slot p_value); // A freed Godot object is null; anything else is as it is.
 	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	Slot type_name(Slot p_value);
+	bool any_equality(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
 	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
+	Slot add_numbers(Slot p_a, Slot p_b);
+	Slot any_number(double p_value);
+	Slot any_wide(int64_t p_value);
+	bool engine_add(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value); // Takes over one reference.
 	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	std::optional<std::string> godot_refuses(Slot p_value, int p_depth) const;
+	std::optional<std::string> refused_by_godot(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers) const;
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
+	Str *stack_text(const Object *p_error, size_t p_skip);
+	void out_of_memory();
+	void stack_overflow(); // AS3's Error #1023: calls, or what they put into words, nest too deep.
+	void throw_new(uint32_t p_class, Str *p_message, std::string_view p_words);
 	// A member of nothing was asked for: AS3's TypeError #1009.
 	void raise_null();
 	void convert_checked(const ir::Instruction &p_in, Slot *p_registers);
@@ -92,18 +165,120 @@ private:
 	void trace(const std::vector<uint32_t> &p_list, const Slot *p_registers);
 	void leave(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result);
 	void object_to_text(const ir::Instruction &p_in, Slot *p_registers);
+	void object_to_number(const ir::Instruction &p_in, Slot *p_registers);
+	// The standard library (vm/string_methods.cpp): StrCall and NumText. Only split() may run the program (a delimiter's text).
+	void string_call(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void string_method(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void char_at(ir::StringFunction p_which, std::string_view p_self, uint32_t p_length, double p_at, Slot &r_out);
+	void replace_first(Slot p_string, std::string_view p_self, uint32_t p_length, std::string_view p_pattern, std::string_view p_with, Slot &r_out);
+	void string_split(const ir::Function &p_function, const ir::Instruction &p_in);
+	void uri_function(ir::StringFunction p_which, std::string_view p_text, Slot &r_out);
+	void number_text(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	// RegExp (vm/regexp_methods.cpp, vm/regexp_strings.cpp). A pattern is read once for each source and
+	// flags, and kept while anything uses it: a replacement function may make the cache forget it.
+	std::unordered_map<std::string, std::shared_ptr<const regex::Program>> patterns_;
+	std::shared_ptr<const regex::Program> pattern(std::string_view p_source, uint8_t p_flags);
+	std::shared_ptr<const regex::Program> pattern_of(const Object *p_regexp);
+	bool is_regexp(Slot p_any) const;
+	void regexp_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	void regexp_new(const ir::Function &p_function, const ir::Instruction &p_in);
+	void regexp_exec(const ir::Function &p_function, const ir::Instruction &p_in);
+	// exec() (untyped: the match's Array, or null) or test() (a Boolean) on p_text, not null. False if it raised.
+	bool regexp_run(Object *p_regexp, Str *p_text, bool p_test, Slot *r_out);
+	// The last text exec() or test() searched, held, and its UTF-16 units: a loop over a global RegExp's
+	// matches converts its text once, not once a match. A String never changes, so the one held is the key.
+	Str *subject_ = nullptr;
+	std::shared_ptr<const std::u16string> subject_units_;
+	std::shared_ptr<const std::u16string> subject_units(Str *p_text);
+	void forget_subject();
+	Slot regexp_read(Object *p_regexp, ir::RegExpFunction p_property); // source (a new reference), or a flag
+	// RegExp's and Date's members by name on a value held untyped (vm/library_members.cpp): nothing if the
+	// object is neither, or has no member of that name; false if it raised. A call's result goes to p_out.
+	std::optional<bool> library_get(Object *p_object, std::string_view p_name, Slot *r_value);
+	std::optional<bool> library_set(Object *p_object, std::string_view p_name, Slot p_value);
+	std::optional<bool> library_call(Object *p_object, std::string_view p_name, const std::vector<Slot> &p_given, uint32_t p_out);
+	bool library_has(const Object *p_object, std::string_view p_name) const;
+	std::optional<Found> find_match(const regex::Program &p_program, std::string_view p_source, const std::u16string &p_text, uint32_t p_from);
+	// p_input is the text searched (null for "null"), which the Array's `input` shares.
+	Vector *match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program, Str *p_input);
+	std::shared_ptr<const regex::Program> pattern_argument(Slot p_pattern, Object **r_regexp, std::string *r_source);
+	void string_match(const ir::Function &p_function, const ir::Instruction &p_in);
+	void string_search(const ir::Function &p_function, const ir::Instruction &p_in);
+	void string_replace(const ir::Function &p_function, const ir::Instruction &p_in);
+	std::optional<std::vector<Found>> places_to_replace(const regex::Program *p_program, const std::string &p_needle, const std::u16string &p_units);
+	// Every match a global pattern finds, one after another as match() finds them; the first only otherwise.
+	std::optional<std::vector<Found>> all_matches(const regex::Program &p_program, std::string_view p_source, const std::u16string &p_text);
+	bool replacement(Object *p_function, const std::u16string &p_with, bool p_expand, const Found &p_found, const std::u16string &p_text,
+			std::u16string *r_out);
+	Vector *split_by_pattern(Object *p_regexp, std::string_view p_text, uint32_t p_most);
+	// Date (vm/date_methods.cpp).
+	void date_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	void date_new(const ir::Function &p_function, const ir::Instruction &p_in);
+	double date_from_parts(const std::vector<uint32_t> &p_list, size_t p_first, bool p_local);
+	double date_set(double p_time, uint32_t p_code, const double *p_given, size_t p_count);
+	bool date_apply(Object *p_date, uint32_t p_code, const double *p_given, size_t p_count, Slot *r_out);
+	double local_time(double p_time);
+	double utc_time(double p_local);
+	std::string date_text(const Object *p_date, ir::DateText p_which) const;
+	void json_call(const ir::Function &p_function, const ir::Instruction &p_in); // vm/json_methods.cpp
+	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
+	void any_null_check(Slot p_value);
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
 	void raise_range(double p_index, uint32_t p_length);
 	bool resize_vector(Vector *p_vector, uint32_t p_length);
+	bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value);
+	// Function values (interpreter_functions.cpp).
+	Object *make_function(uint32_t p_function, Object *p_first);
+	void function_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	void callback_this(Slot p_callback, Slot p_this);
+	Object *function_in(ir::Kind p_kind, Slot p_value);
+	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
+	bool function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values);
+	bool function_arguments(uint32_t p_target, Object *p_first, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values);
+	// Properties by name (interpreter_properties.cpp, interpreter_property_reads.cpp, interpreter_property_calls.cpp).
+	Object *held_object(Slot p_value) const;
+	std::string holder_name(Slot p_holder) const;
+	void raise_unsupported(const std::string &p_what);
+	void raise_not_found(const PropertyKey &p_key, Slot p_holder);
+	bool refuse_write(const char *p_number, const char *p_words, std::string_view p_name, Slot p_holder); // False.
+	bool property_key(Slot p_holder, Slot p_key, PropertyKey *r_key);
+	std::optional<uint32_t> entry_of(const Entries *p_entries, const PropertyKey &p_key) const;
+	bool set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p_value);
+	std::optional<uint32_t> named_method(const ir::Class &p_class, std::string_view p_name, std::string_view p_prefix = {}) const;
+	bool get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
+	bool vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
+	bool sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
+	bool call_getter(Object *p_object, uint32_t p_function, Slot *r_value);
+	bool primitive_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
+	bool set_property(Slot p_holder, const PropertyKey &p_key, Slot p_value);
+	bool set_sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_value, Slot p_holder);
+	bool call_setter(Object *p_object, uint32_t p_function, Slot p_value);
+	bool set_element(Vector *p_vector, const PropertyKey &p_key, Slot p_value);
+	void array_number_get(Vector *p_array, double p_number, Slot &r_out);
+	void array_number_set(Vector *p_array, double p_number, Slot p_value);
+	bool delete_property(Slot p_holder, const PropertyKey &p_key, bool *r_done);
+	bool has_property(Slot p_holder, const PropertyKey &p_key, bool p_prototype, bool *r_has);
+	void dynamic_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	void property_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	void table_new(const ir::Function &p_function, const ir::Instruction &p_in);
+	bool table_text(Object *p_table, std::string *r_text, bool *r_own);
+	void call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out);
+	bool object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
+	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
+	void property_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	Entries *loop_entries(Slot p_holder) const;
+	void property_loop(const ir::Function &p_function, const ir::Instruction &p_in);
+	void let_go_arguments(const ir::Function &p_callee, std::vector<Slot> *p_values);
+	void call_value(const ir::Function &p_function, const ir::Instruction &p_in);
+	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
+	void apply_value(const ir::Function &p_function, const ir::Instruction &p_in);
+	void to_callable(const ir::Instruction &p_in);
+	bool same_function(const Object *p_a, const Object *p_b) const;
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
-	// A call of one of a vector's methods: its arguments (the vector first) by register, where the
-	// frame's registers start, and the register for what it gives back, or NONE.
-	struct VectorCall {
-		const std::vector<uint32_t> &list;
-		size_t base;
-		uint32_t out;
-		ir::VectorMethod method;
-	};
+	void vector_new(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	void get_outside(Vector *p_vector, double p_index, Slot &r_out);
+	void set_outside(Vector *p_vector, ir::Kind p_index_kind, const Slot &p_index, Slot p_value);
+	void array_new(const ir::Function &p_function, const ir::Instruction &p_in);
 	// Looked up each time it is wanted: putting an element into words can run the program, which may
 	// move the registers.
 	Slot &argument(const VectorCall &p_call, size_t p_index) { return stack_[p_call.base + p_call.list[p_index]]; }
@@ -111,11 +286,35 @@ private:
 	bool length_is_fixed(const Vector *p_vector);
 	Vector *fresh_vector(uint32_t p_class, uint64_t p_length);
 	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	void vector_find(Vector *p_vector, const VectorCall &p_call);
+	void vector_join(Vector *p_vector, const VectorCall &p_call);
 	void vector_add(Vector *p_vector, const VectorCall &p_call);
 	void vector_take(Vector *p_vector, const VectorCall &p_call);
 	void vector_copy(Vector *p_vector, const VectorCall &p_call);
+	void array_concat(Vector *p_array, const VectorCall &p_call);
 	void splice(Vector *p_vector, const VectorCall &p_call);
-	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
+	void vector_sort(Vector *p_vector, const VectorCall &p_call);
+	void sorted(Vector *p_vector, const VectorCall &p_call, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, bool p_twins,
+			int32_t p_options);
+	bool sort_on_fields(const VectorCall &p_call, std::vector<SortField> *r_fields, int32_t *r_options);
+	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);
+	bool sort_on_keys(const std::vector<SortField> &p_fields, const std::vector<Slot> &p_elements, std::vector<double> *r_numbers,
+			std::vector<std::string> *r_texts);
+	void vector_sort_on(Vector *p_vector, const VectorCall &p_call);
+	bool sort_order(ir::Kind p_kind, const std::vector<Slot> &p_elements, Object *p_compare, int32_t p_options, std::vector<uint32_t> *r_order,
+			bool *r_twins);
+	bool sort_keys(ir::Kind p_kind, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, int32_t p_options,
+			std::vector<double> *r_numbers, std::vector<std::string> *r_texts);
+	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
+	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale = false);
+	bool locale_element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
+	// Vectors put into words inside one another's words (an Array in an Array, or one that holds itself)
+	// nest at most this deep, by recursion in C++; one more is Error #1023, as Flash's stack check gives.
+	// A level takes about 270 bytes of stack in a release build (measured): 500 fit in a third of the
+	// 512 KB a secondary thread gets on macOS.
+	static constexpr uint32_t MAX_TEXT_DEPTH = 500;
+	uint32_t text_depth_ = 0; // How many vector_text() calls are in progress.
+	bool element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
 	void leave_failed_frame(); // A frame the error leaves: its line goes into the trace.
 	// Catches the error in a frame above p_depth that has a handler for it, innermost first: true, and
@@ -134,7 +333,11 @@ private:
 	bool use_class_now(uint32_t p_class); // From outside: runs it.
 	std::string site(const Frame &p_frame) const;
 	std::string object_text(Object *p_object) const;
+	std::string error_heading(const Object *p_error) const; // "Name: message", as Error's toString() gives it.
 	bool is_class(const Object *p_object, uint32_t p_class) const;
+	// The function the object's class runs for an interface method; NONE, with the error raised, if the
+	// object is missing or its class has none.
+	uint32_t interface_function(const Object *p_object, uint32_t p_method);
 	Str *text(const std::string &p_text);
 
 public:
@@ -150,6 +353,11 @@ public:
 		hook_ = p_hook;
 		hook_data_ = p_data;
 	}
+	// A call from outside that runs, with all it calls, for longer than this (in milliseconds) is stopped
+	// with Flash's Error #1502, which no catch or finally stops: an endless loop ends. 0, as an interpreter
+	// starts, for no limit. Time a debugger's hook keeps the program stopped is not counted.
+	void set_time_limit(uint32_t p_milliseconds) { time_limit_ = p_milliseconds; }
+	uint32_t time_limit() const { return time_limit_; }
 	// Runs the static initializers, then constructs the entry class. False if an error reached the top:
 	// the host has been given it.
 	bool run_program();
@@ -171,6 +379,9 @@ public:
 	// A field by its AS3 name: the value as it is held (no new reference) and its kind. False if there is
 	// no such field.
 	bool get_field(Object *p_object, std::string_view p_name, Slot *r_value, ir::Kind *r_kind = nullptr) const;
+	// Writes the field in that slot of the object's class, giving up what it held. The value's reference
+	// is handed over.
+	void set_field(Object *p_object, uint32_t p_field, Slot p_owned);
 	const ir::Module &module() const { return module_; }
 	// Calls the object's method of that name. The arguments are in the method's parameter kinds, and
 	// parameters left out take their defaults. A reference returned in r_result is the caller's to release.
@@ -182,10 +393,32 @@ public:
 	}
 	// Gives up a value the host was holding for the interpreter: a result, or an argument it made.
 	void discard(ir::Kind p_kind, Slot p_value) { drop(p_kind, p_value); }
+	// A new Array of the elements of one of Godot's Arrays (a handle), for a host passing one to a script:
+	// one reference, the caller's. Null if the engine could not give them (the error is reported).
+	Object *copy_engine_array(void *p_array, uint32_t p_class);
+	// The same for one of Godot's Dictionaries, where a flash.utils.Dictionary is wanted: its keys as a
+	// Dictionary keeps them (a number by its text), each value untyped.
+	Object *copy_engine_dictionary(void *p_dictionary, uint32_t p_class);
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
 	void release_object(Object *p_object);
+	// An object the engine kept (EngineHandles::keep()), with no reference left, freed now that the engine
+	// let go of it too.
+	void free_kept(Object *p_object) { drop_object(p_object); }
 
+	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
+	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of
+	// work, about as many objects and references to look at; it does nothing while a call from outside is
+	// in progress. True if a collection ended. collect() makes a whole collection at once: between calls, or
+	// at a statement (from the statement hook). When the interpreter goes, it collects once more.
+	bool collect_step(size_t p_work) { return entries_ == 0 && collector_.step(p_work); }
+	void collect() { collector_.collect(); }
+	// Another interpreter has taken over the program (a reload): the engine's objects hold its script
+	// objects now, not this one's, so this one's collector no longer looks through them.
+	void superseded() { collector_.ignore_engine(); }
+
+	// How many traces finallies are keeping for errors they will throw again: one at most for each.
+	size_t kept_traces() const { return kept_traces_.size(); }
 	// For a debugger: the frames, innermost last.
 	size_t depth() const { return frames_.size(); }
 	const ir::Function &function_at(size_t p_frame) const { return module_.functions[frames_[p_frame].function]; }
@@ -195,6 +428,9 @@ public:
 	// kind. False if the frame's function has no such local.
 	bool local_at(size_t p_frame, std::string_view p_name, Slot *r_value, ir::Kind *r_kind) const;
 };
+
+// Flash's words for a run stopped after that many milliseconds.
+std::string timeout_message(uint32_t p_milliseconds);
 
 } // namespace vm
 } // namespace kas3

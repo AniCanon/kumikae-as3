@@ -18,10 +18,10 @@ anyone changing the repository are in [AGENTS.md](../AGENTS.md).
 | Folder | Holds | Files |
 |---|---|---|
 | `src/` | The front end: source text to a checked syntax tree | `lexer`, `parser*` (one file per kind of syntax), `names*` (packages, scopes, links), `typer.h` and `typer_*.cpp` (the type of every expression and what fits where), `type_table.cpp`, `whole_numbers` (rules the checker and the lowerer share), `query` (what the language server asks) |
-| `ir/` | The typed IR and the lowerer that produces it | `ir.h`, `ir_print.cpp`, `lowerer.h` and `lower_*.cpp`, by what each lowers: types, places, Godot's members, expressions, operators, calls, statements, classes |
+| `ir/` | The typed IR and the lowerer that produces it | `ir.h` (with `ir_ops.h`, `ir_codes.h`, `ir_module.h`), `ir_print.cpp`, `lowerer.h` and the helper classes it befriends, each a `lower_*.h` and `lower_*.cpp` by what it lowers: types, places, Godot's members, expressions, operators, calls, statements, classes |
 | `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
-| `vm/` host | What the interpreter needs from where it runs | `host.h` holds three interfaces: `output.h`, `engine_handles.h` (what is done to a value the interpreter holds), `engine_source.h` (where values come from). `no_engine.h` answers where there is no engine |
-| `godot_ext/` | The GDExtension | `godot_host` (the three interfaces, with Godot's calls), `callable` (a method as a Godot function, and the look for listener loops), `instance`, `script`, `program`, `language`, `register` |
+| `vm/` host | What the interpreter needs from where it runs | `host.h` holds four interfaces: `output.h`, `engine_handles.h` (what is done to a value the interpreter holds), `engine_source.h` (where values come from), `clock.h` (the time and the zone, for Date). `no_engine.h` answers where there is no engine |
+| `godot_ext/` | The GDExtension | `godot_host` (the four interfaces, with Godot's calls), `callable` (a method as a Godot function, and listeners as the cycle collector sees them), `instance`, `script`, `program`, `language`, `register` |
 | `lsp/` | The language server | `server`, `workspace`, `json` |
 | `godot/` | The generator of Godot's API as AS3 declarations | `generate.py`, `naming.py`, the generated `godot.as` and `godot_names.txt` |
 | `tests/` | Tests, and `bench/` for the timings | See [Tests](#tests) |
@@ -93,15 +93,45 @@ TypeError: Error #1009: Cannot access a property or method of a null object refe
 `override` and `super`; `int`, `uint`, `Number`, `Boolean`, `String` and `null` with AS3's conversions;
 every arithmetic, comparison, logical and bitwise operator; assignment and `++`/`--`; `if`, `while`, `do`,
 `for`, `break`, `continue`, `return`; calls with default parameters; `new`, `is`, `as`; `trace`; `throw`;
-a class's own `toString()`;
+`toString()` on any object (its class's own, or `[object Name]`; an `Error`'s name and message);
 `Error` and its subclasses; `NaN`, `Infinity` and the limits of the number types (`int.MAX_VALUE`); several
-files, packages, and package-level functions and variables.
+files, packages, and package-level functions and variables. `String`'s methods, the numbers' (and `Int64`'s) `toString(radix)`,
+`toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `split` and `Math`.
+`Vector.<T>` (`Vector.<*>` too) and `Array`, with their methods, those that take a function included;
+function values (a method or a function as a value, `f(a, b)`) and function expressions that capture
+their variables, and the members of the object of the method they are written in (`count++`, `update()`);
+`[Signal]` on a field of a class that extends one of Godot's; getters and setters, static ones too,
+overridden and reached with `super` (`o.x += 1` and `o.x++` call each half once). In a stack trace a getter
+is `Class/get x()`, as in Flash. Interfaces, with their getters and setters: a value typed as one calls the
+method of whatever class the object is, found by name as AVM2 finds it; `is`, `as`, parameters, fields and
+vectors of an interface type; a class may implement several, and an interface extend several. Object
+literals (`{a: 1, "b": 2, 3: x}`) and `new Object()`; `flash.utils.Dictionary`, whose keys are objects by
+their identity and anything else by its text; properties by name on an `Object`, a `*`, a Dictionary and an
+Array (`o.a`, `o["a"]`, `o.a = v`, `delete`, `in`, `hasOwnProperty`, a property that holds a function called
+as one); `for in` and `for each` over any of these; an untyped value that holds an object of a class of the
+program, by the names of its public fields, methods, getters and setters (Flash's ReferenceErrors #1069,
+#1056, #1037, #1074 and #1077 for the rest); Array's `sortOn`. `RegExp` (literals, `new RegExp`, the flags
+`g i m s x`, its properties, `exec` and `test` with `lastIndex`, which one that is not global keeps, as in
+avmplus) and String's `match`, `search`, `replace` (with `$1`, `$&` and the rest, or a function) and
+`split` by one; `Date`, with the host's clock and zone (its getters and setters, local and UTC, its texts,
+`Date.parse` and `Date.UTC`); a RegExp's and a Date's properties and methods by name on an untyped value; `escape`, `unescape`,
+`encodeURI`, `encodeURIComponent`, `decodeURI` and `decodeURIComponent`; `JSON.parse` (with a reviver) and
+`JSON.stringify` (with a replacer function or Array of keys, and space).
 
-**What is refused, by name, until later slices:** function values and closures, `Array`, `Vector`,
-`Object` and `Dictionary`, untyped values (`*`), interfaces, `try`, `switch`, `for in`, labels, getters and
-setters, rest parameters, regular expressions, `Math` and the other library functions, `String`'s methods
-other than `length`, and the `godot` package. A program that uses one of these does not run: the compiler
-says `... is not supported by the interpreter yet` at the place.
+Keys go in the order each was first set, in an Object, a Dictionary and an Array's properties beyond its
+indices: AS3 leaves the order unspecified, and this is the interpreter's ruling, so that what a program
+prints does not depend on a hash. A number as a key is its text (`o[1]` is `o["1"]`); so is a Boolean, and
+so is an object on an Object (its `toString()`), but not on a Dictionary. A loop goes through the keys there
+were when it began: one deleted on the way is passed over, one added is not reached.
+
+**What is refused, by name, until later slices:** `new Dictionary(true)` (weak keys, said when the program
+runs), a method of an Array, a Vector, a String or a number called or read by name on an untyped value
+(`u.push(1)`, said when it runs), a RegExp's or a Date's method read by name and not called, or a property
+neither declares (both are dynamic in AS3), a property of one of Godot's values held untyped, by name, `this` and
+`super` written inside a function expression (AS3's `this` there is not the method's object), an
+interface's method that a class has only from Godot's API or the built-in library, a class that extends
+`RegExp`, and the `godot` package. A program that uses one of these does not run: the compiler says
+`... is not supported by the interpreter yet` at the place.
 
 How it works:
 
@@ -113,6 +143,10 @@ How it works:
   stored in an `int`, which is what the checker's types say.
 - **The interpreter** (`vm/interpreter.h`) keeps its own stack of frames and never recurses in C++ for an AS3
   call. Runaway recursion is therefore an AS3 error, not a crash, and a debugger can walk the frames.
+- **An endless loop is stopped,** as Flash stops one: a run that lasts longer than 15 seconds ends with
+  `Error #1502: A script has executed for longer than the default timeout period of 15 seconds.`, which no
+  `catch` or `finally` stops. Every loop goes round through a statement's marker, where the clock is
+  looked at once in 4096 statements; `KAS3_TIME_LIMIT_MS` gives `kas3c run` another limit (0 for none).
 - **For a debugger:** every instruction has a source position, every function lists its named locals, and
   each statement begins with a marker where a hook can stop the program.
 - **Static fields** get their values the first time their class is used, a base class before its
@@ -122,8 +156,45 @@ How it works:
 - **Memory** is reference-counted. Objects that refer to each other in a loop are not freed yet.
 - **Nothing in `vm/` or `ir/` names Godot.** What the engine will supply goes through the interfaces in `vm/host.h`.
 
-Differences from Flash so far: a string's `length` counts characters, not UTF-16 units, and strings compare
-by character.
+Strings are held as UTF-8 and counted, indexed and compared by UTF-16 unit, as AS3 does: a character past
+U+FFFF is two units, and `charAt` gives each half (`vm/text_units.h`). Case changes a character for a
+character, by Unicode's mappings within U+0000 to U+FFFF (`"ß".toUpperCase()` stays `"ß"`).
+
+Where Flash and ECMAScript part, Flash is followed as far as it is known, and each test says so where it
+does: `toString(radix)` writes only the whole part of a number in a radix other than 10, a
+digit count left out is the declared 0 (`toPrecision()` is a `RangeError`), `replace` with a String to
+find inserts its replacement as it is written, and `localeCompare` orders by UTF-16 unit.
+
+**Regular expressions** are read and run by the interpreter's own engine (`vm/regex*`), over UTF-16 units
+as AS3 indexes strings: ECMAScript 3's syntax and meaning, with what AS3 takes from PCRE (the flags `s`
+and `x`, named groups `(?P<name>...)`, lookbehind of a fixed length, atomic groups, possessive
+quantifiers). A pattern that can't be read is a `SyntaxError` where the RegExp is made (ECMAScript's rule;
+Flash, by recollection, makes one that never matches). A search that backtracks without end stops after
+ten million steps, plus a thousand for each unit of the text, with an `Error` that says so.
+
+**Date** asks the host for the time and for the zone's offset at a moment (`vm/clock.h`): Godot's clock in
+the extension, the system's in `kas3c run`, where `KAS3_NOW` fixes the time and `TZ` the zone. Its texts
+are AS3's: `Thu Feb 29 13:05:09 GMT-0800 2024`, `Thu Feb 29 21:05:09 2024 UTC`, and the rest, written
+from recollection of avmplus, not checked against Flash.
+
+**Values as text** follow avmplus's library source: an Array leaves null and undefined elements out of its
+text, and a Vector's `join` and `toString` write them as `null` and `undefined` (`toLocaleString` leaves
+them out of both); a function of any kind is `function Function() {}`; a RegExp's `lastIndex` is an `int`.
+An Array or a Vector that holds itself, or nests more than 500 deep, put into words is Error #1023, as
+avmplus's stack check gives (its `join` has no other guard).
+
+**JSON** reads and writes by ECMA-262 5th edition (15.12), its grammar exactly (`vm/json_text.cpp`). What it
+reads is Objects, Arrays, Strings (a `\u` half of a character kept as the unit it is), Booleans, null and
+numbers, an `int` when whole. What it writes: toJSON() first, then the replacer; an Object's keys in their
+order, an Array's and a Vector's elements, an object of a class of the program by its public fields (its
+base's first) and then its public getters, nothing for a function or undefined (null in an Array), null for
+NaN and Infinity, a Date as its text, a Dictionary as `"Dictionary"`; an object of the library's own classes
+(an Error, a RegExp) has no members to write. The errors are avmplus's, from recollection: SyntaxError #1132
+for text it can't read (a null text too), TypeError #1129 for a structure that holds itself, TypeError #1131
+for a replacer that is neither a function nor an Array (ECMAScript passes over one). Rulings: more than
+1,000 levels of nesting is Error #1023; one of Godot's values or objects is refused with a TypeError, since
+JSON has no form for one; a value written as nothing gives a null String, as the declared String holds
+undefined.
 
 ## Inside Godot
 
@@ -167,13 +238,22 @@ package {
 ```
 
 - A script class extends a Godot class. Godot calls the virtual methods it overrides (`_physicsProcess` is
-  Godot's `_physics_process`), and any other method by its AS3 name, from GDScript too.
+  Godot's `_physics_process`), and any other public method by its AS3 name, from GDScript too.
 - The script reads and writes the node's properties, calls its methods, and makes Godot values with `new`.
-- Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript can read a
-  script's fields. A call from GDScript with too few arguments, the wrong kind of argument, or a number that
-  does not fit an `int` is refused, never bent to fit.
-- A script class may extend another script class, and may be attached to a reference-counted object
-  without keeping it alive.
+- Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript reads and
+  writes a script's public fields (`node.speed = 2`) and reads its public getters and writes its setters as
+  properties (`node.health += 1`), a field converted as a store into the field converts: an
+  `Array` field takes a copy of Godot's Array. A `const`, a signal or a script object is not written from
+  Godot. A call from GDScript with too few arguments, the wrong kind of argument, or a number that does not
+  fit an `int` is refused, never bent to fit; so is a value that does not fit a field.
+- Only public members are reached from Godot. A private, protected or internal field or method is not
+  there for GDScript, `get`, `set`, `call` or `has_method`: Godot's code is neither a subclass nor in the
+  package. Godot's lists of a script's properties and methods give the public ones, with Godot's types.
+- A script class may extend another script class. One that extends a reference-counted class (`RefCounted`,
+  a `Resource`) may be attached from GDScript or made with `new` in AS3: the object lives while AS3 or
+  Godot holds it, and goes when neither does. Neither keeps the other alive in a loop, and a listener it
+  adds does not keep it, as a Godot callable does not keep its object. The same holds for a script whose
+  base is `GodotObject` that GDScript attaches to a `RefCounted`.
 - A Godot object can be compared with `null`. Calling a method on one that Godot has freed is an AS3 error.
 - Operators on Godot's values are Godot's own: `position + velocity * delta`, `-v`, `v == w`, `v += w`. Two
   Godot objects are equal when they are the same object.
@@ -183,6 +263,15 @@ package {
 - An argument left out takes Godot's default. So does a `null` written last for a parameter declared
   `= null`.
 - A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
+- `[Export] public var speed:Number = 5;` shows the field in Godot's inspector, and a value a scene saved
+  is given to the script after its constructor has run. The field is a public instance field of a type
+  Godot can store (a number, `Boolean`, `String`, `Array`, one of Godot's values, a `Resource`, or a `Node`
+  in a node's script), and its first value is a constant Godot is told of: a number, a string, a Boolean,
+  `null`, nothing, or one of Godot's values made from numbers (`new Vector2(1, 2)`). A scene saves only
+  what differs from it. The checker says which rule a field breaks.
+- In the editor no script object is made and no method runs: an object Godot edits holds a stand-in with
+  the exported fields, starting at their first values, as GDScript's does for a script that is not a tool.
+  A script saved while the editor is open is compiled again, and the stand-ins get its exported fields.
 - Signals are listened to the AS3 way: `timer.timeout.add(onTimeout)`, `add(f, true)` for the end of the
   frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`. Adding a listener twice does
   nothing. `removeAll` and `numListeners` are about the listeners scripts added, not the engine's own. A
@@ -211,16 +300,23 @@ package {
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,
   never taken as if it fitted.
 - An AS3 error inside a call from the engine is reported as Godot reports a script's own error, with the
-  `.as` file and line as its source and the AS3 stack trace, and the engine carries on.
+  `.as` file and line as its source and the AS3 stack trace, and the engine carries on. One in code the
+  engine ran for an AS3 instruction (a listener its `emit()` ran, a `toString()` for `"" + node`) comes out
+  of that instruction, where a `catch` around it catches it, as Flash has an error in a listener come out
+  of the dispatch.
+- A call from the engine that runs longer than 15 seconds, with what it calls, is stopped with Flash's
+  `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
+  gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.
 
-**Refused by name until the next slices:** elements of Godot's untyped collections, creating
-Godot objects with `new`, passing a script object to Godot, and everything `kas3c run` refuses.
+**Refused by name until the next slices:** elements of Godot's untyped collections, passing Godot a
+script object of a class that extends none of Godot's, `as` from one of Godot's objects to a script class,
+and everything `kas3c run` refuses.
 
 How it works:
 
 - **One program per project.** Every `.as` file under the project is compiled together when the first
   script loads. A script that fails to compile is reported once, and no script loads.
-- **The interpreter does not know Godot.** `vm/host.h` is the whole boundary: three small interfaces. The extension implements them
+- **The interpreter does not know Godot.** `vm/host.h` is the whole boundary: four small interfaces. The extension implements them
   with Godot's own calls; the tests implement it with a recorder.
 - **Godot's names come from Godot.** `godot/godot_names.txt` (21,519 names, written by the generator from
   Godot's API description) says that `moveAndSlide` is `move_and_slide`. Nothing is worked out backwards
@@ -230,9 +326,21 @@ How it works:
 - **Calls can nest.** The engine calls a script, which calls the engine, which may call a script again,
   up to 64 levels deep.
 
-Known fault: the first time Godot's editor scans a project that has the extension (for example
-`godot --headless --import`), Godot crashes as it exits, after the scan has done its work. Later runs are
-clean. The speed spike's extension does the same; the cause is not yet known.
+Known fault, Godot's: the first time Godot's editor scans a project that has the extension and is told to
+quit at once (`godot --headless --import`, or `--editor --quit`), Godot crashes as it exits, after the scan
+has done its work. The cause, read from Godot's source and borne out by experiments (Godot's binary has
+no symbols to show it in a trace): loading an extension with a class makes the editor document it on a thread, which
+queues a call (`EditorHelp::_gen_extensions_docs`); quitting in the same frame frees the documentation,
+and the call then runs on nothing in Godot's last flush. Any extension that registers a class does the
+same. Give the thread time (`--headless --editor --quit-after 300`), as `tests/run_godot.py` does; later
+runs are clean.
+
+godot-cpp is built as `template_release`, and Godot's editor loads that library too. That is enough for
+the editor: godot-cpp compiles nothing differently for it (its `editor` target only adds `DEBUG_ENABLED`,
+as `template_debug` does: argument checks for methods an extension binds, which this one does not, and
+godot-cpp's own bounds checks). The editor's features run on it, and the tests run them in the editor:
+the inspector's stand-ins and a script edited while the editor is open (`exported_editor.gd`,
+`exported_reload.gd`).
 
 ## Editing a script while the game runs
 
@@ -266,7 +374,7 @@ compiler/build/kas3c lsp --declarations lib.as  # lib.as declares what exists el
 | A file opening or changing | The file's errors: what `kas3c check` prints for the project. |
 | Go to definition | Where the name under the cursor is declared, in the project, the built-in library or Godot's API. |
 | Find references | Every use of it in the project's files. |
-| Completion | After a dot, what the value before it has, with what its bases have; where a type is written, types; otherwise the names in reach: locals, members, definitions, keywords. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a dot whose value has no known type, and nothing in a comment, string or regular expression. |
+| Completion | After a dot, what the value before it has, with what its bases have (through an interface, what it extends and `Object`'s members; a getter and a setter are one property) (`Object`'s members for a `*` or a value of a type not known), or what a package's path holds; where a type is written, types; after `override`, the base classes' methods, each written as its whole declaration; otherwise the names in reach: locals, members, definitions, keywords, with a call argument's parameter name first. Narrowed by what is typed so far, whatever its case; package/type names in imports. Nothing after a name that means nothing here, and nothing in a comment, string or regular expression. |
 | Signature help | The callable declaration and active parameter, including unfinished and nested calls. |
 | Hover | Its declaration, and the class or package it belongs to. |
 | Document symbols | The classes and members of the file. |
@@ -283,8 +391,10 @@ How it works:
   the project).
 - **Typing bursts are checked once.** A change marks the program as stale; the check runs when no further
   message is waiting, or when a request needs an answer.
-- **While any file has a syntax error, only syntax errors are reported,** as `kas3c check` does. Names are
-  still resolved, so go to definition, hover and the outline keep working in a half-typed file.
+- **A syntax error silences only what it may have caused,** as in `kas3c check`: the rest of its own file,
+  every file that uses something that file declares, and every complaint that a name is missing. Other
+  errors are still shown. Names are still resolved, so go to definition, hover and the outline keep working
+  in a half-typed file.
 - **Positions** are counted in UTF-16 code units, or in bytes when the editor offers UTF-8.
 - **Godot's API and the built-in library** are written, read-only, to `kas3c-declarations` in the system's
   temporary folder, so that go to definition has a file to open. No errors are ever reported for them.
@@ -295,19 +405,22 @@ is declared, who refers to it). The Godot editor will use the same three.
 
 Limits:
 
-- Find references on a method also lists the methods that override it and the one it overrides.
-- Workspace symbols are the project's own. Godot's classes are not listed.
+- Find references on a method also lists the methods that override it and the one it overrides, and an
+  interface's method the methods that implement it.
+- Workspace symbols are the project's own first, then Godot's classes and the built-in library's.
 - A change arrives as the range of text that changed; a whole document is accepted too.
 - Rename and code actions are not implemented. Completion and signature help are described in
   [the editor guide](../editors/completion.md).
-- A file is known by the path the editor gives. The same file reached through a symbolic link, or under a
-  name that differs only in letter case, counts as a second file and its classes are reported as already
-  defined.
+- A file is one file however the editor reaches it: through a symbolic link, in another letter case, or in
+  another Unicode form of its name.
 - A file the editor opens from outside the project, or from a folder whose name starts with a dot, is not
   checked, unless no folder is open at all.
-- A project of more than 20,000 `.as` files is read up to that number. The server says so on standard
-  error only.
-- Not yet usable on Windows.
+- A project of more than 20,000 `.as` files is read up to that number. The server says so in the editor
+  and on standard error.
+- **Windows:** paths are compared in one spelling (`/` between parts, a drive's letter in capitals, letter
+  case not counted), `file:` URIs carry drives and shares, and the server's input and output are binary.
+  The path rules are tested with Windows paths on every system; the server has not yet been built or run
+  on Windows itself.
 
 ## Declaration files
 
@@ -409,6 +522,10 @@ built-in.
   of every interface it names.
 - **Writes** to a `const`, to a property with no setter, to a method, a package function or a class. A
   built-in class's methods may be replaced (`o.toString = f`), because they may live on its prototype.
+- **Reads** of a property with no getter, `x += 1` and `x++` included.
+- **Properties:** a getter takes no parameters and gives a value; a setter takes one, with no default, and
+  gives nothing. A getter and its setter are of one type, wherever each is declared. Through an interface,
+  the other half is looked for in the interfaces it extends.
 
 ## What fits
 
@@ -433,7 +550,14 @@ A value of type A may be used where B is expected when one of these holds:
   | `PackedVector2Array`, `PackedVector3Array`, `PackedVector4Array`, `PackedColorArray` | `Array`, or a `Vector` of that type |
   | `GodotDictionary` | `Object`, or `flash.utils.Dictionary` |
 
-  Nothing converts on the way back: a collection that comes from the engine stays Godot's.
+  On the way back, one of Godot's Arrays is copied where an `Array` is wanted (a parameter, a store, `as`),
+  and one of its Dictionaries where a `flash.utils.Dictionary` is wanted: each key as a Dictionary keeps it,
+  so a number is its text and two of Godot's keys (`1` and `"1"`) may become one; a key that is one of
+  Godot's objects or values is refused. Where an `Object` or a `*` is wanted, the collection stays Godot's.
+  An Object or a Dictionary given to Godot (where it takes a `GodotDictionary` or anything) is one of its
+  Dictionaries, each key a String (an object key on a Dictionary is what that object is to Godot). An
+  Array with properties beyond its indices, a container that holds itself, and a script object of a class
+  that extends none of Godot's, anywhere inside, are AS3 errors that say so.
 
 Otherwise it is an error. When B is a subclass or implementer of A, the message asks for a cast
 (`a value of type 'Base' may not be a 'Sub'; use 'as' or a cast`). A `void` result fits only `*`.
@@ -500,8 +624,11 @@ public final native class Vector2 { ... }
   from them are not dynamic.
 - **Calling, or using `new` on, a value typed `Function`, `Class` or `Object` gives `*`.**
 - **`this` inside a nested function is `*`,** because AS3 decides it when the function is called.
-- **Arithmetic on anything but numbers, strings and Booleans has no type yet (`?`).** Godot's math types get
-  their operators in a later part.
+- **An object of AS3's in arithmetic (a `Date`, a vector, a class of the program) is made a primitive as
+  the line runs,** by its class's own `valueOf()` or else its text: beside `+` the result is `*` (a String
+  or a Number), with `-`, `*`, `/` and `%` a `Number`. A `Date` is its time where a Number is wanted, and
+  its text beside `+`. Arithmetic on anything else that is not a number, a string or a Boolean has no type
+  yet (`?`), unless Godot's declarations give the operator.
 - **"has no member" is reported only when every member of the type is known.** Nothing is reported on `*`,
   on a type that failed to resolve, or on a class whose base class is unknown.
 
@@ -535,8 +662,6 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
 - **A built-in name can't be told apart from an imported one of the same spelling.** A class `Object` in an
   imported package would make a bare `Object` ambiguous, and the built-in one has no longer spelling. This
   is why Godot's `Object` is `GodotObject` here.
-- **Names are checked only when every file parses.** With a syntax error anywhere, `check` reports syntax
-  errors only.
 - **One function may declare a variable twice only with the same type.** Adobe's compiler warns in that case
   and this one is silent; with different types both report an error.
 - **Helpers outside the package block count as part of the file's package** when deciding whether an

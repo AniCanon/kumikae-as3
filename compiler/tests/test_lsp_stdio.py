@@ -228,8 +228,11 @@ with tempfile.TemporaryDirectory() as folder:
         check("godot definition", target.startswith("file://") and target.endswith("godot.as") and
               os.path.exists(target[len("file://"):].replace("%20", " ")), repr(found))
         symbols = [m for m in messages if m.get("id") == 3]
-        check("symbols", len(symbols) == 1 and [s["name"] for s in symbols[0]["result"]] == ["Player"] and
-              symbols[0]["result"][0]["location"]["uri"] == uri, repr(symbols))
+        names = [s["name"] for s in symbols[0]["result"]] if len(symbols) == 1 else []
+        # The project's own class first, then what Godot's API has by that name.
+        check("symbols", names[:1] == ["Player"] and symbols[0]["result"][0]["location"]["uri"] == uri and
+              "AnimationPlayer" in names[1:] and
+              all(s["location"]["uri"].endswith("godot.as") for s in symbols[0]["result"][1:]), repr(symbols)[:2000])
 
 # Completion insertion and argument help over the actual framed transport.
 completion_text = ('package { public class Main { public function move(amount:int, label:String = "x"):void {} '
@@ -249,6 +252,17 @@ if messages:
     check("replace suffix", item.get("textEdit", {}).get("replace", {}).get("end", {}).get("character") == position + 9, repr(item))
     signature = next((m for m in messages if m.get("id") == 3), {})
     check("signature parameter", signature.get("result", {}).get("activeParameter") == 1, repr(signature))
+
+# An override's whole declaration, over the transport, with Godot's API loaded.
+override_text = "package { import godot.*; public class Main extends Node2D {\noverride _pro\n} }"
+code, messages, errors = session(start + opened(override_text) +
+    request(2, "textDocument/completion", {"textDocument": {"uri": URI}, "position": {"line": 1, "character": 13}}) + END)
+check("override session", code == 0 and messages is not None, repr(errors))
+if messages:
+    reply = next((m for m in messages if m.get("id") == 2), {})
+    item = next((i for i in reply.get("result", {}).get("items", []) if i.get("label") == "_process"), {})
+    check("override", item.get("textEdit", {}).get("newText", "").startswith("function _process(delta:Number):void {") and
+          item.get("additionalTextEdits", [{}])[0].get("newText") == "public ", repr(item))
 
 # Invalid later changes cannot invalidate an otherwise current queued request.
 invalid_change = notify("textDocument/didChange", {"textDocument": {"uri": URI, "version": 2147483648},
@@ -331,7 +345,9 @@ for snippets in (False, True):
         check("try template replacement", edit.get("range") == {"start": {"line": 0, "character": start_at},
               "end": {"line": 0, "character": start_at + len("trsuffix")}}, repr(item))
 
-# Requests already cancelled or superseded in the input queue must not check old text.
+# A request cancelled in the input queue is not checked. One followed in the queue by an edit of its document is
+# answered for the text it was asked about: LSP 3.17 says a server must not send ContentModified for a change it
+# sees only in its unprocessed messages, and LSP4IJ's completion does not ask again after one.
 params = {"textDocument": {"uri": URI}, "position": {"line": 0, "character": 0}}
 code, messages, errors = session(START + opened("package { public class Main {} }") +
     request(2, "textDocument/completion", params) + notify("$/cancelRequest", {"id": 2}) +
@@ -339,7 +355,7 @@ code, messages, errors = session(START + opened("package { public class Main {} 
     request(4, "textDocument/completion", params) + END, "--no-godot")
 replies = {m.get("id"): m for m in messages or [] if "id" in m}
 check("cancel queued request", replies.get(2, {}).get("error", {}).get("code") == -32800, repr(replies.get(2)))
-check("superseded queued request", replies.get(3, {}).get("error", {}).get("code") == -32801, repr(replies.get(3)))
+check("edited queued request", "result" in replies.get(3, {}), repr(replies.get(3)))
 check("latest queued request", "result" in replies.get(4, {}), repr(replies.get(4)))
 
 for failure in failures:

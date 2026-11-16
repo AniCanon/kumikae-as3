@@ -1,6 +1,8 @@
 package app.anicanon.kumikae.as3.language
 
 import com.intellij.lexer.LexerBase
+import com.intellij.lexer.RestartableLexer
+import com.intellij.lexer.TokenIterator
 import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
@@ -24,8 +26,14 @@ internal object As3Tokens {
  * Splits a file into names, strings, comments, brackets and everything else. It is what makes a name
  * one thing the IDE can ask about (go to declaration, hover) and lets brackets be matched; meaning comes
  * from `kas3c`, through the language server.
+ *
+ * The editor keeps and compares only a restartable lexer's state after an edit, so it is restartable: at
+ * any token whose state is not [As3LexicalContext.REPLAY] it may start again, and an edit inside a class
+ * is not lexed again from the top of the file.
  */
-internal class As3Lexer : LexerBase() {
+internal class As3Lexer :
+    LexerBase(),
+    RestartableLexer {
     private var text: CharSequence = ""
     private var end = 0
     private var start = 0
@@ -47,6 +55,18 @@ internal class As3Lexer : LexerBase() {
     }
 
     override fun getState() = tokenState
+
+    override fun getStartState() = 0
+
+    override fun isRestartableState(state: Int) = state != As3LexicalContext.REPLAY
+
+    override fun start(
+        buffer: CharSequence,
+        startOffset: Int,
+        endOffset: Int,
+        initialState: Int,
+        tokenIterator: TokenIterator?,
+    ) = start(buffer, startOffset, endOffset, initialState)
 
     override fun getTokenType() = type
 

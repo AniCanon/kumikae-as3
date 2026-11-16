@@ -13,7 +13,6 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-// Runs until the frame above p_depth returns. False if an error left it instead.
 // Two strings in order, or equal, as AS3 compares them. With a missing string the two are compared as
 // numbers: null is 0.
 static bool compare_strings(Op p_op, const Str *p_left, const Str *p_right) {
@@ -21,69 +20,29 @@ static bool compare_strings(Op p_op, const Str *p_left, const Str *p_right) {
 		return p_left == p_right || (p_left && p_right && p_left->view() == p_right->view());
 	}
 	if (p_left && p_right) {
-		return p_op == Op::LtStr ? p_left->view() < p_right->view() : p_left->view() <= p_right->view();
+		const int order = compare_utf16(p_left->view(), p_right->view());
+		return p_op == Op::LtStr ? order < 0 : order <= 0;
 	}
 	const double left = p_left ? string_to_number(p_left->view()) : 0;
 	const double right = p_right ? string_to_number(p_right->view()) : 0;
 	return p_op == Op::LtStr ? left < right : left <= right;
 }
 
-// One string after the other. A missing one reads "null".
-static std::string joined(const Str *p_left, const Str *p_right) {
-	const std::string_view left = p_left ? p_left->view() : std::string_view("null");
-	const std::string_view right = p_right ? p_right->view() : std::string_view("null");
-	std::string result;
-	result.reserve(left.size() + right.size());
-	result += left;
-	result += right;
-	return result;
-}
-
-// An Int64 where an int, a uint or a Number is expected, or a Number where an Int64 is, when the
-// program did not write the conversion: the value, or a RangeError that names it.
-void Interpreter::convert_checked(const Instruction &p_in, Slot *p_registers) {
-	Slot &out = p_registers[p_in.a];
-	const Slot &from = p_registers[p_in.b];
-	switch (p_in.op) {
-		case Op::I64ToI32:
-			if (const std::optional<int32_t> fitted = wide_to_int32(from.l)) {
-				set_int32(out, *fitted);
-			} else {
-				raise(module_.range_error_class, std::to_string(from.l) + " does not fit an int.");
-			}
-			break;
-		case Op::I64ToU32:
-			if (const std::optional<uint32_t> fitted = wide_to_uint32(from.l)) {
-				set_uint32(out, *fitted);
-			} else {
-				raise(module_.range_error_class, std::to_string(from.l) + " does not fit a uint.");
-			}
-			break;
-		case Op::I64ToF64:
-			if (const std::optional<double> fitted = wide_to_number(from.l)) {
-				out.d = *fitted;
-			} else {
-				raise(module_.range_error_class, std::to_string(from.l) + " does not fit a Number exactly.");
-			}
-			break;
-		default:
-			if (const std::optional<int64_t> fitted = number_to_wide(from.d)) {
-				out.l = *fitted;
-			} else {
-				raise(module_.range_error_class, number_to_string(from.d) + " does not fit an Int64.");
-			}
-			break;
-	}
-}
-
-// A statement is about to run: the debugger's hook, if there is one, sees it and may stop the program.
+// A statement is about to run: once in a while the clock is looked at, and the debugger's hook, if there is
+// one, sees it and may stop the program.
 void Interpreter::at_statement() {
+	if (--countdown_ == 0) {
+		look_at_clock();
+	}
 	if (!hook_) {
 		return;
 	}
 	frames_.back().pc--; // The hook sees the statement about to run.
 	const bool carry_on = hook_(*this, hook_data_);
 	frames_.back().pc++;
+	if (time_limit_) {
+		entered_ = std::chrono::steady_clock::now(); // A debugger's stop is not the program's time.
+	}
 	if (!carry_on) {
 		stopped_ = true;
 		halted_ = true;
@@ -93,13 +52,24 @@ void Interpreter::at_statement() {
 // A new object of a class, its Number fields not yet a number.
 void Interpreter::make(uint32_t p_class, Slot &r_out) {
 	const ir::Class &klass = module_.classes[p_class];
-	Object *object = new_object(p_class, klass.fields.size());
+	Object *object = new_object(p_class, klass.fields.size(), collector_.list_for(p_class));
 	if (!object) {
-		raise(module_.error_class, "Error #1000: The system is out of memory.");
+		out_of_memory();
 		return;
 	}
 	for (size_t i = 0; i < klass.fields.size(); i++) {
 		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
+	}
+	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref) {
+		// A script class that extends one of Godot's: the Godot object is made, with the script attached.
+		std::string error;
+		void *owner = host_.source.attach_new(p_class, object, &error);
+		if (!owner) {
+			release_object(object);
+			raise(module_.error_class, error.empty() ? "the engine could not make a '" + klass.name + "'" : error);
+			return;
+		}
+		object->fields()[0].p = owner;
 	}
 	assign(Kind::Obj, r_out, object);
 }
@@ -116,6 +86,11 @@ void Interpreter::enter(const Function &p_function, const Instruction &p_in, con
 			return;
 		}
 		target = module_.classes[object->klass].methods[p_in.b];
+	} else if (p_in.op == Op::CallInterface) {
+		target = interface_function(list.empty() ? nullptr : static_cast<const Object *>(p_registers[list[0]].p), p_in.b);
+		if (target == NONE) {
+			return;
+		}
 	}
 	Slot few[16];
 	std::vector<Slot> many;
@@ -144,7 +119,14 @@ void Interpreter::leave(const Function &p_function, const Instruction &p_in, con
 	pop();
 	if (gives && result != NONE && frames_.size() > p_depth) {
 		const Frame &caller = frames_.back();
-		put(kind, stack_[caller.base + result], value);
+		const Kind wanted = module_.functions[caller.function].registers[result];
+		if (wanted == Kind::Any && kind != Kind::Any) {
+			// Called through a function value: what it gives is untyped.
+			Slot typed = value;
+			value = to_any(kind, typed);
+			drop(kind, typed);
+		}
+		put(wanted, stack_[caller.base + result], value);
 	} else if (gives && frames_.size() == p_depth && r_result) {
 		*r_result = value; // The caller from outside takes it, with its reference.
 	} else if (gives && held(kind)) {
@@ -152,25 +134,14 @@ void Interpreter::leave(const Function &p_function, const Instruction &p_in, con
 	}
 }
 
-// An object as text. A class that says how it reads has its toString() called, whose result lands in
-// the register.
-void Interpreter::object_to_text(const Instruction &p_in, Slot *p_registers) {
-	Object *object = static_cast<Object *>(p_registers[p_in.b].p);
-	const uint32_t own = object ? module_.classes[object->klass].to_string : NONE;
-	if (object && module_.classes[object->klass].element != Kind::Void) {
-		// A vector's elements, each in its own words: that may run the program and move the registers.
-		retain(object);
-		std::string all;
-		const bool done = vector_text(static_cast<Vector *>(object), ",", &all);
-		if (done) {
-			assign(Kind::Str, stack_[frames_.back().base + p_in.a], text(all));
-		}
-		release_object(object);
-	} else if (own != NONE) {
-		Slot self = p_registers[p_in.b];
-		push(own, &self, 1, p_in.a);
-	} else {
-		assign(Kind::Str, p_registers[p_in.a], text(object_text(object)));
+// An object as a Number: what an untyped value holding it converts to (a Date's time; null is 0).
+void Interpreter::object_to_number(const Instruction &p_in, Slot *p_registers) {
+	const Slot value = to_any(Kind::Obj, p_registers[p_in.b]);
+	Slot number;
+	const bool done = from_any(value, Kind::F64, NONE, &number); // An object's text may run the program.
+	drop_any(value);
+	if (done) {
+		stack_[frames_.back().base + p_in.a].d = number.d;
 	}
 }
 
@@ -184,6 +155,7 @@ void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_regis
 	host_.output.print(line);
 }
 
+// Runs until the frame above p_depth returns. False if an error left it instead.
 bool Interpreter::run(size_t p_depth, Slot *r_result) {
 	while (frames_.size() > p_depth) {
 		if (failing_ || stopped_) {
@@ -302,6 +274,14 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::CmpI64F64:
 				r[in.a].d = compare_wide(r[in.b].l, r[in.c].d);
 				break;
+			case Op::CmpI64Str: {
+				// Text that is a whole number an Int64 holds is compared exactly; any other as a Number.
+				const Str *text = static_cast<const Str *>(r[in.c].p);
+				const std::string_view view = text ? text->view() : std::string_view("0");
+				const std::optional<int64_t> exact = string_to_wide_exact(view);
+				r[in.a].d = exact ? (r[in.b].l < *exact ? -1 : r[in.b].l > *exact ? 1 : 0) : compare_wide(r[in.b].l, string_to_number(view));
+				break;
+			}
 			case Op::I32ToI64:
 				r[in.a].l = r[in.b].i;
 				break;
@@ -335,6 +315,15 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::StrToI64: {
 				Str *string = static_cast<Str *>(r[in.b].p);
 				r[in.a].l = string ? string_to_wide(string->view()) : 0;
+				break;
+			}
+			case Op::StrToI64Checked: {
+				Str *string = static_cast<Str *>(r[in.b].p);
+				if (const std::optional<int64_t> exact = string ? string_to_wide_exact(string->view()) : std::optional<int64_t>(0)) {
+					r[in.a].l = *exact;
+				} else {
+					raise(module_.range_error_class, "\"" + std::string(string->view()) + "\" does not fit an Int64.");
+				}
 				break;
 			}
 			case Op::F64ToU32:
@@ -377,6 +366,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::ObjToStr:
 				object_to_text(in, r); // `frame` and `r` may be stale after this.
+				break;
+			case Op::ObjToF64:
+				object_to_number(in, r); // `frame` and `r` may be stale after this.
 				break;
 			case Op::StrToStr: {
 				Str *string = r[in.b].p ? static_cast<Str *>(r[in.b].p) : null_text_;
@@ -459,19 +451,40 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				flag(r[in.b].b == r[in.c].b);
 				break;
 			case Op::EqRef:
-				flag(r[in.b].p == r[in.c].p);
+				flag(r[in.b].p == r[in.c].p || same_function(static_cast<const Object *>(r[in.b].p), static_cast<const Object *>(r[in.c].p)));
 				break;
 			case Op::Not:
 				flag(!r[in.b].b);
 				break;
 			case Op::Concat:
-				assign(Kind::Str, r[in.a], text(joined(static_cast<Str *>(r[in.b].p), static_cast<Str *>(r[in.c].p))));
+				// One string after the other; a missing one reads "null".
+				if (Str *joined = join_strings(r[in.b].p ? static_cast<Str *>(r[in.b].p)->view() : std::string_view("null"),
+							r[in.c].p ? static_cast<Str *>(r[in.c].p)->view() : std::string_view("null"))) {
+					assign(Kind::Str, r[in.a], joined);
+				} else {
+					out_of_memory();
+				}
 				break;
 			case Op::StrLength: {
 				Str *string = static_cast<Str *>(r[in.b].p);
-				r[in.a].i = string ? character_count(string->view()) : 0;
+				r[in.a].i = string ? utf16_length(string->view()) : 0;
 				break;
 			}
+			case Op::StrCall:
+				string_call(function, in, r);
+				break;
+			case Op::NumText:
+				number_text(function, in, r);
+				break;
+			case Op::RegExpCall:
+				regexp_call(function, in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::DateCall:
+				date_call(function, in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::JsonCall:
+				json_call(function, in); // `frame` and `r` may be stale after this.
+				break;
 			case Op::Jump:
 				frame.pc = in.a;
 				break;
@@ -528,10 +541,14 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					raise_null();
 				}
 				break;
+			case Op::AnyNullCheck:
+				any_null_check(r[in.a]);
+				break;
 			case Op::New:
 				make(in.b, r[in.a]);
 				break;
 			case Op::VecNew:
+			case Op::ArrayNew:
 			case Op::VecGet:
 			case Op::VecSet:
 			case Op::VecLength:
@@ -553,13 +570,26 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::AnyGt:
 			case Op::AnyGe:
 			case Op::AnyIs:
+			case Op::AnyIsGodot:
 				any_op(function, in, r); // `frame` and `r` may be stale after this.
 				break;
 			case Op::VecCall:
 				vector_call(function, in); // `frame` and `r` may be stale after this.
 				break;
+			case Op::TableNew:
+			case Op::DynGet:
+			case Op::DynSet:
+			case Op::DynDelete:
+			case Op::DynIn:
+			case Op::DynCall:
+			case Op::DynKeys:
+			case Op::DynNext:
+			case Op::DynKey:
+				dynamic_op(function, in); // `frame` and `r` are stale after this.
+				break;
 			case Op::Call:
 			case Op::CallVirtual:
+			case Op::CallInterface:
 				enter(function, in, r); // `frame` and `r` are stale after this.
 				break;
 			case Op::IsClass:
@@ -578,9 +608,63 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::ReturnVoid:
 				leave(function, in, r, p_depth, r_result); // `frame` and `r` are stale after this.
 				break;
+			case Op::ObjectText:
+				assign(Kind::Str, r[in.a], text(object_text(static_cast<Object *>(r[in.b].p))));
+				break;
+			case Op::ErrorStack: {
+				// In an Error's constructor: the frames below it, and below any constructor of an error
+				// class that called it with `super`.
+				Object *error = static_cast<Object *>(r[in.b].p);
+				size_t skip = 0;
+				const auto error_constructor = [&](uint32_t p_function) {
+					const uint32_t owner = module_.functions[p_function].owner;
+					if (owner == NONE || module_.classes[owner].constructor != p_function) {
+						return false;
+					}
+					for (uint32_t at = owner; at != NONE; at = module_.classes[at].base) {
+						if (at == module_.error_class) {
+							return true;
+						}
+					}
+					return false;
+				};
+				while (skip < frames_.size() && error_constructor(frames_[frames_.size() - 1 - skip].function)) {
+					skip++;
+				}
+				assign(Kind::Str, r[in.a], stack_text(error, skip));
+				break;
+			}
+			case Op::MakeFunction:
+			case Op::MakeMethod:
+			case Op::MakeInterfaceMethod:
+			case Op::CallFunction:
+			case Op::FunctionToCallable:
+			case Op::CallbackThis:
+			case Op::ApplyFunction:
+			case Op::FunctionLength:
+				function_op(function, in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::OwnerOf: {
+				Object *object = static_cast<Object *>(r[in.b].p);
+				const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
+				if (klass && (klass->native_base.empty() || klass->fields.empty())) {
+					raise(module_.type_error_class, "Error #1034: Type Coercion failed: cannot convert a " + klass->name +
+									" to one of Godot's objects: its class extends none of Godot's classes.");
+					break;
+				}
+				Slot none;
+				none.bits = 0; // All of it: `{}` on a union clears its first member only.
+				put(Kind::Ref, r[in.a], object ? share(Kind::Ref, object->fields()[0]) : none);
+				break;
+			}
 			case Op::Throw:
 				pending_ = share(Kind::Any, r[in.a]); // Any value, null too.
 				failing_ = true;
+				break;
+			case Op::Rethrow:
+				pending_ = share(Kind::Any, r[in.a]);
+				failing_ = true;
+				take_trace(in.a);
 				break;
 			case Op::HostNew:
 			case Op::HostCall:
@@ -610,6 +694,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 		}
 		if (failing_ || stopped_) {
+			if (carried_.held && carried_.frames == frames_.size()) {
+				raise_carried(); // From code the engine ran for this instruction (Interpreter::call()).
+			}
 			// The instruction that failed is the one before pc: point the frame back at it for the trace.
 			if (!frames_.empty() && frames_.back().pc > 0 && frames_.size() > p_depth) {
 				frames_.back().pc--;

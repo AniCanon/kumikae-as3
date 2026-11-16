@@ -58,7 +58,7 @@ const char *op_shape(Op p_op) {
 
 namespace {
 
-std::string quoted(const std::string &p_text) {
+std::string quoted(std::string_view p_text) {
 	std::string out = "\"";
 	for (char c : p_text) {
 		if (c == '"' || c == '\\') {
@@ -121,6 +121,8 @@ std::string print_operand(const Module &p_module, const Function &p_function, ch
 			return p_value < p_module.globals.size() ? p_module.globals[p_value].name : "?global";
 		case 'V':
 			return "#" + std::to_string(p_value);
+		case 'M':
+			return p_value < p_module.interface_methods.size() ? "~" + p_module.interface_methods[p_value] : "?method";
 		default:
 			return std::string();
 	}
@@ -160,6 +162,9 @@ std::string print(const Module &p_module, const Function &p_function) {
 		} else {
 			out += handler.type < p_module.classes.size() ? p_module.classes[handler.type].name : "?class";
 		}
+		if (handler.rethrows) {
+			out += ", for a finally"; // It keeps the trace, for the Rethrow after the finally.
+		}
 		out += "\n";
 	}
 	return out;
@@ -168,7 +173,7 @@ std::string print(const Module &p_module, const Function &p_function) {
 std::string print(const Module &p_module) {
 	std::string out;
 	for (const Class &klass : p_module.classes) {
-		out += "class " + klass.name;
+		out += (klass.is_interface ? "interface " : "class ") + klass.name;
 		if (klass.base != NONE && klass.base < p_module.classes.size()) {
 			out += " extends " + p_module.classes[klass.base].name;
 		}
@@ -178,6 +183,10 @@ std::string print(const Module &p_module) {
 		if (klass.element != Kind::Void) {
 			out += std::string(" of ") + kind_name(klass.element);
 		}
+		for (size_t i = 0; i < klass.interfaces.size(); i++) {
+			const uint32_t at = klass.interfaces[i];
+			out += (i ? ", " : klass.is_interface ? " extends " : " implements ") + (at < p_module.classes.size() ? p_module.classes[at].name : "?");
+		}
 		out += "\n";
 		for (size_t i = 0; i < klass.fields.size(); i++) {
 			out += "  ." + std::to_string(i) + " " + klass.fields[i].name + ":" + kind_name(klass.fields[i].kind) + "\n";
@@ -185,6 +194,12 @@ std::string print(const Module &p_module) {
 		for (size_t i = 0; i < klass.methods.size(); i++) {
 			out += "  #" + std::to_string(i) + " " +
 					(klass.methods[i] < p_module.functions.size() ? p_module.functions[klass.methods[i]].name : "?") + "\n";
+		}
+		for (size_t i = 0; i < klass.interface_methods.size(); i++) {
+			const uint32_t function = klass.interface_methods[i];
+			if (function != NONE && i < p_module.interface_methods.size()) {
+				out += "  ~" + p_module.interface_methods[i] + " " + (function < p_module.functions.size() ? p_module.functions[function].name : "?") + "\n";
+			}
 		}
 		if (klass.static_init != NONE && klass.static_init < p_module.functions.size()) {
 			out += "  static " + p_module.functions[klass.static_init].name + "\n";

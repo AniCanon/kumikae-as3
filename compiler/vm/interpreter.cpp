@@ -1,6 +1,7 @@
 #include "interpreter_internal.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <limits>
 
@@ -14,12 +15,13 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host) {
+		module_(p_module), host_(p_host), collector_(*this) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}
 	null_text_ = new_string("null");
-	for (const char *name : { "undefined", "boolean", "number", "string", "object" }) {
+	memory_text_ = new_string(OUT_OF_MEMORY);
+	for (const char *name : { "undefined", "boolean", "number", "string", "object", "function" }) {
 		type_names_.push_back(new_string(name));
 	}
 	// A method's function by name, for calls from outside: the class's own and what it inherits.
@@ -41,12 +43,23 @@ Interpreter::~Interpreter() {
 	while (!frames_.empty()) {
 		pop();
 	}
+	for (void *kept : singletons_) {
+		if (kept) {
+			host_.handles.drop(kept);
+		}
+	}
+	for (Object *kept : lone_functions_) {
+		release_object(kept);
+	}
 	for (size_t i = 0; i < globals_.size(); i++) {
 		drop(module_.globals[i].kind, globals_[i]);
 	}
 	if (failing_) {
 		drop_any(pending_);
 	}
+	forget_subject();
+	// With every root let go of, what is left in loops is held only by itself, or by the host.
+	collector_.collect();
 	for (Str *constant : strings_) {
 		if (release(constant)) {
 			free_string(constant);
@@ -57,8 +70,16 @@ Interpreter::~Interpreter() {
 			free_string(name);
 		}
 	}
+	for (Str *character : characters_) {
+		if (release(character)) {
+			free_string(character);
+		}
+	}
 	if (release(null_text_)) {
 		free_string(null_text_);
+	}
+	if (release(memory_text_)) {
+		free_string(memory_text_);
 	}
 }
 
@@ -68,6 +89,7 @@ void Interpreter::clear_globals() {
 		globals_[i].bits = 0;
 		drop(module_.globals[i].kind, value);
 	}
+	forget_subject();
 }
 
 int Interpreter::line_at(size_t p_frame) const {
@@ -86,18 +108,10 @@ int Interpreter::line_at(size_t p_frame) const {
 	return (int)(std::upper_bound(lines.begin(), lines.end(), position) - lines.begin());
 }
 
-// "\tat Main/update()[Main.as:12]"
-std::string Interpreter::site(const Frame &p_frame) const {
-	const Function &function = module_.functions[p_frame.function];
-	size_t index = (size_t)(&p_frame - frames_.data());
-	std::string file = function.file < module_.files.size() ? module_.files[function.file] : "?";
-	return "\tat " + function.name + "()[" + file + ":" + std::to_string(line_at(index)) + "]";
-}
-
 bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result) {
 	const Function &function = module_.functions[p_function];
 	if (frames_.size() >= MAX_FRAMES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 		return false;
 	}
 	Frame frame;
@@ -119,10 +133,26 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		many.assign(p_arguments, p_arguments + p_count);
 		source = many.data();
 	}
+	// With a rest parameter, the arguments past the others (untyped) are its Array.
+	const size_t fixed = function.rest ? function.parameters - 1 : function.parameters;
+	Vector *rest = nullptr;
+	if (function.rest) {
+		rest = fresh_vector(module_.array_class, p_count > fixed ? p_count - fixed : 0);
+		if (!rest) {
+			return false;
+		}
+		for (size_t i = fixed; i < p_count; i++) {
+			rest->data[i - fixed] = share(Kind::Any, source[i]);
+		}
+		frame.arguments = static_cast<uint32_t>(std::min(p_count, fixed));
+	}
 	stack_.resize(stack_.size() + function.registers.size(), zero);
-	size_t count = std::min<size_t>(std::min<size_t>(p_count, function.parameters), function.registers.size());
+	size_t count = std::min<size_t>(std::min<size_t>(p_count, fixed), function.registers.size());
 	for (size_t i = 0; i < count; i++) {
 		stack_[frame.base + i] = share(function.registers[i], source[i]);
+	}
+	if (rest) {
+		stack_[frame.base + fixed].p = rest; // Its one reference, the frame's.
 	}
 	frames_.push_back(frame);
 	return true;
@@ -143,79 +173,9 @@ void Interpreter::pop() {
 	}
 	stack_.resize(base);
 	frames_.resize(index);
-}
-
-// Starts an error on its way out: an object of the class with the message.
-void Interpreter::raise_null() {
-	raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
-}
-
-void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
-	if (failing_) {
-		return;
+	while (!kept_traces_.empty() && kept_traces_.back().depth > frames_.size()) {
+		kept_traces_.pop_back(); // Kept for a frame that is gone.
 	}
-	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size()) : nullptr;
-	if (error) {
-		error->fields()[0].p = text(p_message);
-		pending_ = any::object(error);
-		failing_ = true;
-	} else {
-		trace_ = p_message + "\n";
-		stopped_ = true; // Nothing to throw with: stop.
-	}
-}
-
-// Catches the error, or leaves frames until p_depth remain, adding each to the stack trace.
-bool Interpreter::catch_error(size_t p_depth) {
-	bool innermost = true;
-	while (frames_.size() > p_depth) {
-		Frame &frame = frames_.back();
-		if (!innermost && frame.pc > 0) {
-			frame.pc--; // A caller: at its call, as for the trace.
-		}
-		innermost = false;
-		const Function &function = module_.functions[frame.function];
-		for (const ir::Handler &handler : function.handlers) {
-			if (!failing_ || stopped_ || frame.pc < handler.start || frame.pc >= handler.end ||
-					(handler.type != NONE && !any_is(pending_, handler.type))) {
-				continue;
-			}
-			// Caught: the error goes to the catch's variable, as its kind holds it, and is no longer on
-			// its way out.
-			const Kind kind = function.registers[handler.reg];
-			const Slot error = pending_;
-			pending_.bits = 0;
-			failing_ = false;
-			trace_.clear();
-			trace_lines_ = 0;
-			Slot caught;
-			caught.bits = 0;
-			const bool converted = from_any(error, kind, NONE, &caught);
-			drop_any(error);
-			if (converted) {
-				put(kind, stack_[frame.base + handler.reg], caught);
-			}
-			frame.pc = handler.target;
-			return true;
-		}
-		leave_failed_frame();
-	}
-	return false;
-}
-
-void Interpreter::leave_failed_frame() {
-	// A class whose static fields were being set when the error came is not ready: the next use of it
-	// sets them again, and fails again, where carrying on would run with fields that were never set.
-	const Function &leaving = module_.functions[frames_.back().function];
-	if (leaving.owner != NONE && module_.classes[leaving.owner].static_init == frames_.back().function) {
-		forget_class(leaving.owner);
-	}
-	// A runaway recursion has thousands of frames: the first few and a count say as much.
-	if (trace_lines_ < MAX_TRACE) {
-		trace_ += site(frames_.back()) + "\n";
-	}
-	trace_lines_++;
-	pop();
 }
 
 // One entry from outside: runs the function to its end. An error is reported to the host and cleared, so
@@ -223,10 +183,11 @@ void Interpreter::leave_failed_frame() {
 // back afterwards.
 bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
 	if (entries_ >= MAX_ENTRIES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 		return false;
 	}
 	const size_t depth = frames_.size();
+	entering();
 	entries_++;
 	const bool ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
 	entries_--;
@@ -246,63 +207,56 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	trace_lines_ = 0;
 	stopped_ = false;
 	halted_ = false;
+	// An error already carried for the instruction beneath (an earlier listener's) is that call's: set
+	// aside, so that what this call's own engine calls carry is judged and raised on its own.
+	Carried outer_carried;
+	const bool aside = carried_.held;
+	if (aside) {
+		outer_carried = std::move(carried_);
+		carried_ = Carried();
+	}
 
 	size_t depth = frames_.size();
 	bool ok = false;
 	if (entries_ >= MAX_ENTRIES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 	} else {
+		entering();
 		entries_++;
 		ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
 		entries_--;
 	}
-	if (!ok) {
+	// This program's code is running an instruction beneath this call: the error goes back to it, as Flash
+	// has an error in a listener come out of the dispatch that ran it. Only the first: a later listener's
+	// error, with one already carried, is reported here, where it happened.
+	const bool carry = !ok && depth > 0 && failing_ && !outer_failing && !outer_stopped && !aside;
+	if (!ok && !carry) {
 		report();
+	}
+	if (carried_.held) {
+		report_carried(); // Carried inside this call and taken back by nothing: reported here, as it would have been.
+	}
+	if (carry) {
+		carried_.held = true;
+		carried_.error = pending_;
+		carried_.trace = std::move(trace_);
+		carried_.lines = trace_lines_;
+		carried_.at = thrown_at_;
+		carried_.stopped = stopped_;
+		carried_.frames = depth;
+		carries_++;
+	} else if (aside) {
+		carried_ = std::move(outer_carried);
 	}
 	pending_ = outer_error;
 	failing_ = outer_failing;
 	trace_ = std::move(outer_trace);
 	trace_lines_ = outer_lines;
-	stopped_ = outer_stopped;
+	// Stopped, the instruction that made the engine's call ends as soon as it can: run() raises the error
+	// there (raise_carried()). Nothing on the path that succeeds looks for it.
+	stopped_ = outer_stopped || carry;
 	halted_ = outer_halted;
 	return ok;
-}
-
-std::string Interpreter::error_text() {
-	if (any::tag(pending_) == AnyTag::Object) {
-		return object_text(static_cast<Object *>(any::pointer(pending_)));
-	}
-	if (const std::optional<std::string> plain = any::text(pending_)) {
-		return *plain;
-	}
-	// A Godot value or object: Godot's own text for it.
-	Str *words = host_.handles.text(any::pointer(pending_));
-	std::string out = words ? std::string(words->view()) : std::string("null");
-	if (release(words)) {
-		free_string(words);
-	}
-	return out;
-}
-
-// Gives the host the error that ended an entry, and forgets it.
-void Interpreter::report() {
-	if (!(halted_ && !failing_)) { // Stopped on request: there is no error to report.
-		if (trace_lines_ > MAX_TRACE) {
-			trace_ += "\t... " + std::to_string(trace_lines_ - MAX_TRACE) + " more\n";
-		}
-		std::string text = failing_ ? error_text() + "\n" + trace_ : trace_;
-		while (!text.empty() && text.back() == '\n') {
-			text.pop_back();
-		}
-		host_.output.error(text);
-	}
-	if (failing_) {
-		drop_any(pending_);
-	}
-	pending_.bits = 0;
-	failing_ = false;
-	trace_.clear();
-	trace_lines_ = 0;
 }
 
 // The class and the bases above it that have not been used yet, the class first.
@@ -368,6 +322,15 @@ bool Interpreter::local_at(size_t p_frame, std::string_view p_name, Slot *r_valu
 bool Interpreter::start() {
 	if (started_) {
 		return true;
+	}
+	// The constants are made with the interpreter, which can't raise: a program missing one does not run,
+	// now or later.
+	const auto missing = [](const std::vector<Str *> &p_strings) {
+		return std::find(p_strings.begin(), p_strings.end(), nullptr) != p_strings.end();
+	};
+	if (!null_text_ || !memory_text_ || missing(strings_) || missing(type_names_)) {
+		host_.output.error(OUT_OF_MEMORY);
+		return false;
 	}
 	started_ = true;
 	bool ok = true;

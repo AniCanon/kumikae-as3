@@ -1,6 +1,5 @@
 package app.anicanon.kumikae.as3.panel
 
-import com.intellij.codeInsight.hint.ParameterInfoControllerBase
 import com.intellij.ide.structureView.StructureViewTreeElement
 import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.lang.LanguageStructureViewBuilder
@@ -27,21 +26,9 @@ internal object UiProbeLanguageFeatures {
             val caret = editor.visualPositionToXY(editor.caretModel.visualPosition)
             editor.scrollingModel.visibleArea.contains(caret)
         }
+        UiProbeParameterHelp.run(project, editor, call, observations)
+        UiProbeHover.run(project, editor, observations)
         UiProbeCompletion.edt {
-            UiProbeCompletion.activate(project)
-            UiProbeCompletion.action(editor, IdeActions.ACTION_EDITOR_SHOW_PARAMETER_INFO)
-        }
-        UiProbeCompletion.await("parameter help") {
-            ParameterInfoControllerBase.existsWithVisibleHintForEditor(editor, false)
-        }
-        UiProbeCompletion.edt {
-            val controllers = (call..call + "move(amount)".length).mapNotNull {
-                ParameterInfoControllerBase.findControllerAtOffset(editor, it)
-            }.distinct()
-            check(controllers.isNotEmpty()) { "Parameter help has no controller at the call" }
-            check(controllers.any { it.objects.isNotEmpty() }) { "Parameter help contains no signature" }
-            controllers.forEach { Disposer.dispose(it) }
-            observations += "Parameter help contains a signature"
             editor.caretModel.moveToOffset(call + 1)
             UiProbeCompletion.action(editor, IdeActions.ACTION_GOTO_DECLARATION)
         }
@@ -58,7 +45,7 @@ internal object UiProbeLanguageFeatures {
         try {
             UiProbeCompletion.edt {
                 val file = checkNotNull(PsiDocumentManager.getInstance(project).getPsiFile(editor.document))
-                val builder = LanguageStructureViewBuilder.INSTANCE.getStructureViewBuilder(file)
+                val builder = LanguageStructureViewBuilder.getInstance().getStructureViewBuilder(file)
                 check(builder is TreeBasedStructureViewBuilder) { "Missing tree-based outline" }
                 model = builder.createStructureViewModel(editor)
             }

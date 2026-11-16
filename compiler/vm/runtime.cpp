@@ -1,5 +1,8 @@
 #include "runtime.h"
 
+#include "number_text.h"
+#include "text_units.h"
+
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -12,7 +15,20 @@ namespace vm {
 namespace {
 size_t strings_alive = 0;
 size_t objects_alive = 0;
+uint32_t failing_allocations = 0;
 } // namespace
+
+void fail_allocations(uint32_t p_count) {
+	failing_allocations = p_count;
+}
+
+bool allocation_fails() {
+	if (failing_allocations == 0) {
+		return false;
+	}
+	failing_allocations--;
+	return true;
+}
 
 size_t live_strings() {
 	return strings_alive;
@@ -21,18 +37,32 @@ size_t live_objects() {
 	return objects_alive;
 }
 
-Str *new_string(std::string_view p_text) {
-	void *memory = std::malloc(sizeof(Str) + p_text.size() + 1);
+Str *join_strings(std::string_view p_first, std::string_view p_second) {
+	// A length is held in 32 bits: a longer text is refused as memory running out, never cut short.
+	// Two halves of a character that meet are joined into its four bytes (vm/text_units.h).
+	const size_t saved = joined_halves(p_first, p_second);
+	const uint64_t size = (uint64_t)p_first.size() + p_second.size() - saved;
+	void *memory = size > UINT32_MAX || allocation_fails() ? nullptr : std::malloc(sizeof(Str) + (size_t)size + 1);
 	if (!memory) {
 		return nullptr;
 	}
 	Str *string = new (memory) Str();
 	string->references = 1;
-	string->size = (uint32_t)p_text.size();
-	std::memcpy(string->data(), p_text.data(), p_text.size());
-	string->data()[p_text.size()] = 0;
+	string->size = (uint32_t)size;
+	if (saved) {
+		write_joined(p_first, p_second, string->data() + p_first.size() - 3);
+		p_first.remove_suffix(3);
+		p_second.remove_prefix(3);
+	}
+	std::memcpy(string->data(), p_first.data(), p_first.size());
+	std::memcpy(string->data() + size - p_second.size(), p_second.data(), p_second.size());
+	string->data()[size] = 0;
 	strings_alive++;
 	return string;
+}
+
+Str *new_string(std::string_view p_text) {
+	return join_strings(p_text, std::string_view());
 }
 
 void free_string(Str *p_string) {
@@ -40,25 +70,63 @@ void free_string(Str *p_string) {
 	std::free(p_string);
 }
 
-Object *new_object(uint32_t p_class, size_t p_fields) {
-	void *memory = std::calloc(1, sizeof(Object) + p_fields * sizeof(Slot));
+void list_init(Object *p_head) {
+	p_head->gc_previous = p_head;
+	p_head->gc_next = p_head;
+}
+
+void list_insert(Object *p_head, Object *p_object) {
+	p_object->gc_previous = p_head->gc_previous;
+	p_object->gc_next = p_head;
+	p_head->gc_previous->gc_next = p_object;
+	p_head->gc_previous = p_object;
+}
+
+void list_remove(Object *p_object) {
+	if (p_object->gc_next) {
+		p_object->gc_previous->gc_next = p_object->gc_next;
+		p_object->gc_next->gc_previous = p_object->gc_previous;
+		p_object->gc_previous = nullptr;
+		p_object->gc_next = nullptr;
+	}
+}
+
+void list_splice(Object *p_head, Object *p_from) {
+	if (list_empty(p_from)) {
+		return;
+	}
+	Object *first = p_from->gc_next;
+	Object *last = p_from->gc_previous;
+	first->gc_previous = p_head->gc_previous;
+	p_head->gc_previous->gc_next = first;
+	last->gc_next = p_head;
+	p_head->gc_previous = last;
+	list_init(p_from);
+}
+
+Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list) {
+	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Object) + p_fields * sizeof(Slot));
 	if (!memory) {
 		return nullptr;
 	}
 	Object *object = new (memory) Object();
 	object->references = 1;
 	object->klass = p_class;
+	if (p_list) {
+		list_insert(p_list, object);
+	}
 	objects_alive++;
 	return object;
 }
 
 void free_object(Object *p_object) {
+	list_remove(p_object);
 	objects_alive--;
 	std::free(p_object);
 }
 
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed) {
-	void *memory = std::calloc(1, sizeof(Vector));
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, Object *p_list) {
+	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Vector));
 	if (!memory) {
 		return nullptr;
 	}
@@ -72,6 +140,9 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed) {
 		return nullptr;
 	}
 	vector->length = p_length;
+	if (p_list) {
+		list_insert(p_list, vector);
+	}
 	return vector;
 }
 
@@ -85,7 +156,7 @@ bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 	if (capacity > UINT32_MAX) {
 		return false;
 	}
-	void *memory = std::realloc(p_vector->data, capacity * sizeof(Slot));
+	void *memory = allocation_fails() ? nullptr : std::realloc(p_vector->data, capacity * sizeof(Slot));
 	if (!memory) {
 		return false;
 	}
@@ -96,6 +167,7 @@ bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 }
 
 void free_vector(Vector *p_vector) {
+	list_remove(p_vector);
 	std::free(p_vector->data);
 	objects_alive--;
 	std::free(p_vector);
@@ -169,12 +241,16 @@ std::string number_to_string(double p_value) {
 }
 
 double string_to_number(std::string_view p_text) {
-	auto space = [](char p_c) { return p_c == ' ' || p_c == '\t' || p_c == '\n' || p_c == '\r' || p_c == '\f' || p_c == '\v'; };
-	while (!p_text.empty() && space(p_text.front())) {
-		p_text.remove_prefix(1);
-	}
-	while (!p_text.empty() && space(p_text.back())) {
-		p_text.remove_suffix(1);
+	p_text = without_leading_space(p_text);
+	while (!p_text.empty()) {
+		size_t last = p_text.size() - 1, size = 0;
+		while (last > 0 && (static_cast<unsigned char>(p_text[last]) & 0xC0) == 0x80) {
+			last--;
+		}
+		if (!is_text_space(code_point_at(p_text, last, &size))) {
+			break;
+		}
+		p_text.remove_suffix(p_text.size() - last);
 	}
 	if (p_text.empty()) {
 		return 0;
@@ -212,12 +288,39 @@ double string_to_number(std::string_view p_text) {
 	return end == text.c_str() + text.size() ? value : std::nan("");
 }
 
-int32_t character_count(std::string_view p_text) {
+int32_t utf16_length(std::string_view p_text) {
 	int32_t count = 0;
 	for (unsigned char c : p_text) {
-		count += (c & 0xC0) != 0x80;
+		count += (c & 0xC0) != 0x80; // A character starts here,
+		count += c >= 0xF0; // and one of four bytes is two units.
 	}
 	return count;
+}
+
+namespace {
+
+// The first UTF-16 unit of a code point: a character past U+FFFF starts with its high surrogate.
+uint32_t first_unit(uint32_t p_code_point) {
+	return p_code_point < 0x10000 ? p_code_point : 0xD800 + ((p_code_point - 0x10000) >> 10);
+}
+
+} // namespace
+
+int compare_utf16(std::string_view p_a, std::string_view p_b) {
+	size_t a = 0, b = 0;
+	while (a < p_a.size() && b < p_b.size()) {
+		size_t a_size = 0, b_size = 0;
+		const uint32_t x = code_point_at(p_a, a, &a_size);
+		const uint32_t y = code_point_at(p_b, b, &b_size);
+		if (x != y) {
+			const uint32_t x_unit = first_unit(x), y_unit = first_unit(y);
+			// With the same high surrogate, the low ones are in the code points' order.
+			return x_unit != y_unit ? (x_unit < y_unit ? -1 : 1) : (x < y ? -1 : 1);
+		}
+		a += a_size;
+		b += b_size;
+	}
+	return a < p_a.size() ? 1 : b < p_b.size() ? -1 : 0;
 }
 
 } // namespace vm

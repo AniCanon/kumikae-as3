@@ -70,9 +70,9 @@ bool Interpreter::length_is_fixed(const Vector *p_vector) {
 }
 
 Vector *Interpreter::fresh_vector(uint32_t p_class, uint64_t p_length) {
-	Vector *fresh = p_length <= UINT32_MAX ? new_vector(p_class, static_cast<uint32_t>(p_length), false) : nullptr;
+	Vector *fresh = p_length <= MAX_VECTOR_LENGTH ? new_vector(p_class, static_cast<uint32_t>(p_length), false, collector_.list_for(p_class)) : nullptr;
 	if (!fresh) {
-		raise(module_.error_class, "Error #1000: The system is out of memory.");
+		out_of_memory();
 	}
 	return fresh;
 }
@@ -95,6 +95,28 @@ Slot of_number(uint32_t p_value) {
 
 } // namespace
 
+// Whether an element is the value looked for. One of Godot's values or objects is the same as Godot says:
+// the same object, or an equal value. Null is only null.
+bool Interpreter::element_is(Kind p_kind, Slot p_element, Slot p_value) {
+	if (p_kind == Kind::Any) {
+		bool equal = false;
+		return any_equal(p_element, p_value, true, &equal) && equal;
+	}
+	if (!is_engine(p_kind)) {
+		return same_element(p_kind, p_element, p_value);
+	}
+	if (!p_element.p || !p_value.p) {
+		return p_element.p == p_value.p;
+	}
+	const Argument both[2] = { Argument{ p_kind, p_element }, Argument{ p_kind, p_value } };
+	Wanted wanted;
+	wanted.kind = Kind::Bool;
+	Slot equal;
+	equal.bits = 0;
+	std::string error;
+	return host_.handles.operate("==", both, 2, wanted, &equal, &error) && equal.b;
+}
+
 void Interpreter::vector_call(const Function &p_function, const Instruction &p_in) {
 	VectorCall call{ p_function.argument_lists[p_in.c], frames_.back().base, p_in.a, static_cast<VectorMethod>(p_in.b) };
 	Vector *vector = static_cast<Vector *>(argument(call, 0).p);
@@ -102,7 +124,6 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		raise_null();
 		return;
 	}
-	const Kind kind = module_.classes[vector->klass].element;
 	const uint32_t length = vector->length;
 	switch (call.method) {
 		case VectorMethod::Push:
@@ -115,26 +136,10 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		case VectorMethod::RemoveAt:
 			vector_take(vector, call);
 			break;
-		case VectorMethod::IndexOf: {
-			int32_t found = -1;
-			for (uint32_t i = clamped(argument(call, 2).i, length); i < length && found < 0; i++) {
-				found = same_element(kind, vector->data[i], argument(call, 1)) ? static_cast<int32_t>(i) : -1;
-			}
-			give(call, Kind::I32, of_number(static_cast<uint32_t>(found)));
+		case VectorMethod::IndexOf:
+		case VectorMethod::LastIndexOf:
+			vector_find(vector, call);
 			break;
-		}
-		case VectorMethod::LastIndexOf: {
-			int32_t found = -1;
-			// From the end if negative; before the start, there is nothing to look at.
-			const int32_t asked = argument(call, 2).i;
-			int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
-			from = from >= length ? static_cast<int64_t>(length) - 1 : from;
-			for (int64_t i = from; i >= 0 && found < 0; i--) {
-				found = same_element(kind, vector->data[i], argument(call, 1)) ? static_cast<int32_t>(i) : -1;
-			}
-			give(call, Kind::I32, of_number(static_cast<uint32_t>(found)));
-			break;
-		}
 		case VectorMethod::Reverse:
 			std::reverse(vector->data, vector->data + length);
 			give(call, Kind::Obj, share(Kind::Obj, of_pointer(vector)));
@@ -143,21 +148,53 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		case VectorMethod::Concat:
 			vector_copy(vector, call);
 			break;
-		case VectorMethod::Join: {
-			const Str *separator = static_cast<const Str *>(argument(call, 1).p);
-			const std::string between(separator ? separator->view() : std::string_view("null"));
-			std::string all;
-			retain(vector); // Kept while its elements speak for themselves, which may run the program.
-			const bool done = vector_text(vector, between, &all);
-			release_object(vector);
-			if (done) {
-				give(call, Kind::Str, of_pointer(text(all)));
-			}
+		case VectorMethod::Join:
+			vector_join(vector, call);
 			break;
-		}
 		case VectorMethod::Splice:
 			splice(vector, call);
 			break;
+		case VectorMethod::Sort:
+			vector_sort(vector, call);
+			break;
+		case VectorMethod::SortOn:
+			vector_sort_on(vector, call);
+			break;
+	}
+}
+
+// indexOf and lastIndexOf: the index of the first element, from the start or from the end, that is the
+// value, or -1.
+void Interpreter::vector_find(Vector *p_vector, const VectorCall &p_call) {
+	const Kind kind = module_.classes[p_vector->klass].element;
+	const uint32_t length = p_vector->length;
+	int32_t found = -1;
+	if (p_call.method == VectorMethod::IndexOf) {
+		for (uint32_t i = clamped(argument(p_call, 2).i, length); i < length && found < 0; i++) {
+			found = element_is(kind, p_vector->data[i], argument(p_call, 1)) ? static_cast<int32_t>(i) : -1;
+		}
+	} else {
+		// From the end if negative; before the start, there is nothing to look at.
+		const int32_t asked = argument(p_call, 2).i;
+		int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
+		from = from >= length ? static_cast<int64_t>(length) - 1 : from;
+		for (int64_t i = from; i >= 0 && found < 0; i--) {
+			found = element_is(kind, p_vector->data[i], argument(p_call, 1)) ? static_cast<int32_t>(i) : -1;
+		}
+	}
+	give(p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));
+}
+
+// join: the elements as text, with the separator given between them.
+void Interpreter::vector_join(Vector *p_vector, const VectorCall &p_call) {
+	const Str *separator = static_cast<const Str *>(argument(p_call, 1).p);
+	const std::string between(separator ? separator->view() : std::string_view("null"));
+	std::string all;
+	retain(p_vector); // Kept while its elements speak for themselves, which may run the program.
+	const bool done = vector_text(p_vector, between, &all);
+	release_object(p_vector);
+	if (done) {
+		give(p_call, Kind::Str, of_pointer(text(all)));
 	}
 }
 
@@ -200,9 +237,9 @@ void Interpreter::vector_take(Vector *p_vector, const VectorCall &p_call) {
 			return;
 		}
 	}
-	Slot element;
-	element.bits = 0;
-	// From an empty vector: the element type's empty value, which for every number is 0.
+	// From an empty vector: undefined, made the element type, as AVM2 does: NaN for a Number, 0 for the
+	// other numbers, false, null for the rest, and undefined itself for untyped elements.
+	Slot element = empty_value(kind == Kind::F64, false);
 	if (length != 0) {
 		element = p_vector->data[at];
 		shift_slots(p_vector, static_cast<uint32_t>(at) + 1, length - static_cast<uint32_t>(at) - 1, -1);
@@ -228,6 +265,10 @@ void Interpreter::vector_copy(Vector *p_vector, const VectorCall &p_call) {
 		}
 		return;
 	}
+	if (module_.classes[p_vector->klass].array) {
+		array_concat(p_vector, p_call);
+		return;
+	}
 	uint64_t total = 0;
 	for (size_t i = 0; i < p_call.list.size(); i++) {
 		const Vector *other = static_cast<const Vector *>(argument(p_call, i).p);
@@ -251,6 +292,39 @@ void Interpreter::vector_copy(Vector *p_vector, const VectorCall &p_call) {
 	give(p_call, Kind::Obj, of_pointer(all));
 }
 
+// Array's concat: the array's elements, then each argument's: an Array's elements (one level), anything
+// else as itself.
+void Interpreter::array_concat(Vector *p_array, const VectorCall &p_call) {
+	const auto spread = [&](Slot p_value) -> const Vector * {
+		const Object *object = any::tag(p_value) == AnyTag::Object ? static_cast<const Object *>(any::pointer(p_value)) : nullptr;
+		return object && module_.classes[object->klass].array ? static_cast<const Vector *>(object) : nullptr;
+	};
+	uint64_t total = p_array->length;
+	for (size_t i = 1; i < p_call.list.size(); i++) {
+		const Vector *other = spread(argument(p_call, i));
+		total += other ? other->length : 1;
+	}
+	Vector *all = fresh_vector(p_array->klass, total);
+	if (!all) {
+		return;
+	}
+	uint32_t at = 0;
+	for (uint32_t k = 0; k < p_array->length; k++) {
+		all->data[at++] = share(Kind::Any, p_array->data[k]);
+	}
+	for (size_t i = 1; i < p_call.list.size(); i++) {
+		const Slot value = argument(p_call, i);
+		if (const Vector *other = spread(value)) {
+			for (uint32_t k = 0; k < other->length; k++) {
+				all->data[at++] = share(Kind::Any, other->data[k]);
+			}
+		} else {
+			all->data[at++] = share(Kind::Any, value);
+		}
+	}
+	give(p_call, Kind::Obj, of_pointer(all));
+}
+
 // splice(start, count, ...items): takes `count` elements out from `start`, puts the items in their place,
 // and gives back what was taken out.
 void Interpreter::splice(Vector *p_vector, const VectorCall &p_call) {
@@ -263,8 +337,8 @@ void Interpreter::splice(Vector *p_vector, const VectorCall &p_call) {
 		return;
 	}
 	const uint64_t grown = static_cast<uint64_t>(length) - taken + added;
-	if (grown > UINT32_MAX || !vector_reserve(p_vector, static_cast<uint32_t>(grown))) {
-		raise(module_.error_class, "Error #1000: The system is out of memory.");
+	if (grown > MAX_VECTOR_LENGTH || !vector_reserve(p_vector, static_cast<uint32_t>(grown))) {
+		out_of_memory();
 		return;
 	}
 	Vector *removed = fresh_vector(p_vector->klass, taken);

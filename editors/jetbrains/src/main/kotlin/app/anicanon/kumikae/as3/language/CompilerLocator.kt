@@ -5,10 +5,10 @@ import java.nio.file.Path
 
 /** Finds `kas3c`, the compiler that is also the language server. */
 internal object CompilerLocator {
-
     /**
      * In order: the path the person set; a build of the compiler in the project or a folder above it (the
      * compiler's own repository); the one the plugin carries; the search path; the home folder's own bin.
+     * On Windows the program is `kas3c.exe` and the search path is split at `;`.
      */
     fun find(
         project: Path,
@@ -23,15 +23,14 @@ internal object CompilerLocator {
         val above = generateSequence(project.toAbsolutePath()) { it.parent }.flatMap {
             sequenceOf(it.resolve("compiler/build/$name"), it.resolve("build/$name"))
         }
-        val searched = searchPath.split(if (windows) ';' else ':').filter { it.isNotBlank() }
-            .map(Path::of).filter { it.isAbsolute }.map { it.resolve(name) }
+        // A part of the search path that is not a path at all is passed over, like a relative one.
+        val searched = searchPath.split(if (windows) ';' else ':')
+            .mapNotNull { part -> runCatching { Path.of(part) }.getOrNull()?.takeIf { it.isAbsolute } }
+            .map { it.resolve(name) }
         val known = if (windows) {
             emptyList()
         } else {
-            listOf(
-                Path.of("/opt/homebrew/bin", name),
-                Path.of("/usr/local/bin", name),
-            )
+            listOf(Path.of("/opt/homebrew/bin", name), Path.of("/usr/local/bin", name))
         }
         // A Path is itself a list of its parts: it is wrapped, or `+` would add "home", ".local", "bin".
         val last = sequenceOf(home.resolve(".local/bin/$name"))

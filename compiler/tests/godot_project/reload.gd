@@ -4,6 +4,7 @@ extends SceneTree
 
 var node: Node2D
 var other: Node
+var counted: RefCounted
 var frames := 0
 var stage := 0
 var since := 0
@@ -14,11 +15,14 @@ func show(name: String, got, want) -> void:
 func ask(method: String, arguments: Array = []):
 	return Callable(node, method).callv(arguments)
 
-func put(version: String) -> void:
-	var text := FileAccess.get_file_as_string("res://hot_%s.txt" % version)
+func hot_path() -> String:
 	# Where a person edits the scripts: the project, or the folder the game was told they are in.
 	var folder := OS.get_environment("KAS3_SOURCE_DIR")
-	var file := FileAccess.open(("res://" if folder.is_empty() else folder + "/") + "Hot.as", FileAccess.WRITE)
+	return ProjectSettings.globalize_path("res://Hot.as") if folder.is_empty() else folder + "/Hot.as"
+
+func put(version: String) -> void:
+	var text := FileAccess.get_file_as_string("res://hot_%s.txt" % version)
+	var file := FileAccess.open(hot_path(), FileAccess.WRITE)
 	file.store_string(text)
 	file.close()
 	since = Time.get_ticks_msec()
@@ -32,11 +36,15 @@ func _initialize() -> void:
 	root.add_child(node)
 	other = Node.new()
 	root.add_child(other)
+	counted = RefCounted.new()
+	counted.set_script(load("res://Counted.as"))
+	counted.set("n", 5)
 
 func _process(_delta: float) -> bool:
 	frames += 1
 	if stage == 0 and frames == 2:
 		ask("listen", [other])
+		ask("fill")
 		ask("bump")
 		ask("bump")
 		other.name = "first"
@@ -48,7 +56,13 @@ func _process(_delta: float) -> bool:
 		show("after an edit: the new code runs", ask("value"), 2)
 		show("after an edit: a field keeps its value", ask("count"), 2)
 		show("after an edit: a static field keeps its value", ask("total"), 2)
+		show("after an edit: a vector field keeps its elements", ask("seenText"), "1,2")
 		show("after an edit: a method that is new can be called", ask("added"), "new")
+		show("after an edit: a vector of a type the new code does not name keeps its elements", ask("bagText"), "2")
+		show("after an edit: a counted object keeps its field", counted.get("n"), 5)
+		var weak: WeakRef = weakref(counted)
+		counted = null
+		show("after an edit: a counted object goes when let go", weak.get_ref() == null, true)
 		other.name = "second"
 		show("after an edit: a listener added before runs the new code", ask("heard"), 11)
 		ask("unlisten", [other])
@@ -58,11 +72,43 @@ func _process(_delta: float) -> bool:
 		stage = 2
 	elif stage == 2 and waited(1500):
 		show("with an error: the game keeps the scripts it had", ask("value"), 2)
-		put("v3")
+		# The error is a class that is not there: it is fixed by a file of its own, in a new folder.
+		var folder := hot_path().get_base_dir().path_join("later")
+		DirAccess.make_dir_recursive_absolute(folder)
+		var later := FileAccess.open(folder.path_join("Later.as"), FileAccess.WRITE)
+		later.store_string("package { public class Later { public static function zero():int { return 0; } } }\n")
+		later.close()
+		since = Time.get_ticks_msec()
 		stage = 3
 	elif stage == 3 and (ask("value") == 3 or waited(8000)):
-		show("once the error is fixed: the new code runs", ask("value"), 3)
+		show("once the error is fixed, by a file in a new folder: the new code runs", ask("value"), 3)
 		show("once the error is fixed: the field still has its value", ask("count"), 2)
+		# A save of the same size with the same time as the last (two saves within one second): still seen.
+		var stamp := ProjectSettings.globalize_path("user://stamp")
+		OS.execute("touch", ["-r", hot_path(), stamp])
+		put("v4")
+		OS.execute("touch", ["-r", stamp, hot_path()])
+		stage = 4
+	elif stage == 4 and (ask("value") == 4 or waited(8000)):
+		show("a save of the same size in the same second is seen", ask("value"), 4)
+		# A reload asked for while AS3 runs (AS3 emits a signal, GDScript hears it and asks): refused.
+		var emitter := Node.new()
+		emitter.set_script(load("res://Signals.as"))
+		root.add_child(emitter)
+		emitter.renamed.connect(func():
+			for i in Engine.get_script_language_count():
+				if Engine.get_script_language(i).has_method("reload_scripts"):
+					Engine.get_script_language(i).call("reload_scripts"))
+		emitter.call("fire")
+		emitter.free()
+		show("a reload asked for while AS3 runs is refused: the code stays", ask("value"), 4)
+		# An untyped field holds a Later; the next version, and the project, no longer have the class.
+		ask("holdLater")
+		DirAccess.remove_absolute(hot_path().get_base_dir().path_join("later/Later.as"))
+		put("v5")
+		stage = 5
+	elif stage == 5 and waited(1500):
+		show("a class gone while an object of it is alive: the game keeps the scripts it had", ask("value"), 4)
 		node.free()
 		other.free()
 		return true

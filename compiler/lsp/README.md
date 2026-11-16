@@ -7,8 +7,11 @@ any editor that speaks the Language Server Protocol. Setting up an editor is in
 | Files | Job |
 |---|---|
 | `server`, `server_queue`, `server_documents` | Framed transport, dispatch, bounded lookahead and document versions |
+| `server_places`, `server_diagnostics`, `server_navigation`, `server_completion` | Positions and URIs in the editor's terms; the errors sent after a check; definition, references, hover and symbols; completion and signature help |
 | `workspace` | The project's files as the editor has them, and re-checking after an edit |
-| `json`, `uri` | The wire format |
+| `channel` | Messages framed with `Content-Length`, over binary input and output |
+| `json`, `uri`, `positions` | The wire format |
+| `paths` | Paths as text, one spelling on every system; Windows' rules are tested everywhere |
 
 ## Rules
 

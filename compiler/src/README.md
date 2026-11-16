@@ -6,20 +6,20 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
 | Files | Job |
 |---|---|
 | `source`, `token`, `lexer` | Text to tokens |
-| `parser.cpp`, `parser_decl`, `parser_stmt`, `parser_expr` | Tokens to the tree in `ast.h`, one file per kind of syntax |
-| `ast.h`, `ast_walk.h`, `ast_printer`, `ast_reset`, `arena.h` | The tree, its one walk, its printed form, its memory |
-| `names*.cpp`, `names.h` | Declarations, scopes, imports, and the rules about them |
+| `parser.cpp`, `parser_decl`, `parser_stmt`, `parser_expr`, `parser_literals`, `parser_types`, `parser_functions` | Tokens to the tree in `ast.h`, one file per kind of syntax |
+| `ast.h` (with `ast_node.h`, `ast_expr.h`, `ast_stmt.h`), `ast_walk.h`, `ast_printer` (the dispatch; the parts in `ast_printer_parts.cpp`, the class in `ast_printer_class.h`), `ast_reset`, `arena.h` | The tree, its one walk, its printed form, its memory |
+| `names*.cpp`, `names.h`, `names_symbols.h`, `names_resolver.h` | Declarations, scopes, imports, and the rules about them; `names_lookup` looks up a name at package level and `names_members` on a class; the bodies pass is `names_bodies`, `names_locals`, `names_statements` and `names_expressions` |
 | `typer.h`, `typer_*.cpp`, `type_table.cpp` | The type of each expression and what fits where, by what is typed |
 | `whole_numbers` | Rules the checker and the lowerer must agree on, written once |
 | `godot_names.cpp`, `builtins.h` | The name table and AS3's own declarations |
-| `query*`, `completion*` | Editor queries, lexical context, completion candidates/edits and active-call signatures |
+| `query*`, `completion*` | Editor queries (`query_symbols`: outline and symbol search), lexical context, completion candidates/edits and active-call signatures |
 | `diagnostics` | Every error, as `file:line:column: error: message` |
 
 ## Rules
 
 - **Depends on nothing else here.** No include from `ir/`, `vm/`, `godot_ext/` or `lsp/`, and no Godot
   header. Godot's API arrives as AS3 declarations, like any source file.
-- **A new syntax form** needs its node in `ast.h`, its case in `ast_walk.h` and `ast_printer.cpp`, and a
+- **A new syntax form** needs its node in `ast.h` or the header it includes for that kind of node, its case in `ast_walk.h` and `ast_printer.cpp`, and a
   golden file under `tests/golden/`.
 - **A new diagnostic** is written once, with `quoted()` for names, and has a test in
   `tests/test_type_errors.cpp` or a file under `tests/golden/errors/`.

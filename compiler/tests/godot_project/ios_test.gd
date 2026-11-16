@@ -27,6 +27,31 @@ func _ready() -> void:
 	label.add_theme_font_size_override("font_size", 22)
 	add_child(label)
 	label.text = "ActionScript 3 in Godot on " + OS.get_name() + "\nrunning..."
+	# Attached here, not in the scene: a scene that names a script which can't load does not load at all,
+	# and then nothing would say why.
+	var script = load("res://Player.as")
+	if script == null or not script.can_instantiate():
+		failed = 1
+		finish("the project's scripts did not load: the errors are in the log. (A library built before a script used something new can't compile it: build the library again.)")
+		return
+	$Player.set_script(script)
+	# Godot turns physics processing on as a node enters the tree; this one is in it already.
+	$Player.set_physics_process(true)
+
+# The run is over: the report on screen, in the log, and (on a phone the log is not always in reach) as a
+# file in the app's own folder.
+func publish() -> void:
+	label.text = "ActionScript 3 in Godot on %s\n%d passed, %d failed\n\n%s" % [OS.get_name(), passed, failed, "\n".join(report)]
+	print("AS3TEST DONE passed=%d failed=%d" % [passed, failed])
+	var file := FileAccess.open("user://as3test.txt", FileAccess.WRITE)
+	if file:
+		file.store_string("%s\n%d passed, %d failed\n%s\n" % [OS.get_name(), passed, failed, "\n".join(report)])
+	set_physics_process(false)
+
+func finish(why: String) -> void:
+	report.append("FAIL  " + why)
+	print("AS3TEST " + report[-1])
+	publish()
 
 func _physics_process(_delta: float) -> void:
 	frames += 1
@@ -53,9 +78,4 @@ func _physics_process(_delta: float) -> void:
 	check("Int64: the largest value", wide.call("echo", 9223372036854775807), 9223372036854775807)
 	check("Int64: a wide value for a Vector2i is refused", wide.call("cell", 4294967299), null)
 	check("an AS3 error is reported and the engine carries on", true, true)
-	label.text = "ActionScript 3 in Godot on %s\n%d passed, %d failed\n\n%s" % [OS.get_name(), passed, failed, "\n".join(report)]
-	print("AS3TEST DONE passed=%d failed=%d" % [passed, failed])
-	# On a phone the log is not always in reach: the same report as a file in the app's own folder.
-	var file := FileAccess.open("user://as3test.txt", FileAccess.WRITE)
-	if file:
-		file.store_string("%s\n%d passed, %d failed\n%s\n" % [OS.get_name(), passed, failed, "\n".join(report)])
+	publish()

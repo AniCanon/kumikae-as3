@@ -36,6 +36,9 @@ internal class RiderLifetimeListener : ProjectManagerListener {
         frame?.afterClose(project)
     }
 
+    // Deprecated in favour of a startup activity, which runs too late: the native startup activities this
+    // replaces have run by then. No undeprecated hook runs before them in the builds this plugin supports.
+    @Suppress("OVERRIDE_DEPRECATION")
     override fun projectOpened(project: Project) {
         if (needsRiderLifetimeRepair()) {
             project.putUserData(CLOSING_PROJECT, null)

@@ -1,3 +1,0 @@
-forin.as:1:77: error: creating a 'Object' is not supported by the interpreter yet
-forin.as:1:87: error: 'for in' is not supported by the interpreter yet
-forin.as:1:125: error: 'for each' is not supported by the interpreter yet

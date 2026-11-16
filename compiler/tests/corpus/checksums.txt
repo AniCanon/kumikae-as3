@@ -1,0 +1,9 @@
+# What each corpus program's checksum() is after ten frames in Godot, for those whose work does not depend
+# on the time between frames (run_godot.py compares). Sieve's is ten times the 17984 primes below 200000.
+Alloc 200040000.0
+ArrayConversion 2000.0
+Empty 0.0
+NBody -0.16908926275527
+Saxpy 5000199997.5
+Shapes 41313945.2513847
+Sieve 179840.0

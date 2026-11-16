@@ -15,6 +15,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Launch configuration and VFS work belong to the project, independently of its LSP adapter. */
 @Service(Service.Level.PROJECT)
 internal class As3ProjectLanguageService(private val project: Project) : Disposable {
+    // Shared by the project's LSP4IJ launcher, which sees what is sent, and its client, which is answered.
+    val sentVersions = SentVersions()
     private val warned = AtomicBoolean()
     private val warnedClient = AtomicBoolean()
     private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)

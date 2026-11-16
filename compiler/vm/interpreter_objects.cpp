@@ -1,5 +1,8 @@
 #include "interpreter_internal.h"
 
+#include "regex.h"
+#include "table.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -101,59 +104,57 @@ void Interpreter::put(Kind p_kind, Slot &p_target, Slot p_owned) {
 }
 
 // Frees an object whose last reference is gone, and whatever that in turn leaves unreferenced. A list
-// rather than recursion: a long chain of objects must not overflow the C++ stack.
+// rather than recursion: a long chain of objects must not overflow the C++ stack. Letting go of an engine
+// value can run code that frees more objects: those join the list of the call already freeing, which keeps
+// one list for every call and allocates nothing once it has grown.
 void Interpreter::drop_object(Object *p_object) {
-	std::vector<Object *> dead;
-	dead.push_back(p_object);
-	while (!dead.empty()) {
-		Object *object = dead.back();
-		dead.pop_back();
+	dying_.push_back(p_object);
+	if (freeing_) {
+		return;
+	}
+	freeing_ = true;
+	while (!dying_.empty()) {
+		Object *object = dying_.back();
+		dying_.pop_back();
 		const ir::Class &klass = module_.classes[object->klass];
-		if (klass.element != Kind::Void) {
-			// A vector: its elements are let go as fields are, and its own memory is freed its own way.
-			Vector *vector = static_cast<Vector *>(object);
-			for (uint32_t i = 0; held(klass.element) && i < vector->length; i++) {
-				Slot element = vector->data[i];
-				vector->data[i].bits = 0;
-				if (klass.element == Kind::Obj) {
-					if (release(static_cast<Object *>(element.p))) {
-						dead.push_back(static_cast<Object *>(element.p));
-					}
-				} else {
-					drop(klass.element, element);
-				}
-			}
-			free_vector(vector);
-			continue;
+		if (klass.counted && host_.handles.keep(object)) {
+			continue; // The engine still holds its Godot object, and keeps it.
 		}
-		for (size_t i = 0; i < klass.fields.size(); i++) {
-			Slot &field = object->fields()[i];
-			if (klass.fields[i].kind == Kind::Str) {
-				Str *string = static_cast<Str *>(field.p);
-				if (release(string)) {
-					free_string(string);
-				}
-			} else if (klass.fields[i].kind == Kind::Obj) {
-				Object *other = static_cast<Object *>(field.p);
-				if (release(other)) {
-					dead.push_back(other);
-				}
-			} else if (ir::is_engine(klass.fields[i].kind) && field.p) {
-				void *handle = field.p;
-				field.p = nullptr;
-				host_.handles.drop(handle);
-			} else if (klass.fields[i].kind == Kind::Any) {
-				const Slot value = field;
-				field.bits = 0;
-				Object *other = any::tag(value) == AnyTag::Object ? static_cast<Object *>(any::pointer(value)) : nullptr;
-				if (!other) {
-					drop_any(value);
-				} else if (release(other)) {
-					dead.push_back(other); // On the list, as an object field is: no recursion.
-				}
-			}
+		std::vector<Entry> taken = take_entries(klass, object);
+		each_held(klass, object, [this](Kind p_kind, Slot &p_slot) { let_go(p_kind, p_slot); });
+		for (Entry &entry : taken) {
+			let_go(Kind::Any, entry.key);
+			let_go(Kind::Any, entry.value);
 		}
-		free_object(object);
+		if (klass.table) {
+			free_table(object);
+		} else if (klass.element != Kind::Void) {
+			free_properties(static_cast<Vector *>(object));
+			free_vector(static_cast<Vector *>(object));
+		} else {
+			free_object(object);
+		}
+	}
+	freeing_ = false;
+}
+
+// Empties one slot of an object being freed. An object it held whose last reference this was goes on the
+// list of those to free, as drop_object() keeps it.
+void Interpreter::let_go(Kind p_kind, Slot &p_slot) {
+	const Slot value = p_slot;
+	p_slot.bits = 0; // First: letting go of an engine value can run code that reads it.
+	Object *other = p_kind == Kind::Obj ? static_cast<Object *>(value.p)
+			: p_kind == Kind::Any && any::tag(value) == AnyTag::Object ? static_cast<Object *>(any::pointer(value))
+																	 : nullptr;
+	if (other) {
+		if (release(other)) {
+			dying_.push_back(other);
+		}
+	} else if (p_kind == Kind::Any) {
+		drop_any(value);
+	} else {
+		Slot copy = value;
+		drop(p_kind, copy);
 	}
 }
 
@@ -164,13 +165,22 @@ void Interpreter::assign(Kind p_kind, Slot &p_slot, void *p_value) {
 	drop(p_kind, old);
 }
 
+// Null, and the error raised, when there is no memory for it.
 Str *Interpreter::text(const std::string &p_text) {
-	return new_string(p_text);
+	Str *made = new_string(p_text);
+	if (!made) {
+		out_of_memory();
+	}
+	return made;
 }
 
 bool Interpreter::is_class(const Object *p_object, uint32_t p_class) const {
 	if (!p_object) {
 		return false;
+	}
+	if (module_.classes[p_class].is_interface) {
+		const std::vector<uint32_t> &implemented = module_.classes[p_object->klass].interfaces;
+		return std::find(implemented.begin(), implemented.end(), p_class) != implemented.end();
 	}
 	for (uint32_t at = p_object->klass; at != NONE; at = module_.classes[at].base) {
 		if (at == p_class) {
@@ -180,6 +190,20 @@ bool Interpreter::is_class(const Object *p_object, uint32_t p_class) const {
 	return false;
 }
 
+uint32_t Interpreter::interface_function(const Object *p_object, uint32_t p_method) {
+	if (!p_object) {
+		raise_null();
+		return NONE;
+	}
+	const std::vector<uint32_t> &table = module_.classes[p_object->klass].interface_methods;
+	const uint32_t function = p_method < table.size() ? table[p_method] : NONE;
+	if (function == NONE) {
+		const std::string name = p_method < module_.interface_methods.size() ? module_.interface_methods[p_method] : std::string("a method");
+		raise(module_.type_error_class, "Error #1006: " + name + " is not a function.");
+	}
+	return function;
+}
+
 std::string Interpreter::object_text(Object *p_object) const {
 	if (!p_object) {
 		return "null";
@@ -187,9 +211,17 @@ std::string Interpreter::object_text(Object *p_object) const {
 	const std::string &name = module_.classes[p_object->klass].name;
 	std::string simple = name.substr(name.rfind('.') == std::string::npos ? 0 : name.rfind('.') + 1);
 	if (module_.error_class != NONE && is_class(p_object, module_.error_class)) {
-		// An Error reads as its class and its message.
-		Str *message = static_cast<Str *>(p_object->fields()[0].p);
-		return message && message->size ? simple + ": " + std::string(message->view()) : simple;
+		return error_heading(p_object); // A class of the program's that extends Error is named "Error".
+	}
+	if (p_object->klass == module_.date_class) {
+		return date_text(p_object, ir::DateText::Full);
+	}
+	if (p_object->klass == module_.function_class) {
+		return "function Function() {}"; // avmplus's Function.as: no source text is kept, for any function.
+	}
+	if (p_object->klass == module_.regexp_class) {
+		const Str *source = static_cast<const Str *>(p_object->fields()[ir::REGEXP_SOURCE].p);
+		return regex::regexp_text(source ? source->view() : std::string_view(), static_cast<uint8_t>(p_object->fields()[ir::REGEXP_FLAGS].i));
 	}
 	return "[object " + simple + "]";
 }
@@ -199,17 +231,19 @@ bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_v
 		return false;
 	}
 	const ir::Class &klass = module_.classes[p_object->klass];
-	// The class's own field hides a base's of the same name: the last one wins.
-	for (size_t i = klass.fields.size(); i-- > 0;) {
-		if (klass.fields[i].name == p_name) {
-			*r_value = p_object->fields()[i];
-			if (r_kind) {
-				*r_kind = klass.fields[i].kind;
-			}
-			return true;
-		}
+	const std::optional<uint32_t> field = klass.field(p_name);
+	if (!field) {
+		return false;
 	}
-	return false;
+	*r_value = p_object->fields()[*field];
+	if (r_kind) {
+		*r_kind = klass.fields[*field].kind;
+	}
+	return true;
+}
+
+void Interpreter::set_field(Object *p_object, uint32_t p_field, Slot p_owned) {
+	put(module_.classes[p_object->klass].fields[p_field].kind, p_object->fields()[p_field], p_owned);
 }
 
 Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
@@ -223,7 +257,7 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		}
 		return nullptr;
 	}
-	Object *object = new_object(p_class, klass.fields.size());
+	Object *object = new_object(p_class, klass.fields.size(), collector_.list_for(p_class));
 	if (!object) {
 		if (p_owner) {
 			host_.handles.drop(p_owner);

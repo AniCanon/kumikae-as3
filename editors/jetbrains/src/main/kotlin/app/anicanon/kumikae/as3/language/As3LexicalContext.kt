@@ -9,8 +9,10 @@ internal class As3LexicalContext {
     private var pending = NONE
     private var property = false
 
-    // Common nesting fits in a portable restart state. Deeper input uses a prefix replay on restart,
-    // never a truncated stack or an interning table that grows with the document's edit history.
+    // The editor keeps sixteen bits of a restartable lexer's state, sign-extended, so a packed state stays
+    // below 0x8000. Class members' nesting fits; deeper input is REPLAY, which the editor never restarts
+    // at and which start() lexes again from the top: never a truncated stack, and never an interning table
+    // that grows with the document's edit history.
     val state: Int
         get() {
             if (frames.size > MAX_PACKED_DEPTH) return REPLAY
@@ -141,7 +143,7 @@ internal class As3LexicalContext {
     companion object {
         const val REPLAY = -1
         private const val FLAG_BITS = 6
-        private const val MAX_PACKED_DEPTH = 6
+        private const val MAX_PACKED_DEPTH = 2 // A sentinel bit and two four-bit frames, above the flags.
         private const val CONDITIONAL = 8
         private const val NONE = 0
         private const val BLOCK = 1

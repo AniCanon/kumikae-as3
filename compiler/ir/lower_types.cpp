@@ -1,4 +1,5 @@
-#include "lowerer.h"
+#include "lower_dynamic.h"
+#include "lower_library.h"
 
 namespace kas3 {
 namespace ir {
@@ -21,11 +22,10 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		return true;
 	}
 	if (p_type->kind == Type::Vector) {
-		// A vector is an object, if the interpreter can hold what is in it. Untyped elements wait for
-		// Array (2c-3).
+		// A vector is an object, if the interpreter can hold what is in it.
 		Kind element = Kind::Void;
 		*r_kind = Kind::Obj;
-		return kind_of(p_type->element, &element) && element != Kind::Void && element != Kind::Any;
+		return kind_of(p_type->element, &element) && element != Kind::Void;
 	}
 	if (p_type->kind != Type::Instance || !p_type->symbol) {
 		return false;
@@ -45,7 +45,8 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Str;
 	} else if (symbol == object_) {
 		*r_kind = Kind::Any; // An Object may hold any value, numbers too.
-	} else if (classes_.count(symbol) || is_error(symbol)) {
+	} else if (classes_.count(symbol) || is_error(symbol) || is_dictionary(symbol) || (symbol == function_ && function_) || (symbol == array_ && array_) ||
+			Library::holds(symbol)) {
 		*r_kind = Kind::Obj;
 	} else if (is_godot(symbol) && symbol->kind == SymbolKind::Class) {
 		*r_kind = is_godot_object(symbol) ? Kind::Ref : Kind::Val;
@@ -69,26 +70,27 @@ bool Lowerer::is_godot_object(const Symbol *p_class) const {
 }
 
 bool Lowerer::engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_string) {
-	std::string name;
-	if (!p_class || !godot_name(p_class->name, p_member, &name)) {
+	const std::optional<std::string> name = p_class ? godot_name(p_class->name, p_member) : std::nullopt;
+	if (!name) {
 		return false;
 	}
-	*r_string = string(name);
+	*r_string = string(*name);
 	return true;
 }
 
 Kind Lowerer::written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing) {
 	if (!p_type) {
-		if (p_missing == Kind::Void) {
-			return Kind::Void;
-		}
-		refuse(p_offset, "a declaration without a type");
-		return Kind::F64;
+		// No type written: AS3 takes it as `*` (the checker says so).
+		(void)p_offset;
+		return p_missing == Kind::Void ? Kind::Void : Kind::Any;
 	}
 	Kind kind = Kind::Void;
 	if (!kind_of(compilation_.type_of(p_type), &kind)) {
 		refuse(p_type->offset, "the type '" + compilation_.type_name(compilation_.type_of(p_type)) + "'");
-		return Kind::F64;
+		refused_types_.insert(compilation_.type_of(p_type));
+		// What it would be held as, where that is known (a vector of a kind not held yet is an object):
+		// the rest of the program then lowers without errors that only follow from this one.
+		return kind == Kind::Void ? Kind::F64 : kind;
 	}
 	return kind;
 }
@@ -108,10 +110,66 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 		*r_index = found->second;
 		return true;
 	}
+	if (is_dictionary(p_class)) {
+		*r_index = Dynamic(*this).table_class(true);
+		classes_[p_class] = *r_index;
+		return true;
+	}
+	if (const std::optional<uint32_t> library = Library::class_of(*this, p_class)) {
+		*r_index = *library;
+		return true;
+	}
+	if (p_class && p_class == function_) {
+		// Function: the built-in class of function values (FUNCTION_INDEX and FUNCTION_FIRST in ir_codes.h).
+		Class klass;
+		klass.name = "Function";
+		klass.fields = { { "function", Kind::I32 }, { "first", Kind::Obj } };
+		klass.built_in = true;
+		module_.classes.push_back(std::move(klass));
+		module_.function_class = *r_index = (uint32_t)module_.classes.size() - 1;
+		classes_[p_class] = module_.function_class;
+		return true;
+	}
 	if (!p_class || !p_class->unit || !p_class->unit->is_builtin || !is_error(p_class)) {
 		return false;
 	}
-	// Error and its built-in subclasses: one field, and a constructor that stores the message.
+	return error_class(p_class, r_index);
+}
+
+namespace {
+
+// The constructor error_class() gives each class it makes. p_name: the class's own name, among the module's
+// strings.
+Function error_constructor(const std::string &p_class_name, uint32_t p_owner, uint32_t p_name) {
+	Function constructor;
+	constructor.name = p_class_name;
+	constructor.owner = p_owner;
+	constructor.parameters = 3;
+	constructor.registers = { Kind::Obj, Kind::Str, Kind::I32, Kind::Str, Kind::Str };
+	const auto op = [&](Op p_op, uint32_t p_a, uint32_t p_b, uint32_t p_c) {
+		Instruction made;
+		made.op = p_op;
+		made.a = p_a;
+		made.b = p_b;
+		made.c = p_c;
+		constructor.code.push_back(made);
+	};
+	op(Op::SetField, 0, ERROR_MESSAGE, 1);
+	op(Op::SetField, 0, ERROR_ID, 2);
+	op(Op::ConstStr, 3, p_name, 0);
+	op(Op::SetField, 0, ERROR_NAME, 3);
+	op(Op::ErrorStack, 4, 0, 0);
+	op(Op::SetField, 0, ERROR_STACK, 4);
+	op(Op::ReturnVoid, 0, 0, 0);
+	return constructor;
+}
+
+} // namespace
+
+// Error and its built-in subclasses: message, name, errorID and the stack trace (ERROR_MESSAGE and the
+// rest in ir_codes.h), and a constructor that stores the message and the id, and takes the trace where it
+// is made, as Flash does.
+bool Lowerer::error_class(const Symbol *p_class, uint32_t *r_index) {
 	uint32_t base = NONE;
 	if (p_class != error_ && !class_index(p_class->klass->base, &base)) {
 		return false;
@@ -119,34 +177,24 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	Class klass;
 	klass.name = class_name(p_class);
 	klass.base = base;
-	klass.fields.push_back({ "message", Kind::Str });
-	Function constructor;
-	constructor.name = klass.name;
-	constructor.owner = (uint32_t)module_.classes.size();
-	constructor.parameters = 2;
-	constructor.registers = { Kind::Obj, Kind::Str };
-	Instruction store;
-	store.op = Op::SetField;
-	store.a = 0;
-	store.b = 0;
-	store.c = 1;
-	constructor.code.push_back(store);
-	Instruction done;
-	done.op = Op::ReturnVoid;
-	constructor.code.push_back(done);
+	klass.fields = { { "message", Kind::Str, NONE, false, true }, { "name", Kind::Str, NONE, false, true }, { "errorID", Kind::I32, NONE, false, true },
+		{ "stack", Kind::Str } };
+	klass.built_in = true;
+	Function constructor = error_constructor(klass.name, (uint32_t)module_.classes.size(), string(std::string(p_class->name)));
 	klass.constructor = (uint32_t)module_.functions.size();
 	module_.functions.push_back(std::move(constructor));
 	module_.classes.push_back(std::move(klass));
 	uint32_t index = (uint32_t)module_.classes.size() - 1;
 	classes_[p_class] = index;
-	if (p_class->klass->constructor) {
-		functions_[p_class->klass->constructor] = module_.classes[index].constructor;
+	if (const FunctionDecl *declared = declaration(p_class->klass->constructor)) {
+		functions_[declared] = module_.classes[index].constructor;
 	}
-	Symbol *message = nullptr;
-	auto member = error_->klass->members.find("message");
-	if (member != error_->klass->members.end()) {
-		message = member->second;
-		fields_[message] = 0;
+	// What AS3 reads of an Error: its message, its name, and errorID (a getter, read as the field).
+	for (const auto &[name, field] : { std::pair<const char *, uint32_t>{ "message", ERROR_MESSAGE }, { "name", ERROR_NAME }, { "errorID", ERROR_ID } }) {
+		auto member = error_->klass->members.find(name);
+		if (member != error_->klass->members.end()) {
+			fields_[member->second] = field;
+		}
 	}
 	*r_index = index;
 	return true;
@@ -218,7 +266,8 @@ uint32_t Lowerer::convert_wide(uint32_t p_reg, Kind p_to, uint32_t p_position, b
 		case Kind::Bool:
 			return step(Op::F64ClampI64, Kind::I64, step(Op::BoolToF64, Kind::F64, p_reg));
 		case Kind::Str:
-			return step(Op::StrToI64, Kind::I64, p_reg);
+			// Written out, cut as AS3 cuts; otherwise text that is no whole number an Int64 holds is a RangeError.
+			return step(p_written ? Op::StrToI64 : Op::StrToI64Checked, Kind::I64, p_reg);
 		default:
 			refuse(p_position, is_engine(from) ? "converting a Godot value" : "converting an object to a number");
 			return default_value(Kind::I64, p_position);
@@ -259,10 +308,58 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 		emit(Op::HostPresent, p_position, out, p_reg);
 		return out;
 	}
+	if (from == Kind::Obj && p_to == Kind::Ref) {
+		// A script object where one of Godot's objects is wanted: the Godot object it is attached to. One
+		// with none (of a class that extends no Godot class) is AS3's TypeError as it runs.
+		uint32_t out = reg(Kind::Ref);
+		emit(Op::OwnerOf, p_position, out, p_reg);
+		return out;
+	}
 	if (is_engine(from) || is_engine(p_to)) {
 		refuse(p_position, is_engine(from) ? "converting a Godot value" : "passing this value where a Godot value is expected");
 		return default_value(p_to, p_position);
 	}
+	return convert_primitive(p_reg, p_to, p_position);
+}
+
+namespace {
+
+// The operation that makes a Boolean of a value of the kind (int, uint, Number, String, or an object).
+Op to_boolean_op(Kind p_from) {
+	switch (p_from) {
+		case Kind::I32:
+			return Op::I32ToBool;
+		case Kind::U32:
+			return Op::U32ToBool;
+		case Kind::F64:
+			return Op::F64ToBool;
+		case Kind::Str:
+			return Op::StrToBool;
+		default:
+			return Op::ObjToBool;
+	}
+}
+
+// The operation that makes a String of a value of the kind (int, uint, Number, Boolean, or an object).
+Op to_string_op(Kind p_from) {
+	switch (p_from) {
+		case Kind::I32:
+			return Op::I32ToStr;
+		case Kind::U32:
+			return Op::U32ToStr;
+		case Kind::F64:
+			return Op::F64ToStr;
+		case Kind::Bool:
+			return Op::BoolToStr;
+		default:
+			return Op::ObjToStr;
+	}
+}
+
+} // namespace
+
+uint32_t Lowerer::convert_primitive(uint32_t p_reg, Kind p_to, uint32_t p_position) {
+	const Kind from = kind_at(p_reg);
 	auto via = [&](Op p_op, Kind p_kind, uint32_t p_source) {
 		uint32_t out = reg(p_kind);
 		emit(p_op, p_position, out, p_source);
@@ -280,6 +377,8 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 				return via(Op::StrToF64, Kind::F64, p_reg);
 			case Kind::F64:
 				return p_reg;
+			case Kind::Obj:
+				return via(Op::ObjToF64, Kind::F64, p_reg);
 			default:
 				refuse(p_position, "converting an object to a number");
 				return via(Op::ConstF64, Kind::F64, number(0));
@@ -299,31 +398,9 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 			}
 			return via(Op::F64ToU32, Kind::U32, to_number());
 		case Kind::Bool:
-			switch (from) {
-				case Kind::I32:
-					return via(Op::I32ToBool, Kind::Bool, p_reg);
-				case Kind::U32:
-					return via(Op::U32ToBool, Kind::Bool, p_reg);
-				case Kind::F64:
-					return via(Op::F64ToBool, Kind::Bool, p_reg);
-				case Kind::Str:
-					return via(Op::StrToBool, Kind::Bool, p_reg);
-				default:
-					return via(Op::ObjToBool, Kind::Bool, p_reg);
-			}
+			return via(to_boolean_op(from), Kind::Bool, p_reg);
 		case Kind::Str:
-			switch (from) {
-				case Kind::I32:
-					return via(Op::I32ToStr, Kind::Str, p_reg);
-				case Kind::U32:
-					return via(Op::U32ToStr, Kind::Str, p_reg);
-				case Kind::F64:
-					return via(Op::F64ToStr, Kind::Str, p_reg);
-				case Kind::Bool:
-					return via(Op::BoolToStr, Kind::Str, p_reg);
-				default:
-					return via(Op::ObjToStr, Kind::Str, p_reg);
-			}
+			return via(to_string_op(from), Kind::Str, p_reg);
 		case Kind::Obj:
 			refuse(p_position, "converting a value to an object");
 			return default_value(Kind::Obj, p_position);
@@ -338,8 +415,10 @@ Kind Lowerer::natural(Expr *p_expression) {
 		return Kind::Obj;
 	}
 	if (!kind_of(p_expression->type, &kind)) {
-		refuse(p_expression->offset, "a value of type '" + compilation_.type_name(p_expression->type) + "'");
-		return Kind::F64;
+		if (refused_types_.insert(p_expression->type).second) {
+			refuse(p_expression->offset, "a value of type '" + compilation_.type_name(p_expression->type) + "'");
+		}
+		return kind == Kind::Void ? Kind::F64 : kind;
 	}
 	return kind;
 }

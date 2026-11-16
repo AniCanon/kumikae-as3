@@ -1,6 +1,9 @@
 #include "lexer.h"
 
+#include <array>
+#include <cstdint>
 #include <cstdio>
+#include <iterator>
 
 namespace kas3 {
 
@@ -185,125 +188,125 @@ Token Lexer::lex_string(uint32_t p_start, bool p_newline_before) {
 }
 
 // Longest match over the punctuation and operators. Returns Error if the character starts none.
-TokenKind Lexer::lex_punctuation() {
-	auto follows = [this](const char *p_rest) {
-		uint32_t at = position_ + 1;
-		for (const char *c = p_rest; *c; c++, at++) {
-			if (at >= size_ || text_[at] != *c) {
-				return false;
-			}
-		}
-		return true;
-	};
-	auto take = [this](uint32_t p_length, TokenKind p_kind) {
-		position_ += p_length;
-		return p_kind;
-	};
-	switch (text_[position_]) {
-		case '(':
-			return take(1, TokenKind::LParen);
-		case ')':
-			return take(1, TokenKind::RParen);
-		case '{':
-			return take(1, TokenKind::LBrace);
-		case '}':
-			return take(1, TokenKind::RBrace);
-		case '[':
-			return take(1, TokenKind::LBracket);
-		case ']':
-			return take(1, TokenKind::RBracket);
-		case ';':
-			return take(1, TokenKind::Semicolon);
-		case ',':
-			return take(1, TokenKind::Comma);
-		case '?':
-			return take(1, TokenKind::Question);
-		case '@':
-			return take(1, TokenKind::At);
-		case '~':
-			return take(1, TokenKind::Tilde);
-		case '.':
-			if (follows("..")) {
-				return take(3, TokenKind::Ellipsis);
-			}
-			if (follows(".")) {
-				return take(2, TokenKind::DotDot);
-			}
-			if (follows("<")) {
-				return take(2, TokenKind::DotLess);
-			}
-			return take(1, TokenKind::Dot);
-		case ':':
-			return follows(":") ? take(2, TokenKind::ColonColon) : take(1, TokenKind::Colon);
-		case '+':
-			if (follows("+")) {
-				return take(2, TokenKind::PlusPlus);
-			}
-			return follows("=") ? take(2, TokenKind::PlusAssign) : take(1, TokenKind::Plus);
-		case '-':
-			if (follows("-")) {
-				return take(2, TokenKind::MinusMinus);
-			}
-			return follows("=") ? take(2, TokenKind::MinusAssign) : take(1, TokenKind::Minus);
-		case '*':
-			return follows("=") ? take(2, TokenKind::StarAssign) : take(1, TokenKind::Star);
-		case '/':
-			return follows("=") ? take(2, TokenKind::SlashAssign) : take(1, TokenKind::Slash);
-		case '%':
-			return follows("=") ? take(2, TokenKind::PercentAssign) : take(1, TokenKind::Percent);
-		case '=':
-			if (follows("==")) {
-				return take(3, TokenKind::StrictEqual);
-			}
-			return follows("=") ? take(2, TokenKind::Equal) : take(1, TokenKind::Assign);
-		case '!':
-			if (follows("==")) {
-				return take(3, TokenKind::StrictNotEqual);
-			}
-			return follows("=") ? take(2, TokenKind::NotEqual) : take(1, TokenKind::Bang);
-		case '<':
-			if (follows("<=")) {
-				return take(3, TokenKind::ShiftLeftAssign);
-			}
-			if (follows("<")) {
-				return take(2, TokenKind::ShiftLeft);
-			}
-			return follows("=") ? take(2, TokenKind::LessEqual) : take(1, TokenKind::Less);
-		case '>':
-			if (follows(">>=")) {
-				return take(4, TokenKind::ShiftRightUnsignedAssign);
-			}
-			if (follows(">>")) {
-				return take(3, TokenKind::ShiftRightUnsigned);
-			}
-			if (follows(">=")) {
-				return take(3, TokenKind::ShiftRightAssign);
-			}
-			if (follows(">")) {
-				return take(2, TokenKind::ShiftRight);
-			}
-			return follows("=") ? take(2, TokenKind::GreaterEqual) : take(1, TokenKind::Greater);
-		case '&':
-			if (follows("&=")) {
-				return take(3, TokenKind::AmpAmpAssign);
-			}
-			if (follows("&")) {
-				return take(2, TokenKind::AmpAmp);
-			}
-			return follows("=") ? take(2, TokenKind::AmpAssign) : take(1, TokenKind::Amp);
-		case '|':
-			if (follows("|=")) {
-				return take(3, TokenKind::PipePipeAssign);
-			}
-			if (follows("|")) {
-				return take(2, TokenKind::PipePipe);
-			}
-			return follows("=") ? take(2, TokenKind::PipeAssign) : take(1, TokenKind::Pipe);
-		case '^':
-			return follows("=") ? take(2, TokenKind::CaretAssign) : take(1, TokenKind::Caret);
-		default:
-			return TokenKind::Error;
+namespace {
+
+// Every punctuation mark and operator, each one longer before any it begins with: the first that matches is
+// the token.
+struct Punctuation {
+	std::string_view text;
+	TokenKind kind;
+};
+constexpr Punctuation PUNCTUATION[] = {
+	{ "(", TokenKind::LParen },
+	{ ")", TokenKind::RParen },
+	{ "{", TokenKind::LBrace },
+	{ "}", TokenKind::RBrace },
+	{ "[", TokenKind::LBracket },
+	{ "]", TokenKind::RBracket },
+	{ ";", TokenKind::Semicolon },
+	{ ",", TokenKind::Comma },
+	{ "?", TokenKind::Question },
+	{ "@", TokenKind::At },
+	{ "~", TokenKind::Tilde },
+	{ "...", TokenKind::Ellipsis },
+	{ "..", TokenKind::DotDot },
+	{ ".<", TokenKind::DotLess },
+	{ ".", TokenKind::Dot },
+	{ "::", TokenKind::ColonColon },
+	{ ":", TokenKind::Colon },
+	{ "++", TokenKind::PlusPlus },
+	{ "+=", TokenKind::PlusAssign },
+	{ "+", TokenKind::Plus },
+	{ "--", TokenKind::MinusMinus },
+	{ "-=", TokenKind::MinusAssign },
+	{ "-", TokenKind::Minus },
+	{ "*=", TokenKind::StarAssign },
+	{ "*", TokenKind::Star },
+	{ "/=", TokenKind::SlashAssign },
+	{ "/", TokenKind::Slash },
+	{ "%=", TokenKind::PercentAssign },
+	{ "%", TokenKind::Percent },
+	{ "===", TokenKind::StrictEqual },
+	{ "==", TokenKind::Equal },
+	{ "=", TokenKind::Assign },
+	{ "!==", TokenKind::StrictNotEqual },
+	{ "!=", TokenKind::NotEqual },
+	{ "!", TokenKind::Bang },
+	{ "<<=", TokenKind::ShiftLeftAssign },
+	{ "<<", TokenKind::ShiftLeft },
+	{ "<=", TokenKind::LessEqual },
+	{ "<", TokenKind::Less },
+	{ ">>>=", TokenKind::ShiftRightUnsignedAssign },
+	{ ">>>", TokenKind::ShiftRightUnsigned },
+	{ ">>=", TokenKind::ShiftRightAssign },
+	{ ">>", TokenKind::ShiftRight },
+	{ ">=", TokenKind::GreaterEqual },
+	{ ">", TokenKind::Greater },
+	{ "&&=", TokenKind::AmpAmpAssign },
+	{ "&&", TokenKind::AmpAmp },
+	{ "&=", TokenKind::AmpAssign },
+	{ "&", TokenKind::Amp },
+	{ "||=", TokenKind::PipePipeAssign },
+	{ "||", TokenKind::PipePipe },
+	{ "|=", TokenKind::PipeAssign },
+	{ "|", TokenKind::Pipe },
+	{ "^=", TokenKind::CaretAssign },
+	{ "^", TokenKind::Caret },
+};
+
+constexpr uint8_t NO_MARK = 0xff;
+
+// For each ASCII character, where the marks that begin with it start in PUNCTUATION (they are together), or
+// NO_MARK: a mark is found by looking only at those.
+constexpr std::array<uint8_t, 128> first_marks() {
+	std::array<uint8_t, 128> first{};
+	for (uint8_t &at : first) {
+		at = NO_MARK;
 	}
+	for (size_t i = std::size(PUNCTUATION); i-- > 0;) {
+		first[static_cast<unsigned char>(PUNCTUATION[i].text[0])] = static_cast<uint8_t>(i);
+	}
+	return first;
+}
+constexpr std::array<uint8_t, 128> FIRST_MARK = first_marks();
+
+// For each ASCII character that is a mark and begins no longer one, its kind; TokenKind::Error for the others.
+constexpr std::array<TokenKind, 128> only_marks() {
+	std::array<TokenKind, 128> only{};
+	for (TokenKind &kind : only) {
+		kind = TokenKind::Error;
+	}
+	for (size_t i = 0; i < std::size(PUNCTUATION); i++) {
+		const bool alone = PUNCTUATION[i].text.size() == 1 && (i == 0 || PUNCTUATION[i - 1].text[0] != PUNCTUATION[i].text[0]);
+		if (alone) {
+			only[static_cast<unsigned char>(PUNCTUATION[i].text[0])] = PUNCTUATION[i].kind;
+		}
+	}
+	return only;
+}
+constexpr std::array<TokenKind, 128> ONLY_MARK = only_marks();
+
+} // namespace
+
+TokenKind Lexer::lex_punctuation() {
+	const std::string_view rest(text_ + position_, size_ - position_);
+	const unsigned char first = static_cast<unsigned char>(rest[0]);
+	if (first < ONLY_MARK.size() && ONLY_MARK[first] != TokenKind::Error) {
+		position_++;
+		return ONLY_MARK[first]; // ( ) { } [ ] ; , and the like: no longer mark begins with them.
+	}
+	for (size_t i = first < FIRST_MARK.size() ? FIRST_MARK[first] : NO_MARK; i < std::size(PUNCTUATION) && PUNCTUATION[i].text[0] == rest[0]; i++) {
+		const auto &[mark, kind] = PUNCTUATION[i];
+		size_t same = 1; // A mark is one to four characters: compared here, not by a call.
+		while (same < mark.size() && same < rest.size() && rest[same] == mark[same]) {
+			same++;
+		}
+		if (same == mark.size()) {
+			position_ += static_cast<uint32_t>(same);
+			return kind;
+		}
+	}
+	return TokenKind::Error;
 }
 
 Token Lexer::next() {

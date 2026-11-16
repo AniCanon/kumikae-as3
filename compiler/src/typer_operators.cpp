@@ -1,9 +1,12 @@
 #include "typer.h"
 
+#include "builtins.h"
+
 namespace kas3 {
 
 const Type *Typer::unary(Unary *p_unary) {
 	const Type *operand = expression(p_unary->operand);
+	operand = operand == object_ ? any_ : operand; // As in arithmetic().
 	if (p_unary->op == TokenKind::Minus || p_unary->op == TokenKind::Plus) {
 		if (const Type *result = described_unary(p_unary->op, operand, p_unary->offset)) {
 			return result;
@@ -47,20 +50,41 @@ const Type *Typer::unary(Unary *p_unary) {
 	}
 }
 
-const Type *Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right) {
-	if (p_left->kind == Type::Unknown || p_right->kind == Type::Unknown) {
-		return unknown_;
+const Type *Typer::object_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right) {
+	// An object of AS3's (a Date, a vector, a class of the program) is made a primitive as the line runs,
+	// by its valueOf() or its text: beside `+` a String or a Number, decided then; with `-`, `*`, `/`
+	// and `%` a Number.
+	const auto as3_object = [&](const Type *p_type) {
+		return !primitive(p_type) && (p_type->kind == Type::Vector ||
+				(p_type->kind == Type::Instance && p_type->symbol && p_type->symbol->unit && p_type->symbol->unit->source.path() != GODOT_DECLARATIONS_PATH));
+	};
+	if ((as3_object(p_left) || as3_object(p_right)) && (primitive(p_left) || as3_object(p_left)) && (primitive(p_right) || as3_object(p_right))) {
+		switch (p_op) {
+			case TokenKind::Plus:
+			case TokenKind::PlusAssign:
+				return any_;
+			case TokenKind::Minus:
+			case TokenKind::MinusAssign:
+			case TokenKind::Star:
+			case TokenKind::StarAssign:
+			case TokenKind::Slash:
+			case TokenKind::SlashAssign:
+			case TokenKind::Percent:
+			case TokenKind::PercentAssign:
+				return number_;
+			default:
+				break;
+		}
 	}
-	// A string plus anything is a string: the other side is converted.
-	if ((p_op == TokenKind::Plus || p_op == TokenKind::PlusAssign) && (p_left == string_ || p_right == string_)) {
-		return string_;
-	}
-	// On anything but the primitives the result depends on the class. Godot's math types get their
-	// rules in a later stage; until then the type is unknown.
-	if (!primitive(p_left) || !primitive(p_right)) {
-		return unknown_;
-	}
-	if (p_left == int64_ || p_right == int64_) {
+	return nullptr;
+}
+
+// Arithmetic with an Int64, or null where its rules are a Number's.
+const Type *Typer::int64_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right) {
+	// A shift is as wide as what is shifted: an Int64 count shifts an int by its low five bits.
+	const bool shift = p_op == TokenKind::ShiftLeft || p_op == TokenKind::ShiftRight || p_op == TokenKind::ShiftRightUnsigned ||
+			p_op == TokenKind::ShiftLeftAssign || p_op == TokenKind::ShiftRightAssign || p_op == TokenKind::ShiftRightUnsignedAssign;
+	if (p_left == int64_ || (p_right == int64_ && !shift)) {
 		// An Int64 keeps its 64 bits through whole-number arithmetic. Division gives a Number, as it
 		// always does in AS3, and so does anything with a Number on the other side.
 		switch (p_op) {
@@ -93,6 +117,11 @@ const Type *Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_
 				break;
 		}
 	}
+	return nullptr;
+}
+
+// Arithmetic on two of AS3's own primitives.
+const Type *Typer::primitive_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right) {
 	switch (p_op) {
 		case TokenKind::Plus:
 		case TokenKind::PlusAssign:
@@ -121,6 +150,31 @@ const Type *Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_
 			// AS3 computes int + int as a Number; the wrap to 32 bits happens when it is stored in an int.
 			return number_;
 	}
+}
+
+const Type *Typer::arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right) {
+	if (p_left->kind == Type::Unknown || p_right->kind == Type::Unknown) {
+		return unknown_;
+	}
+	// An Object may hold anything, as a `*` does: what it holds decides when the line runs.
+	p_left = p_left == object_ ? any_ : p_left;
+	p_right = p_right == object_ ? any_ : p_right;
+	// A string plus anything is a string: the other side is converted.
+	if ((p_op == TokenKind::Plus || p_op == TokenKind::PlusAssign) && (p_left == string_ || p_right == string_)) {
+		return string_;
+	}
+	if (const Type *type = object_arithmetic(p_op, p_left, p_right)) {
+		return type;
+	}
+	// On anything but the primitives the result depends on the class. Godot's math types get their
+	// rules in a later stage; until then the type is unknown.
+	if (!primitive(p_left) || !primitive(p_right)) {
+		return unknown_;
+	}
+	if (const Type *type = int64_arithmetic(p_op, p_left, p_right)) {
+		return type;
+	}
+	return primitive_arithmetic(p_op, p_left, p_right);
 }
 
 const Type *Typer::binary(Binary *p_binary) {

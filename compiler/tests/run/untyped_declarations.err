@@ -1,0 +1,6 @@
+untyped_declarations.as:4:7: warning: 'field' has no type: it is taken as '*'. Write ':*' to say so
+untyped_declarations.as:7:8: warning: 'y' has no type: it is taken as '*'. Write ':*' to say so
+untyped_declarations.as:9:8: warning: 'never' has no type: it is taken as '*'. Write ':*' to say so
+untyped_declarations.as:12:20: warning: what 'plusOne' gives back has no type: it is taken as '*'. Write ':*' to say so
+untyped_declarations.as:12:28: warning: 'value' has no type: it is taken as '*'. Write ':*' to say so
+untyped_declarations.as:15:20: warning: what 'nothing' gives back has no type: it is taken as '*'. Write ':*' to say so

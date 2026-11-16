@@ -6,6 +6,8 @@ package {
 		public var calls:int = 0;
 
 		public function add(a:Vector2, b:Vector2):Vector2 { return a + b; }
+		// A freed object is null to a script, also when Godot hands it over.
+		public function nothingThere(n:Node):Boolean { return n == null; }
 		public function sub(a:Vector2, b:Vector2):Vector2 { return a - b; }
 		public function times(a:Vector2, n:Number):Vector2 { return a * n; }
 		public function scaleInt(a:Vector2, n:int):Vector2 { return a * n; }
@@ -42,7 +44,12 @@ package {
 		public function nullNode(n:Node):String { return String(n); }
 		public function nullOwn(n:Node):String { return n.toString(); }
 		public function traced(v:Vector2):void { trace(v, v.x); }
-		public function keep(n:Node):void { kept = n; }
+		public function keep(n:Node):void { kept = n; keptReady = n.ready; }
+		// What is reached through a freed object, in every way: AS3's #1009, saying it was freed.
+		private var keptReady:Signal;
+		private function heard():void {}
+		public function keptSignal():void { keptReady.add(heard); }
+		public function keptByName():void { kept["ready"].add(heard); }
 		public function keptText():String { return "kept " + kept; }
 		// A Godot object that has been freed is null to a script.
 		public function keptIsNull():Boolean { return kept == null; }
@@ -50,6 +57,52 @@ package {
 		public function keptCounts():Boolean { return kept ? true : false; }
 		public function keptNot():Boolean { return !kept; }
 		public function keptName():String { return kept.name; }
+		// `new` of a script class that extends one of Godot's: a Godot object with the script attached, made
+		// with the constructor's arguments, which the program then puts in the tree.
+		public function spawn():String {
+			var made:Spawned = new Spawned(7);
+			addChild(made);
+			return made.value + " " + made.doubled() + " " + made.name + " " + (made.getParent() == this);
+		}
+		// A script object that is one of Godot's goes to Godot as its Godot object: returned, or in a field.
+		public var lastMade:Spawned;
+		public function makeOne():Spawned { lastMade = new Spawned(2); return lastMade; }
+		// Vectors of vectors, and of script objects that are Godot's, handed to Godot as Arrays.
+		public function handNested(target:Node):void {
+			var grid:Vector.<Vector.<int>> = new <Vector.<int>>[new <int>[1, 2], new <int>[3]];
+			target.setMeta("grid", grid);
+			var made:Vector.<Spawned> = new <Spawned>[new Spawned(1)];
+			target.setMeta("made", made);
+		}
+		// Searching a vector of Godot's objects or values: the same object, or an equal value.
+		public function searchGodot(a:Node, b:Node):String {
+			var nodes:Vector.<Node> = new <Node>[a, b, a];
+			var points:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];
+			return nodes.indexOf(b) + "," + nodes.lastIndexOf(a) + "," + nodes.indexOf(null) + "," + points.indexOf(new Vector2(3, 4)) + "," +
+					points.indexOf(Vector2.ZERO);
+		}
+		// A part of an element of a packed array, written back into the array.
+		public function partOfElement(points:PackedVector2Array):PackedVector2Array {
+			points[0].x = 5;
+			points[1][1] = 7;
+			points[0].y += 1;
+			return points;
+		}
+		// A Number as an index must be a whole one, as for a Vector: Godot would cut it.
+		public function fractionIndex(a:PackedInt32Array, at:Number):int { return a[at]; }
+		public function fractionPart(v:Vector2, at:Number):Number { return v[at]; }
+		// for each over Godot's packed arrays, into variables of the element's type or one it converts to.
+		public function eachPacked(a:PackedInt32Array, v:PackedVector2Array):String {
+			var out:String = "";
+			for each (var i:int in a) { out += i + ","; }
+			for each (var p:Vector2 in v) { out += p.x; }
+			var n:Number;
+			for each (n in a) { out += n; }
+			for each (var none:int in new PackedInt32Array()) { out += "never"; }
+			return out;
+		}
+		// `null as` one of Godot's classes is null, as `null is` it is false.
+		public function nullAs():Boolean { var n:Node = null as Node; return n == null && !(null is Node); }
 		public function keptRename():void { kept.name = "renamed"; }
 		public function keptChildren():int { return kept.getChildCount(); }
 		public function keptUnder(parent:Node):Boolean { return parent.isAncestorOf(kept); }
@@ -86,6 +139,8 @@ package {
 		public function clampTrailingNull(c:Color):Color { return c.clamp(new Color(0.25, 0.25, 0.25, 1), null); }
 		public function clampBothNull(c:Color):Color { return c.clamp(null, null); }
 		public function clampMiddleNull(c:Color):Color { return c.clamp(null, new Color(0.5, 0.5, 0.5, 1)); }
+		// A variable that holds null there is the same: the default, looked at as the call is made.
+		public function clampNullVariable(c:Color):Color { var low:Color = null; return c.clamp(low, new Color(0.5, 0.5, 0.5, 1)); }
 		public function looking(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target); }
 		public function lookingNull(t:Transform3D, target:Vector3):Transform3D { return t.lookingAt(target, null); }
 		public function wholeNumbers():Color { return new Color(1, 0, 1); }

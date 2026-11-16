@@ -30,8 +30,10 @@ part of the program.
 >   snippets, imports, overrides, parameter help, navigation and outline. See the
 >   [follow-up results](../docs/results/2026-11-completion-followup.md) for the compatibility matrix.
 
-> **Windows validation is pending.** Binary transport, pipe readiness, UTF-8 filesystem paths and
-> `.exe` discovery are implemented, but these runtime branches have not been exercised on Windows.
+> **Windows: built for, not yet tried.** The server reads and writes its messages in binary, checks a
+> pipe for input without blocking, opens files by their UTF-8 names and spells Windows paths one way
+> (drives, shares, `\` and letter case); those rules are tested on every system. It has not been built or
+> run on Windows itself. The JetBrains plugin looks for `kas3c.exe` there.
 
 ## VS Code
 
@@ -84,12 +86,12 @@ output, for files ending in `.as`.
 
 | Feature | Notes |
 |---|---|
-| Errors as you type | What `kas3c check` reports. While a file has a syntax error, only syntax errors are shown. |
+| Errors as you type | What `kas3c check` reports. A file with a syntax error shows only that; files that use nothing of it keep their other errors. |
 | Go to definition | Locals, parameters, fields, methods, classes, imports, inherited members, and Godot's API. |
 | Find references | Across the project's files. |
 | Hover | The declaration, and the class or package it belongs to. |
 | Outline | The classes and members of a file. |
-| Symbol search | The project's own classes, functions and members. |
+| Symbol search | The project's own classes, functions and members, then Godot's classes and the built-in library's. |
 
 [Completion and typing assistance](completion.md) covers chained members, types, imports, visible names,
 Tab replacement, callable snippets and argument help. Features that depend on client capabilities have

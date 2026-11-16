@@ -1,4 +1,0 @@
-rest.as:1:56: error: a call with extra arguments is not supported by the interpreter yet
-rest.as:1:56: error: a call to a function with a rest parameter is not supported by the interpreter yet
-rest.as:1:90: error: a rest parameter is not supported by the interpreter yet
-rest.as:1:90: error: a declaration without a type is not supported by the interpreter yet

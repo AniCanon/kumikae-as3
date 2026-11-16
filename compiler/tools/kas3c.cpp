@@ -10,6 +10,7 @@
 #include "server.h"
 #include "source.h"
 
+#include <algorithm>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -39,7 +40,9 @@ static const char *const USAGE =
 		"\n"
 		"run    Check the files as one program and run it: the first file's class is\n"
 		"       constructed, and what it traces goes to standard output. An error that\n"
-		"       nothing catches goes to standard error with its stack trace.\n"
+		"       nothing catches goes to standard error with its stack trace. A run that\n"
+		"       lasts longer than 15 seconds is stopped with Error #1502, as in Flash\n"
+		"       (KAS3_TIME_LIMIT_MS gives another limit, 0 none).\n"
 		"\n"
 		"ir     Check the files as one program and print the typed IR the interpreter runs.\n"
 		"       --godot  the files are scripts for Godot: load Godot's API, and expect no\n"
@@ -96,11 +99,12 @@ static int run_check(int p_argc, char **p_argv) {
 	for (int i = 2; i < p_argc; i++) {
 		godot = godot && std::strcmp(p_argv[i], "--no-godot") != 0;
 	}
-	kas3::Compilation compilation;
-	if (godot) {
-		// Before the program's files: a name the program defines again is then reported in the program.
-		compilation.add(kas3::GODOT_DECLARATIONS_PATH, kas3::godot_declarations(), true);
-	}
+	struct File {
+		const char *path;
+		std::string text;
+		bool declaration;
+	};
+	std::vector<File> read;
 	for (int i = 2; i < p_argc; i++) {
 		bool declaration = false;
 		if (std::strcmp(p_argv[i], "--no-godot") == 0) {
@@ -128,7 +132,7 @@ static int run_check(int p_argc, char **p_argv) {
 			unreadable = true;
 			continue;
 		}
-		compilation.add(p_argv[i], std::move(text), declaration);
+		read.push_back(File{ p_argv[i], std::move(text), declaration });
 		files += declaration ? 0 : 1;
 	}
 	if (unreadable) {
@@ -137,7 +141,21 @@ static int run_check(int p_argc, char **p_argv) {
 	if (files == 0) {
 		return usage_error();
 	}
-	compilation.check();
+	// Godot's API takes most of the time of a small check: it is loaded only for files that name its
+	// package. A file that never says `godot` can't reach it.
+	godot = godot && std::any_of(read.begin(), read.end(), [](const File &p_file) {
+		return p_file.text.find("godot") != std::string::npos;
+	});
+	kas3::Compilation compilation;
+	if (godot) {
+		// Before the program's files: a name the program defines again is then reported in the program.
+		compilation.add(kas3::GODOT_DECLARATIONS_PATH, kas3::godot_declarations(), true);
+	}
+	for (File &file : read) {
+		compilation.add(file.path, std::move(file.text), file.declaration);
+	}
+	// Through syntax errors: what they can't have caused is reported too, as the language server does.
+	compilation.check(true);
 	std::fputs(compilation.format_diagnostics().c_str(), stderr);
 	if (dump_names) {
 		std::fputs(compilation.dump_names().c_str(), stdout);
@@ -204,12 +222,18 @@ static int run_run(int p_argc, char **p_argv) {
 	bool ok = false;
 	{
 		kas3::vm::StandaloneOutput output;
-		kas3::vm::Interpreter interpreter(module, output);
+		// KAS3_NOW fixes the time Date takes as now, in milliseconds since 1970 (for tests); TZ sets the zone,
+		// as the C library reads it.
+		const char *fixed = std::getenv("KAS3_NOW");
+		kas3::vm::SystemClock clock(fixed ? std::optional<double>(std::strtod(fixed, nullptr)) : std::nullopt);
+		kas3::vm::Interpreter interpreter(module, kas3::vm::Host(output, kas3::vm::NoEngine::instance(), kas3::vm::NoEngine::instance(), clock));
+		const char *limit = std::getenv("KAS3_TIME_LIMIT_MS");
+		interpreter.set_time_limit(limit ? (uint32_t)std::strtoul(limit, nullptr, 10) : kas3::vm::Interpreter::FLASH_TIME_LIMIT);
 		ok = interpreter.run_program();
 	}
 	std::fflush(stdout);
-	// Everything the program made should be gone by now. Objects that refer to each other in a loop are
-	// not collected yet.
+	// Everything the program made should be gone by now: as the interpreter goes, its cycle collector frees
+	// what is left in loops (vm/collector.h).
 	if (std::getenv("KAS3_REPORT_LEAKS") && (kas3::vm::live_objects() || kas3::vm::live_strings())) {
 		std::fprintf(stderr, "kas3c: %zu objects and %zu strings were never freed\n", kas3::vm::live_objects(),
 				kas3::vm::live_strings());

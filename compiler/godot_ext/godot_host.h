@@ -9,13 +9,24 @@
 #include <godot_cpp/variant/string_name.hpp>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 
 namespace kas3 {
 
-class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::EngineSource {
+// A script object as Godot holds it: the Godot object it is attached to, for a class that extends one of
+// Godot's (a null one when it has none). False for any other script object, which Godot can't hold.
+bool as_godot_object(const vm::Object *p_object, godot::Variant *r_out);
+// A script object as Godot holds it: its Godot object, or a vector or an Array as an Array. False, with
+// why, for an object of a class that extends none of Godot's.
+bool object_element(const vm::Object *p_object, godot::Variant *r_out, std::string *r_error);
+
+// Lets go of the defaults Godot worked out (see GodotHost::evaluate()). Before the extension goes.
+void forget_defaults();
+
+class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::EngineSource, public vm::Clock {
 	std::unordered_set<void *> borrowed_; // Handles made by borrow().
 
 	// Godot's form of a name the interpreter passes on every call ("move_and_slide"), made once. The
@@ -37,9 +48,20 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 		size_t operator()(const Place &p_place) const { return std::hash<const char *>()(p_place.data) ^ (p_place.size * 0x9E3779B97F4A7C15ull); }
 	};
 	std::unordered_map<Place, Name, PlaceHash> names_;
-	std::unordered_map<std::string, godot::Variant> evaluated_; // What evaluate() worked out, by its text.
+	// What evaluate() worked out, by the place of its text: the values are kept for the whole run (see
+	// forget_defaults()), so a program loaded again asks Godot nothing.
+	struct Evaluated {
+		std::string text;
+		const godot::Variant *value = nullptr;
+	};
+	std::unordered_map<Place, Evaluated, PlaceHash> evaluated_;
+	// A class's static method, by "Class.method hash", found once: called through it, a wrong call is an
+	// error the script is told of.
+	std::unordered_map<std::string, GDExtensionMethodBindPtr> static_methods_;
 	const godot::StringName &name(std::string_view p_text);
-	const godot::String &text_of(std::string_view p_text); // name() as a String, made once.
+	const godot::Variant *evaluated(std::string_view p_expression, std::string *r_error);
+	// name() as a String, made once.
+	const godot::String &text_of(std::string_view p_text);
 
 	// One of Godot's global functions, found once: see godot_utility.cpp.
 	struct Utility;
@@ -58,36 +80,48 @@ public:
 
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;
-	void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) override;
-	void *collection(std::string_view p_type, const vm::Argument *p_elements, size_t p_count, std::string *r_error) override;
-	bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
+	void error_at(std::string_view p_text, std::string_view p_function, std::string_view p_file, int32_t p_line) override;
+	[[nodiscard]] void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) override;
+	[[nodiscard]] void *attach_new(uint32_t p_class, vm::Object *p_object, std::string *r_error) override;
+	[[nodiscard]] void *collection(std::string_view p_type, ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, std::string *r_error) override;
+	[[nodiscard]] bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 			vm::Slot *r_result, std::string *r_error) override;
-	bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+	[[nodiscard]] bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	[[nodiscard]] bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error) override;
-	bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override;
-	bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) override;
-	void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
-	bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	void *singleton(std::string_view p_class, std::string *r_error) override;
-	bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
+	[[nodiscard]] bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override;
+	[[nodiscard]] bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	[[nodiscard]] bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) override;
+	[[nodiscard]] void *bind(vm::Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
+	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override;
+	// Godot's clock; the zone's offset at a moment is the C library's, which knows the past and the future
+	// of daylight saving where Godot gives only the offset now.
+	double now() override;
+	double local_offset(double p_utc) override;
+	[[nodiscard]] bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
+	[[nodiscard]] bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	bool present(void *p_value) override;
-	bool is_class(void *p_value, std::string_view p_class) override;
-	vm::Str *text(void *p_value) override;
-	void *copy(void *p_value) override;
+	[[nodiscard]] bool present(void *p_value) override;
+	[[nodiscard]] bool is_class(void *p_value, std::string_view p_class) override;
+	[[nodiscard]] vm::Str *text(void *p_value) override;
+	[[nodiscard]] bool keep(vm::Object *p_object) override; // counted.cpp
+	[[nodiscard]] void *copy(void *p_value) override;
 	void drop(void *p_value) override;
+	// For the cycle collector: a reference-counted object that a script listens to or that has a script
+	// is a node (by its id), and so is a listener (callable.h).
+	[[nodiscard]] uint64_t node(void *p_value) override;
+	[[nodiscard]] bool node_edges(uint64_t p_node, vm::EngineNode *r_node) override;
+	[[nodiscard]] std::vector<uint64_t> let_go(const std::vector<uint64_t> &p_nodes) override;
 };
 
 // An interpreter value as a Variant, and back. A string or an engine value coming back is the caller's
-// to release or drop.
+// to release or drop. Nothing comes back when there was no memory to hold it.
 godot::Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot);
-vm::Slot from_variant(ir::Kind p_kind, const godot::Variant &p_value);
+std::optional<vm::Slot> from_variant(ir::Kind p_kind, const godot::Variant &p_value);
 godot::Variant untyped_to_variant(const vm::Slot &p_slot);
-vm::Slot untyped_from_variant(const godot::Variant &p_value);
+std::optional<vm::Slot> untyped_from_variant(const godot::Variant &p_value);
 // Whether a value arriving from Godot may be taken as this kind, and for an engine value as the type of
 // this name ("Vector2", "Node"; empty for any). Numbers are taken as GDScript itself would take them, but
 // one that does not fit an int or a uint is refused, never wrapped.
@@ -95,7 +129,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const godot::Varian
 // What Godot gave, as the interpreter asked for it; refused, with a message that names p_from, if it is
 // something else.
 bool take(const vm::Wanted &p_wanted, const godot::Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error);
-// One of Godot's value types by its name ("Vector2"), or -1.
-int value_type(std::string_view p_name);
+// One of Godot's value types by its name ("Vector2"); nothing for a name that is not one.
+std::optional<int> value_type(std::string_view p_name);
 
 } // namespace kas3

@@ -22,12 +22,34 @@ restart; it does not patch the IDE installation.
 
 ## Validation
 
-The latest validation is **blocked**: `verifyPlugin` rejects the internal
-`LSPClientFeatures.getServerWrapper()` call in `As3Lsp4ijClient`. The final compatibility matrix
-therefore did not run. Earlier native IDEA publication checks passed three project cycles; the
-stock Rider endurance result below predates the final IDEA-only changes. Claude's final review also
-identified a race in the diagnostic probe's cleanup, which can clear a real server publication.
-Both findings remain unfixed in this handoff.
+The two findings that blocked the previous handoff are fixed: the LSP4IJ client judges a publication
+with public API only, and the publication probe gives the server's own diagnostics back instead of
+clearing them. On 2026-11-16 `verifyPlugin` found both installed builds compatible, each with **0**
+internal, **6** deprecated, **45** experimental and **1** scheduled-for-removal API usages. Plugin tests
+**174 passed** (1 opt-in skipped), core tests **82 passed** (3 opt-in skipped), ktlint clean, no compiler
+warnings. The four sandbox probes passed: `runIdeaWithoutLsp4ij`, `runIdea`, `runIde` and
+`runRiderWithoutLsp4ij`, each with completion, parameter help, hover documentation (six checks per run,
+the server's signature in its code block and its owner), navigation, outline and diagnostics where a
+client is enabled. `runIdea` passed six runs in a row, and the opt-in `KUMIKAE_COMPLETION_RETENTION_CHECK`
+runs of `runIde` and `runIdea` passed (0 closed projects retained), after five causes of failure in the
+probes themselves were fixed:
+
+- Parameter help (1 failure in 11 `runIdea` runs): a hint left from an earlier request stayed visible,
+  owned by no offset, so the wait passed at once; looking the new controller up before its hint showed
+  disposed it. Hints are now closed before asking (no failure in 20 runs, then 12, then 6).
+- Rider reopen ("Required value was null"): the probe copied the layout before it recorded the shown
+  Problems window; it now waits for that record.
+- Concurrent projects (no lookup in the reused frame): a short dumb mode cancelled a completion begun
+  just before it, and no request reached the server (trace and IDE log). The probe asks again after three
+  seconds with no lookup, and records it ("completion asked 2 times"; seen twice in ten runs).
+- IDEA statement templates (no lookup, 1 in 20): LSP4IJ sends a committed edit from a callback, on another
+  path than requests, so the completion request reached the server before the edit (trace). The probe sends
+  LSP4IJ's pending edits before each request. A person's typing leaves this window open for milliseconds.
+- IDEA retention (1 of 3 projects retained, also in the plain-text control): the only strong path was
+  Swing's `BufferStrategyPaintManager.rootJ`, the last frame painted, found in a heap dump. The check paints
+  a one-pixel window of its own first.
+
+The stock Rider endurance result below predates these changes.
 The previous compiler validation remains applicable: Release **26/26**, ASan/UBSan **26/26**, and
 `godot: OK`. Those runs took 27.87 s and 289.61 s respectively. No compiler code changed in this
 plugin-lifetime follow-up. Python client tests: **9 passed**.
@@ -39,6 +61,7 @@ From `editors/jetbrains`, using the installed JDK 25:
 python3 -m unittest discover -s tests -v
 ./gradlew --offline runIdeaWithoutLsp4ij -PuiProbe
 ./gradlew --offline runIdea -PuiProbe
+KUMIKAE_COMPLETION_RETENTION_CHECK=1 ./gradlew --offline runIdea -PuiProbe
 KUMIKAE_COMPLETION_RETENTION_CHECK=1 ./gradlew --offline runIde -PuiProbe
 KUMIKAE_COMPLETION_RETENTION_CHECK=1 ./gradlew --offline runRiderWithoutLsp4ij -PuiProbe
 KUMIKAE_COMPLETION_RETENTION_PROBE=1 ./gradlew --offline runIde -PuiProbe
@@ -102,7 +125,9 @@ The later diagnostic-version change was also compared with its immediate baselin
 
 ## Validation boundaries
 
-Only the stated macOS IDE endpoints were exercised. Windows transport and filesystem paths have
+Only the stated macOS IDE endpoints were exercised; other IDE builds need a download and were not
+verified. The probe shows hover through quick documentation: a mouse hover is not shown while another
+application has the desktop's focus, as it does in the background sandbox. Windows transport and filesystem paths have
 host-side regressions but still need Windows runtime validation. Human acceptance of the complete
 editing workflow remains separate from automated sandbox checks.
 

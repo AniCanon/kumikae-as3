@@ -1,0 +1,15 @@
+{"b":1,"a":[true,false,null],"c":{"d":"x"},"3":-5}
+b,a,c,3
+true true -5 true 3 object x
+0,0,1.5,2,1000,0.01,12345678901,Infinity,-Infinity,0.1,5e-324
+-Infinity false true true false
+a"b \ / Aé é 9
+8 12 10 13 9 55357 56832 55357 true 0
+7 true false null text
+{"a":3,"b":2}
+{} [] [[],{}]
+0,1,a,c,b,
+{"a":[10,20],"b":{"c":30}}
+{"y":[1,null,3]} false 3
+string:0, string:0, string:
+null

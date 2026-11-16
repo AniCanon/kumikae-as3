@@ -70,6 +70,25 @@ class Fixture(unittest.TestCase):
             self.assertNotIn(" class %s " % name, self.text)
         self.assertNotIn("toUpper", self.text)
 
+    def test_a_static_method_carries_its_hash(self):
+        # Called through its own entry, so that a wrong call is Godot's error to the script, not a message.
+        names = generate.Generator(fixture())
+        names.run()
+        self.assertEqual(names.godot_names["Node.printOrphanNodes"], "print_orphan_nodes 1")
+        self.assertEqual(names.godot_names["Node.getNode"], "get_node")
+
+    def test_a_setter_keeps_the_element_type(self):
+        # What the getter says of a typed array, the setter says of what it takes.
+        control = self.members("Control")
+        at = control.index("public final native function set data(value:GodotArray):void;")
+        self.assertEqual(control[at - 1], '[Godot(value="Array[Node]")]')
+
+    def test_constructor_forms(self):
+        # The merged constructor takes any of them; each form Godot has is written down, so that the
+        # checker can refuse a call that matches none.
+        self.assertIn('\t[Constructor(args="")]\n\t[Constructor(args="Vector2")]\n\t[Constructor(args="Number,Number")]\n',
+                      self.text)
+
     def test_constructor_only_when_instantiable(self):
         self.assertIn("public native function Node();", self.members("Node"))
         self.assertFalse([line for line in self.members("Texture2D") if "function Texture2D(" in line])
@@ -102,7 +121,7 @@ class Fixture(unittest.TestCase):
         self.assertNotIn("setOwnerPtr", self.text)
 
     def test_wide_integers_are_int64(self):
-        self.assertIn("public final native function getInstanceId():Int64;", self.members("GodotObject"))
+        self.assertIn("public final native function getInstanceID():Int64;", self.members("GodotObject"))
         self.assertIn("public static native function getTicks():Int64;", self.members("Input"))
 
     def test_defaults(self):
@@ -258,9 +277,9 @@ class Fixture(unittest.TestCase):
 
     def test_an_integer_the_description_gives_no_width_is_an_int64(self):
         # A global function, a built-in type's method, and a signal's argument.
-        self.assertIn("\tpublic native function instanceFromId(instanceId:Int64):GodotObject;\n", self.text)
+        self.assertIn("\tpublic native function instanceFromID(instanceID:Int64):GodotObject;\n", self.text)
         self.assertIn("\tpublic native function randi():Int64;\n", self.text)
-        self.assertIn("public native function getObjectId():Int64;", self.members("Signal"))
+        self.assertIn("public native function getObjectID():Int64;", self.members("Signal"))
         self.assertIn("public native function size():Int64;", self.members("GodotArray"))
 
     def test_to_string_is_as3s(self):
@@ -330,6 +349,21 @@ class Refusals(unittest.TestCase):
 
     def node(self, api):
         return [c for c in api["classes"] if c["name"] == "Node"][0]
+
+    def test_flags_of_one_name_share_the_widest_width(self):
+        # Mesh.ArrayFormat holds RenderingServer.ArrayFormat's flags, whose version bits are above 32:
+        # every flag enum of that name is as wide as the widest.
+        api = fixture()
+        node = self.node(api)
+        node["enums"].append({"name": "Format", "is_bitfield": True, "values": [{"name": "FORMAT_A", "value": 1}]})
+        control = [entry for entry in api["classes"] if entry["name"] == "Control"][0]
+        control.setdefault("enums", []).append(
+            {"name": "Format", "is_bitfield": True, "values": [{"name": "FORMAT_HIGH", "value": 2 ** 35}]})
+        node["methods"].append({"name": "set_format", "is_const": False, "is_vararg": False, "is_static": False,
+                                "is_virtual": False, "hash": 1,
+                                "arguments": [{"name": "format", "type": "bitfield::Node.Format"}]})
+        text = generate.generate(api)
+        self.assertIn("public final native function setFormat(format:Int64):void;", lines_of(text, "Node"))
 
     def test_unknown_type(self):
         api = fixture()
@@ -442,7 +476,7 @@ class FixtureCompiles(unittest.TestCase):
 			processMode = Node.PROCESS_MODE_ALWAYS;
 			var at:Vector2 = new Vector2(1, 2);
 			at.x = Vector2.ZERO.distanceTo(new Vector2());
-			var id:Number = getInstanceId();
+			var id:Number = getInstanceID();
 			if (Input.isActionPressed("jump") && Key.ESCAPE != Key.KEY_0) {
 				print("jump", degToRad(90), anchorLeft, size.y, name);
 			}
@@ -543,7 +577,7 @@ class RealApi(unittest.TestCase):
         self.assertEqual(names["CharacterBody2D.velocity"], "velocity")
         self.assertEqual(names["Node.childEnteredTree"], "child_entered_tree")
         self.assertEqual(names["GodotObject"], "Object")
-        self.assertEqual(names["GodotObject.getInstanceId"], "get_instance_id")
+        self.assertEqual(names["GodotObject.getInstanceID"], "get_instance_id")
         self.assertEqual(names["Vector2.distanceTo"], "distance_to")
         self.assertEqual(names["Vector2.x"], "x")
         self.assertEqual(names["Input.isActionPressed"], "is_action_pressed")

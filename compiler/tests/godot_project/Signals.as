@@ -17,6 +17,11 @@ package {
 		private function isBig(n:int):Boolean { return n > 2; }
 
 		public function reset():void { count = 0; }
+		// A signal of the script's own, which Godot knows by its name.
+		[Signal] public var scored:Signal;
+		public function listenOwn():void { scored.add(onHit); }
+		public function score(n:int):void { scored.emit(n); }
+		public function ownSignalName():String { return scored.getName(); }
 		// A loop of a listener and what it listens to; a listener nothing else holds; a signal in a field.
 		private var mine:Signal;
 		public function loop(r:Resource):void { var h:Holder = new Holder(); h.res = r; r.changed.add(h.heard); }
@@ -27,6 +32,24 @@ package {
 			far.res = r;
 			far.next = h;
 			h.next = far;
+			r.changed.add(h.heard);
+		}
+		// Loops the cycle collector frees: script objects that hold a Godot object and each other, with no
+		// listener; a loop through a Godot object with a script of AS3's; a listener whose object holds what
+		// it listens to through an untyped field; one listener in the signals of two objects, both held by
+		// the loop (GDScript connects the copy).
+		public function plainLoop(r:Resource):void {
+			var h:Holder = new Holder();
+			var g:Holder = new Holder();
+			h.res = r;
+			h.next = g;
+			g.next = h;
+		}
+		public function untypedLoop(r:Resource):void { var h:Holder = new Holder(); h.any = r; r.changed.add(h.heard); }
+		public function loopTwice(r:Resource, other:Resource):void {
+			var h:Holder = new Holder();
+			h.res = r;
+			h.other = other;
 			r.changed.add(h.heard);
 		}
 		// A listener that was removed again, while a list of the signal's listeners is still kept: the
@@ -66,6 +89,28 @@ package {
 		public function listenFailing():void { renamed.add(fails); renamed.add(onRenamed); }
 		public function listenTo(other:Node):void { other.renamed.add(onRenamed); }
 		public function listenByName(other:Node, signal:String):void { other[signal].add(onRenamed); }
+		// Another script object's fields, by name: what is public in them, and nothing else.
+		private var fields:SignalDerived;
+		public function makeFields():SignalDerived { fields = new SignalDerived(); return fields; }
+		public function forgetFields():void { fields = null; }
+		public function listenOther(signal:String):void { fields[signal].add(onRenamed); }
+		// A signal's property and its emit(), by its name.
+		public function listenersByName(other:Node, signal:String):int { return other[signal].numListeners; }
+		public function emitByName(other:Node, signal:String):void { other[signal].emit(); }
+		// A function written in a method sees the object's members, its own and Godot's.
+		public function listenWithClosure():void { renamed.add(function ():void { count += 1000; last = name; }); }
+		// An error in a listener that this script's own emit() ran comes back out of emit(), as in Flash.
+		public function catchesListener():String {
+			renamed.add(fails);
+			var said:String = "not caught";
+			try {
+				renamed.emit();
+			} catch (e:TypeError) {
+				said = "caught " + e.errorID;
+			}
+			renamed.remove(fails);
+			return said;
+		}
 		public function plain(other:Node):void { helper = new Listener(); other.renamed.add(helper.heard); }
 		public function plainCount():int { return helper.count; }
 		public function filtered(a:GodotArray):GodotArray { return a.filter(isBig); }

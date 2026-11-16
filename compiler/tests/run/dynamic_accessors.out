@@ -1,0 +1,9 @@
+3 3
+14 p
+thing 14
+3 9
+3
+ReferenceError
+Error #1074: Illegal write to read-only property ro on Thing.
+Error #1077: Illegal read of write-only property wo on Thing.
+5

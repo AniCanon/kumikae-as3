@@ -1,3 +1,0 @@
-method_value.as:1:78: error: the type 'Function' is not supported by the interpreter yet
-method_value.as:1:89: error: a value of type 'Function' is not supported by the interpreter yet
-method_value.as:1:89: error: 'go' used as a value is not supported by the interpreter yet

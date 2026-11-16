@@ -63,6 +63,19 @@ class CompilerLocatorTest {
         assertEquals(onPath, find(project, searchPath = "relative:${root.resolve("other")}"))
     }
 
+    @Test fun `on Windows the program is kas3c dot exe and the search path is split at semicolons`() {
+        val project = Files.createDirectories(root.resolve("game4"))
+        executable(root.resolve("win/kas3c"))
+        val windows = executable(root.resolve("win/kas3c.exe"))
+        val searchPath = "relative;${root.resolve("win")}"
+        assertEquals(windows, CompilerLocator.find(project, "", searchPath, root.resolve("home"), windows = true))
+        val built = executable(root.resolve("game4/compiler/build/kas3c.exe"))
+        assertEquals(built, CompilerLocator.find(project, "", searchPath, root.resolve("home"), windows = true))
+        // Elsewhere `;` is part of a folder's name, and `kas3c.exe` is not the program.
+        val elsewhere = Files.createDirectories(root.resolve("game5"))
+        assertNull(CompilerLocator.find(elsewhere, "", searchPath, root.resolve("home"), windows = false))
+    }
+
     @Test fun `the compiler the plugin carries is used when the project has none of its own`() {
         val project = Files.createDirectories(root.resolve("game3"))
         val carried = executable(root.resolve("plugin/native/kas3c"))

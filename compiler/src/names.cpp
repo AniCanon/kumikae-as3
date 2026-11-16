@@ -42,9 +42,9 @@ const char *symbol_kind_name(SymbolKind p_kind) {
 	return "?";
 }
 
-static std::string join(const List<std::string_view> &p_parts) {
+std::string dotted_name(const List<std::string_view> &p_parts, uint32_t p_count) {
 	std::string result;
-	for (uint32_t i = 0; i < p_parts.count; i++) {
+	for (uint32_t i = 0; i < p_count && i < p_parts.count; i++) {
 		if (i) {
 			result += '.';
 		}
@@ -54,7 +54,7 @@ static std::string join(const List<std::string_view> &p_parts) {
 }
 
 // "Player" for "src/game/Player.as".
-static std::string_view file_stem(const std::string &p_path) {
+static std::string_view file_stem(std::string_view p_path) {
 	std::string_view stem = p_path;
 	size_t slash = stem.find_last_of("/\\");
 	if (slash != std::string_view::npos) {
@@ -143,17 +143,20 @@ void Compilation::check(bool p_through_syntax_errors) {
 	}
 	checked_ = true;
 	bool syntax_errors = false;
-	for (const Unit &unit : units_) {
-		syntax_errors = syntax_errors || unit.diagnostics.has_errors();
+	for (Unit &unit : units_) {
+		unit.broken = unit.diagnostics.has_errors();
+		syntax_errors = syntax_errors || unit.broken;
 	}
 	if (syntax_errors) {
 		if (!p_through_syntax_errors) {
 			return;
 		}
-		// A file that lost a declaration to a syntax error makes other files look wrong. Nothing the passes
-		// find is certain, so nothing they find is reported.
+		// Nothing the passes find in a file that did not parse is certain, so nothing they find there is
+		// reported. What they find in the other files is sorted out afterwards.
 		for (Unit &unit : units_) {
-			unit.diagnostics.mute();
+			if (unit.broken) {
+				unit.diagnostics.mute();
+			}
 		}
 	}
 	for (Unit &unit : units_) {
@@ -170,6 +173,9 @@ void Compilation::check(bool p_through_syntax_errors) {
 	resolve_bodies(*this);
 	check_class_rules(*this);
 	type_bodies(*this);
+	if (syntax_errors) {
+		drop_doubtful_errors();
+	}
 	reusable_bodies_ = !has_errors();
 	initial_type_count_ = types_.size();
 }
@@ -183,10 +189,10 @@ bool Compilation::has_errors() const {
 	return false;
 }
 
-std::string Compilation::format_diagnostics() const {
+std::string Compilation::format_diagnostics(bool p_warnings) const {
 	std::string result;
 	for (const Unit &unit : units_) {
-		result += unit.diagnostics.format(unit.source);
+		result += unit.diagnostics.format(unit.source, p_warnings);
 	}
 	return result;
 }
@@ -251,7 +257,7 @@ std::string Compilation::where(const Unit &p_from, const Symbol *p_symbol) const
 
 void Compilation::declare_unit(Unit &p_unit) {
 	Program *tree = p_unit.tree;
-	p_unit.package = package(tree->package ? join(tree->package->name) : std::string());
+	p_unit.package = package(tree->package ? dotted_name(tree->package->name, tree->package->name.count) : std::string());
 	if (tree->package) {
 		uint32_t count = 0;
 		for (Node *definition : tree->package->definitions) {
@@ -290,30 +296,33 @@ static void check_override_allowed(Unit &p_unit, uint16_t p_modifiers, uint32_t 
 	}
 }
 
+void Compilation::declare_class(Unit &p_unit, ClassDecl *p_decl, bool p_in_block) {
+	Symbol *symbol = new_symbol(SymbolKind::Class, p_decl->name, &p_unit, p_decl->name_offset);
+	symbol->node = p_decl;
+	symbol->modifiers = p_decl->modifiers.bits;
+	classes_.emplace_back();
+	symbol->klass = &classes_.back();
+	symbol->klass->symbol = symbol;
+	p_decl->symbol = symbol;
+	if ((p_decl->modifiers.bits & Modifiers::Dynamic) && !p_unit.is_declaration) {
+		p_unit.diagnostics.error(p_decl->name_offset, "dynamic classes are not supported");
+	}
+	if (p_unit.is_builtin) {
+		for (const Metadata &tag : p_decl->metadata) {
+			symbol->klass->incomplete |= tag.name == "Incomplete";
+		}
+	}
+	check_override_allowed(p_unit, p_decl->modifiers.bits, p_decl->name_offset);
+	check_native(p_unit, p_decl->modifiers.bits, p_decl->name_offset);
+	declare_package_level(p_unit, symbol, p_in_block);
+	declare_class_members(p_unit, symbol, p_decl);
+}
+
 void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block) {
 	switch (p_node->kind) {
-		case NodeKind::ClassDecl: {
-			ClassDecl *decl = static_cast<ClassDecl *>(p_node);
-			Symbol *symbol = new_symbol(SymbolKind::Class, decl->name, &p_unit, decl->name_offset);
-			symbol->node = decl;
-			symbol->modifiers = decl->modifiers.bits;
-			classes_.emplace_back();
-			symbol->klass = &classes_.back();
-			symbol->klass->symbol = symbol;
-			decl->symbol = symbol;
-			if ((decl->modifiers.bits & Modifiers::Dynamic) && !p_unit.is_declaration) {
-				p_unit.diagnostics.error(decl->name_offset, "dynamic classes are not supported");
-			}
-			if (p_unit.is_builtin) {
-				for (const Metadata &tag : decl->metadata) {
-					symbol->klass->incomplete |= tag.name == "Incomplete";
-				}
-			}
-			check_override_allowed(p_unit, decl->modifiers.bits, decl->name_offset);
-			check_native(p_unit, decl->modifiers.bits, decl->name_offset);
-			declare_package_level(p_unit, symbol, p_in_block);
-			declare_class_members(p_unit, symbol, decl);
-		} break;
+		case NodeKind::ClassDecl:
+			declare_class(p_unit, static_cast<ClassDecl *>(p_node), p_in_block);
+			break;
 		case NodeKind::InterfaceDecl: {
 			InterfaceDecl *decl = static_cast<InterfaceDecl *>(p_node);
 			Symbol *symbol = new_symbol(SymbolKind::Interface, decl->name, &p_unit, decl->name_offset);
@@ -361,8 +370,13 @@ void Compilation::declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_i
 	auto &table = p_in_block ? p_unit.package->definitions : p_unit.helpers;
 	auto inserted = table.emplace(p_symbol->name, p_symbol);
 	if (!inserted.second) {
-		p_unit.diagnostics.error(p_symbol->offset,
-				quoted(p_symbol->name) + " is already defined " + where(p_unit, inserted.first->second));
+		std::string message = quoted(p_symbol->name) + " is already defined " + where(p_unit, inserted.first->second);
+		if (inserted.first->second->unit && inserted.first->second->unit->broken) {
+			// The other one is in a file that did not parse: it may not be what that file means to define.
+			p_unit.diagnostics.unresolved(p_symbol->offset, std::move(message));
+		} else {
+			p_unit.diagnostics.error(p_symbol->offset, std::move(message));
+		}
 	}
 }
 

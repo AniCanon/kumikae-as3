@@ -3,17 +3,26 @@
 
 #include "ast.h"
 
+#include <type_traits>
+
 namespace kas3 {
 
 // Calls p_visit(Node *) on the node and on everything below it, parents first. Null is allowed. The parts
 // of a tree that are not nodes (declarators, parameters, catch clauses, switch cases, object fields) are
-// passed through: the visitor reaches them from the node that holds them.
+// passed through: the visitor reaches them from the node that holds them. A visitor that returns a bool
+// stops the walk below a node it answers false for.
 template <class F>
 void walk(Node *p_node, F &&p_visit) {
 	if (!p_node) {
 		return;
 	}
-	p_visit(p_node);
+	if constexpr (std::is_same_v<decltype(p_visit(p_node)), bool>) {
+		if (!p_visit(p_node)) {
+			return;
+		}
+	} else {
+		p_visit(p_node);
+	}
 	auto each = [&](const auto &p_list) {
 		for (auto *item : p_list) {
 			walk(item, p_visit);

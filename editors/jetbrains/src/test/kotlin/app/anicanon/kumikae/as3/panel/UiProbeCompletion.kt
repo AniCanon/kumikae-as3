@@ -11,6 +11,7 @@ import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.ide.impl.TrustedPathsSettings
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
@@ -136,6 +137,7 @@ object UiProbeCompletion {
             if (missingClient) {
                 UiProbeMissingClient.checkNotice(project)
                 observations += "Missing LSP4IJ is reported once with installation guidance"
+                UiProbeHover.checkAbsent(project, editor, observations)
                 return
             }
             if (plainText) {
@@ -279,8 +281,15 @@ object UiProbeCompletion {
 
     internal fun action(editor: Editor, id: String) {
         val context = DataManager.getInstance().getDataContext(editor.contentComponent)
-        ActionManager.getInstance().getAction(id).actionPerformed(
-            AnActionEvent.createFromDataContext("UI probe", null, context),
+        val action = ActionManager.getInstance().getAction(id)
+        action.actionPerformed(
+            AnActionEvent.createEvent(
+                context,
+                action.templatePresentation.clone(),
+                "UI probe",
+                ActionUiKind.NONE,
+                null,
+            ),
         )
     }
 
@@ -290,6 +299,7 @@ object UiProbeCompletion {
         activate(project)
         PsiDocumentManager.getInstance(project).commitAllDocuments()
         check(UiProbeLsp.canComplete(project, editor)) { "Completion invoked while client indexing is not ready" }
+        UiProbeLsp.synchronize(project, editor)
         CodeCompletionHandlerBase(CompletionType.BASIC).invokeCompletion(project, editor)
     }
 

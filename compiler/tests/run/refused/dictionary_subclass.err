@@ -1,0 +1,1 @@
+dictionary_subclass.as:3:21: error: extending 'Dictionary' is not supported by the interpreter yet

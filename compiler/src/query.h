@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace kas3 {
@@ -62,6 +63,7 @@ struct SignatureHelp {
 	std::string label;
 	std::vector<std::string> parameters;
 	uint32_t active_parameter = 0;
+	std::string active_name; // The active parameter's name. Empty if the function takes none.
 };
 
 struct CompletionEdit {
@@ -86,9 +88,19 @@ struct Completion {
 	std::string detail; // The declaration as one line of AS3. Empty for a keyword.
 	bool callable = false;
 	std::vector<std::string> required_parameters;
+	bool is_parameter_name = false; // In a call's argument, the name of that argument's parameter.
 	std::optional<CompletionEdit> edit;
 	std::optional<CompletionEdit> additional_edit;
 	std::vector<CompletionTabStop> tab_stops;
+};
+
+// True if the name starts with the prefix, whatever the case of either: how completion narrows.
+bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix);
+
+// What is written where `override` comes before a member's name.
+struct OverrideOffer {
+	std::vector<Completion> items;
+	bool after_function = false; // `function` is written already: no keyword can follow.
 };
 
 struct CompletionResult {
@@ -107,14 +119,25 @@ class Queries {
 	const Completion &completion_item(Symbol *p_symbol);
 	static const FunctionDecl *function_declaration(const Symbol *p_symbol);
 	CompletionEdit import_edit(const Unit &p_unit, uint32_t p_offset, std::string_view p_name) const;
-	std::vector<Completion> overrides(const Unit &p_unit, const FunctionDecl &p_function, Symbol *p_class, uint32_t p_offset);
+	// Where `override` is written before a member's name in p_class: each member of a base class that it
+	// may override, written whole. p_function is the declaration the parser made of what is written, if
+	// it made one; otherwise the words before p_start are read, and must be modifiers with `override`.
+	std::optional<OverrideOffer> overrides(const Unit &p_unit, const FunctionDecl *p_function, Symbol *p_class,
+			uint32_t p_start, uint32_t p_offset);
 	static std::string line_break(const Unit &p_unit);
 	static std::string line_indent(const Unit &p_unit, uint32_t p_offset);
 	void statement_templates(const Unit &p_unit, uint32_t p_offset, std::vector<Completion> &p_items) const;
+	static bool block_start(const Unit &p_unit, const Block *p_block, uint32_t p_offset);
 	bool statement_start(const Unit &p_unit, uint32_t p_offset) const;
 	static uint32_t skip_trivia(const Unit &p_unit, uint32_t p_offset);
 
 	const std::vector<Occurrence> &occurrences(const Unit &p_unit);
+	std::vector<const Symbol *> types_; // Every class and interface, once asked for.
+	bool types_listed_ = false;
+	const std::vector<const Symbol *> &types();
+	// The methods that are the same thing as this one because of an interface: for an interface's method
+	// the methods that implement it, and for a class's method the interface methods it implements.
+	std::unordered_set<const Symbol *> same_through_interfaces(const Symbol *p_member);
 	friend class Completer;
 
 public:
@@ -124,22 +147,28 @@ public:
 	// The name the offset is in, or that ends right at it. Null if there is none, or it resolved to nothing.
 	const Occurrence *at(const Unit &p_unit, uint32_t p_offset);
 	Place declaration(const Symbol *p_symbol) const;
+	// Where go to definition leads from the offset: the declaration of the name there, or for the class
+	// in `new X()` its constructor, if it declares one. No place if there is no name there.
+	Place definition(const Unit &p_unit, uint32_t p_offset);
 	// Every use in the program's files, in file order, then by position. Declaration files are searched
 	// only for the declaration itself. For a method, the methods that override it and the one it overrides
-	// count as the same thing: a call through a base class may reach any of them.
+	// count as the same thing: a call through a base class may reach any of them. So do an interface's
+	// method and the methods that implement it, in the class itself or in a base class.
 	std::vector<Place> references(const Symbol *p_symbol, bool p_with_declaration);
 	// The declaration as one line of AS3: "function hit(by:Node, power:int = 1):void".
 	std::string describe(const Symbol *p_symbol) const;
 	// What it is and where it lives: "method of game.Player", "class in package godot", "local variable".
 	std::string context(const Symbol *p_symbol) const;
 	std::vector<OutlineItem> outline(const Unit &p_unit) const;
-	// Definitions in the program's files whose name contains the query, whatever the case. An empty
-	// query matches everything.
+	// Definitions whose name contains the query, whatever the case: the program's own, then those of the
+	// declaration files (Godot's API, the built-in library). An empty query matches everything in the
+	// program, and nothing outside it.
 	std::vector<FoundSymbol> find(std::string_view p_query, size_t p_limit);
 	// What could be written at the offset, narrowed by the letters already there, whatever their case.
-	// After a dot: what the value before it has. Where a type is written: types. Otherwise the names in
+	// After a dot: what the value before it has (Object's members if its type is `*` or not known), or
+	// for a package's path what the package holds. Where a type is written: types. Otherwise the names in
 	// reach (locals, members, definitions, keywords). Nothing inside a comment or a string, and nothing
-	// after a dot whose value has no known type.
+	// after a name that means nothing here.
 	// Counts support bounded-state tests and benchmarks; caches are owned by this checked generation.
 	size_t cached_completion_items() const { return completion_items_.size(); }
 	size_t cached_context_units() const { return context_nodes_.size(); }

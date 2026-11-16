@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <unordered_set>
 
 namespace kas3 {
@@ -23,6 +24,8 @@ constexpr std::string_view IN_FILE[] = {
 	"const", "final", "dynamic",
 };
 
+} // namespace
+
 bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix) {
 	if (p_name.size() < p_prefix.size()) {
 		return false;
@@ -34,8 +37,6 @@ bool starts_with_any_case(std::string_view p_name, std::string_view p_prefix) {
 	}
 	return true;
 }
-
-} // namespace
 
 // One completion request: where the cursor is, and what is collected for it.
 class Completer {
@@ -126,6 +127,10 @@ class Completer {
 		switch (p_type->kind) {
 			case Type::Instance:
 				offer_members(p_type->symbol, false, true);
+				if (p_type->symbol && p_type->symbol->kind == SymbolKind::Interface) {
+					// The object is of some class, and every class has what every object has, as the checker says.
+					offer_members(compilation_.object_class(), false, false);
+				}
 				break;
 			case Type::Vector:
 				offer_members(compilation_.vector_class(), false, true);
@@ -136,8 +141,13 @@ class Completer {
 					offer_members(p_type->element->symbol, true, false);
 				}
 				break;
+			case Type::Any:
+			case Type::Unknown:
+				// Whatever it is, it is an object: what every object has is all that is known.
+				offer_members(compilation_.object_class(), false, false);
+				break;
 			default:
-				break; // Nothing is known of it: offering everything would be a guess.
+				break;
 		}
 	}
 
@@ -206,7 +216,13 @@ class Completer {
 		if (word_before(keyword_end) != "import") {
 			return false;
 		}
-		const std::string path(source_.substr(begin, start_ - begin));
+		offer_package(std::string(source_.substr(begin, start_ - begin)), false);
+		return true;
+	}
+
+	// What a package's path names, dot included ("flash.utils."): what that package holds that can be
+	// reached from here, and the packages whose names go on from the path.
+	void offer_package(std::string_view p_path, bool p_types_only) {
 		const Context context = compilation_.context_of(const_cast<Unit &>(unit_), true);
 		std::unordered_set<const Package *> seen;
 		for (Unit &unit : compilation_.units()) {
@@ -214,10 +230,10 @@ class Completer {
 				continue;
 			}
 			const std::string qualified = unit.package->name + ".";
-			if (qualified == path) {
+			if (qualified == p_path) {
 				std::vector<Symbol *> sorted;
 				for (const auto &[name, symbol] : unit.package->definitions) {
-					if (compilation_.visible(symbol, context)) {
+					if (compilation_.visible(symbol, context) && (!p_types_only || symbol->is_type())) {
 						sorted.push_back(symbol);
 					}
 				}
@@ -225,8 +241,8 @@ class Completer {
 				for (Symbol *symbol : sorted) {
 					offer(symbol);
 				}
-			} else if (qualified.compare(0, path.size(), path) == 0) {
-				const std::string_view name = std::string_view(unit.package->name).substr(path.size(), qualified.find('.', path.size()) - path.size());
+			} else if (qualified.compare(0, p_path.size(), p_path) == 0) {
+				const std::string_view name = std::string_view(unit.package->name).substr(p_path.size(), qualified.find('.', p_path.size()) - p_path.size());
 				if (!name.empty() && starts_with_any_case(name, prefix_) && seen_.insert(name).second) {
 					Completion item;
 					item.name = std::string(name);
@@ -235,7 +251,44 @@ class Completer {
 				}
 			}
 		}
-		return true;
+	}
+
+	// After a dot: what the value before it has, when its type is known (`godot.Vector2.` is a class).
+	// Otherwise, if its first name means nothing here, it may be a package's path; if it does, it is a
+	// value of a type not known.
+	void offer_after_dot(uint32_t p_dot) {
+		const Member *member = member_after(p_dot);
+		const Expr *root = member ? member->object : nullptr;
+		while (root && root->kind == NodeKind::Member) {
+			root = static_cast<const Member *>(root)->object;
+		}
+		const Type *type = member ? member->object->type : nullptr;
+		if (type && type->kind != Type::Unknown) {
+			offer_of_type(type);
+			return;
+		}
+		if (root && !(root->kind == NodeKind::Name && !static_cast<const Name *>(root)->symbol)) {
+			offer_of_type(type);
+			return;
+		}
+		uint32_t begin = p_dot;
+		while (begin > 0 && (is_identifier_at(source_, begin - 1) || source_[begin - 1] == '.')) {
+			--begin;
+		}
+		const std::string path(source_.substr(begin, p_dot + 1 - begin));
+		if (is_identifier_at(path, 0) && path.find("..") == std::string::npos) {
+			offer_package(path, type_ends_at(p_dot) || at_type());
+		}
+	}
+
+	// True if a type written in the tree ends at the offset: `var d:flash.utils.` is a type's path.
+	bool type_ends_at(uint32_t p_offset) const {
+		for (const Node *node : queries_.context_nodes(unit_)) {
+			if (node->kind == NodeKind::TypeRef && node->end == p_offset) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	void offer_locals() {
@@ -269,13 +322,18 @@ class Completer {
 		});
 	}
 
-	// The `a.b` whose dot is at p_dot: of the names written after that dot, the first.
+	// The `a.b` whose dot is at p_dot: of the names written after that dot, the first, whose value ends
+	// right before the dot. None if the dot is not in a member's place (a type's path).
 	Member *member_after(uint32_t p_dot) {
 		Member *found = nullptr;
 		std::for_each(queries_.context_nodes(unit_).begin(), queries_.context_nodes(unit_).end(), [&](Node *p_node) {
 			if (p_node->kind == NodeKind::Member) {
 				Member *member = static_cast<Member *>(p_node);
-				if (member->name_offset > p_dot && (!found || member->name_offset < found->name_offset)) {
+				uint32_t gap = member->object ? member->object->end : p_dot + 1;
+				while (gap < p_dot && (std::isspace((unsigned char)source_[gap]) || queries_.text_byte(unit_, gap))) {
+					gap++;
+				}
+				if (gap == p_dot && member->name_offset > p_dot && (!found || member->name_offset < found->name_offset)) {
 					found = member;
 				}
 			}
@@ -300,7 +358,22 @@ class Completer {
 		return source_.substr(begin, p_end - begin);
 	}
 
+	// In a call's argument, the name in reach that the parameter there has goes first: most often it is
+	// what is meant.
+	void put_parameter_name_first() {
+		const std::optional<SignatureHelp> help = queries_.signature_help(unit_, offset_);
+		if (!help || help->active_name.empty()) {
+			return;
+		}
+		auto match = std::find_if(found_.begin(), found_.end(), [&](const Completion &p_item) { return p_item.name == help->active_name; });
+		if (match != found_.end()) {
+			match->is_parameter_name = true;
+			std::rotate(found_.begin(), match, match + 1);
+		}
+	}
+
 	// Whether a type is what is written here: `var a:`, `):`, `new`, `extends`, `implements`, `is`, `as`.
+	// The tree says so wherever the grammar wants a type, even before one is started.
 	bool at_type() const {
 		const uint32_t end = before();
 		if (end == 0) {
@@ -316,6 +389,30 @@ class Completer {
 		}
 		const std::string_view keyword = word_before(end);
 		return keyword == "new" || keyword == "extends" || keyword == "implements" || keyword == "is" || keyword == "as";
+	}
+
+	// Inside a function's body: locals, members, definitions, keywords and statement templates.
+	void offer_in_body() {
+		const bool is_static = function_->symbol && function_->symbol->is_static();
+		offer_locals();
+		if (class_) {
+			if (!is_static) {
+				offer_members(class_, false, true);
+			}
+			offer_members(class_, true, true);
+		}
+		offer_definitions(false);
+		put_parameter_name_first();
+		offer_keywords(IN_FUNCTION);
+		queries_.statement_templates(unit_, offset_, found_);
+		// Typing a keyword can turn a recovery gap into a known statement start.
+		incomplete_ |= prefix_.empty();
+		if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
+			Completion item;
+			item.name = "this";
+			item.is_keyword = true;
+			found_.push_back(std::move(item));
+		}
 	}
 
 public:
@@ -337,16 +434,15 @@ public:
 		if (class_ && function_ && (function_->modifiers.bits & Modifiers::Override) &&
 				(function_->name.empty() ? offset_ > function_->name_offset :
 						offset_ >= function_->name_offset && offset_ <= function_->name_offset + function_->name.size())) {
-			return queries_.overrides(unit_, *function_, class_, offset_);
+			std::optional<OverrideOffer> offer = queries_.overrides(unit_, function_, class_, start_, offset_);
+			return offer ? std::move(offer->items) : std::vector<Completion>();
 		}
 		if (offer_import()) {
 			return std::move(found_);
 		}
 		const uint32_t end = before();
 		if (end > 0 && source_[end - 1] == '.') {
-			if (Member *member = member_after(end - 1); member && member->object && !member->symbol) {
-				offer_of_type(member->object->type);
-			}
+			offer_after_dot(end - 1);
 			return std::move(found_);
 		}
 		if (at_type()) {
@@ -354,26 +450,14 @@ public:
 			return std::move(found_);
 		}
 		if (function_ && in_body_) {
-			const bool is_static = function_->symbol && function_->symbol->is_static();
-			offer_locals();
-			if (class_) {
-				if (!is_static) {
-					offer_members(class_, false, true);
-				}
-				offer_members(class_, true, true);
-			}
-			offer_definitions(false);
-			offer_keywords(IN_FUNCTION);
-			queries_.statement_templates(unit_, offset_, found_);
-			// Typing a keyword can turn a recovery gap into a known statement start.
-			incomplete_ |= prefix_.empty();
-			if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
-				Completion item;
-				item.name = "this";
-				item.is_keyword = true;
-				found_.push_back(std::move(item));
-			}
+			offer_in_body();
 		} else if (class_) {
+			if (std::optional<OverrideOffer> offer = queries_.overrides(unit_, nullptr, class_, start_, offset_)) {
+				std::move(offer->items.begin(), offer->items.end(), std::back_inserter(found_));
+				if (offer->after_function) {
+					return std::move(found_);
+				}
+			}
 			offer_keywords(IN_CLASS);
 		} else {
 			offer_keywords(IN_FILE);

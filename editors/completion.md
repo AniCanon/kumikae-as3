@@ -20,7 +20,11 @@ getParent().getParent().  // Members of Node
 points[0].                // Vector2 members if points is Vector.<Vector2>
 ```
 
-There are no guessed members for an unknown or `*` receiver. A partial expression can still be
+For a `*` receiver, or one whose type could not be worked out, only what every value has is offered:
+`Object`'s members (`toString`, `hasOwnProperty` and the rest). After a package's path (`flash.utils.`,
+`godot.`) completion offers what that package holds and the packages inside it; where a type is written
+(`var d:flash.utils.`), its types only. A name in reach comes before a package of the same name. Nothing
+is offered after a name that means nothing in the file. A partial expression can still be
 completed; errors elsewhere do not require saving a valid file first. Comments, strings and regular
 expressions do not offer code completion. Parameters, function-wide local variables, outer captures,
 named function expressions, catch variables and function-local imports respect their compiler scope.
@@ -36,13 +40,18 @@ Acceptance adds the signature and a body that throws `Error("Not implemented")`;
 your implementation. With snippet support, the caret lands immediately before `throw`; generated braces
 are ordinary source characters. Metadata, comments and an existing `final` modifier are preserved. Stubs are offered
 only while the method name is unfinished, before a parameter list. Private, final and static methods,
-inaccessible signature types and non-public member defaults are excluded. An explicitly written
+inaccessible signature types and non-public member defaults are excluded, and so is a method this class
+overrides already. An explicitly written
 visibility must match the inherited method. Public default constants work when written as `VALUE`,
 `Base.VALUE` or `package.name.Base.VALUE`; generated references retain their meaning in the derived class.
 Getters/setters use their corresponding accessor prefix. Overriding one does not hide the other, and
 `final` applies to the selected accessor. Completion also works immediately after `override function `,
 `override function get ` or `override function set `, before any name character is typed. A member on
 the following line, including its modifiers and metadata, remains intact.
+
+Completion starts as soon as `override` is written, with or without the access word: before `function`
+it offers methods and properties alike, and accepting one also writes `function` (and `get` or `set` for
+a property's half). Inside a function body `override` offers no stubs.
 
 ## Accepting a suggestion
 
@@ -101,6 +110,10 @@ var callback:Function = onTimeout;
 timer.timeout.add(onTimeout);
 ```
 
+In a call's argument, a variable, parameter or member in reach whose name is the parameter's name there
+comes first and is preselected: in `move(|)` for `move(power:int)`, a local `power` is offered first. No
+name is made up when none is in reach, since AS3 has no named arguments.
+
 Typing `(` or `,` requests argument help. It shows the callable's declaration and active parameter,
 including inside nested calls. Commas inside nested expressions, strings, comments and regular
 expressions do not advance the outer call's active parameter.
@@ -112,8 +125,10 @@ partner can be typed to move past the existing one. Backspace in an empty bracke
 Enter inside braces creates an indented line, using the project's tab/space settings. Code punctuation
 inside comments and strings is not treated as a new code block. The local lexer tracks expression and statement braces, control conditions, function declarations and
 expressions, ternary expressions and labels to distinguish regex literals from division. Its restart
-state carries common nesting directly; deeper nesting reconstructs context from the text prefix without
-retaining a document history. The compiler supplies its own parsed regions for completion and argument help.
+state fits the sixteen bits the editor keeps and carries a class's members' nesting directly, so an edit
+there is lexed again from the member. Deeper inside, the editor restarts at the member; a restart there
+anyway reconstructs context from the text prefix, without retaining a document history. The compiler
+supplies its own parsed regions for completion and argument help.
 
 Highlighting still comes from the shared TextMate grammar. A small adapter supplies AS3 token boundaries
 to the native editing handlers while preserving TextMate's color attributes, including string escapes.
@@ -128,7 +143,7 @@ or history of prefix results survives the generation.
 
 Clients advertising LSP completion-list edit defaults receive the shared range once. Older clients
 receive a range with each item. Snippets and separate insert/replace edits are also capability-gated.
-Every result describes the current document known to the server.
+Every result describes the document as it was when the request was made.
 
 After a clean check, edits confined to method/function bodies reuse stable declaration symbols and
 recheck the changed units. Sources are immutable shared snapshots; body symbols and scopes belong to
@@ -142,8 +157,10 @@ sent when the client advertises support, including empty diagnostic lists for ea
 version. If typing overtakes an earlier clear, the next clean version clears stale errors again.
 Rider receives diagnostic versions and ranges atomically with respect to document writes, so a reply
 cannot cache pre-edit offsets while a deletion is still in progress.
-A bounded lookahead batch cancels queued requests or rejects
-requests made obsolete by a newer document change before checking. Partial frames do not delay an
+A bounded lookahead batch skips a queued request that is cancelled, or whose document is closed, before
+checking. A request that a newer edit follows is still answered, for the text it was asked about: LSP 3.17
+says a server should not send ContentModified for a change it has only queued, and LSP4IJ does not ask again
+after one (which once left override suggestions unshown). Partial frames do not delay an
 already complete request. A check already running remains synchronous and cannot be interrupted.
 See the [follow-up results](../docs/results/2026-11-completion-followup.md) for latency, memory and validation.
 
@@ -154,11 +171,12 @@ See the [follow-up results](../docs/results/2026-11-completion-followup.md) for 
   compiler. Rebuilding an unrelated checkout does not update an installed plugin's binary.
 - If pairing is disabled, check the IDE's editor smart-key settings. The plugin honors those settings.
 - If a member is missing, hover the receiver and check its declared type and visibility. A dynamic value
-  requires a known type before its members can be offered.
+  offers only `Object`'s members until it has a known type.
 - For a sandbox trace, use `./gradlew runIde -PlspTrace=<existing-folder>` from `editors/jetbrains`.
   Trace files contain source text; keep them outside the repository and do not enable them for timings.
 - Windows transport uses binary stdio, pipe readiness checks, UTF-8 filesystem paths and `.exe` compiler
-  discovery. Windows runtime validation is still pending; the macOS tests do not establish Windows support.
+  discovery, and Windows paths are tested on every system. The server has not yet been built or run on
+  Windows itself.
 - Unknown callable signatures cannot show argument help. General incremental declaration checking and
   interruption of a running check remain pending.
 - Rider uses its native LSP client. IntelliJ IDEA Community/free unified IDEA uses the optional LSP4IJ

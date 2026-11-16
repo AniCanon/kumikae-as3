@@ -1,13 +1,33 @@
-#include "lowerer.h"
+#include "lower_bodies.h"
+#include "lower_classes.h"
+#include "lower_members.h"
 
 namespace kas3 {
 namespace ir {
 
-void Lowerer::refuse(uint32_t p_offset, const std::string &p_what) {
+void Lowerer::refuse(uint32_t p_offset, std::string_view p_what) {
 	failed_ = true;
-	if (unit_) {
-		unit_->diagnostics.error(p_offset, p_what + " is not supported by the interpreter yet");
+	// One refusal is enough for a statement: what follows in it most often follows from the first. And a
+	// statement that uses a variable whose type was refused where it is declared is said nothing more of.
+	if (!unit_ || (statement_ && (statement_ == refused_in_ || uses_refused_type(statement_)))) {
+		return;
 	}
+	refused_in_ = statement_;
+	unit_->diagnostics.error(p_offset, std::string(p_what) + " is not supported by the interpreter yet");
+}
+
+bool Lowerer::uses_refused_type(const Stmt *p_statement) {
+	if (refused_types_.empty()) {
+		return false;
+	}
+	bool found = false;
+	walk(const_cast<Stmt *>(p_statement), [&](Node *p_node) {
+		if (p_node->kind == NodeKind::Name) {
+			const Symbol *symbol = static_cast<Name *>(p_node)->symbol;
+			found = found || (symbol && symbol->type && refused_types_.count(compilation_.type_of(symbol->type)));
+		}
+	});
+	return found;
 }
 
 uint32_t Lowerer::string(const std::string &p_text) {
@@ -60,20 +80,19 @@ void Lowerer::lower_unit(Unit &p_unit) {
 				if (!decl->symbol || !classes_.count(decl->symbol)) {
 					continue;
 				}
-				lower_constructor(p_unit, decl);
+				Bodies(*this).lower_constructor(p_unit, decl);
 				for (Node *member : decl->members) {
 					if (member->kind == NodeKind::FunctionDecl) {
 						FunctionDecl *function = static_cast<FunctionDecl *>(member);
-						if (function->symbol && function->symbol != decl->symbol->klass->constructor &&
-								function->accessor == FunctionDecl::None) {
-							lower_function(p_unit, decl->symbol, function);
+						if (function->symbol && function->symbol != decl->symbol->klass->constructor) {
+							Bodies(*this).lower_function(p_unit, decl->symbol, function);
 						}
 					}
 				}
 			} else if (definition->kind == NodeKind::FunctionDecl) {
-				lower_function(p_unit, nullptr, static_cast<FunctionDecl *>(definition));
+				Bodies(*this).lower_function(p_unit, nullptr, static_cast<FunctionDecl *>(definition));
 			} else if (definition->kind == NodeKind::VarDecl) {
-				lower_package_variables(p_unit, static_cast<VarDecl *>(definition));
+				Bodies(*this).lower_package_variables(p_unit, static_cast<VarDecl *>(definition));
 			}
 		}
 	};
@@ -115,6 +134,7 @@ Lowerer::Lowerer(Compilation &p_compilation, Module &p_module) :
 		signal_ = found == godot->definitions.end() ? nullptr : found->second;
 	}
 	function_ = compilation_.builtin("Function");
+	array_ = compilation_.builtin("Array");
 }
 
 // The interpreter raises these itself, whether or not the program names them.
@@ -171,18 +191,15 @@ void Lowerer::declare_package_function(Unit *p_unit, FunctionDecl *p_decl) {
 	function.file = file(p_unit);
 	function.position = p_decl->name_offset;
 	function.is_static = true;
-	functions_[symbol] = (uint32_t)module_.functions.size();
+	functions_[p_decl] = (uint32_t)module_.functions.size();
 	module_.functions.push_back(std::move(function));
 }
 
-// What a file holds at package level other than classes: functions and variables get their places, and
-// an interface is refused.
+// What a file holds at package level other than classes and interfaces: functions and variables get their
+// places.
 void Lowerer::declare_package_level(Unit *p_unit, const List<Node *> &p_definitions) {
 	for (Node *definition : p_definitions) {
 		switch (definition->kind) {
-			case NodeKind::InterfaceDecl:
-				refuse(static_cast<InterfaceDecl *>(definition)->name_offset, "an interface");
-				break;
 			case NodeKind::FunctionDecl:
 				declare_package_function(p_unit, static_cast<FunctionDecl *>(definition));
 				break;
@@ -240,12 +257,13 @@ bool Lowerer::run(LowerMode p_mode) {
 		return false;
 	}
 	find_error_classes();
+	Members(*this).reserve_interfaces(units);
 	const std::vector<ClassInUnit> classes = classes_in_order(units);
 	for (const ClassInUnit &entry : classes) {
-		reserve_class(entry.second);
+		Classes(*this).reserve_class(entry.second);
 	}
 	for (const ClassInUnit &entry : classes) {
-		declare_class(*entry.first, entry.second);
+		Classes(*this).declare_class(*entry.first, entry.second);
 	}
 	for (Unit *unit : units) {
 		unit_ = unit;
@@ -256,7 +274,7 @@ bool Lowerer::run(LowerMode p_mode) {
 	}
 	// Static fields get their values a class at a time, a base class before its subclasses.
 	for (const ClassInUnit &entry : classes) {
-		lower_statics(*entry.first, entry.second);
+		Bodies(*this).lower_statics(*entry.first, entry.second);
 	}
 	for (Unit *unit : units) {
 		lower_unit(*unit);

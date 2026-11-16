@@ -57,6 +57,7 @@ func _physics_process(_delta: float) -> bool:
 	# Whole numbers worked out in AS3 reach Godot whole.
 	show("product", ask("product", [Vector2i(1, 2), 3, 5]), Vector2i(1, 2) * 15)
 	show("product past int", ask("product", [Vector2i(1, 1), 50000, 60000]), null)
+	show("a whole NaN goes as 0", ask("byNothing", [Vector2i(3, 4), 5]), Vector2i(0, 0))
 	# A type that stores 32-bit integers never sees a wide one.
 	var past := 4294967299
 	show("cell", ask("cell", [7]), Vector2i(7, 0))

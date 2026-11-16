@@ -33,7 +33,7 @@ class Server {
 	uint64_t published_document_generation_ = 0;
 	int next_request_ = 1;
 	std::unordered_map<std::string, std::string> uris_; // The URI the editor uses for a path.
-	std::unordered_map<std::string, int64_t> versions_; // Current open-document version, by normalized path.
+	std::unordered_map<std::string, int64_t> versions_; // Current open-document version, by document_key().
 	struct Published {
 		std::string diagnostics;
 		std::optional<int64_t> version;
@@ -47,9 +47,13 @@ class Server {
 	Json location(const Place &p_place);
 	uint32_t offset_at(const Unit &p_unit, const Json &p_position) const;
 	uint32_t offset_in(const Source &p_source, const Json &p_position) const;
+	int mark_width(const Source &p_source) const;
 	const Occurrence *occurrence_at(const Json &p_params, Unit **r_unit);
+	std::string diagnostics_json(const Unit &p_unit) const;
 	void publish(std::vector<std::string> &r_out);
 	void handle_message(const Json &p_message, std::vector<std::string> &r_out);
+	// The name a document is known by, whatever name the editor gives it: the workspace's for its file.
+	std::string document_key(const std::string &p_uri) const;
 	static std::optional<int64_t> valid_version(const Json &p_document);
 	bool accept_version(const Json &p_document, bool p_open, std::vector<std::string> &r_out);
 	std::optional<int64_t> document_version(const std::string &p_uri) const;
@@ -59,17 +63,28 @@ class Server {
 	Json references(const Json &p_params);
 	Json hover(const Json &p_params);
 	Json completion(const Json &p_params);
+	Json completion_item(const Unit &p_unit, const Completion &p_found, const CompletionRange &p_span,
+			const Json &p_edit_range, uint32_t p_priority) const;
 	Json signature_help(const Json &p_params);
 	Json document_symbols(const Json &p_params);
 	Json workspace_symbols(const Json &p_params);
 	void notification(const std::string &p_method, const Json &p_params, std::vector<std::string> &r_out);
+	void register_file_watcher(std::vector<std::string> &r_out);
+	void did_change(const std::string &p_path, const Json &p_document, const Json &p_params,
+			std::vector<std::string> &r_out);
+	void did_close(const std::string &p_path);
+	std::optional<Json> answer(const std::string &p_method, const Json &p_params);
+	using Handler = Json (Server::*)(const Json &p_params);
+	// The handler of a request the server answers after `initialize` (each may be cancelled while queued),
+	// or null.
+	static Handler handler_of(std::string_view p_method);
 
 public:
 	explicit Server(Workspace::Options p_options);
 
 	// Handles one message and appends what to send back, each a complete JSON text.
 	void handle(std::string_view p_message, std::vector<std::string> &r_out);
-	// The bounded input batch preserves notification order and skips obsolete queued requests.
+	// The bounded input batch preserves notification order and skips queued requests that are cancelled or whose document is closed.
 	void handle_batch(const std::vector<std::string> &p_messages, std::vector<std::string> &r_out);
 	// Checks the program if it changed, and appends the diagnostics that differ from what the editor has.
 	// Call it when no further message is waiting.

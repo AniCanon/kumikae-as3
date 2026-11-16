@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_operators.h"
 
 namespace kas3 {
 namespace ir {
@@ -30,23 +30,23 @@ uint32_t Lowerer::any_text(Expr *p_expression) {
 	return out;
 }
 
-uint32_t Lowerer::any_equality(Binary *p_binary) {
+uint32_t Operators::any_equality(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
 	const bool strict = p_binary->op == TokenKind::StrictEqual || p_binary->op == TokenKind::StrictNotEqual;
 	const bool negated = p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual;
-	const uint32_t a = settled(any_value(p_binary->left), p_binary->right, position);
-	const uint32_t b = any_value(p_binary->right);
-	uint32_t out = reg(Kind::Bool);
-	emit(strict ? Op::AnyStrictEq : Op::AnyEq, position, out, a, b);
+	const uint32_t a = l_.settled(l_.any_value(p_binary->left), p_binary->right, position);
+	const uint32_t b = l_.any_value(p_binary->right);
+	uint32_t out = l_.reg(Kind::Bool);
+	l_.emit(strict ? Op::AnyStrictEq : Op::AnyEq, position, out, a, b);
 	if (negated) {
-		uint32_t flipped = reg(Kind::Bool);
-		emit(Op::Not, position, flipped, out);
+		uint32_t flipped = l_.reg(Kind::Bool);
+		l_.emit(Op::Not, position, flipped, out);
 		return flipped;
 	}
 	return out;
 }
 
-uint32_t Lowerer::any_comparison(Binary *p_binary) {
+uint32_t Operators::any_comparison(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
 	// The left one is made a primitive first, whichever way the comparison goes.
 	Op op = Op::AnyLt;
@@ -57,26 +57,29 @@ uint32_t Lowerer::any_comparison(Binary *p_binary) {
 	} else if (p_binary->op == TokenKind::GreaterEqual) {
 		op = Op::AnyGe;
 	}
-	const uint32_t a = settled(any_value(p_binary->left), p_binary->right, position);
-	const uint32_t b = any_value(p_binary->right);
-	uint32_t out = reg(Kind::Bool);
-	emit(op, position, out, a, b);
+	const uint32_t a = l_.settled(l_.any_value(p_binary->left), p_binary->right, position);
+	const uint32_t b = l_.any_value(p_binary->right);
+	uint32_t out = l_.reg(Kind::Bool);
+	l_.emit(op, position, out, a, b);
 	return out;
 }
 
-uint32_t Lowerer::any_add(Binary *p_binary) {
+uint32_t Operators::any_add(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
-	const uint32_t a = settled(any_value(p_binary->left), p_binary->right, position);
-	const uint32_t b = any_value(p_binary->right);
-	uint32_t out = reg(Kind::Any);
-	emit(Op::AnyAdd, position, out, a, b);
-	return convert(out, natural(p_binary), position);
+	const uint32_t a = l_.settled(l_.any_value(p_binary->left), p_binary->right, position);
+	const uint32_t b = l_.any_value(p_binary->right);
+	uint32_t out = l_.reg(Kind::Any);
+	l_.emit(Op::AnyAdd, position, out, a, b);
+	return l_.convert(out, l_.natural(p_binary), position);
 }
 
 // typeof: of an untyped value, asked as the program runs; of anything else, known now.
 uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 	uint32_t out = reg(Kind::Str);
-	if (untyped(p_operand)) {
+	// Asked as it runs of an untyped value, of a String, which is "object" when it holds null, and of a
+	// Function, which is "function" unless it holds null.
+	const bool function = p_operand && p_operand->type && p_operand->type->kind == Type::Instance && p_operand->type->symbol == function_;
+	if (untyped(p_operand) || function || (!is_null(p_operand) && natural(p_operand) == Kind::Str)) {
 		emit(Op::AnyTypeof, p_position, out, any_value(p_operand));
 		return out;
 	}
@@ -87,8 +90,6 @@ uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 		name = "number";
 	} else if (kind == Kind::Bool) {
 		name = "boolean";
-	} else if (kind == Kind::Str) {
-		name = "string"; // A String that is null is still "string" to AS3's checker: typeof of a typed null.
 	}
 	emit(Op::ConstStr, p_position, out, string(name));
 	return out;
@@ -96,44 +97,52 @@ uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 
 // `is` and `as` asked of a value that is untyped or of a type the class can't be: what the value is now
 // decides. Nothing if the type written is not one this can test.
-std::optional<uint32_t> Lowerer::any_type_test(Binary *p_binary) {
+std::optional<uint32_t> Operators::any_type_test(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
-	const Symbol *symbol = named_class(p_binary->right);
+	const Symbol *symbol = l_.named_class(p_binary->right);
 	uint32_t code = NONE;
 	Kind target = Kind::Obj;
-	if (symbol == int_) {
+	if (symbol == l_.int_) {
 		code = ANY_IS_INT;
 		target = Kind::I32;
-	} else if (symbol == uint_) {
+	} else if (symbol == l_.uint_) {
 		code = ANY_IS_UINT;
 		target = Kind::U32;
-	} else if (symbol == number_) {
+	} else if (symbol == l_.number_) {
 		code = ANY_IS_NUMBER;
 		target = Kind::F64;
-	} else if (symbol == string_) {
+	} else if (symbol == l_.string_) {
 		code = ANY_IS_STRING;
 		target = Kind::Str;
-	} else if (symbol == boolean_) {
+	} else if (symbol == l_.boolean_) {
 		code = ANY_IS_BOOLEAN;
 		target = Kind::Bool;
-	} else if (!symbol || !class_index(symbol, &code) || !module_.classes[code].native_base.empty()) {
+	} else if (const Type *written = p_binary->right->type && p_binary->right->type->kind == Type::ClassObject ? p_binary->right->type->element : nullptr;
+			l_.is_vector(written) && l_.vector_class(written)) {
+		code = *l_.vector_class(written); // An Array, or a Vector.<T>: of that very class.
+		symbol = nullptr;
+	} else if (!symbol || !l_.class_index(symbol, &code) || !l_.module_.classes[code].native_base.empty()) {
 		return std::nullopt;
 	}
 	const bool test = p_binary->op == TokenKind::KwIs;
-	if (!test && target != Kind::Obj && target != Kind::Str) {
-		return std::nullopt; // `x as int` gives a number or null: a typed register cannot hold both.
+	const uint32_t value = l_.any_value(p_binary->left);
+	if (symbol) {
+		l_.touch(symbol, position); // As for a typed value: the class named is set up.
 	}
-	const uint32_t value = any_value(p_binary->left);
-	uint32_t fits = reg(Kind::Bool);
-	emit(Op::AnyIs, position, fits, value, code);
+	uint32_t fits = l_.reg(Kind::Bool);
+	l_.emit(Op::AnyIs, position, fits, value, code);
 	if (test) {
 		return fits;
 	}
-	// `as`: the value as that type if it is one, otherwise null.
-	uint32_t out = default_value(target, position);
-	const uint32_t skip = emit(Op::JumpIfNot, position, fits, 0);
-	emit(Op::FromAny, position, out, value, target == Kind::Obj ? code : NONE);
-	patch(skip, here());
+	// `as`: the value as that type if it is one, otherwise null. The checker types `x as int` as an int,
+	// as Adobe's compiler does, so the null is what an int holds for it: 0 (false for a Boolean).
+	uint32_t out = target == Kind::F64 ? l_.reg(Kind::F64) : l_.default_value(target, position);
+	if (target == Kind::F64) {
+		l_.emit(Op::ConstF64, position, out, l_.number(0)); // Not the NaN a Number starts as.
+	}
+	const uint32_t skip = l_.emit(Op::JumpIfNot, position, fits, 0);
+	l_.emit(Op::FromAny, position, out, value, target == Kind::Obj ? code : NONE);
+	l_.patch(skip, l_.here());
 	return out;
 }
 
@@ -144,13 +153,23 @@ uint32_t Lowerer::empty_untyped(const Type *p_type, uint32_t p_position) {
 }
 
 uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
-	if (starts_null_type(p_kind, p_type) && untyped(p_expression)) {
+	// A plain value is asked for in its own kind: a call of Godot's that gives any value then gives that one.
+	const bool checked = starts_null_type(p_kind, p_type) || is_engine(p_kind) || p_kind == Kind::Obj;
+	if (!checked || !untyped(p_expression)) {
+		return expression(p_expression, p_kind);
+	}
+	return from_untyped(expression(p_expression, Kind::Any), p_type, p_kind, p_expression->offset);
+}
+
+// An untyped value stored where a type is declared.
+uint32_t Lowerer::from_untyped(uint32_t p_any, const Type *p_type, Kind p_kind, uint32_t p_position) {
+	if (starts_null_type(p_kind, p_type)) {
 		// Into an Object: undefined becomes null, as AS3's coercion has it.
 		uint32_t out = reg(Kind::Any);
-		emit(Op::FromAny, p_expression->offset, out, expression(p_expression, Kind::Any), 0);
+		emit(Op::FromAny, p_position, out, p_any, 0);
 		return out;
 	}
-	if (is_engine(p_kind) && untyped(p_expression)) {
+	if (is_engine(p_kind)) {
 		// Into a place of one of Godot's types: the value must be of that type, checked by its name.
 		uint32_t name = NONE;
 		const Symbol *godot = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
@@ -158,26 +177,25 @@ uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
 			name = NONE;
 		}
 		uint32_t out = engine_reg(p_kind, p_type);
-		emit(Op::FromAny, p_expression->offset, out, expression(p_expression, Kind::Any), name);
+		emit(Op::FromAny, p_position, out, p_any, name);
 		return out;
 	}
-	if (p_kind != Kind::Obj || !untyped(p_expression)) {
-		return expression(p_expression, p_kind);
+	if (p_kind != Kind::Obj) {
+		return convert(p_any, p_kind, p_position);
 	}
 	const Symbol *symbol = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
 	uint32_t klass = NONE;
 	if (is_vector(p_type)) {
 		klass = vector_class(p_type).value_or(NONE);
-	} else if (symbol) {
-		const auto found = classes_.find(symbol);
-		klass = found == classes_.end() ? NONE : found->second;
+	} else if (symbol && !class_index(symbol, &klass)) {
+		klass = NONE;
 	}
 	if (klass == NONE) {
-		refuse(p_expression->offset, "converting an untyped value to '" + compilation_.type_name(p_type) + "'");
-		return default_value(Kind::Obj, p_expression->offset);
+		refuse(p_position, "converting an untyped value to '" + compilation_.type_name(p_type) + "'");
+		return default_value(Kind::Obj, p_position);
 	}
 	uint32_t out = reg(Kind::Obj);
-	emit(Op::FromAny, p_expression->offset, out, expression(p_expression, Kind::Any), klass);
+	emit(Op::FromAny, p_position, out, p_any, klass);
 	return out;
 }
 
