@@ -193,7 +193,7 @@ NaN and Infinity, a Date as its text, a Dictionary as `"Dictionary"`; an object 
 for text it can't read (a null text too), TypeError #1129 for a structure that holds itself, TypeError #1131
 for a replacer that is neither a function nor an Array (ECMAScript passes over one). Rulings: more than
 1,000 levels of nesting is Error #1023; one of Godot's values or objects is refused with a TypeError, since
-JSON has no form for one; a value written as nothing gives a null String, as the declared String holds
+JSON has no form for one (one Godot has freed is null, and written `null`); a value written as nothing gives a null String, as the declared String holds
 undefined.
 
 ## Inside Godot
@@ -297,7 +297,7 @@ package {
   `GD.Str` and `GD.Print` write a null (GDScript writes `<null>`).
 - A Godot object that has been freed is `null` to a script: `node == null` is true, `if (node)` is
   false, `"" + node`, `String(node)`, `trace(node)`, `str(node)` and `print(node)` give `null` (GDScript's
-  text is `<Freed Object>`),
+  text is `<Freed Object>`), an Array's text leaves it out as it leaves out a null, JSON writes it `null`,
   `hash` and `isSame` take it as null, and a member reached on it is AS3's null error, which says the
   object was freed.
 - `null` written for a default AS3 can't write takes Godot's own default, wherever it is in the call:

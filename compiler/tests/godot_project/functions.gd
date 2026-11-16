@@ -71,6 +71,7 @@ func _physics_process(_delta: float) -> bool:
 	gone.free()
 	show("a freed object as text", ask("freedTexts"), "null,null,null,null,null,null,null")
 	show("a freed object to hash and isSame", ask("freedSame"), "true,true,true,true,true")
+	show("a freed object inside a collection", ask("freedInside"), ",1,;;2,null;null,null,[null,null]")
 	ask("freedTraced")
 	show("str of a freed object and of null", ask("freedStr"), "null,nullnull,null,null,null,undefined,anull1")
 	ask("freedPrinted")

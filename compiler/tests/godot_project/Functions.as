@@ -60,6 +60,12 @@ package {
 			var nothing:* = none;
 			return ["" + kept, kept + "", String(kept), "" + held, String(held), "" + none, "" + nothing].join(",");
 		}
+		// In a collection, as a null is: an Array leaves it out of its text, a Vector writes it, JSON writes null.
+		public function freedInside():String {
+			var none:Node = null;
+			var nodes:Vector.<Node> = new <Node>[kept, none];
+			return ["" + [kept, 1], [kept, none, 2].join(";"), nodes.join(";"), JSON.stringify(kept), JSON.stringify([kept, none])].join(",");
+		}
 		public function freedTraced():void { trace("traced:", kept); }
 		// Godot's functions that make text of their arguments (str, print and the rest) write null as AS3
 		// does, as C#'s GD.Str and GD.Print do; a freed object is one.
