@@ -12,7 +12,7 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
 | `typer.h`, `typer_*.cpp`, `type_table.cpp` | The type of each expression and what fits where, by what is typed |
 | `whole_numbers` | Rules the checker and the lowerer must agree on, written once |
 | `godot_names.cpp`, `builtins.h` | The name table and AS3's own declarations |
-| `query*`, `completion*` | Editor queries, lexical context, completion candidates/edits and active-call signatures |
+| `query*`, `completion*` | Editor queries (`query_symbols`: outline and symbol search), lexical context, completion candidates/edits and active-call signatures |
 | `diagnostics` | Every error, as `file:line:column: error: message` |
 
 ## Rules
