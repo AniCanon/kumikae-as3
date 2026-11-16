@@ -241,10 +241,14 @@ class Lowerer {
 
 	// Evaluates what is needed to reach the place: the object of `a.b`, once.
 	Place place_of(Expr *p_target, Expr *p_later = nullptr);
+	Place place_of_name(Name *p_name, Expr *p_later);
+	Place place_of_member(Member *p_member, Expr *p_later);
+	Place place_of_index(Index *p_index, Expr *p_later);
 
 	uint32_t load(const Place &p_place, uint32_t p_position);
 
 	void store(const Place &p_place, uint32_t p_value, uint32_t p_position);
+	void store_engine(const Place &p_place, uint32_t p_value, uint32_t p_position);
 
 	// The class a `new`, `is`, `as` or conversion names.
 	Symbol * named_class(Expr *p_expression);
