@@ -283,8 +283,8 @@ package {
   a singleton's signal (`Input.joyConnectionChanged`), which the whole game shares, they are about the
   calling script's own: the methods of the object whose method calls them, and the static methods of the
   class whose code does, as C# code can take away only the handlers it holds. A function expression
-  belongs to no object (AS3's `this` there is not the method's), so its listener there goes with
-  `remove(f)`. A listener goes when its object is freed.
+  belongs to no object (AS3's `this` there is not the method's), so its listener there goes only with
+  `remove(f)`: keep it in a variable to take it away. A listener goes when its object is freed.
 - A method is a function wherever Godot takes one: `array.filter(isBig)`.
 - `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs.
 - A singleton is used by its class name: `Input.isActionPressed("jump")`, `Engine.timeScale = 0.5`,
