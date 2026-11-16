@@ -6,7 +6,7 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
 | Files | Job |
 |---|---|
 | `source`, `token`, `lexer` | Text to tokens |
-| `parser.cpp`, `parser_decl`, `parser_stmt`, `parser_expr` | Tokens to the tree in `ast.h`, one file per kind of syntax |
+| `parser.cpp`, `parser_decl`, `parser_stmt`, `parser_expr`, `parser_literals`, `parser_types` | Tokens to the tree in `ast.h`, one file per kind of syntax |
 | `ast.h`, `ast_walk.h`, `ast_printer`, `ast_reset`, `arena.h` | The tree, its one walk, its printed form, its memory |
 | `names*.cpp`, `names.h`, `names_resolver.h` | Declarations, scopes, imports, and the rules about them; `names_lookup` looks up a name at package level and `names_members` on a class; the bodies pass is `names_bodies`, `names_locals`, `names_statements` and `names_expressions` |
 | `typer.h`, `typer_*.cpp`, `type_table.cpp` | The type of each expression and what fits where, by what is typed |
