@@ -16,6 +16,13 @@ void Lowerer::refuse(uint32_t p_offset, std::string_view p_what) {
 	unit_->diagnostics.error(p_offset, std::string(p_what) + " is not supported by the interpreter yet");
 }
 
+void Lowerer::error(uint32_t p_offset, std::string_view p_text) {
+	failed_ = true;
+	if (unit_) {
+		unit_->diagnostics.error(p_offset, std::string(p_text));
+	}
+}
+
 bool Lowerer::uses_refused_type(const Stmt *p_statement) {
 	if (refused_types_.empty()) {
 		return false;

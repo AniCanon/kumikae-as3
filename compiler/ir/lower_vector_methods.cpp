@@ -190,9 +190,6 @@ uint32_t Vectors::vector_call(Call *p_call) {
 	for (size_t i = count; i < fixed.size(); i++) {
 		fits = fits && left_out[i].has_value();
 	}
-	for (uint32_t i = 0; *method == VectorMethod::Concat && !array && i < count; i++) {
-		fits = fits && p_call->arguments[i]->type == callee->object->type; // concat: vectors of this very type.
-	}
 	if (!fits) {
 		l_.refuse(callee->name_offset, "this call of '" + std::string(callee->name) + "' on a Vector");
 		return l_.default_value(Kind::Obj, position);
@@ -206,7 +203,12 @@ uint32_t Vectors::vector_call(Call *p_call) {
 	list.push_back(l_.settled(l_.expression(callee->object, Kind::Obj), Lowerer::writer(p_call->arguments), position));
 	for (uint32_t i = 0; i < count; i++) {
 		Expr *later = Lowerer::writer(p_call->arguments, i + 1, count);
-		list.push_back(l_.settled(l_.expression(p_call->arguments[i], i < fixed.size() ? fixed[i] : *rest), later, position));
+		// concat takes vectors of this very type: one of another, or an Array, is found out as it runs
+		// (AS3's TypeError #1034, as avmplus's castToThisType gives).
+		const bool checked = *method == VectorMethod::Concat && !array && p_call->arguments[i]->type != callee->object->type;
+		const uint32_t value = checked ? l_.from_untyped(l_.any_value(p_call->arguments[i]), callee->object->type, Kind::Obj, position)
+									   : l_.expression(p_call->arguments[i], i < fixed.size() ? fixed[i] : *rest);
+		list.push_back(l_.settled(value, later, position));
 	}
 	for (size_t i = count; i < fixed.size(); i++) {
 		const uint32_t filled = l_.reg(fixed[i]);

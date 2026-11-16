@@ -286,12 +286,8 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 		// A Vector takes no property of its own, as a sealed object takes none.
 		return refuse_write("1056", "Cannot create property ", p_key.text, any::object(p_vector));
 	}
-	if (klass.element == Kind::Obj || ir::is_engine(klass.element)) {
-		raise_unsupported("writing an element of a Vector of objects held untyped");
-		return false;
-	}
 	Slot value;
-	if (!from_any(p_value, p_key.index ? klass.element : Kind::F64, NONE, &value)) {
+	if (!from_any(p_value, p_key.index ? klass.element : Kind::F64, p_key.index ? klass.element_check : NONE, &value)) {
 		return false;
 	}
 	if (!p_key.index) {

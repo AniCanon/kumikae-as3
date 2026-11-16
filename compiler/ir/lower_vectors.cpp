@@ -37,6 +37,7 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 	Class klass;
 	klass.name = "Vector.<" + inner + ">";
 	klass.element = element;
+	klass.element_check = check_for(p_type->element, element).value_or(NONE); // Before the class is added: it may add others.
 	module_.classes.push_back(std::move(klass));
 	const uint32_t index = static_cast<uint32_t>(module_.classes.size()) - 1;
 	vector_classes_[p_type] = index;
@@ -260,6 +261,25 @@ void Vectors::engine_loop(ForIn *p_loop) {
 	l_.emit(Op::Jump, position, top);
 	l_.patch(out, l_.here());
 	Statements(l_).finish_loop(next_at);
+}
+
+// Vector.<T>(x): the conversion written as a call.
+uint32_t Vectors::vector_from(Call *p_call) {
+	const uint32_t position = p_call->offset;
+	const Type *written = p_call->callee->type && p_call->callee->type->kind == Type::ClassObject ? p_call->callee->type->element : nullptr;
+	const std::optional<uint32_t> klass = l_.is_vector(written) ? l_.vector_class(written) : std::nullopt;
+	if (!klass) {
+		l_.refuse(p_call->callee->offset, "this call");
+		return l_.default_value(Kind::Obj, position);
+	}
+	if (p_call->arguments.count != 1) {
+		l_.error(p_call->callee->offset, "a conversion to a Vector takes 1 argument but " + std::to_string(p_call->arguments.count) + " were given");
+		return l_.default_value(Kind::Obj, position);
+	}
+	const uint32_t value = l_.any_value(p_call->arguments[0]);
+	const uint32_t out = l_.reg(Kind::Obj);
+	l_.emit(Op::VecFrom, position, out, value, *klass);
+	return out;
 }
 
 auto Vectors::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::optional<uint32_t> {

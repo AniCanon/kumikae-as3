@@ -1,0 +1,26 @@
+Thing b,Thing c,null,null 4
+Error #1034: Type Coercion failed: cannot convert Object to Thing.
+Error #1034: Type Coercion failed: cannot convert 5 to Thing.
+Error #1034: Type Coercion failed: cannot convert text to Thing.
+Thing b
+grid 1034
+grid 1034
+7,8
+named 1034
+named
+calls 1034
+called
+1,2,3,1 4 false true
+0.5,2,3,1 1,2,3,1
+1|2 null|null|3
+Thing x,null,Thing y
+Error #1034: Type Coercion failed: cannot convert Object to Thing.
+Thing s 3 1,2,3,1
+4,5 false,true true
+Error #1034: Type Coercion failed: cannot convert 5 to Vector.<int>.
+Error #1034: Type Coercion failed: cannot convert null to Vector.<int>.
+Error #1034: Type Coercion failed: cannot convert Object to Vector.<int>.
+1,2,3,1,9,9
+Error #1034: Type Coercion failed: cannot convert Object to Vector.<int>.
+Error #1034: Type Coercion failed: cannot convert Object to Vector.<int>.
+1,2,3,1,9

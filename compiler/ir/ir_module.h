@@ -105,6 +105,12 @@ struct Class {
 	// For a Vector.<T>, what its elements are; Void for every other class. A vector class has no fields,
 	// no methods and no base, and its objects are vm::Vector.
 	Kind element = Kind::Void;
+	// For a Vector.<T> whose elements are checked beyond their kind: what an untyped value stored into one
+	// is checked against, as FromAny's third operand has it. The class, for objects (a class of the
+	// program, an interface, Function, another vector's class); Godot's name for the type, an index into
+	// the strings, for Godot's values and objects; 0 for a Vector.<Object>, where undefined is null; NONE
+	// for the rest.
+	uint32_t element_check = NONE;
 	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;

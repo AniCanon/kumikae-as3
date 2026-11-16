@@ -206,6 +206,9 @@ uint32_t Calls::call(Call *p_call, Kind p_want) {
 	if (callee->kind == NodeKind::SuperExpr) {
 		return super_call(p_call);
 	}
+	if (callee->kind == NodeKind::TypeApply) {
+		return Vectors(l_).vector_from(p_call);
+	}
 	if (const std::optional<uint32_t> signal = l_.callee_symbol(callee) ? std::nullopt : EngineCalls(l_).signal_call_by_name(p_call)) {
 		return *signal; // `timer[name].add(f)`: a signal by its AS3 name.
 	}

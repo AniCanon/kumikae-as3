@@ -163,40 +163,42 @@ uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
 
 // An untyped value stored where a type is declared.
 uint32_t Lowerer::from_untyped(uint32_t p_any, const Type *p_type, Kind p_kind, uint32_t p_position) {
-	if (starts_null_type(p_kind, p_type)) {
-		// Into an Object: undefined becomes null, as AS3's coercion has it.
-		uint32_t out = reg(Kind::Any);
-		emit(Op::FromAny, p_position, out, p_any, 0);
-		return out;
-	}
-	if (is_engine(p_kind)) {
-		// Into a place of one of Godot's types: the value must be of that type, checked by its name.
-		uint32_t name = NONE;
-		const Symbol *godot = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
-		if (!godot || !is_godot(godot) || !engine_name(godot, std::string_view(), &name)) {
-			name = NONE;
-		}
-		uint32_t out = engine_reg(p_kind, p_type);
-		emit(Op::FromAny, p_position, out, p_any, name);
+	const std::optional<uint32_t> check = check_for(p_type, p_kind);
+	if (starts_null_type(p_kind, p_type) || is_engine(p_kind)) {
+		// Into an Object: undefined becomes null, as AS3's coercion has it. Into a place of one of Godot's
+		// types: the value must be of that type, checked by its name.
+		uint32_t out = is_engine(p_kind) ? engine_reg(p_kind, p_type) : reg(Kind::Any);
+		emit(Op::FromAny, p_position, out, p_any, check.value_or(NONE));
 		return out;
 	}
 	if (p_kind != Kind::Obj) {
 		return convert(p_any, p_kind, p_position);
 	}
-	const Symbol *symbol = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
-	uint32_t klass = NONE;
-	if (is_vector(p_type)) {
-		klass = vector_class(p_type).value_or(NONE);
-	} else if (symbol && !class_index(symbol, &klass)) {
-		klass = NONE;
-	}
-	if (klass == NONE) {
+	if (!check) {
 		refuse(p_position, "converting an untyped value to '" + compilation_.type_name(p_type) + "'");
 		return default_value(Kind::Obj, p_position);
 	}
 	uint32_t out = reg(Kind::Obj);
-	emit(Op::FromAny, p_position, out, p_any, klass);
+	emit(Op::FromAny, p_position, out, p_any, *check);
 	return out;
+}
+
+std::optional<uint32_t> Lowerer::check_for(const Type *p_type, Kind p_kind) {
+	if (starts_null_type(p_kind, p_type)) {
+		return 0;
+	}
+	const Symbol *symbol = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
+	uint32_t check = NONE;
+	if (is_engine(p_kind)) {
+		return symbol && is_godot(symbol) && engine_name(symbol, std::string_view(), &check) ? check : NONE;
+	}
+	if (p_kind != Kind::Obj) {
+		return NONE;
+	}
+	if (is_vector(p_type)) {
+		return vector_class(p_type);
+	}
+	return symbol && class_index(symbol, &check) ? std::optional<uint32_t>(check) : std::nullopt;
 }
 
 } // namespace ir

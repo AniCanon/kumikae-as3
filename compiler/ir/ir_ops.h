@@ -156,7 +156,11 @@ inline bool is_held(Kind p_kind) {
 	X(TableNew, "RCr") X(DynGet, "RRR") X(DynSet, "RRR") X(DynDelete, "RRR") X(DynIn, "RRR") \
 	X(DynCall, "rRA") X(DynKeys, "RR-") X(DynNext, "RRA") X(DynKey, "RRA") \
 	X(Rethrow, "R--") /* The error a `finally` caught, thrown again with the trace it had. */ \
-	X(Trace, "A--")
+	X(Trace, "A--") \
+	/* Vector.<T>(x): out (an object), x (untyped), the vector's class. x itself if it is of that class; a \
+	   new vector of an Array's or another Vector's elements, each converted as a store into the vector \
+	   converts it; AS3's TypeError #1034 for anything else, null included. */ \
+	X(VecFrom, "RRC")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,

@@ -89,6 +89,8 @@ class Lowerer {
 	const Function &fn() const { return module_.functions[function_index_]; }
 
 	void refuse(uint32_t p_offset, std::string_view p_what);
+	// An error in the program that only the lowering finds: said as it is, and the program does not run.
+	void error(uint32_t p_offset, std::string_view p_text);
 
 	uint32_t string(const std::string &p_text);
 
@@ -178,6 +180,9 @@ class Lowerer {
 	// a Vector.<T> is made the first time the type is met; nothing if its elements are of a kind not held.
 	bool is_vector(const Type *p_type) const { return p_type && (p_type->kind == Type::Vector || (array_ && p_type->symbol == array_)); }
 	std::optional<uint32_t> vector_class(const Type *p_type);
+	// What an untyped value stored where p_type is declared is checked against (FromAny's third operand):
+	// nothing if the type can't be checked here.
+	std::optional<uint32_t> check_for(const Type *p_type, Kind p_kind);
 	// The class a declaration says its value is of: a class of the program or a vector's. NONE otherwise.
 	uint32_t declared_class(TypeRef *p_type);
 	// The untyped value: ir/lower_any.cpp.
