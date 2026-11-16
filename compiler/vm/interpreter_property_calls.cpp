@@ -48,16 +48,9 @@ void Interpreter::dynamic_op(const Function &p_function, const Instruction &p_in
 void Interpreter::table_new(const Function &p_function, const Instruction &p_in) {
 	Slot *r = stack_.data() + frames_.back().base;
 	(void)p_function;
-	if (p_in.c != NONE && r[p_in.c].b) {
-		raise_unsupported("a Dictionary with weak keys");
-		return;
+	if (Object *made = vm::table_new(library_, p_in.b, p_in.c != NONE && r[p_in.c].b)) {
+		assign(Kind::Obj, r[p_in.a], made);
 	}
-	Object *made = new_table(p_in.b, heap_.list_for(p_in.b));
-	if (!made) {
-		out_of_memory();
-		return;
-	}
-	assign(Kind::Obj, r[p_in.a], made);
 }
 
 // Whether a value is one of Godot's Dictionaries and the class is flash.utils.Dictionary: AS3 takes one as

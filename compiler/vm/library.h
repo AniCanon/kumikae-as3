@@ -69,6 +69,8 @@ struct Library {
 	Vector *fresh_vector(uint32_t p_class, uint64_t p_length);
 	// AS3's TypeError #1009: a member of nothing was asked for.
 	void raise_null();
+	// An Error that says the thing is not supported yet.
+	void raise_unsupported(const std::string &p_what);
 };
 
 // A new error of the class, as a script reads one: its message (taken over, or null), its name, and its
@@ -106,6 +108,12 @@ bool coercion_failed(Library &p_library, Slot p_value, ir::Kind p_kind, uint32_t
 bool any_is(Library &p_library, Slot p_value, uint32_t p_type);
 // Whether an object (null: no) is of the class, or of one that extends or implements it.
 bool is_class(const ir::Module &p_module, const Object *p_object, uint32_t p_class);
+
+// New: an object of the class, its fields as they are before its constructor runs (a Number not yet a
+// number); for a script class that extends one of Godot's, with its Godot object made. TableNew: an Object
+// or a Dictionary of the class, with nothing in it. One reference, the caller's; null if it raised.
+Object *object_new(Library &p_library, uint32_t p_class);
+Object *table_new(Library &p_library, uint32_t p_class, bool p_weak);
 
 // VecCall: one of a vector's or an Array's methods, on the vector and then what the method takes. r_out
 // may be null.

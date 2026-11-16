@@ -332,9 +332,46 @@ void test_untyped() {
 	CHECK_EQ(live_objects(), static_cast<size_t>(0));
 }
 
+void test_making() {
+	kas3::ir::Module module = module_of_three();
+	kas3::ir::Class point;
+	point.name = "Point";
+	kas3::ir::Field x;
+	x.name = "x";
+	x.kind = Kind::F64;
+	point.fields.push_back(x);
+	kas3::ir::Field next;
+	next.name = "next";
+	next.kind = Kind::Obj;
+	point.fields.push_back(next);
+	module.classes.push_back(point);
+	kas3::ir::Class table;
+	table.name = "Object";
+	table.table = true;
+	module.classes.push_back(table);
+	Heap heap(module, NoEngine::instance(), NoEngine::instance());
+	Recorder recorder;
+	Library library{ heap, recorder, recorder };
+	// A Number field is not yet a number; an object that can hold another is on the collector's list.
+	Object *made = object_new(library, 3);
+	CHECK(made != nullptr && std::isnan(made->fields()[0].d) && made->fields()[1].p == nullptr);
+	CHECK(made->gc_next != nullptr);
+	heap.release_object(made);
+	Object *object = table_new(library, 4, false);
+	CHECK(object != nullptr);
+	heap.release_object(object);
+	CHECK(table_new(library, 4, true) == nullptr);
+	CHECK_EQ(recorder.raised.size(), static_cast<size_t>(1));
+	fail_allocations(1);
+	CHECK(object_new(library, 3) == nullptr);
+	CHECK_EQ(recorder.memory, 1);
+	CHECK_EQ(live_objects(), static_cast<size_t>(0));
+}
+
 } // namespace
 
 int main() {
+	test_making();
 	test_untyped();
 	test_vectors();
 	test_number_text();

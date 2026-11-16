@@ -68,7 +68,7 @@ std::string Interpreter::holder_name(Slot p_holder) const {
 }
 
 void Interpreter::raise_unsupported(const std::string &p_what) {
-	raise(module_.error_class, p_what + " is not supported by the interpreter yet");
+	library_.raise_unsupported(p_what);
 }
 
 void Interpreter::raise_not_found(const PropertyKey &p_key, Slot p_holder) {

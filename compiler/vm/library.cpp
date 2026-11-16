@@ -25,6 +25,10 @@ void Library::raise_null() {
 	runner.raise(heap.module.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
 }
 
+void Library::raise_unsupported(const std::string &p_what) {
+	runner.raise(heap.module.error_class, p_what + " is not supported by the interpreter yet");
+}
+
 Object *new_error(Heap &p_heap, uint32_t p_class, Str *p_message) {
 	const ir::Module &module = p_heap.module;
 	Object *error = p_class != ir::NONE ? new_object(p_class, module.classes[p_class].fields.size(), p_heap.list_for(p_class)) : nullptr;

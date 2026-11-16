@@ -49,29 +49,11 @@ void Interpreter::at_statement() {
 	}
 }
 
-// A new object of a class, its Number fields not yet a number.
+// New, by the library's function.
 void Interpreter::make(uint32_t p_class, Slot &r_out) {
-	const ir::Class &klass = module_.classes[p_class];
-	Object *object = new_object(p_class, klass.fields.size(), heap_.list_for(p_class));
-	if (!object) {
-		out_of_memory();
-		return;
+	if (Object *object = object_new(library_, p_class)) {
+		assign(Kind::Obj, r_out, object);
 	}
-	for (size_t i = 0; i < klass.fields.size(); i++) {
-		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
-	}
-	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref) {
-		// A script class that extends one of Godot's: the Godot object is made, with the script attached.
-		std::string error;
-		void *owner = host_.source.attach_new(p_class, object, &error);
-		if (!owner) {
-			release_object(object);
-			raise(module_.error_class, error.empty() ? "the engine could not make a '" + klass.name + "'" : error);
-			return;
-		}
-		object->fields()[0].p = owner;
-	}
-	assign(Kind::Obj, r_out, object);
 }
 
 // A call: the function named, or for a virtual call the one the object's own class has in that slot.
