@@ -65,6 +65,9 @@ public:
 	static void reload_now();
 	// Once a frame while the project is a folder a person can edit: looks for changed scripts.
 	static void watch();
+	// How many looks the watch has made, each ended with what it began (a reload too): a test that saves
+	// a file waits for looks, not for time. A save is acted on by the second look after it (see watch()).
+	static uint64_t watch_looks();
 	// Once a frame: a step of the cycle collector, if the program is loaded.
 	static void collect_step();
 	// The class a script file declares: the one named after the file. NONE if there is none.

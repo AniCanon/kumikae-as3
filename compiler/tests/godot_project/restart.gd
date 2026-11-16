@@ -3,7 +3,9 @@
 extends SceneTree
 
 var stage := 0
-var since := 0
+var mark := 0 # The watch's looks when the last save was made.
+var frames := 0
+var frame_mark := 0
 var first_id := 0
 var changes := 0
 var keeper: Node2D
@@ -15,7 +17,18 @@ func put(version: String) -> void:
 	var file := FileAccess.open("res://Restart.as", FileAccess.WRITE)
 	file.store_string(FileAccess.get_file_as_string("res://restart_%s.txt" % version))
 	file.close()
-	since = Time.get_ticks_msec()
+	mark = looks()
+	frame_mark = frames
+
+# How many times the watch has looked at the scripts (the language's watch_looks()). A save is acted on by
+# the second look after it: the first finds the change, the next finds it settled and compiles. The tests
+# wait for looks, never for the clock, so a busy machine changes nothing.
+func looks() -> int:
+	for i in Engine.get_script_language_count():
+		var language := Engine.get_script_language(i)
+		if language.has_method("watch_looks"):
+			return language.call("watch_looks")
+	return 0
 
 func said():
 	return current_scene.call("said") if current_scene else null
@@ -37,18 +50,22 @@ func _initialize() -> void:
 	root.add_child(keeper)
 
 func _process(_delta: float) -> bool:
-	var waited := Time.get_ticks_msec() - since
+	frames += 1
+	# The watch acts on a save by its second look; a scene started again is in a few frames later. Past
+	# these, what was waited for did not happen, and the line that shows it says so.
+	var acted := looks() >= mark + 2
+	var late := looks() >= mark + 12 or frames - frame_mark > 2000
 	if stage == 0 and current_scene and said() == "one":
 		first_id = current_scene.get_instance_id()
 		show("first", said(), "one")
 		put("body")
 		stage = 1
-	elif stage == 1 and (said() == "one!" or waited > 8000):
+	elif stage == 1 and acted:
 		show("a method edited: the new code runs", said(), "one!")
 		show("a method edited and a field added: the scene is the same", current_scene.get_instance_id() == first_id, true)
 		put("ready")
 		stage = 2
-	elif stage == 2 and (str(said()).begins_with("three") or waited > 8000):
+	elif stage == 2 and (str(said()).begins_with("three") or late):
 		show("_ready edited: the scene starts again", said(), "three!")
 		show("_ready edited: a new scene", current_scene.get_instance_id() != first_id, true)
 		# The fifth version is saved as Godot takes the old scene out: the new one is made (its constructors
@@ -59,9 +76,10 @@ func _process(_delta: float) -> bool:
 		changes = 0
 		put("four")
 		reload_now()
+		frame_mark = frames
 		stage = 3
-	elif stage == 3 and (said() == "five!five" or waited > 8000):
+	elif stage == 3 and (said() == "five!five" or frames - frame_mark > 2000):
 		show("a save while the scene starts again: the scene has that save's code throughout", said(), "five!five")
 		show("a save while the scene starts again: the scene starts once more", changes, 2)
 		return true
-	return Time.get_ticks_msec() > 60000
+	return frames > 200000

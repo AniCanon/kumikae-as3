@@ -17,7 +17,13 @@ class AS3Language : public godot::ScriptLanguageExtension {
 protected:
 	// reload_scripts(): the scripts compiled again now and the game moved onto them, as when the watch
 	// sees an edit (kas3::Project::reload_now). For a tool, or a test, that knows when it has written them.
-	static void _bind_methods() { godot::ClassDB::bind_method(godot::D_METHOD("reload_scripts"), &AS3Language::reload_scripts); }
+	// watch_looks(): how many times the watch has looked at the scripts (kas3::Project::watch_looks), for a
+	// test to wait on instead of the clock.
+	static void _bind_methods() {
+		godot::ClassDB::bind_method(godot::D_METHOD("reload_scripts"), &AS3Language::reload_scripts);
+		godot::ClassDB::bind_method(godot::D_METHOD("watch_looks"), &AS3Language::watch_looks);
+	}
+	int64_t watch_looks() const { return static_cast<int64_t>(kas3::Project::watch_looks()); }
 	// A game, never the editor: in the editor no AS3 runs, and an edit is seen when a script is opened.
 	void reload_scripts() {
 		if (!godot::Engine::get_singleton()->is_editor_hint()) {

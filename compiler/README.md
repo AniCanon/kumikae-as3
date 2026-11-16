@@ -531,8 +531,10 @@ has done its work. The cause, read from Godot's source and borne out by experime
 no symbols to show it in a trace): loading an extension with a class makes the editor document it on a thread, which
 queues a call (`EditorHelp::_gen_extensions_docs`); quitting in the same frame frees the documentation,
 and the call then runs on nothing in Godot's last flush. Any extension that registers a class does the
-same. Give the thread time (`--headless --editor --quit-after 300`), as `tests/run_godot.py` does; later
-runs are clean.
+same. Wait for the thread before quitting: `tests/godot_project/first_scan.gd`, which `tests/run_godot.py`
+runs with `--headless --editor -s`, ends once the scan has listed the extension and a page of the
+documentation has been asked for, which waits for that thread (giving it time with `--quit-after 300`
+works too, on a machine that is not busy); later runs are clean.
 
 godot-cpp is built as `template_release`, and Godot's editor loads that library too. That is enough for
 the editor: godot-cpp compiles nothing differently for it (its `editor` target only adds `DEBUG_ENABLED`,
