@@ -44,6 +44,38 @@ Slot of_pointer(void *p_value) {
 	return slot;
 }
 
+// The pieces split() gives of a text by a delimiter that is text: the whole of it with none (p_whole), each
+// UTF-16 unit for an empty one; at most p_most pieces.
+std::vector<std::string> split_text(std::string_view p_self, bool p_whole, const std::string &p_by, uint32_t p_most) {
+	const uint32_t length = static_cast<uint32_t>(utf16_length(p_self));
+	std::vector<std::string> pieces;
+	if (p_whole) {
+		pieces.emplace_back(p_self);
+	} else if (p_by.empty()) {
+		for (uint32_t i = 0; i < length && pieces.size() < p_most; i++) {
+			pieces.push_back(units_between(p_self, i, i + 1));
+		}
+	} else if (length > 0) {
+		const uint32_t step = static_cast<uint32_t>(utf16_length(p_by));
+		uint32_t from = 0;
+		while (pieces.size() < p_most) {
+			const int32_t found = find_units(p_self, p_by, from);
+			const uint32_t end = found < 0 ? length : static_cast<uint32_t>(found);
+			pieces.push_back(units_between(p_self, from, end));
+			if (found < 0) {
+				break;
+			}
+			from = end + step;
+		}
+	} else {
+		pieces.emplace_back(); // An empty string with a delimiter: one empty piece.
+	}
+	if (pieces.size() > p_most) {
+		pieces.resize(p_most);
+	}
+	return pieces;
+}
+
 constexpr std::string_view URI_FUNCTIONS[] = { "encodeURI", "encodeURIComponent", "decodeURI", "decodeURIComponent" };
 
 } // namespace
@@ -281,34 +313,7 @@ void Interpreter::string_split(const Function &p_function, const Instruction &p_
 		}
 	}
 	const Str *string = static_cast<const Str *>(at(0).p);
-	const std::string_view self = string ? string->view() : std::string_view();
-	const uint32_t most = to_uint32(at(2).d);
-	const uint32_t length = static_cast<uint32_t>(utf16_length(self));
-	std::vector<std::string> pieces;
-	if (whole) {
-		pieces.emplace_back(self);
-	} else if (by.empty()) {
-		for (uint32_t i = 0; i < length && pieces.size() < most; i++) {
-			pieces.push_back(units_between(self, i, i + 1));
-		}
-	} else if (length > 0) {
-		const uint32_t step = static_cast<uint32_t>(utf16_length(by));
-		uint32_t from = 0;
-		while (pieces.size() < most) {
-			const int32_t found = find_units(self, by, from);
-			const uint32_t end = found < 0 ? length : static_cast<uint32_t>(found);
-			pieces.push_back(units_between(self, from, end));
-			if (found < 0) {
-				break;
-			}
-			from = end + step;
-		}
-	} else {
-		pieces.emplace_back(); // An empty string with a delimiter: one empty piece.
-	}
-	if (pieces.size() > most) {
-		pieces.resize(most);
-	}
+	const std::vector<std::string> pieces = split_text(string ? string->view() : std::string_view(), whole, by, to_uint32(at(2).d));
 	Vector *made = fresh_vector(module_.array_class, pieces.size());
 	for (size_t i = 0; made && i < pieces.size(); i++) {
 		Str *piece = text(pieces[i]);
