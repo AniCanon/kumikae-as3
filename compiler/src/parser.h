@@ -128,7 +128,7 @@ private:
 		return list;
 	}
 
-	// Expressions and types. In parser_expr.cpp.
+	// Expressions. In parser_expr.cpp.
 	Expr *parse_expression();
 	Expr *parse_assignment();
 	Expr *parse_conditional();
@@ -138,14 +138,18 @@ private:
 	Expr *parse_call_member(bool p_allow_calls);
 	Expr *parse_primary();
 	Expr *parse_new();
+	Expr *missing_expression();
+	List<Expr *> parse_arguments(uint32_t *r_height);
+	std::string_view parse_property_name(const char *p_what);
+
+	// Literals. In parser_literals.cpp.
 	Expr *parse_array_literal();
 	Expr *parse_object_literal();
 	Expr *parse_function_expression();
-	Expr *missing_expression();
-	List<Expr *> parse_arguments(uint32_t *r_height);
+
+	// Types and dotted names. In parser_types.cpp.
 	TypeRef *parse_type();
 	void expect_type_close();
-	std::string_view parse_property_name(const char *p_what);
 	List<std::string_view> parse_dotted_name(const char *p_what, bool *r_wildcard, List<uint32_t> *r_offsets);
 
 	// Statements. In parser_stmt.cpp.
@@ -159,18 +163,20 @@ private:
 	Stmt *parse_throw();
 	Stmt *parse_with();
 	Block *parse_block();
-	Block *parse_function_body();
 	Stmt *parse_if();
 	Stmt *parse_for();
 	Stmt *parse_switch();
 	Stmt *parse_try();
 	VarDecl *parse_variable_declaration(Modifiers p_modifiers, List<Metadata> p_metadata, bool p_allow_in);
-	FunctionDecl *parse_function_rest(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata,
-			bool p_body_expected, bool p_allow_accessor, bool p_name_required);
 	Import *parse_import();
 	bool parse_unsupported_statement();
 	void end_statement();
 	static bool begins_statement(TokenKind p_kind);
+
+	// Functions. In parser_functions.cpp.
+	Block *parse_function_body();
+	FunctionDecl *parse_function_rest(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata,
+			bool p_body_expected, bool p_allow_accessor, bool p_name_required);
 
 	// Declarations. In parser_decl.cpp.
 	void parse_definitions(bool p_in_package, std::vector<Import *> &r_imports, std::vector<Node *> &r_definitions,
