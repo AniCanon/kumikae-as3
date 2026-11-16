@@ -243,6 +243,7 @@ check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not
 output = compare("threads.gd", [
     "toString on the main thread", "toString from a worker is refused: Godot's own text",
     "attached on a worker is refused: no script, no constructor run", "lists asked for on workers and on the main thread at once",
+    "scripts loaded on workers at once",
     "freed on a worker: nothing of AS3's freed there",
     "freed on a worker: freed on the main thread",
 ])

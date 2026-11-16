@@ -37,6 +37,18 @@ func _initialize() -> void:
 	WorkerThreadPool.wait_for_group_task_completion(group)
 	show("lists asked for on workers and on the main thread at once", counts, [true, true])
 
+	# Script resources loaded on workers at once, as a scene loaded in a thread loads its scripts.
+	var loaded := []
+	loaded.resize(4)
+	var loads := WorkerThreadPool.add_group_task(func(i):
+		var fine := true
+		for k in 300:
+			var again = ResourceLoader.load("res://Threaded.as", "", ResourceLoader.CACHE_MODE_IGNORE)
+			fine = fine and again != null and again.can_instantiate()
+		loaded[i] = fine, 4)
+	WorkerThreadPool.wait_for_group_task_completion(loads)
+	show("scripts loaded on workers at once", loaded, [true, true, true, true])
+
 	# The last reference let go on a worker: the script object goes on the main thread, at the end of a frame.
 	var box := [on_main]
 	var partner: int = on_main.call("partnerID")

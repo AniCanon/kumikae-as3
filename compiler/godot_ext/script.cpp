@@ -10,26 +10,41 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <mutex>
 #include <unordered_set>
 
 using namespace godot;
 using kas3::Project;
 
-static std::unordered_set<AS3Script *> &scripts() {
-	static std::unordered_set<AS3Script *> all;
-	return all;
+// Every script resource there is. Godot loads them on any thread (a scene loaded in a thread loads its
+// scripts there, several at once), so the set is changed and looked through under a lock. Made once and
+// never destroyed, as a thread may free a script while the game shuts down.
+struct AllScripts {
+	std::mutex lock;
+	std::unordered_set<AS3Script *> scripts;
+};
+
+static AllScripts &all_scripts() {
+	static AllScripts *all = new AllScripts();
+	return *all;
 }
 
 AS3Script::AS3Script() {
-	scripts().insert(this);
+	AllScripts &all = all_scripts();
+	const std::lock_guard<std::mutex> held(all.lock);
+	all.scripts.insert(this);
 }
 
 AS3Script::~AS3Script() {
-	scripts().erase(this);
+	AllScripts &all = all_scripts();
+	const std::lock_guard<std::mutex> held(all.lock);
+	all.scripts.erase(this);
 }
 
 void AS3Script::refresh_all() {
-	for (AS3Script *script : scripts()) {
+	AllScripts &all = all_scripts();
+	const std::lock_guard<std::mutex> held(all.lock);
+	for (AS3Script *script : all.scripts) {
 		if (!script->file_.empty()) {
 			script->set_file(String::utf8(script->file_.c_str()));
 		}
