@@ -616,6 +616,7 @@ def reload_test(label, elsewhere):
                 file.write(text)
         environment = dict(os.environ)
         environment.pop("KAS3_SOURCE_DIR", None)
+        environment["KAS3_REPORT_PREPARED"] = "1"
         if elsewhere:
             sources = os.path.join(edited, "sources")
             shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
@@ -636,6 +637,12 @@ def reload_test(label, elsewhere):
         check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 5, output[-1500:])
         check("%s: a script with an error is reported and not loaded" % label,
               "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
+        # What the host worked out for a call at its own place (one that takes a StringName keeps the name
+        # it made) is let go of with the program it was worked out for: after each reload, none is kept
+        # that the program now running does not use.
+        kept = re.findall(r"ActionScript: (\d+) calls keep a name of their own, (\d+) of them the running program's", output)
+        check("%s: a reload keeps no call's name the running program does not use" % label,
+              len(kept) == 5 and all(each[0] == each[1] for each in kept) and any(int(each[0]) > 0 for each in kept), str(kept))
 
 
 reload_test("reload.gd", False)
