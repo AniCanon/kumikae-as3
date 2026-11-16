@@ -19,5 +19,5 @@ internal object PluginFiles {
      * plugin's folder holds lib/<this jar>; `native` is beside lib.
      */
     fun native(): Path? = PathManager.getJarPathForClass(PluginFiles::class.java)?.let(Path::of)
-        ?.parent?.parent?.resolve("native")?.takeIf { Files.isDirectory(it) }
+        ?.parent?.parent?.resolve("native")?.takeIf { Files.isDirectory(it) }?.also(NativePrograms::makeRunnable)
 }

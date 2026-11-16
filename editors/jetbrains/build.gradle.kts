@@ -178,7 +178,11 @@ tasks.register<Exec>("formatSimulatorBridge") {
     onlyIf("installed Swift on macOS is required") { nativeSwiftAvailable.get() }
 }
 tasks.check { dependsOn(lintSimulatorBridge) }
-tasks.buildPlugin { dependsOn(lintSimulatorBridge) }
+tasks.buildPlugin {
+    dependsOn(lintSimulatorBridge)
+    // The zip records no execute bit of its own; the programs it carries need theirs to run.
+    filesMatching(listOf("**/native/kas3c", "**/native/simulator-bridge")) { permissions { unix("rwxr-xr-x") } }
+}
 
 // Native Simulator helper: SwiftPM's resource bundle must travel beside its executable.
 val buildSimulatorBridge = tasks.register<Exec>("buildSimulatorBridge") {
