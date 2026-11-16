@@ -73,6 +73,22 @@ void add_occurrence(std::vector<Occurrence> &r_list, uint32_t p_offset, std::str
 	}
 }
 
+// `super(...)`: the base class's constructor, or the class if it declares none.
+void add_super_occurrence(Call *p_call, Symbol *p_enclosing, std::vector<Occurrence> &r_list) {
+	Symbol *base = p_enclosing && p_enclosing->klass ? p_enclosing->klass->base : nullptr;
+	if (p_call->callee && p_call->callee->kind == NodeKind::SuperExpr && base) {
+		Symbol *constructor = base->klass ? base->klass->constructor : nullptr;
+		add_occurrence(r_list, p_call->callee->offset, "super", constructor ? constructor : base, false);
+	}
+}
+
+void add_function_occurrences(FunctionDecl *p_function, std::vector<Occurrence> &r_list) {
+	add_occurrence(r_list, p_function->name_offset, p_function->name, p_function->symbol, true);
+	for (const Parameter &parameter : p_function->parameters) {
+		add_occurrence(r_list, parameter.offset, parameter.name, parameter.symbol, true);
+	}
+}
+
 // The names one node declares or uses. r_enclosing is the class whose members are being walked.
 void add_occurrences(Node *p_node, Symbol *&r_enclosing, std::vector<Occurrence> &r_list) {
 	switch (p_node->kind) {
@@ -94,16 +110,9 @@ void add_occurrences(Node *p_node, Symbol *&r_enclosing, std::vector<Occurrence>
 			add_occurrence(r_list, member->name_offset, member->name, member->resolved(), false);
 			break;
 		}
-		case NodeKind::Call: {
-			// `super(...)`: the base class's constructor, or the class if it declares none.
-			Call *call = static_cast<Call *>(p_node);
-			Symbol *base = r_enclosing && r_enclosing->klass ? r_enclosing->klass->base : nullptr;
-			if (call->callee && call->callee->kind == NodeKind::SuperExpr && base) {
-				Symbol *constructor = base->klass ? base->klass->constructor : nullptr;
-				add_occurrence(r_list, call->callee->offset, "super", constructor ? constructor : base, false);
-			}
+		case NodeKind::Call:
+			add_super_occurrence(static_cast<Call *>(p_node), r_enclosing, r_list);
 			break;
-		}
 		case NodeKind::Import: {
 			Import *import = static_cast<Import *>(p_node);
 			if (import->name.count > 0 && !import->wildcard) {
@@ -123,14 +132,9 @@ void add_occurrences(Node *p_node, Symbol *&r_enclosing, std::vector<Occurrence>
 			add_occurrence(r_list, decl->name_offset, decl->name, decl->symbol, true);
 			break;
 		}
-		case NodeKind::FunctionDecl: {
-			FunctionDecl *function = static_cast<FunctionDecl *>(p_node);
-			add_occurrence(r_list, function->name_offset, function->name, function->symbol, true);
-			for (const Parameter &parameter : function->parameters) {
-				add_occurrence(r_list, parameter.offset, parameter.name, parameter.symbol, true);
-			}
+		case NodeKind::FunctionDecl:
+			add_function_occurrences(static_cast<FunctionDecl *>(p_node), r_list);
 			break;
-		}
 		case NodeKind::VarDecl:
 			for (const Declarator &declarator : static_cast<VarDecl *>(p_node)->declarators) {
 				add_occurrence(r_list, declarator.offset, declarator.name, declarator.symbol, true);
