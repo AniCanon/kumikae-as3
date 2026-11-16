@@ -377,6 +377,9 @@ bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size
 }
 
 bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+	if (carried_.held && !frames_.empty()) {
+		return false; // An error is on its way out of the instruction that made this call: nothing more runs in it.
+	}
 	const Slot outer_error = pending_;
 	const bool outer_failing = failing_;
 	std::string outer_trace = std::move(trace_);
@@ -400,14 +403,16 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		ok = push(p_function, p_arguments, p_count, NONE) && run(depth, r_result);
 		entries_--;
 	}
-	if (!ok && depth > 0 && failing_ && !carried_.held) {
-		// This program's code is running beneath this call: the error goes back to it, as Flash has an
-		// error in a listener come out of the dispatch that ran it.
+	// This program's code is running an instruction beneath this call: the error goes back to it, as Flash
+	// has an error in a listener come out of the dispatch that ran it.
+	const bool carry = !ok && depth > 0 && failing_ && !outer_failing && !outer_stopped;
+	if (carry) {
 		carried_.held = true;
 		carried_.error = pending_;
 		carried_.trace = std::move(trace_);
 		carried_.lines = trace_lines_;
 		carried_.at = thrown_at_;
+		carried_.stopped = stopped_;
 	} else if (!ok) {
 		report();
 	}
@@ -419,16 +424,23 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	failing_ = outer_failing;
 	trace_ = std::move(outer_trace);
 	trace_lines_ = outer_lines;
-	stopped_ = outer_stopped;
+	// Stopped, the instruction that made the engine's call ends as soon as it can: run() raises the error
+	// there (raise_carried()). Nothing on the path that succeeds looks for it.
+	stopped_ = outer_stopped || carry;
 	halted_ = outer_halted;
 	return ok;
 }
 
-// The error carried back from a call the engine made: on its way out again, from where it was.
+// The error carried back from a call the engine made: on its way out again, from where it was, in place of
+// any the instruction raised of its own once the call failed. Stopped again if it stops the run (#1502).
 void Interpreter::raise_carried() {
+	if (failing_) {
+		drop_any(pending_);
+	}
 	carried_.held = false;
 	pending_ = carried_.error;
 	failing_ = true;
+	stopped_ = carried_.stopped;
 	trace_ = std::move(carried_.trace);
 	trace_lines_ = carried_.lines;
 	thrown_at_ = carried_.at;

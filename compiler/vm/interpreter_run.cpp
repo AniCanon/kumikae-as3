@@ -777,6 +777,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 		}
 		if (failing_ || stopped_) {
+			if (carried_.held) {
+				raise_carried(); // From code the engine ran for this instruction (Interpreter::call()).
+			}
 			// The instruction that failed is the one before pc: point the frame back at it for the trace.
 			if (!frames_.empty() && frames_.back().pc > 0 && frames_.size() > p_depth) {
 				frames_.back().pc--;

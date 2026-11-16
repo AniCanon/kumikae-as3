@@ -12,8 +12,9 @@ func _initialize() -> void:
 	var started := Time.get_ticks_msec()
 	show("an endless loop is stopped", node.call("forever"), null)
 	show("a catch does not stop it", node.call("caught"), null)
+	show("nor a catch around the emit() that ran it", node.call("listened"), null)
 	var took := Time.get_ticks_msec() - started
-	show("after the limit, not long after", took >= 1000 and took < 10000, true)
+	show("after the limit, not long after", took >= 1500 and took < 15000, true)
 	show("it ran until then", node.get("turns") > 1000, true)
 	show("the next call runs", node.call("quick"), 7)
 	node.free()

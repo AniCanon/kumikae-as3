@@ -84,9 +84,11 @@ private:
 	};
 	Site thrown_at_;
 	// An error that ended a call from outside made while this program's own code was running beneath it
-	// (a listener that its emit() ran): kept, to be raised again in that code once the engine's call returns.
+	// (a listener that its emit() ran): kept, to be raised again at the end of the instruction that made the
+	// engine's call (run()), which stopped_ ends.
 	struct Carried {
 		bool held = false;
+		bool stopped = false; // It stops the run: Flash's #1502, which no catch stops.
 		Slot error{};
 		std::string trace;
 		size_t lines = 0;

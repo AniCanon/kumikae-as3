@@ -86,6 +86,10 @@ func _physics_process(_delta: float) -> bool:
 	show("a Godot value plus a number joins them, as AS3 does", ask("plusPosition", [2]), "(1.0, 1.0)2")
 	show("a Godot value plus-assigned a Godot value", ask("addPosition", [Vector2(1, 2)]), Vector2(2, 3))
 	show("caught in AS3", [ask("guarded", [Vector2(2, 3)]), ask("guarded", [Color(1, 1, 1)]), node.position], ["fits (2.0, 3.0)", "caught true", Vector2(1, 1)])
+	var thrower := Node.new()
+	thrower.set_script(load("res://Thrower.as"))
+	show("a toString() that throws, caught where the text was asked for", ask("caughtText", [thrower]), "caught from toString")
+	thrower.free()
 	var refused := "refused: JSON.stringify can't write one of Godot's values or objects; convert it to an AS3 value first"
 	show("JSON refuses Godot's values", [ask("json", [Vector2(1, 2)]), ask("json", [node]), ask("json", [5]), ask("json", ["a"])],
 		[refused, refused, "{\"p\":[1,5]}", "{\"p\":[1,\"a\"]}"])

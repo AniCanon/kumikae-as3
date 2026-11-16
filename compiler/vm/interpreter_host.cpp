@@ -475,15 +475,9 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 		}
 		request.singleton = &singletons_[p_in.b];
 	}
+	// A call the engine made back into this program may have failed: run() raises that error at the end of
+	// this instruction, in place of any the outcome raises.
 	const Outcome outcome = perform(request);
-	if (carried_.held) {
-		// A call the engine made back into this program failed: that error is this instruction's.
-		if (request.target != NONE && outcome == Outcome::Done) {
-			drop(request.kind, request.result);
-		}
-		raise_carried();
-		return;
-	}
 	switch (outcome) {
 		case Outcome::Missing:
 			raise_null();

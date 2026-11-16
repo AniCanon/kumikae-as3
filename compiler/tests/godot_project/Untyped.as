@@ -28,6 +28,11 @@ package {
 		public function asVector(value:*):Vector2 { var v:Vector2 = value; return v; }
 		public function asNode(value:*):Node { var n:Node = value; return n; }
 		public function throwValue(value:*):void { throw value; }
+		// The text of a node whose script's toString() throws: the error comes out here, where it is caught.
+		public function caughtText(value:*):String {
+			try { return "" + value; } catch (e:Error) { return "caught " + e.message; }
+			return "not caught";
+		}
 		public function increment(value:*):* { return value + 1; }
 		public function moveBy(by:*):Vector2 { var q:Vector2 = position + by; return q; }
 		// The object written is the one named before the value changes the local: AS3's order.

@@ -292,6 +292,7 @@ output = compare("untyped.gd", [
     "script object not given", "equal values", "unequal values", "large integers", "a vector stays a vector",
     "a color is not a vector", "a vector3 is not a vector2", "a resource is not a node", "a node is a node",
     "a property takes its type only", "a script object returned", "a script object in a field", "freed", "caught in AS3",
+    "a toString() that throws, caught where the text was asked for",
     "an int plus one stays an int", "a Godot value and an untyped one",
     "a value read above its line is its zero", "an untyped node is a Node", "an untyped value as a Node", "a part is written to the object named before the value", "the other object is untouched",
     "minusOne of an int stays an int", "twice of an int stays an int", "stepped of an int stays an int",
@@ -387,12 +388,12 @@ with tempfile.TemporaryDirectory() as limited:
     run = subprocess.run([godot, "--headless", "--path", copy, "-s", "timeout.gd"], capture_output=True, text=True, timeout=300)
     output = run.stdout + run.stderr
     values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("timeout.gd ran to its end", run.returncode == 0 and len(values) == 5, output[-1500:])
+    check("timeout.gd ran to its end", run.returncode == 0 and len(values) == 6, output[-1500:])
     for name, got, want in values:
         check("timeout.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
     check("timeout.gd: Flash's error, where the loop is", output.count(
-        "Error #1502: A script has executed for longer than the timeout period of 0.5 seconds.") == 2 and
-        "at Spin/forever()" in output and "at Spin/caught()" in output, output[-1500:])
+        "Error #1502: A script has executed for longer than the timeout period of 0.5 seconds.") == 3 and
+        "at Spin/forever()" in output and "at Spin/caught()" in output and "at Spin/spin()" in output, output[-1500:])
 
 # Godot's own classes with `is` and `as`, and input events as a script receives them.
 compare("events.gd", [

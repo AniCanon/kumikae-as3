@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <map>
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -333,21 +334,23 @@ static void test_entry_points() {
 		CHECK(host.printed.find("depth 0\n") != std::string::npos);
 		CHECK_EQ(host.errors, std::string());
 
-		// An error inside a nested call is reported and cleared there; the outer call carries on.
+		// An error inside a nested call comes out of the instruction whose call out made it (the trace that
+		// called back in), level by level, and is reported once, at the top.
 		host.nest = 3;
 		host.fail_inside = true;
 		host.results = 0;
-		CHECK(interpreter.call_method(object, "shout", arguments, 1, &result));
-		CHECK_EQ(result.i, 1000);
+		CHECK(!interpreter.call_method(object, "shout", arguments, 1, &result));
 		CHECK(host.errors.find("TypeError: Error #1009") == 0);
-		CHECK_EQ(host.results, 2 + 1 + 1 + 1); // The two levels that returned; the failing one added nothing.
+		CHECK_EQ(host.errors.find("TypeError", 1), std::string::npos);
+		CHECK(host.errors.find("\tat Counter/fail()") != std::string::npos && host.errors.find("\tat Counter/shout()") != std::string::npos);
+		CHECK_EQ(host.results, 0); // No level returned.
 		host.errors.clear();
 		host.fail_inside = false;
 
-		// Nesting without end is an AS3 error, not a crash.
+		// Nesting without end is an AS3 error, not a crash: it comes out to the top, as any other.
 		host.nest = 100000;
 		host.results = 0;
-		CHECK(interpreter.call_method(object, "shout", arguments, 1, &result));
+		CHECK(!interpreter.call_method(object, "shout", arguments, 1, &result));
 		CHECK(host.errors.find("Error #1023") != std::string::npos);
 		host.nest = 0;
 		host.errors.clear();
@@ -410,6 +413,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	bool fail_calls = false;
 	bool fail_sets = false;
 	std::string name = "Player";
+	// What the engine runs of the program before it answers a call or gives a value's text, as Godot runs a
+	// listener when a signal is emitted, or a script's toString().
+	std::function<void()> calls_back;
 
 	static std::string show(const vm::Argument &p_argument) {
 		switch (p_argument.kind) {
@@ -492,6 +498,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 			vm::Slot *r_result, std::string *r_error) override {
 		ir::Kind p_kind = p_wanted.kind;
 		log += "call #" + std::to_string((intptr_t)p_receiver) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
+		if (calls_back) {
+			calls_back();
+		}
 		if (fail_calls) {
 			*r_error = "the engine refused " + std::string(p_method);
 			return false;
@@ -567,6 +576,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	}
 	[[nodiscard]] vm::Str *text(void *p_value) override {
 		log += "text #" + std::to_string((intptr_t)p_value) + "\n";
+		if (calls_back) {
+			calls_back();
+		}
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
 	}
 	[[nodiscard]] bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
@@ -2491,6 +2503,70 @@ static void test_counted_cycles() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// An error in code the engine ran for an instruction (a toString() Godot called for a value's text, a
+// listener that ran in an emit) comes out of that instruction, where a catch around it catches it; Error
+// #1502 does not, whatever runs it.
+static void test_carried_errors() {
+	const char *source = "package { import godot.*;\n"
+						 "public class Reentry extends Node {\n"
+						 "	public function boom():String { throw new Error(\"boom\"); }\n"
+						 "	public function spin():void { for (;;) {} }\n"
+						 "	public function textOf(u:*):String { try { return \"\" + u; } catch (e:Error) { return \"caught \" + e.message; } return \"none\"; }\n"
+						 "	public function joined(u:*):String { try { return [u, u].join(); } catch (e:Error) { return \"caught \" + e.message; } return \"none\"; }\n"
+						 "	public function called():String { try { setPhysicsProcess(true); } catch (e:*) { return \"caught\"; } return \"out\"; }\n"
+						 "} }\n";
+	ir::Module module;
+	compile_cycles(&module, source, "Reentry.as");
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *reentry = interpreter.construct(class_named(module, "Reentry"), engine.box());
+		const char *again = "boom";
+		engine.calls_back = [&]() {
+			vm::Slot ignored;
+			ignored.bits = 0;
+			if (interpreter.call_method(reentry, again, nullptr, 0, &ignored)) {
+				interpreter.discard(ir::Kind::Str, ignored);
+			}
+		};
+		auto text_of = [&](const char *p_method) {
+			engine.errors.clear();
+			engine.next = (engine.next + 15) / 16 * 16; // An untyped value holds a handle 16-aligned.
+			vm::Slot argument = vm::any::godot_object(engine.box());
+			vm::Slot result;
+			result.bits = 0;
+			const bool ok = interpreter.call_method(reentry, p_method, &argument, 1, &result);
+			interpreter.discard(ir::Kind::Any, argument);
+			std::string text = ok && result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : "failed";
+			if (ok) {
+				interpreter.discard(ir::Kind::Str, result);
+			}
+			return text;
+		};
+		CHECK_EQ(text_of("textOf"), std::string("caught boom"));
+		CHECK_EQ(engine.errors, std::string());
+		CHECK_EQ(text_of("joined"), std::string("caught boom"));
+		// The second toString() does not run: an error is on its way out of the join already.
+		CHECK_EQ(engine.errors, std::string());
+		// Flash's timeout in a listener: it comes out of the call that ran it, and no catch stops it.
+		again = "spin";
+		interpreter.set_time_limit(30);
+		engine.errors.clear();
+		vm::Slot result;
+		result.bits = 0;
+		CHECK(!interpreter.call_method(reentry, "called", nullptr, 0, &result));
+		CHECK_EQ(engine.errors.substr(0, engine.errors.find('\n')),
+				std::string("Error: Error #1502: A script has executed for longer than the timeout period of 0.03 seconds."));
+		CHECK(engine.errors.find("at Reentry/spin()") != std::string::npos);
+		CHECK(engine.errors.find("at Reentry/called()") != std::string::npos);
+		interpreter.release_object(reentry);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // A script object of a class that extends Godot's is written by its own public fields, as any other: the
 // Godot object it is attached to is not one of them. (One of Godot's values is refused: tests/godot_project.)
 static void test_json_script_object() {
@@ -2583,6 +2659,7 @@ int main() {
 	test_cycles();
 	test_cycles_through_engine();
 	test_counted_cycles();
+	test_carried_errors();
 	test_host_construct_order();
 	test_interface_table();
 	test_kept_traces();
