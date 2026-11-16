@@ -243,6 +243,12 @@ static void run_module(void *p_run) {
 		kas3::vm::Interpreter interpreter(module, kas3::vm::Host(output, kas3::vm::NoEngine::instance(), kas3::vm::NoEngine::instance(), clock));
 		const char *limit = std::getenv("KAS3_TIME_LIMIT_MS");
 		interpreter.set_time_limit(limit ? (uint32_t)std::strtoul(limit, nullptr, 10) : kas3::vm::Interpreter::FLASH_TIME_LIMIT);
+		// What a game being edited pays for a reload that updates its objects in place (vm/constructions.h),
+		// here to be measured (tests/bench) and to run every test program with it on: it changes nothing a
+		// program does.
+		if (std::getenv("KAS3_REMEMBER_CONSTRUCTIONS")) {
+			interpreter.remember_constructions();
+		}
 		ok = interpreter.run_program();
 	}
 }

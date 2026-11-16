@@ -16,6 +16,11 @@ fastest and the slowest. A change is slower only if its median moved by more tha
   run       `kas3c run` of loop.as: arithmetic, calls and fields in a loop
   vectors   `kas3c run` of vectors.as: a vector's elements read and written in loops
   values    `kas3c run` of values.as: calls through function values, objects and arrays made in a loop
+  objects   `kas3c run` of objects.as: objects of a class made, used and let go in a loop
+
+KAS3_REMEMBER_CONSTRUCTIONS=1 in the environment times `kas3c run` as a game being edited runs: with what each
+object is constructed with remembered, for a reload that updates objects in place (a build without that
+ignores it, so --against an older build shows what remembering costs).
   engine    in headless Godot, 160,000 calls from AS3 into the engine (--godot only; needs the extension)
 """
 import glob
@@ -43,7 +48,7 @@ def report(name, samples):
 
 
 # The programs `kas3c run` times, by the name each is reported under.
-PROGRAMS = (("run", "loop.as"), ("vectors", "vectors.as"), ("values", "values.as"))
+PROGRAMS = (("run", "loop.as"), ("vectors", "vectors.as"), ("values", "values.as"), ("objects", "objects.as"))
 
 
 def against(build, other, runs):
