@@ -11,6 +11,7 @@
 #include "ir.h"
 #include "native_code.h"
 #include "runtime.h"
+#include "text_methods.h"
 
 #include <array>
 #include <memory>
@@ -84,7 +85,7 @@ private:
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	// The strings of one ASCII character each, made the first time charAt() gives one: a loop over a
 	// string's characters makes no string for each.
-	std::array<Str *, 128> characters_{};
+	Characters characters_{};
 	bool failing_ = false; // An error is on its way out: pending_ holds it.
 	Slot pending_{}; // What was thrown, as an untyped value with a reference of its own.
 	std::string trace_; // Its stack trace, built as frames are left.
@@ -182,9 +183,6 @@ private:
 	void object_to_number(const ir::Instruction &p_in, Slot *p_registers);
 	// The standard library (vm/string_methods.cpp): StrCall and NumText. Only split() may run the program (a delimiter's text).
 	void string_call(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
-	void string_method(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
-	void char_at(ir::StringFunction p_which, std::string_view p_self, uint32_t p_length, double p_at, Slot &r_out);
-	void replace_first(Slot p_string, std::string_view p_self, uint32_t p_length, std::string_view p_pattern, std::string_view p_with, Slot &r_out);
 	void string_split(const ir::Function &p_function, const ir::Instruction &p_in);
 	void uri_function(ir::StringFunction p_which, std::string_view p_text, Slot &r_out);
 	void number_text(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
