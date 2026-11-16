@@ -194,6 +194,10 @@ class Typer {
 
 	const Type *binary(Binary *p_binary);
 
+	const Type *literal_type(Expr *p_expression);
+	const Type *applied_type(TypeApply *p_apply);
+	const Type *postfix_type(Postfix *p_postfix);
+	const Type *conditional_type(Conditional *p_choice);
 	const Type *compute(Expr *p_expression);
 	const Type *member_expression_type(Expr *p_expression);
 	const Type *index_type(Expr *p_expression);
