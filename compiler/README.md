@@ -262,7 +262,12 @@ package {
   back. So do `position.x += 5`, `transform.origin.y = 3` and `v[0] = 1`.
 - An argument left out takes Godot's default. So does a `null` written last for a parameter declared
   `= null`.
-- A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
+- A script's `toString()` is what `str(node)` and `print(node)` show in GDScript. Without one, `"" + this`
+  is AS3's text (`[object Player]`) and Godot's text for the node is Godot's (`<Node2D#123>`): each side
+  keeps its own language's rule.
+- `super._process(delta)` on one of Godot's virtuals does nothing, which is what Godot's own empty
+  versions do. A virtual that a C++ extension class implements can't be reached this way: GDExtension
+  gives a script no call to its parent class's virtual.
 - `[Export] public var speed:Number = 5;` shows the field in Godot's inspector, and a value a scene saved
   is given to the script after its constructor has run. The field is a public instance field of a type
   Godot can store (a number, `Boolean`, `String`, `Array`, one of Godot's values, a `Resource`, or a `Node`
@@ -294,6 +299,11 @@ package {
   One converts to an `int`, a `uint` or a `Number` where that is expected, and a `RangeError` says so if
   the value does not fit; `int(x)` written out cuts it, as in Flash. Arithmetic on it wraps at 64 bits,
   `/` gives a `Number`, and a comparison with a `Number` is exact.
+- Where Godot takes any type (`str`, `print`, `setMeta`), a `Number` goes as Godot's
+  float whatever its value, as C# keeps a `double` a `double`: `str(x)` of a `Number` that holds 2 is
+  `2.0`. An `int`, a `uint`, an `Int64`, and an expression whole by its form (`-5`, `i * 2`) go as
+  Godot's integer; write `int(x)` for one. Back from Godot into an untyped value, an integer that fits an
+  `int` is one, a larger one an `Int64`, and a whole float stays a `Number`.
 - Godot's global functions: `print("x", n)`, `lerpf(a, b, t)`, `clampi(v, 0, 10)`, `randf()`, `str(...)`.
   One that can give back anything (`lerp`, `max`) is used where the program says what it expects:
   `var x:Number = lerp(a, b, 0.5)`. Those that make text of their arguments (`str`, `print`, `pushError`
@@ -317,9 +327,12 @@ package {
   `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
   gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.
 
-**Refused by name until the next slices:** elements of Godot's untyped collections, passing Godot a
-script object of a class that extends none of Godot's, `as` from one of Godot's objects to a script class,
-and everything `kas3c run` refuses.
+**Refused by name until the next slices:** elements of Godot's untyped collections, `as` from one of
+Godot's objects to a script class, and everything `kas3c run` refuses.
+
+**Refused, and staying so:** a script object of a class that extends none of Godot's has no Godot object
+to give. An AS3 call that hands one to Godot is an AS3 error; when Godot reads one (a return, a field),
+it gets null and an error is printed. One of a class that extends a Godot class goes as its Godot object.
 
 How it works:
 
@@ -474,6 +487,10 @@ What the declarations decide beyond the names:
 - **Integers.** Godot's integer has 64 bits and is the AS3 type `Int64`. An integer is an `int` or a
   `uint` only where Godot's description says it is narrower: by a width mark, or by belonging to a type
   that stores 32-bit integers (`Vector2i` and its relatives, `PackedInt32Array`). Nothing is kept by hand.
+  The methods of Godot's built-in types carry no width mark in the description (`PackedByteArray.append`,
+  `encodeU32`, `Array.insert`, `removeAt`, `Color.hex`, `Basis.getEuler`, `Callable.unbind`), so they
+  take an `Int64`, and Godot cuts a wider value as GDScript does: `bytes.append(300)` stores 44. C#'s
+  narrower types for these come from classes written by hand, not from the description.
 - **Only virtual methods can be overridden.** Every other method, property and signal is `final`, so
   `override public function addChild(...)` is an error: the engine would never call it.
 - **`toString()` is AS3's.** A script writes `public function toString():String` as in any AS3 class.
