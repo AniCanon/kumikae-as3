@@ -1597,10 +1597,10 @@ static void test_reload_alive() {
 
 // A constant is never written by the program, so after a reload it has what the new code gives it; a
 // static variable keeps what the program made of it.
-static void test_reload_constants() {
-	const auto source = [](int p_first) {
+static void test_reload_constants(const char *p_package, const char *p_class) {
+	const auto source = [&](int p_first) {
 		const std::string n = std::to_string(p_first);
-		return "package { public class Game { public static const SPEED:Number = " + n + "; public static const NAMES:Array = [" + n +
+		return std::string("package ") + p_package + " { public class Game { public static const SPEED:Number = " + n + "; public static const NAMES:Array = [" + n +
 				"]; public static var best:int = " + n +
 				"; public function play():void { best = 5; } public function speed():Number { return SPEED; }"
 				" public function name():int { return NAMES[0]; } public function bestNow():int { return best; } } }\n";
@@ -1612,7 +1612,7 @@ static void test_reload_constants() {
 		Recorder recorder;
 		vm::Interpreter running(old_module, recorder);
 		CHECK(running.start());
-		vm::Object *game = running.construct(class_named(old_module, "Game"), nullptr);
+		vm::Object *game = running.construct(class_named(old_module, p_class), nullptr);
 		vm::Slot result;
 		CHECK(running.call_method(game, "play", nullptr, 0, &result));
 		CHECK(running.call_method(game, "speed", nullptr, 0, &result) && result.d == 1);
@@ -3061,7 +3061,8 @@ int main() {
 	test_static_changes();
 	test_reload_kept_containers();
 	test_reload_alive();
-	test_reload_constants();
+	test_reload_constants("", "Game");
+	test_reload_constants("com.example.config", "com.example.config.Game"); // A class in a package: its fields are named with it.
 	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_loop_markers();
