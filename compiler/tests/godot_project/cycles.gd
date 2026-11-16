@@ -22,6 +22,7 @@ var unjoined_plain: WeakRef
 var unjoined_kept: RefCounted
 var unjoined_kept_gone: WeakRef
 var unjoined_static_id := 0
+var unjoined_object: Object
 
 # A RefCounted with Unjoined.as on it, a script whose base is Godot's Object.
 func unjoined(label: String, through: bool) -> RefCounted:
@@ -63,6 +64,10 @@ func _initialize() -> void:
 	var held := unjoined("static", false)
 	held.hold()
 	unjoined_static_id = held.get_instance_id()
+	# The same script on an Object, which is not counted: Godot holds it until it is freed.
+	unjoined_object = Object.new()
+	unjoined_object.set_script(load("res://Unjoined.as"))
+	unjoined_object.loop("object", false)
 
 func _physics_process(_delta: float) -> bool:
 	frames += 1
@@ -84,6 +89,9 @@ func _physics_process(_delta: float) -> bool:
 		unjoined_kept_gone = weakref(unjoined_kept)
 		unjoined_kept = null
 		cycles.letGoOfUnjoined()
+		show("on an Object, a loop GDScript holds stays whole", unjoined_object.word(), "object partner true")
+		unjoined_object.hold()
+		unjoined_object.free()
 		talker_gone = weakref(talker)
 		talker = null
 		cycles.letGoOfStatic()
@@ -100,6 +108,8 @@ func _physics_process(_delta: float) -> bool:
 		show("so does the listening one", talker_gone.get_ref() == null, true)
 		show("on a RefCounted, a loop GDScript held goes when it lets go", unjoined_kept_gone.get_ref() == null, true)
 		show("on a RefCounted, what a static held goes when the static lets go", is_instance_id_valid(unjoined_static_id), false)
+		show("on an Object, what an AS3 static holds stays whole when Godot frees the Object", cycles.unjoinedWord(), "object partner true")
+		cycles.letGoOfUnjoined()
 		cycles.queue_free()
 		return true
 	return false
