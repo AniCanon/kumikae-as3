@@ -9,6 +9,8 @@
 // one is an object and `is`, `as` and every check of a class work as they do for a class. A call through
 // one goes by the method's name, as in AVM2: each name an interface declares has a number, and each class
 // a table from those numbers to the functions it runs (CallInterface).
+#include "lower_calls.h"
+#include "lower_classes.h"
 #include "lower_members.h"
 
 namespace kas3 {
@@ -16,11 +18,11 @@ namespace ir {
 
 void Members::declare_accessor(uint32_t p_class, FunctionDecl *p_function) {
 	const bool is_static = (p_function->modifiers.bits & Modifiers::Static) != 0;
-	const uint32_t made = l_.add_function(p_class, l_.module_.classes[p_class].name + "/" + member_key(p_function), p_function->name_offset, is_static);
+	const uint32_t made = Classes(l_).add_function(p_class, l_.module_.classes[p_class].name + "/" + member_key(p_function), p_function->name_offset, is_static);
 	l_.functions_[p_function] = made;
 	l_.module_.functions[made].is_public = (p_function->modifiers.bits & Modifiers::Public) != 0; // Godot reaches it.
 	if (!is_static) {
-		l_.give_method_slot(p_class, p_function, made);
+		Classes(l_).give_method_slot(p_class, p_function, made);
 	}
 }
 
@@ -224,9 +226,9 @@ std::optional<uint32_t> Members::interface_call(Call *p_call, Symbol *p_method) 
 	const uint32_t position = p_call->offset;
 	std::vector<uint32_t> list = { l_.settled(l_.receiver(static_cast<Member *>(p_call->callee)->object), Lowerer::writer(p_call->arguments), position) };
 	// What is left out is left to the function that runs, which has its own defaults.
-	l_.call_arguments(declaration(p_method), p_call->arguments, position, list);
+	Calls(l_).call_arguments(declaration(p_method), p_call->arguments, position, list);
 	Kind kind = Kind::Void;
-	const uint32_t out = l_.call_result(p_method, position, &kind);
+	const uint32_t out = Calls(l_).call_result(p_method, position, &kind);
 	l_.emit(Op::CallInterface, position, out, *number, l_.arguments(std::move(list)));
 	return out == NONE ? 0 : out;
 }

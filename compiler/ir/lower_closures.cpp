@@ -4,7 +4,9 @@
 // environment: an object made as the function starts, one field for each such variable, its first field
 // the environment the function itself was given. Every read and write of the variable, in the function
 // and in those written inside it, goes through that object, so that they all see one variable.
-#include "lowerer.h"
+#include "lower_bodies.h"
+#include "lower_functions.h"
+#include "lower_statements.h"
 
 namespace kas3 {
 namespace ir {
@@ -15,20 +17,11 @@ bool nested_function(const Node *p_node) {
 	return p_node->kind == NodeKind::FunctionExpr || p_node->kind == NodeKind::FunctionStmt;
 }
 
-} // namespace
-
-// After the function's parameters and locals are declared: the environment, if a function written inside
-// it uses any of them.
-void Lowerer::make_environment(FunctionDecl *p_decl) {
-	own_env_reg_ = NONE;
-	own_layout_ = EnvLayout();
-	if (!p_decl || !p_decl->body) {
-		return;
-	}
-	// What the functions written inside use, at any depth; and whether they name a member of the object.
+// What the functions written inside a body use, at any depth; and whether they name a member of the object.
+std::unordered_set<const Symbol *> used_inside(Node *p_body, bool *r_members) {
 	std::unordered_set<const Symbol *> used;
 	bool members = false;
-	walk(p_decl->body, [&](Node *p_node) -> bool {
+	walk(p_body, [&](Node *p_node) -> bool {
 		if (nested_function(p_node)) {
 			walk(p_node, [&](Node *p_inner) {
 				if (p_inner->kind == NodeKind::Name && static_cast<Name *>(p_inner)->symbol) {
@@ -40,10 +33,26 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 		}
 		return true;
 	});
+	*r_members = members;
+	return used;
+}
+
+} // namespace
+
+// After the function's parameters and locals are declared: the environment, if a function written inside
+// it uses any of them.
+void Functions::make_environment(FunctionDecl *p_decl) {
+	l_.own_env_reg_ = NONE;
+	l_.own_layout_ = EnvLayout();
+	if (!p_decl || !p_decl->body) {
+		return;
+	}
+	bool members = false;
+	const std::unordered_set<const Symbol *> used = used_inside(p_decl->body, &members);
 	// A method's: the functions written in it see the object's members, as AS3's scope chain has it.
-	const bool keeps_this = members && !fn().is_static && !received_env_;
+	const bool keeps_this = members && !l_.fn().is_static && !l_.received_env_;
 	std::vector<const Symbol *> captured;
-	for (const auto &[symbol, local] : locals_) {
+	for (const auto &[symbol, local] : l_.locals_) {
 		if (used.count(symbol) && symbol->kind != SymbolKind::CatchVariable) {
 			captured.push_back(symbol);
 		}
@@ -54,30 +63,30 @@ void Lowerer::make_environment(FunctionDecl *p_decl) {
 	// In the order they are declared, so that the class is the same each time the program is compiled.
 	std::sort(captured.begin(), captured.end(), [](const Symbol *p_a, const Symbol *p_b) { return p_a->offset < p_b->offset; });
 	Class klass;
-	klass.name = fn().name + "$environment";
+	klass.name = l_.fn().name + "$environment";
 	klass.fields.push_back({ "$outer", Kind::Obj });
 	if (keeps_this) {
-		own_layout_.this_field = static_cast<uint32_t>(klass.fields.size());
+		l_.own_layout_.this_field = static_cast<uint32_t>(klass.fields.size());
 		klass.fields.push_back({ "$this", Kind::Obj });
 	}
 	for (const Symbol *symbol : captured) {
-		own_layout_.fields[symbol] = static_cast<uint32_t>(klass.fields.size());
-		klass.fields.push_back({ std::string(symbol->name), kind_at(locals_[symbol]) });
+		l_.own_layout_.fields[symbol] = static_cast<uint32_t>(klass.fields.size());
+		klass.fields.push_back({ std::string(symbol->name), l_.kind_at(l_.locals_[symbol]) });
 	}
-	module_.classes.push_back(std::move(klass));
-	own_layout_.klass = static_cast<uint32_t>(module_.classes.size()) - 1;
+	l_.module_.classes.push_back(std::move(klass));
+	l_.own_layout_.klass = static_cast<uint32_t>(l_.module_.classes.size()) - 1;
 	const uint32_t position = p_decl->offset;
-	own_env_reg_ = reg(Kind::Obj);
-	emit(Op::New, position, own_env_reg_, own_layout_.klass);
-	if (received_env_) {
-		emit(Op::SetField, position, own_env_reg_, 0, 0); // The environment it was given, from r0.
+	l_.own_env_reg_ = l_.reg(Kind::Obj);
+	l_.emit(Op::New, position, l_.own_env_reg_, l_.own_layout_.klass);
+	if (l_.received_env_) {
+		l_.emit(Op::SetField, position, l_.own_env_reg_, 0, 0); // The environment it was given, from r0.
 	}
 	if (keeps_this) {
-		emit(Op::SetField, position, own_env_reg_, own_layout_.this_field, 0);
+		l_.emit(Op::SetField, position, l_.own_env_reg_, l_.own_layout_.this_field, 0);
 	}
 	// What each holds now: a parameter's argument, a local's starting value.
 	for (const Symbol *symbol : captured) {
-		emit(Op::SetField, position, own_env_reg_, own_layout_.fields[symbol], locals_[symbol]);
+		l_.emit(Op::SetField, position, l_.own_env_reg_, l_.own_layout_.fields[symbol], l_.locals_[symbol]);
 	}
 }
 
@@ -108,32 +117,32 @@ uint32_t Lowerer::self(uint32_t p_position, bool p_written) {
 
 // A variable a function written inside this one shares, or one of an enclosing function's that this one
 // uses: its field in an environment. Nothing for any other variable.
-std::optional<Lowerer::Place> Lowerer::captured_place(const Symbol *p_symbol, uint32_t p_position) {
+std::optional<Lowerer::Place> Functions::captured_place(const Symbol *p_symbol, uint32_t p_position) {
 	Place place;
 	place.where = Place::FieldOf;
-	if (own_env_reg_ != NONE) {
-		if (const auto found = own_layout_.fields.find(p_symbol); found != own_layout_.fields.end()) {
-			place.object = own_env_reg_;
+	if (l_.own_env_reg_ != NONE) {
+		if (const auto found = l_.own_layout_.fields.find(p_symbol); found != l_.own_layout_.fields.end()) {
+			place.object = l_.own_env_reg_;
 			place.index = found->second;
-			place.kind = module_.classes[own_layout_.klass].fields[found->second].kind;
+			place.kind = l_.module_.classes[l_.own_layout_.klass].fields[found->second].kind;
 			return place;
 		}
 	}
-	for (size_t depth = 0; depth < chain_.size(); depth++) {
-		const auto found = chain_[depth].fields.find(p_symbol);
-		if (found == chain_[depth].fields.end()) {
+	for (size_t depth = 0; depth < l_.chain_.size(); depth++) {
+		const auto found = l_.chain_[depth].fields.find(p_symbol);
+		if (found == l_.chain_[depth].fields.end()) {
 			continue;
 		}
 		// The environment this function was given (r0), then each one's outer one.
 		uint32_t at = 0;
 		for (size_t step = 0; step < depth; step++) {
-			const uint32_t outer = reg(Kind::Obj);
-			emit(Op::GetField, p_position, outer, at, 0);
+			const uint32_t outer = l_.reg(Kind::Obj);
+			l_.emit(Op::GetField, p_position, outer, at, 0);
 			at = outer;
 		}
 		place.object = at;
 		place.index = found->second;
-		place.kind = module_.classes[chain_[depth].klass].fields[found->second].kind;
+		place.kind = l_.module_.classes[l_.chain_[depth].klass].fields[found->second].kind;
 		return place;
 	}
 	return std::nullopt;
@@ -141,60 +150,60 @@ std::optional<Lowerer::Place> Lowerer::captured_place(const Symbol *p_symbol, ui
 
 // `function (a:int):int { ... }`: a function value of a function of its own, given the environment it may
 // use. Lowered once the function it is written in is done.
-uint32_t Lowerer::closure_value(FunctionExpr *p_expression) {
+uint32_t Functions::closure_value(FunctionExpr *p_expression) {
 	const uint32_t position = p_expression->offset;
 	uint32_t klass = NONE;
-	if (!p_expression->function || !class_index(function_, &klass)) {
-		refuse(position, "this function expression");
-		return default_value(Kind::Obj, position);
+	if (!p_expression->function || !l_.class_index(l_.function_, &klass)) {
+		l_.refuse(position, "this function expression");
+		return l_.default_value(Kind::Obj, position);
 	}
 	Function made;
-	made.name = fn().name + "/function";
-	made.file = fn().file;
+	made.name = l_.fn().name + "/function";
+	made.file = l_.fn().file;
 	made.position = position;
 	made.owner = NONE;
-	made.written_in = fn().owner != NONE ? fn().owner : fn().written_in;
+	made.written_in = l_.fn().owner != NONE ? l_.fn().owner : l_.fn().written_in;
 	made.is_static = false; // Its first register is the environment.
-	module_.functions.push_back(std::move(made));
-	const uint32_t index = static_cast<uint32_t>(module_.functions.size()) - 1;
+	l_.module_.functions.push_back(std::move(made));
+	const uint32_t index = static_cast<uint32_t>(l_.module_.functions.size()) - 1;
 	PendingFunction pending;
 	pending.decl = p_expression->function;
 	pending.index = index;
-	pending.unit = unit_;
-	pending.klass = class_;
-	if (own_env_reg_ != NONE) {
-		pending.chain.push_back(own_layout_);
+	pending.unit = l_.unit_;
+	pending.klass = l_.class_;
+	if (l_.own_env_reg_ != NONE) {
+		pending.chain.push_back(l_.own_layout_);
 	}
-	if (received_env_) {
-		pending.chain.insert(pending.chain.end(), chain_.begin(), chain_.end());
+	if (l_.received_env_) {
+		pending.chain.insert(pending.chain.end(), l_.chain_.begin(), l_.chain_.end());
 	}
-	pending_functions_.push_back(std::move(pending));
-	const uint32_t environment = own_env_reg_ != NONE ? own_env_reg_ : received_env_ ? 0 : NONE;
-	uint32_t out = reg(Kind::Obj);
-	emit(Op::MakeFunction, position, out, index, environment);
+	l_.pending_functions_.push_back(std::move(pending));
+	const uint32_t environment = l_.own_env_reg_ != NONE ? l_.own_env_reg_ : l_.received_env_ ? 0 : NONE;
+	uint32_t out = l_.reg(Kind::Obj);
+	l_.emit(Op::MakeFunction, position, out, index, environment);
 	return out;
 }
 
 // The function expressions met while lowering a function, each as a function of its own; and those met in
 // them.
-void Lowerer::lower_pending_functions() {
-	while (!pending_functions_.empty()) {
-		PendingFunction pending = std::move(pending_functions_.back());
-		pending_functions_.pop_back();
-		begin(pending.index, *pending.unit, pending.klass);
-		received_env_ = true;
-		chain_ = std::move(pending.chain);
+void Functions::lower_pending_functions() {
+	while (!l_.pending_functions_.empty()) {
+		PendingFunction pending = std::move(l_.pending_functions_.back());
+		l_.pending_functions_.pop_back();
+		Bodies(l_).begin(pending.index, *pending.unit, pending.klass);
+		l_.received_env_ = true;
+		l_.chain_ = std::move(pending.chain);
 		FunctionDecl *decl = pending.decl;
-		result_type_ = decl->return_type ? compilation_.type_of(decl->return_type) : compilation_.any_type();
-		parameters(decl);
-		fn().locals[0].name = "$environment";
-		fn().result = decl->return_type ? written_kind(decl->return_type, decl->return_type->offset, Kind::Void) : Kind::Any;
+		l_.result_type_ = decl->return_type ? l_.compilation_.type_of(decl->return_type) : l_.compilation_.any_type();
+		Bodies(l_).parameters(decl);
+		l_.fn().locals[0].name = "$environment";
+		l_.fn().result = decl->return_type ? l_.written_kind(decl->return_type, decl->return_type->offset, Kind::Void) : Kind::Any;
 		if (decl->body) {
-			declare_locals(decl->body);
+			Statements(l_).declare_locals(decl->body);
 			make_environment(decl);
-			statement(decl->body);
+			Statements(l_).statement(decl->body);
 		}
-		end(decl->end ? decl->end - 1 : decl->offset);
+		Bodies(l_).end(decl->end ? decl->end - 1 : decl->offset);
 	}
 }
 

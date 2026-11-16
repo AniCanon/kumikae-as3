@@ -1,4 +1,6 @@
 #include "lower_dynamic.h"
+#include "lower_functions.h"
+#include "lower_statements.h"
 
 namespace kas3 {
 namespace ir {
@@ -35,7 +37,7 @@ void Dynamic::use_classes() {
 	if (l_.array_) {
 		l_.vector_class(l_.compilation_.instance_type(l_.array_));
 	}
-	l_.use_argument_error();
+	Functions(l_).use_argument_error();
 }
 
 bool Dynamic::by_name(const Expr *p_holder) const {
@@ -286,12 +288,12 @@ void Dynamic::loop(ForIn *p_loop) {
 		value = element;
 	}
 	l_.store(target, l_.convert(value, target.kind, position), position);
-	l_.open_loop();
-	l_.statement(p_loop->body);
+	Statements(l_).open_loop();
+	Statements(l_).statement(p_loop->body);
 	const uint32_t next_at = l_.here();
 	l_.emit(Op::Jump, position, top);
 	l_.patch(out, l_.here());
-	l_.finish_loop(next_at);
+	Statements(l_).finish_loop(next_at);
 }
 
 } // namespace ir

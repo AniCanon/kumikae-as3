@@ -1,4 +1,5 @@
 #include "library_names.h"
+#include "lower_functions.h"
 #include "lower_library.h"
 
 namespace kas3 {
@@ -179,7 +180,7 @@ uint32_t Library::pattern_call(RegExpFunction p_which) {
 		l_.vector_class(l_.compilation_.instance_type(l_.array_));
 	}
 	if (p_which == RegExpFunction::Replace) {
-		l_.use_argument_error(); // A replacement function called with more than it takes.
+		Functions(l_).use_argument_error(); // A replacement function called with more than it takes.
 	}
 	return emit(Op::RegExpCall, static_cast<uint32_t>(p_which), std::move(list), result);
 }

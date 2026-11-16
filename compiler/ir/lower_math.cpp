@@ -32,7 +32,10 @@ std::optional<double> Lowerer::math_constant(const Symbol *p_symbol) const {
 	return std::nullopt;
 }
 
-std::optional<uint32_t> Lowerer::math_call(Call *p_call, const Symbol *p_function) {
+namespace {
+
+// Math's functions of one Number, by name.
+std::optional<MathFunction> math_unary(std::string_view p_name) {
 	struct Unary {
 		std::string_view name;
 		MathFunction function;
@@ -52,6 +55,17 @@ std::optional<uint32_t> Lowerer::math_call(Call *p_call, const Symbol *p_functio
 			{ "sqrt", MathFunction::Sqrt },
 			{ "tan", MathFunction::Tan },
 	} };
+	for (const Unary &unary : unaries) {
+		if (unary.name == p_name) {
+			return unary.function;
+		}
+	}
+	return std::nullopt;
+}
+
+} // namespace
+
+std::optional<uint32_t> Lowerer::math_call(Call *p_call, const Symbol *p_function) {
 	if (!math_ || p_function->owner != math_ || p_function->kind != SymbolKind::Method) {
 		return std::nullopt;
 	}
@@ -87,11 +101,9 @@ std::optional<uint32_t> Lowerer::math_call(Call *p_call, const Symbol *p_functio
 		emit(name == "pow" ? Op::Pow : Op::Atan2, position, out, values[0], values[1]);
 		return out;
 	}
-	for (const Unary &unary : unaries) {
-		if (unary.name == name && values.size() == 1) {
-			emit(Op::MathUnary, position, out, values[0], static_cast<uint32_t>(unary.function));
-			return out;
-		}
+	if (const std::optional<MathFunction> unary = math_unary(name); unary && values.size() == 1) {
+		emit(Op::MathUnary, position, out, values[0], static_cast<uint32_t>(*unary));
+		return out;
 	}
 	return std::nullopt;
 }

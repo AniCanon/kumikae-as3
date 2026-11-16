@@ -1,3 +1,5 @@
+#include "lower_bodies.h"
+#include "lower_classes.h"
 #include "lower_members.h"
 
 namespace kas3 {
@@ -78,19 +80,19 @@ void Lowerer::lower_unit(Unit &p_unit) {
 				if (!decl->symbol || !classes_.count(decl->symbol)) {
 					continue;
 				}
-				lower_constructor(p_unit, decl);
+				Bodies(*this).lower_constructor(p_unit, decl);
 				for (Node *member : decl->members) {
 					if (member->kind == NodeKind::FunctionDecl) {
 						FunctionDecl *function = static_cast<FunctionDecl *>(member);
 						if (function->symbol && function->symbol != decl->symbol->klass->constructor) {
-							lower_function(p_unit, decl->symbol, function);
+							Bodies(*this).lower_function(p_unit, decl->symbol, function);
 						}
 					}
 				}
 			} else if (definition->kind == NodeKind::FunctionDecl) {
-				lower_function(p_unit, nullptr, static_cast<FunctionDecl *>(definition));
+				Bodies(*this).lower_function(p_unit, nullptr, static_cast<FunctionDecl *>(definition));
 			} else if (definition->kind == NodeKind::VarDecl) {
-				lower_package_variables(p_unit, static_cast<VarDecl *>(definition));
+				Bodies(*this).lower_package_variables(p_unit, static_cast<VarDecl *>(definition));
 			}
 		}
 	};
@@ -258,10 +260,10 @@ bool Lowerer::run(LowerMode p_mode) {
 	Members(*this).reserve_interfaces(units);
 	const std::vector<ClassInUnit> classes = classes_in_order(units);
 	for (const ClassInUnit &entry : classes) {
-		reserve_class(entry.second);
+		Classes(*this).reserve_class(entry.second);
 	}
 	for (const ClassInUnit &entry : classes) {
-		declare_class(*entry.first, entry.second);
+		Classes(*this).declare_class(*entry.first, entry.second);
 	}
 	for (Unit *unit : units) {
 		unit_ = unit;
@@ -272,7 +274,7 @@ bool Lowerer::run(LowerMode p_mode) {
 	}
 	// Static fields get their values a class at a time, a base class before its subclasses.
 	for (const ClassInUnit &entry : classes) {
-		lower_statics(*entry.first, entry.second);
+		Bodies(*this).lower_statics(*entry.first, entry.second);
 	}
 	for (Unit *unit : units) {
 		lower_unit(*unit);

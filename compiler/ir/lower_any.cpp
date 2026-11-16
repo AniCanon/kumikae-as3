@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_operators.h"
 
 namespace kas3 {
 namespace ir {
@@ -30,23 +30,23 @@ uint32_t Lowerer::any_text(Expr *p_expression) {
 	return out;
 }
 
-uint32_t Lowerer::any_equality(Binary *p_binary) {
+uint32_t Operators::any_equality(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
 	const bool strict = p_binary->op == TokenKind::StrictEqual || p_binary->op == TokenKind::StrictNotEqual;
 	const bool negated = p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual;
-	const uint32_t a = settled(any_value(p_binary->left), p_binary->right, position);
-	const uint32_t b = any_value(p_binary->right);
-	uint32_t out = reg(Kind::Bool);
-	emit(strict ? Op::AnyStrictEq : Op::AnyEq, position, out, a, b);
+	const uint32_t a = l_.settled(l_.any_value(p_binary->left), p_binary->right, position);
+	const uint32_t b = l_.any_value(p_binary->right);
+	uint32_t out = l_.reg(Kind::Bool);
+	l_.emit(strict ? Op::AnyStrictEq : Op::AnyEq, position, out, a, b);
 	if (negated) {
-		uint32_t flipped = reg(Kind::Bool);
-		emit(Op::Not, position, flipped, out);
+		uint32_t flipped = l_.reg(Kind::Bool);
+		l_.emit(Op::Not, position, flipped, out);
 		return flipped;
 	}
 	return out;
 }
 
-uint32_t Lowerer::any_comparison(Binary *p_binary) {
+uint32_t Operators::any_comparison(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
 	// The left one is made a primitive first, whichever way the comparison goes.
 	Op op = Op::AnyLt;
@@ -57,20 +57,20 @@ uint32_t Lowerer::any_comparison(Binary *p_binary) {
 	} else if (p_binary->op == TokenKind::GreaterEqual) {
 		op = Op::AnyGe;
 	}
-	const uint32_t a = settled(any_value(p_binary->left), p_binary->right, position);
-	const uint32_t b = any_value(p_binary->right);
-	uint32_t out = reg(Kind::Bool);
-	emit(op, position, out, a, b);
+	const uint32_t a = l_.settled(l_.any_value(p_binary->left), p_binary->right, position);
+	const uint32_t b = l_.any_value(p_binary->right);
+	uint32_t out = l_.reg(Kind::Bool);
+	l_.emit(op, position, out, a, b);
 	return out;
 }
 
-uint32_t Lowerer::any_add(Binary *p_binary) {
+uint32_t Operators::any_add(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
-	const uint32_t a = settled(any_value(p_binary->left), p_binary->right, position);
-	const uint32_t b = any_value(p_binary->right);
-	uint32_t out = reg(Kind::Any);
-	emit(Op::AnyAdd, position, out, a, b);
-	return convert(out, natural(p_binary), position);
+	const uint32_t a = l_.settled(l_.any_value(p_binary->left), p_binary->right, position);
+	const uint32_t b = l_.any_value(p_binary->right);
+	uint32_t out = l_.reg(Kind::Any);
+	l_.emit(Op::AnyAdd, position, out, a, b);
+	return l_.convert(out, l_.natural(p_binary), position);
 }
 
 // typeof: of an untyped value, asked as the program runs; of anything else, known now.
@@ -97,52 +97,52 @@ uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 
 // `is` and `as` asked of a value that is untyped or of a type the class can't be: what the value is now
 // decides. Nothing if the type written is not one this can test.
-std::optional<uint32_t> Lowerer::any_type_test(Binary *p_binary) {
+std::optional<uint32_t> Operators::any_type_test(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
-	const Symbol *symbol = named_class(p_binary->right);
+	const Symbol *symbol = l_.named_class(p_binary->right);
 	uint32_t code = NONE;
 	Kind target = Kind::Obj;
-	if (symbol == int_) {
+	if (symbol == l_.int_) {
 		code = ANY_IS_INT;
 		target = Kind::I32;
-	} else if (symbol == uint_) {
+	} else if (symbol == l_.uint_) {
 		code = ANY_IS_UINT;
 		target = Kind::U32;
-	} else if (symbol == number_) {
+	} else if (symbol == l_.number_) {
 		code = ANY_IS_NUMBER;
 		target = Kind::F64;
-	} else if (symbol == string_) {
+	} else if (symbol == l_.string_) {
 		code = ANY_IS_STRING;
 		target = Kind::Str;
-	} else if (symbol == boolean_) {
+	} else if (symbol == l_.boolean_) {
 		code = ANY_IS_BOOLEAN;
 		target = Kind::Bool;
 	} else if (const Type *written = p_binary->right->type && p_binary->right->type->kind == Type::ClassObject ? p_binary->right->type->element : nullptr;
-			is_vector(written) && vector_class(written)) {
-		code = *vector_class(written); // An Array, or a Vector.<T>: of that very class.
+			l_.is_vector(written) && l_.vector_class(written)) {
+		code = *l_.vector_class(written); // An Array, or a Vector.<T>: of that very class.
 		symbol = nullptr;
-	} else if (!symbol || !class_index(symbol, &code) || !module_.classes[code].native_base.empty()) {
+	} else if (!symbol || !l_.class_index(symbol, &code) || !l_.module_.classes[code].native_base.empty()) {
 		return std::nullopt;
 	}
 	const bool test = p_binary->op == TokenKind::KwIs;
-	const uint32_t value = any_value(p_binary->left);
+	const uint32_t value = l_.any_value(p_binary->left);
 	if (symbol) {
-		touch(symbol, position); // As for a typed value: the class named is set up.
+		l_.touch(symbol, position); // As for a typed value: the class named is set up.
 	}
-	uint32_t fits = reg(Kind::Bool);
-	emit(Op::AnyIs, position, fits, value, code);
+	uint32_t fits = l_.reg(Kind::Bool);
+	l_.emit(Op::AnyIs, position, fits, value, code);
 	if (test) {
 		return fits;
 	}
 	// `as`: the value as that type if it is one, otherwise null. The checker types `x as int` as an int,
 	// as Adobe's compiler does, so the null is what an int holds for it: 0 (false for a Boolean).
-	uint32_t out = target == Kind::F64 ? reg(Kind::F64) : default_value(target, position);
+	uint32_t out = target == Kind::F64 ? l_.reg(Kind::F64) : l_.default_value(target, position);
 	if (target == Kind::F64) {
-		emit(Op::ConstF64, position, out, number(0)); // Not the NaN a Number starts as.
+		l_.emit(Op::ConstF64, position, out, l_.number(0)); // Not the NaN a Number starts as.
 	}
-	const uint32_t skip = emit(Op::JumpIfNot, position, fits, 0);
-	emit(Op::FromAny, position, out, value, target == Kind::Obj ? code : NONE);
-	patch(skip, here());
+	const uint32_t skip = l_.emit(Op::JumpIfNot, position, fits, 0);
+	l_.emit(Op::FromAny, position, out, value, target == Kind::Obj ? code : NONE);
+	l_.patch(skip, l_.here());
 	return out;
 }
 
