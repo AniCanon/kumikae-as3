@@ -81,6 +81,7 @@ package game {
 | [Completion and typing assistance](editors/completion.md) | Typed chains, imports, scopes, snippets, replacement edits and argument help implemented |
 | Rename, Godot's documentation in hover | Planned |
 | JetBrains plugin | Native Rider language support, project/run tools and Simulator panel implemented; see [its README](editors/jetbrains/README.md) |
+| [AS3 testing](testing/README.md) | Named AS3 fixtures, assertions and Rider test results with rerun-failed support |
 | Debugger | Planned (stage 6) |
 
 ## Try the compiler

@@ -18,6 +18,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.WindowManager
@@ -131,7 +132,12 @@ object UiProbeCompletion {
             lateinit var editor: Editor
             edt {
                 FileEditorManager.getInstance(project).openFile(file, true)
-                editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
+                editor =
+                    checkNotNull(
+                        FileEditorManager.getInstance(
+                            project,
+                        ).getEditors(file).filterIsInstance<TextEditor>().firstOrNull()?.editor,
+                    )
                 editor.caretModel.moveToOffset(source.indexOf("normsuffix") + 4)
             }
             if (missingClient) {
@@ -152,9 +158,13 @@ object UiProbeCompletion {
             await("indexing") { !DumbService.getInstance(project).isDumb }
             UiProbeLsp.checkDiagnostics(project)
             edt {
-                // First-run What's New can select a non-text tab while the project initializes.
                 FileEditorManager.getInstance(project).openFile(file, true)
-                editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
+                editor =
+                    checkNotNull(
+                        FileEditorManager.getInstance(
+                            project,
+                        ).getEditors(file).filterIsInstance<TextEditor>().firstOrNull()?.editor,
+                    )
                 editor.caretModel.moveToOffset(source.indexOf("normsuffix") + 4)
             }
             val times = mutableListOf<Double>()
@@ -239,6 +249,7 @@ object UiProbeCompletion {
             observations += "Required argument is selected; Tab exits the snippet after the call"
             UiProbeLanguageFeatures.run(project, editor, observations)
             UiProbeDiagnostics.run(project, editor, observations)
+            if (cycle == 0) UiProbeTestResults.run(project, destination)
         } finally {
             settings.AUTOCOMPLETE_ON_CODE_COMPLETION = autoComplete
             try {

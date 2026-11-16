@@ -96,6 +96,51 @@ The Simulator panel is absent on Windows and Linux. The supported targets are Ri
 Community/free unified IDEA. Android Studio is outside the scope. Other operating systems remain
 unverified; the compatibility range and exact tested builds are listed below.
 
+## Project settings, scenes and packages
+
+Open `project.godot` to use the **Settings** editor alongside its source editor.
+General contains the application name, main scene and icon chooser/preview. Display
+contains viewport size, stretch mode and the seven Godot orientation policies.
+Export edits the application identifier and icon of an existing iOS or Android
+preset. Apply changes the IDE documents in one undoable command. Save the project
+before exporting; rebuild an installed app to change its orientation policy.
+A landscape-only game's layout must still be adapted before using portrait.
+
+Unknown settings and comments are preserved. Invalid values and external source
+changes are reported. Reload discards the current draft and reads the source again.
+Preset-specific drafts survive switching presets. Signing settings remain in the
+export source. Create missing export presets in Godot, then reload.
+
+Open a `.tscn` to use its **Scene** editor. The outline shows native node types and
+attached AS3 paths. Open Script navigates to the source; Attach/Detach changes the
+script resource and node assignment, with undo. Attach currently accepts a script
+that directly extends the node's native type, with an explicit native import or
+qualified base name. Inherited/instanced scenes and other base relationships must
+be edited in Godot. The source editor remains available for the complete format.
+AS3 class gutters and **Find Attached Scene Nodes** in the editor menu navigate
+back to scenes that attach the script.
+
+The **Game** tree compacts empty directory chains under `src` and `tests` into
+package names such as `com.supportsprint`. Its context menu has **Compact AS3
+Packages** and **Show Generated Files**. These options change presentation;
+ordinary project views and physical directories remain available. Package rename
+refactoring is not implemented.
+
+## AS3 tests
+
+The **AS3 Tests** run configuration reads `kas3-tests.json` in the game project.
+Registered source classes get a gutter Run action. The native Tests tree shows
+individual framework cases, failures, source navigation and rerun-failed actions.
+The bundled Python runner uses installed `kas3c` and Godot programs. It rejects
+missing completion, malformed reports, unknown selected tests, runtime failures
+and timeouts. Cancellation terminates only its owned process group.
+
+The [testing guide](../../testing/README.md) describes the AS3 assertion library,
+`TestCase` setup/teardown, typed parameter cases, manifest and CLI. This is a new
+framework for this runtime, inspired by AS3, Kotlin, Swift and C# conventions;
+it does not implement FlexUnit metadata discovery. Existing Godot integration
+scenes can be registered as individual process-level tests.
+
 ## Build
 
 The build needs JDK 25 and an installed Rider 2026.2 (build 262.10968.170). It uses

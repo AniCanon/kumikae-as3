@@ -13,8 +13,10 @@ import java.nio.file.Path
 
 /** What a person writing a game does not open: what Godot and the IDE keep for themselves. */
 internal object Clutter {
-    private val folders = setOf(".godot", ".idea", "bin")
+    private val folders = setOf(".godot", ".idea", "bin", ".build", "build")
     private val endings = listOf(".uid", ".import", ".gdextension")
+
+    fun hideFolder(name: String, projectRoot: Boolean): Boolean = projectRoot && isClutter(name, isFolder = true)
 
     fun isClutter(name: String, isFolder: Boolean): Boolean =
         if (isFolder) name in folders else endings.any(name::endsWith)
@@ -30,12 +32,29 @@ class GameProjectView : TreeStructureProvider {
         val project = parent.project ?: return children
         // Only in the Game view: the IDE's other views show everything, as they always have.
         if (ProjectView.getInstance(project).currentViewId != GamePane.ID || !isGame(project)) return children
-        return children.filterNotTo(ArrayList()) { node ->
-            when (node) {
-                is PsiDirectoryNode -> node.virtualFile?.let { Clutter.isClutter(it.name, isFolder = true) } == true
-                is PsiFileNode -> node.virtualFile?.let { Clutter.isClutter(it.name, isFolder = false) } == true
-                else -> false
+        val visible = if (GameViewOptions.generated(project)) {
+            children
+        } else {
+            children.filterNotTo(ArrayList()) { node ->
+                when (node) {
+                    is PsiDirectoryNode -> node.virtualFile?.let {
+                        Clutter.hideFolder(
+                            it.name,
+                            projectRoot =
+                            it.parent?.path == project.basePath,
+                        )
+                    } ==
+                        true
+
+                    is PsiFileNode -> node.virtualFile?.let { Clutter.isClutter(it.name, isFolder = false) } == true
+
+                    else -> false
+                }
             }
+        }
+        if (!GameViewOptions.compact(project) || settings == null) return visible
+        return visible.mapTo(ArrayList()) { node ->
+            if (node is PsiDirectoryNode) packageNode(node, project, settings) else node
         }
     }
 

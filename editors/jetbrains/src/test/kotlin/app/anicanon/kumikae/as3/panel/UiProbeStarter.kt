@@ -64,6 +64,7 @@ class UiProbeStarter : ApplicationStarter {
                     manager.updateUI()
                 }
                 checkWindow(destination, requested.lowercase())
+                UiProbeProjectExperience.run(destination, requested.lowercase())
             }
         } finally {
             onEdt {

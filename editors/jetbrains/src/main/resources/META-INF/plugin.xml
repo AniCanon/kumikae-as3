@@ -8,6 +8,12 @@
     <depends optional="true" config-file="as3-rider.xml">com.intellij.modules.rider</depends>
     <depends optional="true" config-file="as3-idea.xml">com.intellij.modules.idea</depends>
     <extensions defaultExtensionNs="com.intellij">
+        <codeInsight.lineMarkerProvider language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.scene.AttachedScenesLineMarker"/>
+        <runConfigurationProducer implementation="app.anicanon.kumikae.as3.testing.As3TestProducer"/>
+        <runLineMarkerContributor language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.testing.As3TestLineMarker"/>
+        <fileEditorProvider implementation="app.anicanon.kumikae.as3.scene.SceneEditorProvider"/>
+        <configurationType implementation="app.anicanon.kumikae.as3.testing.As3TestsType"/>
+        <fileEditorProvider implementation="app.anicanon.kumikae.as3.settings.ProjectSettingsEditorProvider"/>
         <textmate.bundleProvider implementation="app.anicanon.kumikae.as3.language.As3Grammar"/>
         <notificationGroup id="Kumikae AS3" displayType="BALLOON"/>
         <configurationType implementation="app.anicanon.kumikae.as3.run.SimulatorConfigurationType"/>
@@ -42,6 +48,15 @@
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>
     <actions>
+        <action id="KumikaeAs3.FindAttachedScenes" class="app.anicanon.kumikae.as3.scene.FindAttachedScenesAction" text="Find Attached Scene Nodes">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action id="KumikaeAs3.CompactPackages" class="app.anicanon.kumikae.as3.project.CompactPackagesAction" text="Compact AS3 Packages">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+        <action id="KumikaeAs3.ShowGenerated" class="app.anicanon.kumikae.as3.project.ShowGeneratedAction" text="Show Generated Files">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
         <action id="KumikaeAs3.NewClass" class="app.anicanon.kumikae.as3.project.NewAs3FileAction">
             <add-to-group group-id="NewGroup" anchor="first"/>
         </action>

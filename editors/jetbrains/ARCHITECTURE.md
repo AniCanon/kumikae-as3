@@ -67,6 +67,25 @@ scope/type semantics, wire capabilities, Unicode ranges and cache invalidation. 
 and restores it on exit. It prevents desktop focus changes from dismissing the test's live lookup;
 ordinary live-editor focus remains controlled by the IDE.
 
+## Project editors and tests
+
+`settings/` separates source-preserving configuration models, an observable draft
+controller, the IDE document repository and the Compose form. The repository sees
+unsaved source edits, validates the entire draft, then changes both documents in
+one write command. Conflicting source revisions are rejected. Drafts are kept per
+export preset. Preview decoding belongs to the repository, never to composition.
+
+`scene/` parses node/resource headers and edits only an attachment. The IDE adapter
+checks a conservative direct native base and refuses unsupported scene inheritance.
+The outline controller owns selection/status; its Compose view forwards actions.
+Scene usages use project indexing and return source navigation targets.
+
+`testing/` integrates the IDE's bundled test runner with the repository's Python
+runner. A manifest declares executable argument arrays and source files. A normal
+Godot target produces one result; a framework suite emits validated events for
+individual cases. Failed-case reruns preserve suite/case identities. The compiler
+still owns language semantics; no AS3 reflection or new compiler syntax is added.
+
 ## Simulator composition
 
 ```text

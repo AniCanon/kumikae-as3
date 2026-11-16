@@ -32,4 +32,9 @@ class ClutterTest {
             assertFalse(Clutter.isClutter(file, isFolder = false), file)
         }
     }
+
+    @Test fun `source packages named build remain visible`() {
+        assertFalse(Clutter.hideFolder("build", projectRoot = false))
+        assertTrue(Clutter.hideFolder("build", projectRoot = true))
+    }
 }
