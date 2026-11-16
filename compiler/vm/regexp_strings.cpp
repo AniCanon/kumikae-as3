@@ -208,6 +208,20 @@ bool Interpreter::replacement(Object *p_function, const std::u16string &p_with, 
 	return spoke;
 }
 
+// What replace() replaces: every match of a pattern as match() finds them, or the first place of a text.
+// Nothing if the pattern's matcher raised.
+std::optional<std::vector<Interpreter::Found>> Interpreter::places_to_replace(const regex::Program *p_program, const std::string &p_needle,
+		const std::u16string &p_units) {
+	if (p_program) {
+		return all_matches(*p_program, p_needle, p_units);
+	}
+	std::vector<Found> matches;
+	if (const size_t at = p_units.find(units_of(p_needle)); at != std::u16string::npos) {
+		matches.push_back(Found{ { static_cast<int32_t>(at), static_cast<int32_t>(at + units_of(p_needle).size()) } });
+	}
+	return matches;
+}
+
 // replace(pattern, replacement). A pattern that is not a RegExp is text, and only its first place is
 // replaced, with the replacement as it is written (the ruling string_methods.cpp follows for two Strings;
 // Flash's by recollection). Every match is found before a replacement function is first called.
@@ -244,17 +258,12 @@ void Interpreter::string_replace(const Function &p_function, const Instruction &
 		return;
 	}
 	const std::u16string units = units_of(text_in(argument(0).p));
-	std::vector<Found> matches;
-	if (regexp) {
-		std::optional<std::vector<Found>> all = all_matches(*program, needle, units);
-		if (!all) {
-			release_object(regexp);
-			return;
-		}
-		matches = std::move(*all);
-	} else if (const size_t at = units.find(units_of(needle)); at != std::u16string::npos) {
-		matches.push_back(Found{ { static_cast<int32_t>(at), static_cast<int32_t>(at + units_of(needle).size()) } });
+	const std::optional<std::vector<Found>> found = places_to_replace(regexp ? program.get() : nullptr, needle, units);
+	if (!found) {
+		release_object(regexp);
+		return;
 	}
+	const std::vector<Found> &matches = *found;
 	retain(function); // Held while it runs: it may let go of itself.
 	const std::u16string with_units = units_of(with);
 	std::u16string out;

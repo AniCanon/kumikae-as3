@@ -218,6 +218,7 @@ private:
 	void string_match(const ir::Function &p_function, const ir::Instruction &p_in);
 	void string_search(const ir::Function &p_function, const ir::Instruction &p_in);
 	void string_replace(const ir::Function &p_function, const ir::Instruction &p_in);
+	std::optional<std::vector<Found>> places_to_replace(const regex::Program *p_program, const std::string &p_needle, const std::u16string &p_units);
 	// Every match a global pattern finds, one after another as match() finds them; the first only otherwise.
 	std::optional<std::vector<Found>> all_matches(const regex::Program &p_program, std::string_view p_source, const std::u16string &p_text);
 	bool replacement(Object *p_function, const std::u16string &p_with, bool p_expand, const Found &p_found, const std::u16string &p_text,
