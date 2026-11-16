@@ -6,4 +6,6 @@ vector: Error #1023: Stack overflow occurred.
 deep: Error #1023: Stack overflow occurred.
 object: Error #1023: Stack overflow occurred.
 290
+0
+501: Error #1023: Stack overflow occurred.
 done

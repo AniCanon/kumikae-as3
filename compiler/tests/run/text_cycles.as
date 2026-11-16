@@ -34,6 +34,14 @@ package {
 				shallow = [shallow, j];
 			}
 			trace(shallow.toString().length);
+			// The limit: 500 Arrays one inside the next are put into words, 501 are not.
+			var most:Array = [];
+			for (var m:int = 1; m < 500; m++) {
+				most = [most];
+			}
+			trace(most.toString().length);
+			most = [most];
+			attempt("501", function():void { trace(most.toString().length); });
 			a[1] = 0;
 			b.pop();
 			p.pop();

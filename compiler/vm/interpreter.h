@@ -310,7 +310,9 @@ private:
 	bool locale_element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
 	// Vectors put into words inside one another's words (an Array in an Array, or one that holds itself)
 	// nest at most this deep, by recursion in C++; one more is Error #1023, as Flash's stack check gives.
-	static constexpr uint32_t MAX_TEXT_DEPTH = 1000;
+	// A level takes about 270 bytes of stack in a release build (measured): 500 fit in a third of the
+	// 512 KB a secondary thread gets on macOS.
+	static constexpr uint32_t MAX_TEXT_DEPTH = 500;
 	uint32_t text_depth_ = 0; // How many vector_text() calls are in progress.
 	bool element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
