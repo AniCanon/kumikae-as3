@@ -1,6 +1,7 @@
 // The object Godot holds for each object a script is attached to: the engine's calls arrive here and go
 // on into the interpreter.
 #include "any.h"
+#include "godot_calls.h"
 #include "instance.h"
 #include "language.h"
 #include "members.h"
@@ -14,8 +15,10 @@
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <atomic>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -38,7 +41,12 @@ static std::unordered_map<const Object *, ScriptInstance *> &instances_on() {
 
 vm::Object *kas3::script_object(const Object *p_owner) {
 	auto found = instances_on().find(p_owner);
-	return found == instances_on().end() ? nullptr : found->second->object;
+	// An instance freed on another thread stays here until the main thread frees it, and another object may
+	// have been made where its object was.
+	if (found == instances_on().end() || found->second->owner_id != ObjectID(p_owner->get_instance_id())) {
+		return nullptr;
+	}
+	return found->second->object;
 }
 
 std::vector<std::pair<vm::Object *, Object *>> kas3::instances_outside(const Node *p_scene) {
@@ -135,8 +143,10 @@ bool kas3::as_godot_object(const vm::Object *p_object, Variant *r_out) {
 	if (!p_object || p_object->klass >= module.classes.size() || module.classes[p_object->klass].native_base.empty()) {
 		return false;
 	}
-	const void *owner = const_cast<vm::Object *>(p_object)->fields()[0].p;
-	*r_out = owner ? *static_cast<const Variant *>(owner) : Variant();
+	// A freed Godot object is null, as to_variant() gives it. A reference-counted one taken off its script
+	// (counted.cpp) must not be copied: the copy would count a reference on freed memory.
+	const Variant *owner = static_cast<const Variant *>(const_cast<vm::Object *>(p_object)->fields()[0].p);
+	*r_out = owner && !kas3::is_freed(*owner) ? *owner : Variant();
 	return true;
 }
 
@@ -195,9 +205,34 @@ struct Listed {
 	}
 };
 
-static std::unordered_map<const void *, std::unique_ptr<Listed>> &listed() {
-	static std::unordered_map<const void *, std::unique_ptr<Listed>> all;
-	return all;
+// The lists given out, until Godot frees each. Godot asks for them on any thread (a resource loaded in a
+// thread is asked for its properties), so they are kept and let go under a lock.
+struct AllListed {
+	std::mutex lock;
+	std::unordered_map<const void *, std::unique_ptr<Listed>> lists;
+
+	void keep(const void *p_list, std::unique_ptr<Listed> p_made) {
+		const std::lock_guard<std::mutex> held(lock);
+		lists[p_list] = std::move(p_made);
+	}
+	void free(const void *p_list) {
+		std::unique_ptr<Listed> freeing;
+		{
+			const std::lock_guard<std::mutex> held(lock);
+			const auto found = lists.find(p_list);
+			if (found == lists.end()) {
+				return;
+			}
+			freeing = std::move(found->second);
+			lists.erase(found);
+		}
+	}
+};
+
+// Made once and never destroyed, as a thread may free a list while the game shuts down.
+static AllListed &listed() {
+	static AllListed *all = new AllListed();
+	return *all;
 }
 
 static const GDExtensionPropertyInfo *instance_get_property_list(GDExtensionScriptInstanceDataPtr p_data, uint32_t *r_count) {
@@ -209,13 +244,13 @@ static const GDExtensionPropertyInfo *instance_get_property_list(GDExtensionScri
 	*r_count = (uint32_t)made->properties.size();
 	const GDExtensionPropertyInfo *out = made->properties.empty() ? nullptr : made->properties.data();
 	if (out) {
-		listed()[out] = std::move(made);
+		listed().keep(out, std::move(made));
 	}
 	return out;
 }
 
 static void instance_free_property_list(GDExtensionScriptInstanceDataPtr, const GDExtensionPropertyInfo *p_list, uint32_t) {
-	listed().erase(p_list);
+	listed().free(p_list);
 }
 
 static const GDExtensionMethodInfo *instance_get_method_list(GDExtensionScriptInstanceDataPtr p_data, uint32_t *r_count) {
@@ -246,13 +281,13 @@ static const GDExtensionMethodInfo *instance_get_method_list(GDExtensionScriptIn
 	*r_count = (uint32_t)made->methods.size();
 	const GDExtensionMethodInfo *out = made->methods.empty() ? nullptr : made->methods.data();
 	if (out) {
-		listed()[out] = std::move(made);
+		listed().keep(out, std::move(made));
 	}
 	return out;
 }
 
 static void instance_free_method_list(GDExtensionScriptInstanceDataPtr, const GDExtensionMethodInfo *p_list, uint32_t) {
-	listed().erase(p_list);
+	listed().free(p_list);
 }
 
 static GDExtensionObjectPtr instance_get_owner(GDExtensionScriptInstanceDataPtr p_data) {
@@ -286,13 +321,17 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 static void instance_notification(GDExtensionScriptInstanceDataPtr, int32_t, GDExtensionBool) {}
 
 // Godot asking how the object reads (`str(node)`, `print(node)`): the script's toString(), if it has one.
-// Without one, Godot's own text stands.
+// Without one, or asked from another thread, Godot's own text stands.
 static void instance_to_string(GDExtensionScriptInstanceDataPtr p_data, GDExtensionBool *r_is_valid, GDExtensionStringPtr r_out) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
 	Project &program = Project::get();
 	*r_is_valid = false;
 	uint32_t own = program.module().classes[instance->object->klass].to_string;
 	if (own == ir::NONE) {
+		return;
+	}
+	if (!kas3::on_main_thread()) {
+		kas3::refuse_thread(own);
 		return;
 	}
 	vm::Slot self, result;
@@ -330,8 +369,7 @@ static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDa
 	return true;
 }
 
-static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
-	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+static void free_instance(ScriptInstance *instance) {
 	instances().erase(instance);
 	auto on = instances_on().find(instance->owner);
 	if (on != instances_on().end() && on->second == instance) {
@@ -343,6 +381,48 @@ static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 		Project::get().interpreter().release_object(instance->object);
 	}
 	delete instance;
+}
+
+// Script instances Godot freed on another thread (an object's last reference let go in a task of its worker
+// threads), to be freed on the main thread: nothing of AS3's is touched on another. Made once and never
+// destroyed, as a thread may free one while the game shuts down.
+struct FreedElsewhere {
+	std::mutex lock;
+	std::vector<ScriptInstance *> instances;
+	std::atomic<bool> any{ false }; // Read without the lock, so that the main thread takes it only when needed.
+};
+
+static FreedElsewhere &freed_elsewhere() {
+	static FreedElsewhere *freed = new FreedElsewhere();
+	return *freed;
+}
+
+static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
+	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+	if (kas3::on_main_thread()) {
+		free_instance(instance);
+		return;
+	}
+	FreedElsewhere &freed = freed_elsewhere();
+	const std::lock_guard<std::mutex> held(freed.lock);
+	freed.instances.push_back(instance);
+	freed.any.store(true, std::memory_order_release);
+}
+
+void kas3::free_instances_freed_elsewhere() {
+	FreedElsewhere &freed = freed_elsewhere();
+	if (!freed.any.load(std::memory_order_acquire)) {
+		return;
+	}
+	std::vector<ScriptInstance *> freeing;
+	{
+		const std::lock_guard<std::mutex> held(freed.lock);
+		freeing.swap(freed.instances);
+		freed.any.store(false, std::memory_order_relaxed);
+	}
+	for (ScriptInstance *instance : freeing) {
+		free_instance(instance);
+	}
 }
 
 // The script object being made by AS3's `new` (GodotHost::attach_new), for the script instance that its
@@ -396,6 +476,7 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	ScriptInstance *instance = new ScriptInstance();
 	instance->object = object;
 	instance->owner = p_owner;
+	instance->owner_id = ObjectID(p_owner->get_instance_id());
 	instance->script = Ref<AS3Script>(const_cast<AS3Script *>(p_script));
 	instance->counted = counted;
 	instances().insert(instance);

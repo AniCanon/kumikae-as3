@@ -2,6 +2,7 @@
 
 #include "builtins.h"
 #include "callable.h"
+#include "instance.h"
 #include "lower.h"
 #include "names.h"
 #include "script.h"
@@ -39,6 +40,8 @@ uint64_t Project::generation() {
 
 void Project::before_shutdown() {
 	forget_scenes();
+	free_instances_freed_elsewhere();
+	free_detached();
 	if (program && program->valid()) {
 		release_listeners();
 		program->interpreter().clear_globals();
@@ -127,6 +130,8 @@ Project &Project::get() {
 static const size_t COLLECTOR_WORK = 10000;
 
 void Project::collect_step() {
+	free_instances_freed_elsewhere();
+	free_detached();
 	if (program && program->valid_) {
 		program->interpreter_->collect_step(COLLECTOR_WORK);
 	}
@@ -237,6 +242,7 @@ void Project::reload() {
 				String::utf8(errors.c_str()));
 		return;
 	}
+	free_instances_freed_elsewhere(); // Before the instances are looked through: their objects are gone.
 	// Code that runs once (a constructor, a field's first value, `_ready`) does not run again for the
 	// objects that are alive: for an edit there to show, the scene is made again from its file.
 	Restart restart;
@@ -277,6 +283,8 @@ void Project::reload_now() {
 void Project::unload() {
 	// First, so that whatever is destroyed along with the program (a listener held through one of its
 	// static fields) knows the program is no longer there to be used.
+	free_instances_freed_elsewhere();
+	free_detached();
 	if (program && program->valid_) {
 		release_listeners(); // While the interpreter is still there to free what they hold.
 		// And what the program holds, with loops among it: freeing a Godot object can call back into the
@@ -287,6 +295,7 @@ void Project::unload() {
 	loads++;
 	delete program;
 	program = nullptr;
+	forget_reached();
 }
 
 uint32_t Project::class_of_file(std::string_view p_path) const {

@@ -9,7 +9,7 @@ called by the engine.
 | `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
 | `script_call.cpp` | Godot calling a function of a script object (`call_script`): the arguments counted, checked and converted, the result handed back |
-| `counted` | A script object whose Godot object is reference-counted (`counted_on`: a script whose base is Godot's Object, on a RefCounted, too): each lives while AS3 or Godot holds it |
+| `counted` | A script object whose Godot object is reference-counted (`counted_on`: a script whose base is Godot's Object, on a RefCounted, too): each lives while AS3 or Godot holds it. A script taken off its object ends the pair: AS3's hold on the Godot object is given back (a last one frees it at the end of the frame), and a script object AS3 still holds lives on alone, its handle on the Godot object keeping nothing |
 | `members` | What Godot reaches of a script by name: public fields to read and write (an Array or a Dictionary as a copy of Godot's), public getters and setters, public methods, and the lists of them with Godot's types |
 | `godot_host` | The interpreter's four interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_handles.cpp` | What an engine value is (`present`, `is_class`, `text`), how long it lives (`borrow`, `copy`, `drop`), and what the cycle collector sees of it (`node`, `node_edges`, `let_go`) |
@@ -35,7 +35,9 @@ called by the engine.
 - **A name Godot needs is made once and kept** (`GodotHost::name`). No `StringName` is built per call.
 - **Files are read through Godot** (`FileAccess`, `DirAccess`, `res://`), never the operating system's
   paths: an exported game keeps them in a pack.
-- **AS3 runs on the main thread.** A call from another thread is refused with a message.
+- **AS3 runs on the main thread.** A call from another thread (a method, a field, `toString`) is refused with
+  a message, and so is a script attached there; a script instance Godot frees there is freed on the main
+  thread, at the end of the frame.
 - **Every behaviour is compared with GDScript's** in `tests/godot_project/`: the driver prints what the AS3
   script gave beside what GDScript gives, and `tests/run_godot.py` checks they agree.
 - An Array or a Dictionary handed to Godot may be written by it: never hand the same one to two calls.

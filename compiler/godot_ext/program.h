@@ -91,11 +91,18 @@ bool joined_to_script(const godot::Object *p_owner);
 void script_edges(godot::RefCounted *p_counted, vm::EngineNode *r_node);
 
 // AS3 runs on one thread, the one the extension was started on. Godot can call a script from another (a
-// task given to its worker threads): such a call is refused, and said so, before it touches anything.
+// task given to its worker threads): such a call is refused, and said so, before it touches anything. A
+// script attached there is refused too (AS3Script::_instance_create).
 void note_main_thread();
 bool on_main_thread();
 // Reports the refusal: the function Godot tried to call.
 void refuse_thread(uint32_t p_function);
+// The program is unloaded: the names members.h's reach() keeps go, while Godot is there to free them.
+void forget_reached();
+// What Godot frees on another thread (a script instance, when an object's last reference goes in a worker's
+// task) is freed on the main thread: once a frame, before the instances are looked through (a reload), and
+// as Godot shuts down or the program is unloaded.
+void free_instances_freed_elsewhere();
 
 // Godot calling a function of a script object, from a method call or through a bound method: the arguments
 // in as the parameters expect them (refused, never bent to fit), the result out. An AS3 error ends here:

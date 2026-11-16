@@ -238,6 +238,29 @@ check("statics.gd: a call from a worker thread is refused and says so",
 check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not in output and "Godot has no" not in output,
       output[-900:])
 
+# A script reached from Godot's worker threads: what would run AS3 there is refused, and said so; what Godot
+# frees there is freed on the main thread.
+output = compare("threads.gd", [
+    "toString on the main thread", "toString from a worker is refused: Godot's own text",
+    "attached on a worker is refused: no script, no constructor run", "lists asked for on workers and on the main thread at once",
+    "scripts loaded on workers at once",
+    "freed on a worker: nothing of AS3's freed there",
+    "freed on a worker: freed on the main thread",
+])
+check("threads.gd: toString from a worker is refused and says so",
+      "Threaded/toString() was called by Godot from another thread" in output, output[-900:])
+check("threads.gd: a script attached on a worker is refused and says so",
+      "res://Threaded.as was not attached to a RefCounted: Godot attached it from another thread" in output, output[-900:])
+
+# The names Godot asks a script about: only those that reach something are kept, and none is left at exit
+# (Godot lists a name still held then, with --verbose).
+compare("names.gd", ["names that reach nothing are not kept", "a field is still reached"])
+run = subprocess.run([godot, "--headless", "--verbose", "--path", project, "-s", "names.gd"], capture_output=True, text=True,
+                     timeout=300)
+left = re.findall(r"Orphan StringName: (\S+)", run.stdout + run.stderr)
+check("names.gd: no name the script was asked about is left at exit",
+      not [name for name in left if name in ("n", "hello", "heard") or "_unreached_" in name], left[:20])
+
 
 # Int64 at Godot's edge, as GDScript works it out.
 output = compare("wide.gd", [
@@ -371,6 +394,8 @@ compare("kept.gd", [
     "freed when both let go", "freed when AS3 lets go", "given to Godot, alive while Godot holds them", "freed when Godot lets go",
     "made and forgotten in AS3", "a resource that listens to itself goes", "a listener on another node goes",
     "attached, kept while AS3 holds it", "attached, freed when AS3 lets go too",
+    "detached, AS3's hold given back", "detached, freed when Godot lets go", "detached and freed, to AS3 and Godot it is a freed object",
+    "detached by itself, freed once nothing holds it",
 ])
 # The cycle collector with such objects in loops: what nothing holds goes; what GDScript or AS3 holds stays
 # whole, its fields with it.
@@ -414,7 +439,7 @@ compare("events.gd", [
 output = compare("accessors.gd", [
     "getter", "setter", "setter ran once", "get by name", "set by name", "getter alone", "no setter, no change",
     "setter alone", "setter alone reads as nothing", "a Godot value", "a value of the wrong kind is refused", "compound",
-    "through an interface", "a getter's error reads as nothing", "a native property still", "a native property set",
+    "through an interface", "an accessor is no method by its AS3 name", "a getter's error reads as nothing", "a native property still", "a native property set",
 ])
 check("a getter's error is reported as a script's own", re.search(r"SCRIPT ERROR: Error: broken getter[^\n]*\n(\s+at [^\n]+\n)*\s+at: Accessors/get broken\(\)", output) is not None, output[-900:])
 

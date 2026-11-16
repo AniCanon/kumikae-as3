@@ -9,6 +9,7 @@
 struct ScriptInstance {
 	kas3::vm::Object *object;
 	godot::Object *owner;
+	godot::ObjectID owner_id; // To find the owner again where it may be gone (an instance freed on another thread).
 	godot::Ref<AS3Script> script; // Kept alive for as long as anything runs it.
 	// On a reference-counted object (counted_on()) the instance does not hold its script object: the
 	// program's references do. While the program has any, the instance holds one reference to the Godot
@@ -30,6 +31,9 @@ void counted_attached(ScriptInstance *p_instance);
 void hold_if_referenced(vm::Object *p_object);
 // Godot frees the object a counted instance is on: its script object goes too, now.
 void counted_freed(ScriptInstance *p_instance);
+// The Godot objects whose last reference a script gave back as it was taken off them are freed: once a
+// frame, and as Godot shuts down. On the main thread, outside any call of Godot's.
+void free_detached();
 // A reload gave the instance its object in the new program.
 void counted_moved(const vm::Object *p_old, ScriptInstance *p_instance);
 

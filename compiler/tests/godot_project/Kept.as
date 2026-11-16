@@ -27,6 +27,10 @@ package {
 		}
 		public function heldN():int { return Counted.held ? Counted.held.n : -1; }
 		public function letGoOfHeld():void { Counted.held = null; }
+		public function detachHeld():void { Counted.held.detach(); }
+		public function heldCount():int { return Counted.held.getReferenceCount(); }
+		public function heldItself():Counted { return Counted.held; }
+		public function heldInArray():Array { return [Counted.held]; }
 		public function makeAndForget():Int64 { var lost:Counted = new Counted(); return lost.getInstanceID(); }
 		public function selfListening():Int64 {
 			var made:Stored = new Stored();

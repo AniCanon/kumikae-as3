@@ -10,26 +10,53 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <mutex>
 #include <unordered_set>
+#include <vector>
 
 using namespace godot;
 using kas3::Project;
 
-static std::unordered_set<AS3Script *> &scripts() {
-	static std::unordered_set<AS3Script *> all;
-	return all;
+// Every script resource there is. Godot loads them on any thread (a scene loaded in a thread loads its
+// scripts there, several at once), so the set is changed and looked through under a lock. Made once and
+// never destroyed, as a thread may free a script while the game shuts down.
+struct AllScripts {
+	std::mutex lock;
+	std::unordered_set<AS3Script *> scripts;
+};
+
+static AllScripts &all_scripts() {
+	static AllScripts *all = new AllScripts();
+	return *all;
 }
 
 AS3Script::AS3Script() {
-	scripts().insert(this);
+	AllScripts &all = all_scripts();
+	const std::lock_guard<std::mutex> held(all.lock);
+	all.scripts.insert(this);
 }
 
 AS3Script::~AS3Script() {
-	scripts().erase(this);
+	AllScripts &all = all_scripts();
+	const std::lock_guard<std::mutex> held(all.lock);
+	all.scripts.erase(this);
 }
 
 void AS3Script::refresh_all() {
-	for (AS3Script *script : scripts()) {
+	// Held while each is refreshed, outside the lock: refreshing one calls into Godot. One being freed (its
+	// count gone to zero) gives a null reference, and is passed over.
+	std::vector<Ref<AS3Script>> scripts;
+	{
+		AllScripts &all = all_scripts();
+		const std::lock_guard<std::mutex> held(all.lock);
+		scripts.reserve(all.scripts.size());
+		for (AS3Script *script : all.scripts) {
+			if (Ref<AS3Script> kept(script); kept.is_valid()) {
+				scripts.push_back(kept);
+			}
+		}
+	}
+	for (const Ref<AS3Script> &script : scripts) {
 		if (!script->file_.empty()) {
 			script->set_file(String::utf8(script->file_.c_str()));
 		}
@@ -97,6 +124,14 @@ StringName AS3Script::_get_instance_base_type() const {
 }
 
 void *AS3Script::_instance_create(Object *p_for_object) const {
+	if (!kas3::on_main_thread()) {
+		// Not made later on the main thread: until then the object would have a script that is not there, and
+		// what Godot does next on this thread (a loaded resource's values set) is refused anyway.
+		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(file_.c_str()) + " was not attached to a " +
+				p_for_object->get_class() + ": Godot attached it from another thread (a task of its worker threads, or a resource " +
+				"loaded in a thread). AS3 runs on the main thread only: attach it, or load what has it, there.");
+		return nullptr;
+	}
 	if (class_ == kas3::ir::NONE) {
 		return nullptr;
 	}
