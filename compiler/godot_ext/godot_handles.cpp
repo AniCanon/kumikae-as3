@@ -25,7 +25,7 @@ static constexpr size_t SPARE_HANDLES = 4096; // The most kept; more are freed.
 
 void *handle_memory() {
 	std::vector<void *> &spare = spare_handles();
-	if (spare.empty() || !on_main_thread()) {
+	if (!on_main_thread() || spare.empty()) {
 		return ::operator new(sizeof(Variant));
 	}
 	void *memory = spare.back();
@@ -35,7 +35,7 @@ void *handle_memory() {
 
 void free_handle_memory(void *p_memory) {
 	std::vector<void *> &spare = spare_handles();
-	if (spare.size() >= SPARE_HANDLES || !on_main_thread()) {
+	if (!on_main_thread() || spare.size() >= SPARE_HANDLES) {
 		::operator delete(p_memory);
 		return;
 	}
