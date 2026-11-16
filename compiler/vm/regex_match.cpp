@@ -106,6 +106,9 @@ class Matcher {
 	bool same_text(int32_t p_from, int32_t p_to, int32_t *r_at, bool p_fold) const;
 	bool look(const Instruction &p_in, uint32_t p_pc, int32_t *r_at);
 	bool step(const Instruction &p_in, uint32_t *r_pc, int32_t *r_at);
+	bool takes(const Instruction &p_in, char16_t p_unit) const;
+	bool holds(const Instruction &p_in, int32_t p_at) const;
+	void clear(uint32_t p_first, uint32_t p_end);
 
 public:
 	Matcher(const Program &p_program, std::u16string_view p_text, const Limits &p_limits, std::vector<int32_t> &r_slots) :
@@ -142,37 +145,23 @@ int32_t Matcher::run(uint32_t p_pc, int32_t p_at) {
 // One instruction: true, and where to go on, or false if the search must go back.
 bool Matcher::step(const Instruction &p_in, uint32_t *r_pc, int32_t *r_at) {
 	const int32_t at = *r_at;
-	const bool inside = at < static_cast<int32_t>(text_.size());
-	const char16_t unit = inside ? text_[at] : 0;
-	const char16_t before = at > 0 ? text_[at - 1] : 0;
-	bool taken = false; // A unit matched, and the search goes on after it.
 	switch (p_in.code) {
 		case Code::Unit:
-			taken = inside && (p_in.flag ? canonical(unit) : unit) == p_in.a;
-			break;
 		case Code::Any:
-			taken = inside && (p_in.flag || !is_line_break(unit));
-			break;
 		case Code::Set:
-			taken = inside && in_set(program_.sets[p_in.a], unit, (program_.flags & IGNORE_CASE) != 0) != p_in.flag;
+			// A unit matched, and the search goes on after it.
+			if (at >= static_cast<int32_t>(text_.size()) || !takes(p_in, text_[at])) {
+				return false;
+			}
+			*r_at = at + 1;
 			break;
 		case Code::LineStart:
-			if (!(at == 0 || (p_in.flag && is_line_break(before)))) {
-				return false;
-			}
-			break;
 		case Code::LineEnd:
-			if (!(!inside || (p_in.flag && is_line_break(unit)))) {
+		case Code::Boundary:
+			if (!holds(p_in, at)) {
 				return false;
 			}
 			break;
-		case Code::Boundary: {
-			const bool edge = (at > 0 && is_word(before)) != (inside && is_word(unit));
-			if (edge == p_in.flag) {
-				return false;
-			}
-			break;
-		}
 		case Code::Split:
 			stack_.push_back({ false, p_in.b, at });
 			*r_pc = p_in.a;
@@ -184,11 +173,7 @@ bool Matcher::step(const Instruction &p_in, uint32_t *r_pc, int32_t *r_at) {
 			write(p_in.a, at);
 			break;
 		case Code::Clear:
-			for (uint32_t slot = p_in.a; slot < p_in.b; slot++) {
-				if (slots_[slot] != -1) {
-					write(slot, -1);
-				}
-			}
+			clear(p_in.a, p_in.b);
 			break;
 		case Code::Mark:
 			write(p_in.a | REGISTER, at);
@@ -215,14 +200,46 @@ bool Matcher::step(const Instruction &p_in, uint32_t *r_pc, int32_t *r_at) {
 		case Code::Match:
 			return false;
 	}
-	if (p_in.code == Code::Unit || p_in.code == Code::Any || p_in.code == Code::Set) {
-		if (!taken) {
-			return false;
-		}
-		*r_at = at + 1;
-	}
 	(*r_pc)++;
 	return true;
+}
+
+// Whether Unit, Any or Set takes the unit.
+bool Matcher::takes(const Instruction &p_in, char16_t p_unit) const {
+	switch (p_in.code) {
+		case Code::Unit:
+			return (p_in.flag ? canonical(p_unit) : p_unit) == p_in.a;
+		case Code::Any:
+			return p_in.flag || !is_line_break(p_unit);
+		default:
+			return in_set(program_.sets[p_in.a], p_unit, (program_.flags & IGNORE_CASE) != 0) != p_in.flag;
+	}
+}
+
+// Whether LineStart, LineEnd or Boundary holds at p_at.
+bool Matcher::holds(const Instruction &p_in, int32_t p_at) const {
+	const bool inside = p_at < static_cast<int32_t>(text_.size());
+	const char16_t unit = inside ? text_[p_at] : 0;
+	const char16_t before = p_at > 0 ? text_[p_at - 1] : 0;
+	switch (p_in.code) {
+		case Code::LineStart:
+			return p_at == 0 || (p_in.flag && is_line_break(before));
+		case Code::LineEnd:
+			return !inside || (p_in.flag && is_line_break(unit));
+		default: {
+			const bool edge = (p_at > 0 && is_word(before)) != (inside && is_word(unit));
+			return edge != p_in.flag;
+		}
+	}
+}
+
+// Clear: the slots from p_first up to p_end that a group set are unset, each write kept to be undone.
+void Matcher::clear(uint32_t p_first, uint32_t p_end) {
+	for (uint32_t slot = p_first; slot < p_end; slot++) {
+		if (slots_[slot] != -1) {
+			write(slot, -1);
+		}
+	}
 }
 
 // What a group took, again from *r_at; a group that took no part takes nothing (15.10.2.9).
