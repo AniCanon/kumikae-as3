@@ -30,6 +30,10 @@ native_skipped.txt lists the programs skipped and why. A program that is skipped
 it and not skipped, fails: support is never lost unseen, and the list never goes stale. --update rewrites it;
 read the result before committing it.
 
+It runs at most four compilers at once unless --jobs says otherwise: it is one of several test groups run
+side by side, and must leave them room. A step that takes too long (a compiler, a program) is that
+program's failure, by name.
+
 Prints the programs skipped, by operation, then `native: P passed, S skipped, F failed`.
 """
 import concurrent.futures
@@ -46,6 +50,19 @@ FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off
 # one by itself; the others are told to).
 LIBRARY_FLAGS = ["-shared", "-fPIC", "-fvisibility=hidden"] + ([] if sys.platform == "darwin" else ["-Wl,-z,defs"])
 NOT_YET = "kas3c: not yet supported: "
+MOST_JOBS = 4
+
+
+def step(what, command, seconds, **more):
+    """A command run to its end, or None if it took longer than it may: the caller says whose failure that is."""
+    try:
+        return subprocess.run(command, capture_output=True, text=True, timeout=seconds, **more)
+    except subprocess.TimeoutExpired:
+        timed_out.append("%s took more than %d seconds" % (what, seconds))
+        return None
+
+
+timed_out = []
 
 
 def options(arguments):
@@ -84,10 +101,9 @@ def precompiled():
     header = os.path.join(folder_, "kas3_all.h")
     with open(header, "w") as handle:
         handle.write('#define KAS3_PROGRAM_LIBRARY 1\n#include "kas3.h"\n\n#include <cmath>\n#include <cstdint>\n#include <limits>\n')
-    built = subprocess.run([given["--cxx"][0], *FLAGS, *given["--flag"], *includes, "-x", "c++-header", header, "-o", header + ".gch"],
-                           capture_output=True, text=True, timeout=600)
-    if built.returncode != 0:
-        sys.exit("the runtime's headers did not build\n" + built.stderr[-4000:])
+    built = step("the runtime's headers", [given["--cxx"][0], *FLAGS, *given["--flag"], *includes, "-x", "c++-header", header, "-o", header + ".gch"], 600)
+    if built is None or built.returncode != 0:
+        sys.exit("the runtime's headers did not build\n" + (built.stderr[-4000:] if built else timed_out[-1]))
     return ["-include", header]
 
 
@@ -98,7 +114,10 @@ def expected(path, missing=""):
 def build(files, sources_in, out):
     """The files as an executable in out: ("", what kas3c said), ("skipped", operation) or ("failed", why)."""
     shutil.rmtree(out, ignore_errors=True)
-    written = subprocess.run([kas3c, "cpp", *files, "-o", out], capture_output=True, text=True, cwd=sources_in, timeout=120)
+    name = os.path.basename(out)
+    written = step("%s: kas3c cpp" % name, [kas3c, "cpp", *files, "-o", out], 120, cwd=sources_in)
+    if written is None:
+        return "failed", "kas3c cpp took more than 120 seconds"
     lines = written.stderr.splitlines()
     if written.returncode != 0:
         if lines and lines[-1].startswith(NOT_YET):
@@ -107,12 +126,14 @@ def build(files, sources_in, out):
     executable = os.path.join(out, "program")
     sources = sorted(glob.glob(os.path.join(out, "*.cpp")))
     library = os.path.join(out, "libprogram.dylib" if sys.platform == "darwin" else "libprogram.so")
-    built = subprocess.run([given["--cxx"][0], *FLAGS, *given["--flag"], *LIBRARY_FLAGS, *includes, *headers, *sources, "-o", library],
-                           capture_output=True, text=True, timeout=600)
+    built = step("%s: the C++ build" % name, [given["--cxx"][0], *FLAGS, *given["--flag"], *LIBRARY_FLAGS, *includes, *headers, *sources, "-o", library], 600)
+    if built is None:
+        return "failed", "the C++ took more than 600 seconds to build"
     if built.returncode != 0:
         return "failed", "the C++ did not build\n" + built.stderr[-4000:]
-    linked = subprocess.run([given["--cxx"][0], *given["--flag"], library, *given["--lib"], "-Wl,-rpath," + out, "-o", executable],
-                            capture_output=True, text=True, timeout=600)
+    linked = step("%s: the link" % name, [given["--cxx"][0], *given["--flag"], library, *given["--lib"], "-Wl,-rpath," + out, "-o", executable], 600)
+    if linked is None:
+        return "failed", "the program took more than 600 seconds to link"
     if linked.returncode != 0:
         return "failed", "the program did not link\n" + linked.stderr[-4000:]
     return "", written.stderr
@@ -148,7 +169,7 @@ if given["--only"]:
     names = [name for name in names if name in given["--only"]]
 includes = [flag for folder_ in given["--include"] for flag in ("-I", folder_)]
 headers = precompiled()
-jobs = int(given["--jobs"][0]) if given["--jobs"] else (os.cpu_count() or 4)
+jobs = int(given["--jobs"][0]) if given["--jobs"] else min(MOST_JOBS, os.cpu_count() or MOST_JOBS)
 with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
     outcomes = dict(zip(names, pool.map(one, names)))
 
@@ -157,9 +178,11 @@ skipped = {name: why for name, (what, why) in outcomes.items() if what == "skipp
 passed = sum(1 for what, _ in outcomes.values() if what == "passed")
 
 if outcomes.get("deep_frames", ("", ""))[0] == "passed":
-    small = subprocess.run([os.path.join(work, "deep_frames", "program")], capture_output=True, text=True, cwd=folder, timeout=120,
-                           env=dict(environment, KAS3_STACK_KB="4096"))
-    if small.returncode != 1 or "Error #1023" not in small.stderr or "9968 more" in small.stderr:
+    small = step("deep_frames with a small stack", [os.path.join(work, "deep_frames", "program")], 120, cwd=folder,
+                 env=dict(environment, KAS3_STACK_KB="4096"))
+    if small is None:
+        failures.append("deep_frames with a small stack ran for more than 120 seconds")
+    elif small.returncode != 1 or "Error #1023" not in small.stderr or "9968 more" in small.stderr:
         failures.append("deep_frames with a small stack: exit %d\n%s" % (small.returncode, small.stderr[-600:]))
 
 
@@ -169,7 +192,9 @@ def counted(name):
     what, said = build([name + ".as"], os.path.join(tests, "bench"), out)
     if what:
         return "%s: %s" % (what, said)
-    ran = subprocess.run([os.path.join(out, "program")], capture_output=True, text=True, timeout=300, env=dict(environment, KAS3_NATIVE_COUNTS="1"))
+    ran = step("bench/%s" % name, [os.path.join(out, "program")], 300, env=dict(environment, KAS3_NATIVE_COUNTS="1"))
+    if ran is None:
+        return "it ran for more than 300 seconds"
     found = [line for line in ran.stderr.splitlines() if line.startswith("kas3: counts ")]
     if ran.returncode != 0 or len(found) != 1:
         return "exit %d, and no counts:\n%s" % (ran.returncode, ran.stderr[-600:])
