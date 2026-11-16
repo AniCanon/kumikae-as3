@@ -38,8 +38,9 @@ bool FunctionWriter::by_library(const Instruction &p_in) {
 	if (entry.has_more) {
 		values += (count++ ? ", " : "") + ("slot(static_cast<uint32_t>(" + std::to_string(entry.more) + "))");
 	}
-	mark();
+	// One statement, the line it is at set inside it: it may be what follows an `else`.
 	line("{");
+	mark();
 	line("const Slot t[] = { " + values + (count ? ", " : "") + "empty() };"); // One more than given: no array is empty.
 	// With no register for what it gives, the function lets go of it.
 	if (gives) {

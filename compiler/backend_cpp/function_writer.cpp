@@ -180,8 +180,9 @@ void FunctionWriter::by_thunk(const Instruction &p_in) {
 
 void FunctionWriter::raw_thunk(const Instruction &p_in) {
 	const ThunkUse use = thunks_.use(function_, p_in);
-	mark();
+	// One statement, the line it is at set inside it: it may be what follows an `else`.
 	line("{");
+	mark();
 	std::string given = "nullptr";
 	if (!use.given.empty()) {
 		std::string slots;
