@@ -24,6 +24,11 @@ _mapping_spec.loader.exec_module(_mapping)
 Result = namedtuple("Result", "passed output duration")
 
 
+def summary(details):
+    """A failure's one line for the results tree: the first of its details that says anything."""
+    return next((line.strip() for line in details.splitlines() if line.strip()), "Assertion failed")
+
+
 def escape(value):
     result = str(value)
     for original, replacement in [("|", "||"), ("'", "|'"), ("\n", "|n"), ("\r", "|r"), ("[", "|["), ("]", "|]")]:
@@ -221,7 +226,7 @@ def main():
                     if kind == "testStarted":
                         attributes["locationHint"] = _mapping.location(root, case, suite_name, name)
                     if kind == "testFailed":
-                        attributes.update(message=details or "Assertion failed", details=details)
+                        attributes.update(message=summary(details), details=details)
                     message(event, **attributes)
                 if not result.passed and not any(event[0] == "testFailed" for event in events):
                     message("testStarted", name=case["name"], locationHint=location)

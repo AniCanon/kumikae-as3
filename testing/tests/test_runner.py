@@ -28,6 +28,14 @@ class RunnerTest(unittest.TestCase):
                 result = runner.run_case(root, {"name": "case", "command": command, "marker": "DONE", "timeout": 0.1})
                 self.assertEqual(result.passed, expected, result.output)
 
+    def test_failure_summary_is_one_line_of_the_details(self):
+        # The details may be a whole stack trace: the tree's one line is its first, the rest stays in details.
+        self.assertEqual(runner.summary("Error: boom\n\tat Case/run()[tests/Case.as:3]\n\tat Suite/run()[Suite.as:9]"), "Error: boom")
+        self.assertEqual(runner.summary("\n  expected 2, got 3  \nmore"), "expected 2, got 3")
+        self.assertEqual(runner.summary("plain"), "plain")
+        self.assertEqual(runner.summary(""), "Assertion failed")
+        self.assertEqual(runner.summary(" \n\t\n"), "Assertion failed")
+
     def test_manifest_rejects_duplicate_names_and_empty_suite(self):
         for value in [{"version": 1, "tests": []}, {"version": 1, "tests": [{"name": "x"}, {"name": "x"}]}]:
             with self.assertRaises(ValueError):
