@@ -31,3 +31,12 @@ func vec(n: int) -> float:
 		v = v + d * 0.5
 		v = v.normalized() * 3.0
 	return v.x
+func vec3(n: int) -> float:
+	var v := Vector3.ZERO
+	var d := Vector3(0.5, 0.25, 0.125)
+	var sum := 0.0
+	for i in n:
+		v = v + d * 0.5
+		v = v.normalized() * 3.0
+		sum += v.dot(d)
+	return sum

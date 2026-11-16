@@ -463,6 +463,10 @@ public:
 	size_t kept_traces() const { return kept_traces_.size(); }
 	// For a debugger: the frames, innermost last.
 	size_t depth() const { return frames_.size(); }
+	// For a host whose native code called the engine itself, with no instruction of this interpreter's
+	// around the call: the error a listener left for that call (carried, or as the running instruction's
+	// own), given up to the host with its trace. False if there is none, or it is one that stops the run.
+	bool take_carried(NativeError *r_error);
 	const ir::Function &function_at(size_t p_frame) const { return module_.functions[frames_[p_frame].function]; }
 	// The line (from 1) the frame is at.
 	int line_at(size_t p_frame) const;

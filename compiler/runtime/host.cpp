@@ -3,11 +3,14 @@
 #include "fast.h"
 #include "held.h"
 
+#include <cstdio>
+#include <cstdlib>
 
 namespace kas3 {
 namespace rt {
 
 using ir::Kind;
+using ir::Op;
 
 static_assert(MAX_DEPTH == vm::Interpreter::MAX_FRAMES, "generated code and the interpreter overflow at the same depth");
 static_assert(NONE == ir::NONE, "the program table and the IR write `none` alike");
@@ -31,6 +34,9 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	for (const ir::Class &klass : module.classes) {
 		made_here.push_back(klass.element == Kind::Void && !klass.table && !klass.is_interface && klass.native_base.empty());
 	}
+	if (std::getenv("KAS3_NATIVE_COUNTS")) {
+		thunk_counts.assign(module.functions.size() - program.function_count, 0);
+	}
 	resolved.resize(program.use_count);
 	names.assign(program.name_count, nullptr);
 	context.resolved = resolved.data();
@@ -40,6 +46,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	context.class_used = class_used.data();
 	context.classes = program.classes;
 	context.program = &program;
+	context.api = runtime_api();
 	context.host = this;
 }
 
@@ -51,7 +58,39 @@ void Host::clear_globals() {
 	}
 }
 
+// What a thunk asks of the library, for the counts: the operation, and Godot's name where it asks Godot.
+static std::string asked_of(const ir::Module &p_module, const ir::Instruction &p_in) {
+	std::string text = ir::op_name(p_in.op);
+	const bool by_b = p_in.op == Op::HostCall || p_in.op == Op::HostNew || p_in.op == Op::HostOperate || p_in.op == Op::HostSet ||
+			p_in.op == Op::HostSingleton || p_in.op == Op::HostConstant || p_in.op == Op::HostCallStatic;
+	const uint32_t name = by_b ? p_in.b : p_in.op == Op::HostGet ? p_in.c : NONE;
+	if (name < p_module.engine_names.size()) {
+		text += " " + (p_module.engine_names[name].key.empty() ? p_module.engine_names[name].name : p_module.engine_names[name].key);
+	}
+	return text;
+}
+
+void Host::say_counts() const {
+	uint64_t all = 0;
+	for (uint64_t each : thunk_counts) {
+		all += each;
+	}
+	std::fprintf(stderr, "kas3: counts thunks=%llu unresolved=%zu\n", static_cast<unsigned long long>(all), unresolved.size());
+	for (size_t i = 0; i < thunk_counts.size(); i++) {
+		if (thunk_counts[i]) {
+			const std::string what = asked_of(module, module.functions[thunk_function(static_cast<uint32_t>(i))].code[0]);
+			std::fprintf(stderr, "kas3:   %llu %s\n", static_cast<unsigned long long>(thunk_counts[i]), what.c_str());
+		}
+	}
+	for (uint32_t use : unresolved) {
+		std::fprintf(stderr, "kas3:   unresolved %s\n", asked_of(module, module.functions[thunk_function(program.uses[use])].code[0]).c_str());
+	}
+}
+
 Host::~Host() {
+	if (!thunk_counts.empty()) {
+		say_counts();
+	}
 	Host::clear_globals();
 	if (context.failing) {
 		interpreter->discard(Kind::Any, context.pending);
@@ -125,6 +164,9 @@ Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 		return empty();
 	}
 	const uint32_t function = host.thunk_function(p_thunk);
+	if (KAS3_UNLIKELY(!host.thunk_counts.empty())) {
+		host.thunk_counts[p_thunk]++;
+	}
 	Slot *const outer = host.updated;
 	host.updated = r_updated;
 	host.nesting++;

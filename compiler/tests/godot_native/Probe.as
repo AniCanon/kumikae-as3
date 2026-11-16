@@ -2,14 +2,136 @@ package {
 	import godot.*;
 
 	// Run twice by run_godot.py, by the interpreter and as native code: what each method gives must be the
-	// same text. The interpreter asks Godot for every operation on a Vector2, so the same text also says
-	// that the runtime's own maths for it (runtime/godot_values.h) is Godot's to the last bit.
+	// same text. The interpreter asks Godot for every operation on one of its values, so the same text also
+	// says that the runtime's own maths (runtime/godot_values.h) is Godot's to the last bit.
 	public class Probe extends Node2D {
 		private var total:Number = 0;
 		private var kept:Vector2 = new Vector2(1.5, -2.25);
 		private var log:Array = [];
 		private var heard:Array = [];
 		[Signal] public var struck:Signal;
+
+		// A function value that gives one of Godot's values or objects, called every way there is, and
+		// `arguments` of a function whose parameters are such values.
+		private function giveVector():Vector2 {
+			return new Vector2(5, 6);
+		}
+
+		private function giveNode():Node2D {
+			return this;
+		}
+
+		private function giveNothing():Node2D {
+			return null;
+		}
+
+		private function echo(at:Vector2, node:Node2D, deep:Vector3):String {
+			return arguments[0] + " " + (arguments[1] === node) + " " + arguments[2] + " " + arguments.length;
+		}
+
+		public function given():String {
+			var out:Array = [];
+			var vector:Function = giveVector;
+			var untyped:* = vector();
+			var typed:Vector2 = vector();
+			out.push(untyped, typed.x, vector.call(null));
+			var node:Function = giveNode;
+			var found:* = node();
+			var same:Node2D = node();
+			out.push(found === this, same === this, node.call(null) === this);
+			var nothing:Function = giveNothing;
+			out.push(nothing(), nothing() === null);
+			out.push(echo(new Vector2(1, 2), this, new Vector3(1, 2, 3)));
+			return out.join("|");
+		}
+
+		// An error raised by a listener while Godot runs a method this function called on bare values: it
+		// comes out of that call, to this function's catch, after its finally.
+		private var raising:Boolean = false;
+
+		private function onShown():void {
+			if (raising) {
+				throw new Error("in listener");
+			}
+		}
+
+		public function carried():String {
+			var said:String = "";
+			visibilityChanged.add(onShown);
+			raising = true;
+			try {
+				try {
+					hide();
+					said += "after-hide ";
+				} finally {
+					said += "finally ";
+				}
+			} catch (e:Error) {
+				said += "caught " + e.message;
+			}
+			raising = false;
+			show();
+			return said + " end " + visible;
+		}
+
+		// Each of Godot's value types that has parts: made, its parts read and written, its operators, a
+		// method or two, a constant. Native code holds each in a local as the bytes Godot holds, and asks
+		// Godot's own code for the type with nothing between, or does the same sums itself.
+		public function values():String {
+			var out:Array = [];
+			var a2:Vector2 = new Vector2(0.1, -7.3);
+			var b2:Vector2 = new Vector2(3.3, 1e-3);
+			out.push(a2.dot(b2), a2.distanceTo(b2), a2.angle(), a2.lerp(b2, 0.3), -a2, a2 * b2, a2 == b2, a2 != b2, Vector2.ONE, a2.abs());
+			var i2:Vector2i = new Vector2i(7, -3);
+			var j2:Vector2i = new Vector2i(2, 5);
+			i2.x += 4;
+			out.push(i2 + j2, i2 - j2, i2 * j2, i2 * 3, i2.x, i2.y, i2 == j2, i2.lengthSquared());
+			var a3:Vector3 = new Vector3(0.1, 0.7, -3.3);
+			var b3:Vector3 = new Vector3(12345.678, -0.000123, 1 / 3);
+			a3.z += 0.25;
+			out.push(a3 + b3, a3 - b3, a3 * 0.37, a3 / 3.3, a3 * b3, a3.cross(b3), a3.dot(b3), a3.length(), a3.normalized(), a3.x, a3.y, a3.z);
+			out.push(Vector3.UP, a3.lerp(b3, 0.25), a3.distanceTo(b3), -a3, a3 == a3, a3 != b3);
+			var triples:Array = [0.1, 0.7, -3.3, 1e-20, 12345.678, -0.000123, 0, 0, 0, 1e19, 1e19, -1e19, 3, 4, 12, 1 / 3, -2 / 3, 1 / 7];
+			for (var t:int = 0; t < triples.length; t += 3) {
+				var p3:Vector3 = new Vector3(triples[t], triples[t + 1], triples[t + 2]);
+				var q3:Vector3 = new Vector3(triples[t + 2] * 1.7, triples[t] - 0.3, triples[t + 1] / 0.9);
+				out.push(p3 + q3, p3 - q3, p3 * 0.37, p3 / 3.3, p3.dot(q3), p3.cross(q3), p3.length(), p3.normalized(), p3.normalized().length());
+				out.push(new Vector2(triples[t], triples[t + 1]).dot(new Vector2(triples[t + 2], 0.3)));
+			}
+			var i3:Vector3i = new Vector3i(1, -2, 3);
+			out.push(i3 + i3, i3 * 4, i3.z, i3 == new Vector3i(1, -2, 3));
+			var a4:Vector4 = new Vector4(0.5, 1.5, -2.5, 1e-7);
+			var b4:Vector4 = new Vector4(4, 3, 2, 1);
+			out.push(a4 + b4, a4 * 0.1, a4.dot(b4), a4.length(), a4.w, new Vector4i(1, 2, 3, 4) + new Vector4i(4, 3, 2, 1));
+			var tint:Color = new Color(0.1, 0.2, 0.3, 0.4);
+			var plain:Color = new Color(1, 0.5, 0.25);
+			tint.g = 0.9;
+			out.push(tint + plain, tint * 0.5, tint.lerp(plain, 0.3), tint.r, tint.g, tint.b, tint.a, plain.a, tint == plain, Color.WHITE);
+			var box:Rect2 = new Rect2(1.5, 2.5, 10, 20);
+			var other:Rect2 = new Rect2(new Vector2(5, 5), new Vector2(2.5, 100));
+			out.push(box.position, box.size, box.end, box.hasPoint(a2), box.hasPoint(new Vector2(2, 3)), box.grow(0.5), box.intersection(other),
+					box.getArea(), box == other, new Rect2i(1, 2, 3, 4).size);
+			var turn:Quaternion = new Quaternion(0.1, 0.2, 0.3, 0.9);
+			var unit:Quaternion = turn.normalized();
+			out.push(unit, unit.length(), unit * unit, unit.x, unit.w, unit * a3);
+			var frame:Basis = new Basis();
+			var spun:Basis = frame.rotated(new Vector3(0, 1, 0), 0.5);
+			out.push(spun, spun * a3, spun.x, spun.determinant(), spun * spun, spun == frame);
+			var flat:Transform2D = new Transform2D();
+			flat.origin = new Vector2(3, 4);
+			out.push(flat, flat * a2, flat.origin, flat.rotated(0.25), flat.x);
+			var deep:Transform3D = new Transform3D();
+			deep.origin = b3;
+			out.push(deep * a3, deep.origin, deep.basis, deep.translated(a3).origin);
+			var room:AABB = new AABB(new Vector3(0, 0, 0), new Vector3(1, 2, 3));
+			out.push(room.hasPoint(new Vector3(0.5, 1, 2)), room.hasPoint(b3), room.size, room.end, room.getVolume());
+			var wall:Plane = new Plane(0, 1, 0, 2.5);
+			out.push(wall.distanceTo(a3), wall.normal, wall.d, wall.isPointOver(a3));
+			var lens:Projection = new Projection();
+			out.push(lens.x, lens.determinant(), lens * a4);
+			out.push(new Vector2(), new Vector3i(), new Color(), new Quaternion(), new Plane(), new Rect2(), new AABB(), new Vector4());
+			return out.join(" ");
+		}
 
 		// Every operation generated code does inline on a Vector2, on values a float can't hold exactly,
 		// on large and small ones, and on the zero vector.
@@ -110,6 +232,46 @@ package {
 		private function second(n:int):void {
 			heard.push("second " + n);
 			throw new Error("from the second");
+		}
+
+		// The script's own Godot object is freed in the middle of a method (the killer does it, when asked),
+		// and the method goes on using it: what is asked of it from then on is asked of nothing. From
+		// _process, because Godot refuses to free an object while a call it was asked to make is running.
+		public var killer:Node;
+
+		override public function _process(delta:Number):void {
+			if (killer == null) {
+				return;
+			}
+			var asked:Node = killer;
+			killer = null;
+			var out:Array = [];
+			position = new Vector2(1, 2);
+			out.push(position.x);
+			asked.call("kill");
+			try {
+				out.push(position.x);
+			} catch (e:Error) {
+				out.push("read: " + e.message);
+			}
+			try {
+				position = new Vector2(3, 4);
+				out.push("moved");
+			} catch (e:Error) {
+				out.push("move: " + e.message);
+			}
+			try {
+				rotation = 1;
+				out.push("written");
+			} catch (e:Error) {
+				out.push("write: " + e.message);
+			}
+			try {
+				out.push(isInsideTree());
+			} catch (e:Error) {
+				out.push("call: " + e.message);
+			}
+			asked.call("report", out.join("|"));
 		}
 
 		private var mute:Boolean = false;

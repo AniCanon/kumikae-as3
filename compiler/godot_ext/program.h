@@ -50,6 +50,11 @@ public:
 	bool valid() const { return valid_; }
 	vm::Interpreter &interpreter() { return native_ ? native_->interpreter() : *interpreter_; }
 	bool native() const { return native_ != nullptr; }
+	void instance_freed() {
+		if (native_) {
+			native_->instance_freed();
+		}
+	}
 	GodotHost &host() { return host_; }
 	const ir::Module &module() const { return *module_; }
 	// The scripts were edited while the game runs: they are compiled again and, if they compile, every

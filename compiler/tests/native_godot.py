@@ -1,0 +1,146 @@
+"""Generated code inside Godot, for run_godot.py: scripts built into a program library and run by the
+extension in the interpreter's place (KAS3_PROGRAM_LIBRARY).
+
+Two things are held:
+
+  probe      tests/godot_native's Probe.as says, as native code, what it says interpreted, line for line.
+  workloads  each workload of tests/bench/languages' CmpAs.as, run small, stays on the fast paths.
+
+The second is by the host's counts (KAS3_NATIVE_COUNTS): how many times generated code left an operation
+to the library (a thunk), and how many of the places it asks Godot directly the host could not work out.
+`native_counts.txt` beside each script holds the two numbers, which do not grow with a loop: a change that
+loses a fast path makes the first thousands, and fails here and not only in a timing. When a number is
+meant to change, the failure says what was counted; write that into the file.
+"""
+import glob
+import os
+import shutil
+import subprocess
+import tempfile
+
+# What generated code is built with (the design's flags), as strictly as our own, into a library that
+# shows one symbol and needs none of ours.
+FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops", "-Wall", "-Wextra", "-Werror",
+         "-fvisibility=hidden", "-shared"]
+# The editor's first scan of a project, which is given time (see run_godot.py).
+FIRST_SCAN = ["--headless", "--editor", "--quit-after", "300"]
+USED = "ActionScript: the scripts run as native code."
+# How many rounds a workload is run for the counts: enough that a thunk in its loop shows.
+ROUNDS = 1000
+
+
+class Runner:
+    def __init__(self, godot, extension, tests, kas3c, check):
+        self.godot = godot
+        self.extension = extension  # A project that holds kas3.gdextension and the built library.
+        self.tests = tests
+        self.kas3c = kas3c
+        self.check = check
+        self.compiler = shutil.which("c++")
+
+    def able(self, what):
+        if self.kas3c and os.path.exists(self.kas3c) and self.compiler:
+            return True
+        print("godot: %s was not run (it needs kas3c and a C++ compiler)" % what)
+        return False
+
+    def project(self, where, sources, files=None):
+        """A project in `where` of a folder's files (all, or those named: a path names a file of elsewhere), with
+        the extension; scanned once."""
+        made = os.path.join(where, "project")
+        if files is None:
+            shutil.copytree(sources, made)
+        else:
+            os.makedirs(made)
+            for name in files:
+                shutil.copy(os.path.join(sources, name), made)
+        shutil.copy(os.path.join(self.extension, "kas3.gdextension"), made)
+        os.makedirs(os.path.join(made, "bin"))
+        for library in glob.glob(os.path.join(self.extension, "bin", "libkas3_godot.*")):
+            shutil.copy(library, os.path.join(made, "bin"))
+        subprocess.run([self.godot, *FIRST_SCAN, "--path", made], capture_output=True, text=True, timeout=300)
+        return made
+
+    def library(self, label, project, scripts, where):
+        """The project's scripts as a program library, or None: what went wrong is a failed check."""
+        out = os.path.join(where, "native")
+        written = subprocess.run([self.kas3c, "cpp", "--godot", *scripts, "-o", out], capture_output=True, text=True, cwd=project, timeout=300)
+        self.check("native: %s is written as C++" % label, written.returncode == 0, written.stderr[-600:])
+        if written.returncode != 0:
+            return None
+        root = os.path.dirname(self.tests)
+        program = os.path.join(where, "libkas3_program.dylib")
+        includes = [flag for each in ("runtime", "vm", "ir", "src") for flag in ("-I", os.path.join(root, each))]
+        built = subprocess.run([self.compiler, *FLAGS, *includes, *sorted(glob.glob(os.path.join(out, "*.cpp"))), "-o", program],
+                               capture_output=True, text=True, timeout=600)
+        self.check("native: the C++ of %s builds without a warning" % label, built.returncode == 0, built.stderr[-900:])
+        return program if built.returncode == 0 else None
+
+    def run(self, project, script, library, arguments=()):
+        environment = dict(os.environ, KAS3_NATIVE_COUNTS="1")
+        environment.pop("KAS3_PROGRAM_LIBRARY", None)
+        if library:
+            environment["KAS3_PROGRAM_LIBRARY"] = library
+        command = [self.godot, "--headless", "--path", project, "-s", script, *(["--", *arguments] if arguments else [])]
+        try:
+            ran = subprocess.run(command, capture_output=True, text=True, timeout=300, env=environment)
+        except subprocess.TimeoutExpired as late:
+            return -1, "it ran for more than 300 seconds\n" + (late.stdout or b"").decode(errors="replace")[-2000:]
+        return ran.returncode, ran.stdout + ran.stderr
+
+    def counts(self, label, text, listed, name):
+        """Holds what the host counted in a run to the file's line for it."""
+        wanted = dict(line.split(": ", 1) for line in open(listed).read().splitlines() if line and not line.startswith("#"))
+        found = [line for line in text.split("\n") if line.startswith("kas3: counts ")]
+        detail = "\n".join(line for line in text.split("\n") if line.startswith("kas3:   "))
+        self.check("native: %s says what it counted" % label, len(found) == 1, text[-600:])
+        if len(found) == 1:
+            counted = found[0][len("kas3: counts "):].strip()
+            self.check("native: %s leaves to the library what %s says" % (label, os.path.basename(listed)), counted == wanted.get(name),
+                       "\nlisted   %s\ncounted  %s\n%s" % (wanted.get(name), counted, detail))
+
+    def probe(self):
+        """The probe by the interpreter and as native code: what each run prints of it."""
+        if not self.able("the native probe"):
+            return
+        sources = os.path.join(self.tests, "godot_native")
+        with tempfile.TemporaryDirectory() as where:
+            project = self.project(where, sources)
+            program = self.library("the probe", project, ["Probe.as"], where)
+            if not program:
+                return
+            said = {}
+            for label, library in (("interpreter", None), ("native", program)):
+                status, text = self.run(project, "probe.gd", library)
+                self.check("native: the probe runs (%s)" % label, status == 0, "exit %d\n%s" % (status, text[-600:]))
+                self.check("native: %s" % ("the program library is used" if library else "no library without one"),
+                           (USED in text) == bool(library), text[-600:])
+                # What the probe gave, and the error Godot was told of with its trace.
+                said[label] = [line for line in text.split("\n") if line.startswith("PROBE ") or line.startswith("SCRIPT ERROR") or
+                               line.lstrip().startswith("at ") or line.lstrip().startswith("at: ")]
+                if library:
+                    self.counts("the probe", text, os.path.join(sources, "native_counts.txt"), "probe")
+            self.check("native: the probe said something", len(said["interpreter"]) >= 8, "\n".join(said["interpreter"]))
+            for ours, theirs in zip(said["native"], said["interpreter"]):
+                self.check("native: as the interpreter says it", ours == theirs, "native       %s\ninterpreter  %s" % (ours, theirs))
+            self.check("native: as many lines", len(said["native"]) == len(said["interpreter"]),
+                       "%d and %d" % (len(said["native"]), len(said["interpreter"])))
+
+    def workloads(self):
+        """Each workload of the languages benchmark as native code, counted."""
+        if not self.able("the count of the workloads"):
+            return
+        sources = os.path.join(self.tests, "bench", "languages")
+        listed = os.path.join(sources, "native_counts.txt")
+        names = [line.split(": ")[0] for line in open(listed).read().splitlines() if line and not line.startswith("#")]
+        with tempfile.TemporaryDirectory() as where:
+            # The benchmark's own project is for Godot .NET: the probe's plain one serves here.
+            project = self.project(where, sources, ["CmpAs.as", "counts.gd", os.path.join(self.tests, "godot_native", "project.godot")])
+            program = self.library("the workloads", project, ["CmpAs.as"], where)
+            if not program:
+                return
+            for name in names:
+                status, text = self.run(project, "counts.gd", program, [name, str(ROUNDS)])
+                self.check("native: the workload %s runs" % name, status == 0 and USED in text and "COUNTED " + name in text,
+                           "exit %d\n%s" % (status, text[-600:]))
+                self.counts("the workload %s" % name, text, listed, name)

@@ -1,0 +1,6 @@
+# How many times each benchmark program, as native code, leaves an operation to the library (run_native.py).
+# What is left is making the program's own object, and in values a function value.
+loop: thunks=1 unresolved=0
+objects: thunks=1 unresolved=0
+values: thunks=2 unresolved=0
+vectors: thunks=1 unresolved=0

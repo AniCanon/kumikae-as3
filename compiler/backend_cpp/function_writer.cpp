@@ -32,8 +32,9 @@ Signature signature_of(const ir::Function &p_function) {
 	return signature;
 }
 
-FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack) :
-		module_(p_module), index_(p_function), function_(p_module.functions[p_function]), thunks_(r_thunks), keeps_stack_(p_keeps_stack) {
+FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts) :
+		module_(p_module), index_(p_function), function_(p_module.functions[p_function]), thunks_(r_thunks), keeps_stack_(p_keeps_stack),
+		facts_(p_facts) {
 	analyse();
 }
 
@@ -58,9 +59,14 @@ void FunctionWriter::analyse() {
 		written_[handler.reg] = true;
 	}
 	shadow_.assign(function_.registers.size(), std::string());
+	borrowed_.assign(function_.registers.size(), NONE);
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();
+	find_borrowed();
+	find_kept();
+	find_last_uses();
+	find_twice();
 }
 
 std::string_view FunctionWriter::parts(uint32_t p_register) const {
@@ -72,7 +78,7 @@ std::string FunctionWriter::reg(uint32_t p_register) const {
 }
 
 bool FunctionWriter::owns(uint32_t p_register) const {
-	return ir::is_held(kind(p_register)) && parts(p_register).empty() && alias_[p_register] == Alias::None &&
+	return ir::is_held(kind(p_register)) && parts(p_register).empty() && alias_[p_register] == Alias::None && borrowed_[p_register] == NONE &&
 			(p_register >= function_.parameters || written_[p_register]);
 }
 
@@ -122,7 +128,9 @@ std::string FunctionWriter::fail() {
 	fails_ = true;
 	const uint32_t chain = chain_of(pc_);
 	const uint32_t at = line_of(module_, function_.file, function_.code[pc_].position);
-	return "line = " + std::to_string(at) + "; goto " + (chain == NONE ? std::string("failed") : "H" + std::to_string(chain)) + ";";
+	// A kept field the instruction may have changed is read again first: the local is what is written back.
+	const std::string again = kept_read_again(pc_);
+	return again + (again.empty() ? "" : " ") + "line = " + std::to_string(at) + "; goto " + (chain == NONE ? std::string("failed") : "H" + std::to_string(chain)) + ";";
 }
 
 void FunctionWriter::check() {
@@ -164,7 +172,7 @@ void FunctionWriter::by_thunk(const Instruction &p_in) {
 		line("Slot u = empty();");
 	}
 	line(std::string(use.result != NONE ? "const Slot o = " : "") + "thunk(c, " + std::to_string(use.thunk) + ", " + given +
-			(use.updated != NONE ? ", &u" : "") + ");");
+			(use.updated != NONE ? ", &u" : ", nullptr") + ");");
 	check();
 	if (use.updated != NONE) {
 		put(use.updated, from_slot(kind(use.updated), "u"));
@@ -176,7 +184,7 @@ void FunctionWriter::by_thunk(const Instruction &p_in) {
 }
 
 void FunctionWriter::dispatch(const Instruction &p_in) {
-	const bool written = whole_conversion(p_in) || constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_object(p_in) ||
+	const bool written = whole_conversion(p_in) || whole_comparison(p_in) || constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_object(p_in) ||
 			fast_text(p_in) || fast_untyped(p_in) || fast_call(p_in);
 	if (!written) {
 		by_thunk(p_in);
@@ -231,8 +239,17 @@ void FunctionWriter::generic(const Instruction &p_in) {
 }
 
 void FunctionWriter::instruction(const Instruction &p_in) {
+	// Around what may see or change a field kept in a local, memory and the local are made to agree.
+	const std::string before = kept_written_back(pc_);
+	const std::string after = kept_read_again(pc_);
+	if (!before.empty()) {
+		line(before);
+	}
 	if (!engine(p_in)) {
 		generic(p_in);
+	}
+	if (!after.empty()) {
+		line(after);
 	}
 
 	// What was known of a register is forgotten when it is written, and with it what was made from it.
@@ -273,15 +290,16 @@ std::string FunctionWriter::prologue() const {
 	if (gives) {
 		add(declared(function_.result, "result") + " = " + std::string(zero_of(function_.result)) + ";");
 	}
-	// A function in which nothing can fail calls nothing of the program's: it is still one call too deep
-	// at the limit, but nothing below it sees the depth, and its one frame fits in what the stack's floor
-	// leaves free. Measured on tests/bench/loop.as, whose two callees are such, against the build before the
-	// stack was looked at: 9.1 ms to its 7.9 ms with the look in every function, 7.4 ms to its 7.4 ms with
-	// this rule (a machine under load: only the pairs compare).
-	const std::string too_deep = fails_ ? "c->depth >= MAX_DEPTH || stack_low(c)" : "c->depth >= MAX_DEPTH";
-	add("if (KAS3_UNLIKELY(" + too_deep + ")) { stack_overflow(c); return" + (gives ? " result" : "") + "; }");
+	// A function in which nothing can fail calls nothing of the program's. It is still one call too deep
+	// at the limit, which whoever calls it sees to before the call (`deep`, below; its entry, for a call
+	// from outside): it keeps no count itself, sets no error, and its one frame fits in what the stack's
+	// floor leaves free.
 	if (fails_) {
+		add("if (KAS3_UNLIKELY(c->depth >= MAX_DEPTH || stack_low(c))) { stack_overflow(c); return" + std::string(gives ? " result" : "") + "; }");
 		add("c->depth++;");
+		// Whether a call from here is one too deep: asked once, of a count nothing moves while this runs.
+		add("const bool deep = c->depth >= MAX_DEPTH;");
+		add("(void)deep;");
 	}
 	if (keeps_stack_) {
 		add("StackFrame frame = { " + std::to_string(index_) + ", 0, c->frames };");
@@ -292,10 +310,12 @@ std::string FunctionWriter::prologue() const {
 			add(reg(i) + " = shared(c, " + reg(i) + ");");
 		}
 	}
+	out += kept_declared() + twice_declared();
 	if (has_owner_alias_) {
-		// The script's own Godot object, which lives as long as the script's object does: found once.
-		add("void *const self = object_of(c, field<Ref>(r0, 0));");
-		add("(void)self;");
+		// The script's own Godot object: found once, and again only after the engine has freed a script's.
+		add("void *self = object_of(c, field<Ref>(r0, 0));");
+		add("uint32_t self_seen = c->freed.load(std::memory_order_relaxed);");
+		add("(void)self; (void)self_seen;");
 	}
 	return out;
 }
@@ -304,19 +324,25 @@ std::string FunctionWriter::handlers() const {
 	std::string out;
 	for (size_t i = 0; i < chains_.size(); i++) {
 		out += "H" + std::to_string(i) + ":\n";
+		// Taking the error lets go of what the handler's register held, which may run code (facts.h).
+		const std::string back = kept_written_back(NONE);
+		const std::string again = kept_read_again(NONE);
+		if (!back.empty()) {
+			out += "\t" + back + "\n";
+		}
 		for (uint32_t each : chains_[i]) {
 			const ir::Handler &handler = function_.handlers[each];
 			const Kind held = kind(handler.reg);
 			const std::string error = "caught(c, " + std::to_string(index_) + ", line, " + std::to_string(handler.reg) + ", " +
 					(handler.rethrows ? "true" : "false") + ", &traced)";
-			const std::string target = "goto L" + std::to_string(handler.target) + ";";
+			const std::string target = again + (again.empty() ? "" : " ") + "goto L" + std::to_string(handler.target) + ";";
 			out += "\tif (catches(c, " + number(handler.type) + ")) {";
 			if (held == Kind::Obj || held == Kind::Any) {
-				out += " put(c, " + reg(handler.reg) + ", " + (held == Kind::Obj ? "object_of(" + error + ")" : error) + "); " + target + " }\n";
+				out += " put(c, " + reg(handler.reg) + ", " + (held == Kind::Obj ? "object_of(c, " + error + ")" : error) + "); " + target + " }\n";
 				continue;
 			}
 			// A catch of a String or a number: the value thrown as that kind, as a store makes it one.
-			out += "\n\t\tconst Slot e = " + error + ";\n\t\tconst Slot o = thunk(c, " + std::to_string(thunks_.from_any(held)) + ", &e);\n";
+			out += "\n\t\tconst Slot e = " + error + ";\n\t\tconst Slot o = thunk(c, " + std::to_string(thunks_.from_any(held)) + ", &e, nullptr);\n";
 			out += "\t\trelease(c, e);\n\t\tif (KAS3_UNLIKELY(c->failing)) goto failed;\n";
 			out += "\t\t" + (ir::is_held(held) ? "put(c, " + reg(handler.reg) + ", " + from_slot(held, "o") + ");" : reg(handler.reg) + " = " + from_slot(held, "o") + ";") +
 					"\n\t\t" + target + "\n\t}\n";
@@ -328,6 +354,9 @@ std::string FunctionWriter::handlers() const {
 
 std::string FunctionWriter::epilogue() const {
 	std::string out = "\tgoto done;\ndone:\n";
+	if (const std::string back = kept_written_back(NONE); !back.empty()) {
+		out += "\t" + back + "\n";
+	}
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
 		if (owns(i)) {
 			out += "\trelease(c, " + reg(i) + ");\n";
@@ -361,7 +390,13 @@ std::string FunctionWriter::write() {
 	}
 	whole_.assign(function_.registers.size(), Whole());
 	text_.assign(function_.registers.size(), NONE);
+	std::vector<std::string> copies(function_.code.size() + 1); // Before an instruction: a loop's copy with locals.
 	for (pc_ = 0; pc_ < function_.code.size(); pc_++) {
+		for (const Twice &loop : twice_) {
+			if (loop.from == pc_) {
+				copies[pc_] = fast_copy(loop, landed);
+			}
+		}
 		body_.clear();
 		if (landed[pc_]) {
 			whole_.assign(function_.registers.size(), Whole());
@@ -380,8 +415,12 @@ std::string FunctionWriter::write() {
 	}
 	body_.clear();
 	for (size_t pc = 0; pc <= function_.code.size(); pc++) {
+		body_ += copies[pc];
 		if (labelled[pc]) {
 			body_ += "L" + std::to_string(pc) + ":;\n";
+		}
+		if (retried_[pc]) {
+			body_ += "S" + std::to_string(pc) + ":;\n";
 		}
 		if (pc < pieces.size()) {
 			body_ += pieces[pc];
@@ -406,6 +445,9 @@ std::string FunctionWriter::write() {
 	// The same function for a caller that knows it only by its number: its arguments as slots.
 	const std::string call = function_name(module_, index_) + "(" + passed + ")";
 	out += "void " + entry_name(index_) + "(Context *c, const Slot *a, uint32_t n, Slot *r) {\n\t(void)a; (void)n; (void)r;\n";
+	if (!fails_) {
+		out += "\tif (KAS3_UNLIKELY(c->depth >= MAX_DEPTH)) { stack_overflow(c); return; }\n";
+	}
 	out += function_.result == Kind::Void ? "\t" + call + ";\n" : "\t*r = slot(" + call + ");\n";
 	return out + "}\n\n";
 }

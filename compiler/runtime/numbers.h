@@ -12,17 +12,17 @@ namespace rt {
 
 // ECMAScript's ToInt32 and ToUint32. A Number that is already in range needs only its fraction dropped;
 // the rest (a wrap, an infinity, not-a-number) is the shared routine's.
-inline int32_t to_i32(double p_value) {
+inline int32_t to_i32(Context *c, double p_value) {
 	if (p_value >= -2147483648.0 && p_value < 2147483648.0) {
 		return static_cast<int32_t>(p_value);
 	}
-	return vm::to_int32(p_value);
+	return to_int32(c, p_value);
 }
-inline uint32_t to_u32(double p_value) {
+inline uint32_t to_u32(Context *c, double p_value) {
 	if (p_value >= 0.0 && p_value < 4294967296.0) {
 		return static_cast<uint32_t>(p_value);
 	}
-	return vm::to_uint32(p_value);
+	return to_uint32(c, p_value);
 }
 
 // An int or a uint as the int the bitwise operators work on: the same bits.

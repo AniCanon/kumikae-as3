@@ -109,5 +109,45 @@ inline Vector2 normalized(Vector2 p_a) {
 	return p_a;
 }
 
+inline double dot(Vector2 p_a, Vector2 p_b) {
+	return p_a.x * p_b.x + p_a.y * p_b.y;
+}
+
+// Vector3 (core/math/vector3.h).
+inline Vector3 add(Vector3 p_a, Vector3 p_b) {
+	return Vector3{ p_a.x + p_b.x, p_a.y + p_b.y, p_a.z + p_b.z };
+}
+inline Vector3 subtract(Vector3 p_a, Vector3 p_b) {
+	return Vector3{ p_a.x - p_b.x, p_a.y - p_b.y, p_a.z - p_b.z };
+}
+inline Vector3 multiply(Vector3 p_a, double p_by) {
+	const float by = static_cast<float>(p_by);
+	return Vector3{ p_a.x * by, p_a.y * by, p_a.z * by };
+}
+inline Vector3 divide(Vector3 p_a, double p_by) {
+	const float by = static_cast<float>(p_by);
+	return Vector3{ p_a.x / by, p_a.y / by, p_a.z / by };
+}
+inline double dot(Vector3 p_a, Vector3 p_b) {
+	return p_a.x * p_b.x + p_a.y * p_b.y + p_a.z * p_b.z;
+}
+inline Vector3 cross(Vector3 p_a, Vector3 p_b) {
+	return Vector3{ (p_a.y * p_b.z) - (p_a.z * p_b.y), (p_a.z * p_b.x) - (p_a.x * p_b.z), (p_a.x * p_b.y) - (p_a.y * p_b.x) };
+}
+inline double length(Vector3 p_a) {
+	const float x2 = p_a.x * p_a.x;
+	const float y2 = p_a.y * p_a.y;
+	const float z2 = p_a.z * p_a.z;
+	return std::sqrt(x2 + y2 + z2);
+}
+inline Vector3 normalized(Vector3 p_a) {
+	const float squared = p_a.x * p_a.x + p_a.y * p_a.y + p_a.z * p_a.z;
+	if (squared == 0) {
+		return Vector3{ 0, 0, 0 };
+	}
+	const float l = std::sqrt(squared);
+	return Vector3{ p_a.x / l, p_a.y / l, p_a.z / l };
+}
+
 } // namespace rt
 } // namespace kas3

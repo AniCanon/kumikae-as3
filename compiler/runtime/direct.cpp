@@ -176,19 +176,19 @@ void text_of_value(Context *c, uint32_t p_which, const Slot *p_values, uint32_t,
 	Str *made = nullptr;
 	switch (static_cast<Kind>(p_which)) {
 		case Kind::I32:
-			made = text_of(p_values[0].i);
+			made = text_of(c, p_values[0].i);
 			break;
 		case Kind::U32:
-			made = text_of(p_values[0].u);
+			made = text_of(c, p_values[0].u);
 			break;
 		case Kind::I64:
-			made = text_of(static_cast<int64_t>(p_values[0].l));
+			made = text_of(c, static_cast<int64_t>(p_values[0].l));
 			break;
 		case Kind::Bool:
-			made = text_of(p_values[0].b);
+			made = text_of(c, p_values[0].b);
 			break;
 		default:
-			made = text_of(p_values[0].d);
+			made = text_of(c, p_values[0].d);
 			break;
 	}
 	if (made) {
@@ -199,7 +199,7 @@ void text_of_value(Context *c, uint32_t p_which, const Slot *p_values, uint32_t,
 }
 
 void text_joined(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *r_out) {
-	if (Str *made = join(static_cast<const Str *>(p_values[0].p), static_cast<const Str *>(p_values[1].p))) {
+	if (Str *made = join(c, static_cast<const Str *>(p_values[0].p), static_cast<const Str *>(p_values[1].p))) {
 		hand_back(c, Kind::Str, slot(made), r_out);
 	} else {
 		out_of_memory(c);

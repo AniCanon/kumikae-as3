@@ -10,6 +10,7 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `values.h` | The values (the runtime's own: `vm/runtime.h`'s `Str`, `Object`, `Vector`, `Slot`), the `Context` every generated function takes first, `retain`/`release`, `put`/`store` |
 | `numbers.h` | AS3's arithmetic and conversions on machine numbers, as the interpreter's loop does them |
 | `fast.h` | The fast paths of operations the library owns, each for the usual case only: a vector's element in range, a String joined to another, a new object of a class the collector does not look at, and the rest declared for `calls.cpp` and `properties.cpp` |
+| `api.h`, `api.cpp` | Every function of the runtime generated code calls out of line, once: the table a program library is handed, and the host's side of it |
 | `operations.h` | What generated code calls out of line: errors and their traces, a class's first use, thunks, `trace` |
 | `program.h` | The table a program library gives its host (`kas3_program`): classes, functions, static fields, strings, thunks, all by number |
 | `engine.h`, `godot_values.h` | Godot with no header of Godot's: handles on its objects and values (`Ref`, `Val`), its values with parts as plain structs with their maths inline, what the host worked out for each place the program calls the engine (`Resolved`), the engine's few entry points (`EngineApi`) |
@@ -33,7 +34,8 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 - **The depth of calls** is counted (`c->depth`), so that Error #1023 comes at the 10,001st call as it does
   under the interpreter. A generated function's frame is on the thread's stack, though, where the
   interpreter's are on the heap: a function that finds its frame below `c->stack_floor` raises the same
-  Error rather than run off the stack's end (`stack_low`). The host with no engine runs a program on a
+  Error rather than run off the stack's end (`stack_low`). A function that cannot fail leaves the count to
+  whoever calls it (`backend_cpp/facts.h`). The host with no engine runs a program on a
   thread with 512 MB of stack, so that the count is what ends a recursion.
 - **Errors** are `c->failing` and `c->pending`. A trace is built on the error path, by each function an
   error leaves (`leave_failed`).
@@ -96,9 +98,11 @@ What this costs, until the split:
 - **A value with parts held inline** is boxed into the host's handle wherever it crosses into what the
   library and the host hold: an instruction run by thunk (`Boxed`), a field, an untyped value, an Array.
   Only a register that can never be null is inline; a parameter, a field and a call's result are handles.
-- **The runtime's functions are found in the extension's library** by a program library when it is
-  loaded (`-undefined dynamic_lookup`): the extension links the whole runtime and interpreter in. A table
-  of them, handed over like the engine's, is what replaces that.
+- **The runtime's functions reach a program library through a table** (`api.h`, `c->api`), as the
+  engine's do: every out-of-line function generated code calls is one entry of `KAS3_RUNTIME_API`, an
+  inline call through the table in a program library and the function itself in the host. A program
+  library is linked against nothing of ours; the native oracle builds each program that way, so a function
+  reached by name fails the build.
 
 ## To split out of `vm/`, so that no interpreter is needed
 

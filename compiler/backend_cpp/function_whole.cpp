@@ -9,6 +9,9 @@
 //
 // Measured, whole processes turn and turn about: tests/bench/loop.as 19.6 ms without and 6.6 ms with,
 // vectors.as 34.9 ms and 9.0 ms.
+//
+// Two such Numbers compared are compared as the integers they are (`i < n` is I32ToF64 twice and LtF64):
+// the same answer, and a loop's test that the C++ compiler knows the range of.
 #include "function_writer.h"
 
 #include "names.h"
@@ -50,17 +53,33 @@ bool FunctionWriter::whole_conversion(const Instruction &p_in) {
 	return true;
 }
 
+// LtF64, LeF64 or EqF64 of two registers whose whole-number sums are known: the sums themselves compared.
+bool FunctionWriter::whole_comparison(const Instruction &p_in) {
+	if (p_in.op != Op::LtF64 && p_in.op != Op::LeF64 && p_in.op != Op::EqF64) {
+		return false;
+	}
+	const Whole &left = whole_[p_in.b];
+	const Whole &right = whole_[p_in.c];
+	if (left.exact.empty() || right.exact.empty()) {
+		return false;
+	}
+	const char *const test = p_in.op == Op::LtF64 ? " < " : p_in.op == Op::LeF64 ? " <= " : " == ";
+	line(reg(p_in.a) + " = " + left.exact + test + right.exact + ";");
+	return true;
+}
+
 // What the instruction just written makes known of the register it wrote.
 void FunctionWriter::remember_whole(const Instruction &p_in) {
 	switch (p_in.op) {
 		case Op::I32ToF64:
 		case Op::U32ToF64:
-			whole_[p_in.a] = Whole{ "static_cast<uint32_t>(" + reg(p_in.b) + ")", { p_in.b }, 1 };
+			whole_[p_in.a] = Whole{ "static_cast<uint32_t>(" + reg(p_in.b) + ")", "static_cast<int64_t>(" + reg(p_in.b) + ")", { p_in.b }, 1 };
 			break;
 		case Op::ConstF64: {
 			const double value = module_.numbers[p_in.b];
 			if (value == std::trunc(value) && std::fabs(value) <= 4294967295.0) {
-				whole_[p_in.a] = Whole{ "static_cast<uint32_t>(INT64_C(" + std::to_string(static_cast<int64_t>(value)) + "))", {}, 1 };
+				const std::string whole = "INT64_C(" + std::to_string(static_cast<int64_t>(value)) + ")";
+				whole_[p_in.a] = Whole{ "static_cast<uint32_t>(" + whole + ")", whole, {}, 1 };
 			}
 			break;
 		}
@@ -71,7 +90,9 @@ void FunctionWriter::remember_whole(const Instruction &p_in) {
 			if (left.expression.empty() || right.expression.empty() || left.terms + right.terms > MOST_TERMS) {
 				break;
 			}
-			Whole sum{ "(" + left.expression + (p_in.op == Op::AddF64 ? " + " : " - ") + right.expression + ")", left.sources, left.terms + right.terms };
+			const char *const sign = p_in.op == Op::AddF64 ? " + " : " - ";
+			Whole sum{ "(" + left.expression + sign + right.expression + ")", "(" + left.exact + sign + right.exact + ")", left.sources,
+				left.terms + right.terms };
 			sum.sources.insert(sum.sources.end(), right.sources.begin(), right.sources.end());
 			sum.sources.push_back(p_in.b);
 			sum.sources.push_back(p_in.c);

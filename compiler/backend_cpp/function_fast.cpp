@@ -15,6 +15,9 @@ using ir::Op;
 
 bool FunctionWriter::fast_object(const Instruction &p_in) {
 	const auto whole = [&](uint32_t p_register) { return kind(p_register) == Kind::I32 || kind(p_register) == Kind::U32; };
+	if (fast_ && fast_vector(p_in)) {
+		return true;
+	}
 	switch (p_in.op) {
 		case Op::New:
 			line("if (Object *const e = new_object(c, " + std::to_string(p_in.b) + ")) {");
@@ -36,7 +39,7 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			if (!whole(p_in.b)) {
 				return false;
 			}
-			line("if (Slot *const e = element_to_write(" + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
+			line("if (Slot *const e = element_to_write(c, " + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
 			line(ir::is_held(kind(p_in.c)) ? "\tstore_slot(c, *e, " + reg(p_in.c) + ");" : "\t*e = slot(" + reg(p_in.c) + ");");
 			break;
 		default:
@@ -50,7 +53,7 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 bool FunctionWriter::fast_text(const Instruction &p_in) {
 	switch (p_in.op) {
 		case Op::Concat:
-			line("if (Str *const s = join(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
+			line("if (Str *const s = join(c, " + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
 			put(p_in.a, "s");
 			break;
 		case Op::I32ToStr:
@@ -58,14 +61,14 @@ bool FunctionWriter::fast_text(const Instruction &p_in) {
 		case Op::F64ToStr:
 		case Op::BoolToStr:
 		case Op::I64ToStr:
-			line("if (Str *const s = text_of(" + reg(p_in.b) + ")) {");
+			line("if (Str *const s = text_of(c, " + reg(p_in.b) + ")) {");
 			put(p_in.a, "s");
 			break;
 		case Op::LtStr:
 		case Op::LeStr:
 			// With a missing String the two are compared as numbers: the library's.
 			line("if (" + reg(p_in.b) + " && " + reg(p_in.c) + ") {");
-			line("\t" + reg(p_in.a) + " = kas3::vm::compare_utf16(" + reg(p_in.b) + "->view(), " + reg(p_in.c) + "->view()) " +
+			line("\t" + reg(p_in.a) + " = compare_text(c, " + reg(p_in.b) + ", " + reg(p_in.c) + ") " +
 					(p_in.op == Op::LtStr ? "< 0;" : "<= 0;"));
 			break;
 		case Op::StrCall: {
@@ -78,7 +81,7 @@ bool FunctionWriter::fast_text(const Instruction &p_in) {
 			for (const uint32_t each : function_.argument_lists[p_in.c]) {
 				given += ", slot(" + reg(each) + ")";
 			}
-			line("if (Slot w = empty(); KAS3_LIKELY(text_method_of(" + std::to_string(p_in.b) + ", &w" + given + "))) {");
+			line("if (Slot w = empty(); KAS3_LIKELY(text_method_of(c, " + std::to_string(p_in.b) + ", &w" + given + "))) {");
 			put(p_in.a, from_slot(kind(p_in.a), "w"));
 			line("} else {");
 			mark();
@@ -115,7 +118,7 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 				put(p_in.a, "to_any(c, " + reg(p_in.b) + ")");
 				return true;
 			}
-			line("if (Slot w = empty(); number_to_any(" + reg(p_in.b) + ", &w)) {");
+			line("if (Slot w = empty(); number_to_any(c, " + reg(p_in.b) + ", &w)) {");
 			put(p_in.a, "w");
 			break;
 		case Op::FromAny:
@@ -135,7 +138,7 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 			if (!held || (p_in.op == Op::DynSet && kind(p_in.c) != Kind::Any)) {
 				return false;
 			}
-			const std::string place = "c, holder_of(" + reg(holder) + "), key_of(" + reg(key) + ")";
+			const std::string place = "c, holder_of(c, " + reg(holder) + "), key_of(c, " + reg(key) + ")";
 			if (p_in.op == Op::DynSet) {
 				line("if (KAS3_UNLIKELY(!set_property(" + place + ", " + reg(p_in.c) + ")))");
 				by_thunk(p_in);
@@ -146,7 +149,7 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 			break;
 		}
 		case Op::AnyNullCheck:
-			line("if (KAS3_UNLIKELY(!has_members(" + reg(p_in.a) + ")))");
+			line("if (KAS3_UNLIKELY(!has_members(c, " + reg(p_in.a) + ")))");
 			by_thunk(p_in);
 			return true;
 		default:
@@ -183,7 +186,7 @@ bool FunctionWriter::fast_call(const Instruction &p_in) {
 		line("const Slot g[] = { " + given + " };");
 	}
 	line("Slot w = empty();");
-	line("if (call_value(c, function_of(" + reg(p_in.b) + "), " + (list.empty() ? "nullptr" : "g") + ", " + std::to_string(list.size()) + ", &w)) {");
+	line("if (call_value(c, function_of(c, " + reg(p_in.b) + "), " + (list.empty() ? "nullptr" : "g") + ", " + std::to_string(list.size()) + ", &w)) {");
 	check();
 	if (p_in.a != NONE) {
 		put(p_in.a, "w");

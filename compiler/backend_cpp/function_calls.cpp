@@ -70,11 +70,17 @@ std::string FunctionWriter::arguments(const ir::Function &p_callee, const std::v
 	return out;
 }
 
-void FunctionWriter::call_function(const Instruction &p_in, const ir::Function &p_callee, const std::string &p_target) {
+void FunctionWriter::call_function(const Instruction &p_in, const ir::Function &p_callee, const std::string &p_target, bool p_direct) {
 	const std::vector<uint32_t> &list = function_.argument_lists[p_in.c];
 	const uint32_t fixed = p_callee.rest ? p_callee.parameters - 1 : p_callee.parameters;
+	// A function that cannot fail does not look at the depth itself (facts.h): a call that may reach one
+	// looks first, and one that surely does has no error to look for afterwards.
+	const bool quiet = p_direct && facts_ && facts_->functions[p_in.b].quiet;
 	mark();
 	line("{");
+	if (quiet || !p_direct) {
+		line("if (KAS3_UNLIKELY(deep)) { stack_overflow(c); " + fail() + " }");
+	}
 	if (p_callee.rest) {
 		// The arguments past the others, untyped, are the rest parameter's Array: the caller's, let go
 		// of once the call is over.
@@ -101,7 +107,9 @@ void FunctionWriter::call_function(const Instruction &p_in, const ir::Function &
 	if (p_callee.rest) {
 		line("release(c, rest);");
 	}
-	check();
+	if (!quiet) {
+		check();
+	}
 	if (result != Kind::Void && p_in.a != NONE) {
 		put(p_in.a, "v");
 	}
@@ -130,7 +138,7 @@ const ir::Function *FunctionWriter::callee_of(const Instruction &p_in) const {
 
 bool FunctionWriter::call(const Instruction &p_in) {
 	if (p_in.op == Op::Call) {
-		call_function(p_in, module_.functions[p_in.b], function_name(module_, p_in.b));
+		call_function(p_in, module_.functions[p_in.b], function_name(module_, p_in.b), true);
 		return true;
 	}
 	if (p_in.op != Op::CallVirtual && p_in.op != Op::CallInterface) {
@@ -141,7 +149,7 @@ bool FunctionWriter::call(const Instruction &p_in) {
 	const std::string klass = "c->classes[" + reg(receiver) + "->klass]";
 	if (p_in.op == Op::CallVirtual) {
 		const ir::Function &callee = *virtual_callee(p_in);
-		call_function(p_in, callee, "reinterpret_cast<" + pointer_type(callee) + ">(" + klass + ".code[" + std::to_string(p_in.b) + "])");
+		call_function(p_in, callee, "reinterpret_cast<" + pointer_type(callee) + ">(" + klass + ".code[" + std::to_string(p_in.b) + "])", false);
 		return true;
 	}
 	// A class that has no function for the interface's method is the library's to report (TypeError #1006).
@@ -151,7 +159,7 @@ bool FunctionWriter::call(const Instruction &p_in) {
 		return true;
 	}
 	line("if (const Code code = " + klass + ".interface_code[" + std::to_string(p_in.b) + "]) {");
-	call_function(p_in, *callee, "reinterpret_cast<" + pointer_type(*callee) + ">(code)");
+	call_function(p_in, *callee, "reinterpret_cast<" + pointer_type(*callee) + ">(code)", false);
 	line("} else");
 	by_thunk(p_in);
 	return true;
