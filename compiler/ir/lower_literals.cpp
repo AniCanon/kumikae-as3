@@ -28,21 +28,20 @@ namespace {
 
 // The value of p_count hexadecimal digits of a literal's text from p_at, if all of them are there before its
 // closing quote.
-bool hex_digits(std::string_view p_text, size_t p_at, size_t p_count, uint32_t *r_value) {
+std::optional<uint32_t> hex_digits(std::string_view p_text, size_t p_at, size_t p_count) {
 	uint32_t value = 0;
 	if (p_at + p_count > p_text.size() - 1) {
-		return false;
+		return std::nullopt;
 	}
 	for (size_t i = 0; i < p_count; i++) {
 		char c = p_text[p_at + i];
 		int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
 		if (digit < 0) {
-			return false;
+			return std::nullopt;
 		}
 		value = value * 16 + (uint32_t)digit;
 	}
-	*r_value = value;
-	return true;
+	return value;
 }
 
 void append_utf8(uint32_t p_code, std::string *r_out) {
@@ -67,15 +66,15 @@ void append_utf8(uint32_t p_code, std::string *r_out) {
 // `\uXXXX`, its `u` at *r_at: the character, and *r_at on the last digit read.
 void append_unicode_escape(std::string_view p_text, size_t *r_at, std::string *r_out) {
 	size_t &i = *r_at;
-	uint32_t code = 0;
-	if (hex_digits(p_text, i + 1, 4, &code)) {
+	if (const std::optional<uint32_t> written = hex_digits(p_text, i + 1, 4)) {
+		uint32_t code = *written;
 		i += 4;
 		// A high half written just before a low half is one character, held as its four bytes, as the
 		// runtime holds it (vm/text_units.h); a half with no partner is held alone.
-		uint32_t low = 0;
-		if (code >= 0xD800 && code < 0xDC00 && i + 2 < p_text.size() && p_text[i + 1] == '\\' && p_text[i + 2] == 'u' &&
-				hex_digits(p_text, i + 3, 4, &low) && low >= 0xDC00 && low < 0xE000) {
-			code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+		const bool high_then_escape = code >= 0xD800 && code < 0xDC00 && i + 2 < p_text.size() && p_text[i + 1] == '\\' && p_text[i + 2] == 'u';
+		const std::optional<uint32_t> low = high_then_escape ? hex_digits(p_text, i + 3, 4) : std::nullopt;
+		if (low && *low >= 0xDC00 && *low < 0xE000) {
+			code = 0x10000 + ((code - 0xD800) << 10) + (*low - 0xDC00);
 			i += 6;
 		}
 		append_utf8(code, r_out);
@@ -90,7 +89,6 @@ void append_escape(std::string_view p_text, size_t *r_at, std::string *r_out) {
 	size_t &i = *r_at;
 	std::string &out = *r_out;
 	char escape = p_text[i];
-	uint32_t code = 0;
 	switch (escape) {
 		case 'n':
 			out += '\n';
@@ -111,8 +109,8 @@ void append_escape(std::string_view p_text, size_t *r_at, std::string *r_out) {
 			out += '\0';
 			break;
 		case 'x':
-			if (hex_digits(p_text, i + 1, 2, &code)) {
-				append_utf8(code, r_out);
+			if (const std::optional<uint32_t> code = hex_digits(p_text, i + 1, 2)) {
+				append_utf8(*code, r_out);
 				i += 2;
 			} else {
 				out += 'x';
