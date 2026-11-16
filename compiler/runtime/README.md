@@ -16,7 +16,7 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `errors.cpp` | Raising, catching, the stack trace, the report of an error nothing caught |
 | `calls.cpp` | A function value called from generated code without the interpreter between |
 | `stub_module.cpp`, `bridge.cpp` | The interpreter the host keeps for the shared library (below) |
-| `standalone_main.cpp` | `main` for a program library built as an executable |
+| `standalone.cpp`, `standalone_main.cpp` | A program library run as a plain program, on a thread whose stack holds 10,000 calls of any likely size; `main` |
 
 ## The fixed shape
 
@@ -28,6 +28,11 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
   struct), and a descriptor (`ClassInfo`): name, base, a hash of its layout, each field's name, kind and
   offset, its method table by method number. The host reads descriptors, never C++ types.
 - **Counts** change only in `retain(c, x)` and `release(c, x)` (`values.h`).
+- **The depth of calls** is counted (`c->depth`), so that Error #1023 comes at the 10,001st call as it does
+  under the interpreter. A generated function's frame is on the thread's stack, though, where the
+  interpreter's are on the heap: a function that finds its frame below `c->stack_floor` raises the same
+  Error rather than run off the stack's end (`stack_low`). The host with no engine runs a program on a
+  thread with 512 MB of stack, so that the count is what ends a recursion.
 - **Errors** are `c->failing` and `c->pending`. A trace is built on the error path, by each function an
   error leaves (`leave_failed`).
 - **`kas3_program`** is the one symbol a program library exports.

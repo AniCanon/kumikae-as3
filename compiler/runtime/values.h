@@ -40,6 +40,9 @@ struct Context {
 	bool failing = false; // An error is on its way out: `pending` holds it.
 	Slot pending{}; // What was thrown, untyped, with a reference of its own.
 	uint32_t depth = 0; // Generated functions in progress.
+	// Where the thread's stack is nearly used up, as an address: a function whose frame is below it does
+	// not go on (stack_low). 0 where the host does not know the stack's size.
+	uintptr_t stack_floor = 0;
 	StackFrame *frames = nullptr; // The innermost of them, where they are kept.
 	Slot *globals = nullptr; // Static fields and package variables, by the module's numbers.
 	Str *const *strings = nullptr; // The program's string constants.
@@ -49,6 +52,13 @@ struct Context {
 	const Program *program = nullptr;
 	Host *host = nullptr;
 };
+
+// Whether the function this is written in has its frame below the context's floor: the C++ stack is nearly
+// used up, which is Error #1023 like calls nested too deep, never a crash. Always inline: it is the frame of
+// the function that asks.
+__attribute__((always_inline)) inline bool stack_low(const Context *c) {
+	return reinterpret_cast<uintptr_t>(__builtin_frame_address(0)) < c->stack_floor;
+}
 
 // A slot with nothing in it. (`Slot{}` clears the union's first member only: half of a pointer.)
 inline Slot empty() {

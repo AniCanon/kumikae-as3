@@ -3,8 +3,6 @@
 #include "fast.h"
 #include "held.h"
 
-#include <cstdio>
-#include <cstdlib>
 
 namespace kas3 {
 namespace rt {
@@ -209,22 +207,6 @@ bool Host::run() {
 	}
 	release(&context, object);
 	return ran;
-}
-
-int run_standalone(const Program *p_program) {
-	bool ran = false;
-	{
-		// KAS3_NOW fixes the time Date takes as now, as for `kas3c run`.
-		const char *fixed = std::getenv("KAS3_NOW");
-		Host host(*p_program, fixed ? std::optional<double>(std::strtod(fixed, nullptr)) : std::nullopt);
-		ran = host.run();
-	}
-	std::fflush(stdout);
-	if (std::getenv("KAS3_REPORT_LEAKS") && (vm::live_objects() || vm::live_strings())) {
-		std::fprintf(stderr, "kas3: %zu objects and %zu strings were never freed\n", vm::live_objects(), vm::live_strings());
-		return 3;
-	}
-	return ran ? 0 : 1;
 }
 
 } // namespace rt

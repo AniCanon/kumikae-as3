@@ -200,8 +200,16 @@ std::string FunctionWriter::prologue() const {
 	if (gives) {
 		add(declared(function_.result, "result") + " = " + std::string(zero_of(function_.result)) + ";");
 	}
-	add(std::string("if (KAS3_UNLIKELY(c->depth >= MAX_DEPTH)) { stack_overflow(c); return") + (gives ? " result" : "") + "; }");
-	add("c->depth++;");
+	// A function in which nothing can fail calls nothing of the program's: it is still one call too deep
+	// at the limit, but nothing below it sees the depth, and its one frame fits in what the stack's floor
+	// leaves free. Measured on tests/bench/loop.as, whose two callees are such, against the build before the
+	// stack was looked at: 9.1 ms to its 7.9 ms with the look in every function, 7.4 ms to its 7.4 ms with
+	// this rule (a machine under load: only the pairs compare).
+	const std::string too_deep = fails_ ? "c->depth >= MAX_DEPTH || stack_low(c)" : "c->depth >= MAX_DEPTH";
+	add("if (KAS3_UNLIKELY(" + too_deep + ")) { stack_overflow(c); return" + (gives ? " result" : "") + "; }");
+	if (fails_) {
+		add("c->depth++;");
+	}
 	if (keeps_stack_) {
 		add("StackFrame frame = { " + std::to_string(index_) + ", 0, c->frames };");
 		add("c->frames = &frame;");
@@ -250,7 +258,9 @@ std::string FunctionWriter::epilogue() const {
 	if (keeps_stack_) {
 		out += "\tc->frames = frame.below;\n";
 	}
-	out += "\tc->depth--;\n";
+	if (fails_) {
+		out += "\tc->depth--;\n";
+	}
 	const bool keeps = std::any_of(function_.handlers.begin(), function_.handlers.end(), [](const ir::Handler &p_each) { return p_each.rethrows; });
 	if (keeps) {
 		out += "\tforget_kept(c);\n";

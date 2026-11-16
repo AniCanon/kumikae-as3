@@ -15,6 +15,9 @@ For each program of run/ (the same ones run_programs.py holds the interpreter to
      its warnings) must equal X.err, or be empty without one; the exit status is 1 for a program that ends
      in an error nothing catches and 0 otherwise. Nothing the program made may be left alive (status 3).
 
+deep_frames, whose calls each hold a great deal, is run once more with a stack too small for it
+(KAS3_STACK_KB): running out of stack must be Error #1023 too, never a crash.
+
 native_skipped.txt lists the programs skipped and why. A program that is skipped and not on the list, or on
 it and not skipped, fails: support is never lost unseen, and the list never goes stale. --update rewrites it;
 read the result before committing it.
@@ -128,6 +131,12 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
 failures = ["%s\n%s" % (name, why) for name, (what, why) in outcomes.items() if what == "failed"]
 skipped = {name: why for name, (what, why) in outcomes.items() if what == "skipped"}
 passed = sum(1 for what, _ in outcomes.values() if what == "passed")
+
+if outcomes.get("deep_frames", ("", ""))[0] == "passed":
+    small = subprocess.run([os.path.join(work, "deep_frames", "program")], capture_output=True, text=True, cwd=folder, timeout=120,
+                           env=dict(environment, KAS3_STACK_KB="4096"))
+    if small.returncode != 1 or "Error #1023" not in small.stderr or "9968 more" in small.stderr:
+        failures.append("deep_frames with a small stack: exit %d\n%s" % (small.returncode, small.stderr[-600:]))
 
 listed_path = os.path.join(tests, "native_skipped.txt")
 if not given["--only"]:
