@@ -102,7 +102,8 @@ Json::Wrote Json::write(Slot p_owned, std::string_view p_key) {
 }
 
 Json::Wrote Json::value(Slot p_value) {
-	switch (any::tag(p_value)) {
+	// A freed Godot object is null, and JSON writes null.
+	switch (any::tag(vm_.present_or_null(p_value))) {
 		case AnyTag::Undefined:
 			return Wrote::Nothing;
 		case AnyTag::Null:

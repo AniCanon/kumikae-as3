@@ -68,6 +68,11 @@ bool GodotHost::is_class(void *p_value, std::string_view p_class) {
 }
 
 vm::Str *GodotHost::text(void *p_value) {
+	// A freed object is null to a script, in words too (Godot's text would be `<Freed Object>`). So is an
+	// empty handle, which a copy of one on a freed counted object is.
+	if (!present(p_value)) {
+		return vm::new_string(NULL_TEXT);
+	}
 	CharString utf8 = static_cast<Variant *>(p_value)->stringify().utf8();
 	return vm::new_string(std::string_view(utf8.get_data(), (size_t)utf8.length()));
 }

@@ -66,9 +66,10 @@ OBJECT_EXTRAS = [
 #   add(f, true)      connect(f, CONNECT_DEFERRED): the listener is called at the end of the frame
 #   addOnce(f)        connect(f, CONNECT_ONE_SHOT)
 #   remove(f)         disconnect(f)
-#   removeAll()       disconnect for every connection
+#   removeAll()       disconnect for every connection a script made; on a singleton's signal, for the
+#                     calling script's own (its object's methods, its class's static methods)
 #   has(f)            is_connected(f)
-#   numListeners      get_connections().size()
+#   numListeners      the connections removeAll() would take away
 # A signal whose name is known only at run time is reached as any AS3 property is: `timer[name].add(f)`.
 SIGNAL_EXTRAS = [
     ("add", "public native function add(listener:Function, deferred:Boolean = false):void;"),

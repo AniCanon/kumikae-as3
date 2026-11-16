@@ -193,7 +193,7 @@ NaN and Infinity, a Date as its text, a Dictionary as `"Dictionary"`; an object 
 for text it can't read (a null text too), TypeError #1129 for a structure that holds itself, TypeError #1131
 for a replacer that is neither a function nor an Array (ECMAScript passes over one). Rulings: more than
 1,000 levels of nesting is Error #1023; one of Godot's values or objects is refused with a TypeError, since
-JSON has no form for one; a value written as nothing gives a null String, as the declared String holds
+JSON has no form for one (one Godot has freed is null, and written `null`); a value written as nothing gives a null String, as the declared String holds
 undefined.
 
 ## Inside Godot
@@ -262,7 +262,12 @@ package {
   back. So do `position.x += 5`, `transform.origin.y = 3` and `v[0] = 1`.
 - An argument left out takes Godot's default. So does a `null` written last for a parameter declared
   `= null`.
-- A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
+- A script's `toString()` is what `str(node)` and `print(node)` show in GDScript. Without one, `"" + this`
+  is AS3's text (`[object Player]`) and Godot's text for the node is Godot's (`<Node2D#123>`): each side
+  keeps its own language's rule.
+- `super._process(delta)` on one of Godot's virtuals does nothing, which is what Godot's own empty
+  versions do. A virtual that a C++ extension class implements can't be reached this way: GDExtension
+  gives a script no call to its parent class's virtual.
 - `[Export] public var speed:Number = 5;` shows the field in Godot's inspector, and a value a scene saved
   is given to the script after its constructor has run. The field is a public instance field of a type
   Godot can store (a number, `Boolean`, `String`, `Array`, one of Godot's values, a `Resource`, or a `Node`
@@ -274,8 +279,12 @@ package {
   A script saved while the editor is open is compiled again, and the stand-ins get its exported fields.
 - Signals are listened to the AS3 way: `timer.timeout.add(onTimeout)`, `add(f, true)` for the end of the
   frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`. Adding a listener twice does
-  nothing. `removeAll` and `numListeners` are about the listeners scripts added, not the engine's own. A
-  listener goes when its object is freed.
+  nothing. `removeAll` and `numListeners` are about the listeners scripts added, not the engine's own. On
+  a singleton's signal (`Input.joyConnectionChanged`), which the whole game shares, they are about the
+  calling script's own: the methods of the object whose method calls them, and the static methods of the
+  class whose code does, as C# code can take away only the handlers it holds. A function expression
+  belongs to no object (AS3's `this` there is not the method's), so its listener there goes only with
+  `remove(f)`: keep it in a variable to take it away. A listener goes when its object is freed.
 - A method is a function wherever Godot takes one: `array.filter(isBig)`.
 - `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs.
 - A singleton is used by its class name: `Input.isActionPressed("jump")`, `Engine.timeScale = 0.5`,
@@ -290,11 +299,21 @@ package {
   One converts to an `int`, a `uint` or a `Number` where that is expected, and a `RangeError` says so if
   the value does not fit; `int(x)` written out cuts it, as in Flash. Arithmetic on it wraps at 64 bits,
   `/` gives a `Number`, and a comparison with a `Number` is exact.
+- Where Godot takes any type (`str`, `print`, `setMeta`), a `Number` goes as Godot's
+  float whatever its value, as C# keeps a `double` a `double`: `str(x)` of a `Number` that holds 2 is
+  `2.0`. An `int`, a `uint`, an `Int64`, and an expression whole by its form (`-5`, `i * 2`) go as
+  Godot's integer; write `int(x)` for one. Back from Godot into an untyped value, an integer that fits an
+  `int` is one, a larger one an `Int64`, and a whole float stays a `Number`.
 - Godot's global functions: `print("x", n)`, `lerpf(a, b, t)`, `clampi(v, 0, 10)`, `randf()`, `str(...)`.
   One that can give back anything (`lerp`, `max`) is used where the program says what it expects:
-  `var x:Number = lerp(a, b, 0.5)`.
+  `var x:Number = lerp(a, b, 0.5)`. Those that make text of their arguments (`str`, `print`, `pushError`
+  and the rest) write a null, and so a freed object, as `null` and undefined as `undefined`, as C#'s
+  `GD.Str` and `GD.Print` write a null (GDScript writes `<null>`).
 - A Godot object that has been freed is `null` to a script: `node == null` is true, `if (node)` is
-  false, and a member reached on it is AS3's null error, which says the object was freed.
+  false, `"" + node`, `String(node)`, `trace(node)`, `str(node)` and `print(node)` give `null` (GDScript's
+  text is `<Freed Object>`), an Array's text leaves it out as it leaves out a null, JSON writes it `null`,
+  `hash` and `isSame` take it as null, and a member reached on it is AS3's null error, which says the
+  object was freed.
 - `null` written for a default AS3 can't write takes Godot's own default, wherever it is in the call:
   `color.clamp(null, max)`.
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,
@@ -308,9 +327,12 @@ package {
   `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
   gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.
 
-**Refused by name until the next slices:** elements of Godot's untyped collections, passing Godot a
-script object of a class that extends none of Godot's, `as` from one of Godot's objects to a script class,
-and everything `kas3c run` refuses.
+**Refused by name until the next slices:** elements of Godot's untyped collections, `as` from one of
+Godot's objects to a script class, and everything `kas3c run` refuses.
+
+**Refused, and staying so:** a script object of a class that extends none of Godot's has no Godot object
+to give. An AS3 call that hands one to Godot is an AS3 error; when Godot reads one (a return, a field),
+it gets null and an error is printed. One of a class that extends a Godot class goes as its Godot object.
 
 How it works:
 
@@ -465,6 +487,10 @@ What the declarations decide beyond the names:
 - **Integers.** Godot's integer has 64 bits and is the AS3 type `Int64`. An integer is an `int` or a
   `uint` only where Godot's description says it is narrower: by a width mark, or by belonging to a type
   that stores 32-bit integers (`Vector2i` and its relatives, `PackedInt32Array`). Nothing is kept by hand.
+  The methods of Godot's built-in types carry no width mark in the description (`PackedByteArray.append`,
+  `encodeU32`, `Array.insert`, `removeAt`, `Color.hex`, `Basis.getEuler`, `Callable.unbind`), so they
+  take an `Int64`, and Godot cuts a wider value as GDScript does: `bytes.append(300)` stores 44. C#'s
+  narrower types for these come from classes written by hand, not from the description.
 - **Only virtual methods can be overridden.** Every other method, property and signal is `final`, so
   `override public function addChild(...)` is an error: the engine would never call it.
 - **`toString()` is AS3's.** A script writes `public function toString():String` as in any AS3 class.

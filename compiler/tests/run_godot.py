@@ -221,6 +221,9 @@ output = compare("statics.gd", [
     "a singleton's members through a variable", "a singleton variable that is null", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
     "listening", "heard", "cleared", "others still listen", "not listening", "a function written in place listens", "and is removed through its value", "input class", "same singleton",
     "singleton object",
+    "a singleton's listeners counted by their own script", "removeAll() on a singleton's signal takes the caller's own",
+    "and leaves the others' counted", "from another class, it takes that class's own", "from static code, its class's static listeners",
+    "from a function expression, which has no object, the class's static listeners", "nothing is left listening",
     "escape", "captured", "ready notice", "axis", "zero", "up", "red", "forward", "identity", "sum", "up y",
     "default key", "given key",
     "from angle", "hsv", "html", "euler", "image", "after orphans",
@@ -289,7 +292,11 @@ output = compare("functions.gd", [
     "anything as text", "a default is not shared",
     "max past what a Number holds", "lerp of vectors", "int of lerp cuts", "Boolean of max", "lerp and max as text",
     "lerp of anything", "lerp into the wrong type", "now", "zone", "a regular expression",
+    "a freed object as text", "a freed object to hash and isSame", "str of a freed object and of null",
+    "a freed object inside a collection", "a script object of no Godot class is not written as null", "a whole Number stays a float",
 ])
+check("functions.gd: trace shows a freed object as null", "traced: null" in output, output[-1200:])
+check("functions.gd: print shows a freed object and a null as null", "freed: null null" in output, output[-1200:])
 check("functions.gd: a wide whole number into a Number is a RangeError",
       "RangeError: 9007199254740993 does not fit a Number exactly.\n\tat Functions/widest()" in output, output[-1500:])
 
@@ -570,6 +577,9 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 	public function listen(other:Node):void { other.renamed.add(onRenamed); }
 	public function unlisten(other:Node):void { other.renamed.remove(onRenamed); }
 	private function onRenamed():void { h += %s; }%s
+	public function listenJoy():void { Input.joyConnectionChanged.add(onJoy); }
+	public function clearJoy():void { Input.joyConnectionChanged.removeAll(); }
+	private function onJoy(device:int, connected:Boolean):void { onRenamed(); }
 } }
 """
 ADDED = "\n\tpublic function added():String { return \"new\"; }"
@@ -607,7 +617,7 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 18, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 20, output[-1500:])
         check("%s: a reload that would drop an object whose class is gone is refused, and names it" % label,
               "an object of the class 'Later' is alive" in output, output[-1500:])
         check("%s: a reload asked for while AS3 runs says it was not made" % label,

@@ -2,7 +2,9 @@
 // them, which takes arguments of exact types and not boxed values. The interpreter passes the function's
 // signature, written by the generator: "lerpf 998901048 float float,float,float", and "varargs" at the
 // end for a function that takes any number of arguments.
-#include "godot_host.h"
+#include "godot_calls.h"
+
+#include "any.h"
 
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -64,6 +66,17 @@ bool fits(const Variant &p_value, int p_type) {
 	}
 }
 
+// An argument of a function that writes text: null (a freed object is null) and undefined in AS3's
+// words, as C#'s GD.Str and GD.Print write a null, not Godot's `<null>`.
+Variant text_argument(const vm::Argument &p_argument) {
+	Variant value = to_variant(p_argument.kind, p_argument.slot);
+	if (value.get_type() != Variant::NIL) {
+		return value;
+	}
+	const bool undefined = p_argument.kind == ir::Kind::Any && vm::any::tag(p_argument.slot) == vm::AnyTag::Undefined;
+	return to_godot(undefined ? std::string_view("undefined") : NULL_TEXT);
+}
+
 std::string type_name(int p_type) {
 	return p_type == ANYTHING ? "anything" : Variant::get_type_name((Variant::Type)p_type).utf8().get_data();
 }
@@ -80,6 +93,9 @@ struct GodotHost::Utility {
 	bool any_number = false;
 	// Null is a proper answer from it.
 	bool reads_a_value = false;
+	// It makes text of any number of arguments: str, print, push_error and the rest, the functions of any
+	// number of arguments that give back text or nothing.
+	bool writes_text = false;
 };
 
 GodotHost::GodotHost() = default;
@@ -111,6 +127,7 @@ const GodotHost::Utility *GodotHost::utility(std::string_view p_signature, std::
 	}
 	made->result = *result;
 	made->any_number = parts.size() > 4 && parts[4] == "varargs";
+	made->writes_text = made->any_number && (made->result == Variant::STRING || made->result == NOTHING);
 	// str_to_var, bytes_to_var and type_convert read a value out of their argument, and null is one.
 	made->reads_a_value = made->name.find("_to_var") != std::string::npos || made->name == "type_convert";
 	for (size_t at = 0; parts[3] != "-" && at <= parts[3].size();) {
@@ -156,7 +173,7 @@ bool GodotHost::call_utility(std::string_view p_signature, const vm::Argument *p
 	std::vector<int> made;
 	bool ok = true;
 	for (size_t i = 0; i < p_count && ok; i++) {
-		values[i] = to_variant(p_arguments[i].kind, p_arguments[i].slot);
+		values[i] = function->writes_text ? text_argument(p_arguments[i]) : to_variant(p_arguments[i].kind, p_arguments[i].slot);
 		const int type = function->any_number || i >= function->parameters.size() ? ANYTHING : function->parameters[i];
 		if (!fits(values[i], type)) {
 			*r_error = "Godot's '" + function->name + "' takes a " + type_name(type) + " for argument " + std::to_string(i + 1) + ", not a " +

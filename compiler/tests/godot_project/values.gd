@@ -73,7 +73,8 @@ func _physics_process(_delta: float) -> bool:
 	show("alive is set", ask("keptIsSet", []), true)
 	show("alive counts", ask("keptCounts", []), true)
 	gone.free()
-	show("freed text after", ask("keptText", []), "kept " + str(gone))
+	# Freed, it is null to the script, in words too (GDScript's text is `<Freed Object>`).
+	show("freed text after", ask("keptText", []), "kept null")
 	show("freed is null", ask("keptIsNull", []), true)
 	show("freed is not set", ask("keptIsSet", []), false)
 	show("freed does not count", ask("keptCounts", []), false)

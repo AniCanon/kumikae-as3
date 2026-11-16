@@ -41,6 +41,8 @@ package {
 		// Review of part C.
 		public function nothing():Boolean { print(); printerr(); pushWarning(); return true; }
 		public function wholes(i:int):String { return str(-5, " ", 5, " ", -5 + 2, " ", 0x10, " ", 2 * 3, " ", i * 2, " ", 1.5, " ", i / 2); }
+		// A Number goes to Godot as a float whatever its value, as C# keeps a double a double.
+		public function wholeNumber(n:Number):String { var meta:Node = new Node(); meta.setMeta("n", n); var back:* = meta.getMeta("n"); meta.free(); return str(n) + " " + str(back); }
 		public function noAnswer():String { var s:String = max("a", "b"); return s; }
 		public function shown(a:Number, b:Number, t:Number):String { var s:String = lerp(a, b, t); return s; }
 		public var pings:int = 0;
@@ -50,6 +52,42 @@ package {
 		// Date's clock and zone are the host's: compared with GDScript's, so that nothing depends on where it runs.
 		public function since(godot:Number):Boolean { return Math.abs(new Date().time - godot) < 5000; }
 		public function zone():int { return int(-new Date().timezoneOffset); }
+		// A freed object is null on every path that makes text, as a null is: AS3's text, which is also what
+		// C#'s GD.Str and GD.Print give for a null. hash and isSame take it as null.
+		private var kept:Node;
+		public function keep(n:Node):void { kept = n; }
+		public function freedTexts():String {
+			var none:Node = null;
+			var held:* = kept;
+			var nothing:* = none;
+			return ["" + kept, kept + "", String(kept), "" + held, String(held), "" + none, "" + nothing].join(",");
+		}
+		// In a collection, as a null is: an Array leaves it out of its text, a Vector writes it, JSON writes null.
+		public function freedInside():String {
+			var none:Node = null;
+			var nodes:Vector.<Node> = new <Node>[kept, none];
+			return ["" + [kept, 1], [kept, none, 2].join(";"), nodes.join(";"), JSON.stringify(kept), JSON.stringify([kept, none])].join(",");
+		}
+		public function freedTraced():void { trace("traced:", kept); }
+		// Godot's functions that make text of their arguments (str, print and the rest) write null as AS3
+		// does, as C#'s GD.Str and GD.Print do; a freed object is one.
+		public function freedStr():String {
+			var none:Node = null;
+			var held:* = kept;
+			var nothing:*;
+			return [str(kept), str(kept, none), str(held), str(none), str(null), str(nothing), str("a", null, 1)].join(",");
+		}
+		public function freedPrinted():void { print("freed: ", kept, " ", null); }
+		// Only a null is written so: a script object Godot has no form for is still refused.
+		public function plainStr():String {
+			var plain:* = new Plain();
+			try { return str(plain); } catch (e:Error) { return "refused"; }
+			return "carried on";
+		}		public function freedSame():String {
+			var none:Node = null;
+			var held:* = kept;
+			return [hash(kept) == hash(none), isSame(kept, none), isSame(kept, kept), hash(held) == hash(null), isSame(held, null)].join(",");
+		}
 		public function marked(text:String):String { return text.replace(/(\d+)/g, "<$1>") + " " + escape(text) + " " + encodeURIComponent("é"); }
 	}
 }

@@ -227,7 +227,9 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 			append_text(r_text, p_separator); // Text is joined as Concat joins it: two halves that meet are one character.
 		}
 		const Slot element = p_vector->data[i];
-		const bool nothing = kind == Kind::Any ? any::tag(element) == AnyTag::Null || any::tag(element) == AnyTag::Undefined
+		// A freed Godot object is null here too.
+		const AnyTag tag = kind == Kind::Any ? any::tag(present_or_null(element)) : AnyTag::Undefined;
+		const bool nothing = kind == Kind::Any ? tag == AnyTag::Null || tag == AnyTag::Undefined
 											   : held(kind) && !element.p;
 		if (leaves_out && nothing) {
 			continue;

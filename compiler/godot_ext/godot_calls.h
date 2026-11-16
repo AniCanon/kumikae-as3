@@ -51,6 +51,9 @@ public:
 // What reaching through an object Godot has freed is: AS3's null error, which says so.
 inline constexpr const char *FREED = "TypeError: Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.";
 
+// AS3's text for null, which a freed object reads as too.
+inline constexpr std::string_view NULL_TEXT = "null";
+
 // An object Godot has freed. To a script it is null.
 inline bool is_freed(const godot::Variant &p_value) {
 	return p_value.get_type() == godot::Variant::OBJECT && !((godot::ObjectID)p_value).is_null() && !p_value.get_validated_object();

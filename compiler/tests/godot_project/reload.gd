@@ -44,6 +44,7 @@ func _process(_delta: float) -> bool:
 	frames += 1
 	if stage == 0 and frames == 2:
 		ask("listen", [other])
+		ask("listenJoy")
 		ask("fill")
 		ask("bump")
 		ask("bump")
@@ -68,6 +69,12 @@ func _process(_delta: float) -> bool:
 		ask("unlisten", [other])
 		other.name = "third"
 		show("after an edit: a listener added before can be removed", ask("heard"), 11)
+		# A singleton's listener, added before: it is the object's own still, for removeAll().
+		Input.joy_connection_changed.emit(0, true)
+		show("after an edit: a singleton's listener added before runs the new code", ask("heard"), 21)
+		ask("clearJoy")
+		Input.joy_connection_changed.emit(0, true)
+		show("after an edit: removeAll() on a singleton's signal takes the object's own", ask("heard"), 21)
 		put("broken")
 		stage = 2
 	elif stage == 2 and waited(1500):
