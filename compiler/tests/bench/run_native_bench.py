@@ -3,7 +3,7 @@
 
     python3 run_native_bench.py <build dir> [--runs N] [--against <other build dir>]
 
-Each program (loop.as, vectors.as, values.as) is written as C++ by <build dir>/kas3c, built with the flags
+Each program (loop.as, vectors.as, values.as, and objects.as, which only this script times) is written as C++ by <build dir>/kas3c, built with the flags
 generated code is meant for against <build dir>'s libraries, and run turn and turn about with `kas3c run`
 of the same program: the median of the runs in milliseconds and the spread between the fastest and the
 slowest, then the two set against each other. The times are whole processes, start to end,
@@ -22,7 +22,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 COMPILER = os.path.dirname(os.path.dirname(HERE))
-PROGRAMS = ("loop.as", "vectors.as", "values.as")
+PROGRAMS = ("loop.as", "vectors.as", "values.as", "objects.as")
 FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops"]
 
 

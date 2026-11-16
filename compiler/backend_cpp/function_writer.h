@@ -80,7 +80,7 @@ class FunctionWriter {
 	bool whole_conversion(const ir::Instruction &p_in);
 	void remember_whole(const ir::Instruction &p_in);
 	// function_fast.cpp: an inline path for the usual case, and the thunk for the rest.
-	bool fast_vector(const ir::Instruction &p_in);
+	bool fast_object(const ir::Instruction &p_in); // A new object, a vector's elements and length.
 	bool fast_text(const ir::Instruction &p_in);
 	bool fast_untyped(const ir::Instruction &p_in);
 	bool fast_call(const ir::Instruction &p_in);

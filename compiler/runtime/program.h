@@ -139,4 +139,10 @@ struct Program {
 } // namespace rt
 } // namespace kas3
 
-extern "C" const kas3::rt::Program *kas3_program();
+// The one symbol a program library exports: built with hidden visibility, it shows nothing else.
+#if defined(_WIN32)
+#define KAS3_EXPORT __declspec(dllexport)
+#else
+#define KAS3_EXPORT __attribute__((visibility("default")))
+#endif
+extern "C" KAS3_EXPORT const kas3::rt::Program *kas3_program();

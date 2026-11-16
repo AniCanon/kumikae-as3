@@ -13,9 +13,13 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-bool FunctionWriter::fast_vector(const Instruction &p_in) {
+bool FunctionWriter::fast_object(const Instruction &p_in) {
 	const auto whole = [&](uint32_t p_register) { return kind(p_register) == Kind::I32 || kind(p_register) == Kind::U32; };
 	switch (p_in.op) {
+		case Op::New:
+			line("if (Object *const e = new_object(c, " + std::to_string(p_in.b) + ")) {");
+			put(p_in.a, "e");
+			break;
 		case Op::VecLength:
 			line("if (KAS3_LIKELY(" + reg(p_in.b) + ")) {");
 			line("\t" + reg(p_in.a) + " = static_cast<" + std::string(type_of(kind(p_in.a))) + ">(static_cast<Vector *>(" + reg(p_in.b) + ")->length);");

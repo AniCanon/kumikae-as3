@@ -216,7 +216,7 @@ std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, 
 	counted("const ThunkInfo", "THUNKS", thunks);
 	program += known_classes(p_module) + ", " + boolean(p_keeps_stack) + " };\n";
 	tables += program + "\n} // namespace\n\n} // namespace " + std::string(PROGRAM_NAMESPACE) + "\n\n";
-	tables += "extern \"C\" const kas3::rt::Program *kas3_program() {\n\treturn &" + std::string(PROGRAM_NAMESPACE) + "::PROGRAM;\n}\n";
+	tables += "extern \"C\" KAS3_EXPORT const kas3::rt::Program *kas3_program() {\n\treturn &" + std::string(PROGRAM_NAMESPACE) + "::PROGRAM;\n}\n";
 	return tables;
 }
 

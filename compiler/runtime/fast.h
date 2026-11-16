@@ -20,6 +20,11 @@ inline Slot *element(Object *p_vector, uint32_t p_index) {
 	return vector && p_index < vector->length ? vector->data + p_index : nullptr;
 }
 
+// A new object of the class, its fields as an object's are before its constructor runs, with one reference,
+// the caller's. Null for a class whose objects the cycle collector looks at (they are made on its list,
+// which is the library's), and when there is no memory.
+Object *new_object(Context *c, uint32_t p_class);
+
 // One String after another, a missing one reading "null". Null if there is no memory for it.
 inline Str *join(const Str *p_first, const Str *p_second) {
 	return vm::join_strings(p_first ? p_first->view() : std::string_view("null"), p_second ? p_second->view() : std::string_view("null"));

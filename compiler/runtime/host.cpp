@@ -1,5 +1,8 @@
 #include "host.h"
 
+#include "fast.h"
+#include "held.h"
+
 #include <cstdio>
 #include <cstdlib>
 
@@ -24,6 +27,9 @@ Host::Host(const Program &p_program, std::optional<double> p_now) :
 	null_text = vm::new_string("null");
 	context.null_text = null_text;
 	class_used.assign(program.class_count, 0);
+	for (const ir::Class &klass : module.classes) {
+		made_here.push_back(klass.element == Kind::Void && !klass.table && !klass.is_interface && !vm::may_hold_objects(klass));
+	}
 	context.globals = globals.data();
 	context.strings = strings.data();
 	context.class_used = class_used.data();
@@ -49,6 +55,18 @@ Host::~Host() {
 			vm::free_string(constant);
 		}
 	}
+}
+
+Object *new_object(Context *c, uint32_t p_class) {
+	if (!c->host->made_here[p_class]) {
+		return nullptr;
+	}
+	const ClassInfo &klass = c->classes[p_class];
+	Object *object = vm::new_object(p_class, klass.field_count, nullptr);
+	for (uint32_t i = 0; object && i < klass.field_count; i++) {
+		object->fields()[i] = vm::empty_value(static_cast<Kind>(klass.fields[i].kind) == Kind::F64, klass.fields[i].starts_null);
+	}
+	return object;
 }
 
 void free_object(Context *c, Object *p_object) {

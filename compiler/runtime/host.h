@@ -93,6 +93,9 @@ struct Host {
 	std::vector<Str *> strings;
 	Str *null_text = nullptr;
 	std::vector<uint8_t> class_used;
+	// Per class: its objects are plain fields that can lead to no other object, so the cycle collector
+	// does not look at them and new_object() can make one.
+	std::vector<uint8_t> made_here;
 	// The stack trace of the error on its way out, built as generated functions are left (as the
 	// interpreter builds its own: vm/interpreter_errors.cpp).
 	std::string trace;
