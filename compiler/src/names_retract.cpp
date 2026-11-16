@@ -114,10 +114,8 @@ void Compilation::retract(Unit &p_unit) {
 	}
 	p_unit.diagnostics = p_unit.parsed->diagnostics;
 	const bool broken = p_unit.diagnostics.has_errors();
-	if (broken || p_unit.broken) {
-		++doubt_state_; // What a broken file declares may differ now.
-	}
 	if (broken != p_unit.broken) {
+		++doubt_state_; // Which files are broken changed: every judgement goes.
 		broken ? ++broken_files_ : --broken_files_;
 	}
 	p_unit.broken = broken;

@@ -168,11 +168,6 @@ void Compilation::redeclare(std::vector<Unit *> &r_units, std::vector<Dependency
 		resolve_unit_signatures(*this, *unit);
 		keep_declared(*unit);
 	}
-	if (broken_files_) {
-		// Doubt follows a symbol through its types to their bases, further than any file records: every file
-		// is judged again while a file does not parse.
-		++doubt_state_;
-	}
 	// What was not declared again is gone.
 	for (auto &[slot, symbols] : tracking.retracted) {
 		for (Symbol *symbol : symbols) {
@@ -187,6 +182,14 @@ void Compilation::redeclare(std::vector<Unit *> &r_units, std::vector<Dependency
 	tracking.retracted.clear();
 	tracking.prints.begin_round(r_units);
 	tracking.prints.finish_round(r_changed);
+	if (broken_files_ && !r_changed.empty()) {
+		// Doubt follows a symbol through its types to their bases, further than any file records: while a file
+		// does not parse, every file is judged again when a declaration changed.
+		++doubt_state_;
+	}
+	for (Unit *unit : r_units) {
+		moved(*unit, r_changed);
+	}
 	for (const auto &[unit, broken] : broken_before) {
 		if (broken != unit->broken) {
 			// "Is already defined" is said otherwise of a definition in a file that does not parse.
@@ -231,6 +234,9 @@ void Compilation::prepare() {
 	tracking_->prints.begin_round(program);
 	tracking_->prints.finish_round(ignored);
 	for (Unit *unit : program) {
+		moved(*unit, ignored);
+	}
+	for (Unit *unit : program) {
 		std::vector<Dependency> keys;
 		declaration_dependencies(*unit, keys);
 		tracking_->index.set(unit->rank, DependencyIndex::Declarations, std::move(keys));
@@ -249,7 +255,7 @@ bool Compilation::update(const std::vector<std::pair<Unit *, std::shared_ptr<Par
 			return false;
 		}
 		tracking.replacing[unit] = parsed;
-		changed.push_back(on_positions(unit));
+		// A half of a property points into the old tree, which goes at the end of the update.
 		changed.push_back(on_halves(unit));
 		work.push_back(unit);
 	}
@@ -342,6 +348,19 @@ void Compilation::check_bodies(Unit &p_unit) {
 		body_dependencies(p_unit, keys);
 		tracking_->index.set(p_unit.rank, DependencyIndex::Bodies, std::move(keys));
 		tracking_->counts.bodies++;
+	}
+}
+
+// A file whose declarations moved to other lines or columns changes the messages that quote where they are.
+void Compilation::moved(Unit &p_unit, std::vector<Dependency> &r_changed) {
+	uint64_t positions = 0x9E3779B97F4A7C15ull;
+	for (const Symbol *symbol : p_unit.declared) {
+		const Position at = p_unit.source.position(symbol->offset);
+		positions = (positions ^ (((uint64_t)at.line << 32) | (uint32_t)at.column)) * 0xFF51AFD7ED558CCDull;
+	}
+	if (positions != p_unit.positions) {
+		p_unit.positions = positions;
+		r_changed.push_back(on_positions(&p_unit));
 	}
 }
 

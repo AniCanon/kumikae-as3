@@ -91,6 +91,7 @@ struct Unit {
 	size_t declared_references = 0;
 	size_t declared_cited = 0;
 	bool declared_failed_import = false;
+	uint64_t positions = 0; // Where its declarations are, as lines and columns: another file's message may say.
 
 	explicit Unit(std::shared_ptr<Parsed> p_parsed) :
 			parsed(std::move(p_parsed)), source(parsed->source), diagnostics(parsed->diagnostics), tree(parsed->tree) {}
@@ -167,6 +168,7 @@ class Compilation {
 	// checked whole; the files an edit touched when updated.
 	void declare_files(const std::vector<Unit *> &p_units);
 	void redeclare(std::vector<Unit *> &r_units, std::vector<Dependency> &r_changed);
+	void moved(Unit &p_unit, std::vector<Dependency> &r_changed);
 	bool propagate(std::vector<Unit *> p_work, std::vector<Dependency> p_changed, std::vector<Unit *> p_done);
 	std::vector<Unit *> cycle_files(const std::vector<Symbol *> &p_classes, const std::vector<Unit *> &p_units);
 	void retract(Unit &p_unit); // names_retract.cpp
