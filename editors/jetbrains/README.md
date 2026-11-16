@@ -11,18 +11,19 @@ cover generated edits, diagnostics, Undo and project lifetime checks. The plugin
 Problems view and owns the cleanup needed by the tested Rider build. Install, update and uninstall
 require an IDE restart.
 
-**Current PR validation is blocked:** the final verifier rejects an internal LSP4IJ API call in the
-new diagnostic client. The table below records earlier validation, not acceptance of the current tree.
-See the [current results](../../docs/results/2026-11-completion-followup.md#validation).
+The automated validation of 2026-11-16 passes: the verifier finds no internal API in either IDE build, and
+the four sandbox probes pass, hover included. See the [current results](../../docs/results/2026-11-completion-followup.md#validation).
 
-Production focus behavior and manual editor acceptance remain separate from this automated coverage.
+Still left for a person: acceptance of the editing workflow by hand (and production focus behavior, which
+the background sandbox cannot show), a first run on Windows, and IDE builds older or newer than the two
+installed ones, which were not verified because that needs a download.
 
 | Checked | By | Result |
 |---|---|---|
-| Compilation, style check and plugin zip | Automated build, 2026-11-15 | `./gradlew check buildPlugin` succeeds. |
-| Service tests (`core`) | Automated build | 82 pass; three opt-in live probes skip in ordinary checks and passed separately. |
-| Plugin tests (language, project tools, panel and adapters) | Automated build | 168 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
-| Plugin verifier against installed Rider and IDEA | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170 and IU-261.22158.277, including LSP4IJ 0.21.0. |
+| Compilation, style check and plugin zip | Automated build, 2026-11-16 | `./gradlew check buildPlugin` succeeds, with no compiler warnings. |
+| Service tests (`core`) | Automated build | 85 pass; three opt-in live probes skip in ordinary checks. |
+| Plugin tests (language, project tools, panel and adapters) | Automated build | 174 pass; one opt-in retention probe skips in ordinary checks. |
+| Plugin verifier against installed Rider and IDEA | `./gradlew verifyPlugin`, 2026-11-16 | Compatible with RD-262.10968.170 and IU-261.22158.277, including LSP4IJ 0.21.0: on each, 0 internal, 6 deprecated, 45 experimental and 1 scheduled-for-removal API usages. |
 | Editor compatibility matrix | Four isolated sandbox probes | IDEA with/without LSP4IJ; Rider with/without LSP4IJ. Completion, parameter help, hover documentation, navigation and outline pass where the client is enabled; missing IDEA dependency is reported, and no hover is shown without it. |
 | Native Swift tests | `swift test` | 38 pass in 20 suites. |
 | Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
