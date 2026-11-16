@@ -1,5 +1,6 @@
 #include "generate.h"
 
+#include "facts.h"
 #include "function_writer.h"
 #include "names.h"
 #include "program_writer.h"
@@ -30,11 +31,12 @@ Generated generate(const ir::Module &p_module) {
 	}
 	ThunkTable thunks;
 	const bool keeps_stack = reads_error_stack(p_module);
+	const Facts facts = find_facts(p_module, keeps_stack);
 	std::vector<std::string> by_class(p_module.classes.size());
 	std::string of_no_class;
 	for (uint32_t i = 0; i < p_module.functions.size(); i++) {
 		const uint32_t owner = p_module.functions[i].owner;
-		(owner == ir::NONE ? of_no_class : by_class[owner]) += FunctionWriter(p_module, i, thunks, keeps_stack).write();
+		(owner == ir::NONE ? of_no_class : by_class[owner]) += FunctionWriter(p_module, i, thunks, keeps_stack, &facts).write();
 	}
 	out.files.push_back(File{ std::string(HEADER), write_header(p_module) });
 	// Two classes of one name in two packages, or one called `program`, still get a file each.

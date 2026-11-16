@@ -225,6 +225,11 @@ bool object_text(Context *c, Object *p_object, Str **r_text) {
 	if (static_cast<Kind>(own.result) != Kind::Str || own.parameters != 1) {
 		return false;
 	}
+	// A function that cannot fail leaves the depth to its caller (the generator's facts.h): here, this.
+	if (KAS3_UNLIKELY(c->depth >= MAX_DEPTH)) {
+		stack_overflow(c);
+		return true;
+	}
 	*r_text = reinterpret_cast<Str *(*)(Context *, Object *)>(own.direct)(c, p_object);
 	return true;
 }

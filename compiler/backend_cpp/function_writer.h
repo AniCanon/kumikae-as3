@@ -9,6 +9,7 @@
 //     through its handlers, or by `failed`, which puts its line into the trace.
 #pragma once
 
+#include "facts.h"
 #include "ir.h"
 #include "thunks.h"
 
@@ -37,6 +38,7 @@ class FunctionWriter {
 	// The program reads the stack of an error nothing threw: each function keeps a StackFrame, and says
 	// which line it is on before anything that may run code.
 	const bool keeps_stack_;
+	const Facts *const facts_; // Null while the facts themselves are being found: nothing is known of any callee.
 	std::string body_;
 	std::vector<bool> targets_; // Per instruction: a jump lands on it.
 	std::vector<bool> written_; // Per register: an instruction writes it.
@@ -93,7 +95,8 @@ class FunctionWriter {
 	bool object(const ir::Instruction &p_in); // function_objects.cpp: fields, globals, classes.
 	bool flow(const ir::Instruction &p_in); // Jumps, returns, throws.
 	bool call(const ir::Instruction &p_in); // function_calls.cpp
-	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target);
+	// p_direct: the callee is the very function p_callee, and not one found in a table as the call is made.
+	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target, bool p_direct);
 	void by_thunk(const ir::Instruction &p_in);
 	std::string_view parts(uint32_t p_register) const; // The value with parts the register holds inline, if it does.
 	void dispatch(const ir::Instruction &p_in); // The instruction written by whichever part owns it.
@@ -125,9 +128,11 @@ class FunctionWriter {
 	std::string handlers() const;
 
 public:
-	FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack);
+	FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts);
 	// The function's definition, and after it its entry (the function called with slots).
 	std::string write();
+	// Once written: whether anything in it can raise an error.
+	bool fails() const { return fails_; }
 };
 
 } // namespace backend_cpp

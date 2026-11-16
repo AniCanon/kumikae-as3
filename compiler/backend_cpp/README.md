@@ -12,6 +12,7 @@ holds every program of `tests/run/` to the same output under both.
 |---|---|
 | `generate.h`, `generate.cpp` | The entry point: the files, or the first thing not translated yet |
 | `support.h`, `support.cpp` | What is refused, asked before anything is written; whether the program reads an Error's stack |
+| `facts.h`, `facts.cpp` | What is known of every function before any is written: which cannot fail |
 | `names.h`, `names.cpp` | Identifiers, C++ types and literals for the things of a module |
 | `function_writer.h`, `function_writer.cpp` | One function: its registers as locals, who owns what, labels, the error paths and handlers, and its entry (the same function called with slots) |
 | `patterns.h`, `function_simple.cpp` | The operations that are one C++ statement, as a table (arithmetic, conversions, comparisons), and constants |
@@ -40,6 +41,10 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   its handlers, or leaves by `failed`, which puts its line into the trace: nothing about lines is kept
   while a program runs. (A program that reads `getStackTrace()` is the exception: its functions keep a
   `StackFrame` each, because that stack is of an error nothing threw.)
+- A function in which nothing can fail (so one that calls nothing of the program's) keeps no count of the
+  depth and sets no error. A call of it looks at the depth first, in its place (`deep`, a local the caller
+  sets once), and for no error afterwards; a call through a table, which may reach such a function, looks
+  first as well. Error #1023 comes at the same call either way (`tests/run/deep_leaf.as`).
 - A null check is explicit, and left out on `this`.
 - `#line` markers point at the `.as` source.
 

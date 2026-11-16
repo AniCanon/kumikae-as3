@@ -1,0 +1,68 @@
+"""What `kas3c cpp` writes for the benchmark's script, where its shape is its speed.
+
+Usage: test_generated.py <kas3c> <tests dir>
+
+run_native.py holds what generated code does to the interpreter; this holds how it does the things the
+timings rest on, so that a change that undoes one fails here and not only in a benchmark:
+
+  - a method that calls nothing and cannot fail keeps no count of the depth, and a call of it is not
+    followed by a look at whether an error is on its way out.
+"""
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+kas3c = os.path.abspath(sys.argv[1])
+tests = os.path.abspath(sys.argv[2])
+failures = []
+
+
+def check(name, condition, detail=""):
+    if not condition:
+        failures.append("%s\n%s" % (name, detail))
+
+
+def functions(folder, file):
+    """{name: body} for the functions of one generated file, each without its #line markers."""
+    text = open(os.path.join(folder, file)).read()
+    found = {}
+    for match in re.finditer(r"^[\w:\* ]+?\bf\d+_(\w+)\(Context \*c[^\n]*\) \{\n(.*?)^\}\n", text, re.M | re.S):
+        found[match.group(1)] = "\n".join(line for line in match.group(2).split("\n") if not line.startswith("#line"))
+    return found
+
+
+def loops(body):
+    """The text of each loop: from a label to the last jump back to it."""
+    found = []
+    for label in re.findall(r"^(L\d+):;$", body, re.M):
+        start = body.index(label + ":;")
+        back = body.rfind("goto %s;" % label)
+        if back > start:
+            found.append(body[start:back])
+    return found
+
+
+with tempfile.TemporaryDirectory() as where:
+    sources = os.path.join(tests, "bench", "languages")
+    written = subprocess.run([kas3c, "cpp", "--godot", "CmpAs.as", "-o", where], capture_output=True, text=True, cwd=sources)
+    check("CmpAs.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        made = functions(where, "CmpAs.cpp")
+        work = made.get("CmpAs_work", "")
+        check("work is found", work and len(loops(work)) == 1, work)
+        inside = "".join(loops(work))
+        check("work does not look for an error after calls that cannot fail", "c->failing" not in inside, inside)
+        check("work calls its two methods", "CmpAs_scaled(" in inside and "CmpAs_bump(" in inside, inside)
+        for leaf in ("CmpAs_scaled", "CmpAs_bump"):
+            body = made.get(leaf, "")
+            check("%s is found" % leaf, bool(body))
+            check("%s keeps no count of the depth" % leaf, "c->depth" not in body and "stack_overflow" not in body, body)
+        vec = made.get("CmpAs_vec", "")
+        check("vec, which calls nothing, keeps no count of the depth", vec and "c->depth" not in vec, vec)
+
+for failure in failures:
+    print("FAIL " + failure[:2500])
+print("generated: %s" % ("OK" if not failures else "%d failed" % len(failures)))
+sys.exit(1 if failures else 0)

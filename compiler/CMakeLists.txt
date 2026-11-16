@@ -144,6 +144,9 @@ add_executable(bench_recheck tools/bench_recheck.cpp)
 target_link_libraries(bench_recheck PRIVATE kas3lsp)
 
 add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:kas3c>)
+# What `kas3c cpp` writes, where its shape is its speed.
+add_test(NAME generated COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_generated.py
+    $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME lsp_stdio COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp_stdio.py $<TARGET_FILE:kas3c>)
 add_test(NAME programs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_programs.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)

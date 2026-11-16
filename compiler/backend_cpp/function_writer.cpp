@@ -32,8 +32,9 @@ Signature signature_of(const ir::Function &p_function) {
 	return signature;
 }
 
-FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack) :
-		module_(p_module), index_(p_function), function_(p_module.functions[p_function]), thunks_(r_thunks), keeps_stack_(p_keeps_stack) {
+FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack, const Facts *p_facts) :
+		module_(p_module), index_(p_function), function_(p_module.functions[p_function]), thunks_(r_thunks), keeps_stack_(p_keeps_stack),
+		facts_(p_facts) {
 	analyse();
 }
 
@@ -270,15 +271,16 @@ std::string FunctionWriter::prologue() const {
 	if (gives) {
 		add(declared(function_.result, "result") + " = " + std::string(zero_of(function_.result)) + ";");
 	}
-	// A function in which nothing can fail calls nothing of the program's: it is still one call too deep
-	// at the limit, but nothing below it sees the depth, and its one frame fits in what the stack's floor
-	// leaves free. Measured on tests/bench/loop.as, whose two callees are such, against the build before the
-	// stack was looked at: 9.1 ms to its 7.9 ms with the look in every function, 7.4 ms to its 7.4 ms with
-	// this rule (a machine under load: only the pairs compare).
-	const std::string too_deep = fails_ ? "c->depth >= MAX_DEPTH || stack_low(c)" : "c->depth >= MAX_DEPTH";
-	add("if (KAS3_UNLIKELY(" + too_deep + ")) { stack_overflow(c); return" + (gives ? " result" : "") + "; }");
+	// A function in which nothing can fail calls nothing of the program's. It is still one call too deep
+	// at the limit, which whoever calls it sees to before the call (`deep`, below; its entry, for a call
+	// from outside): it keeps no count itself, sets no error, and its one frame fits in what the stack's
+	// floor leaves free.
 	if (fails_) {
+		add("if (KAS3_UNLIKELY(c->depth >= MAX_DEPTH || stack_low(c))) { stack_overflow(c); return" + std::string(gives ? " result" : "") + "; }");
 		add("c->depth++;");
+		// Whether a call from here is one too deep: asked once, of a count nothing moves while this runs.
+		add("const bool deep = c->depth >= MAX_DEPTH;");
+		add("(void)deep;");
 	}
 	if (keeps_stack_) {
 		add("StackFrame frame = { " + std::to_string(index_) + ", 0, c->frames };");
@@ -404,6 +406,9 @@ std::string FunctionWriter::write() {
 	// The same function for a caller that knows it only by its number: its arguments as slots.
 	const std::string call = function_name(module_, index_) + "(" + passed + ")";
 	out += "void " + entry_name(index_) + "(Context *c, const Slot *a, uint32_t n, Slot *r) {\n\t(void)a; (void)n; (void)r;\n";
+	if (!fails_) {
+		out += "\tif (KAS3_UNLIKELY(c->depth >= MAX_DEPTH)) { stack_overflow(c); return; }\n";
+	}
 	out += function_.result == Kind::Void ? "\t" + call + ";\n" : "\t*r = slot(" + call + ");\n";
 	return out + "}\n\n";
 }

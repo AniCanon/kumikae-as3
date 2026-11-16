@@ -33,7 +33,8 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 - **The depth of calls** is counted (`c->depth`), so that Error #1023 comes at the 10,001st call as it does
   under the interpreter. A generated function's frame is on the thread's stack, though, where the
   interpreter's are on the heap: a function that finds its frame below `c->stack_floor` raises the same
-  Error rather than run off the stack's end (`stack_low`). The host with no engine runs a program on a
+  Error rather than run off the stack's end (`stack_low`). A function that cannot fail leaves the count to
+  whoever calls it (`backend_cpp/facts.h`). The host with no engine runs a program on a
   thread with 512 MB of stack, so that the count is what ends a recursion.
 - **Errors** are `c->failing` and `c->pending`. A trace is built on the error path, by each function an
   error leaves (`leave_failed`).
