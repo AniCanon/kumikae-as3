@@ -12,6 +12,7 @@
 
 #include <mutex>
 #include <unordered_set>
+#include <vector>
 
 using namespace godot;
 using kas3::Project;
@@ -42,9 +43,20 @@ AS3Script::~AS3Script() {
 }
 
 void AS3Script::refresh_all() {
-	AllScripts &all = all_scripts();
-	const std::lock_guard<std::mutex> held(all.lock);
-	for (AS3Script *script : all.scripts) {
+	// Held while each is refreshed, outside the lock: refreshing one calls into Godot. One being freed (its
+	// count gone to zero) gives a null reference, and is passed over.
+	std::vector<Ref<AS3Script>> scripts;
+	{
+		AllScripts &all = all_scripts();
+		const std::lock_guard<std::mutex> held(all.lock);
+		scripts.reserve(all.scripts.size());
+		for (AS3Script *script : all.scripts) {
+			if (Ref<AS3Script> kept(script); kept.is_valid()) {
+				scripts.push_back(kept);
+			}
+		}
+	}
+	for (const Ref<AS3Script> &script : scripts) {
 		if (!script->file_.empty()) {
 			script->set_file(String::utf8(script->file_.c_str()));
 		}
