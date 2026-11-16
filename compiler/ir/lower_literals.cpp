@@ -24,102 +24,161 @@ double Lowerer::literal_value(const NumberLit *p_literal) {
 	return std::strtod(text.c_str(), nullptr);
 }
 
+namespace {
+
+// The value of p_count hexadecimal digits of a literal's text from p_at, if all of them are there before its
+// closing quote.
+bool hex_digits(std::string_view p_text, size_t p_at, size_t p_count, uint32_t *r_value) {
+	uint32_t value = 0;
+	if (p_at + p_count > p_text.size() - 1) {
+		return false;
+	}
+	for (size_t i = 0; i < p_count; i++) {
+		char c = p_text[p_at + i];
+		int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+		if (digit < 0) {
+			return false;
+		}
+		value = value * 16 + (uint32_t)digit;
+	}
+	*r_value = value;
+	return true;
+}
+
+void append_utf8(uint32_t p_code, std::string *r_out) {
+	std::string &out = *r_out;
+	if (p_code < 0x80) {
+		out += (char)p_code;
+	} else if (p_code < 0x800) {
+		out += (char)(0xC0 | (p_code >> 6));
+		out += (char)(0x80 | (p_code & 0x3F));
+	} else if (p_code < 0x10000) {
+		out += (char)(0xE0 | (p_code >> 12));
+		out += (char)(0x80 | ((p_code >> 6) & 0x3F));
+		out += (char)(0x80 | (p_code & 0x3F));
+	} else {
+		out += (char)(0xF0 | (p_code >> 18));
+		out += (char)(0x80 | ((p_code >> 12) & 0x3F));
+		out += (char)(0x80 | ((p_code >> 6) & 0x3F));
+		out += (char)(0x80 | (p_code & 0x3F));
+	}
+}
+
+// `\uXXXX`, its `u` at *r_at: the character, and *r_at on the last digit read.
+void append_unicode_escape(std::string_view p_text, size_t *r_at, std::string *r_out) {
+	size_t &i = *r_at;
+	uint32_t code = 0;
+	if (hex_digits(p_text, i + 1, 4, &code)) {
+		i += 4;
+		// A high half written just before a low half is one character, held as its four bytes, as the
+		// runtime holds it (vm/text_units.h); a half with no partner is held alone.
+		uint32_t low = 0;
+		if (code >= 0xD800 && code < 0xDC00 && i + 2 < p_text.size() && p_text[i + 1] == '\\' && p_text[i + 2] == 'u' &&
+				hex_digits(p_text, i + 3, 4, &low) && low >= 0xDC00 && low < 0xE000) {
+			code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+			i += 6;
+		}
+		append_utf8(code, r_out);
+	} else {
+		*r_out += 'u';
+	}
+}
+
+// The escape whose letter is at *r_at, just after its backslash: what it stands for, and *r_at on the last
+// character it took.
+void append_escape(std::string_view p_text, size_t *r_at, std::string *r_out) {
+	size_t &i = *r_at;
+	std::string &out = *r_out;
+	char escape = p_text[i];
+	uint32_t code = 0;
+	switch (escape) {
+		case 'n':
+			out += '\n';
+			break;
+		case 't':
+			out += '\t';
+			break;
+		case 'r':
+			out += '\r';
+			break;
+		case 'b':
+			out += '\b';
+			break;
+		case 'f':
+			out += '\f';
+			break;
+		case '0':
+			out += '\0';
+			break;
+		case 'x':
+			if (hex_digits(p_text, i + 1, 2, &code)) {
+				append_utf8(code, r_out);
+				i += 2;
+			} else {
+				out += 'x';
+			}
+			break;
+		case 'u':
+			append_unicode_escape(p_text, r_at, r_out);
+			break;
+		default:
+			out += escape; // Quotes, the backslash, and anything else stand for themselves.
+			break;
+	}
+}
+
+} // namespace
+
 std::string Lowerer::unescape(std::string_view p_text) {
 	std::string out;
 	if (p_text.size() < 2) {
 		return out;
 	}
-	auto hex = [&](size_t p_at, size_t p_count, uint32_t *r_value) {
-		uint32_t value = 0;
-		if (p_at + p_count > p_text.size() - 1) {
-			return false;
-		}
-		for (size_t i = 0; i < p_count; i++) {
-			char c = p_text[p_at + i];
-			int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
-			if (digit < 0) {
-				return false;
-			}
-			value = value * 16 + (uint32_t)digit;
-		}
-		*r_value = value;
-		return true;
-	};
-	auto utf8 = [&](uint32_t p_code) {
-		if (p_code < 0x80) {
-			out += (char)p_code;
-		} else if (p_code < 0x800) {
-			out += (char)(0xC0 | (p_code >> 6));
-			out += (char)(0x80 | (p_code & 0x3F));
-		} else if (p_code < 0x10000) {
-			out += (char)(0xE0 | (p_code >> 12));
-			out += (char)(0x80 | ((p_code >> 6) & 0x3F));
-			out += (char)(0x80 | (p_code & 0x3F));
-		} else {
-			out += (char)(0xF0 | (p_code >> 18));
-			out += (char)(0x80 | ((p_code >> 12) & 0x3F));
-			out += (char)(0x80 | ((p_code >> 6) & 0x3F));
-			out += (char)(0x80 | (p_code & 0x3F));
-		}
-	};
 	for (size_t i = 1; i + 1 < p_text.size(); i++) {
 		char c = p_text[i];
 		if (c != '\\' || i + 2 >= p_text.size()) {
 			out += c;
 			continue;
 		}
-		char escape = p_text[++i];
-		uint32_t code = 0;
-		switch (escape) {
-			case 'n':
-				out += '\n';
-				break;
-			case 't':
-				out += '\t';
-				break;
-			case 'r':
-				out += '\r';
-				break;
-			case 'b':
-				out += '\b';
-				break;
-			case 'f':
-				out += '\f';
-				break;
-			case '0':
-				out += '\0';
-				break;
-			case 'x':
-				if (hex(i + 1, 2, &code)) {
-					utf8(code);
-					i += 2;
-				} else {
-					out += 'x';
-				}
-				break;
-			case 'u':
-				if (hex(i + 1, 4, &code)) {
-					i += 4;
-					// A high half written just before a low half is one character, held as its four bytes, as the
-					// runtime holds it (vm/text_units.h); a half with no partner is held alone.
-					uint32_t low = 0;
-					if (code >= 0xD800 && code < 0xDC00 && i + 2 < p_text.size() && p_text[i + 1] == '\\' && p_text[i + 2] == 'u' &&
-							hex(i + 3, 4, &low) && low >= 0xDC00 && low < 0xE000) {
-						code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
-						i += 6;
-					}
-					utf8(code);
-				} else {
-					out += 'u';
-				}
-				break;
-			default:
-				out += escape; // Quotes, the backslash, and anything else stand for themselves.
-				break;
-		}
+		++i;
+		append_escape(p_text, &i, &out);
 	}
 	return out;
 }
+
+namespace {
+
+// NaN and Infinity, or (p_of_number) Number's constants: the value of the one named. Nothing for any other.
+std::optional<double> number_constant_named(bool p_of_number, std::string_view p_name) {
+	const double infinity = std::numeric_limits<double>::infinity();
+	const double nan = std::numeric_limits<double>::quiet_NaN();
+	if (p_name == "NaN") {
+		return nan;
+	} else if ((!p_of_number && p_name == "Infinity") || (p_of_number && p_name == "POSITIVE_INFINITY")) {
+		return infinity;
+	} else if (p_of_number && p_name == "NEGATIVE_INFINITY") {
+		return -infinity;
+	} else if (p_of_number && p_name == "MAX_VALUE") {
+		return std::numeric_limits<double>::max();
+	} else if (p_of_number && p_name == "MIN_VALUE") {
+		return std::numeric_limits<double>::denorm_min(); // The smallest above zero, as in AS3.
+	}
+	return std::nullopt;
+}
+
+// Array's sort options.
+std::optional<uint32_t> array_sort_option(std::string_view p_name) {
+	constexpr std::pair<std::string_view, uint32_t> options[] = { { "CASEINSENSITIVE", 1 }, { "DESCENDING", 2 }, { "UNIQUESORT", 4 },
+		{ "RETURNINDEXEDARRAY", 8 }, { "NUMERIC", 16 } };
+	for (const auto &[option, value] : options) {
+		if (p_name == option) {
+			return value;
+		}
+	}
+	return std::nullopt;
+}
+
+} // namespace
 
 bool Lowerer::builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint32_t *r_reg) {
 	if (!p_symbol || !p_symbol->unit || !p_symbol->unit->is_builtin ||
@@ -128,30 +187,18 @@ bool Lowerer::builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint
 	}
 	const Symbol *owner = p_symbol->owner;
 	std::string_view name = p_symbol->name;
-	const double infinity = std::numeric_limits<double>::infinity();
-	const double nan = std::numeric_limits<double>::quiet_NaN();
 	if (!owner && name == "undefined") {
 		*r_reg = reg(Kind::Any);
 		emit(Op::AnyConst, p_position, *r_reg, 0);
 		return true;
 	}
 	if (!owner || owner == number_) {
-		double value = 0;
-		if (name == "NaN") {
-			value = nan;
-		} else if ((!owner && name == "Infinity") || (owner && name == "POSITIVE_INFINITY")) {
-			value = infinity;
-		} else if (owner && name == "NEGATIVE_INFINITY") {
-			value = -infinity;
-		} else if (owner && name == "MAX_VALUE") {
-			value = std::numeric_limits<double>::max();
-		} else if (owner && name == "MIN_VALUE") {
-			value = std::numeric_limits<double>::denorm_min(); // The smallest above zero, as in AS3.
-		} else {
+		const std::optional<double> value = number_constant_named(owner != nullptr, name);
+		if (!value) {
 			return false;
 		}
 		*r_reg = reg(Kind::F64);
-		emit(Op::ConstF64, p_position, *r_reg, number(value));
+		emit(Op::ConstF64, p_position, *r_reg, number(*value));
 		return true;
 	}
 	if (const std::optional<double> constant = math_constant(p_symbol)) {
@@ -170,15 +217,10 @@ bool Lowerer::builtin_constant(const Symbol *p_symbol, uint32_t p_position, uint
 		return true;
 	}
 	if (owner == array_ && array_) {
-		// Array's sort options.
-		constexpr std::pair<std::string_view, uint32_t> options[] = { { "CASEINSENSITIVE", 1 }, { "DESCENDING", 2 }, { "UNIQUESORT", 4 },
-			{ "RETURNINDEXEDARRAY", 8 }, { "NUMERIC", 16 } };
-		for (const auto &[option, value] : options) {
-			if (name == option) {
-				*r_reg = reg(Kind::U32);
-				emit(Op::ConstU32, p_position, *r_reg, value);
-				return true;
-			}
+		if (const std::optional<uint32_t> option = array_sort_option(name)) {
+			*r_reg = reg(Kind::U32);
+			emit(Op::ConstU32, p_position, *r_reg, *option);
+			return true;
 		}
 	}
 	if (owner == uint_ && (name == "MAX_VALUE" || name == "MIN_VALUE")) {
