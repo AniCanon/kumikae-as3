@@ -252,7 +252,7 @@ body edit at 1M lines gains. Against `5732e88` in the same session: a file joins
 367.264 ms at 1M lines, and leaves in 0.034 ms against 362.954 ms.
 
 A soak of 20,000 renames at 100k lines (a method, a class and a package, each to a new name and back) held
-resident memory at 88.5 MiB, from 86.4 MiB at its start.
+resident memory at 88.4 MiB from the 10,000th on, from 86.8 MiB at its start.
 
 Reading a declaration file's tags when it is declared, not when a body first uses the class, means its
 mistakes are said even when no file uses the class.
