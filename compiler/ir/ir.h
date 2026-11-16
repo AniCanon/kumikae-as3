@@ -301,6 +301,9 @@ struct Function {
 	uint32_t file = 0; // An index into Module::files.
 	uint32_t position = 0; // Of its name.
 	uint32_t owner = NONE; // The class, for a method or constructor.
+	// For a function written inside a method (owner NONE): the class whose code it is, which decides what
+	// it sees of objects by name.
+	uint32_t written_in = NONE;
 	bool is_static = false; // No receiver: a static method or a package function.
 	bool is_public = false; // A public method: Godot may call it by name.
 	// The first registers are the parameters; an instance method's first parameter is `this`.
@@ -458,7 +461,8 @@ std::string print_operand(const Module &p_module, const Function &p_function, ch
 // constructor (which also gives fields their first values), `_ready`, `_enter_tree` or `_init` (its own or
 // inherited), or what those call: by name, on the object itself (an override included), on another object
 // through the class it is declared as (any subclass's override included) or through an interface (any
-// class's that implements it). A field or method of the object a function runs on is compared by name, so
+// class's that implements it). A call on an untyped value, or through a function value, is not followed.
+// A field or method of the object a function runs on is compared by name, so
 // one added before it changes nothing and one renamed does. So a `_ready` that reaches much of the game
 // is changed by most edits to it. Objects that are alive ran the old version, so a
 // reload of the code alone does not show such a change. A class that is new, or gone, is not listed.

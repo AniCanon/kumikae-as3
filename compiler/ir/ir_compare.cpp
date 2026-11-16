@@ -84,7 +84,7 @@ std::string reached_text(const Module &p_module, std::vector<std::pair<uint32_t,
 			out += instruction_text(p_module, function, instruction, klass) + "\n";
 			const bool own = !function.is_static && instruction.c < function.argument_lists.size() &&
 					!function.argument_lists[instruction.c].empty() && function.argument_lists[instruction.c][0] == 0;
-			if (instruction.op == Op::Call) {
+			if (instruction.op == Op::Call) { // A constructor too: `new` calls it.
 				const uint32_t owner = instruction.b < p_module.functions.size() ? p_module.functions[instruction.b].owner : NONE;
 				pending.emplace_back(instruction.b, own ? on : owner);
 			} else if (instruction.op == Op::CallVirtual && own) {

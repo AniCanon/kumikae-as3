@@ -41,7 +41,9 @@ public:
 	Reload &operator=(const Reload &) = delete;
 
 	// The object's counterpart in the new program, with a reference of the caller's own. Null for null,
-	// and for an object whose class the new program does not have: missing() then names the class.
+	// and for an object whose class the new program does not have: missing() then names the class. Met in a
+	// field or an untyped value, such an object leaves null there; a host refuses a reload that met one
+	// (a library class made on first use, such as Date, counts: a build that no longer uses it lacks it).
 	Object *object(Object *p_old);
 	// Static fields and package variables, by name. A class whose static fields had been given their
 	// values is not given them again; one of its fields that is new starts empty.

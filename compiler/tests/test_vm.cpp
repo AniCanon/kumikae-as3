@@ -1514,13 +1514,14 @@ static void test_run_once_overrides() {
 static void test_run_once_other_objects() {
 	const char *base = "package { public class Game {\n"
 					   "  public var helper:Helper = new Helper(); public var thing:Doer = new Thing();\n"
-					   "  public function _ready():void { helper.go(); thing.act(); var s:int = helper.size; }\n"
+					   "  public function _ready():void { helper.go(); thing.act(); var s:int = helper.size; var m:Maker = new Maker(); }\n"
 					   "} }\n"
 					   "interface Doer { function act():void; }\n"
 					   "class Thing implements Doer { public var done:int; public function act():void { done = 1; } }\n"
 					   "class Helper { public var n:int; public function go():void { n = 1; } public function later():void { n = 7; }\n"
 					   "  public function get size():int { return 4; } }\n"
-					   "class Fancy extends Helper { override public function go():void { n = 5; } }\n";
+					   "class Fancy extends Helper { override public function go():void { n = 5; } }\n"
+					   "class Maker { public var k:int = 1; public function Maker() { k = 2; } }\n";
 	const auto changes = [&](const char *p_from, const char *p_to) {
 		std::string after = base;
 		after.replace(after.find(p_from), std::string(p_from).size(), p_to);
@@ -1537,6 +1538,9 @@ static void test_run_once_other_objects() {
 	CHECK_EQ(changes("{ n = 5; }", "{ n = 6; }"), std::string("Game;")); // An override in a subclass may run.
 	CHECK_EQ(changes("{ done = 1; }", "{ done = 3; }"), std::string("Game;"));
 	CHECK_EQ(changes("return 4;", "return 8;"), std::string("Game;"));
+	// An object made there: its constructor, and its fields' first values.
+	CHECK_EQ(changes("{ k = 2; }", "{ k = 3; }"), std::string("Game;Maker;")); // Maker too: its own objects ran it.
+	CHECK_EQ(changes("k:int = 1", "k:int = 5"), std::string("Game;Maker;"));
 	// What the code that runs once does not reach, and a field added before the one it sets, change nothing.
 	CHECK_EQ(changes("{ n = 7; }", "{ n = 8; }"), std::string());
 	CHECK_EQ(changes("public var n:int;", "public var m:int; public var n:int;"), std::string());

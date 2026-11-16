@@ -209,6 +209,8 @@ func _physics_process(_delta: float) -> bool:
 	show("by name from a subclass: its own private field", fields.child_entered_tree.get_connections().size(), 1)
 	fields.listenFromDerived("secret")
 	show("by name from a subclass: a base's private field is not reached", fields.tree_exiting.get_connections().size(), 0)
+	fields.listenInFunction("secret")
+	show("by name in a function written in the base: its private field", fields.tree_exiting.get_connections().size(), 1)
 	fields.listenFromBase("shout")
 	show("by name from a base: a subclass's public field first", [fields.get_signal_connection_list("shout").size(), fields.renamed.get_connections().size()], [1, 1])
 	node.reset()

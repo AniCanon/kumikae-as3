@@ -73,7 +73,8 @@ Slot Reload::carry_into(Kind p_kind, uint32_t p_class, Slot p_value) {
 	return out;
 }
 
-// Each property, in order. A key that is an object whose class is gone is left out, with its value.
+// Each property, in order. A key that is an object whose class is gone is left out, with its value, and
+// missing() names the class: a host refuses such a reload.
 void Reload::carry_entries(const Entries &p_from, Entries *p_to) {
 	for (const Entry &entry : p_from.all()) {
 		if (any::tag(entry.key) == AnyTag::Undefined) {

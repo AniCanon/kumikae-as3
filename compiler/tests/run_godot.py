@@ -176,7 +176,7 @@ output = compare("signals.gd", [
     "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "declared signal listed", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed", "own signal field by name", "by name from a base: its own private field",
-    "by name from a subclass: its own private field", "by name from a subclass: a base's private field is not reached",
+    "by name from a subclass: its own private field", "by name from a subclass: a base's private field is not reached", "by name in a function written in the base: its private field",
     "by name from a base: a subclass's public field first", "by name from outside: a public signal field",
     "by name from outside, the object typed as a Node: a public signal field",
     "by name from a subclass: a base's protected field", "by name from outside: a private or protected field is not reached", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
@@ -453,6 +453,11 @@ with tempfile.TemporaryDirectory() as edited:
 with tempfile.TemporaryDirectory() as edited:
     copy = os.path.join(edited, "project")
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    # As Godot's editor saves a scene: with a uid. (An AS3 script has none, so its ext_resource has none.)
+    with open(os.path.join(copy, "restart.tscn")) as file:
+        scene = file.read().replace("format=3]", 'format=3 uid="uid://b8kas3restart"]')
+    with open(os.path.join(copy, "restart.tscn"), "w") as file:
+        file.write(scene)
     sources = os.path.join(edited, "sources")
     shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
     environment = dict(os.environ)
@@ -464,6 +469,7 @@ with tempfile.TemporaryDirectory() as edited:
     check("scene_edit.gd ran to its end", run.returncode == 0 and len(values) == 3 and "leaked" not in output.lower(), output[-1500:])
     for name, got, want in values:
         check("scene_edit.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+    check("scene_edit.gd: no warning", "WARNING" not in output, re.findall(r"WARNING.*\n.*", output))
     check("scene_edit.gd: Godot is told why the scene started again", "the scene's file changed, so the scene starts again" in output,
           output[-1500:])
 
@@ -525,6 +531,8 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 """
 ADDED = "\n\tpublic function added():String { return \"new\"; }"
 
+HOLD = " public function holdLater():void { bag = new Later(); }"
+
 def reload_test(label, elsewhere):
     """Runs reload.gd in a copy of the project. With `elsewhere`, the scripts a person edits are in a
     folder outside the project, which the game is told of: what the project itself holds is stale."""
@@ -536,8 +544,10 @@ def reload_test(label, elsewhere):
             "Hot.as": HOT % (" public function fill():void { bag = new <Vector.<Hot>>[new Vector.<Hot>(), new Vector.<Hot>()]; }", "1", "1", ""),
             "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
             # Later is a class that reload.gd adds, alone, in a folder it makes: the watch must see it.
-            "hot_broken.txt": HOT % (" private var extra:String = \"x\";", "3 + Later.zero()", "10", ADDED),
-            "hot_v4.txt": HOT % (" private var extra:String = \"x\";", "4 + Later.zero()", "10", ADDED),
+            "hot_broken.txt": HOT % (" private var extra:String = \"x\";" + HOLD, "3 + Later.zero()", "10", ADDED),
+            "hot_v4.txt": HOT % (" private var extra:String = \"x\";" + HOLD, "4 + Later.zero()", "10", ADDED),
+            # Later is removed with it, while an untyped field holds one: the reload is refused.
+            "hot_v5.txt": HOT % (" private var extra:String = \"x\";", "5", "10", ADDED),
         }
         for name, text in versions.items():
             with open(os.path.join(copy, name), "w") as file:
@@ -554,7 +564,9 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 17, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 18, output[-1500:])
+        check("%s: a reload that would drop an object whose class is gone is refused, and names it" % label,
+              "an object of the class 'Later' is alive" in output, output[-1500:])
         check("%s: a reload asked for while AS3 runs says it was not made" % label,
               "can't be reloaded while AS3 runs" in output, output[-1500:])
         for name, got, want in values:

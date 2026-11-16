@@ -275,7 +275,7 @@ bool extends_class(const ir::Module &p_module, uint32_t p_class, uint32_t p_base
 // protected one from the code of its class and of subclasses, any other from the code of its class.
 bool field_seen(const Request &p_request, uint32_t p_class, size_t p_field) {
 	const ir::Field &field = p_request.module.classes[p_class].fields[p_field];
-	const uint32_t code = p_request.function.owner;
+	const uint32_t code = p_request.function.owner != NONE ? p_request.function.owner : p_request.function.written_in;
 	if (field.is_public || code == NONE) {
 		return field.is_public;
 	}

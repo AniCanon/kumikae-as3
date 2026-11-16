@@ -153,6 +153,7 @@ uint32_t Lowerer::closure_value(FunctionExpr *p_expression) {
 	made.file = fn().file;
 	made.position = position;
 	made.owner = NONE;
+	made.written_in = fn().owner != NONE ? fn().owner : fn().written_in;
 	made.is_static = false; // Its first register is the environment.
 	module_.functions.push_back(std::move(made));
 	const uint32_t index = static_cast<uint32_t>(module_.functions.size()) - 1;

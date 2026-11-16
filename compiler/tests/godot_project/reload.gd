@@ -102,6 +102,13 @@ func _process(_delta: float) -> bool:
 		emitter.call("fire")
 		emitter.free()
 		show("a reload asked for while AS3 runs is refused: the code stays", ask("value"), 4)
+		# An untyped field holds a Later; the next version, and the project, no longer have the class.
+		ask("holdLater")
+		DirAccess.remove_absolute(hot_path().get_base_dir().path_join("later/Later.as"))
+		put("v5")
+		stage = 5
+	elif stage == 5 and waited(1500):
+		show("a class gone while an object of it is alive: the game keeps the scripts it had", ask("value"), 4)
 		node.free()
 		other.free()
 		return true

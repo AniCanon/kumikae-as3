@@ -15,5 +15,11 @@ package {
 		// From the base's code: its own private field, never a subclass's private one; a subclass's public
 		// field before its own private one.
 		public function listenFromBase(name:String):void { this[name].add(heardOne); }
+		// From a function written in the base's code: what the base's code sees.
+		public function listenInFunction(name:String):void {
+			var me:SignalBase = this;
+			var listen:Function = function ():void { me[name].add(heardOne); };
+			listen();
+		}
 	}
 }

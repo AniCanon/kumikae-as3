@@ -265,7 +265,12 @@ void Project::reload_now() {
 		UtilityFunctions::push_error("ActionScript: the scripts can't be reloaded while AS3 runs: the reload was not made.");
 		return;
 	}
-	watch_loaded = watch_seen = scripts_signature(); // What is read now: the watch need not reload it again.
+	// Godot's debugger asks whenever the editor saves any script: nothing to do if no AS3 file changed.
+	const uint64_t now = scripts_signature();
+	if (program && program->valid_ && now == watch_loaded) {
+		return;
+	}
+	watch_loaded = watch_seen = now; // What is read now: the watch need not reload it again.
 	reload();
 }
 
