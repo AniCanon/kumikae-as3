@@ -15,7 +15,7 @@ turns the checked tree from `src/` into it.
 | `lowerer.h` | The one class: its state and every method's declaration |
 | `lower_flow.h` | What is kept of the loops and `try` statements around the code being lowered (`Loop`, `TryBlock`, `TryExit`) |
 | `lower_emit`, `lower_types`, `lower_places` | Registers and constants; kinds, conversions, default values; what can be read and written |
-| `lower_expressions` | Expressions, by kind |
+| `lower_expressions.h`, `lower_expressions` | Expressions: the lowerer's `expression()`, which converts a value to the kind wanted, and each kind of expression (the `Expressions` class, a friend of the lowerer) |
 | `lower_calls.h`, `lower_calls` | Calls (the `Calls` class, a friend of the lowerer): what a call is, a method or function of the program, a conversion, `trace`, `super(...)`, and a call's arguments as the function's parameters expect them |
 | `lower_operators.h`, `lower_operators` | Operators on two values (the `Operators` class, a friend of the lowerer): arithmetic, bitwise, string, logical, comparisons, equality, `is` and `as` |
 | `lower_statements.h`, `lower_statements` | Statements (the `Statements` class, a friend of the lowerer): locals, `if`, the loops, `switch`, `break`, `continue`, `return`, `throw` |

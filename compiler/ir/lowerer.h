@@ -209,6 +209,7 @@ class Lowerer {
 	friend class Classes; // Each class's place in the module: lower_classes.h
 	friend class Bodies; // The body of each function: lower_bodies.h
 	friend class Calls; // Calls: lower_calls.h
+	friend class Expressions; // Each kind of expression: lower_expressions.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 
@@ -249,17 +250,8 @@ class Lowerer {
 	// The first of the expressions from `p_from` up to `p_end` (all, by default) that can change a local, or null.
 	static Expr *writer(const List<Expr *> &p_expressions, uint32_t p_from = 0, uint32_t p_end = UINT32_MAX);
 
-	uint32_t evaluate(Expr *p_expression, Kind p_want);
 	uint32_t number_literal(Expr *p_expression, Kind p_want);
 	uint32_t number_constant(double p_value, Kind p_kind, Kind p_want, uint32_t p_position);
-	uint32_t name_value(Expr *p_expression);
-	uint32_t member_value(Expr *p_expression);
-	uint32_t new_value(Expr *p_expression);
-	uint32_t postfix(Expr *p_expression);
-	uint32_t conditional(Expr *p_expression, Kind p_want);
-
-	uint32_t unary(Unary *p_unary, Kind p_want);
-
 	static bool is_numeric(Kind p_kind);
 	static bool is_integral(Kind p_kind);
 
@@ -275,8 +267,6 @@ class Lowerer {
 	bool whole(const Expr *p_expression);
 
 	bool is_string_type(const Type *p_type) const;
-
-	uint32_t assign(Assign *p_assign);
 
 	void lower_unit(Unit &p_unit);
 
