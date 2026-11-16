@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The same three workloads in Godot C#, GDScript and AS3 (interpreted, and as native code), timed in one
+"""The same workloads in Godot C#, GDScript and AS3 (interpreted, and as native code), timed in one
 release export.
 
     python3 run.py [<extension project>] [--against <other extension project>] [--runs N]
@@ -24,6 +24,7 @@ export prints one table; with --runs N, the best of the runs is kept per cell.
   calls    200,000 rounds of property reads and writes, a method and a singleton's method on the engine
   script   3,000,000 calls of the script's own methods, with arithmetic and fields
   vectors  1,000,000 rounds of Vector2 arithmetic and normalized()
+  vectors3 1,000,000 rounds of Vector3 arithmetic, normalized() and dot()
 """
 import os
 import re
@@ -35,7 +36,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_EXTENSION = os.path.join(HERE, "..", "..", "godot_project")
 LIBRARY = os.path.join("bin", "libkas3_godot.dylib")
-WORKLOADS = (("spin", "calls"), ("work", "script"), ("vec", "vectors"))
+WORKLOADS = (("spin", "calls"), ("work", "script"), ("vec", "vectors"), ("vec3", "vectors3"))
 LANGUAGES = (("cs", "C#"), ("gd", "GDScript"), ("as", "AS3"))
 NATIVE = ("native", "AS3 native")
 COMPILER = os.path.abspath(os.path.join(HERE, "..", "..", ".."))

@@ -14,9 +14,9 @@ func _ready() -> void:
 	add_child(a)
 	nodes["as"] = a
 	await get_tree().process_frame
-	var names := {"cs": ["Spin", "Work", "Vec"], "gd": ["spin", "work", "vec"], "as": ["spin", "work", "vec"]}
-	var sizes := [200000, 3000000, 1000000]
-	for t in 3:
+	var names := {"cs": ["Spin", "Work", "Vec", "Vec3"], "gd": ["spin", "work", "vec", "vec3"], "as": ["spin", "work", "vec", "vec3"]}
+	var sizes := [200000, 3000000, 1000000, 1000000]
+	for t in sizes.size():
 		for who in ["gd", "cs", "as"]:
 			var best := 1 << 62
 			for r in 40:

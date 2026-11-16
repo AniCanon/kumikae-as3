@@ -2,3 +2,4 @@
 spin: thunks=0 unresolved=0
 work: thunks=0 unresolved=0
 vec: thunks=0 unresolved=0
+vec3: thunks=0 unresolved=0
