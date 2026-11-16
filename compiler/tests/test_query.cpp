@@ -385,6 +385,11 @@ static void test_override_completion() {
 	CHECK(!Overriding({ bases, head + "override public function done():void {}\noverride |\n} }" }).offered().has("done"));
 	CHECK(!Overriding({ bases, head + "public function |\n} }" }).offered().has("done"));
 	CHECK(!Overriding({ bases, head + "override get |\n} }" }).offered().has("hp"));
+	// A method named as a keyword is offered as well as the keyword.
+	const Offered keyword = Overriding({ { { "game/Base.as", "package game { public class Base { public function get():int { return 1; } } }" } },
+			head + "override |\n} }" }).offered();
+	CHECK_EQ(keyword.count("get"), size_t{2});
+	CHECK(keyword.find("get") && keyword.find("get")->edit);
 	const Offered in_body = Overriding({ bases, head + "function f():void { override | }\n} }" }).offered();
 	CHECK(in_body.find("done") && !in_body.find("done")->edit);
 }
