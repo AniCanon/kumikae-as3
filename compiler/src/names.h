@@ -2,7 +2,8 @@
 //
 // Three passes run over the syntax trees:
 //   declare  packages, their definitions, and each class's members            (names.cpp)
-//   link     imports, the class hierarchy, and the override rules             (names_link.cpp)
+//   link     imports, the class hierarchy, and the override rules             (names_link.cpp, names_lookup.cpp,
+//                                                                              names_members.cpp)
 //   bodies   every type name and every name inside a function                 (names_resolver.h lists its files)
 // The results are written onto the trees as `symbol` fields.
 #pragma once
