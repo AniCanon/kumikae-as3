@@ -8,6 +8,7 @@ host differs.
 | `interpreter.h`, `interpreter.cpp` | Frames, calls, the public entry points |
 | `interpreter_errors.cpp` | Errors: raising one, catching it, its stack trace, and reporting it to the host |
 | `interpreter_run.cpp` | The loop: one case per operation |
+| `interpreter_conversions.cpp`, `interpreter_time_limit.cpp` | What the loop hands on: an Int64 converted with a check, an object as text; the time limit on a call from outside (Error #1502) |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
 | `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
 | `interpreter_objects.cpp`, `runtime` | Lifetime of objects and strings |

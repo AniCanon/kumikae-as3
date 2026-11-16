@@ -13,7 +13,6 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-// Runs until the frame above p_depth returns. False if an error left it instead.
 // Two strings in order, or equal, as AS3 compares them. With a missing string the two are compared as
 // numbers: null is 0.
 static bool compare_strings(Op p_op, const Str *p_left, const Str *p_right) {
@@ -27,44 +26,6 @@ static bool compare_strings(Op p_op, const Str *p_left, const Str *p_right) {
 	const double left = p_left ? string_to_number(p_left->view()) : 0;
 	const double right = p_right ? string_to_number(p_right->view()) : 0;
 	return p_op == Op::LtStr ? left < right : left <= right;
-}
-
-
-// An Int64 where an int, a uint or a Number is expected, or a Number where an Int64 is, when the
-// program did not write the conversion: the value, or a RangeError that names it.
-void Interpreter::convert_checked(const Instruction &p_in, Slot *p_registers) {
-	Slot &out = p_registers[p_in.a];
-	const Slot &from = p_registers[p_in.b];
-	switch (p_in.op) {
-		case Op::I64ToI32:
-			if (const std::optional<int32_t> fitted = wide_to_int32(from.l)) {
-				set_int32(out, *fitted);
-			} else {
-				raise(module_.range_error_class, std::to_string(from.l) + " does not fit an int.");
-			}
-			break;
-		case Op::I64ToU32:
-			if (const std::optional<uint32_t> fitted = wide_to_uint32(from.l)) {
-				set_uint32(out, *fitted);
-			} else {
-				raise(module_.range_error_class, std::to_string(from.l) + " does not fit a uint.");
-			}
-			break;
-		case Op::I64ToF64:
-			if (const std::optional<double> fitted = wide_to_number(from.l)) {
-				out.d = *fitted;
-			} else {
-				raise(module_.range_error_class, std::to_string(from.l) + " does not fit a Number exactly.");
-			}
-			break;
-		default:
-			if (const std::optional<int64_t> fitted = number_to_wide(from.d)) {
-				out.l = *fitted;
-			} else {
-				raise(module_.range_error_class, number_to_string(from.d) + " does not fit an Int64.");
-			}
-			break;
-	}
 }
 
 // A statement is about to run: once in a while the clock is looked at, and the debugger's hook, if there is
@@ -86,29 +47,6 @@ void Interpreter::at_statement() {
 		stopped_ = true;
 		halted_ = true;
 	}
-}
-
-// A run that has gone on too long ends with Flash's error, which nothing catches.
-void Interpreter::look_at_clock() {
-	countdown_ = STATEMENTS_PER_LOOK;
-	if (!time_limit_ || failing_ || stopped_ || std::chrono::steady_clock::now() - entered_ <= std::chrono::milliseconds(time_limit_)) {
-		return;
-	}
-	raise(module_.error_class, timeout_message(time_limit_));
-	stopped_ = true;
-}
-
-void Interpreter::entering() {
-	if (entries_ == 0 && time_limit_) {
-		entered_ = std::chrono::steady_clock::now();
-		countdown_ = STATEMENTS_PER_LOOK;
-	}
-}
-
-std::string timeout_message(uint32_t p_milliseconds) {
-	return std::string("Error #1502: A script has executed for longer than the ") +
-			(p_milliseconds == Interpreter::FLASH_TIME_LIMIT ? "default " : "") + "timeout period of " +
-			number_to_string(p_milliseconds / 1000.0) + " seconds.";
 }
 
 // A new object of a class, its Number fields not yet a number.
@@ -196,28 +134,6 @@ void Interpreter::leave(const Function &p_function, const Instruction &p_in, con
 	}
 }
 
-// An object as text. A class that says how it reads has its toString() called, whose result lands in
-// the register.
-void Interpreter::object_to_text(const Instruction &p_in, Slot *p_registers) {
-	Object *object = static_cast<Object *>(p_registers[p_in.b].p);
-	const uint32_t own = object ? module_.classes[object->klass].to_string : NONE;
-	if (object && module_.classes[object->klass].element != Kind::Void) {
-		// A vector's elements, each in its own words: that may run the program and move the registers.
-		retain(object);
-		std::string all;
-		const bool done = vector_text(static_cast<Vector *>(object), ",", &all);
-		if (done) {
-			assign(Kind::Str, stack_[frames_.back().base + p_in.a], text(all));
-		}
-		release_object(object);
-	} else if (own != NONE) {
-		Slot self = p_registers[p_in.b];
-		push(own, &self, 1, p_in.a);
-	} else {
-		assign(Kind::Str, p_registers[p_in.a], text(object_text(object)));
-	}
-}
-
 // An object as a Number: what an untyped value holding it converts to (a Date's time; null is 0).
 void Interpreter::object_to_number(const Instruction &p_in, Slot *p_registers) {
 	const Slot value = to_any(Kind::Obj, p_registers[p_in.b]);
@@ -239,6 +155,7 @@ void Interpreter::trace(const std::vector<uint32_t> &p_list, const Slot *p_regis
 	host_.output.print(line);
 }
 
+// Runs until the frame above p_depth returns. False if an error left it instead.
 bool Interpreter::run(size_t p_depth, Slot *r_result) {
 	while (frames_.size() > p_depth) {
 		if (failing_ || stopped_) {
