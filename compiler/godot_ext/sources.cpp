@@ -1,5 +1,7 @@
 #include "sources.h"
 
+#include "watch.h"
+
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
@@ -56,8 +58,7 @@ namespace {
 
 // A folder as it was last listed: when it was last changed, and the files and folders in it.
 struct Folder {
-	bool listed = false;
-	uint64_t changed = 0;
+	Seen seen; // When it was listed, by the time it was last changed.
 	std::vector<std::string> files; // The scripts, and in a folder elsewhere its scenes and resources.
 	std::vector<String> folders;
 };
@@ -101,26 +102,20 @@ void list_folder(const String &p_folder, bool p_scenes, Folder *r_folder) {
 
 // The scripts under a folder (and its scenes, outside the project), by where they are, for the watch. Listing a folder is slow (on macOS, 20 to
 // 50 microseconds a name), so a folder is listed again only when it changed (a file made, removed or
-// renamed in it changes it) or changed in the last two seconds (its time is in whole seconds).
+// renamed in it changes it) or may have changed again within the second of its time (watch.h).
 void watched_files(const String &p_folder, uint64_t p_now, std::vector<std::string> &r_files) {
 	Folder &known = folders()[p_folder.utf8().get_data()];
 	// By the folder's place on the disk: Godot gives "res://" itself no time (0, as for a folder in a pack).
 	const uint64_t changed = FileAccess::get_modified_time(ProjectSettings::get_singleton()->globalize_path(p_folder));
-	if (!known.listed || known.changed != changed || changed + 2 >= p_now) {
+	look(known.seen, changed, p_now, [&]() {
 		list_folder(p_folder, scripts_root() != "res://", &known);
-		known.listed = true;
-		known.changed = changed;
-	}
+		return uint64_t(0);
+	});
 	r_files.insert(r_files.end(), known.files.begin(), known.files.end());
 	for (const String &inner : std::vector<String>(known.folders)) {
 		watched_files(inner, p_now, r_files);
 	}
 }
-
-// What a file was when last looked at: when it was written, and what it held if that was recent.
-struct Seen {
-	uint64_t written = 0, held = 0;
-};
 
 std::unordered_map<std::string, Seen> &seen() {
 	static std::unordered_map<std::string, Seen> all;
@@ -137,9 +132,9 @@ std::unordered_map<std::string, Ref<Resource>> &taken() {
 
 // What the project's scripts are now: every file, when it was last written, and what it held when it was
 // last read. The time is in whole seconds, so two saves within one are told apart only by what they hold:
-// a file is read again while it was written in the last two seconds, and what it held then is kept, so
-// that the signature does not change as the file grows old. (A file's size is not asked for: on macOS that
-// opens the file, and took most of a look, 150 microseconds a script.)
+// a file is read again for as long as another save of that time may have followed the last read
+// (watch.h), and what it held then is kept. (A file's size is not asked for: on macOS that opens the file,
+// and took most of a look, 150 microseconds a script.)
 uint64_t scripts_signature() {
 	const uint64_t now = static_cast<uint64_t>(Time::get_singleton()->get_unix_time_from_system());
 	std::vector<std::string> files;
@@ -153,18 +148,15 @@ uint64_t scripts_signature() {
 		}
 		const String file = String::utf8(path.c_str());
 		const uint64_t written = FileAccess::get_modified_time(file);
-		Seen &known = seen()[path];
-		if (known.written != written || written + 2 >= now) {
+		const uint64_t content = look(seen()[path], written, now, [&]() {
 			uint64_t held = 1469598103934665603ull;
-			if (written + 2 >= now) {
-				const PackedByteArray bytes = FileAccess::get_file_as_bytes(file);
-				for (int64_t i = 0; i < bytes.size(); i++) {
-					held = mix(held, bytes[i]);
-				}
+			const PackedByteArray bytes = FileAccess::get_file_as_bytes(file);
+			for (int64_t i = 0; i < bytes.size(); i++) {
+				held = mix(held, bytes[i]);
 			}
-			known = Seen{ written, held };
-		}
-		mixed = mix(mix(mixed, written), known.held);
+			return held;
+		});
+		mixed = mix(mix(mixed, written), content);
 	}
 	return mixed;
 }
