@@ -43,7 +43,7 @@ struct Asked final : vm::Runner {
 	}
 
 	void out_of_memory() override { rt::out_of_memory(c); }
-	bool failing() const override { return c->failing; }
+	bool failing() const override { return c->failing || c->host->interpreter->left_error(); }
 
 	bool call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override {
 		if (call_value(c, p_function, p_arguments, static_cast<uint32_t>(p_count), r_result)) {
@@ -88,6 +88,55 @@ void hand_back(Context *c, Kind p_kind, Slot p_made, Slot *r_out) {
 	} else {
 		c->host->interpreter->discard(p_kind, p_made);
 	}
+}
+
+// What is still the interpreter's own of the library (vm::Unmoved) may have left an error there: it is the
+// context's from here, as a thunk's catch makes it.
+void settle(Context *c) {
+	Host &host = *c->host;
+	if (!host.interpreter->left_error()) {
+		return;
+	}
+	const vm::Interpreter::Left left = host.interpreter->take_error();
+	if (left.stopped) {
+		host.stopped = true;
+		c->pending = empty();
+		c->failing = true;
+	} else if (c->failing) {
+		// What the interpreter raised to leave its own frames, in place of an error that is the context's.
+		host.interpreter->discard(Kind::Any, left.value);
+	} else {
+		Object *object = vm::any::tag(left.value) == AnyTag::Object ? static_cast<Object *>(vm::any::pointer(left.value)) : nullptr;
+		if (host.program.keeps_stack && object && is_class(c, object, host.program.known.error)) {
+			put(c, field<Str *>(object, ir::ERROR_STACK), vm::new_string(host.stack_text(object, false)));
+		}
+		c->pending = left.value;
+		c->failing = true;
+	}
+}
+
+// One of the library's functions in progress for generated code, where it may ask the interpreter for a
+// part that is still its own.
+struct Direct {
+	Context *const c;
+	explicit Direct(Context *p_context) :
+			c(p_context) {
+		c->host->direct++;
+	}
+	~Direct() {
+		c->host->direct--;
+		settle(c);
+	}
+	vm::Library library() const { return c->host->library(); }
+};
+
+// The vector an entry is handed first. Null, with AS3's TypeError #1009 raised, where there is none.
+Vector *vector_in(Context *c, const Slot *p_values) {
+	Vector *vector = static_cast<Vector *>(p_values[0].p);
+	if (!vector) {
+		raise_null(c);
+	}
+	return vector;
 }
 
 bool is_regexp(const Context *c, Slot p_any) {
@@ -160,6 +209,82 @@ void number_text(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_
 	Slot made = empty();
 	if (vm::number_text(library, format, (p_which & ir::NUMBER_TEXT_WIDE) != 0, p_values, p_count, &made)) {
 		hand_back(c, Kind::Str, made, r_out);
+	}
+}
+
+void vector_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+	const Direct direct(c);
+	vm::Library library = direct.library();
+	Slot made = empty();
+	if (vm::vector_call(library, static_cast<ir::VectorMethod>(p_which), p_values, p_count, r_out ? &made : nullptr) && r_out) {
+		*r_out = made;
+	}
+}
+
+void vector_get(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	if (Vector *vector = vector_in(c, p_values)) {
+		const Direct direct(c);
+		vm::Library library = direct.library();
+		vm::vector_get(library, vector, static_cast<Kind>(p_which), p_values[1], r_out);
+	}
+}
+
+void vector_set(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *) {
+	if (Vector *vector = vector_in(c, p_values)) {
+		const Direct direct(c);
+		vm::Library library = direct.library();
+		vm::vector_set(library, vector, static_cast<Kind>(p_which), p_values[1], p_values[2]);
+	}
+}
+
+void vector_length(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *r_out) {
+	if (const Vector *vector = vector_in(c, p_values)) {
+		r_out->u = vector->length;
+	}
+}
+
+void vector_set_length(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *) {
+	if (Vector *vector = vector_in(c, p_values)) {
+		const Direct direct(c);
+		vm::Library library = direct.library();
+		vm::vector_set_length(library, vector, p_values[1].u);
+	}
+}
+
+void vector_fixed(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *r_out) {
+	if (const Vector *vector = vector_in(c, p_values)) {
+		r_out->b = vector->fixed;
+	}
+}
+
+void vector_set_fixed(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *) {
+	if (Vector *vector = vector_in(c, p_values)) {
+		vector->fixed = p_values[1].b;
+	}
+}
+
+void vector_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	const Direct direct(c);
+	vm::Library library = direct.library();
+	if (Vector *made = vm::vector_new(library, p_which, p_values[0].u, p_values[1].b)) {
+		r_out->p = made;
+	}
+}
+
+void array_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+	const Direct direct(c);
+	vm::Library library = direct.library();
+	if (Vector *made = vm::array_new(library, p_which, p_values, p_count)) {
+		r_out->p = made;
+	}
+}
+
+void vector_from(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	const Direct direct(c);
+	vm::Library library = direct.library();
+	Slot made = empty();
+	if (vm::vector_from(library, p_which, p_values[0], &made)) {
+		*r_out = made;
 	}
 }
 

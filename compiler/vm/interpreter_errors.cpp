@@ -266,5 +266,22 @@ void Interpreter::report() {
 	trace_lines_ = 0;
 }
 
+Interpreter::Left Interpreter::take_error() {
+	Left left;
+	if (failing_) {
+		left.error = true;
+		left.value = pending_;
+		pending_.bits = 0;
+		failing_ = false;
+		trace_.clear();
+		trace_lines_ = 0;
+	} else if (stopped_ && !carried_.held) {
+		report();
+		stopped_ = false;
+		left.stopped = true;
+	}
+	return left;
+}
+
 } // namespace vm
 } // namespace kas3

@@ -106,6 +106,10 @@ struct Host final : vm::NativeCode {
 	// The interpreter holds the error that is on its way out, until the instruction beneath ends: see thunk().
 	bool carried = false;
 	uint32_t nesting = 0; // Thunks in progress, one inside another.
+	// Calls of the library's functions of plain values in progress (runtime/direct.cpp): like a thunk,
+	// generated code began what such a call leads to, and an error of a function called beneath it stays
+	// the context's.
+	uint32_t direct = 0;
 
 	// What the library's functions of plain values (vm/library.h) ask of whoever runs the program, answered
 	// for generated code (runtime/direct.cpp); and the library as those functions are handed it.

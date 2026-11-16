@@ -432,6 +432,16 @@ public:
 	Heap &heap() { return heap_; }
 	// And what its library still asks of the interpreter itself (vm/library.h, Unmoved).
 	Unmoved &unmoved() { return asked_; }
+	// An error one of those left on its way out, called with none of this interpreter's code running to
+	// carry it: taken over by the host, which is running the program. `stopped`: not even the error could
+	// be made, and what there was to say has been reported.
+	struct Left {
+		bool error = false;
+		bool stopped = false;
+		Slot value{};
+	};
+	bool left_error() const { return failing_ || (stopped_ && !carried_.held); }
+	Left take_error();
 
 	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
 	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of

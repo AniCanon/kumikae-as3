@@ -21,8 +21,8 @@ struct LibraryEntry {
 constexpr uint32_t NUMBER_TEXT_WIDE = 256;
 
 // The entry for an instruction of a function. It is handed the values the instruction reads, in the
-// instruction's order (a register operand, then each of its list); what it gives is the instruction's
-// first operand.
+// instruction's order (a register operand, then each of its list; the first operand too, where the
+// instruction reads it: VecSet's vector); what it gives is the instruction's first operand otherwise.
 inline LibraryEntry library_entry(const Function &p_function, const Instruction &p_in) {
 	switch (p_in.op) {
 		case Op::StrCall:
@@ -41,6 +41,27 @@ inline LibraryEntry library_entry(const Function &p_function, const Instruction 
 			const bool wide = p_function.registers[p_function.argument_lists[p_in.c][0]] == Kind::I64;
 			return LibraryEntry{ "number_text", p_in.b | (wide ? NUMBER_TEXT_WIDE : 0) };
 		}
+		case Op::VecCall:
+			return LibraryEntry{ "vector_call", p_in.b };
+		case Op::VecGet:
+			// An element by an index held as an int, a uint or a Number: the entry is told which.
+			return LibraryEntry{ "vector_get", static_cast<uint32_t>(p_function.registers[p_in.c]) };
+		case Op::VecSet:
+			return LibraryEntry{ "vector_set", static_cast<uint32_t>(p_function.registers[p_in.b]) };
+		case Op::VecLength:
+			return LibraryEntry{ "vector_length", 0 };
+		case Op::VecSetLength:
+			return LibraryEntry{ "vector_set_length", 0 };
+		case Op::VecFixed:
+			return LibraryEntry{ "vector_fixed", 0 };
+		case Op::VecSetFixed:
+			return LibraryEntry{ "vector_set_fixed", 0 };
+		case Op::VecNew:
+			return LibraryEntry{ "vector_new", p_in.b };
+		case Op::ArrayNew:
+			return LibraryEntry{ "array_new", p_in.b };
+		case Op::VecFrom:
+			return LibraryEntry{ "vector_from", p_in.c };
 		default:
 			return LibraryEntry{};
 	}

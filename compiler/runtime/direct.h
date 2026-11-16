@@ -19,6 +19,21 @@ void text_of_value(Context *c, uint32_t p_which, const Slot *p_values, uint32_t 
 void text_joined(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 // NumText: p_which is the format (an ir::NumberFormat), with ir::NUMBER_TEXT_WIDE for an Int64.
 void number_text(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// VecCall: p_which is the method (an ir::VectorMethod); the vector, then what the method takes.
+void vector_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// A vector's element read (the vector, the index) and written (the vector, the index, the value): p_which
+// is the kind (an ir::Kind) the index is held as. Its length and whether that is fixed, read and set.
+void vector_get(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void vector_set(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void vector_length(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void vector_set_length(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void vector_fixed(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void vector_set_fixed(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// A new vector (its length, whether that is fixed), a new Array (what `new Array` was given) and
+// Vector.<T>(x): p_which is the class.
+void vector_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void array_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void vector_from(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 
 } // namespace rt
 } // namespace kas3
