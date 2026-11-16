@@ -39,11 +39,14 @@ struct Unmoved {
 	virtual ~Unmoved() {}
 	// Whether a vector's element of the kind is the value looked for, as `===` has it.
 	virtual bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value) = 0;
-	// A typed value as an untyped one with a reference of its own, and an untyped one as a store into a
-	// place of the kind makes it (false if it raised); and that store refused, with its TypeError (false).
-	virtual Slot to_any(ir::Kind p_kind, Slot p_value) = 0;
-	[[nodiscard]] virtual bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out) = 0;
-	virtual bool coercion_failed(Slot p_value, ir::Kind p_kind, uint32_t p_check) = 0;
+	// An untyped value as a primitive (ECMAScript's ToPrimitive; with p_number, where a Number is wanted),
+	// with a reference of its own: an object's valueOf() or its text. False if it raised.
+	[[nodiscard]] virtual bool any_primitive(Slot p_value, Slot *r_out, bool p_number) = 0;
+	// One of Godot's Arrays or Dictionaries where an object of the class is wanted and the class is Array
+	// or Dictionary: *r_taken, and a new one of what it holds in r_out (false if the engine refused).
+	virtual bool object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) = 0;
+	// Whether one of Godot's values is such an Array or Dictionary for such a class.
+	virtual bool engine_is(Slot p_value, uint32_t p_class) = 0;
 	// An Array's property under a number that names no element, read (into an empty slot) and written.
 	virtual bool array_number_get(Vector *p_array, double p_number, Slot *r_out) = 0;
 	virtual bool array_number_set(Vector *p_array, double p_number, Slot p_value) = 0;
@@ -88,6 +91,21 @@ Object *new_error(Heap &p_heap, uint32_t p_class, Str *p_message);
 std::optional<std::string> number_words(Library &p_library, ir::NumberFormat p_format, Slot p_value, bool p_wide, double p_digits);
 // NumText: the same as a String, of its values (the number, then the radix or the digits as a Number).
 [[nodiscard]] bool number_text(Library &p_library, ir::NumberFormat p_format, bool p_wide, const Slot *p_values, size_t p_count, Slot *r_out);
+
+// A typed value as an untyped one with a reference of its own (undefined, with Error #1000 raised, when an
+// Int64 finds no memory); a Number as AVM2 holds one untyped (an int where it fits, an Int64 up to 2^53).
+Slot to_any(Library &p_library, ir::Kind p_kind, Slot p_value);
+Slot any_number(Library &p_library, double p_value);
+Slot any_wide(Library &p_library, int64_t p_value);
+// An untyped value as a store into a place of the kind makes it: AS3's coercion, checked against the class
+// (or, for one of Godot's, the engine name) p_check unless that is NONE. The value made has a reference
+// of its own. False if it raised; coercion_failed() raises AS3's TypeError #1034 for it, and gives false.
+[[nodiscard]] bool from_any(Library &p_library, Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
+bool coercion_failed(Library &p_library, Slot p_value, ir::Kind p_kind, uint32_t p_check);
+// `is` on an untyped value: of a class, or one of the ANY_IS_ tests of the value itself (5.0 is an int).
+bool any_is(Library &p_library, Slot p_value, uint32_t p_type);
+// Whether an object (null: no) is of the class, or of one that extends or implements it.
+bool is_class(const ir::Module &p_module, const Object *p_object, uint32_t p_class);
 
 // VecCall: one of a vector's or an Array's methods, on the vector and then what the method takes. r_out
 // may be null.

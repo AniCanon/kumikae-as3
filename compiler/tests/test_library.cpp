@@ -21,19 +21,12 @@ struct Recorder final : Runner, Unmoved {
 	bool failing() const override { return !raised.empty() || memory > 0; }
 	// Nothing here is still the interpreter's: these answer plainly.
 	bool element_is(Kind, Slot p_element, Slot p_value) override { return p_element.bits == p_value.bits; }
-	Slot to_any(Kind p_kind, Slot p_value) override { return p_kind == Kind::I32 ? any::integer(p_value.i) : p_value; }
-	bool from_any(Slot p_value, Kind p_kind, uint32_t, Slot *r_out) override {
-		r_out->bits = 0;
-		if (p_kind == Kind::F64) {
-			r_out->d = any::to_number(p_value);
-		} else if (p_kind == Kind::I32) {
-			r_out->i = static_cast<int32_t>(any::to_number(p_value));
-		} else {
-			*r_out = p_value;
-		}
+	bool any_primitive(Slot p_value, Slot *r_out, bool) override {
+		*r_out = p_value;
 		return true;
 	}
-	bool coercion_failed(Slot, Kind, uint32_t) override { return false; }
+	bool object_of_engine(Slot, uint32_t, bool *, Slot *) override { return false; }
+	bool engine_is(Slot, uint32_t) override { return false; }
 	bool array_number_get(Vector *, double, Slot *) override { return true; }
 	bool array_number_set(Vector *, double, Slot) override { return true; }
 	bool vector_text(Vector *, std::string_view, std::string *, bool) override { return true; }
@@ -294,9 +287,55 @@ void test_vectors() {
 	CHECK_EQ(live_objects(), static_cast<size_t>(0));
 }
 
+void test_untyped() {
+	kas3::ir::Module module = module_of_three();
+	module.type_error_class = ERROR;
+	module.range_error_class = ERROR;
+	Heap heap(module, NoEngine::instance(), NoEngine::instance());
+	Recorder recorder;
+	Library library{ heap, recorder, recorder };
+	// A whole Number is held as an int where it fits one, and as an Int64 up to 2^53.
+	CHECK(any::tag(to_any(library, Kind::F64, of_number(3))) == AnyTag::Int);
+	CHECK(any::tag(to_any(library, Kind::F64, of_number(3.5))) == AnyTag::Number);
+	CHECK(any::tag(to_any(library, Kind::F64, of_number(-0.0))) == AnyTag::Number);
+	const Slot large = to_any(library, Kind::F64, of_number(4294967296.0));
+	CHECK(any::tag(large) == AnyTag::Wide);
+	Slot out = of_number(0);
+	CHECK(from_any(library, large, Kind::I64, kas3::ir::NONE, &out));
+	CHECK(out.l == 4294967296);
+	CHECK(from_any(library, large, Kind::I32, kas3::ir::NONE, &out));
+	CHECK_EQ(out.i, 0); // An Int64 wraps into an int by its own low bits.
+	CHECK(any_is(library, large, kas3::ir::ANY_IS_NUMBER) && !any_is(library, large, kas3::ir::ANY_IS_INT));
+	heap.drop_any(large);
+	// Into a String: null and undefined are null, a number is its text.
+	CHECK(from_any(library, any::undefined(), Kind::Str, kas3::ir::NONE, &out));
+	CHECK(out.p == nullptr);
+	CHECK(from_any(library, any::integer(12), Kind::Str, kas3::ir::NONE, &out));
+	Str *twelve = static_cast<Str *>(out.p);
+	CHECK_EQ(std::string(twelve->view()), std::string("12"));
+	if (release(twelve)) {
+		free_string(twelve);
+	}
+	// An object where one of another class is wanted is the TypeError; of its own class or none, itself.
+	Object *error = new_error(heap, ERROR, nullptr);
+	CHECK(from_any(library, any::object(error), Kind::Obj, ERROR, &out));
+	CHECK(out.p == error);
+	heap.release_object(error);
+	CHECK(is_class(module, error, ERROR) && !is_class(module, error, URI_ERROR) && !is_class(module, nullptr, ERROR));
+	CHECK(any_is(library, any::object(error), ERROR) && !any_is(library, any::null(), kas3::ir::ANY_IS_OBJECT));
+	CHECK(!from_any(library, any::object(error), Kind::Obj, ARRAY, &out));
+	CHECK(recorder.raised.back().find("Error #1034: Type Coercion failed: cannot convert") == 0);
+	recorder.raised.clear();
+	CHECK(!from_any(library, any::number(1.5), Kind::I64, kas3::ir::NONE, &out));
+	CHECK_EQ(recorder.raised.size(), static_cast<size_t>(1));
+	heap.release_object(error);
+	CHECK_EQ(live_objects(), static_cast<size_t>(0));
+}
+
 } // namespace
 
 int main() {
+	test_untyped();
 	test_vectors();
 	test_number_text();
 	test_split();

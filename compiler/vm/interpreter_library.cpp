@@ -11,16 +11,26 @@ bool Interpreter::Asked::element_is(Kind p_kind, Slot p_element, Slot p_value) {
 	return vm.element_is(p_kind, p_element, p_value);
 }
 
-Slot Interpreter::Asked::to_any(Kind p_kind, Slot p_value) {
-	return vm.to_any(p_kind, p_value);
+bool Interpreter::Asked::any_primitive(Slot p_value, Slot *r_out, bool p_number) {
+	return vm.any_primitive(p_value, r_out, p_number);
 }
 
-bool Interpreter::Asked::from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_out) {
-	return vm.from_any(p_value, p_kind, p_check, r_out);
+bool Interpreter::Asked::object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) {
+	Object *made = nullptr;
+	if (vm.engine_array(p_value, p_class)) {
+		made = vm.array_of_engine(any::pointer(p_value), p_class);
+	} else if (vm.engine_dictionary(p_value, p_class)) {
+		made = vm.table_of_engine(any::pointer(p_value), p_class);
+	} else {
+		return false;
+	}
+	*r_taken = true;
+	r_out->p = made;
+	return made != nullptr;
 }
 
-bool Interpreter::Asked::coercion_failed(Slot p_value, Kind p_kind, uint32_t p_check) {
-	return vm.coercion_failed(p_value, p_kind, p_check);
+bool Interpreter::Asked::engine_is(Slot p_value, uint32_t p_class) {
+	return vm.engine_array(p_value, p_class) || vm.engine_dictionary(p_value, p_class);
 }
 
 bool Interpreter::Asked::array_number_get(Vector *p_array, double p_number, Slot *r_out) {

@@ -77,9 +77,9 @@ private:
 		bool text(Slot p_value, std::string *r_text) override { return vm.any_text(p_value, r_text); }
 		// What is still the interpreter's own (vm/interpreter_library.cpp).
 		bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value) override;
-		Slot to_any(ir::Kind p_kind, Slot p_value) override;
-		bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out) override;
-		bool coercion_failed(Slot p_value, ir::Kind p_kind, uint32_t p_check) override;
+		bool any_primitive(Slot p_value, Slot *r_out, bool p_number) override;
+		bool object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) override;
+		bool engine_is(Slot p_value, uint32_t p_class) override;
 		bool array_number_get(Vector *p_array, double p_number, Slot *r_out) override;
 		bool array_number_set(Vector *p_array, double p_number, Slot p_value) override;
 		bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale) override;
@@ -147,16 +147,12 @@ private:
 	std::vector<std::vector<Slot>> spare_slots_; // For SpareSlots: argument lists of calls through values.
 	void drop_any(Slot p_value) { heap_.drop_any(p_value); }
 	// The untyped value: vm/interpreter_any.cpp.
-	Slot to_any(ir::Kind p_kind, Slot p_value);
+	Slot to_any(ir::Kind p_kind, Slot p_value) { return vm::to_any(library_, p_kind, p_value); }
 	bool any_text(Slot p_value, std::string *r_text);
 	bool engine_text(void *p_handle, std::string *r_text);
-	bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
-	bool wide_from_any(Slot p_value, Slot *r_out);
-	bool text_from_any(Slot p_value, Slot *r_out);
-	bool object_from_any(Slot p_value, uint32_t p_check, Slot *r_out);
-	bool engine_from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
-	bool coercion_failed(Slot p_value, ir::Kind p_kind, uint32_t p_check);
-	bool any_is(Slot p_value, uint32_t p_type) const;
+	bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out) { return vm::from_any(library_, p_value, p_kind, p_check, r_out); }
+	bool coercion_failed(Slot p_value, ir::Kind p_kind, uint32_t p_check) { return vm::coercion_failed(library_, p_value, p_kind, p_check); }
+	bool any_is(Slot p_value, uint32_t p_type) { return vm::any_is(library_, p_value, p_type); }
 	bool engine_array(Slot p_value, uint32_t p_class) const;
 	Vector *array_of_engine(void *p_array, uint32_t p_class);
 	bool engine_dictionary(Slot p_value, uint32_t p_class) const;
@@ -170,8 +166,8 @@ private:
 	bool any_equality(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
 	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	Slot add_numbers(Slot p_a, Slot p_b);
-	Slot any_number(double p_value);
-	Slot any_wide(int64_t p_value);
+	Slot any_number(double p_value) { return vm::any_number(library_, p_value); }
+	Slot any_wide(int64_t p_value) { return vm::any_wide(library_, p_value); }
 	bool engine_add(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value) { heap_.assign(p_kind, p_slot, p_value); }
 	Slot share(ir::Kind p_kind, Slot p_value) { return heap_.share(p_kind, p_value); }
@@ -354,7 +350,7 @@ private:
 	std::string site(const Frame &p_frame) const;
 	std::string object_text(Object *p_object) const;
 	std::string error_heading(const Object *p_error) const; // "Name: message", as Error's toString() gives it.
-	bool is_class(const Object *p_object, uint32_t p_class) const;
+	bool is_class(const Object *p_object, uint32_t p_class) const { return vm::is_class(module_, p_object, p_class); }
 	// The function the object's class runs for an interface method; NONE, with the error raised, if the
 	// object is missing or its class has none.
 	uint32_t interface_function(const Object *p_object, uint32_t p_method);

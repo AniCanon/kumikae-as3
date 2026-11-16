@@ -195,7 +195,7 @@ bool vector_from(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_ou
 	}
 	const Kind given = object ? p_library.class_of(object).element : Kind::Void;
 	if (given == Kind::Void) {
-		return p_library.unmoved.coercion_failed(p_source, Kind::Obj, p_class);
+		return coercion_failed(p_library, p_source, Kind::Obj, p_class);
 	}
 	const Vector *from = static_cast<const Vector *>(object);
 	const ir::Class &klass = p_library.module().classes[p_class];
@@ -203,8 +203,8 @@ bool vector_from(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_ou
 	bool ok = made != nullptr;
 	for (uint32_t i = 0; ok && i < made->length; i++) {
 		// One taken out of the source as an earlier element spoke is undefined.
-		const Slot element = i < from->length ? p_library.unmoved.to_any(given, from->data[i]) : any::undefined();
-		ok = p_library.unmoved.from_any(element, klass.element, klass.element_check, &made->data[i]);
+		const Slot element = i < from->length ? to_any(p_library, given, from->data[i]) : any::undefined();
+		ok = from_any(p_library, element, klass.element, klass.element_check, &made->data[i]);
 		p_library.heap.drop_any(element);
 	}
 	if (!ok) {

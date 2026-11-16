@@ -83,7 +83,7 @@ bool sort_order(Library &p_library, Kind p_kind, const std::vector<Slot> &p_elem
 	const auto compare = [&](uint32_t p_a, uint32_t p_b) -> std::optional<double> {
 		double order = 0;
 		if (p_compare) {
-			Slot both[2] = { p_library.unmoved.to_any(p_kind, p_elements[p_a]), p_library.unmoved.to_any(p_kind, p_elements[p_b]) };
+			Slot both[2] = { to_any(p_library, p_kind, p_elements[p_a]), to_any(p_library, p_kind, p_elements[p_b]) };
 			Slot answer = any::undefined();
 			const bool called = p_library.runner.call(p_compare, both, 2, &answer);
 			p_library.heap.drop_any(both[0]);
@@ -92,7 +92,7 @@ bool sort_order(Library &p_library, Kind p_kind, const std::vector<Slot> &p_elem
 				return std::nullopt;
 			}
 			Slot number;
-			const bool ok = p_library.unmoved.from_any(answer, Kind::F64, NONE, &number);
+			const bool ok = from_any(p_library, answer, Kind::F64, NONE, &number);
 			p_library.heap.drop_any(answer);
 			if (!ok) {
 				return std::nullopt;
@@ -132,11 +132,11 @@ bool sort_keys(Library &p_library, Kind p_kind, const std::vector<Slot> &p_eleme
 	r_numbers->resize(p_elements.size());
 	r_texts->resize(p_elements.size());
 	for (uint32_t at : p_order) {
-		Slot untyped = p_library.unmoved.to_any(p_kind, p_elements[at]);
+		Slot untyped = to_any(p_library, p_kind, p_elements[at]);
 		bool ok = true;
 		if (p_options & NUMERIC) {
 			Slot number;
-			ok = p_library.unmoved.from_any(untyped, Kind::F64, NONE, &number);
+			ok = from_any(p_library, untyped, Kind::F64, NONE, &number);
 			(*r_numbers)[at] = number.d;
 		} else {
 			std::string text;
@@ -180,7 +180,7 @@ bool sort_behavior(Library &p_library, const VectorCall &p_call, Object **r_comp
 		return refuse(options);
 	}
 	Slot whole;
-	if (!p_library.unmoved.from_any(options, Kind::I32, NONE, &whole)) {
+	if (!from_any(p_library, options, Kind::I32, NONE, &whole)) {
 		return false;
 	}
 	*r_options = whole.i;
@@ -241,7 +241,7 @@ void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, cons
 			Slot made;
 			made.bits = 0;
 			made.p = indices;
-			give(p_library, p_call, Kind::Any, p_library.unmoved.to_any(Kind::Obj, made));
+			give(p_library, p_call, Kind::Any, to_any(p_library, Kind::Obj, made));
 			p_library.heap.release_object(indices);
 		}
 	} else {
@@ -249,7 +249,7 @@ void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, cons
 			p_library.heap.put(kind, p_vector->data[i], p_library.heap.share(kind, p_elements[p_order[i]]));
 		}
 		const Kind gives = klass.array ? Kind::Any : Kind::Obj;
-		give(p_library, p_call, gives, gives == Kind::Any ? p_library.unmoved.to_any(Kind::Obj, self) : p_library.heap.share(Kind::Obj, self));
+		give(p_library, p_call, gives, gives == Kind::Any ? to_any(p_library, Kind::Obj, self) : p_library.heap.share(Kind::Obj, self));
 	}
 }
 
@@ -267,7 +267,7 @@ bool sort_on_fields(Library &p_library, const VectorCall &p_call, std::vector<So
 	};
 	const auto number = [&](Slot p_value, int32_t *r_number) {
 		Slot whole;
-		const bool done = any::tag(p_value) == AnyTag::Undefined || p_library.unmoved.from_any(p_value, Kind::I32, NONE, &whole);
+		const bool done = any::tag(p_value) == AnyTag::Undefined || from_any(p_library, p_value, Kind::I32, NONE, &whole);
 		*r_number = any::tag(p_value) == AnyTag::Undefined ? 0 : whole.i;
 		return done;
 	};
@@ -319,7 +319,7 @@ bool sort_on_keys(Library &p_library, const std::vector<SortField> &p_fields, co
 			ok = p_library.unmoved.sort_field(p_elements[i], name, &value);
 			if (ok && (p_fields[f].options & NUMERIC)) {
 				Slot as_number;
-				ok = p_library.unmoved.from_any(value, Kind::F64, NONE, &as_number);
+				ok = from_any(p_library, value, Kind::F64, NONE, &as_number);
 				(*r_numbers)[f * count + i] = as_number.d;
 			} else if (ok) {
 				std::string words;
