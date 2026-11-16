@@ -274,8 +274,12 @@ package {
   A script saved while the editor is open is compiled again, and the stand-ins get its exported fields.
 - Signals are listened to the AS3 way: `timer.timeout.add(onTimeout)`, `add(f, true)` for the end of the
   frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`. Adding a listener twice does
-  nothing. `removeAll` and `numListeners` are about the listeners scripts added, not the engine's own. A
-  listener goes when its object is freed.
+  nothing. `removeAll` and `numListeners` are about the listeners scripts added, not the engine's own. On
+  a singleton's signal (`Input.joyConnectionChanged`), which the whole game shares, they are about the
+  calling script's own: the methods of the object whose method calls them, and the static methods of the
+  class whose code does, as C# code can take away only the handlers it holds. A function expression
+  belongs to no object (AS3's `this` there is not the method's), so its listener there goes with
+  `remove(f)`. A listener goes when its object is freed.
 - A method is a function wherever Godot takes one: `array.filter(isBig)`.
 - `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs.
 - A singleton is used by its class name: `Input.isActionPressed("jump")`, `Engine.timeScale = 0.5`,

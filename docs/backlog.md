@@ -64,8 +64,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - Godot calling a script from another thread (a method given to `WorkerThreadPool.addTask`) is refused
   with an error, and so is a field read or written from another thread. Running AS3 off the main thread
   waits for the `async` research. **2d**
-- `removeAll()` on a singleton's signal removes every script's listeners, not only the caller's.
-  **decision**
 
 ## Stage 2b-3, part B: `Int64`
 

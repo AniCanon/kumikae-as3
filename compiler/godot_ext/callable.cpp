@@ -245,6 +245,20 @@ bool is_script_listener(const Callable &p_callable) {
 	return p_callable.is_custom() && dynamic_cast<BoundMethod *>(p_callable.get_custom()) != nullptr;
 }
 
+bool listener_belongs_to(const Callable &p_callable, const vm::Object *p_object, uint32_t p_class) {
+	const BoundMethod *bound = p_callable.is_custom() ? dynamic_cast<const BoundMethod *>(p_callable.get_custom()) : nullptr;
+	if (!bound || !bound->alive()) {
+		return false;
+	}
+	// object_, not the key: a reload moves a listener onto the object's counterpart, which is the caller's
+	// `this` from then on.
+	const ir::Function &function = Project::get().module().functions[bound->function_];
+	if (function.owner == ir::NONE) {
+		return false;
+	}
+	return function.is_static ? function.owner == p_class : p_object && bound->object_ == p_object;
+}
+
 Variant *make_callable(vm::Object *p_object, uint32_t p_function, Object *p_owner) {
 	return make_handle(Callable(memnew(BoundMethod(p_object, p_function, p_owner))));
 }

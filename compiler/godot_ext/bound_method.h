@@ -31,6 +31,7 @@ class BoundMethod : public godot::CallableCustom {
 	friend bool kas3::listener_edges(uint64_t, vm::EngineNode *);
 	friend class ListenerRemoval;
 	friend void kas3::forget_listeners(const vm::Object *);
+	friend bool kas3::listener_belongs_to(const godot::Callable &, const vm::Object *, uint32_t);
 
 	vm::Object *object_;
 	// For a script object whose Godot object is reference-counted (counted_on()): the callable does not hold

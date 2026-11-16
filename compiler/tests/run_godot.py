@@ -221,6 +221,9 @@ output = compare("statics.gd", [
     "a singleton's members through a variable", "a singleton variable that is null", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
     "listening", "heard", "cleared", "others still listen", "not listening", "a function written in place listens", "and is removed through its value", "input class", "same singleton",
     "singleton object",
+    "a singleton's listeners counted by their own script", "removeAll() on a singleton's signal takes the caller's own",
+    "and leaves the others' counted", "from another class, it takes that class's own", "from static code, its class's static listeners",
+    "from a function expression, which has no object, the class's static listeners", "nothing is left listening",
     "escape", "captured", "ready notice", "axis", "zero", "up", "red", "forward", "identity", "sum", "up y",
     "default key", "given key",
     "from angle", "hsv", "html", "euler", "image", "after orphans",
@@ -573,6 +576,9 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 	public function listen(other:Node):void { other.renamed.add(onRenamed); }
 	public function unlisten(other:Node):void { other.renamed.remove(onRenamed); }
 	private function onRenamed():void { h += %s; }%s
+	public function listenJoy():void { Input.joyConnectionChanged.add(onJoy); }
+	public function clearJoy():void { Input.joyConnectionChanged.removeAll(); }
+	private function onJoy(device:int, connected:Boolean):void { onRenamed(); }
 } }
 """
 ADDED = "\n\tpublic function added():String { return \"new\"; }"
@@ -610,7 +616,7 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 18, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 20, output[-1500:])
         check("%s: a reload that would drop an object whose class is gone is refused, and names it" % label,
               "an object of the class 'Later' is alive" in output, output[-1500:])
         check("%s: a reload asked for while AS3 runs says it was not made" % label,
