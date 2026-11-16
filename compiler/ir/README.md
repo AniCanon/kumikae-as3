@@ -11,6 +11,8 @@ turns the checked tree from `src/` into it.
 | `ir_module.h` | A module: classes, fields, functions, handlers, globals |
 | `ir_print.cpp` | The text form the golden files hold |
 | `ir_compare.cpp` | What changed between two builds that a reload alone would not show (`run_once_changes`) |
+| `ir_reach.h` | What an instruction calls, and the code reached from a function, said once for the two files around it |
+| `ir_chain.cpp` | A class's constructor chain (`constructor_chain`): whether it depends only on its arguments and constants, so that a reload can run it again for an object that is alive, why not, and which constants it reads |
 | `lower.h`, `lower.cpp` | The entry point, and units and classes in order |
 | `lowerer.h` | The one class: its state, the methods every part of the lowering uses (registers, constants, kinds and conversions, places, `expression()`), and the helper classes it befriends. Each helper holds `Lowerer &l_`, is made where it is needed (`Statements(*this).statement(s)`), and keeps nothing from one use to the next: what lasts is the lowerer's |
 | `lower_env.h` | Places (where a value is stored), and what is kept of the variables function expressions capture |
@@ -55,4 +57,4 @@ turns the checked tree from `src/` into it.
   the arguments are worked out.
 - **A clean-up leaves the golden IR byte for byte** (`tests/run/*.ir`).
 
-Tests: `test_ir`, `test_vm`, and the `programs` group (`tests/run/`).
+Tests: `test_ir`, `test_constructors`, `test_vm`, and the `programs` group (`tests/run/`).
