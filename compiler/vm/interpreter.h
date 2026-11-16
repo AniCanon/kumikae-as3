@@ -135,6 +135,11 @@ private:
 	Slot to_any(ir::Kind p_kind, Slot p_value);
 	bool any_text(Slot p_value, std::string *r_text);
 	bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
+	bool wide_from_any(Slot p_value, Slot *r_out);
+	bool text_from_any(Slot p_value, Slot *r_out);
+	bool object_from_any(Slot p_value, uint32_t p_check, Slot *r_out);
+	bool engine_from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
+	bool coercion_failed(Slot p_value, ir::Kind p_kind, uint32_t p_check);
 	bool any_is(Slot p_value, uint32_t p_type) const;
 	bool engine_array(Slot p_value, uint32_t p_class) const;
 	Vector *array_of_engine(void *p_array, uint32_t p_class);
@@ -145,6 +150,8 @@ private:
 	bool any_primitive(Slot p_value, Slot *r_out, bool p_number = false);
 	Slot present_or_null(Slot p_value); // A freed Godot object is null; anything else is as it is.
 	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	Slot type_name(Slot p_value);
+	bool any_equality(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
 	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	Slot add_numbers(Slot p_a, Slot p_b);
 	Slot any_number(double p_value);
