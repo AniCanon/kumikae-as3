@@ -5,7 +5,7 @@ host differs.
 
 | Files | Job |
 |---|---|
-| `interpreter.h`, `interpreter.cpp` | Frames, calls, the public entry points |
+| `interpreter.h`, `interpreter_records.h`, `interpreter.cpp` | Frames, calls, the public entry points; the records the class keeps (a frame, a kept trace, a property's key and the rest) |
 | `interpreter_errors.cpp` | Errors: raising one, catching it, its stack trace, and reporting it to the host |
 | `interpreter_run.cpp` | The loop: one case per operation |
 | `interpreter_conversions.cpp`, `interpreter_time_limit.cpp` | What the loop hands on: an Int64 converted with a check, an object as text; the time limit on a call from outside (Error #1502) |
