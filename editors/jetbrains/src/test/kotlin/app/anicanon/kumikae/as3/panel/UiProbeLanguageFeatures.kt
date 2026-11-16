@@ -42,6 +42,9 @@ internal object UiProbeLanguageFeatures {
             check(controllers.any { it.objects.isNotEmpty() }) { "Parameter help contains no signature" }
             controllers.forEach { Disposer.dispose(it) }
             observations += "Parameter help contains a signature"
+        }
+        UiProbeHover.run(project, editor, observations)
+        UiProbeCompletion.edt {
             editor.caretModel.moveToOffset(call + 1)
             UiProbeCompletion.action(editor, IdeActions.ACTION_GOTO_DECLARATION)
         }
@@ -58,7 +61,7 @@ internal object UiProbeLanguageFeatures {
         try {
             UiProbeCompletion.edt {
                 val file = checkNotNull(PsiDocumentManager.getInstance(project).getPsiFile(editor.document))
-                val builder = LanguageStructureViewBuilder.INSTANCE.getStructureViewBuilder(file)
+                val builder = LanguageStructureViewBuilder.getInstance().getStructureViewBuilder(file)
                 check(builder is TreeBasedStructureViewBuilder) { "Missing tree-based outline" }
                 model = builder.createStructureViewModel(editor)
             }

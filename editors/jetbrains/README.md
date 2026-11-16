@@ -23,7 +23,7 @@ Production focus behavior and manual editor acceptance remain separate from this
 | Service tests (`core`) | Automated build | 82 pass; three opt-in live probes skip in ordinary checks and passed separately. |
 | Plugin tests (language, project tools, panel and adapters) | Automated build | 168 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
 | Plugin verifier against installed Rider and IDEA | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170 and IU-261.22158.277, including LSP4IJ 0.21.0. |
-| Editor compatibility matrix | Four isolated sandbox probes | IDEA with/without LSP4IJ; Rider with/without LSP4IJ. Completion, parameter help, navigation and outline pass where the client is enabled; missing IDEA dependency is reported. |
+| Editor compatibility matrix | Four isolated sandbox probes | IDEA with/without LSP4IJ; Rider with/without LSP4IJ. Completion, parameter help, hover documentation, navigation and outline pass where the client is enabled; missing IDEA dependency is reported, and no hover is shown without it. |
 | Native Swift tests | `swift test` | 38 pass in 20 suites. |
 | Native lifecycle recovery | Owned disposable Simulator, 2026-11-15 | Shutdown, reboot and read-only device switching passed; startup input-service readiness now preserves native retry. |
 | Native rotation and text | Owned iPhone and iPad fixtures, 2026-11-15 | Four orientation commands and target taps passed on each family; exact ASCII, accents, Japanese, Arabic and emoji reached the app. Interface orientation policy still applies. |

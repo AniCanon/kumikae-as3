@@ -110,8 +110,6 @@ any Godot value passing as a condition):
 
 ## Reload while running
 
-- Rider's hover was failing on code marked `actionscript` (fixed: the plugin names its own language); not
-  yet seen working in Rider. **LS-2**
 - A game on a simulator reads its scripts, scenes and text resources from the folder it is told of
   (`KAS3_SOURCE_DIR`), but an edited picture (any file Godot imports) needs a new build: importing needs
   Godot's editor. A real phone or tablet cannot see that folder: it needs the edits sent to it. **2d**
