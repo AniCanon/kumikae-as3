@@ -684,6 +684,40 @@ with tempfile.TemporaryDirectory() as packed:
               (wanted is None or wanted in output), output[-700:])
 
 
+# A project's tests are not part of the game that is run: a mistake in one of their scripts can't stop it.
+# They are part of a run that starts in a test folder (a scene or script of the tests'), or is told so.
+BROKEN = "package { public class Broken { public function f():void { nonsense(; } } }\n"
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    os.makedirs(os.path.join(copy, "tests", "framework"))
+    for place in ("tests/Broken.as", "tests/framework/Deep.as"):
+        with open(os.path.join(copy, place), "w") as file:
+            file.write(BROKEN.replace("Broken", os.path.splitext(os.path.basename(place))[0]))
+    shutil.copy(os.path.join(copy, "game_runs.gd"), os.path.join(copy, "tests", "run.gd"))
+
+    def game(arguments, environment=None):
+        done = subprocess.run([godot, "--headless", "--path", copy, *arguments], capture_output=True, text=True, timeout=300,
+                              env=dict(os.environ, **(environment or {})))
+        return done.stdout + done.stderr
+
+    output = game(["-s", "game_runs.gd"])
+    check("test folders: the game runs with a mistake in a test's script",
+          "VALUE the game's scripts run=6|6" in output and "have errors" not in output, output[-800:])
+    output = game(["-s", "tests/run.gd"])
+    check("test folders: a run that starts in a test folder has the tests' scripts", "have errors" in output and "Broken.as" in output, output[-800:])
+    output = game(["-s", "game_runs.gd"], {"KAS3_TESTS": "1"})
+    check("test folders: a run told it is the tests' has their scripts", "have errors" in output and "Deep.as" in output, output[-800:])
+    # The folders are the project's to name (actionscript/tests/folders): with another named, `tests` is the game's.
+    with open(os.path.join(copy, "project.godot"), "a") as file:
+        file.write('\n[actionscript]\n\ntests/folders=PackedStringArray("res://checks")\n')
+    output = game(["-s", "game_runs.gd"])
+    check("test folders: a folder the project does not name is the game's", "have errors" in output and "Broken.as" in output, output[-800:])
+    shutil.move(os.path.join(copy, "tests"), os.path.join(copy, "checks"))
+    output = game(["-s", "game_runs.gd"])
+    check("test folders: the folder the project names is left out",
+          "VALUE the game's scripts run=6|6" in output and "have errors" not in output, output[-800:])
+
 native = native_godot.Runner(godot, project, tests, os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None, check)
 native.probe()
 native.workloads()

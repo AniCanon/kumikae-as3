@@ -526,6 +526,10 @@ package {
 - A call from the engine that runs longer than 15 seconds, with what it calls, is stopped with Flash's
   `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
   gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.
+- A project's tests are not part of the game that is run: the scripts in its test folders are not read, so
+  a mistake in a test can't stop the game. The folders are the project setting `actionscript/tests/folders`
+  (`res://tests` where it names none). A run that starts in one of them (its main scene, or a scene or
+  script named on its command line) has them, as has one whose environment sets `KAS3_TESTS`.
 
 **Not built yet:** elements of Godot's untyped collections, `as` from one of Godot's objects to a script
 class, and what `kas3c run` refuses (see "What is refused, and why").

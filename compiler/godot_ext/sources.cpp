@@ -1,5 +1,6 @@
 #include "sources.h"
 
+#include "test_folders.h"
 #include "watch.h"
 
 #include <godot_cpp/classes/dir_access.hpp>
@@ -30,13 +31,45 @@ String scripts_root() {
 	return "res://";
 }
 
+// The folders of the project that hold its tests, which a game that is run does not read: none in a run
+// that is the tests' own (it starts in one of them, or KAS3_TESTS says so). The project names them in its
+// setting `actionscript/tests/folders`; `res://tests` where it names none. Worked out once: neither the
+// setting nor what the run started with changes while it runs.
+static const std::vector<std::string> &left_out() {
+	static const std::vector<std::string> folders = []() {
+		std::vector<std::string> named;
+		const PackedStringArray set = ProjectSettings::get_singleton()->get_setting("actionscript/tests/folders", PackedStringArray({ "res://tests" }));
+		for (const String &folder : set) {
+			named.push_back(folder.utf8().get_data());
+		}
+		const std::vector<std::string> tests = test_places(named);
+		std::vector<std::string> started = { String(ProjectSettings::get_singleton()->get_setting("application/run/main_scene", "")).utf8().get_data() };
+		for (const String &word : OS::get_singleton()->get_cmdline_args()) {
+			started.push_back(word.utf8().get_data());
+		}
+		const bool told = !OS::get_singleton()->get_environment("KAS3_TESTS").is_empty();
+		return told || tests_run(started, tests) ? std::vector<std::string>() : tests;
+	}();
+	return folders;
+}
+
+// Whether a folder under the scripts' root is not part of this run's program: its name starts with a dot,
+// or it holds the project's tests and the game is what runs.
+static bool skipped(const String &p_folder, const String &p_name) {
+	if (p_name.begins_with(".")) {
+		return true;
+	}
+	const std::string place = p_folder.path_join(p_name).utf8().get_data();
+	return in_test_folder(std::string_view(place).substr((size_t)scripts_root().utf8().length()), left_out());
+}
+
 // A script by its place in the project ("res://game/Player.as"), wherever it is read from.
 std::string project_path(std::string_view p_file, const String &p_root) {
 	return "res://" + std::string(p_file.substr((size_t)p_root.utf8().length()));
 }
 
 // Every .as file under a folder, by where it is. Folders and files whose name starts with a dot are not
-// part of a project.
+// part of a project, and its tests' folders are not part of the game (skipped()).
 void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) {
 	const Ref<DirAccess> folder = DirAccess::open(p_folder);
 	if (folder.is_null()) {
@@ -48,7 +81,7 @@ void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) 
 		}
 	}
 	for (const String &name : folder->get_directories()) {
-		if (!name.begins_with(".")) {
+		if (!skipped(p_folder, name)) {
 			collect_scripts(p_folder.path_join(name), r_files);
 		}
 	}
@@ -92,7 +125,9 @@ void list_folder(const String &p_folder, bool p_scenes, Folder *r_folder) {
 			continue;
 		}
 		if (folder->current_is_dir()) {
-			r_folder->folders.push_back(p_folder.path_join(name));
+			if (!skipped(p_folder, name)) {
+				r_folder->folders.push_back(p_folder.path_join(name));
+			}
 		} else if (name.ends_with(".as") || (p_scenes && is_scene(name))) {
 			r_folder->files.push_back(p_folder.path_join(name).utf8().get_data());
 		}
