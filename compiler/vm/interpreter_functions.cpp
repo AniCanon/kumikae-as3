@@ -10,36 +10,6 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-// A new function value: the function, and what it is called with first (held: a reference of its own). A
-// function that takes nothing first has one value, the same each time, as AVM2 gives one for a static
-// method: adding and removing it as a listener then match.
-Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
-	if (!p_first && module_.functions[p_function].is_static) {
-		if (lone_functions_.size() <= p_function) {
-			lone_functions_.resize(module_.functions.size(), nullptr);
-		}
-		if (Object *kept = lone_functions_[p_function]) {
-			retain(kept);
-			return kept;
-		}
-	}
-	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, slots_of(module_.classes[module_.function_class]), heap_.list_for(module_.function_class));
-	if (!made) {
-		if (module_.function_class != NONE) {
-			out_of_memory();
-		}
-		return nullptr;
-	}
-	own_field(made, ir::FUNCTION_INDEX).i = static_cast<int32_t>(p_function);
-	retain(p_first);
-	own_field(made, ir::FUNCTION_FIRST).p = p_first;
-	if (!p_first && module_.functions[p_function].is_static) {
-		retain(made); // Kept until the interpreter goes.
-		lone_functions_[p_function] = made;
-	}
-	return made;
-}
-
 void Interpreter::function_op(const Function &p_function, const Instruction &p_in) {
 	Slot *r = stack_.data() + frames_.back().base;
 	switch (p_in.op) {
@@ -52,12 +22,7 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 		}
 		case Op::MakeMethod: {
 			// A method taken from an object: its class's own, bound to it.
-			Object *object = static_cast<Object *>(r[p_in.c].p);
-			if (!object) {
-				raise_null();
-				break;
-			}
-			if (Object *made = make_function(module_.classes[object->klass].methods[p_in.b], object)) {
+			if (Object *made = vm::make_method(library_, p_in.b, static_cast<Object *>(r[p_in.c].p))) {
 				assign(Kind::Obj, r[p_in.a], made);
 			}
 			break;
@@ -91,12 +56,6 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			call_value(p_function, p_in);
 			break;
 	}
-}
-
-// A function value's `length`: the parameters it declares, without what it takes first or `...rest`.
-int32_t Interpreter::function_length(Object *p_function) const {
-	const Function &callee = module_.functions[static_cast<uint32_t>(own_field(p_function, ir::FUNCTION_INDEX).i)];
-	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
 // Native: the function's body is native code, which whoever holds it runs. The frame is found again by its

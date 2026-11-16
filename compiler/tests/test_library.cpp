@@ -454,6 +454,18 @@ void test_words() {
 	CHECK(recorder.raised.back().find("Error #1063: Argument count mismatch on join(). Expected 2, got 3.") == 0);
 	CHECK(!function_call(library, made, given, 0, &result));
 	CHECK(recorder.raised.back().find("Error #1006") == 0);
+	// A static function has one value, the same each time; a method's is made for its object each time.
+	Object *lone = make_function(library, JOIN, nullptr);
+	CHECK(lone != nullptr && make_function(library, JOIN, nullptr) == lone);
+	heap.release_object(lone);
+	heap.release_object(lone);
+	CHECK_EQ(function_length(module, lone), 2);
+	Object *bound = make_method(library, 1, made);
+	CHECK(bound != nullptr);
+	CHECK(own_field(bound, kas3::ir::FUNCTION_FIRST).p == made && static_cast<uint32_t>(own_field(bound, kas3::ir::FUNCTION_INDEX).i) == VALUE);
+	CHECK(make_method(library, 1, nullptr) == nullptr);
+	heap.release_object(bound);
+	heap.release_lone_functions();
 	heap.release_object(value);
 	heap.release_object(made);
 	if (release(said)) {

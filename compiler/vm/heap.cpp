@@ -35,6 +35,21 @@ Heap::Heap(const ir::Module &p_module, EngineHandles &p_handles, EngineSource &p
 	}
 }
 
+Object *&Heap::lone_function(uint32_t p_function) {
+	if (lone_functions_.size() <= p_function) {
+		lone_functions_.resize(module.functions.size(), nullptr);
+	}
+	return lone_functions_[p_function];
+}
+
+void Heap::release_lone_functions() {
+	for (Object *&kept : lone_functions_) {
+		Object *held = kept;
+		kept = nullptr;
+		release_object(held);
+	}
+}
+
 uint32_t Heap::find_method(uint32_t p_class, std::string_view p_name) const {
 	if (p_class >= methods_.size()) {
 		return ir::NONE;

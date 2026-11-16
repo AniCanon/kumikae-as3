@@ -61,9 +61,7 @@ Interpreter::~Interpreter() {
 			host_.handles.drop(kept);
 		}
 	}
-	for (Object *kept : lone_functions_) {
-		release_object(kept);
-	}
+	heap_.release_lone_functions();
 	for (auto &[code, kept] : class_values_) {
 		release_object(kept);
 	}

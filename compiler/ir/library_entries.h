@@ -84,6 +84,12 @@ inline LibraryEntry library_entry(const Function &p_function, const Instruction 
 		case Op::AnyGt:
 		case Op::AnyGe:
 			return LibraryEntry{ "any_operate", static_cast<uint32_t>(p_in.op) };
+		case Op::MakeFunction:
+			return LibraryEntry{ "function_make", p_in.b };
+		case Op::MakeMethod:
+			return LibraryEntry{ "method_make", p_in.b };
+		case Op::FunctionLength:
+			return LibraryEntry{ "function_length", static_cast<uint32_t>(p_function.registers[p_in.b]) };
 		case Op::AnyText:
 			return LibraryEntry{ "text_of_any", 0 };
 		case Op::ObjToStr:

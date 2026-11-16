@@ -83,6 +83,46 @@ void let_go_arguments(Library &p_library, const Function &p_callee, Slot *p_valu
 	}
 }
 
+Object *make_function(Library &p_library, uint32_t p_function, Object *p_first) {
+	const ir::Module &module = p_library.module();
+	const bool lone = !p_first && module.functions[p_function].is_static;
+	if (lone) {
+		if (Object *kept = p_library.heap.lone_function(p_function)) {
+			retain(kept);
+			return kept;
+		}
+	}
+	Object *made = module.function_class == NONE ? nullptr
+			: new_object(module.function_class, slots_of(module.classes[module.function_class]), p_library.heap.list_for(module.function_class));
+	if (!made) {
+		if (module.function_class != NONE) {
+			p_library.runner.out_of_memory();
+		}
+		return nullptr;
+	}
+	own_field(made, ir::FUNCTION_INDEX).i = static_cast<int32_t>(p_function);
+	retain(p_first);
+	own_field(made, ir::FUNCTION_FIRST).p = p_first;
+	if (lone) {
+		retain(made); // Kept until whoever runs the program goes.
+		p_library.heap.lone_function(p_function) = made;
+	}
+	return made;
+}
+
+Object *make_method(Library &p_library, uint32_t p_method, Object *p_object) {
+	if (!p_object) {
+		p_library.raise_null();
+		return nullptr;
+	}
+	return make_function(p_library, p_library.class_of(p_object).methods[p_method], p_object);
+}
+
+int32_t function_length(const ir::Module &p_module, Object *p_function) {
+	const Function &callee = p_module.functions[static_cast<uint32_t>(own_field(p_function, ir::FUNCTION_INDEX).i)];
+	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
+}
+
 Object *function_in(Library &p_library, Kind p_kind, Slot p_value) {
 	Object *object = nullptr;
 	if (p_kind == Kind::Any) {

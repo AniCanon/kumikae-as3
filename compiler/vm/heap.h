@@ -58,10 +58,15 @@ public:
 		return p_name == ir::NONE ? OperatorName{ p_spelling, false, -1 } : operators_[p_name];
 	}
 	const std::vector<OperatorName> &operators() const { return operators_; }
+	// The one function value of a static function, once made (vm/library.h, make_function): kept here with
+	// a reference until whoever runs the program lets go of them all, before it goes.
+	Object *&lone_function(uint32_t p_function);
+	void release_lone_functions();
 
 private:
 	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
 	std::vector<OperatorName> operators_; // By engine name: what an operator's entry says, read once.
+	std::vector<Object *> lone_functions_;
 	std::vector<Object *> dying_; // Objects whose last reference is gone, still to be freed.
 	bool freeing_ = false; // drop_object() is freeing them: one called meanwhile adds to the list.
 	void let_go(ir::Kind p_kind, Slot &p_slot); // One slot of an object being freed.

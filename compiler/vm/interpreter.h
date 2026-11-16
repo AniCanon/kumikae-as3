@@ -95,7 +95,6 @@ private:
 		return heap_.operator_named(p_name, p_spelling);
 	}
 	void prepare_engine();
-	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	// The strings of one ASCII character each, made the first time charAt() gives one: a loop over a
 	// string's characters makes no string for each.
@@ -247,7 +246,7 @@ private:
 	bool length_is_fixed(const Vector *p_vector) { return vm::length_is_fixed(library_, p_vector); }
 	Vector *fresh_vector(uint32_t p_class, uint64_t p_length) { return library_.fresh_vector(p_class, p_length); }
 	// Function values (interpreter_functions.cpp).
-	Object *make_function(uint32_t p_function, Object *p_first);
+	Object *make_function(uint32_t p_function, Object *p_first) { return vm::make_function(library_, p_function, p_first); }
 	void function_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void callback_this(Slot p_callback, Slot p_this);
 	Object *function_in(ir::Kind p_kind, Slot p_value) { return vm::function_in(library_, p_kind, p_value); }
@@ -299,7 +298,7 @@ private:
 	void class_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
-	int32_t function_length(Object *p_function) const;
+	int32_t function_length(Object *p_function) const { return vm::function_length(module_, p_function); }
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	void property_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	Entries *loop_entries(Slot p_holder) const;

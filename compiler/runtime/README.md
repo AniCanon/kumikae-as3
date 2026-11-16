@@ -56,7 +56,7 @@ raise, out of memory, a function of the program run by its number on typed value
 generated code there: an error is the context's at once, and a function of the program is the C++ it is,
 called through its entry.
 
-The rest (RegExp, Date, JSON, properties by name, function values made)
+The rest (RegExp, Date, JSON, properties by name, `apply`)
 are still members of `vm::Interpreter` that work on a frame's registers. For those, and for the
 parts of them a moved function still asks for (`vm::Unmoved`), the host keeps an interpreter of its own:
 
@@ -124,8 +124,9 @@ exactly those), named so that the split can be checked against it:
    goes with 3.
 3. Properties by name and tables (`interpreter_properties*.cpp`, `interpreter_property_calls.cpp`), `typeof`,
    and Godot's Arrays and Dictionaries copied.
-4. Function values (`interpreter_functions.cpp`): making one (the one value of a static function is kept
-   by the interpreter) and `apply`. A call through one is the library's function already.
+4. Function values (`interpreter_functions.cpp`): `apply`, a method taken through an interface, and one
+   made into a Callable. Making one (the one value of a static function is kept by the heap), its `length`
+   and a call through one are the library's functions already.
 5. Raising: the words of #1009 and #1000 are still raised by the interpreter for the host
    (`Builtin`), and `object_text` / `error_heading`.
 6. Lifetime: freeing an object with what it holds is the heap's (`Heap::drop_object`), still reached

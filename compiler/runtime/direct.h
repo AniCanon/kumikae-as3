@@ -56,6 +56,12 @@ namespace rt {
 // One of the untyped value's operators on two untyped values: p_which is the instruction (an ir::Op: AnyEq,
 // AnyStrictEq, AnyAdd, AnyLt, AnyLe, AnyGt, AnyGe). A Boolean, or for AnyAdd an untyped value.
 //     void any_operate(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// MakeFunction: a function value of the function p_which, with what it is called with first (or nothing).
+// MakeMethod: the method numbered p_which in its class's table, taken from the object. FunctionLength: the
+// `length` of the function value held as the kind p_which.
+//     void function_make(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+//     void method_make(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+//     void function_length(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 
 } // namespace rt
 } // namespace kas3

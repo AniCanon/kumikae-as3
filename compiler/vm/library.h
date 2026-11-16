@@ -142,6 +142,15 @@ void raise_range(Library &p_library, double p_index, uint32_t p_length);
 // holds it, one left out its default, too many or too few AS3's ArgumentError #1063. What it gives,
 // untyped, is the caller's to let go of. False if it raised.
 [[nodiscard]] bool function_call(Library &p_library, Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result);
+// A function value: the function, and what it is called with first (a method's object, a closure's
+// environment, or nothing). A function that takes nothing first has one value, the same each time, as AVM2
+// gives one for a static method: adding and removing it as a listener then match. One reference, the
+// caller's; null if it raised. make_method(): a method taken from an object by its number in the class's
+// table, the object's class's own, bound to it (#1009 for no object).
+Object *make_function(Library &p_library, uint32_t p_function, Object *p_first);
+Object *make_method(Library &p_library, uint32_t p_method, Object *p_object);
+// A function value's `length`: the parameters it declares, without what it takes first or `...rest`.
+int32_t function_length(const ir::Module &p_module, Object *p_function);
 // The function value a register of the kind holds. Null, with AS3's TypeError raised, for anything else:
 // #1009 for nothing, #1006 for a value that is no function.
 Object *function_in(Library &p_library, ir::Kind p_kind, Slot p_value);

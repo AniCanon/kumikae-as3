@@ -18,7 +18,7 @@ host differs.
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
 | `library` | The standard library as functions of plain values (slots in, a slot out, no frame): what each is handed (`Library`: the heap, and `Runner`, the few things only whoever runs the program can do), and `Unmoved`, the parts still the interpreter's own that those functions ask for, which shrinks to nothing as each family moves |
-| `value_text.cpp`, `function_calls.cpp` | A value put into words (`String(x)`, a vector's elements, an object's own `toString()`, ECMAScript's ToPrimitive) and a function value called with untyped arguments, as such functions: the program's own code is run by its function's number (`Runner::run`) |
+| `value_text.cpp`, `function_calls.cpp` | A value put into words (`String(x)`, a vector's elements, an object's own `toString()`, ECMAScript's ToPrimitive) and a function value made and called with untyped arguments, as such functions: the program's own code is run by its function's number (`Runner::run`) |
 | `text_methods`, `text_calls.cpp` | A String's methods, and a number in a radix or in digits, as such functions |
 | `vector_elements.cpp`, `vector_methods.cpp`, `vector_sort.cpp`, `vector_calls.h` | `Vector.<T>` and Array as such functions: making, indexing, length, the methods, sort and sortOn |
 | `interpreter_vectors.cpp`, `interpreter_library.cpp` | The interpreter's side of those: its instructions handing registers to the functions (an element in range is read and written in place), and what it answers for `Unmoved` |

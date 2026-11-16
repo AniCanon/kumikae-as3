@@ -361,5 +361,26 @@ void any_operate(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_
 	}
 }
 
+void function_make(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	if (Object *made = vm::make_function(library, p_which, static_cast<Object *>(p_values[0].p))) {
+		hand_back(c, Kind::Obj, slot(made), r_out);
+	}
+}
+
+void method_make(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	if (Object *made = vm::make_method(library, p_which, static_cast<Object *>(p_values[0].p))) {
+		hand_back(c, Kind::Obj, slot(made), r_out);
+	}
+}
+
+void function_length(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	if (Object *function = vm::function_in(library, static_cast<Kind>(p_which), p_values[0])) {
+		hand_back(c, Kind::I32, slot(vm::function_length(library.module(), function)), r_out);
+	}
+}
+
 } // namespace rt
 } // namespace kas3
