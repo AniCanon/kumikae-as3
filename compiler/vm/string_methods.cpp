@@ -253,28 +253,34 @@ std::string formatted(NumberFormat p_format, Slot p_value, bool p_wide, int p_di
 
 void Interpreter::number_text(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
-	const Slot value = p_registers[list[0]];
 	const bool wide = p_function.registers[list[0]] == Kind::I64;
-	const double digits = whole(p_registers[list[1]].d);
-	const NumberFormat format = static_cast<NumberFormat>(p_in.b);
+	const std::optional<std::string> words = number_words(static_cast<NumberFormat>(p_in.b), p_registers[list[0]], wide, p_registers[list[1]].d);
+	if (words) {
+		assign(Kind::Str, p_registers[p_in.a], text(*words));
+	}
+}
+
+// toString(radix), toFixed, toExponential or toPrecision of a Number, or of an Int64 (p_wide). Nothing,
+// with AS3's RangeError raised, for a radix or a count of digits out of range.
+std::optional<std::string> Interpreter::number_words(NumberFormat p_format, Slot p_value, bool p_wide, double p_digits) {
+	const double digits = whole(p_digits);
 	double least = 0, most = MAX_FIXED_DIGITS;
-	if (format == NumberFormat::Radix) {
+	if (p_format == NumberFormat::Radix) {
 		least = 2;
 		most = 36;
-	} else if (format == NumberFormat::Precision) {
+	} else if (p_format == NumberFormat::Precision) {
 		least = 1;
 		most = MAX_PRECISION;
 	}
-	if (!wide && (format == NumberFormat::Exponential || format == NumberFormat::Precision) && !std::isfinite(value.d)) {
+	if (!p_wide && (p_format == NumberFormat::Exponential || p_format == NumberFormat::Precision) && !std::isfinite(p_value.d)) {
 		// toExponential and toPrecision look at NaN and Infinity before the digits.
-		assign(Kind::Str, p_registers[p_in.a], text(number_to_string(value.d)));
-		return;
+		return number_to_string(p_value.d);
 	}
 	if (digits < least || digits > most) {
-		raise(module_.range_error_class, format == NumberFormat::Radix ? radix_error(digits) : digits_error());
-		return;
+		raise(module_.range_error_class, p_format == NumberFormat::Radix ? radix_error(digits) : digits_error());
+		return std::nullopt;
 	}
-	assign(Kind::Str, p_registers[p_in.a], text(formatted(format, value, wide, static_cast<int>(digits))));
+	return formatted(p_format, p_value, p_wide, static_cast<int>(digits));
 }
 
 void Interpreter::any_null_check(Slot p_value) {

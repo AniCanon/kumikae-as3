@@ -193,7 +193,7 @@ std::optional<Slot> Json::walk(Slot p_owned, std::string_view p_name, size_t p_d
 			}
 		} else {
 			for (const Entry &entry : entries_of(object)->all()) {
-				if (any::tag(entry.key) == AnyTag::String) {
+				if (any::tag(entry.key) == AnyTag::String && !entry.hidden) {
 					keys.emplace_back();
 					keys.back().text = static_cast<const Str *>(any::pointer(entry.key))->view();
 				}

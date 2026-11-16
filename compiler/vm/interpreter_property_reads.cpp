@@ -18,8 +18,9 @@ constexpr std::array<std::string_view, 7> OBJECT_METHODS = { "hasOwnProperty", "
 	"toLocaleString", "toString", "valueOf" };
 constexpr std::array<std::string_view, 20> ARRAY_METHODS = { "concat", "every", "filter", "forEach", "indexOf", "join", "lastIndexOf", "map", "pop",
 	"push", "reverse", "shift", "slice", "some", "sort", "sortOn", "splice", "unshift", "insertAt", "removeAt" };
-constexpr std::array<std::string_view, 16> STRING_METHODS = { "charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "localeCompare", "match",
-	"replace", "search", "slice", "split", "substr", "substring", "toLowerCase", "toUpperCase", "fromCharCode" };
+constexpr std::array<std::string_view, 18> STRING_METHODS = { "charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "localeCompare", "match",
+	"replace", "search", "slice", "split", "substr", "substring", "toLowerCase", "toUpperCase", "toLocaleLowerCase", "toLocaleUpperCase",
+	"fromCharCode" };
 constexpr std::array<std::string_view, 3> NUMBER_METHODS = { "toFixed", "toExponential", "toPrecision" };
 
 template <size_t Count>

@@ -91,7 +91,7 @@ void Reload::carry_entries(const Entries &p_from, Entries *p_to) {
 			to_.drop_any(key); // Two keys that became one object: the first is kept.
 			continue;
 		}
-		p_to->add(key, carry(Kind::Any, entry.value));
+		p_to->add(key, carry(Kind::Any, entry.value), entry.hidden);
 	}
 }
 

@@ -214,7 +214,7 @@ std::vector<std::string> Json::names_of(Object *p_object) const {
 	const ir::Class &klass = vm_.module_.classes[p_object->klass];
 	if (klass.table) {
 		for (const Entry &entry : entries_of(p_object)->all()) {
-			if (any::tag(entry.key) == AnyTag::String) {
+			if (any::tag(entry.key) == AnyTag::String && !entry.hidden) {
 				names.emplace_back(static_cast<const Str *>(any::pointer(entry.key))->view());
 			}
 		}
