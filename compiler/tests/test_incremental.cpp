@@ -580,6 +580,12 @@ void test_directed() {
 					{ "/p/p/Missin.as", file("p", "public class Missin {}") }, { "/p/B.as", file("", "public class B {") } },
 			{ { "/p/p/Missin.as", file("p", "public class Missing {}") }, { "/p/p/Missin.as", file("p", "public class Missin {}") } },
 			"/p/C.as", "x:");
+	// A type argument in a field's type is looked up too: another file defining the name makes it ambiguous.
+	directed("type argument", false,
+			{ { "/p/A.as", file("", "public class A { var v:Vector.<P> = new Vector.<P>(); }") + "class P {}\n" },
+					{ "/p/Q.as", file("", "public class Q {}") } },
+			{ { "/p/Q.as", file("", "public class P {}") }, { "/p/Q.as", file("", "public class Q {}") } },
+			"/p/A.as", "v:");
 	// Godot's API loaded, and a file that joins and leaves: Godot's declarations are never checked again.
 	directed("godot", true, { { "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Node2D { function f():void { position.x = 1; } }") } },
 			{ { "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Sprite2D { function f():void { position.x = 1; } }") },

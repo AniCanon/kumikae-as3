@@ -104,10 +104,13 @@ public:
 		}
 	}
 
+	// A written type and its type arguments (`Vector.<Particle>`): each name is looked up.
 	void type_ref(const TypeRef *p_type) {
-		if (p_type && p_type->name.count) {
-			push(on_name(p_type->name[p_type->name.count - 1]));
-			symbol(p_type->symbol);
+		for (; p_type; p_type = p_type->argument) {
+			if (p_type->name.count) {
+				push(on_name(p_type->name[p_type->name.count - 1]));
+				symbol(p_type->symbol);
+			}
 		}
 	}
 
