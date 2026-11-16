@@ -1,5 +1,6 @@
-// A script object whose Godot object is reference-counted (a RefCounted, a Resource): the two live as long
-// as either is held from outside, by AS3 or by Godot, and no longer.
+// A script object whose Godot object is reference-counted (a RefCounted, a Resource, or a RefCounted that
+// carries a script whose base is Godot's Object): the two live as long as either is held from outside, by
+// AS3 or by Godot, and no longer.
 //
 // The program's references count the script object; Godot's count the Godot object. The instance does not
 // hold the script object, and the script object's own handle on its Godot object does not count. While
@@ -29,6 +30,10 @@ std::unordered_map<const vm::Object *, ScriptInstance *> &held() {
 }
 
 } // namespace
+
+bool counted_on(uint32_t p_class, const Object *p_owner) {
+	return Project::get().module().classes[p_class].counted && Object::cast_to<RefCounted>(p_owner);
+}
 
 void counted_attached(ScriptInstance *p_instance) {
 	held()[p_instance->object] = p_instance;
@@ -75,8 +80,8 @@ bool joined_to_script(const Object *p_owner) {
 // To the cycle collector the two are one. The script object's own handle on its Godot object counts as a
 // reference (GodotHost::node), and the instance's does not: it stands for the program's references, which
 // the collector counts on the script object itself. The script object lives as long as the Godot object,
-// which holds no reference to it: it is joined, never taken off. The instance of a script of another class
-// (one that extends Godot's Object) holds its script object, as an instance on any other object does.
+// which holds no reference to it: it is joined, never taken off. Every script on a RefCounted is counted
+// (counted_on()), whatever its class, so the instance never holds its script object here.
 void script_edges(RefCounted *p_counted, vm::EngineNode *r_node) {
 	r_node->references = (uint64_t)p_counted->get_reference_count();
 	vm::Object *object = script_object(p_counted);
@@ -84,8 +89,6 @@ void script_edges(RefCounted *p_counted, vm::EngineNode *r_node) {
 	if (found != held().end()) {
 		r_node->references += found->second->holding ? 0 : 1;
 		r_node->joined.push_back(object);
-	} else if (object) {
-		r_node->objects.push_back(object);
 	}
 }
 

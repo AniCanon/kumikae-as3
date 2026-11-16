@@ -126,8 +126,9 @@ struct Class {
 	// For a script class, one that extends a Godot class directly or through other script classes: Godot's
 	// name for that class. Field 0 then holds the Godot object the script is attached to.
 	std::string native_base;
-	// A script class whose Godot object is reference-counted (it extends RefCounted, a Resource): when the
-	// program lets go of an object of it, the engine is asked whether it still holds the Godot object.
+	// A script class whose Godot object may be reference-counted (it extends RefCounted, a Resource, or its
+	// base is Godot's Object, which a RefCounted can carry too): when the program lets go of an object of it,
+	// the engine is asked whether it still holds the Godot object.
 	bool counted = false;
 	// The engine's virtual methods the class answers: Godot's name ("_physics_process") and the function.
 	std::vector<std::pair<std::string, uint32_t>> virtuals;

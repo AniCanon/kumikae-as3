@@ -164,9 +164,17 @@ uint32_t Expressions::new_value(Expr *p_expression) {
 	return out;
 }
 
-// Whether a class extends Godot's RefCounted, by its own bases.
-bool Lowerer::extends_counted(const Symbol *p_class) const {
-	for (const Symbol *at = p_class; at && at->klass; at = at->klass->base) {
+// Whether a script class's Godot object may be reference-counted: its first Godot base is Godot's Object,
+// which Godot lets a RefCounted carry as well as any other object, or it extends RefCounted.
+bool Lowerer::may_be_counted(const Symbol *p_class) const {
+	const Symbol *godot_base = p_class;
+	while (godot_base && godot_base->klass && !is_godot(godot_base)) {
+		godot_base = godot_base->klass->base;
+	}
+	if (godot_base && godot_base == godot_object_) {
+		return true;
+	}
+	for (const Symbol *at = godot_base; at && at->klass; at = at->klass->base) {
 		if (at->name == "RefCounted" && is_godot(at)) {
 			return true;
 		}

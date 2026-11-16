@@ -9,7 +9,7 @@ called by the engine.
 | `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
 | `script_call.cpp` | Godot calling a function of a script object (`call_script`): the arguments counted, checked and converted, the result handed back |
-| `counted` | A script object whose Godot object is reference-counted: each lives while AS3 or Godot holds it |
+| `counted` | A script object whose Godot object is reference-counted (`counted_on`: a script whose base is Godot's Object, on a RefCounted, too): each lives while AS3 or Godot holds it |
 | `members` | What Godot reaches of a script by name: public fields to read and write (an Array or a Dictionary as a copy of Godot's), public getters and setters, public methods, and the lists of them with Godot's types |
 | `godot_host` | The interpreter's four interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_handles.cpp` | What an engine value is (`present`, `is_class`, `text`), how long it lives (`borrow`, `copy`, `drop`), and what the cycle collector sees of it (`node`, `node_edges`, `let_go`) |

@@ -33,8 +33,8 @@ class BoundMethod : public godot::CallableCustom {
 	friend void kas3::forget_listeners(const vm::Object *);
 
 	vm::Object *object_;
-	// For a class whose Godot object is reference-counted: the callable does not hold the script object, as
-	// a callable of Godot's does not hold its object. It goes when that Godot object goes.
+	// For a script object whose Godot object is reference-counted (counted_on()): the callable does not hold
+	// the script object, as a callable of Godot's does not hold its object. It goes when that Godot object goes.
 	bool weak_ = false;
 	uint32_t function_;
 	godot::ObjectID owner_; // Null for a class with no Godot object behind it.

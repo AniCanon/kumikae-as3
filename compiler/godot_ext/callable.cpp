@@ -1,6 +1,7 @@
 #include "bound_method.h"
 
 #include "any.h"
+#include "instance.h"
 
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable.hpp>
@@ -80,7 +81,7 @@ BoundMethod::BoundMethod(vm::Object *p_object, uint32_t p_function, Object *p_ow
 			break;
 		}
 	}
-	weak_ = p_owner && Project::get().module().classes[p_object->klass].counted;
+	weak_ = p_owner && counted_on(p_object->klass, p_owner);
 	if (!weak_) {
 		vm::retain(object_);
 	}

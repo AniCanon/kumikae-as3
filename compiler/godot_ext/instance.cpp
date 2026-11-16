@@ -382,7 +382,7 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	if (!program.valid()) {
 		return nullptr;
 	}
-	const bool counted = program.module().classes[p_script->get_class_index()].counted;
+	const bool counted = kas3::counted_on(p_script->get_class_index(), p_owner);
 	vm::Object *object = nullptr;
 	bool made_here = false;
 	if (pending_object && pending_object->klass == p_script->get_class_index()) {

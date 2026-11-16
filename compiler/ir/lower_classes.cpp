@@ -42,7 +42,7 @@ Class Classes::inherited_class(ClassDecl *p_decl) {
 			klass.virtuals = from.virtuals;
 		}
 	}
-	klass.counted = !klass.native_base.empty() && l_.extends_counted(symbol);
+	klass.counted = !klass.native_base.empty() && l_.may_be_counted(symbol);
 	return klass;
 }
 
