@@ -3,6 +3,7 @@
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/time.hpp>
 
 #include <algorithm>
@@ -49,19 +50,78 @@ void collect_scripts(const String &p_folder, std::vector<std::string> &r_files) 
 	}
 }
 
-// What the project's scripts are now: every file, when it was last written, its size, and what it held when
-// it was last read. The time is in whole seconds, so two saves of the same size within one are told apart
-// only by what they hold: a file is read again while it was written in the last two seconds, and what it
-// held then is kept, so that the signature does not change as the file grows old.
+namespace {
+
+// A folder as it was last listed: when it was last changed, and the files and folders in it.
+struct Folder {
+	bool listed = false;
+	uint64_t changed = 0;
+	std::vector<std::string> files; // The scripts.
+	std::vector<String> folders;
+};
+
+std::unordered_map<std::string, Folder> &folders() {
+	static std::unordered_map<std::string, Folder> all;
+	return all;
+}
+
+// One look through the folder, for its scripts and its folders. Names that start with a dot are not part
+// of a project.
+void list_folder(const String &p_folder, Folder *r_folder) {
+	r_folder->files.clear();
+	r_folder->folders.clear();
+	const Ref<DirAccess> folder = DirAccess::open(p_folder);
+	if (folder.is_null()) {
+		return;
+	}
+	folder->list_dir_begin();
+	for (String name = folder->get_next(); !name.is_empty(); name = folder->get_next()) {
+		if (name.begins_with(".")) {
+			continue;
+		}
+		if (folder->current_is_dir()) {
+			r_folder->folders.push_back(p_folder.path_join(name));
+		} else if (name.ends_with(".as")) {
+			r_folder->files.push_back(p_folder.path_join(name).utf8().get_data());
+		}
+	}
+	folder->list_dir_end();
+}
+
+// The scripts under a folder, by where they are, for the watch. Listing a folder is slow (on macOS, 20 to
+// 50 microseconds a name), so a folder is listed again only when it changed (a file made, removed or
+// renamed in it changes it) or changed in the last two seconds (its time is in whole seconds).
+void watched_scripts(const String &p_folder, uint64_t p_now, std::vector<std::string> &r_files) {
+	Folder &known = folders()[p_folder.utf8().get_data()];
+	// By the folder's place on the disk: Godot gives "res://" itself no time (0, as for a folder in a pack).
+	const uint64_t changed = FileAccess::get_modified_time(ProjectSettings::get_singleton()->globalize_path(p_folder));
+	if (!known.listed || known.changed != changed || changed + 2 >= p_now) {
+		list_folder(p_folder, &known);
+		known.listed = true;
+		known.changed = changed;
+	}
+	r_files.insert(r_files.end(), known.files.begin(), known.files.end());
+	for (const String &inner : std::vector<String>(known.folders)) {
+		watched_scripts(inner, p_now, r_files);
+	}
+}
+
+} // namespace
+
+// What the project's scripts are now: every file, when it was last written, and what it held when it was
+// last read. The time is in whole seconds, so two saves within one are told apart only by what they hold:
+// a file is read again while it was written in the last two seconds, and what it held then is kept, so
+// that the signature does not change as the file grows old. (A file's size is not asked for: on macOS that
+// opens the file, and took most of a look, 150 microseconds a script.)
 uint64_t scripts_signature() {
 	struct Seen {
-		uint64_t written = 0, size = 0, held = 0;
+		uint64_t written = 0, held = 0;
 	};
 	static std::unordered_map<std::string, Seen> seen;
-	std::vector<std::string> files;
-	collect_scripts(scripts_root(), files);
-	std::sort(files.begin(), files.end());
 	const uint64_t now = static_cast<uint64_t>(Time::get_singleton()->get_unix_time_from_system());
+	std::vector<std::string> files;
+	watched_scripts(scripts_root(), now, files);
+	std::sort(files.begin(), files.end());
 	uint64_t mixed = 1469598103934665603ull;
 	const auto mix = [](uint64_t p_into, uint64_t p_value) { return (p_into ^ p_value) * 1099511628211ull; };
 	for (const std::string &path : files) {
@@ -70,10 +130,8 @@ uint64_t scripts_signature() {
 		}
 		const String file = String::utf8(path.c_str());
 		const uint64_t written = FileAccess::get_modified_time(file);
-		const uint64_t size = (uint64_t)FileAccess::get_size(file);
 		Seen &known = seen[path];
-		const bool moved = known.written != written || known.size != size;
-		if (moved || written + 2 >= now) {
+		if (known.written != written || written + 2 >= now) {
 			uint64_t held = 1469598103934665603ull;
 			if (written + 2 >= now) {
 				const PackedByteArray bytes = FileAccess::get_file_as_bytes(file);
@@ -81,9 +139,9 @@ uint64_t scripts_signature() {
 					held = mix(held, bytes[i]);
 				}
 			}
-			known = Seen{ written, size, held };
+			known = Seen{ written, held };
 		}
-		mixed = mix(mix(mix(mixed, written), size), known.held);
+		mixed = mix(mix(mixed, written), known.held);
 	}
 	return mixed;
 }

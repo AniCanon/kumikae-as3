@@ -516,9 +516,9 @@ def reload_test(label, elsewhere):
             # A vector of a type that only this version names, kept in an untyped field.
             "Hot.as": HOT % (" public function fill():void { bag = new <Vector.<Hot>>[new Vector.<Hot>(), new Vector.<Hot>()]; }", "1", "1", ""),
             "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
-            "hot_broken.txt": HOT % ("", "2 +", "10", ADDED),
-            "hot_v3.txt": HOT % (" private var extra:String = \"x\";", "3", "10", ADDED),
-            "hot_v4.txt": HOT % (" private var extra:String = \"x\";", "4", "10", ADDED),
+            # Later is a class that reload.gd adds, alone, in a folder it makes: the watch must see it.
+            "hot_broken.txt": HOT % (" private var extra:String = \"x\";", "3 + Later.zero()", "10", ADDED),
+            "hot_v4.txt": HOT % (" private var extra:String = \"x\";", "4 + Later.zero()", "10", ADDED),
         }
         for name, text in versions.items():
             with open(os.path.join(copy, name), "w") as file:

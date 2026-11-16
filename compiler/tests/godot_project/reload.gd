@@ -72,10 +72,16 @@ func _process(_delta: float) -> bool:
 		stage = 2
 	elif stage == 2 and waited(1500):
 		show("with an error: the game keeps the scripts it had", ask("value"), 2)
-		put("v3")
+		# The error is a class that is not there: it is fixed by a file of its own, in a new folder.
+		var folder := hot_path().get_base_dir().path_join("later")
+		DirAccess.make_dir_recursive_absolute(folder)
+		var later := FileAccess.open(folder.path_join("Later.as"), FileAccess.WRITE)
+		later.store_string("package { public class Later { public static function zero():int { return 0; } } }\n")
+		later.close()
+		since = Time.get_ticks_msec()
 		stage = 3
 	elif stage == 3 and (ask("value") == 3 or waited(8000)):
-		show("once the error is fixed: the new code runs", ask("value"), 3)
+		show("once the error is fixed, by a file in a new folder: the new code runs", ask("value"), 3)
 		show("once the error is fixed: the field still has its value", ask("count"), 2)
 		# A save of the same size with the same time as the last (two saves within one second): still seen.
 		var stamp := ProjectSettings.globalize_path("user://stamp")
