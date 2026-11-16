@@ -219,6 +219,18 @@ from recollection of avmplus, not checked against Flash.
 text, and a Vector's `join` and `toString` write them as `null` and `undefined` (`toLocaleString` leaves
 them out of both, and asks each element for its own `toLocaleString()`: a class's own, a Date's, an Array's
 or a Vector's, and otherwise its text); a function of any kind is `function Function() {}`; a RegExp's `lastIndex` is an `int`.
+Where the library's rules were read from avmplus's source (`core/Vector.as`, `VectorImpl.as`, `Array.as`,
+`String.as`, `MethodInfo`), the code says which file. Read: a vector of numbers converts what `indexOf` and
+`lastIndexOf` are given (`indexOf(value:int)`), and any other vector looks for the value as it is, by `===`
+(`value:Object`); an Array's `join` takes undefined for the comma (`sep === undefined ? "," : String(sep)`); a
+default is for an argument left out, so `"abc".indexOf(undefined)` looks for "null". Inferred from those
+declarations and not run in Flash: a Vector's `join(undefined)` gives "null" between the elements; by name, an
+Array's `toString("x")` is Error #1063 and a Vector's ignores the argument. Not as avmplus has it, and why: a
+`for each` over an Array passes over an element that is undefined (avmplus passes over holes only, and an
+Array here does not tell the two apart); `*`, `-` and `/` on two untyped Godot values give NaN, as AS3's
+ToNumber does, where typed code uses Godot's operator; a function that names `arguments` still refuses more
+arguments than it declares (avmplus takes them).
+
 An Array or a Vector that holds itself, or nests more than 500 deep, put into words is Error #1023, as
 avmplus's stack check gives (its `join` has no other guard).
 

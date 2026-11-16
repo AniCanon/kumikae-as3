@@ -123,9 +123,9 @@ inline constexpr std::array<LibraryMethod, 45> LIBRARY_METHODS = { {
 		// `join(separator:String=",")`, where undefined given is null as for any String parameter.
 		{ "join", ON_ARRAY, Does::VecCall, list_code(VectorMethod::JoinAny), { or_else(Takes::Any) }, Takes::Nothing, Takes::Text },
 		{ "join", ON_VECTOR, Does::VecCall, list_code(VectorMethod::Join), { or_else(Takes::Text) }, Takes::Nothing, Takes::Text, "," },
-		// An Array's toString() takes nothing (Array.as: `prototype.toString = function():String`, which is
-		// held to its count); a Vector's ignores what it is given (VectorImpl.as: `prototype.toString =
-		// function()`, with no type in it, which avmplus leaves unchecked).
+		// The two declarations are read from avmplus (Array.as: `prototype.toString = function():String`;
+		// VectorImpl.as: `prototype.toString = function()`). That the first is held to its count and the
+		// second, with no type in it, is left unchecked is inferred from MethodInfo's rule, not run.
 		{ "toString", ON_ARRAY, Does::VecCall, list_code(VectorMethod::Text), {}, Takes::Nothing, Takes::Text },
 		{ "toString", ON_VECTOR, Does::VecCall, list_code(VectorMethod::Text), {}, Takes::Any, Takes::Text },
 		{ "toLocaleString", ON_LIST, Does::VecCall, list_code(VectorMethod::LocaleText), {}, Takes::Nothing, Takes::Text },
