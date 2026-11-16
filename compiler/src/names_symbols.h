@@ -120,6 +120,7 @@ struct Package {
 	std::unordered_map<std::string_view, Symbol *> definitions;
 	// Further definitions of a name in other files: the first file's is in definitions.
 	std::unordered_multimap<std::string_view, Symbol *> repeated;
+	size_t files = 0; // How many files' package blocks name it: with none, an edited program forgets it.
 };
 
 // A resolved use of a name, kept for `--dump-names` and for tools.

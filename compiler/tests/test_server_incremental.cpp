@@ -12,6 +12,7 @@
 #include "server.h"
 #include "uri.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -81,6 +82,10 @@ struct Editor {
 		return notification("textDocument/didOpen", Json::object().set("textDocument", Json::object()
 				.set("uri", uri_from_path(p_path)).set("languageId", "actionscript").set("version", 1).set("text", p_text)));
 	}
+	Json close(const std::string &p_path) {
+		versions.erase(p_path);
+		return notification("textDocument/didClose", Json::object().set("textDocument", Json::object().set("uri", uri_from_path(p_path))));
+	}
 	Json change(const std::string &p_path, const std::string &p_text) {
 		return notification("textDocument/didChange", Json::object()
 				.set("textDocument", Json::object().set("uri", uri_from_path(p_path)).set("version", ++versions[p_path]))
@@ -118,6 +123,7 @@ bool run(uint64_t p_seed, int p_edits, long &r_edits, long &r_yields) {
 		opening.push_back(editor.open(path, text));
 	}
 	editor.send(opening);
+	int joined = 0;
 	for (int step = 0; step < p_edits; ++step) {
 		// One batch, as the server reads them: edits, and questions about the text as it is at that point.
 		std::vector<Json> batch;
@@ -125,7 +131,21 @@ bool run(uint64_t p_seed, int p_edits, long &r_edits, long &r_yields) {
 		for (int i = 0, count = 1 + (int)random.below(3); i < count; ++i) {
 			auto at = files.begin();
 			std::advance(at, (long)random.below(files.size()));
-			if (random.chance(60)) {
+			const bool asked = std::any_of(questions.begin(), questions.end(), [&](const auto &p_question) {
+				return p_question.first.get("params").get("textDocument").get("uri").string() == uri_from_path(at->first);
+			});
+			// A request whose document is closed after it in the batch is refused, as before: not what is compared.
+			if (random.chance(4) && files.size() > 3 && !asked) {
+				// With no project folder the open files are the program: closing one takes it out.
+				batch.push_back(editor.close(at->first));
+				files.erase(at);
+				r_edits++;
+			} else if (random.chance(4)) {
+				const std::string path = "/project/Joined" + std::to_string(++joined) + ".as";
+				files[path] = at->second;
+				batch.push_back(editor.open(path, at->second));
+				r_edits++;
+			} else if (random.chance(60)) {
 				const std::vector<std::string> words = oracle::vocabulary(files);
 				oracle::Editor typing(random, words);
 				typing.edit(at->second, files.begin()->second);
@@ -181,7 +201,10 @@ bool run(uint64_t p_seed, int p_edits, long &r_edits, long &r_yields) {
 	// The fresh editor's versions are all 1: compare what is held, with the version left out.
 	std::map<std::string, std::string> held;
 	for (const auto &[uri, diagnostics] : editor.held) {
-		held[uri] = diagnostics.substr(0, diagnostics.rfind(" v"));
+		// A file that was closed has its errors cleared, and is nothing to a fresh server.
+		if (diagnostics.rfind("[]", 0) != 0 || files.count(path_from_uri(uri))) {
+			held[uri] = diagnostics.substr(0, diagnostics.rfind(" v"));
+		}
 	}
 	std::vector<std::string> out;
 	fresh.server.settle(out);

@@ -12,6 +12,7 @@
 #include "scratch.h"
 #include "oracle_edits.h"
 
+#include "ast_walk.h"
 #include "workspace.h"
 
 #include <cstdio>
@@ -32,10 +33,27 @@ long setting(const char *p_name, long p_default) {
 	return value && *value ? std::strtol(value, nullptr, 10) : p_default;
 }
 
-Workspace::Options options(bool p_godot) {
+// A declaration file whose class has tags, two of them mistaken: what it says must not depend on which
+// files use the class, or on how often they are checked.
+const std::string &tagged_api() {
+	static const std::string path = [] {
+		const std::string written = (check::fresh_folder("api") / "tagged.as").string();
+		std::ofstream(written, std::ios::binary)
+				<< "package api {\n\t[Operators]\n\t[Operator(op=\"+\", right=\"V2\", returns=\"V2\")]\n"
+				   "\t[Operator(op=\"+\", right=\"V2\", returns=\"V2\")]\n\t[Operator(op=\"-\", right=\"Nope\", returns=\"V2\")]\n"
+				   "\t[Indexed(element=\"int\")]\n\tpublic class V2 {\n\t\tpublic var x:Number;\n\t\tpublic native function V2(x:Number = 0);\n\t}\n}\n";
+		return written;
+	}();
+	return path;
+}
+
+Workspace::Options options(bool p_godot, bool p_tagged = false) {
 	Workspace::Options result;
 	result.godot = p_godot;
 	result.support_folder = (check::run_folder() / "support").string();
+	if (p_tagged) {
+		result.declarations.push_back(tagged_api());
+	}
 	return result;
 }
 
@@ -116,6 +134,7 @@ struct Totals {
 	long comparisons = 0;
 	long partial_settles = 0;
 	long lazy_questions = 0;
+	long joined_or_left = 0; // Times the program's set of files changed.
 	Compilation::Counts work; // Summed over every workspace: shows which hard paths the edits reached.
 };
 
@@ -133,6 +152,7 @@ void add(Compilation::Counts &r_total, const Compilation::Counts &p_now, const C
 class Sequence {
 	uint64_t seed_;
 	bool godot_;
+	bool tagged_; // A declaration file with tags is part of the program (tagged_api).
 	oracle::Random random_;
 	oracle::Files files_;
 	std::map<std::string, std::vector<std::string>> history_;
@@ -192,7 +212,7 @@ class Sequence {
 		for (const auto &[path, text] : files_) {
 			paths.push_back(path);
 		}
-		allowed_rebuilds_ += paths != applied_ ? 1 : 0;
+		totals_.joined_or_left += paths != applied_ ? 1 : 0; // No rebuild: a file that joins or leaves is an edit.
 		applied_ = std::move(paths);
 	}
 
@@ -251,7 +271,7 @@ class Sequence {
 		applying();
 		totals_.comparisons++;
 		check::checks()++;
-		Workspace reference(options(godot_));
+		Workspace reference(options(godot_, tagged_));
 		this->reference(reference);
 		for (const std::string &path : sampled_paths(p_edited)) {
 			const std::vector<uint32_t> offsets = probe_offsets(random_, files_[path], 4);
@@ -288,7 +308,7 @@ class Sequence {
 		check::checks()++;
 		const std::vector<uint32_t> offsets = probe_offsets(random_, files_[p_path], 3);
 		const std::string got = answers(workspace_, where(p_path), offsets);
-		Workspace reference(options(godot_));
+		Workspace reference(options(godot_, tagged_));
 		this->reference(reference);
 		const std::string wanted = answers(reference, where(p_path), offsets);
 		return got == wanted || fail("a question about " + p_path + " only", got, wanted);
@@ -343,8 +363,9 @@ class Sequence {
 	}
 
 public:
-	Sequence(uint64_t p_seed, bool p_godot, oracle::Files p_files, Totals &r_totals, bool p_rooted = false) :
-			seed_(p_seed), godot_(p_godot), random_(p_seed), files_(std::move(p_files)), workspace_(options(p_godot)), totals_(r_totals) {
+	Sequence(uint64_t p_seed, bool p_godot, oracle::Files p_files, Totals &r_totals, bool p_rooted = false, bool p_tagged = false) :
+			seed_(p_seed), godot_(p_godot), tagged_(p_tagged), random_(p_seed), files_(std::move(p_files)),
+			workspace_(options(p_godot, p_tagged)), totals_(r_totals) {
 		if (p_rooted) {
 			root_ = check::fresh_folder("root" + std::to_string(p_seed)).string();
 			for (const auto &[path, text] : files_) {
@@ -487,10 +508,9 @@ void directed(const char *p_name, bool p_godot, oracle::Files p_files,
 	}
 	workspace.compilation();
 	int step = 0;
-	int rebuilds = 1; // A file that joins or leaves the program rebuilds it.
+	const int rebuilds = 1; // The first check only: a file that joins or leaves the program is an edit.
 	for (const auto &[path, text] : p_steps) {
 		++step;
-		rebuilds += text.empty() || !p_files.count(path) ? 1 : 0;
 		if (text.empty()) {
 			workspace.close(path);
 			p_files.erase(path);
@@ -546,6 +566,18 @@ void test_directed() {
 			{ { "/p/a/One.as", file("x", "public class One { public var v:int; }") }, { "/p/b/One.as", file("x", "public class Two {}") },
 					{ "/p/a/One.as", file("x", "public class One {") }, { "/p/a/One.as", file("x", "public class Three {}") } },
 			"/p/User.as", "one:");
+	// The halves of a property overridden along a chain, each in another class: the getter's override added to
+	// the class in the middle is not an error in the class below, in whatever order the files are checked.
+	directed("halves along a chain", false,
+			{ { "/p/A_D.as", file("", "public class A_D extends M { override public function set x(v:int):void { } }") },
+					{ "/p/B.as", file("", "public class B { public function get x():int { return 1; } public function set x(v:int):void { } }") },
+					{ "/p/M.as", file("", "public class M extends B { }") } },
+			{ { "/p/M.as", file("", "public class M extends B { override public function get x():int { return 2; } }") },
+					{ "/p/B.as", file("", "public class B { public function get x():int { return 1; } }") },
+					{ "/p/M.as", file("", "public class M extends B { }") },
+					{ "/p/B.as", file("", "public class B { public function get x():int { return 1; } public function set x(v:int):void { } }") },
+					{ "/p/M.as", file("", "public class M extends B { override public function get x():int { return 2; } }") } },
+			"/p/A_D.as", "set ");
 	// A setter inherited across files points into the base file's tree: a body edit there moves it.
 	directed("inherited half", false,
 			{ { "/p/Base.as", file("", "public class Base { public function get v():int { return 1; } public function set v(x:int):void {} }") },
@@ -593,9 +625,121 @@ void test_directed() {
 			"/p/Mover.as", "position.");
 }
 
+// A mistake in a declaration file's tag is said once, in that file, however many files use the class and
+// however often their bodies are checked again.
+void test_declaration_tags() {
+	const fs::path folder = check::fresh_folder("tags");
+	const std::string api = (folder / "api.as").string();
+	std::ofstream(api, std::ios::binary) << "package api {\n\t[Operators]\n\t[Operator(op=\"+\", right=\"V2\", returns=\"V2\")]\n"
+											"\t[Operator(op=\"+\", right=\"V2\", returns=\"V2\")]\n\t[Operator(op=\"-\", right=\"Nope\", returns=\"V2\")]\n"
+											"\tpublic class V2 {\n\t\tpublic var x:Number;\n\t\tpublic native function V2(x:Number = 0);\n\t}\n}\n";
+	Workspace::Options with = options(false);
+	with.declarations.push_back(api);
+	const std::string a = "package { import api.V2; public class A { public function f(a:V2, b:V2):V2 { return a + b; } } }";
+	const std::string b = "package { import api.V2; public class B { public function g(a:V2, b:V2):V2 { return a + b; } } }";
+	Workspace workspace(with);
+	workspace.open("/p/A.as", a);
+	workspace.open("/p/B.as", b);
+	const std::string said = workspace.compilation().format_diagnostics();
+	CHECK_EQ(workspace.unit(api)->diagnostics.count(), 2);
+	for (int i = 0; i < 8; ++i) {
+		workspace.change("/p/A.as", replaced(a, "return a + b;", "var q:int = " + std::to_string(i) + "; return a + b;"));
+		CHECK_EQ(workspace.compilation().format_diagnostics(), said);
+	}
+	// And the same whether two files use the class, or none.
+	Workspace alone(with);
+	alone.open("/p/C.as", "package { public class C {} }");
+	alone.compilation();
+	CHECK_EQ(alone.unit(api)->diagnostics.count(), 2);
+}
+
+// A long chain of classes: an edit to the root reaches every class, one after another, and is still an
+// edit, not a rebuild.
+void test_deep_chain() {
+	for (int depth : { 70, 1000 }) {
+		oracle::Files files;
+		const auto name = [](int p_index) { return "C" + std::to_string(p_index); };
+		const std::string root = "package { public class C0 { public function m():int { return 1; } } }";
+		files["/p/C0.as"] = root;
+		for (int i = 1; i < depth; ++i) {
+			files["/p/" + name(i) + ".as"] = "package { public class " + name(i) + " extends " + name(i - 1) + " { } }";
+		}
+		files["/p/Z.as"] = "package { public class Z extends " + name(depth - 1) + " { override public function m():int { return 2; } } }";
+		Workspace workspace(options(false));
+		for (const auto &[path, text] : files) {
+			workspace.open(path, text);
+		}
+		CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+		for (const std::string &text : { replaced(root, "m():int { return 1; }", "m():String { return ''; }"), root }) {
+			workspace.change("/p/C0.as", text);
+			files["/p/C0.as"] = text;
+			Workspace reference(options(false));
+			for (const auto &[path, written] : files) {
+				reference.open(path, written);
+			}
+			CHECK(program_state(workspace) == program_state(reference));
+		}
+		CHECK_EQ(workspace.full_checks(), 1);
+	}
+}
+
+// A package that nothing declares any more is forgotten: a file moved from package to package for a whole
+// session leaves no trace of where it was.
+void test_packages_released() {
+	Workspace workspace(options(false));
+	workspace.open("/p/User.as", "package { import game.*; public class User { var m:Mover; } }");
+	const std::string mover = "package game { public class Mover {} }";
+	workspace.open("/p/Mover.as", mover);
+	const size_t packages = workspace.compilation().counts().packages;
+	for (int i = 0; i < 200; ++i) {
+		workspace.change("/p/Mover.as", replaced(mover, "package game", "package game.p" + std::to_string(i)));
+		workspace.compilation();
+		workspace.change("/p/Mover.as", mover);
+		CHECK_EQ(workspace.compilation().counts().packages, packages);
+	}
+	CHECK_EQ(workspace.compilation().format_diagnostics(), std::string());
+	CHECK_EQ(workspace.full_checks(), 1);
+}
+
+// A tree checked a second time keeps nothing of the first check: a for-each loop's element type was worked
+// out from a class that the second compilation does not have.
+void test_reused_tree() {
+	const std::string collection = "package api { [Indexed(element=\"int\")] public class Bag { public native function Bag(); } }";
+	std::shared_ptr<Parsed> program = parse_file("/p/Loop.as",
+			"package { import api.Bag; public class Loop { function f(b:Bag):void { for each (var i:int in b) {} } } }");
+	const auto element = [&] {
+		const Type *found = nullptr;
+		bool any = false;
+		walk(program->tree, [&](Node *p_node) {
+			if (p_node->kind == NodeKind::ForIn) {
+				any = true;
+				found = static_cast<ForIn *>(p_node)->element;
+			}
+		});
+		CHECK(any);
+		return found;
+	};
+	{
+		Compilation first;
+		first.add("/p/api.as", collection, true);
+		first.add(program);
+		first.check(true);
+		CHECK_EQ(first.format_diagnostics(), std::string());
+		CHECK(element() != nullptr);
+	}
+	Compilation second;
+	second.add(program);
+	second.check(true);
+	CHECK(element() == nullptr);
+}
+
 int main() {
 	test_scope();
 	test_directed();
+	test_declaration_tags();
+	test_deep_chain();
+	test_packages_released();
+	test_reused_tree();
 	const long seeds = setting("KAS3_ORACLE_SEEDS", 12);
 	const long edits = setting("KAS3_ORACLE_EDITS", 60);
 	const long classes = setting("KAS3_ORACLE_CLASSES", 10);
@@ -609,14 +753,24 @@ int main() {
 		}
 		oracle::Random random(seed * 7919);
 		// One sequence in three is a project folder on disk, edited in the editor and on disk.
-		Sequence(seed, false, oracle::generate(random, (int)classes), totals, seed % 3 == 2).run((int)edits);
+		// One in four has a declaration file with tags, and two files that use its class.
+		oracle::Files generated = oracle::generate(random, (int)classes);
+		const bool tagged = seed % 4 == 3;
+		if (tagged) {
+			for (const char *name : { "Adds", "Loops" }) {
+				generated[std::string("/project/") + name + ".as"] = std::string("package {\n\timport api.V2;\n\tpublic class ") + name +
+						" {\n\t\tpublic function sum(a:V2, b:V2):V2 {\n\t\t\tfor each (var i:int in a) { trace(i); }\n"
+						"\t\t\treturn a + b;\n\t\t}\n\t}\n}\n";
+			}
+		}
+		Sequence(seed, false, std::move(generated), totals, seed % 3 == 2, tagged).run((int)edits);
 		// Godot's API is checked once and kept: a sequence with it shows that it is never checked again.
 		if (seed % 4 == 1) {
 			Sequence(seed, true, corpus(fs::path(KAS3_TESTS_DIR) / "corpus"), totals).run((int)edits / 3);
 		}
 	}
-	std::printf("oracle: %ld edits, %ld comparisons, %ld yielding checks, %ld one-file questions\n", totals.edits,
-			totals.comparisons, totals.partial_settles, totals.lazy_questions);
+	std::printf("oracle: %ld edits, %ld comparisons, %ld yielding checks, %ld one-file questions, %ld changes of the files\n",
+			totals.edits, totals.comparisons, totals.partial_settles, totals.lazy_questions, totals.joined_or_left);
 	const Compilation::Counts &work = totals.work;
 	std::printf("oracle: %zu declarations and %zu bodies checked; %zu cascades, %zu cycle rounds, %zu symbols reused, "
 				"%zu new first definitions, %zu doubt judgements, %zu bodies checked alone\n",

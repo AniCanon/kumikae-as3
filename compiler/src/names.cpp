@@ -132,11 +132,22 @@ Unit *Compilation::add(std::shared_ptr<Parsed> p_parsed, bool p_is_declaration) 
 		clear_annotations(p_parsed->tree);
 	}
 	p_parsed->used = true;
-	units_.emplace_back(std::move(p_parsed));
-	Unit &unit = units_.back();
-	unit.rank = (uint32_t)(units_.size() - 1);
-	unit.is_declaration = p_is_declaration;
-	return &unit;
+	Unit *unit = nullptr;
+	if (tracking_ && !tracking_->left.empty()) {
+		unit = tracking_->left.back();
+		tracking_->left.pop_back();
+		const uint32_t id = unit->id;
+		*unit = Unit(std::move(p_parsed));
+		unit->id = id;
+	} else {
+		units_.emplace_back(std::move(p_parsed));
+		unit = &units_.back();
+		unit->id = (uint32_t)(units_.size() - 1);
+	}
+	unit->rank = (uint32_t)files_.size();
+	files_.push_back(unit);
+	unit->is_declaration = p_is_declaration;
+	return unit;
 }
 
 void Compilation::check(bool p_through_syntax_errors) {
@@ -173,8 +184,8 @@ void Compilation::check(bool p_through_syntax_errors) {
 }
 
 bool Compilation::has_errors() const {
-	for (const Unit &unit : units_) {
-		if (unit.diagnostics.has_errors()) {
+	for (const Unit *unit : files_) {
+		if (unit->diagnostics.has_errors()) {
 			return true;
 		}
 	}
@@ -183,8 +194,8 @@ bool Compilation::has_errors() const {
 
 std::string Compilation::format_diagnostics(bool p_warnings) const {
 	std::string result;
-	for (const Unit &unit : units_) {
-		result += unit.diagnostics.format(unit.source, p_warnings);
+	for (const Unit *unit : files_) {
+		result += unit->diagnostics.format(unit->source, p_warnings);
 	}
 	return result;
 }
@@ -257,6 +268,10 @@ std::string Compilation::where(const Unit &p_from, const Symbol *p_symbol) const
 void Compilation::declare_unit(Unit &p_unit) {
 	Program *tree = p_unit.tree;
 	p_unit.package = package(tree->package ? dotted_name(tree->package->name, tree->package->name.count) : std::string());
+	if (tracking_ && p_unit.package->files == 0) {
+		tracking_->packages.try_emplace(p_unit.package->name, false); // Not known before, unless a file just left it.
+	}
+	p_unit.package->files++;
 	if (tree->package) {
 		uint32_t count = 0;
 		for (Node *definition : tree->package->definitions) {

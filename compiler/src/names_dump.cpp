@@ -9,10 +9,12 @@ namespace kas3 {
 std::string Compilation::dump_names() const {
 	std::string result;
 	int shown = 0;
-	for (const Unit &unit : units_) {
+	for (const Unit *file : files_) {
+		const Unit &unit = *file;
 		shown += unit.is_declaration ? 0 : 1;
 	}
-	for (const Unit &unit : units_) {
+	for (const Unit *file : files_) {
+		const Unit &unit = *file;
 		if (unit.is_declaration) {
 			continue;
 		}

@@ -182,7 +182,8 @@ class Editor {
 			r_text.erase(at, (end == std::string::npos ? r_text.size() : end + 1) - at);
 			return "remove import";
 		}
-		static const std::vector<std::string> written = { "import game.*;\n", "import game.util.*;\n",
+		static const std::vector<std::string> written = { "import game.*;\n", "import game.util.*;\n", "import game.moved.*;\n",
+			"import elsewhere.*;\n", "import api.*;\n",
 			"import game.C1;\n", "import game.util.C2;\n", "import game.I0;\n", "import nowhere.*;\n" };
 		const size_t brace = r_text.find('{');
 		const std::string &line = random_.pick(written);
@@ -202,13 +203,44 @@ class Editor {
 		return "statement " + statement.substr(0, statement.find('\n'));
 	}
 
+	// One half of a property written into the class, overriding or not: a base may have the other half, or a
+	// class between this one and the base that has both.
+	std::string accessor(std::string &r_text) {
+		const size_t declared = r_text.find("class ");
+		const size_t brace = declared == std::string::npos ? std::string::npos : r_text.find(" {\n", declared);
+		if (brace == std::string::npos) {
+			return body(r_text);
+		}
+		const std::string &name = random_.pick(member_names());
+		const std::string &type = random_.pick(value_types());
+		const std::string half = random_.chance(50) ? "function get " + name + "():" + type + " { return null; }"
+													: "function set " + name + "(v:" + type + "):void {}";
+		const std::string line = std::string("\t\t") + (random_.chance(60) ? "override " : "") + "public " + half + "\n";
+		r_text.insert(brace + 3, line);
+		return "accessor " + line.substr(2, line.size() - 3);
+	}
+
+	// The file moves to another package: one of the project's, or one that no other file is in, which comes
+	// to exist with the move and stops existing with the next.
+	std::string package(std::string &r_text) {
+		const size_t at = r_text.find("package ");
+		const size_t brace = at == std::string::npos ? std::string::npos : r_text.find('{', at);
+		if (brace == std::string::npos) {
+			return body(r_text);
+		}
+		static const std::vector<std::string> names = { "", "game ", "game.util ", "game.moved ", "elsewhere ", "game.util.deep " };
+		const std::string &name = random_.pick(names);
+		r_text.replace(at + 8, brace - at - 8, name);
+		return "package " + name;
+	}
+
 public:
 	Editor(Random &p_random, const std::vector<std::string> &p_vocabulary) :
 			random_(p_random), vocabulary_(p_vocabulary) {}
 
 	// Changes the text in one of the ways typing would; p_other is another file of the project, to paste from.
 	std::string edit(std::string &r_text, const std::string &p_other) {
-		switch (random_.below(10)) {
+		switch (random_.below(12)) {
 			case 0:
 			case 1:
 				return replace_word(r_text);
@@ -222,6 +254,10 @@ public:
 				return clause(r_text);
 			case 6:
 				return import(r_text);
+			case 7:
+				return accessor(r_text);
+			case 8:
+				return package(r_text);
 			default:
 				return body(r_text);
 		}

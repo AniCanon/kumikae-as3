@@ -75,6 +75,8 @@ struct Unit {
 	std::vector<Import *> signature_imports; // The imports that are.
 	std::deque<Symbol> body_symbols; // Replaced together with this unit's body semantics.
 	uint32_t rank = 0; // Its place among the files: of two definitions of one name, the first file's wins.
+	uint32_t id = 0; // Its place in the compilation's storage, which it keeps when files join or leave.
+	bool removed = false; // It left the program being edited: nothing of it is left but this place.
 	std::vector<Symbol *> declared; // What its declarations made, which a redo of them reuses.
 	std::vector<Symbol *> classes; // Its classes and interfaces, in the order written.
 	// Other files whose positions its messages give, and those whose property halves its classes took: a
@@ -118,6 +120,7 @@ struct Tracking; // incremental.h
 
 class Compilation {
 	std::deque<Unit> units_;
+	std::vector<Unit *> files_; // The files of the program, in their order: units_ without those that left.
 	std::deque<Symbol> symbols_;
 	std::deque<ClassInfo> classes_;
 	std::unordered_map<std::string, Package> packages_;
@@ -169,6 +172,9 @@ class Compilation {
 	void declare_files(const std::vector<Unit *> &p_units);
 	void redeclare(std::vector<Unit *> &r_units, std::vector<Dependency> &r_changed);
 	void moved(Unit &p_unit, std::vector<Dependency> &r_changed);
+	void leave(Unit &p_unit);
+	void settle_packages(std::vector<Dependency> &r_changed);
+	void renumber();
 	bool propagate(std::vector<Unit *> p_work, std::vector<Dependency> p_changed, std::vector<Unit *> p_done);
 	std::vector<Unit *> cycle_files(const std::vector<Symbol *> &p_classes, const std::vector<Unit *> &p_units);
 	void retract(Unit &p_unit); // names_retract.cpp
@@ -202,6 +208,10 @@ public:
 	void prepare();
 	// False if the change can't be made in place (a declaration file changed): check again from the start.
 	bool update(const std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> &p_changes);
+	// A file joins the program, before p_before in the order (null: last), or leaves it. Taken in by the
+	// next update(), like an edit: what the file declares is new, or gone, to the files that read it.
+	Unit *insert(std::shared_ptr<Parsed> p_parsed, const Unit *p_before);
+	void remove(Unit &p_unit);
 	Unit *next_unchecked(); // Null when every file's bodies are checked.
 	// What the checks since prepare() did, for tests and benchmarks.
 	struct Counts {
@@ -213,6 +223,7 @@ public:
 		size_t reused = 0; // Symbols of declarations that were gone, used again.
 		size_t firsts = 0; // Times another file's definition of a name became the first.
 		size_t judged = 0; // Files judged again for what a syntax error elsewhere makes doubtful.
+		size_t packages = 0; // Packages known now: those something declares, and the top-level one.
 	};
 	Counts counts() const;
 	void check_bodies(Unit &p_unit);
@@ -249,6 +260,9 @@ public:
 	Symbol *object_class() const { return object_; }
 	Symbol *element_parameter() const { return element_; }
 	std::deque<Unit> &units() { return units_; }
+	// The files in their order. In a compilation that is edited, files join in the middle and leave: this
+	// is then the list to walk, and units() only where everything was added once.
+	const std::vector<Unit *> &files() const { return files_; }
 
 	// Resolves the imports into r_scope, reporting those that name nothing.
 	void resolve_imports(Unit &p_unit, const List<Import *> &p_imports, ImportScope &r_scope);

@@ -161,7 +161,8 @@ std::vector<FoundSymbol> Queries::find(std::string_view p_query, size_t p_limit)
 		if (declared && p_query.empty()) {
 			break; // Everything, unasked: the program is what is meant, not Godot's thousands of names.
 		}
-		for (const Unit &unit : compilation_.units()) {
+		for (const Unit *file : compilation_.files()) {
+			const Unit &unit = *file;
 			if (unit.is_declaration != declared) {
 				continue;
 			}

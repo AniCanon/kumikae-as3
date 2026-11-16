@@ -274,7 +274,8 @@ std::vector<Place> Queries::references(const Symbol *p_symbol, bool p_with_decla
 		return places;
 	}
 	const std::unordered_set<const Symbol *> implemented = same_through_interfaces(p_symbol);
-	for (const Unit &unit : compilation_.units()) {
+	for (const Unit *file : compilation_.files()) {
+		const Unit &unit = *file;
 		if (unit.is_declaration) {
 			continue;
 		}

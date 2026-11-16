@@ -355,34 +355,42 @@ bool Workspace::update() {
 	if (!compilation_) {
 		return false;
 	}
-	std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> changes;
-	size_t present = 0;
-	for (const auto &[path, file] : files_) {
-		if (!included(path)) {
-			continue;
-		}
-		auto found = units_.find(path);
-		if (found == units_.end()) {
-			return false; // A file joined the program.
-		}
-		++present;
-		if (found->second->parsed != file.parsed) {
-			changes.emplace_back(found->second, file.parsed);
-		}
-	}
-	size_t expected = 0;
-	for (const Unit &unit : compilation_->units()) {
-		if (!unit.is_declaration) {
-			++expected;
-		}
-	}
 	for (const auto &parsed : declarations_) {
 		auto found = units_.find(parsed->source.path());
 		if (found == units_.end() || found->second->parsed != parsed) {
-			return false;
+			return false; // A declaration file changed: nothing the program reads of it is tracked.
 		}
 	}
-	return present == expected && (changes.empty() || compilation_->update(changes));
+	bool any = false;
+	// A file that left the program: its unit goes, and what read its declarations is checked again.
+	for (auto unit = units_.begin(); unit != units_.end();) {
+		auto file = files_.find(unit->first);
+		if (!unit->second->is_declaration && (file == files_.end() || !included(unit->first))) {
+			compilation_->remove(*unit->second);
+			unit = units_.erase(unit);
+			any = true;
+		} else {
+			++unit;
+		}
+	}
+	// From the last file to the first, so that a file that joined knows the file it comes before.
+	std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> changes;
+	const Unit *next = nullptr;
+	for (auto file = files_.rbegin(); file != files_.rend(); ++file) {
+		if (!included(file->first)) {
+			continue;
+		}
+		auto found = units_.find(file->first);
+		if (found == units_.end()) {
+			found = units_.emplace(file->first, compilation_->insert(file->second.parsed, next)).first;
+			any = true;
+		} else if (found->second->parsed != file->second.parsed) {
+			changes.emplace_back(found->second, file->second.parsed);
+			any = true;
+		}
+		next = found->second;
+	}
+	return !any || compilation_->update(changes);
 }
 
 void Workspace::check() {
@@ -506,7 +514,8 @@ bool Workspace::settle(const std::function<bool()> &p_yield) {
 
 std::vector<Unit *> Workspace::program_units() {
 	std::vector<Unit *> units;
-	for (Unit &unit : current().units()) {
+	for (Unit *file : current().files()) {
+		Unit &unit = *file;
 		if (!unit.is_declaration) {
 			units.push_back(&unit);
 		}
@@ -516,7 +525,8 @@ std::vector<Unit *> Workspace::program_units() {
 
 std::vector<Unit *> Workspace::reported_units() {
 	std::vector<Unit *> units;
-	for (Unit &unit : current().units()) {
+	for (Unit *file : current().files()) {
+		Unit &unit = *file;
 		if (!unit.is_builtin && unit.source.path() != GODOT_DECLARATIONS_PATH) {
 			units.push_back(&unit);
 		}

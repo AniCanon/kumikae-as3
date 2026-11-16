@@ -82,6 +82,12 @@ void Compilation::retract(Unit &p_unit) {
 		}
 		tracking.retracted[{ &p_unit, symbol->owner, symbol->kind, name_hash(symbol->name) }].push_back(symbol);
 	}
+	if (p_unit.package) {
+		// Its package may be left with no file: settle_packages forgets it then.
+		tracking.packages.try_emplace(p_unit.package->name, true);
+		p_unit.package->files--;
+		p_unit.package = nullptr;
+	}
 	p_unit.declared.clear();
 	p_unit.classes.clear();
 	p_unit.helpers.clear();
@@ -125,7 +131,7 @@ void Compilation::retract(Unit &p_unit) {
 	}
 	if (!p_unit.unchecked) {
 		p_unit.unchecked = true;
-		tracking.unchecked.insert(p_unit.rank);
+		tracking.unchecked.insert(p_unit.id);
 	}
 }
 
