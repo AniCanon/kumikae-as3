@@ -148,9 +148,9 @@ the compiler or the interpreter says `... is not supported by the interpreter ye
 - **Weak keys** (`new Dictionary(true)`): memory is reference-counted, and a key that does not count needs
   the collector to clear it; a Dictionary that kept its keys alive would be silently wrong.
 - **A property added to a Date, a RegExp, an Error or a Function** (dynamic in AS3): these hold their
-  fields in fixed places; one read that the class does not declare is `undefined`.
+  fields in fixed places. One read that a Date or a RegExp does not declare is `undefined`.
 - **Through a class held in a variable:** its static members (`c.create()`), which the IR does not list
-  by name, and `new` of a Function. One of Godot's classes is no value (`var c:Class = Node`): Godot's
+  by name. One of Godot's classes is no value (`var c:Class = Node`): Godot's
   classes are not the program's.
 - **A function of the library that belongs to no value, as a value:** `Math.max`, `String.fromCharCode`,
   `trace`. (A method of a value is one: `list.push`, `text.charAt`.)
