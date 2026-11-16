@@ -5,7 +5,6 @@
 
 #include "table.h"
 
-#include <array>
 #include <cmath>
 
 namespace kas3 {
@@ -18,24 +17,6 @@ using ir::NONE;
 using ir::Op;
 
 namespace {
-
-constexpr std::array<std::string_view, 7> OBJECT_METHODS = { "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "setPropertyIsEnumerable",
-	"toLocaleString", "toString", "valueOf" };
-constexpr std::array<std::string_view, 20> ARRAY_METHODS = { "concat", "every", "filter", "forEach", "indexOf", "join", "lastIndexOf", "map", "pop",
-	"push", "reverse", "shift", "slice", "some", "sort", "sortOn", "splice", "unshift", "insertAt", "removeAt" };
-constexpr std::array<std::string_view, 16> STRING_METHODS = { "charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "localeCompare", "match",
-	"replace", "search", "slice", "split", "substr", "substring", "toLowerCase", "toUpperCase", "fromCharCode" };
-constexpr std::array<std::string_view, 3> NUMBER_METHODS = { "toFixed", "toExponential", "toPrecision" };
-
-template <size_t Count>
-bool listed(const std::array<std::string_view, Count> &p_names, std::string_view p_name) {
-	for (std::string_view each : p_names) {
-		if (each == p_name) {
-			return true;
-		}
-	}
-	return false;
-}
 
 // "12" names element 12 of an Array; "012", "1e1" and "-1" name properties, as in ECMAScript.
 std::optional<uint32_t> index_text(std::string_view p_text) {
@@ -212,139 +193,6 @@ std::optional<uint32_t> Interpreter::named_method(const ir::Class &p_class, std:
 	return std::nullopt;
 }
 
-// holder[key] as an untyped value with a reference of its own. False if it raised: a name a sealed object
-// does not have is AS3's ReferenceError #1069; one the interpreter can't reach yet says so.
-bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
-	*r_value = any::undefined();
-	Object *object = held_object(p_holder);
-	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
-	if (klass && klass->table) {
-		if (const std::optional<uint32_t> at = entry_of(entries_of(object), p_key)) {
-			*r_value = share(Kind::Any, entries_of(object)->value_at(*at));
-			return true;
-		}
-		if (listed(OBJECT_METHODS, p_key.text)) {
-			raise_unsupported("reading '" + p_key.text + "' of an Object by its name");
-			return false;
-		}
-		return true; // Nothing there: undefined.
-	}
-	if (klass && klass->element != Kind::Void) {
-		return vector_property(static_cast<Vector *>(object), p_key, p_holder, r_value);
-	}
-	if (klass) {
-		return sealed_property(object, p_key, p_holder, r_value);
-	}
-	return primitive_property(p_holder, p_key, r_value);
-}
-
-// An element of an Array or a Vector held untyped, its length, or another property of an Array.
-bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value) {
-	const ir::Class &klass = module_.classes[p_vector->klass];
-	if (p_key.index && *p_key.index < p_vector->length) {
-		*r_value = to_any(klass.element, p_vector->data[*p_key.index]);
-		return true;
-	}
-	if (p_key.index && !klass.array) {
-		raise_range(*p_key.index, p_vector->length);
-		return false;
-	}
-	if (p_key.text == "length") {
-		Slot length;
-		set_uint32(length, p_vector->length);
-		*r_value = to_any(Kind::U32, length);
-		return true;
-	}
-	if (const std::optional<uint32_t> at = entry_of(p_vector->properties, p_key); at && klass.array) {
-		*r_value = share(Kind::Any, p_vector->properties->value_at(*at));
-		return true;
-	}
-	if (listed(ARRAY_METHODS, p_key.text) || listed(OBJECT_METHODS, p_key.text) || p_key.text == "fixed") {
-		raise_unsupported("reading '" + p_key.text + "' of " + (klass.array ? "an Array" : "a Vector") + " by its name");
-		return false;
-	}
-	if (klass.array) {
-		return true; // Nothing there: undefined.
-	}
-	raise_not_found(p_key, p_holder);
-	return false;
-}
-
-// A property of a sealed object: one of RegExp's or Date's, a public field, a method as a function value,
-// or what a getter gives.
-bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value) {
-	const ir::Class &klass = module_.classes[p_object->klass];
-	if (const std::optional<bool> done = library_get(p_object, p_key.text, r_value)) {
-		return *done;
-	}
-	if (const std::optional<uint32_t> field = klass.field(p_key.text, true)) {
-		*r_value = to_any(klass.fields[*field].kind, p_object->fields()[*field]);
-		return true;
-	}
-	if (const std::optional<uint32_t> slot = named_method(klass, p_key.text)) {
-		Object *made = make_function(klass.methods[*slot], p_object);
-		*r_value = made ? any::object(made) : any::undefined();
-		return made != nullptr;
-	}
-	if (const std::optional<uint32_t> getter = named_method(klass, p_key.text, "get ")) {
-		return call_getter(p_object, klass.methods[*getter], r_value);
-	}
-	if (named_method(klass, p_key.text, "set ")) {
-		raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
-				"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
-		return false;
-	}
-	if (klass.built_in || listed(OBJECT_METHODS, p_key.text)) {
-		raise_unsupported("reading '" + p_key.text + "' of " + holder_name(p_holder) + " by its name");
-		return false;
-	}
-	raise_not_found(p_key, p_holder);
-	return false;
-}
-
-// A public getter: called, on the object's class's own (it may be overridden).
-bool Interpreter::call_getter(Object *p_object, uint32_t p_function, Slot *r_value) {
-	Slot self;
-	self.bits = 0;
-	self.p = p_object;
-	Slot result;
-	result.bits = 0;
-	retain(p_object); // Held while its getter runs.
-	const bool ok = call_within(p_function, &self, 1, &result);
-	release_object(p_object);
-	if (ok) {
-		const Kind kind = module_.functions[p_function].result;
-		*r_value = to_any(kind, result);
-		drop(kind, result);
-	}
-	return ok;
-}
-
-// A property of a String, a number or a Boolean held untyped; null and undefined have none.
-bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value) {
-	const AnyTag tag = any::tag(p_holder);
-	if (tag == AnyTag::Null || tag == AnyTag::Undefined) {
-		any_null_check(p_holder);
-		return false;
-	}
-	if (any::is_engine(p_holder)) {
-		raise_unsupported("a property of one of Godot's values or objects held untyped, by its name");
-		return false;
-	}
-	if (tag == AnyTag::String && p_key.text == "length") {
-		*r_value = any::integer(utf16_length(static_cast<const Str *>(any::pointer(p_holder))->view()));
-		return true;
-	}
-	const bool number = tag == AnyTag::Int || tag == AnyTag::Number || tag == AnyTag::Wide;
-	if (listed(OBJECT_METHODS, p_key.text) || (tag == AnyTag::String && listed(STRING_METHODS, p_key.text)) ||
-			(number && listed(NUMBER_METHODS, p_key.text))) {
-		raise_unsupported("reading '" + p_key.text + "' of a " + holder_name(p_holder) + " by its name");
-		return false;
-	}
-	raise_not_found(p_key, p_holder);
-	return false;
-}
-
 // AS3's ReferenceError for a write a sealed object refuses: "Error #1056: Cannot create property x on C.".
 bool Interpreter::refuse_write(const char *p_number, const char *p_words, std::string_view p_name, Slot p_holder) {
 	raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
@@ -502,38 +350,6 @@ bool Interpreter::delete_property(Slot p_holder, const PropertyKey &p_key, bool 
 	return true;
 }
 
-// key in holder (p_prototype: what its prototype has counts), or holder.hasOwnProperty(key).
-bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_prototype, bool *r_has) {
-	Object *object = held_object(p_holder);
-	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
-	const AnyTag tag = any::tag(p_holder);
-	if (!klass && (tag == AnyTag::Null || tag == AnyTag::Undefined)) {
-		any_null_check(p_holder);
-		return false;
-	}
-	if (!klass && any::is_engine(p_holder)) {
-		raise_unsupported("a property of one of Godot's values or objects held untyped, by its name");
-		return false;
-	}
-	bool has = p_prototype && listed(OBJECT_METHODS, p_key.text);
-	if (klass && klass->table) {
-		has = has || entry_of(entries_of(object), p_key).has_value();
-	} else if (klass && klass->element != Kind::Void) {
-		const Vector *vector = static_cast<const Vector *>(object);
-		const bool element = p_key.index && *p_key.index < vector->length &&
-				(!klass->array || any::tag(vector->data[*p_key.index]) != AnyTag::Undefined);
-		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed") ||
-				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && listed(ARRAY_METHODS, p_key.text));
-	} else if (klass) {
-		has = has || klass->field(p_key.text, true) || named_method(*klass, p_key.text) || library_has(object, p_key.text);
-	} else if (tag == AnyTag::String) {
-		has = has || p_key.text == "length" || (p_prototype && listed(STRING_METHODS, p_key.text));
-	} else if (tag != AnyTag::Boolean) {
-		has = has || (p_prototype && listed(NUMBER_METHODS, p_key.text));
-	}
-	*r_has = has;
-	return true;
-}
 
 // DynGet, DynSet, DynDelete and DynIn. Making the key's text may run the program, which may move
 // the registers: the operands are held first, and the result is written through the frame's place.
