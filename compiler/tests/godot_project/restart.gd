@@ -1,5 +1,6 @@
 # A scene edited while it runs: run_godot.py runs this in a copy of the project, where it may rewrite
-# Restart.as. An edit to code that runs once starts the scene again; any other edit keeps it.
+# Restart.as. No edit starts the scene again by itself: objects whose constructors depend only on their
+# arguments and constants are updated in place, the rest is said, and a restart that is asked for shows it.
 extends SceneTree
 
 var stage := 0
@@ -40,6 +41,13 @@ func reload_now() -> void:
 		if language.has_method("reload_scripts"):
 			language.call("reload_scripts")
 
+# The running scene started again from its file: what a person asks for to see what a reload could not show.
+func restart_scene() -> void:
+	for i in Engine.get_script_language_count():
+		var language := Engine.get_script_language(i)
+		if language.has_method("restart_scene"):
+			language.call("restart_scene")
+
 func _initialize() -> void:
 	change_scene_to_file("res://restart.tscn")
 	scene_changed.connect(func(): changes += 1)
@@ -67,11 +75,19 @@ func _process(_delta: float) -> bool:
 		show("a method edited and a field added: the scene is the same", current_scene.get_instance_id() == first_id, true)
 		put("ready")
 		stage = 2
-	elif stage == 2 and (str(said()).begins_with("three") or late):
-		show("_ready edited: the scene starts again", said(), "three!")
-		show("_ready edited: a new scene", current_scene.get_instance_id() != first_id, true)
+	elif stage == 2 and acted:
+		show("_ready edited: the scene does not start again by itself", current_scene.get_instance_id() == first_id, true)
+		show("_ready edited: what it did is kept", said(), "one!")
 		show("a constant edited: it has its new value", current_scene.call("limit"), "b")
+		show("a constant edited: an object alive that was made from it is updated in place", current_scene.call("width"), 30.0)
+		show("a constant edited: a field the game changed since keeps what it holds", current_scene.call("moved"), 7.0)
 		show("a static variable's first value edited: it keeps the one it was given", current_scene.call("firstNow"), "a")
+		restart_scene()
+		mark = looks()
+		stage = 21
+	elif stage == 21 and (str(said()).begins_with("three") or late):
+		show("a restart asked for: the scene starts again", said(), "three!")
+		show("a restart asked for: a new scene", current_scene.get_instance_id() != first_id, true)
 		# The fifth version is saved as Godot takes the old scene out: the new one is made (its constructors
 		# ran the fourth version's code) and not yet in the tree.
 		current_scene.tree_exited.connect(func():
@@ -80,10 +96,11 @@ func _process(_delta: float) -> bool:
 		changes = 0
 		put("four")
 		reload_now()
+		restart_scene()
 		frame_mark = frames
 		stage = 3
 	elif stage == 3 and (said() == "five!five" or frames - frame_mark > 2000):
-		show("a save while the scene starts again: the scene has that save's code throughout", said(), "five!five")
-		show("a save while the scene starts again: the scene starts once more", changes, 2)
+		show("a save while a restart asked for is being made: the scene has that save's code throughout", said(), "five!five")
+		show("a save while a restart asked for is being made: the scene starts once more", changes, 2)
 		return true
 	return frames > 200000

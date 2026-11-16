@@ -1,5 +1,6 @@
-// After a reload whose code that runs once changed: the scene that is running is made again from its file,
-// so that what runs once runs again with the new code.
+// What a reload says of the objects alive, and the scene that is running made again from its file, so that
+// what runs once runs again with the new code: when a person asks for it, or when the scene's own file was
+// edited. A reload of the scripts never starts the scene again by itself.
 #include "program.h"
 
 #include <godot_cpp/classes/engine.hpp>
@@ -57,38 +58,57 @@ static void start_again() {
 	}
 }
 
-void restart_scene(const Restart &p_restart) {
-	const String names = listed(p_restart.classes);
-	if (!p_restart.statics.empty()) {
-		UtilityFunctions::print(String("ActionScript: the first values of static fields changed in ") + listed(p_restart.statics) +
+void say_moved(const Moved &p_moved) {
+	const vm::InPlace &done = p_moved.in_place;
+	String line;
+	if (!done.updated.empty()) {
+		line = String("updated in place: ") + listed(done.updated) + ".";
+	}
+	if (!done.left.empty()) {
+		String left;
+		for (const auto &[name, why] : done.left) {
+			left += String(left.is_empty() ? "" : ", ") + String::utf8(name.c_str()) + " (" + String::utf8(why.c_str()) + ")";
+		}
+		line += String(line.is_empty() ? "not updated in place: " : " Not updated: ") + left + ". Restart the scene to see the new code on those.";
+	}
+	if (!line.is_empty()) {
+		UtilityFunctions::print(String("ActionScript: objects ") + line);
+	}
+	if (!p_moved.statics.empty()) {
+		UtilityFunctions::print(String("ActionScript: the first values of static fields changed in ") + listed(p_moved.statics) +
 				". Constants have their new values. Static variables keep the values the game gave them, through a reload and a "
 				"scene started again; restart the game for their new first values.");
 	}
+}
+
+void restart_scene(const Restart &p_restart) {
 	if (in_flight) {
 		// The scene being made now has some of the old build's code run: it is made again once it is in.
 		once_more = true;
-		UtilityFunctions::print("ActionScript: the scripts changed while the scene was starting again; it starts once more when it is ready.");
+		UtilityFunctions::print(String("ActionScript: ") + (p_restart.asked ? "a restart was asked for" : "the scripts changed") +
+				" while the scene was starting again; it starts once more when it is ready.");
 		return;
 	}
 	SceneTree *tree = scene_tree();
 	godot::Node *scene = tree ? tree->get_current_scene() : nullptr;
 	const std::string file = scene ? std::string(scene->get_scene_file_path().utf8().get_data()) : std::string();
-	const bool edited = !file.empty() && std::find(p_restart.scenes.begin(), p_restart.scenes.end(), file) != p_restart.scenes.end();
-	if (p_restart.classes.empty() && edited) {
-		UtilityFunctions::print("ActionScript: the scene's file changed, so the scene starts again.");
-		in_flight = true;
-		callable_mp_static(&start_again).call_deferred();
+	if (!p_restart.asked) {
+		if (!file.empty() && std::find(p_restart.scenes.begin(), p_restart.scenes.end(), file) != p_restart.scenes.end()) {
+			UtilityFunctions::print("ActionScript: the scene's file changed, so the scene starts again.");
+			in_flight = true;
+			callable_mp_static(&start_again).call_deferred();
+		}
+		return;
+	}
+	if (file.empty()) {
+		UtilityFunctions::print("ActionScript: there is no scene made from a file to start again.");
 		return;
 	}
 	if (p_restart.classes.empty()) {
-		return;
+		UtilityFunctions::print("ActionScript: the scene starts again.");
+	} else {
+		UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + listed(p_restart.classes) + ", so the scene starts again.");
 	}
-	if (!scene || scene->get_scene_file_path().is_empty()) {
-		UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names +
-				". Objects alive now keep what it did; restart the scene to see it.");
-		return;
-	}
-	UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names + ", so the scene starts again.");
 	if (!p_restart.kept.empty()) {
 		UtilityFunctions::print(String("ActionScript: not made again, as they are kept outside the scene, and keeping what the old code did: ") +
 				listed(p_restart.kept) + ". Restart the game to see it.");
