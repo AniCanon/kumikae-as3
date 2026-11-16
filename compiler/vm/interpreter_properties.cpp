@@ -33,13 +33,6 @@ std::optional<uint32_t> index_text(std::string_view p_text) {
 	return value < 4294967295ull ? std::optional<uint32_t>(static_cast<uint32_t>(value)) : std::nullopt;
 }
 
-Slot of_bool(bool p_value) {
-	Slot out;
-	out.bits = 0;
-	out.b = p_value;
-	return out;
-}
-
 std::optional<uint32_t> index_number(double p_value) {
 	if (!(p_value >= 0 && p_value < 4294967295.0) || p_value != std::floor(p_value)) {
 		return std::nullopt;

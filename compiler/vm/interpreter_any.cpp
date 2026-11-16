@@ -14,13 +14,6 @@ using ir::Op;
 
 namespace {
 
-Slot of_bool(bool p_value) {
-	Slot out;
-	out.bits = 0;
-	out.b = p_value;
-	return out;
-}
-
 const char *tag_name(AnyTag p_tag) {
 	switch (p_tag) {
 		case AnyTag::Undefined:
