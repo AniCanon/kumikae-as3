@@ -130,23 +130,7 @@ Object *Reload::object(Object *p_old) {
 		return table;
 	}
 	if (old_class.element != Kind::Void || new_class.element != Kind::Void) {
-		// A vector: the same length, and each element carried as a field is. Its type must still hold
-		// elements of the same kind.
-		const Vector *old = static_cast<const Vector *>(p_old);
-		Vector *vector = old_class.element == new_class.element ? new_vector(named->second, old->length, old->fixed, to_.collector_.list_for(named->second)) : nullptr;
-		if (!vector) {
-			return lost(p_old->klass);
-		}
-		moved_.emplace(p_old, vector);
-		retain(vector);
-		for (uint32_t i = 0; i < old->length; i++) {
-			vector->data[i] = carry(new_class.element, old->data[i]);
-		}
-		Entries *properties = old->properties && old->properties->size() ? properties_of(vector) : nullptr;
-		if (properties) {
-			carry_entries(*old->properties, properties);
-		}
-		return vector;
+		return moved_vector(static_cast<Vector *>(p_old), named->second);
 	}
 	Object *fresh = new_object(named->second, new_class.fields.size(), to_.collector_.list_for(named->second));
 	if (!fresh) {
@@ -155,6 +139,35 @@ Object *Reload::object(Object *p_old) {
 	// Before its fields: an object it refers to may refer back.
 	moved_.emplace(p_old, fresh);
 	retain(fresh);
+	carry_fields(p_old, fresh);
+	return fresh;
+}
+
+// A vector: the same length, and each element carried as a field is. Its type must still hold elements of
+// the same kind.
+Object *Reload::moved_vector(Vector *p_old, uint32_t p_class) {
+	const ir::Class &old_class = from_.module_.classes[p_old->klass];
+	const ir::Class &new_class = to_.module_.classes[p_class];
+	Vector *vector = old_class.element == new_class.element ? new_vector(p_class, p_old->length, p_old->fixed, to_.collector_.list_for(p_class)) : nullptr;
+	if (!vector) {
+		return lost(p_old->klass);
+	}
+	moved_.emplace(p_old, vector);
+	retain(vector);
+	for (uint32_t i = 0; i < p_old->length; i++) {
+		vector->data[i] = carry(new_class.element, p_old->data[i]);
+	}
+	Entries *properties = p_old->properties && p_old->properties->size() ? properties_of(vector) : nullptr;
+	if (properties) {
+		carry_entries(*p_old->properties, properties);
+	}
+	return vector;
+}
+
+// The new object's fields, each carried from the old one's field of its name and kind, or empty.
+void Reload::carry_fields(Object *p_old, Object *p_fresh) {
+	const ir::Class &old_class = from_.module_.classes[p_old->klass];
+	const ir::Class &new_class = to_.module_.classes[p_fresh->klass];
 	// A base and its subclass may each have a private field of one name: the n-th of a name is the n-th.
 	std::unordered_map<std::string_view, size_t> seen;
 	for (size_t i = 0; i < new_class.fields.size(); i++) {
@@ -166,15 +179,14 @@ Object *Reload::object(Object *p_old) {
 				continue;
 			}
 			if (old_class.fields[j].kind == field.kind) {
-				fresh->fields()[i] = carry_into(field.kind, field.klass, p_old->fields()[j]);
+				p_fresh->fields()[i] = carry_into(field.kind, field.klass, p_old->fields()[j]);
 			}
 			carried = true;
 		}
 		if (!carried) {
-			fresh->fields()[i] = empty_value(field.kind == Kind::F64, field.starts_null);
+			p_fresh->fields()[i] = empty_value(field.kind == Kind::F64, field.starts_null);
 		}
 	}
-	return fresh;
 }
 
 void Reload::globals() {
