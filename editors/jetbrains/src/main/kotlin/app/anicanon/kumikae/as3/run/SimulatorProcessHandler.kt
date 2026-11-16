@@ -23,7 +23,7 @@ internal class SimulatorProcessHandler(
             notifyTextAvailable(text, if (error) ProcessOutputTypes.STDERR else ProcessOutputTypes.STDOUT)
         },
         sources,
-        build,
+        build = build,
     )
     private val worker = Thread(::follow, "Kumikae AS3 Simulator run").apply { isDaemon = true }
 
