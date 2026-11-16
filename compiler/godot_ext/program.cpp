@@ -38,6 +38,7 @@ uint64_t Project::generation() {
 }
 
 void Project::before_shutdown() {
+	forget_scenes();
 	if (program && program->valid()) {
 		release_listeners();
 		program->interpreter().clear_globals();
@@ -99,6 +100,7 @@ Project &Project::get() {
 	loads++;
 	// Taken before the scripts are read: an edit made from here on is one the game has not seen.
 	watch_loaded = watch_seen = scripts_signature();
+	refresh_scenes(); // What they are now: an edit from here on is read again.
 	std::string errors;
 	if (!compile_project(program->module_.get(), &errors)) {
 		UtilityFunctions::push_error(String("ActionScript: the project's scripts have errors and were not loaded.\n") +
@@ -254,6 +256,7 @@ void Project::reload() {
 	module.reset();
 	AS3Script::refresh_all();
 	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.");
+	restart.scenes = refresh_scenes();
 	restart_scene(restart);
 }
 

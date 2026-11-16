@@ -91,6 +91,17 @@ func _process(_delta: float) -> bool:
 		stage = 4
 	elif stage == 4 and (ask("value") == 4 or waited(8000)):
 		show("a save of the same size in the same second is seen", ask("value"), 4)
+		# A reload asked for while AS3 runs (AS3 emits a signal, GDScript hears it and asks): refused.
+		var emitter := Node.new()
+		emitter.set_script(load("res://Signals.as"))
+		root.add_child(emitter)
+		emitter.renamed.connect(func():
+			for i in Engine.get_script_language_count():
+				if Engine.get_script_language(i).has_method("reload_scripts"):
+					Engine.get_script_language(i).call("reload_scripts"))
+		emitter.call("fire")
+		emitter.free()
+		show("a reload asked for while AS3 runs is refused: the code stays", ask("value"), 4)
 		node.free()
 		other.free()
 		return true

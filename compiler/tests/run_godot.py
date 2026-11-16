@@ -448,6 +448,25 @@ with tempfile.TemporaryDirectory() as edited:
     check("restart.gd: Godot is told the scene starts once more", "it starts once more when it is ready" in output and
           "so it starts once more" in output and "restart it by hand" not in output and "restart the scene to see it" not in output, output[-1500:])
 
+# A game on a simulator is told where on this computer its files are edited (KAS3_SOURCE_DIR): a scene
+# edited there is read from there, and the scene starts again from it.
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    sources = os.path.join(edited, "sources")
+    shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
+    environment = dict(os.environ)
+    environment["KAS3_SOURCE_DIR"] = sources
+    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "scene_edit.gd"], capture_output=True, text=True, timeout=300,
+                         env=environment)
+    output = run.stdout + run.stderr
+    values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
+    check("scene_edit.gd ran to its end", run.returncode == 0 and len(values) == 3 and "leaked" not in output.lower(), output[-1500:])
+    for name, got, want in values:
+        check("scene_edit.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
+    check("scene_edit.gd: Godot is told why the scene started again", "the scene's file changed, so the scene starts again" in output,
+          output[-1500:])
+
 # The scene the iOS test app opens finishes and says so, here too; and when the scripts can't compile (a
 # library older than they are), it says why instead of never finishing.
 for broken in (False, True):
@@ -535,7 +554,9 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 16, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 17, output[-1500:])
+        check("%s: a reload asked for while AS3 runs says it was not made" % label,
+              "can't be reloaded while AS3 runs" in output, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
         check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 3, output[-1500:])

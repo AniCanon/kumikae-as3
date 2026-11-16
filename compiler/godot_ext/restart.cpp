@@ -8,6 +8,8 @@
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <algorithm>
+
 using namespace godot;
 
 namespace kas3 {
@@ -67,11 +69,19 @@ void restart_scene(const Restart &p_restart) {
 		UtilityFunctions::print("ActionScript: the scripts changed while the scene was starting again; it starts once more when it is ready.");
 		return;
 	}
+	SceneTree *tree = scene_tree();
+	godot::Node *scene = tree ? tree->get_current_scene() : nullptr;
+	const std::string file = scene ? std::string(scene->get_scene_file_path().utf8().get_data()) : std::string();
+	const bool edited = !file.empty() && std::find(p_restart.scenes.begin(), p_restart.scenes.end(), file) != p_restart.scenes.end();
+	if (p_restart.classes.empty() && edited) {
+		UtilityFunctions::print("ActionScript: the scene's file changed, so the scene starts again.");
+		in_flight = true;
+		callable_mp_static(&start_again).call_deferred();
+		return;
+	}
 	if (p_restart.classes.empty()) {
 		return;
 	}
-	SceneTree *tree = scene_tree();
-	godot::Node *scene = tree ? tree->get_current_scene() : nullptr;
 	if (!scene || scene->get_scene_file_path().is_empty()) {
 		UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names +
 				". Objects alive now keep what it did; restart the scene to see it.");

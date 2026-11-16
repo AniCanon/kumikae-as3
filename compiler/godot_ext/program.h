@@ -69,11 +69,13 @@ std::vector<std::pair<vm::Object *, godot::Object *>> instances_outside(const go
 
 // A scene started again after a reload (restart.cpp): code that runs once changed in `classes`, of which
 // objects are alive. What a restart would not make again is said: `kept` names it; `statics` names the
-// classes whose static fields' first values changed after the fields were given them.
+// classes whose static fields' first values changed after the fields were given them; `scenes` the scene
+// files that changed (refresh_scenes): the running scene starts again if its own did.
 struct Restart {
 	std::vector<std::string> classes;
 	std::vector<std::string> kept;
 	std::vector<std::string> statics;
+	std::vector<std::string> scenes;
 };
 // Starts the running scene again, from its file, deferred to when Godot changes scenes; or says why not.
 // While a scene is being started again (from the deferred call to Godot saying the scene changed), a reload

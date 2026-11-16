@@ -114,15 +114,13 @@ any Godot value passing as a condition):
 
 ## Reload while running
 
-- On the iOS Simulator the scene comes from the app's own copy: a scene file edited on the computer is not
-  seen until the game is built again. **2d**
 - Rider's hover was failing on code marked `actionscript` (fixed: the plugin names its own language); not
   yet seen working in Rider. **LS-2**
-- A game on a simulator reloads from the folder it is told of (`KAS3_SOURCE_DIR`); only scripts are read
-  there, so an edited scene or picture needs a new build. A real phone or tablet cannot see that folder:
-  it needs the edits sent to it. **2d**
-- Not tried: a reload while a debugger is stopped, in the Godot editor's own play mode with the editor
-  attached, or with more than a few hundred scripts. **2d**
+- A game on a simulator reads its scripts, scenes and text resources from the folder it is told of
+  (`KAS3_SOURCE_DIR`), but an edited picture (any file Godot imports) needs a new build: importing needs
+  Godot's editor. A real phone or tablet cannot see that folder: it needs the edits sent to it. **2d**
+- Not tried: a reload while a debugger is stopped at a breakpoint (the editor's play mode, and 2,034
+  scripts, were). **2d**
 
 ## Stage 2c-3: `try`, `catch`, `finally`, labels
 

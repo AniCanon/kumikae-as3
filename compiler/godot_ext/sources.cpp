@@ -4,6 +4,8 @@
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/time.hpp>
 
 #include <algorithm>
@@ -56,7 +58,7 @@ namespace {
 struct Folder {
 	bool listed = false;
 	uint64_t changed = 0;
-	std::vector<std::string> files; // The scripts.
+	std::vector<std::string> files; // The scripts, and in a folder elsewhere its scenes and resources.
 	std::vector<String> folders;
 };
 
@@ -65,9 +67,18 @@ std::unordered_map<std::string, Folder> &folders() {
 	return all;
 }
 
-// One look through the folder, for its scripts and its folders. Names that start with a dot are not part
-// of a project.
-void list_folder(const String &p_folder, Folder *r_folder) {
+// A scene or a resource saved as text, which Godot reads as it is: no importing.
+bool is_scene(const String &p_name) {
+	return p_name.ends_with(".tscn") || p_name.ends_with(".tres");
+}
+
+bool is_scene(const std::string &p_path) {
+	return is_scene(String::utf8(p_path.c_str()));
+}
+
+// One look through the folder, for its scripts (and, with `p_scenes`, its scenes) and its folders. Names
+// that start with a dot are not part of a project.
+void list_folder(const String &p_folder, bool p_scenes, Folder *r_folder) {
 	r_folder->files.clear();
 	r_folder->folders.clear();
 	const Ref<DirAccess> folder = DirAccess::open(p_folder);
@@ -81,29 +92,45 @@ void list_folder(const String &p_folder, Folder *r_folder) {
 		}
 		if (folder->current_is_dir()) {
 			r_folder->folders.push_back(p_folder.path_join(name));
-		} else if (name.ends_with(".as")) {
+		} else if (name.ends_with(".as") || (p_scenes && is_scene(name))) {
 			r_folder->files.push_back(p_folder.path_join(name).utf8().get_data());
 		}
 	}
 	folder->list_dir_end();
 }
 
-// The scripts under a folder, by where they are, for the watch. Listing a folder is slow (on macOS, 20 to
+// The scripts under a folder (and its scenes, outside the project), by where they are, for the watch. Listing a folder is slow (on macOS, 20 to
 // 50 microseconds a name), so a folder is listed again only when it changed (a file made, removed or
 // renamed in it changes it) or changed in the last two seconds (its time is in whole seconds).
-void watched_scripts(const String &p_folder, uint64_t p_now, std::vector<std::string> &r_files) {
+void watched_files(const String &p_folder, uint64_t p_now, std::vector<std::string> &r_files) {
 	Folder &known = folders()[p_folder.utf8().get_data()];
 	// By the folder's place on the disk: Godot gives "res://" itself no time (0, as for a folder in a pack).
 	const uint64_t changed = FileAccess::get_modified_time(ProjectSettings::get_singleton()->globalize_path(p_folder));
 	if (!known.listed || known.changed != changed || changed + 2 >= p_now) {
-		list_folder(p_folder, &known);
+		list_folder(p_folder, scripts_root() != "res://", &known);
 		known.listed = true;
 		known.changed = changed;
 	}
 	r_files.insert(r_files.end(), known.files.begin(), known.files.end());
 	for (const String &inner : std::vector<String>(known.folders)) {
-		watched_scripts(inner, p_now, r_files);
+		watched_files(inner, p_now, r_files);
 	}
+}
+
+// What a file was when last looked at: when it was written, and what it held if that was recent.
+struct Seen {
+	uint64_t written = 0, held = 0;
+};
+
+std::unordered_map<std::string, Seen> &seen() {
+	static std::unordered_map<std::string, Seen> all;
+	return all;
+}
+
+// The scenes and resources read from the folder elsewhere, each in its place in the project.
+std::unordered_map<std::string, Ref<Resource>> &taken() {
+	static std::unordered_map<std::string, Ref<Resource>> all;
+	return all;
 }
 
 } // namespace
@@ -114,13 +141,9 @@ void watched_scripts(const String &p_folder, uint64_t p_now, std::vector<std::st
 // that the signature does not change as the file grows old. (A file's size is not asked for: on macOS that
 // opens the file, and took most of a look, 150 microseconds a script.)
 uint64_t scripts_signature() {
-	struct Seen {
-		uint64_t written = 0, held = 0;
-	};
-	static std::unordered_map<std::string, Seen> seen;
 	const uint64_t now = static_cast<uint64_t>(Time::get_singleton()->get_unix_time_from_system());
 	std::vector<std::string> files;
-	watched_scripts(scripts_root(), now, files);
+	watched_files(scripts_root(), now, files);
 	std::sort(files.begin(), files.end());
 	uint64_t mixed = 1469598103934665603ull;
 	const auto mix = [](uint64_t p_into, uint64_t p_value) { return (p_into ^ p_value) * 1099511628211ull; };
@@ -130,7 +153,7 @@ uint64_t scripts_signature() {
 		}
 		const String file = String::utf8(path.c_str());
 		const uint64_t written = FileAccess::get_modified_time(file);
-		Seen &known = seen[path];
+		Seen &known = seen()[path];
 		if (known.written != written || written + 2 >= now) {
 			uint64_t held = 1469598103934665603ull;
 			if (written + 2 >= now) {
@@ -144,6 +167,47 @@ uint64_t scripts_signature() {
 		mixed = mix(mix(mixed, written), known.held);
 	}
 	return mixed;
+}
+
+std::vector<std::string> refresh_scenes() {
+	static std::unordered_map<std::string, std::pair<uint64_t, uint64_t>> read; // As each was when last read.
+	static bool primed = false;
+	const String root = scripts_root();
+	if (root == "res://") {
+		return {};
+	}
+	std::vector<std::string> files;
+	watched_files(root, static_cast<uint64_t>(Time::get_singleton()->get_unix_time_from_system()), files);
+	std::vector<std::string> changed;
+	for (const std::string &path : files) {
+		const Seen &now = seen()[path];
+		auto &last = read[path];
+		if (is_scene(path) && primed && last != std::make_pair(now.written, now.held)) {
+			changed.push_back(path);
+		}
+		last = { now.written, now.held };
+	}
+	primed = true;
+	// Resources first: a scene read after them finds them in their places.
+	std::stable_sort(changed.begin(), changed.end(), [](const std::string &p_a, const std::string &p_b) {
+		return String::utf8(p_a.c_str()).ends_with(".tres") && !String::utf8(p_b.c_str()).ends_with(".tres");
+	});
+	std::vector<std::string> places;
+	for (const std::string &path : changed) {
+		const Ref<Resource> fresh = ResourceLoader::get_singleton()->load(String::utf8(path.c_str()), "", ResourceLoader::CACHE_MODE_IGNORE);
+		if (fresh.is_null()) {
+			continue; // Godot has said why.
+		}
+		const std::string place = project_path(path, root);
+		fresh->take_over_path(String::utf8(place.c_str()));
+		taken()[place] = fresh;
+		places.push_back(place);
+	}
+	return places;
+}
+
+void forget_scenes() {
+	taken().clear();
 }
 
 } // namespace kas3
