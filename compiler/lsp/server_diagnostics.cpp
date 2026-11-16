@@ -47,6 +47,27 @@ uint32_t extent(const std::string &p_text, uint32_t p_offset) {
 
 } // namespace
 
+// The file's errors as the protocol's list of diagnostics, written out.
+std::string Server::diagnostics_json(const Unit &p_unit) const {
+	Json list = Json::array();
+	for (const Diagnostic &item : p_unit.diagnostics.items()) {
+		list.push(Json::object()
+						  .set("range", range(p_unit, item.offset, extent(p_unit.source.text(), item.offset)))
+						  .set("severity", item.warning ? 2 : 1)
+						  .set("source", "kas3c")
+						  .set("message", item.message));
+	}
+	int dropped = p_unit.diagnostics.dropped();
+	if (dropped > 0) {
+		list.push(Json::object()
+						  .set("range", range(p_unit, 0, 0))
+						  .set("severity", 1)
+						  .set("source", "kas3c")
+						  .set("message", "too many errors (" + std::to_string(dropped) + " more)"));
+	}
+	return write_json(list);
+}
+
 void Server::publish(std::vector<std::string> &r_out) {
 	if (workspace_.stale() || (workspace_.checks() == published_check_ && document_generation_ == published_document_generation_)) {
 		return;
@@ -72,23 +93,7 @@ void Server::publish(std::vector<std::string> &r_out) {
 		if (!unit->diagnostics.has_errors() && before == published_.end() && !version) {
 			continue;
 		}
-		Json list = Json::array();
-		for (const Diagnostic &item : unit->diagnostics.items()) {
-			list.push(Json::object()
-							  .set("range", range(*unit, item.offset, extent(unit->source.text(), item.offset)))
-							  .set("severity", item.warning ? 2 : 1)
-							  .set("source", "kas3c")
-							  .set("message", item.message));
-		}
-		int dropped = unit->diagnostics.dropped();
-		if (dropped > 0) {
-			list.push(Json::object()
-							  .set("range", range(*unit, 0, 0))
-							  .set("severity", 1)
-							  .set("source", "kas3c")
-							  .set("message", "too many errors (" + std::to_string(dropped) + " more)"));
-		}
-		std::string text = write_json(list);
+		std::string text = diagnostics_json(*unit);
 		if (before == published_.end() || before->second.diagnostics != text || before->second.version != version) {
 			send(uri, text);
 			if (!unit->diagnostics.has_errors() && !version) {

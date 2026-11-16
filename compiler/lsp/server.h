@@ -49,6 +49,7 @@ class Server {
 	uint32_t offset_in(const Source &p_source, const Json &p_position) const;
 	int mark_width(const Source &p_source) const;
 	const Occurrence *occurrence_at(const Json &p_params, Unit **r_unit);
+	std::string diagnostics_json(const Unit &p_unit) const;
 	void publish(std::vector<std::string> &r_out);
 	void handle_message(const Json &p_message, std::vector<std::string> &r_out);
 	// The name a document is known by, whatever name the editor gives it: the workspace's for its file.
