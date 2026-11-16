@@ -71,7 +71,7 @@ internal object UiProbeRiderReopen {
                         if (cycle == 0) {
                             layout =
                                 (ToolWindowManager.getInstance(project) as ToolWindowManagerImpl).getLayout().copy()
-                            check(layout!!.getInfo("Problems View")!!.isVisible)
+                            check(layout.getInfo("Problems View")!!.isVisible)
                         }
                         val current = contents.map { it.component.javaClass.name }
                         if (tabs == null) {

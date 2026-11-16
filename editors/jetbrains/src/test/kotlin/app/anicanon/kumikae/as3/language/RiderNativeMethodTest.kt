@@ -38,21 +38,21 @@ class RiderNativeMethodTest {
     @Test fun `suspending native eligibility preserves continuation and result`() {
         val native = Eligibility()
         val method = RiderNativeMethod(Eligibility::class.java, "eligible", Continuation::class.java)
-        var result: Boolean? = null
+        var received: Boolean? = null
         val check: suspend () -> Boolean = { suspendCoroutineUninterceptedOrReturn { method.call(native, it) } }
         check.startCoroutine(object : Continuation<Boolean> {
             override val context = EmptyCoroutineContext
-            override fun resumeWith(value: Result<Boolean>) {
-                result = value.getOrThrow()
+            override fun resumeWith(result: Result<Boolean>) {
+                received = result.getOrThrow()
             }
         })
-        assertNull(result)
+        assertNull(received)
         native.continuation.resume(true)
-        assertEquals(true, result)
+        assertEquals(true, received)
     }
 
     @Test fun `static native calls preserve the return value`() {
-        assertEquals(42, RiderNativeMethod(Integer::class.java, "valueOf", String::class.java).call(null, "42"))
+        assertEquals(42, RiderNativeMethod(Int::class.javaObjectType, "valueOf", String::class.java).call(null, "42"))
     }
 
     @Test fun `bridge preserves native callback arguments`() {

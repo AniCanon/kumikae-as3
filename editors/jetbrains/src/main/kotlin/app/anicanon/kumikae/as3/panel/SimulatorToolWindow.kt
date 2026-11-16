@@ -15,6 +15,9 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
     val console = JBTextArea().apply {
         isEditable = false
         lineWrap = true
+
+        // Between words; a word wider than the console alone is still broken where it must be.
+        wrapStyleWord = true
         margin = JBUI.insets(4)
     }
     private val timer = Timer(POLL_MILLIS) { controller.poll() }

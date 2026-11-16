@@ -152,8 +152,13 @@ Reports are under `build/reports/ui-idea`, `ui`, `ui-runIdeaWithoutLsp4ij` and
 `ui-runRiderWithoutLsp4ij`, respectively. Preserve them before another run.
 
 Each semantic run opens and disposes three projects. It checks Enter/Tab, continued typing and
-Backspace, snippet navigation, prefix refresh, generated edits and Undo, parameter help, go to
-declaration and outline. The probe waits for each client's indexing gate before invoking the first
+Backspace, snippet navigation, prefix refresh, generated edits and Undo, parameter help, hover
+documentation, go to declaration and outline. `UiProbeHover` asks for quick documentation on a method
+call and waits for a shown pane with the server's signature (its code block) and the method's owner.
+It does not move the mouse: the platform shows no mouse hover while another application has the
+desktop's focus, and the probe runs in the background; quick documentation uses the same documentation
+targets and rendering. IDEA without LSP4IJ checks that no documentation target answers and nothing
+with server text is shown. The probe waits for each client's indexing gate before invoking the first
 completion; IDEA checks LSP4IJ's readiness in the same UI-thread turn as invocation. Parameter help
 waits for the live template to finish and activates the sandbox before displaying its hint. No fixed
 delay stands in for readiness. It also mounts the panel and writes light/dark images for inspection.
