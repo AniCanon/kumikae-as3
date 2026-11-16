@@ -221,8 +221,11 @@ object UiProbeCompletion {
                 editor.caretModel.moveToOffset(latest.indexOf("xsuffix") + 1)
                 invokeCompletion(project, editor)
             }
+            // The lookup of the text before may still be showing when the latest one's first items arrive: wait
+            // for it to hold the latest text's items only, which the check below then requires.
             await("latest document lookup") {
-                LookupManager.getActiveLookup(editor)?.items?.any { it.lookupString == "x" } == true
+                val items = LookupManager.getActiveLookup(editor)?.items
+                items?.any { it.lookupString == "x" } == true && items.none { it.lookupString.startsWith("normalized") }
             }
             edt {
                 check(
