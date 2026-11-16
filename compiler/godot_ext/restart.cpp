@@ -61,7 +61,8 @@ void restart_scene(const Restart &p_restart) {
 	const String names = listed(p_restart.classes);
 	if (!p_restart.statics.empty()) {
 		UtilityFunctions::print(String("ActionScript: the first values of static fields changed in ") + listed(p_restart.statics) +
-				". Static fields keep the values they were given, through a reload and a scene started again; restart the game for the new ones.");
+				". Constants have their new values. Static variables keep the values the game gave them, through a reload and a "
+				"scene started again; restart the game for their new first values.");
 	}
 	if (in_flight) {
 		// The scene being made now has some of the old build's code run: it is made again once it is in.

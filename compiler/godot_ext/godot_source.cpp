@@ -4,6 +4,8 @@
 #include "godot_host.h"
 #include "handles.h"
 
+#include "godot_names.h"
+
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/expression.hpp>
@@ -129,9 +131,10 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 	if (p_class.empty()) {
 		return call_utility(p_method, p_arguments, p_count, p_result, r_result, r_error);
 	}
-	// A class's static method comes with its hash ("print_orphan_nodes 2648703342").
-	const size_t space = p_method.find(' ');
-	const std::string_view method = p_method.substr(0, space);
+	// A class's static method comes with its entry in the name table ("print_orphan_nodes method 2648703342
+	// void -"): the hash is its third word.
+	const std::vector<std::string_view> words = godot_words(p_method);
+	const std::string_view method = words[0];
 	const StringName &method_name = name(method);
 	Arguments arguments(p_arguments, p_count);
 	Variant result;
@@ -143,9 +146,10 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 		const std::string key = std::string(p_class) + "." + std::string(p_method);
 		auto found = static_methods_.find(key);
 		if (found == static_methods_.end()) {
-			const GDExtensionInt hash = space == std::string_view::npos ? 0 : std::strtoll(key.c_str() + p_class.size() + 1 + space + 1, nullptr, 10);
+			const bool hashed = words.size() > 2 && words[1] == "method" && words[2] != "-";
+			const GDExtensionInt hash = hashed ? std::strtoll(std::string(words[2]).c_str(), nullptr, 10) : 0;
 			const StringName class_name(String::utf8(p_class.data(), (int64_t)p_class.size()));
-			GDExtensionMethodBindPtr bound = space == std::string_view::npos ? nullptr
+			GDExtensionMethodBindPtr bound = !hashed ? nullptr
 					: gdextension_interface::classdb_get_method_bind(class_name._native_ptr(), method_name._native_ptr(), hash);
 			found = static_methods_.emplace(key, bound).first;
 		}

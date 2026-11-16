@@ -140,7 +140,7 @@ bool Json::string(std::string_view p_text) {
 
 bool Json::begin_object() {
 	const uint32_t klass = vm_.module_.object_class;
-	Object *made = new_table(klass, vm_.collector_.list_for(klass));
+	Object *made = new_table(klass, vm_.heap_.list_for(klass));
 	if (!made) {
 		vm_.out_of_memory();
 		return false;
@@ -193,7 +193,7 @@ std::optional<Slot> Json::walk(Slot p_owned, std::string_view p_name, size_t p_d
 			}
 		} else {
 			for (const Entry &entry : entries_of(object)->all()) {
-				if (any::tag(entry.key) == AnyTag::String) {
+				if (any::tag(entry.key) == AnyTag::String && !entry.hidden) {
 					keys.emplace_back();
 					keys.back().text = static_cast<const Str *>(any::pointer(entry.key))->view();
 				}
@@ -203,7 +203,7 @@ std::optional<Slot> Json::walk(Slot p_owned, std::string_view p_name, size_t p_d
 			Slot member = any::undefined();
 			if (klass->array) {
 				Vector *array = static_cast<Vector *>(object);
-				member = *key.index < array->length ? vm_.share(Kind::Any, array->data[*key.index]) : any::undefined();
+				member = *key.index < array->length ? vm_.share(Kind::Any, any::filled(array->data[*key.index])) : any::undefined();
 			} else if (const std::optional<uint32_t> at = vm_.entry_of(entries_of(object), key)) {
 				member = vm_.share(Kind::Any, entries_of(object)->value_at(*at));
 			}

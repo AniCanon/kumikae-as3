@@ -69,10 +69,10 @@ std::string Server::diagnostics_json(const Unit &p_unit) const {
 }
 
 void Server::publish(std::vector<std::string> &r_out) {
-	if (workspace_.stale() || (workspace_.checks() == published_check_ && document_generation_ == published_document_generation_)) {
+	if (workspace_.stale() || (workspace_.progress() == published_check_ && document_generation_ == published_document_generation_)) {
 		return;
 	}
-	published_check_ = workspace_.checks();
+	published_check_ = workspace_.progress();
 	published_document_generation_ = document_generation_;
 	std::set<std::string> present;
 	auto send = [&](const std::string &p_uri, const std::string &p_diagnostics) {
@@ -88,6 +88,9 @@ void Server::publish(std::vector<std::string> &r_out) {
 			continue;
 		}
 		present.insert(uri);
+		if (!workspace_.checked(*unit)) {
+			continue; // The editor keeps what it has until the file is checked.
+		}
 		auto before = published_.find(uri);
 		const auto version = document_version(uri);
 		// Warnings are shown as errors are: a file with either is published, and cleared when it has none.
@@ -117,11 +120,11 @@ void Server::publish(std::vector<std::string> &r_out) {
 	}
 }
 
-void Server::settle(std::vector<std::string> &r_out) {
+bool Server::settle(std::vector<std::string> &r_out, const std::function<bool()> &p_yield) {
 	if (!initialized_ || exited_) {
-		return;
+		return true;
 	}
-	workspace_.compilation();
+	const bool done = workspace_.settle(p_yield);
 	if (workspace_.cut_off() && !warned_cut_off_) {
 		warned_cut_off_ = true;
 		std::string text = "Kumikae AS3: this project has more than " + std::to_string(workspace_.max_files()) +
@@ -130,6 +133,7 @@ void Server::settle(std::vector<std::string> &r_out) {
 				Json::object().set("type", 2).set("message", text))));
 	}
 	publish(r_out);
+	return done;
 }
 
 } // namespace kas3

@@ -1,6 +1,5 @@
 // The records the interpreter keeps (vm/interpreter.h): its frames, where an error was thrown and what is
-// kept of one on its way, a match, a property's key, a call of a vector's method and a field sortOn() sorts
-// by. Each is known in the class by the same name. Nothing but interpreter.h includes this.
+// kept of one on its way, a match and a property's key. Each is known in the class by the same name. Nothing but interpreter.h includes this.
 #pragma once
 
 #include "ir.h"
@@ -21,7 +20,9 @@ struct Frame {
 	uint32_t pc;
 	size_t base; // Where its registers start in stack_.
 	uint32_t result; // The caller's register for the value returned, or NONE.
-	uint32_t arguments; // How many the caller passed.
+	uint32_t arguments; // How many of its parameters the caller passed.
+	// How many more than its parameters (ir::Function::takes_extra): untyped, in stack_ after its registers.
+	uint32_t extras = 0;
 	bool traced = false; // Its line is already in the trace of the error on its way out.
 };
 
@@ -67,19 +68,21 @@ struct PropertyKey {
 	std::string text;
 };
 
-// A call of one of a vector's methods: its arguments (the vector first) by register, where the
-// frame's registers start, and the register for what it gives back, or NONE.
-struct VectorCall {
-	const std::vector<uint32_t> &list;
-	size_t base;
-	uint32_t out;
-	ir::VectorMethod method;
+// An operator an engine instruction names, worked out once from its entry: AS3's spelling ("-" for the
+// description's "unary-"), and whether it compares (== and !=, which take a missing value).
+struct OperatorName {
+	std::string_view spelling;
+	bool compares = false;
+	int number = -1; // Godot's number for it (Variant::Operator), the entry's second word.
 };
 
-// A field sortOn() sorts by, and its options.
-struct SortField {
-	std::string name;
-	int32_t options;
+struct Prepared; // vm/engine_handles.h
+
+// What the host worked out for one engine instruction when the program was loaded, and whether any of its
+// operands is untyped (what refused_by_godot() has to look at as it runs).
+struct EngineStep {
+	const Prepared *prepared = nullptr;
+	bool untyped = false;
 };
 
 } // namespace vm

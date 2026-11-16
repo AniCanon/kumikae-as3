@@ -24,6 +24,7 @@ func _physics_process(_delta: float) -> bool:
 		return true
 	show("lerpf", ask("mix", [2.0, 6.0, 0.25]), lerpf(2.0, 6.0, 0.25))
 	show("rest from Godot", [ask("gather", [1]), ask("gather", [1, "a", 2])], ["1;0;", "1;2;a,2"])
+	show("arguments from Godot", [ask("tally", [1]), ask("tally", [1, "a", 2.5])], ["1;1;1", "1;3;1,a,2.5"])
 	show("clampf", ask("hold", [3.5]), clampf(3.5, -1, 1))
 	show("clampi", ask("holdWhole", [42]), clampi(42, 0, 10))
 	show("absi", ask("size", [-9007199254740993]), absi(-9007199254740993))
@@ -57,6 +58,7 @@ func _physics_process(_delta: float) -> bool:
 	show("no arguments", ask("nothing"), true)
 	show("whole numbers", ask("wholes", [3]), str(-5, " ", 5, " ", -5 + 2, " ", 0x10, " ", 2 * 3, " ", 3 * 2, " ", 1.5, " ", 3 / 2.0))
 	show("no answer", ask("noAnswer"), null)
+	show("a whole Number stays a float", ask("wholeNumber", [2.0]), str(2.0) + " " + str(2.0))
 	show("anything as text", ask("shown", [1.0, 2.0, 0.5]), str(lerp(1.0, 2.0, 0.5)))
 	ask("run")
 	ask("run")
@@ -64,5 +66,18 @@ func _physics_process(_delta: float) -> bool:
 	show("now", ask("since", [Time.get_unix_time_from_system() * 1000.0]), true)
 	show("zone", ask("zone"), Time.get_time_zone_from_system().bias)
 	show("a regular expression", ask("marked", ["a1 b22"]), "a<1> b<22> a1%20b22 %C3%A9")
+	# A freed object is null to the script on every path, text included: AS3's null text, which C#'s
+	# GD.Str and GD.Print give for a null too (GDScript gives `<Freed Object>` and `<null>`).
+	var gone := Node.new()
+	ask("keep", [gone])
+	gone.free()
+	show("a freed object as text", ask("freedTexts"), "null,null,null,null,null,null,null")
+	show("a freed object to hash and isSame", ask("freedSame"), "true,true,true,true,true")
+	show("a freed object inside a collection", ask("freedInside"), ",1,;;2,null;null,null,[null,null]")
+	ask("freedTraced")
+	show("str of a freed object and of null", ask("freedStr"), "null,nullnull,null,null,null,undefined,anull1")
+	ask("freedPrinted")
+	show("a freed object in locale text", ask("freedLocale"), ",;,,1;,2")
+	show("a script object of no Godot class is not written as null", ask("plainStr"), "refused")
 	node.free()
 	return false

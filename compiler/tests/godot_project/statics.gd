@@ -20,6 +20,52 @@ func _initialize() -> void:
 	node.set_script(load("res://Statics.as"))
 	root.add_child(node)
 
+# A singleton's signal is the whole game's: removeAll() and numListeners on it are about the calling
+# script's own listeners, its object's methods (and its class's static methods), never another script's,
+# another object's of the same class, GDScript's or a function expression's.
+func singleton_remove_all() -> void:
+	var second := Node2D.new()
+	second.set_script(load("res://Statics.as"))
+	root.add_child(second)
+	var other := Node.new()
+	other.set_script(load("res://JoyListener.as"))
+	root.add_child(other)
+	var connected := Input.joy_connection_changed.get_connections().size()
+	Input.joy_connection_changed.connect(on_joy)
+	heard = 0
+	node.joys = 0
+	var statics: int = ask("heardStatic")
+	ask("listen")
+	second.listen()
+	other.listen()
+	ask("listenInPlace")
+	show("a singleton's listeners counted by their own script", [ask("listeners"), second.listeners(), other.listeners()], [2, 2, 1])
+	ask("clear")
+	Input.joy_connection_changed.emit(1, true)
+	show("removeAll() on a singleton's signal takes the caller's own",
+		[node.joys, second.joys, other.joys, heard, ask("heardStatic") - statics], [10, 1, 1, 1, 0])
+	show("and leaves the others' counted", [ask("listeners"), second.listeners(), other.listeners()], [0, 1, 1])
+	second.listen()
+	ask("listen")
+	other.call("clear")
+	Input.joy_connection_changed.emit(1, true)
+	show("from another class, it takes that class's own", [node.joys, second.joys, other.joys, heard], [21, 2, 1, 2])
+	ask("listenStatic")
+	ask("clearFromStatic")
+	Input.joy_connection_changed.emit(1, true)
+	show("from static code, its class's static listeners", [node.joys, second.joys, ask("heardStatic") - statics], [32, 3, 0])
+	ask("listenStatic")
+	ask("clearInPlace")
+	Input.joy_connection_changed.emit(1, true)
+	show("from a function expression, which has no object, the class's static listeners", [node.joys, ask("heardStatic") - statics], [43, 0])
+	ask("unlistenInPlace")
+	ask("clear")
+	second.clear()
+	Input.joy_connection_changed.disconnect(on_joy)
+	show("nothing is left listening", Input.joy_connection_changed.get_connections().size(), connected)
+	second.free()
+	other.free()
+
 func _physics_process(_delta: float) -> bool:
 	frames += 1
 	if frames < 2:
@@ -68,6 +114,7 @@ func _physics_process(_delta: float) -> bool:
 	Input.joy_connection_changed.emit(5, true)
 	show("and is removed through its value", [node.joys - before, ask("heardStatic")], [20, 2])
 	Input.joy_connection_changed.disconnect(on_joy)
+	singleton_remove_all()
 	show("input class", ask("inputClass"), Input.get_class())
 	show("same singleton", ask("sameSingleton"), true)
 	show("singleton object", ask("singletonObject") == Input, true)

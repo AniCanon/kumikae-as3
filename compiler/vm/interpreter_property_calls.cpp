@@ -48,16 +48,9 @@ void Interpreter::dynamic_op(const Function &p_function, const Instruction &p_in
 void Interpreter::table_new(const Function &p_function, const Instruction &p_in) {
 	Slot *r = stack_.data() + frames_.back().base;
 	(void)p_function;
-	if (p_in.c != NONE && r[p_in.c].b) {
-		raise_unsupported("a Dictionary with weak keys");
-		return;
+	if (Object *made = vm::table_new(library_, p_in.b, p_in.c != NONE && r[p_in.c].b)) {
+		assign(Kind::Obj, r[p_in.a], made);
 	}
-	Object *made = new_table(p_in.b, collector_.list_for(p_in.b));
-	if (!made) {
-		out_of_memory();
-		return;
-	}
-	assign(Kind::Obj, r[p_in.a], made);
 }
 
 // Whether a value is one of Godot's Dictionaries and the class is flash.utils.Dictionary: AS3 takes one as
@@ -93,7 +86,7 @@ Object *Interpreter::table_of_engine(void *p_dictionary, uint32_t p_class) {
 	whole.kind = Kind::I64;
 	Slot size;
 	size.bits = 0;
-	Object *made = keys.p && host_.handles.call(keys.p, "size", nullptr, 0, whole, &size, &error) ? new_table(p_class, collector_.list_for(p_class)) : nullptr;
+	Object *made = keys.p && host_.handles.call(keys.p, "size", nullptr, 0, whole, &size, &error) ? new_table(p_class, heap_.list_for(p_class)) : nullptr;
 	bool ok = made != nullptr;
 	if (!ok && error.empty()) {
 		out_of_memory();
@@ -158,7 +151,52 @@ void Interpreter::call_with(uint32_t p_target, Object *p_first, const std::vecto
 	}
 }
 
-// Object's own methods, called on a value that has no property of that name: true if the name is one.
+// setPropertyIsEnumerable(name, isEnum = true). Only an object that keeps properties in a table has the
+// setting (an Object, a Dictionary, an Array's properties beyond its indices): on any other it is the
+// ReferenceError a sealed object gives a write (avmplus, from recollection). A name that is not there,
+// or an Array's element, is left as it is. False if it raised.
+bool Interpreter::set_enumerable(Slot p_holder, const std::vector<Slot> &p_given) {
+	PropertyKey asked;
+	if (!property_key(p_holder, p_given.empty() ? any::undefined() : p_given[0], &asked)) {
+		return false;
+	}
+	const Object *object = held_object(p_holder);
+	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
+	const bool library = object && (object->klass == module_.date_class || object->klass == module_.regexp_class);
+	if (klass && !klass->table && !klass->array && (klass->built_in || library || klass->element != Kind::Void)) {
+		return true; // A Date, a RegExp, a Vector: dynamic in AS3, with no property here to hide.
+	}
+	if (!klass || !(klass->table || klass->array)) {
+		return refuse_write("1056", "Cannot create property ", asked.text, p_holder);
+	}
+	Entries *entries = loop_entries(p_holder);
+	if (const std::optional<uint32_t> at = entry_of(entries, asked)) {
+		entries->all()[*at].hidden = p_given.size() >= 2 && !any::to_boolean(p_given[1]);
+	}
+	return true;
+}
+
+namespace {
+
+// A number's method of that name that formats it; toString() only with a radix, since without one it
+// is any value's.
+std::optional<ir::NumberFormat> number_format(std::string_view p_name, bool p_with_argument) {
+	if (p_name == "toString") {
+		return p_with_argument ? std::optional<ir::NumberFormat>(ir::NumberFormat::Radix) : std::nullopt;
+	}
+	if (p_name == "toFixed") {
+		return ir::NumberFormat::Fixed;
+	}
+	if (p_name == "toExponential") {
+		return ir::NumberFormat::Exponential;
+	}
+	return p_name == "toPrecision" ? std::optional<ir::NumberFormat>(ir::NumberFormat::Precision) : std::nullopt;
+}
+
+} // namespace
+
+// Object's own methods, and a number's, called on a value that has no property of that name: true if the
+// name is one.
 bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out) {
 	const size_t base = frames_.back().base;
 	const auto give = [&](Kind p_kind, Slot p_value) {
@@ -174,17 +212,40 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 		if (property_key(p_holder, p_given.empty() ? any::undefined() : p_given[0], &asked) && has_property(p_holder, asked, false, &has)) {
 			const Object *object = held_object(p_holder);
 			const bool listed = object && (module_.classes[object->klass].table || module_.classes[object->klass].array);
+			const Entries *entries = loop_entries(p_holder);
+			const std::optional<uint32_t> at = entry_of(entries, asked);
 			Slot answer;
 			answer.bits = 0;
-			answer.b = has && (name == "hasOwnProperty" || listed);
+			answer.b = has && (name == "hasOwnProperty" || (listed && !(at && entries->all()[*at].hidden)));
 			give(Kind::Bool, answer);
 		}
 		return true;
 	}
-	const AnyTag tag = any::tag(p_holder);
-	if (name == "toString" && !p_given.empty() && (tag == AnyTag::Int || tag == AnyTag::Number || tag == AnyTag::Wide)) {
-		raise_unsupported("calling 'toString' with a radix on a number held untyped");
+	if (name == "setPropertyIsEnumerable") {
+		if (set_enumerable(p_holder, p_given)) {
+			give(Kind::Any, any::undefined());
+		}
 		return true;
+	}
+	const AnyTag tag = any::tag(p_holder);
+	if (tag == AnyTag::Int || tag == AnyTag::Number || tag == AnyTag::Wide) {
+		if (const std::optional<ir::NumberFormat> format = number_format(name, !p_given.empty())) {
+			// A number's own method: the digits converted as the declared parameter is.
+			Slot value;
+			value.bits = 0;
+			if (tag == AnyTag::Wide) {
+				value.l = static_cast<const Wide *>(any::pointer(p_holder))->value;
+			} else {
+				value.d = any::to_number(p_holder);
+			}
+			const double digits = p_given.empty() ? (*format == ir::NumberFormat::Radix ? 10 : 0) : any::to_number(p_given[0]);
+			if (const std::optional<std::string> words = number_words(library_, *format, value, tag == AnyTag::Wide, digits)) {
+				if (Str *made = text(*words)) {
+					give(Kind::Str, of_pointer(made));
+				}
+			}
+			return true;
+		}
 	}
 	if (name == "toString" || name == "toLocaleString") {
 		std::string words;
@@ -212,8 +273,8 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out) {
 	Object *object = held_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
-	if (object && library_call(object, p_key.text, p_given, p_out)) {
-		return; // RegExp's or Date's, done or raised.
+	if (object && (static_call(object, p_key, p_given, p_out) || library_call(object, p_key.text, p_given, p_out))) {
+		return; // A class's static method, or RegExp's or Date's, done or raised.
 	}
 	if (klass && klass->element == Kind::Void && !klass->table) {
 		if (const std::optional<uint32_t> slot = named_method(*klass, p_key.text)) {
@@ -235,8 +296,8 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 	if (function && function->klass == module_.function_class) {
 		const uint32_t target = static_cast<uint32_t>(function->fields()[ir::FUNCTION_INDEX].i);
 		call_with(target, static_cast<Object *>(function->fields()[ir::FUNCTION_FIRST].p), p_given, p_out);
-	} else if (!own && object_method(p_holder, p_key, p_given, p_out)) {
-		// Object's own method, on a value with no property of that name.
+	} else if (!own && (library_call(p_holder, p_key.text, p_given, p_out) || object_method(p_holder, p_key, p_given, p_out))) {
+		// The library's method, or Object's own, on a value with no property of that name.
 	} else if (own || (klass && klass->table)) {
 		raise(module_.type_error_class, "Error #1006: " + p_key.text + " is not a function.");
 	} else {
@@ -309,9 +370,12 @@ void Interpreter::property_loop(const Function &p_function, const Instruction &p
 		Vector *keys = entries && entries->size() && module_.array_class != NONE ? fresh_vector(module_.array_class, entries->size()) : nullptr;
 		uint32_t at = 0;
 		for (const Entry &entry : keys ? entries->all() : std::vector<Entry>()) {
-			if (any::tag(entry.key) != AnyTag::Undefined) {
+			if (any::tag(entry.key) != AnyTag::Undefined && !entry.hidden) {
 				keys->data[at++] = share(Kind::Any, entry.key);
 			}
+		}
+		if (keys) {
+			keys->length = at; // Fewer than there is room for, when some are hidden.
 		}
 		drop_any(holder);
 		put(Kind::Obj, r[p_in.a], of_pointer(keys));
@@ -339,7 +403,7 @@ void Interpreter::property_loop(const Function &p_function, const Instruction &p
 	bool more = false;
 	for (; !more && elements && cursor >= 0 && cursor < elements->length; cursor++) {
 		const uint32_t at = static_cast<uint32_t>(cursor);
-		more = !klass->array || any::tag(elements->data[at]) != AnyTag::Undefined;
+		more = !klass->array || !any::is_hole(elements->data[at]);
 	}
 	cursor = more ? cursor : cursor >= 0 ? -1 : cursor;
 	const Entries *entries = loop_entries(holder);

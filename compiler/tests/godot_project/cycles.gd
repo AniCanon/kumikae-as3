@@ -69,7 +69,7 @@ func _initialize() -> void:
 	unjoined_object.set_script(load("res://Unjoined.as"))
 	unjoined_object.loop("object", false)
 
-func _physics_process(_delta: float) -> bool:
+func _process(_delta: float) -> bool:
 	frames += 1
 	if frames == 60:
 		show("a loop held by nobody goes", is_instance_id_valid(nobody), false)

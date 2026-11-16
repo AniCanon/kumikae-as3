@@ -25,15 +25,29 @@ uint32_t Lowerer::reg(Kind p_kind) {
 }
 
 uint32_t Lowerer::engine_reg(Kind p_kind, const Type *p_type) {
-	uint32_t out = reg(p_kind);
 	std::optional<std::string> godot;
-	if (is_engine(p_kind) && p_type && p_type->symbol && (godot = godot_name(p_type->symbol->name, std::string_view()))) {
+	if (is_engine(p_kind) && p_type && p_type->kind == Type::Instance && p_type->symbol && is_godot(p_type->symbol)) {
+		godot = godot_name(p_type->symbol->name, std::string_view());
+	}
+	// One of Godot's values of a type not known here (what gives back anything, a null) may be any of them.
+	return engine_reg(p_kind, godot ? std::string_view(*godot) : p_kind == Kind::Val ? ANY_GODOT_TYPE : std::string_view());
+}
+
+uint32_t Lowerer::engine_reg(Kind p_kind, std::string_view p_godot) {
+	uint32_t out = reg(p_kind);
+	if (is_engine(p_kind) && !p_godot.empty()) {
 		if (fn().engine_types.size() <= out) {
 			fn().engine_types.resize(out + 1);
 		}
-		fn().engine_types[out] = *godot;
+		fn().engine_types[out] = std::string(p_godot);
 	}
 	return out;
+}
+
+uint32_t Lowerer::reg_like(uint32_t p_reg) {
+	// A copy: making the register may move the list it is in.
+	const std::string type = p_reg < fn().engine_types.size() ? fn().engine_types[p_reg] : std::string();
+	return engine_reg(kind_at(p_reg), type);
 }
 
 Kind Lowerer::kind_at(uint32_t p_reg) const {
@@ -64,7 +78,7 @@ uint32_t Lowerer::settled(uint32_t p_reg, Expr *p_later, uint32_t p_position) {
 	}
 	for (const auto &local : locals_) {
 		if (local.second == p_reg) {
-			uint32_t copy = reg(kind_at(p_reg));
+			uint32_t copy = reg_like(p_reg);
 			emit(Op::Move, p_position, copy, p_reg);
 			return copy;
 		}

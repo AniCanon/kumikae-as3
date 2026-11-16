@@ -3,7 +3,17 @@
 extends SceneTree
 
 var node: Node2D
-var started := 0
+var mark := 0 # The watch's looks when the script was saved.
+
+# How many times the watch has looked at the scripts (the language's watch_looks()). A save is acted on by
+# the second look after it: the first finds the change, the next finds it settled and compiles. The tests
+# wait for looks, never for the clock, so a busy machine changes nothing.
+func looks() -> int:
+	for i in Engine.get_script_language_count():
+		var language := Engine.get_script_language(i)
+		if language.has_method("watch_looks"):
+			return language.call("watch_looks")
+	return 0
 
 func show(name: String, got, want) -> void:
 	print("VALUE %s=%s|%s" % [name, str(got), str(want)])
@@ -17,11 +27,11 @@ func _initialize() -> void:
 	var file := FileAccess.open("res://Exported.as", FileAccess.WRITE)
 	file.store_string(text)
 	file.close()
-	started = Time.get_ticks_msec()
+	mark = looks()
 
 func _process(_delta: float) -> bool:
-	# The watch sees the edit within a second or two; a machine that is busy may take longer.
-	if node.get("added") == null and Time.get_ticks_msec() - started < 15000:
+	# The watch acts on the edit by its second look; the object being edited has the field soon after.
+	if node.get("added") == null and looks() < mark + 12:
 		return false
 	show("the new field", node.get("added"), 9)
 	show("a value set before stays", node.get("speed"), 8.0)

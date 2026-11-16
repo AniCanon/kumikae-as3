@@ -12,7 +12,8 @@ are in `docs/cpp-guidelines.md`; this is what gets broken most.
 
 ```
 src/ (front end)  ->  ir/ (typed IR, lowerer)  ->  vm/ (interpreter)  <-  godot_ext/ (Godot's side)
-                                                   lsp/ uses src/ only
+                           |                       lsp/ uses src/ only
+                           +->  backend_cpp/ (the IR as C++ text)      runtime/ (what that C++ is built against) -> vm/
 ```
 
 - `src/` knows nothing of the IR, the interpreter or Godot's headers. Godot's API reaches it as AS3
@@ -21,6 +22,10 @@ src/ (front end)  ->  ir/ (typed IR, lowerer)  ->  vm/ (interpreter)  <-  godot_
   (`godot/godot_names.txt`), by `godot_name(...)`.
 - `vm/` includes `ir/ir.h`. It includes no Godot header and nothing of `src/`. It knows the engine only
   through the three interfaces in `vm/host.h`: `Output`, `EngineHandles`, `EngineSource`.
+- `backend_cpp/` includes `ir/ir.h` only, like `vm/`. It writes C++ as text and includes no header of
+  `vm/`, `runtime/` or Godot.
+- `runtime/` includes `vm/` and `ir/`: the headers generated code is written against, and the host with no
+  engine. Generated code includes `runtime/kas3.h` and nothing else of ours.
 - `godot_ext/` is the only place that includes godot-cpp.
 - A rule the checker and the lowerer must agree on is written once, in `src/` (see `whole_numbers.h`).
 
@@ -34,6 +39,7 @@ lower layer owns.
 | A syntax form | `src/parser_*.cpp` by kind, its node in `src/ast.h`, its walk in `ast_walk.h`, its print in `ast_printer.cpp` |
 | A type rule or a diagnostic | `src/typer_*.cpp` by what is typed; the message once, with `quoted()` |
 | An IR operation | One line in the table in `ir/ir_ops.h` (name and shape letters), its case in `vm/interpreter_run.cpp`, its lowering in the `ir/lower_*.cpp` that owns that kind of code |
+| An operation in native code | `backend_cpp/patterns.h` if it is one C++ statement, else the `function_*.cpp` that owns that kind; until then it runs by thunk. A fast path keeps the thunk for what it does not handle, and comes with a number from `tests/bench/run_native_bench.py` |
 | Something asked of Godot | An entry on `EngineHandles` (done to a value the interpreter holds) or `EngineSource` (where a value comes from); `NoEngine` answers it; the recorder in `tests/test_vm.cpp` records it; `godot_ext/godot_host*.cpp` does it |
 | Something about Godot's API as a whole | A rule in `godot/generate.py`, never a hand edit of `godot.as` or `godot_names.txt` |
 
@@ -61,7 +67,7 @@ lower layer owns.
 3. Before saying done, all of these, with the output read:
 
 ```sh
-cmake --build compiler/build -j8 && ctest --test-dir compiler/build -j8          # 24 groups
+cmake --build compiler/build -j8 && ctest --test-dir compiler/build -j8          # 27 groups, `native` among them
 cmake --build compiler/build-godot -j8 && python3 compiler/tests/run_godot.py compiler/tests
 cmake --build compiler/build-san -j8 && ctest --test-dir compiler/build-san -j4  # before a merge
 ```

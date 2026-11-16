@@ -37,6 +37,11 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 	Class klass;
 	klass.name = "Vector.<" + inner + ">";
 	klass.element = element;
+	klass.element_check = check_for(p_type->element, element).value_or(NONE); // Before the class is added: it may add others.
+	if (element == Kind::Val && of && is_godot(of)) {
+		klass.element_type = godot_name(of->name, std::string_view()).value_or(std::string());
+		klass.element_zero = of->klass && value_has_parts(of);
+	}
 	module_.classes.push_back(std::move(klass));
 	const uint32_t index = static_cast<uint32_t>(module_.classes.size()) - 1;
 	vector_classes_[p_type] = index;
@@ -101,7 +106,9 @@ uint32_t Vectors::vector_literal(Expr *p_literal, const List<Expr *> &p_elements
 		const uint32_t where = element ? element->offset : position;
 		uint32_t value = NONE;
 		if (element) {
-			value = l_.expression(element, l_.module_.classes[*klass].element);
+			// Into a Vector.<Object>, undefined is null; an Array's element is untyped and keeps it.
+			const ir::Class &made = l_.module_.classes[*klass];
+			value = made.array ? l_.expression(element, made.element) : l_.typed(element, p_literal->type->element, made.element);
 		} else {
 			value = l_.reg(Kind::Any);
 			l_.emit(Op::AnyConst, where, value, 0);
@@ -119,6 +126,7 @@ auto Vectors::vector_place(Expr *p_target, Expr *p_later) -> std::optional<Place
 	if (p_target->kind == NodeKind::Index && l_.is_vector(static_cast<Index *>(p_target)->object->type)) {
 		object = static_cast<Index *>(p_target)->object;
 		place.where = Place::Element;
+		place.type = p_target->type;
 		if (!l_.kind_of(p_target->type, &place.kind) || place.kind == Kind::Void) {
 			l_.refuse(p_target->offset, "an element of type '" + l_.compilation_.type_name(p_target->type) + "'");
 			return Place();
@@ -237,7 +245,7 @@ void Vectors::engine_loop(ForIn *p_loop) {
 		l_.refuse(position, "this loop variable");
 		return;
 	}
-	const uint32_t collection = l_.reg(Kind::Val);
+	const uint32_t collection = l_.engine_reg(Kind::Val, whole);
 	l_.emit(Op::Move, position, collection, l_.expression(p_loop->collection, Kind::Val));
 	const uint32_t at = l_.reg(Kind::I64);
 	l_.emit(Op::ConstI64, position, at, l_.wide(0));
@@ -262,6 +270,25 @@ void Vectors::engine_loop(ForIn *p_loop) {
 	Statements(l_).finish_loop(next_at);
 }
 
+// Vector.<T>(x): the conversion written as a call.
+uint32_t Vectors::vector_from(Call *p_call) {
+	const uint32_t position = p_call->offset;
+	const Type *written = p_call->callee->type && p_call->callee->type->kind == Type::ClassObject ? p_call->callee->type->element : nullptr;
+	const std::optional<uint32_t> klass = l_.is_vector(written) ? l_.vector_class(written) : std::nullopt;
+	if (!klass) {
+		l_.refuse(p_call->callee->offset, "this call");
+		return l_.default_value(Kind::Obj, position);
+	}
+	if (p_call->arguments.count != 1) {
+		l_.error(p_call->callee->offset, "a conversion to a Vector takes 1 argument but " + std::to_string(p_call->arguments.count) + " were given");
+		return l_.default_value(Kind::Obj, position);
+	}
+	const uint32_t value = l_.any_value(p_call->arguments[0]);
+	const uint32_t out = l_.reg(Kind::Obj);
+	l_.emit(Op::VecFrom, position, out, value, *klass);
+	return out;
+}
+
 auto Vectors::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::optional<uint32_t> {
 	if (!l_.is_vector(p_value->type)) {
 		return std::nullopt;
@@ -273,17 +300,17 @@ auto Vectors::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::opti
 		return l_.default_value(Kind::Val, position);
 	}
 	// Godot's name for what it takes here: a packed array, or an Array where it takes that or anything.
-	const std::optional<std::string> godot = p_wanted && p_wanted->kind == Type::Instance && Lowerer::is_godot(p_wanted->symbol)
-			? godot_name(p_wanted->symbol->name, std::string_view())
+	const std::optional<uint32_t> godot = p_wanted && p_wanted->kind == Type::Instance && Lowerer::is_godot(p_wanted->symbol)
+			? l_.engine_entry(p_wanted->symbol->name)
 			: std::nullopt;
 	const bool named = godot.has_value();
-	const std::string wanted = godot.value_or("Array");
-	if (p_wanted && p_wanted->kind != Type::Any && !named) {
+	const std::optional<uint32_t> wanted = named ? godot : l_.engine_entry("GodotArray");
+	if ((p_wanted && p_wanted->kind != Type::Any && !named) || !wanted) {
 		l_.refuse(position, "passing a Vector where '" + l_.compilation_.type_name(p_wanted) + "' is expected");
 		return l_.default_value(Kind::Val, position);
 	}
-	const uint32_t out = named ? l_.engine_reg(Kind::Val, p_wanted) : l_.reg(Kind::Val);
-	l_.emit(Op::HostCollection, position, out, l_.expression(p_value, Kind::Obj), l_.string(wanted));
+	const uint32_t out = named ? l_.engine_reg(Kind::Val, p_wanted) : l_.engine_reg(Kind::Val, "Array");
+	l_.emit(Op::HostCollection, position, out, l_.expression(p_value, Kind::Obj), *wanted);
 	return out;
 }
 

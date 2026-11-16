@@ -147,7 +147,7 @@ void Interpreter::date_new(const Function &p_function, const Instruction &p_in) 
 			time = date::time_clip(any::to_number(value));
 		}
 	}
-	Object *made = new_object(module_.date_class, module_.classes[module_.date_class].fields.size(), collector_.list_for(module_.date_class));
+	Object *made = new_object(module_.date_class, module_.classes[module_.date_class].fields.size(), heap_.list_for(module_.date_class));
 	if (!made) {
 		out_of_memory();
 		return;

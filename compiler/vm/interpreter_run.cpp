@@ -41,7 +41,7 @@ void Interpreter::at_statement() {
 	const bool carry_on = hook_(*this, hook_data_);
 	frames_.back().pc++;
 	if (time_limit_) {
-		entered_ = std::chrono::steady_clock::now(); // A debugger's stop is not the program's time.
+		entered_ = host_.clock.elapsed(); // A debugger's stop is not the program's time.
 	}
 	if (!carry_on) {
 		stopped_ = true;
@@ -49,29 +49,11 @@ void Interpreter::at_statement() {
 	}
 }
 
-// A new object of a class, its Number fields not yet a number.
+// New, by the library's function.
 void Interpreter::make(uint32_t p_class, Slot &r_out) {
-	const ir::Class &klass = module_.classes[p_class];
-	Object *object = new_object(p_class, klass.fields.size(), collector_.list_for(p_class));
-	if (!object) {
-		out_of_memory();
-		return;
+	if (Object *object = object_new(library_, p_class)) {
+		assign(Kind::Obj, r_out, object);
 	}
-	for (size_t i = 0; i < klass.fields.size(); i++) {
-		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
-	}
-	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref) {
-		// A script class that extends one of Godot's: the Godot object is made, with the script attached.
-		std::string error;
-		void *owner = host_.source.attach_new(p_class, object, &error);
-		if (!owner) {
-			release_object(object);
-			raise(module_.error_class, error.empty() ? "the engine could not make a '" + klass.name + "'" : error);
-			return;
-		}
-		object->fields()[0].p = owner;
-	}
-	assign(Kind::Obj, r_out, object);
 }
 
 // A call: the function named, or for a virtual call the one the object's own class has in that slot.
@@ -199,6 +181,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::Move: {
 				Kind kind = function.registers[in.a];
+				if (kind == Kind::Val && r[in.a].p && r[in.b].p && host_.handles.assign(r[in.a].p, r[in.b].p)) {
+					break;
+				}
 				put(kind, r[in.a], share(kind, r[in.b]));
 				break;
 			}
@@ -557,6 +542,25 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::VecSetFixed:
 				vector_op(function, in, r);
 				break;
+			case Op::VecFrom:
+				vector_from(in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::Arguments:
+				arguments_array(in);
+				break;
+			case Op::Native:
+				native_op(in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::ClassValue:
+			case Op::ClassIs:
+			case Op::ClassInstanceOf:
+			case Op::ClassAs:
+			case Op::ClassNew:
+				class_op(function, in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::CallLibrary:
+				call_library(in); // `frame` and `r` may be stale after this.
+				break;
 			case Op::AnyConst:
 			case Op::ToAny:
 			case Op::FromAny:
@@ -569,6 +573,11 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::AnyLe:
 			case Op::AnyGt:
 			case Op::AnyGe:
+			case Op::AnySub:
+			case Op::AnyMul:
+			case Op::AnyDiv:
+			case Op::AnyMod:
+			case Op::AnyNeg:
 			case Op::AnyIs:
 			case Op::AnyIsGodot:
 				any_op(function, in, r); // `frame` and `r` may be stale after this.

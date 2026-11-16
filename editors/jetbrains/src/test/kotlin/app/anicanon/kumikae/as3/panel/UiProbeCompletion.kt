@@ -184,7 +184,9 @@ object UiProbeCompletion {
                         true
                     }
                 }
-                await("normalized lookup sample $sample") {
+                // What the editor held and whether the client was up, should the lookup never come.
+                val state = { "client ready=${UiProbeLsp.ready(project)}; ${editorText(project)}" }
+                await("normalized lookup sample $sample", state) {
                     LookupManager.getActiveLookup(editor)?.items?.any { it.lookupString.startsWith("normalized") } ==
                         true
                 }
@@ -241,10 +243,11 @@ object UiProbeCompletion {
                 LookupManager.getActiveLookup(editor)?.items?.any { it.lookupString == "x" } == true
             }
             edt {
-                check(
-                    LookupManager.getActiveLookup(editor)?.items?.none { it.lookupString.startsWith("normalized") } ==
-                        true,
-                )
+                // From the moment the latest text's item is offered, none of the text before may be.
+                val items = LookupManager.getActiveLookup(editor)?.items?.map { it.lookupString }
+                check(items?.none { it.startsWith("normalized") } == true) {
+                    "The lookup of the latest text still offers the text before: $items"
+                }
                 LookupManager.getInstance(project).hideActiveLookup()
                 observations += "Changed document cancels the old lookup and offers x"
             }
@@ -336,7 +339,7 @@ object UiProbeCompletion {
 
     internal fun edt(action: () -> Unit) = ApplicationManager.getApplication().invokeAndWait(action)
 
-    internal fun await(name: String, condition: () -> Boolean) {
+    internal fun await(name: String, state: () -> String = { "" }, condition: () -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
         while (System.nanoTime() < deadline) {
             var ready = false
@@ -344,6 +347,8 @@ object UiProbeCompletion {
             if (ready) return
             Thread.sleep(10)
         }
-        error("Timed out waiting for $name")
+        var found = ""
+        edt { found = state() }
+        error("Timed out waiting for $name" + if (found.isEmpty()) "" else ": $found")
     }
 }

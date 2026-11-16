@@ -4,8 +4,10 @@
 #include "paths.h"
 #include "uri.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
+#include <functional>
 #include <system_error>
 
 namespace kas3 {
@@ -144,6 +146,7 @@ void Workspace::set_root(const std::string &p_folder) {
 	}
 	scan(root_);
 	stale_ = true;
+	every_file_ = true; // What is part of the program is decided by the folder: every file is looked at again.
 }
 
 int Workspace::declaration(const std::string &p_path) const {
@@ -244,7 +247,7 @@ bool Workspace::load(const std::string &p_path) {
 	}
 	file.parsed = parse_file(p_path, std::move(text));
 	file.open = false;
-	stale_ = true;
+	touch(p_path);
 	return true;
 }
 
@@ -267,7 +270,7 @@ void Workspace::open(const std::string &p_path, std::string p_text) {
 	}
 	file.parsed = parse_file(path, std::move(p_text));
 	file.open = true;
-	stale_ = true;
+	touch(path);
 }
 
 void Workspace::change(const std::string &p_path, std::string p_text) {
@@ -285,7 +288,7 @@ void Workspace::close(const std::string &p_path) {
 		return;
 	}
 	found->second.open = false;
-	stale_ = true;
+	touch(path);
 	if (!in_project(path) || !load(path)) {
 		files_.erase(path);
 	}
@@ -311,7 +314,7 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 	}
 	if (found != files_.end()) {
 		files_.erase(found);
-		stale_ = true;
+		touch(path);
 		return;
 	}
 	if (root_.empty() || !under(root_, path)) {
@@ -323,8 +326,8 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 	const std::string prefix = path_join(path, "");
 	for (auto file = files_.lower_bound(prefix); file != files_.end() && file->first.compare(0, prefix.size(), prefix) == 0;) {
 		if (!file->second.open && !fs::is_regular_file(fs::u8path(file->first), error)) {
+			touch(file->first);
 			file = files_.erase(file);
-			stale_ = true;
 		} else {
 			++file;
 		}
@@ -350,49 +353,86 @@ bool Workspace::sent_with_mark(const std::string &p_path) const {
 	return found != files_.end() && found->second.open && found->second.parsed && found->second.parsed->source.has_mark();
 }
 
-bool Workspace::update_bodies() {
+bool Workspace::update() {
 	if (!compilation_) {
 		return false;
-	}
-	std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> changes;
-	size_t present = 0;
-	for (const auto &[path, file] : files_) {
-		if (!included(path)) {
-			continue;
-		}
-		auto found = units_.find(path);
-		if (found == units_.end()) {
-			return false;
-		}
-		++present;
-		if (found->second->parsed != file.parsed) {
-			changes.emplace_back(found->second, file.parsed);
-		}
-	}
-	size_t expected = 0;
-	for (const Unit &unit : compilation_->units()) {
-		if (!unit.is_declaration) {
-			++expected;
-		}
 	}
 	for (const auto &parsed : declarations_) {
 		auto found = units_.find(parsed->source.path());
 		if (found == units_.end() || found->second->parsed != parsed) {
-			return false;
+			return false; // A declaration file changed: nothing the program reads of it is tracked.
 		}
 	}
-	return present == expected && compilation_->update_bodies(changes);
+	// Only the files touched since the last time are looked at: an edit costs what it changes, not the
+	// number of files. From the last to the first, so that a file that joins knows the file it comes before.
+	std::vector<std::string> paths = std::move(touched_);
+	if (every_file_) {
+		for (const auto &[path, file] : files_) {
+			paths.push_back(path);
+		}
+		for (const auto &[path, unit] : units_) {
+			if (!unit->is_declaration) {
+				paths.push_back(path);
+			}
+		}
+	}
+	std::sort(paths.begin(), paths.end(), std::greater<>());
+	paths.erase(std::unique(paths.begin(), paths.end()), paths.end());
+	std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> changes;
+	bool any = false;
+	for (const std::string &path : paths) {
+		auto file = files_.find(path);
+		auto unit = units_.find(path);
+		const bool part = file != files_.end() && included(path);
+		if (unit != units_.end() && unit->second->is_declaration) {
+			continue;
+		}
+		if (!part && unit != units_.end()) {
+			compilation_->remove(*unit->second);
+			units_.erase(unit);
+			any = true;
+		} else if (part && unit == units_.end()) {
+			units_.emplace(path, compilation_->insert(file->second.parsed, unit_after(path)));
+			any = true;
+		} else if (part && unit->second->parsed != file->second.parsed) {
+			changes.emplace_back(unit->second, file->second.parsed);
+			any = true;
+		}
+	}
+	return !any || compilation_->update(changes);
+}
+
+// The unit of the next file of the program after this path, in the order the files are checked in.
+const Unit *Workspace::unit_after(const std::string &p_path) const {
+	for (auto file = files_.upper_bound(p_path); file != files_.end(); ++file) {
+		auto unit = units_.find(file->first);
+		if (unit != units_.end() && !unit->second->is_declaration) {
+			return unit->second;
+		}
+	}
+	return nullptr;
+}
+
+void Workspace::touch(const std::string &p_path) {
+	touched_.push_back(p_path);
+	stale_ = true;
 }
 
 void Workspace::check() {
-	// The old compilation goes first: the new one writes onto the same trees.
-	queries_.reset();
-	if (update_bodies()) {
-		queries_ = std::make_unique<Queries>(*compilation_);
-		stale_ = false;
-		++checks_;
+	stale_ = false;
+	const bool updated = update();
+	touched_.clear();
+	every_file_ = false;
+	++checks_;
+	++progress_;
+	if (updated) {
+		if (queries_) {
+			queries_->clear(); // Kept, for a caller that holds them: only what they worked out goes.
+		}
 		return;
 	}
+	queries_.reset();
+	// The old compilation goes first: the new one writes onto the same trees.
 	compilation_.reset();
 	units_.clear();
 	compilation_ = std::make_unique<Compilation>(builtins_);
@@ -408,39 +448,102 @@ void Workspace::check() {
 			compilation_->add(file.second.parsed);
 		}
 	}
-	compilation_->check(true);
-	queries_ = std::make_unique<Queries>(*compilation_);
+	compilation_->prepare();
 	for (Unit &unit : compilation_->units()) {
 		const std::string &path = unit.source.path();
 		bool embedded = unit.is_builtin || path == GODOT_DECLARATIONS_PATH;
 		units_[embedded ? path_join(options_.support_folder, support_name(path)) : path] = &unit;
 	}
-	stale_ = false;
-	checks_++;
 	++full_checks_;
 }
 
-Compilation &Workspace::compilation() {
+Compilation &Workspace::current() {
 	if (stale_ || !compilation_) {
 		check();
 	}
 	return *compilation_;
 }
 
+void Workspace::check_bodies(Unit &p_unit) {
+	if (!p_unit.unchecked) {
+		return;
+	}
+	compilation_->check_bodies(p_unit);
+	if (queries_) {
+		queries_->forget(p_unit);
+	}
+	++progress_;
+}
+
+Compilation &Workspace::compilation() {
+	settle([] { return false; });
+	return *compilation_;
+}
+
 Queries &Workspace::queries() {
-	compilation();
+	current();
+	if (!queries_) {
+		queries_ = std::make_unique<Queries>(*compilation_);
+	}
 	return *queries_;
 }
 
 Unit *Workspace::unit(const std::string &p_path) {
-	compilation();
+	current();
 	auto found = units_.find(resolve(p_path));
-	return found == units_.end() ? nullptr : found->second;
+	if (found == units_.end()) {
+		return nullptr;
+	}
+	Unit *unit = found->second;
+	check_bodies(*unit);
+	// Completing `override` writes a base class's default values, which its file's bodies resolve.
+	std::vector<const Symbol *> pending(unit->classes.begin(), unit->classes.end());
+	for (size_t i = 0; i < pending.size(); ++i) {
+		const ClassInfo *info = pending[i]->klass;
+		if (pending[i]->unit && pending[i]->unit->unchecked) {
+			check_bodies(*pending[i]->unit);
+		}
+		for (const Symbol *super : info->interfaces) {
+			if (super && std::find(pending.begin(), pending.end(), super) == pending.end()) {
+				pending.push_back(super);
+			}
+		}
+		if (info->base && std::find(pending.begin(), pending.end(), info->base) == pending.end()) {
+			pending.push_back(info->base);
+		}
+	}
+	// An edit may have changed which files are broken: what is published after the request is judged anew.
+	compilation_->settle_doubt();
+	return unit;
+}
+
+bool Workspace::settle(const std::function<bool()> &p_yield) {
+	Compilation &compilation = current();
+	// The files open in the editor first, whose errors the person is looking at; then the rest in order.
+	std::vector<Unit *> order;
+	for (const auto &[path, file] : files_) {
+		auto found = file.open ? units_.find(path) : units_.end();
+		if (found != units_.end() && found->second->unchecked) {
+			order.push_back(found->second);
+		}
+	}
+	size_t next = 0;
+	bool done = true;
+	while (Unit *unit = next < order.size() ? order[next++] : compilation.next_unchecked()) {
+		check_bodies(*unit);
+		if (p_yield()) {
+			done = compilation.next_unchecked() == nullptr;
+			break;
+		}
+	}
+	compilation.settle_doubt();
+	return done;
 }
 
 std::vector<Unit *> Workspace::program_units() {
 	std::vector<Unit *> units;
-	for (Unit &unit : compilation().units()) {
+	for (Unit *file : current().files()) {
+		Unit &unit = *file;
 		if (!unit.is_declaration) {
 			units.push_back(&unit);
 		}
@@ -450,7 +553,8 @@ std::vector<Unit *> Workspace::program_units() {
 
 std::vector<Unit *> Workspace::reported_units() {
 	std::vector<Unit *> units;
-	for (Unit &unit : compilation().units()) {
+	for (Unit *file : current().files()) {
+		Unit &unit = *file;
 		if (!unit.is_builtin && unit.source.path() != GODOT_DECLARATIONS_PATH) {
 			units.push_back(&unit);
 		}

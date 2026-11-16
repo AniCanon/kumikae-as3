@@ -33,6 +33,11 @@ namespace kas3 {
 static Project *program = nullptr;
 static uint64_t loads = 0;
 static const uint64_t WATCH_MILLIS = 200; // Between looks at the scripts.
+static uint64_t looks = 0;
+
+uint64_t Project::watch_looks() {
+	return looks;
+}
 
 uint64_t Project::generation() {
 	return loads;
@@ -81,6 +86,7 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 // Flash stops a script that runs too long, after 15 seconds; so does this, after the project's setting
 // `actionscript/limits/script_timeout_seconds` (0 for no limit).
 static std::unique_ptr<vm::Interpreter> new_interpreter(const ir::Module &p_module, GodotHost &p_host) {
+	p_host.new_program(); // What is worked out from here on is this program's.
 	auto made = std::make_unique<vm::Interpreter>(p_module, p_host);
 	const double seconds = ProjectSettings::get_singleton()->get_setting("actionscript/limits/script_timeout_seconds",
 			vm::Interpreter::FLASH_TIME_LIMIT / 1000.0);
@@ -110,8 +116,20 @@ Project &Project::get() {
 				String::utf8(errors.c_str()));
 		return *program;
 	}
-	program->interpreter_ = new_interpreter(*program->module_, program->host_);
-	program->valid_ = program->interpreter_->start();
+	if (const std::string library = NativeProgram::path(); !library.empty()) {
+		std::string why;
+		program->native_ = NativeProgram::load(library, *program->module_, program->host_, &why);
+		if (program->native_) {
+			UtilityFunctions::print("ActionScript: the scripts run as native code.");
+		} else {
+			UtilityFunctions::push_warning(String("ActionScript: the program library ") + String::utf8(library.c_str()) + " is not used (" +
+					String::utf8(why.c_str()) + "): the interpreter runs the scripts.");
+		}
+	}
+	if (!program->native_) {
+		program->interpreter_ = new_interpreter(*program->module_, program->host_);
+	}
+	program->valid_ = program->interpreter().start();
 	static bool watching = false;
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
 	if (!watching && tree && tree->get_root()) {
@@ -133,7 +151,7 @@ void Project::collect_step() {
 	free_instances_freed_elsewhere();
 	free_detached();
 	if (program && program->valid_) {
-		program->interpreter_->collect_step(COLLECTOR_WORK);
+		program->interpreter().collect_step(COLLECTOR_WORK);
 	}
 }
 
@@ -151,6 +169,7 @@ void Project::watch() {
 		reload();
 	}
 	watch_seen = now;
+	looks++;
 }
 
 // What a scene started again would not make again, of the classes whose code that runs once changed: the
@@ -194,7 +213,7 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 		{
 			vm::Reload moving(p_running, *fresh);
 			if (instances_can_move(moving) && listeners_can_move(moving) && moving.missing().empty()) {
-				moving.globals();
+				moving.globals(p_statics); // Their constants take the new first values; their variables keep theirs.
 				move_instances(p_running, moving);
 				move_listeners(p_running, moving, loads + 1);
 				// A class whose code that runs once changed matters only if an object of it is alive.
@@ -224,6 +243,12 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 }
 
 void Project::reload() {
+	if (program && program->native_) {
+		// Native code is not moved onto new code yet: the game carries on with what it was built from.
+		UtilityFunctions::push_warning("ActionScript: the scripts changed, but they run as native code, which is not reloaded: build the "
+									   "program library again and start the game again.");
+		return;
+	}
 	if (!program || !program->valid_) {
 		// Nothing is running: the scripts had errors. They are simply loaded again.
 		unload();
@@ -260,6 +285,13 @@ void Project::reload() {
 	fresh->superseded(); // Godot's objects now hold the new program's script objects, not the old one's.
 	fresh.reset();
 	module.reset();
+	// The program just let go of was the only other one that held what the host worked out for it.
+	program->host_.release_unused();
+	if (std::getenv("KAS3_REPORT_PREPARED")) {
+		const auto [kept, used] = program->host_.own_places();
+		UtilityFunctions::print(String("ActionScript: ") + String::num_int64((int64_t)kept) + " calls keep a name of their own, " +
+				String::num_int64((int64_t)used) + " of them the running program's");
+	}
 	AS3Script::refresh_all();
 	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.");
 	restart.scenes = refresh_scenes();
@@ -267,7 +299,7 @@ void Project::reload() {
 }
 
 void Project::reload_now() {
-	if (program && program->valid_ && program->interpreter_->depth() > 0) {
+	if (program && program->valid_ && program->interpreter().depth() > 0) {
 		UtilityFunctions::push_error("ActionScript: the scripts can't be reloaded while AS3 runs: the reload was not made.");
 		return;
 	}

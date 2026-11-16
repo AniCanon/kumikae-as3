@@ -19,6 +19,8 @@ on, where a new thing goes and how it is tested. A change that ignores it will b
 | `compiler/src/` | [README](compiler/src/README.md) | The front end | |
 | `compiler/ir/` | [README](compiler/ir/README.md) | The typed IR and the lowerer | |
 | `compiler/vm/` | [README](compiler/vm/README.md) | The interpreter | |
+| `compiler/backend_cpp/` | [README](compiler/backend_cpp/README.md) | The C++ backend: the IR as C++ source | |
+| `compiler/runtime/` | [README](compiler/runtime/README.md) | What generated C++ is built against | |
 | `compiler/godot_ext/` | [README](compiler/godot_ext/README.md) | The GDExtension, with godot-cpp | |
 | `compiler/lsp/` | [README](compiler/lsp/README.md) | The language server | |
 | `compiler/godot/` | [README](compiler/godot/README.md) | The generator of Godot's API, Python | |

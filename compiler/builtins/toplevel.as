@@ -12,7 +12,7 @@
 //   giving a default, the parameters here are given defaults so that every documented call is accepted.
 package {
 	public dynamic native class Object {
-		public native function Object();
+		public native function Object(value:* = undefined);
 		public native function hasOwnProperty(name:* = null):Boolean;
 		public native function isPrototypeOf(theClass:* = null):Boolean;
 		public native function propertyIsEnumerable(name:* = null):Boolean;
@@ -95,7 +95,7 @@ package {
 		public native function concat(...args):String;
 		public native function indexOf(val:String = "undefined", startIndex:Number = 0):int;
 		public native function lastIndexOf(val:String = "undefined", startIndex:Number = 0x7FFFFFFF):int;
-		public native function localeCompare(other:String, ...values):int;
+		public native function localeCompare(other:String = "undefined"):int;
 		public native function match(pattern:* = null):Array;
 		public native function replace(pattern:* = null, repl:* = null):String;
 		public native function search(pattern:* = null):int;

@@ -14,6 +14,7 @@ void Bodies::begin(uint32_t p_function, Unit &p_unit, Symbol *p_class) {
 	l_.constructor_ = false;
 	l_.result_type_ = nullptr;
 	l_.locals_.clear();
+	l_.arguments_reg_ = NONE;
 	l_.loops_.clear();
 	l_.received_env_ = false;
 	l_.chain_.clear();
@@ -62,6 +63,16 @@ void Bodies::parameters(FunctionDecl *p_function) {
 			break;
 		}
 	}
+	if (p_function && p_function->body && !l_.fn().rest && names_arguments(p_function->body)) {
+		// What was passed, before a default or the body changes a parameter.
+		l_.fn().takes_extra = true;
+		l_.vector_class(l_.compilation_.instance_type(l_.array_));
+		uint32_t klass = NONE;
+		l_.class_index(l_.function_, &klass); // For `callee`.
+		const uint32_t made = l_.reg(Kind::Obj);
+		l_.emit(Op::Arguments, p_function->offset, made);
+		l_.arguments_reg_ = l_.convert(made, Kind::Any, p_function->offset);
+	}
 	// A parameter the caller left out takes its default here, in the function that runs.
 	for (uint32_t i = 0; p_function && i < p_function->parameters.count; i++) {
 		Parameter &parameter = p_function->parameters[i];
@@ -85,7 +96,7 @@ void Bodies::end(uint32_t p_position) {
 		l_.emit(Op::ReturnVoid, p_position);
 	} else {
 		// Falling off the end gives the type's default value.
-		l_.emit(Op::Return, p_position, l_.fn().result == Kind::Any ? l_.empty_untyped(l_.result_type_, p_position) : l_.default_value(l_.fn().result, p_position));
+		l_.emit(Op::Return, p_position, l_.fn().result == Kind::Any ? l_.empty_untyped(l_.result_type_, p_position) : l_.default_value(l_.fn().result, p_position, l_.result_type_));
 	}
 }
 
@@ -108,6 +119,17 @@ void Bodies::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl)
 	Functions(l_).lower_pending_functions();
 }
 
+// Whether the body names `arguments`: its own, not that of a function written inside it.
+bool Bodies::names_arguments(Block *p_body) {
+	bool found = false;
+	walk(p_body, [&](Node *p_node) {
+		const Symbol *symbol = p_node->kind == NodeKind::Name ? static_cast<Name *>(p_node)->symbol : nullptr;
+		found = found || (symbol && symbol->kind == SymbolKind::Arguments);
+		return p_node->kind != NodeKind::FunctionExpr;
+	});
+	return found;
+}
+
 bool Bodies::calls_super(Block *p_body) {
 	bool found = false;
 	walk(p_body, [&](Node *p_node) {
@@ -127,7 +149,7 @@ uint32_t Bodies::own_signal(std::string_view p_name, uint32_t p_position) {
 	l_.emit(Op::OwnerOf, p_position, owner, l_.self(p_position, true));
 	const uint32_t name = l_.reg(Kind::Str);
 	l_.emit(Op::ConstStr, p_position, name, l_.string(std::string(p_name)));
-	const uint32_t out = l_.reg(Kind::Val);
+	const uint32_t out = l_.engine_reg(Kind::Val, l_.module_.engine_names[type_name].name);
 	l_.emit(Op::HostNew, p_position, out, type_name, l_.arguments({ owner, name }));
 	return out;
 }

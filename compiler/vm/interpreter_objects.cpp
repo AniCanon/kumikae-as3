@@ -16,155 +16,6 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-// Gives up the reference a slot holds.
-void Interpreter::drop(Kind p_kind, Slot &p_slot) {
-	if (p_kind == Kind::Str) {
-		Str *string = static_cast<Str *>(p_slot.p);
-		if (release(string)) {
-			free_string(string);
-		}
-	} else if (p_kind == Kind::Obj) {
-		Object *object = static_cast<Object *>(p_slot.p);
-		if (release(object)) {
-			drop_object(object);
-		}
-	} else if (ir::is_engine(p_kind) && p_slot.p) {
-		// Letting go of an engine value can run engine code that calls back in and moves the registers:
-		// the slot is emptied first and not touched again.
-		void *handle = p_slot.p;
-		p_slot.bits = 0;
-		host_.handles.drop(handle);
-		return;
-	} else if (p_kind == Kind::Any) {
-		const Slot value = p_slot;
-		p_slot.bits = 0; // For the same reason.
-		drop_any(value);
-		return;
-	}
-	p_slot.bits = 0;
-}
-
-void Interpreter::drop_any(Slot p_value) {
-	switch (any::tag(p_value)) {
-		case AnyTag::String: {
-			Str *string = static_cast<Str *>(any::pointer(p_value));
-			if (release(string)) {
-				free_string(string);
-			}
-			break;
-		}
-		case AnyTag::Object: {
-			Object *object = static_cast<Object *>(any::pointer(p_value));
-			if (release(object)) {
-				drop_object(object);
-			}
-			break;
-		}
-		case AnyTag::Wide: {
-			Wide *wide = static_cast<Wide *>(any::pointer(p_value));
-			if (release(wide)) {
-				free_wide(wide);
-			}
-			break;
-		}
-		case AnyTag::Value:
-		case AnyTag::Godot:
-			host_.handles.drop(any::pointer(p_value));
-			break;
-		default:
-			break;
-	}
-}
-
-Slot Interpreter::share(Kind p_kind, Slot p_value) {
-	if (p_kind == Kind::Any) {
-		retain(any::counted(p_value));
-		if (any::tag(p_value) == AnyTag::Value) {
-			return any::godot_value(host_.handles.copy(any::pointer(p_value)));
-		}
-		if (any::tag(p_value) == AnyTag::Godot) {
-			return any::godot_object(host_.handles.copy(any::pointer(p_value)));
-		}
-		return p_value;
-	}
-	if (ir::is_reference(p_kind)) {
-		retain(static_cast<Counted *>(p_value.p));
-	} else if (ir::is_engine(p_kind) && p_value.p) {
-		p_value.p = host_.handles.copy(p_value.p);
-	}
-	return p_value;
-}
-
-void Interpreter::put(Kind p_kind, Slot &p_target, Slot p_owned) {
-	Slot old = p_target;
-	p_target = p_owned;
-	if (held(p_kind)) {
-		drop(p_kind, old);
-	}
-}
-
-// Frees an object whose last reference is gone, and whatever that in turn leaves unreferenced. A list
-// rather than recursion: a long chain of objects must not overflow the C++ stack. Letting go of an engine
-// value can run code that frees more objects: those join the list of the call already freeing, which keeps
-// one list for every call and allocates nothing once it has grown.
-void Interpreter::drop_object(Object *p_object) {
-	dying_.push_back(p_object);
-	if (freeing_) {
-		return;
-	}
-	freeing_ = true;
-	while (!dying_.empty()) {
-		Object *object = dying_.back();
-		dying_.pop_back();
-		const ir::Class &klass = module_.classes[object->klass];
-		if (klass.counted && host_.handles.keep(object)) {
-			continue; // The engine still holds its Godot object, and keeps it.
-		}
-		std::vector<Entry> taken = take_entries(klass, object);
-		each_held(klass, object, [this](Kind p_kind, Slot &p_slot) { let_go(p_kind, p_slot); });
-		for (Entry &entry : taken) {
-			let_go(Kind::Any, entry.key);
-			let_go(Kind::Any, entry.value);
-		}
-		if (klass.table) {
-			free_table(object);
-		} else if (klass.element != Kind::Void) {
-			free_properties(static_cast<Vector *>(object));
-			free_vector(static_cast<Vector *>(object));
-		} else {
-			free_object(object);
-		}
-	}
-	freeing_ = false;
-}
-
-// Empties one slot of an object being freed. An object it held whose last reference this was goes on the
-// list of those to free, as drop_object() keeps it.
-void Interpreter::let_go(Kind p_kind, Slot &p_slot) {
-	const Slot value = p_slot;
-	p_slot.bits = 0; // First: letting go of an engine value can run code that reads it.
-	Object *other = p_kind == Kind::Obj ? static_cast<Object *>(value.p)
-			: p_kind == Kind::Any && any::tag(value) == AnyTag::Object ? static_cast<Object *>(any::pointer(value))
-																	 : nullptr;
-	if (other) {
-		if (release(other)) {
-			dying_.push_back(other);
-		}
-	} else if (p_kind == Kind::Any) {
-		drop_any(value);
-	} else {
-		Slot copy = value;
-		drop(p_kind, copy);
-	}
-}
-
-void Interpreter::assign(Kind p_kind, Slot &p_slot, void *p_value) {
-	Slot old = p_slot;
-	p_slot.bits = 0;
-	p_slot.p = p_value;
-	drop(p_kind, old);
-}
-
 // Null, and the error raised, when there is no memory for it.
 Str *Interpreter::text(const std::string &p_text) {
 	Str *made = new_string(p_text);
@@ -172,22 +23,6 @@ Str *Interpreter::text(const std::string &p_text) {
 		out_of_memory();
 	}
 	return made;
-}
-
-bool Interpreter::is_class(const Object *p_object, uint32_t p_class) const {
-	if (!p_object) {
-		return false;
-	}
-	if (module_.classes[p_class].is_interface) {
-		const std::vector<uint32_t> &implemented = module_.classes[p_object->klass].interfaces;
-		return std::find(implemented.begin(), implemented.end(), p_class) != implemented.end();
-	}
-	for (uint32_t at = p_object->klass; at != NONE; at = module_.classes[at].base) {
-		if (at == p_class) {
-			return true;
-		}
-	}
-	return false;
 }
 
 uint32_t Interpreter::interface_function(const Object *p_object, uint32_t p_method) {
@@ -218,6 +53,9 @@ std::string Interpreter::object_text(Object *p_object) const {
 	}
 	if (p_object->klass == module_.function_class) {
 		return "function Function() {}"; // avmplus's Function.as: no source text is kept, for any function.
+	}
+	if (p_object->klass == module_.class_class) {
+		return "[class " + class_name(static_cast<uint32_t>(p_object->fields()[ir::CLASS_CODE].i)) + "]";
 	}
 	if (p_object->klass == module_.regexp_class) {
 		const Str *source = static_cast<const Str *>(p_object->fields()[ir::REGEXP_SOURCE].p);
@@ -257,7 +95,7 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		}
 		return nullptr;
 	}
-	Object *object = new_object(p_class, klass.fields.size(), collector_.list_for(p_class));
+	Object *object = new_object(p_class, klass.fields.size(), heap_.list_for(p_class));
 	if (!object) {
 		if (p_owner) {
 			host_.handles.drop(p_owner);
@@ -288,12 +126,6 @@ uint32_t Interpreter::find_method(uint32_t p_class, std::string_view p_name) con
 	}
 	auto found = methods_[p_class].find(std::string(p_name));
 	return found == methods_[p_class].end() ? NONE : found->second;
-}
-
-void Interpreter::release_object(Object *p_object) {
-	if (release(p_object)) {
-		drop_object(p_object);
-	}
 }
 
 } // namespace vm

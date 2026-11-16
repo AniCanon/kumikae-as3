@@ -1,9 +1,12 @@
 // What a syntax error makes doubtful. A file that did not parse may have lost a declaration, or read one
 // wrongly (a modifier, a parameter, `extends`): an error that rests on what that file declares may be
 // false. Those are dropped, and the rest stay.
+#include "incremental.h"
 #include "names.h"
 
 #include "ast_walk.h"
+
+#include <algorithm>
 
 namespace kas3 {
 
@@ -112,11 +115,28 @@ public:
 
 } // namespace
 
-void Compilation::drop_doubtful_errors() {
+// A view over what the passes said: a file judged before keeps what it was told while nothing it rests on
+// changed, and is judged again from what the passes said when something did.
+void Compilation::settle_doubt() {
+	const bool any_broken = tracking_ ? broken_files_ > 0
+			: std::any_of(units_.begin(), units_.end(), [](const Unit &p_unit) { return p_unit.broken; });
 	Doubt doubt;
-	for (Unit &unit : units_) {
-		if (unit.broken || !(unit.diagnostics.has_errors() || unit.diagnostics.has_warnings())) {
+	for (Unit *file : files_) {
+		Unit &unit = *file;
+		if (unit.unchecked || unit.doubted_at == doubt_state_) {
+			continue;
+		}
+		unit.doubted_at = doubt_state_;
+		if (unit.undoubted) {
+			unit.diagnostics = std::move(*unit.undoubted);
+			unit.undoubted.reset();
+		}
+		if (!any_broken || unit.broken || !(unit.diagnostics.has_errors() || unit.diagnostics.has_warnings())) {
 			continue; // A broken file's own were never taken; a file with none has none to drop.
+		}
+		unit.undoubted = unit.diagnostics;
+		if (tracking_) {
+			tracking_->counts.judged++;
 		}
 		// An import that found nothing may have changed what the file's other names mean.
 		if (unit.failed_import || doubt.affected(unit)) {

@@ -1,3 +1,4 @@
+#include "lower_dynamic.h"
 #include "lower_operators.h"
 
 namespace kas3 {
@@ -71,6 +72,33 @@ uint32_t Operators::any_add(Binary *p_binary) {
 	uint32_t out = l_.reg(Kind::Any);
 	l_.emit(Op::AnyAdd, position, out, a, b);
 	return l_.convert(out, l_.natural(p_binary), position);
+}
+
+// The operation that carries out `-`, `*`, `/` or `%` (or the same written with `=`) on untyped operands, or
+// unary `-` on one; nothing for any other operator.
+std::optional<Op> Operators::untyped_operator(TokenKind p_op, bool p_unary) {
+	switch (p_op) {
+		case TokenKind::Minus:
+		case TokenKind::MinusAssign:
+			return p_unary ? Op::AnyNeg : Op::AnySub;
+		case TokenKind::Star:
+		case TokenKind::StarAssign:
+			return p_unary ? std::nullopt : std::optional<Op>(Op::AnyMul);
+		case TokenKind::Slash:
+		case TokenKind::SlashAssign:
+			return p_unary ? std::nullopt : std::optional<Op>(Op::AnyDiv);
+		case TokenKind::Percent:
+		case TokenKind::PercentAssign:
+			return p_unary ? std::nullopt : std::optional<Op>(Op::AnyMod);
+		default:
+			return std::nullopt;
+	}
+}
+
+uint32_t Operators::any_operate(Op p_op, uint32_t p_left, uint32_t p_right, uint32_t p_position) {
+	const uint32_t out = l_.reg(Kind::Any);
+	l_.emit(p_op, p_position, out, p_left, p_op == Op::AnyNeg ? 0 : p_right);
+	return out;
 }
 
 // typeof: of an untyped value, asked as the program runs; of anything else, known now.
@@ -163,40 +191,61 @@ uint32_t Lowerer::typed(Expr *p_expression, const Type *p_type, Kind p_kind) {
 
 // An untyped value stored where a type is declared.
 uint32_t Lowerer::from_untyped(uint32_t p_any, const Type *p_type, Kind p_kind, uint32_t p_position) {
-	if (starts_null_type(p_kind, p_type)) {
-		// Into an Object: undefined becomes null, as AS3's coercion has it.
-		uint32_t out = reg(Kind::Any);
-		emit(Op::FromAny, p_position, out, p_any, 0);
-		return out;
-	}
-	if (is_engine(p_kind)) {
-		// Into a place of one of Godot's types: the value must be of that type, checked by its name.
-		uint32_t name = NONE;
-		const Symbol *godot = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
-		if (!godot || !is_godot(godot) || !engine_name(godot, std::string_view(), &name)) {
-			name = NONE;
-		}
-		uint32_t out = engine_reg(p_kind, p_type);
-		emit(Op::FromAny, p_position, out, p_any, name);
+	const std::optional<uint32_t> check = check_for(p_type, p_kind);
+	if (starts_null_type(p_kind, p_type) || is_engine(p_kind)) {
+		// Into an Object: undefined becomes null, as AS3's coercion has it. Into a place of one of Godot's
+		// types: the value must be of that type, checked by its name.
+		uint32_t out = is_engine(p_kind) ? engine_reg(p_kind, p_type) : reg(Kind::Any);
+		emit(Op::FromAny, p_position, out, p_any, check.value_or(NONE));
 		return out;
 	}
 	if (p_kind != Kind::Obj) {
 		return convert(p_any, p_kind, p_position);
 	}
-	const Symbol *symbol = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
-	uint32_t klass = NONE;
-	if (is_vector(p_type)) {
-		klass = vector_class(p_type).value_or(NONE);
-	} else if (symbol && !class_index(symbol, &klass)) {
-		klass = NONE;
-	}
-	if (klass == NONE) {
+	if (!check) {
 		refuse(p_position, "converting an untyped value to '" + compilation_.type_name(p_type) + "'");
 		return default_value(Kind::Obj, p_position);
 	}
 	uint32_t out = reg(Kind::Obj);
-	emit(Op::FromAny, p_position, out, p_any, klass);
+	emit(Op::FromAny, p_position, out, p_any, *check);
 	return out;
+}
+
+std::optional<uint32_t> Lowerer::class_code(const Type *p_class) {
+	if (is_vector(p_class)) {
+		return vector_class(p_class);
+	}
+	const Symbol *symbol = p_class && p_class->kind == Type::Instance ? p_class->symbol : nullptr;
+	uint32_t index = NONE;
+	if (symbol == int_ || symbol == uint_ || symbol == number_ || symbol == string_ || symbol == boolean_) {
+		return symbol == int_ ? ANY_IS_INT : symbol == uint_ ? ANY_IS_UINT : symbol == number_ ? ANY_IS_NUMBER : symbol == string_ ? ANY_IS_STRING : ANY_IS_BOOLEAN;
+	}
+	if (symbol && symbol == object_) {
+		Dynamic(*this).table_class(false); // What `new` of it makes.
+		return ANY_IS_OBJECT;
+	}
+	if (!symbol || is_godot(symbol) || !class_index(symbol, &index)) {
+		return std::nullopt;
+	}
+	return index;
+}
+
+std::optional<uint32_t> Lowerer::check_for(const Type *p_type, Kind p_kind) {
+	if (starts_null_type(p_kind, p_type)) {
+		return 0;
+	}
+	const Symbol *symbol = p_type && p_type->kind == Type::Instance ? p_type->symbol : nullptr;
+	uint32_t check = NONE;
+	if (is_engine(p_kind)) {
+		return symbol && is_godot(symbol) && engine_name(symbol, std::string_view(), &check) ? check : NONE;
+	}
+	if (p_kind != Kind::Obj) {
+		return NONE;
+	}
+	if (is_vector(p_type)) {
+		return vector_class(p_type);
+	}
+	return symbol && class_index(symbol, &check) ? std::optional<uint32_t>(check) : std::nullopt;
 }
 
 } // namespace ir

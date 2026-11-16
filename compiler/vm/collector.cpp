@@ -1,6 +1,8 @@
 #include "collector.h"
 
-#include "interpreter_internal.h"
+#include "any.h"
+#include "heap.h"
+#include "held.h"
 
 #include <limits>
 
@@ -33,12 +35,12 @@ void insert_after(Object *p_at, Object *p_object) {
 
 } // namespace
 
-Collector::Collector(Interpreter &p_interpreter) :
-		interpreter_(p_interpreter) {
+Collector::Collector(Heap &p_heap) :
+		heap_(p_heap) {
 	for (Object *head : { &young_, &all_, &gray_, &done_, &suspects_ }) {
 		list_init(head);
 	}
-	const ir::Module &module = interpreter_.module_;
+	const ir::Module &module = heap_.module;
 	looked_at_.resize(module.classes.size());
 	for (size_t i = 0; i < module.classes.size(); i++) {
 		looked_at_[i] = may_hold_objects(module.classes[i]);
@@ -57,8 +59,8 @@ Collector::~Collector() {
 // Each counted reference an object holds to an object that is looked at, or to an engine node.
 template <typename OnObject, typename OnNode>
 void Collector::each_reference(Object *p_object, OnObject &&p_on_object, OnNode &&p_on_node) {
-	EngineHandles &engine = interpreter_.host_.handles;
-	each_held(interpreter_.module_.classes[p_object->klass], p_object, [&](Kind p_kind, Slot &p_slot) {
+	EngineHandles &engine = heap_.handles;
+	each_held(heap_.module.classes[p_object->klass], p_object, [&](Kind p_kind, Slot &p_slot) {
 		work_++;
 		const AnyTag tag = p_kind == Kind::Any ? any::tag(p_slot) : AnyTag::Undefined;
 		if (p_kind == Kind::Obj || tag == AnyTag::Object) {
@@ -155,7 +157,7 @@ void Collector::touch(Object *p_object) {
 
 bool Collector::ask(uint64_t p_node, EngineNode *r_edges) {
 	work_ += NODE_WORK;
-	return engine_ && interpreter_.host_.handles.node_edges(p_node, r_edges);
+	return engine_ && heap_.handles.node_edges(p_node, r_edges);
 }
 
 void Collector::ignore_engine() {
@@ -435,13 +437,13 @@ bool Collector::free_garbage() {
 		return true;
 	}
 	if (!dead.empty()) {
-		const std::vector<uint64_t> kept = interpreter_.host_.handles.let_go(dead);
+		const std::vector<uint64_t> kept = heap_.handles.let_go(dead);
 		if (!kept.empty()) {
 			kept_.insert(kept_.end(), kept.begin(), kept.end());
 			const std::vector<Object *> taken = std::move(found_);
 			found_.clear();
 			for (Object *object : taken) {
-				interpreter_.release_object(object);
+				heap_.release_object(object);
 			}
 			return false;
 		}
@@ -449,23 +451,23 @@ bool Collector::free_garbage() {
 	const std::vector<Object *> garbage = std::move(found_);
 	found_.clear();
 	for (Object *object : garbage) {
-		const ir::Class &klass = interpreter_.module_.classes[object->klass];
+		const ir::Class &klass = heap_.module.classes[object->klass];
 		std::vector<Entry> taken = take_entries(klass, object);
 		each_held(klass, object, [this](Kind p_kind, Slot &p_slot) {
 			Slot value = p_slot;
 			p_slot.bits = 0;
-			interpreter_.drop(p_kind, value);
+			heap_.drop(p_kind, value);
 		});
 		for (Entry &entry : taken) {
-			interpreter_.drop(Kind::Any, entry.key);
-			interpreter_.drop(Kind::Any, entry.value);
+			heap_.drop(Kind::Any, entry.key);
+			heap_.drop(Kind::Any, entry.value);
 		}
 	}
 	for (Object *object : garbage) {
 		// Back on the list first: something the engine ran while they were emptied may hold it still.
 		list_remove(object);
 		list_insert(&all_, object);
-		interpreter_.release_object(object);
+		heap_.release_object(object);
 	}
 	return true;
 }

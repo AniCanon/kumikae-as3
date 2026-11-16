@@ -279,7 +279,8 @@ for partial in (b"C", b"Content-Length: 100\r\n\r\n{"):
     try:
         process.stdin.write(START + partial)
         process.stdin.flush()
-        ready = bool(select.select([process.stdout], [], [], 2)[0])
+        # Returns as soon as the answer is there; a server that waits for the rest of the frame never answers.
+        ready = bool(select.select([process.stdout], [], [], 120)[0])
         check("response before partial next frame", ready, repr(partial))
         if ready:
             check("initialize before partial next frame", b'"id":1' in os.read(process.stdout.fileno(), 65536))
@@ -357,6 +358,67 @@ replies = {m.get("id"): m for m in messages or [] if "id" in m}
 check("cancel queued request", replies.get(2, {}).get("error", {}).get("code") == -32800, repr(replies.get(2)))
 check("edited queued request", "result" in replies.get(3, {}), repr(replies.get(3)))
 check("latest queued request", "result" in replies.get(4, {}), repr(replies.get(4)))
+
+
+FILES = 2000
+
+
+def yields_to_a_request():
+    """The check of what is left stops for a message that arrives: the request is answered, then the check goes on
+    and the rest of the errors arrive after the answer."""
+    with tempfile.TemporaryDirectory() as folder:
+        body = "".join("\t\tvar v%d:int = \"text\"; v%d += %d;\n" % (i, i, i) for i in range(150))
+        for i in range(FILES):
+            with open(os.path.join(folder, "F%d.as" % i), "w") as f:
+                f.write("package {\npublic class F%d {\n\tfunction f():void {\n%s\t}\n}\n}\n" % (i, body))
+        uri = "file://" + os.path.join(os.path.realpath(folder), "F0.as")
+        server = subprocess.Popen([KAS3C, "lsp", "--no-godot"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        received = b""
+
+        def read_until(done):
+            nonlocal received
+            messages = []
+            while True:
+                end = received.find(b"\r\n\r\n")
+                if end >= 0:
+                    length = int(received[len(b"Content-Length: "):end])
+                    if len(received) >= end + 4 + length:
+                        messages.append(json.loads(received[end + 4:end + 4 + length]))
+                        received = received[end + 4 + length:]
+                        if done(messages[-1]):
+                            return messages
+                        continue
+                chunk = os.read(server.stdout.fileno(), 1 << 16)
+                if not chunk:
+                    return messages
+                received += chunk
+
+        server.stdin.write(request(1, "initialize", {"rootUri": "file://" + os.path.realpath(folder), "capabilities": {}}))
+        server.stdin.flush()
+        read_until(lambda m: m.get("id") == 1)
+        server.stdin.write(notify("initialized", {}))
+        server.stdin.flush()
+        # The check of the files starts once the server finds nothing waiting; the request arrives during it.
+        server.stdin.write(request(2, "textDocument/hover", {"textDocument": {"uri": uri}, "position": {"line": 1, "character": 14}}))
+        server.stdin.flush()
+        before = read_until(lambda m: m.get("id") == 2)
+        published = len(diagnostics(before))
+        count = [published]
+
+        def all_published(message):
+            count[0] += message.get("method") == "textDocument/publishDiagnostics"
+            return count[0] == FILES
+        after = read_until(all_published) if published < FILES else []
+        server.stdin.write(request(3, "shutdown") + notify("exit"))
+        server.stdin.flush()
+        read_until(lambda m: m.get("id") == 3)
+        server.wait(timeout=60)
+        check("request answered during a check", any(m.get("id") == 2 and "result" in m for m in before), repr(before[-1:]))
+        check("check goes on after the answer", published < FILES and count[0] == FILES and diagnostics(after),
+              "%d before, %d in all" % (published, count[0]))
+
+
+yields_to_a_request()
 
 for failure in failures:
     print("FAIL " + failure)

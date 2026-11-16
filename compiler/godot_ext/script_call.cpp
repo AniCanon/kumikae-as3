@@ -63,7 +63,7 @@ struct Parameters {
 static bool count_fits(const Parameters &p_parameters, int64_t p_argc, GDExtensionCallError *r_error) {
 	const ir::Function &function = p_parameters.function;
 	size_t wanted = function.parameters > p_parameters.first ? function.parameters - p_parameters.first : 0;
-	if ((size_t)p_argc > wanted && !function.rest) {
+	if ((size_t)p_argc > wanted && !function.rest && !function.takes_extra) {
 		r_error->error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
 		r_error->expected = (int32_t)wanted;
 		return false;
@@ -111,10 +111,10 @@ static bool arguments_fit(const Parameters &p_parameters, const Variant *const *
 // The arguments as the function's registers take them, after the object, if it takes one. False when there
 // was no memory for one: what was made is given up, and the error said.
 static bool convert_arguments(const Parameters &p_parameters, vm::Object *p_object, const Variant *const *p_args, int64_t p_argc,
-		std::vector<vm::Slot> *r_arguments, GDExtensionCallError *r_error) {
+		vm::Slot *r_arguments, GDExtensionCallError *r_error) {
 	const ir::Function &function = p_parameters.function;
 	const size_t first = p_parameters.first;
-	std::vector<vm::Slot> &arguments = *r_arguments;
+	vm::Slot *const arguments = r_arguments;
 	if (first) {
 		arguments[0].bits = 0;
 		arguments[0].p = p_object;
@@ -167,13 +167,27 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 		return;
 	}
 	const size_t first = parameters.first;
-	std::vector<vm::Slot> arguments((size_t)p_argc + first);
-	if (!convert_arguments(parameters, p_object, p_args, p_argc, &arguments, r_error)) {
+	// Nothing is allocated for a call of the usual size: Godot makes one for every listener and every frame.
+	const size_t count = (size_t)p_argc + first;
+	vm::Slot few[8];
+	std::vector<vm::Slot> many;
+	vm::Slot *arguments = few;
+	if (count > 8) {
+		many.resize(count);
+		arguments = many.data();
+	}
+	for (size_t i = 0; i < count; i++) {
+		arguments[i].bits = 0;
+	}
+	if (!convert_arguments(parameters, p_object, p_args, p_argc, arguments, r_error)) {
 		return;
 	}
+	// Only an object of a class whose Godot object may be reference-counted is ever held by Godot's count
+	// (asked before the call, which may be the object's end).
+	const bool counted = !p_object || program.module().classes[p_object->klass].counted;
 	vm::Slot result;
 	result.bits = 0;
-	bool ok = program.interpreter().call_function(method, arguments.data(), arguments.size(), &result);
+	bool ok = program.call_function(method, arguments, count, &result);
 	// What was made for the call is given up again.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		program.interpreter().discard(parameters.kind_at(i + first), arguments[i + first]);
@@ -181,6 +195,8 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	if (ok) {
 		hand_back(function, result, r_return);
 	}
-	kas3::hold_if_referenced(p_object);
+	if (counted) {
+		kas3::hold_if_referenced(p_object);
+	}
 	r_error->error = GDEXTENSION_CALL_OK;
 }

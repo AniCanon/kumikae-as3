@@ -47,7 +47,7 @@ public:
 	int count() const { return count_; }
 	// The errors reported that are not among items().
 	int dropped() const { return count_ - stored_errors_; }
-	// At most LIMIT items, ordered by offset, then by arrival.
+	// At most LIMIT items, ordered by offset, then by arrival: past the limit, those first in the file.
 	const std::vector<Diagnostic> &items() const { return items_; }
 	// One "<file>:<line>:<column>: error: <message>" (or "warning:") line per item, then a note if any were
 	// dropped.

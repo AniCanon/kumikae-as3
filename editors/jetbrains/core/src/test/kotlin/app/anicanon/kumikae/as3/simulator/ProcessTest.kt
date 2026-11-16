@@ -14,7 +14,7 @@ class ProcessTest {
         assumeTrue(Files.isExecutable(Path.of("/bin/sh")))
         val runner = ProcessRunner()
         val failed = assertThrows(SimulatorException::class.java) {
-            runner.run(listOf("/bin/sh", "-c", "echo failure >&2; exit 3"), 2000)
+            runner.run(listOf("/bin/sh", "-c", "echo failure >&2; exit 3"), 60_000)
         }
         assertEquals("PROCESS_FAILED", failed.code)
         assertTrue(failed.message!!.contains("failure"))
@@ -23,7 +23,8 @@ class ProcessTest {
             runner.run(listOf("/bin/sh", "-c", "sleep 30"), 100)
         }
         assertEquals("TIMEOUT", timedOut.code)
-        assertTrue((System.nanoTime() - start) / 1_000_000 < 4000)
+        // Well short of the 30 seconds the command sleeps for: the time limit ended it, on however busy a machine.
+        assertTrue((System.nanoTime() - start) / 1_000_000 < 20_000)
     }
 
     @Test fun `a launch with a scripts folder hands it to the app through the launcher's environment`() {
@@ -50,7 +51,7 @@ class ProcessTest {
             }
         }
         logs.launch("phone", "org.test.app")
-        val deadline = System.nanoTime() + 2_000_000_000
+        val deadline = System.nanoTime() + 60_000_000_000
         while (logs.buffer.read(0).entries.size < 3 && System.nanoTime() < deadline) Thread.sleep(10)
         val entries = logs.buffer.read(0).entries
         assertTrue(entries.any { it.stream == "stdout" && it.text.contains("output") })

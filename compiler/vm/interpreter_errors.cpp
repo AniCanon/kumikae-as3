@@ -36,6 +36,9 @@ Str *Interpreter::stack_text(const Object *p_error, size_t p_skip) {
 
 // A frame that an error leaves, added to its trace; the first one is where it was thrown.
 void Interpreter::traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const {
+	if (p_frame.function == module_.library_function) {
+		return; // The library's own frame, which is no place in the program.
+	}
 	if (*r_lines == 0) {
 		const Function &function = module_.functions[p_frame.function];
 		r_site->function = function.name + "()";
@@ -57,7 +60,7 @@ std::string Interpreter::site(const Frame &p_frame) const {
 
 // Starts an error on its way out: an object of the class with the message.
 void Interpreter::raise_null() {
-	raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
+	library_.raise_null();
 }
 
 void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
@@ -75,7 +78,7 @@ void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
 
 // Error #1000, with nothing more allocated than the error object itself.
 void Interpreter::stack_overflow() {
-	raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+	library_.raise_overflow();
 }
 
 void Interpreter::out_of_memory() {
@@ -88,20 +91,11 @@ void Interpreter::out_of_memory() {
 
 // p_message is the error's own, or null; p_words are what is said if not even the error can be made.
 void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
-	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size(), collector_.list_for(p_class)) : nullptr;
-	if (error) {
-		// What a script reads of it: its name, its number ("Error #1009: ..." is 1009), and the stack.
-		error->fields()[ir::ERROR_MESSAGE].p = p_message;
-		error->fields()[ir::ERROR_NAME].p = new_string(module_.classes[p_class].name);
-		const std::string_view words = p_message ? p_message->view() : std::string_view();
-		error->fields()[ir::ERROR_ID].i = words.compare(0, 7, "Error #") == 0 ? std::atoi(std::string(words.substr(7, 6)).c_str()) : 0;
+	if (Object *error = new_error(heap_, p_class, p_message)) {
 		error->fields()[ir::ERROR_STACK].p = stack_text(error, 0);
 		pending_ = any::object(error);
 		failing_ = true;
 		return;
-	}
-	if (release(p_message)) {
-		free_string(p_message);
 	}
 	trace_.assign(p_words);
 	trace_ += "\n";
@@ -213,6 +207,44 @@ void Interpreter::raise_carried() {
 	carried_.error.bits = 0;
 }
 
+bool Interpreter::take_carried(NativeError *r_error) {
+	// A call made within a running instruction leaves its error as that instruction's own, not carried.
+	if (!carried_.held && failing_ && !stopped_) {
+		r_error->error = pending_;
+		r_error->trace = std::move(trace_);
+		r_error->lines = trace_lines_;
+		r_error->function = std::move(thrown_at_.function);
+		r_error->file = std::move(thrown_at_.file);
+		r_error->line = thrown_at_.line;
+		pending_.bits = 0;
+		failing_ = false;
+		trace_.clear();
+		trace_lines_ = 0;
+		return true;
+	}
+	if (!carried_.held || carried_.stopped) {
+		return false;
+	}
+	r_error->error = carried_.error;
+	r_error->trace = std::move(carried_.trace);
+	r_error->lines = carried_.lines;
+	r_error->function = std::move(carried_.at.function);
+	r_error->file = std::move(carried_.at.file);
+	r_error->line = carried_.at.line;
+	carried_ = Carried();
+	stopped_ = false; // Set so that the instruction beneath would end and raise it: there is none.
+	return true;
+}
+
+void Interpreter::report_native(NativeError p_error) {
+	pending_ = p_error.error;
+	failing_ = true;
+	trace_ = std::move(p_error.trace);
+	trace_lines_ = p_error.lines;
+	thrown_at_ = Site{ std::move(p_error.function), std::move(p_error.file), p_error.line };
+	report();
+}
+
 void Interpreter::report_carried() {
 	const Slot error = pending_;
 	const bool failing = failing_;
@@ -270,6 +302,26 @@ void Interpreter::report() {
 	failing_ = false;
 	trace_.clear();
 	trace_lines_ = 0;
+}
+
+Interpreter::Left Interpreter::take_error(bool p_carried) {
+	Left left;
+	if (p_carried && carried_.held) {
+		raise_carried();
+	}
+	if (failing_) {
+		left.error = true;
+		left.value = pending_;
+		pending_.bits = 0;
+		failing_ = false;
+		trace_.clear();
+		trace_lines_ = 0;
+	} else if (stopped_ && !carried_.held) {
+		report();
+		stopped_ = false;
+		left.stopped = true;
+	}
+	return left;
 }
 
 } // namespace vm

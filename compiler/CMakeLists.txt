@@ -72,6 +72,26 @@ target_include_directories(kas3vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vm)
 target_link_libraries(kas3vm PUBLIC kas3ir)
 target_compile_options(kas3vm PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
+# The C++ backend: the IR written as C++ source. It includes ir/ only, and writes text.
+file(GLOB KAS3_BACKEND_CPP_SOURCES CONFIGURE_DEPENDS backend_cpp/*.cpp)
+add_library(kas3backend_cpp STATIC ${KAS3_BACKEND_CPP_SOURCES})
+target_include_directories(kas3backend_cpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/backend_cpp)
+target_link_libraries(kas3backend_cpp PUBLIC kas3ir)
+target_compile_options(kas3backend_cpp PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+
+# What generated code is built against and, where there is no engine, the host it runs in.
+file(GLOB KAS3_RUNTIME_SOURCES CONFIGURE_DEPENDS runtime/*.cpp)
+# `main` for a program library built as a plain program is a library of its own: the Godot extension takes
+# the whole runtime in, and has no use for one.
+list(FILTER KAS3_RUNTIME_SOURCES EXCLUDE REGEX "standalone_main\\.cpp$")
+add_library(kas3standalone STATIC runtime/standalone_main.cpp)
+target_include_directories(kas3standalone PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime ${CMAKE_CURRENT_SOURCE_DIR}/vm ${CMAKE_CURRENT_SOURCE_DIR}/ir ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(kas3standalone PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+add_library(kas3runtime STATIC ${KAS3_RUNTIME_SOURCES})
+target_include_directories(kas3runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
+target_link_libraries(kas3runtime PUBLIC kas3vm)
+target_compile_options(kas3runtime PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+
 # The language server: JSON, the workspace and the message loop. The Godot editor does not need it.
 file(GLOB KAS3_LSP_SOURCES CONFIGURE_DEPENDS lsp/*.cpp)
 add_library(kas3lsp STATIC ${KAS3_LSP_SOURCES})
@@ -90,7 +110,7 @@ if(KAS3_GODOT_CPP)
     add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES})
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
     target_compile_options(kas3_godot PRIVATE -fno-exceptions)
-    target_link_libraries(kas3_godot PRIVATE godot-cpp kas3vm)
+    target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm)
     # On this machine's own system the library goes beside the test project, which loads it. Built for
     # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
     if(CMAKE_CROSSCOMPILING)
@@ -108,7 +128,7 @@ file(GLOB KAS3_TESTS CONFIGURE_DEPENDS tests/test_*.cpp)
 foreach(test_source ${KAS3_TESTS})
     get_filename_component(test_name ${test_source} NAME_WE)
     add_executable(${test_name} ${test_source})
-    target_link_libraries(${test_name} PRIVATE kas3lsp kas3vm)
+    target_link_libraries(${test_name} PRIVATE kas3lsp kas3vm kas3backend_cpp)
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_compile_definitions(${test_name} PRIVATE KAS3_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME ${test_name} COMMAND ${test_name})
@@ -116,7 +136,7 @@ endforeach()
 
 # The command-line tool.
 add_executable(kas3c tools/kas3c.cpp)
-target_link_libraries(kas3c PRIVATE kas3lsp kas3vm)
+target_link_libraries(kas3c PRIVATE kas3lsp kas3vm kas3backend_cpp)
 target_compile_options(kas3c PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
 # Not a test: prints how long a re-check takes (tests/bench/generate_project.py writes a project to try).
@@ -124,15 +144,30 @@ add_executable(bench_recheck tools/bench_recheck.cpp)
 target_link_libraries(bench_recheck PRIVATE kas3lsp)
 
 add_test(NAME cli COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:kas3c>)
+# What `kas3c cpp` writes, where its shape is its speed.
+add_test(NAME generated COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_generated.py
+    $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME lsp_stdio COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp_stdio.py $<TARGET_FILE:kas3c>)
 add_test(NAME programs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_programs.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+# The same programs as native code: written as C++ by `kas3c cpp`, built and run (tests/run_native.py).
+set(KAS3_NATIVE_FLAGS "")
+if(KAS3_SANITIZE)
+    # And each program as one file of C++, as a release is built: the normal build has a file for each class.
+    set(KAS3_NATIVE_FLAGS --unit --flag -fsanitize=address,undefined --flag -fno-omit-frame-pointer --flag -g)
+endif()
+add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_native.py
+    $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR}/native
+    --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS}
+    --include ${CMAKE_CURRENT_SOURCE_DIR}/runtime --include ${CMAKE_CURRENT_SOURCE_DIR}/vm
+    --include ${CMAKE_CURRENT_SOURCE_DIR}/ir --include ${CMAKE_CURRENT_SOURCE_DIR}/src
+    --lib $<TARGET_FILE:kas3standalone> --lib $<TARGET_FILE:kas3runtime> --lib $<TARGET_FILE:kas3vm> --lib $<TARGET_FILE:kas3ir> --lib $<TARGET_FILE:kas3front>)
 # Which corpus programs can run in Godot, and what stops the others.
 add_test(NAME corpus COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_corpus.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 # AS3 inside Godot. Skips itself, with a message, without the extension library or Godot 4.7.
 add_test(NAME godot_extension COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_godot.py
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests $<TARGET_FILE:kas3c>)
 add_test(NAME golden COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_golden.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 # The rules of docs/cpp-guidelines.md that a script can judge.
@@ -140,3 +175,9 @@ add_test(NAME style COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/to
 add_test(NAME style_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_style.py --self-test)
 add_test(NAME godot COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/godot -p "test_*.py")
 set_tests_properties(godot PROPERTIES ENVIRONMENT "KAS3C=$<TARGET_FILE:kas3c>")
+# A group under the sanitizers on a busy machine takes several times its usual minutes: none is cut off at
+# ctest's own 1500 seconds. The one that runs Godot waits on the engine's frames and on files being seen
+# within seconds, so no other group runs beside it.
+get_property(KAS3_ALL_TESTS DIRECTORY PROPERTY TESTS)
+set_tests_properties(${KAS3_ALL_TESTS} PROPERTIES TIMEOUT 7200)
+set_tests_properties(godot_extension PROPERTIES RUN_SERIAL TRUE)

@@ -35,11 +35,11 @@
 namespace kas3 {
 namespace vm {
 
-class Interpreter;
+class Heap;
 
 class Collector {
 public:
-	explicit Collector(Interpreter &p_interpreter);
+	explicit Collector(Heap &p_heap);
 	// Objects still on the lists are left on none: a host may free them later, through another interpreter.
 	~Collector();
 	Collector(const Collector &) = delete;
@@ -72,7 +72,7 @@ private:
 		uint32_t asked = 0;
 	};
 
-	Interpreter &interpreter_;
+	Heap &heap_;
 	std::vector<uint8_t> looked_at_; // Per class: whether its objects go on the list.
 	Object young_{}; // Made since the collection under way started.
 	Object all_{}; // The rest; during a collection, those not yet found in use.

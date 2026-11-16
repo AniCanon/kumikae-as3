@@ -4,6 +4,8 @@
 #include "json.h"
 #include "workspace.h"
 
+#include <functional>
+
 #include <map>
 #include <optional>
 #include <string>
@@ -86,9 +88,10 @@ public:
 	void handle(std::string_view p_message, std::vector<std::string> &r_out);
 	// The bounded input batch preserves notification order and skips queued requests that are cancelled or whose document is closed.
 	void handle_batch(const std::vector<std::string> &p_messages, std::vector<std::string> &r_out);
-	// Checks the program if it changed, and appends the diagnostics that differ from what the editor has.
-	// Call it when no further message is waiting.
-	void settle(std::vector<std::string> &r_out);
+	// Checks what is left of the program, and appends the diagnostics that differ from what the editor has.
+	// Call it when no further message is waiting. p_yield is asked after each file: true stops the check,
+	// to answer newer messages first; what was checked is kept and published. True if all is checked.
+	bool settle(std::vector<std::string> &r_out, const std::function<bool()> &p_yield = [] { return false; });
 	bool exited() const { return exited_; }
 	int exit_code() const { return exit_code_; } // 0 if `shutdown` came before `exit`.
 	Workspace &workspace() { return workspace_; }

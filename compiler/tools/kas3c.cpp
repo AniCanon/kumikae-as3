@@ -3,6 +3,7 @@
 #include "builtins.h"
 #include "ast_printer.h"
 #include "diagnostics.h"
+#include "generate.h"
 #include "interpreter.h"
 #include "lower.h"
 #include "names.h"
@@ -15,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -23,6 +25,7 @@ static const char *const USAGE =
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c run <file>...\n"
 		"       kas3c ir [--godot] <file>...\n"
+		"       kas3c cpp [--godot] [--unit] <file>... -o <folder>\n"
 		"       kas3c lsp [--stdio] [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
@@ -47,6 +50,15 @@ static const char *const USAGE =
 		"ir     Check the files as one program and print the typed IR the interpreter runs.\n"
 		"       --godot  the files are scripts for Godot: load Godot's API, and expect no\n"
 		"                class to start the program with\n"
+		"\n"
+		"cpp    Check the files as one program and write it as C++ into the folder: a\n"
+		"       .cpp for each class, program.h and program.cpp, to be built against\n"
+		"       compiler/runtime. A program that uses something not translated yet is\n"
+		"       refused with `not yet supported: <operation>`, and nothing is written.\n"
+		"       --godot  the files are scripts for Godot, as for `ir`: the C++ is built into\n"
+		"                the project's program library, which the Godot extension loads\n"
+		"       --unit   the whole program in program.cpp alone: what a release is built\n"
+		"                from, since the C++ compiler then sees every function at once\n"
 		"\n"
 		"lsp    Serve an editor over standard input and output with the Language Server\n"
 		"       Protocol: errors as you type, go to definition, find references, hover,\n"
@@ -213,13 +225,15 @@ static int run_ir(int p_argc, char **p_argv) {
 	return 0;
 }
 
-static int run_run(int p_argc, char **p_argv) {
-	kas3::ir::Module module;
-	int status = 0;
-	if (!compile(p_argc, p_argv, &module, &status)) {
-		return status;
-	}
+struct ProgramRun {
+	const kas3::ir::Module &module;
 	bool ok = false;
+};
+
+static void run_module(void *p_run) {
+	ProgramRun &run = *static_cast<ProgramRun *>(p_run);
+	const kas3::ir::Module &module = run.module;
+	bool &ok = run.ok;
 	{
 		kas3::vm::StandaloneOutput output;
 		// KAS3_NOW fixes the time Date takes as now, in milliseconds since 1970 (for tests); TZ sets the zone,
@@ -231,6 +245,19 @@ static int run_run(int p_argc, char **p_argv) {
 		interpreter.set_time_limit(limit ? (uint32_t)std::strtoul(limit, nullptr, 10) : kas3::vm::Interpreter::FLASH_TIME_LIMIT);
 		ok = interpreter.run_program();
 	}
+}
+
+static int run_run(int p_argc, char **p_argv) {
+	kas3::ir::Module module;
+	int status = 0;
+	if (!compile(p_argc, p_argv, &module, &status)) {
+		return status;
+	}
+	// On a thread with a stack that holds as many calls as may nest (vm/stack.h), like the program built
+	// as native code: the library's calls back into the program are C++ calls here too.
+	ProgramRun run{ module };
+	kas3::vm::run_as_program(run_module, &run);
+	const bool ok = run.ok;
 	std::fflush(stdout);
 	// Everything the program made should be gone by now: as the interpreter goes, its cycle collector frees
 	// what is left in loops (vm/collector.h).
@@ -240,6 +267,59 @@ static int run_run(int p_argc, char **p_argv) {
 		return 3;
 	}
 	return ok ? 0 : 1;
+}
+
+static bool write_file(const std::filesystem::path &p_path, const std::string &p_text) {
+	std::FILE *file = std::fopen(p_path.string().c_str(), "wb");
+	if (!file) {
+		return false;
+	}
+	const bool written = std::fwrite(p_text.data(), 1, p_text.size(), file) == p_text.size();
+	return std::fclose(file) == 0 && written;
+}
+
+static int run_cpp(int p_argc, char **p_argv) {
+	// compile() takes the files alone: `-o <folder>` is taken out first, wherever it is written.
+	std::vector<char *> rest(p_argv, p_argv + std::min(p_argc, 2));
+	const char *folder = nullptr;
+	kas3::backend_cpp::Options options;
+	for (int i = 2; i < p_argc; i++) {
+		if (std::strcmp(p_argv[i], "-o") == 0) {
+			if (folder || i + 1 >= p_argc) {
+				return usage_error();
+			}
+			folder = p_argv[++i];
+		} else if (std::strcmp(p_argv[i], "--unit") == 0) {
+			options.one_unit = true;
+		} else {
+			rest.push_back(p_argv[i]);
+		}
+	}
+	if (!folder) {
+		return usage_error();
+	}
+	kas3::ir::Module module;
+	int status = 0;
+	if (!compile(static_cast<int>(rest.size()), rest.data(), &module, &status, true)) {
+		return status;
+	}
+	const kas3::backend_cpp::Generated generated = kas3::backend_cpp::generate(module, options);
+	if (!generated.unsupported.empty()) {
+		std::fprintf(stderr, "kas3c: not yet supported: %s\n", generated.unsupported.c_str());
+		return 1;
+	}
+	std::error_code failed;
+	std::filesystem::create_directories(folder, failed);
+	for (const kas3::backend_cpp::File &file : generated.files) {
+		if (failed || !write_file(std::filesystem::path(folder) / file.name, file.text)) {
+			std::fprintf(stderr, "kas3c: cannot write %s in %s\n", file.name.c_str(), folder);
+			return 2;
+		}
+	}
+	for (const std::string &name : generated.not_written) {
+		std::filesystem::remove(std::filesystem::path(folder) / name, failed);
+	}
+	return 0;
 }
 
 static int run_lsp(int p_argc, char **p_argv) {
@@ -283,6 +363,9 @@ int main(int p_argc, char **p_argv) {
 	}
 	if (command == "ir") {
 		return run_ir(p_argc, p_argv);
+	}
+	if (command == "cpp") {
+		return run_cpp(p_argc, p_argv);
 	}
 	if (command == "lsp") {
 		return run_lsp(p_argc, p_argv);

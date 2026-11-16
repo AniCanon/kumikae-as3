@@ -29,12 +29,13 @@ class Reload {
 	Object *lost(uint32_t p_old_class);
 
 	// What a field or a static field held, as the new one holds it: nothing, if the new one is declared
-	// to hold another class of object than the one that was there.
-	Slot carry_into(ir::Kind p_kind, uint32_t p_class, Slot p_value);
+	// to hold another class of object (or of Godot's, by its name there) than the one that was there.
+	Slot carry_into(ir::Kind p_kind, uint32_t p_class, std::string_view p_engine_type, Slot p_value);
 	Slot carry(ir::Kind p_kind, Slot p_value);
 	void carry_entries(const Entries &p_from, Entries *p_to);
 	Object *moved_vector(Vector *p_old, uint32_t p_class);
 	void carry_fields(Object *p_old, Object *p_fresh);
+	void constants_again(const std::string &p_class);
 
 public:
 	Reload(Interpreter &p_from, Interpreter &p_to);
@@ -48,8 +49,9 @@ public:
 	// (a library class made on first use, such as Date, counts: a build that no longer uses it lacks it).
 	Object *object(Object *p_old);
 	// Static fields and package variables, by name. A class whose static fields had been given their
-	// values is not given them again; one of its fields that is new starts empty.
-	void globals();
+	// values is not given them again; one of its fields that is new starts empty. Of the classes named
+	// (those whose static fields' first values changed: ir::static_changes), the constants take the new code's.
+	void globals(const std::vector<std::string> &p_changed = {});
 	// Where a function of the old program is in the new one, by its name. NONE if it is gone.
 	uint32_t function(uint32_t p_old) const;
 	const std::string &missing() const { return missing_; }

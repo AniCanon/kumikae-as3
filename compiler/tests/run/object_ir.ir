@@ -128,6 +128,9 @@ function ArgumentError(r0:Object, r1:String, r2:int):void
   @4 ErrorStack r4 r0
   @5 SetField r0 .3 r4
   @6 ReturnVoid
+function Function/call(r0:Object, r1:Object):*
+  @0 CallLibrary r2 r0 r1
+  @1 Return r2
 function object_ir/function(r0:Object):int
   @1 ConstI32 r1 3
   @2 Return r1

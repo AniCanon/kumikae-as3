@@ -16,6 +16,13 @@ void Lowerer::refuse(uint32_t p_offset, std::string_view p_what) {
 	unit_->diagnostics.error(p_offset, std::string(p_what) + " is not supported by the interpreter yet");
 }
 
+void Lowerer::error(uint32_t p_offset, std::string_view p_text) {
+	failed_ = true;
+	if (unit_) {
+		unit_->diagnostics.error(p_offset, std::string(p_text));
+	}
+}
+
 bool Lowerer::uses_refused_type(const Stmt *p_statement) {
 	if (refused_types_.empty()) {
 		return false;
@@ -134,6 +141,7 @@ Lowerer::Lowerer(Compilation &p_compilation, Module &p_module) :
 		signal_ = found == godot->definitions.end() ? nullptr : found->second;
 	}
 	function_ = compilation_.builtin("Function");
+	class_type_ = compilation_.builtin("Class");
 	array_ = compilation_.builtin("Array");
 }
 
@@ -207,7 +215,7 @@ void Lowerer::declare_package_level(Unit *p_unit, const List<Node *> &p_definiti
 				for (Declarator &declarator : static_cast<VarDecl *>(definition)->declarators) {
 					if (declarator.symbol) {
 						globals_[declarator.symbol] = (uint32_t)module_.globals.size();
-						module_.globals.push_back({ std::string(declarator.name), written_kind(declarator.type, declarator.offset, Kind::F64) });
+						module_.globals.push_back({ std::string(declarator.name), written_kind(declarator.type, declarator.offset, Kind::F64), NONE, false, {} });
 					}
 				}
 				break;
@@ -257,6 +265,18 @@ bool Lowerer::run(LowerMode p_mode) {
 		return false;
 	}
 	find_error_classes();
+	// What untyped values holding Godot's values are compared and added with, wherever that happens.
+	module_.equal_operator = engine_operator("==").value_or(NONE);
+	module_.add_operator = engine_operator("+").value_or(NONE);
+	module_.less_operator = engine_operator("<").value_or(NONE);
+	module_.less_equal_operator = engine_operator("<=").value_or(NONE);
+	module_.greater_operator = engine_operator(">").value_or(NONE);
+	module_.greater_equal_operator = engine_operator(">=").value_or(NONE);
+	module_.subtract_operator = engine_operator("-").value_or(NONE);
+	module_.multiply_operator = engine_operator("*").value_or(NONE);
+	module_.divide_operator = engine_operator("/").value_or(NONE);
+	module_.modulo_operator = engine_operator("%").value_or(NONE);
+	module_.negate_operator = engine_operator("unary-").value_or(NONE);
 	Members(*this).reserve_interfaces(units);
 	const std::vector<ClassInUnit> classes = classes_in_order(units);
 	for (const ClassInUnit &entry : classes) {

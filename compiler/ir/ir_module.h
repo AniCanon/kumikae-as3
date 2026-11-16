@@ -32,6 +32,10 @@ struct Handler {
 	bool rethrows = false;
 };
 
+// The type of a register that may hold any of Godot's values (what a global function that gives back
+// anything gives, a null): Godot's own name for "any value".
+inline constexpr std::string_view ANY_GODOT_TYPE = "Variant";
+
 struct Function {
 	std::string name; // "Main/update", "Main" for a constructor, "helper" for a package function.
 	uint32_t file = 0; // An index into Module::files.
@@ -48,10 +52,16 @@ struct Function {
 	// `...rest`: the last parameter's register is an Array of every argument past the others. A caller
 	// passes those untyped, after the others, and as many as it likes.
 	bool rest = false;
+	// It names `arguments`, and so takes more than it declares, as avmplus's MethodInfo has it
+	// (`_allowExtraArgs = _needRest || _needArguments || _ignoreRest`): a caller through a function value
+	// or by name may pass any number past the parameters, untyped, and `arguments` holds them after the
+	// others. A call the checker typed never passes more.
+	bool takes_extra = false;
 	Kind result = Kind::Void;
-	// For each register that takes a Godot value or object from outside (a parameter, or the result of a
-	// request to the engine): Godot's name for its type ("Vector2", "CharacterBody2D"), by register. Empty
-	// for the others, and the vector may be shorter than the registers. A host checks what arrives against it.
+	// Godot's name for the type of each register: for every one that holds one of Godot's values (Kind::Val:
+	// "Vector2", "Callable", or ANY_GODOT_TYPE where any may be there), and for one that holds one of
+	// Godot's objects where its class is known ("CharacterBody2D"). Empty for the others, and the vector may
+	// be shorter than the registers. A backend reads it; a host checks what arrives against it.
 	std::vector<std::string> engine_types;
 	// For each parameter that holds a script object: the class it is declared to hold, by register (NONE
 	// for the others; the vector may be shorter). A call through a function value checks what it passes.
@@ -105,6 +115,17 @@ struct Class {
 	// For a Vector.<T>, what its elements are; Void for every other class. A vector class has no fields,
 	// no methods and no base, and its objects are vm::Vector.
 	Kind element = Kind::Void;
+	// For a Vector.<T> whose elements are checked beyond their kind: what an untyped value stored into one
+	// is checked against, as FromAny's third operand has it. The class, for objects (a class of the
+	// program, an interface, Function, another vector's class); Godot's name for the type, an index into
+	// the strings, for Godot's values and objects; 0 for a Vector.<Object>, where undefined is null; NONE
+	// for the rest.
+	uint32_t element_check = NONE;
+	// For a vector of one of Godot's value types: Godot's name for it ("Vector2"). Each place a vector of
+	// one with parts (Vector2, Color: not an array or a signal) is made or grows by starts at its zero, as
+	// a C# array of structs does and as a local of that type does.
+	std::string element_type;
+	bool element_zero = false;
 	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;
@@ -154,11 +175,27 @@ struct Class {
 	}
 };
 
+// One of Godot's classes, members, operators, global functions or defaults that the program names, as Godot's
+// name table (godot/godot_names.txt) has it: what an engine instruction's E operand points at. Copied into
+// the module so that the module stands alone; `id` says which entry of the table it was.
+struct EngineName {
+	uint32_t id = 0; // The entry's place in the name table the module was built with.
+	std::string key; // "Node2D.position", "Vector2", "@operator.OP_ADD"
+	std::string value; // The whole value: Godot's name, then what the table says of it ("position property ...").
+	std::string name; // Godot's name: the value's first word ("position", "Vector2", "+"), or a default's text.
+	std::string owner; // Godot's name for the class it is a member of ("Node2D"); empty for anything else.
+};
+
 struct Global {
 	std::string name; // "Main.count"
 	Kind kind = Kind::Void;
 	uint32_t klass = NONE; // As for a field.
 	bool starts_null = false; // As for a field.
+	std::string engine_type = {}; // As for a field.
+	// A class's public static field, which the class held as a value gives by name (`c.count`); and
+	// whether it is a constant, which is not written.
+	bool is_public = false;
+	bool is_const = false;
 };
 
 struct Module {
@@ -170,6 +207,7 @@ struct Module {
 	std::vector<std::string> strings;
 	std::vector<double> numbers;
 	std::vector<int64_t> wides; // Int64 constants.
+	std::vector<EngineName> engine_names; // What the engine instructions name, each once.
 	// Functions run once, in order, before anything else: package-level variables. (A class's static fields
 	// are set on the class's first use: Class::static_init.)
 	std::vector<uint32_t> initializers;
@@ -183,9 +221,29 @@ struct Module {
 	uint32_t argument_error_class = NONE; // Made when a program calls a function value: too many arguments.
 	// The built-in class of function values (FUNCTION_FIELDS), when the program has any.
 	uint32_t function_class = NONE;
+	uint32_t class_class = NONE; // Class: the built-in class of class values, when a program has any.
+	// The function behind every method of the library read by name and not called (`u.push`): it takes an
+	// Array of the value and the method's name first, then any number of arguments, and runs CallLibrary.
+	// Made when a program reaches properties by name.
+	uint32_t library_function = NONE;
 	uint32_t array_class = NONE; // The one class of every Array, when the program has any.
 	uint32_t object_class = NONE; // The class of `{}` and `new Object()`, when the program makes one.
 	uint32_t dictionary_class = NONE; // flash.utils.Dictionary, when the program makes one.
+	// Godot's == and + (engine names), for untyped values that hold Godot's values: any part of the program
+	// may compare or add them, the library's own functions too.
+	uint32_t equal_operator = NONE;
+	uint32_t add_operator = NONE;
+	// Godot's <, <=, > and >=, likewise: AnyLt, AnyLe, AnyGt and AnyGe ask them of Godot's values.
+	uint32_t less_operator = NONE;
+	uint32_t less_equal_operator = NONE;
+	uint32_t greater_operator = NONE;
+	uint32_t greater_equal_operator = NONE;
+	// And Godot's -, *, /, % and unary -, for AnySub, AnyMul, AnyDiv, AnyMod and AnyNeg.
+	uint32_t subtract_operator = NONE;
+	uint32_t multiply_operator = NONE;
+	uint32_t divide_operator = NONE;
+	uint32_t modulo_operator = NONE;
+	uint32_t negate_operator = NONE;
 	// Made when a program reaches a property by name: a sealed object's missing one (#1069, #1056).
 	uint32_t reference_error_class = NONE;
 	// RegExp and Date, and the errors their functions and the URI functions raise, when the program uses them.

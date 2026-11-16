@@ -33,8 +33,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 ## Stage 1d: Godot's API in AS3
 
 - A script class named like a Godot class is ambiguous in the default package. **clean-up**
-- **decision** 60 methods that take raw pointers are left out. AS3 has nothing to pass them, so the
-  proposal is that this stands.
 
 ## Stage 1e: Godot's math types
 
@@ -45,12 +43,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - **Manual editor acceptance remains pending.** Automated Rider and free unified IDEA checks cover
   completion, Undo, diagnostics and navigation. The plugin supplies the tested Rider lifetime repairs
   while preserving split Problems; see [validation](results/2026-11-completion-followup.md). **LS-2**
-
-## Stage 2b-2, part A: Godot's values
-
-- **decision** `"" + this` in a script without `toString()` reads `[object Values]` (AS3's), while Godot's
-  text for the same node reads `<Node2D#123>`. And a `toString()` that raises an error ends the caller
-  through `"" + this`, but through Godot's text it is reported and Godot's text stands.
 
 ## Stage 2b-2, part B: signals
 
@@ -64,20 +56,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
 - Godot calling a script from another thread (a method given to `WorkerThreadPool.addTask`) is refused
   with an error, and so is a field read or written from another thread. Running AS3 off the main thread
   waits for the `async` research. **2d**
-- `removeAll()` on a singleton's signal removes every script's listeners, not only the caller's.
-  **decision**
-
-## Stage 2b-3, part B: `Int64`
-
-- **decision** Godot cuts a wide integer off, without an error, inside more of its built-in types than
-  the integer vectors and `PackedInt32Array`, which are guarded. The description gives these no width, so
-  they are `Int64`, and a script gets what GDScript gets:
-  `bytes.append(300)` stores 44; `items.insert(4294967297, 99)` inserts at 1; `Color.hex` keeps the low 32
-  bits (it was a `uint` before); `PackedByteArray.encodeU32`, `encodeS32`, `encodeU16` and `encodeU8` cut
-  their value; `Array`'s `removeAt`, `popAt`, `slice` and `find` cut an index; `Basis.getEuler` and
-  `Quaternion.getEuler` cut the order; `Callable.unbind` its count. Guarding each needs a list kept by
-  hand, which the owner chose against; the choice is whether a short one is worth it.
-- Every program's IR now carries the `RangeError` class, used or not. **clean-up**
 
 ## C++ clean-up, November 2026
 
@@ -90,24 +68,6 @@ the review of the clean-up put off.
   value. Holding Godot's values inline, with no handle, is a change across `ir`, `vm` and the host; the
   choice is whether it is worth that now.
 
-## Stage 2b-3, part C: global functions and errors
-
-- Godot's message for a listener that was not called names it `Node(Signals.as)::`, without the method.
-  **clean-up**
-- A freed Godot object still reads as `<Freed Object>` as text, as in GDScript, though it is `null` in
-  every test. **decision**
-
-From the review of part C (its five important findings were fixed with it: `print()` with no arguments, a
-default `[]` shared between calls, a null answer taken silently as text, `-5` reaching Godot as `-5.0`, and
-any Godot value passing as a condition):
-
-- A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
-  `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
-  **decision**
-- A Number variable that holds a whole value reaches a parameter that takes anything as a float
-  (`str(x)` gives `2.0`, as GDScript does for a float). Only expressions that are whole by their form are
-  sent as integers. **decision**
-
 ## Reload while running
 
 - A game on a simulator reads its scripts, scenes and text resources from the folder it is told of
@@ -119,33 +79,6 @@ any Godot value passing as a condition):
 ## Stage 2c-3: `try`, `catch`, `finally`, labels
 
 
-## Stage 2c-2: the untyped value
-
-- A script object of a class that extends none of Godot's (in an untyped value or not) is an AS3 error when
-  an AS3 call gives it to Godot; when Godot reads it (a return, a field), Godot gets null and an error is
-  printed. Nothing converts it. (One of a class that extends a Godot class goes as its Godot object.)
-  **decision**
-- Godot's integers in an untyped value: one that fits an `int` is held as one, a larger one as an `Int64`;
-  a whole float stays a float. My ruling, beside the Int64 rule the owner approved for typed values.
-  **decision**
-
-## Stage 2c-1: vectors, `switch` and `Math`
-
-- `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
 
 ## Stage 2a: interpreter core
 
-
-## Stage 2b-1: AS3 inside Godot, first slice
-
-- **decision** **The first editor scan of a project with the extension crashes as Godot exits** when the
-  editor is told to quit at once (`--editor --quit`, `--import`), after the scan has done its work. The
-  cause, read from Godot's source and borne out by experiments (any one class does it, no class does not,
-  time to finish does not) but not seen in a symbolized trace, is Godot's: loading an extension that
-  registers a class makes the editor document it on a thread,
-  which queues `EditorHelp::_gen_extensions_docs`; quitting in that frame frees the documentation first,
-  and Godot's last flush of its queue then runs the call on nothing. Any extension with a class does it.
-  `--quit-after` with time for the thread (the tests use it) is clean, as is every later run. Nothing in
-  the extension can wait for the editor's thread; the choice is whether this stands until Godot fixes it.
-- `super.method()` on one of Godot's virtuals does nothing, which is right for Godot's own empty versions
-  but skips a virtual that a C++ extension class implements. **clean-up**

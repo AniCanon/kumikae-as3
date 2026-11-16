@@ -23,7 +23,7 @@ package {
 			trace(nested);
 			// toLocaleString leaves them out of a Vector too (VectorImpl.as: `if (x !== undefined && x !== null)`),
 			// and asks each element for its own, so a Vector inside one leaves them out as well.
-			// A typed Vector's toLocaleString() is not lowered yet: these are by name.
+			// These are by name; locale_text.as has the typed ones.
 			var held:* = any;
 			var heldObjects:* = objects;
 			trace(held.toLocaleString(), heldObjects.toLocaleString(), held.toString());

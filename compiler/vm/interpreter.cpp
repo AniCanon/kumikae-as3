@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include <limits>
 
@@ -15,7 +16,7 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host), collector_(*this) {
+		module_(p_module), host_(p_host), heap_(p_module, p_host.handles, p_host.source) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}
@@ -37,6 +38,39 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 	for (size_t i = 0; i < globals_.size(); i++) {
 		globals_[i] = empty_value(module_.globals[i].kind == Kind::F64, module_.globals[i].starts_null);
 	}
+	prepare_engine();
+}
+
+// Each engine instruction is worked out by the host once, now, on the thread that loads the program: none
+// is looked up by its name as the program runs. A function with none keeps an empty list.
+void Interpreter::prepare_engine() {
+	operators_.resize(module_.engine_names.size());
+	for (size_t i = 0; i < module_.engine_names.size(); i++) {
+		// The description's names for the unary ones are "unary-" and "unary+".
+		std::string_view spelling = module_.engine_names[i].name;
+		if (spelling.substr(0, 5) == "unary") {
+			spelling.remove_prefix(5);
+		}
+		// An operator's entry is "<name> <Godot's number>"; anything else is not an operator and has none.
+		const std::string &value = module_.engine_names[i].value;
+		const size_t space = value.find(' ');
+		const bool numbered = module_.engine_names[i].key.rfind("@operator.", 0) == 0 && space != std::string::npos;
+		operators_[i] = OperatorName{ spelling, spelling == "==" || spelling == "!=", numbered ? std::atoi(value.c_str() + space + 1) : -1 };
+	}
+	prepared_.resize(module_.functions.size());
+	for (size_t f = 0; f < module_.functions.size(); f++) {
+		const Function &function = module_.functions[f];
+		for (size_t i = 0; i < function.code.size(); i++) {
+			const char *shape = ir::op_shape(function.code[i].op);
+			if (std::strchr(shape, 'E') == nullptr) {
+				continue;
+			}
+			if (const Prepared *prepared = host_.handles.prepare(module_, function, function.code[i])) {
+				prepared_[f].resize(function.code.size());
+				prepared_[f][i] = EngineStep{ prepared, untyped_operand(function, function.code[i]) };
+			}
+		}
+	}
 }
 
 Interpreter::~Interpreter() {
@@ -51,6 +85,9 @@ Interpreter::~Interpreter() {
 	for (Object *kept : lone_functions_) {
 		release_object(kept);
 	}
+	for (auto &[code, kept] : class_values_) {
+		release_object(kept);
+	}
 	for (size_t i = 0; i < globals_.size(); i++) {
 		drop(module_.globals[i].kind, globals_[i]);
 	}
@@ -59,7 +96,7 @@ Interpreter::~Interpreter() {
 	}
 	forget_subject();
 	// With every root let go of, what is left in loops is held only by itself, or by the host.
-	collector_.collect();
+	heap_.collector.collect();
 	for (Str *constant : strings_) {
 		if (release(constant)) {
 			free_string(constant);
@@ -84,6 +121,9 @@ Interpreter::~Interpreter() {
 }
 
 void Interpreter::clear_globals() {
+	if (native_) {
+		native_->clear_globals();
+	}
 	for (size_t i = 0; i < globals_.size(); i++) {
 		Slot value = globals_[i];
 		globals_[i].bits = 0;
@@ -146,7 +186,13 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		}
 		frame.arguments = static_cast<uint32_t>(std::min(p_count, fixed));
 	}
-	stack_.resize(stack_.size() + function.registers.size(), zero);
+	const size_t extras = function.takes_extra && p_count > function.parameters ? p_count - function.parameters : 0;
+	frame.extras = static_cast<uint32_t>(extras);
+	frame.arguments = static_cast<uint32_t>(std::min<size_t>(frame.arguments, function.parameters));
+	stack_.resize(stack_.size() + function.registers.size() + extras, zero);
+	for (size_t i = 0; i < extras; i++) {
+		stack_[frame.base + function.registers.size() + i] = share(Kind::Any, source[function.parameters + i]);
+	}
 	size_t count = std::min<size_t>(std::min<size_t>(p_count, fixed), function.registers.size());
 	for (size_t i = 0; i < count; i++) {
 		stack_[frame.base + i] = share(function.registers[i], source[i]);
@@ -171,6 +217,12 @@ void Interpreter::pop() {
 			drop(function.registers[i], value);
 		}
 	}
+	for (size_t i = 0; i < frames_[index].extras; i++) {
+		const size_t at = base + function.registers.size() + i;
+		Slot value = stack_[at];
+		stack_[at].bits = 0;
+		drop_any(value);
+	}
 	stack_.resize(base);
 	frames_.resize(index);
 	while (!kept_traces_.empty() && kept_traces_.back().depth > frames_.size()) {
@@ -182,7 +234,7 @@ void Interpreter::pop() {
 // that the next entry starts clean; an error that was already on its way out when this entry began is put
 // back afterwards.
 bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
-	if (entries_ >= MAX_ENTRIES) {
+	if (stack_used_up()) {
 		stack_overflow();
 		return false;
 	}
@@ -218,7 +270,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 
 	size_t depth = frames_.size();
 	bool ok = false;
-	if (entries_ >= MAX_ENTRIES) {
+	if (stack_used_up()) {
 		stack_overflow();
 	} else {
 		entering();
@@ -229,7 +281,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	// This program's code is running an instruction beneath this call: the error goes back to it, as Flash
 	// has an error in a listener come out of the dispatch that ran it. Only the first: a later listener's
 	// error, with one already carried, is reported here, where it happened.
-	const bool carry = !ok && depth > 0 && failing_ && !outer_failing && !outer_stopped && !aside;
+	const bool carry = !ok && (depth > 0 || direct_ > 0) && failing_ && !outer_failing && !outer_stopped && !aside;
 	if (!ok && !carry) {
 		report();
 	}

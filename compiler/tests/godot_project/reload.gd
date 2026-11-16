@@ -7,7 +7,7 @@ var other: Node
 var counted: RefCounted
 var frames := 0
 var stage := 0
-var since := 0
+var mark := 0 # The watch's looks when the last save was made.
 
 func show(name: String, got, want) -> void:
 	print("VALUE %s=%s|%s" % [name, str(got), str(want)])
@@ -25,10 +25,29 @@ func put(version: String) -> void:
 	var file := FileAccess.open(hot_path(), FileAccess.WRITE)
 	file.store_string(text)
 	file.close()
-	since = Time.get_ticks_msec()
+	mark = looks()
 
-func waited(milliseconds: int) -> bool:
-	return Time.get_ticks_msec() - since > milliseconds
+# How many times the watch has looked at the scripts (the language's watch_looks()). A save is acted on by
+# the second look after it: the first finds the change, the next finds it settled and compiles. The tests
+# wait for looks, never for the clock, so a busy machine changes nothing.
+func looks() -> int:
+	for i in Engine.get_script_language_count():
+		var language := Engine.get_script_language(i)
+		if language.has_method("watch_looks"):
+			return language.call("watch_looks")
+	return 0
+
+# Whether the watch has acted on the last save: compiled it, and moved the game onto it if it compiled.
+func acted() -> bool:
+	return looks() >= mark + 2
+
+func same_time() -> String:
+	# A file whose time the saves of one step are all given.
+	return ProjectSettings.globalize_path("user://stamp")
+
+func put_at_same_time(version: String) -> void:
+	put(version)
+	OS.execute("touch", ["-r", same_time(), hot_path()])
 
 func _initialize() -> void:
 	node = Node2D.new()
@@ -44,20 +63,24 @@ func _process(_delta: float) -> bool:
 	frames += 1
 	if stage == 0 and frames == 2:
 		ask("listen", [other])
+		ask("listenJoy")
 		ask("fill")
 		ask("bump")
 		ask("bump")
+		ask("hold")
 		other.name = "first"
 		show("before: value", ask("value"), 1)
 		show("before: heard", ask("heard"), 1)
 		put("v2")
 		stage = 1
-	elif stage == 1 and (ask("value") == 2 or waited(8000)):
+	elif stage == 1 and acted():
 		show("after an edit: the new code runs", ask("value"), 2)
 		show("after an edit: a field keeps its value", ask("count"), 2)
 		show("after an edit: a static field keeps its value", ask("total"), 2)
 		show("after an edit: a vector field keeps its elements", ask("seenText"), "1,2")
 		show("after an edit: a method that is new can be called", ask("added"), "new")
+		# A class as a value, a method of the library as a value, and a property hidden from loops.
+		show("after an edit: a class value, a method value and a hidden property are kept", ask("held"), "true true 3 b 1")
 		show("after an edit: a vector of a type the new code does not name keeps its elements", ask("bagText"), "2")
 		show("after an edit: a counted object keeps its field", counted.get("n"), 5)
 		var weak: WeakRef = weakref(counted)
@@ -68,9 +91,15 @@ func _process(_delta: float) -> bool:
 		ask("unlisten", [other])
 		other.name = "third"
 		show("after an edit: a listener added before can be removed", ask("heard"), 11)
+		# A singleton's listener, added before: it is the object's own still, for removeAll().
+		Input.joy_connection_changed.emit(0, true)
+		show("after an edit: a singleton's listener added before runs the new code", ask("heard"), 21)
+		ask("clearJoy")
+		Input.joy_connection_changed.emit(0, true)
+		show("after an edit: removeAll() on a singleton's signal takes the object's own", ask("heard"), 21)
 		put("broken")
 		stage = 2
-	elif stage == 2 and waited(1500):
+	elif stage == 2 and acted():
 		show("with an error: the game keeps the scripts it had", ask("value"), 2)
 		# The error is a class that is not there: it is fixed by a file of its own, in a new folder.
 		var folder := hot_path().get_base_dir().path_join("later")
@@ -78,18 +107,26 @@ func _process(_delta: float) -> bool:
 		var later := FileAccess.open(folder.path_join("Later.as"), FileAccess.WRITE)
 		later.store_string("package { public class Later { public static function zero():int { return 0; } } }\n")
 		later.close()
-		since = Time.get_ticks_msec()
+		mark = looks()
 		stage = 3
-	elif stage == 3 and (ask("value") == 3 or waited(8000)):
+	elif stage == 3 and acted():
 		show("once the error is fixed, by a file in a new folder: the new code runs", ask("value"), 3)
 		show("once the error is fixed: the field still has its value", ask("count"), 2)
-		# A save of the same size with the same time as the last (two saves within one second): still seen.
-		var stamp := ProjectSettings.globalize_path("user://stamp")
-		OS.execute("touch", ["-r", hot_path(), stamp])
-		put("v4")
-		OS.execute("touch", ["-r", stamp, hot_path()])
+		# Saves of the same size that carry the same time (as two within one second do) are told apart by
+		# what they hold. The time is one set here, far ahead, and given to every save of this step: however
+		# long this machine takes between a save and the look at it, the saves stay "within one second" of
+		# each other and of that look. Nothing is waited for but the code each save brings.
+		OS.execute("touch", ["-t", "203701010000", same_time()])
+		put_at_same_time("v4")
+		stage = 31
+	elif stage == 31 and acted():
+		put_at_same_time("broken") # The code that gives 3, of the same size as the one that gives 4.
+		stage = 32
+	elif stage == 32 and acted():
+		show("a save of the same size at the same time is seen", ask("value"), 3)
+		put_at_same_time("v4")
 		stage = 4
-	elif stage == 4 and (ask("value") == 4 or waited(8000)):
+	elif stage == 4 and acted():
 		show("a save of the same size in the same second is seen", ask("value"), 4)
 		# A reload asked for while AS3 runs (AS3 emits a signal, GDScript hears it and asks): refused.
 		var emitter := Node.new()
@@ -107,7 +144,7 @@ func _process(_delta: float) -> bool:
 		DirAccess.remove_absolute(hot_path().get_base_dir().path_join("later/Later.as"))
 		put("v5")
 		stage = 5
-	elif stage == 5 and waited(1500):
+	elif stage == 5 and acted():
 		show("a class gone while an object of it is alive: the game keeps the scripts it had", ask("value"), 4)
 		node.free()
 		other.free()

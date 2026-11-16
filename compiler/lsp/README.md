@@ -8,7 +8,7 @@ any editor that speaks the Language Server Protocol. Setting up an editor is in
 |---|---|
 | `server`, `server_queue`, `server_documents` | Framed transport, dispatch, bounded lookahead and document versions |
 | `server_places`, `server_diagnostics`, `server_navigation`, `server_completion` | Positions and URIs in the editor's terms; the errors sent after a check; definition, references, hover and symbols; completion and signature help |
-| `workspace` | The project's files as the editor has them, and re-checking after an edit |
+| `workspace` | The project's files as the editor has them: an edit applied, a file's bodies checked when asked for, the rest checked a file at a time |
 | `channel` | Messages framed with `Content-Length`, over binary input and output |
 | `json`, `uri`, `positions` | The wire format |
 | `paths` | Paths as text, one spelling on every system; Windows' rules are tested everywhere |
@@ -19,11 +19,14 @@ any editor that speaks the Language Server Protocol. Setting up an editor is in
   positions and references). It must never disagree with `kas3c check`.
 - **Includes `src/` only.** No `ir/`, `vm/` or Godot header.
 - **No dependency:** the JSON reader is here, on purpose.
-- **A handler never blocks on the whole project** for an edit to one file.
+- **A handler never blocks on the whole project** for an edit to one file. A request checks the bodies of
+  the file it asks about (find references: every file's); `settle` checks the rest one file at a time and
+  stops when a message is waiting.
 - A new request has a test in `tests/test_lsp.cpp` and, when it concerns the wire, in
   `tests/test_lsp_stdio.py`.
 
-Tests: `test_lsp`, `test_workspace`, `test_json`, `lsp_stdio`.
+Tests: `test_lsp`, `test_workspace`, `test_json`, `lsp_stdio`, and the incremental oracles `test_incremental`
+(the workspace) and `test_server_incremental` (whole sessions through `handle_batch` and `settle`).
 
 ## Completion transport
 
@@ -36,11 +39,16 @@ requests those candidates. Typed-member lists remain complete.
 
 The server does not parse declarations to discover call parameters. Structured compiler candidates
 provide required parameter names; signature queries identify the innermost call. Callback positions
-remain name-only. Query caches belong to `Workspace`'s current `Queries`; a recheck destroys them before
-replacing the compilation. The synchronous loop coalesces waiting document changes. Lookahead holds at most 32 messages or about
+remain name-only. Query caches belong to `Workspace`'s current `Queries`: an edit clears them (a rebuild
+destroys them with the compilation), and a file whose bodies are checked drops what was worked out from
+it. The synchronous loop coalesces waiting document changes. Lookahead holds at most 32 messages or about
 1 MiB before dispatch (a single allowed frame can exceed that byte threshold). It reads only currently
-available bytes and retains an incomplete frame for later. Cancellation applies to queued work; the
-compiler remains single-threaded. Document versions and lookahead use the same integer validation.
+available bytes and retains an incomplete frame for later. Cancellation applies to queued work. The
+compiler stays single-threaded: a batch's answers are sent first; then the check of what is left (open
+files first) runs and asks the channel after each file whether a message waits; if one does it stops, its
+diagnostics so far are sent, the next batch is handled, and it goes on from there.
+Diagnostics are published for each file once it is checked. Document versions and lookahead use the same
+integer validation.
 
 See [the user guide](../../editors/completion.md) and [measurements](../../docs/results/2026-11-completion.md).
 

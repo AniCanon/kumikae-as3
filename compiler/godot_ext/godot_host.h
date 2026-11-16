@@ -69,6 +69,34 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	const Utility *utility(std::string_view p_signature, std::string *r_error);
 	bool call_utility(std::string_view p_signature, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 			vm::Slot *r_result, std::string *r_error);
+	bool call_utility(const Utility &p_function, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error);
+
+public:
+	// An engine instruction worked out once (worked.h): public for the helpers of godot_prepared.cpp.
+	struct Worked;
+	// A program is about to be made (its interpreter asks for every engine instruction it has, once).
+	void new_program() { program_++; }
+	// The programs made before the last are gone: what was worked out for a call at its own place and
+	// is not the last program's is let go of.
+	void release_unused();
+	// How many calls worked out at their own place are kept, and how many of them are the last program's.
+	std::pair<size_t, size_t> own_places() const;
+
+private:
+	// Each kind of engine instruction worked out once (godot_prepared.cpp), by what it was worked out from.
+	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
+	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
+	uint64_t program_ = 0; // Which program is being worked out for: counted up as each is made.
+	std::unique_ptr<Worked> work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in, std::string *r_key);
+	bool run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result);
+	bool run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error);
+	bool run_bound(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error);
+	bool run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error);
+	bool run_construct(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error);
 
 public:
 	GodotHost();
@@ -77,6 +105,11 @@ public:
 	// script on a reference-counted object must not keep that object from being freed. Dropped like any
 	// other handle. Copies of it are ordinary handles.
 	void *borrow(godot::Object *p_object);
+
+	// The engine instructions, worked out once and run (godot_prepared.cpp).
+	[[nodiscard]] const vm::Prepared *prepare(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in) override;
+	[[nodiscard]] bool run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error) override;
 
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;
@@ -87,7 +120,7 @@ public:
 	[[nodiscard]] bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 			vm::Slot *r_result, std::string *r_error) override;
 	[[nodiscard]] bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+	[[nodiscard]] bool operate(int p_number, std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error) override;
 	[[nodiscard]] bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override;
 	[[nodiscard]] bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) override;
@@ -109,6 +142,7 @@ public:
 	[[nodiscard]] bool keep(vm::Object *p_object) override; // counted.cpp
 	[[nodiscard]] void *copy(void *p_value) override;
 	void drop(void *p_value) override;
+	[[nodiscard]] bool assign(void *p_to, const void *p_from) override;
 	// For the cycle collector: a reference-counted object that a script listens to or that has a script
 	// is a node (by its id), and so is a listener (callable.h).
 	[[nodiscard]] uint64_t node(void *p_value) override;

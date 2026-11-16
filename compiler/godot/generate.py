@@ -66,9 +66,10 @@ OBJECT_EXTRAS = [
 #   add(f, true)      connect(f, CONNECT_DEFERRED): the listener is called at the end of the frame
 #   addOnce(f)        connect(f, CONNECT_ONE_SHOT)
 #   remove(f)         disconnect(f)
-#   removeAll()       disconnect for every connection
+#   removeAll()       disconnect for every connection a script made; on a singleton's signal, for the
+#                     calling script's own (its object's methods, its class's static methods)
 #   has(f)            is_connected(f)
-#   numListeners      get_connections().size()
+#   numListeners      the connections removeAll() would take away
 # A signal whose name is known only at run time is reached as any AS3 property is: `timer[name].add(f)`.
 SIGNAL_EXTRAS = [
     ("add", "public native function add(listener:Function, deferred:Boolean = false):void;"),
@@ -102,6 +103,16 @@ UNARY = {"unary-": "-", "unary+": "+"}
 # Operators that are not recorded: every type has == and !=, and AS3 has no such operator on these types
 # for the rest (the bitwise ones exist only on Godot's int).
 OPERATORS_LEFT_OUT = {"==", "!=", "not", "in", "and", "or", "xor", "**", "~", "<<", ">>", "&", "|", "^"}
+# Each operator the description names, as the enumerator of Godot's Variant.Operator it is: the name table gives
+# its number, so that a backend asks Godot for the operator by it and never by text. One the description
+# names that is not here, or one here that Godot does not number, stops the generator.
+OPERATOR_ENUMERATORS = {
+    "==": "OP_EQUAL", "!=": "OP_NOT_EQUAL", "<": "OP_LESS", "<=": "OP_LESS_EQUAL", ">": "OP_GREATER",
+    ">=": "OP_GREATER_EQUAL", "+": "OP_ADD", "-": "OP_SUBTRACT", "*": "OP_MULTIPLY", "/": "OP_DIVIDE",
+    "unary-": "OP_NEGATE", "unary+": "OP_POSITIVE", "%": "OP_MODULE", "**": "OP_POWER", "<<": "OP_SHIFT_LEFT",
+    ">>": "OP_SHIFT_RIGHT", "&": "OP_BIT_AND", "|": "OP_BIT_OR", "^": "OP_BIT_XOR", "~": "OP_BIT_NEGATE",
+    "and": "OP_AND", "or": "OP_OR", "xor": "OP_XOR", "not": "OP_NOT", "in": "OP_IN",
+}
 
 NUMBER = re.compile(r"-?\d+(\.\d+)?(e[-+]?\d+)?$")
 NAME = re.compile(r"[A-Za-z_]\w*$")
@@ -349,6 +360,29 @@ class Generator:
         if what.startswith("the "):
             self.godot_names["%s.%s" % (naming.class_name(owner), name)] = what.split(" ")[-1]
 
+    def signature(self, method, result):
+        """A method's line in the name table, after Godot's name: "method", the hash its entry is found by ("-"
+        for one the engine keeps to itself), the type it gives back, the types it takes ("-" for none), and
+        "varargs" if it takes any number more."""
+        arguments = ",".join(argument["type"] for argument in method.get("arguments", [])) or "-"
+        words = ["method", str(method["hash"]) if "hash" in method else "-", result or "void", arguments]
+        return " ".join(words + (["varargs"] if method["is_vararg"] else []))
+
+    def accessors(self, entry, prop):
+        """A property's line in the name table, after Godot's name: "property", its type as Godot writes it,
+        its getter and setter with their hashes ("-" where there is none, or none is described), and the index
+        an accessor that serves several properties takes ("-" for none)."""
+        godot_type = [part for part in prop["type"].split(",") if not part.startswith("-")][0]
+        getter = self.find_method(entry, prop["getter"]) if prop.get("getter") else None
+        if getter is not None and "return_value" in getter:
+            godot_type = getter["return_value"]["type"]
+        words = ["property", godot_type]
+        for name in (prop.get("getter"), prop.get("setter")):
+            described = self.find_method(entry, name) if name else None
+            words += [name or "-", str(described["hash"]) if described is not None and "hash" in described else "-"]
+        words.append(str(prop["index"]) if "index" in prop else "-")
+        return " ".join(words)
+
     def integer(self, value, where):
         if not isinstance(value, int) or isinstance(value, bool):
             raise Refused("%s: the value %r is not an integer" % (where, value))
@@ -427,6 +461,7 @@ class Generator:
             if not getter and not setter:
                 raise Refused("%s: no accessor" % where)
             self.claim(owner, name, "the property " + prop["name"], inherited)
+            self.godot_names["%s.%s" % (as3_name, name)] += " " + self.accessors(entry, prop)
             described = self.find_method(entry, getter) if getter else None
             if described is not None and "return_value" in described:
                 as3, note = self.type(described["return_value"]["type"], described["return_value"].get("meta"), where)
@@ -449,6 +484,7 @@ class Generator:
         for signal in entry.get("signals", []):
             name = naming.member(signal["name"])
             self.claim(owner, name, "the signal " + signal["name"], inherited)
+            self.godot_names["%s.%s" % (as3_name, name)] += " signal"
             out.append("public %snative function get %s():Signal;" % (sealed, name))
 
         if static:
@@ -473,10 +509,9 @@ class Generator:
                 self.left_out.append(where)
                 continue
             self.claim(owner, name, "the method " + method["name"], inherited)
-            if method["is_static"] and not static:
-                # Called through its own entry, which needs the hash, so that a wrong call is an error the
-                # script is told of: through ClassDB it would only be printed.
-                self.godot_names["%s.%s" % (naming.class_name(owner), name)] += " %d" % method["hash"]
+            # The hash finds the method's own entry: a static one called through it reports a wrong call to the
+            # script, where ClassDB would only print it.
+            self.godot_names["%s.%s" % (as3_name, name)] += " " + self.signature(method, result.get("type"))
             out.extend(lines)
 
         self.lines.extend(self.enum_lines(entry))
@@ -560,6 +595,7 @@ class Generator:
         for member in entry.get("members", []):
             name = naming.member(member["name"])
             self.claim(owner, name, "the field " + member["name"], {})
+            self.godot_names["%s.%s" % (as3_name, name)] += " field " + member["type"]
             out.append("public var %s:%s;" % (name, self.type(member["type"], None, owner + "." + name)[0]))
         out.append(self.constructor(entry, as3_name))
         for method in entry.get("methods", []):
@@ -568,6 +604,7 @@ class Generator:
             where = "%s.%s" % (owner, method["name"])
             name = naming.member(method["name"])
             self.claim(owner, name, "the method " + method["name"], {})
+            self.godot_names["%s.%s" % (as3_name, name)] += " " + self.signature(method, method.get("return_type"))
             out.extend(self.function(where, name, method.get("arguments", []), method.get("return_type"), None,
                                      method["is_vararg"], "static " if method["is_static"] else ""))
         if owner == "Signal":
@@ -632,11 +669,33 @@ class Generator:
         described = {(entry["name"], method["name"]) for entry in self.api["classes"]
                      for method in entry.get("methods", [])}
         builtins = {entry["name"] for entry in self.api["builtin_classes"]}
-        return sorted(((AS3_HAS_METHOD | LISTEN_BY_NAME) - described) | {("", name) for name in NARROW_BY_NAME - builtins})
+        operators = {operator["name"] for entry in self.api["builtin_classes"] for operator in entry.get("operators", [])}
+        return sorted(((AS3_HAS_METHOD | LISTEN_BY_NAME) - described) | {("", name) for name in NARROW_BY_NAME - builtins} |
+                      {("operator", name) for name in set(OPERATOR_ENUMERATORS) - operators})
+
+    def operator_numbers(self):
+        """Each operator the description names, by its enumerator: the name the description gives it, and
+        Godot's number for it: "@operator.OP_ADD=+ 6". (The name is not the key: "==" would end the key.)"""
+        numbers = {}
+        for entry in self.api["global_enums"]:
+            if entry["name"] == "Variant.Operator":
+                numbers = {value["name"]: value["value"] for value in entry["values"]}
+        found = {}
+        for entry in self.api["builtin_classes"]:
+            for operator in entry.get("operators", []):
+                name = operator["name"]
+                if name not in OPERATOR_ENUMERATORS:
+                    raise Refused("%s: unknown operator '%s'" % (entry["name"], name))
+                if OPERATOR_ENUMERATORS[name] not in numbers:
+                    raise Refused("Godot's Variant.Operator has no %s for '%s'" % (OPERATOR_ENUMERATORS[name], name))
+                enumerator = OPERATOR_ENUMERATORS[name]
+                found["@operator." + enumerator] = "%s %d" % (name, numbers[enumerator])
+        return found
 
     def names_text(self):
         """One "AS3 name=Godot name" line per declared class and member, sorted. Call after run()."""
         names = dict(self.godot_names)
+        names.update(self.operator_numbers())
         for group in ("classes", "builtin_classes"):
             for entry in self.api[group]:
                 as3_name = naming.class_name(entry["name"])

@@ -13,6 +13,8 @@ enum class MathFunction : uint8_t { Abs, Acos, Asin, Atan, Ceil, Cos, Exp, Floor
 // The fields of a function value: the function, and what it is called with first (the object of a method,
 // or the environment of a function expression), or null for a function that takes nothing first.
 constexpr uint32_t FUNCTION_INDEX = 0, FUNCTION_FIRST = 1;
+// The field of a class value: which class it is, as ClassValue's second operand says it.
+constexpr uint32_t CLASS_CODE = 0;
 
 // The fields of Error and of its built-in subclasses, which the interpreter fills in for an error it raises.
 constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK = 3;
@@ -31,7 +33,17 @@ constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK 
 //   Sort            a function that compares two elements, or the options as a number (untyped)   -> the vector
 // (forEach, map, filter, some and every are loops the lowerer writes, calling the function each time.)
 //   SortOn          the field names, the options (untyped), as Array's sortOn takes them   -> as Sort's
-enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort, SortOn };
+//   LocaleText      nothing                          -> a String: toLocaleString()
+//   IndexOfAny, LastIndexOfAny   an untyped value, where to start (int)   -> the index (int), or -1: for a
+//                   vector that holds no numbers and no untyped values, where what is looked for is not
+//                   known to be an element; found by === (nothing is converted, undefined is null)
+//   Text            anything, which is ignored        -> a String: toString(), the elements joined by ","
+//   JoinAny         the separator, untyped            -> a String: an Array's join(), where undefined is ","
+//                   and anything else is its words (avmplus's Array.as, _join)
+enum class VectorMethod : uint8_t {
+	Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort, SortOn, LocaleText,
+	IndexOfAny, LastIndexOfAny, Text, JoinAny
+};
 
 // String's methods and the functions on text, in StrCall's second operand. An index or a count is a
 // Number as the program wrote it; text is a String, and a null one reads "null". After the string:
@@ -55,6 +67,14 @@ enum class StringFunction : uint8_t {
 	// alone, is AS3's URIError #1052.
 	Escape, Unescape, EncodeURI, EncodeURIComponent, DecodeURI, DecodeURIComponent
 };
+
+// Whether a StrCall of the function only reads text: it runs nothing of the program and raises nothing, so
+// a back end may call the library's function of plain values for it (vm/text_methods.h). split() may run
+// a delimiter's toString(), and the URI functions raise URIError: those are not.
+constexpr bool reads_text_only(StringFunction p_function) {
+	return p_function != StringFunction::Split && p_function != StringFunction::EncodeURI && p_function != StringFunction::EncodeURIComponent &&
+			p_function != StringFunction::DecodeURI && p_function != StringFunction::DecodeURIComponent;
+}
 
 // RegExp's methods and properties, in RegExpCall's second operand. After the RegExp, or the text for
 // String's methods:

@@ -3,6 +3,7 @@
 
 #include "godot_host.h"
 #include "interpreter.h"
+#include "native_program.h"
 #include "ir.h"
 #include "reload.h"
 
@@ -23,6 +24,9 @@ class Project {
 	std::unique_ptr<ir::Module> module_ = std::make_unique<ir::Module>();
 	GodotHost host_;
 	std::unique_ptr<vm::Interpreter> interpreter_;
+	// The scripts as native code, where the project has a program library built from them as they are
+	// now: its host's interpreter is then the one everything here asks, and interpreter_ is not made.
+	std::unique_ptr<NativeProgram> native_;
 	bool loaded_ = false;
 	bool valid_ = false;
 
@@ -44,7 +48,20 @@ public:
 	static uint64_t generation();
 
 	bool valid() const { return valid_; }
-	vm::Interpreter &interpreter() { return *interpreter_; }
+	vm::Interpreter &interpreter() { return native_ ? native_->interpreter() : *interpreter_; }
+	bool native() const { return native_ != nullptr; }
+	// Godot calling a function of the scripts, by whichever runs them: the first argument of a method is
+	// its object, and a result is the caller's to give up. False if it failed: the error has been reported,
+	// or is carried to the script's own call of the engine that led here.
+	[[nodiscard]] bool call_function(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result) {
+		return native_ ? native_->call(p_function, p_arguments, p_count, r_result)
+					   : interpreter_->call_function(p_function, p_arguments, p_count, r_result);
+	}
+	void instance_freed() {
+		if (native_) {
+			native_->instance_freed();
+		}
+	}
 	GodotHost &host() { return host_; }
 	const ir::Module &module() const { return *module_; }
 	// The scripts were edited while the game runs: they are compiled again and, if they compile, every
@@ -55,6 +72,9 @@ public:
 	static void reload_now();
 	// Once a frame while the project is a folder a person can edit: looks for changed scripts.
 	static void watch();
+	// How many looks the watch has made, each ended with what it began (a reload too): a test that saves
+	// a file waits for looks, not for time. A save is acted on by the second look after it (see watch()).
+	static uint64_t watch_looks();
 	// Once a frame: a step of the cycle collector, if the program is loaded.
 	static void collect_step();
 	// The class a script file declares: the one named after the file. NONE if there is none.

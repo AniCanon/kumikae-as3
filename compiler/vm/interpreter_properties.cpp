@@ -68,7 +68,7 @@ std::string Interpreter::holder_name(Slot p_holder) const {
 }
 
 void Interpreter::raise_unsupported(const std::string &p_what) {
-	raise(module_.error_class, p_what + " is not supported by the interpreter yet");
+	library_.raise_unsupported(p_what);
 }
 
 void Interpreter::raise_not_found(const PropertyKey &p_key, Slot p_holder) {
@@ -224,6 +224,9 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_value, Slot p_holder) {
 	const ir::Class &klass = module_.classes[p_object->klass];
 	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.text, p_holder); };
+	if (const std::optional<bool> done = static_set(p_object, p_key, p_holder, p_value)) {
+		return *done;
+	}
 	if (const std::optional<bool> done = library_set(p_object, p_key.text, p_value)) {
 		return *done;
 	}
@@ -279,15 +282,15 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 		if (klass.array) {
 			return set_entry(properties_of(p_vector), p_key, p_value);
 		}
-		raise_unsupported("a property of a Vector other than its elements and length, by its name");
-		return false;
-	}
-	if (klass.element == Kind::Obj || ir::is_engine(klass.element)) {
-		raise_unsupported("writing an element of a Vector of objects held untyped");
-		return false;
+		if (p_key.text == "fixed") {
+			p_vector->fixed = any::to_boolean(p_value);
+			return true;
+		}
+		// A Vector takes no property of its own, as a sealed object takes none.
+		return refuse_write("1056", "Cannot create property ", p_key.text, any::object(p_vector));
 	}
 	Slot value;
-	if (!from_any(p_value, p_key.index ? klass.element : Kind::F64, NONE, &value)) {
+	if (!from_any(p_value, p_key.index ? klass.element : Kind::F64, p_key.index ? klass.element_check : NONE, &value)) {
 		return false;
 	}
 	if (!p_key.index) {
@@ -296,7 +299,8 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 			raise(module_.range_error_class, "Error #1005: Array index is not a positive integer (" + number_to_string(value.d) + ").");
 			return false;
 		}
-		return length_is_fixed(p_vector) || *length == p_vector->length || resize_vector(p_vector, *length);
+		const uint32_t old = p_vector->length;
+		return length_is_fixed(p_vector) || *length == old || (resize_vector(p_vector, *length) && fill_zeroes(p_vector, old));
 	}
 	const uint32_t at = *p_key.index;
 	if (!klass.array && (at > p_vector->length || (p_vector->fixed && at == p_vector->length))) {
@@ -323,14 +327,15 @@ bool Interpreter::delete_property(Slot p_holder, const PropertyKey &p_key, bool 
 		Vector *vector = static_cast<Vector *>(object);
 		if (p_key.index && klass->array) {
 			if (*p_key.index < vector->length) {
-				put(Kind::Any, vector->data[*p_key.index], any::undefined());
+				put(Kind::Any, vector->data[*p_key.index], any::hole());
 			}
 			return true;
 		}
 		*r_done = klass->array && !p_key.index && p_key.text != "length";
 		entries = klass->array ? vector->properties : nullptr;
 	} else if (klass && !klass->table) {
-		*r_done = !klass->field(p_key.text, true) && !named_method(*klass, p_key.text);
+		*r_done = !klass->field(p_key.text, true) && !named_method(*klass, p_key.text) && !named_method(*klass, p_key.text, "get ") &&
+				!named_method(*klass, p_key.text, "set ");
 	} else if (!klass && (any::tag(p_holder) == AnyTag::Null || any::tag(p_holder) == AnyTag::Undefined)) {
 		any_null_check(p_holder);
 		return false;

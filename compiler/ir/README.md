@@ -34,6 +34,7 @@ turns the checked tree from `src/` into it.
 | `lower_vector_methods` | For `Vectors`: a vector's methods, what each takes and gives, and the call |
 | `lower_members` | Getters and setters (a property is a place; each half a function with a table slot of its own, `get x`), and interfaces (a class with no objects; each class's table from an interface method's name to its function, `CallInterface`). A helper class, `Members`, that the lowerer befriends |
 | `lower_regexp`, `lower_date` | RegExp and Date for the `Library` class: their classes (made on first use), a regular expression literal, `new`, their properties as places, their methods and String's that take a pattern |
+| `library_methods.h` | The methods of a String, an Array, a Vector and a Function by name: what each takes and gives, and the typed operation that does it. Read by the lowerer for a typed vector's call, and by the interpreter for a call by name on an untyped value |
 | `library_names.h` | RegExp's and Date's members by name and their codes in RegExpCall and DateCall: read by the lowerer, and by the interpreter for a member reached by name on an untyped value |
 | `lower_json` | JSON for the `Library` class: `JSON.parse`, `JSON.stringify` and a Dictionary's `toJSON()`, one `JsonCall` each, with the classes it makes and raises put into the module |
 | `lower_library.h`, `lower_library` | The standard library (the `Library` class, a friend of the lowerer): `String`'s methods, the numbers' `toString(radix)`, `toFixed`, `toExponential` and `toPrecision`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, and `toString()` of any object |
@@ -42,6 +43,10 @@ turns the checked tree from `src/` into it.
 
 - **Includes `src/` only.** No Godot header, nothing from `vm/`. Godot's own names come from the name table
   through `godot_name(...)`.
+- **An engine instruction names what it asks for by its entry in the name table,** never by text: an `E`
+  operand is an index into `Module::engine_names`, each a copy of one entry (`engine_entry()`,
+  `engine_name()`, `engine_operator()`), so that a backend finds Godot's method, property or operator
+  once, by that entry.
 - **A new operation** is one entry in `KAS3_IR_OPS`, with its shape letters, plus its case in
   `vm/interpreter_run.cpp`. `tests/test_ir.cpp` checks the letters; nothing else lists operations.
 - **What is not supported yet is refused by name** with `refuse(position, "...")`, never lowered to

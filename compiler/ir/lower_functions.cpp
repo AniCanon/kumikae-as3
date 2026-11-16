@@ -1,4 +1,5 @@
 // Function values: a method or a function taken as a value, and a call through one.
+#include "lower_dynamic.h"
 #include "lower_functions.h"
 #include "lower_members.h"
 #include "lower_vectors.h"
@@ -24,12 +25,22 @@ uint32_t Functions::function_value(Expr *p_expression) {
 		return *bound;
 	}
 	auto function = l_.functions_.find(declaration(symbol));
+	const bool library = symbol->unit && symbol->unit->is_builtin && symbol->kind == SymbolKind::Method && !symbol->is_static();
+	if (function == l_.functions_.end() && library && p_expression->kind == NodeKind::Member &&
+			static_cast<Member *>(p_expression)->object->kind != NodeKind::SuperExpr) {
+		return Dynamic(l_).method_value(static_cast<Member *>(p_expression), klass);
+	}
 	if (function == l_.functions_.end()) {
 		l_.refuse(position, "'" + std::string(symbol->name) + "' used as a value");
 		return l_.default_value(Kind::Obj, position);
 	}
 	uint32_t out = l_.reg(Kind::Obj);
 	if (symbol->kind != SymbolKind::Method || symbol->is_static()) {
+		if (symbol->kind == SymbolKind::Method && symbol->owner) {
+			// A static method read is a use of its class, which is set up first, as a call of it sets it up:
+			// the function may be called later from where nothing names the class.
+			l_.touch(symbol->owner, position);
+		}
 		l_.emit(Op::MakeFunction, position, out, function->second, NONE);
 		return out;
 	}

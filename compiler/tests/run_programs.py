@@ -7,6 +7,7 @@ Usage: run_programs.py <path to kas3c> <tests dir> [--update]
                       must be empty and the status 0.
   run/X.args          the files of a program of several files, the entry file first, instead of X.as.
   run/X.ir            if present, `kas3c ir` of the program must print it.
+  run/godot/X.as      a script for Godot: `kas3c ir --godot` of it must print X.ir (it does not run here).
   run/refused/X.as    uses something the interpreter does not run yet: status 1, nothing on standard
                       output, and X.err on standard error.
   corpus/, golden/    every other test program: it runs or is refused, and never crashes.
@@ -32,12 +33,18 @@ failures = []
 passed = 0
 # Date's now is fixed (2025-11-15 14:39:11.123 UTC), and its zone is the US Pacific one as a POSIX rule,
 # which every C library reads without a zone database: no output depends on this machine's clock or zone.
-environment = dict(os.environ, KAS3_REPORT_LEAKS="1", KAS3_NOW="1763217551123", TZ="PST8PDT,M3.2.0,M11.1.0")
+# No program here is held to Flash's fifteen seconds (KAS3_TIME_LIMIT_MS=0: test_cli.py tests the limit): on a
+# machine too busy to run one in that time, it would end with Error #1502 and a wrong failure.
+environment = dict(os.environ, KAS3_REPORT_LEAKS="1", KAS3_NOW="1763217551123", TZ="PST8PDT,M3.2.0,M11.1.0", KAS3_TIME_LIMIT_MS="0")
 
 
-def run(command, files, cwd):
-    return subprocess.run([kas3c, command, *files], capture_output=True, text=True, cwd=cwd, timeout=120,
-                          env=environment)
+def run(command, files, cwd, extra=None):
+    """One run of kas3c. A run that does not end is a failure like any other, said as one (status -1)."""
+    arguments = [kas3c, command, *files]
+    try:
+        return subprocess.run(arguments, capture_output=True, text=True, cwd=cwd, timeout=600, env=dict(environment, **(extra or {})))
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(arguments, -1, "", "did not end within 600 seconds")
 
 
 def compare(name, actual, path, missing=None):
@@ -74,6 +81,25 @@ for name in names:
     check(name + " status", result.returncode == (1 if fails else 0), "exit %d" % result.returncode)
     if os.path.exists(base + ".ir"):
         compare(name + " ir", run("ir", files, folder).stdout, base + ".ir")
+
+# With a stack too small for what a program does, it ends with Error #1023 and never with a crash: a library
+# callback that calls the library again (callbacks_nest: caught, where the stack holds its first part),
+# and words that nest in C++ alone (text_cycles). How much fits depends on the build, so only that is held.
+for name, kilobytes in (("callbacks_nest", "4096"), ("text_cycles", "2048"), ("deep_frames", "1024")):
+    small = run("run", [name + ".as"], folder, {"KAS3_STACK_KB": kilobytes})
+    overflowed = "Error #1023" in small.stderr or "1023" in small.stdout
+    check(name + " with a small stack", small.returncode in (0, 1) and overflowed and "Sanitizer" not in small.stderr and
+          (small.returncode == 1) == small.stderr.startswith("Error: Error #1023"), "exit %d\n%s%s" % (small.returncode, small.stdout[-300:], small.stderr[-600:]))
+
+for path in sorted(glob.glob(os.path.join(folder, "godot", "*.as"))):
+    name = "godot/" + os.path.basename(path)
+    compare(name + " ir", run("ir", ["--godot", os.path.basename(path)], os.path.dirname(path)).stdout, path[:-3] + ".ir")
+
+# Every register that holds one of Godot's values says which type, in each script of the Godot test project.
+project = os.path.join(tests, "godot_project")
+lowered = run("ir", ["--godot"] + sorted(os.path.basename(path) for path in glob.glob(os.path.join(project, "*.as"))), project)
+untyped = [line for line in lowered.stdout.splitlines() if line.startswith("  godot ") and ":?" in line]
+check("godot_project ir", lowered.returncode == 0 and not untyped, "\n".join(untyped[:5]) or lowered.stderr[-600:])
 
 refused = os.path.join(folder, "refused")
 for path in sorted(glob.glob(os.path.join(refused, "*.as"))):

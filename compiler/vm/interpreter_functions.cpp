@@ -23,7 +23,7 @@ Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
 			return kept;
 		}
 	}
-	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, collector_.list_for(module_.function_class));
+	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, heap_.list_for(module_.function_class));
 	if (!made) {
 		if (module_.function_class != NONE) {
 			out_of_memory();
@@ -77,9 +77,7 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			break;
 		case Op::FunctionLength: {
 			if (Object *value = function_in(p_function.registers[p_in.b], r[p_in.b])) {
-				const Function &callee = module_.functions[static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i)];
-				const uint32_t declared = callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0);
-				set_int32(r[p_in.a], static_cast<int32_t>(declared));
+				set_int32(r[p_in.a], function_length(value));
 			}
 			break;
 		}
@@ -93,6 +91,72 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			call_value(p_function, p_in);
 			break;
 	}
+}
+
+// A function value's `length`: the parameters it declares, without what it takes first or `...rest`.
+int32_t Interpreter::function_length(Object *p_function) const {
+	const Function &callee = module_.functions[static_cast<uint32_t>(p_function->fields()[ir::FUNCTION_INDEX].i)];
+	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
+}
+
+// Native: the function's body is native code, which whoever holds it runs. The frame is found again by its
+// number afterwards: native code may call back in and move the stack.
+void Interpreter::native_op(const Instruction &p_in) {
+	const size_t index = frames_.size() - 1;
+	const Frame &frame = frames_[index];
+	Slot result;
+	result.bits = 0;
+	const bool wanted = p_in.a != NONE;
+	const Kind kind = wanted ? module_.functions[frame.function].registers[p_in.a] : Kind::Void;
+	if (!native_ || !native_->run_native(frame.function, p_in.b, p_in.c, stack_.data() + frame.base, frame.arguments, frame.extras, wanted ? &result : nullptr)) {
+		NativeError error;
+		if (!native_ || failing_ || index >= frames_.size() || !native_->hand_over(&error)) {
+			raise(module_.error_class, "an error is on its way out of native code");
+			return;
+		}
+		// The error goes on from here as one thrown in this frame, whose line native code has put in.
+		pending_ = error.error;
+		failing_ = true;
+		trace_ = std::move(error.trace);
+		trace_lines_ = error.lines;
+		thrown_at_ = Site{ std::move(error.function), std::move(error.file), error.line };
+		frames_[index].traced = true;
+		return;
+	}
+	if (wanted && index < frames_.size()) {
+		put(kind, stack_[frames_[index].base + p_in.a], result);
+	}
+}
+
+// Arguments: what the caller passed, as an Array, and the running function as its `callee`.
+void Interpreter::arguments_array(const Instruction &p_in) {
+	const Frame &frame = frames_.back();
+	const Function &function = module_.functions[frame.function];
+	const uint32_t first = function.is_static ? 0 : 1;
+	const uint32_t count = frame.arguments > first ? frame.arguments - first : 0;
+	Vector *made = fresh_vector(module_.array_class, count + frame.extras);
+	if (!made) {
+		return;
+	}
+	Slot *r = stack_.data() + frame.base;
+	for (uint32_t i = 0; i < count; i++) {
+		made->data[i] = to_any(function.registers[first + i], r[first + i]);
+	}
+	for (uint32_t i = 0; i < frame.extras; i++) {
+		made->data[count + i] = share(Kind::Any, r[function.registers.size() + i]);
+	}
+	Object *callee = make_function(frame.function, first ? static_cast<Object *>(r[0].p) : nullptr);
+	Entries *properties = callee ? properties_of(made) : nullptr;
+	PropertyKey key;
+	key.text = "callee";
+	if (!properties || !set_entry(properties, key, any::object(callee))) {
+		release_object(callee);
+		release_object(made);
+		return;
+	}
+	properties->all()[*entry_of(properties, key)].hidden = true;
+	release_object(callee); // The Array holds it now.
+	put(Kind::Obj, r[p_in.a], of_object(made));
 }
 
 // CallbackThis: a method keeps its own object, so Flash will not be told another (Error #1510).
@@ -141,6 +205,21 @@ bool Interpreter::same_function(const Object *p_a, const Object *p_b) const {
 	}
 	Object *a = const_cast<Object *>(p_a);
 	Object *b = const_cast<Object *>(p_b);
+	if (a->fields()[ir::FUNCTION_INDEX].i != b->fields()[ir::FUNCTION_INDEX].i) {
+		return false;
+	}
+	if (static_cast<uint32_t>(a->fields()[ir::FUNCTION_INDEX].i) == module_.library_function) {
+		// A method of the library, which both are (what such a one is bound to is a pair, the value and
+		// the name, where any other function's is its object): the same when read from the same value by
+		// the same name.
+		const Vector *bound_a = static_cast<const Vector *>(a->fields()[ir::FUNCTION_FIRST].p);
+		const Vector *bound_b = static_cast<const Vector *>(b->fields()[ir::FUNCTION_FIRST].p);
+		if (!bound_a || !bound_b || bound_a == bound_b) {
+			return bound_a && bound_a == bound_b;
+		}
+		const bool named = static_cast<const Str *>(any::pointer(bound_a->data[1]))->view() == static_cast<const Str *>(any::pointer(bound_b->data[1]))->view();
+		return named && bound_a->data[0].bits == bound_b->data[0].bits;
+	}
 	return a->fields()[ir::FUNCTION_INDEX].i == b->fields()[ir::FUNCTION_INDEX].i &&
 			a->fields()[ir::FUNCTION_FIRST].p == b->fields()[ir::FUNCTION_FIRST].p && a->fields()[ir::FUNCTION_FIRST].p;
 }
@@ -183,8 +262,9 @@ bool Interpreter::argument_as(const Function &p_callee, uint32_t p_register, Slo
 }
 
 // What a call of a function value starts with: what it takes first, then each untyped argument as its
-// parameter holds it. One left out takes its default; too many is AS3's ArgumentError #1063. False if it
-// raised. p_values must not be in the stack: making an argument a String may run the program, which may
+// parameter holds it. One left out takes its default; too many is AS3's ArgumentError #1063, which says how
+// many are required whichever way the count is wrong (avmplus's "Expected %2", the required count). False if
+// it raised. p_values must not be in the stack: making an argument a String may run the program, which may
 // move the stack.
 bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
 	return function_arguments(static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i), static_cast<Object *>(p_value->fields()[ir::FUNCTION_FIRST].p),
@@ -195,11 +275,11 @@ bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot
 bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
 	const Function &callee = module_.functions[p_target];
 	const size_t first = callee.is_static ? 0 : 1;
-	const size_t most = callee.rest ? SIZE_MAX : callee.parameters - first;
+	const size_t most = callee.rest || callee.takes_extra ? SIZE_MAX : callee.parameters - first;
 	if (p_count > most || p_count + first < callee.required) {
 		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
 				"Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
-						std::to_string(p_count > most ? most : callee.required - first) + ", got " + std::to_string(p_count) + ".");
+						std::to_string(callee.required - first) + ", got " + std::to_string(p_count) + ".");
 		return false;
 	}
 	r_values->assign(first + p_count, Slot());
@@ -207,10 +287,10 @@ bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t 
 		(*r_values)[0].bits = 0;
 		(*r_values)[0].p = p_first;
 	}
-	const size_t fixed = callee.rest ? callee.parameters - 1 - first : p_count;
+	const size_t fixed = callee.rest ? callee.parameters - 1 - first : callee.parameters - first;
 	for (size_t i = 0; i < p_count; i++) {
 		if (i >= fixed) {
-			(*r_values)[first + i] = share(Kind::Any, p_values[i]); // For the rest parameter, untyped.
+			(*r_values)[first + i] = share(Kind::Any, p_values[i]); // For the rest parameter or `arguments`, untyped.
 			continue;
 		}
 		if (!argument_as(callee, static_cast<uint32_t>(first + i), p_values[i], &(*r_values)[first + i])) {
@@ -224,7 +304,7 @@ bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t 
 
 // The arguments function_arguments() made, once the callee has taken references of its own.
 void Interpreter::let_go_arguments(const Function &p_callee, std::vector<Slot> *p_values) {
-	const size_t fixed = p_callee.rest ? p_callee.parameters - 1 : SIZE_MAX;
+	const size_t fixed = p_callee.rest ? p_callee.parameters - 1 : p_callee.parameters;
 	for (size_t made = p_callee.is_static ? 0 : 1; made < p_values->size(); made++) {
 		drop(made >= fixed ? Kind::Any : p_callee.registers[made], (*p_values)[made]);
 	}
@@ -237,8 +317,21 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 	if (p_in.a != NONE) {
 		put(Kind::Any, r[p_in.a], any::undefined()); // A function that gives nothing gives undefined.
 	}
-	Object *value = function_in(p_function.registers[p_in.b], r[p_in.b]);
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	const Object *called = p_function.registers[p_in.b] == Kind::Any ? held_object(r[p_in.b]) : static_cast<const Object *>(r[p_in.b].p);
+	if (called && module_.class_class != NONE && called->klass == module_.class_class) {
+		// A class called as a function converts what it is given.
+		SpareSlots given(spare_slots_);
+		for (const uint32_t each : list) {
+			given->push_back(share(Kind::Any, r[each]));
+		}
+		class_call(static_cast<uint32_t>(const_cast<Object *>(called)->fields()[ir::CLASS_CODE].i), *given, p_in.a);
+		for (Slot each : *given) {
+			drop_any(each);
+		}
+		return;
+	}
+	Object *value = function_in(p_function.registers[p_in.b], r[p_in.b]);
 	if (!value) {
 		return;
 	}
@@ -301,7 +394,7 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	// may take them out of the Array.
 	SpareSlots given(spare_slots_);
 	for (uint32_t i = 0; array && i < array->length; i++) {
-		given->push_back(share(Kind::Any, array->data[i]));
+		given->push_back(share(Kind::Any, any::filled(array->data[i])));
 	}
 	SpareSlots values(spare_slots_);
 	const bool ok = function_arguments(value, given->size(), given->data(), &*values);
@@ -314,6 +407,14 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
 	push(target, values->data(), values->size(), p_in.a);
 	let_go_arguments(module_.functions[target], &*values);
+}
+
+bool Interpreter::Asked::call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+	const std::optional<Slot> made = vm.call_function_within(p_function, p_arguments, p_count);
+	if (made) {
+		*r_result = *made;
+	}
+	return made.has_value();
 }
 
 } // namespace vm

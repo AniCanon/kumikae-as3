@@ -5,8 +5,14 @@
 namespace kas3 {
 
 void Diagnostics::store(Diagnostic p_item) {
+	// Past the limit the first in the file are kept, so that what is shown does not depend on the order the
+	// passes run in.
 	if ((int)items_.size() >= LIMIT) {
-		return;
+		if (p_item.offset >= items_.back().offset) {
+			return;
+		}
+		stored_errors_ -= items_.back().warning ? 0 : 1;
+		items_.pop_back();
 	}
 	stored_errors_ += p_item.warning ? 0 : 1;
 	// Keep the list ordered by offset; equal offsets stay in arrival order.

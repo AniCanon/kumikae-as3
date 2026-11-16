@@ -14,11 +14,27 @@
 namespace kas3 {
 namespace vm {
 
+// What a host worked out once for one engine instruction (an operator found for its operands' types, a
+// method's entry, a constant's value): its own, kept by the host for as long as the host lives.
+struct Prepared {
+	virtual ~Prepared() {}
+};
+
 struct EngineHandles {
 	virtual ~EngineHandles() {}
+	// Asked once for each engine instruction when a program is loaded, before any of it runs: what the host
+	// keeps of it, or null for one it carries out by the requests below each time.
+	[[nodiscard]] virtual const Prepared *prepare(const ir::Module &, const ir::Function &, const ir::Instruction &) { return nullptr; }
+	// Carries out an instruction prepare() worked out: its operands in order (a call's, get's or set's
+	// receiver first, never null), and the result wanted. False with r_error empty: the host can't here (an
+	// operand of another type than prepared for), and the instruction is carried out by the requests below.
+	[[nodiscard]] virtual bool run(const Prepared &, const Argument *, size_t, const Wanted &, Slot *, std::string *) { return false; }
 	// Another handle for the same value (for a value type, a copy of it), and giving one up.
 	[[nodiscard]] virtual void *copy(void *p_value) = 0;
 	virtual void drop(void *p_value) = 0;
+	// One of Godot's values (never an object) copied into a handle that holds one already, in place of a new
+	// handle: what assigning to a variable that has one costs. False if the engine can't: copy() then.
+	[[nodiscard]] virtual bool assign(void *, const void *) { return false; }
 	// Whether a handle still has something behind it: not if it is null, or an object the engine has freed.
 	// A freed object is null to a script.
 	[[nodiscard]] virtual bool present(void *p_value) = 0;
@@ -42,9 +58,10 @@ struct EngineHandles {
 	// An element, by a number or another key: `vector[0]`.
 	[[nodiscard]] virtual bool index_get(void *p_receiver, const Argument &p_key, const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	[[nodiscard]] virtual bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) = 0;
-	// An operator as AS3 writes it ("+", "==", "<"), on one operand or two, at least one of them an engine
+	// An operator, by Godot's number for it (its name table entry's: Variant::Operator), with AS3's spelling for
+	// what is said of it ("+", "=="), on one operand or two, at least one of them an engine
 	// value.
-	[[nodiscard]] virtual bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
+	[[nodiscard]] virtual bool operate(int p_operator, std::string_view p_spelling, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
 			Slot *r_result, std::string *r_error) = 0;
 
 	// For the cycle collector (vm/collector.h), which runs between calls into the program.

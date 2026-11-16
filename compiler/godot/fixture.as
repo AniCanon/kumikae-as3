@@ -180,6 +180,35 @@ package godot {
 		public static const MAX:int = 39;
 	}
 	[Abstract]
+	public final native class VariantOperator {
+		public static const EQUAL:int = 0;
+		public static const NOT_EQUAL:int = 1;
+		public static const LESS:int = 2;
+		public static const LESS_EQUAL:int = 3;
+		public static const GREATER:int = 4;
+		public static const GREATER_EQUAL:int = 5;
+		public static const ADD:int = 6;
+		public static const SUBTRACT:int = 7;
+		public static const MULTIPLY:int = 8;
+		public static const DIVIDE:int = 9;
+		public static const NEGATE:int = 10;
+		public static const POSITIVE:int = 11;
+		public static const MODULE:int = 12;
+		public static const POWER:int = 13;
+		public static const SHIFT_LEFT:int = 14;
+		public static const SHIFT_RIGHT:int = 15;
+		public static const BIT_AND:int = 16;
+		public static const BIT_OR:int = 17;
+		public static const BIT_XOR:int = 18;
+		public static const BIT_NEGATE:int = 19;
+		public static const AND:int = 20;
+		public static const OR:int = 21;
+		public static const XOR:int = 22;
+		public static const NOT:int = 23;
+		public static const IN:int = 24;
+		public static const MAX:int = 25;
+	}
+	[Abstract]
 	public final native class Wide {
 		public static const LOW:Int64 = 1;
 		public static const HIGH:Int64 = 34359738368;

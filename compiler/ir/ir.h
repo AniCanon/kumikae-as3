@@ -39,5 +39,10 @@ std::vector<std::string> run_once_changes(const Module &p_old, const Module &p_n
 // reload, and through the scene started again.
 std::vector<std::string> static_changes(const Module &p_old, const Module &p_new);
 
+// A number two modules share if they print alike, their sources' lines are where each other's are, and
+// Godot's name table said the same of each name they use: a program compiled twice from the same sources
+// with the same table, by whatever reads them, gives the same one.
+uint64_t fingerprint(const Module &p_module);
+
 } // namespace ir
 } // namespace kas3

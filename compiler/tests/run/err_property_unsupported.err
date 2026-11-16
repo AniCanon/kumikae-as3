@@ -1,2 +1,0 @@
-Error: calling 'push' on a value of type 'Array' by its name is not supported by the interpreter yet
-	at err_property_unsupported()[err_property_unsupported.as:15]

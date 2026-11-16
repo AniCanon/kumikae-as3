@@ -102,7 +102,8 @@ Json::Wrote Json::write(Slot p_owned, std::string_view p_key) {
 }
 
 Json::Wrote Json::value(Slot p_value) {
-	switch (any::tag(p_value)) {
+	// A freed Godot object is null, and JSON writes null.
+	switch (any::tag(vm_.present_or_null(p_value))) {
 		case AnyTag::Undefined:
 			return Wrote::Nothing;
 		case AnyTag::Null:
@@ -194,7 +195,8 @@ Json::Wrote Json::array(Vector *p_vector) {
 	const uint32_t length = p_vector->length;
 	out_ += '[';
 	for (uint32_t i = 0; i < length; i++) {
-		const Slot each = i < p_vector->length ? vm_.to_any(element, p_vector->data[i]) : any::undefined();
+		// A hole is undefined to a replacer, as to anything that reads it.
+		const Slot each = i < p_vector->length ? vm_.to_any(element, element == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i]) : any::undefined();
 		if (vm_.failing_ || member(i == 0, std::to_string(i), false, each) == Wrote::Failed) {
 			return Wrote::Failed;
 		}
@@ -213,7 +215,7 @@ std::vector<std::string> Json::names_of(Object *p_object) const {
 	const ir::Class &klass = vm_.module_.classes[p_object->klass];
 	if (klass.table) {
 		for (const Entry &entry : entries_of(p_object)->all()) {
-			if (any::tag(entry.key) == AnyTag::String) {
+			if (any::tag(entry.key) == AnyTag::String && !entry.hidden) {
 				names.emplace_back(static_cast<const Str *>(any::pointer(entry.key))->view());
 			}
 		}

@@ -57,6 +57,11 @@ package {
 		public function listen():void { Input.joyConnectionChanged.add(onJoy); }
 		public function unlisten():void { Input.joyConnectionChanged.remove(onJoy); }
 		public function clear():void { Input.joyConnectionChanged.removeAll(); }
+		public function listeners():int { return Input.joyConnectionChanged.numListeners; }
+		private static function clearStatic():void { Input.joyConnectionChanged.removeAll(); }
+		public function clearFromStatic():void { clearStatic(); }
+		public function listenStatic():void { Input.joyConnectionChanged.add(onJoyStatic); }
+		public function clearInPlace():void { var clearing:Function = function ():void { Input.joyConnectionChanged.removeAll(); }; clearing(); }
 		public function listening():Boolean { return Input.joyConnectionChanged.has(onJoy); }
 		private function onJoy(device:int, connected:Boolean):void { joys += connected ? device : 100; }
 		// Listeners that are not methods: a function written in place, which captures what it uses, and a

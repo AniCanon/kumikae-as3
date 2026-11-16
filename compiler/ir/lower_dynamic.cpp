@@ -38,6 +38,39 @@ void Dynamic::use_classes() {
 		l_.vector_class(l_.compilation_.instance_type(l_.array_));
 	}
 	Functions(l_).use_argument_error();
+	if (l_.module_.library_function == NONE) {
+		Function made;
+		made.name = "Function/call";
+		made.parameters = 2;
+		made.required = 1;
+		made.rest = true;
+		made.result = Kind::Any;
+		made.registers = { Kind::Obj, Kind::Obj, Kind::Any };
+		Instruction call;
+		call.op = Op::CallLibrary;
+		call.a = 2;
+		call.b = 0;
+		call.c = 1;
+		Instruction give;
+		give.op = Op::Return;
+		give.a = 2;
+		made.code = { call, give };
+		l_.module_.functions.push_back(std::move(made));
+		l_.module_.library_function = static_cast<uint32_t>(l_.module_.functions.size()) - 1;
+	}
+}
+
+// `list.push`, `text.charAt`: a method of the library as a value, read by name as it would be from an
+// untyped value, which binds it to what it is read from. p_class is Function's.
+uint32_t Dynamic::method_value(Member *p_member, uint32_t p_class) {
+	use_classes();
+	const uint32_t position = p_member->offset;
+	const uint32_t object = holder(p_member->object, nullptr, position);
+	const uint32_t read = l_.reg(Kind::Any);
+	l_.emit(Op::DynGet, position, read, object, name(p_member->name, p_member->name_offset));
+	const uint32_t out = l_.reg(Kind::Obj);
+	l_.emit(Op::FromAny, position, out, read, p_class);
+	return out;
 }
 
 bool Dynamic::by_name(const Expr *p_holder) const {
@@ -131,14 +164,43 @@ uint32_t Dynamic::literal(ObjectLit *p_literal) {
 	return l_.convert(made, Kind::Any, position);
 }
 
+// Object(x) and new Object(x): the value itself, or a new Object for null and undefined (and for nothing
+// written), as avmplus's ObjectClass has it.
+uint32_t Dynamic::object_from(Expr *p_value, uint32_t p_position) {
+	use_classes();
+	const uint32_t out = l_.reg(Kind::Any);
+	uint32_t to_end = NONE;
+	if (p_value) {
+		const uint32_t value = l_.any_value(p_value);
+		const uint32_t null = l_.reg(Kind::Any);
+		l_.emit(Op::AnyConst, p_position, null, 1);
+		const uint32_t missing = l_.reg(Kind::Bool);
+		l_.emit(Op::AnyEq, p_position, missing, value, null); // undefined == null.
+		const uint32_t to_new = l_.emit(Op::JumpIf, p_position, missing, 0);
+		l_.emit(Op::Move, p_position, out, value);
+		to_end = l_.emit(Op::Jump, p_position, 0);
+		l_.patch(to_new, l_.here());
+	}
+	const uint32_t table = l_.reg(Kind::Obj);
+	l_.emit(Op::TableNew, p_position, table, table_class(false), NONE);
+	l_.emit(Op::Move, p_position, out, l_.convert(table, Kind::Any, p_position));
+	if (to_end != NONE) {
+		l_.patch(to_end, l_.here());
+	}
+	return out;
+}
+
 auto Dynamic::made(New *p_new, const Symbol *p_class) -> std::optional<uint32_t> {
 	const bool dictionary = is_dictionary(p_class);
 	if (!p_class || (p_class != l_.object_ && !dictionary)) {
 		return std::nullopt;
 	}
 	const uint32_t position = p_new->offset;
-	if (p_new->arguments.count > (dictionary ? 1u : 0u)) {
-		l_.refuse(p_new->callee->offset, dictionary ? "a Dictionary made with more than weakKeys" : "an Object made from a value");
+	if (!dictionary && p_new->arguments.count == 1) {
+		return object_from(p_new->arguments[0], position); // new Object(x) is Object(x), as avmplus has it.
+	}
+	if (p_new->arguments.count > 1) {
+		l_.refuse(p_new->callee->offset, dictionary ? "a Dictionary made with more than weakKeys" : "an Object made from more than one value");
 		return l_.default_value(Kind::Obj, position);
 	}
 	use_classes();
@@ -165,8 +227,8 @@ auto Dynamic::call(Call *p_call) -> std::optional<uint32_t> {
 	if (!object_method && !by_name(callee->object)) {
 		return std::nullopt;
 	}
-	if (object_method && (!l_.kind_of(callee->object->type, &kind) || (kind != Kind::Any && kind != Kind::Obj))) {
-		return std::nullopt; // On a String or a number: the library's, or refused there.
+	if (object_method && (!l_.kind_of(callee->object->type, &kind) || is_engine(kind) || kind == Kind::Void)) {
+		return std::nullopt; // On one of Godot's values: refused where the call is lowered.
 	}
 	use_classes();
 	const uint32_t position = p_call->offset;

@@ -131,13 +131,13 @@ void Compilation::link_interface(Symbol *p_interface) {
 
 // A class in a cycle loses its base, so that every walk up a hierarchy ends. One error per cycle, at the
 // class declared first.
-void Compilation::cut_class_cycles() {
-	uint32_t mark = 0;
-	for (ClassInfo &start : classes_) {
+void Compilation::cut_class_cycles(const std::vector<Symbol *> &p_classes) {
+	for (Symbol *symbol : p_classes) {
+		ClassInfo &start = *symbol->klass;
 		if (start.symbol->kind != SymbolKind::Class) {
 			continue;
 		}
-		mark++;
+		const uint32_t mark = ++cycle_mark_;
 		for (ClassInfo *info = &start; info; info = info->base ? info->base->klass : nullptr) {
 			if (info->mark == mark) {
 				if (info == &start) {
@@ -154,20 +154,22 @@ void Compilation::cut_class_cycles() {
 	}
 }
 
-// The same for interfaces, which may extend several. Depth-first, with an explicit stack.
-void Compilation::cut_interface_cycles() {
+// The same for interfaces, which may extend several. Depth-first, with an explicit stack. Interfaces not in
+// the list were walked before and have no cycle left: they are passed over.
+void Compilation::cut_interface_cycles(const std::vector<Symbol *> &p_classes) {
 	enum : uint32_t { WHITE = 0, GREY = 1, BLACK = 2 };
 	struct Frame {
 		ClassInfo *info;
 		size_t next;
 	};
-	for (ClassInfo &info : classes_) {
-		if (info.symbol->kind == SymbolKind::Interface) {
-			info.mark = WHITE;
+	for (Symbol *symbol : p_classes) {
+		if (symbol->kind == SymbolKind::Interface) {
+			symbol->klass->mark = WHITE;
 		}
 	}
 	std::vector<Frame> stack;
-	for (ClassInfo &start : classes_) {
+	for (Symbol *symbol : p_classes) {
+		ClassInfo &start = *symbol->klass;
 		if (start.symbol->kind != SymbolKind::Interface || start.mark != WHITE) {
 			continue;
 		}
@@ -198,11 +200,21 @@ void Compilation::cut_interface_cycles() {
 								quoted(target->symbol->name) + " inherits from itself");
 						target->interfaces[edge] = nullptr;
 						target->broken = true;
+						interface_cycles_ = interface_cycles_ || !target->symbol->unit->is_declaration;
 						break;
 					}
 				}
 			}
 		}
+	}
+}
+
+// A half that another file supplies points into that file's tree: when the file is read again, the class
+// takes the half again.
+void Compilation::took_half(Symbol *p_class, const FunctionDecl *p_half) {
+	const Unit *from = p_half && p_half->symbol ? p_half->symbol->unit : nullptr;
+	if (from && from != p_class->unit) {
+		p_class->unit->halves_from.push_back(from);
 	}
 }
 
@@ -229,9 +241,11 @@ void Compilation::inherit_properties(Symbol *p_class) {
 					inherited_visible(base, base->owner, owner->package)) {
 				if (!property->getter) {
 					property->getter = base->getter;
+					took_half(owner, base->getter);
 				}
 				if (!property->setter) {
 					property->setter = base->setter;
+					took_half(owner, base->setter);
 				}
 			}
 		}
@@ -329,21 +343,30 @@ void Compilation::check_overrides(Symbol *p_class) {
 	}
 }
 
-void Compilation::link_hierarchy() {
-	for (ClassInfo &info : classes_) {
-		if (info.symbol->kind == SymbolKind::Class) {
-			link_class(info.symbol);
+void Compilation::link_bases(const std::vector<Symbol *> &p_classes) {
+	for (Symbol *symbol : p_classes) {
+		if (symbol->kind == SymbolKind::Class) {
+			link_class(symbol);
 		} else {
-			link_interface(info.symbol);
+			link_interface(symbol);
 		}
 	}
-	cut_class_cycles();
-	cut_interface_cycles();
-	settle_hierarchy();
-	for (ClassInfo &info : classes_) {
-		if (info.symbol->kind == SymbolKind::Class && !hierarchy_broken(info.symbol)) {
-			check_overrides(info.symbol);
-			inherit_properties(info.symbol);
+}
+
+void Compilation::settle_classes(const std::vector<Symbol *> &p_classes) {
+	cut_class_cycles(p_classes);
+	cut_interface_cycles(p_classes);
+	settle_hierarchy(p_classes);
+	// Every class takes the halves its bases hand down before any override is checked: a half overridden here
+	// may be one that the base itself has only from its own base, whichever file was read first.
+	for (Symbol *symbol : p_classes) {
+		if (symbol->kind == SymbolKind::Class && !hierarchy_broken(symbol)) {
+			inherit_properties(symbol);
+		}
+	}
+	for (Symbol *symbol : p_classes) {
+		if (symbol->kind == SymbolKind::Class && !hierarchy_broken(symbol)) {
+			check_overrides(symbol);
 		}
 	}
 }

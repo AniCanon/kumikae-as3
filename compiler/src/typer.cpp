@@ -204,6 +204,9 @@ void Typer::definition(Node *p_node) {
 		case NodeKind::ClassDecl: {
 			ClassDecl *decl = static_cast<ClassDecl *>(p_node);
 			class_ = decl->symbol;
+			if (unit_.is_declaration && decl->symbol && decl->metadata.count) {
+				described(compilation_.instance_type(decl->symbol)); // Its tags are read here, mistakes and all.
+			}
 			for (Node *member : decl->members) {
 				if (member->kind == NodeKind::VarDecl) {
 					static_ = (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static) != 0;
@@ -275,10 +278,8 @@ void Typer::run() {
 	}
 }
 
-void type_bodies(Compilation &p_compilation) {
-	for (Unit &unit : p_compilation.units()) {
-		Typer(p_compilation, unit).run();
-	}
+void type_unit(Compilation &p_compilation, Unit &p_unit) {
+	Typer(p_compilation, p_unit).run();
 }
 
 } // namespace kas3

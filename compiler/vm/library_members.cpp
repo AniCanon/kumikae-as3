@@ -42,13 +42,13 @@ std::optional<bool> Interpreter::library_get(Object *p_object, std::string_view 
 	} else {
 		return std::nullopt;
 	}
-	// A method read and not called, or a property the class does not declare (AS3's RegExp and Date are
-	// dynamic, and may have more).
-	const std::string &klass = module_.classes[p_object->klass].name;
+	// A method read and not called is a function bound to the object. Anything else is left to what every
+	// object has (Object's own methods), or is a property the class does not declare.
 	const bool method = of_class(p_object, module_.regexp_class) ? ir::regexp_method(p_name).has_value() : ir::date_method(p_name).has_value();
-	raise_unsupported(method ? "reading the method '" + std::string(p_name) + "' of a " + klass + " without calling it"
-							 : "reading '" + std::string(p_name) + "', which a " + klass + " does not declare, by its name");
-	return false;
+	if (method) {
+		return method_value(any::object(p_object), p_name, r_value);
+	}
+	return std::nullopt;
 }
 
 std::optional<bool> Interpreter::library_set(Object *p_object, std::string_view p_name, Slot p_value) {

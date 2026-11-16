@@ -49,12 +49,40 @@ Symbol *Lowerer::named_class(Expr *p_expression) {
 	return symbol && symbol->is_type() ? symbol : nullptr;
 }
 
+// A class named where a value is wanted (`var c:Class = Player`): the class itself. Nothing if the
+// expression names no class.
+std::optional<uint32_t> Expressions::class_value(Expr *p_expression) {
+	const Type *type = p_expression->type;
+	if (!type || type->kind != Type::ClassObject) {
+		return std::nullopt;
+	}
+	const uint32_t position = p_expression->offset;
+	const std::optional<uint32_t> code = l_.class_code(type->element);
+	uint32_t klass = NONE;
+	if (!code || !l_.class_type_ || !l_.class_index(l_.class_type_, &klass)) {
+		l_.refuse(position, "the class '" + l_.compilation_.type_name(type->element) + "' as a value");
+		return l_.default_value(Kind::Obj, position);
+	}
+	if (const Symbol *symbol = l_.named_class(p_expression)) {
+		l_.touch(symbol, position); // A class named is set up, as in AVM2.
+	}
+	const uint32_t out = l_.reg(Kind::Obj);
+	l_.emit(Op::ClassValue, position, out, *code);
+	return out;
+}
+
 uint32_t Expressions::name_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	Name *name = static_cast<Name *>(p_expression);
+	if (const std::optional<uint32_t> klass = class_value(p_expression)) {
+		return *klass;
+	}
 	uint32_t constant = 0;
 	if (l_.builtin_constant(name->symbol, position, &constant)) {
 		return constant;
+	}
+	if (name->symbol && name->symbol->kind == SymbolKind::Arguments && l_.arguments_reg_ != NONE) {
+		return l_.arguments_reg_;
 	}
 	if (name->symbol && (name->symbol->kind == SymbolKind::Method || name->symbol->kind == SymbolKind::Function)) {
 		return Functions(l_).function_value(p_expression); // A method or a function as a value, not called.
@@ -67,6 +95,9 @@ uint32_t Expressions::member_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	Member *member = static_cast<Member *>(p_expression);
 	Symbol *symbol = member->resolved();
+	if (const std::optional<uint32_t> klass = class_value(p_expression)) {
+		return *klass; // `flash.utils.Dictionary`, written with its package.
+	}
 	// The one member of a built-in value so far: a string's length.
 	if (symbol && symbol->owner == l_.string_ && symbol->name == "length") {
 		uint32_t text = l_.expression(member->object, Kind::Str);
@@ -137,7 +168,7 @@ uint32_t Expressions::new_value(Expr *p_expression) {
 				}
 			}
 		}
-		uint32_t value = l_.reg(Kind::Val);
+		uint32_t value = l_.engine_reg(Kind::Val, l_.module_.engine_names[type_name].name);
 		l_.emit(Op::HostNew, position, value, type_name, l_.arguments(std::move(list)));
 		return value;
 	}
@@ -151,8 +182,28 @@ uint32_t Expressions::new_value(Expr *p_expression) {
 	if (const std::optional<uint32_t> table = Dynamic(l_).made(made, symbol)) {
 		return *table;
 	}
-	if (!symbol || !l_.class_index(symbol, &index)) {
-		l_.refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
+	Kind primitive = Kind::Void;
+	if (symbol && l_.kind_of_class(symbol, &primitive) && made->arguments.count <= 1) {
+		// AS3 has no wrapper objects: `new String(x)` is the String itself, as String(x) gives it.
+		return Calls(l_).conversion_of(made->arguments, primitive, position);
+	}
+	if (!symbol) {
+		// `new c(a)`, the class held in a variable: found out, and made, as the line runs.
+		Dynamic(l_).table_class(false);
+		l_.vector_class(l_.compilation_.instance_type(l_.array_));
+		Functions(l_).use_argument_error();
+		const uint32_t klass = l_.settled(l_.any_value(made->callee), Lowerer::writer(made->arguments), position);
+		std::vector<uint32_t> list;
+		for (uint32_t i = 0; i < made->arguments.count; i++) {
+			Expr *later = Lowerer::writer(made->arguments, i + 1);
+			list.push_back(l_.settled(l_.any_value(made->arguments[i]), later, position));
+		}
+		const uint32_t out = l_.reg(Kind::Any);
+		l_.emit(Op::ClassNew, position, out, klass, l_.arguments(std::move(list)));
+		return out;
+	}
+	if (!l_.class_index(symbol, &index)) {
+		l_.refuse(made->callee->offset, "creating a '" + std::string(symbol->name) + "'");
 		return l_.default_value(Kind::Obj, position);
 	}
 	l_.touch(symbol, position);
@@ -215,7 +266,7 @@ uint32_t Expressions::conditional(Expr *p_expression, Kind p_want) {
 	uint32_t position = p_expression->offset;
 	Conditional *conditional = static_cast<Conditional *>(p_expression);
 	Kind kind = p_want != Kind::Void ? p_want : l_.natural(p_expression);
-	uint32_t out = l_.reg(kind);
+	uint32_t out = l_.engine_reg(kind, p_expression->type);
 	uint32_t test = l_.expression(conditional->condition, Kind::Bool);
 	uint32_t to_else = l_.emit(Op::JumpIfNot, position, test, 0);
 	uint32_t then_value = l_.expression(conditional->then_value, kind);
@@ -296,6 +347,9 @@ uint32_t Expressions::evaluate(Expr *p_expression, Kind p_want) {
 		case NodeKind::Index:
 			return l_.load(l_.place_of(p_expression), position);
 		case NodeKind::TypeApply:
+			if (const std::optional<uint32_t> klass = class_value(p_expression)) {
+				return *klass; // `Vector.<int>` as a value.
+			}
 			l_.refuse(position, "a Vector");
 			break;
 		default:
@@ -311,6 +365,10 @@ uint32_t Expressions::sign(Unary *p_unary, Kind p_want) {
 	Kind result = Kind::Void;
 	if (is_engine(l_.natural(p_unary->operand)) && l_.kind_of(p_unary->type, &result) && result != Kind::Void) {
 		return Engine(l_).engine_operate(p_unary->op, { Engine(l_).operand(p_unary->operand) }, result, p_unary->type, position);
+	}
+	if (const std::optional<Op> op = !Lowerer::is_numeric(p_want) && l_.untyped(p_unary->operand) ? Operators(l_).untyped_operator(p_unary->op, true) : std::nullopt) {
+		// What the value holds decides as it runs: Godot's own `-` for one of Godot's values, or a Number.
+		return l_.convert(Operators(l_).any_operate(*op, l_.any_value(p_unary->operand), NONE, position), l_.natural(p_unary), position);
 	}
 	if (const std::optional<int64_t> exact = Lowerer::wide_literal(p_unary); exact && p_want == Kind::I64) {
 		uint32_t out = l_.reg(Kind::I64);
@@ -441,6 +499,10 @@ uint32_t Expressions::assign(Assign *p_assign) {
 		uint32_t sum = l_.reg(Kind::Any);
 		l_.emit(Op::AnyAdd, position, sum, old, l_.any_value(p_assign->value));
 		value = l_.convert(sum, place.kind, position);
+	} else if (const std::optional<Op> op = !Lowerer::is_numeric(place.kind) && (place.kind == Kind::Any || l_.untyped(p_assign->value)) ? Operators(l_).untyped_operator(p_assign->op, false) : std::nullopt) {
+		// `-=`, `*=`, `/=` and `%=` with an untyped side, likewise.
+		const uint32_t old = l_.settled(l_.convert(l_.load(place, position), Kind::Any, position), p_assign->value, position);
+		value = l_.convert(Operators(l_).any_operate(*op, old, l_.any_value(p_assign->value), position), place.kind, position);
 	} else {
 		uint32_t old = l_.settled(l_.load(place, position), p_assign->value, position);
 		Kind right_kind = Kind::Void;

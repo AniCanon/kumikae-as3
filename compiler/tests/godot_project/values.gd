@@ -73,7 +73,8 @@ func _physics_process(_delta: float) -> bool:
 	show("alive is set", ask("keptIsSet", []), true)
 	show("alive counts", ask("keptCounts", []), true)
 	gone.free()
-	show("freed text after", ask("keptText", []), "kept " + str(gone))
+	# Freed, it is null to the script, in words too (GDScript's text is `<Freed Object>`).
+	show("freed text after", ask("keptText", []), "kept null")
 	show("freed is null", ask("keptIsNull", []), true)
 	show("freed is not set", ask("keptIsSet", []), false)
 	show("freed does not count", ask("keptCounts", []), false)
@@ -172,6 +173,25 @@ func _physics_process(_delta: float) -> bool:
 	show("mixed", ask("mixed", [a, root]), false)
 	show("big hash", ask("bigHash", [[]]), float([].hash()))
 	show("decode", ask("decode", [PackedByteArray([255, 255, 255, 255])]), 4294967295.0)
+	var box := Control.new()
+	box.anchor_left = 0.25
+	box.anchor_top = 0.5
+	show("anchors", ask("anchors", [0.25]), box.anchor_left + box.anchor_top * 10)
+	box.free()
+	show("words", ask("words", [PackedStringArray(["a", "ff8000"]), "ff8000"]), "true " + str(Color.html("ff8000").g8))
+	show("action", ask("action", ["no_such_action"]), InputMap.has_action("no_such_action") and InputMap.has_action("ui_accept"))
+	show("action known", ask("action", ["ui_cancel"]), InputMap.has_action("ui_cancel") and InputMap.has_action("ui_accept"))
+	show("angled", ask("angled", [0.5]), Vector2.from_angle(0.5))
+	var w := a
+	w.y = w.x * 2
+	w.x += 1
+	show("parts", ask("parts", [a]), w)
+	show("same twice", ask("sameTwice", [a, 3]), 3)
+	var zeroes: Array[Vector2] = []
+	zeroes.resize(4)
+	zeroes[1] = Vector2(5, 0)
+	show("zeroes", ask("zeroes", [3]), str(zeroes[0]) + " " + str(zeroes[1]) + " " + str(zeroes[3]))
+	show("copies", ask("copies", [a]), str(a + Vector2(10, 0)) + " " + str(a * 8 + Vector2(1, 1)) + " " + str(a) + " " + str(a))
 	twin.free()
 	node.queue_free()
 	return true

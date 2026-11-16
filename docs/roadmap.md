@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 23 items;
+**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 9 items;
 none waits for a later stage (the owner, 2026-11-15), and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -79,7 +79,7 @@ locals, classes, imports, inherited members and Godot's API.
 | Part | Status |
 |---|---|
 | The server: protocol, errors as you type, definition, references, hover, outline, symbols | Done. Tested by scripted sessions that send what an editor sends. |
-| Speed: a re-check of 100,000 lines in under 50 ms | Done: about 27 ms, by keeping the parse of files that did not change. |
+| Speed: a re-check of 100,000 lines in under 50 ms | Done, and for 1,000,000 lines: an edit checks again only the files that read what it changed, bodies a file at a time, and a running check stops for newer messages; a signature change is checked in under a millisecond at either size, and answered with a completion in about 1 ms (100,000 lines) or 4 ms (1,000,000) over the protocol ([results](results/2026-11-completion-followup.md#incremental-checking-november-16)). |
 | A VS Code client and the [set-up guide](../editors/README.md) | Done. |
 | Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. The owner confirmed the underlined errors by eye. |
 | Tried in Rider | Native plugin completion and typing validated in the pinned sandbox on 2026-11-15; see [results](results/2026-11-completion.md). Full manual editor acceptance remains pending. |
@@ -126,6 +126,16 @@ earlier stages promised to this one.
 **Done when:** the conformance suite passes on both the interpreter and native builds, and the speed gate
 passes on real compiled AS3 (not hand-written code, as in stage 0).
 
+**Built ahead, on 2026-11-16:** `kas3c cpp` writes a program as C++; every program of the run tests gives
+the interpreter's output as native code; the Godot extension loads a program library and Godot calls its
+functions directly. Against Godot C# (rough: measured on a loaded machine) it is ahead on calls into Godot,
+script-only code and one array benchmark, about level on three, and behind on eight (1.2 to 4.9 times):
+the speed gate is not passed. Decided the same day: native code is to run in the editor's play too, not
+only in exports, with the interpreter kept for a machine with no C++ toolchain; and tests are to run on
+Steam Deck and Nintendo Switch once build targets are configurations. Left: the library called directly
+everywhere (part done), Godot's values held inline in fields and parameters, building on Play, reloading
+native code, threads.
+
 ### Stage 4: mobile
 
 **Delivers:** iOS and Android, as interpreted debug builds and native release builds.
@@ -163,8 +173,8 @@ typing, lexical scopes, import paths, replacement edits, callable snippets and s
 [results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
 complete stage 6. The [follow-up results](results/2026-11-completion-followup.md) cover auto-imports,
 override stubs (including qualified defaults and independent getter/setter slots), AS3 statement-block
-templates with linked Tab stops, body-only incremental
-checking, diagnostic range guards and plugin-owned Rider lifetime repairs with split Problems. Empty
+templates with linked Tab stops, incremental checking of declarations and bodies with interruptible
+checks, diagnostic range guards and plugin-owned Rider lifetime repairs with split Problems. Empty
 override names work before following members, and background sandbox completion checks isolate
 window-deactivation cancellation. The optional LSP4IJ adapter
 supports IntelliJ IDEA Community/free unified IDEA alongside Rider's native client. The installed
@@ -231,7 +241,7 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) is being worked off in full, now:** 23 items, of which 12 wait on the
+- **The [backlog](backlog.md) is being worked off in full, now:** 9 items, of which 1 waits on the
   owner's answer.
 - **Loops:** the cycle collector frees objects that refer to each other in a loop, also through Godot's
   reference-counted objects, their AS3 scripts and listeners, in a short step each frame. A loop through
@@ -257,16 +267,18 @@ Open items:
 | 64-bit integers | Decided on 2026-11-12: supported, in the way that is easiest to maintain. A real `Int64` type, given by one rule from Godot's description with no hand-kept table, converting to `int` or `Number` with a range check and never silently. Built in stage 2b-3; until then such values are declared `Number`. |
 | Static fields and null calls | Decided on 2026-11-12, and built: both follow Flash. A class's static fields are set on its first use, and a call on a null object evaluates its arguments before raising the error. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
+| How a ruling is made | The owner's rule of 2026-11-16: best in class, as fast as Godot C# or faster, scalable, useful; where AS3 does not decide, C#'s behaviour is the bar. |
+| A freed Godot object as text | Decided on 2026-11-16, and built: it is `null` everywhere. `"" + x`, `String(x)`, `trace`, `str` and `print` give `null`, as C#'s `GD.Str` and `GD.Print` give for a null; `hash` and `isSame` take it as null. |
+| `removeAll()` on a singleton's signal | Decided on 2026-11-16, and built: on a signal the whole game shares (`Input`'s), `removeAll()` and `numListeners` are about the calling script's own listeners (its object's methods, its class's static methods), never another script's, as C# code can take away only the handlers it holds. |
+| Wide integers Godot cuts inside its built-in types | Decided on 2026-11-16: they stand as GDScript has them (`bytes.append(300)` stores 44, `items.insert(4294967297, x)` inserts at 1). Godot's description gives the methods of its built-in types no width mark (it gives one only to the engine classes' methods, which the generator already reads), and C#'s narrower types for them come from classes written by hand. Narrowing them would need a list kept by hand, which the owner chose against. |
+| A whole `Number` where Godot takes any type | Decided on 2026-11-16: it stays a float (`str(x)` of a `Number` that holds 2 is `2.0`), as C# keeps a `double` a `double`. An `int`, a `uint`, an `Int64` and an expression whole by its form go as integers. |
+| Rulings that stand (2026-11-16) | The 60 methods that take raw pointers stay out. `"" + this` without `toString()` is AS3's text, and Godot's text for the node Godot's. A script object of a class that extends none of Godot's stays an error when given to Godot. Godot's integers in an untyped value: one that fits an `int` is one, a larger one an `Int64`. The first editor scan's crash on an immediate quit is Godot's, until Godot fixes it. `super` on a virtual a C++ extension class implements stays out of reach (GDExtension has no such call). Every program's IR carries `RangeError`, which the interpreter raises itself, as it does `TypeError`. Godot's report of a listener it could not call names no method, since GDExtension gives a custom callable no way to name one; the extension's own report, in AS3's words, does. |
 | Godot naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
 
 ## Decisions waiting on the owner
 
 | Decision | Why it matters |
 |---|---|
-| 60 Godot methods that take raw pointers are left out | AS3 has nothing to pass them. The proposal is that this stands. |
-| What `"" + this` reads in a script without `toString()` | Today AS3's `[object Values]`; Godot's own text for the node is `<Node2D#123>`. |
-| `removeAll()` on a singleton's signal | It removes every script's listeners on that signal, not only the caller's, as on any signal. On a singleton that reaches across the whole game. |
-| Wide integers Godot cuts inside its other built-in types | `items.insert(4294967297, x)` inserts at 1 and `Color.hex` keeps 32 bits, without an error, as in GDScript. The integer vectors and `PackedInt32Array` are guarded; guarding the rest needs a short list kept by hand. See the [backlog](backlog.md). |
 | When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
 
 ## How to follow progress

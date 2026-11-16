@@ -3,6 +3,8 @@
 #include "lower_engine_calls.h"
 #include "lower_vectors.h"
 
+#include "godot_names.h"
+
 namespace kas3 {
 namespace ir {
 
@@ -67,7 +69,7 @@ uint32_t EngineCalls::godot_call(Call *p_call, Symbol *p_method) {
 // signature, which the engine's entry for such functions needs.
 uint32_t EngineCalls::global_call(Call *p_call, Symbol *p_function, Kind p_want) {
 	uint32_t position = p_call->offset;
-	const std::optional<std::string> signature = godot_name("@global", p_function->name);
+	const std::optional<uint32_t> signature = l_.engine_entry("@global." + std::string(p_function->name));
 	if (!signature) {
 		l_.refuse(p_call->callee->offset, "calling '" + std::string(p_function->name) + "'");
 		return l_.default_value(p_want, position);
@@ -88,8 +90,7 @@ uint32_t EngineCalls::global_call(Call *p_call, Symbol *p_function, Kind p_want)
 	FunctionDecl *decl = p_function->node && p_function->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_function->node) : nullptr;
 	engine_arguments(decl, p_call->arguments, position, list);
 	uint32_t out = kind == Kind::Void ? NONE : l_.engine_reg(kind, type);
-	// No class before the dot: the engine's side reads that as a global function.
-	l_.emit(Op::HostCallStatic, position, out, l_.string("." + *signature), l_.arguments(std::move(list)));
+	l_.emit(Op::HostCallStatic, position, out, *signature, l_.arguments(std::move(list)));
 	if (out != NONE && (p_want == Kind::Str || p_want == Kind::I32 || p_want == Kind::U32) && kind != p_want) {
 		// Godot's text for it; a Number cut to a whole one.
 		return l_.convert(out, p_want, position);
@@ -108,7 +109,7 @@ uint32_t EngineCalls::bound_method(Expr *p_expression) {
 		// Any other function value (a function expression, a static method, one held in a variable): a
 		// Godot Callable that calls it.
 		const uint32_t value = l_.expression(p_expression, Kind::Obj);
-		uint32_t out = l_.reg(Kind::Val);
+		uint32_t out = l_.engine_reg(Kind::Val, "Callable");
 		l_.emit(Op::FunctionToCallable, position, out, value);
 		return out;
 	}
@@ -134,7 +135,7 @@ uint32_t EngineCalls::bound_method(Expr *p_expression) {
 		object = l_.self(position);
 	}
 	bool exact = (symbol->modifiers & Modifiers::Private) != 0;
-	uint32_t out = l_.reg(Kind::Val);
+	uint32_t out = l_.engine_reg(Kind::Val, "Callable");
 	l_.emit(Op::HostBind, position, out, object, exact ? function->second : (l_.slots_[function->first] | ir::BIND_SLOT));
 	return out;
 }
@@ -166,15 +167,10 @@ uint32_t EngineCalls::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t
 	*r_object = l_.settled(object_reg, index->index, p_expression->offset);
 	*r_object = l_.settled(*r_object, p_later, p_expression->offset);
 	*r_name = l_.settled(l_.expression(index->index, Kind::Str), p_later, p_expression->offset);
-	uint32_t out = l_.reg(Kind::Val);
-	if (l_.fn().engine_types.size() <= out) {
-		l_.fn().engine_types.resize(out + 1);
-	}
-	l_.fn().engine_types[out] = "Signal";
-	return out;
+	return l_.engine_reg(Kind::Val, "Signal");
 }
 
-uint32_t EngineCalls::godot_default_argument(Expr *p_argument, const Type *p_type, const std::string &p_default) {
+uint32_t EngineCalls::godot_default_argument(Expr *p_argument, const Type *p_type, uint32_t p_default) {
 	uint32_t value = l_.engine_reg(Kind::Val, p_type);
 	// Written `null`, the default is known now; a value that may be null (`var c:Color = null`) is looked
 	// at as the call is made.
@@ -184,10 +180,10 @@ uint32_t EngineCalls::godot_default_argument(Expr *p_argument, const Type *p_typ
 		uint32_t present = l_.reg(Kind::Bool);
 		l_.emit(Op::HostPresent, p_argument->offset, present, value);
 		uint32_t given = l_.emit(Op::JumpIf, p_argument->offset, present, 0);
-		l_.emit(Op::HostDefault, p_argument->offset, value, l_.string(p_default));
+		l_.emit(Op::HostDefault, p_argument->offset, value, p_default);
 		l_.patch(given, l_.here());
 	} else {
-		l_.emit(Op::HostDefault, p_argument->offset, value, l_.string(p_default));
+		l_.emit(Op::HostDefault, p_argument->offset, value, p_default);
 	}
 	return value;
 }
@@ -213,9 +209,10 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 				r_list.push_back(l_.settled(bound_method(p_arguments[i]), later, p_position));
 				continue;
 			}
-			std::optional<std::string> godot_default;
+			std::optional<uint32_t> godot_default;
 			if (p_defaults && p_function->parameters[i].default_value && Lowerer::is_null(p_function->parameters[i].default_value) &&
-					l_.kind_of(type, &kind) && kind == Kind::Val && (godot_default = godot_name("@default", std::string(*p_defaults) + "." + std::to_string(i)))) {
+					l_.kind_of(type, &kind) && kind == Kind::Val &&
+					(godot_default = l_.engine_entry("@default." + std::string(*p_defaults) + "." + std::to_string(i)))) {
 				r_list.push_back(godot_default_argument(p_arguments[i], type, *godot_default));
 				continue;
 			}
@@ -311,7 +308,12 @@ uint32_t EngineCalls::static_call(Call *p_call, Symbol *p_method) {
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
 	engine_arguments(decl, p_call->arguments, position, list, key);
 	uint32_t out = kind == Kind::Void ? NONE : l_.engine_reg(kind, p_method->type ? l_.compilation_.type_of(p_method->type) : nullptr);
-	l_.emit(Op::HostCallStatic, position, out, l_.string(*key), l_.arguments(std::move(list)));
+	uint32_t method = 0;
+	if (!l_.engine_name(p_method->owner, p_method->name, &method)) {
+		l_.refuse(p_call->callee->offset, "calling '" + std::string(p_method->name) + "'");
+		return 0;
+	}
+	l_.emit(Op::HostCallStatic, position, out, method, l_.arguments(std::move(list)));
 	return out == NONE ? 0 : out;
 }
 

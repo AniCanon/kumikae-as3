@@ -52,9 +52,13 @@ class Resolver {
 	void hoist_try(Try *p_try, std::vector<Import *> *r_imports);
 	void hoist(Stmt *p_statement, std::vector<Import *> *r_imports);
 	Scope &retain_scope(Scope &p_fallback, const Node *p_extent);
-	void body_imports(FunctionDecl *p_function, ImportScope &r_imports);
-	void declare_parameters(FunctionDecl *p_function, Scope &r_scope);
-	void function(FunctionDecl *p_function, bool p_expression);
+	// p_declared: the function is a declaration (a method, an interface's method, a package-level function),
+	// whose signature and body imports the signature pass resolved.
+	void body_imports(FunctionDecl *p_function, ImportScope &r_imports, bool p_declared);
+	void signature(FunctionDecl *p_function);
+	void signatures(Node *p_node, bool p_in_block);
+	void declare_parameters(FunctionDecl *p_function, Scope &r_scope, bool p_declared);
+	void function(FunctionDecl *p_function, bool p_expression, bool p_declared = false);
 	const Label *find_label(std::string_view p_name) const;
 	void loop_body(Stmt *p_body);
 	void try_statement(Try *p_try);
@@ -78,6 +82,10 @@ public:
 	Resolver(Compilation &p_compilation, Unit &p_unit) :
 			compilation_(p_compilation), unit_(p_unit) {}
 
+	// The types written outside function bodies, with the imports of the bodies that are in force for them.
+	// Every file's run before any body is typed: typing reads other files' declarations.
+	void run_signatures();
+	// Everything else: the bodies, field initializers and default values.
 	void run();
 };
 

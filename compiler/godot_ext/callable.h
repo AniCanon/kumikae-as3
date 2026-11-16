@@ -41,5 +41,8 @@ void move_listeners(vm::Interpreter &p_old, vm::Reload &p_reload, uint64_t p_gen
 void forget_listeners(const vm::Object *p_object);
 // Whether the callable is one of those: a listener that a script added.
 bool is_script_listener(const godot::Callable &p_callable);
+// Whether it is a listener of that object's or class's own: a method of the object, or a static method of
+// the class. A function expression's is no object's: AS3's `this` there is not the method's object.
+bool listener_belongs_to(const godot::Callable &p_callable, const vm::Object *p_object, uint32_t p_class);
 
 } // namespace kas3

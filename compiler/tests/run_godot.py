@@ -1,15 +1,21 @@
 """AS3 inside Godot: runs the test project in headless Godot and checks what the script did.
 
-Usage: run_godot.py <tests dir>
+Usage: run_godot.py <tests dir> [<kas3c>]
 
 Needs the extension library (built when CMake is given -DKAS3_GODOT_CPP=<godot-cpp checkout>) and Godot 4.7
 (`godot` on the PATH, or the KAS3_GODOT environment variable). Without either, the test is skipped and says
 so: it does not fail.
 
+With kas3c and a C++ compiler, scripts are also run as native code (native_godot.py): written as C++ by
+`kas3c cpp --godot`, built into a program library and loaded by the extension. tests/godot_native's Probe.as
+is held to what the interpreter prints for the same script, line for line, and the benchmark's workloads to
+the fast paths they are meant to take.
+
 The project is compiler/tests/godot_project: Player.as on a CharacterBody2D sets its velocity and calls
 moveAndSlide() for 30 physics frames. At 200 units a second and 60 frames a second that is 100 units.
 """
 import glob
+import hashlib
 import os
 import re
 import shutil
@@ -17,8 +23,19 @@ import subprocess
 import sys
 import tempfile
 
+import native_godot
+
 tests = os.path.abspath(sys.argv[1])
 project = os.path.join(tests, "godot_project")
+# Every build folder's run uses this one project (its .godot folder, the one extension library in its
+# bin): two runs at once would each rewrite what the other is reading. The second waits for the first,
+# on a lock that goes with the process however it ends.
+try:
+    import fcntl
+    held = open(os.path.join(tempfile.gettempdir(), "kas3-godot-" + hashlib.sha256(project.encode()).hexdigest()[:16] + ".lock"), "w")
+    fcntl.flock(held, fcntl.LOCK_EX)
+except ImportError:
+    held = None  # No such lock on this system: runs there are not made side by side.
 godot = os.environ.get("KAS3_GODOT") or shutil.which("godot")
 
 
@@ -45,9 +62,10 @@ def check(name, condition, detail=""):
 
 # Godot learns of a project's extensions when the editor first scans it. Told to quit at once (--import),
 # Godot crashes as it exits after that first scan: its documentation thread for the new classes outlives
-# the documentation (see the compiler's README). Given time for the thread, the first scan is clean, and
-# is checked so in a copy that has never been scanned.
-FIRST_SCAN = ["--headless", "--editor", "--quit-after", "300"]
+# the documentation (see the compiler's README). first_scan.gd ends when the scan has and that thread has
+# been waited for, however long either takes: the first scan is then clean, and is checked so in a copy
+# that has never been scanned.
+FIRST_SCAN = ["--headless", "--editor", "-s", "first_scan.gd"]
 with tempfile.TemporaryDirectory() as fresh:
     copy = os.path.join(fresh, "project")
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", ".godot"))
@@ -155,6 +173,7 @@ output = compare("values.gd", [
     "clamp default", "clamp one", "clamp trailing null", "clamp both null", "clamp middle null", "clamp null variable", "looking",
     "looking null", "whole numbers", "to string", "to string in AS3", "no to string", "no to string in AS3",
     "negative cells", "cells plus", "cells compound", "plain order", "compound order", "mixed", "big hash", "decode",
+    "anchors", "words", "action", "action known", "angled", "parts", "same twice", "zeroes", "copies",
 ])
 check("a null that is not the last argument takes Godot's default, with no error", "at Values/clampMiddleNull()" not in output,
       output[-800:])
@@ -173,7 +192,7 @@ check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" 
 output = compare("signals.gd", [
     "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "counts what scripts added", "remove all leaves others", "lasting or once, not both",
     "null argument and order", "arguments", "removes itself",
-    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "declared signal listed", "filter",
+    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "a signal's object", "declared signal listed", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed", "own signal field by name", "by name from a base: its own private field",
     "by name from a subclass: its own private field", "by name from a subclass: a base's private field is not reached", "by name in a function written in the base: its private field",
@@ -221,6 +240,9 @@ output = compare("statics.gd", [
     "a singleton's members through a variable", "a singleton variable that is null", "slowed", "time scale", "faster", "faster in Godot", "at start", "mouse",
     "listening", "heard", "cleared", "others still listen", "not listening", "a function written in place listens", "and is removed through its value", "input class", "same singleton",
     "singleton object",
+    "a singleton's listeners counted by their own script", "removeAll() on a singleton's signal takes the caller's own",
+    "and leaves the others' counted", "from another class, it takes that class's own", "from static code, its class's static listeners",
+    "from a function expression, which has no object, the class's static listeners", "nothing is left listening",
     "escape", "captured", "ready notice", "axis", "zero", "up", "red", "forward", "identity", "sum", "up y",
     "default key", "given key",
     "from angle", "hsv", "html", "euler", "image", "after orphans",
@@ -283,13 +305,18 @@ check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError:
 
 # Godot's global functions, as GDScript works them out.
 output = compare("functions.gd", [
-    "lerpf", "rest from Godot", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
+    "lerpf", "rest from Godot", "arguments from Godot", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
     "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
     "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
     "anything as text", "a default is not shared",
     "max past what a Number holds", "lerp of vectors", "int of lerp cuts", "Boolean of max", "lerp and max as text",
     "lerp of anything", "lerp into the wrong type", "now", "zone", "a regular expression",
+    "a freed object as text", "a freed object to hash and isSame", "str of a freed object and of null",
+    "a freed object inside a collection", "a script object of no Godot class is not written as null", "a whole Number stays a float",
+    "a freed object in locale text",
 ])
+check("functions.gd: trace shows a freed object as null", "traced: null" in output, output[-1200:])
+check("functions.gd: print shows a freed object and a null as null", "freed: null null" in output, output[-1200:])
 check("functions.gd: a wide whole number into a Number is a RangeError",
       "RangeError: 9007199254740993 does not fit a Number exactly.\n\tat Functions/widest()" in output, output[-1500:])
 
@@ -322,6 +349,9 @@ output = compare("untyped.gd", [
     "an Int64 minus one stays whole", "a half is a float", "a Godot value plus text joins them",
     "text plus a Godot value joins them", "text plus-assigned a Godot value joins them",
     "a Godot value plus a number joins them, as AS3 does", "a Godot value plus-assigned a Godot value",
+    "untyped Godot values multiplied, subtracted, divided and negated", "untyped Godot values in order",
+    "an untyped Godot value multiplied and subtracted in place", "a typed Godot value times an untyped one",
+    "untyped numbers stay AS3's", "where Godot has no such operator the answer is AS3's",
     "JSON refuses Godot's values",
 ])
 check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",
@@ -460,27 +490,30 @@ RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 	private var word:String;
 	override public function _ready():void { word = "%s"; }
 	public function said():String { return word%s; }
+	public function limit():String { return LIMIT; }
+	public function firstNow():String { return first; }
 } }
 """
 with tempfile.TemporaryDirectory() as edited:
     copy = os.path.join(edited, "project")
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
     # The second version also adds a field before the one `_ready` sets: nothing that ran changed. The third
-    # edits `_ready` and a static field's first value. The fourth and fifth are saved one after the other,
+    # edits `_ready`, a static variable's first value and a constant's: the constant has the new value at
+    # once, the variable keeps the one it was given. The fourth and fifth are saved one after the other,
     # the fifth while the scene the fourth started is being made: its constructors have run, its `_ready` not.
     unused = "\n\tpublic var unused:int;"
-    first = "\n\tpublic static var first:String = \"%s\";"
+    first = "\n\tpublic static var first:String = \"%s\";\n\tpublic static const LIMIT:String = \"%s\";"
     made = "\n\tpublic var made:String = \"%s\";"
-    for name, text in {"Restart.as": RESTART % (first % "a", "one", ""), "restart_body.txt": RESTART % (unused + first % "a", "one", ' + "!"'),
-                       "restart_ready.txt": RESTART % (unused + first % "b", "three", ' + "!"'),
-                       "restart_four.txt": RESTART % (unused + first % "b" + made % "four", "four", ' + "!" + made'),
-                       "restart_five.txt": RESTART % (unused + first % "b" + made % "five", "five", ' + "!" + made')}.items():
+    for name, text in {"Restart.as": RESTART % (first % ("a", "a"), "one", ""), "restart_body.txt": RESTART % (unused + first % ("a", "a"), "one", ' + "!"'),
+                       "restart_ready.txt": RESTART % (unused + first % ("b", "b"), "three", ' + "!"'),
+                       "restart_four.txt": RESTART % (unused + first % ("b", "b") + made % "four", "four", ' + "!" + made'),
+                       "restart_five.txt": RESTART % (unused + first % ("b", "b") + made % "five", "five", ' + "!" + made')}.items():
         with open(os.path.join(copy, name), "w") as file:
             file.write(text)
     run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300)
     output = run.stdout + run.stderr
     values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 7, output[-1500:])
+    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 9, output[-1500:])
     for name, got, want in values:
         check("restart.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
     check("restart.gd: Godot is told why the scene started again", "so the scene starts again" in output, output[-1500:])
@@ -570,6 +603,12 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 	public function listen(other:Node):void { other.renamed.add(onRenamed); }
 	public function unlisten(other:Node):void { other.renamed.remove(onRenamed); }
 	private function onRenamed():void { h += %s; }%s
+	public function listenJoy():void { Input.joyConnectionChanged.add(onJoy); }
+	public function clearJoy():void { Input.joyConnectionChanged.removeAll(); }
+	private var kind:Class; private var pusher:Function; private var table:Object;
+	public function hold():void { kind = Hot; pusher = seen.push; table = {a: 1, b: 2}; table.setPropertyIsEnumerable("a", false); }
+	public function held():String { var keys:Array = []; for (var k:String in table) { keys.push(k); } return (kind == Hot) + " " + (this is kind) + " " + pusher(99) + " " + keys.join() + " " + table.a; }
+	private function onJoy(device:int, connected:Boolean):void { onRenamed(); }
 } }
 """
 ADDED = "\n\tpublic function added():String { return \"new\"; }"
@@ -597,6 +636,7 @@ def reload_test(label, elsewhere):
                 file.write(text)
         environment = dict(os.environ)
         environment.pop("KAS3_SOURCE_DIR", None)
+        environment["KAS3_REPORT_PREPARED"] = "1"
         if elsewhere:
             sources = os.path.join(edited, "sources")
             shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
@@ -607,16 +647,22 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 18, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 22, output[-1500:])
         check("%s: a reload that would drop an object whose class is gone is refused, and names it" % label,
               "an object of the class 'Later' is alive" in output, output[-1500:])
         check("%s: a reload asked for while AS3 runs says it was not made" % label,
               "can't be reloaded while AS3 runs" in output, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
-        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 3, output[-1500:])
+        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 5, output[-1500:])
         check("%s: a script with an error is reported and not loaded" % label,
               "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
+        # What the host worked out for a call at its own place (one that takes a StringName keeps the name
+        # it made) is let go of with the program it was worked out for: after each reload, none is kept
+        # that the program now running does not use.
+        kept = re.findall(r"ActionScript: (\d+) calls keep a name of their own, (\d+) of them the running program's", output)
+        check("%s: a reload keeps no call's name the running program does not use" % label,
+              len(kept) == 5 and all(each[0] == each[1] for each in kept) and any(int(each[0]) > 0 for each in kept), str(kept))
 
 
 reload_test("reload.gd", False)
@@ -636,6 +682,46 @@ with tempfile.TemporaryDirectory() as packed:
         output = run.stdout + run.stderr
         check("from a pack: %s runs" % driver, run.returncode == 0 and "were not loaded" not in output and "no script" not in output and
               (wanted is None or wanted in output), output[-700:])
+
+
+# A project's tests are not part of the game that is run: a mistake in one of their scripts can't stop it.
+# They are part of a run that starts in a test folder (a scene or script of the tests'), or is told so.
+BROKEN = "package { public class Broken { public function f():void { nonsense(; } } }\n"
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+    os.makedirs(os.path.join(copy, "tests", "framework"))
+    for place in ("tests/Broken.as", "tests/framework/Deep.as"):
+        with open(os.path.join(copy, place), "w") as file:
+            file.write(BROKEN.replace("Broken", os.path.splitext(os.path.basename(place))[0]))
+    shutil.copy(os.path.join(copy, "game_runs.gd"), os.path.join(copy, "tests", "run.gd"))
+
+    def game(arguments, environment=None):
+        done = subprocess.run([godot, "--headless", "--path", copy, *arguments], capture_output=True, text=True, timeout=300,
+                              env=dict(os.environ, **(environment or {})))
+        return done.stdout + done.stderr
+
+    output = game(["-s", "game_runs.gd"])
+    check("test folders: the game runs with a mistake in a test's script",
+          "VALUE the game's scripts run=6|6" in output and "have errors" not in output, output[-800:])
+    output = game(["-s", "tests/run.gd"])
+    check("test folders: a run that starts in a test folder has the tests' scripts", "have errors" in output and "Broken.as" in output, output[-800:])
+    output = game(["-s", "game_runs.gd"], {"KAS3_TESTS": "1"})
+    check("test folders: a run told it is the tests' has their scripts", "have errors" in output and "Deep.as" in output, output[-800:])
+    # The folders are the project's to name (actionscript/tests/folders): with another named, `tests` is the game's.
+    with open(os.path.join(copy, "project.godot"), "a") as file:
+        file.write('\n[actionscript]\n\ntests/folders=PackedStringArray("res://checks")\n')
+    output = game(["-s", "game_runs.gd"])
+    check("test folders: a folder the project does not name is the game's", "have errors" in output and "Broken.as" in output, output[-800:])
+    shutil.move(os.path.join(copy, "tests"), os.path.join(copy, "checks"))
+    output = game(["-s", "game_runs.gd"])
+    check("test folders: the folder the project names is left out",
+          "VALUE the game's scripts run=6|6" in output and "have errors" not in output, output[-800:])
+
+native = native_godot.Runner(godot, project, tests, os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None, check)
+native.probe()
+native.workloads()
+native.frames()
 
 for failure in failures:
     print("FAIL " + failure)

@@ -338,7 +338,7 @@ static void instance_to_string(GDExtensionScriptInstanceDataPtr p_data, GDExtens
 	self.bits = 0;
 	self.p = instance->object;
 	result.bits = 0;
-	const bool called = program.interpreter().call_function(own, &self, 1, &result);
+	const bool called = program.call_function(own, &self, 1, &result);
 	kas3::hold_if_referenced(instance->object);
 	if (!called) {
 		return; // The error has been reported.
@@ -399,6 +399,7 @@ static FreedElsewhere &freed_elsewhere() {
 
 static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+	Project::get().instance_freed();
 	if (kas3::on_main_thread()) {
 		free_instance(instance);
 		return;

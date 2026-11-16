@@ -75,5 +75,23 @@ std::optional<std::string> Interpreter::refused_by_godot(const Function &p_funct
 	return std::nullopt;
 }
 
+bool Interpreter::untyped_operand(const Function &p_function, const Instruction &p_in) {
+	const char *shape = ir::op_shape(p_in.op);
+	const uint32_t operands[3] = { p_in.a, p_in.b, p_in.c };
+	for (int n = 1; n < 3; n++) {
+		if (shape[n] == 'R' && p_function.registers[operands[n]] == Kind::Any) {
+			return true;
+		}
+		if (shape[n] == 'A') {
+			for (uint32_t each : p_function.argument_lists[operands[n]]) {
+				if (p_function.registers[each] == Kind::Any) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
 } // namespace vm
 } // namespace kas3

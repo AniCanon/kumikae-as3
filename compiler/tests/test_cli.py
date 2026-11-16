@@ -1,5 +1,6 @@
 """The kas3c command line: exit codes and where output goes. Usage: test_cli.py <path to kas3c>"""
 import os
+import resource
 import re
 import subprocess
 import sys
@@ -12,6 +13,13 @@ failures = []
 
 def run(*args):
     return subprocess.run([KAS3C, *args], capture_output=True, text=True, timeout=60)
+
+
+def children_cpu():
+    """The processor time, in seconds, that the processes this test ran and waited for have used: to the
+    microsecond, and the same however busy the machine is."""
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return usage.ru_utime + usage.ru_stime
 
 
 def check(name, condition, detail=""):
@@ -143,6 +151,36 @@ with tempfile.TemporaryDirectory() as folder:
         result = run("parse", "--dump-ast", deep)
         check(name, result.returncode == 1 and ": error: " in result.stderr, "exit %d" % result.returncode)
 
+    # cpp: the program as C++ in a folder, or refused by what it lacks with nothing written.
+    native = os.path.join(folder, "native")
+    result = run("cpp", good, "-o", native)
+    written = sorted(os.listdir(native)) if os.path.isdir(native) else []
+    check("cpp writes", result.returncode == 0 and result.stdout == "" and result.stderr == "" and
+          "program.h" in written and "program.cpp" in written and "Good.cpp" in written, "%d %r %r" % (result.returncode, result.stderr, written))
+    # --unit: the whole program in program.cpp, and a class's file of an earlier run taken away, so that
+    # building every .cpp in the folder builds the program once.
+    result = run("cpp", "--unit", good, "-o", native)
+    written = sorted(os.listdir(native)) if os.path.isdir(native) else []
+    whole = open(os.path.join(native, "program.cpp")).read() if "program.cpp" in written else ""
+    check("cpp --unit writes one file of C++", result.returncode == 0 and result.stderr == "" and written == ["program.cpp", "program.h"] and
+          "kas3_program" in whole and "Good" in whole, "%d %r %r" % (result.returncode, result.stderr, written))
+    result = run("cpp", good)
+    check("cpp without a folder", result.returncode == 2 and "usage: kas3c parse" in result.stderr)
+    result = run("cpp", bad, "-o", os.path.join(folder, "never"))
+    check("cpp of a program with errors", result.returncode == 1 and "Bad.as:1:" in result.stderr and
+          not os.path.exists(os.path.join(folder, "never")), repr(result))
+    mover = os.path.join(folder, "Mover.as")
+    with open(mover, "w") as handle:
+        handle.write("package {\n\timport godot.*;\n\tpublic class Mover extends Node2D {\n"
+                     "\t\tpublic function step():void { position = new Vector2(1, 2); }\n\t}\n}\n")
+    script = os.path.join(folder, "script")
+    result = run("cpp", "--godot", mover, "-o", script)
+    written = sorted(os.listdir(script)) if os.path.isdir(script) else []
+    check("cpp writes a script for Godot", result.returncode == 0 and result.stderr == "" and "Mover.cpp" in written and "program.cpp" in written,
+          "%d %r %r" % (result.returncode, result.stderr, written))
+    result = run("cpp", mover, "-o", os.path.join(folder, "never2"))
+    check("cpp of a Godot script without --godot", result.returncode == 1 and not os.path.exists(os.path.join(folder, "never2")), repr(result))
+
     # check: Godot's API is known without any option, under its AS3 names.
     player = os.path.join(folder, "Player.as")
     program = """package {
@@ -234,12 +272,16 @@ with tempfile.TemporaryDirectory() as looping:
     with open(spin, "w") as handle:
         handle.write("package { public class Spin { public function Spin() { try { while (true) {} } catch (e:*) { trace(\"caught\"); } } } }\n")
     started = time.monotonic()
+    before = children_cpu()
     result = subprocess.run([KAS3C, "run", spin], capture_output=True, text=True, timeout=60,
                             env=dict(os.environ, KAS3_TIME_LIMIT_MS="200"))
     took = time.monotonic() - started
-    check("an endless loop is stopped", result.returncode == 1 and result.stdout == "" and 0.2 <= took < 20 and
+    used = children_cpu() - before
+    # At least the limit by the clock; and by the processor time it used, which a busy machine does not
+    # stretch, not much more than the limit.
+    check("an endless loop is stopped", result.returncode == 1 and result.stdout == "" and 0.2 <= took and used < 5 and
           result.stderr.startswith("Error: Error #1502: A script has executed for longer than the timeout period of 0.2 seconds.\n\tat Spin()"),
-          repr((result.returncode, result.stdout, result.stderr[:300], took)))
+          repr((result.returncode, result.stdout, result.stderr[:300], took, used)))
 
 # A finally is written once, however many ways lead out of its try.
 once = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "finally_once.as")
@@ -248,18 +290,20 @@ check("finally written once", result.returncode == 0 and result.stdout.count('"c
       "%d copies" % result.stdout.count('"cleanup marker"'))
 
 # Godot's API is loaded only for files that name its package: a file that doesn't is checked far faster.
+# Measured as the processor time the compiler itself used, which does not move with what else the machine does.
 def best_time(*args):
     best = 1e9
     for _ in range(3):
-        start = time.monotonic()
+        before = children_cpu()
         run(*args)
-        best = min(best, time.monotonic() - start)
+        best = min(best, children_cpu() - before)
     return best
 
 plain = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "small_fixes.as")
 with_godot = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus", "Empty.as")
-check("check skips Godot's API when no file names it", best_time("check", plain) * 2 < best_time("check", with_godot),
-      "plain %.3fs, with Godot %.3fs" % (best_time("check", plain), best_time("check", with_godot)))
+plain_time, godot_time = best_time("check", plain), best_time("check", with_godot)
+check("check skips Godot's API when no file names it", plain_time * 2 < godot_time,
+      "plain %.3fs, with Godot %.3fs" % (plain_time, godot_time))
 
 # A script for Godot is lowered with Godot's API in reach, as the extension does it.
 empty = os.path.join(os.path.dirname(os.path.abspath(__file__)), "corpus", "Empty.as")
