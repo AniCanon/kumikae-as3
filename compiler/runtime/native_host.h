@@ -109,6 +109,10 @@ struct Host final : vm::NativeCode {
 		Waiting error{};
 	};
 	Held held;
+	// What `direct` is inside the innermost instruction generated code is asking the engine for with no
+	// frame (engine_thunk), or NONE: a function the engine calls back then has only generated code and
+	// that request beneath it, which takes its error as a call on bare values does.
+	uint32_t asking = NONE;
 	// The engine calling a function of the program (a script's method, a listener): the generated function
 	// itself, with no interpreter between, where nothing of the interpreter's is in progress; its own call
 	// otherwise. Either way an error is reported or carried as the interpreter does it (vm::Interpreter::call),
@@ -167,6 +171,14 @@ struct Host final : vm::NativeCode {
 	void report();
 };
 
+// After a call the host made of the library or of the engine with none of the interpreter's code running
+// (Interpreter::direct_began()): an error the interpreter was left with, its own or one carried back from
+// a script the engine ran meanwhile (carries() moved on from p_carries), is the context's from here.
+void settle_direct(Context *c, uint32_t p_carries);
+// An instruction that asks the engine, carried out for generated code on the values it hands over, with no
+// frame of the interpreter's (runtime/engine_thunk.cpp): what thunk() does for those.
+bool asks_engine(uint8_t p_op); // Whether the instruction is one of those.
+Slot engine_thunk(Context *c, uint32_t p_function, const ThunkInfo &p_info, const Slot *p_given, Slot *r_updated);
 // The runner for a context's generated code (runtime/direct.cpp).
 std::unique_ptr<vm::Runner> runner_for(Context *c);
 

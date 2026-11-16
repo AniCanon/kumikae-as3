@@ -174,6 +174,15 @@ private:
 	Slot share(ir::Kind p_kind, Slot p_value) { return heap_.share(p_kind, p_value); }
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned) { heap_.put(p_kind, p_target, p_owned); }
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	// The request itself, on those registers: what the engine gave and the register it goes to (NONE for
+	// none), or false with an error raised if the engine refuses.
+	struct EngineAnswer {
+		uint32_t target;
+		ir::Kind kind;
+		Slot result;
+	};
+	bool ask_engine(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers, EngineAnswer *r_asked);
+	void settle_asked(const EngineAnswer &p_asked, Slot &r_target);
 	std::optional<std::string> godot_refuses(Slot p_value, int p_depth) const;
 	std::optional<std::string> refused_by_godot(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers) const;
 	// Whether any operand of an instruction is untyped: only such an operand is ever refused_by_godot().
@@ -411,6 +420,8 @@ public:
 	bool call_function(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
 		return p_function < module_.functions.size() && call(p_function, p_arguments, p_count, r_result);
 	}
+	// For a host whose native code is the program (native_code.h says what each is for).
+	void engine_instruction(uint32_t p_function, Slot *p_registers);
 	// Gives up a value the host was holding for the interpreter: a result, or an argument it made.
 	void discard(ir::Kind p_kind, Slot p_value) { drop(p_kind, p_value); }
 	// A new Array of the elements of one of Godot's Arrays (a handle), for a host passing one to a script:
@@ -447,17 +458,11 @@ public:
 	// the engine runs meanwhile is carried back to that call, as to an instruction.
 	void direct_began() { direct_++; }
 	void direct_ended() { direct_--; }
-	// For a host that runs a function of the program itself when the engine calls one (native code's, with
-	// no frame of this interpreter's): whether nothing here is in progress or held that such a call would
-	// have to answer to (a frame, an error on its way out or carried, a call of the library by the host).
-	// The call is then counted with this interpreter's own calls from outside (entered(), left()) and
-	// starts the same clock; an error of it that nothing takes is reported as one of this interpreter's own
-	// is (report_native()).
-	bool idle() const { return frames_.empty() && direct_ == 0 && !failing_ && !stopped_ && !halted_ && !carried_.held; }
-	void entered() {
-		entering();
-		entries_++;
+	// For a host whose native code is the program (native_code.h says what each is for).
+	bool idle(uint32_t p_direct = 0) const {
+		return frames_.empty() && direct_ == p_direct && !failing_ && !stopped_ && !halted_ && !carried_.held;
 	}
+	void entered() { entering(), entries_++; }
 	void left() { entries_--; }
 	void report_native(NativeError p_error);
 

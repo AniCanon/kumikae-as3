@@ -166,6 +166,9 @@ Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 	if (KAS3_UNLIKELY(!host.thunk_counts.empty())) {
 		host.thunk_counts[p_thunk]++;
 	}
+	if (p_thunk < host.program.thunk_count && asks_engine(host.program.thunks[p_thunk].op)) {
+		return engine_thunk(c, function, host.program.thunks[p_thunk], p_given, r_updated);
+	}
 	Slot *const outer = host.updated;
 	host.updated = r_updated;
 	host.nesting++;

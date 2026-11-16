@@ -42,8 +42,9 @@ void report_outside(Host &r_host, Host::Waiting p_error) {
 } // namespace
 
 bool Host::enter(uint32_t p_function, const Slot *p_arguments, uint32_t p_count, Slot *r_result) {
-	if (p_function >= program.function_count || program.functions[p_function].rest || nesting > 0 || direct > 0 || stopped || carried ||
-			!interpreter->idle()) {
+	const bool asked = direct > 0 && direct == asking;
+	if (p_function >= program.function_count || program.functions[p_function].rest || nesting > 0 || (direct > 0 && !asked) || stopped ||
+			carried || !interpreter->idle(direct)) {
 		return interpreter->call_function(p_function, p_arguments, p_count, r_result);
 	}
 	const FunctionInfo &info = program.functions[p_function];
