@@ -37,7 +37,7 @@ internal object UiProbeRetention {
             check(project.isDisposed) { "Closed probe project was not disposed" }
             observations += "Project closed and disposed"
         }
-        check(panels.all(Disposer::isDisposed)) { "Native Current File panel survived project close" }
+        check(panels.all(::disposed)) { "Native Current File panel survived project close" }
         if (panels.isNotEmpty()) observations += "Native Current File panel owned by its tool window and disposed"
         if (focusRoot != null) {
             check(focusManager.currentFocusCycleRoot !== focusRoot) {
@@ -87,5 +87,13 @@ internal object UiProbeRetention {
             "$retained of ${projects.size} closed projects retained\n",
         )
         return retained
+    }
+
+    /** A disposed parent refuses a new child; one it accepts is released at once. */
+    private fun disposed(panel: Disposable): Boolean {
+        val probe = Disposer.newDisposable("disposal probe")
+        val accepted = Disposer.tryRegister(panel, probe)
+        Disposer.dispose(probe)
+        return !accepted
     }
 }
