@@ -63,7 +63,7 @@ struct Parameters {
 static bool count_fits(const Parameters &p_parameters, int64_t p_argc, GDExtensionCallError *r_error) {
 	const ir::Function &function = p_parameters.function;
 	size_t wanted = function.parameters > p_parameters.first ? function.parameters - p_parameters.first : 0;
-	if ((size_t)p_argc > wanted && !function.rest) {
+	if ((size_t)p_argc > wanted && !function.rest && !function.takes_extra) {
 		r_error->error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
 		r_error->expected = (int32_t)wanted;
 		return false;

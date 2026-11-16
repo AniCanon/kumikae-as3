@@ -159,7 +159,7 @@ Dictionary method_info(const ir::Module &p_module, const ir::Function &p_functio
 	method["args"] = arguments;
 	method["default_args"] = defaults;
 	method["return"] = returned;
-	method["flags"] = p_function.rest ? METHOD_FLAG_NORMAL | METHOD_FLAG_VARARG : METHOD_FLAG_NORMAL;
+	method["flags"] = p_function.rest || p_function.takes_extra ? METHOD_FLAG_NORMAL | METHOD_FLAG_VARARG : METHOD_FLAG_NORMAL;
 	method["id"] = 0;
 	return method;
 }

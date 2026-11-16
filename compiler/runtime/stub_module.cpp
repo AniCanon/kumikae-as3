@@ -55,6 +55,7 @@ ir::Function stub(const FunctionInfo &p_info) {
 	function.parameters = p_info.parameters;
 	function.required = p_info.required;
 	function.rest = p_info.rest;
+	function.takes_extra = p_info.takes_extra;
 	function.result = static_cast<Kind>(p_info.result);
 	for (uint32_t i = 0; i < p_info.parameters; i++) {
 		function.registers.push_back(static_cast<Kind>(p_info.kinds[i]));

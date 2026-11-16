@@ -35,11 +35,12 @@ struct NativeCode {
 	// Carries out a Native instruction of the function (by its number in the module): `p_what` and
 	// `p_register` are the instruction's second and third operands, which only the native side reads.
 	// p_registers are the frame's, valid until the native side calls anything; p_given is how many
-	// arguments the frame was given. What it gives for the instruction's first operand goes to *r_result,
+	// arguments the frame was given; what it was given beyond its parameters (a function that names
+	// `arguments`, ir::Function::takes_extra) follows the registers, untyped, p_extras of them. What it gives for the instruction's first operand goes to *r_result,
 	// with a reference of its own (null when the instruction has none). False if an error is on its way
 	// out of native code (hand_over).
 	[[nodiscard]] virtual bool run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given,
-			Slot *r_result) = 0;
+			uint32_t p_extras, Slot *r_result) = 0;
 };
 
 } // namespace vm

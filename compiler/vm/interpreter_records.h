@@ -20,7 +20,9 @@ struct Frame {
 	uint32_t pc;
 	size_t base; // Where its registers start in stack_.
 	uint32_t result; // The caller's register for the value returned, or NONE.
-	uint32_t arguments; // How many the caller passed.
+	uint32_t arguments; // How many of its parameters the caller passed.
+	// How many more than its parameters (ir::Function::takes_extra): untyped, in stack_ after its registers.
+	uint32_t extras = 0;
 	bool traced = false; // Its line is already in the trace of the error on its way out.
 };
 

@@ -162,6 +162,9 @@ Object *arguments_of(Context *c, uint32_t p_function, const Slot *p_parameters, 
 	const uint32_t first = function.is_static ? 0 : 1;
 	const uint32_t count = p_given > first ? p_given - first : 0;
 	std::vector<Slot> values(count, empty());
+	// What the caller passed beyond the parameters comes after them; the references are taken over.
+	values.insert(values.end(), c->host->extras.begin(), c->host->extras.end());
+	c->host->extras.clear();
 	for (uint32_t i = 0; i < count && !c->failing; i++) {
 		// Each as an untyped value with a reference of its own: result_to_any() takes over the one taken here.
 		const Kind kind = static_cast<Kind>(function.kinds[first + i]);
@@ -175,7 +178,7 @@ Object *arguments_of(Context *c, uint32_t p_function, const Slot *p_parameters, 
 		const Slot own = kind == Kind::Any ? shared(c, held) : ir::is_engine(kind) ? slot(shared(c, Ref{ held.p })) : held;
 		result_to_any(c, kind, own, &values[i]);
 	}
-	Object *made = c->failing ? nullptr : new_array(c, values.data(), count);
+	Object *made = c->failing ? nullptr : new_array(c, values.data(), static_cast<uint32_t>(values.size()));
 	for (Slot each : values) {
 		release(c, each);
 	}

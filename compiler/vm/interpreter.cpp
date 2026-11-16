@@ -186,7 +186,13 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		}
 		frame.arguments = static_cast<uint32_t>(std::min(p_count, fixed));
 	}
-	stack_.resize(stack_.size() + function.registers.size(), zero);
+	const size_t extras = function.takes_extra && p_count > function.parameters ? p_count - function.parameters : 0;
+	frame.extras = static_cast<uint32_t>(extras);
+	frame.arguments = static_cast<uint32_t>(std::min<size_t>(frame.arguments, function.parameters));
+	stack_.resize(stack_.size() + function.registers.size() + extras, zero);
+	for (size_t i = 0; i < extras; i++) {
+		stack_[frame.base + function.registers.size() + i] = share(Kind::Any, source[function.parameters + i]);
+	}
 	size_t count = std::min<size_t>(std::min<size_t>(p_count, fixed), function.registers.size());
 	for (size_t i = 0; i < count; i++) {
 		stack_[frame.base + i] = share(function.registers[i], source[i]);
@@ -210,6 +216,12 @@ void Interpreter::pop() {
 			stack_[base + i].bits = 0;
 			drop(function.registers[i], value);
 		}
+	}
+	for (size_t i = 0; i < frames_[index].extras; i++) {
+		const size_t at = base + function.registers.size() + i;
+		Slot value = stack_[at];
+		stack_[at].bits = 0;
+		drop_any(value);
 	}
 	stack_.resize(base);
 	frames_.resize(index);

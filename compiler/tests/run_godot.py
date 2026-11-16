@@ -304,7 +304,7 @@ check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError:
 
 # Godot's global functions, as GDScript works them out.
 output = compare("functions.gd", [
-    "lerpf", "rest from Godot", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
+    "lerpf", "rest from Godot", "arguments from Godot", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
     "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
     "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
     "anything as text", "a default is not shared",

@@ -82,6 +82,7 @@ struct FunctionInfo {
 	bool is_static;
 	bool is_public;
 	bool rest;
+	bool takes_extra; // It names `arguments`: a call through a value or by name may pass more than it declares.
 	uint8_t result; // An ir::Kind.
 	uint32_t parameters;
 	uint32_t required;

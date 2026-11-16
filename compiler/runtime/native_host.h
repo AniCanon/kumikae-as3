@@ -116,6 +116,12 @@ struct Host final : vm::NativeCode {
 	// generated code began what such a call leads to, and an error of a function called beneath it stays
 	// the context's.
 	uint32_t direct = 0;
+	// What a function that names `arguments` was given beyond its parameters (FunctionInfo::takes_extra),
+	// each with a reference: put here by the stub's frame as the function is entered, and taken by
+	// arguments_of(), the first thing such a function does. Empty for a call generated code makes itself,
+	// which passes no more than the parameters.
+	std::vector<Slot> extras;
+	void drop_extras();
 
 	// What the library's functions of plain values (vm/library.h) ask of whoever runs the program, answered
 	// for generated code (runtime/direct.cpp); and the library as those functions are handed it.
@@ -125,7 +131,7 @@ struct Host final : vm::NativeCode {
 	Host(const Program &p_program, const Embedder &p_embedder);
 	~Host() override;
 	[[nodiscard]] bool run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given,
-			Slot *r_result) override;
+			uint32_t p_extras, Slot *r_result) override;
 	[[nodiscard]] bool hand_over(vm::NativeError *r_error) override;
 	void clear_globals() override;
 	Host(const Host &) = delete;
