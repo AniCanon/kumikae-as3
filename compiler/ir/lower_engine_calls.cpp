@@ -172,6 +172,25 @@ uint32_t EngineCalls::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t
 	return out;
 }
 
+// `null` where the default is one AS3 can't write, with arguments after it: Godot's own
+// default, from Godot's text for it. Written `null`, it is known now; a value that may be
+// null (`var c:Color = null`) is looked at as the call is made.
+uint32_t EngineCalls::godot_default_argument(Expr *p_argument, const Type *p_type, const std::string &p_default) {
+	uint32_t value = l_.engine_reg(Kind::Val, p_type);
+	if (!Lowerer::is_null(p_argument)) {
+		// Into a register of its own: what comes later can't change it.
+		l_.emit(Op::Move, p_argument->offset, value, l_.expression(p_argument, Kind::Val));
+		uint32_t present = l_.reg(Kind::Bool);
+		l_.emit(Op::HostPresent, p_argument->offset, present, value);
+		uint32_t given = l_.emit(Op::JumpIf, p_argument->offset, present, 0);
+		l_.emit(Op::HostDefault, p_argument->offset, value, l_.string(p_default));
+		l_.patch(given, l_.here());
+	} else {
+		l_.emit(Op::HostDefault, p_argument->offset, value, l_.string(p_default));
+	}
+	return value;
+}
+
 void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
 		const std::string &p_defaults) {
 	uint32_t count = p_function ? p_function->parameters.count : 0;
@@ -196,22 +215,7 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 			std::string godot_default;
 			if (!p_defaults.empty() && p_function->parameters[i].default_value && Lowerer::is_null(p_function->parameters[i].default_value) &&
 					l_.kind_of(type, &kind) && kind == Kind::Val && godot_name("@default", p_defaults + "." + std::to_string(i), &godot_default)) {
-				// `null` where the default is one AS3 can't write, with arguments after it: Godot's own
-				// default, from Godot's text for it. Written `null`, it is known now; a value that may be
-				// null (`var c:Color = null`) is looked at as the call is made.
-				uint32_t value = l_.engine_reg(Kind::Val, type);
-				if (!Lowerer::is_null(p_arguments[i])) {
-					// Into a register of its own: what comes later can't change it.
-					l_.emit(Op::Move, p_arguments[i]->offset, value, l_.expression(p_arguments[i], Kind::Val));
-					uint32_t present = l_.reg(Kind::Bool);
-					l_.emit(Op::HostPresent, p_arguments[i]->offset, present, value);
-					uint32_t given = l_.emit(Op::JumpIf, p_arguments[i]->offset, present, 0);
-					l_.emit(Op::HostDefault, p_arguments[i]->offset, value, l_.string(godot_default));
-					l_.patch(given, l_.here());
-				} else {
-					l_.emit(Op::HostDefault, p_arguments[i]->offset, value, l_.string(godot_default));
-				}
-				r_list.push_back(value);
+				r_list.push_back(godot_default_argument(p_arguments[i], type, godot_default));
 				continue;
 			}
 			kind = Kind::Void;

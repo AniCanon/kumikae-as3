@@ -26,6 +26,8 @@ class EngineCalls {
 	uint32_t bound_method(Expr *p_expression);
 
 	std::string defaults_key(const Symbol *p_method) const;
+	// The value of an argument whose default is one AS3 can't write, Godot's own when it is null.
+	uint32_t godot_default_argument(Expr *p_argument, const Type *p_type, const std::string &p_default);
 
 public:
 	explicit EngineCalls(Lowerer &p_lowerer) :

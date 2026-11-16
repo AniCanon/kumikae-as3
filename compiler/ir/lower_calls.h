@@ -16,6 +16,7 @@ class Calls {
 	uint32_t cast(Call *p_call, Symbol *p_type, Kind p_want);
 	uint32_t trace_call(Call *p_call);
 	uint32_t script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function);
+	uint32_t symbol_call(Call *p_call, Symbol *p_symbol, Kind p_want);
 	uint32_t written_value(Expr *p_value, Kind p_conversion, uint32_t p_position);
 
 public:

@@ -188,7 +188,6 @@ uint32_t Calls::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function)
 
 uint32_t Calls::call(Call *p_call, Kind p_want) {
 	Expr *callee = p_call->callee;
-	uint32_t position = p_call->offset;
 	if (callee->kind == NodeKind::SuperExpr) {
 		return super_call(p_call);
 	}
@@ -214,32 +213,39 @@ uint32_t Calls::call(Call *p_call, Kind p_want) {
 		}
 		return Functions(l_).value_call(p_call, p_want); // `make()(1)`, `table[name](2)`: whatever it gives is called.
 	}
-	if (Functions::called_value(symbol)) {
+	return symbol_call(p_call, symbol, p_want);
+}
+
+// A call of what a name or a member names, by what it is.
+uint32_t Calls::symbol_call(Call *p_call, Symbol *p_symbol, Kind p_want) {
+	Expr *callee = p_call->callee;
+	uint32_t position = p_call->offset;
+	if (Functions::called_value(p_symbol)) {
 		return Functions(l_).value_call(p_call, p_want); // A variable, a field or a parameter that holds a function.
 	}
-	if (symbol->is_type()) {
-		return cast(p_call, symbol, p_want);
+	if (p_symbol->is_type()) {
+		return cast(p_call, p_symbol, p_want);
 	}
-	if (symbol->unit && symbol->unit->is_builtin && symbol->kind == SymbolKind::Function && symbol->name == "trace") {
+	if (p_symbol->unit && p_symbol->unit->is_builtin && p_symbol->kind == SymbolKind::Function && p_symbol->name == "trace") {
 		return trace_call(p_call);
 	}
-	if (symbol->name == "toString" && p_call->arguments.count == 0 && callee->kind == NodeKind::Member &&
+	if (p_symbol->name == "toString" && p_call->arguments.count == 0 && callee->kind == NodeKind::Member &&
 			static_cast<Member *>(callee)->object->kind != NodeKind::SuperExpr && is_engine(l_.natural(static_cast<Member *>(callee)->object))) {
 		return EngineCalls(l_).engine_text(p_call);
 	}
-	if (Lowerer::is_godot(symbol) && symbol->kind == SymbolKind::Method) {
-		return EngineCalls(l_).godot_call(p_call, symbol);
+	if (Lowerer::is_godot(p_symbol) && p_symbol->kind == SymbolKind::Method) {
+		return EngineCalls(l_).godot_call(p_call, p_symbol);
 	}
-	if (Lowerer::is_godot(symbol) && symbol->kind == SymbolKind::Function) {
-		return EngineCalls(l_).global_call(p_call, symbol, p_want);
+	if (Lowerer::is_godot(p_symbol) && p_symbol->kind == SymbolKind::Function) {
+		return EngineCalls(l_).global_call(p_call, p_symbol, p_want);
 	}
-	if (const std::optional<uint32_t> math = l_.math_call(p_call, symbol)) {
+	if (const std::optional<uint32_t> math = l_.math_call(p_call, p_symbol)) {
 		return *math;
 	}
-	if (const std::optional<uint32_t> library = l_.library_call(p_call, symbol)) {
+	if (const std::optional<uint32_t> library = l_.library_call(p_call, p_symbol)) {
 		return *library;
 	}
-	if (symbol->name == "getStackTrace" && symbol->owner == l_.error_ && callee->kind == NodeKind::Member && p_call->arguments.count == 0) {
+	if (p_symbol->name == "getStackTrace" && p_symbol->owner == l_.error_ && callee->kind == NodeKind::Member && p_call->arguments.count == 0) {
 		// An Error's stack trace, taken when it was made.
 		const uint32_t object = l_.receiver(static_cast<Member *>(callee)->object);
 		l_.emit(Op::NullCheck, position, object);
@@ -247,15 +253,15 @@ uint32_t Calls::call(Call *p_call, Kind p_want) {
 		l_.emit(Op::GetField, position, out, object, ERROR_STACK);
 		return out;
 	}
-	if (const std::optional<uint32_t> through = Members(l_).interface_call(p_call, symbol)) {
+	if (const std::optional<uint32_t> through = Members(l_).interface_call(p_call, p_symbol)) {
 		return *through; // On whatever class the object is.
 	}
-	auto function = l_.functions_.find(declaration(symbol));
+	auto function = l_.functions_.find(declaration(p_symbol));
 	if (function == l_.functions_.end()) {
-		l_.refuse(callee->offset, "calling '" + std::string(symbol->name) + "'");
+		l_.refuse(callee->offset, "calling '" + std::string(p_symbol->name) + "'");
 		return l_.default_value(p_want, position);
 	}
-	return script_call(p_call, symbol, function->second);
+	return script_call(p_call, p_symbol, function->second);
 }
 
 void Calls::constructor_arguments(Symbol *p_class, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list) {
