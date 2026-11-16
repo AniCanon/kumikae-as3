@@ -213,6 +213,24 @@ void Interpreter::raise_carried() {
 	carried_.error.bits = 0;
 }
 
+void Interpreter::report_carried() {
+	const Slot error = pending_;
+	const bool failing = failing_;
+	std::string trace = std::move(trace_);
+	const size_t lines = trace_lines_;
+	const Site at = thrown_at_;
+	const bool stopped = stopped_;
+	failing_ = false; // So that raise_carried() does not let go of it.
+	raise_carried();
+	report();
+	pending_ = error;
+	failing_ = failing;
+	trace_ = std::move(trace);
+	trace_lines_ = lines;
+	thrown_at_ = at;
+	stopped_ = stopped;
+}
+
 std::string Interpreter::error_text() {
 	if (any::tag(pending_) == AnyTag::Object) {
 		return object_text(static_cast<Object *>(any::pointer(pending_)));

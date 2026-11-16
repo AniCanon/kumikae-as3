@@ -84,7 +84,11 @@ private:
 	// (a listener that its emit() ran): kept, to be raised again at the end of the instruction that made the
 	// engine's call (run()), which stopped_ ends.
 	Carried carried_;
+	// How many errors have been carried: code that asked the engine for something sees whether its own
+	// request carried one by this count before and after, not by what another call left held.
+	uint32_t carries_ = 0;
 	void raise_carried();
+	void report_carried(); // Reports the error carried, leaving any error on its way out as it was.
 	void traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const;
 	std::vector<Kept> kept_traces_; // At most one for each finally: see Kept.
 	void keep_trace(Kept p_kept);
