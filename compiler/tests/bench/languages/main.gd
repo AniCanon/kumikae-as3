@@ -1,6 +1,11 @@
 extends Node
 var nodes := {}
 func _ready() -> void:
+	# Given a benchmark to run by frames, that is all this run does (frames/runner.gd).
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--bench="):
+			add_child(load("res://frames/runner.gd").new())
+			return
 	var cs := Node2D.new()
 	cs.set_script(load("res://CmpCs.cs"))
 	add_child(cs)
