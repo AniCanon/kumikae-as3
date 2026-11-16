@@ -686,23 +686,30 @@ static_assert(!std::is_base_of<vm::EngineHandles, vm::StandaloneOutput>::value, 
 static_assert(!std::is_base_of<vm::EngineSource, Recorder>::value, "nor does the tests' recorder");
 
 // A script object whose Godot object is reference-counted is kept when the program lets go of it, if the
-// engine says it still holds the object, and freed with what it holds when the engine lets go too.
+// engine says it still holds the object, and freed with what it holds when the engine lets go too. A
+// script whose base is Godot's Object may be on a RefCounted too: the engine is asked about its objects.
 static void test_kept_by_the_engine() {
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 	compilation.add("Counted.as", "package { import godot.*; public class Counted extends RefCounted { public var text:String = \"kept\"; } }");
 	compilation.add("Plain.as", "package { import godot.*; public class Plain extends Node { public var text:String = \"plain\"; } }");
+	compilation.add("Unjoined.as", "package { import godot.*; public class Unjoined extends GodotObject {} }");
+	compilation.add("Further.as", "package { import godot.*; public class Further extends Unjoined {} }");
 	compilation.check();
 	CHECK_EQ(compilation.format_diagnostics(false), std::string());
 	ir::Module module;
 	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
-	uint32_t counted = 0, plain = 0;
+	uint32_t counted = 0, plain = 0, unjoined = 0, further = 0;
 	for (size_t i = 0; i < module.classes.size(); i++) {
 		counted = module.classes[i].name == "Counted" ? (uint32_t)i : counted;
 		plain = module.classes[i].name == "Plain" ? (uint32_t)i : plain;
+		unjoined = module.classes[i].name == "Unjoined" ? (uint32_t)i : unjoined;
+		further = module.classes[i].name == "Further" ? (uint32_t)i : further;
 	}
 	CHECK(module.classes[counted].counted);
 	CHECK(!module.classes[plain].counted);
+	CHECK(module.classes[unjoined].counted);
+	CHECK(module.classes[further].counted);
 	{
 		FakeEngine engine;
 		engine.module = &module;
@@ -730,7 +737,8 @@ static void test_kept_by_the_engine() {
 		engine.log.clear();
 		interpreter.release_object(interpreter.construct(counted, engine.box()));
 		interpreter.release_object(interpreter.construct(plain, engine.box()));
-		CHECK_EQ(engine.log, std::string("keep Counted\n"));
+		interpreter.release_object(interpreter.construct(unjoined, engine.box()));
+		CHECK_EQ(engine.log, std::string("keep Counted\nkeep Unjoined\n"));
 		CHECK_EQ(vm::live_objects(), before);
 		CHECK_EQ(engine.boxes, 0);
 	}
