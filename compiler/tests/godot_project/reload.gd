@@ -44,6 +44,7 @@ func _process(_delta: float) -> bool:
 	frames += 1
 	if stage == 0 and frames == 2:
 		ask("listen", [other])
+		ask("fill")
 		ask("bump")
 		ask("bump")
 		other.name = "first"
@@ -57,6 +58,7 @@ func _process(_delta: float) -> bool:
 		show("after an edit: a static field keeps its value", ask("total"), 2)
 		show("after an edit: a vector field keeps its elements", ask("seenText"), "1,2")
 		show("after an edit: a method that is new can be called", ask("added"), "new")
+		show("after an edit: a vector of a type the new code does not name keeps its elements", ask("bagText"), "2")
 		show("after an edit: a counted object keeps its field", counted.get("n"), 5)
 		var weak: WeakRef = weakref(counted)
 		counted = null

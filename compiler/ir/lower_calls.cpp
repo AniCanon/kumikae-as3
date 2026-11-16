@@ -271,7 +271,11 @@ uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_functio
 	if (direct) {
 		emit(Op::Call, position, out, p_function, arguments(std::move(list)));
 	} else {
-		emit(Op::CallVirtual, position, out, slots_[decl], arguments(std::move(list)));
+		const uint32_t at = emit(Op::CallVirtual, position, out, slots_[decl], arguments(std::move(list)));
+		uint32_t declared = NONE;
+		if (on_another && class_index(p_symbol->owner, &declared)) {
+			fn().virtual_receivers.emplace_back(at, declared);
+		}
 	}
 	return out == NONE ? 0 : out;
 }

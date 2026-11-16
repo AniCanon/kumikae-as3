@@ -23,6 +23,10 @@ class Reload {
 	std::unordered_map<std::string_view, uint32_t> functions_;
 	std::unordered_map<Object *, Object *> moved_; // Each holds one reference to the new object.
 	std::string missing_;
+	std::vector<uint8_t> missing_classes_; // By class of the old program: an object of it had no place.
+
+	// An object of the class has no place in the new program: said, and null.
+	Object *lost(uint32_t p_old_class);
 
 	// What a field or a static field held, as the new one holds it: nothing, if the new one is declared
 	// to hold another class of object than the one that was there.
@@ -45,11 +49,25 @@ public:
 	// Where a function of the old program is in the new one, by its name. NONE if it is gone.
 	uint32_t function(uint32_t p_old) const;
 	const std::string &missing() const { return missing_; }
+	// By class of the old program: whether an object of it was met that has no place in the new one.
+	const std::vector<uint8_t> &missing_classes() const { return missing_classes_; }
 	// The new program's interpreter, for a host that changes what was moved.
 	Interpreter &target() { return to_; }
 	// Whether an object of one of these classes (named as the new program names them) has been moved so
 	// far: one that is alive.
 	bool alive(const std::vector<std::string> &p_classes) const;
+	// After globals(): whether the class (named as the new program names it) has had its static fields
+	// given their values, which it keeps.
+	bool statics_given(const std::string &p_class) const;
+
+	// By class of the program, whether an object of it can be reached from the program's static fields or
+	// from these objects of its own, through what objects hold (`each_held`). Not through Godot's objects.
+	static std::vector<uint8_t> reached(const Interpreter &p_program, const std::vector<Object *> &p_roots);
+	// Adds to a new build the classes of the library's containers (a Vector.<T>, Array, Object, Dictionary)
+	// that it no longer names but that the running program has objects of (`p_live`, by its classes: those
+	// reached(), or a reload's missing_classes()), so that those objects can be moved: an object is moved
+	// only to a class of the same name. False if there was none to add.
+	static bool keep_containers(const ir::Module &p_old, const std::vector<uint8_t> &p_live, ir::Module *r_new);
 };
 
 } // namespace vm

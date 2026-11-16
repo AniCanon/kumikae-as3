@@ -412,8 +412,7 @@ check("vectors.gd: a value that does not fit a byte is an AS3 error that says so
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
 
 # A scene edited while it runs: an edit to `_ready` (code that runs once) starts the scene again; an edit
-# elsewhere keeps the scene and its state. The versions differ in size: two saves of one size within a
-# second are seen as one (see the backlog).
+# elsewhere keeps the scene and its state.
 RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 	private var word:String;
 	override public function _ready():void { word = "%s"; }
@@ -423,19 +422,31 @@ RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 with tempfile.TemporaryDirectory() as edited:
     copy = os.path.join(edited, "project")
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
-    # The second version also adds a field before the one `_ready` sets: nothing that ran changed.
+    # The second version also adds a field before the one `_ready` sets: nothing that ran changed. The third
+    # edits `_ready` and a static field's first value. The fourth and fifth are saved one after the other,
+    # the fifth while the scene the fourth started is being made: its constructors have run, its `_ready` not.
     unused = "\n\tpublic var unused:int;"
-    for name, text in {"Restart.as": RESTART % ("", "one", ""), "restart_body.txt": RESTART % (unused, "one", ' + "!"'),
-                       "restart_ready.txt": RESTART % (unused, "three", ' + "!"')}.items():
+    first = "\n\tpublic static var first:String = \"%s\";"
+    made = "\n\tpublic var made:String = \"%s\";"
+    for name, text in {"Restart.as": RESTART % (first % "a", "one", ""), "restart_body.txt": RESTART % (unused + first % "a", "one", ' + "!"'),
+                       "restart_ready.txt": RESTART % (unused + first % "b", "three", ' + "!"'),
+                       "restart_four.txt": RESTART % (unused + first % "b" + made % "four", "four", ' + "!" + made'),
+                       "restart_five.txt": RESTART % (unused + first % "b" + made % "five", "five", ' + "!" + made')}.items():
         with open(os.path.join(copy, name), "w") as file:
             file.write(text)
     run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300)
     output = run.stdout + run.stderr
     values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 5, output[-1500:])
+    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 7, output[-1500:])
     for name, got, want in values:
         check("restart.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
     check("restart.gd: Godot is told why the scene started again", "so the scene starts again" in output, output[-1500:])
+    check("restart.gd: Godot is told what is kept outside the scene and not made again",
+          re.search(r"not made again[^\n]*/root/Keeper", output) is not None, output[-1500:])
+    check("restart.gd: Godot is told a static field's first value changed and is kept",
+          "the first values of static fields changed in Restart" in output, output[-1500:])
+    check("restart.gd: Godot is told the scene starts once more", "it starts once more when it is ready" in output and
+          "so it starts once more" in output and "restart it by hand" not in output and "restart the scene to see it" not in output, output[-1500:])
 
 # The scene the iOS test app opens finishes and says so, here too; and when the scripts can't compile (a
 # library older than they are), it says why instead of never finishing.
@@ -479,7 +490,8 @@ with tempfile.TemporaryDirectory() as folder:
 
 # Scripts edited while the game runs. In a copy of the project: the test rewrites a script.
 HOT = """package { import godot.*; public class Hot extends Node2D {
-	private var n:int = 0; private var h:int = 0; public static var made:int = 0;%s
+	private var n:int = 0; private var h:int = 0; public static var made:int = 0; private var bag:*;%s
+	public function bagText():String { return String(bag.length); }
 	private var seen:Vector.<int> = new Vector.<int>();
 	public function value():int { return %s; }
 	public function bump():int { n++; made++; seen.push(n); return n; }
@@ -501,7 +513,8 @@ def reload_test(label, elsewhere):
         copy = os.path.join(edited, "project")
         shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
         versions = {
-            "Hot.as": HOT % ("", "1", "1", ""),
+            # A vector of a type that only this version names, kept in an untyped field.
+            "Hot.as": HOT % (" public function fill():void { bag = new <Vector.<Hot>>[new Vector.<Hot>(), new Vector.<Hot>()]; }", "1", "1", ""),
             "hot_v2.txt": HOT % (" private var extra:String = \"x\";", "2", "10", ADDED),
             "hot_broken.txt": HOT % ("", "2 +", "10", ADDED),
             "hot_v3.txt": HOT % (" private var extra:String = \"x\";", "3", "10", ADDED),
@@ -522,7 +535,7 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 15, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 16, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
         check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 3, output[-1500:])

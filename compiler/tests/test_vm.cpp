@@ -1509,6 +1509,111 @@ static void test_run_once_overrides() {
 	CHECK(!found.empty() && found[0] == "Game");
 }
 
+// Code that runs once and calls a method on another object: through the object's declared class, its
+// subclasses' overrides, an interface, or a property's getter. What that object's class runs is followed.
+static void test_run_once_other_objects() {
+	const char *base = "package { public class Game {\n"
+					   "  public var helper:Helper = new Helper(); public var thing:Doer = new Thing();\n"
+					   "  public function _ready():void { helper.go(); thing.act(); var s:int = helper.size; }\n"
+					   "} }\n"
+					   "interface Doer { function act():void; }\n"
+					   "class Thing implements Doer { public var done:int; public function act():void { done = 1; } }\n"
+					   "class Helper { public var n:int; public function go():void { n = 1; } public function later():void { n = 7; }\n"
+					   "  public function get size():int { return 4; } }\n"
+					   "class Fancy extends Helper { override public function go():void { n = 5; } }\n";
+	const auto changes = [&](const char *p_from, const char *p_to) {
+		std::string after = base;
+		after.replace(after.find(p_from), std::string(p_from).size(), p_to);
+		ir::Module before_module, after_module;
+		compile(base, &before_module, "Game.as");
+		compile(after.c_str(), &after_module, "Game.as");
+		std::string out;
+		for (const std::string &name : ir::run_once_changes(before_module, after_module)) {
+			out += name + ";";
+		}
+		return out;
+	};
+	CHECK_EQ(changes("{ n = 1; }", "{ n = 2; }"), std::string("Game;"));
+	CHECK_EQ(changes("{ n = 5; }", "{ n = 6; }"), std::string("Game;")); // An override in a subclass may run.
+	CHECK_EQ(changes("{ done = 1; }", "{ done = 3; }"), std::string("Game;"));
+	CHECK_EQ(changes("return 4;", "return 8;"), std::string("Game;"));
+	// What the code that runs once does not reach, and a field added before the one it sets, change nothing.
+	CHECK_EQ(changes("{ n = 7; }", "{ n = 8; }"), std::string());
+	CHECK_EQ(changes("public var n:int;", "public var m:int; public var n:int;"), std::string());
+}
+
+// A static field's first value edited: objects alive, and the scene started again, keep the value it had.
+static void test_static_changes() {
+	const char *base = "package { public class Game { public static var best:int = 1; public static var name:String = pick();\n"
+					   "  private static function pick():String { return \"a\"; } public var n:int = 2; } }\n";
+	const auto changes = [&](const char *p_from, const char *p_to) {
+		std::string after = base;
+		after.replace(after.find(p_from), std::string(p_from).size(), p_to);
+		ir::Module before_module, after_module;
+		compile(base, &before_module, "Game.as");
+		compile(after.c_str(), &after_module, "Game.as");
+		std::string out;
+		for (const std::string &name : ir::static_changes(before_module, after_module)) {
+			out += name + ";";
+		}
+		return out;
+	};
+	CHECK_EQ(changes("best:int = 1", "best:int = 9"), std::string("Game;"));
+	CHECK_EQ(changes("return \"a\";", "return \"b\";"), std::string("Game;"));
+	CHECK_EQ(changes("n:int = 2", "n:int = 3"), std::string());
+}
+
+// A vector, an Array or an Object held where any value goes, of a type the new build no longer names: it is
+// moved all the same, its class added to the new build, empty or not.
+static void test_reload_kept_containers() {
+	const char *before = "package { public class Bag {\n"
+						 "  public var flags:* = new <Boolean>[true, false]; public var none:* = new Vector.<uint>();\n"
+						 "  public var list:* = [1, \"two\"]; public var table:* = { a: 1 };\n"
+						 "} }\n";
+	const char *after = "package { public class Bag {\n"
+						"  public var flags:*; public var none:*; public var list:*; public var table:*;\n"
+						"  public function tell():String { return String(flags) + \"|\" + none.length + \"|\" + list + \"|\" + table.a; }\n"
+						"} }\n";
+	ir::Module old_module, new_module, bare_module;
+	compile(before, &old_module, "Bag.as");
+	compile(after, &new_module, "Bag.as");
+	compile(after, &bare_module, "Bag.as");
+	{
+		Recorder recorder;
+		vm::Interpreter running(old_module, recorder);
+		CHECK(running.start());
+		vm::Object *bag = running.construct(class_named(old_module, "Bag"), nullptr);
+		{
+			// Without the classes, what can't be moved is named: a reload that sees it is refused.
+			vm::Interpreter fresh(bare_module, recorder);
+			vm::Reload reload(running, fresh);
+			fresh.release_object(reload.object(bag));
+			CHECK(reload.missing().rfind("Vector.<", 0) == 0);
+		}
+		const std::vector<uint8_t> live = vm::Reload::reached(running, { bag });
+		vm::Reload::keep_containers(old_module, live, &new_module);
+		vm::Interpreter fresh(new_module, recorder);
+		vm::Object *moved = nullptr;
+		{
+			vm::Reload reload(running, fresh);
+			moved = reload.object(bag);
+			CHECK(moved != nullptr);
+			CHECK_EQ(reload.missing(), std::string());
+		}
+		running.release_object(bag);
+		if (moved) {
+			vm::Slot result;
+			CHECK(fresh.call_method(moved, "tell", nullptr, 0, &result));
+			CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("true,false|0|1,two|1"));
+			fresh.discard(ir::Kind::Str, result);
+			fresh.release_object(moved);
+		}
+		CHECK_EQ(recorder.errors, std::string());
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // Vectors across a reload: one is moved with its elements, and the objects in it are moved too.
 static void test_reload_vectors() {
 	const char *before = "package { public class Bag {\n"
@@ -2422,6 +2527,9 @@ int main() {
 	test_reload_tables();
 	test_run_once_changes();
 	test_run_once_overrides();
+	test_run_once_other_objects();
+	test_static_changes();
+	test_reload_kept_containers();
 	test_reload_alive();
 	test_failed_static_initializer();
 	test_loop_markers();

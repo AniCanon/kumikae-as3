@@ -5,6 +5,8 @@ extends SceneTree
 var stage := 0
 var since := 0
 var first_id := 0
+var changes := 0
+var keeper: Node2D
 
 func show(name: String, got, want) -> void:
 	print("VALUE %s=%s|%s" % [name, str(got), str(want)])
@@ -18,8 +20,21 @@ func put(version: String) -> void:
 func said():
 	return current_scene.call("said") if current_scene else null
 
+# The scripts compiled again now, not when the watch next looks: what the test needs to hit a moment.
+func reload_now() -> void:
+	for i in Engine.get_script_language_count():
+		var language := Engine.get_script_language(i)
+		if language.has_method("reload_scripts"):
+			language.call("reload_scripts")
+
 func _initialize() -> void:
 	change_scene_to_file("res://restart.tscn")
+	scene_changed.connect(func(): changes += 1)
+	# A node with the same script outside the scene, as an autoload is: a restart does not make it again.
+	keeper = Node2D.new()
+	keeper.name = "Keeper"
+	keeper.set_script(load("res://Restart.as"))
+	root.add_child(keeper)
 
 func _process(_delta: float) -> bool:
 	var waited := Time.get_ticks_msec() - since
@@ -36,5 +51,17 @@ func _process(_delta: float) -> bool:
 	elif stage == 2 and (str(said()).begins_with("three") or waited > 8000):
 		show("_ready edited: the scene starts again", said(), "three!")
 		show("_ready edited: a new scene", current_scene.get_instance_id() != first_id, true)
+		# The fifth version is saved as Godot takes the old scene out: the new one is made (its constructors
+		# ran the fourth version's code) and not yet in the tree.
+		current_scene.tree_exited.connect(func():
+			put("five")
+			reload_now(), CONNECT_ONE_SHOT)
+		changes = 0
+		put("four")
+		reload_now()
+		stage = 3
+	elif stage == 3 and (said() == "five!five" or waited > 8000):
+		show("a save while the scene starts again: the scene has that save's code throughout", said(), "five!five")
+		show("a save while the scene starts again: the scene starts once more", changes, 2)
 		return true
 	return Time.get_ticks_msec() > 60000

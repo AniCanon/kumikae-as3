@@ -317,6 +317,9 @@ struct Function {
 	// For each parameter that holds a script object: the class it is declared to hold, by register (NONE
 	// for the others; the vector may be shorter). A call through a function value checks what it passes.
 	std::vector<uint32_t> parameter_classes;
+	// For each CallVirtual on an object other than `this`: the instruction, and the class that declares the
+	// method called (what runs is its method or a subclass's override). Not printed: run_once_changes reads it.
+	std::vector<std::pair<uint32_t, uint32_t>> virtual_receivers;
 	std::vector<Kind> registers;
 	std::vector<Instruction> code;
 	std::vector<std::vector<uint32_t>> argument_lists;
@@ -453,11 +456,17 @@ std::string print_operand(const Module &p_module, const Function &p_function, ch
 
 // The classes, by name, whose code that runs once for each object changed from one build to the next: a
 // constructor (which also gives fields their first values), `_ready`, `_enter_tree` or `_init` (its own or
-// inherited), or what those call by name or on the object itself (an override included). A field or
-// method of the object is compared by name, so one added before it changes nothing and one renamed does.
-// A method called on another object is not followed. Objects that are alive ran the old version, so a
+// inherited), or what those call: by name, on the object itself (an override included), on another object
+// through the class it is declared as (any subclass's override included) or through an interface (any
+// class's that implements it). A field or method of the object a function runs on is compared by name, so
+// one added before it changes nothing and one renamed does. So a `_ready` that reaches much of the game
+// is changed by most edits to it. Objects that are alive ran the old version, so a
 // reload of the code alone does not show such a change. A class that is new, or gone, is not listed.
 std::vector<std::string> run_once_changes(const Module &p_old, const Module &p_new);
+// The classes, by name, whose static fields' first values changed from one build to the next (what the
+// class's static initializer runs, and what it calls). Static fields given their values keep them through a
+// reload, and through the scene started again.
+std::vector<std::string> static_changes(const Module &p_old, const Module &p_new);
 
 } // namespace ir
 } // namespace kas3

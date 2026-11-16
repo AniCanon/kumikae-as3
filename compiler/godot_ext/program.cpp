@@ -221,22 +221,74 @@ void Project::watch() {
 	watch_seen = now;
 }
 
-// After the code itself is swapped: the scene that is running is made again from its file, so that what
-// runs once runs again with the new code. The game's static fields keep their values.
-static void restart_scene(const std::vector<std::string> &p_classes) {
-	String names;
-	for (const std::string &name : p_classes) {
-		names += String(names.is_empty() ? "" : ", ") + String::utf8(name.c_str());
+// What a scene started again would not make again, of the classes whose code that runs once changed: the
+// Godot objects outside the scene that have their scripts, and objects of them that static fields reach.
+static std::vector<std::string> kept_outside(const vm::Interpreter &p_running, const ir::Module &p_module,
+		const std::vector<std::string> &p_classes) {
+	std::vector<std::string> kept;
+	const auto changed = [&](uint32_t p_class) {
+		return std::find(p_classes.begin(), p_classes.end(), p_module.classes[p_class].name) != p_classes.end();
+	};
+	if (p_classes.empty()) {
+		return kept;
 	}
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
-	godot::Node *scene = tree ? tree->get_current_scene() : nullptr;
-	if (!scene || scene->get_scene_file_path().is_empty()) {
-		UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names +
-				". Objects alive now keep what it did; restart the scene to see it.");
-		return;
+	for (const auto &[object, owner] : instances_outside(tree ? tree->get_current_scene() : nullptr)) {
+		const godot::Node *node = Object::cast_to<godot::Node>(owner);
+		if (changed(object->klass)) {
+			kept.push_back(String(node ? String(node->get_path()) : owner->to_string()).utf8().get_data());
+		}
 	}
-	UtilityFunctions::print(String("ActionScript: code that runs once changed in ") + names + ", so the scene starts again.");
-	tree->call_deferred("reload_current_scene");
+	const std::vector<uint8_t> statics = vm::Reload::reached(p_running, {});
+	for (uint32_t i = 0; i < statics.size(); i++) {
+		if (statics[i] && changed(i)) {
+			kept.push_back("objects of " + p_module.classes[i].name + " that static fields hold");
+		}
+	}
+	return kept;
+}
+
+// Moves the running program onto a new build, the new program into `r_fresh`. A class of the library's
+// containers that the new build no longer names, of which an object is alive, is added to the build. False,
+// said, when an object alive has no place in the new program: the game carries on with the one it had.
+static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, GodotHost &p_host, ir::Module *r_module,
+		std::unique_ptr<vm::Interpreter> *r_fresh, Restart *r_restart, const std::vector<std::string> &p_statics) {
+	// Each try that fails for want of a container's class adds one of the old build's or more: it ends. (A
+	// vector of vectors needs two: the inner one is met only once the outer one has its class.)
+	for (;;) {
+		auto fresh = new_interpreter(*r_module, p_host);
+		std::string missing;
+		std::vector<uint8_t> lost;
+		{
+			vm::Reload moving(p_running, *fresh);
+			if (instances_can_move(moving) && listeners_can_move(moving) && moving.missing().empty()) {
+				moving.globals();
+				move_instances(p_running, moving);
+				move_listeners(p_running, moving, loads + 1);
+				// A class whose code that runs once changed matters only if an object of it is alive.
+				if (!moving.alive(r_restart->classes)) {
+					r_restart->classes.clear();
+					r_restart->kept.clear();
+				}
+				for (const std::string &name : p_statics) {
+					if (moving.statics_given(name)) {
+						r_restart->statics.push_back(name);
+					}
+				}
+				*r_fresh = std::move(fresh);
+				return true;
+			}
+			missing = moving.missing();
+			lost = moving.missing_classes();
+		}
+		fresh->superseded(); // Godot's objects hold the running program's script objects, not this one's.
+		fresh.reset();
+		if (!vm::Reload::keep_containers(p_old, lost, r_module)) {
+			UtilityFunctions::push_error(String("ActionScript: the scripts were not reloaded: an object of the class '") +
+					String::utf8(missing.c_str()) + "' is alive, and the class is no longer there. Restart the game.");
+			return false;
+		}
+	}
 }
 
 void Project::reload() {
@@ -260,22 +312,13 @@ void Project::reload() {
 	}
 	// Code that runs once (a constructor, a field's first value, `_ready`) does not run again for the
 	// objects that are alive: for an edit there to show, the scene is made again from its file.
-	const std::vector<std::string> run_once = ir::run_once_changes(*program->module_, *module);
-	bool restart = false;
-	auto fresh = new_interpreter(*module, program->host_);
-	{
-		vm::Reload moving(*program->interpreter_, *fresh);
-		if (!instances_can_move(moving) || !listeners_can_move(moving)) {
-			UtilityFunctions::push_error(String("ActionScript: the scripts were not reloaded: an object of the class '") +
-					String::utf8(moving.missing().c_str()) + "' is alive, and the class is no longer there. Restart the game.");
-			fresh->superseded(); // Godot's objects hold the running program's script objects, not this one's.
-			return;
-		}
-		moving.globals();
-		move_instances(*program->interpreter_, moving);
-		move_listeners(*program->interpreter_, moving, loads + 1);
-		// A class whose code that runs once changed matters only if an object of it is alive.
-		restart = moving.alive(run_once);
+	Restart restart;
+	restart.classes = ir::run_once_changes(*program->module_, *module);
+	restart.kept = kept_outside(*program->interpreter_, *program->module_, restart.classes);
+	std::unique_ptr<vm::Interpreter> fresh;
+	if (!move_onto(*program->interpreter_, *program->module_, program->host_, module.get(), &fresh, &restart,
+				ir::static_changes(*program->module_, *module))) {
+		return;
 	}
 	loads++;
 	// The old program goes last: what it still holds (its static fields) is let go while it can be.
@@ -286,9 +329,16 @@ void Project::reload() {
 	module.reset();
 	AS3Script::refresh_all();
 	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.");
-	if (restart) {
-		restart_scene(run_once);
+	restart_scene(restart);
+}
+
+void Project::reload_now() {
+	if (program && program->valid_ && program->interpreter_->depth() > 0) {
+		UtilityFunctions::push_error("ActionScript: the scripts can't be reloaded while AS3 runs: the reload was not made.");
+		return;
 	}
+	watch_loaded = watch_seen = scripts_signature(); // What is read now: the watch need not reload it again.
+	reload();
 }
 
 void Project::unload() {

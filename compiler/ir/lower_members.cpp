@@ -71,6 +71,9 @@ std::optional<Place> Members::property(Expr *p_target, Expr *p_object, Expr *p_l
 		// `super.x` is the base's own; a private property is never overridden.
 		const bool exact = (symbol->modifiers & Modifiers::Private) || (p_object && p_object->kind == NodeKind::SuperExpr);
 		place.dispatch = by_interface ? Place::Interface : exact ? Place::Direct : Place::Virtual;
+		if (!l_.class_index(symbol->owner, &place.declared)) {
+			place.declared = NONE;
+		}
 	}
 	place.getter = half(getter, place.dispatch);
 	place.setter = half(setter, place.dispatch);
@@ -91,7 +94,10 @@ void Members::call(const Place &p_place, uint32_t p_function, uint32_t p_out, ui
 		l_.emit(Op::NullCheck, p_position, p_place.object);
 	}
 	const Op op = p_place.dispatch == Place::Direct ? Op::Call : p_place.dispatch == Place::Virtual ? Op::CallVirtual : Op::CallInterface;
-	l_.emit(op, p_position, p_out, p_function, l_.arguments(std::move(list)));
+	const uint32_t at = l_.emit(op, p_position, p_out, p_function, l_.arguments(std::move(list)));
+	if (op == Op::CallVirtual && p_place.object != 0 && p_place.declared != NONE) {
+		l_.fn().virtual_receivers.emplace_back(at, p_place.declared);
+	}
 }
 
 uint32_t Members::get(const Place &p_place, uint32_t p_position) {
