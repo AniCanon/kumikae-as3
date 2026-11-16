@@ -217,6 +217,7 @@ class Lowerer {
 	friend class Operators; // Operators on two values, and `is` and `as`: lower_operators.h
 	friend class Engine; // Godot's members, values and operators: lower_engine.h
 	friend class Vectors; // A vector's lowering, once its class is made: lower_vectors.h
+	friend class Functions; // Function expressions and function values: lower_functions.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 
@@ -275,17 +276,6 @@ class Lowerer {
 	uint32_t number_literal(Expr *p_expression, Kind p_want);
 	uint32_t number_constant(double p_value, Kind p_kind, Kind p_want, uint32_t p_position);
 	uint32_t written_value(Expr *p_value, Kind p_conversion, uint32_t p_position);
-	// Function expressions and what they capture (lower_closures.cpp).
-	void make_environment(FunctionDecl *p_decl);
-	std::optional<Place> captured_place(const Symbol *p_symbol, uint32_t p_position);
-	uint32_t closure_value(FunctionExpr *p_expression);
-	void lower_pending_functions();
-	// Function values (lower_functions.cpp).
-	uint32_t function_value(Expr *p_expression);
-	static bool called_value(const Symbol *p_symbol);
-	uint32_t value_call(Call *p_call, Kind p_want);
-	std::optional<uint32_t> function_method(Call *p_call);
-	void use_argument_error();
 	uint32_t name_value(Expr *p_expression);
 	uint32_t member_value(Expr *p_expression);
 	uint32_t new_value(Expr *p_expression);

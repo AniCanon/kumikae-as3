@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_functions.h"
 #include "lower_library.h"
 
 namespace kas3 {
@@ -27,7 +28,7 @@ uint32_t Library::json_call() {
 	}
 	uint32_t ignored = NONE;
 	l_.class_index(l_.function_, &ignored);
-	l_.use_argument_error();
+	Functions(l_).use_argument_error();
 
 	std::vector<uint32_t> list;
 	if (to_json) {

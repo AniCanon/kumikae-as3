@@ -1,5 +1,6 @@
 #include "lower_dynamic.h"
 #include "lower_engine.h"
+#include "lower_functions.h"
 #include "lower_operators.h"
 #include "lower_statements.h"
 #include "lower_vectors.h"
@@ -394,7 +395,7 @@ void Statements::variables(VarDecl *p_decl) {
 			continue; // Without an initializer a `var` keeps what the variable holds: it is declared once.
 		}
 		uint32_t value = l_.typed(declarator.initializer, l_.compilation_.type_of(declarator.type), l_.kind_at(local->second));
-		if (std::optional<Place> shared = l_.captured_place(declarator.symbol, declarator.offset)) {
+		if (std::optional<Place> shared = Functions(l_).captured_place(declarator.symbol, declarator.offset)) {
 			l_.store(*shared, value, declarator.offset); // One a function written inside shares.
 		} else if (value != local->second) {
 			l_.emit(Op::Move, declarator.offset, local->second, value);

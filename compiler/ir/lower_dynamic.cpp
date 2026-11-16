@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_functions.h"
 #include "lower_statements.h"
 
 namespace kas3 {
@@ -36,7 +37,7 @@ void Dynamic::use_classes() {
 	if (l_.array_) {
 		l_.vector_class(l_.compilation_.instance_type(l_.array_));
 	}
-	l_.use_argument_error();
+	Functions(l_).use_argument_error();
 }
 
 bool Dynamic::by_name(const Expr *p_holder) const {

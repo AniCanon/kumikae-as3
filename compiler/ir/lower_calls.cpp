@@ -1,5 +1,6 @@
 #include "lower_dynamic.h"
 #include "lower_engine_calls.h"
+#include "lower_functions.h"
 #include "lower_members.h"
 #include "lower_vectors.h"
 
@@ -199,7 +200,7 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 	if (callee->kind == NodeKind::Member && is_vector(static_cast<Member *>(callee)->object->type)) {
 		return Vectors(*this).vector_call(p_call);
 	}
-	if (const std::optional<uint32_t> called = function_method(p_call)) {
+	if (const std::optional<uint32_t> called = Functions(*this).function_method(p_call)) {
 		return *called; // f.call(), f.apply()
 	}
 	Symbol *symbol = callee_symbol(callee);
@@ -210,10 +211,10 @@ uint32_t Lowerer::call(Call *p_call, Kind p_want) {
 		if (const std::optional<uint32_t> text = library_call(p_call, nullptr)) {
 			return *text; // `x.toString()` on an untyped value.
 		}
-		return value_call(p_call, p_want); // `make()(1)`, `table[name](2)`: whatever it gives is called.
+		return Functions(*this).value_call(p_call, p_want); // `make()(1)`, `table[name](2)`: whatever it gives is called.
 	}
-	if (called_value(symbol)) {
-		return value_call(p_call, p_want); // A variable, a field or a parameter that holds a function.
+	if (Functions::called_value(symbol)) {
+		return Functions(*this).value_call(p_call, p_want); // A variable, a field or a parameter that holds a function.
 	}
 	if (symbol->is_type()) {
 		return cast(p_call, symbol, p_want);

@@ -1,4 +1,5 @@
 // Function values: a method or a function taken as a value, and a call through one.
+#include "lower_functions.h"
 #include "lower_members.h"
 #include "lower_vectors.h"
 
@@ -7,58 +8,58 @@ namespace ir {
 
 // `obj.method`, `method`, `helper`: a function value. A method is bound to its object, and is the override
 // of that object's class; a static method or a package function is bound to nothing.
-uint32_t Lowerer::function_value(Expr *p_expression) {
+uint32_t Functions::function_value(Expr *p_expression) {
 	const uint32_t position = p_expression->offset;
-	Symbol *symbol = callee_symbol(p_expression);
+	Symbol *symbol = l_.callee_symbol(p_expression);
 	uint32_t klass = NONE;
-	if (!symbol || !class_index(function_, &klass)) {
-		refuse(position, "this function used as a value");
-		return default_value(Kind::Obj, position);
+	if (!symbol || !l_.class_index(l_.function_, &klass)) {
+		l_.refuse(position, "this function used as a value");
+		return l_.default_value(Kind::Obj, position);
 	}
-	if (is_godot(symbol)) {
-		refuse(position, "one of Godot's methods used as a value");
-		return default_value(Kind::Obj, position);
+	if (Lowerer::is_godot(symbol)) {
+		l_.refuse(position, "one of Godot's methods used as a value");
+		return l_.default_value(Kind::Obj, position);
 	}
-	if (const std::optional<uint32_t> bound = Members(*this).interface_value(p_expression, symbol)) {
+	if (const std::optional<uint32_t> bound = Members(l_).interface_value(p_expression, symbol)) {
 		return *bound;
 	}
-	auto function = functions_.find(declaration(symbol));
-	if (function == functions_.end()) {
-		refuse(position, "'" + std::string(symbol->name) + "' used as a value");
-		return default_value(Kind::Obj, position);
+	auto function = l_.functions_.find(declaration(symbol));
+	if (function == l_.functions_.end()) {
+		l_.refuse(position, "'" + std::string(symbol->name) + "' used as a value");
+		return l_.default_value(Kind::Obj, position);
 	}
-	uint32_t out = reg(Kind::Obj);
+	uint32_t out = l_.reg(Kind::Obj);
 	if (symbol->kind != SymbolKind::Method || symbol->is_static()) {
-		emit(Op::MakeFunction, position, out, function->second, NONE);
+		l_.emit(Op::MakeFunction, position, out, function->second, NONE);
 		return out;
 	}
 	uint32_t object = 0;
 	if (p_expression->kind == NodeKind::Member) {
 		Expr *written = static_cast<Member *>(p_expression)->object;
 		if (written->kind == NodeKind::SuperExpr) {
-			refuse(position, "a method of 'super' used as a value");
-			return default_value(Kind::Obj, position);
+			l_.refuse(position, "a method of 'super' used as a value");
+			return l_.default_value(Kind::Obj, position);
 		}
-		object = receiver(written);
-	} else if (fn().is_static) {
-		refuse(position, "this name");
-		return default_value(Kind::Obj, position);
+		object = l_.receiver(written);
+	} else if (l_.fn().is_static) {
+		l_.refuse(position, "this name");
+		return l_.default_value(Kind::Obj, position);
 	} else {
-		object = self(position);
+		object = l_.self(position);
 	}
 	// A private or final method is that very one; any other is the object's class's own.
 	if ((symbol->modifiers & Modifiers::Private) || (symbol->modifiers & Modifiers::Final)) {
-		emit(Op::NullCheck, position, object);
-		emit(Op::MakeFunction, position, out, function->second, object);
+		l_.emit(Op::NullCheck, position, object);
+		l_.emit(Op::MakeFunction, position, out, function->second, object);
 	} else {
-		emit(Op::MakeMethod, position, out, slots_[function->first], object);
+		l_.emit(Op::MakeMethod, position, out, l_.slots_[function->first], object);
 	}
 	return out;
 }
 
 // Whether a call's callee is a value to call (a variable, a field, a parameter that holds a function), not
 // a function or a method named.
-bool Lowerer::called_value(const Symbol *p_symbol) {
+bool Functions::called_value(const Symbol *p_symbol) {
 	switch (p_symbol->kind) {
 		case SymbolKind::Variable:
 		case SymbolKind::Field:
@@ -74,30 +75,30 @@ bool Lowerer::called_value(const Symbol *p_symbol) {
 }
 
 // A call of a function value may raise AS3's ArgumentError: the class it is of.
-void Lowerer::use_argument_error() {
-	if (module_.argument_error_class == NONE) {
-		if (Symbol *argument_error = compilation_.builtin("ArgumentError")) {
-			class_index(argument_error, &module_.argument_error_class);
+void Functions::use_argument_error() {
+	if (l_.module_.argument_error_class == NONE) {
+		if (Symbol *argument_error = l_.compilation_.builtin("ArgumentError")) {
+			l_.class_index(argument_error, &l_.module_.argument_error_class);
 		}
 	}
 }
 
 // f(a, b) on a function value: each argument untyped, and what it gives back too.
-uint32_t Lowerer::value_call(Call *p_call, Kind p_want) {
+uint32_t Functions::value_call(Call *p_call, Kind p_want) {
 	const uint32_t position = p_call->offset;
-	const uint32_t value = settled(expression(p_call->callee, Kind::Void), writer(p_call->arguments), position);
-	if (kind_at(value) != Kind::Obj && kind_at(value) != Kind::Any) {
-		refuse(p_call->callee->offset, "calling a value of type '" + compilation_.type_name(p_call->callee->type) + "'");
-		return default_value(p_want, position);
+	const uint32_t value = l_.settled(l_.expression(p_call->callee, Kind::Void), Lowerer::writer(p_call->arguments), position);
+	if (l_.kind_at(value) != Kind::Obj && l_.kind_at(value) != Kind::Any) {
+		l_.refuse(p_call->callee->offset, "calling a value of type '" + l_.compilation_.type_name(p_call->callee->type) + "'");
+		return l_.default_value(p_want, position);
 	}
 	use_argument_error();
 	std::vector<uint32_t> list;
 	for (uint32_t i = 0; i < p_call->arguments.count; i++) {
-		Expr *later = writer(p_call->arguments, i + 1);
-		list.push_back(settled(any_value(p_call->arguments[i]), later, position));
+		Expr *later = Lowerer::writer(p_call->arguments, i + 1);
+		list.push_back(l_.settled(l_.any_value(p_call->arguments[i]), later, position));
 	}
-	uint32_t out = reg(Kind::Any);
-	emit(Op::CallFunction, position, out, value, arguments(std::move(list)));
+	uint32_t out = l_.reg(Kind::Any);
+	l_.emit(Op::CallFunction, position, out, value, l_.arguments(std::move(list)));
 	return out;
 }
 
@@ -127,7 +128,7 @@ uint32_t Vectors::vector_each(Call *p_call) {
 	if (given != NONE && !map) {
 		l_.emit(Op::CallbackThis, position, function, given);
 	}
-	l_.use_argument_error();
+	Functions(l_).use_argument_error();
 	const uint32_t limit = l_.reg(Kind::U32);
 	l_.emit(Op::VecLength, position, limit, vector);
 	uint32_t out = NONE;
@@ -195,38 +196,38 @@ uint32_t Vectors::vector_each(Call *p_call) {
 // f.call(thisArg, a, b) and f.apply(thisArg, [a, b]) on a Function: thisArg is worked out and set aside, as
 // vector_each() does with the object to call a callback on: a method keeps its own object, and a function
 // expression can't use `this`. Nothing if the call is not one of these.
-std::optional<uint32_t> Lowerer::function_method(Call *p_call) {
+std::optional<uint32_t> Functions::function_method(Call *p_call) {
 	Member *member = p_call->callee->kind == NodeKind::Member ? static_cast<Member *>(p_call->callee) : nullptr;
 	Symbol *symbol = member ? member->resolved() : nullptr;
-	if (!symbol || !function_ || symbol->owner != function_ || (symbol->name != "call" && symbol->name != "apply")) {
+	if (!symbol || !l_.function_ || symbol->owner != l_.function_ || (symbol->name != "call" && symbol->name != "apply")) {
 		return std::nullopt;
 	}
 	const uint32_t position = p_call->offset;
 	const List<Expr *> &given = p_call->arguments;
-	const uint32_t value = settled(expression(member->object, Kind::Obj), writer(given), position);
+	const uint32_t value = l_.settled(l_.expression(member->object, Kind::Obj), Lowerer::writer(given), position);
 	if (given.count > 0) {
-		Expr *later = writer(given, 1);
-		settled(expression(given[0], Kind::Void), later, position);
+		Expr *later = Lowerer::writer(given, 1);
+		l_.settled(l_.expression(given[0], Kind::Void), later, position);
 	}
 	use_argument_error();
-	const uint32_t out = reg(Kind::Any);
+	const uint32_t out = l_.reg(Kind::Any);
 	if (symbol->name == "apply") {
 		uint32_t array = NONE;
 		if (given.count > 1) {
-			array = any_value(given[1]);
+			array = l_.any_value(given[1]);
 		} else {
-			array = reg(Kind::Any);
-			emit(Op::AnyConst, position, array, 1);
+			array = l_.reg(Kind::Any);
+			l_.emit(Op::AnyConst, position, array, 1);
 		}
-		emit(Op::ApplyFunction, position, out, value, array);
+		l_.emit(Op::ApplyFunction, position, out, value, array);
 		return out;
 	}
 	std::vector<uint32_t> list;
 	for (uint32_t i = 1; i < given.count; i++) {
-		Expr *later = writer(given, i + 1);
-		list.push_back(settled(any_value(given[i]), later, position));
+		Expr *later = Lowerer::writer(given, i + 1);
+		list.push_back(l_.settled(l_.any_value(given[i]), later, position));
 	}
-	emit(Op::CallFunction, position, out, value, arguments(std::move(list)));
+	l_.emit(Op::CallFunction, position, out, value, l_.arguments(std::move(list)));
 	return out;
 }
 

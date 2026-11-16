@@ -1,4 +1,5 @@
 #include "lower_engine.h"
+#include "lower_functions.h"
 #include "lower_statements.h"
 
 namespace kas3 {
@@ -98,11 +99,11 @@ void Lowerer::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl
 	fn().result = p_decl->return_type ? written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void) : Kind::Any;
 	if (p_decl->body) {
 		Statements(*this).declare_locals(p_decl->body);
-		make_environment(p_decl);
+		Functions(*this).make_environment(p_decl);
 		Statements(*this).statement(p_decl->body);
 	}
 	end(p_decl->end ? p_decl->end - 1 : p_decl->offset);
-	lower_pending_functions();
+	Functions(*this).lower_pending_functions();
 }
 
 bool Lowerer::calls_super(Block *p_body) {
@@ -141,7 +142,7 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 	parameters(decl);
 	if (decl && decl->body) {
 		Statements(*this).declare_locals(decl->body);
-		make_environment(decl);
+		Functions(*this).make_environment(decl);
 	}
 	// The class's own fields get their values first, before any constructor body runs. One of Godot's
 	// values with parts starts at its zero, and does so before any written value is worked out, since
@@ -190,7 +191,7 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 		Statements(*this).statement(decl->body);
 	}
 	emit(Op::ReturnVoid, decl && decl->end ? decl->end - 1 : p_class->name_offset);
-	lower_pending_functions();
+	Functions(*this).lower_pending_functions();
 }
 
 void Lowerer::lower_statics(Unit &p_unit, ClassDecl *p_class) {

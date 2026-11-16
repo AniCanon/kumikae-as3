@@ -1,5 +1,6 @@
 #include "lower_dynamic.h"
 #include "lower_engine.h"
+#include "lower_functions.h"
 #include "lower_library.h"
 #include "lower_members.h"
 #include "lower_vectors.h"
@@ -40,7 +41,7 @@ uint32_t Lowerer::whole_of(const Place &p_place, uint32_t p_position) {
 
 auto Lowerer::place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_position) -> Lowerer::Place {
 	if (p_symbol && (p_symbol->kind == SymbolKind::Local || p_symbol->kind == SymbolKind::Parameter)) {
-		if (std::optional<Place> shared = captured_place(p_symbol, p_position)) {
+		if (std::optional<Place> shared = Functions(*this).captured_place(p_symbol, p_position)) {
 			return *shared; // A variable a function written inside shares, through its environment.
 		}
 	}

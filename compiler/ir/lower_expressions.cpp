@@ -1,6 +1,7 @@
 #include "lower_dynamic.h"
 #include "lower_engine.h"
 #include "lower_engine_calls.h"
+#include "lower_functions.h"
 #include "lower_library.h"
 #include "lower_operators.h"
 #include "lower_vectors.h"
@@ -54,7 +55,7 @@ uint32_t Lowerer::name_value(Expr *p_expression) {
 		return constant;
 	}
 	if (name->symbol && (name->symbol->kind == SymbolKind::Method || name->symbol->kind == SymbolKind::Function)) {
-		return function_value(p_expression); // A method or a function as a value, not called.
+		return Functions(*this).function_value(p_expression); // A method or a function as a value, not called.
 	}
 	natural(p_expression);
 	return load(place_of(name), position);
@@ -100,7 +101,7 @@ uint32_t Lowerer::member_value(Expr *p_expression) {
 		return constant;
 	}
 	if (symbol && (symbol->kind == SymbolKind::Method || symbol->kind == SymbolKind::Function)) {
-		return function_value(p_expression); // A method or a function as a value, not called.
+		return Functions(*this).function_value(p_expression); // A method or a function as a value, not called.
 	}
 	natural(p_expression);
 	return load(place_of(member), member->name_offset);
@@ -271,7 +272,7 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 		case NodeKind::VectorLit:
 			return Vectors(*this).vector_literal(p_expression, static_cast<VectorLit *>(p_expression)->elements);
 		case NodeKind::FunctionExpr:
-			return closure_value(static_cast<FunctionExpr *>(p_expression));
+			return Functions(*this).closure_value(static_cast<FunctionExpr *>(p_expression));
 		case NodeKind::Index:
 			return load(place_of(p_expression), position);
 		case NodeKind::TypeApply:
