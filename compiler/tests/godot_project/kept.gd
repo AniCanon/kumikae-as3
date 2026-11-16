@@ -79,6 +79,8 @@ func _initialize() -> void:
 	show("detached, AS3's hold given back", [held_count, attached.get_reference_count()], [2, 1])
 	attached = null
 	show("detached, freed when Godot lets go", [weak_attached.get_ref() == null, node.call("heldN")], [true, 4])
+	show("detached and freed, to AS3 and Godot it is a freed object",
+			[node.call("heldCount"), node.call("heldItself"), node.call("heldInArray")], [null, null, [null]])
 	node.call("letGoOfHeld")
 
 	# Detached by its own script while only AS3 holds it: it goes, after the call that detached it.

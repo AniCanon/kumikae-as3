@@ -1,6 +1,7 @@
 // The object Godot holds for each object a script is attached to: the engine's calls arrive here and go
 // on into the interpreter.
 #include "any.h"
+#include "godot_calls.h"
 #include "instance.h"
 #include "language.h"
 #include "members.h"
@@ -135,8 +136,10 @@ bool kas3::as_godot_object(const vm::Object *p_object, Variant *r_out) {
 	if (!p_object || p_object->klass >= module.classes.size() || module.classes[p_object->klass].native_base.empty()) {
 		return false;
 	}
-	const void *owner = const_cast<vm::Object *>(p_object)->fields()[0].p;
-	*r_out = owner ? *static_cast<const Variant *>(owner) : Variant();
+	// A freed Godot object is null, as to_variant() gives it. A reference-counted one taken off its script
+	// (counted.cpp) must not be copied: the copy would count a reference on freed memory.
+	const Variant *owner = static_cast<const Variant *>(const_cast<vm::Object *>(p_object)->fields()[0].p);
+	*r_out = owner && !kas3::is_freed(*owner) ? *owner : Variant();
 	return true;
 }
 

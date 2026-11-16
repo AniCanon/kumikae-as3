@@ -371,7 +371,8 @@ compare("kept.gd", [
     "freed when both let go", "freed when AS3 lets go", "given to Godot, alive while Godot holds them", "freed when Godot lets go",
     "made and forgotten in AS3", "a resource that listens to itself goes", "a listener on another node goes",
     "attached, kept while AS3 holds it", "attached, freed when AS3 lets go too",
-    "detached, AS3's hold given back", "detached, freed when Godot lets go", "detached by itself, freed once nothing holds it",
+    "detached, AS3's hold given back", "detached, freed when Godot lets go", "detached and freed, to AS3 and Godot it is a freed object",
+    "detached by itself, freed once nothing holds it",
 ])
 # The cycle collector with such objects in loops: what nothing holds goes; what GDScript or AS3 holds stays
 # whole, its fields with it.
