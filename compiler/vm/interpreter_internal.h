@@ -27,5 +27,31 @@ inline void set_uint32(Slot &r_slot, uint32_t p_value) {
 	r_slot.u = p_value;
 }
 
+// A list of slots taken from the interpreter's spares and given back, emptied, when it goes: a call through
+// a function value allocates nothing once the spares have grown. One per call in progress, since making an
+// argument its type may run the program, which may make such a call again.
+class SpareSlots {
+public:
+	explicit SpareSlots(std::vector<std::vector<Slot>> &p_spares) :
+			spares_(p_spares) {
+		if (!spares_.empty()) {
+			slots_ = std::move(spares_.back());
+			spares_.pop_back();
+		}
+	}
+	~SpareSlots() {
+		slots_.clear();
+		spares_.push_back(std::move(slots_));
+	}
+	SpareSlots(const SpareSlots &) = delete;
+	SpareSlots &operator=(const SpareSlots &) = delete;
+	std::vector<Slot> &operator*() { return slots_; }
+	std::vector<Slot> *operator->() { return &slots_; }
+
+private:
+	std::vector<std::vector<Slot>> &spares_;
+	std::vector<Slot> slots_;
+};
+
 } // namespace vm
 } // namespace kas3

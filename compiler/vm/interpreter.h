@@ -129,6 +129,7 @@ private:
 	void let_go(ir::Kind p_kind, Slot &p_slot); // One slot of an object being freed.
 	std::vector<Object *> dying_; // Objects whose last reference is gone, still to be freed.
 	bool freeing_ = false; // drop_object() is freeing them: one called meanwhile adds to the list.
+	std::vector<std::vector<Slot>> spare_slots_; // For SpareSlots: argument lists of calls through values.
 	void drop_any(Slot p_value); // Gives up what an untyped value holds.
 	// The untyped value: vm/interpreter_any.cpp.
 	Slot to_any(ir::Kind p_kind, Slot p_value);

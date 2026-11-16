@@ -242,32 +242,32 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 	}
 	// Taken out of the registers first (each still held by its register, which nothing can change while
 	// this call is made).
-	std::vector<Slot> given(list.size());
-	for (size_t i = 0; i < list.size(); i++) {
-		given[i] = r[list[i]];
+	SpareSlots given(spare_slots_);
+	for (const uint32_t each : list) {
+		given->push_back(r[each]);
 	}
-	std::vector<Slot> values;
-	if (!function_arguments(value, given.size(), given.data(), &values)) {
+	SpareSlots values(spare_slots_);
+	if (!function_arguments(value, given->size(), given->data(), &*values)) {
 		return;
 	}
 	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
-	push(target, values.data(), values.size(), p_in.a); // It takes references of its own.
-	let_go_arguments(module_.functions[target], &values);
+	push(target, values->data(), values->size(), p_in.a); // It takes references of its own.
+	let_go_arguments(module_.functions[target], &*values);
 }
 
 // A function value called from inside an instruction, with untyped arguments: what it gives back, untyped,
 // or nothing if it raised (the error is then on its way out, as call_within() leaves it).
 std::optional<Slot> Interpreter::call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count) {
-	std::vector<Slot> values;
-	if (!function_arguments(p_value, p_count, p_arguments, &values)) {
+	SpareSlots values(spare_slots_);
+	if (!function_arguments(p_value, p_count, p_arguments, &*values)) {
 		return std::nullopt;
 	}
 	const uint32_t target = static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i);
 	const Function &callee = module_.functions[target];
 	Slot result;
 	result.bits = 0;
-	const bool ok = call_within(target, values.data(), values.size(), &result);
-	let_go_arguments(callee, &values);
+	const bool ok = call_within(target, values->data(), values->size(), &result);
+	let_go_arguments(callee, &*values);
 	if (!ok) {
 		return std::nullopt;
 	}
@@ -297,21 +297,21 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	}
 	// The elements, each with a reference of its own: making an argument its type may run the program, which
 	// may take them out of the Array.
-	std::vector<Slot> given;
+	SpareSlots given(spare_slots_);
 	for (uint32_t i = 0; array && i < array->length; i++) {
-		given.push_back(share(Kind::Any, array->data[i]));
+		given->push_back(share(Kind::Any, array->data[i]));
 	}
-	std::vector<Slot> values;
-	const bool ok = function_arguments(value, given.size(), given.data(), &values);
-	for (Slot &each : given) {
+	SpareSlots values(spare_slots_);
+	const bool ok = function_arguments(value, given->size(), given->data(), &*values);
+	for (Slot &each : *given) {
 		drop_any(each);
 	}
 	if (!ok) {
 		return;
 	}
 	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
-	push(target, values.data(), values.size(), p_in.a);
-	let_go_arguments(module_.functions[target], &values);
+	push(target, values->data(), values->size(), p_in.a);
+	let_go_arguments(module_.functions[target], &*values);
 }
 
 } // namespace vm

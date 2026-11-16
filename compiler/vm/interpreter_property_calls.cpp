@@ -151,10 +151,10 @@ bool Interpreter::table_text(Object *p_table, std::string *r_text, bool *r_own) 
 
 // Pushes a call of the function with what it takes first, the result to go to the caller's register.
 void Interpreter::call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out) {
-	std::vector<Slot> values;
-	if (function_arguments(p_target, p_first, p_given.size(), p_given.data(), &values)) {
-		push(p_target, values.data(), values.size(), p_out); // It takes references of its own.
-		let_go_arguments(module_.functions[p_target], &values);
+	SpareSlots values(spare_slots_);
+	if (function_arguments(p_target, p_first, p_given.size(), p_given.data(), &*values)) {
+		push(p_target, values->data(), values->size(), p_out); // It takes references of its own.
+		let_go_arguments(module_.functions[p_target], &*values);
 	}
 }
 
