@@ -1,5 +1,5 @@
-// The lowerer: turns a checked program into the typed IR. One class; its methods are in the lower_*.cpp
-// files, by what they lower. Nothing outside ir/ includes this.
+// The lowerer: turns a checked program into the typed IR. One class, with helper classes it befriends for
+// each kind of thing lowered (lower_*.h); nothing outside ir/ includes this.
 #pragma once
 
 #include "lower.h"

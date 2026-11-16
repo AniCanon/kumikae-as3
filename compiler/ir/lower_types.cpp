@@ -120,7 +120,7 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 		return true;
 	}
 	if (p_class && p_class == function_) {
-		// Function: the built-in class of function values (FUNCTION_FIELDS in ir.h).
+		// Function: the built-in class of function values (FUNCTION_INDEX and FUNCTION_FIRST in ir_codes.h).
 		Class klass;
 		klass.name = "Function";
 		klass.fields = { { "function", Kind::I32 }, { "first", Kind::Obj } };
@@ -166,9 +166,9 @@ Function error_constructor(const std::string &p_class_name, uint32_t p_owner, ui
 
 } // namespace
 
-// Error and its built-in subclasses: message, name, errorID and the stack trace (ERROR_FIELDS in ir.h),
-// and a constructor that stores the message and the id, and takes the trace where it is made, as
-// Flash does.
+// Error and its built-in subclasses: message, name, errorID and the stack trace (ERROR_MESSAGE and the
+// rest in ir_codes.h), and a constructor that stores the message and the id, and takes the trace where it
+// is made, as Flash does.
 bool Lowerer::error_class(const Symbol *p_class, uint32_t *r_index) {
 	uint32_t base = NONE;
 	if (p_class != error_ && !class_index(p_class->klass->base, &base)) {
