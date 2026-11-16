@@ -31,7 +31,12 @@ bool FunctionWriter::object(const Instruction &p_in) {
 	};
 	switch (p_in.op) {
 		case Op::Move:
-			if (p_in.a != p_in.b) { // A register moved to itself is nothing, and C++ warns of it.
+			if (p_in.a == p_in.b) { // A register moved to itself is nothing, and C++ warns of it.
+				return true;
+			}
+			if (hands_over_[pc_]) {
+				keep(reg(p_in.a), p_in.b, false);
+			} else {
 				share(p_in.a, reg(p_in.b));
 			}
 			return true;
@@ -44,7 +49,7 @@ bool FunctionWriter::object(const Instruction &p_in) {
 			if (const std::optional<std::string> local = kept_local(p_in.a, p_in.b)) {
 				line(*local + " = " + reg(p_in.c) + ";");
 			} else if (ir::is_held(kind(p_in.c))) {
-				line("store(c, " + field(p_in.a, p_in.b, kind(p_in.c)) + ", " + reg(p_in.c) + ");");
+				keep(field(p_in.a, p_in.b, kind(p_in.c)), p_in.c, false);
 			} else {
 				line(field(p_in.a, p_in.b, kind(p_in.c)) + " = " + reg(p_in.c) + ";");
 			}
@@ -54,7 +59,7 @@ bool FunctionWriter::object(const Instruction &p_in) {
 			return true;
 		case Op::SetGlobal:
 			if (ir::is_held(kind(p_in.b))) {
-				line("store_slot(c, c->globals[" + std::to_string(p_in.a) + "], " + reg(p_in.b) + ");");
+				keep("c->globals[" + std::to_string(p_in.a) + "]", p_in.b, true);
 			} else {
 				line(global(p_in.a, kind(p_in.b)) + " = " + reg(p_in.b) + ";");
 			}

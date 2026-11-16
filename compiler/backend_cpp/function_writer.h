@@ -89,6 +89,13 @@ class FunctionWriter {
 	// read again after one that may change them. For NONE, all of them (the function's end, a handler).
 	std::string kept_written_back(uint32_t p_pc) const;
 	std::string kept_read_again(uint32_t p_pc) const;
+	// Per instruction: it copies a register that nothing reads afterwards, so the reference is handed over
+	// and not shared (a Move, or a field or static field set).
+	std::vector<bool> hands_over_;
+	void find_last_uses();
+	// Stores a register's value where the instruction says; the register gives up its reference if this
+	// is its last use.
+	void keep(const std::string &p_place, uint32_t p_register, bool p_is_slot);
 	uint32_t pc_ = 0;
 
 	std::string reg(uint32_t p_register) const;

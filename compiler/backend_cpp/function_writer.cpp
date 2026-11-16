@@ -63,6 +63,7 @@ void FunctionWriter::analyse() {
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();
 	find_kept();
+	find_last_uses();
 }
 
 std::string_view FunctionWriter::parts(uint32_t p_register) const {

@@ -7,6 +7,8 @@ timings rest on, so that a change that undoes one fails here and not only in a b
 
   - a field of the method's own object, used in a loop nothing else can see it from, is read once before
     and written once after: the loop itself has it in a local;
+  - an object handed from where it was made to a variable, as the last thing done with it there, is handed
+    over with its reference: none is taken and given back;
   - a method that calls nothing and cannot fail keeps no count of the depth, and a call of it is not
     followed by a look at whether an error is on its way out.
 """
@@ -65,6 +67,15 @@ with tempfile.TemporaryDirectory() as where:
             check("%s keeps no count of the depth" % leaf, "c->depth" not in body and "stack_overflow" not in body, body)
         vec = made.get("CmpAs_vec", "")
         check("vec, which calls nothing, keeps no count of the depth", vec and "c->depth" not in vec, vec)
+
+with tempfile.TemporaryDirectory() as where:
+    written = subprocess.run([kas3c, "cpp", "objects.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "bench"))
+    check("objects.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        made = functions(where, "objects.cpp").get("objects", "")
+        inside = "".join(loops(made))
+        check("objects' loop is found", "new_object(" in inside, made)
+        check("the object made in objects' loop is handed over, not shared", "store(c, " not in inside and "= nullptr;" in inside, inside)
 
 for failure in failures:
     print("FAIL " + failure[:2500])

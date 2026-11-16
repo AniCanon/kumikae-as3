@@ -138,5 +138,82 @@ std::string FunctionWriter::kept_read_again(uint32_t p_pc) const {
 	return out;
 }
 
+// A copy that is the last use of what it copies. Only the plain case is looked for, which is a value made
+// and then put where it is kept: a register written once, in straight code from there to this copy, with
+// every read of it between the two. Nothing can then read the register before it is written again, so
+// the copy takes its reference and leaves it empty.
+void FunctionWriter::find_last_uses() {
+	hands_over_.assign(function_.code.size(), false);
+	const size_t count = function_.registers.size();
+	std::vector<uint32_t> writes(count, 0);
+	std::vector<uint32_t> written_at(count, NONE);
+	std::vector<uint32_t> last_read(count, NONE);
+	std::vector<uint32_t> first_read(count, NONE);
+	std::vector<bool> lands(function_.code.size() + 1, false);
+	for (const ir::Handler &handler : function_.handlers) {
+		writes[handler.reg] += 2; // Written from outside the code: never the plain case.
+		lands[handler.target] = true;
+	}
+	const auto read = [&](uint32_t p_register, uint32_t p_pc) {
+		first_read[p_register] = first_read[p_register] == NONE ? p_pc : first_read[p_register];
+		last_read[p_register] = p_pc;
+	};
+	for (uint32_t pc = 0; pc < function_.code.size(); pc++) {
+		const Instruction &in = function_.code[pc];
+		const char *shape = ir::op_shape(in.op);
+		const uint32_t operands[3] = { in.a, in.b, in.c };
+		const bool writes_first = (shape[0] == 'R' || shape[0] == 'r') && in.a != NONE && !first_is_read(in.op);
+		for (int n = 0; n < 3; n++) {
+			if (shape[n] == 'L') {
+				lands[operands[n]] = true;
+			} else if (shape[n] == 'A') {
+				for (uint32_t each : function_.argument_lists[operands[n]]) {
+					read(each, pc);
+				}
+			} else if ((shape[n] == 'R' || shape[n] == 'r') && operands[n] != NONE && !(n == 0 && writes_first)) {
+				read(operands[n], pc);
+			}
+		}
+		if (writes_first) {
+			writes[in.a]++;
+			written_at[in.a] = pc;
+		}
+		if (const uint32_t changed = changed_in_place(function_, in); changed != NONE) {
+			writes[changed] += 2;
+		}
+	}
+	for (uint32_t pc = 0; pc < function_.code.size(); pc++) {
+		const Instruction &in = function_.code[pc];
+		const uint32_t from = in.op == Op::Move ? in.b : in.op == Op::SetField ? in.c : in.op == Op::SetGlobal ? in.b : NONE;
+		if (from == NONE || from < function_.parameters || !owns(from) || writes[from] != 1 || last_read[from] != pc) {
+			continue;
+		}
+		const uint32_t made = written_at[from];
+		if (in.op == Op::Move && (in.a == in.b || !owns(in.a))) {
+			continue;
+		}
+		bool straight = made < pc && first_read[from] > made;
+		for (uint32_t between = made; straight && between < pc; between++) {
+			const Op op = function_.code[between].op;
+			straight = !lands[between + 1] && op != Op::Jump && op != Op::JumpIf && op != Op::JumpIfNot;
+		}
+		hands_over_[pc] = straight;
+	}
+}
+
+void FunctionWriter::keep(const std::string &p_place, uint32_t p_register, bool p_is_slot) {
+	if (!hands_over_[pc_]) {
+		line(std::string(p_is_slot ? "store_slot" : "store") + "(c, " + p_place + ", " + reg(p_register) + ");");
+		return;
+	}
+	if (p_is_slot) {
+		// What the slot held is let go of as the kind it is of, last.
+		line("{ const Slot old = " + p_place + "; " + p_place + " = slot(" + reg(p_register) + "); release(c, " + from_slot(kind(p_register), "old") + "); }");
+	} else {
+		line("put(c, " + p_place + ", " + reg(p_register) + ");");
+	}
+	line(reg(p_register) + " = " + std::string(zero_of(kind(p_register))) + ";");
+}
+
 } // namespace backend_cpp
 } // namespace kas3

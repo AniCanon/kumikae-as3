@@ -13,7 +13,7 @@ holds every program of `tests/run/` to the same output under both.
 | `generate.h`, `generate.cpp` | The entry point: the files, or the first thing not translated yet |
 | `support.h`, `support.cpp` | What is refused, asked before anything is written; whether the program reads an Error's stack |
 | `facts.h`, `facts.cpp` | What is known of every function before any is written: which cannot fail, and which fields each may read or write |
-| `function_fields.cpp` | A field of the method's own object kept in a local for the whole function, when a loop uses it and nothing else in that loop can see it |
+| `function_fields.cpp` | A field of the method's own object kept in a local for the whole function, when a loop uses it and nothing else in that loop can see it; a copy that is the last use of a register, which hands its reference over |
 | `names.h`, `names.cpp` | Identifiers, C++ types and literals for the things of a module |
 | `function_writer.h`, `function_writer.cpp` | One function: its registers as locals, who owns what, labels, the error paths and handlers, and its entry (the same function called with slots) |
 | `patterns.h`, `function_simple.cpp` | The operations that are one C++ statement, as a table (arithmetic, conversions, comparisons), and constants |
@@ -36,8 +36,10 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   table (`c->classes[object->klass].code[slot]`), an interface call through its interface table.
 - A register that holds a String, an object or an untyped value owns a reference, except a parameter
   that is never written, which borrows its caller's. A result is the caller's, and a register returned
-  hands its reference over. (That is the only move so far: a value's last use elsewhere still takes a
-  reference and gives one back.) Counts change only in `retain(c, x)` and `release(c, x)`.
+  hands its reference over. So does a register copied into a variable, a field or a static field as
+  the last thing done with it, in the plain case of a value made and then put where it is kept
+  (`find_last_uses`, `tests/run/last_use.as`); any other last use still takes a reference and gives one
+  back. Counts change only in `retain(c, x)` and `release(c, x)`.
 - An error is `c->failing`, tested after each operation that can raise one. The function then goes to
   its handlers, or leaves by `failed`, which puts its line into the trace: nothing about lines is kept
   while a program runs. (A program that reads `getStackTrace()` is the exception: its functions keep a
