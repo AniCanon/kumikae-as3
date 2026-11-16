@@ -145,6 +145,13 @@ bool Interpreter::same_function(const Object *p_a, const Object *p_b) const {
 	}
 	Object *a = const_cast<Object *>(p_a);
 	Object *b = const_cast<Object *>(p_b);
+	const Vector *bound_a = static_cast<const Vector *>(a->fields()[ir::FUNCTION_FIRST].p);
+	const Vector *bound_b = static_cast<const Vector *>(b->fields()[ir::FUNCTION_FIRST].p);
+	if (static_cast<uint32_t>(a->fields()[ir::FUNCTION_INDEX].i) == module_.library_function && bound_a && bound_b && bound_a != bound_b) {
+		// A method of the library: the same when read from the same value by the same name.
+		const bool named = static_cast<const Str *>(any::pointer(bound_a->data[1]))->view() == static_cast<const Str *>(any::pointer(bound_b->data[1]))->view();
+		return b->fields()[ir::FUNCTION_INDEX].i == a->fields()[ir::FUNCTION_INDEX].i && named && bound_a->data[0].bits == bound_b->data[0].bits;
+	}
 	return a->fields()[ir::FUNCTION_INDEX].i == b->fields()[ir::FUNCTION_INDEX].i &&
 			a->fields()[ir::FUNCTION_FIRST].p == b->fields()[ir::FUNCTION_FIRST].p && a->fields()[ir::FUNCTION_FIRST].p;
 }

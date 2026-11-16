@@ -189,6 +189,10 @@ struct Module {
 	uint32_t argument_error_class = NONE; // Made when a program calls a function value: too many arguments.
 	// The built-in class of function values (FUNCTION_FIELDS), when the program has any.
 	uint32_t function_class = NONE;
+	// The function behind every method of the library read by name and not called (`u.push`): it takes an
+	// Array of the value and the method's name first, then any number of arguments, and runs CallLibrary.
+	// Made when a program reaches properties by name.
+	uint32_t library_function = NONE;
 	uint32_t array_class = NONE; // The one class of every Array, when the program has any.
 	uint32_t object_class = NONE; // The class of `{}` and `new Object()`, when the program makes one.
 	uint32_t dictionary_class = NONE; // flash.utils.Dictionary, when the program makes one.

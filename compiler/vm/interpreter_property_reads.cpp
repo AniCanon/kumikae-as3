@@ -16,11 +16,6 @@ namespace {
 
 constexpr std::array<std::string_view, 7> OBJECT_METHODS = { "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "setPropertyIsEnumerable",
 	"toLocaleString", "toString", "valueOf" };
-constexpr std::array<std::string_view, 20> ARRAY_METHODS = { "concat", "every", "filter", "forEach", "indexOf", "join", "lastIndexOf", "map", "pop",
-	"push", "reverse", "shift", "slice", "some", "sort", "sortOn", "splice", "unshift", "insertAt", "removeAt" };
-constexpr std::array<std::string_view, 18> STRING_METHODS = { "charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "localeCompare", "match",
-	"replace", "search", "slice", "split", "substr", "substring", "toLowerCase", "toUpperCase", "toLocaleLowerCase", "toLocaleUpperCase",
-	"fromCharCode" };
 constexpr std::array<std::string_view, 3> NUMBER_METHODS = { "toFixed", "toExponential", "toPrecision" };
 
 template <size_t Count>
@@ -47,8 +42,7 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 			return true;
 		}
 		if (listed(OBJECT_METHODS, p_key.text)) {
-			raise_unsupported("reading '" + p_key.text + "' of an Object by its name");
-			return false;
+			return method_value(p_holder, p_key.text, r_value);
 		}
 		return true; // Nothing there: undefined.
 	}
@@ -89,9 +83,8 @@ bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Sl
 		*r_value = to_any(Kind::Bool, fixed);
 		return true;
 	}
-	if (listed(ARRAY_METHODS, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
-		raise_unsupported("reading '" + p_key.text + "' of " + (klass.array ? "an Array" : "a Vector") + " by its name");
-		return false;
+	if (library_name(p_holder, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
+		return method_value(p_holder, p_key.text, r_value);
 	}
 	if (klass.array) {
 		return true; // Nothing there: undefined.
@@ -128,7 +121,13 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 				"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
 		return false;
 	}
-	if (klass.built_in || listed(OBJECT_METHODS, p_key.text)) {
+	if (library_name(p_holder, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
+		return method_value(p_holder, p_key.text, r_value);
+	}
+	if (p_object->klass == module_.regexp_class || p_object->klass == module_.date_class) {
+		return true; // Dynamic in AS3, and nothing can be added to one here: undefined.
+	}
+	if (klass.built_in) {
 		raise_unsupported("reading '" + p_key.text + "' of " + holder_name(p_holder) + " by its name");
 		return false;
 	}
@@ -170,10 +169,8 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 		return true;
 	}
 	const bool number = tag == AnyTag::Int || tag == AnyTag::Number || tag == AnyTag::Wide;
-	if (listed(OBJECT_METHODS, p_key.text) || (tag == AnyTag::String && listed(STRING_METHODS, p_key.text)) ||
-			(number && listed(NUMBER_METHODS, p_key.text))) {
-		raise_unsupported("reading '" + p_key.text + "' of a " + holder_name(p_holder) + " by its name");
-		return false;
+	if (listed(OBJECT_METHODS, p_key.text) || library_name(p_holder, p_key.text) || (number && listed(NUMBER_METHODS, p_key.text))) {
+		return method_value(p_holder, p_key.text, r_value);
 	}
 	raise_not_found(p_key, p_holder);
 	return false;
@@ -200,11 +197,12 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		const bool element = p_key.index && *p_key.index < vector->length &&
 				(!klass->array || any::tag(vector->data[*p_key.index]) != AnyTag::Undefined);
 		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed") ||
-				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && listed(ARRAY_METHODS, p_key.text));
+				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && library_name(p_holder, p_key.text));
 	} else if (klass) {
-		has = has || klass->field(p_key.text, true) || named_method(*klass, p_key.text) || library_has(object, p_key.text);
+		has = has || klass->field(p_key.text, true) || named_method(*klass, p_key.text) || library_has(object, p_key.text) ||
+				(p_prototype && library_name(p_holder, p_key.text));
 	} else if (tag == AnyTag::String) {
-		has = has || p_key.text == "length" || (p_prototype && listed(STRING_METHODS, p_key.text));
+		has = has || p_key.text == "length" || (p_prototype && library_name(p_holder, p_key.text));
 	} else if (tag != AnyTag::Boolean) {
 		has = has || (p_prototype && listed(NUMBER_METHODS, p_key.text));
 	}

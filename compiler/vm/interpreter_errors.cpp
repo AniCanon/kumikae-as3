@@ -36,6 +36,9 @@ Str *Interpreter::stack_text(const Object *p_error, size_t p_skip) {
 
 // A frame that an error leaves, added to its trace; the first one is where it was thrown.
 void Interpreter::traced_frame(const Frame &p_frame, std::string *r_trace, size_t *r_lines, Site *r_site) const {
+	if (p_frame.function == module_.library_function) {
+		return; // The library's own frame, which is no place in the program.
+	}
 	if (*r_lines == 0) {
 		const Function &function = module_.functions[p_frame.function];
 		r_site->function = function.name + "()";

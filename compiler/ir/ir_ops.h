@@ -160,7 +160,11 @@ inline bool is_held(Kind p_kind) {
 	/* Vector.<T>(x): out (an object), x (untyped), the vector's class. x itself if it is of that class; a \
 	   new vector of an Array's or another Vector's elements, each converted as a store into the vector \
 	   converts it; AS3's TypeError #1034 for anything else, null included. */ \
-	X(VecFrom, "RRC")
+	X(VecFrom, "RRC") \
+	/* A method of the library called through a function value: out (untyped), an Array of the value and \
+	   the method's name, an Array of the arguments. It is called as DynCall calls it by name. Only the \
+	   module's library_function has it. */ \
+	X(CallLibrary, "RRR")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,

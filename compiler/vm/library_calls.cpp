@@ -20,6 +20,54 @@ bool Interpreter::library_call(Slot p_holder, std::string_view p_name, const std
 	return method != nullptr;
 }
 
+bool Interpreter::library_name(Slot p_holder, std::string_view p_name) const {
+	return LibraryCall::find(*this, p_holder, p_name) != nullptr;
+}
+
+bool Interpreter::method_value(Slot p_holder, std::string_view p_name, Slot *r_value) {
+	if (module_.library_function == NONE || module_.array_class == NONE) {
+		raise_unsupported("reading '" + std::string(p_name) + "' of " + holder_name(p_holder) + " by its name");
+		return false;
+	}
+	Vector *bound = fresh_vector(module_.array_class, 2);
+	Str *name = bound ? text(std::string(p_name)) : nullptr;
+	if (!name) {
+		if (bound) {
+			release_object(bound);
+		}
+		return false;
+	}
+	bound->data[0] = share(Kind::Any, p_holder);
+	bound->data[1] = any::string(name);
+	Object *made = make_function(module_.library_function, bound);
+	release_object(bound); // The function holds it now.
+	*r_value = made ? any::object(made) : any::undefined();
+	return made != nullptr;
+}
+
+// CallLibrary: the method a function value is bound to, called by its name with the arguments given.
+void Interpreter::call_library(const ir::Instruction &p_in) {
+	const size_t base = frames_.back().base;
+	const Vector *bound = static_cast<const Vector *>(stack_[base + p_in.b].p);
+	const Vector *rest = static_cast<const Vector *>(stack_[base + p_in.c].p);
+	put(Kind::Any, stack_[base + p_in.a], any::undefined());
+	const Slot holder = share(Kind::Any, bound->data[0]);
+	const Slot name = share(Kind::Any, bound->data[1]);
+	SpareSlots given(spare_slots_);
+	for (uint32_t i = 0; rest && i < rest->length; i++) {
+		given->push_back(share(Kind::Any, rest->data[i]));
+	}
+	PropertyKey key;
+	if (property_key(holder, name, &key)) {
+		call_named(holder, key, *given, p_in.a);
+	}
+	drop_any(holder);
+	drop_any(name);
+	for (Slot each : *given) {
+		drop_any(each);
+	}
+}
+
 const ir::LibraryMethod *LibraryCall::find(const Interpreter &p_vm, Slot p_holder, std::string_view p_name) {
 	uint8_t on = 0;
 	if (any::tag(p_holder) == AnyTag::String) {

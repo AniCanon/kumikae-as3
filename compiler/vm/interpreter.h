@@ -268,6 +268,10 @@ private:
 	bool object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	// A method of a String, an Array, a Vector or a Function, called by name: true if the name is one.
 	bool library_call(Slot p_holder, std::string_view p_name, const std::vector<Slot> &p_given, uint32_t p_out);
+	bool library_name(Slot p_holder, std::string_view p_name) const; // Whether the name is such a method.
+	// A method of the library read and not called, as a function bound to the value. CallLibrary runs it.
+	bool method_value(Slot p_holder, std::string_view p_name, Slot *r_value);
+	void call_library(const ir::Instruction &p_in);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
 	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);

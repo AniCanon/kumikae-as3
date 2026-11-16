@@ -38,6 +38,39 @@ void Dynamic::use_classes() {
 		l_.vector_class(l_.compilation_.instance_type(l_.array_));
 	}
 	Functions(l_).use_argument_error();
+	if (l_.module_.library_function == NONE) {
+		Function made;
+		made.name = "Function/call";
+		made.parameters = 2;
+		made.required = 1;
+		made.rest = true;
+		made.result = Kind::Any;
+		made.registers = { Kind::Obj, Kind::Obj, Kind::Any };
+		Instruction call;
+		call.op = Op::CallLibrary;
+		call.a = 2;
+		call.b = 0;
+		call.c = 1;
+		Instruction give;
+		give.op = Op::Return;
+		give.a = 2;
+		made.code = { call, give };
+		l_.module_.functions.push_back(std::move(made));
+		l_.module_.library_function = static_cast<uint32_t>(l_.module_.functions.size()) - 1;
+	}
+}
+
+// `list.push`, `text.charAt`: a method of the library as a value, read by name as it would be from an
+// untyped value, which binds it to what it is read from. p_class is Function's.
+uint32_t Dynamic::method_value(Member *p_member, uint32_t p_class) {
+	use_classes();
+	const uint32_t position = p_member->offset;
+	const uint32_t object = holder(p_member->object, nullptr, position);
+	const uint32_t read = l_.reg(Kind::Any);
+	l_.emit(Op::DynGet, position, read, object, name(p_member->name, p_member->name_offset));
+	const uint32_t out = l_.reg(Kind::Obj);
+	l_.emit(Op::FromAny, position, out, read, p_class);
+	return out;
 }
 
 bool Dynamic::by_name(const Expr *p_holder) const {
