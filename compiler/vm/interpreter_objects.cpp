@@ -216,6 +216,9 @@ std::string Interpreter::object_text(Object *p_object) const {
 	if (p_object->klass == module_.date_class) {
 		return date_text(p_object, ir::DateText::Full);
 	}
+	if (p_object->klass == module_.function_class) {
+		return "function Function() {}"; // avmplus's Function.as: no source text is kept, for any function.
+	}
 	if (p_object->klass == module_.regexp_class) {
 		const Str *source = static_cast<const Str *>(p_object->fields()[ir::REGEXP_SOURCE].p);
 		return regex::regexp_text(source ? source->view() : std::string_view(), static_cast<uint8_t>(p_object->fields()[ir::REGEXP_FLAGS].i));
