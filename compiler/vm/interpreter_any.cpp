@@ -106,7 +106,7 @@ bool Interpreter::any_text(Slot p_value, std::string *r_text) {
 			return false;
 		}
 	}
-	return true;
+	return !carried_.held; // The script's toString() Godot ran failed: Godot's own text is not the value's.
 }
 
 // A store of an untyped value into a register of another kind: AS3's coercion. False if it raised.

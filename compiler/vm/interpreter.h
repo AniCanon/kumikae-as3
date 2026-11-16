@@ -89,6 +89,7 @@ private:
 	struct Carried {
 		bool held = false;
 		bool stopped = false; // It stops the run: Flash's #1502, which no catch stops.
+		size_t frames = 0; // How many frames there were: the last is the one whose instruction it ends.
 		Slot error{};
 		std::string trace;
 		size_t lines = 0;

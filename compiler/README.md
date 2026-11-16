@@ -111,9 +111,10 @@ Array (`o.a`, `o["a"]`, `o.a = v`, `delete`, `in`, `hasOwnProperty`, a property 
 as one); `for in` and `for each` over any of these; an untyped value that holds an object of a class of the
 program, by the names of its public fields, methods, getters and setters (Flash's ReferenceErrors #1069,
 #1056, #1037, #1074 and #1077 for the rest); Array's `sortOn`. `RegExp` (literals, `new RegExp`, the flags
-`g i m s x`, its properties, `exec` and `test` with `lastIndex`) and String's `match`, `search`, `replace`
-(with `$1`, `$&` and the rest, or a function) and `split` by one; `Date`, with the host's clock and zone
-(its getters and setters, local and UTC, its texts, `Date.parse` and `Date.UTC`); `escape`, `unescape`,
+`g i m s x`, its properties, `exec` and `test` with `lastIndex`, which one that is not global keeps, as in
+avmplus) and String's `match`, `search`, `replace` (with `$1`, `$&` and the rest, or a function) and
+`split` by one; `Date`, with the host's clock and zone (its getters and setters, local and UTC, its texts,
+`Date.parse` and `Date.UTC`); a RegExp's and a Date's properties and methods by name on an untyped value; `escape`, `unescape`,
 `encodeURI`, `encodeURIComponent`, `decodeURI` and `decodeURIComponent`; `JSON.parse` (with a reviver) and
 `JSON.stringify` (with a replacer function or Array of keys, and space).
 
@@ -125,7 +126,8 @@ were when it began: one deleted on the way is passed over, one added is not reac
 
 **What is refused, by name, until later slices:** `new Dictionary(true)` (weak keys, said when the program
 runs), a method of an Array, a Vector, a String or a number called or read by name on an untyped value
-(`u.push(1)`, said when it runs), a property of one of Godot's values held untyped, by name, `this` and
+(`u.push(1)`, said when it runs), a RegExp's or a Date's method read by name and not called, or a property
+neither declares (both are dynamic in AS3), a property of one of Godot's values held untyped, by name, `this` and
 `super` written inside a function expression (AS3's `this` there is not the method's object), an
 interface's method that a class has only from Godot's API or the built-in library, a class that extends
 `RegExp`, and the `godot` package. A program that uses one of these does not run: the compiler says
@@ -291,7 +293,10 @@ package {
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,
   never taken as if it fitted.
 - An AS3 error inside a call from the engine is reported as Godot reports a script's own error, with the
-  `.as` file and line as its source and the AS3 stack trace, and the engine carries on.
+  `.as` file and line as its source and the AS3 stack trace, and the engine carries on. One in code the
+  engine ran for an AS3 instruction (a listener its `emit()` ran, a `toString()` for `"" + node`) comes out
+  of that instruction, where a `catch` around it catches it, as Flash has an error in a listener come out
+  of the dispatch.
 - A call from the engine that runs longer than 15 seconds, with what it calls, is stopped with Flash's
   `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
   gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.

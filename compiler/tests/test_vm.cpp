@@ -2514,6 +2514,10 @@ static void test_carried_errors() {
 						 "	public function textOf(u:*):String { try { return \"\" + u; } catch (e:Error) { return \"caught \" + e.message; } return \"none\"; }\n"
 						 "	public function joined(u:*):String { try { return [u, u].join(); } catch (e:Error) { return \"caught \" + e.message; } return \"none\"; }\n"
 						 "	public function called():String { try { setPhysicsProcess(true); } catch (e:*) { return \"caught\"; } return \"out\"; }\n"
+						 "	public function keyed(u:*):String { var o:Object = {}; try { o[u] = 1; } catch (e:Error) { var n:int = 0; for (var k:* in o) { n++; } return \"caught \" + e.message + \" \" + n; } return \"none\"; }\n"
+						 "	public static var noted:int;\n"
+						 "	public function note():void { noted++; }\n"
+						 "	public function notes():int { return noted; }\n"
 						 "} }\n";
 	ir::Module module;
 	compile_cycles(&module, source, "Reentry.as");
@@ -2523,12 +2527,14 @@ static void test_carried_errors() {
 		vm::Interpreter interpreter(module, engine);
 		CHECK(interpreter.start());
 		vm::Object *reentry = interpreter.construct(class_named(module, "Reentry"), engine.box());
-		const char *again = "boom";
+		std::vector<const char *> again = { "boom" };
 		engine.calls_back = [&]() {
-			vm::Slot ignored;
-			ignored.bits = 0;
-			if (interpreter.call_method(reentry, again, nullptr, 0, &ignored)) {
-				interpreter.discard(ir::Kind::Str, ignored);
+			for (const char *method : again) {
+				vm::Slot ignored;
+				ignored.bits = 0;
+				if (interpreter.call_method(reentry, method, nullptr, 0, &ignored)) {
+					interpreter.discard(ir::Kind::Str, ignored);
+				}
 			}
 		};
 		auto text_of = [&](const char *p_method) {
@@ -2548,10 +2554,25 @@ static void test_carried_errors() {
 		CHECK_EQ(text_of("textOf"), std::string("caught boom"));
 		CHECK_EQ(engine.errors, std::string());
 		CHECK_EQ(text_of("joined"), std::string("caught boom"));
-		// The second toString() does not run: an error is on its way out of the join already.
+		// The second toString() is not asked for: the first one's error ends the join.
 		CHECK_EQ(engine.errors, std::string());
+		// Nor is a key written under Godot's own text for the value.
+		CHECK_EQ(text_of("keyed"), std::string("caught boom 0"));
+		CHECK_EQ(engine.errors, std::string());
+		// What else the engine runs before it answers runs: the first error is the instruction's, a later
+		// one is reported where it happened.
+		again = { "boom", "note", "boom" };
+		engine.errors.clear();
+		vm::Slot said;
+		said.bits = 0;
+		CHECK(interpreter.call_method(reentry, "called", nullptr, 0, &said));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(said.p)->view()), std::string("caught"));
+		interpreter.discard(ir::Kind::Str, said);
+		CHECK(interpreter.call_method(reentry, "notes", nullptr, 0, &said));
+		CHECK_EQ(said.i, 1);
+		CHECK(engine.errors.find("Error: boom") == 0 && engine.errors.find("Error: boom", 1) == std::string::npos);
 		// Flash's timeout in a listener: it comes out of the call that ran it, and no catch stops it.
-		again = "spin";
+		again = { "spin" };
 		interpreter.set_time_limit(30);
 		engine.errors.clear();
 		vm::Slot result;

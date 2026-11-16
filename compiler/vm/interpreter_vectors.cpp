@@ -262,6 +262,9 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 						return false;
 					}
 				}
+				if (carried_.held) {
+					return false; // As in any_text(): the script's toString() failed.
+				}
 				break;
 			}
 		}

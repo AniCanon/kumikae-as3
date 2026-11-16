@@ -377,9 +377,6 @@ bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size
 }
 
 bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
-	if (carried_.held && !frames_.empty()) {
-		return false; // An error is on its way out of the instruction that made this call: nothing more runs in it.
-	}
 	const Slot outer_error = pending_;
 	const bool outer_failing = failing_;
 	std::string outer_trace = std::move(trace_);
@@ -413,6 +410,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 		carried_.lines = trace_lines_;
 		carried_.at = thrown_at_;
 		carried_.stopped = stopped_;
+		carried_.frames = depth;
 	} else if (!ok) {
 		report();
 	}
