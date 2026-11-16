@@ -110,6 +110,11 @@ struct Class {
 	// For a Vector.<T>, what its elements are; Void for every other class. A vector class has no fields,
 	// no methods and no base, and its objects are vm::Vector.
 	Kind element = Kind::Void;
+	// For a vector of one of Godot's value types: Godot's name for it ("Vector2"). Each place a vector of
+	// one with parts (Vector2, Color: not an array or a signal) is made or grows by starts at its zero, as
+	// a C# array of structs does and as a local of that type does.
+	std::string element_type;
+	bool element_zero = false;
 	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;

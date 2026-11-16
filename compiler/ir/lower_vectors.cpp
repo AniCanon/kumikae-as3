@@ -37,6 +37,10 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 	Class klass;
 	klass.name = "Vector.<" + inner + ">";
 	klass.element = element;
+	if (element == Kind::Val && of && is_godot(of)) {
+		klass.element_type = godot_name(of->name, std::string_view()).value_or(std::string());
+		klass.element_zero = of->klass && value_has_parts(of);
+	}
 	module_.classes.push_back(std::move(klass));
 	const uint32_t index = static_cast<uint32_t>(module_.classes.size()) - 1;
 	vector_classes_[p_type] = index;

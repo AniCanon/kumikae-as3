@@ -285,7 +285,8 @@ package {
 - Static methods: `Vector2.fromAngle(a)`, `Color.html("#ff8000")`, `Image.createEmpty(...)`.
 - A variable of a Godot value that has parts (`Vector2`, `Color`, `Transform2D`) starts at the type's zero
   when no value is written, as in GDScript. `null` can still be assigned. Any other Godot value (an array,
-  a signal) starts missing.
+  a signal) starts missing. So does each place of a vector of one: `new Vector.<Vector2>(3)` holds three
+  zero vectors, as a C# array of structs does, and setting a longer `length` adds zeroes.
 - Godot's integer is an AS3 type, `Int64`. `items.size()`, `randi()` and an object's id are `Int64`s.
   One converts to an `int`, a `uint` or a `Number` where that is expected, and a `RangeError` says so if
   the value does not fit; `int(x)` written out cuts it, as in Flash. Arithmetic on it wraps at 64 bits,

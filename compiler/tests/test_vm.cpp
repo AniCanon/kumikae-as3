@@ -1124,6 +1124,49 @@ static void test_engine_prepared() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// A vector of one of Godot's value types with parts starts with that type's zero in each place, as a C#
+// array of structs does, and so does each place it grows by; a vector of any other Godot value starts null.
+static void test_vector_of_values() {
+	const char *source = "package { import godot.*; public class Holder extends Node {\n"
+						 "  public function made():int { var v:Vector.<Vector2> = new Vector.<Vector2>(3); v.length = 5; v.push(new Vector2(1, 2));\n"
+						 "    var missing:int = 0; for (var i:int = 0; i < v.length; i++) { if (v[i] == null) missing++; } return missing; }\n"
+						 "  public function arrays():int { var a:Vector.<GodotArray> = new Vector.<GodotArray>(2); return a[0] == null ? 2 : 0; }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Holder.as", source);
+	compilation.check();
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	{
+		FakeEngine engine;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		uint32_t holder = 0;
+		for (size_t i = 0; i < module.classes.size(); i++) {
+			holder = module.classes[i].name == "Holder" ? (uint32_t)i : holder;
+		}
+		vm::Object *object = interpreter.construct(holder, engine.box());
+		vm::Slot result;
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "made", nullptr, 0, &result));
+		CHECK_EQ(result.i, 0);
+		size_t zeroes = 0;
+		for (size_t at = engine.log.find("construct Vector2() "); at != std::string::npos; at = engine.log.find("construct Vector2() ", at + 1)) {
+			zeroes++;
+		}
+		CHECK_EQ(zeroes, (size_t)5); // Three made, two grown by; what push() adds is its own.
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "arrays", nullptr, 0, &result));
+		CHECK_EQ(result.i, 2);
+		CHECK_EQ(engine.log.find("construct"), std::string::npos);
+		CHECK_EQ(engine.boxes, 1);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 // Operators on Godot's values are the engine's to carry out.
 static void test_engine_operators() {
 	const char *source = "package { import godot.*; public class Mover extends Node2D {\n"
@@ -2903,6 +2946,7 @@ int main() {
 	test_loop_markers();
 	test_engine_calls();
 	test_engine_prepared();
+	test_vector_of_values();
 	test_engine_operators();
 	test_kept_by_the_engine();
 	test_no_engine();

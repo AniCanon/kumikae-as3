@@ -232,6 +232,7 @@ private:
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
 	void raise_range(double p_index, uint32_t p_length);
 	bool resize_vector(Vector *p_vector, uint32_t p_length);
+	bool fill_zeroes(Vector *p_vector, uint32_t p_from);
 	bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value);
 	// Function values (interpreter_functions.cpp).
 	Object *make_function(uint32_t p_function, Object *p_first);

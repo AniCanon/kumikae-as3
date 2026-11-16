@@ -170,6 +170,7 @@ package {
 		public function action(name:String):Boolean { return InputMap.hasAction(name) && InputMap.hasAction("ui_accept"); }
 		public function angled(a:Number):Vector2 { return Vector2.fromAngle(a); }
 		public function parts(v:Vector2):Vector2 { var w:Vector2 = v; w.y = w.x * 2; w.x += 1; return w; }
+		public function zeroes(n:int):String { var v:Vector.<Vector2> = new Vector.<Vector2>(n); v.length = n + 1; var first:Vector2 = v[0]; first.x = 5; v[1] = first; return v[0] + " " + v[1] + " " + v[n]; }
 		public function sameTwice(v:Vector2, n:int):int { var count:int = 0; for (var i:int = 0; i < n; i++) { if (v * 2 == v + v) { count++; } } return count; }
 	}
 }

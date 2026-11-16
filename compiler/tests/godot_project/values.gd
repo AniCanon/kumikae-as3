@@ -186,6 +186,10 @@ func _physics_process(_delta: float) -> bool:
 	w.x += 1
 	show("parts", ask("parts", [a]), w)
 	show("same twice", ask("sameTwice", [a, 3]), 3)
+	var zeroes: Array[Vector2] = []
+	zeroes.resize(4)
+	zeroes[1] = Vector2(5, 0)
+	show("zeroes", ask("zeroes", [3]), str(zeroes[0]) + " " + str(zeroes[1]) + " " + str(zeroes[3]))
 	twin.free()
 	node.queue_free()
 	return true

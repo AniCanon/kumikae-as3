@@ -129,10 +129,6 @@ any Godot value passing as a condition):
   a whole float stays a float. My ruling, beside the Int64 rule the owner approved for typed values.
   **decision**
 
-## Stage 2c-1: vectors, `switch` and `Math`
-
-- `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
-
 ## Stage 2a: interpreter core
 
 
