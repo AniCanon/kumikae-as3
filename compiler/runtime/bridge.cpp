@@ -9,11 +9,6 @@ using ir::Kind;
 
 namespace {
 
-bool refuse(std::string *r_error) {
-	*r_error = "there is no engine here";
-	return false;
-}
-
 // A register of the frame that made the call, by its local's name: as it is held, with no new reference.
 Slot local(vm::Interpreter &p_interpreter, std::string_view p_name) {
 	Slot value = empty();
@@ -102,79 +97,6 @@ bool Bridge::call_static(std::string_view p_class, std::string_view p_method, co
 		take_updated(host_);
 	}
 	return true;
-}
-
-void *Bridge::construct(std::string_view, const vm::Argument *, size_t, std::string *r_error) {
-	refuse(r_error);
-	return nullptr;
-}
-void *Bridge::attach_new(uint32_t, Object *, std::string *r_error) {
-	refuse(r_error);
-	return nullptr;
-}
-void *Bridge::collection(std::string_view, ir::Kind, const Slot *, size_t, std::string *r_error) {
-	refuse(r_error);
-	return nullptr;
-}
-bool Bridge::constant(std::string_view, std::string_view, const vm::Wanted &, Slot *, std::string *r_error) {
-	return refuse(r_error);
-}
-bool Bridge::evaluate(std::string_view, const vm::Wanted &, Slot *, std::string *r_error) {
-	return refuse(r_error);
-}
-void *Bridge::singleton(std::string_view, std::string *r_error) {
-	refuse(r_error);
-	return nullptr;
-}
-void *Bridge::bind(Object *, uint32_t, void *, std::string *r_error) {
-	refuse(r_error);
-	return nullptr;
-}
-void *Bridge::copy(void *p_value) {
-	return p_value;
-}
-void Bridge::drop(void *) {}
-bool Bridge::present(void *p_value) {
-	return p_value != nullptr;
-}
-bool Bridge::is_class(void *, std::string_view) {
-	return false;
-}
-Str *Bridge::text(void *) {
-	return nullptr;
-}
-bool Bridge::keep(Object *) {
-	return false;
-}
-bool Bridge::call(void *, std::string_view, const vm::Argument *, size_t, const vm::Wanted &, Slot *, std::string *r_error) {
-	return refuse(r_error);
-}
-bool Bridge::get(void *, std::string_view, const vm::Wanted &, Slot *, std::string *r_error) {
-	return refuse(r_error);
-}
-bool Bridge::set(void *, std::string_view, const vm::Argument &, std::string *r_error) {
-	return refuse(r_error);
-}
-bool Bridge::member(void *, std::string_view, const vm::Wanted &, Slot *, std::string *r_error) {
-	return refuse(r_error);
-}
-bool Bridge::index_get(void *, const vm::Argument &, const vm::Wanted &, Slot *, std::string *r_error) {
-	return refuse(r_error);
-}
-bool Bridge::index_set(void *, const vm::Argument &, const vm::Argument &, std::string *r_error) {
-	return refuse(r_error);
-}
-bool Bridge::operate(std::string_view, const vm::Argument *, size_t, const vm::Wanted &, Slot *, std::string *r_error) {
-	return refuse(r_error);
-}
-uint64_t Bridge::node(void *) {
-	return 0;
-}
-bool Bridge::node_edges(uint64_t, vm::EngineNode *) {
-	return false;
-}
-std::vector<uint64_t> Bridge::let_go(const std::vector<uint64_t> &) {
-	return {};
 }
 
 } // namespace rt

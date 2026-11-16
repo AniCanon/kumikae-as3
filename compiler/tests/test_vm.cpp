@@ -562,7 +562,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	[[nodiscard]] bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
 		log += "static " + std::string(p_class) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
-		if (p_method == missing) {
+		if (p_method.substr(0, p_method.find(' ')) == missing) {
 			*r_error = "Godot has no '" + missing + "'";
 			return false;
 		}
@@ -581,7 +581,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		}
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
 	}
-	[[nodiscard]] bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
+	[[nodiscard]] bool operate(int, std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
 			std::string *r_error) override {
 		log += "operate " + std::string(p_operator) + " (" + list(p_arguments, p_count) + ") as " + ir::kind_name(p_wanted.kind) +
 				(p_wanted.type.empty() ? "" : " " + std::string(p_wanted.type)) + "\n";
@@ -865,6 +865,7 @@ static void test_engine_statics() {
 						 "  public function up():Number { return Vector2.UP.y; }\n"
 						 "  public function made(a:Number, b:Number):Vector2 { return Vector2.fromAngle(a + b); }\n"
 						 "  public function shown():void { Node.printOrphanNodes(); }\n"
+						 "  public function opened(iv:PackedByteArray):FileAccess { return FileAccess.openEncrypted(\"p\", 1, iv, iv); }\n"
 						 "  public function mixed(a:Number):Number { return lerpf(a, 2, 0.5); }\n"
 						 "  private function note():int { trace(\"note\"); return 0; }\n"
 						 "  public function order(other:Pad):Node { return other.getChild(note()); }\n"
@@ -942,11 +943,11 @@ static void test_engine_statics() {
 		arguments[1].bits = 0;
 		arguments[1].d = 2;
 		CHECK(interpreter.call_method(object, "made", arguments, 2, &result));
-		CHECK_EQ(engine.log, std::string("static Vector2.from_angle(3)\n"));
+		CHECK_EQ(engine.log, std::string("static Vector2.from_angle method 889263119 Vector2 float(3)\n"));
 		engine.drop(result.p);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "shown", nullptr, 0, nullptr));
-		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes 3218959716()\n"));
+		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes method 3218959716 void -()\n"));
 		// A global function is called on no class, with its signature for the engine's side.
 		engine.log.clear();
 		arguments[0].d = 1;
@@ -982,6 +983,13 @@ static void test_engine_statics() {
 		CHECK(interpreter.call_method(object, "nothing", nullptr, 0, &result));
 		CHECK(result.b);
 		CHECK_EQ(engine.boxes, 4); // The owner, the field, and the two singletons kept.
+		// A static method's default that AS3 can't write is Godot's, for a missing value given in its place.
+		engine.log.clear();
+		arguments[0].bits = 0;
+		CHECK(interpreter.call_method(object, "opened", arguments, 1, &result));
+		CHECK(engine.log.find("evaluate PackedByteArray() as PackedByteArray\n") != std::string::npos);
+		engine.drop(result.p);
+		CHECK_EQ(engine.boxes, 4);
 		// What the engine does not have is an AS3 error, and nothing is left behind. (A singleton not yet
 		// looked up: this interpreter has Input already.)
 		CHECK_EQ(engine.errors, std::string());
@@ -1009,6 +1017,154 @@ static void test_engine_statics() {
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+// An engine that works out each operator once, as the program is loaded, and carries out with it what it
+// worked out; one it can't carry out (a value of another type) is left to its requests by name.
+struct PreparingEngine : FakeEngine {
+	struct Worked : vm::Prepared {
+		std::string what;
+	};
+	std::vector<std::unique_ptr<Worked>> worked;
+	int prepared = 0;
+	bool refuse_to_run = false; // Leave every one to the requests by name.
+	[[nodiscard]] const vm::Prepared *prepare(const ir::Module &p_module, const ir::Function &, const ir::Instruction &p_in) override {
+		prepared++;
+		if (p_in.op != ir::Op::HostOperate) {
+			return nullptr;
+		}
+		worked.push_back(std::make_unique<Worked>());
+		worked.back()->what = p_module.engine_names[p_in.b].key;
+		return worked.back().get();
+	}
+	[[nodiscard]] bool run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
+			std::string *) override {
+		if (refuse_to_run) {
+			return false;
+		}
+		log += "run " + static_cast<const Worked &>(p_prepared).what + " (" + list(p_operands, p_count) + ")\n";
+		if (in_place && p_wanted.reuse) {
+			log += "into #" + std::to_string((intptr_t)p_wanted.reuse) + "\n";
+			r_result->p = p_wanted.reuse; // The handle the register holds, written over: no new one.
+			return true;
+		}
+		give(p_wanted.kind, r_result, 1, "");
+		return true;
+	}
+	// Write results into the handle the register holds, and assign values into handles, where it can.
+	bool in_place = false;
+	int assigned = 0;
+	[[nodiscard]] bool assign(void *, const void *) override {
+		assigned += in_place;
+		return in_place;
+	}
+};
+
+static void test_engine_prepared() {
+	const char *source = "package { import godot.*; public class Mover extends Node2D {\n"
+						 "  public function step(by:Vector2, n:int):Boolean { var v:Vector2 = position + by * n; return v == by; }\n"
+						 "  public function grow(by:Vector2, n:int):Vector2 { var v:Vector2 = by; for (var i:int = 0; i < n; i++) { v = v + by; } return v; }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Mover.as", source);
+	compilation.check();
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	size_t named = 0; // Engine instructions: those that name something of Godot's.
+	for (const ir::Function &function : module.functions) {
+		for (const ir::Instruction &in : function.code) {
+			named += std::strchr(ir::op_shape(in.op), 'E') != nullptr;
+		}
+	}
+	PreparingEngine engine;
+	{
+		vm::Interpreter interpreter(module, engine);
+		// Each was worked out once, when the program was loaded, and none is again as it runs.
+		CHECK_EQ((size_t)engine.prepared, named);
+		CHECK(interpreter.start());
+		uint32_t mover = 0;
+		for (size_t i = 0; i < module.classes.size(); i++) {
+			mover = module.classes[i].name == "Mover" ? (uint32_t)i : mover;
+		}
+		vm::Object *object = interpreter.construct(mover, engine.box());
+		vm::Slot arguments[2];
+		arguments[0].bits = 0;
+		arguments[0].p = engine.box();
+		arguments[1].bits = 0;
+		arguments[1].i = 3;
+		vm::Slot result;
+		for (bool refuse : { false, true }) {
+			engine.refuse_to_run = refuse;
+			engine.log.clear();
+			CHECK(interpreter.call_method(object, "step", arguments, 2, &result));
+			CHECK_EQ((size_t)engine.prepared, named);
+			// What the engine worked out runs, or what it leaves runs by name: never both.
+			CHECK_EQ(engine.log, refuse ? std::string("get #1.position\noperate * (#2, 3) as GodotValue Vector2\noperate + (#6, #7) as GodotValue Vector2\n"
+													  "operate == (#8, #2) as Boolean\n")
+										: std::string("get #1.position\nrun @operator.OP_MULTIPLY (#2, 3)\nrun @operator.OP_ADD (#3, #4)\n"
+													  "run @operator.OP_EQUAL (#5, #2)\n"));
+		}
+		CHECK_EQ(engine.boxes, 2);
+		// A loop's value made in the handle its register already holds, and assigned into the variable's:
+		// no handle is made for either once the loop runs, and none is lost.
+		engine.refuse_to_run = false;
+		engine.in_place = true;
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "grow", arguments, 2, &result));
+		CHECK_EQ(engine.log, std::string("run @operator.OP_ADD (#2, #2)\nrun @operator.OP_ADD (#2, #2)\ninto #9\nrun @operator.OP_ADD (#2, #2)\n"
+										 "into #9\n"));
+		CHECK_EQ(engine.assigned, 3); // Into the zero the variable starts at, then each time round.
+		CHECK_EQ(engine.boxes, 3); // The owner, the argument, and the result.
+		engine.drop(result.p);
+		engine.drop(arguments[0].p);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
+// A vector of one of Godot's value types with parts starts with that type's zero in each place, as a C#
+// array of structs does, and so does each place it grows by; a vector of any other Godot value starts null.
+static void test_vector_of_values() {
+	const char *source = "package { import godot.*; public class Holder extends Node {\n"
+						 "  public function made():int { var v:Vector.<Vector2> = new Vector.<Vector2>(3); v.length = 5; v.push(new Vector2(1, 2));\n"
+						 "    var missing:int = 0; for (var i:int = 0; i < v.length; i++) { if (v[i] == null) missing++; } return missing; }\n"
+						 "  public function arrays():int { var a:Vector.<GodotArray> = new Vector.<GodotArray>(2); return a[0] == null ? 2 : 0; }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Holder.as", source);
+	compilation.check();
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	{
+		FakeEngine engine;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		uint32_t holder = 0;
+		for (size_t i = 0; i < module.classes.size(); i++) {
+			holder = module.classes[i].name == "Holder" ? (uint32_t)i : holder;
+		}
+		vm::Object *object = interpreter.construct(holder, engine.box());
+		vm::Slot result;
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "made", nullptr, 0, &result));
+		CHECK_EQ(result.i, 0);
+		size_t zeroes = 0;
+		for (size_t at = engine.log.find("construct Vector2() "); at != std::string::npos; at = engine.log.find("construct Vector2() ", at + 1)) {
+			zeroes++;
+		}
+		CHECK_EQ(zeroes, (size_t)5); // Three made, two grown by; what push() adds is its own.
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "arrays", nullptr, 0, &result));
+		CHECK_EQ(result.i, 2);
+		CHECK_EQ(engine.log.find("construct"), std::string::npos);
+		CHECK_EQ(engine.boxes, 1);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
 // Operators on Godot's values are the engine's to carry out.
@@ -2789,6 +2945,8 @@ int main() {
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();
+	test_engine_prepared();
+	test_vector_of_values();
 	test_engine_operators();
 	test_kept_by_the_engine();
 	test_no_engine();

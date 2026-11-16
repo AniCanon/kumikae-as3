@@ -24,6 +24,10 @@ struct Argument {
 struct Wanted {
 	ir::Kind kind = ir::Kind::Void;
 	std::string_view type;
+	// For EngineHandles::run(): the handle the register the result goes to holds now, if any. The engine may
+	// write one of its values into it and give it back as the result, in place of a new one: a value the
+	// loop makes each time round then costs no handle.
+	void *reuse = nullptr;
 };
 
 // A thing of the engine's that the cycle collector (vm/collector.h) looks through: one that holds counted

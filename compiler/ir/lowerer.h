@@ -6,6 +6,7 @@
 
 #include "ast_walk.h"
 #include "builtins.h"
+#include "godot_names.h"
 #include "lower_env.h"
 #include "lower_flow.h"
 #include "whole_numbers.h"
@@ -53,6 +54,7 @@ class Lowerer {
 	std::unordered_map<std::string, uint32_t> strings_;
 	std::unordered_map<uint64_t, uint32_t> numbers_; // A Number constant by its bits.
 	std::unordered_map<int64_t, uint32_t> wides_;
+	std::unordered_map<uint32_t, uint32_t> engine_names_; // module_.engine_names by the name table's id.
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint32_t>> slot_names_; // Per class.
 	std::unordered_map<const Unit *, uint32_t> files_;
 
@@ -116,8 +118,13 @@ class Lowerer {
 	// A Godot class whose objects the engine owns (a node, a resource), as against a value type.
 	bool is_godot_object(const Symbol *p_class) const;
 
-	// Godot's own name for a member or (with no member) a class it declares.
-	bool engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_string);
+	// A member or (with no member) a class Godot declares, as an engine instruction names it: its entry in
+	// module_.engine_names (an E operand).
+	bool engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_name);
+	// The entry of Godot's name table of this key, in module_.engine_names; nothing if the table has none.
+	std::optional<uint32_t> engine_entry(std::string_view p_key);
+	// The operator Godot's description names so ("+", "unary-", "=="), as an engine name.
+	std::optional<uint32_t> engine_operator(std::string_view p_name);
 
 	// The kind a written type names; refused if the interpreter has no such values yet.
 	Kind written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing);
@@ -138,15 +145,20 @@ class Lowerer {
 
 	uint32_t reg(Kind p_kind);
 
-	// A register for what the engine gives back. The host checks what arrives against the type.
+	// A register of a kind, with Godot's type for it when it holds one of Godot's values or objects (every
+	// one of Godot's values has its type: a backend reads it, and the host checks what arrives against it).
 	uint32_t engine_reg(Kind p_kind, const Type *p_type);
+	// The same, with Godot's name for the type: "Vector2", "Callable", or "Variant" for any of Godot's values.
+	uint32_t engine_reg(Kind p_kind, std::string_view p_godot);
+	// A new register of the kind and Godot type of another.
+	uint32_t reg_like(uint32_t p_reg);
 
 	Kind kind_at(uint32_t p_reg) const;
 
 	uint32_t arguments(std::vector<uint32_t> p_list);
 
-	// The default value of a kind, in a new register.
-	uint32_t default_value(Kind p_kind, uint32_t p_position);
+	// The default value of a kind (of a type, if it is known), in a new register.
+	uint32_t default_value(Kind p_kind, uint32_t p_position, const Type *p_type = nullptr);
 
 	// The value in p_reg as p_to, in a new register unless it is that kind already.
 	// p_written: the program wrote the conversion itself (`int(x)`). That matters for an Int64 only: a

@@ -71,7 +71,7 @@ uint32_t Engine::zero_value(TypeRef *p_written, uint32_t p_position, uint32_t p_
 	if (!value_has_parts(type->symbol)) {
 		return NONE;
 	}
-	uint32_t out = p_into != NONE ? p_into : l_.reg(Kind::Val);
+	uint32_t out = p_into != NONE ? p_into : l_.engine_reg(Kind::Val, l_.module_.engine_names[name].name);
 	l_.emit(Op::HostNew, p_position, out, name, l_.arguments({}));
 	return out;
 }
@@ -151,7 +151,7 @@ auto Engine::constant_place(Symbol *p_symbol, uint32_t p_position) -> Lowerer::P
 	Place place;
 	Kind kind = Kind::Void;
 	const Type *type = p_symbol->type ? l_.compilation_.type_of(p_symbol->type) : nullptr;
-	uint32_t klass = 0, name = 0;
+	uint32_t name = 0;
 	Expr *value = nullptr;
 	if (p_symbol->node && p_symbol->node->kind == NodeKind::VarDecl) {
 		for (const Declarator &declarator : static_cast<VarDecl *>(p_symbol->node)->declarators) {
@@ -159,7 +159,7 @@ auto Engine::constant_place(Symbol *p_symbol, uint32_t p_position) -> Lowerer::P
 		}
 	}
 	if (p_symbol->kind != SymbolKind::Field || !type || !l_.kind_of(type, &kind) || kind == Kind::Void ||
-			(!value && (!l_.engine_name(p_symbol->owner, std::string_view(), &klass) || !l_.engine_name(p_symbol->owner, p_symbol->name, &name)))) {
+			(!value && !l_.engine_name(p_symbol->owner, p_symbol->name, &name))) {
 		l_.refuse(p_position, "'" + std::string(p_symbol->name) + "' of Godot's " + std::string(p_symbol->owner ? p_symbol->owner->name : "API"));
 		return place;
 	}
@@ -170,7 +170,7 @@ auto Engine::constant_place(Symbol *p_symbol, uint32_t p_position) -> Lowerer::P
 		place.index = l_.expression(value, kind);
 	} else {
 		place.index = l_.engine_reg(kind, type);
-		l_.emit(Op::HostConstant, p_position, place.index, klass, name);
+		l_.emit(Op::HostConstant, p_position, place.index, name);
 	}
 	return place;
 }
@@ -275,8 +275,15 @@ uint32_t Engine::engine_operate(TokenKind p_op, std::vector<uint32_t> p_operands
 			operand = l_.convert(operand, Kind::Ref, p_position); // `node == this`: the Godot object it is.
 		}
 	}
+	// Godot's description names a unary minus or plus "unary-" and "unary+".
+	const bool unary = p_operands.size() == 1 && (spelling == "-" || spelling == "+");
+	const std::optional<uint32_t> op = l_.engine_operator(unary ? "unary" + std::string(spelling) : std::string(spelling));
+	if (!op) {
+		l_.refuse(p_position, "the operator '" + std::string(spelling) + "' on Godot's values");
+		return l_.default_value(p_result, p_position);
+	}
 	uint32_t out = l_.engine_reg(p_result, p_type);
-	l_.emit(Op::HostOperate, p_position, out, l_.string(std::string(spelling)), l_.arguments(std::move(p_operands)));
+	l_.emit(Op::HostOperate, p_position, out, *op, l_.arguments(std::move(p_operands)));
 	return out;
 }
 

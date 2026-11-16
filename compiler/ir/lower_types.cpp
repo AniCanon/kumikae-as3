@@ -75,13 +75,46 @@ bool Lowerer::is_godot_object(const Symbol *p_class) const {
 	return false;
 }
 
-bool Lowerer::engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_string) {
-	const std::optional<std::string> name = p_class ? godot_name(p_class->name, p_member) : std::nullopt;
-	if (!name) {
+bool Lowerer::engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_name) {
+	if (!p_class) {
 		return false;
 	}
-	*r_string = string(*name);
-	return true;
+	const std::string key = p_member.empty() ? std::string(p_class->name) : std::string(p_class->name) + "." + std::string(p_member);
+	const std::optional<uint32_t> found = engine_entry(key);
+	if (found) {
+		*r_name = *found;
+	}
+	return found.has_value();
+}
+
+std::optional<uint32_t> Lowerer::engine_entry(std::string_view p_key) {
+	const std::optional<uint32_t> id = godot_entry(p_key);
+	if (!id) {
+		return std::nullopt;
+	}
+	if (auto known = engine_names_.find(*id); known != engine_names_.end()) {
+		return known->second;
+	}
+	const GodotEntry entry = godot_entry_at(*id);
+	EngineName name;
+	name.id = *id;
+	name.key = std::string(entry.key);
+	name.value = std::string(entry.value);
+	// A default's text is all one value; anything else starts with Godot's name.
+	name.name = entry.key.rfind("@default.", 0) == 0 ? name.value : name.value.substr(0, name.value.find(' '));
+	const size_t dot = entry.key.find('.');
+	if (entry.key[0] != '@' && dot != std::string_view::npos) {
+		name.owner = godot_name(entry.key.substr(0, dot), std::string_view()).value_or(std::string());
+	}
+	module_.engine_names.push_back(std::move(name));
+	const uint32_t index = (uint32_t)module_.engine_names.size() - 1;
+	engine_names_[*id] = index;
+	return index;
+}
+
+std::optional<uint32_t> Lowerer::engine_operator(std::string_view p_name) {
+	const std::optional<uint32_t> id = godot_operator(p_name);
+	return id ? engine_entry(godot_entry_at(*id).key) : std::nullopt;
 }
 
 Kind Lowerer::written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing) {
@@ -217,8 +250,9 @@ bool Lowerer::error_class(const Symbol *p_class, uint32_t *r_index) {
 	return true;
 }
 
-uint32_t Lowerer::default_value(Kind p_kind, uint32_t p_position) {
-	uint32_t out = reg(p_kind == Kind::Void ? Kind::F64 : p_kind);
+uint32_t Lowerer::default_value(Kind p_kind, uint32_t p_position, const Type *p_type) {
+	const Kind kind = p_kind == Kind::Void ? Kind::F64 : p_kind;
+	uint32_t out = engine_reg(kind, p_type);
 	switch (p_kind) {
 		case Kind::I32:
 			emit(Op::ConstI32, p_position, out, 0);

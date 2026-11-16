@@ -43,6 +43,7 @@ inline bool is_held(Kind p_kind) {
 //   L  an instruction index in the same function                     A  into the function's argument lists
 //   F  a function index    C  a class index    D  a field slot       G  a global slot    V  a method-table slot
 //   M  an interface method: an index into the module's interface_methods
+//   E  one of Godot's classes, members or operators: an index into the module's engine_names
 //   -  unused
 #define KAS3_IR_OPS(X) \
 	X(Stmt, "---") /* A statement starts here: where a debugger may stop. */ \
@@ -84,7 +85,8 @@ inline bool is_held(Kind p_kind) {
 	/* A method of a vector: out, which one (a VectorMethod), [the vector, then what the method takes]. */ \
 	X(VecCall, "rIA") \
 	X(IsClass, "RRC") X(AsClass, "RRC") \
-	/* The engine. Names are Godot's own. In HostCall the first argument is what the method is called on. */ \
+	/* The engine. What it names is an entry of Godot's name table (E). In HostCall the first argument is what \
+	   the method is called on. */ \
 	/* Int64. The constant is an index into the module's wide numbers. Arithmetic wraps at 64 bits. */ \
 	X(ConstI64, "RW-") \
 	X(AddI64, "RRR") X(SubI64, "RRR") X(MulI64, "RRR") X(ModI64, "RRR") X(NegI64, "RR-") \
@@ -97,9 +99,9 @@ inline bool is_held(Kind p_kind) {
 	X(I64ToI32, "RR-") X(I64ToU32, "RR-") X(I64ToF64, "RR-") X(F64ToI64, "RR-") \
 	/* Conversions the program wrote, int(x) and the rest: AS3's own, which cut, round or hold at the end. */ \
 	X(I64WrapI32, "RR-") X(I64WrapU32, "RR-") X(I64RoundF64, "RR-") X(F64ClampI64, "RR-") X(StrToI64, "RR-") X(StrToI64Checked, "RR-") \
-	X(HostNew, "RSA") X(HostCall, "rSA") X(HostGet, "RRS") X(HostSet, "RSR") \
-	/* An operator on Godot values: the operator as AS3 writes it ("+", "=="), and one or two operands. */ \
-	X(HostOperate, "RSA") \
+	X(HostNew, "REA") X(HostCall, "rEA") X(HostGet, "RRE") X(HostSet, "RER") \
+	/* An operator on Godot values: the operator (its entry, @operator.OP_ADD), and one or two operands. */ \
+	X(HostOperate, "REA") \
 	X(HostIndexGet, "RRR") X(HostIndexSet, "RRR") /* value[key]: out, value, key; and value, key, new element. */ \
 	/* A method bound to its object, as a function Godot can call: out, the object, and the function, or \
 	   with the top bit set a method-table slot to look up in the object's own class. */ \
@@ -107,24 +109,24 @@ inline bool is_held(Kind p_kind) {
 	X(HostMember, "RRR") /* object[name], the name being AS3's and known only now: out, object, name. */ \
 	X(HostToStr, "RR-") /* Godot's text for one of its values or objects; "null" for a missing one. */ \
 	X(HostPresent, "RR-") /* Is there an engine value here? Not if it is null, or an object Godot has freed. */ \
-	/* `is` and `as` with one of Godot's classes: out, the object, Godot's name for the class. HostAsClass \
+	/* `is` and `as` with one of Godot's classes: out, the object, the class (E). HostAsClass \
 	   gives the object, or null if it is not of that class. */ \
-	X(HostIsClass, "RRS") X(HostAsClass, "RRS") \
-	X(HostDefault, "RS-") /* The value of a default Godot declares, from Godot's own text for it. */ \
-	X(HostSingleton, "RS-") /* One of the engine's singletons (Input), by Godot's name for it. */ \
-	X(HostConstant, "RSS") /* A constant Godot keeps: out, the type, the constant (Vector2, ZERO). */ \
-	X(HostCallStatic, "rSA") /* A method called on no object: "Vector2.from_angle", and its arguments. */ \
-	/* A vector as one of Godot's collections: out, the vector, Godot's name for the type wanted. */ \
-	X(HostCollection, "RRS") \
+	X(HostIsClass, "RRE") X(HostAsClass, "RRE") \
+	X(HostDefault, "RE-") /* The value of a default Godot declares, from Godot's own text for it (its @default entry). */ \
+	X(HostSingleton, "RE-") /* One of the engine's singletons (Input), by its class. */ \
+	X(HostConstant, "RE-") /* A constant Godot keeps for one of its types: out, the constant (Vector2.ZERO). */ \
+	X(HostCallStatic, "rEA") /* A method called on no object (Vector2.fromAngle), or a global function (@global.lerpf). */ \
+	/* A vector as one of Godot's collections: out, the vector, the type wanted (E). */ \
+	X(HostCollection, "RRE") \
 	/* The untyped value. AnyConst: 0 undefined, 1 null. ToAny takes any kind; FromAny converts to the \
-	   out register's kind as a store does (AS3's coercion), checking a class (an object), or Godot's \
-	   name for a type (a Godot object) when the third operand is not NONE; into an untyped register, \
+	   out register's kind as a store does (AS3's coercion), checking a class (an object), or one of \
+	   Godot's types (a Godot object: an engine name, E) when the third operand is not NONE; into an untyped register, \
 	   any third operand but NONE means an `Object`, where undefined is null. AnyText is String(x). \
 	   AnyIs: the third operand is a class, or one of the ANY_IS_ codes. AnyIsGodot: whether it holds an \
-	   object of the Godot class of that name, or of one that extends it. */ \
+	   object of that Godot class, or of one that extends it. */ \
 	X(AnyConst, "RI-") X(ToAny, "RR-") X(FromAny, "RRI") X(AnyText, "RR-") X(AnyTypeof, "RR-") \
 	X(AnyEq, "RRR") X(AnyStrictEq, "RRR") X(AnyAdd, "RRR") X(AnyLt, "RRR") X(AnyLe, "RRR") X(AnyGt, "RRR") X(AnyGe, "RRR") \
-	X(AnyIs, "RRI") X(AnyIsGodot, "RRS") \
+	X(AnyIs, "RRI") X(AnyIsGodot, "RRE") \
 	X(Return, "R--") X(ReturnVoid, "---") \
 	X(Throw, "R--") /* An untyped value: AS3 throws any value. */ \
 	X(OwnerOf, "RR-") /* A script object as the Godot object it is attached to; null for null. */ \

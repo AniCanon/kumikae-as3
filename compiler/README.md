@@ -367,7 +367,8 @@ package {
 - Static methods: `Vector2.fromAngle(a)`, `Color.html("#ff8000")`, `Image.createEmpty(...)`.
 - A variable of a Godot value that has parts (`Vector2`, `Color`, `Transform2D`) starts at the type's zero
   when no value is written, as in GDScript. `null` can still be assigned. Any other Godot value (an array,
-  a signal) starts missing.
+  a signal) starts missing. So does each place of a vector of one: `new Vector.<Vector2>(3)` holds three
+  zero vectors, as a C# array of structs does, and setting a longer `length` adds zeroes.
 - Godot's integer is an AS3 type, `Int64`. `items.size()`, `randi()` and an object's id are `Int64`s.
   One converts to an `int`, a `uint` or a `Number` where that is expected, and a `RangeError` says so if
   the value does not fit; `int(x)` written out cuts it, as in Flash. Arithmetic on it wraps at 64 bits,
@@ -413,11 +414,17 @@ How it works:
   script loads. A script that fails to compile is reported once, and no script loads.
 - **The interpreter does not know Godot.** `vm/host.h` is the whole boundary: four small interfaces. The extension implements them
   with Godot's own calls; the tests implement it with a recorder.
-- **Godot's names come from Godot.** `godot/godot_names.txt` (21,519 names, written by the generator from
+- **Godot's names come from Godot.** `godot/godot_names.txt` (21,940 entries, written by the generator from
   Godot's API description) says that `moveAndSlide` is `move_and_slide`. Nothing is worked out backwards
   from the AS3 name.
-- **In the interpreter a Godot value is boxed** and calls go by name. That is the simple, slow path, in
-  GDScript's range. The same typed IR will give the native backend direct calls and inline values.
+- **In the interpreter a Godot value is boxed** (a handle). The IR names each operator, method, property
+  and constant by its entry in the name table, and every register that holds one of Godot's values carries
+  its type, so operators, methods, properties, constants and new values are found once when the program
+  loads (an operator's evaluator for its operands' types, a method bind called on the bare values where
+  its signature allows) and none of them is looked up by name as it runs. The rest (making one of Godot's
+  objects, `is` and `as`, a vector handed to Godot, a value of another type than the one worked out) goes
+  by Godot's name, made into a StringName once. The same typed IR will give the native backend direct
+  calls and inline values.
 - **Calls can nest.** The engine calls a script, which calls the engine, which may call a script again,
   up to 64 levels deep.
 

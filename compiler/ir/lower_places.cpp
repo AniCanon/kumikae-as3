@@ -65,6 +65,7 @@ auto Lowerer::place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_po
 		place.where = Place::GlobalSlot;
 		place.index = global->second;
 		place.kind = module_.globals[global->second].kind;
+		place.type = p_symbol->type ? compilation_.type_of(p_symbol->type) : nullptr;
 		return place;
 	}
 	auto field = fields_.find(p_symbol);
@@ -75,6 +76,7 @@ auto Lowerer::place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_po
 			place.index = field->second;
 			place.object = p_object;
 			place.kind = module_.classes[owner].fields[field->second].kind;
+			place.type = p_symbol->type ? compilation_.type_of(p_symbol->type) : nullptr;
 			return place;
 		}
 	}
@@ -177,12 +179,12 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 		case Place::Register:
 			return p_place.index;
 		case Place::FieldOf: {
-			uint32_t out = reg(p_place.kind);
+			uint32_t out = engine_reg(p_place.kind, p_place.type);
 			emit(Op::GetField, p_position, out, p_place.object, p_place.index);
 			return out;
 		}
 		case Place::GlobalSlot: {
-			uint32_t out = reg(p_place.kind);
+			uint32_t out = engine_reg(p_place.kind, p_place.type);
 			emit(Op::GetGlobal, p_position, out, p_place.index);
 			return out;
 		}
@@ -202,7 +204,7 @@ uint32_t Lowerer::load(const Place &p_place, uint32_t p_position) {
 		case Place::Element:
 		case Place::Length:
 		case Place::Fixed: {
-			uint32_t out = reg(p_place.kind);
+			uint32_t out = engine_reg(p_place.kind, p_place.type);
 			if (p_place.where == Place::Element) {
 				emit(Op::VecGet, p_position, out, p_place.object, p_place.key);
 			} else {

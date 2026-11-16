@@ -33,6 +33,8 @@ struct Request {
 	Slot *registers;
 	Str *null_text;
 	void **singleton = nullptr; // For HostSingleton: where the singleton is kept once it is found.
+	const Prepared *prepared = nullptr; // What the host worked out for the instruction when it was loaded.
+	const std::vector<OperatorName> *operators = nullptr; // The interpreter's, by engine name.
 
 	std::string error;
 	Slot result{};
@@ -44,7 +46,9 @@ struct Request {
 		result.bits = 0; // All of it: `{}` on a union clears its first member only, which is half a pointer.
 	}
 
-	const std::string &text(uint32_t p_string) const { return module.strings[p_string]; }
+	// Godot's name for what an engine instruction names (an E operand).
+	const ir::EngineName &engine(uint32_t p_name) const { return module.engine_names[p_name]; }
+	const std::string &name(uint32_t p_name) const { return module.engine_names[p_name].name; }
 	void *handle(uint32_t p_register) const { return registers[p_register].p; }
 	Argument argument(uint32_t p_register) const { return Argument{ function.registers[p_register], registers[p_register] }; }
 
@@ -58,7 +62,8 @@ struct Request {
 		Wanted want;
 		if (target != NONE) {
 			want.kind = function.registers[target];
-			if (target < function.engine_types.size()) {
+			// "Variant" is any of Godot's values: no one type is asked for.
+			if (target < function.engine_types.size() && function.engine_types[target] != ir::ANY_GODOT_TYPE) {
 				want.type = function.engine_types[target];
 			}
 		}
@@ -91,10 +96,29 @@ public:
 	size_t count() const { return count_; }
 };
 
+// The instruction the host's own way, as it worked it out when the program was loaded (into() is called
+// first): Done or Refused, or nothing when there is no such way or the host can't take it with these values.
+std::optional<Outcome> prepared(Request &p_request, const Argument *p_operands, size_t p_count) {
+	if (!p_request.prepared) {
+		return std::nullopt;
+	}
+	vm::Wanted wanted = p_request.wanted();
+	if (p_request.target != NONE && p_request.kind == Kind::Val) {
+		wanted.reuse = p_request.registers[p_request.target].p;
+	}
+	if (p_request.host.handles.run(*p_request.prepared, p_operands, p_count, wanted, p_request.result_or_none(), &p_request.error)) {
+		return Outcome::Done;
+	}
+	return p_request.error.empty() ? std::nullopt : std::optional<Outcome>(Outcome::Refused);
+}
+
 Outcome construct(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
 	p_request.into(p_request.in.a); // One of Godot's values, or one of its objects.
-	p_request.result.p = p_request.host.source.construct(p_request.text(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
+	if (const std::optional<Outcome> outcome = prepared(p_request, arguments.values(), arguments.count())) {
+		return *outcome;
+	}
+	p_request.result.p =p_request.host.source.construct(p_request.name(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -108,7 +132,7 @@ Outcome collection(Request &p_request) {
 		return Outcome::Done;
 	}
 	const Kind element = p_request.module.classes[vector->klass].element;
-	p_request.result.p = p_request.host.source.collection(p_request.text(p_request.in.c), element, vector->data, vector->length, &p_request.error);
+	p_request.result.p = p_request.host.source.collection(p_request.name(p_request.in.c), element, vector->data, vector->length, &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -118,17 +142,23 @@ Outcome call(Request &p_request) {
 	if (!receiver) {
 		return Outcome::Missing;
 	}
-	const Gathered arguments(p_request, p_request.in.c, 1);
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.handles.call(receiver, p_request.text(p_request.in.b), arguments.values(), arguments.count(),
+	if (p_request.prepared) {
+		const Gathered operands(p_request, p_request.in.c, 0);
+		if (const std::optional<Outcome> outcome = prepared(p_request, operands.values(), operands.count())) {
+			return *outcome;
+		}
+	}
+	const Gathered arguments(p_request, p_request.in.c, 1);
+	return p_request.done(p_request.host.handles.call(receiver, p_request.name(p_request.in.b), arguments.values(), arguments.count(),
 			p_request.wanted(), p_request.result_or_none(), &p_request.error));
 }
 
 Outcome operate(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
-	const std::string &op = p_request.text(p_request.in.b);
+	const OperatorName &op = (*p_request.operators)[p_request.in.b];
 	// Only a comparison takes a missing value: `node == null`. Arithmetic on one is an error.
-	if (op != "==" && op != "!=") {
+	if (!op.compares) {
 		for (size_t i = 0; i < arguments.count(); i++) {
 			if (ir::is_engine(arguments.values()[i].kind) && !arguments.values()[i].slot.p) {
 				return Outcome::Missing;
@@ -136,7 +166,10 @@ Outcome operate(Request &p_request) {
 		}
 	}
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.handles.operate(op, arguments.values(), arguments.count(), p_request.wanted(), &p_request.result,
+	if (const std::optional<Outcome> outcome = prepared(p_request, arguments.values(), arguments.count())) {
+		return *outcome;
+	}
+	return p_request.done(p_request.host.handles.operate(op.number, op.spelling, arguments.values(), arguments.count(), p_request.wanted(), &p_request.result,
 			&p_request.error));
 }
 
@@ -145,7 +178,7 @@ Outcome singleton(Request &p_request) {
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Ref;
 	if (!*p_request.singleton) {
-		*p_request.singleton = p_request.host.source.singleton(p_request.text(p_request.in.b), &p_request.error);
+		*p_request.singleton = p_request.host.source.singleton(p_request.name(p_request.in.b), &p_request.error);
 		if (!*p_request.singleton) {
 			return Outcome::Refused;
 		}
@@ -156,23 +189,29 @@ Outcome singleton(Request &p_request) {
 
 Outcome evaluate(Request &p_request) {
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.source.evaluate(p_request.text(p_request.in.b), p_request.wanted(), &p_request.result, &p_request.error));
+	return p_request.done(p_request.host.source.evaluate(p_request.name(p_request.in.b), p_request.wanted(), &p_request.result, &p_request.error));
 }
 
 Outcome constant(Request &p_request) {
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.source.constant(p_request.text(p_request.in.b), p_request.text(p_request.in.c), p_request.wanted(),
-			&p_request.result, &p_request.error));
+	if (const std::optional<Outcome> outcome = prepared(p_request, nullptr, 0)) {
+		return *outcome;
+	}
+	const ir::EngineName &constant = p_request.engine(p_request.in.b);
+	return p_request.done(p_request.host.source.constant(constant.owner, constant.name, p_request.wanted(), &p_request.result, &p_request.error));
 }
 
+// A class's method ("Vector2", and its whole entry, "from_angle method 889263119 Vector2 float"), or a
+// global function (no class, and its signature).
 Outcome call_static(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
-	// "Vector2.from_angle": the type, and the method.
-	const std::string_view name = p_request.text(p_request.in.b);
-	const size_t dot = name.rfind('.');
+	const ir::EngineName &method = p_request.engine(p_request.in.b);
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.source.call_static(name.substr(0, dot), name.substr(dot + 1), arguments.values(), arguments.count(),
-			p_request.wanted(), p_request.result_or_none(), &p_request.error));
+	if (const std::optional<Outcome> outcome = prepared(p_request, arguments.values(), arguments.count())) {
+		return *outcome;
+	}
+	return p_request.done(p_request.host.source.call_static(method.owner, method.value, arguments.values(), arguments.count(), p_request.wanted(),
+			p_request.result_or_none(), &p_request.error));
 }
 
 Outcome present(Request &p_request) {
@@ -186,7 +225,7 @@ Outcome present(Request &p_request) {
 // `is` and `as` with one of Godot's classes.
 Outcome class_test(Request &p_request) {
 	void *value = p_request.handle(p_request.in.b);
-	const bool fits = value != nullptr && p_request.host.handles.is_class(value, p_request.text(p_request.in.c));
+	const bool fits = value != nullptr && p_request.host.handles.is_class(value, p_request.name(p_request.in.c));
 	p_request.target = p_request.in.a;
 	if (p_request.in.op == Op::HostIsClass) {
 		p_request.kind = Kind::Bool;
@@ -222,7 +261,11 @@ Outcome get(Request &p_request) {
 		return Outcome::Missing;
 	}
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.handles.get(receiver, p_request.text(p_request.in.c), p_request.wanted(), &p_request.result,
+	const Argument operand = p_request.argument(p_request.in.b);
+	if (const std::optional<Outcome> outcome = prepared(p_request, &operand, 1)) {
+		return *outcome;
+	}
+	return p_request.done(p_request.host.handles.get(receiver, p_request.name(p_request.in.c), p_request.wanted(), &p_request.result,
 			&p_request.error));
 }
 
@@ -231,7 +274,11 @@ Outcome set(Request &p_request) {
 	if (!receiver) {
 		return Outcome::Missing;
 	}
-	return p_request.done(p_request.host.handles.set(receiver, p_request.text(p_request.in.b), p_request.argument(p_request.in.c), &p_request.error));
+	const Argument operands[2] = { p_request.argument(p_request.in.a), p_request.argument(p_request.in.c) };
+	if (const std::optional<Outcome> outcome = prepared(p_request, operands, 2)) {
+		return *outcome;
+	}
+	return p_request.done(p_request.host.handles.set(receiver, p_request.name(p_request.in.b), p_request.argument(p_request.in.c), &p_request.error));
 }
 
 Outcome bind(Request &p_request) {
@@ -399,14 +446,23 @@ Outcome perform(Request &p_request) {
 // One request to the engine. Raises an AS3 error if the engine refuses.
 void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	const size_t frame_index = frames_.size() - 1;
-	if (const std::optional<std::string> why = refused_by_godot(p_function, p_in, stack_.data() + frames_.back().base)) {
-		raise(module_.type_error_class, *why);
-		return;
+	EngineStep step;
+	if (const size_t f = (size_t)(&p_function - module_.functions.data()); !prepared_[f].empty()) {
+		step = prepared_[f][(size_t)(&p_in - p_function.code.data())];
+	}
+	// Only an untyped operand can hold what Godot can't take; a prepared instruction knows whether it has one.
+	if (!step.prepared || step.untyped) {
+		if (const std::optional<std::string> why = refused_by_godot(p_function, p_in, stack_.data() + frames_.back().base)) {
+			raise(module_.type_error_class, *why);
+			return;
+		}
 	}
 	Request request(module_, host_, p_function, p_in, stack_.data() + frames_.back().base, null_text_);
+	request.operators = &operators_;
+	request.prepared = step.prepared;
 	if (p_in.op == Op::HostSingleton) {
 		if (singletons_.size() <= p_in.b) {
-			singletons_.resize(module_.strings.size(), nullptr);
+			singletons_.resize(module_.engine_names.size(), nullptr);
 		}
 		request.singleton = &singletons_[p_in.b];
 	}
@@ -435,7 +491,11 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	}
 	// The frame is found again by its number: the engine may have called back in and moved the stack.
 	if (request.target != NONE && frame_index < frames_.size()) {
-		put(request.kind, stack_[frames_[frame_index].base + request.target], request.result);
+		Slot &target = stack_[frames_[frame_index].base + request.target];
+		// The engine wrote the result into the handle the register holds (Wanted::reuse): it stays.
+		if (!(ir::is_engine(request.kind) && request.result.p && request.result.p == target.p)) {
+			put(request.kind, target, request.result);
+		}
 	}
 }
 

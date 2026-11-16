@@ -296,7 +296,8 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 			raise(module_.range_error_class, "Error #1005: Array index is not a positive integer (" + number_to_string(value.d) + ").");
 			return false;
 		}
-		return length_is_fixed(p_vector) || *length == p_vector->length || resize_vector(p_vector, *length);
+		const uint32_t old = p_vector->length;
+		return length_is_fixed(p_vector) || *length == old || (resize_vector(p_vector, *length) && fill_zeroes(p_vector, old));
 	}
 	const uint32_t at = *p_key.index;
 	if (!klass.array && (at > p_vector->length || (p_vector->fixed && at == p_vector->length))) {

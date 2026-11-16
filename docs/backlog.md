@@ -79,9 +79,6 @@ the review of the clean-up put off.
 ## Stage 2c-3: `try`, `catch`, `finally`, labels
 
 
-## Stage 2c-1: vectors, `switch` and `Math`
-
-- `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
 
 ## Stage 2a: interpreter core
 

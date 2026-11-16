@@ -316,37 +316,12 @@ bool GodotHost::call(void *p_receiver, std::string_view p_method, const vm::Argu
 	return take(p_result, result, p_method, r_result, r_error);
 }
 
-// AS3's spelling of an operator, as Godot's. With one operand, '-' and '+' are the unary ones.
-static std::optional<Variant::Operator> operator_of(std::string_view p_operator, size_t p_count) {
-	static const struct {
-		const char *spelling;
-		Variant::Operator op;
-	} TABLE[] = {
-		{ "==", Variant::OP_EQUAL }, { "!=", Variant::OP_NOT_EQUAL }, { "<", Variant::OP_LESS }, { "<=", Variant::OP_LESS_EQUAL },
-		{ ">", Variant::OP_GREATER }, { ">=", Variant::OP_GREATER_EQUAL }, { "+", Variant::OP_ADD }, { "-", Variant::OP_SUBTRACT },
-		{ "*", Variant::OP_MULTIPLY }, { "/", Variant::OP_DIVIDE }, { "%", Variant::OP_MODULE }, { "<<", Variant::OP_SHIFT_LEFT },
-		{ ">>", Variant::OP_SHIFT_RIGHT }, { "&", Variant::OP_BIT_AND }, { "|", Variant::OP_BIT_OR }, { "^", Variant::OP_BIT_XOR },
-	};
-	if (p_count == 1) {
-		if (p_operator == "-" || p_operator == "+") {
-			return p_operator == "-" ? Variant::OP_NEGATE : Variant::OP_POSITIVE;
-		}
-		if (p_operator == "~") {
-			return Variant::OP_BIT_NEGATE;
-		}
-		return std::nullopt;
-	}
-	for (const auto &entry : TABLE) {
-		if (p_operator == entry.spelling) {
-			return entry.op;
-		}
-	}
-	return std::nullopt;
-}
-
-bool GodotHost::operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
+// The operator is Godot's own number for it, from its entry in the name table: nothing here reads its text.
+bool GodotHost::operate(int p_number, std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
-	const std::optional<Variant::Operator> op = p_count < 1 || p_count > 2 ? std::nullopt : operator_of(p_operator, p_count);
+	const std::optional<Variant::Operator> op = p_count < 1 || p_count > 2 || p_number < 0 || p_number >= Variant::OP_MAX
+			? std::nullopt
+			: std::optional<Variant::Operator>((Variant::Operator)p_number);
 	if (!op) {
 		*r_error = "Godot has no operator '" + std::string(p_operator) + "'";
 		return false;

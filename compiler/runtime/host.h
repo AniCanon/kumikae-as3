@@ -8,6 +8,7 @@
 #pragma once
 
 #include "interpreter.h"
+#include "no_engine.h"
 #include "operations.h"
 #include "program.h"
 
@@ -45,40 +46,14 @@ struct KeptTrace {
 };
 
 // The engine the interpreter is given: there is none, but for the calls of BRIDGE.
-class Bridge final : public vm::EngineHandles, public vm::EngineSource {
+class Bridge final : public vm::NoEngine {
 	Host &host_;
 
 public:
 	explicit Bridge(Host &p_host) :
 			host_(p_host) {}
-	[[nodiscard]] void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) override;
-	[[nodiscard]] void *attach_new(uint32_t p_class, Object *p_object, std::string *r_error) override;
-	[[nodiscard]] void *collection(std::string_view p_type, ir::Kind p_kind, const Slot *p_elements, size_t p_count, std::string *r_error) override;
-	[[nodiscard]] bool constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, Slot *r_result,
-			std::string *r_error) override;
-	[[nodiscard]] bool evaluate(std::string_view p_expression, const vm::Wanted &p_result, Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] void *singleton(std::string_view p_class, std::string *r_error) override;
 	[[nodiscard]] bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_result, Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] void *bind(Object *p_object, uint32_t p_function, void *p_owner, std::string *r_error) override;
-	[[nodiscard]] void *copy(void *p_value) override;
-	void drop(void *p_value) override;
-	[[nodiscard]] bool present(void *p_value) override;
-	[[nodiscard]] bool is_class(void *p_value, std::string_view p_class) override;
-	[[nodiscard]] Str *text(void *p_value) override;
-	[[nodiscard]] bool keep(Object *p_object) override;
-	[[nodiscard]] bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
-			const vm::Wanted &p_result, Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] bool get(void *p_receiver, std::string_view p_property, const vm::Wanted &p_result, Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] bool set(void *p_receiver, std::string_view p_property, const vm::Argument &p_value, std::string *r_error) override;
-	[[nodiscard]] bool member(void *p_receiver, std::string_view p_name, const vm::Wanted &p_result, Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] bool index_get(void *p_receiver, const vm::Argument &p_key, const vm::Wanted &p_result, Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] bool index_set(void *p_receiver, const vm::Argument &p_key, const vm::Argument &p_value, std::string *r_error) override;
-	[[nodiscard]] bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
-			Slot *r_result, std::string *r_error) override;
-	[[nodiscard]] uint64_t node(void *p_handle) override;
-	[[nodiscard]] bool node_edges(uint64_t p_node, vm::EngineNode *r_node) override;
-	[[nodiscard]] std::vector<uint64_t> let_go(const std::vector<uint64_t> &p_nodes) override;
 };
 
 struct Host {

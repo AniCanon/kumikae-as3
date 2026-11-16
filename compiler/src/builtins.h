@@ -24,6 +24,7 @@ inline const char *const GODOT_DECLARATIONS_PATH = "<godot>/godot.as";
 // ("CharacterBody2D", "moveAndSlide"), "Object" for the class "GodotObject" (an empty member). The class is
 // the one that declares the member, not a subclass. Nothing if nothing of that name is declared. The names
 // come from Godot's API description (compiler/godot/godot_names.txt), never from reversing the AS3 name.
+// Only the name: what the table says of the member besides is godot_value()'s (godot_names.h).
 std::optional<std::string> godot_name(std::string_view p_class, std::string_view p_member);
 std::string godot_names_text();
 

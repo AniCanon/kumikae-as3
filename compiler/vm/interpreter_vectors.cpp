@@ -105,6 +105,24 @@ bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 	return true;
 }
 
+// The places of a vector from p_from to its end, empty until now, each given the zero of its Godot value type
+// where the class says so (ir::Class::element_zero). False, with the error raised, if the engine can't make one.
+bool Interpreter::fill_zeroes(Vector *p_vector, uint32_t p_from) {
+	const ir::Class &klass = module_.classes[p_vector->klass];
+	if (!klass.element_zero) {
+		return true;
+	}
+	for (uint32_t i = p_from; i < p_vector->length; i++) {
+		std::string error;
+		p_vector->data[i].p = host_.source.construct(klass.element_type, nullptr, 0, &error);
+		if (!p_vector->data[i].p) {
+			raise(module_.error_class, error.empty() ? "the engine refused" : error);
+			return false;
+		}
+	}
+	return true;
+}
+
 // ArrayNew, and VecNew: a vector of the length asked for, fixed or not.
 void Interpreter::vector_new(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	Slot *r = p_registers;
@@ -120,6 +138,7 @@ void Interpreter::vector_new(const Function &p_function, const Instruction &p_in
 		return;
 	}
 	assign(Kind::Obj, r[p_in.a], made);
+	fill_zeroes(made, 0);
 }
 
 // VecGet at an index that names no element: of an Array, the property named by the number; of a Vector,
@@ -193,7 +212,10 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		case Op::VecSetLength:
 			// A fixed vector's length can't be set at all, even to what it is (AVM2 checks first).
 			if (!length_is_fixed(vector) && r[p_in.b].u != vector->length) {
-				resize_vector(vector, r[p_in.b].u);
+				const uint32_t old = vector->length;
+				if (resize_vector(vector, r[p_in.b].u)) {
+					fill_zeroes(vector, old);
+				}
 			}
 			break;
 		case Op::VecFixed:

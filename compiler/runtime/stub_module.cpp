@@ -20,7 +20,7 @@ std::string missing_local(uint32_t p_index) {
 
 namespace {
 
-// The numbers of the bridge's names among the module's strings, after the program's.
+// The numbers of the bridge's names among the module's engine names: an engine instruction names what it asks for there.
 struct Names {
 	uint32_t call, caught, updated;
 };
@@ -194,8 +194,13 @@ ir::Module stub_module(const Program &p_program) {
 	}
 	Names names;
 	const auto name = [&](std::string_view p_method) {
-		module.strings.push_back(std::string(BRIDGE) + "." + std::string(p_method));
-		return static_cast<uint32_t>(module.strings.size() - 1);
+		ir::EngineName entry;
+		entry.key = std::string(BRIDGE) + "." + std::string(p_method);
+		entry.value = std::string(p_method);
+		entry.name = entry.value;
+		entry.owner = std::string(BRIDGE);
+		module.engine_names.push_back(std::move(entry));
+		return static_cast<uint32_t>(module.engine_names.size() - 1);
 	};
 	names.call = name(BRIDGE_CALL);
 	names.caught = name(BRIDGE_CAUGHT);

@@ -76,6 +76,23 @@ struct VectorCall {
 	ir::VectorMethod method;
 };
 
+// An operator an engine instruction names, worked out once from its entry: AS3's spelling ("-" for the
+// description's "unary-"), and whether it compares (== and !=, which take a missing value).
+struct OperatorName {
+	std::string_view spelling;
+	bool compares = false;
+	int number = -1; // Godot's number for it (Variant::Operator), the entry's second word.
+};
+
+struct Prepared; // vm/engine_handles.h
+
+// What the host worked out for one engine instruction when the program was loaded, and whether any of its
+// operands is untyped (what refused_by_godot() has to look at as it runs).
+struct EngineStep {
+	const Prepared *prepared = nullptr;
+	bool untyped = false;
+};
+
 // A field sortOn() sorts by, and its options.
 struct SortField {
 	std::string name;

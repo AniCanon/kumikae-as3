@@ -199,6 +199,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				break;
 			case Op::Move: {
 				Kind kind = function.registers[in.a];
+				if (kind == Kind::Val && r[in.a].p && r[in.b].p && host_.handles.assign(r[in.a].p, r[in.b].p)) {
+					break;
+				}
 				put(kind, r[in.a], share(kind, r[in.b]));
 				break;
 			}

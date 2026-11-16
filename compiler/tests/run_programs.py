@@ -7,6 +7,7 @@ Usage: run_programs.py <path to kas3c> <tests dir> [--update]
                       must be empty and the status 0.
   run/X.args          the files of a program of several files, the entry file first, instead of X.as.
   run/X.ir            if present, `kas3c ir` of the program must print it.
+  run/godot/X.as      a script for Godot: `kas3c ir --godot` of it must print X.ir (it does not run here).
   run/refused/X.as    uses something the interpreter does not run yet: status 1, nothing on standard
                       output, and X.err on standard error.
   corpus/, golden/    every other test program: it runs or is refused, and never crashes.
@@ -74,6 +75,16 @@ for name in names:
     check(name + " status", result.returncode == (1 if fails else 0), "exit %d" % result.returncode)
     if os.path.exists(base + ".ir"):
         compare(name + " ir", run("ir", files, folder).stdout, base + ".ir")
+
+for path in sorted(glob.glob(os.path.join(folder, "godot", "*.as"))):
+    name = "godot/" + os.path.basename(path)
+    compare(name + " ir", run("ir", ["--godot", os.path.basename(path)], os.path.dirname(path)).stdout, path[:-3] + ".ir")
+
+# Every register that holds one of Godot's values says which type, in each script of the Godot test project.
+project = os.path.join(tests, "godot_project")
+lowered = run("ir", ["--godot"] + sorted(os.path.basename(path) for path in glob.glob(os.path.join(project, "*.as"))), project)
+untyped = [line for line in lowered.stdout.splitlines() if line.startswith("  godot ") and ":?" in line]
+check("godot_project ir", lowered.returncode == 0 and not untyped, "\n".join(untyped[:5]) or lowered.stderr[-600:])
 
 refused = os.path.join(folder, "refused")
 for path in sorted(glob.glob(os.path.join(refused, "*.as"))):

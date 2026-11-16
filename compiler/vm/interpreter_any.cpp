@@ -227,7 +227,7 @@ bool Interpreter::engine_from_any(Slot p_value, Kind p_kind, uint32_t p_check, S
 	const AnyTag tag = any::tag(p_value);
 	const bool nothing = tag == AnyTag::Undefined || tag == AnyTag::Null;
 	const bool fits = (p_kind == Kind::Val ? tag == AnyTag::Value : tag == AnyTag::Godot) &&
-			(p_check == NONE || host_.handles.is_class(any::pointer(p_value), module_.strings[p_check]));
+			(p_check == NONE || host_.handles.is_class(any::pointer(p_value), module_.engine_names[p_check].name));
 	if (nothing || fits) {
 		r_out->p = nothing ? nullptr : host_.handles.copy(any::pointer(p_value));
 		return true;
@@ -240,7 +240,7 @@ bool Interpreter::engine_from_any(Slot p_value, Kind p_kind, uint32_t p_check, S
 bool Interpreter::coercion_failed(Slot p_value, Kind p_kind, uint32_t p_check) {
 	std::string wanted = ir::kind_name(p_kind);
 	if (p_check != NONE) {
-		wanted = p_kind == Kind::Obj ? module_.classes[p_check].name : module_.strings[p_check];
+		wanted = p_kind == Kind::Obj ? module_.classes[p_check].name : module_.engine_names[p_check].name;
 	}
 	const std::optional<std::string> shown = any::text(p_value);
 	raise(module_.type_error_class, "Error #1034: Type Coercion failed: cannot convert " +
@@ -419,7 +419,7 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 			result(Kind::Bool, of_bool(any_is(b, p_in.c)));
 			break;
 		case Op::AnyIsGodot:
-			result(Kind::Bool, of_bool(any::tag(b) == AnyTag::Godot && host_.handles.is_class(any::pointer(b), module_.strings[p_in.c])));
+			result(Kind::Bool, of_bool(any::tag(b) == AnyTag::Godot && host_.handles.is_class(any::pointer(b), module_.engine_names[p_in.c].name)));
 			break;
 		default:
 			break;

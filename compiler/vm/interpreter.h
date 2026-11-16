@@ -70,7 +70,15 @@ private:
 	std::vector<Str *> strings_; // The module's string constants.
 	Str *null_text_ = nullptr; // "null"
 	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
-	std::vector<void *> singletons_; // The engine's singletons, by the string of their name, once found.
+	std::vector<void *> singletons_; // The engine's singletons, by the engine name of their class, once found.
+	// What the host worked out once for each engine instruction, by function and instruction: see prepare().
+	std::vector<std::vector<EngineStep>> prepared_;
+	std::vector<OperatorName> operators_; // By engine name: what an operator's entry says, read once.
+	// An operator by its engine name, or (NONE: a program built without Godot's names) none Godot can number.
+	OperatorName operator_named(uint32_t p_name, std::string_view p_spelling) const {
+		return p_name == ir::NONE ? OperatorName{ p_spelling, false, -1 } : operators_[p_name];
+	}
+	void prepare_engine();
 	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	// The strings of one ASCII character each, made the first time charAt() gives one: a loop over a
@@ -149,6 +157,8 @@ private:
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	std::optional<std::string> godot_refuses(Slot p_value, int p_depth) const;
 	std::optional<std::string> refused_by_godot(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers) const;
+	// Whether any operand of an instruction is untyped: only such an operand is ever refused_by_godot().
+	static bool untyped_operand(const ir::Function &p_function, const ir::Instruction &p_in);
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);
@@ -228,6 +238,7 @@ private:
 	// Vectors. An index outside the vector is AS3's RangeError #1125.
 	void raise_range(double p_index, uint32_t p_length);
 	bool resize_vector(Vector *p_vector, uint32_t p_length);
+	bool fill_zeroes(Vector *p_vector, uint32_t p_from);
 	bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value);
 	// Function values (interpreter_functions.cpp).
 	Object *make_function(uint32_t p_function, Object *p_first);

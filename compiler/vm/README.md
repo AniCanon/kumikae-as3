@@ -40,6 +40,10 @@ host differs.
 - **The engine is known only through the interfaces.** Something new asked of Godot is a new entry on
   `EngineHandles` (done to a value the interpreter holds) or `EngineSource` (where a value comes from).
   `NoEngine` must answer it, and the recorder in `tests/test_vm.cpp` must record it.
+- **Each engine instruction is worked out once, when the program loads:** `EngineHandles::prepare()` is
+  asked for every instruction that names something of Godot's (an `E` operand), and `run()` carries out
+  what it kept. A host that keeps nothing, or can't run one with the values it is given, gets the requests
+  by name (`call`, `get`, `operate` and the rest), which say what is wrong.
 - **Nothing is allocated per instruction, and no text is built on the path that succeeds.**
 - **The loop is measured, not guessed.** A change to `interpreter_run.cpp` comes with
   `tests/bench/run_bench.py <build> --against <other build>`. A helper in a header has cost 3% before.

@@ -6,11 +6,11 @@ func _ready() -> void:
 	add_child(cs)
 	nodes["cs"] = cs
 	var gd := Node2D.new()
-	gd.set_script(load("res://TmpCmpGd.gd"))
+	gd.set_script(load("res://CmpGd.gd"))
 	add_child(gd)
 	nodes["gd"] = gd
 	var a := Node2D.new()
-	a.set_script(load("res://TmpCmpAs.as"))
+	a.set_script(load("res://CmpAs.as"))
 	add_child(a)
 	nodes["as"] = a
 	await get_tree().process_frame
