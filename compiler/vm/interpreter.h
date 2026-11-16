@@ -307,6 +307,8 @@ private:
 	bool length_is_fixed(const Vector *p_vector);
 	Vector *fresh_vector(uint32_t p_class, uint64_t p_length);
 	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
+	void vector_find(Vector *p_vector, const VectorCall &p_call);
+	void vector_join(Vector *p_vector, const VectorCall &p_call);
 	void vector_add(Vector *p_vector, const VectorCall &p_call);
 	void vector_take(Vector *p_vector, const VectorCall &p_call);
 	void vector_copy(Vector *p_vector, const VectorCall &p_call);

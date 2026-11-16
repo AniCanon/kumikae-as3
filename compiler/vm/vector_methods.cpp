@@ -124,7 +124,6 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		raise_null();
 		return;
 	}
-	const Kind kind = module_.classes[vector->klass].element;
 	const uint32_t length = vector->length;
 	switch (call.method) {
 		case VectorMethod::Push:
@@ -137,26 +136,10 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		case VectorMethod::RemoveAt:
 			vector_take(vector, call);
 			break;
-		case VectorMethod::IndexOf: {
-			int32_t found = -1;
-			for (uint32_t i = clamped(argument(call, 2).i, length); i < length && found < 0; i++) {
-				found = element_is(kind, vector->data[i], argument(call, 1)) ? static_cast<int32_t>(i) : -1;
-			}
-			give(call, Kind::I32, of_number(static_cast<uint32_t>(found)));
+		case VectorMethod::IndexOf:
+		case VectorMethod::LastIndexOf:
+			vector_find(vector, call);
 			break;
-		}
-		case VectorMethod::LastIndexOf: {
-			int32_t found = -1;
-			// From the end if negative; before the start, there is nothing to look at.
-			const int32_t asked = argument(call, 2).i;
-			int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
-			from = from >= length ? static_cast<int64_t>(length) - 1 : from;
-			for (int64_t i = from; i >= 0 && found < 0; i--) {
-				found = element_is(kind, vector->data[i], argument(call, 1)) ? static_cast<int32_t>(i) : -1;
-			}
-			give(call, Kind::I32, of_number(static_cast<uint32_t>(found)));
-			break;
-		}
 		case VectorMethod::Reverse:
 			std::reverse(vector->data, vector->data + length);
 			give(call, Kind::Obj, share(Kind::Obj, of_pointer(vector)));
@@ -165,18 +148,9 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		case VectorMethod::Concat:
 			vector_copy(vector, call);
 			break;
-		case VectorMethod::Join: {
-			const Str *separator = static_cast<const Str *>(argument(call, 1).p);
-			const std::string between(separator ? separator->view() : std::string_view("null"));
-			std::string all;
-			retain(vector); // Kept while its elements speak for themselves, which may run the program.
-			const bool done = vector_text(vector, between, &all);
-			release_object(vector);
-			if (done) {
-				give(call, Kind::Str, of_pointer(text(all)));
-			}
+		case VectorMethod::Join:
+			vector_join(vector, call);
 			break;
-		}
 		case VectorMethod::Splice:
 			splice(vector, call);
 			break;
@@ -186,6 +160,41 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 		case VectorMethod::SortOn:
 			vector_sort_on(vector, call);
 			break;
+	}
+}
+
+// indexOf and lastIndexOf: the index of the first element, from the start or from the end, that is the
+// value, or -1.
+void Interpreter::vector_find(Vector *p_vector, const VectorCall &p_call) {
+	const Kind kind = module_.classes[p_vector->klass].element;
+	const uint32_t length = p_vector->length;
+	int32_t found = -1;
+	if (p_call.method == VectorMethod::IndexOf) {
+		for (uint32_t i = clamped(argument(p_call, 2).i, length); i < length && found < 0; i++) {
+			found = element_is(kind, p_vector->data[i], argument(p_call, 1)) ? static_cast<int32_t>(i) : -1;
+		}
+	} else {
+		// From the end if negative; before the start, there is nothing to look at.
+		const int32_t asked = argument(p_call, 2).i;
+		int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
+		from = from >= length ? static_cast<int64_t>(length) - 1 : from;
+		for (int64_t i = from; i >= 0 && found < 0; i--) {
+			found = element_is(kind, p_vector->data[i], argument(p_call, 1)) ? static_cast<int32_t>(i) : -1;
+		}
+	}
+	give(p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));
+}
+
+// join: the elements as text, with the separator given between them.
+void Interpreter::vector_join(Vector *p_vector, const VectorCall &p_call) {
+	const Str *separator = static_cast<const Str *>(argument(p_call, 1).p);
+	const std::string between(separator ? separator->view() : std::string_view("null"));
+	std::string all;
+	retain(p_vector); // Kept while its elements speak for themselves, which may run the program.
+	const bool done = vector_text(p_vector, between, &all);
+	release_object(p_vector);
+	if (done) {
+		give(p_call, Kind::Str, of_pointer(text(all)));
 	}
 }
 
