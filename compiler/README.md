@@ -322,8 +322,12 @@ How it works:
 - **Godot's names come from Godot.** `godot/godot_names.txt` (21,519 names, written by the generator from
   Godot's API description) says that `moveAndSlide` is `move_and_slide`. Nothing is worked out backwards
   from the AS3 name.
-- **In the interpreter a Godot value is boxed** and calls go by name. That is the simple, slow path, in
-  GDScript's range. The same typed IR will give the native backend direct calls and inline values.
+- **In the interpreter a Godot value is boxed** (a handle), but nothing is looked up by name as the program
+  runs: the IR names each operator, method, property and constant by its entry in the name table, and
+  every register that holds one of Godot's values carries its type, so each engine instruction is found
+  once when the program loads (an operator's evaluator for its operands' types, a method bind called on
+  the bare values where its signature allows). The same typed IR will give the native backend direct calls
+  and inline values.
 - **Calls can nest.** The engine calls a script, which calls the engine, which may call a script again,
   up to 64 levels deep.
 
