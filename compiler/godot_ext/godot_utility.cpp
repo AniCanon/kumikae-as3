@@ -18,8 +18,10 @@ namespace kas3 {
 
 namespace {
 
-constexpr int ANYTHING = -1; // A parameter or result declared as Variant.
-constexpr int NOTHING = -2; // No result.
+// A parameter or result declared as Variant.
+constexpr int ANYTHING = -1;
+// No result.
+constexpr int NOTHING = -2;
 
 // A value of one of Godot's types as the entry takes it: the bare value, not a Variant. Large enough for
 // every type a global function uses (the largest are the packed arrays, two words).
@@ -51,7 +53,8 @@ bool fits(const Variant &p_value, int p_type) {
 		case Variant::FLOAT:
 			return given == Variant::FLOAT || given == Variant::INT;
 		case Variant::INT:
-			return given == Variant::INT; // A Number for an integer is converted, or refused, before the call.
+			// A Number for an integer is converted, or refused, before the call.
+			return given == Variant::INT;
 		case Variant::STRING:
 			return given == Variant::STRING || given == Variant::STRING_NAME;
 		case Variant::OBJECT:
@@ -68,13 +71,15 @@ std::string type_name(int p_type) {
 } // namespace
 
 struct GodotHost::Utility {
-	std::string signature; // The key: the text the interpreter passes.
+	// The key: the text the interpreter passes.
+	std::string signature;
 	std::string name;
 	GDExtensionPtrUtilityFunction function = nullptr;
 	int result = NOTHING;
 	std::vector<int> parameters;
 	bool any_number = false;
-	bool reads_a_value = false; // Null is a proper answer from it.
+	// Null is a proper answer from it.
+	bool reads_a_value = false;
 };
 
 GodotHost::GodotHost() = default;
@@ -147,7 +152,8 @@ bool GodotHost::call_utility(std::string_view p_signature, const vm::Argument *p
 	std::vector<Variant> values(p_count);
 	std::vector<Bare> bare(p_count);
 	std::vector<GDExtensionConstTypePtr> pointers(p_count);
-	std::vector<int> made; // The bare values that were made, to be let go.
+	// The bare values that were made, to be let go.
+	std::vector<int> made;
 	bool ok = true;
 	for (size_t i = 0; i < p_count && ok; i++) {
 		values[i] = to_variant(p_arguments[i].kind, p_arguments[i].slot);

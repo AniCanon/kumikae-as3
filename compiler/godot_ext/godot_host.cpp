@@ -242,14 +242,13 @@ void GodotHost::print(std::string_view p_text) {
 	UtilityFunctions::print(to_godot(p_text));
 }
 
-// An uncaught AS3 error, shown as Godot shows a script's own: the place it was raised is given as the
-// error's source, so that the editor can open the line. The text is the error and its AS3 stack, whose
-// first line reads "\tat Class/method()[file:line]".
+// An error with no place it was thrown: there is no line for the editor to open.
 void GodotHost::error(std::string_view p_text) {
-	UtilityFunctions::push_error(to_godot(p_text)); // An error with no stack: nothing to point at.
+	UtilityFunctions::push_error(to_godot(p_text));
 }
 
-// Shown as Godot shows a script's own error, with the script's file and line as its source.
+// Shown as Godot shows a script's own error: the script's file and line are given as the error's source,
+// so that the editor can open the line.
 void GodotHost::error_at(std::string_view p_text, std::string_view p_function, std::string_view p_file, int32_t p_line) {
 	const std::string text(p_text), function(p_function), file(p_file);
 	gdextension_interface::print_script_error(text.c_str(), function.c_str(), file.c_str(), p_line, false);

@@ -60,7 +60,8 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	std::unordered_map<std::string, GDExtensionMethodBindPtr> static_methods_;
 	const godot::StringName &name(std::string_view p_text);
 	const godot::Variant *evaluated(std::string_view p_expression, std::string *r_error);
-	const godot::String &text_of(std::string_view p_text); // name() as a String, made once.
+	// name() as a String, made once.
+	const godot::String &text_of(std::string_view p_text);
 
 	// One of Godot's global functions, found once: see godot_utility.cpp.
 	struct Utility;
