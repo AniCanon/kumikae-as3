@@ -115,7 +115,7 @@ program, by the names of its public fields, methods, getters and setters (Flash'
 #1056, #1037, #1074 and #1077 for the rest); Array's `sortOn`. `Object`'s methods on any value, a number, a
 Boolean and a String included (`n.toLocaleString()`, `s.hasOwnProperty("length")`), with
 `setPropertyIsEnumerable`, which hides a property of an Object, a Dictionary or an Array from `for in`,
-`for each` and JSON (on a sealed object it is ReferenceError #1056, from recollection of avmplus); a
+`for each` and JSON (on a sealed object it is ReferenceError #1056, as in avmplus); a
 number's `toString(radix)`, `toFixed`, `toExponential` and `toPrecision`, a Vector's `fixed` and a
 Function's `length` by name on an untyped value (a Vector takes no other property: ReferenceError #1056);
 `toLocaleString()` of an Array and a Vector; `new String(x)`, `new Number(x)` and the like, which give the
@@ -226,7 +226,17 @@ Where the library's rules were read from avmplus's source (`core/Vector.as`, `Ve
 default is for an argument left out, so `"abc".indexOf(undefined)` looks for "null"; a function that names
 `arguments` takes more arguments than it declares, as one with `...rest` does (`MethodInfo`'s
 `_allowExtraArgs = _needRest || _needArguments || _ignoreRest`), through a function value, `call`, `apply`,
-by name and from Godot, and `arguments` holds them after the others. Inferred from those
+by name and from Godot, and `arguments` holds them after the others; `instanceof` looks at its right-hand
+side first (what is no class or function, null and undefined too, is TypeError #1040), gives false for null
+and TypeError #1010 for undefined (`Toplevel::instanceof`); a class called as a function converts its one
+argument, and any other count is ArgumentError #1112 (`ClassClosure::call`); `Vector.<T>(x)` takes any object,
+as long as its `length`, of what it holds under each index (`TypedVectorClassBase::call`), and what is no
+object is TypeError #1034; Error #1063 gives the number of arguments required, whichever way the count is
+wrong (`MethodEnv`'s argcError); `localeCompare(other:*=void 0)` with nothing given compares with
+"undefined"; hasOwnProperty on a String, a number or a Boolean looks only at what the type declares
+(`ObjectClass::_hasOwnProperty`: true for a String's `length`, false for the rest), setPropertyIsEnumerable
+on a sealed object or a primitive is ReferenceError #1056 and propertyIsEnumerable is false there;
+`new Object(x, y)` takes no notice of `y`. Inferred from those
 declarations and not run in Flash: a Vector's `join(undefined)` gives "null" between the elements; by name, an
 Array's `toString("x")` is Error #1063 and a Vector's ignores the argument.
 

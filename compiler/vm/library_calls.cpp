@@ -114,7 +114,7 @@ bool LibraryCall::counted() const {
 	}
 	vm_.raise(vm_.module_.argument_error_class != NONE ? vm_.module_.argument_error_class : vm_.module_.error_class,
 			"Error #1063: Argument count mismatch on " + vm_.holder_name(holder_) + "/" + std::string(method_.name) + "(). Expected " +
-					std::to_string(count < least ? least : most) + ", got " + std::to_string(count) + ".");
+					std::to_string(least) + ", got " + std::to_string(count) + ".");
 	return false;
 }
 

@@ -262,8 +262,9 @@ bool Interpreter::argument_as(const Function &p_callee, uint32_t p_register, Slo
 }
 
 // What a call of a function value starts with: what it takes first, then each untyped argument as its
-// parameter holds it. One left out takes its default; too many is AS3's ArgumentError #1063. False if it
-// raised. p_values must not be in the stack: making an argument a String may run the program, which may
+// parameter holds it. One left out takes its default; too many is AS3's ArgumentError #1063, which says how
+// many are required whichever way the count is wrong (avmplus's "Expected %2", the required count). False if
+// it raised. p_values must not be in the stack: making an argument a String may run the program, which may
 // move the stack.
 bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
 	return function_arguments(static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i), static_cast<Object *>(p_value->fields()[ir::FUNCTION_FIRST].p),
@@ -278,7 +279,7 @@ bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t 
 	if (p_count > most || p_count + first < callee.required) {
 		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
 				"Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
-						std::to_string(p_count > most ? most : callee.required - first) + ", got " + std::to_string(p_count) + ".");
+						std::to_string(callee.required - first) + ", got " + std::to_string(p_count) + ".");
 		return false;
 	}
 	r_values->assign(first + p_count, Slot());
@@ -316,8 +317,21 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 	if (p_in.a != NONE) {
 		put(Kind::Any, r[p_in.a], any::undefined()); // A function that gives nothing gives undefined.
 	}
-	Object *value = function_in(p_function.registers[p_in.b], r[p_in.b]);
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	const Object *called = p_function.registers[p_in.b] == Kind::Any ? held_object(r[p_in.b]) : static_cast<const Object *>(r[p_in.b].p);
+	if (called && module_.class_class != NONE && called->klass == module_.class_class) {
+		// A class called as a function converts what it is given.
+		SpareSlots given(spare_slots_);
+		for (const uint32_t each : list) {
+			given->push_back(share(Kind::Any, r[each]));
+		}
+		class_call(static_cast<uint32_t>(const_cast<Object *>(called)->fields()[ir::CLASS_CODE].i), *given, p_in.a);
+		for (Slot each : *given) {
+			drop_any(each);
+		}
+		return;
+	}
+	Object *value = function_in(p_function.registers[p_in.b], r[p_in.b]);
 	if (!value) {
 		return;
 	}

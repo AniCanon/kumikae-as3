@@ -189,6 +189,10 @@ uint32_t Operators::instance_of(Binary *p_binary) {
 	if (!symbol && !(p_binary->right->type && p_binary->right->type->kind == Type::ClassObject)) {
 		return class_test(p_binary, Op::ClassInstanceOf);
 	}
+	if (symbol && !Lowerer::is_godot(symbol) && l_.untyped_type(p_binary->left->type)) {
+		// What may hold undefined is asked as it runs: undefined has no chain to look in (Error #1010).
+		return class_test(p_binary, Op::ClassInstanceOf);
+	}
 	if (symbol && (symbol->kind == SymbolKind::Interface || symbol == l_.int_ || symbol == l_.uint_)) {
 		l_.expression(p_binary->left, Kind::Void);
 		return l_.default_value(Kind::Bool, p_binary->offset);

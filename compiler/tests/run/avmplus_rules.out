@@ -1,0 +1,29 @@
+0 TypeError Error #1040: The right-hand side of instanceof must be a class or function.
+1 TypeError Error #1040: The right-hand side of instanceof must be a class or function.
+2 TypeError Error #1040: The right-hand side of instanceof must be a class or function.
+3 TypeError Error #1040: The right-hand side of instanceof must be a class or function.
+4 false,true,true,true,true,false
+5 TypeError Error #1010: A term is undefined and has no properties.
+6 TypeError Error #1010: A term is undefined and has no properties.
+7 TypeError Error #1010: A term is undefined and has no properties.
+8 1,2,7,8,0,0,5
+9 
+10 TypeError Error #1034: Type Coercion failed: cannot convert ab to Vector.<int>.
+11 TypeError Error #1034: Type Coercion failed: cannot convert null to Vector.<int>.
+12 ArgumentError Error #1112: Argument count mismatch on class coercion.  Expected 1, got 0.
+13 ArgumentError Error #1112: Argument count mismatch on class coercion.  Expected 1, got 2.
+14 3,4,1,true,,,13
+15 TypeError Error #1034: Type Coercion failed: cannot convert 5 to Sealed.
+16 ArgumentError Error #1112: Argument count mismatch on class coercion.  Expected 1, got 0.
+17 ArgumentError Error #1112: Argument count mismatch on class coercion.  Expected 1, got 2.
+18 ArgumentError Error #1063: Argument count mismatch on String/charAt(). Expected 0, got 3.
+19 -1,0,0,0
+20 ArgumentError Error #1063: Argument count mismatch on String/localeCompare(). Expected 0, got 2.
+21 ArgumentError Error #1063: Argument count mismatch on Array/insertAt(). Expected 2, got 1.
+22 ArgumentError Error #1063: Argument count mismatch on Array/join(). Expected 0, got 2.
+23 ArgumentError Error #1063: Argument count mismatch on Sealed/say(). Expected 1, got 2.
+24 ArgumentError Error #1063: Argument count mismatch on Sealed/say(). Expected 1, got 0.
+25 ArgumentError Error #1063: Argument count mismatch on Sealed/more(). Expected 1, got 0.
+26 ArgumentError Error #1063: Argument count mismatch on Sealed/more(). Expected 1, got 3.
+27 true,object
+28 ArgumentError Error #1063: Argument count mismatch on String(). Expected 0, got 2.

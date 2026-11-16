@@ -308,6 +308,7 @@ private:
 	std::optional<uint32_t> class_in(Slot p_class, std::string_view p_error); // The class an untyped value holds, or raised.
 	void class_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
+	void class_call(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
 	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
