@@ -326,6 +326,7 @@ private:
 			bool *r_twins);
 	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
+	bool element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
 	void leave_failed_frame(); // A frame the error leaves: its line goes into the trace.
 	// Catches the error in a frame above p_depth that has a handler for it, innermost first: true, and
