@@ -3,11 +3,11 @@
 // valid, and a declaration that did not change is, to every other file, the same one.
 #include "incremental.h"
 
+#include "ast_walk.h"
+
 #include <algorithm>
 
 namespace kas3 {
-
-void clear_annotations(Program *p_tree); // ast_reset.cpp
 
 void Compilation::remove_definition(Symbol *p_symbol) {
 	Package *package = p_symbol->package;
@@ -62,6 +62,9 @@ Symbol *Compilation::reused(SymbolKind p_kind, std::string_view p_name, Unit *p_
 		return nullptr;
 	}
 	ClassInfo *klass = symbol->kind == p_kind ? symbol->klass : nullptr;
+	if (symbol->klass && !klass) {
+		tracking_->unused_classes.push_back(symbol->klass);
+	}
 	*symbol = Symbol();
 	if (klass) {
 		*klass = ClassInfo();

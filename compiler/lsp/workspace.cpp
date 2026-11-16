@@ -459,14 +459,12 @@ Unit *Workspace::unit(const std::string &p_path) {
 		return nullptr;
 	}
 	Unit *unit = found->second;
-	bool checked = unit->unchecked;
 	check_bodies(*unit);
 	// Completing `override` writes a base class's default values, which its file's bodies resolve.
 	std::vector<const Symbol *> pending(unit->classes.begin(), unit->classes.end());
 	for (size_t i = 0; i < pending.size(); ++i) {
 		const ClassInfo *info = pending[i]->klass;
 		if (pending[i]->unit && pending[i]->unit->unchecked) {
-			checked = true;
 			check_bodies(*pending[i]->unit);
 		}
 		for (const Symbol *super : info->interfaces) {
@@ -478,9 +476,8 @@ Unit *Workspace::unit(const std::string &p_path) {
 			pending.push_back(info->base);
 		}
 	}
-	if (checked) {
-		compilation_->settle_doubt();
-	}
+	// An edit may have changed which files are broken: what is published after the request is judged anew.
+	compilation_->settle_doubt();
 	return unit;
 }
 

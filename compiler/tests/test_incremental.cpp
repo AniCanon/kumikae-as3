@@ -573,6 +573,13 @@ void test_directed() {
 					{ "/p/T.as", file("", "public class T {}") }, { "/p/B.as", file("", "public class B { public var x:int; }") },
 					{ "/p/A.as", file("", "public class A { public function f(t:T):void {} }") } },
 			"/p/U.as", "a.");
+	// An import inside a local function is the bodies'; once it finds what it names, a broken file elsewhere
+	// takes back only the unresolved errors, not all of them.
+	directed("local import", false,
+			{ { "/p/C.as", file("", "public class C { var x:int = \"s\"; function f():void { function g():void { import p.Missing; } } }") },
+					{ "/p/p/Missin.as", file("p", "public class Missin {}") }, { "/p/B.as", file("", "public class B {") } },
+			{ { "/p/p/Missin.as", file("p", "public class Missing {}") }, { "/p/p/Missin.as", file("p", "public class Missin {}") } },
+			"/p/C.as", "x:");
 	// Godot's API loaded, and a file that joins and leaves: Godot's declarations are never checked again.
 	directed("godot", true, { { "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Node2D { function f():void { position.x = 1; } }") } },
 			{ { "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Sprite2D { function f():void { position.x = 1; } }") },

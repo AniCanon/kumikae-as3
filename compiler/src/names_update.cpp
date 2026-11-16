@@ -4,6 +4,8 @@
 // files declare, so they are checked one file at a time, in any order.
 #include "incremental.h"
 
+#include "ast_walk.h"
+
 #include <algorithm>
 #include <cstdio>
 
@@ -13,7 +15,6 @@ void resolve_unit_signatures(Compilation &p_compilation, Unit &p_unit); // names
 void check_unit_bodies(Compilation &p_compilation, Unit &p_unit); // names_bodies.cpp
 void declaration_dependencies(const Unit &p_unit, std::vector<Dependency> &r_keys); // names_dependencies.cpp
 void body_dependencies(const Unit &p_unit, std::vector<Dependency> &r_keys);
-void clear_body_annotations(Program *p_tree); // ast_reset.cpp
 
 namespace {
 
@@ -45,6 +46,7 @@ void keep_declared(Unit &p_unit) {
 	p_unit.declared_diagnostics = p_unit.diagnostics;
 	p_unit.declared_references = p_unit.references.size();
 	p_unit.declared_cited = p_unit.cited.size();
+	p_unit.declared_failed_import = p_unit.failed_import;
 }
 
 } // namespace
@@ -173,7 +175,14 @@ void Compilation::redeclare(std::vector<Unit *> &r_units, std::vector<Dependency
 	}
 	// What was not declared again is gone.
 	for (auto &[slot, symbols] : tracking.retracted) {
-		tracking.unused.insert(tracking.unused.end(), symbols.begin(), symbols.end());
+		for (Symbol *symbol : symbols) {
+			// Its tree goes at the end of the update: nothing may reach it through the symbol after.
+			symbol->node = nullptr;
+			symbol->type = nullptr;
+			symbol->getter = nullptr;
+			symbol->setter = nullptr;
+			tracking.unused.push_back(symbol);
+		}
 	}
 	tracking.retracted.clear();
 	tracking.prints.begin_round(r_units);
@@ -308,6 +317,7 @@ void Compilation::check_bodies(Unit &p_unit) {
 		p_unit.diagnostics = p_unit.declared_diagnostics;
 		p_unit.references.resize(p_unit.declared_references);
 		p_unit.cited.resize(p_unit.declared_cited);
+		p_unit.failed_import = p_unit.declared_failed_import; // A local function's import may fail or not now.
 		p_unit.typed.clear();
 		p_unit.local_scopes.clear();
 		p_unit.body_symbols.clear();

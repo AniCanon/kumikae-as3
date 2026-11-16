@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <array>
 #include <unordered_map>
-#include <functional>
 
 namespace kas3 {
 
@@ -192,7 +191,8 @@ public:
 	}
 };
 
-void each_definition(const Unit &p_unit, const std::function<void(Node *)> &p_visit) {
+template <class F>
+void each_definition(const Unit &p_unit, F &&p_visit) {
 	if (p_unit.tree->package) {
 		for (Node *node : p_unit.tree->package->definitions) {
 			p_visit(node);

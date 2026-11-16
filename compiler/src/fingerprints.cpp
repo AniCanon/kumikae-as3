@@ -11,7 +11,7 @@ uint64_t mix(uint64_t p_hash, uint64_t p_value) {
 }
 
 uint64_t pointer(const void *p_pointer) {
-	return (uint64_t)(uintptr_t)p_pointer;
+	return reinterpret_cast<uintptr_t>(p_pointer);
 }
 
 uint64_t text(const Unit &p_unit, uint32_t p_begin, uint32_t p_end) {

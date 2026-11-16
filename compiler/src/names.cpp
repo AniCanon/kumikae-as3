@@ -9,9 +9,7 @@
 
 namespace kas3 {
 
-void resolve_signatures(Compilation &p_compilation); // names_signatures.cpp
 void check_unit_bodies(Compilation &p_compilation, Unit &p_unit); // names_bodies.cpp
-void clear_annotations(Program *p_tree); // ast_reset.cpp
 
 const char *symbol_kind_name(SymbolKind p_kind) {
 	switch (p_kind) {
@@ -487,6 +485,11 @@ void Compilation::declare_interface_members(Unit &p_unit, Symbol *p_interface, I
 
 // A class keeps its ClassInfo when its declarations are made again.
 void Compilation::class_info(Unit &p_unit, Symbol *p_symbol) {
+	if (!p_symbol->klass && tracking_ && !tracking_->unused_classes.empty()) {
+		p_symbol->klass = tracking_->unused_classes.back();
+		tracking_->unused_classes.pop_back();
+		*p_symbol->klass = ClassInfo();
+	}
 	if (!p_symbol->klass) {
 		classes_.emplace_back();
 		p_symbol->klass = &classes_.back();

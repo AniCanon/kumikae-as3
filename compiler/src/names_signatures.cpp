@@ -81,10 +81,4 @@ void resolve_unit_signatures(Compilation &p_compilation, Unit &p_unit) {
 	Resolver(p_compilation, p_unit).run_signatures();
 }
 
-void resolve_signatures(Compilation &p_compilation) {
-	for (Unit &unit : p_compilation.units()) {
-		resolve_unit_signatures(p_compilation, unit);
-	}
-}
-
 } // namespace kas3

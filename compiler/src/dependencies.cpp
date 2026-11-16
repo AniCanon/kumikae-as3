@@ -29,7 +29,7 @@ bool Dependency::operator<(const Dependency &p_other) const {
 }
 
 size_t DependencyHash::operator()(const Dependency &p_key) const noexcept {
-	const uint64_t subject = (uint64_t)(uintptr_t)p_key.subject;
+	const uint64_t subject = reinterpret_cast<uintptr_t>(p_key.subject);
 	return (size_t)((subject * 0x9E3779B97F4A7C15ull) ^ (p_key.name + (uint64_t)p_key.kind * 0xC2B2AE3D27D4EB4Full));
 }
 

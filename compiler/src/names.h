@@ -90,6 +90,7 @@ struct Unit {
 	Diagnostics declared_diagnostics; // What it said up to the end of its signatures.
 	size_t declared_references = 0;
 	size_t declared_cited = 0;
+	bool declared_failed_import = false;
 
 	explicit Unit(std::shared_ptr<Parsed> p_parsed) :
 			parsed(std::move(p_parsed)), source(parsed->source), diagnostics(parsed->diagnostics), tree(parsed->tree) {}
