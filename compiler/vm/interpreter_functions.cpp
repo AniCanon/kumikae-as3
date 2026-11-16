@@ -23,16 +23,16 @@ Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
 			return kept;
 		}
 	}
-	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, heap_.list_for(module_.function_class));
+	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, slots_of(module_.classes[module_.function_class]), heap_.list_for(module_.function_class));
 	if (!made) {
 		if (module_.function_class != NONE) {
 			out_of_memory();
 		}
 		return nullptr;
 	}
-	made->fields()[ir::FUNCTION_INDEX].i = static_cast<int32_t>(p_function);
+	own_field(made, ir::FUNCTION_INDEX).i = static_cast<int32_t>(p_function);
 	retain(p_first);
-	made->fields()[ir::FUNCTION_FIRST].p = p_first;
+	own_field(made, ir::FUNCTION_FIRST).p = p_first;
 	if (!p_first && module_.functions[p_function].is_static) {
 		retain(made); // Kept until the interpreter goes.
 		lone_functions_[p_function] = made;
@@ -95,7 +95,7 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 
 // A function value's `length`: the parameters it declares, without what it takes first or `...rest`.
 int32_t Interpreter::function_length(Object *p_function) const {
-	const Function &callee = module_.functions[static_cast<uint32_t>(p_function->fields()[ir::FUNCTION_INDEX].i)];
+	const Function &callee = module_.functions[static_cast<uint32_t>(own_field(p_function, ir::FUNCTION_INDEX).i)];
 	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
@@ -160,7 +160,7 @@ void Interpreter::arguments_array(const Instruction &p_in) {
 void Interpreter::callback_this(Slot p_callback, Slot p_this) {
 	const Object *callback = any::tag(p_callback) == AnyTag::Object ? static_cast<const Object *>(any::pointer(p_callback)) : nullptr;
 	const bool method = callback && callback->klass == module_.function_class &&
-			module_.functions[static_cast<uint32_t>(const_cast<Object *>(callback)->fields()[ir::FUNCTION_INDEX].i)].owner != NONE;
+			module_.functions[static_cast<uint32_t>(own_field(const_cast<Object *>(callback), ir::FUNCTION_INDEX).i)].owner != NONE;
 	const AnyTag given = any::tag(p_this);
 	if (method && given != AnyTag::Null && given != AnyTag::Undefined) {
 		raise(module_.type_error_class, "Error #1510: When the callback argument is a method of a class, the optional this argument must be null.");
@@ -179,13 +179,13 @@ void Interpreter::to_callable(const Instruction &p_in) {
 		put(Kind::Val, r[p_in.a], made);
 		return;
 	}
-	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	const uint32_t target = static_cast<uint32_t>(own_field(value, ir::FUNCTION_INDEX).i);
 	const Function &callee = module_.functions[target];
 	// A function expression that captured nothing is given nothing first: the value itself goes there.
-	Object *first = static_cast<Object *>(value->fields()[ir::FUNCTION_FIRST].p);
+	Object *first = static_cast<Object *>(own_field(value, ir::FUNCTION_FIRST).p);
 	Object *bound = callee.is_static || !first ? value : first;
 	const ir::Class &klass = module_.classes[bound->klass];
-	void *owner = !callee.is_static && !klass.native_base.empty() && !klass.fields.empty() ? bound->fields()[0].p : nullptr;
+	void *owner = !callee.is_static && !klass.native_base.empty() && !klass.fields.empty() ? owner_field(bound).p : nullptr;
 	std::string error;
 	made.p = host_.source.bind(bound, target, owner, &error);
 	if (!made.p) {
@@ -202,23 +202,23 @@ bool Interpreter::same_function(const Object *p_a, const Object *p_b) const {
 	}
 	Object *a = const_cast<Object *>(p_a);
 	Object *b = const_cast<Object *>(p_b);
-	if (a->fields()[ir::FUNCTION_INDEX].i != b->fields()[ir::FUNCTION_INDEX].i) {
+	if (own_field(a, ir::FUNCTION_INDEX).i != own_field(b, ir::FUNCTION_INDEX).i) {
 		return false;
 	}
-	if (static_cast<uint32_t>(a->fields()[ir::FUNCTION_INDEX].i) == module_.library_function) {
+	if (static_cast<uint32_t>(own_field(a, ir::FUNCTION_INDEX).i) == module_.library_function) {
 		// A method of the library, which both are (what such a one is bound to is a pair, the value and
 		// the name, where any other function's is its object): the same when read from the same value by
 		// the same name.
-		const Vector *bound_a = static_cast<const Vector *>(a->fields()[ir::FUNCTION_FIRST].p);
-		const Vector *bound_b = static_cast<const Vector *>(b->fields()[ir::FUNCTION_FIRST].p);
+		const Vector *bound_a = static_cast<const Vector *>(own_field(a, ir::FUNCTION_FIRST).p);
+		const Vector *bound_b = static_cast<const Vector *>(own_field(b, ir::FUNCTION_FIRST).p);
 		if (!bound_a || !bound_b || bound_a == bound_b) {
 			return bound_a && bound_a == bound_b;
 		}
 		const bool named = static_cast<const Str *>(any::pointer(bound_a->data[1]))->view() == static_cast<const Str *>(any::pointer(bound_b->data[1]))->view();
 		return named && bound_a->data[0].bits == bound_b->data[0].bits;
 	}
-	return a->fields()[ir::FUNCTION_INDEX].i == b->fields()[ir::FUNCTION_INDEX].i &&
-			a->fields()[ir::FUNCTION_FIRST].p == b->fields()[ir::FUNCTION_FIRST].p && a->fields()[ir::FUNCTION_FIRST].p;
+	return own_field(a, ir::FUNCTION_INDEX).i == own_field(b, ir::FUNCTION_INDEX).i &&
+			own_field(a, ir::FUNCTION_FIRST).p == own_field(b, ir::FUNCTION_FIRST).p && own_field(a, ir::FUNCTION_FIRST).p;
 }
 
 // What a call of a function value starts with: what it takes first, then each untyped argument as its
@@ -226,7 +226,7 @@ bool Interpreter::same_function(const Object *p_a, const Object *p_b) const {
 // raised. p_values must not be in the stack: making an argument a String may run the program, which may
 // move the stack.
 bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
-	return function_arguments(static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i), static_cast<Object *>(p_value->fields()[ir::FUNCTION_FIRST].p),
+	return function_arguments(static_cast<uint32_t>(own_field(p_value, ir::FUNCTION_INDEX).i), static_cast<Object *>(own_field(p_value, ir::FUNCTION_FIRST).p),
 			p_count, p_values, r_values);
 }
 
@@ -265,7 +265,7 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 	if (!function_arguments(value, given->size(), given->data(), &*values)) {
 		return;
 	}
-	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	const uint32_t target = static_cast<uint32_t>(own_field(value, ir::FUNCTION_INDEX).i);
 	push(target, values->data(), values->size(), p_in.a); // It takes references of its own.
 	let_go_arguments(module_.functions[target], &*values);
 }
@@ -310,7 +310,7 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	if (!ok) {
 		return;
 	}
-	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	const uint32_t target = static_cast<uint32_t>(own_field(value, ir::FUNCTION_INDEX).i);
 	push(target, values->data(), values->size(), p_in.a);
 	let_go_arguments(module_.functions[target], &*values);
 }

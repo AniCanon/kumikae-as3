@@ -22,8 +22,8 @@ bool Interpreter::any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
 	const auto as_godot = [this](Slot p_value) {
 		Object *object = held_object(p_value);
 		const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
-		const bool owned = klass && !klass->native_base.empty() && !klass->fields.empty() && object->fields()[0].p;
-		return owned ? any::godot_object(object->fields()[0].p) : p_value;
+		const bool owned = klass && !klass->native_base.empty() && !klass->fields.empty() && owner_field(object).p;
+		return owned ? any::godot_object(owner_field(object).p) : p_value;
 	};
 	if ((any::tag(p_a) == AnyTag::Godot && any::tag(p_b) == AnyTag::Object) || (any::tag(p_a) == AnyTag::Object && any::tag(p_b) == AnyTag::Godot)) {
 		p_a = as_godot(p_a);

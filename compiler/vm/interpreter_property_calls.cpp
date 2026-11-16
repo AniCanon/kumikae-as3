@@ -273,8 +273,8 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 	}
 	Object *function = held_object(value);
 	if (function && function->klass == module_.function_class) {
-		const uint32_t target = static_cast<uint32_t>(function->fields()[ir::FUNCTION_INDEX].i);
-		call_with(target, static_cast<Object *>(function->fields()[ir::FUNCTION_FIRST].p), p_given, p_out);
+		const uint32_t target = static_cast<uint32_t>(own_field(function, ir::FUNCTION_INDEX).i);
+		call_with(target, static_cast<Object *>(own_field(function, ir::FUNCTION_FIRST).p), p_given, p_out);
 	} else if (!own && (library_call(p_holder, p_key.text, p_given, p_out) || object_method(p_holder, p_key, p_given, p_out))) {
 		// The library's method, or Object's own, on a value with no property of that name.
 	} else if (own || (klass && klass->table)) {

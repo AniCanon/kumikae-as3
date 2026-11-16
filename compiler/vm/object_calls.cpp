@@ -10,14 +10,12 @@ using ir::Kind;
 
 Object *object_new(Library &p_library, uint32_t p_class) {
 	const ir::Class &klass = p_library.module().classes[p_class];
-	Object *object = new_object(p_class, klass.fields.size(), p_library.heap.list_for(p_class));
+	Object *object = new_object(p_class, slots_of(klass), p_library.heap.list_for(p_class));
 	if (!object) {
 		p_library.runner.out_of_memory();
 		return nullptr;
 	}
-	for (size_t i = 0; i < klass.fields.size(); i++) {
-		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
-	}
+	reset_fields(klass, object);
 	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref) {
 		// A script class that extends one of Godot's: the Godot object is made, with the script attached.
 		std::string error;
@@ -27,7 +25,7 @@ Object *object_new(Library &p_library, uint32_t p_class) {
 			p_library.runner.raise(p_library.module().error_class, error.empty() ? "the engine could not make a '" + klass.name + "'" : error);
 			return nullptr;
 		}
-		object->fields()[0].p = owner;
+		owner_field(object).p = owner;
 	}
 	return object;
 }

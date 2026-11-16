@@ -144,7 +144,7 @@ static void test_counts() {
 	free_string(text);
 	Object *object = new_object(3, 2, nullptr);
 	CHECK_EQ(object->klass, 3u);
-	CHECK_EQ(object->fields()[1].bits, (uint64_t)0);
+	CHECK_EQ(slot_at(object, 1).bits, (uint64_t)0);
 	CHECK_EQ(live_objects(), objects + 1);
 	CHECK(release(object));
 	free_object(object);

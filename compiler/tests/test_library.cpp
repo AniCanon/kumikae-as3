@@ -162,9 +162,9 @@ void test_new_error() {
 	Heap heap(module, NoEngine::instance(), NoEngine::instance());
 	Object *error = new_error(heap, URI_ERROR, new_string("Error #1052: Invalid URI passed to decodeURI function."));
 	CHECK(error != nullptr);
-	CHECK_EQ(error->fields()[kas3::ir::ERROR_ID].i, 1052);
-	CHECK_EQ(std::string(static_cast<Str *>(error->fields()[kas3::ir::ERROR_NAME].p)->view()), std::string("URIError"));
-	CHECK(error->fields()[kas3::ir::ERROR_STACK].p == nullptr);
+	CHECK_EQ(own_field(error, kas3::ir::ERROR_ID).i, 1052);
+	CHECK_EQ(std::string(static_cast<Str *>(own_field(error, kas3::ir::ERROR_NAME).p)->view()), std::string("URIError"));
+	CHECK(own_field(error, kas3::ir::ERROR_STACK).p == nullptr);
 	heap.release_object(error);
 	CHECK(new_error(heap, kas3::ir::NONE, nullptr) == nullptr);
 	Str *lost = new_string("lost");
@@ -348,7 +348,7 @@ void test_making() {
 	Library library{ heap, recorder, recorder };
 	// A Number field is not yet a number; an object that can hold another is on the collector's list.
 	Object *made = object_new(library, 3);
-	CHECK(made != nullptr && std::isnan(made->fields()[0].d) && made->fields()[1].p == nullptr);
+	CHECK(made != nullptr && std::isnan(field(module.classes[3], made, 0).d) && field(module.classes[3], made, 1).p == nullptr);
 	CHECK(made->gc_next != nullptr);
 	heap.release_object(made);
 	Object *object = table_new(library, 4, false);
@@ -424,7 +424,7 @@ void test_words() {
 	CHECK_EQ(object_text(library, made), std::string("[object Point]"));
 	// A function value is called with each argument as its parameter holds it; too many is the ArgumentError.
 	Object *value = object_new(library, FUNCTION);
-	value->fields()[kas3::ir::FUNCTION_INDEX].i = static_cast<int32_t>(JOIN);
+	own_field(value, kas3::ir::FUNCTION_INDEX).i = static_cast<int32_t>(JOIN);
 	recorder.ran.clear();
 	const Slot given[] = { any::integer(4), any::integer(5), any::integer(6) };
 	Slot result = any::undefined();

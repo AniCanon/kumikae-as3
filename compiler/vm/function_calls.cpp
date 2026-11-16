@@ -107,7 +107,7 @@ bool function_call(Library &p_library, Object *p_function, const Slot *p_argumen
 	if (!function_in(p_library, Kind::Obj, of_object(p_function))) {
 		return false;
 	}
-	const uint32_t target = static_cast<uint32_t>(p_function->fields()[ir::FUNCTION_INDEX].i);
+	const uint32_t target = static_cast<uint32_t>(own_field(p_function, ir::FUNCTION_INDEX).i);
 	const Function &callee = module.functions[target];
 	Slot usual[USUAL_ARGUMENTS + 1];
 	std::vector<Slot> many;
@@ -117,7 +117,7 @@ bool function_call(Library &p_library, Object *p_function, const Slot *p_argumen
 		values = many.data();
 	}
 	const std::optional<size_t> made =
-			function_arguments(p_library, target, static_cast<Object *>(p_function->fields()[ir::FUNCTION_FIRST].p), p_count, p_arguments, values);
+			function_arguments(p_library, target, static_cast<Object *>(own_field(p_function, ir::FUNCTION_FIRST).p), p_count, p_arguments, values);
 	if (!made) {
 		return false;
 	}

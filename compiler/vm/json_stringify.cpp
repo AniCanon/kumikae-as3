@@ -255,7 +255,7 @@ bool Json::member_value(Object *p_object, const std::string &p_name, Slot *r_val
 		return true;
 	}
 	if (const std::optional<uint32_t> field = klass.field(p_name, true)) {
-		*r_value = vm_.to_any(klass.fields[*field].kind, p_object->fields()[*field]);
+		*r_value = vm_.to_any(klass.fields[*field].kind, vm::field(klass, p_object, *field));
 		return !vm_.failing_;
 	}
 	if (vm_.named_method(klass, p_name, "get ")) {

@@ -14,6 +14,7 @@ host differs.
 | `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
 | `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on |
 | `interpreter_objects.cpp` | Objects made, their class asked, fields read by a host |
+| `fields.h` | Where an object's fields are: the one accessor every read and write of a field goes through (`field()` by the class's description, `own_field()` for the library's own classes, `owner_field()` for a script object's Godot object), and how many slots a class's objects have |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
 | `library` | The standard library as functions of plain values (slots in, a slot out, no frame): what each is handed (`Library`: the heap, and `Runner`, the few things only whoever runs the program can do), and `Unmoved`, the parts still the interpreter's own that those functions ask for, which shrinks to nothing as each family moves |
@@ -53,6 +54,10 @@ host differs.
 - **Nothing is allocated per instruction, and no text is built on the path that succeeds.**
 - **The loop is measured, not guessed.** A change to `interpreter_run.cpp` comes with
   `tests/bench/run_bench.py <build> --against <other build>`. A helper in a header has cost 3% before.
+- **Where a field is is said once, in `fields.h`.** Nothing else turns a field's number into a place in the
+  object, or counts an object's slots (`slots_of()`): a field that comes to take more than one slot changes
+  that file and the class's description, and no reader. `slot_at()` (`runtime.h`) is for that file and for
+  generated code's own accessor (`runtime/values.h`), which is handed the slot by the generator.
 - **What a container holds is said once, in `each_held()` (`held.h`).** An object's fields, a vector's
   elements, a function value's bound object or environment (its `FUNCTION_FIRST` field): freeing lets go of
   each slot it visits, and the cycle collector follows each. A new container (an Array, a keyed table for

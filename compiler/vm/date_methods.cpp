@@ -127,7 +127,7 @@ void Interpreter::date_new(const Function &p_function, const Instruction &p_in) 
 		const AnyTag tag = any::tag(value);
 		const Object *object = tag == AnyTag::Object ? static_cast<const Object *>(any::pointer(value)) : nullptr;
 		if (object && module_.date_class != ir::NONE && object->klass == module_.date_class) {
-			time = const_cast<Object *>(object)->fields()[ir::DATE_TIME].d;
+			time = own_field(const_cast<Object *>(object), ir::DATE_TIME).d;
 		} else if (tag == AnyTag::String || tag == AnyTag::Object) {
 			std::string written;
 			const Slot held = share(Kind::Any, value);
@@ -142,12 +142,12 @@ void Interpreter::date_new(const Function &p_function, const Instruction &p_in) 
 			time = date::time_clip(any::to_number(value));
 		}
 	}
-	Object *made = new_object(module_.date_class, module_.classes[module_.date_class].fields.size(), heap_.list_for(module_.date_class));
+	Object *made = new_object(module_.date_class, slots_of(module_.classes[module_.date_class]), heap_.list_for(module_.date_class));
 	if (!made) {
 		out_of_memory();
 		return;
 	}
-	made->fields()[ir::DATE_TIME].d = time;
+	own_field(made, ir::DATE_TIME).d = time;
 	Slot out;
 	out.bits = 0;
 	out.p = made;
@@ -193,7 +193,7 @@ void Interpreter::date_call(const Function &p_function, const Instruction &p_in)
 // One of a Date's methods or properties other than new, parse and UTC, on the parts given: a Number, or
 // for a text a String with a reference of its own. False if it raised.
 bool Interpreter::date_apply(Object *p_date, uint32_t p_code, const double *p_given, size_t p_count, Slot *r_out) {
-	double &time = p_date->fields()[ir::DATE_TIME].d;
+	double &time = own_field(p_date, ir::DATE_TIME).d;
 	r_out->bits = 0;
 	switch (static_cast<DateFunction>(p_code & 0xFF)) {
 		case DateFunction::Time:

@@ -79,7 +79,7 @@ void Interpreter::out_of_memory() {
 // p_message is the error's own, or null; p_words are what is said if not even the error can be made.
 void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
 	if (Object *error = new_error(heap_, p_class, p_message)) {
-		error->fields()[ir::ERROR_STACK].p = stack_text(error, 0);
+		own_field(error, ir::ERROR_STACK).p = stack_text(error, 0);
 		pending_ = any::object(error);
 		failing_ = true;
 		return;

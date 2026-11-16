@@ -48,7 +48,7 @@ bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_v
 	if (!field) {
 		return false;
 	}
-	*r_value = p_object->fields()[*field];
+	*r_value = vm::field(klass, p_object, *field);
 	if (r_kind) {
 		*r_kind = klass.fields[*field].kind;
 	}
@@ -56,7 +56,8 @@ bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_v
 }
 
 void Interpreter::set_field(Object *p_object, uint32_t p_field, Slot p_owned) {
-	put(module_.classes[p_object->klass].fields[p_field].kind, p_object->fields()[p_field], p_owned);
+	const ir::Class &klass = module_.classes[p_object->klass];
+	put(klass.fields[p_field].kind, field(klass, p_object, p_field), p_owned);
 }
 
 Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
@@ -70,18 +71,16 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		}
 		return nullptr;
 	}
-	Object *object = new_object(p_class, klass.fields.size(), heap_.list_for(p_class));
+	Object *object = new_object(p_class, slots_of(klass), heap_.list_for(p_class));
 	if (!object) {
 		if (p_owner) {
 			host_.handles.drop(p_owner);
 		}
 		return nullptr;
 	}
-	for (size_t i = 0; i < klass.fields.size(); i++) {
-		object->fields()[i] = empty_value(klass.fields[i].kind == Kind::F64, klass.fields[i].starts_null);
-	}
+	reset_fields(klass, object);
 	if (!klass.native_base.empty() && !klass.fields.empty() && klass.fields[0].kind == Kind::Ref && p_owner) {
-		object->fields()[0].p = p_owner; // The object's own from here on.
+		owner_field(object).p = p_owner; // The object's own from here on.
 	} else if (p_owner) {
 		host_.handles.drop(p_owner);
 	}

@@ -733,7 +733,7 @@ static void test_kept_by_the_engine() {
 		interpreter.release_object(second);
 		CHECK_EQ(engine.log, std::string("keep Counted\nkeep Counted\n"));
 		CHECK_EQ(vm::live_objects(), before + 2);
-		CHECK_EQ(std::string(static_cast<vm::Str *>(object->fields()[1].p)->view()), std::string("kept"));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(vm::slot_at(object, 1).p)->view()), std::string("kept"));
 		// The engine lets go of the first; the engine's freeing it frees the second on the way.
 		engine.keeps = false;
 		engine.free_first = second;

@@ -23,13 +23,13 @@ Object *Interpreter::class_value(uint32_t p_code) {
 	if (const auto found = class_values_.find(p_code); found != class_values_.end()) {
 		return found->second;
 	}
-	Object *made = module_.class_class == NONE ? nullptr : new_object(module_.class_class, 1, heap_.list_for(module_.class_class));
+	Object *made = module_.class_class == NONE ? nullptr : new_object(module_.class_class, slots_of(module_.classes[module_.class_class]), heap_.list_for(module_.class_class));
 	if (!made) {
 		out_of_memory();
 		return nullptr;
 	}
-	made->fields()[ir::CLASS_CODE].bits = 0;
-	made->fields()[ir::CLASS_CODE].i = static_cast<int32_t>(p_code);
+	own_field(made, ir::CLASS_CODE).bits = 0;
+	own_field(made, ir::CLASS_CODE).i = static_cast<int32_t>(p_code);
 	class_values_.emplace(p_code, made); // Its one reference, kept until the interpreter goes.
 	return made;
 }
@@ -37,7 +37,7 @@ Object *Interpreter::class_value(uint32_t p_code) {
 std::optional<uint32_t> Interpreter::class_in(Slot p_class, std::string_view p_error) {
 	const Object *object = held_object(p_class);
 	if (object && module_.class_class != NONE && object->klass == module_.class_class) {
-		return static_cast<uint32_t>(const_cast<Object *>(object)->fields()[ir::CLASS_CODE].i);
+		return static_cast<uint32_t>(own_field(const_cast<Object *>(object), ir::CLASS_CODE).i);
 	}
 	if (!object && (any::tag(p_class) == AnyTag::Null || any::tag(p_class) == AnyTag::Undefined)) {
 		raise_null();

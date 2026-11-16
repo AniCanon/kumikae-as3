@@ -23,7 +23,7 @@ bool of_class(const Object *p_object, uint32_t p_class) {
 std::optional<bool> Interpreter::library_get(Object *p_object, std::string_view p_name, Slot *r_value) {
 	if (of_class(p_object, module_.regexp_class)) {
 		if (p_name == "lastIndex") {
-			*r_value = to_any(Kind::I32, p_object->fields()[ir::REGEXP_LAST_INDEX]);
+			*r_value = to_any(Kind::I32, own_field(p_object, ir::REGEXP_LAST_INDEX));
 			return true;
 		}
 		if (const ir::RegExpProperty *property = ir::regexp_property(p_name)) {
@@ -75,7 +75,7 @@ std::optional<bool> Interpreter::library_set(Object *p_object, std::string_view 
 		return false;
 	}
 	if (write == ir::NONE) {
-		set_int32(p_object->fields()[ir::REGEXP_LAST_INDEX], number.i);
+		set_int32(own_field(p_object, ir::REGEXP_LAST_INDEX), number.i);
 		return true;
 	}
 	Slot ignored;

@@ -233,7 +233,7 @@ bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key
 		if (!from_any(p_value, declared.kind, declared.kind == Kind::Obj ? declared.klass : declared.starts_null ? 0 : NONE, &stored)) {
 			return false;
 		}
-		put(declared.kind, p_object->fields()[*field], stored);
+		put(declared.kind, vm::field(klass, p_object, *field), stored);
 		return true;
 	}
 	if (named_method(klass, p_key.text)) {

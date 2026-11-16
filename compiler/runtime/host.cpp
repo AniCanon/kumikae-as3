@@ -109,10 +109,10 @@ Object *new_object(Context *c, uint32_t p_class) {
 	if (!c->host->made_here[p_class]) {
 		return nullptr;
 	}
-	const ClassInfo &klass = c->classes[p_class];
-	Object *object = vm::new_object(p_class, klass.field_count, c->host->interpreter->heap().list_for(p_class));
-	for (uint32_t i = 0; object && i < klass.field_count; i++) {
-		object->fields()[i] = vm::empty_value(static_cast<Kind>(klass.fields[i].kind) == Kind::F64, klass.fields[i].starts_null);
+	const ir::Class &klass = c->host->module.classes[p_class];
+	Object *object = vm::new_object(p_class, vm::slots_of(klass), c->host->interpreter->heap().list_for(p_class));
+	if (object) {
+		vm::reset_fields(klass, object);
 	}
 	return object;
 }

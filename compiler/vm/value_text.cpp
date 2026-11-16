@@ -266,7 +266,7 @@ bool any_primitive(Library &p_library, Slot p_value, Slot *r_out, bool p_number)
 	}
 	Object *object = held_object(p_value);
 	if (p_number && object && object->klass == module.date_class) {
-		*r_out = any_number(p_library, object->fields()[ir::DATE_TIME].d); // A Date's valueOf().
+		*r_out = any_number(p_library, own_field(object, ir::DATE_TIME).d); // A Date's valueOf().
 		return true;
 	}
 	// A class's own valueOf() comes first, if what it gives is not an object (ECMAScript's [[DefaultValue]]).
@@ -303,15 +303,15 @@ bool any_primitive(Library &p_library, Slot p_value, Slot *r_out, bool p_number)
 }
 
 std::string date_text(const Library &p_library, const Object *p_date, ir::DateText p_which) {
-	const double time = const_cast<Object *>(p_date)->fields()[ir::DATE_TIME].d;
+	const double time = own_field(const_cast<Object *>(p_date), ir::DATE_TIME).d;
 	return date::text(p_which, time, std::isnan(time) ? 0 : p_library.heap.clock.local_offset(time));
 }
 
 // With no name (it could not be made, memory having run out), the class's.
 std::string error_heading(const ir::Module &p_module, const Object *p_error) {
-	Slot *fields = const_cast<Object *>(p_error)->fields();
-	const Str *name = static_cast<const Str *>(fields[ir::ERROR_NAME].p);
-	const Str *message = static_cast<const Str *>(fields[ir::ERROR_MESSAGE].p);
+	Object *error = const_cast<Object *>(p_error);
+	const Str *name = static_cast<const Str *>(own_field(error, ir::ERROR_NAME).p);
+	const Str *message = static_cast<const Str *>(own_field(error, ir::ERROR_MESSAGE).p);
 	std::string text = name ? std::string(name->view()) : p_module.classes[p_error->klass].name;
 	if (message && message->size > 0) {
 		text += ": " + std::string(message->view());
@@ -357,11 +357,11 @@ std::string object_text(const Library &p_library, Object *p_object) {
 		return "function Function() {}"; // avmplus's Function.as: no source text is kept, for any function.
 	}
 	if (p_object->klass == module.class_class) {
-		return "[class " + class_name(module, static_cast<uint32_t>(p_object->fields()[ir::CLASS_CODE].i)) + "]";
+		return "[class " + class_name(module, static_cast<uint32_t>(own_field(p_object, ir::CLASS_CODE).i)) + "]";
 	}
 	if (p_object->klass == module.regexp_class) {
-		const Str *source = static_cast<const Str *>(p_object->fields()[ir::REGEXP_SOURCE].p);
-		return regex::regexp_text(source ? source->view() : std::string_view(), static_cast<uint8_t>(p_object->fields()[ir::REGEXP_FLAGS].i));
+		const Str *source = static_cast<const Str *>(own_field(p_object, ir::REGEXP_SOURCE).p);
+		return regex::regexp_text(source ? source->view() : std::string_view(), static_cast<uint8_t>(own_field(p_object, ir::REGEXP_FLAGS).i));
 	}
 	return "[object " + name.substr(name.rfind('.') == std::string::npos ? 0 : name.rfind('.') + 1) + "]";
 }

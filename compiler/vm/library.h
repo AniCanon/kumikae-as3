@@ -5,6 +5,7 @@
 #pragma once
 
 #include "any.h"
+#include "fields.h"
 #include "heap.h"
 #include "ir.h"
 #include "runtime.h"

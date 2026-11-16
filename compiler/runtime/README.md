@@ -26,8 +26,11 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 - **`Context *c`** is the host's, one per thread: the pending error, the depth of calls, static fields,
   string constants, which classes have been set up. A program library has no thread-local and no global
   that changes; its tables are constants.
-- **Objects** are `vm::Object` (the header) followed by one eight-byte slot for each field, at
-  `sizeof(Object) + 8 * field`. A class is a C++ struct deriving from `Object` (or from its base's
+- **Objects** are `vm::Object` (the header) followed by its slots, eight bytes each. Which slot a field is
+  in is said in `vm/fields.h` for everything that has the class only as the program runs (the host, the
+  library, the collector, Godot reading a property), and by the generator for generated code, which
+  writes `field<T>(object, slot)` (`values.h`) and each field's place in bytes in the class's descriptor:
+  today slot and field number are the same, one slot a field. A class is a C++ struct deriving from `Object` (or from its base's
   struct), and a descriptor (`ClassInfo`): name, base, a hash of its layout, each field's name, kind and
   offset, its method table by method number. The host reads descriptors, never C++ types.
 - **Counts** change only in `retain(c, x)` and `release(c, x)` (`values.h`).

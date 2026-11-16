@@ -42,8 +42,14 @@ struct Object : Counted {
 	Object *gc_next;
 	int32_t gc_count;
 	uint32_t gc_state;
-	Slot *fields() { return reinterpret_cast<Slot *>(this + 1); }
 };
+
+// A slot of an object, by its number: they follow the header. Which slot a field is in is not said here:
+// vm/fields.h says it for the interpreter, the library and the hosts, and generated code has its class's
+// description (runtime/values.h). Nothing else reads an object's slots.
+inline Slot &slot_at(Object *p_object, size_t p_slot) {
+	return reinterpret_cast<Slot *>(p_object + 1)[p_slot];
+}
 
 class Entries; // vm/table.h
 
