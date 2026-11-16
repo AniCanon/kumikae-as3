@@ -17,7 +17,7 @@ class SimulatorRunTest {
     private val asked get() = repository.calls.filterNot { it.startsWith("console") }
 
     private fun run(bundle: String = "org.example.game", app: String = "") =
-        SimulatorRun(repository, bundle, app, { text, error -> said += text to error })
+        SimulatorRun(repository, bundle, app, { text, error -> said += text to error }, exists = { true })
 
     @Test fun `the app is launched on the device the panel shows`() {
         repository.select("A")
@@ -120,8 +120,42 @@ class SimulatorRunTest {
     @Test fun `an app that is named is used as it is and nothing is built`() {
         repository.select("A")
         repository.calls.clear()
-        SimulatorRun(repository, "org.example.game", "/games/Game.app", { _, _ -> }) { error("must not build") }.start()
+        SimulatorRun(repository, "org.example.game", "/games/Game.app", { _, _ -> }, exists = { true }) {
+            error("must not build")
+        }.start()
         assertEquals(listOf("connect", "status", "install A /games/Game.app", "launch A org.example.game"), asked)
+    }
+
+    @Test fun `an app that is named and is not there is built, and the run says so`() {
+        repository.select("A")
+        repository.calls.clear()
+        val run = SimulatorRun(
+            repository,
+            "org.example.game",
+            "/games/.build/Game.app",
+            { text, error -> said += text to error },
+            exists = { false },
+        ) { "/games/out/Game.app" }
+        run.start()
+        assertEquals(listOf("connect", "status", "install A /games/out/Game.app", "launch A org.example.game"), asked)
+        assertEquals(
+            "There is no app at /games/.build/Game.app: building the game for the Simulator.\n" to false,
+            said.first(),
+        )
+    }
+
+    @Test fun `an app that is not there, with nothing to build from, says where it looked and what to do`() {
+        repository.select("A")
+        repository.calls.clear()
+        val run =
+            SimulatorRun(repository, "org.example.game", "/games/.build/Game.app", { _, _ -> }, exists = { false })
+        val failure = assertFailsWith<IllegalStateException> { run.start() }
+        assertEquals(
+            "There is no app at /games/.build/Game.app. Build the game for the Simulator, or clear the app in this " +
+                "run configuration so that Run builds it.",
+            failure.message,
+        )
+        assertTrue(asked.none { it.startsWith("install") || it.startsWith("launch") })
     }
 
     @Test fun `the game is told where its scripts are edited, so that it takes a save while it runs`() {
