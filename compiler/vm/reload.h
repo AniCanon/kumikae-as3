@@ -5,6 +5,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace kas3 {
 namespace vm {
@@ -36,6 +37,9 @@ class Reload {
 	Object *moved_vector(Vector *p_old, uint32_t p_class);
 	void carry_fields(Object *p_old, Object *p_fresh);
 	void constants_again(const std::string &p_class);
+	// For each field of the new class, the old class's field of its name, or NONE. A base and its subclass
+	// may each have a private field of one name: the n-th of a name is the n-th.
+	static std::vector<uint32_t> fields_by_name(const ir::Class &p_old, const ir::Class &p_new);
 
 public:
 	Reload(Interpreter &p_from, Interpreter &p_to);
