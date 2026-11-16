@@ -169,7 +169,7 @@ find inserts its replacement as it is written, and `localeCompare` orders by UTF
 as AS3 indexes strings: ECMAScript 3's syntax and meaning, with what AS3 takes from PCRE (the flags `s`
 and `x`, named groups `(?P<name>...)`, lookbehind of a fixed length, atomic groups, possessive
 quantifiers). A pattern that can't be read is a `SyntaxError` where the RegExp is made (ECMAScript's rule;
-Flash, by recollection, makes one that never matches). A search that backtracks without end stops after
+avmplus raises nothing and makes one that never matches; the owner chose the error, 2026-11-16). A search that backtracks without end stops after
 ten million steps, plus a thousand for each unit of the text, with an `Error` that says so.
 
 **Date** asks the host for the time and for the zone's offset at a moment (`vm/clock.h`): Godot's clock in
