@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
@@ -15,9 +16,17 @@ import java.util.concurrent.ConcurrentHashMap
 /** Keeps accepted diagnostics visible even when an edit invalidated an identical earlier repaint. */
 internal class As3Lsp4ijClient(project: Project, private val refresh: (VirtualFile, Document) -> Unit) :
     LanguageClientImpl(project) {
-    // The newest document version the server has published for, by file. LSP4IJ keeps its own count of
-    // versions to itself; one older than a version already published is stale for certain.
-    private val published = ConcurrentHashMap<VirtualFile, Int>()
+    private val published = PublishedVersions<VirtualFile>()
+
+    init {
+        // A file opened again counts its versions from the start.
+        project.messageBus.connect(this).subscribe(
+            FileEditorManagerListener.FILE_EDITOR_MANAGER,
+            object : FileEditorManagerListener {
+                override fun fileClosed(source: FileEditorManager, file: VirtualFile) = published.forget(file)
+            },
+        )
+    }
 
     override fun publishDiagnostics(params: PublishDiagnosticsParams) {
         // Keep the client's version check and the refresh on the same document snapshot.
@@ -31,14 +40,23 @@ internal class As3Lsp4ijClient(project: Project, private val refresh: (VirtualFi
             }
             super.publishDiagnostics(params)
             if (document == null || !FileEditorManager.getInstance(project).isFileOpen(file)) return@runBlocking
-            if (!current(file, params.version)) return@runBlocking
+            if (!published.current(file, params.version)) return@runBlocking
             // Render the client's accepted cache, never the incoming payload. Native refreshes coalesce.
             refresh(file, document)
         }
     }
+}
 
-    private fun current(file: VirtualFile, version: Int?): Boolean {
-        if (version == null) return true
-        return published.merge(file, version, ::maxOf) == version
+/**
+ * The newest document version the server has published for, by file. LSP4IJ keeps its own count of
+ * versions to itself; a publication older than one already published is stale for certain.
+ */
+internal class PublishedVersions<K : Any> {
+    private val newest = ConcurrentHashMap<K, Int>()
+
+    fun current(key: K, version: Int?): Boolean = version == null || newest.merge(key, version, ::maxOf) == version
+
+    fun forget(key: K) {
+        newest.remove(key)
     }
 }

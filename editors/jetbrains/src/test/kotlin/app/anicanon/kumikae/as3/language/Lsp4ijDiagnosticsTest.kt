@@ -77,6 +77,18 @@ class Lsp4ijDiagnosticsTest {
         assertEquals(TextRange.EMPTY_RANGE, renderedRange)
     }
 
+    @Test fun `a publication older than one already published is stale, until the file is closed`() {
+        val versions = PublishedVersions<String>()
+        assertTrue(versions.current("a", 3))
+        assertTrue(versions.current("a", 3), "the same version again is current")
+        assertFalse(versions.current("a", 2), "an older one is stale")
+        assertTrue(versions.current("b", 1), "each file counts its own versions")
+        assertTrue(versions.current("a", null), "without a version nothing says it is stale")
+        assertTrue(versions.current("a", 4))
+        versions.forget("a")
+        assertTrue(versions.current("a", 1), "a file opened again counts from its first version")
+    }
+
     private fun range(startLine: Int, start: Int, endLine: Int, end: Int) =
         Range(Position(startLine, start), Position(endLine, end))
 
