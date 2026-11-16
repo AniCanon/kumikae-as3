@@ -1587,6 +1587,79 @@ static void test_reload_alive() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// A field whose Godot class changed takes the old field's object only if it is of the new class: the
+// calls prepared for the new class would otherwise run on an object of another.
+static void test_reload_engine_class() {
+	struct Classed : FakeEngine {
+		std::string refused;
+		[[nodiscard]] bool is_class(void *p_value, std::string_view p_class) override { return p_value != nullptr && p_class != refused; }
+	};
+	const auto lowered = [](const char *p_type, ir::Module *r_module) {
+		Compilation program;
+		program.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		program.add("Rig.as", std::string("package { import godot.*; public class Rig extends Node { public var cam:") + p_type +
+									  "; public var other:Node2D; } }");
+		program.check();
+		CHECK_EQ(program.format_diagnostics(false), std::string());
+		CHECK(ir::lower(program, r_module, ir::LowerMode::Library));
+	};
+	ir::Module old_module, new_module;
+	lowered("Node2D", &old_module);
+	lowered("Camera2D", &new_module);
+	{
+		Classed engine;
+		engine.refused = "Camera2D";
+		vm::Interpreter running(old_module, engine);
+		CHECK(running.start());
+		const uint32_t rig_class = class_named(old_module, "Rig");
+		vm::Object *rig = running.construct(rig_class, engine.box());
+		const auto field = [&](const char *p_name) {
+			const std::vector<ir::Field> &fields = old_module.classes[rig_class].fields;
+			for (uint32_t i = 0; i < fields.size(); i++) {
+				if (fields[i].name == p_name) {
+					return i;
+				}
+			}
+			return uint32_t(0);
+		};
+		vm::Slot held;
+		held.bits = 0;
+		held.p = engine.box();
+		void *const camera = held.p;
+		running.set_field(rig, field("cam"), held);
+		held.p = engine.box();
+		void *const other = held.p;
+		running.set_field(rig, field("other"), held);
+		vm::Slot now;
+		{
+			vm::Interpreter fresh(new_module, engine);
+			vm::Object *moved = nullptr;
+			{
+				vm::Reload reload(running, fresh);
+				moved = reload.object(rig);
+				CHECK(moved != nullptr);
+			}
+			CHECK(fresh.get_field(moved, "cam", &now) && now.p == nullptr);
+			CHECK(fresh.get_field(moved, "other", &now) && now.p == other);
+			fresh.release_object(moved);
+		}
+		// Where the object is of the new class too, it is carried.
+		engine.refused.clear();
+		{
+			vm::Interpreter fresh(new_module, engine);
+			vm::Object *moved = nullptr;
+			{
+				vm::Reload reload(running, fresh);
+				moved = reload.object(rig);
+			}
+			CHECK(fresh.get_field(moved, "cam", &now) && now.p == camera);
+			fresh.release_object(moved);
+		}
+		running.release_object(rig);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 // The container behind Object, Dictionary and an Array's properties: insertion order kept through deletes
 // and through the packing that drops deleted entries; every key found again after it.
 static void test_entries() {
@@ -2942,6 +3015,7 @@ int main() {
 	test_static_changes();
 	test_reload_kept_containers();
 	test_reload_alive();
+	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();

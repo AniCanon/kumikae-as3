@@ -199,7 +199,7 @@ ir::Module stub_module(const Program &p_program) {
 	}
 	for (uint32_t i = 0; i < p_program.global_count; i++) {
 		const GlobalInfo &from = p_program.globals[i];
-		module.globals.push_back(ir::Global{ from.name, static_cast<Kind>(from.kind), from.klass, from.starts_null });
+		module.globals.push_back(ir::Global{ from.name, static_cast<Kind>(from.kind), from.klass, from.starts_null, {} });
 	}
 	for (uint32_t i = 0; i < p_program.string_count; i++) {
 		module.strings.emplace_back(p_program.strings[i].data, p_program.strings[i].size);
