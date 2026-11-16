@@ -45,7 +45,7 @@ const char *symbol_kind_name(SymbolKind p_kind);
 
 struct Symbol {
 	SymbolKind kind = SymbolKind::Local;
-	std::string_view name;
+	std::string name; // Stable across replacement of a source snapshot.
 	Unit *unit = nullptr; // Null only for `arguments`.
 	uint32_t offset = 0; // Of the name where it is declared.
 	Node *node = nullptr; // ClassDecl, InterfaceDecl, FunctionDecl or VarDecl; null for the rest.
@@ -167,7 +167,7 @@ struct LocalScope {
 // One source file in a Compilation.
 struct Unit {
 	std::shared_ptr<Parsed> parsed;
-	const Source &source;
+	Source source;
 	Diagnostics diagnostics; // The syntax errors, then what the passes report.
 	Program *tree = nullptr;
 	bool is_declaration = false; // Declares what exists elsewhere: `native`, no bodies.
@@ -181,6 +181,7 @@ struct Unit {
 	std::vector<Reference> references;
 	std::vector<TypedExpression> typed;
 	std::deque<LocalScope> local_scopes;
+	std::deque<Symbol> body_symbols; // Replaced together with this unit's body semantics.
 
 	explicit Unit(std::shared_ptr<Parsed> p_parsed) :
 			parsed(std::move(p_parsed)), source(parsed->source), diagnostics(parsed->diagnostics), tree(parsed->tree) {}
@@ -195,10 +196,6 @@ struct Context {
 };
 
 // The outcome of a package-level lookup.
-// What code in a class of package p_package may name on a base class p_base: p_member is not private, and
-// if it is internal, p_base is in that package.
-bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package);
-
 struct Found {
 	Symbol *first = nullptr;
 	Symbol *second = nullptr; // Set when the name is ambiguous.
@@ -216,6 +213,8 @@ class Compilation {
 	Symbol *vector_ = nullptr;
 	Symbol *element_ = nullptr; // `T`, the element type inside the built-in Vector.
 	bool checked_ = false;
+	bool reusable_bodies_ = false;
+	size_t initial_type_count_ = 0;
 	std::deque<Type> types_;
 	std::unordered_map<const Symbol *, const Type *> instance_types_;
 	std::unordered_map<const Type *, const Type *> vector_types_;
@@ -259,6 +258,10 @@ public:
 	// in a file that has one, nothing in a file that uses what such a file declares, and nowhere that a
 	// name is missing (names_doubt.cpp).
 	void check(bool p_through_syntax_errors = false);
+	// Reuses declaration identities only when the source outside function bodies is unchanged.
+	// Drop queries before calling: a successful update invalidates changed units' body symbols,
+	// scopes and syntax pointers. False leaves the compilation unchanged and requests a full check.
+	bool update_bodies(const std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> &p_changes);
 	bool has_errors() const;
 	// The diagnostics of every file, in the order the files were added.
 	std::string format_diagnostics(bool p_warnings = true) const; // Without the warnings when false.
@@ -333,6 +336,10 @@ inline std::string quoted(std::string_view p_name) {
 	result += '\'';
 	return result;
 }
+
+// What code in a class of package p_package may name on a base class p_base: p_member is not private, and
+// if it is internal, p_base is in that package.
+bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package);
 
 // Whether a class written in a declaration file carries a tag: [Abstract], [Singleton].
 bool has_tag(const Symbol *p_class, std::string_view p_tag);

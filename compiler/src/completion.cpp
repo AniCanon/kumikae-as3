@@ -10,7 +10,7 @@ namespace kas3 {
 namespace {
 
 constexpr std::string_view IN_FUNCTION[] = {
-	"var", "const", "if", "else", "for", "each", "in", "while", "do", "return", "break", "continue", "switch", "case",
+	"var", "const", "if", "else", "for", "for each", "each", "in", "while", "do", "return", "break", "continue", "switch", "case",
 	"default", "new", "null", "true", "false", "is", "as", "typeof", "function", "throw", "try", "catch", "finally",
 	"super", "delete", "void",
 };
@@ -49,6 +49,7 @@ class Completer {
 	Symbol *class_ = nullptr; // The class the cursor is in.
 	FunctionDecl *function_ = nullptr; // The outermost function the cursor is in.
 	bool in_body_ = false;
+	bool incomplete_ = false;
 	std::vector<Completion> found_;
 	std::unordered_set<std::string_view> seen_;
 
@@ -174,10 +175,30 @@ class Completer {
 		for (const auto &[name, symbol] : unit_.helpers) {
 			take(symbol);
 		}
-		std::sort(sorted.begin(), sorted.end(), [](const Symbol *p_a, const Symbol *p_b) { return p_a->name < p_b->name; });
+		std::sort(sorted.begin(), sorted.end(), [&](const Symbol *p_a, const Symbol *p_b) {
+			return p_a->name != p_b->name ? p_a->name < p_b->name :
+					compilation_.qualified_name(p_a) < compilation_.qualified_name(p_b);
+		});
 		for (Symbol *symbol : sorted) {
-			if (compilation_.lookup_package_level(context, symbol->name).first == symbol) {
+			const Found found = compilation_.lookup_package_level(context, symbol->name);
+			if (found.first == symbol && !found.second) {
 				offer(symbol);
+			}
+		}
+		for (Symbol *symbol : sorted) {
+			const Found found = compilation_.lookup_package_level(context, symbol->name);
+			if (symbol->is_type() && !symbol->file_private && symbol->package &&
+					!symbol->package->name.empty() && !found.first && !seen_.count(symbol->name) &&
+					compilation_.visible(symbol, context)) {
+				if (prefix_.empty()) {
+					incomplete_ = true;
+					continue;
+				}
+				Completion item = queries_.completion_item(symbol);
+				const std::string qualified = compilation_.qualified_name(symbol);
+				item.detail += " (import " + qualified + ")";
+				item.additional_edit = queries_.import_edit(unit_, offset_, qualified);
+				found_.push_back(std::move(item));
 			}
 		}
 	}
@@ -350,23 +371,30 @@ class Completer {
 		}
 	}
 
-	// Whether a type is what is written here. The tree says so wherever the grammar wants a type (`var a:`,
-	// a parameter, a result, `catch (e:)`, `extends`, `implements`), even before one is started: the
-	// parser gives a type not yet written the place from the colon to what follows. After `new`, `is` and
-	// `as` an expression is parsed, so there the word before says it.
+	// Whether a type is what is written here: `var a:`, `):`, `new`, `extends`, `implements`, `is`, `as`.
+	// The tree says so wherever the grammar wants a type, even before one is started.
 	bool at_type() const {
+		const uint32_t end = before();
+		if (end == 0) {
+			return false;
+		}
 		for (const Node *node : queries_.context_nodes(unit_)) {
-			if (node->kind == NodeKind::TypeRef && node->offset <= start_ && offset_ <= node->end) {
-				return true;
+			if (node->kind == NodeKind::TypeRef) {
+				const auto *type = static_cast<const TypeRef *>(node);
+				if (type->completion_begin <= offset_ && offset_ <= std::max(type->offset, type->end)) {
+					return true;
+				}
 			}
 		}
-		const std::string_view keyword = word_before(before());
-		return keyword == "new" || keyword == "is" || keyword == "as";
+		const std::string_view keyword = word_before(end);
+		return keyword == "new" || keyword == "extends" || keyword == "implements" || keyword == "is" || keyword == "as";
 	}
 
 public:
 	Completer(Queries &p_queries, Compilation &p_compilation, const Unit &p_unit, uint32_t p_offset) :
 			queries_(p_queries), compilation_(p_compilation), unit_(p_unit), source_(p_unit.source.text()), offset_(p_offset) {}
+
+	bool incomplete() const { return incomplete_; }
 
 	std::vector<Completion> run() {
 		if (offset_ > source_.size() || queries_.in_text(unit_, offset_)) {
@@ -378,6 +406,12 @@ public:
 		}
 		prefix_ = source_.substr(start_, offset_ - start_);
 		find_enclosing();
+		if (class_ && function_ && (function_->modifiers.bits & Modifiers::Override) &&
+				(function_->name.empty() ? offset_ > function_->name_offset :
+						offset_ >= function_->name_offset && offset_ <= function_->name_offset + function_->name.size())) {
+			std::optional<OverrideOffer> offer = queries_.overrides(unit_, function_, class_, start_, offset_);
+			return offer ? std::move(offer->items) : std::vector<Completion>();
+		}
 		if (offer_import()) {
 			return std::move(found_);
 		}
@@ -402,6 +436,9 @@ public:
 			offer_definitions(false);
 			put_parameter_name_first();
 			offer_keywords(IN_FUNCTION);
+			queries_.statement_templates(unit_, offset_, found_);
+			// Typing a keyword can turn a recovery gap into a known statement start.
+			incomplete_ |= prefix_.empty();
 			if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
 				Completion item;
 				item.name = "this";
@@ -409,7 +446,7 @@ public:
 				found_.push_back(std::move(item));
 			}
 		} else if (class_) {
-			if (std::optional<OverrideOffer> offer = queries_.overrides(unit_, class_, start_, prefix_)) {
+			if (std::optional<OverrideOffer> offer = queries_.overrides(unit_, nullptr, class_, start_, offset_)) {
 				for (Completion &item : offer->items) {
 					seen_.insert(item.name); // Its name is in the base's tree, which outlives the request.
 					found_.push_back(std::move(item));
@@ -426,8 +463,10 @@ public:
 	}
 };
 
-std::vector<Completion> Queries::complete(const Unit &p_unit, uint32_t p_offset) {
-	return Completer(*this, compilation_, p_unit, p_offset).run();
+CompletionResult Queries::complete(const Unit &p_unit, uint32_t p_offset) {
+	Completer completer(*this, compilation_, p_unit, p_offset);
+	auto items = completer.run();
+	return { std::move(items), completer.incomplete() };
 }
 
 } // namespace kas3

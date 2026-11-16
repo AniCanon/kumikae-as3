@@ -37,6 +37,12 @@ static std::string paths(Workspace &p_workspace, const fs::path &p_root) {
 }
 
 static void test_uri() {
+	CHECK_EQ(path_from_uri("file://server/share/a%20b.as"), std::string("//server/share/a b.as"));
+	CHECK_EQ(uri_from_path("//server/share/a b.as"), std::string("file://server/share/a%20b.as"));
+	CHECK_EQ(uri_from_path("C:\\work\\Main.as", PathStyle::Windows), std::string("file:///C:/work/Main.as"));
+#ifndef _WIN32
+	CHECK_EQ(uri_from_path("/work/a\\b.as"), std::string("file:///work/a%5Cb.as"));
+#endif
 	CHECK_EQ(path_from_uri("file:///a/b.as"), std::string("/a/b.as"));
 	CHECK_EQ(path_from_uri("file:///a%20b/c%C3%A9.as"), std::string("/a b/c\xC3\xA9.as"));
 	CHECK_EQ(path_from_uri("file:///a%25b.as"), std::string("/a%b.as"));
@@ -337,7 +343,7 @@ static void test_completion_cache_lifetime() {
 		CHECK_EQ(queries.cached_context_units(), size_t{0});
 		const auto caret = static_cast<uint32_t>(source.find("cur }") + 3);
 		for (int request = 0; request < 100; ++request) {
-			const auto items = queries.complete(*unit, caret);
+			const auto items = queries.complete(*unit, caret).items;
 			CHECK_EQ(items.size(), size_t{1});
 			CHECK_EQ(items.front().detail, "var current:" + type);
 			CHECK_EQ(queries.cached_completion_items(), size_t{1});
@@ -437,9 +443,92 @@ static void test_one_file_many_names() {
 	fs::remove_all(links);
 }
 
+static void test_body_recheck() {
+	Workspace workspace(plain());
+	const std::string path = "/Main.as";
+	const std::string other = "package { public class Other { public var value:int; } }";
+	const std::string prefix = "package { public class Main { public function run():void { ";
+	const std::string suffix = " } public function later():int { return 1; } } }";
+	workspace.open("/Other.as", other);
+	workspace.open(path, prefix + "var local:Other; local.value;" + suffix);
+	CHECK(!workspace.compilation().has_errors());
+	const int initial = workspace.full_checks();
+	for (int i = 0; i < 40; ++i) {
+		std::weak_ptr<Parsed> previous = workspace.unit(path)->parsed;
+		const std::string body = i % 2 ? "var item:Other; item.value;" : "var item:Other; item.missing;";
+		const std::string text = prefix + body + suffix;
+		workspace.change(path, text);
+		Compilation clean;
+		clean.add(path, text);
+		clean.add("/Other.as", other);
+		clean.check(true);
+		CHECK_EQ(workspace.compilation().format_diagnostics(), clean.format_diagnostics());
+		CHECK_EQ(workspace.compilation().dump_names(), clean.dump_names());
+		CHECK_EQ(workspace.compilation().dump_types(), clean.dump_types());
+		CHECK_EQ(workspace.full_checks(), initial); // Body edits do not rebuild unrelated declarations.
+		CHECK(previous.expired());
+		CHECK(workspace.unit(path)->body_symbols.size() <= 5);
+	}
+	workspace.change(path, prefix + "var item:Other; item.value;" + " } public function later():Number { return 1; } } }");
+	CHECK(!workspace.compilation().has_errors());
+	CHECK_EQ(workspace.full_checks(), initial + 1); // A signature change takes the full-check path.
+}
+
+static void test_body_import_invalidates_signature() {
+	for (bool moved : { false, true }) {
+		Workspace workspace(plain());
+		const std::string a = "package a { public class Other {} }";
+		const std::string b = "package b { public class Other {} }";
+		const std::string caller = "package { public class Caller { public function run(m:Main, x:a.Other):void { m.run(x); } } }";
+		const std::string before = "package { public class Main { public function run(x:Other):void { import a.Other; } public function later():void {} } }";
+		const std::string after = moved ?
+			"package { public class Main { public function run(x:Other):void {} public function later():void { import a.Other; } } }" :
+			"package { public class Main { public function run(x:Other):void { import b.Other; } public function later():void {} } }";
+		workspace.open("/a/Other.as", a);
+		workspace.open("/b/Other.as", b);
+		workspace.open("/Caller.as", caller);
+		workspace.open("/Main.as", before);
+		CHECK(!workspace.compilation().has_errors());
+		workspace.change("/Main.as", after);
+		Compilation clean;
+		clean.add("/Caller.as", caller);
+		clean.add("/Main.as", after);
+		clean.add("/a/Other.as", a);
+		clean.add("/b/Other.as", b);
+		clean.check(true);
+		CHECK(clean.has_errors());
+		CHECK_EQ(workspace.compilation().format_diagnostics(), clean.format_diagnostics());
+		CHECK_EQ(workspace.full_checks(), 2);
+	}
+}
+
+static void test_batched_body_recheck() {
+	Workspace workspace(plain());
+	const std::string before_a = "package { public class A { public function run(b:B):void { b.take(1); } } }";
+	const std::string after_a = "package { public class A { public function run(b:B):void { b.take(\"bad\"); } } }";
+	const std::string before_b = "package { public class B { public function take(n:int):void {} } }";
+	const std::string after_b = "package { public class B { public function take(n:int):void { var local:int; } } }";
+	workspace.open("/A.as", before_a);
+	workspace.open("/B.as", before_b);
+	CHECK(!workspace.compilation().has_errors());
+	workspace.change("/A.as", after_a);
+	workspace.change("/B.as", after_b);
+	Compilation clean;
+	clean.add("/A.as", after_a);
+	clean.add("/B.as", after_b);
+	clean.check(true);
+	CHECK(clean.has_errors());
+	CHECK_EQ(workspace.compilation().format_diagnostics(), clean.format_diagnostics());
+	CHECK_EQ(workspace.compilation().dump_types(), clean.dump_types());
+	CHECK_EQ(workspace.full_checks(), 1);
+}
+
 int main() {
 	test_paths();
 	test_one_file_many_names();
+	test_batched_body_recheck();
+	test_body_import_invalidates_signature();
+	test_body_recheck();
 	test_completion_cache_lifetime();
 	test_uri();
 	test_scan();

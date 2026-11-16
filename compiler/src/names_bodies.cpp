@@ -321,7 +321,8 @@ class Resolver {
 		}
 		type(p_function->return_type);
 		if (!arguments_) {
-			arguments_ = compilation_.new_symbol(SymbolKind::Arguments, "arguments", nullptr, 0);
+			arguments_ = compilation_.new_symbol(SymbolKind::Arguments, "arguments", &unit_, 0);
+			arguments_->unit = nullptr;
 		}
 		scope.names.emplace("arguments", arguments_);
 
@@ -715,9 +716,13 @@ public:
 
 } // namespace
 
+void resolve_unit_bodies(Compilation &p_compilation, Unit &p_unit) {
+	Resolver(p_compilation, p_unit).run();
+}
+
 void resolve_bodies(Compilation &p_compilation) {
 	for (Unit &unit : p_compilation.units()) {
-		Resolver(p_compilation, unit).run();
+		resolve_unit_bodies(p_compilation, unit);
 	}
 }
 

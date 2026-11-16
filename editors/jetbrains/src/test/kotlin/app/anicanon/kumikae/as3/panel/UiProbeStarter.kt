@@ -30,11 +30,20 @@ class UiProbeStarter : ApplicationStarter {
         val destination = Path.of(args[1])
         Files.createDirectories(destination)
         val failure = runCatching {
-            UiProbeLanguage.run(destination)
-            UiProbeCompletion.run(destination)
-            checkThemes(destination)
-            if (System.getenv("KUMIKAE_SIMULATOR_MEMORY_PROBE") == "1") UiProbeMemory.run(destination)
-            if (System.getenv("KUMIKAE_SIMULATOR_LIVE_PROBE") == "1") UiProbeLive.run(destination)
+            UiProbeFeedbackGuard.run(destination) {
+                if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
+                    UiProbeLanguage.run(destination)
+                    UiProbeCompletion.run(destination, missingClient = true)
+                } else if (System.getenv("KUMIKAE_COMPLETION_CONTROL_PROBE") == "1") {
+                    UiProbeCompletion.run(destination, plainText = true)
+                } else {
+                    UiProbeLanguage.run(destination)
+                    UiProbeCompletion.run(destination)
+                    checkThemes(destination)
+                    if (System.getenv("KUMIKAE_SIMULATOR_MEMORY_PROBE") == "1") UiProbeMemory.run(destination)
+                    if (System.getenv("KUMIKAE_SIMULATOR_LIVE_PROBE") == "1") UiProbeLive.run(destination)
+                }
+            }
         }.exceptionOrNull()
         Files.writeString(destination.resolve("result.txt"), failure?.stackTraceToString() ?: "passed\n")
         val application = ApplicationManager.getApplication()

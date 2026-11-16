@@ -34,6 +34,7 @@ static Workspace::Options options(bool p_godot) {
 struct Session {
 	Server server;
 	int next_id = 1;
+	std::unordered_map<std::string, int> versions;
 	std::vector<Json> received; // Since the last send.
 
 	explicit Session(bool p_godot = false) :
@@ -79,7 +80,7 @@ struct Session {
 		server.settle(out);
 		take(out);
 	}
-	void initialize(const std::string &p_root = std::string(), bool p_utf8 = false, const std::string &p_code_language = std::string()) {
+	void initialize(const std::string &p_root = std::string(), bool p_utf8 = false, const std::string &p_code_language = std::string(), bool p_versions = false) {
 		Json params = Json::object();
 		if (!p_code_language.empty()) {
 			params.set("initializationOptions", Json::object().set("codeLanguage", p_code_language));
@@ -87,6 +88,9 @@ struct Session {
 		params.set("processId", Json());
 		params.set("rootUri", p_root.empty() ? Json() : Json(uri_from_path(p_root)));
 		Json capabilities = Json::object();
+		if (p_versions) {
+			capabilities.set("textDocument", Json::object().set("publishDiagnostics", Json::object().set("versionSupport", true)));
+		}
 		if (p_utf8) {
 			capabilities.set("general", Json::object().set("positionEncodings", Json::array().push("utf-8").push("utf-16")));
 		}
@@ -96,6 +100,7 @@ struct Session {
 		notify("initialized", Json::object());
 	}
 	void open(const std::string &p_uri, const std::string &p_text) {
+		versions[p_uri] = 1;
 		notify("textDocument/didOpen",
 				Json::object().set("textDocument",
 						Json::object().set("uri", p_uri).set("languageId", "actionscript").set("version", 1).set("text", p_text)));
@@ -103,7 +108,7 @@ struct Session {
 	void change(const std::string &p_uri, const std::string &p_text) {
 		notify("textDocument/didChange",
 				Json::object()
-						.set("textDocument", Json::object().set("uri", p_uri).set("version", 2))
+						.set("textDocument", Json::object().set("uri", p_uri).set("version", ++versions[p_uri]))
 						.set("contentChanges", Json::array().push(Json::object().set("text", p_text))));
 	}
 	void close(const std::string &p_uri) {
@@ -599,7 +604,7 @@ static void test_windows_line_endings() {
 	};
 	auto change = [&](const Json &p_range, const char *p_text) {
 		session.notify("textDocument/didChange",
-				Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", 2))
+				Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", ++session.versions[MAIN]))
 						.set("contentChanges", Json::array().push(Json::object().set("range", p_range).set("text", p_text))));
 		session.settle();
 	};
@@ -626,7 +631,7 @@ static void test_ranged_changes() {
 		};
 		auto change = [&](Json p_changes) {
 			session.notify("textDocument/didChange",
-					Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", 2)).set("contentChanges", std::move(p_changes)));
+					Json::object().set("textDocument", Json::object().set("uri", MAIN).set("version", ++session.versions[MAIN])).set("contentChanges", std::move(p_changes)));
 			session.settle();
 		};
 		// Replace the `1` after the non-ASCII text with a string: the position differs by encoding.
@@ -871,6 +876,26 @@ static void test_completion_edits_and_signatures() {
 	}
 }
 
+static void test_override_snippet_text() {
+	for (bool snippets : { false, true }) {
+		Session session;
+		const Json capabilities = Json::object().set("textDocument", Json::object().set("completion",
+				Json::object().set("completionItem", Json::object().set("snippetSupport", snippets))));
+		session.request("initialize", Json::object().set("capabilities", capabilities));
+		session.notify("initialized", Json::object());
+		const std::string head = "package { public class Main { override function setProp";
+		session.open(MAIN, head + " } }");
+		const Json answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size())));
+		const Json &item = answer.get("result").get("items").at(0);
+		CHECK_EQ(item.get("label").string(), std::string("setPropertyIsEnumerable"));
+		const std::string body = snippets ? "$0throw" : "throw";
+		CHECK_EQ(item.get("textEdit").get("newText").string(),
+				"setPropertyIsEnumerable(name:String, isEnum:Boolean = true):void {\n\t" + body +
+				" new Error(\"Not implemented\");\n}");
+		CHECK_EQ(item.get("insertTextFormat").integer(1), snippets ? 2 : 1);
+	}
+}
+
 static void test_completion_unicode_boundaries() {
 	for (const char *encoding : { "utf-8", "utf-16" }) {
 		Session session;
@@ -899,7 +924,8 @@ static void test_completion_default_range() {
 	CHECK(!answer.get("result").get("items").at(0).has("textEdit"));
 }
 
-// An override's declaration goes in whole, as plain text, however the editor takes edits.
+// After the keyword alone, an override's declaration goes in whole, however the editor takes edits: the
+// access word before the keyword, the rest in place of the name.
 static void test_override_completion() {
 	for (int client = 0; client < 3; client++) {
 		Session session;
@@ -918,9 +944,11 @@ static void test_override_completion() {
 		const Json answer = session.request("textDocument/completion", Session::at(MAIN, 1, 11));
 		const Json &item = answer.get("result").get("items").at(0);
 		CHECK_EQ(item.get("label").string(), std::string("done"));
-		const std::string written = "public function done(by:int):Boolean { return super.done(by); }";
-		CHECK_EQ(client == 2 ? item.get("textEditText").string() : item.get("textEdit").get("newText").string(), written);
-		CHECK(!item.has("insertTextFormat"));
+		const std::string written = std::string("function done(by:int):Boolean {\n\t") + (client == 1 ? "$0" : "") +
+				"throw new Error(\"Not implemented\");\n}";
+		CHECK_EQ(item.get("textEdit").get("newText").string(), written);
+		CHECK_EQ(item.get("additionalTextEdits").at(0).get("newText").string(), std::string("public "));
+		CHECK_EQ(item.get("insertTextFormat").integer(1), client == 1 ? 2 : 1);
 	}
 }
 
@@ -966,7 +994,7 @@ static Json span(int p_line, int p_from, int p_to_line, int p_to) {
 static void change_range(Session &p_session, Json p_range, const char *p_text) {
 	p_session.notify("textDocument/didChange",
 			Json::object()
-					.set("textDocument", Json::object().set("uri", MAIN).set("version", 2))
+					.set("textDocument", Json::object().set("uri", MAIN).set("version", ++p_session.versions[MAIN]))
 					.set("contentChanges", Json::array().push(Json::object().set("range", std::move(p_range)).set("text", p_text))));
 	p_session.settle();
 }
@@ -1060,6 +1088,7 @@ static void test_linked_project() {
 	CHECK_EQ(where.at(0).get("uri").string(), other_uri);
 	// The same file by its real name is the same document.
 	const std::string real_uri = uri_from_path((root / "Main.as").string());
+	session.versions[real_uri] = session.versions[main_uri]; // One document, so one count of versions.
 	session.change(real_uri, "package { public class Main { var other:Nope; } }");
 	session.settle();
 	CHECK_EQ(session.published(), main_uri + " 0:40-0:44 unknown type 'Nope'\n");
@@ -1070,10 +1099,135 @@ static void test_linked_project() {
 	fs::remove_all(links);
 }
 
+static void test_body_recheck_publishes_diagnostics() {
+	Session session;
+	session.initialize();
+	session.open(MAIN, "package { public class Main { function value():int { return 1; } } }");
+	session.settle();
+	session.change(MAIN, "package { public class Main { function value():int { return \"bad\"; } } }");
+	session.settle();
+	CHECK(session.published().find("where 'int' is expected") != std::string::npos);
+}
+
+static void test_repeated_diagnostics_version() {
+	Session session;
+	session.initialize({}, false, {}, true);
+	const std::string bad = "package { public class Main { var x:Missing; } }";
+	session.open(MAIN, bad);
+	session.settle();
+	for (int version : {2, 3}) {
+		session.change(MAIN, bad);
+		session.settle();
+		CHECK_EQ(session.received.size(), size_t{1});
+		if (!session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), version);
+		}
+	}
+}
+
+static void test_repeated_diagnostic_clear() {
+	for (bool versions : { false, true }) {
+		Session session;
+		session.initialize({}, false, {}, versions);
+		const std::string good = "package { public class Main { public function later():void {} } }";
+		session.open(MAIN, "package { public class Main { public function later():void } }");
+		session.settle();
+		CHECK(session.published().find("expected '{'") != std::string::npos);
+		session.change(MAIN, good);
+		session.settle();
+		CHECK_EQ(session.received.size(), size_t{1});
+		if (!session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("params").get("diagnostics").size(), size_t{0});
+		}
+		// The editor has already advanced to v3, so it drops the delayed v2 clear.
+		for (int version : {3, 4}) {
+			session.change(MAIN, good + " ");
+			session.settle();
+			CHECK_EQ(session.received.size(), versions ? size_t{1} : size_t{0});
+			if (versions && !session.received.empty()) {
+				const Json &params = session.received.at(0).get("params");
+				CHECK_EQ(params.get("version").integer(-1), version);
+				CHECK_EQ(params.get("diagnostics").size(), size_t{0});
+			}
+			session.settle();
+			CHECK(session.received.empty());
+		}
+		// Checking another file must not resend this file's unchanged clean version.
+		const std::string other = "file:///work/Other.as";
+		session.open(other, "package { public class Other { var n:int = \"bad\"; } }");
+		session.settle();
+		CHECK_EQ(session.received.size(), size_t{1});
+		if (!session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("params").get("uri").string(), other);
+		}
+		session.close(MAIN);
+		session.settle();
+		session.open(MAIN, good);
+		session.settle();
+		CHECK_EQ(session.received.size(), versions ? size_t{1} : size_t{0});
+		if (versions && !session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), 1);
+			CHECK_EQ(session.received.at(0).get("params").get("diagnostics").size(), size_t{0});
+		}
+	}
+}
+
+static void test_document_versions() {
+	Session session;
+	session.initialize({}, false, {}, true);
+	const std::string good = "package { public class Main { function value():int { return 1; } } }";
+	const std::string bad = "package { public class Main { function value():int { return \"bad\"; } } }";
+	session.open(MAIN, good);
+	session.change(MAIN, bad);
+	session.settle();
+	CHECK(!session.published().empty());
+	CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), 2);
+	for (int version : {1, 2}) {
+		session.notify("textDocument/didChange", Json::object()
+				.set("textDocument", Json::object().set("uri", MAIN).set("version", version))
+				.set("contentChanges", Json::array().push(Json::object().set("text", good))));
+		CHECK_EQ(*session.server.workspace().text(path_from_uri(MAIN)), bad);
+		CHECK_EQ(session.received.size(), size_t{1});
+		if (!session.received.empty()) {
+			CHECK_EQ(session.received.at(0).get("method").string(), std::string("window/logMessage"));
+		}
+	}
+	session.change(MAIN, good);
+	session.settle();
+	CHECK(session.published().find("clear") != std::string::npos);
+	CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), 3);
+	session.close(MAIN);
+	session.open(MAIN, bad);
+	session.settle();
+	CHECK(!session.published().empty());
+	CHECK_EQ(session.received.at(0).get("params").get("version").integer(-1), 1);
+}
+
+static void test_completion_import_refresh() {
+	Session session(true);
+	session.initialize();
+	for (const auto &[prefix, incomplete] : std::vector<std::pair<std::string, bool>>{ {"", true}, {"Vec", false} }) {
+		const std::string head = "package { public class Main { var point:" + prefix;
+		session.open(MAIN, head + "; } }");
+		const auto answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size())));
+		CHECK_EQ(answer.get("result").get("isIncomplete").boolean(), incomplete);
+	}
+	const std::string head = "package { import godot.*; public class Main extends Node2D { function run():void { position.";
+	session.open(MAIN, head + " } } }");
+	const auto answer = session.request("textDocument/completion", Session::at(MAIN, 0, static_cast<int>(head.size())));
+	CHECK(!answer.get("result").get("isIncomplete").boolean());
+}
+
 int main() {
 	test_linked_project();
 	test_byte_order_mark();
 	test_inside_a_character();
+	test_repeated_diagnostic_clear();
+	test_override_snippet_text();
+	test_completion_import_refresh();
+	test_repeated_diagnostics_version();
+	test_document_versions();
+	test_body_recheck_publishes_diagnostics();
 	test_completion_unicode_boundaries();
 	test_signature_contexts();
 	test_completion_default_range();

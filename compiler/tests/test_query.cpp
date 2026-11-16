@@ -6,6 +6,7 @@
 #include "builtins.h"
 #include "names.h"
 #include "query.h"
+#include "query_completion.h"
 
 #include <filesystem>
 #include <memory>
@@ -14,6 +15,7 @@
 #include <vector>
 
 using namespace kas3;
+using namespace completion_test;
 
 struct File {
 	const char *path;
@@ -30,42 +32,6 @@ static const Reference *reference(const Unit *p_unit, std::string_view p_name) {
 	return nullptr;
 }
 
-// What completion offers at the `|` in the text, by name.
-struct Offered {
-	std::vector<Completion> items;
-	bool has(std::string_view p_name) const { return find(p_name) != nullptr; }
-	const Completion *find(std::string_view p_name) const {
-		for (const Completion &item : items) {
-			if (item.name == p_name) {
-				return &item;
-			}
-		}
-		return nullptr;
-	}
-	size_t count(std::string_view p_name) const {
-		size_t found = 0;
-		for (const Completion &item : items) {
-			found += item.name == p_name;
-		}
-		return found;
-	}
-};
-
-static Offered complete(std::string p_text, const char *p_other = nullptr) {
-	size_t at = p_text.find('|');
-	CHECK(at != std::string::npos);
-	p_text.erase(at, 1);
-	Compilation compilation;
-	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
-	Unit *unit = compilation.add("Player.as", p_text);
-	if (p_other) {
-		compilation.add("Other.as", p_other);
-	}
-	compilation.check(true);
-	Queries queries(compilation);
-	return Offered{ queries.complete(*unit, (uint32_t)at) };
-}
-
 static std::string player(const char *p_body) {
 	return std::string("package { import godot.*; public class Player extends Node2D {\n"
 					   "public var speed:Number = 1;\n"
@@ -73,6 +39,56 @@ static std::string player(const char *p_body) {
 					   "public static var count:int;\n"
 					   "public function run(n:int):void {\n") +
 			p_body + "\n}\npublic function later():void { var elsewhere:int; }\n} }";
+}
+
+static void test_completion_generated_edits() {
+	CHECK(!complete("package { public class Player extends Other { override function fo| } }",
+			"package { public class Other { private static const VALUE:int=1; public function foo(n:int=VALUE):void {} } }").has("foo"));
+	CHECK(!complete("package b { public class Player extends a.Other { override function fo| } }",
+			"package a { internal class Hidden {} public class Other { public function foo(n:Hidden):void {} } }").has("foo"));
+	const auto tagged = apply_completion("package { import godot.*; public class Player extends Node2D { [SomeTag] final override function _ph| } }", "_physicsProcess");
+	CHECK(tagged.find("[SomeTag]") != std::string::npos);
+	CHECK(tagged.find("final ") != std::string::npos);
+
+	for (const char *source : {
+		"package { import godot.*; public class Player extends Node2D { over|ride function _ph } }",
+		"package { import godot.*; public class Player extends Node2D { override func|tion _ph } }",
+	}) {
+		CHECK(!complete(source).has("_physicsProcess"));
+	}
+	for (const char *source : {
+		"package { import godot.*; public class Player extends Node2D { override function _ph|():void {} } }",
+		"package { import godot.*; public class Player extends Node2D { override function _ph| /* keep */ () } }",
+	}) {
+		CHECK(!complete(source).has("_physicsProcess"));
+	}
+	CHECK(!complete("package b { public class Player extends a.Other { override function fo| } }",
+			"package a { public class Other { internal function foo():void {} } }").has("foo"));
+	for (const auto &source : {
+		apply_completion("package { public class Player extends Base { override function ru| } } class Base { public function run(x:Helper):void {} } class Helper {}", "run"),
+		apply_completion("package { public class Player extends Base { override function ru| } } class Base { public static const VALUE:int=1; public function run(x:int=VALUE):void {} }", "run"),
+		apply_completion("package { public class Player { public var point:Vec|; } }", "Vector2"),
+		apply_completion("package { import godot.*; public class Player extends Node2D { override function _ph| } }", "_physicsProcess"),
+		apply_completion("package { import godot.*; public class Player extends Node2D { override\nfunction _ph| } }", "_physicsProcess"),
+		apply_completion("package { import godot.Node2D; public class Player extends Node2D { override function _inp| } }", "_input"),
+	}) {
+		Compilation clean;
+		clean.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		clean.add("Player.as", source);
+		clean.check();
+		CHECK_EQ(clean.format_diagnostics(), std::string());
+	}
+	const auto visible = complete("package { import godot.*; public class Player { public var point:Vec|; } }");
+	CHECK(visible.find("Vector2") && !visible.find("Vector2")->additional_edit);
+	const auto overridden = complete("package { import godot.*; public class Player extends Node2D { override function _ph| } }");
+	const auto *stub = overridden.find("_physicsProcess");
+	CHECK(stub && stub->edit && stub->additional_edit);
+	CHECK(stub && stub->edit && stub->edit->text.find("_physicsProcess(") == 0);
+	const auto hidden = complete("package { public class Player { public var point:Vec|; } }");
+	CHECK(hidden.find("Vector2") && hidden.find("Vector2")->additional_edit);
+	const auto conflicting = complete(player("var Vector2:int; Vec|"));
+	CHECK_EQ(conflicting.count("Vector2"), size_t{1});
+	CHECK(conflicting.find("Vector2") && !conflicting.find("Vector2")->additional_edit);
 }
 
 static void test_completion() {
@@ -151,6 +167,13 @@ static void test_completion() {
 }
 
 static void test_completion_scopes_and_context() {
+	CHECK(complete("package { public class Player { public var point:Vec|; } }").has("Vector2"));
+	CHECK(complete("package { import godot.*; public class Player extends Node2D { override function _ph| } }").has("_physicsProcess"));
+	for (const char *body : { "var first:int, second: /* type */ |;", "try {} catch (problem: |) {}", "var items:Vector.<|>;" }) {
+		const Offered types = complete(player(body));
+		CHECK(types.has("Vector2"));
+		CHECK(!types.has("speed") && !types.has("var"));
+	}
 	CHECK(!complete("package { import |; public class Player {} }").has(""));
 	CHECK(complete(player("\u00a0spe|")).has("speed"));
 	CHECK(complete(player("\u2028spe|")).has("speed"));
@@ -278,23 +301,34 @@ struct Overriding {
 		}
 		compilation.check(true);
 		Queries queries(compilation);
-		return Offered{ queries.complete(*unit, (uint32_t)at) };
+		return Offered{ queries.complete(*unit, (uint32_t)at).items };
 	}
-	// What is reported once the item named is taken: its text in place of the word at the cursor.
+	// The declaration the item writes, up to its body.
+	std::string head(std::string_view p_name) const {
+		const Offered all = offered();
+		const Completion *item = all.find(p_name);
+		if (!item || !item->edit) {
+			return "not offered";
+		}
+		return item->edit->text.substr(0, item->edit->text.find(" {"));
+	}
+	// What is reported once the item named is taken: its edits applied to the file.
 	std::string taken(std::string_view p_name) const {
 		Offered all = offered();
 		const Completion *item = all.find(p_name);
-		if (!item || item->insert_text.empty()) {
+		if (!item || !item->edit) {
 			return "not offered";
 		}
 		std::string written = text;
-		size_t at = written.find('|');
-		written.erase(at, 1);
-		size_t begin = at;
-		while (begin > 0 && is_identifier_at(written, (uint32_t)begin - 1)) {
-			begin--;
+		written.erase(written.find('|'), 1);
+		std::vector<CompletionEdit> edits = { *item->edit };
+		if (item->additional_edit) {
+			edits.push_back(*item->additional_edit);
 		}
-		written.replace(begin, at - begin, item->insert_text);
+		std::sort(edits.begin(), edits.end(), [](const CompletionEdit &p_a, const CompletionEdit &p_b) { return p_a.begin > p_b.begin; });
+		for (const CompletionEdit &edit : edits) {
+			written.replace(edit.begin, edit.end - edit.begin, edit.text);
+		}
 		Compilation compilation;
 		compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
 		compilation.add("Derived.as", written);
@@ -323,37 +357,36 @@ static void test_override_completion() {
 	CHECK(offered.has("hit") && offered.has("guard") && offered.has("hp") && offered.has("done"));
 	CHECK(offered.has("_process") && offered.has("_ready") && !offered.has("addChild")); // Godot's own are final.
 	CHECK(!offered.has("secret") && !offered.has("make") && !offered.has("fixed") && !offered.has("inside"));
-	CHECK(!offered.has("toString")); // Built in: Flash takes it without `override`.
+	CHECK_EQ(fresh.head("hit"), std::string("function hit(by:lib.Thing, power:int = 1, ...rest):Boolean"));
+	CHECK_EQ(fresh.head("hp"), std::string("function get hp():int"));
 	const Completion *hit = offered.find("hit");
-	CHECK_EQ(hit ? hit->insert_text : std::string(),
-			std::string("public function hit(by:lib.Thing, power:int = 1, ...rest):Boolean { return super.hit(by, power); }"));
-	const Completion *hp = offered.find("hp");
-	CHECK_EQ(hp ? hp->insert_text : std::string(), std::string("public function get hp():int { return super.hp; }"));
+	CHECK(hit && hit->additional_edit && hit->additional_edit->text == "public ");
 	for (const char *name : { "hit", "guard", "hp", "done", "_process", "_ready" }) {
 		CHECK_EQ(fresh.taken(name), std::string());
 	}
 
 	// What is written already is not written again.
 	Overriding named{ bases, head + "override protected function gu|\n} }" };
-	CHECK_EQ(named.offered().find("guard") ? named.offered().find("guard")->insert_text : std::string(),
-			std::string("guard(at:Vector.<lib.Thing>):void {}"));
+	CHECK_EQ(named.head("guard"), std::string("guard(at:Vector.<lib.Thing>):void"));
+	CHECK(named.offered().find("guard") && !named.offered().find("guard")->additional_edit);
 	CHECK_EQ(named.taken("guard"), std::string());
 	Overriding modifiers{ bases, head + "public override |\n} }" };
 	CHECK_EQ(modifiers.taken("done"), std::string());
+	CHECK(!modifiers.offered().has("guard")); // Protected in the base: a public override is not one.
 	CHECK_EQ(Overriding({ bases, head + "override public function |\n} }" }).taken("_ready"), std::string());
 	Overriding setter{ bases, head + "override public function set |\n} }" };
-	CHECK_EQ(setter.offered().find("hp") ? setter.offered().find("hp")->insert_text : std::string(),
-			std::string("hp(p_value:int):void { super.hp = p_value; }"));
+	CHECK_EQ(setter.head("hp"), std::string("hp(p_value:int):void"));
 	CHECK(!setter.offered().has("done"));
 	CHECK_EQ(setter.taken("hp"), std::string());
 	// Before another member, which the parser joins to what is written.
 	CHECK_EQ(Overriding({ bases, head + "override |\npublic var z:int; } }" }).taken("done"), std::string());
 
-	// A method this class overrides already is not offered again, and without `override` none is.
+	// A method this class overrides already is not offered again, and without the keyword none is.
 	CHECK(!Overriding({ bases, head + "override public function done():void {}\noverride |\n} }" }).offered().has("done"));
 	CHECK(!Overriding({ bases, head + "public function |\n} }" }).offered().has("done"));
+	CHECK(!Overriding({ bases, head + "override get |\n} }" }).offered().has("hp"));
 	const Offered in_body = Overriding({ bases, head + "function f():void { override | }\n} }" }).offered();
-	CHECK(in_body.find("done") && in_body.find("done")->insert_text.empty());
+	CHECK(in_body.find("done") && !in_body.find("done")->edit);
 }
 
 static const char *const BROKEN =
@@ -1140,6 +1173,7 @@ static void test_typing() {
 }
 
 int main() {
+	test_completion_generated_edits();
 	test_completion_scopes_and_context();
 	test_type_places();
 	test_parameter_names();

@@ -590,6 +590,7 @@ void Parser::expect_type_close() {
 
 TypeRef *Parser::parse_type() {
 	TypeRef *type = node<TypeRef>(current_.offset);
+	type->completion_begin = previous_end_;
 	if (!enter()) {
 		return type;
 	}

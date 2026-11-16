@@ -3,6 +3,10 @@
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #else
 #include <poll.h>
 #include <unistd.h>
@@ -25,7 +29,10 @@ Channel::Channel(int p_input, int p_output) :
 #endif
 }
 
-bool Channel::fill() {
+bool Channel::fill(bool p_wait) {
+	if (ended_ || (!p_wait && !readable())) {
+		return false;
+	}
 	char chunk[65536];
 #ifdef _WIN32
 	int got = _read(input_, chunk, sizeof(chunk));
@@ -40,11 +47,11 @@ bool Channel::fill() {
 	return true;
 }
 
-bool Channel::next(std::string *r_message) {
+bool Channel::next(std::string *r_message, bool p_wait) {
 	while (true) {
 		size_t header_end = buffer_.find("\r\n\r\n");
 		if (header_end == std::string::npos) {
-			if (buffer_.size() > 65536 || !fill()) {
+			if (buffer_.size() > 65536 || !fill(p_wait)) {
 				return false; // No header in sight.
 			}
 			continue;
@@ -85,7 +92,7 @@ bool Channel::next(std::string *r_message) {
 		}
 		size_t body = header_end + 4;
 		while (buffer_.size() < body + length) {
-			if (!fill()) {
+			if (!fill(p_wait)) {
 				return false;
 			}
 		}
@@ -96,11 +103,14 @@ bool Channel::next(std::string *r_message) {
 }
 
 bool Channel::waiting() const {
-	if (!buffer_.empty()) {
-		return true;
-	}
+	return !buffer_.empty() || readable();
+}
+
+bool Channel::readable() const {
 #ifdef _WIN32
-	return false;
+	const HANDLE handle = reinterpret_cast<HANDLE>(_get_osfhandle(input_));
+	DWORD available = 0;
+	return PeekNamedPipe(handle, nullptr, 0, nullptr, &available, nullptr) && available != 0;
 #else
 	struct pollfd descriptor;
 	descriptor.fd = input_;

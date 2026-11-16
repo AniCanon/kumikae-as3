@@ -42,8 +42,15 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Language server, first slice
 
-- **Manual Rider acceptance remains pending.** The native plugin passes sandbox completion and typing
-  checks; a person still needs to accept the full editing and navigation workflow. **LS-2**
+- **Manual editor acceptance remains pending.** Rider and free unified IDEA pass sandbox editing
+  checks; a person still needs to accept the full editing and navigation workflow. Paired ten-minute
+  AS3/plain-text probes retain all ten disposed projects and reproduce the `HighlightingPanel` warning.
+  The Rider diagnostic receive race now has a read-action guard and shrink/burst regressions. The
+  intermittent probe Undo dialog was traced to asynchronous ignore-file generation; fixture setup
+  and exact-editor Undo targeting now isolate completion history. LSP4IJ's caught invalid-range warning
+  and the separate shrink-then-parameter-help sequence still need investigation.
+  The exact GC root and platform resolution remain pending; see the
+  [retention results](results/2026-11-completion-followup.md#ide-lifecycle-investigation). **LS-2**
 
 ## Stage 2b-2, part A: Godot's values
 

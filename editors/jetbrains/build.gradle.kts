@@ -1,4 +1,5 @@
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
+import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
 import java.time.Duration
 
 plugins {
@@ -21,6 +22,8 @@ repositories {
 }
 
 val riderHome = providers.environmentVariable("RIDER_HOME").orElse("/Applications/Rider.app")
+val lsp4ijVersion = "0.21.0"
+val ideaHome = providers.environmentVariable("IDEA_HOME").orElse("/Applications/IntelliJ IDEA.app")
 dependencies {
     implementation(project(":core")) {
         // The IDE supplies Kotlin at runtime; the standalone core distribution carries its own copy.
@@ -31,6 +34,7 @@ dependencies {
         local(riderHome.get())
         bundledPlugin("org.jetbrains.plugins.textmate")
         bundledModule("intellij.platform.lsp")
+        plugin("com.redhat.devtools.lsp4ij", lsp4ijVersion)
         pluginVerifier()
     }
     testImplementation(kotlin("test"))
@@ -54,14 +58,35 @@ intellijPlatform {
     pluginConfiguration {
         name = "Kumikae AS3"
         ideaVersion {
-            // The alpha Compose Swing library is only known to work in this exact build.
-            sinceBuild = "262.10968.170"
+            // Runtime probes and verification cover the installed IDEA and Rider endpoints.
+            sinceBuild = "261.22158.277"
             untilBuild = "262.10968.170"
         }
     }
     pluginVerification {
-        ides { local(riderHome.get()) }
+        ides {
+            local(riderHome.get())
+            local(ideaHome.get())
+        }
     }
+}
+
+intellijPlatformTesting.runIde.register("runIdea") {
+    localPath = ideaHome.map { file(it) }
+    plugins {
+        plugin("com.redhat.devtools.lsp4ij", lsp4ijVersion)
+    }
+}
+
+intellijPlatformTesting.runIde.register("runIdeaWithoutLsp4ij") {
+    localPath = ideaHome.map { file(it) }
+    plugins { disablePlugin("com.redhat.devtools.lsp4ij") }
+    task { environment("KUMIKAE_MISSING_CLIENT_PROBE", "1") }
+}
+
+intellijPlatformTesting.runIde.register("runRiderWithoutLsp4ij") {
+    localPath = riderHome.map { file(it) }
+    plugins { disablePlugin("com.redhat.devtools.lsp4ij") }
 }
 
 tasks.test { useJUnitPlatform() }
@@ -75,12 +100,29 @@ val uiProbeJar = tasks.register<Jar>("uiProbeJar") {
 }
 if (providers.gradleProperty("uiProbe").isPresent) {
     tasks.withType<PrepareSandboxTask>().configureEach {
-        if (name == "prepareSandbox_runIde") from(uiProbeJar) { into("kumikae-as3-ui-probe/lib") }
+        if (name.startsWith("prepareSandbox_run")) {
+            from(uiProbeJar) { into("kumikae-as3-ui-probe/lib") }
+        }
     }
-    tasks.runIde {
-        val report = layout.buildDirectory.dir("reports/ui").get().asFile
+    tasks.withType<RunIdeTask>().configureEach {
+        val report = layout.buildDirectory.dir(
+            when (name) {
+                "runIde" -> "reports/ui"
+                "runIdea" -> "reports/ui-idea"
+                else -> "reports/ui-$name"
+            },
+        ).get().asFile
         args("kumikae-as3-ui-check", report.absolutePath)
-        timeout = Duration.ofMinutes(2)
+        timeout =
+            Duration.ofMinutes(
+                if (providers.environmentVariable("KUMIKAE_COMPLETION_RETENTION_PROBE").orNull ==
+                    "1"
+                ) {
+                    15
+                } else {
+                    2
+                },
+            )
         doFirst { report.resolve("result.txt").delete() }
         doLast {
             check(report.resolve("result.txt").takeIf { it.isFile }?.readText()?.trim() == "passed") {
@@ -97,7 +139,7 @@ val kas3Root = providers.gradleProperty("kas3Root").orElse(rootDir.resolve("../.
 tasks.withType<PrepareSandboxTask>().configureEach {
     val root = file(kas3Root.get())
     from(root.resolve("compiler/build")) {
-        include("kas3c")
+        include("kas3c", "kas3c.exe")
         into("${intellijPlatform.projectName.get()}/native")
     }
     from(root.resolve("compiler/tests/godot_project/bin")) {
@@ -164,7 +206,7 @@ tasks.withType<PrepareSandboxTask>().configureEach {
 
 // What the IDE and the language server say to each other goes to the sandbox's log: when a feature
 // does not work in the editor, the log shows whether it was asked for and what came back.
-tasks.runIde {
+tasks.withType<RunIdeTask>().configureEach {
     systemProperty("idea.log.debug.categories", "#com.intellij.platform.lsp")
     providers.gradleProperty("lspTrace").orNull?.let { environment("KUMIKAE_AS3_LSP_TRACE", it) }
 }

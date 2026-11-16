@@ -29,18 +29,71 @@ completed; errors elsewhere do not require saving a valid file first. Comments, 
 expressions do not offer code completion. Parameters, function-wide local variables, outer captures,
 named function expressions, catch variables and function-local imports respect their compiler scope.
 
-In a class, after `override` (with or without the access word and `function`), completion offers the
-methods and properties of the base classes that may be overridden: not private, static or final ones,
-not built-in ones (Flash takes those without `override`), and not one this class overrides already.
-Taking one writes the rest of its declaration: the access word and `function` if they are not there yet,
-the parameters with their defaults, the result, and a body that calls the base class's version (`{}` for
-a method that gives back nothing). A type the file cannot name by itself is written in full, as in
-`lib.Thing`. A rest parameter is not passed on to the base class's version.
+In an import, complete the package path and type, for example `import godot.Vec`. Outside imports,
+a partial type name can offer an accessible type from another package. Its description names the import.
+Accepting `Vector2` for `Vec` adds `import godot.Vector2;` and replaces the identifier in one undoable action.
+An existing visible name takes precedence; duplicate short names keep their qualified descriptions.
+An empty-prefix lookup is refreshed as a prefix is typed, so imports do not require reopening the popup.
 
-In an import, complete the package path and type, for example `import godot.Vec`. Completion does not
-silently add imports to the file. Types must already be visible to appear as unqualified names.
+Inside a derived class, `override function _ph` offers inherited methods such as `_physicsProcess`.
+Acceptance adds the signature and a body that throws `Error("Not implemented")`; replace that body with
+your implementation. With snippet support, the caret lands immediately before `throw`; generated braces
+are ordinary source characters. Metadata, comments and an existing `final` modifier are preserved. Stubs are offered
+only while the method name is unfinished, before a parameter list. Private, final and static methods,
+inaccessible signature types and non-public member defaults are excluded, and so is a method this class
+overrides already. An explicitly written
+visibility must match the inherited method. Public default constants work when written as `VALUE`,
+`Base.VALUE` or `package.name.Base.VALUE`; generated references retain their meaning in the derived class.
+Getters/setters use their corresponding accessor prefix. Overriding one does not hide the other, and
+`final` applies to the selected accessor. Completion also works immediately after `override function `,
+`override function get ` or `override function set `, before any name character is typed. A member on
+the following line, including its modifiers and metadata, remains intact.
+
+Completion starts as soon as `override` is written, with or without the access word: before `function`
+it offers methods and properties alike, and accepting one also writes `function` (and `get` or `set` for
+a property's half). Inside a function body `override` offers no stubs.
 
 ## Accepting a suggestion
+
+### AS3 language blocks
+
+Inside a function, accept a keyword suggestion to insert its block. For example, type `tr` or `try`,
+select **try**, and press Tab:
+
+```actionscript
+try {
+
+} catch (error:Error) {
+    throw error;
+}
+```
+
+The first caret is inside the try body. Tab then visits the catch name, its type, the handler body,
+and finally the position after the block. Renaming `error` updates the rethrow too. Replace the rethrow
+when you implement handling; the default does not swallow the error. The catch type is editable,
+including `*` when you intend to catch values other than `Error` objects.
+
+| Suggestion | Editable parts |
+|---|---|
+| `try` | Try body, catch name/type, catch body |
+| `if`, `while` | Condition, body |
+| `do` | Body, condition |
+| `for` | Linked loop-variable name, upper bound, body |
+| `for each` (offered while typing `for`) | Item name, collection, body |
+| `switch` | Subject, case value, case body, default body |
+
+Names such as `condition`, `count`, `items` and `value` are editable placeholders: replace them with
+your expressions. Tab visits placeholders in order and then leaves the template. Accepting a block is
+one undoable insertion. Later placeholder edits and navigation use the IDE's normal Undo history;
+Rider can first undo a navigation step without changing the source text.
+
+Expansion requires a statement position and does not replace an existing parenthesis or block.
+Expression positions, imports, types, class/file scope, comments, strings and regex literals do not
+expand language blocks. Empty gaps after `{`, `;` or `}` offer blocks directly; after a statement without
+a semicolon, type a keyword prefix first. Other keywords remain words, and clients without snippet
+support receive words too. Typing alone never expands a block: accept the completion suggestion.
+
+### Names and calls
 
 The server supplies the identifier's insertion and replacement ranges, including the suffix when the
 caret is in the middle of a name. Clients that support separate ranges can use their normal Enter
@@ -70,13 +123,12 @@ expressions do not advance the outer call's active parameter.
 Parentheses, square brackets, braces and single/double quotes use the IDE's pairing settings. A closing
 partner can be typed to move past the existing one. Backspace in an empty bracket pair removes the pair.
 Enter inside braces creates an indented line, using the project's tab/space settings. Code punctuation
-inside comments and strings is not treated as a new code block. Regex literals are protected in
-expression positions and after control conditions. After a closing brace the local lexer remembers
-what the brace began: a block (`if (a) {} /re/`) may be followed by a regex, while an object or a
-function written in place (`var o = {} / 2`) is divided. Blocks may be nested to any depth. Of the braces
-that began values, the two innermost are remembered (with up to fourteen and six blocks inside them); a
-third one around them is read as a block's. The compiler handles regex contexts independently for completion and argument
-help.
+inside comments and strings is not treated as a new code block. The local lexer tracks expression and statement braces, control conditions, function declarations and
+expressions, ternary expressions and labels to distinguish regex literals from division. Its restart
+state fits the sixteen bits the editor keeps and carries a class's members' nesting directly, so an edit
+there is lexed again from the member. Deeper inside, the editor restarts at the member; a restart there
+anyway reconstructs context from the text prefix, without retaining a document history. The compiler
+supplies its own parsed regions for completion and argument help.
 
 Highlighting still comes from the shared TextMate grammar. A small adapter supplies AS3 token boundaries
 to the native editing handlers while preserving TextMate's color attributes, including string escapes.
@@ -93,9 +145,22 @@ Clients advertising LSP completion-list edit defaults receive the shared range o
 receive a range with each item. Snippets and separate insert/replace edits are also capability-gated.
 Every result describes the current document known to the server.
 
-The server still checks names and types across the project after an edit, reusing unchanged parses.
-This change does not introduce concurrent access to mutable syntax trees or a second type checker.
-See the [measured results](../docs/results/2026-11-completion.md) for latency, memory, commands and limits.
+After a clean check, edits confined to method/function bodies reuse stable declaration symbols and
+recheck the changed units. Sources are immutable shared snapshots; body symbols and scopes belong to
+the changed unit and are replaced together. Declaration changes, syntax errors, interfaces, accessors,
+function-local imports and recovery from an initially invalid program use a full check. Type-table growth
+is bounded by periodically rebuilding the semantic environment. This is a conservative fast path, not
+a general dependency graph for incremental checking.
+
+Document changes with old or duplicate versions are ignored with a log message. Diagnostic versions are
+sent when the client advertises support, including empty diagnostic lists for each newly checked clean
+version. If typing overtakes an earlier clear, the next clean version clears stale errors again.
+Rider receives diagnostic versions and ranges atomically with respect to document writes, so a reply
+cannot cache pre-edit offsets while a deletion is still in progress.
+A bounded lookahead batch cancels queued requests or rejects
+requests made obsolete by a newer document change before checking. Partial frames do not delay an
+already complete request. A check already running remains synchronous and cannot be interrupted.
+See the [follow-up results](../docs/results/2026-11-completion-followup.md) for latency, memory and validation.
 
 ## Troubleshooting and limits
 
@@ -107,10 +172,15 @@ See the [measured results](../docs/results/2026-11-completion.md) for latency, m
   offers only `Object`'s members until it has a known type.
 - For a sandbox trace, use `./gradlew runIde -PlspTrace=<existing-folder>` from `editors/jetbrains`.
   Trace files contain source text; keep them outside the repository and do not enable them for timings.
-- Automatic imports and whole-project incremental type checking remain separate work. The server has not
-  yet been tried on Windows. Unknown callable signatures cannot show argument help.
-- The plugin is pinned to the Rider build listed in its README. Android Studio and IntelliJ open-source
-  builds do not provide the JetBrains LSP module this plugin requires; they are not supported targets.
+- Windows transport uses binary stdio, pipe readiness checks, UTF-8 filesystem paths and `.exe` compiler
+  discovery, and Windows paths are tested on every system. The server has not yet been built or run on
+  Windows itself.
+- Unknown callable signatures cannot show argument help. General incremental declaration checking and
+  interruption of a running check remain pending.
+- Rider uses its native LSP client. IntelliJ IDEA Community/free unified IDEA uses the optional LSP4IJ
+  plugin (0.21.0); install and enable it in **Settings > Plugins**. A project notification explains this
+  requirement if it is missing. Local syntax, punctuation pairing and indentation work without it.
+  Android Studio is outside the scope. See the [tested builds](jetbrains/README.md#names-and-compatibility-the-owners-to-change).
 
 The [IntelliJ LSP documentation](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html)
 describes the supported products. The [editor extension documentation](https://plugins.jetbrains.com/docs/intellij/additional-minor-features.html)

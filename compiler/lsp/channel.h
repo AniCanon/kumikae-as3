@@ -12,7 +12,9 @@ class Channel {
 	std::string buffer_;
 	bool ended_ = false;
 
-	bool fill();
+	// Reads what is there. Without p_wait, only if something is: it does not block.
+	bool fill(bool p_wait);
+	bool readable() const;
 
 public:
 	// On Windows the descriptors are set to binary: in text mode "\r\n" would be read as "\n" and every
@@ -20,7 +22,8 @@ public:
 	Channel(int p_input, int p_output);
 
 	// The next message's body. False at the end of input, or when the framing is broken past repair.
-	bool next(std::string *r_message);
+	// Without p_wait, it gives up rather than wait for the rest of a message.
+	bool next(std::string *r_message, bool p_wait = true);
 	// True if another message, or part of one, is already waiting.
 	bool waiting() const;
 	bool send(const std::vector<std::string> &p_messages);

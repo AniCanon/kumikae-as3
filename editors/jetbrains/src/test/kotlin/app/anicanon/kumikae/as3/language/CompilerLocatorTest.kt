@@ -29,6 +29,15 @@ class CompilerLocatorTest {
         assertNull(find(Files.createDirectories(root.resolve("game"))))
     }
 
+    @Test fun `a bundled Windows executable is found`() {
+        val bundled = root.resolve("windows/native")
+        val compiler = executable(bundled.resolve("kas3c.exe"))
+        assertEquals(
+            compiler,
+            CompilerLocator.find(root.resolve("game"), "", "", root.resolve("home"), bundled, windows = true),
+        )
+    }
+
     @Test fun `the path the person set comes first`() {
         val set = executable(root.resolve("tools/kas3c"))
         executable(root.resolve("bin/kas3c"))

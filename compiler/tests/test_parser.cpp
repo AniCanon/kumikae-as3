@@ -908,8 +908,28 @@ static void every_single_byte_deletion_of_the_corpus_parses() {
 	CHECK(parsed > 10000);
 }
 
+static void empty_override_recovery() {
+	for (const char *prefix : { "", "get ", "set " }) {
+		for (const char *next : { "public function later():void {}", "[Tag] public function later():void {}",
+			"override public function later():void {}", "final public function later():void {}" }) {
+			const auto parsed = program(std::string("class C { override function ") + prefix + "\n" + next + " }");
+			CHECK(!parsed.errors.empty());
+			CHECK(has(parsed.tree, "FunctionDecl name=\"later\""));
+			CHECK_EQ(count(parsed.tree, "FunctionDecl"), 2);
+		}
+	}
+	// A newline alone never ends a valid signature, including modifier or reserved accessor names.
+	for (const char *name : { "step", "get", "set", "override", "static" }) {
+		NO_ERRORS(program(std::string("class C { override function\n") + name + "\n():void {} }"));
+	}
+	for (const char *name : { "count", "public", "function", "override" }) {
+		NO_ERRORS(program(std::string("class C { override function get\n") + name + "\n():int { return 1; } }"));
+	}
+}
+
 int main() {
 	empty_file();
+	empty_override_recovery();
 	package_with_class();
 	members();
 	metadata_forms();

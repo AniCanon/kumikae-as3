@@ -49,7 +49,8 @@ std::string path_from_uri(std::string_view p_uri, PathStyle p_style) {
 	if (p_style == PathStyle::Windows && path.size() >= 3 && path[0] == '/' && is_letter(path[1]) && path[2] == ':') {
 		path.erase(0, 1);
 	}
-	return generic_path(path, p_style);
+	// A NUL byte names no file: it would cut the path short wherever the path is used.
+	return path.find('\0') == std::string::npos ? generic_path(path, p_style) : std::string();
 }
 
 std::string uri_from_path(std::string_view p_path, PathStyle p_style) {
@@ -57,7 +58,7 @@ std::string uri_from_path(std::string_view p_path, PathStyle p_style) {
 	const std::string generic = generic_path(p_path, p_style);
 	std::string_view path = generic;
 	std::string uri = "file://";
-	if (p_style == PathStyle::Windows && path.compare(0, 2, "//") == 0) {
+	if (path.compare(0, 2, "//") == 0) {
 		path.remove_prefix(2); // A share: its server is the URI's host.
 	} else if (path.empty() || path[0] != '/') {
 		uri += '/';

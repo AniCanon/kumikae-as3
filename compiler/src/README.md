@@ -28,7 +28,7 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
   to one file (`tools/bench_recheck.cpp` measures it).
 
 Tests: `test_lexer`, `test_parser`, `test_ast`, `test_names`, `test_types`, `test_type_errors`,
-`test_query`, `test_source`, and the `golden` group.
+`test_query`, `test_override_completion`, `test_statement_completion`, `test_source`, and the `golden` group.
 
 ## Editor query ownership
 
@@ -45,3 +45,26 @@ without bodies do not retain scopes.
 It never caches a history of prefix responses. `Workspace` destroys queries before changing the
 compilation that owns their symbol/tree pointers. `test_workspace` exercises repeated requests, edits,
 changed types and close; the compiler corpus tests exercise malformed input under sanitizers.
+
+`names_incremental` reuses the semantic environment only when source outside direct function bodies is
+identical and the prior full check was clean. Units with interfaces, accessors, body-local imports or
+parse errors fall back. All changed units resolve names before any is typed, preserving cross-file
+signature consistency. Stable declaration symbols own their names; each unit owns its replaceable body
+symbols and scopes. `Source` copies share an immutable snapshot, so replacing the parse never exposes
+text through an expired source reference. Type interning rebases after 1,024 additional entries.
+
+Override completion uses the same inherited visibility rule as name resolution. Its primary edit covers
+only the filtering word; additional edits insert visibility without rewriting metadata or comments.
+Generated signatures qualify accessible types and public default references, including references already
+qualified by class or package. Package prefixes are not value references. Getter and setter declarations
+and final modifiers are checked separately, including inherited complementary accessors. Parser recovery
+retains an empty override name's span so completion also works before its first character. A declaration
+on the next line remains a separate member, including its metadata; valid multiline signatures retain
+their names. Tests apply generated edits and check the resulting source with a fresh compiler.
+
+`completion_statements` adds language-block text at statement starts found through cached AST containers.
+It excludes expression/header positions and existing continuations, including keyword recovery in
+unfinished `if`/`for` headers. Empty gaps use conservative brace/semicolon boundaries. A block carries
+ordinary AS3 text and ordered byte-span tab stops; repeated indices link names, and zero is the final
+caret. Overrides use the same representation. Only the LSP layer encodes snippet syntax. The try/catch
+default rethrows its caught error. These candidates add no project-wide scan or history of edits.

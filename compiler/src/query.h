@@ -66,6 +66,18 @@ struct SignatureHelp {
 	std::string active_name; // The active parameter's name. Empty if the function takes none.
 };
 
+struct CompletionEdit {
+	uint32_t begin = 0;
+	uint32_t end = 0;
+	std::string text;
+};
+
+struct CompletionTabStop {
+	uint32_t begin; // Byte span in edit.text, ordered by source position; empty spans are caret stops.
+	uint32_t end;
+	uint32_t index; // Repeated indices mirror one another; zero is the final caret.
+};
+
 // One thing completion offers.
 struct Completion {
 	std::string name;
@@ -76,10 +88,10 @@ struct Completion {
 	std::string detail; // The declaration as one line of AS3. Empty for a keyword.
 	bool callable = false;
 	std::vector<std::string> required_parameters;
-	// Written in place of the word at the cursor, when that is not the name alone: an override's whole
-	// declaration, less what is written before the cursor already. Plain text.
-	std::string insert_text;
 	bool is_parameter_name = false; // In a call's argument, the name of that argument's parameter.
+	std::optional<CompletionEdit> edit;
+	std::optional<CompletionEdit> additional_edit;
+	std::vector<CompletionTabStop> tab_stops;
 };
 
 // True if the name starts with the prefix, whatever the case of either: how completion narrows.
@@ -91,8 +103,13 @@ struct OverrideOffer {
 	bool after_function = false; // `function` is written already: no keyword can follow.
 };
 
-// Built over a Compilation after check(). It reads the trees the passes wrote onto, so it is good for as
-// long as that Compilation is the one using them.
+struct CompletionResult {
+	std::vector<Completion> items;
+	bool incomplete = false; // More candidates become eligible once the user types a prefix.
+};
+
+// Built over one checked generation. Discard queries before the compilation's trees or body scopes
+// change, including a successful update_bodies that preserves the Compilation itself.
 class Queries {
 	Compilation &compilation_;
 	std::unordered_map<const Unit *, std::vector<Occurrence>> occurrences_;
@@ -101,9 +118,17 @@ class Queries {
 	const std::vector<Node *> &context_nodes(const Unit &p_unit) const;
 	const Completion &completion_item(Symbol *p_symbol);
 	static const FunctionDecl *function_declaration(const Symbol *p_symbol);
-	// Where `override` is written before a member's name in p_class: each method of a base class that it
-	// may override, nearest first. Nothing if the words before p_start are not modifiers with `override`.
-	std::optional<OverrideOffer> overrides(const Unit &p_unit, Symbol *p_class, uint32_t p_start, std::string_view p_prefix);
+	CompletionEdit import_edit(const Unit &p_unit, uint32_t p_offset, std::string_view p_name) const;
+	// Where `override` is written before a member's name in p_class: each member of a base class that it
+	// may override, written whole. p_function is the declaration the parser made of what is written, if
+	// it made one; otherwise the words before p_start are read, and must be modifiers with `override`.
+	std::optional<OverrideOffer> overrides(const Unit &p_unit, const FunctionDecl *p_function, Symbol *p_class,
+			uint32_t p_start, uint32_t p_offset);
+	static std::string line_break(const Unit &p_unit);
+	static std::string line_indent(const Unit &p_unit, uint32_t p_offset);
+	void statement_templates(const Unit &p_unit, uint32_t p_offset, std::vector<Completion> &p_items) const;
+	bool statement_start(const Unit &p_unit, uint32_t p_offset) const;
+	static uint32_t skip_trivia(const Unit &p_unit, uint32_t p_offset);
 
 	const std::vector<Occurrence> &occurrences(const Unit &p_unit);
 	std::vector<const Symbol *> types_; // Every class and interface, once asked for.
@@ -151,7 +176,7 @@ public:
 	bool in_text(const Unit &p_unit, uint32_t p_offset) const;
 	CompletionRange completion_range(const Unit &p_unit, uint32_t p_offset) const;
 	std::optional<SignatureHelp> signature_help(const Unit &p_unit, uint32_t p_offset) const;
-	std::vector<Completion> complete(const Unit &p_unit, uint32_t p_offset);
+	CompletionResult complete(const Unit &p_unit, uint32_t p_offset);
 };
 
 } // namespace kas3

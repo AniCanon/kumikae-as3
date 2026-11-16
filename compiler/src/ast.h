@@ -55,6 +55,7 @@ struct TypeRef : Node {
 	static const NodeKind KIND = NodeKind::TypeRef;
 	enum Form : uint8_t { Any, Void, Named, Applied }; // `*`, `void`, `a.b.C`, `Vector.<T>`
 	Form form = Any;
+	uint32_t completion_begin = 0; // After the token that introduced this type, including a missing type.
 	List<std::string_view> name; // Dotted parts, for Named and Applied.
 	List<uint32_t> name_offsets; // Where each part starts.
 	TypeRef *argument = nullptr; // For Applied.
@@ -120,6 +121,7 @@ struct FunctionDecl : Node {
 	static const NodeKind KIND = NodeKind::FunctionDecl;
 	enum Accessor : uint8_t { None, Getter, Setter };
 	Accessor accessor = None;
+	bool has_parameter_list = false; // Distinguishes an unfinished completion name from a written signature.
 	std::string_view name; // Empty for an anonymous function expression.
 	uint32_t name_offset = 0;
 	Modifiers modifiers;
@@ -385,6 +387,7 @@ struct Import : Node { // `import a.b.C;` or `import a.b.*;`
 };
 struct PackageDecl : Node {
 	static const NodeKind KIND = NodeKind::PackageDecl;
+	uint32_t body_offset = 0; // Immediately after the opening brace.
 	List<std::string_view> name;
 	List<Import *> imports;
 	List<Node *> definitions; // ClassDecl, InterfaceDecl, FunctionDecl or VarDecl.

@@ -108,15 +108,15 @@ class As3LexerTest {
         }
     }
 
-    @Test fun `blocks may be open to any depth, and the two innermost values are kept`() {
+    @Test fun `blocks and values may be open to any depth`() {
         val deep = "{".repeat(40) + "x = {} / 2; if (a) {} /re/" + "}".repeat(40) + " /re/"
         assertEquals(listOf("AS3_SYMBOL:/", "AS3_WORD:2"), tokens(deep).dropWhile { it != "AS3_SYMBOL:/" }.take(2))
         assertEquals(2, tokens(deep).count { it == "AS3_REGEX:/re/" })
         // An object in an object, each with blocks inside: both are told apart from the blocks.
         val nested = "x = { a: function() { if (b) { } }, c: { d: 1 } / 2 } / 3"
         assertEquals(listOf("AS3_SYMBOL:/", "AS3_SYMBOL:/"), tokens(nested).filter { it == "AS3_SYMBOL:/" })
-        // A third value around them is forgotten: its `}` is read as a block's.
-        assertEquals("AS3_REGEX:/ 2", tokens("x = { a: { b: { c: 1 } } } / 2").last())
+        // A third value around them is still a value: its `}` is followed by division.
+        assertEquals("AS3_WORD:2", tokens("x = { a: { b: { c: 1 } } } / 2").last())
     }
 
     @Test fun `the whole state fits in the sixteen bits the editor keeps`() {
@@ -125,25 +125,67 @@ class As3LexerTest {
         val lexer = As3Lexer()
         lexer.start(text, 0, text.length, 0)
         while (lexer.tokenType != null) {
-            assertEquals(lexer.state, lexer.state and 0xFFFF)
+            assertEquals(lexer.state, (lexer.state shl 16) shr 16)
             lexer.advance()
         }
     }
 
-    @Test fun `the editor may start again at any token, as tokens() checks for every one`() {
+    @Test fun `the editor may start again at a class's members, and tokens() checks every token`() {
         // The state holds all the lexer knows: an edit is lexed again from a token near it, not from the
-        // top of the file, though inside a class the state is never the first one.
+        // top of the file, though inside a class the state is never the first one. Deeper in, the editor
+        // goes back to the member; a start there anyway lexes again from the top.
         val lexer = As3Lexer()
         assertEquals(0, lexer.startState)
         val text = "package { class A { function f():void { x = {} / 2; } } }"
         lexer.start(text, 0, text.length, 0)
+        val restartable = mutableListOf<String>()
         while (lexer.tokenType != null) {
-            assertEquals(true, lexer.isRestartableState(lexer.state))
+            if (lexer.isRestartableState(lexer.state)) restartable += text.substring(lexer.tokenStart, lexer.tokenEnd)
             lexer.advance()
         }
+        assertEquals(true, "function" in restartable && "class" in restartable && "x" !in restartable, "$restartable")
+        assertEquals(listOf("AS3_SYMBOL:/", "AS3_WORD:2"), tokens(text).dropWhile { it != "AS3_SYMBOL:/" }.take(2))
     }
 
     @Test fun `an empty file has no tokens`() {
         assertEquals(emptyList(), tokens(""))
+    }
+
+    @Test fun `closing a statement block permits regex but closing a value permits division`() {
+        for (source in listOf(
+            "if (ready) {} /[()]/",
+            "{ if (ready) {} } /[()]/",
+            "function run():void {} /[()]/",
+            "class Main { public function run():void {} } /[()]/",
+        )) {
+            assertEquals("AS3_REGEX:/[()]/", tokens(source).last(), source)
+        }
+        for (source in listOf(
+            "var value = {} / divisor",
+            "var fn = function():Number {} / divisor",
+            "var value = { nested: {} } / divisor",
+            "call(function():void {}) / divisor",
+        )) {
+            assertEquals("AS3_WORD:divisor", tokens(source).last(), source)
+        }
+    }
+
+    @Test fun `deep brace context survives lexer restarts and changed prefixes`() {
+        val nested = "{".repeat(32) + "}".repeat(32) + " /[()]/"
+        assertEquals("AS3_REGEX:/[()]/", tokens(nested).last())
+        for (prefix in listOf("if (ready)", "var object =", "if (other())", "var other =")) {
+            val suffix = if (prefix.startsWith("if")) " /[()]/" else " / divisor"
+            val expected = if (prefix.startsWith("if")) "AS3_REGEX:/[()]/" else "AS3_WORD:divisor"
+            assertEquals(expected, tokens("$prefix {}$suffix").last())
+        }
+    }
+
+    @Test fun `object keys and conditional colons do not introduce statement blocks`() {
+        for (keyword in listOf("if", "while", "function", "class")) {
+            val actual = tokens("var object:Object = { $keyword: call() / divisor }")
+            assertEquals(true, actual.contains("AS3_WORD:divisor"))
+        }
+        assertEquals("AS3_WORD:divisor", tokens("var value = ready ? 1 : {} / divisor").last())
+        assertEquals("AS3_REGEX:/literal/", tokens("label: {} /literal/").last())
     }
 }
