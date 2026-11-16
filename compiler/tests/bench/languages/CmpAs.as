@@ -1,6 +1,6 @@
 package {
 	import godot.*;
-	public class TmpCmpAs extends Node2D {
+	public class CmpAs extends Node2D {
 		private var total:Number = 0;
 		private var steps:int = 0;
 		public function spin(rounds:int):Number {
