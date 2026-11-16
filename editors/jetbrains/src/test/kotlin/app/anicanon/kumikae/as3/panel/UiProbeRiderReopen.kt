@@ -58,6 +58,11 @@ internal object UiProbeRiderReopen {
                     UiProbeCompletion.await("restored visible Problems window") {
                         ToolWindowManager.getInstance(project).getToolWindow("Problems View")?.isVisible == true
                     }
+                    // The layout records a shown window after the window reports itself visible.
+                    UiProbeCompletion.await("visible Problems window in the layout") {
+                        (ToolWindowManager.getInstance(project) as ToolWindowManagerImpl).getLayout()
+                            .getInfo("Problems View")?.isVisible == true
+                    }
                     UiProbeCompletion.edt {
                         UiProbeRetention.checkSplitView(project, observations)
                         val window = checkNotNull(ToolWindowManager.getInstance(project).getToolWindow("Problems View"))
@@ -71,7 +76,9 @@ internal object UiProbeRiderReopen {
                         if (cycle == 0) {
                             layout =
                                 (ToolWindowManager.getInstance(project) as ToolWindowManagerImpl).getLayout().copy()
-                            check(layout.getInfo("Problems View")!!.isVisible)
+                            check(layout.getInfo("Problems View")?.isVisible == true) {
+                                "Layout lost the Problems window"
+                            }
                         }
                         val current = contents.map { it.component.javaClass.name }
                         if (tabs == null) {
