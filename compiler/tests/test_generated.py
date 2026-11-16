@@ -9,6 +9,8 @@ timings rest on, so that a change that undoes one fails here and not only in a b
     and written once after: the loop itself has it in a local;
   - an object handed from where it was made to a variable, as the last thing done with it there, is handed
     over with its reference: none is taken and given back;
+  - two whole numbers (ints, uints, sums of them, whole constants) are compared as integers, not as the
+    Numbers the IR makes of them first: a loop's test is then one the C++ compiler can reason about;
   - a method that calls nothing and cannot fail keeps no count of the depth, and a call of it is not
     followed by a look at whether an error is on its way out.
 """
@@ -60,6 +62,7 @@ with tempfile.TemporaryDirectory() as where:
         check("work's loop does not touch the field `total`", "f1_total" not in inside, inside)
         check("work reads `total` once and writes it once", work.count("->f1_total") == 2, work)
         check("work does not look for an error after calls that cannot fail", "c->failing" not in inside, inside)
+        check("work compares its whole numbers as integers", "less(" not in work and "equal(" not in work, work)
         check("work calls its two methods", "CmpAs_scaled(" in inside and "CmpAs_bump(" in inside, inside)
         for leaf in ("CmpAs_scaled", "CmpAs_bump"):
             body = made.get(leaf, "")

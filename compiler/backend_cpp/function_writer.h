@@ -50,6 +50,7 @@ class FunctionWriter {
 	// (function_whole.cpp): what it reads, so that it is forgotten when one of those is written.
 	struct Whole {
 		std::string expression; // Empty: nothing is known of the register.
+		std::string exact; // The same sum as a 64-bit integer, which holds it whole: what a comparison reads.
 		std::vector<uint32_t> sources;
 		uint32_t terms = 0;
 	};
@@ -137,6 +138,7 @@ class FunctionWriter {
 	bool engine_bound(const ir::Instruction &p_in);
 	void forget_whole(uint32_t p_register);
 	bool whole_conversion(const ir::Instruction &p_in);
+	bool whole_comparison(const ir::Instruction &p_in);
 	void remember_whole(const ir::Instruction &p_in);
 	// function_fast.cpp: an inline path for the usual case, and the thunk for the rest.
 	bool fast_object(const ir::Instruction &p_in); // A new object, a vector's elements and length.
