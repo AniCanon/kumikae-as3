@@ -330,18 +330,16 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 		return;
 	}
 	// An Array parameter takes one of Godot's Arrays, copied, or null; a Dictionary one of Godot's
-	// Dictionaries, copied, or null.
-	const auto container_parameter = [&](size_t p_at, Variant::Type *r_type) {
-		const uint32_t klass = p_at < function.parameter_classes.size() ? function.parameter_classes[p_at] : ir::NONE;
-		const bool object = p_at < fixed && function.registers[p_at] == ir::Kind::Obj && klass != ir::NONE;
-		*r_type = object && program.module().classes[klass].array ? Variant::ARRAY : Variant::DICTIONARY;
-		return object && (program.module().classes[klass].array || program.module().classes[klass].dictionary);
+	// Dictionaries, copied, or null (members.h).
+	const auto container_parameter = [&](size_t p_at) {
+		const bool object = p_at < fixed && function.registers[p_at] == ir::Kind::Obj && p_at < function.parameter_classes.size();
+		return object ? kas3::container_type(function.parameter_classes[p_at]) : Variant::NIL;
 	};
 	// Every argument is checked before any is converted, so that a refusal leaves nothing to give back.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		ir::Kind kind = kind_at(i + first);
-		Variant::Type container = Variant::NIL;
-		if (container_parameter(i + first, &container) && (p_args[i]->get_type() == container || p_args[i]->get_type() == Variant::NIL)) {
+		const Variant::Type container = container_parameter(i + first);
+		if (container != Variant::NIL && (p_args[i]->get_type() == container || p_args[i]->get_type() == Variant::NIL)) {
 			continue;
 		}
 		const std::string godot_type = i + first < function.engine_types.size() ? function.engine_types[i + first] : std::string();
@@ -368,21 +366,9 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 		arguments[0].p = p_object;
 	}
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		std::optional<vm::Slot> taken;
-		Variant::Type container = Variant::NIL;
-		if (container_parameter(i + first, &container)) {
-			taken = vm::Slot();
-			taken->bits = 0;
-			if (p_args[i]->get_type() == container) {
-				Variant held = *p_args[i];
-				const uint32_t klass = function.parameter_classes[i + first];
-				taken->p = container == Variant::ARRAY ? program.interpreter().copy_engine_array(&held, klass)
-													   : program.interpreter().copy_engine_dictionary(&held, klass);
-				taken = taken->p ? taken : std::nullopt;
-			}
-		} else {
-			taken = kas3::from_variant(kind_at(i + first), *p_args[i]);
-		}
+		const std::optional<vm::Slot> taken = container_parameter(i + first) != Variant::NIL
+				? kas3::container_from_variant(function.parameter_classes[i + first], *p_args[i])
+				: kas3::from_variant(kind_at(i + first), *p_args[i]);
 		if (!taken) {
 			// As with any call that fails: the error said, and null for the caller.
 			for (size_t made = 0; made < i; made++) {

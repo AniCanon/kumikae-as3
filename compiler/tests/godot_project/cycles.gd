@@ -11,6 +11,9 @@ var static_id := 0
 var godot_only: Resource
 var kept: Resource
 var read_only: WeakRef
+var closure_id := 0
+var talker: Resource
+var talker_gone: WeakRef
 var written_only: WeakRef
 var let_go: WeakRef
 
@@ -26,6 +29,8 @@ func _initialize() -> void:
 	static_id = cycles.staticOnly()
 	godot_only = cycles.godotOnly()
 	kept = cycles.keptByGodot()
+	closure_id = cycles.closureLoop()
+	talker = cycles.closureHeld()
 	# Made by GDScript and read by a getter that keeps it in a static: AS3 holds it now, and it outlives
 	# GDScript's hold.
 	var made := Resource.new()
@@ -48,6 +53,10 @@ func _physics_process(_delta: float) -> bool:
 		show("kept by Godot alone stays whole", [kept.get("label"), kept.partnerWord()], ["kept", "partner false"])
 		show("what a getter kept outlives GDScript's hold", [read_only.get_ref() != null, cycles.readWord()], [true, "read no partner"])
 		show("what a setter kept outlives GDScript's hold", [written_only.get_ref() != null, cycles.writtenWord()], [true, "written"])
+		show("a function listening to its own object's signal goes with it", [closure_id != 0, is_instance_id_valid(closure_id)], [true, false])
+		show("and stays, still listening, while GDScript holds the object", talker.say(), 1)
+		talker_gone = weakref(talker)
+		talker = null
 		cycles.letGoOfStatic()
 		cycles.letGoOfRead()
 		let_go = weakref(godot_only)
@@ -59,6 +68,7 @@ func _physics_process(_delta: float) -> bool:
 		show("what a getter kept goes when AS3 lets go", read_only.get_ref() == null, true)
 		show("what a setter kept goes when AS3 lets go", written_only.get_ref() == null, true)
 		show("a loop GDScript held goes when it lets go", let_go.get_ref() == null, true)
+		show("so does the listening one", talker_gone.get_ref() == null, true)
 		cycles.queue_free()
 		return true
 	return false

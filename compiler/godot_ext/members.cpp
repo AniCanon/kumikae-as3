@@ -84,9 +84,12 @@ Dictionary describe(const ir::Module &p_module, std::string_view p_name, ir::Kin
 			}
 			break;
 		case ir::Kind::Obj:
-			// An Array is Godot's Array; a script object is its Godot object, when it has one.
+			// An Array is Godot's Array, a Dictionary Godot's Dictionary; a script object is its Godot
+			// object, when it has one.
 			if (p_class < p_module.classes.size() && p_module.classes[p_class].array) {
 				type = Variant::ARRAY;
+			} else if (p_class < p_module.classes.size() && p_module.classes[p_class].dictionary) {
+				type = Variant::DICTIONARY;
 			} else if (p_class < p_module.classes.size() && !p_module.classes[p_class].native_base.empty()) {
 				type = Variant::OBJECT;
 				class_name = String::utf8(p_module.classes[p_class].native_base.c_str());
@@ -211,8 +214,9 @@ Variant read_field(const vm::Object *p_object, uint32_t p_field) {
 	Variant owner;
 	std::string why;
 	if (held && !object_element(held, &owner, &why)) {
-		UtilityFunctions::push_error(String("ActionScript: the field '") + String::utf8(field.name.c_str()) +
-				"' holds a script object of a class that extends none of Godot's, which Godot can't hold. Godot gets null.");
+		const std::string &held_class = Project::get().module().classes[held->klass].name;
+		UtilityFunctions::push_error(String("ActionScript: the field '") + String::utf8(field.name.c_str()) + "' holds an object of '" +
+				String::utf8(held_class.c_str()) + "', a class that extends none of Godot's, which Godot can't hold. Godot gets null.");
 	}
 	return owner;
 }
@@ -227,18 +231,16 @@ bool write_field(vm::Object *p_object, uint32_t p_field, const Variant &p_value)
 	vm::Slot taken;
 	taken.bits = 0;
 	if (field.kind == ir::Kind::Obj) {
-		// Only an Array comes from Godot, copied: a script object can't.
-		if (field.klass >= module.classes.size() || !module.classes[field.klass].array ||
-				(p_value.get_type() != Variant::ARRAY && p_value.get_type() != Variant::NIL)) {
+		// Only a container comes from Godot, copied: a script object or a Date can't.
+		const Variant::Type type = container_type(field.klass);
+		if (type == Variant::NIL || (p_value.get_type() != type && p_value.get_type() != Variant::NIL)) {
 			return false;
 		}
-		if (p_value.get_type() == Variant::ARRAY) {
-			Variant held = p_value;
-			taken.p = program.interpreter().copy_engine_array(&held, field.klass);
-			if (!taken.p) {
-				return false; // The error has been reported.
-			}
+		const std::optional<vm::Slot> copied = container_from_variant(field.klass, p_value);
+		if (!copied) {
+			return false;
 		}
+		taken = *copied;
 	} else {
 		if (!arrives(field.kind, field.engine_type, p_value)) {
 			return false;
@@ -252,6 +254,25 @@ bool write_field(vm::Object *p_object, uint32_t p_field, const Variant &p_value)
 	}
 	program.interpreter().set_field(p_object, p_field, taken);
 	return true;
+}
+
+Variant::Type container_type(uint32_t p_class) {
+	const ir::Module &module = Project::get().module();
+	const ir::Class *klass = p_class < module.classes.size() ? &module.classes[p_class] : nullptr;
+	return klass && klass->array ? Variant::ARRAY : klass && klass->dictionary ? Variant::DICTIONARY : Variant::NIL;
+}
+
+std::optional<vm::Slot> container_from_variant(uint32_t p_class, const Variant &p_value) {
+	vm::Slot taken;
+	taken.bits = 0;
+	if (p_value.get_type() == Variant::NIL) {
+		return taken;
+	}
+	Variant held = p_value;
+	vm::Interpreter &interpreter = Project::get().interpreter();
+	taken.p = container_type(p_class) == Variant::ARRAY ? static_cast<void *>(interpreter.copy_engine_array(&held, p_class))
+														: static_cast<void *>(interpreter.copy_engine_dictionary(&held, p_class));
+	return taken.p ? std::optional<vm::Slot>(taken) : std::nullopt;
 }
 
 TypedArray<Dictionary> property_list(uint32_t p_class) {
@@ -269,6 +290,29 @@ TypedArray<Dictionary> property_list(uint32_t p_class) {
 		const Member member = find_member(p_class, name);
 		if (member.what == Member::What::Field && member.index == i && !is_signal(module, p_class, field.name)) {
 			list.push_back(describe(module, field.name, field.kind, field.engine_type, field.klass, field.exported));
+		}
+	}
+	// A public getter or setter, which GDScript reaches as a property (instance.cpp): listed once, with its
+	// setter's parameter's type, or its getter's result's. A field or method of the name comes first.
+	std::unordered_set<std::string_view> accessors;
+	for (uint32_t function : klass.methods) {
+		const ir::Function &method = module.functions[function];
+		const std::string_view own = own_name(method);
+		const std::string_view name = own.substr(own.size() > 4 ? 4 : own.size());
+		if (!method.is_public || (own.substr(0, 4) != "get " && own.substr(0, 4) != "set ") || program.interpreter().find_method(p_class, own) != function ||
+				find_member(p_class, StringName(String::utf8(name.data(), (int64_t)name.size()))).what != Member::What::None ||
+				!accessors.insert(name).second) {
+			continue;
+		}
+		const uint32_t write = program.interpreter().find_method(p_class, "set " + std::string(name));
+		const ir::Function *setter = write != ir::NONE && module.functions[write].is_public ? &module.functions[write] : nullptr;
+		if (setter && setter->registers.size() > 1) {
+			const std::string &engine = setter->engine_types.size() > 1 ? setter->engine_types[1] : std::string();
+			const uint32_t holds = setter->parameter_classes.size() > 1 ? setter->parameter_classes[1] : ir::NONE;
+			list.push_back(describe(module, name, setter->registers[1], engine, holds, false));
+		} else {
+			const uint32_t read = program.interpreter().find_method(p_class, "get " + std::string(name));
+			list.push_back(describe(module, name, module.functions[read].result, "", ir::NONE, false));
 		}
 	}
 	return list;
@@ -291,7 +335,8 @@ TypedArray<Dictionary> method_list(uint32_t p_class) {
 	for (uint32_t function : klass.methods) {
 		const ir::Function &method = module.functions[function];
 		const std::string_view name = own_name(method);
-		if (method.is_public && !virtuals.count(function) && seen.insert(name).second &&
+		const bool accessor = name.substr(0, 4) == "get " || name.substr(0, 4) == "set "; // A property: property_list().
+		if (method.is_public && !accessor && !virtuals.count(function) && seen.insert(name).second &&
 				program.interpreter().find_method(p_class, name) == function) {
 			list.push_back(method_info(module, method, name));
 		}

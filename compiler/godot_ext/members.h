@@ -12,6 +12,7 @@
 #include <godot_cpp/variant/variant.hpp>
 
 #include <cstdint>
+#include <optional>
 
 namespace kas3 {
 
@@ -30,12 +31,20 @@ Member find_member(uint32_t p_class, const godot::StringName &p_name);
 // A field as Godot is given it. Godot gets null for a script object it can't hold, and is told so.
 godot::Variant read_field(const vm::Object *p_object, uint32_t p_field);
 // A value from Godot stored in a field, converted as a store into the field converts: an Array field takes
-// a copy of Godot's Array, or null. False, the field unchanged, when the value does not fit or the field
-// can't be written from Godot (a const, a signal, a script object).
+// a copy of Godot's Array, a Dictionary field a copy of Godot's Dictionary, or null. False, the field
+// unchanged, when the value does not fit or the field can't be written from Godot (a const, a signal, a
+// script object, a Date).
 bool write_field(vm::Object *p_object, uint32_t p_field, const godot::Variant &p_value);
 
-// The class's public fields as Godot describes properties, and its public methods as Godot describes
-// methods, those of its base classes included.
+// The one kind of Godot's value that comes into a register or field of this class, an AS3 container: an
+// Array's Godot Array, a Dictionary's (flash.utils) Godot Dictionary; NIL for any other class, of which no
+// object comes from Godot.
+godot::Variant::Type container_type(uint32_t p_class);
+// That value copied, or null for Godot's null. Nothing if the copy failed: the error has been reported.
+std::optional<vm::Slot> container_from_variant(uint32_t p_class, const godot::Variant &p_value);
+
+// The class's public fields, getters and setters as Godot describes properties, and its public methods as
+// Godot describes methods, those of its base classes included.
 godot::TypedArray<godot::Dictionary> property_list(uint32_t p_class);
 godot::TypedArray<godot::Dictionary> method_list(uint32_t p_class);
 

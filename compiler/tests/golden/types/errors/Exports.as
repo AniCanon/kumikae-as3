@@ -29,6 +29,8 @@ package {
 		[Export] [Signal] public var both:Signal;
 		[Export] public var callback:Function;
 		[Export] public var counted:RefCounted;
+		[Export] public var when:Date;
+		[Export] public var lookup:Dictionary;
 
 		[Export] public var made:Vector2 = new Vector2(1, -2.5);
 		[Export] public var below:Number = -1;

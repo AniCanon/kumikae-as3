@@ -11,16 +11,18 @@ golden/types/errors/Exports.as:28:23: error: 'heard' is an [Export] field, so it
 golden/types/errors/Exports.as:29:32: error: 'both' is an [Export] field, so its type is one Godot can store: a number, Boolean, String, Array, one of Godot's values, a Resource, or a Node in a node's script
 golden/types/errors/Exports.as:30:23: error: 'callback' is an [Export] field, so its type is one Godot can store: a number, Boolean, String, Array, one of Godot's values, a Resource, or a Node in a node's script
 golden/types/errors/Exports.as:31:23: error: 'counted' is an [Export] field, so its type is one Godot can store: a number, Boolean, String, Array, one of Godot's values, a Resource, or a Node in a node's script
-golden/types/errors/Exports.as:36:41: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
-golden/types/errors/Exports.as:37:37: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
-golden/types/errors/Exports.as:38:38: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
-golden/types/errors/Exports.as:39:40: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
-golden/types/errors/Exports.as:40:39: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
-golden/types/errors/Exports.as:41:23: error: 'unset' is an [Export] Number, so its first value is written: a Number starts as NaN, which Godot's inspector can't show
-golden/types/errors/Exports.as:42:39: error: 'onOff' is an [Export] field, so its first value is written as its type: true or false
-golden/types/errors/Exports.as:43:40: error: 'worded' is an [Export] field, so its first value is written as its type: true or false
-golden/types/errors/Exports.as:44:37: error: 'nothing' is an [Export] field, so its first value is written as its type: a number
-golden/types/errors/Exports.as:45:41: error: can't use a value of type 'int' where 'String' is expected
-golden/types/errors/Exports.as:46:40: error: can't use a value of type 'Boolean' where 'Number' is expected
-golden/types/errors/Exports.as:54:2: error: [Export] is for a class that extends one of Godot's: only a Godot object is kept in a scene
-golden/types/errors/Exports.as:58:22: error: 'node' is an [Export] field, so its type is one Godot can store: a number, Boolean, String, Array, one of Godot's values, a Resource, or a Node in a node's script
+golden/types/errors/Exports.as:32:23: error: 'when' is an [Export] field, so its type is one Godot can store: a number, Boolean, String, Array, one of Godot's values, a Resource, or a Node in a node's script
+golden/types/errors/Exports.as:33:30: error: unknown type 'Dictionary'
+golden/types/errors/Exports.as:38:41: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
+golden/types/errors/Exports.as:39:37: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
+golden/types/errors/Exports.as:40:38: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
+golden/types/errors/Exports.as:41:40: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
+golden/types/errors/Exports.as:42:39: error: an [Export] field's first value is a constant, which Godot's inspector is told: a number, String, Boolean, null, or one of Godot's values made from numbers
+golden/types/errors/Exports.as:43:23: error: 'unset' is an [Export] Number, so its first value is written: a Number starts as NaN, which Godot's inspector can't show
+golden/types/errors/Exports.as:44:39: error: 'onOff' is an [Export] field, so its first value is written as its type: true or false
+golden/types/errors/Exports.as:45:40: error: 'worded' is an [Export] field, so its first value is written as its type: true or false
+golden/types/errors/Exports.as:46:37: error: 'nothing' is an [Export] field, so its first value is written as its type: a number
+golden/types/errors/Exports.as:47:41: error: can't use a value of type 'int' where 'String' is expected
+golden/types/errors/Exports.as:48:40: error: can't use a value of type 'Boolean' where 'Number' is expected
+golden/types/errors/Exports.as:56:2: error: [Export] is for a class that extends one of Godot's: only a Godot object is kept in a scene
+golden/types/errors/Exports.as:60:22: error: 'node' is an [Export] field, so its type is one Godot can store: a number, Boolean, String, Array, one of Godot's values, a Resource, or a Node in a node's script

@@ -62,6 +62,25 @@ func _initialize() -> void:
 	node.set("items", "no")
 	show("an array refuses what is not one", ask("itemCount"), -1)
 
+	# A Dictionary field takes a copy of Godot's Dictionary, or null, and is read as one.
+	var table := {"a": 1, "b": 2}
+	node.set("table", table)
+	table["c"] = 3
+	show("a dictionary is copied", [ask("tableSize"), node.get("table")], [2, {"a": 1, "b": 2}])
+	node.set("table", null)
+	show("a dictionary set to null", ask("tableSize"), -1)
+	node.set("table", [1])
+	show("a dictionary refuses what is not one", ask("tableSize"), -1)
+	# An Object field holds any value: one of Godot's Dictionaries too.
+	node.set("thing", {"x": 1})
+	show("an object field", node.get("thing"), {"x": 1})
+	# A Date comes neither from Godot nor goes to it: Godot has none.
+	node.set("when", 5)
+	show("a date field is not set from Godot", [ask("whenTime"), node.get("when")], [0.0, null])
+	# A getter and a setter are a property.
+	node.set("level", 10)
+	show("a setter and its getter", [node.get("count"), node.get("level"), node.get("title")], [5, 10, "set"])
+
 	var other := Node.new()
 	other.name = "other"
 	node.set("buddy", other)
@@ -91,7 +110,8 @@ func _initialize() -> void:
 	var script: Script = node.get_script()
 	var properties: Array = script.get_script_property_list()
 	show("the script's properties", names(properties),
-			["FIXED", "anything", "buddy", "count", "flag", "items", "label", "mine", "ratio", "small", "spot", "wide"])
+			["FIXED", "anything", "buddy", "count", "flag", "items", "label", "level", "mine", "ratio", "small", "spot", "table", "thing",
+			"title", "when", "wide"])
 	show("the instance's properties", names(node.get_property_list().filter(func(p): return p["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE)),
 			names(properties))
 	var types := []
@@ -99,12 +119,14 @@ func _initialize() -> void:
 		types.append(entry(properties, name)["type"])
 	show("their types", types, [TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_BOOL, TYPE_VECTOR2, TYPE_ARRAY, TYPE_OBJECT, TYPE_INT, TYPE_INT,
 			TYPE_NIL, TYPE_INT])
+	show("accessors and containers", ["level", "title", "table", "thing", "when"].map(func(n): return entry(properties, n)["type"]),
+			[TYPE_INT, TYPE_STRING, TYPE_DICTIONARY, TYPE_NIL, TYPE_NIL])
 	show("a node's class", entry(properties, "buddy")["class_name"], &"Node")
 	show("not shown or stored", entry(properties, "count")["usage"], PROPERTY_USAGE_SCRIPT_VARIABLE)
 	show("untyped is any value", entry(properties, "anything")["usage"] & PROPERTY_USAGE_NIL_IS_VARIANT, PROPERTY_USAGE_NIL_IS_VARIANT)
 	var methods: Array = script.get_script_method_list()
 	show("the script's methods", names(methods),
-			["_ready", "buddyName", "describe", "hiddenValues", "itemCount", "total", "twice"])
+			["_ready", "buddyName", "describe", "hiddenValues", "itemCount", "tableSize", "total", "twice", "whenTime"])
 	var twice := entry(methods, "twice")
 	show("a method's arguments", [twice["args"].map(func(a): return [a["name"], a["type"]]), twice["default_args"].size(), twice["return"]["type"]],
 			[[["n", TYPE_INT], ["by", TYPE_FLOAT]], 1, TYPE_FLOAT])

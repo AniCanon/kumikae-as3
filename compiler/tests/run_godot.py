@@ -305,7 +305,7 @@ check("untyped.gd: a value of another Godot type is AS3's coercion error, where 
       output.count("Error #1034") >= 5 and "at Untyped/asVector()" in output and "at Untyped/asNode()" in output and
       "at Untyped/place()" in output, output[-2000:])
 check("untyped.gd: a script object reaching Godot is said", "giveScript returns a script object" in output and
-      "'keep' holds a script object" in output, output[-2000:])
+      "'keep' holds an object of 'Thing'" in output, output[-2000:])
 check("untyped.gd: a value of the wrong type is AS3's coercion error", "at Untyped/wrongType()" in output and "Error #1034" in output,
       output[-1500:])
 check("untyped.gd: a thrown Godot value nothing catches is reported as its text", "(3.0, 4.0)\n\tat Untyped/throwValue()" in output,
@@ -327,7 +327,9 @@ check("objects.gd: what Godot can't hold is an AS3 error that says why",
 # What GDScript reaches of a script by name: public fields to read and write, public methods, and the lists.
 compare("members.gd", [
     "fields set", "fields read back", "ratio is a float", "refused", "a whole float into an int", "an array is copied",
-    "an array set to null", "an array refuses what is not one", "a node field", "a node field refuses another class",
+    "an array set to null", "an array refuses what is not one", "a dictionary is copied", "a dictionary set to null",
+    "a dictionary refuses what is not one", "an object field", "a date field is not set from Godot", "a setter and its getter",
+    "accessors and containers", "a node field", "a node field refuses another class",
     "a node field set to null", "a const", "a script object field is not set from Godot", "hidden fields read",
     "hidden fields are not written", "hidden methods", "public methods",
     "the script's properties", "the instance's properties", "their types", "a node's class", "not shown or stored",
@@ -377,6 +379,8 @@ compare("cycles.gd", [
     "a loop an AS3 static holds stays whole", "kept by Godot alone stays whole", "what a getter kept outlives GDScript's hold",
     "what a setter kept outlives GDScript's hold", "a static's loop goes when the static lets go", "what a getter kept goes when AS3 lets go",
     "what a setter kept goes when AS3 lets go", "a loop GDScript held goes when it lets go",
+    "a function listening to its own object's signal goes with it", "and stays, still listening, while GDScript holds the object",
+    "so does the listening one",
 ])
 
 # A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give.

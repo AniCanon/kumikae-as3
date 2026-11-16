@@ -9,7 +9,7 @@ called by the engine.
 | `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
 | `counted` | A script object whose Godot object is reference-counted: each lives while AS3 or Godot holds it |
-| `members` | What Godot reaches of a script by name: public fields to read and write, public methods, and the lists of both with Godot's types |
+| `members` | What Godot reaches of a script by name: public fields to read and write (an Array or a Dictionary as a copy of Godot's), public getters and setters, public methods, and the lists of them with Godot's types |
 | `godot_host` | The interpreter's four interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_source.cpp` | Where values come from (`EngineSource`): defaults, constants, constructors, singletons, static methods; and the time (`Clock`: Godot's clock, the C library's zone) |
 | `godot_calls.h` | What the two host files share: the arguments of a call, a failed call in AS3's words |
