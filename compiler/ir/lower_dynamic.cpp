@@ -165,8 +165,8 @@ auto Dynamic::call(Call *p_call) -> std::optional<uint32_t> {
 	if (!object_method && !by_name(callee->object)) {
 		return std::nullopt;
 	}
-	if (object_method && (!l_.kind_of(callee->object->type, &kind) || (kind != Kind::Any && kind != Kind::Obj))) {
-		return std::nullopt; // On a String or a number: the library's, or refused there.
+	if (object_method && (!l_.kind_of(callee->object->type, &kind) || is_engine(kind) || kind == Kind::Void)) {
+		return std::nullopt; // On one of Godot's values: refused where the call is lowered.
 	}
 	use_classes();
 	const uint32_t position = p_call->offset;
