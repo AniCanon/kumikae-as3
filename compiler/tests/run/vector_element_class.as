@@ -47,7 +47,7 @@ package { public class vector_element_class {
 		trace(Vector.<uint>(untyped), Vector.<Boolean>([0, "x"]), Vector.<Vector.<int>>([ints])[0] === ints);
 		try { Vector.<int>(5); } catch (e:TypeError) { trace(e.message); }
 		try { Vector.<int>(null); } catch (e:TypeError) { trace(e.message); }
-		try { Vector.<int>({length: 2}); } catch (e:TypeError) { trace(e.message); }
+		trace(Vector.<int>({length: 2, 0: 7, 1: "8"}), Vector.<int>({length: 2}));
 
 		// concat: each argument is a vector of this very type (avmplus's castToThisType), or TypeError #1034.
 		var more:Vector.<int> = new <int>[9];

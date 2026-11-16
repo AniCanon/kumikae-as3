@@ -273,8 +273,8 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out) {
 	Object *object = held_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
-	if (object && library_call(object, p_key.text, p_given, p_out)) {
-		return; // RegExp's or Date's, done or raised.
+	if (object && (static_call(object, p_key, p_given, p_out) || library_call(object, p_key.text, p_given, p_out))) {
+		return; // A class's static method, or RegExp's or Date's, done or raised.
 	}
 	if (klass && klass->element == Kind::Void && !klass->table) {
 		if (const std::optional<uint32_t> slot = named_method(*klass, p_key.text)) {
@@ -403,7 +403,7 @@ void Interpreter::property_loop(const Function &p_function, const Instruction &p
 	bool more = false;
 	for (; !more && elements && cursor >= 0 && cursor < elements->length; cursor++) {
 		const uint32_t at = static_cast<uint32_t>(cursor);
-		more = !klass->array || any::tag(elements->data[at]) != AnyTag::Undefined;
+		more = !klass->array || !any::is_hole(elements->data[at]);
 	}
 	cursor = more ? cursor : cursor >= 0 ? -1 : cursor;
 	const Entries *entries = loop_entries(holder);

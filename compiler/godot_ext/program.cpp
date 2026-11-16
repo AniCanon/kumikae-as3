@@ -33,6 +33,11 @@ namespace kas3 {
 static Project *program = nullptr;
 static uint64_t loads = 0;
 static const uint64_t WATCH_MILLIS = 200; // Between looks at the scripts.
+static uint64_t looks = 0;
+
+uint64_t Project::watch_looks() {
+	return looks;
+}
 
 uint64_t Project::generation() {
 	return loads;
@@ -164,6 +169,7 @@ void Project::watch() {
 		reload();
 	}
 	watch_seen = now;
+	looks++;
 }
 
 // What a scene started again would not make again, of the classes whose code that runs once changed: the

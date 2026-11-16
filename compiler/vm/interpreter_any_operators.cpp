@@ -2,6 +2,8 @@
 // ECMAScript has them.
 #include "interpreter_internal.h"
 
+#include <cmath>
+
 namespace kas3 {
 namespace vm {
 
@@ -86,28 +88,87 @@ Slot Interpreter::add_numbers(Slot p_a, Slot p_b) {
 // `+` with a Godot value on a side and no text on either: Godot's own operator, where it has one
 // (Vector2 + Vector2). True if that settled it, with the result or the error in place.
 bool Interpreter::engine_add(const Instruction &p_in, Slot p_b, Slot p_c) {
-	const AnyTag b = any::tag(p_b);
-	const AnyTag c = any::tag(p_c);
-	if ((!any::is_engine(p_b) && !any::is_engine(p_c)) || b == AnyTag::String || c == AnyTag::String ||
-			b == AnyTag::Object || c == AnyTag::Object) {
+	if (any::tag(p_b) == AnyTag::String || any::tag(p_c) == AnyTag::String) {
 		return false;
 	}
-	const Argument operands[2] = { Argument{ Kind::Any, p_b }, Argument{ Kind::Any, p_c } };
+	const Slot operands[2] = { p_b, p_c };
+	return engine_operate(operator_named(module_.add_operator, "+"), operands, 2, Kind::Any, p_in.a);
+}
+
+// An operator on one or two untyped values, one of them a Godot value and none an object of the program's:
+// Godot's own, where it has one for what they hold, as typed code has it (Vector2 * 3). True if that
+// settled it, with the result or the error in place; false leaves it to AS3's rule.
+bool Interpreter::engine_operate(const OperatorName &p_operator, const Slot *p_operands, size_t p_count, Kind p_result, uint32_t p_out) {
+	bool engine = false;
+	Argument operands[2];
+	for (size_t i = 0; i < p_count; i++) {
+		engine = engine || any::is_engine(p_operands[i]);
+		if (any::tag(p_operands[i]) == AnyTag::Object) {
+			return false;
+		}
+		operands[i] = Argument{ Kind::Any, p_operands[i] };
+	}
+	if (!engine) {
+		return false;
+	}
 	Wanted wanted;
-	wanted.kind = Kind::Any;
+	wanted.kind = p_result;
 	Slot result;
 	result.bits = 0;
 	std::string error;
-	const OperatorName add = operator_named(module_.add_operator, "+");
-	if (!host_.handles.operate(add.number, add.spelling, operands, 2, wanted, &result, &error)) {
+	if (!host_.handles.operate(p_operator.number, p_operator.spelling, operands, p_count, wanted, &result, &error)) {
 		if (error == OUT_OF_MEMORY) {
 			raise(module_.error_class, error);
 			return true;
 		}
-		return false; // No such operator in Godot: AS3's rule, which joins their text.
+		return false; // No such operator in Godot for these.
 	}
-	put(Kind::Any, stack_[frames_.back().base + p_in.a], result);
+	put(p_result, stack_[frames_.back().base + p_out], result);
 	return true;
+}
+
+// AnySub and the rest: Godot's operator where an operand holds one of Godot's values; otherwise, and where
+// Godot has none for them, AS3's, which makes both Numbers.
+void Interpreter::any_operate(const Instruction &p_in, Slot p_b, Slot p_c) {
+	const bool two = p_in.op != Op::AnyNeg;
+	// Each stays held by its register, which nothing changes while this runs.
+	const Slot operands[2] = { p_b, two ? p_c : any::undefined() };
+	if (any::is_engine(operands[0]) || any::is_engine(operands[1])) {
+		const OperatorName named = p_in.op == Op::AnySub ? operator_named(module_.subtract_operator, "-")
+				: p_in.op == Op::AnyMul ? operator_named(module_.multiply_operator, "*")
+				: p_in.op == Op::AnyDiv ? operator_named(module_.divide_operator, "/")
+				: p_in.op == Op::AnyMod ? operator_named(module_.modulo_operator, "%") : operator_named(module_.negate_operator, "-");
+		if (engine_operate(named, operands, two ? 2 : 1, Kind::Any, p_in.a)) {
+			return;
+		}
+	}
+	Slot numbers[2];
+	numbers[0].bits = numbers[1].bits = 0;
+	for (size_t i = 0; i < (two ? 2 : 1); i++) {
+		if (!from_any(operands[i], Kind::F64, ir::NONE, &numbers[i])) {
+			return;
+		}
+	}
+	Slot out;
+	out.bits = 0;
+	switch (p_in.op) {
+		case Op::AnyMul:
+			out.d = numbers[0].d * numbers[1].d;
+			break;
+		case Op::AnyDiv:
+			out.d = numbers[0].d / numbers[1].d;
+			break;
+		case Op::AnyMod:
+			out.d = std::fmod(numbers[0].d, numbers[1].d);
+			break;
+		case Op::AnySub:
+			out.d = numbers[0].d - numbers[1].d;
+			break;
+		default:
+			out.d = -numbers[0].d;
+			break;
+	}
+	put(Kind::Any, stack_[frames_.back().base + p_in.a], to_any(Kind::F64, out));
 }
 
 // `+`, `<` and `<=` with an untyped operand, as ECMAScript has them: both become primitives; `+` joins
@@ -116,6 +177,16 @@ void Interpreter::any_arithmetic(const Instruction &p_in, Slot p_b, Slot p_c) {
 	const size_t base = frames_.back().base;
 	if (p_in.op == Op::AnyAdd && engine_add(p_in, p_b, p_c)) {
 		return;
+	}
+	if (p_in.op != Op::AnyAdd && (any::is_engine(p_b) || any::is_engine(p_c))) {
+		// Godot's own order for its values (Vector2 < Vector2), as typed code has it.
+		const OperatorName named = p_in.op == Op::AnyLt ? operator_named(module_.less_operator, "<")
+				: p_in.op == Op::AnyLe ? operator_named(module_.less_equal_operator, "<=")
+				: p_in.op == Op::AnyGt ? operator_named(module_.greater_operator, ">") : operator_named(module_.greater_equal_operator, ">=");
+		const Slot operands[2] = { p_b, p_c };
+		if (engine_operate(named, operands, 2, Kind::Bool, p_in.a)) {
+			return;
+		}
 	}
 	Slot first;
 	Slot second;

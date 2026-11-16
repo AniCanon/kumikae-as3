@@ -68,6 +68,16 @@ package {
 		public function plusPosition(by:*):* { return position + by; }
 		public function positionAfter(by:*):* { return by + position; }
 		public function addPosition(x:*):* { x += position; return x; }
+		// The other operators on untyped values that hold Godot's: Godot's own, as typed code has them.
+		public function times(a:*, b:*):* { return a * b; }
+		public function minus(a:*, b:*):* { return a - b; }
+		public function over(a:*, b:*):* { return a / b; }
+		public function remainder(a:*, b:*):* { return a % b; }
+		public function negated(a:*):* { return -a; }
+		public function ordered(a:*, b:*):String { return "" + (a < b) + (a <= b) + (a > b) + (a >= b); }
+		public function scaled(a:*, b:*):* { a *= b; a -= b; return a; }
+		public function positionTimes(by:*):* { return position * by; }
+		public function timesText(a:*, b:*):String { return "" + a * b + " " + (a - b) + " " + -a; }
 		// An error raised for a Godot value is caught like any other.
 		public function guarded(value:*):String {
 			try {

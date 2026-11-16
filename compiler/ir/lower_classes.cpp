@@ -111,6 +111,8 @@ void Classes::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 		if (p_decl->modifiers.bits & Modifiers::Static) {
 			l_.globals_[declarator.symbol] = (uint32_t)l_.module_.globals.size();
 			l_.module_.globals.push_back({ l_.module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds, starts_null, engine_type });
+			l_.module_.globals.back().is_public = (p_decl->modifiers.bits & Modifiers::Public) != 0;
+			l_.module_.globals.back().is_const = p_decl->is_const;
 		} else {
 			l_.fields_[declarator.symbol] = (uint32_t)l_.module_.classes[p_class].fields.size();
 			l_.module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null });

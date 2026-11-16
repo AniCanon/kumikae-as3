@@ -65,6 +65,7 @@ void Bodies::parameters(FunctionDecl *p_function) {
 	}
 	if (p_function && p_function->body && !l_.fn().rest && names_arguments(p_function->body)) {
 		// What was passed, before a default or the body changes a parameter.
+		l_.fn().takes_extra = true;
 		l_.vector_class(l_.compilation_.instance_type(l_.array_));
 		uint32_t klass = NONE;
 		l_.class_index(l_.function_, &klass); // For `callee`.

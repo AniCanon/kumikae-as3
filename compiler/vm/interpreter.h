@@ -170,6 +170,8 @@ private:
 	Slot any_number(double p_value) { return vm::any_number(library_, p_value); }
 	Slot any_wide(int64_t p_value) { return vm::any_wide(library_, p_value); }
 	bool engine_add(const ir::Instruction &p_in, Slot p_b, Slot p_c);
+	bool engine_operate(const OperatorName &p_operator, const Slot *p_operands, size_t p_count, ir::Kind p_result, uint32_t p_out);
+	void any_operate(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value) { heap_.assign(p_kind, p_slot, p_value); }
 	Slot share(ir::Kind p_kind, Slot p_value) { return heap_.share(p_kind, p_value); }
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned) { heap_.put(p_kind, p_target, p_owned); }
@@ -306,6 +308,16 @@ private:
 	std::optional<uint32_t> class_in(Slot p_class, std::string_view p_error); // The class an untyped value holds, or raised.
 	void class_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
+	void class_call(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
+	// A class value's public static members by name (class_statics.cpp); nothing where it has none of that name.
+	std::unordered_map<std::string, uint32_t> statics_;
+	bool statics_listed_ = false;
+	std::optional<uint32_t> static_member(uint32_t p_class, char p_joint, std::string_view p_prefix, std::string_view p_name);
+	std::optional<uint32_t> statics_of(const Object *p_object, bool *r_raised);
+	std::optional<bool> static_get(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
+	std::optional<bool> static_set(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot p_value);
+	bool static_has(const Object *p_object, const PropertyKey &p_key);
+	bool static_call(Object *p_object, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
 	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);

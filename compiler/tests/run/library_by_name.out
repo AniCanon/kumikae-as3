@@ -37,7 +37,7 @@ caught 1125
 0 0 3 0 0 0 2
 caught 1116
 caught 1063
-Error #1063: Argument count mismatch on String/charAt(). Expected 1, got 2.
+Error #1063: Argument count mismatch on String/charAt(). Expected 0, got 2.
 Error #1063: Argument count mismatch on Array/insertAt(). Expected 2, got 1.
 Error #1063: Argument count mismatch on __AS3__.vec.Vector.<int>/sort(). Expected 1, got 0.
 1069

@@ -95,7 +95,7 @@ package {
 		public native function concat(...args):String;
 		public native function indexOf(val:String = "undefined", startIndex:Number = 0):int;
 		public native function lastIndexOf(val:String = "undefined", startIndex:Number = 0x7FFFFFFF):int;
-		public native function localeCompare(other:String, ...values):int;
+		public native function localeCompare(other:String = "undefined"):int;
 		public native function match(pattern:* = null):Array;
 		public native function replace(pattern:* = null, repl:* = null):String;
 		public native function search(pattern:* = null):int;

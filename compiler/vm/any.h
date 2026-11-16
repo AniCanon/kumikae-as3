@@ -38,6 +38,26 @@ Slot object(Object *p_object);
 Slot godot_value(void *p_handle); // One of Godot's values (a Vector2).
 Slot godot_object(void *p_handle); // One of Godot's objects (a node).
 Slot wide(Wide *p_wide);
+// What an Array's slot holds where no element was ever written, or one was deleted: a hole, as avmplus keeps
+// one (atomNotFound in ArrayObject's dense list), which is not an element that holds undefined. It is only
+// ever in an Array's slots. Whatever reads an element reads it through filled(), and so reads undefined; a
+// hole that got out all the same is undefined to everything here (tag() says so).
+constexpr uint64_t HOLE_BITS = 4 << 3; // No pointer, and none of undefined, null, false and true.
+inline Slot hole() {
+	Slot slot;
+	slot.bits = HOLE_BITS;
+	return slot;
+}
+inline bool is_hole(Slot p_value) {
+	return p_value.bits == HOLE_BITS;
+}
+// An untyped element as whatever reads it is given it: undefined for a hole.
+inline Slot filled(Slot p_element) {
+	if (p_element.bits == HOLE_BITS) {
+		p_element.bits = 0;
+	}
+	return p_element;
+}
 
 AnyTag tag(Slot p_value);
 bool to_bool_payload(Slot p_value); // For Boolean.

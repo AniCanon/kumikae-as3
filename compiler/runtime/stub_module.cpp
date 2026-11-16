@@ -55,6 +55,7 @@ ir::Function stub(const FunctionInfo &p_info) {
 	function.parameters = p_info.parameters;
 	function.required = p_info.required;
 	function.rest = p_info.rest;
+	function.takes_extra = p_info.takes_extra;
 	function.result = static_cast<Kind>(p_info.result);
 	for (uint32_t i = 0; i < p_info.parameters; i++) {
 		function.registers.push_back(static_cast<Kind>(p_info.kinds[i]));
@@ -199,7 +200,7 @@ ir::Module stub_module(const Program &p_program) {
 	}
 	for (uint32_t i = 0; i < p_program.global_count; i++) {
 		const GlobalInfo &from = p_program.globals[i];
-		module.globals.push_back(ir::Global{ from.name, static_cast<Kind>(from.kind), from.klass, from.starts_null, {} });
+		module.globals.push_back(ir::Global{ from.name, static_cast<Kind>(from.kind), from.klass, from.starts_null, {}, from.is_public, from.is_const });
 	}
 	for (uint32_t i = 0; i < p_program.string_count; i++) {
 		module.strings.emplace_back(p_program.strings[i].data, p_program.strings[i].size);

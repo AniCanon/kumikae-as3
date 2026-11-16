@@ -10,7 +10,7 @@ using ir::Kind;
 namespace {
 
 // A stub's body: the generated function, with the arguments the stub's frame was given.
-bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, uint32_t p_given, Slot *r_result) {
+bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, uint32_t p_given, uint32_t p_extras, Slot *r_result) {
 	const FunctionInfo &info = r_host.program.functions[p_function];
 	// Copied out of the frame first: what the function calls may move the interpreter's stack.
 	Slot few[16];
@@ -23,6 +23,11 @@ bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, 
 	for (uint32_t i = 0; i < info.parameters; i++) {
 		arguments[i] = p_registers[i];
 	}
+	r_host.drop_extras();
+	const Slot *extras = p_registers + r_host.module.functions[p_function].registers.size();
+	for (uint32_t i = 0; i < p_extras; i++) {
+		r_host.extras.push_back(shared(&r_host.context, extras[i]));
+	}
 	// Called with an error on its way out already: the engine is going on (a signal's next listener). The
 	// function runs as any other, and its own error, if it has one, is reported where it ends.
 	const bool pending = r_host.context.failing;
@@ -33,6 +38,7 @@ bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, 
 	if (!r_host.set_up_by_library(p_function)) {
 		info.entry(&r_host.context, arguments, p_given, &result);
 	}
+	r_host.drop_extras(); // Had the function not begun (its class's first use failed), they are still here.
 	if (r_host.context.failing) {
 		r_host.context.listener_failed = true;
 		// The error stays the context's. What the interpreter raises in its place only leaves its frames,
@@ -73,12 +79,20 @@ void take_error(Host &r_host, Slot p_error) {
 
 } // namespace
 
-bool Host::run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given, Slot *r_result) {
+void Host::drop_extras() {
+	for (const Slot each : extras) {
+		release(&context, each);
+	}
+	extras.clear();
+}
+
+bool Host::run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given, uint32_t p_extras,
+		Slot *r_result) {
 	switch (static_cast<NativeWhat>(p_what)) {
 		case NativeWhat::Body:
 			// Whichever thread the embedder calls on: its stack's floor is what generated code looks at.
 			context.stack_floor = vm::stack_floor();
-			return p_function < program.function_count && call_generated(*this, p_function, p_registers, p_given, r_result);
+			return p_function < program.function_count && call_generated(*this, p_function, p_registers, p_given, p_extras, r_result);
 		case NativeWhat::Caught:
 			take_error(*this, p_registers[p_register]);
 			return true;

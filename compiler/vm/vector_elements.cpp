@@ -71,6 +71,9 @@ Vector *array_new(Library &p_library, uint32_t p_class, const Slot *p_values, si
 	for (size_t i = 0; made && spread && i < p_count; i++) {
 		made->data[i] = p_library.heap.share(Kind::Any, p_values[i]);
 	}
+	if (made && !spread) {
+		std::fill(made->data, made->data + made->length, any::hole()); // A length alone: no element is written.
+	}
 	return made;
 }
 
@@ -86,6 +89,10 @@ bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length) {
 	const Kind kind = p_library.class_of(p_vector).element;
 	const uint32_t old = p_vector->length;
 	if (p_length >= old) {
+		if (p_library.class_of(p_vector).array) {
+			// An Array's new places are holes until something is written to them.
+			std::fill(p_vector->data + old, p_vector->data + p_length, any::hole());
+		}
 		p_vector->length = p_length;
 		return true;
 	}
@@ -142,7 +149,7 @@ Vector *vector_new(Library &p_library, uint32_t p_class, uint32_t p_length, bool
 bool vector_get(Library &p_library, Vector *p_vector, Kind p_index_kind, Slot p_index, Slot *r_out) {
 	const Kind kind = p_library.class_of(p_vector).element;
 	if (const std::optional<uint32_t> at = element_index(p_index_kind, p_index, p_vector->length)) {
-		*r_out = p_library.heap.share(kind, p_vector->data[*at]);
+		*r_out = p_library.heap.share(kind, kind == Kind::Any ? any::filled(p_vector->data[*at]) : p_vector->data[*at]);
 		return true;
 	}
 	// An index that names no element: of an Array, the property named by the number; of a Vector, AS3's
@@ -187,9 +194,55 @@ bool vector_set_length(Library &p_library, Vector *p_vector, uint32_t p_length) 
 	return p_length == old || (resize_vector(p_library, p_vector, p_length) && fill_zeroes(p_library, p_vector, old));
 }
 
-// Vector.<T>(x): x itself if it is one. Otherwise a new one, as long as an Array or another Vector, of its
-// elements, each converted as a store into the vector converts it (which may run the program: an element's
-// text). Anything else, null included, is AS3's TypeError #1034 (avmplus's VectorClass, from recollection).
+namespace {
+
+// Vector.<T>(x) of an object that is no Array or Vector: as long as its `length`, of what it holds under each
+// index, each converted (avmplus's TypedVectorClassBase::call: getLengthProperty(), then getUintProperty(i)).
+bool vector_from_object(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_out) {
+	const ir::Class &klass = p_library.module().classes[p_class];
+	const auto read = [&](std::string_view p_name, Slot *r_value) {
+		Str *name = new_string(p_name);
+		if (!name) {
+			p_library.runner.out_of_memory();
+			return false;
+		}
+		const bool ok = p_library.unmoved.sort_field(p_source, name, r_value);
+		if (release(name)) {
+			free_string(name);
+		}
+		return ok;
+	};
+	Slot length, count;
+	if (!read("length", &length)) {
+		return false;
+	}
+	const bool counted = from_any(p_library, length, Kind::U32, ir::NONE, &count);
+	p_library.heap.drop_any(length);
+	Vector *made = counted ? p_library.fresh_vector(p_class, count.u) : nullptr;
+	bool ok = made != nullptr;
+	for (uint32_t i = 0; ok && i < made->length; i++) {
+		Slot element;
+		ok = read(std::to_string(i), &element);
+		if (ok) {
+			ok = from_any(p_library, element, klass.element, klass.element_check, &made->data[i]);
+			p_library.heap.drop_any(element);
+		}
+	}
+	if (!ok) {
+		p_library.heap.release_object(made);
+		return false;
+	}
+	r_out->bits = 0;
+	r_out->p = made;
+	return true;
+}
+
+} // namespace
+
+// Vector.<T>(x): x itself if it is one. Otherwise a new one, as long as the object given (an Array, another
+// Vector, anything with a `length`), of its elements, each converted as a store into the vector converts it
+// (which may run the program: an element's text). What is no object, null included, is AS3's TypeError
+// #1034 (avmplus's VectorClass-impl.h, TypedVectorClassBase::call).
 bool vector_from(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_out) {
 	Object *object = any::tag(p_source) == AnyTag::Object ? static_cast<Object *>(any::pointer(p_source)) : nullptr;
 	if (object && object->klass == p_class) {
@@ -200,7 +253,7 @@ bool vector_from(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_ou
 	}
 	const Kind given = object ? p_library.class_of(object).element : Kind::Void;
 	if (given == Kind::Void) {
-		return coercion_failed(p_library, p_source, Kind::Obj, p_class);
+		return object ? vector_from_object(p_library, p_class, p_source, r_out) : coercion_failed(p_library, p_source, Kind::Obj, p_class);
 	}
 	const Vector *from = static_cast<const Vector *>(object);
 	const ir::Class &klass = p_library.module().classes[p_class];
@@ -208,7 +261,7 @@ bool vector_from(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_ou
 	bool ok = made != nullptr;
 	for (uint32_t i = 0; ok && i < made->length; i++) {
 		// One taken out of the source as an earlier element spoke is undefined.
-		const Slot element = i < from->length ? to_any(p_library, given, from->data[i]) : any::undefined();
+		const Slot element = i < from->length ? to_any(p_library, given, given == Kind::Any ? any::filled(from->data[i]) : from->data[i]) : any::undefined();
 		ok = from_any(p_library, element, klass.element, klass.element_check, &made->data[i]);
 		p_library.heap.drop_any(element);
 	}

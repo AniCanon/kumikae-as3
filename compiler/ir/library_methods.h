@@ -97,7 +97,9 @@ inline constexpr std::array<LibraryMethod, 45> LIBRARY_METHODS = { {
 		{ "toLocaleUpperCase", ON_TEXT, Does::StrCall, text_code(StringFunction::Upper), {}, Takes::Nothing, Takes::Text },
 		{ "toLowerCase", ON_TEXT, Does::StrCall, text_code(StringFunction::Lower), {}, Takes::Nothing, Takes::Text },
 		{ "toLocaleLowerCase", ON_TEXT, Does::StrCall, text_code(StringFunction::Lower), {}, Takes::Nothing, Takes::Text },
-		{ "localeCompare", ON_TEXT, Does::StrCall, text_code(StringFunction::LocaleCompare), { need(Takes::Text) }, Takes::Any, Takes::Int },
+		// avmplus's String.as: `localeCompare(other:*=void 0)`, compared with String(other).
+		{ "localeCompare", ON_TEXT, Does::StrCall, text_code(StringFunction::LocaleCompare), { or_else(Takes::Words) }, Takes::Nothing, Takes::Int,
+				"undefined" },
 		{ "split", ON_TEXT, Does::StrCall, text_code(StringFunction::Split), { or_else(Takes::Any, 1), or_else(Takes::Number, END) }, Takes::Nothing,
 				Takes::Object },
 		{ "replace", ON_TEXT, Does::RegExpCall, pattern_code(RegExpFunction::Replace), { or_else(Takes::Any), or_else(Takes::Any) }, Takes::Nothing,

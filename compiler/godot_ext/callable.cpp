@@ -158,7 +158,7 @@ void BoundMethod::call(const Variant **p_arguments, int p_argcount, Variant &r_r
 			size_t most = callee.parameters > first ? callee.parameters - first : 0;
 			size_t least = callee.required > first ? callee.required - first : 0;
 			text = "ArgumentError: Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
-					std::to_string((size_t)p_argcount > most ? most : least) + ", got " + std::to_string(p_argcount) + ".";
+					std::to_string(least) + ", got " + std::to_string(p_argcount) + ".";
 		}
 		// The listener was never entered, so there is no stack: say where it is declared.
 		const ir::Module &module = Project::get().module();

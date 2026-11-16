@@ -52,6 +52,11 @@ struct Function {
 	// `...rest`: the last parameter's register is an Array of every argument past the others. A caller
 	// passes those untyped, after the others, and as many as it likes.
 	bool rest = false;
+	// It names `arguments`, and so takes more than it declares, as avmplus's MethodInfo has it
+	// (`_allowExtraArgs = _needRest || _needArguments || _ignoreRest`): a caller through a function value
+	// or by name may pass any number past the parameters, untyped, and `arguments` holds them after the
+	// others. A call the checker typed never passes more.
+	bool takes_extra = false;
 	Kind result = Kind::Void;
 	// Godot's name for the type of each register: for every one that holds one of Godot's values (Kind::Val:
 	// "Vector2", "Callable", or ANY_GODOT_TYPE where any may be there), and for one that holds one of
@@ -187,6 +192,10 @@ struct Global {
 	uint32_t klass = NONE; // As for a field.
 	bool starts_null = false; // As for a field.
 	std::string engine_type = {}; // As for a field.
+	// A class's public static field, which the class held as a value gives by name (`c.count`); and
+	// whether it is a constant, which is not written.
+	bool is_public = false;
+	bool is_const = false;
 };
 
 struct Module {
@@ -224,6 +233,17 @@ struct Module {
 	// may compare or add them, the library's own functions too.
 	uint32_t equal_operator = NONE;
 	uint32_t add_operator = NONE;
+	// Godot's <, <=, > and >=, likewise: AnyLt, AnyLe, AnyGt and AnyGe ask them of Godot's values.
+	uint32_t less_operator = NONE;
+	uint32_t less_equal_operator = NONE;
+	uint32_t greater_operator = NONE;
+	uint32_t greater_equal_operator = NONE;
+	// And Godot's -, *, /, % and unary -, for AnySub, AnyMul, AnyDiv, AnyMod and AnyNeg.
+	uint32_t subtract_operator = NONE;
+	uint32_t multiply_operator = NONE;
+	uint32_t divide_operator = NONE;
+	uint32_t modulo_operator = NONE;
+	uint32_t negate_operator = NONE;
 	// Made when a program reaches a property by name: a sealed object's missing one (#1069, #1056).
 	uint32_t reference_error_class = NONE;
 	// RegExp and Date, and the errors their functions and the URI functions raise, when the program uses them.

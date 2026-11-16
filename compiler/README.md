@@ -115,7 +115,7 @@ program, by the names of its public fields, methods, getters and setters (Flash'
 #1056, #1037, #1074 and #1077 for the rest); Array's `sortOn`. `Object`'s methods on any value, a number, a
 Boolean and a String included (`n.toLocaleString()`, `s.hasOwnProperty("length")`), with
 `setPropertyIsEnumerable`, which hides a property of an Object, a Dictionary or an Array from `for in`,
-`for each` and JSON (on a sealed object it is ReferenceError #1056, from recollection of avmplus); a
+`for each` and JSON (on a sealed object it is ReferenceError #1056, as in avmplus); a
 number's `toString(radix)`, `toFixed`, `toExponential` and `toPrecision`, a Vector's `fixed` and a
 Function's `length` by name on an untyped value (a Vector takes no other property: ReferenceError #1056);
 `toLocaleString()` of an Array and a Vector; `new String(x)`, `new Number(x)` and the like, which give the
@@ -125,7 +125,8 @@ untyped value, each as its typed call (`u.push(1)`, `u.charAt(0)`, `u.forEach(f)
 read without being called, as functions bound to their value (`u.push`, `list.sort`, `text.charAt`); an
 element written by name into a Vector, checked as a typed store is; `Vector.<T>(x)`; `Function(x)` and
 `Class(x)`; `instanceof`; `arguments`, with `arguments.callee`; classes as values (`var c:Class = Player`,
-`x is c`, `new c(a)`). `RegExp` (literals, `new RegExp`, the flags
+`x is c`, `new c(a)`, `c(x)`, and the class's public static members by name: `c.create()`, `c.count`, which
+a subclass does not have, as AS3's statics are not inherited). `RegExp` (literals, `new RegExp`, the flags
 `g i m s x`, its properties, `exec` and `test` with `lastIndex`, which one that is not global keeps, as in
 avmplus) and String's `match`, `search`, `replace` (with `$1`, `$&` and the rest, or a function) and
 `split` by one; `Date`, with the host's clock and zone (its getters and setters, local and UTC, its texts,
@@ -159,8 +160,6 @@ Not built yet, and what each needs:
 - **A property added to a Date, a RegExp, an Error or a Function** (dynamic in AS3): these hold their
   fields in fixed places, and need a table of properties beside them, as an Array has. One read that a
   Date or a RegExp does not declare is `undefined`.
-- **A static member through a class held in a variable** (`c.create()`): the IR lists a class's instance
-  methods by name, not its static ones.
 - **One of Godot's classes as a value** (`var c:Class = Node`): a class value names a class of the
   program or the library; Godot's are known by Godot's name only where their type is declared.
 - **A function of the library that belongs to no value, as a value:** `Math.max`, `String.fromCharCode`,
@@ -223,13 +222,45 @@ Where the library's rules were read from avmplus's source (`core/Vector.as`, `Ve
 `String.as`, `MethodInfo`), the code says which file. Read: a vector of numbers converts what `indexOf` and
 `lastIndexOf` are given (`indexOf(value:int)`), and any other vector looks for the value as it is, by `===`
 (`value:Object`); an Array's `join` takes undefined for the comma (`sep === undefined ? "," : String(sep)`); a
-default is for an argument left out, so `"abc".indexOf(undefined)` looks for "null". Inferred from those
+default is for an argument left out, so `"abc".indexOf(undefined)` looks for "null"; a function that names
+`arguments` takes more arguments than it declares, as one with `...rest` does (`MethodInfo`'s
+`_allowExtraArgs = _needRest || _needArguments || _ignoreRest`), through a function value, `call`, `apply`,
+by name and from Godot, and `arguments` holds them after the others; `instanceof` looks at its right-hand
+side first (what is no class or function, null and undefined too, is TypeError #1040), gives false for null
+and TypeError #1010 for undefined (`Toplevel::instanceof`); a class called as a function converts its one
+argument, and any other count is ArgumentError #1112 (`ClassClosure::call`); `Vector.<T>(x)` takes any object,
+as long as its `length`, of what it holds under each index (`TypedVectorClassBase::call`), and what is no
+object is TypeError #1034; Error #1063 gives the number of arguments required, whichever way the count is
+wrong (`MethodEnv`'s argcError); `localeCompare(other:*=void 0)` with nothing given compares with
+"undefined"; hasOwnProperty on a String, a number or a Boolean looks only at what the type declares
+(`ObjectClass::_hasOwnProperty`: true for a String's `length`, false for the rest), setPropertyIsEnumerable
+on a sealed object or a primitive is ReferenceError #1056 and propertyIsEnumerable is false there;
+`new Object(x, y)` takes no notice of `y`. Inferred from those
 declarations and not run in Flash: a Vector's `join(undefined)` gives "null" between the elements; by name, an
-Array's `toString("x")` is Error #1063 and a Vector's ignores the argument. Not as avmplus has it, and why: a
-`for each` over an Array passes over an element that is undefined (avmplus passes over holes only, and an
-Array here does not tell the two apart); `*`, `-` and `/` on two untyped Godot values give NaN, as AS3's
-ToNumber does, where typed code uses Godot's operator; a function that names `arguments` still refuses more
-arguments than it declares (avmplus takes them).
+Array's `toString("x")` is Error #1063 and a Vector's ignores the argument; `"abc".hasOwnProperty("0")` is
+false (String's traits declare no such name); the Vector that `Vector.<T>(x)` makes is not fixed; an
+interface on the right of `instanceof` gives false. Not as avmplus would have it: `Vector.<T>(x)` of a
+sealed object that declares no `length` makes an empty Vector, where avmplus's read of `length` is an
+ordinary one (ReferenceError #1069, inferred). From recollection, neither read nor run: Date's texts, JSON's error numbers,
+and the errors of the URI functions.
+
+**An Array's holes** are avmplus's (`core/ArrayObject.cpp`, `ArrayClass.cpp`, read): an index never written
+(`new Array(3)`, a longer `length`, `a[10] = x` on a short Array) or deleted is a hole, which is not an
+element that holds undefined. `for in`, `for each`, `in`, hasOwnProperty and propertyIsEnumerable pass over
+holes only (`nextNameIndex`, `hasUintProperty`); reading one gives undefined, so forEach, map, filter, some,
+every and indexOf see every index, `indexOf(undefined)` finds a hole, join writes nothing for one and JSON
+writes null; sort puts what is defined first, then the elements that hold undefined, then the holes, and
+keeps the length (`ArraySort`); shift, unshift, splice, concat and reverse keep a hole a hole (the dense
+paths) and slice's copy holds undefined there (`generic_slice`). Not carried over: avmplus's sparse form
+(every Array here is dense, so one with a far index takes that much memory), and what its dense `pop` and
+`reverse` do to an Array whose last places are holes, which reading the code suggests is a fault (here
+`pop()` gives undefined for a hole and `reverse()` reverses every place). A Vector has no holes.
+
+Beyond avmplus, which has no such values: `-`, `*`, `/`, `%`, unary
+`-` and the four comparisons on an untyped value that holds one of Godot's values ask Godot's own operator
+first, as `+` does and as typed code has it (`av * 3` is the Vector2 that `v * 3` is), so the type of such an
+expression with an untyped side is `*`; where Godot has no operator for what the two hold, the answer is
+AS3's (ToNumber on both, which is NaN for a Godot value; avmplus's multiply is `AvmCore::number` on both).
 
 An Array or a Vector that holds itself, or nests more than 500 deep, put into words is Error #1023, as
 avmplus's stack check gives (its `join` has no other guard).
@@ -504,8 +535,10 @@ has done its work. The cause, read from Godot's source and borne out by experime
 no symbols to show it in a trace): loading an extension with a class makes the editor document it on a thread, which
 queues a call (`EditorHelp::_gen_extensions_docs`); quitting in the same frame frees the documentation,
 and the call then runs on nothing in Godot's last flush. Any extension that registers a class does the
-same. Give the thread time (`--headless --editor --quit-after 300`), as `tests/run_godot.py` does; later
-runs are clean.
+same. Wait for the thread before quitting: `tests/godot_project/first_scan.gd`, which `tests/run_godot.py`
+runs with `--headless --editor -s`, ends once the scan has listed the extension and a page of the
+documentation has been asked for, which waits for that thread (giving it time with `--quit-after 300`
+works too, on a machine that is not busy); later runs are clean.
 
 godot-cpp is built as `template_release`, and Godot's editor loads that library too. That is enough for
 the editor: godot-cpp compiles nothing differently for it (its `editor` target only adds `DEBUG_ENABLED`,

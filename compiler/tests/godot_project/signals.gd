@@ -33,7 +33,7 @@ func _initialize() -> void:
 	other = Node.new()
 	root.add_child(other)
 
-func _physics_process(_delta: float) -> bool:
+func _process(_delta: float) -> bool:
 	frames += 1
 	if frames < 2:
 		return false

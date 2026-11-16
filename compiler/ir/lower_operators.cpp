@@ -189,6 +189,10 @@ uint32_t Operators::instance_of(Binary *p_binary) {
 	if (!symbol && !(p_binary->right->type && p_binary->right->type->kind == Type::ClassObject)) {
 		return class_test(p_binary, Op::ClassInstanceOf);
 	}
+	if (symbol && !Lowerer::is_godot(symbol) && l_.untyped_type(p_binary->left->type)) {
+		// What may hold undefined is asked as it runs: undefined has no chain to look in (Error #1010).
+		return class_test(p_binary, Op::ClassInstanceOf);
+	}
 	if (symbol && (symbol->kind == SymbolKind::Interface || symbol == l_.int_ || symbol == l_.uint_)) {
 		l_.expression(p_binary->left, Kind::Void);
 		return l_.default_value(Kind::Bool, p_binary->offset);
@@ -278,6 +282,12 @@ uint32_t Operators::arithmetic(Binary *p_binary, Kind p_want) {
 	// With an untyped side, `+` is decided as it runs: text, Godot's own `+` for Godot values, or numbers.
 	if (p_binary->op == TokenKind::Plus && (l_.untyped(left) || l_.untyped(right))) {
 		return any_add(p_binary);
+	}
+	// So are `-`, `*`, `/` and `%`: Godot's own for Godot values, as typed code has them, or numbers.
+	if (const std::optional<Op> op = !Lowerer::is_numeric(p_want) && (l_.untyped(left) || l_.untyped(right)) ? untyped_operator(p_binary->op, false) : std::nullopt) {
+		const uint32_t a = l_.settled(l_.any_value(left), right, position);
+		const uint32_t b = l_.any_value(right);
+		return l_.convert(any_operate(*op, a, b, position), l_.natural(p_binary), position);
 	}
 	Kind left_kind = Kind::Void, right_kind = Kind::Void;
 	l_.kind_of(left->type, &left_kind);

@@ -32,7 +32,8 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 				return false;
 			}
 			line("if (Slot *const e = element(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
-			share(p_in.a, from_slot(kind(p_in.a), "(*e)"));
+			// An Array's hole is read as undefined (vm/any.h).
+			share(p_in.a, from_slot(kind(p_in.a), kind(p_in.a) == Kind::Any ? "kas3::vm::any::filled(*e)" : "(*e)"));
 			break;
 		case Op::VecSet:
 			// An element there is, or one added at the end: a gap, a fixed vector and the rest are the library's.
@@ -129,6 +130,23 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 					", &w)) {");
 			share(p_in.a, from_slot(kind(p_in.a), "w"));
 			break;
+		case Op::AnySub:
+		case Op::AnyMul:
+		case Op::AnyDiv:
+		case Op::AnyMod:
+		case Op::AnyNeg: {
+			// Two numbers, here: AS3's arithmetic. Anything else (one of Godot's values, text, an object) is
+			// the library's.
+			const std::string number_kind = std::to_string(static_cast<unsigned>(Kind::F64));
+			const std::string second = p_in.op == Op::AnyNeg ? "" : " && from_any(c, " + number_kind + ", " + number(NONE) + ", " + reg(p_in.c) + ", &y)";
+			const std::string result = p_in.op == Op::AnySub ? "x.d - y.d" : p_in.op == Op::AnyMul ? "x.d * y.d" : p_in.op == Op::AnyDiv ? "x.d / y.d"
+					: p_in.op == Op::AnyMod ? "std::fmod(x.d, y.d)" : "-x.d";
+			line("if (Slot x = empty(), y = empty(), w = empty(); from_any(c, " + number_kind + ", " + number(NONE) + ", " + reg(p_in.b) + ", &x)" + second +
+					" && number_to_any(c, " + result + ", &w)) {");
+			line("(void)y;");
+			put(p_in.a, "w");
+			break;
+		}
 		case Op::DynGet:
 		case Op::DynSet: {
 			// A property of an Object or a Dictionary under a String key, where the table keeps it.

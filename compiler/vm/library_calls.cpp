@@ -114,7 +114,7 @@ bool LibraryCall::counted() const {
 	}
 	vm_.raise(vm_.module_.argument_error_class != NONE ? vm_.module_.argument_error_class : vm_.module_.error_class,
 			"Error #1063: Argument count mismatch on " + vm_.holder_name(holder_) + "/" + std::string(method_.name) + "(). Expected " +
-					std::to_string(count < least ? least : most) + ", got " + std::to_string(count) + ".");
+					std::to_string(least) + ", got " + std::to_string(count) + ".");
 	return false;
 }
 
@@ -286,7 +286,7 @@ void LibraryCall::each() {
 			break;
 		}
 		// The element as it is now: what the function does to the vector does not change what filter keeps.
-		Slot element = at < vector->length ? vm_.share(klass.element, vector->data[at]) : any::undefined();
+		Slot element = at < vector->length ? vm_.share(klass.element, klass.element == Kind::Any ? any::filled(vector->data[at]) : vector->data[at]) : any::undefined();
 		const Slot item = vm_.to_any(klass.element, element);
 		const Slot arguments[3] = { item, any::integer(static_cast<int32_t>(at)), holder_ };
 		const std::optional<Slot> answer = vm_.call_function_within(function, arguments, 3);
@@ -355,7 +355,7 @@ void LibraryCall::invoke() {
 		}
 		const Vector *array = static_cast<const Vector *>(list);
 		for (uint32_t i = 0; i < array->length; i++) {
-			arguments.push_back(vm_.share(Kind::Any, array->data[i]));
+			arguments.push_back(vm_.share(Kind::Any, any::filled(array->data[i])));
 		}
 	}
 	vm_.call_with(target, first, arguments, out_);

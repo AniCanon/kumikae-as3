@@ -267,6 +267,10 @@ uint64_t fingerprint(const Module &p_module) {
 		text(name.key);
 		text(name.value);
 	}
+	// What a class held as a value gives by name: which static fields are public, and which are constants.
+	for (const Global &global : p_module.globals) {
+		number((global.is_public ? 2 : 0) + (global.is_const ? 1 : 0));
+	}
 	return hash;
 }
 

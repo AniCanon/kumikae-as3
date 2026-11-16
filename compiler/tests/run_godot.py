@@ -62,9 +62,10 @@ def check(name, condition, detail=""):
 
 # Godot learns of a project's extensions when the editor first scans it. Told to quit at once (--import),
 # Godot crashes as it exits after that first scan: its documentation thread for the new classes outlives
-# the documentation (see the compiler's README). Given time for the thread, the first scan is clean, and
-# is checked so in a copy that has never been scanned.
-FIRST_SCAN = ["--headless", "--editor", "--quit-after", "300"]
+# the documentation (see the compiler's README). first_scan.gd ends when the scan has and that thread has
+# been waited for, however long either takes: the first scan is then clean, and is checked so in a copy
+# that has never been scanned.
+FIRST_SCAN = ["--headless", "--editor", "-s", "first_scan.gd"]
 with tempfile.TemporaryDirectory() as fresh:
     copy = os.path.join(fresh, "project")
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", ".godot"))
@@ -304,7 +305,7 @@ check("wide.gd: an Int64 past what a Number holds is a RangeError", "RangeError:
 
 # Godot's global functions, as GDScript works them out.
 output = compare("functions.gd", [
-    "lerpf", "rest from Godot", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
+    "lerpf", "rest from Godot", "arguments from Godot", "clampf", "clampi", "absi", "maxi", "sin", "snappedf", "wrapi", "posmod", "is_equal_approx", "randf",
     "randi_range", "floori and roundi", "hash", "str", "is_instance_valid", "instance_from_id", "instance_from_id counted",
     "lerp as a number", "max of three", "wrong argument", "in a loop", "no arguments", "whole numbers", "no answer",
     "anything as text", "a default is not shared",
@@ -348,6 +349,9 @@ output = compare("untyped.gd", [
     "an Int64 minus one stays whole", "a half is a float", "a Godot value plus text joins them",
     "text plus a Godot value joins them", "text plus-assigned a Godot value joins them",
     "a Godot value plus a number joins them, as AS3 does", "a Godot value plus-assigned a Godot value",
+    "untyped Godot values multiplied, subtracted, divided and negated", "untyped Godot values in order",
+    "an untyped Godot value multiplied and subtracted in place", "a typed Godot value times an untyped one",
+    "untyped numbers stay AS3's", "where Godot has no such operator the answer is AS3's",
     "JSON refuses Godot's values",
 ])
 check("untyped.gd: a value of another Godot type is AS3's coercion error, where it is stored",

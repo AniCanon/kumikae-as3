@@ -14,7 +14,9 @@ func _initialize() -> void:
 	show("a catch does not stop it", node.call("caught"), null)
 	show("nor a catch around the emit() that ran it", node.call("listened"), null)
 	var took := Time.get_ticks_msec() - started
-	show("after the limit, not long after", took >= 1500 and took < 15000, true)
+	# Three loops, each stopped at the limit of half a second. How soon after the limit a loop stops is held
+	# with a clock the test steps (tests/test_vm.cpp): here the clock is the machine's, which may be busy.
+	show("after the limit", took >= 1500, true)
 	show("it ran until then", node.get("turns") > 1000, true)
 	show("the next call runs", node.call("quick"), 7)
 	node.free()

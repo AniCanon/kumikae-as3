@@ -96,6 +96,12 @@ void Interpreter::class_op(const Function &p_function, const Instruction &p_in) 
 		return;
 	}
 	const bool chain = p_in.op == Op::ClassInstanceOf;
+	// avmplus's Toplevel::instanceof looks at the right-hand side first: anything that is no class or
+	// function, null and undefined too, is #1040, whatever the value is.
+	if (const AnyTag right = any::tag(stack_[base + p_in.c]); chain && (right == AnyTag::Null || right == AnyTag::Undefined)) {
+		raise(module_.type_error_class, "Error #1040: The right-hand side of instanceof must be a class or function.");
+		return;
+	}
 	const std::optional<uint32_t> code = class_in(stack_[base + p_in.c],
 			chain ? "Error #1040: The right-hand side of instanceof must be a class or function."
 				  : "Error #1041: The right-hand side of operator must be a class.");
@@ -103,6 +109,11 @@ void Interpreter::class_op(const Function &p_function, const Instruction &p_in) 
 		return;
 	}
 	const Slot value = present_or_null(stack_[base + p_in.b]);
+	if (chain && any::tag(value) == AnyTag::Undefined) {
+		// null is in no chain; undefined has none to look in (toPrototype's kConvertUndefinedToObjectError).
+		raise(module_.type_error_class, "Error #1010: A term is undefined and has no properties.");
+		return;
+	}
 	// instanceof: an interface is in no chain of prototypes, and a number's prototype is Number's.
 	const bool never = chain && (*code == ir::ANY_IS_INT || *code == ir::ANY_IS_UINT || (*code < module_.classes.size() && module_.classes[*code].is_interface));
 	const bool is = !never && any_is(value, *code);
@@ -113,24 +124,63 @@ void Interpreter::class_op(const Function &p_function, const Instruction &p_in) 
 	}
 }
 
+// `c(x)`, a class held as a value called as a function: the value as that class, as `Player(x)` and `int(x)`
+// are where the class is named. Anything but one argument is AS3's ArgumentError #1112 (avmplus's
+// ClassClosure::call and TypedVectorClassBase::call, kCoerceArgumentCountError).
+void Interpreter::class_call(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out) {
+	if (p_given.size() != 1) {
+		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
+				"Error #1112: Argument count mismatch on class coercion.  Expected 1, got " + std::to_string(p_given.size()) + ".");
+		return;
+	}
+	const ir::Class *klass = p_code < module_.classes.size() ? &module_.classes[p_code] : nullptr;
+	const AnyTag tag = any::tag(p_given[0]);
+	Slot made = any::null();
+	if (klass && klass->element != Kind::Void && !klass->array) {
+		Slot vector;
+		if (!vm::vector_from(library_, p_code, p_given[0], &vector)) {
+			return;
+		}
+		made = to_any(Kind::Obj, vector);
+		drop(Kind::Obj, vector);
+	} else if (!klass || klass->array || (klass->table && !klass->dictionary)) {
+		// A number, a Boolean, a String, an Object, an Array: what `new` of it with one argument gives, which
+		// is the conversion. With nowhere to put it there is nothing to do.
+		if (p_out != NONE) {
+			class_new(p_code, p_given, p_out);
+		}
+		return;
+	} else if (any_is(p_given[0], p_code)) {
+		made = share(Kind::Any, p_given[0]);
+	} else if (tag != AnyTag::Null && tag != AnyTag::Undefined) {
+		coercion_failed(p_given[0], Kind::Obj, p_code);
+		return;
+	}
+	if (p_out != NONE) {
+		put(Kind::Any, stack_[frames_.back().base + p_out], made);
+	} else {
+		drop_any(made);
+	}
+}
+
 // `new c(a)`: what `new` of the class named makes, the arguments converted and counted as a call's are.
 void Interpreter::class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out) {
 	const auto give = [&](Kind p_kind, Slot p_owned) {
 		put(Kind::Any, stack_[frames_.back().base + p_out], to_any(p_kind, p_owned));
 		drop(p_kind, p_owned);
 	};
-	const auto count_error = [&](size_t p_most) {
+	// Too many: avmplus's message gives how many are required (MethodEnv's argcError), which is none.
+	const auto count_error = [&]() {
 		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
-				"Error #1063: Argument count mismatch on " + class_name(p_code) + "(). Expected " + std::to_string(p_most) + ", got " +
-						std::to_string(p_given.size()) + ".");
+				"Error #1063: Argument count mismatch on " + class_name(p_code) + "(). Expected 0, got " + std::to_string(p_given.size()) + ".");
 	};
 	const ir::Class *klass = p_code < module_.classes.size() ? &module_.classes[p_code] : nullptr;
 	const bool object = p_code == ir::ANY_IS_OBJECT || (klass && klass->table && !klass->dictionary);
 	if (object || is_value_code(p_code)) {
 		// A number, a Boolean, a String: the conversion of what is given, or the type's empty value. An
 		// Object: what is given, or a new one for nothing, null or undefined.
-		if (p_given.size() > 1) {
-			count_error(1);
+		if (p_given.size() > 1 && !object) {
+			count_error();
 			return;
 		}
 		const AnyTag tag = p_given.empty() ? AnyTag::Undefined : any::tag(p_given[0]);
@@ -175,7 +225,7 @@ void Interpreter::class_new(uint32_t p_code, const std::vector<Slot> &p_given, u
 		const bool parts = p_code == module_.date_class && p_given.size() > 1;
 		const size_t most = vector || p_code == module_.regexp_class ? 2 : p_code == module_.date_class ? 7 : SIZE_MAX;
 		if (p_given.size() > most) {
-			count_error(most);
+			count_error();
 			return;
 		}
 		bool ok = true;
@@ -204,7 +254,7 @@ void Interpreter::class_new(uint32_t p_code, const std::vector<Slot> &p_given, u
 	if (klass->table) {
 		// A Dictionary: weak keys are refused where a typed `new` refuses them.
 		if (p_given.size() > 1) {
-			count_error(1);
+			count_error();
 		} else if (!p_given.empty() && any::to_boolean(p_given[0])) {
 			raise_unsupported("a Dictionary with weak keys");
 		} else if (Object *made = new_table(p_code, heap_.list_for(p_code))) {
@@ -227,7 +277,7 @@ void Interpreter::class_new(uint32_t p_code, const std::vector<Slot> &p_given, u
 	if (klass->constructor != NONE) {
 		call_with(klass->constructor, fresh, p_given, NONE);
 	} else if (!p_given.empty()) {
-		count_error(0);
+		count_error();
 	}
 	if (!failing_ && p_code < class_used_.size() && !class_used_[p_code]) {
 		use_class(p_code);

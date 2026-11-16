@@ -268,6 +268,15 @@ bool Lowerer::run(LowerMode p_mode) {
 	// What untyped values holding Godot's values are compared and added with, wherever that happens.
 	module_.equal_operator = engine_operator("==").value_or(NONE);
 	module_.add_operator = engine_operator("+").value_or(NONE);
+	module_.less_operator = engine_operator("<").value_or(NONE);
+	module_.less_equal_operator = engine_operator("<=").value_or(NONE);
+	module_.greater_operator = engine_operator(">").value_or(NONE);
+	module_.greater_equal_operator = engine_operator(">=").value_or(NONE);
+	module_.subtract_operator = engine_operator("-").value_or(NONE);
+	module_.multiply_operator = engine_operator("*").value_or(NONE);
+	module_.divide_operator = engine_operator("/").value_or(NONE);
+	module_.modulo_operator = engine_operator("%").value_or(NONE);
+	module_.negate_operator = engine_operator("unary-").value_or(NONE);
 	Members(*this).reserve_interfaces(units);
 	const std::vector<ClassInUnit> classes = classes_in_order(units);
 	for (const ClassInUnit &entry : classes) {

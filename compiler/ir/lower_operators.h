@@ -33,6 +33,11 @@ class Operators {
 	uint32_t arithmetic(Binary *p_binary, Kind p_want);
 
 public:
+	// `-`, `*`, `/`, `%` and unary `-` with an untyped operand (lower_any.cpp): the operation for the
+	// operator, or nothing for any other; and that operation on untyped registers, which gives an untyped
+	// value (AnyNeg reads the first only).
+	std::optional<Op> untyped_operator(TokenKind p_op, bool p_unary);
+	uint32_t any_operate(Op p_op, uint32_t p_left, uint32_t p_right, uint32_t p_position);
 	explicit Operators(Lowerer &p_lowerer) :
 			l_(p_lowerer) {}
 
