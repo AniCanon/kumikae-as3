@@ -198,6 +198,9 @@ class Typer {
 
 	const Type *unary(Unary *p_unary);
 
+	const Type *object_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
+	const Type *int64_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
+	const Type *primitive_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
 	const Type *arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
 
 	const Type *binary(Binary *p_binary);
