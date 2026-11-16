@@ -3,7 +3,6 @@
 #include "number_text.h"
 #include "text_methods.h"
 #include "text_units.h"
-#include "uri_text.h"
 
 #include <cmath>
 
@@ -30,76 +29,39 @@ Slot of_pointer(void *p_value) {
 	return slot;
 }
 
-// The pieces split() gives of a text by a delimiter that is text: the whole of it with none (p_whole), each
-// UTF-16 unit for an empty one; at most p_most pieces.
-std::vector<std::string> split_text(std::string_view p_self, bool p_whole, std::string_view p_by, uint32_t p_most) {
-	const uint32_t length = static_cast<uint32_t>(utf16_length(p_self));
-	std::vector<std::string> pieces;
-	if (p_whole) {
-		pieces.emplace_back(p_self);
-	} else if (p_by.empty()) {
-		for (uint32_t i = 0; i < length && pieces.size() < p_most; i++) {
-			pieces.push_back(units_between(p_self, i, i + 1));
-		}
-	} else if (length > 0) {
-		const uint32_t step = static_cast<uint32_t>(utf16_length(p_by));
-		uint32_t from = 0;
-		while (pieces.size() < p_most) {
-			const int32_t found = find_units(p_self, p_by, from);
-			const uint32_t end = found < 0 ? length : static_cast<uint32_t>(found);
-			pieces.push_back(units_between(p_self, from, end));
-			if (found < 0) {
-				break;
-			}
-			from = end + step;
-		}
-	} else {
-		pieces.emplace_back(); // An empty string with a delimiter: one empty piece.
-	}
-	if (pieces.size() > p_most) {
-		pieces.resize(p_most);
-	}
-	return pieces;
-}
-
-constexpr std::string_view URI_FUNCTIONS[] = { "encodeURI", "encodeURIComponent", "decodeURI", "decodeURIComponent" };
-
 } // namespace
 
-// StrCall. A method that only reads text is the library's function of plain values (text_methods.h), on
-// this frame's registers; split() and the URI functions, which may run the program or raise, are here.
+// StrCall. Each method is the library's function of plain values (text_methods.h, library.h), on this
+// frame's registers. split() and the URI functions may run the program or raise: they are handed the values
+// themselves, since the registers may move, and what they give is stored where the register then is.
 void Interpreter::string_call(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 	const StringFunction which = static_cast<StringFunction>(p_in.b);
-	if (which == StringFunction::Split) {
-		string_split(p_function, p_in);
-		return;
-	}
-	Slot &out = p_registers[p_in.a];
-	if (!ir::reads_text_only(which)) {
-		const Str *string = static_cast<const Str *>(p_registers[list[0]].p);
-		uri_function(which, string ? string->view() : std::string_view("null"), out);
-		return;
-	}
 	Slot made;
-	if (!text_method(which, Values{ p_registers, list.data(), list.size() }, &characters_, &made)) {
-		out_of_memory();
-	} else if (p_function.registers[p_in.a] == Kind::Str) {
-		assign(Kind::Str, out, made.p);
-	} else {
-		out = made;
+	if (ir::reads_text_only(which)) {
+		if (!text_method(which, Values{ p_registers, list.data(), list.size() }, &characters_, &made)) {
+			out_of_memory();
+		} else if (p_function.registers[p_in.a] == Kind::Str) {
+			assign(Kind::Str, p_registers[p_in.a], made.p);
+		} else {
+			p_registers[p_in.a] = made;
+		}
+		return;
 	}
-}
-
-// escape, unescape and the URI functions. One that can't read or write its text is AS3's URIError #1052.
-void Interpreter::uri_function(StringFunction p_which, std::string_view p_text, Slot &r_out) {
-	const size_t uri = static_cast<size_t>(p_which) - static_cast<size_t>(StringFunction::EncodeURI);
-	const bool component = p_which == StringFunction::EncodeURIComponent || p_which == StringFunction::DecodeURIComponent;
-	const std::optional<std::string> made = uri < 2 ? encode_uri(p_text, component) : decode_uri(p_text, component);
-	if (made) {
-		assign(Kind::Str, r_out, text(*made));
-	} else {
-		raise(module_.uri_error_class != ir::NONE ? module_.uri_error_class : module_.error_class, uri_error(URI_FUNCTIONS[uri]));
+	const size_t base = frames_.back().base;
+	if (which == StringFunction::Split && is_regexp(p_registers[list[1]])) {
+		Vector *pieces = split_by_pattern(static_cast<Object *>(any::pointer(p_registers[list[1]])), text_in(p_registers[list[0]]), to_uint32(p_registers[list[2]].d));
+		if (pieces) {
+			put(Kind::Obj, stack_[base + p_in.a], of_pointer(pieces));
+		}
+		return;
+	}
+	Slot given[3] = {};
+	for (size_t i = 0; i < list.size() && i < 3; i++) {
+		given[i] = p_registers[list[i]];
+	}
+	if (text_call(library_, which, given, list.size(), &made)) {
+		put(p_function.registers[p_in.a], stack_[base + p_in.a], made);
 	}
 }
 
@@ -160,49 +122,6 @@ void Interpreter::any_null_check(Slot p_value) {
 		raise(module_.type_error_class, "Error #1010: A term is undefined and has no properties.");
 	} else if (tag == AnyTag::Null) {
 		raise_null();
-	}
-}
-
-// split(delimiter, limit), as ECMAScript 3 has it: a RegExp splits as split_by_pattern() says; none
-// (null or undefined) is the whole string; an empty one gives each UTF-16 unit; at most `limit` pieces. A
-// delimiter that is neither a String nor null becomes its text, which may run the program: the registers
-// are read again after.
-void Interpreter::string_split(const Function &p_function, const Instruction &p_in) {
-	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
-	const size_t base = frames_.back().base;
-	const auto at = [&](size_t p_index) -> Slot & { return stack_[base + list[p_index]]; };
-	if (is_regexp(at(1))) {
-		Vector *made = split_by_pattern(static_cast<Object *>(any::pointer(at(1))), text_in(at(0)), to_uint32(at(2).d));
-		if (made) {
-			put(Kind::Obj, stack_[base + p_in.a], of_pointer(made));
-		}
-		return;
-	}
-	const AnyTag tag = any::tag(at(1));
-	const bool whole = tag == AnyTag::Null || tag == AnyTag::Undefined;
-	std::string by;
-	if (!whole) {
-		const Slot held = share(Kind::Any, at(1));
-		const bool said = any_text(held, &by);
-		drop_any(held);
-		if (!said) {
-			return;
-		}
-	}
-	const Str *string = static_cast<const Str *>(at(0).p);
-	const std::vector<std::string> pieces = split_text(string ? string->view() : std::string_view(), whole, by, to_uint32(at(2).d));
-	Vector *made = fresh_vector(module_.array_class, pieces.size());
-	for (size_t i = 0; made && i < pieces.size(); i++) {
-		Str *piece = text(pieces[i]);
-		if (!piece) {
-			release_object(made);
-			out_of_memory();
-			return;
-		}
-		made->data[i] = any::string(piece);
-	}
-	if (made) {
-		put(Kind::Obj, stack_[base + p_in.a], of_pointer(made));
 	}
 }
 

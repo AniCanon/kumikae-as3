@@ -384,5 +384,13 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	let_go_arguments(module_.functions[target], &*values);
 }
 
+bool Interpreter::Asked::call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+	const std::optional<Slot> made = vm.call_function_within(p_function, p_arguments, p_count);
+	if (made) {
+		*r_result = *made;
+	}
+	return made.has_value();
+}
+
 } // namespace vm
 } // namespace kas3

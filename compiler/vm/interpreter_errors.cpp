@@ -60,7 +60,7 @@ std::string Interpreter::site(const Frame &p_frame) const {
 
 // Starts an error on its way out: an object of the class with the message.
 void Interpreter::raise_null() {
-	raise(module_.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
+	library_.raise_null();
 }
 
 void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
@@ -91,20 +91,11 @@ void Interpreter::out_of_memory() {
 
 // p_message is the error's own, or null; p_words are what is said if not even the error can be made.
 void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
-	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size(), heap_.list_for(p_class)) : nullptr;
-	if (error) {
-		// What a script reads of it: its name, its number ("Error #1009: ..." is 1009), and the stack.
-		error->fields()[ir::ERROR_MESSAGE].p = p_message;
-		error->fields()[ir::ERROR_NAME].p = new_string(module_.classes[p_class].name);
-		const std::string_view words = p_message ? p_message->view() : std::string_view();
-		error->fields()[ir::ERROR_ID].i = words.compare(0, 7, "Error #") == 0 ? std::atoi(std::string(words.substr(7, 6)).c_str()) : 0;
+	if (Object *error = new_error(heap_, p_class, p_message)) {
 		error->fields()[ir::ERROR_STACK].p = stack_text(error, 0);
 		pending_ = any::object(error);
 		failing_ = true;
 		return;
-	}
-	if (release(p_message)) {
-		free_string(p_message);
 	}
 	trace_.assign(p_words);
 	trace_ += "\n";

@@ -9,6 +9,7 @@
 #include "interpreter_records.h"
 #include "host.h"
 #include "ir.h"
+#include "library.h"
 #include "native_code.h"
 #include "runtime.h"
 #include "text_methods.h"
@@ -65,6 +66,18 @@ private:
 	const ir::Module &module_;
 	Host host_;
 	Heap heap_; // Who holds what, and the cycle collector (vm/heap.h). After the module: it reads the classes.
+	// What the library's functions of plain values ask of whoever runs the program (vm/library.h), answered
+	// by this interpreter.
+	struct Asked final : Runner {
+		Interpreter &vm;
+		explicit Asked(Interpreter &p_vm) :
+				vm(p_vm) {}
+		void raise(uint32_t p_class, const std::string &p_message) override { vm.raise(p_class, p_message); }
+		void out_of_memory() override { vm.out_of_memory(); }
+		bool call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override;
+		bool text(Slot p_value, std::string *r_text) override { return vm.any_text(p_value, r_text); }
+	} asked_{ *this };
+	Library library_{ heap_, asked_ };
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
 	std::vector<Slot> globals_;
@@ -178,10 +191,8 @@ private:
 	void leave(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers, size_t p_depth, Slot *r_result);
 	void object_to_text(const ir::Instruction &p_in, Slot *p_registers);
 	void object_to_number(const ir::Instruction &p_in, Slot *p_registers);
-	// The standard library (vm/string_methods.cpp): StrCall and NumText. Only split() may run the program (a delimiter's text).
+	// The standard library (vm/string_methods.cpp): StrCall and NumText.
 	void string_call(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
-	void string_split(const ir::Function &p_function, const ir::Instruction &p_in);
-	void uri_function(ir::StringFunction p_which, std::string_view p_text, Slot &r_out);
 	void number_text(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	std::optional<std::string> number_words(ir::NumberFormat p_format, Slot p_value, bool p_wide, double p_digits);
 	// RegExp (vm/regexp_methods.cpp, vm/regexp_strings.cpp). A pattern is read once for each source and
@@ -437,6 +448,8 @@ public:
 	// An object the engine kept (EngineHandles::keep()), with no reference left, freed now that the engine
 	// let go of it too.
 	void free_kept(Object *p_object) { drop_object(p_object); }
+	// The heap its values live on, for whatever else runs the program over them (native code's host).
+	Heap &heap() { return heap_; }
 
 	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
 	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of
