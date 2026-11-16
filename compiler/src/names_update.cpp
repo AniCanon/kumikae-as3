@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace kas3 {
 
@@ -89,18 +90,21 @@ std::vector<Unit *> Compilation::cycle_files(const std::vector<Symbol *> &p_clas
 		if (start->kind != SymbolKind::Class) {
 			continue;
 		}
-		std::vector<Symbol *> walked;
+		// Marked as it is walked, so that a long chain is walked once for each class, not once for each pair.
+		const uint32_t mark = ++cycle_mark_;
 		for (Symbol *at = start; at && at->klass; at = at->klass->base) {
-			auto seen = std::find(walked.begin(), walked.end(), at);
-			if (seen != walked.end()) {
-				for (; seen != walked.end(); ++seen) {
-					if (outside((*seen)->unit)) {
-						more.push_back((*seen)->unit);
+			if (at->klass->mark == mark) {
+				// Come round to a class of this walk: every class from it back to it is the cycle.
+				Symbol *member = at;
+				do {
+					if (outside(member->unit)) {
+						more.push_back(member->unit);
 					}
-				}
+					member = member->klass->base;
+				} while (member != at);
 				break;
 			}
-			walked.push_back(at);
+			at->klass->mark = mark;
 		}
 	}
 	if (interfaces && !interface_cycles_) {
@@ -358,13 +362,32 @@ bool Compilation::update(const std::vector<std::pair<Unit *, std::shared_ptr<Par
 bool Compilation::propagate(std::vector<Unit *> p_work, std::vector<Dependency> p_changed, std::vector<Unit *> p_done) {
 	Tracking &tracking = *tracking_;
 	const auto done = [&](const Unit *p_unit) { return std::find(p_done.begin(), p_done.end(), p_unit) != p_done.end(); };
-	// A change goes down a chain of classes one class a round, however long the chain. A file redone this many
-	// times over in one edit means a mistake in the dependencies, not a program: check again from the start.
+	// A file redone this many times over in one edit means a mistake in the dependencies, not a program: check
+	// again from the start.
 	constexpr int MAX_REDOS = 8;
 	std::unordered_map<const Unit *, int> redone;
 	for (int round = 0;; ++round) {
 		std::vector<uint32_t> declarations;
 		std::vector<uint32_t> bodies;
+		// A class whose shape changed changes the chain and the shape of every class below it, whatever they
+		// declare: they are taken in this round, with what reads them, not a class a round.
+		std::unordered_set<const Unit *> below;
+		for (size_t i = 0; i < p_changed.size(); ++i) {
+			if (p_changed[i].kind != DependencyKind::Shape) {
+				continue;
+			}
+			std::vector<uint32_t> subtypes;
+			std::vector<uint32_t> unused;
+			tracking.index.readers(p_changed[i], subtypes, unused);
+			for (uint32_t id : subtypes) {
+				if (!done(&units_[id]) && below.insert(&units_[id]).second) {
+					for (const Symbol *klass : units_[id].classes) {
+						p_changed.push_back(on_shape(klass));
+						p_changed.push_back(on_chain(klass));
+					}
+				}
+			}
+		}
 		for (const Dependency &key : p_changed) {
 			tracking.index.readers(key, declarations, bodies);
 		}

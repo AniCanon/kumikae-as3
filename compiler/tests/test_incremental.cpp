@@ -501,8 +501,9 @@ void test_scope() {
 // A named sequence for what random edits seldom reach. After each step the workspace, asked about p_asked
 // first (only that file checked), then about everything, says what a fresh workspace says.
 void directed(const char *p_name, bool p_godot, oracle::Files p_files,
-		const std::vector<std::pair<std::string, std::string>> &p_steps, const std::string &p_asked, const char *p_marker) {
-	Workspace workspace(options(p_godot));
+		const std::vector<std::pair<std::string, std::string>> &p_steps, const std::string &p_asked, const char *p_marker,
+		bool p_tagged = false) {
+	Workspace workspace(options(p_godot, p_tagged));
 	for (const auto &[path, text] : p_files) {
 		workspace.open(path, text);
 	}
@@ -518,7 +519,7 @@ void directed(const char *p_name, bool p_godot, oracle::Files p_files,
 			workspace.open(path, text);
 			p_files[path] = text;
 		}
-		Workspace reference(options(p_godot));
+		Workspace reference(options(p_godot, p_tagged));
 		for (const auto &[file, written] : p_files) {
 			reference.open(file, written);
 		}
@@ -618,6 +619,13 @@ void test_directed() {
 					{ "/p/Q.as", file("", "public class Q {}") } },
 			{ { "/p/Q.as", file("", "public class P {}") }, { "/p/Q.as", file("", "public class Q {}") } },
 			"/p/A.as", "v:");
+	// A declaration file's tag names a type no declaration file has. A class of the program by that name is
+	// not what it means, when it joins or when it leaves: a declaration file sees declarations only.
+	directed("tag and program class", false,
+			{ { "/p/A.as", file("", "import api.V2;\npublic class A { function f(a:V2, b:V2):V2 { return a - b; } }") } },
+			{ { "/p/Nope.as", file("", "public class Nope {}") }, { "/p/api/Nope.as", file("api", "public class Nope {}") },
+					{ "/p/Nope.as", "" }, { "/p/api/Nope.as", "" } },
+			"/p/A.as", "a - ", true);
 	// Godot's API loaded, and a file that joins and leaves: Godot's declarations are never checked again.
 	directed("godot", true, { { "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Node2D { function f():void { position.x = 1; } }") } },
 			{ { "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Sprite2D { function f():void { position.x = 1; } }") },
@@ -683,6 +691,40 @@ void test_deep_chain() {
 	}
 }
 
+// A file whose signatures name every class of a chain reads each class's chain: a change to the root's
+// header reaches it once, with the whole chain, and is still an edit.
+void test_reader_of_a_chain() {
+	oracle::Files files;
+	const std::string root = "package { public class C0 { } }";
+	files["/p/C0.as"] = root;
+	files["/p/Marked.as"] = "package { public interface Marked { } }";
+	std::string fields = "package { public class Fields {\n";
+	for (int i = 0; i < 40; ++i) {
+		const std::string name = "C" + std::to_string(i);
+		if (i) {
+			files["/p/" + name + ".as"] = "package { public class " + name + " extends C" + std::to_string(i - 1) + " { } }";
+		}
+		fields += "\tvar f" + std::to_string(i) + ":" + name + ";\n\tfunction g" + std::to_string(i) + "(m:Marked):void { g" +
+				std::to_string(i) + "(f" + std::to_string(i) + "); }\n";
+	}
+	files["/p/Fields.as"] = fields + "} }";
+	Workspace workspace(options(false));
+	for (const auto &[path, text] : files) {
+		workspace.open(path, text);
+	}
+	workspace.compilation();
+	for (const std::string &text : { replaced(root, "class C0 {", "class C0 implements Marked {"), root }) {
+		workspace.change("/p/C0.as", text);
+		files["/p/C0.as"] = text;
+		Workspace reference(options(false));
+		for (const auto &[path, written] : files) {
+			reference.open(path, written);
+		}
+		CHECK(program_state(workspace) == program_state(reference));
+	}
+	CHECK_EQ(workspace.full_checks(), 1);
+}
+
 // A package that nothing declares any more is forgotten: a file moved from package to package for a whole
 // session leaves no trace of where it was.
 void test_packages_released() {
@@ -738,6 +780,7 @@ int main() {
 	test_directed();
 	test_declaration_tags();
 	test_deep_chain();
+	test_reader_of_a_chain();
 	test_packages_released();
 	test_reused_tree();
 	const long seeds = setting("KAS3_ORACLE_SEEDS", 12);

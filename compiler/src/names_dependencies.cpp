@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace kas3 {
 
@@ -65,6 +66,7 @@ class Collector {
 			return chain;
 		}
 		std::vector<const Symbol *> pending{ p_class };
+		std::unordered_set<const Symbol *> seen{ p_class };
 		for (size_t i = 0; i < pending.size(); ++i) {
 			if (!in_program(pending[i]) || !pending[i]->klass) {
 				continue;
@@ -72,11 +74,11 @@ class Collector {
 			chain.push_back(pending[i]);
 			const ClassInfo *info = pending[i]->klass;
 			for (const Symbol *next : info->interfaces) {
-				if (next && std::find(pending.begin(), pending.end(), next) == pending.end()) {
+				if (next && seen.insert(next).second) {
 					pending.push_back(next);
 				}
 			}
-			if (info->base && std::find(pending.begin(), pending.end(), info->base) == pending.end()) {
+			if (info->base && seen.insert(info->base).second) {
 				pending.push_back(info->base);
 			}
 		}
