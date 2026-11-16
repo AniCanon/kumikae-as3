@@ -58,7 +58,7 @@ public:
 	// Once a frame: a step of the cycle collector, if the program is loaded.
 	static void collect_step();
 	// The class a script file declares: the one named after the file. NONE if there is none.
-	uint32_t class_of_file(const std::string &p_path) const;
+	uint32_t class_of_file(std::string_view p_path) const;
 };
 
 // For a reload: whether every script instance's object has a place in the new program, and the move.

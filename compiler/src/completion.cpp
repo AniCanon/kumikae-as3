@@ -222,7 +222,7 @@ class Completer {
 
 	// What a package's path names, dot included ("flash.utils."): what that package holds that can be
 	// reached from here, and the packages whose names go on from the path.
-	void offer_package(const std::string &p_path, bool p_types_only) {
+	void offer_package(std::string_view p_path, bool p_types_only) {
 		const Context context = compilation_.context_of(const_cast<Unit &>(unit_), true);
 		std::unordered_set<const Package *> seen;
 		for (Unit &unit : compilation_.units()) {

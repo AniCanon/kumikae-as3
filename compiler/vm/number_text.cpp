@@ -159,10 +159,11 @@ std::string rounded(const Exact &p_exact, int p_keep) {
 }
 
 // d.ddd and an exponent, from n's digits: what toExponential and toPrecision write past their range.
-std::string with_exponent(const std::string &p_digits, int p_exponent) {
-	std::string out = p_digits.substr(0, 1);
+std::string with_exponent(std::string_view p_digits, int p_exponent) {
+	std::string out(p_digits.substr(0, 1));
 	if (p_digits.size() > 1) {
-		out += "." + p_digits.substr(1);
+		out += '.';
+		out += p_digits.substr(1);
 	}
 	return out + (p_exponent < 0 ? "e-" : "e+") + std::to_string(std::abs(p_exponent));
 }

@@ -192,7 +192,7 @@ uint32_t EngineCalls::godot_default_argument(Expr *p_argument, const Type *p_typ
 }
 
 void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
-		const std::optional<std::string> &p_defaults) {
+		std::optional<std::string_view> p_defaults) {
 	uint32_t count = p_function ? p_function->parameters.count : 0;
 	// A default that AS3 can't write is declared `= null`, and Godot fills in the real one when the
 	// argument is left out. A `null` written last for such a parameter is the same as leaving it out.
@@ -214,7 +214,7 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 			}
 			std::optional<std::string> godot_default;
 			if (p_defaults && p_function->parameters[i].default_value && Lowerer::is_null(p_function->parameters[i].default_value) &&
-					l_.kind_of(type, &kind) && kind == Kind::Val && (godot_default = godot_name("@default", *p_defaults + "." + std::to_string(i)))) {
+					l_.kind_of(type, &kind) && kind == Kind::Val && (godot_default = godot_name("@default", std::string(*p_defaults) + "." + std::to_string(i)))) {
 				r_list.push_back(godot_default_argument(p_arguments[i], type, *godot_default));
 				continue;
 			}
@@ -278,7 +278,8 @@ uint32_t EngineCalls::engine_call(Call *p_call, Symbol *p_method, uint32_t p_rec
 		list.push_back(l_.settled(receiver, Lowerer::writer(p_call->arguments), position));
 	}
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
-	engine_arguments(decl, p_call->arguments, position, list, defaults_key(p_method));
+	const std::optional<std::string> defaults = defaults_key(p_method);
+	engine_arguments(decl, p_call->arguments, position, list, defaults);
 	if (script_object != NONE) {
 		Engine(l_).owner_of(script_object, receiver, object->offset);
 	}

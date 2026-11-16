@@ -47,7 +47,7 @@ public:
 	// Arguments for the engine: each as its parameter says, or as it comes where the parameter takes anything.
 	// p_defaults: "Class.method" in Godot's names, for a method whose defaults Godot's description gives.
 	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
-			const std::optional<std::string> &p_defaults = std::nullopt);
+			std::optional<std::string_view> p_defaults = std::nullopt);
 };
 
 } // namespace ir

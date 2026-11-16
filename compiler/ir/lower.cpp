@@ -5,7 +5,7 @@
 namespace kas3 {
 namespace ir {
 
-void Lowerer::refuse(uint32_t p_offset, const std::string &p_what) {
+void Lowerer::refuse(uint32_t p_offset, std::string_view p_what) {
 	failed_ = true;
 	// One refusal is enough for a statement: what follows in it most often follows from the first. And a
 	// statement that uses a variable whose type was refused where it is declared is said nothing more of.
@@ -13,7 +13,7 @@ void Lowerer::refuse(uint32_t p_offset, const std::string &p_what) {
 		return;
 	}
 	refused_in_ = statement_;
-	unit_->diagnostics.error(p_offset, p_what + " is not supported by the interpreter yet");
+	unit_->diagnostics.error(p_offset, std::string(p_what) + " is not supported by the interpreter yet");
 }
 
 bool Lowerer::uses_refused_type(const Stmt *p_statement) {

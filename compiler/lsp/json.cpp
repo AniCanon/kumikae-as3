@@ -286,7 +286,7 @@ public:
 };
 
 // The length of the UTF-8 sequence that starts at p_at, or 0 if the bytes there are not one.
-size_t utf8_length(const std::string &p_text, size_t p_at) {
+size_t utf8_length(std::string_view p_text, size_t p_at) {
 	unsigned char lead = (unsigned char)p_text[p_at];
 	size_t length = lead < 0x80 ? 1 : lead >= 0xC2 && lead <= 0xDF ? 2 : lead >= 0xE0 && lead <= 0xEF ? 3 :
 			lead >= 0xF0 && lead <= 0xF4 ? 4 : 0;
@@ -306,7 +306,7 @@ size_t utf8_length(const std::string &p_text, size_t p_at) {
 	return length;
 }
 
-void write_string(std::string &r_out, const std::string &p_text) {
+void write_string(std::string &r_out, std::string_view p_text) {
 	r_out += '"';
 	for (size_t i = 0; i < p_text.size();) {
 		unsigned char c = (unsigned char)p_text[i];

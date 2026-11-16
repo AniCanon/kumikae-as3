@@ -74,8 +74,8 @@ Expr *Library::object() const {
 	return call_->callee->kind == NodeKind::Member ? static_cast<Member *>(call_->callee)->object : nullptr;
 }
 
-uint32_t Library::refused(const std::string &p_why, Kind p_kind) {
-	l_.refuse(call_->callee->offset, "calling '" + std::string(function_ ? function_->name : "toString") + "'" + p_why);
+uint32_t Library::refused(std::string_view p_why, Kind p_kind) {
+	l_.refuse(call_->callee->offset, "calling '" + std::string(function_ ? function_->name : "toString") + "'" + std::string(p_why));
 	return l_.default_value(p_kind, position_);
 }
 

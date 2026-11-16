@@ -14,7 +14,7 @@ bool is_name_byte(unsigned char p_c) {
 
 // How much of the text an error at this offset is about: the name, number or string there, or else one
 // character. Nothing at the end of a line.
-uint32_t extent(const std::string &p_text, uint32_t p_offset) {
+uint32_t extent(std::string_view p_text, uint32_t p_offset) {
 	if (p_offset >= p_text.size() || p_text[p_offset] == '\n' || p_text[p_offset] == '\r') {
 		return 0;
 	}

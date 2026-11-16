@@ -54,7 +54,7 @@ std::string dotted_name(const List<std::string_view> &p_parts, uint32_t p_count)
 }
 
 // "Player" for "src/game/Player.as".
-static std::string_view file_stem(const std::string &p_path) {
+static std::string_view file_stem(std::string_view p_path) {
 	std::string_view stem = p_path;
 	size_t slash = stem.find_last_of("/\\");
 	if (slash != std::string_view::npos) {

@@ -58,7 +58,7 @@ const char *op_shape(Op p_op) {
 
 namespace {
 
-std::string quoted(const std::string &p_text) {
+std::string quoted(std::string_view p_text) {
 	std::string out = "\"";
 	for (char c : p_text) {
 		if (c == '"' || c == '\\') {

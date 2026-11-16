@@ -289,12 +289,12 @@ void Project::unload() {
 	program = nullptr;
 }
 
-uint32_t Project::class_of_file(const std::string &p_path) const {
+uint32_t Project::class_of_file(std::string_view p_path) const {
 	// The class named after the file and declared in it: two folders may each have a Thing.as.
 	const size_t slash = p_path.find_last_of('/');
-	const size_t start = slash == std::string::npos ? 0 : slash + 1;
+	const size_t start = slash == std::string_view::npos ? 0 : slash + 1;
 	const size_t end = p_path.rfind('.');
-	const std::string stem = p_path.substr(start, end == std::string::npos || end < start ? std::string::npos : end - start);
+	const std::string_view stem = p_path.substr(start, end == std::string_view::npos || end < start ? std::string_view::npos : end - start);
 	for (size_t i = 0; i < module_->classes.size(); i++) {
 		const ir::Class &klass = module_->classes[i];
 		const size_t dot = klass.name.rfind('.');
