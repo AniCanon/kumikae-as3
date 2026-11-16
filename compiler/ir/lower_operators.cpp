@@ -141,6 +141,46 @@ uint32_t Operators::godot_object_of(uint32_t p_object, Expr *p_written, uint32_t
 	return owner;
 }
 
+// An untyped value and one of Godot's classes: whether it holds such an object decides.
+uint32_t Operators::untyped_godot_test(Binary *p_binary, uint32_t p_godot_class) {
+	const uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	const bool test = p_binary->op == TokenKind::KwIs;
+	const uint32_t value = l_.any_value(left);
+	uint32_t fits = l_.reg(Kind::Bool);
+	l_.emit(Op::AnyIsGodot, position, fits, value, p_godot_class);
+	if (test) {
+		return fits;
+	}
+	uint32_t out = l_.engine_reg(Kind::Ref, p_binary->type);
+	l_.emit(Op::ConstNull, position, out);
+	const uint32_t skip = l_.emit(Op::JumpIfNot, position, fits, 0);
+	l_.emit(Op::FromAny, position, out, value, p_godot_class);
+	l_.patch(skip, l_.here());
+	return out;
+}
+
+// One of Godot's classes: the engine knows what an object of its own is.
+uint32_t Operators::godot_test(Binary *p_binary, uint32_t p_godot_class) {
+	const uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	const bool test = p_binary->op == TokenKind::KwIs;
+	uint32_t object = l_.expression(left, Kind::Void);
+	if (l_.kind_at(object) == Kind::Obj) {
+		object = godot_object_of(object, left, position);
+	}
+	if (l_.kind_at(object) != Kind::Ref) {
+		if (!test || l_.kind_at(object) != Kind::Str) {
+			l_.refuse(left->offset, std::string(test ? "'is'" : "'as'") + " with a Godot class on a value that is not one of Godot's objects");
+			return l_.default_value(test ? Kind::Bool : Kind::Ref, position);
+		}
+		return l_.default_value(Kind::Bool, position); // A string is never one of Godot's objects.
+	}
+	uint32_t out = test ? l_.reg(Kind::Bool) : l_.engine_reg(Kind::Ref, p_binary->type);
+	l_.emit(test ? Op::HostIsClass : Op::HostAsClass, position, out, object, p_godot_class);
+	return out;
+}
+
 uint32_t Operators::type_test(Binary *p_binary) {
 	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
@@ -157,38 +197,10 @@ uint32_t Operators::type_test(Binary *p_binary) {
 		}
 	}
 	if (godot_target && l_.untyped(left) && l_.engine_name(symbol, std::string_view(), &godot_class)) {
-		// An untyped value and one of Godot's classes: whether it holds such an object decides.
-		const bool test = p_binary->op == TokenKind::KwIs;
-		const uint32_t value = l_.any_value(left);
-		uint32_t fits = l_.reg(Kind::Bool);
-		l_.emit(Op::AnyIsGodot, position, fits, value, godot_class);
-		if (test) {
-			return fits;
-		}
-		uint32_t out = l_.engine_reg(Kind::Ref, p_binary->type);
-		l_.emit(Op::ConstNull, position, out);
-		const uint32_t skip = l_.emit(Op::JumpIfNot, position, fits, 0);
-		l_.emit(Op::FromAny, position, out, value, godot_class);
-		l_.patch(skip, l_.here());
-		return out;
+		return untyped_godot_test(p_binary, godot_class);
 	}
 	if (godot_target && l_.engine_name(symbol, std::string_view(), &godot_class)) {
-		// One of Godot's classes: the engine knows what an object of its own is.
-		const bool test = p_binary->op == TokenKind::KwIs;
-		uint32_t object = l_.expression(left, Kind::Void);
-		if (l_.kind_at(object) == Kind::Obj) {
-			object = godot_object_of(object, left, position);
-		}
-		if (l_.kind_at(object) != Kind::Ref) {
-			if (!test || l_.kind_at(object) != Kind::Str) {
-				l_.refuse(left->offset, std::string(test ? "'is'" : "'as'") + " with a Godot class on a value that is not one of Godot's objects");
-				return l_.default_value(test ? Kind::Bool : Kind::Ref, position);
-			}
-			return l_.default_value(Kind::Bool, position); // A string is never one of Godot's objects.
-		}
-		uint32_t out = test ? l_.reg(Kind::Bool) : l_.engine_reg(Kind::Ref, p_binary->type);
-		l_.emit(test ? Op::HostIsClass : Op::HostAsClass, position, out, object, godot_class);
-		return out;
+		return godot_test(p_binary, godot_class);
 	}
 	if (const std::optional<uint32_t> of_vector = l_.is_vector(written) ? l_.vector_class(written) : std::nullopt) {
 		index = *of_vector;
@@ -298,6 +310,64 @@ uint32_t Operators::comparison(Binary *p_binary) {
 	return out;
 }
 
+// A Godot object or value against null: is there one? An object Godot has freed is not there.
+uint32_t Operators::engine_against_null(Binary *p_binary, Expr *p_value, Kind p_kind) {
+	const uint32_t position = p_binary->offset;
+	uint32_t object = l_.expression(p_value, p_kind);
+	uint32_t present = l_.reg(Kind::Bool);
+	l_.emit(Op::HostPresent, position, present, object);
+	if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
+		return present;
+	}
+	uint32_t absent = l_.reg(Kind::Bool);
+	l_.emit(Op::Not, position, absent, present);
+	return absent;
+}
+
+// An Int64 against a Boolean or a String: exactly, as numbers.
+uint32_t Operators::wide_against_other(Binary *p_binary) {
+	const uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	Expr *right = p_binary->right;
+	uint32_t out = l_.reg(Kind::Bool);
+	l_.emit(Op::EqF64, position, out, wide_order(left, right, position), number_zero(position));
+	if (p_binary->op == TokenKind::NotEqual) {
+		uint32_t negated = l_.reg(Kind::Bool);
+		l_.emit(Op::Not, position, negated, out);
+		return negated;
+	}
+	return out;
+}
+
+// An Int64 against a number: as two Int64s when both are whole, else the Int64 and the Number exactly.
+uint32_t Operators::wide_equality(Binary *p_binary) {
+	const uint32_t position = p_binary->offset;
+	Expr *left = p_binary->left;
+	Expr *right = p_binary->right;
+	Kind x_kind = l_.operand_kind(left, right), y_kind = l_.operand_kind(right, left);
+	uint32_t out = l_.reg(Kind::Bool);
+	if (Lowerer::is_integral(x_kind) && Lowerer::is_integral(y_kind)) {
+		uint32_t x = l_.settled(l_.convert(l_.wide_operand(left, y_kind), Kind::I64, position), right, position);
+		uint32_t y = l_.convert(l_.wide_operand(right, x_kind), Kind::I64, position);
+		l_.emit(Op::EqI64, position, out, x, y);
+	} else {
+		// An Int64 and a Number, exactly.
+		uint32_t x = l_.settled(l_.expression(left, Kind::Void), right, position);
+		uint32_t y = l_.expression(right, Kind::Void);
+		uint32_t order = l_.reg(Kind::F64);
+		l_.emit(Op::CmpI64F64, position, order, x_kind == Kind::I64 ? x : y, x_kind == Kind::I64 ? y : x);
+		uint32_t zero = l_.reg(Kind::F64);
+		l_.emit(Op::ConstF64, position, zero, l_.number(0));
+		l_.emit(Op::EqF64, position, out, order, zero);
+	}
+	if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
+		uint32_t negated = l_.reg(Kind::Bool);
+		l_.emit(Op::Not, position, negated, out);
+		return negated;
+	}
+	return out;
+}
+
 uint32_t Operators::equality(Binary *p_binary) {
 	if (l_.untyped(p_binary->left) || l_.untyped(p_binary->right)) {
 		return any_equality(p_binary);
@@ -317,16 +387,7 @@ uint32_t Operators::equality(Binary *p_binary) {
 		// Against null: a reference is compared; a number or a Boolean is never null.
 		kind = a == Kind::Void ? b : a;
 		if (is_engine(kind)) {
-			// A Godot object or value against null: is there one? An object Godot has freed is not there.
-			uint32_t object = l_.expression(a == Kind::Void ? right : left, kind);
-			uint32_t present = l_.reg(Kind::Bool);
-			l_.emit(Op::HostPresent, position, present, object);
-			if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
-				return present;
-			}
-			uint32_t absent = l_.reg(Kind::Bool);
-			l_.emit(Op::Not, position, absent, present);
-			return absent;
+			return engine_against_null(p_binary, a == Kind::Void ? right : left, kind);
 		}
 		if (!is_reference(kind)) {
 			l_.refuse(position, "comparing a number or a Boolean with null");
@@ -347,39 +408,10 @@ uint32_t Operators::equality(Binary *p_binary) {
 		kind = Kind::Bool;
 		op = Op::EqBool;
 	} else if (!strict && ((a == Kind::I64 && (b == Kind::Bool || b == Kind::Str)) || (b == Kind::I64 && (a == Kind::Bool || a == Kind::Str)))) {
-		// An Int64 against a Boolean or a String: exactly, as numbers.
-		uint32_t out = l_.reg(Kind::Bool);
-		l_.emit(Op::EqF64, position, out, wide_order(left, right, position), number_zero(position));
-		if (p_binary->op == TokenKind::NotEqual) {
-			uint32_t negated = l_.reg(Kind::Bool);
-			l_.emit(Op::Not, position, negated, out);
-			return negated;
-		}
-		return out;
+		return wide_against_other(p_binary);
 	} else if ((l_.operand_kind(left, right) == Kind::I64 || l_.operand_kind(right, left) == Kind::I64) &&
 			Lowerer::is_numeric(l_.operand_kind(left, right)) && Lowerer::is_numeric(l_.operand_kind(right, left))) {
-		Kind x_kind = l_.operand_kind(left, right), y_kind = l_.operand_kind(right, left);
-		uint32_t out = l_.reg(Kind::Bool);
-		if (Lowerer::is_integral(x_kind) && Lowerer::is_integral(y_kind)) {
-			uint32_t x = l_.settled(l_.convert(l_.wide_operand(left, y_kind), Kind::I64, position), right, position);
-			uint32_t y = l_.convert(l_.wide_operand(right, x_kind), Kind::I64, position);
-			l_.emit(Op::EqI64, position, out, x, y);
-		} else {
-			// An Int64 and a Number, exactly.
-			uint32_t x = l_.settled(l_.expression(left, Kind::Void), right, position);
-			uint32_t y = l_.expression(right, Kind::Void);
-			uint32_t order = l_.reg(Kind::F64);
-			l_.emit(Op::CmpI64F64, position, order, x_kind == Kind::I64 ? x : y, x_kind == Kind::I64 ? y : x);
-			uint32_t zero = l_.reg(Kind::F64);
-			l_.emit(Op::ConstF64, position, zero, l_.number(0));
-			l_.emit(Op::EqF64, position, out, order, zero);
-		}
-		if (p_binary->op == TokenKind::NotEqual || p_binary->op == TokenKind::StrictNotEqual) {
-			uint32_t negated = l_.reg(Kind::Bool);
-			l_.emit(Op::Not, position, negated, out);
-			return negated;
-		}
-		return out;
+		return wide_equality(p_binary);
 	} else if ((Lowerer::is_numeric(a) && Lowerer::is_numeric(b)) || (!strict && (Lowerer::is_numeric(a) || a == Kind::Bool) && (Lowerer::is_numeric(b) || b == Kind::Bool))) {
 		kind = Kind::F64;
 	} else {

@@ -18,10 +18,15 @@ class Operators {
 	std::optional<uint32_t> any_type_test(Binary *p_binary);
 	uint32_t wide_order(Expr *p_left, Expr *p_right, uint32_t p_position);
 	uint32_t number_zero(uint32_t p_position);
+	uint32_t engine_against_null(Binary *p_binary, Expr *p_value, Kind p_kind);
+	uint32_t wide_against_other(Binary *p_binary);
+	uint32_t wide_equality(Binary *p_binary);
 	uint32_t concatenate(uint32_t p_left, uint32_t p_right, uint32_t p_position);
 
 	uint32_t logical(Binary *p_binary, Kind p_want);
 	uint32_t type_test(Binary *p_binary);
+	uint32_t untyped_godot_test(Binary *p_binary, uint32_t p_godot_class);
+	uint32_t godot_test(Binary *p_binary, uint32_t p_godot_class);
 	uint32_t comparison(Binary *p_binary);
 	uint32_t arithmetic(Binary *p_binary, Kind p_want);
 
