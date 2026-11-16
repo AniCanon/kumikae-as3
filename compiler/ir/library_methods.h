@@ -32,7 +32,9 @@ enum class InvokeMethod : uint8_t { Call, Apply };
 //   Element   what the vector holds, checked as a store into it is
 //   Own       a vector of the very class it is called on
 //   Object    any object, or null
-enum class Takes : uint8_t { Nothing, Int, Uint, Number, Flag, Text, Words, Any, Element, Own, Object };
+//   Sought    what indexOf looks for (avmplus's Vector.as): a number, converted, for a vector of numbers
+//             (`value:int`); for any other, the value as it is (`value:Object`, compared by ===)
+enum class Takes : uint8_t { Nothing, Int, Uint, Number, Flag, Text, Words, Any, Element, Own, Object, Sought };
 
 struct Taken {
 	Takes kind = Takes::Nothing;
@@ -77,7 +79,7 @@ constexpr uint8_t each_code(EachMethod p_method) {
 	return static_cast<uint8_t>(p_method);
 }
 
-inline constexpr std::array<LibraryMethod, 43> LIBRARY_METHODS = { {
+inline constexpr std::array<LibraryMethod, 44> LIBRARY_METHODS = { {
 		{ "charAt", ON_TEXT, Does::StrCall, text_code(StringFunction::CharAt), { or_else(Takes::Number) }, Takes::Nothing, Takes::Text },
 		{ "charCodeAt", ON_TEXT, Does::StrCall, text_code(StringFunction::CharCodeAt), { or_else(Takes::Number) }, Takes::Nothing, Takes::Number },
 		{ "indexOf", ON_TEXT, Does::StrCall, text_code(StringFunction::IndexOf), { or_else(Takes::Text), or_else(Takes::Number) }, Takes::Nothing,
@@ -107,9 +109,9 @@ inline constexpr std::array<LibraryMethod, 43> LIBRARY_METHODS = { {
 		{ "unshift", ON_LIST, Does::VecCall, list_code(VectorMethod::Unshift), {}, Takes::Element, Takes::Uint },
 		{ "pop", ON_LIST, Does::VecCall, list_code(VectorMethod::Pop), {}, Takes::Nothing, Takes::Element },
 		{ "shift", ON_LIST, Does::VecCall, list_code(VectorMethod::Shift), {}, Takes::Nothing, Takes::Element },
-		{ "indexOf", ON_LIST, Does::VecCall, list_code(VectorMethod::IndexOf), { need(Takes::Element), or_else(Takes::Int) }, Takes::Nothing,
+		{ "indexOf", ON_LIST, Does::VecCall, list_code(VectorMethod::IndexOf), { need(Takes::Sought), or_else(Takes::Int) }, Takes::Nothing,
 				Takes::Int },
-		{ "lastIndexOf", ON_LIST, Does::VecCall, list_code(VectorMethod::LastIndexOf), { need(Takes::Element), or_else(Takes::Int, END) },
+		{ "lastIndexOf", ON_LIST, Does::VecCall, list_code(VectorMethod::LastIndexOf), { need(Takes::Sought), or_else(Takes::Int, END) },
 				Takes::Nothing, Takes::Int },
 		{ "reverse", ON_LIST, Does::VecCall, list_code(VectorMethod::Reverse), {}, Takes::Nothing, Takes::Own },
 		{ "slice", ON_LIST, Does::VecCall, list_code(VectorMethod::Slice), { or_else(Takes::Int), or_else(Takes::Int, 16777215) }, Takes::Nothing,
@@ -118,7 +120,11 @@ inline constexpr std::array<LibraryMethod, 43> LIBRARY_METHODS = { {
 		{ "concat", ON_ARRAY, Does::VecCall, list_code(VectorMethod::Concat), {}, Takes::Any, Takes::Own },
 		{ "concat", ON_VECTOR, Does::VecCall, list_code(VectorMethod::Concat), {}, Takes::Own, Takes::Own },
 		{ "join", ON_LIST, Does::VecCall, list_code(VectorMethod::Join), { or_else(Takes::Words) }, Takes::Nothing, Takes::Text, "," },
-		{ "toString", ON_LIST, Does::VecCall, list_code(VectorMethod::Join), { or_else(Takes::Words) }, Takes::Nothing, Takes::Text, "," },
+		// An Array's toString() takes nothing (Array.as: `prototype.toString = function():String`, which is
+		// held to its count); a Vector's ignores what it is given (VectorImpl.as: `prototype.toString =
+		// function()`, with no type in it, which avmplus leaves unchecked).
+		{ "toString", ON_ARRAY, Does::VecCall, list_code(VectorMethod::Text), {}, Takes::Nothing, Takes::Text },
+		{ "toString", ON_VECTOR, Does::VecCall, list_code(VectorMethod::Text), {}, Takes::Any, Takes::Text },
 		{ "toLocaleString", ON_LIST, Does::VecCall, list_code(VectorMethod::LocaleText), {}, Takes::Nothing, Takes::Text },
 		{ "insertAt", ON_LIST, Does::VecCall, list_code(VectorMethod::InsertAt), { need(Takes::Int), need(Takes::Element) }, Takes::Nothing,
 				Takes::Nothing },
@@ -150,6 +156,20 @@ constexpr const LibraryMethod *library_method(std::string_view p_name, uint8_t p
 	return nullptr;
 }
 
+// Whether a vector of such elements is one of numbers.
+constexpr bool holds_numbers(Kind p_element) {
+	return p_element == Kind::I32 || p_element == Kind::U32 || p_element == Kind::F64 || p_element == Kind::I64;
+}
+
+// indexOf or lastIndexOf as it is done where what is looked for is held untyped: a vector of numbers was
+// given a number, and one of untyped values compares them as they are; any other takes the untyped search.
+constexpr VectorMethod search_untyped(VectorMethod p_method, Kind p_element) {
+	if (holds_numbers(p_element) || p_element == Kind::Any) {
+		return p_method;
+	}
+	return p_method == VectorMethod::IndexOf ? VectorMethod::IndexOfAny : p_method == VectorMethod::LastIndexOf ? VectorMethod::LastIndexOfAny : p_method;
+}
+
 // The kind of register a taken or given value is held in. `Element` is the vector's own element kind.
 constexpr Kind kind_taken(Takes p_takes, Kind p_element) {
 	switch (p_takes) {
@@ -168,6 +188,8 @@ constexpr Kind kind_taken(Takes p_takes, Kind p_element) {
 			return Kind::Any;
 		case Takes::Element:
 			return p_element;
+		case Takes::Sought:
+			return holds_numbers(p_element) ? p_element : Kind::Any;
 		case Takes::Own:
 		case Takes::Object:
 			return Kind::Obj;

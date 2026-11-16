@@ -1,0 +1,13 @@
+0 2 1 0
+0 2 1 0
+0 0 -1 -1 2 -1
+2 1 2 -1 1 -1
+-1 -1 -1 -1 0 1 -1
+1 -1 -1 -1
+1 0 1 -1
+1 -1 1 1
+1 0 3 2 -1 1
+1,2,1 1,1,,true 1x2x1 1,1,,true
+1063 Error #1063: Argument count mismatch on Array/toString(). Expected 0, got 1.
+1,2,1
+a,null,1

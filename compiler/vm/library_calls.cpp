@@ -145,6 +145,10 @@ bool LibraryCall::converted(const Taken *p_fixed, Takes p_takes, size_t p_index,
 		r_value->p = said ? vm_.text(words) : nullptr;
 		return r_value->p != nullptr;
 	}
+	if (p_takes == Takes::Sought && *r_kind == Kind::Any) {
+		*r_value = vm_.share(Kind::Any, given); // Looked for as it is: nothing is converted.
+		return true;
+	}
 	uint32_t check = NONE;
 	if (p_takes == Takes::Element) {
 		check = klass->element_check;
@@ -191,7 +195,9 @@ void LibraryCall::typed() {
 	}
 	const Kind result = ir::kind_taken(method_.result, klass ? klass->element : Kind::Void);
 	const ir::Op op = method_.does == Does::VecCall ? ir::Op::VecCall : method_.does == Does::StrCall ? ir::Op::StrCall : ir::Op::RegExpCall;
-	if (const std::optional<Slot> made = run_typed(vm_, op, method_.which, kinds, values, result)) {
+	const uint32_t which = klass && method_.does == Does::VecCall ? static_cast<uint32_t>(ir::search_untyped(static_cast<ir::VectorMethod>(method_.which), klass->element))
+																  : method_.which;
+	if (const std::optional<Slot> made = run_typed(vm_, op, which, kinds, values, result)) {
 		give(result, *made);
 	}
 }
