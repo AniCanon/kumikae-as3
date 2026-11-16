@@ -12,16 +12,15 @@ using ir::Instruction;
 using ir::NONE;
 
 bool FunctionWriter::by_library(const Instruction &p_in) {
-	const std::string_view entry = ir::library_entry(p_in.op, p_in.b);
-	if (entry.empty()) {
+	const ir::LibraryEntry entry = ir::library_entry(function_, p_in);
+	if (entry.name.empty()) {
 		return false;
 	}
-	// What it reads, in the instruction's order; its number, if it has one, is handed over as it is.
+	// What it reads, in the instruction's order.
 	const char *shape = ir::op_shape(p_in.op);
 	const uint32_t operands[3] = { p_in.a, p_in.b, p_in.c };
 	std::string values;
 	size_t count = 0;
-	uint32_t which = 0;
 	const auto value = [&](uint32_t p_register) {
 		values += (count++ ? ", " : "") + (p_register == NONE ? std::string("empty()") : "slot(" + reg(p_register) + ")");
 	};
@@ -32,8 +31,6 @@ bool FunctionWriter::by_library(const Instruction &p_in) {
 			for (const uint32_t each : function_.argument_lists[operands[n]]) {
 				value(each);
 			}
-		} else if (shape[n] != '-') {
-			which = operands[n];
 		}
 	}
 	mark();
@@ -43,7 +40,7 @@ bool FunctionWriter::by_library(const Instruction &p_in) {
 	if (p_in.a != NONE) {
 		line("Slot o = empty();");
 	}
-	line(std::string(entry) + "(c, " + std::to_string(which) + ", t, " + std::to_string(count) + (p_in.a != NONE ? ", &o);" : ", nullptr);"));
+	line(std::string(entry.name) + "(c, " + std::to_string(entry.which) + ", t, " + std::to_string(count) + (p_in.a != NONE ? ", &o);" : ", nullptr);"));
 	check();
 	if (p_in.a != NONE) {
 		put(p_in.a, from_slot(kind(p_in.a), "o"));

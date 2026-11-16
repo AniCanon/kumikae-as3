@@ -5,6 +5,7 @@
 
 #include "fast.h"
 #include "library.h"
+#include "library_entries.h"
 #include "native_host.h"
 
 namespace kas3 {
@@ -115,6 +116,49 @@ void text_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_co
 	Slot made = empty();
 	if (vm::text_call(library, which, p_values, p_count, &made)) {
 		hand_back(c, gives, made, r_out);
+	}
+}
+
+void text_of_value(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	Str *made = nullptr;
+	switch (static_cast<Kind>(p_which)) {
+		case Kind::I32:
+			made = text_of(p_values[0].i);
+			break;
+		case Kind::U32:
+			made = text_of(p_values[0].u);
+			break;
+		case Kind::I64:
+			made = text_of(static_cast<int64_t>(p_values[0].l));
+			break;
+		case Kind::Bool:
+			made = text_of(p_values[0].b);
+			break;
+		default:
+			made = text_of(p_values[0].d);
+			break;
+	}
+	if (made) {
+		hand_back(c, Kind::Str, slot(made), r_out);
+	} else {
+		out_of_memory(c);
+	}
+}
+
+void text_joined(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *r_out) {
+	if (Str *made = join(static_cast<const Str *>(p_values[0].p), static_cast<const Str *>(p_values[1].p))) {
+		hand_back(c, Kind::Str, slot(made), r_out);
+	} else {
+		out_of_memory(c);
+	}
+}
+
+void number_text(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+	vm::Library library = c->host->library();
+	const ir::NumberFormat format = static_cast<ir::NumberFormat>(p_which & (ir::NUMBER_TEXT_WIDE - 1));
+	Slot made = empty();
+	if (vm::number_text(library, format, (p_which & ir::NUMBER_TEXT_WIDE) != 0, p_values, p_count, &made)) {
+		hand_back(c, Kind::Str, made, r_out);
 	}
 }
 
