@@ -14,6 +14,7 @@ fastest and the slowest. A change is slower only if its median moved by more tha
   recheck   the language server checking that project again after one edit (bench_recheck's median)
   run       `kas3c run` of loop.as: arithmetic, calls and fields in a loop
   vectors   `kas3c run` of vectors.as: a vector's elements read and written in loops
+  values    `kas3c run` of values.as: calls through function values, objects and arrays made in a loop
   engine    in headless Godot, 160,000 calls from AS3 into the engine (--godot only; needs the extension)
 """
 import glob
@@ -40,14 +41,18 @@ def report(name, samples):
                                                           len(samples)))
 
 
+# The programs `kas3c run` times, by the name each is reported under.
+PROGRAMS = (("run", "loop.as"), ("vectors", "vectors.as"), ("values", "values.as"))
+
+
 def against(build, other, runs):
     """`check` and `run` for two builds, one run of each in turn."""
     with tempfile.TemporaryDirectory() as project:
         subprocess.run([sys.executable, os.path.join(HERE, "generate_project.py"), project, "100000"], check=True,
                        capture_output=True)
         files = sorted(glob.glob(os.path.join(project, "**", "*.as"), recursive=True))
-        for name, command, cwd in (("check", ["check", *files], None), ("run", ["run", "loop.as"], HERE),
-                                   ("vectors", ["run", "vectors.as"], HERE)):
+        timings = [("check", ["check", *files], None)] + [(name, ["run", program], HERE) for name, program in PROGRAMS]
+        for name, command, cwd in timings:
             samples = {build: [], other: []}
             for _ in range(runs):
                 for which in (build, other):
@@ -92,20 +97,14 @@ def main():
                 sys.exit("bench_recheck printed no median:\n" + done.stdout[-600:])
             samples.append(float(found.group(1)))
         report("recheck", samples)
-    samples = []
-    for _ in range(runs):
-        elapsed, done = timed([kas3c, "run", "loop.as"], cwd=HERE)
-        if done.returncode != 0:
-            sys.exit("run failed:\n" + done.stderr[-600:])
-        samples.append(elapsed)
-    report("run", samples)
-    samples = []
-    for _ in range(runs):
-        elapsed, done = timed([kas3c, "run", "vectors.as"], cwd=HERE)
-        if done.returncode != 0:
-            sys.exit("vectors failed:\n" + done.stderr[-600:])
-        samples.append(elapsed)
-    report("vectors", samples)
+    for name, program in PROGRAMS:
+        samples = []
+        for _ in range(runs):
+            elapsed, done = timed([kas3c, "run", program], cwd=HERE)
+            if done.returncode != 0:
+                sys.exit("%s failed:\n%s" % (name, done.stderr[-600:]))
+            samples.append(elapsed)
+        report(name, samples)
     if godot_tests:
         godot = os.environ.get("KAS3_GODOT") or shutil.which("godot")
         samples = []
