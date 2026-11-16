@@ -52,9 +52,37 @@ were observed failing before those fixes. No review findings were deferred.
 
 ## Limits
 
-The plugin ZIP is built; the owner's installed Rider plugin was not replaced.
+The plugin ZIP was built, then installed at the owner's request; an IDE restart is
+required to load the updated files. The previous installation was backed up.
 UI checks drive real controls with synthetic repositories; model tests cover
 configuration and scene transformations. Export checks use the sample and installed
 native tools. Physical audible output, Android device exports and other operating
 systems were not observed. Playback assertions establish native player state.
-No compiler source changed; the full compiler suite was not rerun.
+No compiler source was changed by this feature. After integrating current main,
+the compiler was rebuilt and all 26 CTest groups passed.
+
+## Current-main integration
+
+PR preparation integrated current main and retained its optional Rider/IDEA adapters
+and executable-permission repair. `check buildPlugin` passed again: plugin tests
+reported 191 tests with one opt-in skip, and core tests reported 85 with three
+opt-in skips; neither reported failures or errors. Fifteen framework tests passed
+against the newly built compiler, including astral Unicode labels. Framing now
+counts UTF-16 code units, matching AS3 String.length. The test-runner dependency
+is scoped to Rider because IDEA carries those classes in core modules.
+
+The package carries the compiler built from the merged branch. Existing tested
+Godot/iOS runtime assets are reused; Unicode-framed framework cases against those
+older native runtimes were not verified. The model suite runs through the newly
+built CLI compiler. Independent integration review checked the framing, optional
+dependency and compiler revision.
+
+Final `check buildPlugin verifyPlugin runIde -PuiProbe` completed with
+`BUILD SUCCESSFUL`. The verifier reported compatible on both installed Rider and
+IDEA builds (one scheduled-for-removal, seven deprecated and 45 experimental API
+usages). The Rider UI report and native result-tree report both passed. Updated
+settings screenshots were inspected. Plugin Python discovery passed eight tests
+and skipped the worktree's absent native library; rerunning the template check
+against the existing native library passed. Installed ZIP files were compared
+byte-for-byte, executable permissions checked, and the installed compiler passed
+the UTF-16 string smoke check.
