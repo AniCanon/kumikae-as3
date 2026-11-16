@@ -186,7 +186,9 @@ private:
 			PackageDecl **r_package);
 	List<Metadata> parse_metadata_tags();
 	Modifiers parse_modifiers();
+	void parse_class_member(uint32_t p_start, std::vector<Node *> &r_members);
 	ClassDecl *parse_class(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata);
+	void parse_interface_member(uint32_t p_start, std::vector<FunctionDecl *> &r_methods);
 	InterfaceDecl *parse_interface(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata);
 	PackageDecl *parse_package();
 };
