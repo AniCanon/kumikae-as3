@@ -207,6 +207,7 @@ class Lowerer {
 	friend class Vectors; // A vector's lowering, once its class is made: lower_vectors.h
 	friend class Functions; // Function expressions and function values: lower_functions.h
 	friend class Classes; // Each class's place in the module: lower_classes.h
+	friend class Bodies; // The body of each function: lower_bodies.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 
@@ -253,7 +254,6 @@ class Lowerer {
 	uint32_t call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind);
 
 	uint32_t super_call(Call *p_call);
-	uint32_t own_signal(std::string_view p_name, uint32_t p_position);
 	uint32_t cast(Call *p_call, Symbol *p_type, Kind p_want);
 	uint32_t trace_call(Call *p_call);
 	uint32_t script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function);
@@ -291,25 +291,7 @@ class Lowerer {
 
 	uint32_t assign(Assign *p_assign);
 
-	void begin(uint32_t p_function, Unit &p_unit, Symbol *p_class);
-
-	// Parameters take the first registers; an instance method's first is `this`.
-	void parameters(FunctionDecl *p_function);
-
-	void end(uint32_t p_position);
-
-	void lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl);
-
-	static bool calls_super(Block *p_body);
-
-	void lower_constructor(Unit &p_unit, ClassDecl *p_class);
-
-	// A function that gives the class's static fields their values.
-	void lower_statics(Unit &p_unit, ClassDecl *p_class);
-
 	void lower_unit(Unit &p_unit);
-
-	void lower_package_variables(Unit &p_unit, VarDecl *p_decl);
 
 	// Classes in an order where each comes after its base.
 	void collect(Unit &p_unit, std::vector<std::pair<Unit *, ClassDecl *>> &r_classes);

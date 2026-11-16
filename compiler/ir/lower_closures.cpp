@@ -4,6 +4,7 @@
 // environment: an object made as the function starts, one field for each such variable, its first field
 // the environment the function itself was given. Every read and write of the variable, in the function
 // and in those written inside it, goes through that object, so that they all see one variable.
+#include "lower_bodies.h"
 #include "lower_functions.h"
 #include "lower_statements.h"
 
@@ -182,12 +183,12 @@ void Functions::lower_pending_functions() {
 	while (!l_.pending_functions_.empty()) {
 		PendingFunction pending = std::move(l_.pending_functions_.back());
 		l_.pending_functions_.pop_back();
-		l_.begin(pending.index, *pending.unit, pending.klass);
+		Bodies(l_).begin(pending.index, *pending.unit, pending.klass);
 		l_.received_env_ = true;
 		l_.chain_ = std::move(pending.chain);
 		FunctionDecl *decl = pending.decl;
 		l_.result_type_ = decl->return_type ? l_.compilation_.type_of(decl->return_type) : l_.compilation_.any_type();
-		l_.parameters(decl);
+		Bodies(l_).parameters(decl);
 		l_.fn().locals[0].name = "$environment";
 		l_.fn().result = decl->return_type ? l_.written_kind(decl->return_type, decl->return_type->offset, Kind::Void) : Kind::Any;
 		if (decl->body) {
@@ -195,7 +196,7 @@ void Functions::lower_pending_functions() {
 			make_environment(decl);
 			Statements(l_).statement(decl->body);
 		}
-		l_.end(decl->end ? decl->end - 1 : decl->offset);
+		Bodies(l_).end(decl->end ? decl->end - 1 : decl->offset);
 	}
 }
 
