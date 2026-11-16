@@ -8,6 +8,7 @@
 #include "numeric.h"
 #include "regex.h"
 #include "runtime.h"
+#include "text_methods.h"
 #include "text_units.h"
 
 #include <cmath>
@@ -661,7 +662,68 @@ static void test_json_text() {
 	CHECK_EQ(quoted, std::string("x\"\""));
 }
 
+// A String's methods as functions of plain values, with no interpreter: slots in, a slot out.
+static void test_text_methods() {
+	using kas3::ir::StringFunction;
+	Str *hello = new_string("Hello, World");
+	Str *o = new_string("o");
+	const auto text_of = [](Slot p_slot) {
+		Str *made = static_cast<Str *>(p_slot.p);
+		const std::string words(made->view());
+		if (release(made)) {
+			free_string(made);
+		}
+		return words;
+	};
+	const auto number = [](double p_value) {
+		Slot slot;
+		slot.bits = 0;
+		slot.d = p_value;
+		return slot;
+	};
+	Slot self, other;
+	self.bits = other.bits = 0;
+	self.p = hello;
+	other.p = o;
+	Slot out;
+	out.bits = 0;
+	const Slot at[] = { self, number(1) };
+	CHECK(text_method(StringFunction::CharAt, Values{ at, nullptr, 2 }, nullptr, &out));
+	CHECK_EQ(text_of(out), std::string("e"));
+	CHECK(text_method(StringFunction::CharCodeAt, Values{ at, nullptr, 2 }, nullptr, &out));
+	CHECK_EQ(out.d, 101.0);
+	const Slot find[] = { self, other, number(5) };
+	CHECK(text_method(StringFunction::IndexOf, Values{ find, nullptr, 3 }, nullptr, &out));
+	CHECK_EQ(out.i, 8);
+	const Slot part[] = { self, number(-5), number(3) };
+	CHECK(text_method(StringFunction::Substr, Values{ part, nullptr, 3 }, nullptr, &out));
+	CHECK_EQ(text_of(out), std::string("Wor"));
+	// By a frame's registers and an instruction's list of them, as the interpreter hands them.
+	const Slot registers[] = { number(0), other, self };
+	const uint32_t order[] = { 2, 1 };
+	CHECK(text_method(StringFunction::Concat, Values{ registers, order, 2 }, nullptr, &out));
+	CHECK_EQ(text_of(out), std::string("Hello, Worldo"));
+	// One character is made once when the caller keeps them.
+	Characters kept{};
+	CHECK(text_method(StringFunction::CharAt, Values{ at, nullptr, 2 }, &kept, &out));
+	CHECK(kept['e'] == out.p);
+	CHECK_EQ(text_of(out), std::string("e"));
+	CHECK(kas3::ir::reads_text_only(StringFunction::Upper) && !kas3::ir::reads_text_only(StringFunction::Split) &&
+			!kas3::ir::reads_text_only(StringFunction::EncodeURI));
+	for (Str *each : kept) {
+		if (each && release(each)) {
+			free_string(each);
+		}
+	}
+	for (Str *each : { hello, o }) {
+		if (release(each)) {
+			free_string(each);
+		}
+	}
+}
+
 int main() {
+	test_text_methods();
 	test_json_text();
 	test_regex_matches();
 	test_regex_limits();

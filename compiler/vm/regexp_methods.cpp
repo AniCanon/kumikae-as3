@@ -223,7 +223,7 @@ void Interpreter::regexp_new(const Function &p_function, const Instruction &p_in
 	if (!pattern(source, flags)) {
 		return;
 	}
-	Object *made = new_object(module_.regexp_class, module_.classes[module_.regexp_class].fields.size(), collector_.list_for(module_.regexp_class));
+	Object *made = new_object(module_.regexp_class, module_.classes[module_.regexp_class].fields.size(), heap_.list_for(module_.regexp_class));
 	Str *kept = made ? text(source) : nullptr;
 	if (!kept) {
 		if (made) {

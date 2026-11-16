@@ -9,6 +9,7 @@
 
 #include "engine.h"
 #include "interpreter.h"
+#include "library.h"
 #include "no_engine.h"
 #include "operations.h"
 #include "program.h"
@@ -21,7 +22,12 @@ namespace kas3 {
 namespace rt {
 
 // The operations the host itself asks of the library, each a thunk after the program's own.
-enum class Builtin : uint32_t { NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray };
+enum class Builtin : uint32_t {
+	NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray,
+	Apply, // A function value called with an Array of untyped arguments, as apply() calls it.
+	AnyText, // String(x) of an untyped value.
+	SplitByPattern, // split() by a RegExp.
+};
 
 // What a Native instruction asks of the host (its second operand): a function's body run, or one of the
 // two things a thunk hands back.
@@ -71,8 +77,8 @@ struct Host final : vm::NativeCode {
 	std::vector<Str *> strings;
 	Str *null_text = nullptr;
 	std::vector<uint8_t> class_used;
-	// Per class: its objects are plain fields that can lead to no other object, so the cycle collector
-	// does not look at them and new_object() can make one.
+	// Per class: its objects are fields and nothing more (no vector, no table, no Godot object made with
+	// one), so new_object() can make one, on the collector's list where the collector looks at the class.
 	std::vector<uint8_t> made_here;
 	// The stack trace of the error on its way out, built as generated functions are left (as the
 	// interpreter builds its own: vm/interpreter_errors.cpp).
@@ -100,6 +106,15 @@ struct Host final : vm::NativeCode {
 	// The interpreter holds the error that is on its way out, until the instruction beneath ends: see thunk().
 	bool carried = false;
 	uint32_t nesting = 0; // Thunks in progress, one inside another.
+	// Calls of the library's functions of plain values in progress (runtime/direct.cpp): like a thunk,
+	// generated code began what such a call leads to, and an error of a function called beneath it stays
+	// the context's.
+	uint32_t direct = 0;
+
+	// What the library's functions of plain values (vm/library.h) ask of whoever runs the program, answered
+	// for generated code (runtime/direct.cpp); and the library as those functions are handed it.
+	std::unique_ptr<vm::Runner> asked;
+	vm::Library library() { return vm::Library{ interpreter->heap(), *asked, interpreter->unmoved() }; }
 
 	Host(const Program &p_program, const Embedder &p_embedder);
 	~Host() override;
@@ -130,6 +145,9 @@ struct Host final : vm::NativeCode {
 	// Gives the error on its way out to standard error, with its trace, and forgets it.
 	void report();
 };
+
+// The runner for a context's generated code (runtime/direct.cpp).
+std::unique_ptr<vm::Runner> runner_for(Context *c);
 
 // Runs the program as `kas3c run` runs it under the interpreter: its traces on standard output, an error
 // nothing catches on standard error, and the same exit status.

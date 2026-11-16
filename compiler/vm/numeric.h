@@ -3,12 +3,18 @@
 
 #include "ir.h"
 
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string_view>
 
 namespace kas3 {
 namespace vm {
+
+// ECMAScript's ToInteger: NaN is 0, and a fraction goes towards 0.
+inline double to_integer(double p_value) {
+	return std::isnan(p_value) ? 0 : std::trunc(p_value);
+}
 
 // A Number as an Int64, the way a conversion the program wrote does it: not-a-number is 0, and a value
 // past either end is held at that end.

@@ -134,7 +134,7 @@ Object *Reload::object(Object *p_old) {
 	const ir::Class &new_class = to_.module_.classes[named->second];
 	if (old_class.table || new_class.table) {
 		// An Object or a Dictionary: each key and value carried as an untyped field is.
-		Object *table = old_class.table == new_class.table ? new_table(named->second, to_.collector_.list_for(named->second)) : nullptr;
+		Object *table = old_class.table == new_class.table ? new_table(named->second, to_.heap_.list_for(named->second)) : nullptr;
 		if (!table) {
 			return lost(p_old->klass);
 		}
@@ -146,7 +146,7 @@ Object *Reload::object(Object *p_old) {
 	if (old_class.element != Kind::Void || new_class.element != Kind::Void) {
 		return moved_vector(static_cast<Vector *>(p_old), named->second);
 	}
-	Object *fresh = new_object(named->second, new_class.fields.size(), to_.collector_.list_for(named->second));
+	Object *fresh = new_object(named->second, new_class.fields.size(), to_.heap_.list_for(named->second));
 	if (!fresh) {
 		return nullptr;
 	}
@@ -162,7 +162,7 @@ Object *Reload::object(Object *p_old) {
 Object *Reload::moved_vector(Vector *p_old, uint32_t p_class) {
 	const ir::Class &old_class = from_.module_.classes[p_old->klass];
 	const ir::Class &new_class = to_.module_.classes[p_class];
-	Vector *vector = old_class.element == new_class.element ? new_vector(p_class, p_old->length, p_old->fixed, to_.collector_.list_for(p_class)) : nullptr;
+	Vector *vector = old_class.element == new_class.element ? new_vector(p_class, p_old->length, p_old->fixed, to_.heap_.list_for(p_class)) : nullptr;
 	if (!vector) {
 		return lost(p_old->klass);
 	}

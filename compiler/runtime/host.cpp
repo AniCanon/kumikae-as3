@@ -17,6 +17,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 		output(p_embedder.output), handles(p_embedder.handles) {
 	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(p_embedder.output, p_embedder.handles, p_embedder.source, p_embedder.clock));
 	interpreter->set_native(this);
+	asked = runner_for(&context);
 	globals.resize(program.global_count);
 	for (uint32_t i = 0; i < program.global_count; i++) {
 		globals[i] = vm::empty_value(static_cast<Kind>(program.globals[i].kind) == Kind::F64, program.globals[i].starts_null);
@@ -28,7 +29,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	context.null_text = null_text;
 	class_used.assign(program.class_count, 0);
 	for (const ir::Class &klass : module.classes) {
-		made_here.push_back(klass.element == Kind::Void && !klass.table && !klass.is_interface && !vm::may_hold_objects(klass));
+		made_here.push_back(klass.element == Kind::Void && !klass.table && !klass.is_interface && klass.native_base.empty());
 	}
 	resolved.resize(program.use_count);
 	names.assign(program.name_count, nullptr);
@@ -70,7 +71,7 @@ Object *new_object(Context *c, uint32_t p_class) {
 		return nullptr;
 	}
 	const ClassInfo &klass = c->classes[p_class];
-	Object *object = vm::new_object(p_class, klass.field_count, nullptr);
+	Object *object = vm::new_object(p_class, klass.field_count, c->host->interpreter->heap().list_for(p_class));
 	for (uint32_t i = 0; object && i < klass.field_count; i++) {
 		object->fields()[i] = vm::empty_value(static_cast<Kind>(klass.fields[i].kind) == Kind::F64, klass.fields[i].starts_null);
 	}

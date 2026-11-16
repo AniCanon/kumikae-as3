@@ -199,7 +199,9 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed") ||
 				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && library_name(p_holder, p_key.text));
 	} else if (klass) {
-		has = has || klass->field(p_key.text, true) || named_method(*klass, p_key.text) || library_has(object, p_key.text) ||
+		// A getter or a setter is a property of the object as a field is (avmplus looks through the traits).
+		has = has || klass->field(p_key.text, true) || named_method(*klass, p_key.text) || named_method(*klass, p_key.text, "get ") ||
+				named_method(*klass, p_key.text, "set ") || library_has(object, p_key.text) ||
 				(p_prototype && library_name(p_holder, p_key.text));
 	} else if (tag == AnyTag::String) {
 		has = has || p_key.text == "length" || (p_prototype && library_name(p_holder, p_key.text));

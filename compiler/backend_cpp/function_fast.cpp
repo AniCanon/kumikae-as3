@@ -68,6 +68,24 @@ bool FunctionWriter::fast_text(const Instruction &p_in) {
 			line("\t" + reg(p_in.a) + " = kas3::vm::compare_utf16(" + reg(p_in.b) + "->view(), " + reg(p_in.c) + "->view()) " +
 					(p_in.op == Op::LtStr ? "< 0;" : "<= 0;"));
 			break;
+		case Op::StrCall: {
+			// A method that only reads text is the library's function of plain values, called as it is, with
+			// no thunk behind it: all that can go wrong is running out of memory.
+			if (!ir::reads_text_only(static_cast<ir::StringFunction>(p_in.b))) {
+				return false;
+			}
+			std::string given;
+			for (const uint32_t each : function_.argument_lists[p_in.c]) {
+				given += ", slot(" + reg(each) + ")";
+			}
+			line("if (Slot w = empty(); KAS3_LIKELY(text_method_of(" + std::to_string(p_in.b) + ", &w" + given + "))) {");
+			put(p_in.a, from_slot(kind(p_in.a), "w"));
+			line("} else {");
+			mark();
+			line("out_of_memory(c); " + fail());
+			line("}");
+			return true;
+		}
 		case Op::ObjToStr:
 		case Op::AnyText:
 			mark();
