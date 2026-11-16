@@ -10,36 +10,6 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-// A new function value: the function, and what it is called with first (held: a reference of its own). A
-// function that takes nothing first has one value, the same each time, as AVM2 gives one for a static
-// method: adding and removing it as a listener then match.
-Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
-	if (!p_first && module_.functions[p_function].is_static) {
-		if (lone_functions_.size() <= p_function) {
-			lone_functions_.resize(module_.functions.size(), nullptr);
-		}
-		if (Object *kept = lone_functions_[p_function]) {
-			retain(kept);
-			return kept;
-		}
-	}
-	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, heap_.list_for(module_.function_class));
-	if (!made) {
-		if (module_.function_class != NONE) {
-			out_of_memory();
-		}
-		return nullptr;
-	}
-	made->fields()[ir::FUNCTION_INDEX].i = static_cast<int32_t>(p_function);
-	retain(p_first);
-	made->fields()[ir::FUNCTION_FIRST].p = p_first;
-	if (!p_first && module_.functions[p_function].is_static) {
-		retain(made); // Kept until the interpreter goes.
-		lone_functions_[p_function] = made;
-	}
-	return made;
-}
-
 void Interpreter::function_op(const Function &p_function, const Instruction &p_in) {
 	Slot *r = stack_.data() + frames_.back().base;
 	switch (p_in.op) {
@@ -52,12 +22,7 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 		}
 		case Op::MakeMethod: {
 			// A method taken from an object: its class's own, bound to it.
-			Object *object = static_cast<Object *>(r[p_in.c].p);
-			if (!object) {
-				raise_null();
-				break;
-			}
-			if (Object *made = make_function(module_.classes[object->klass].methods[p_in.b], object)) {
+			if (Object *made = vm::make_method(library_, p_in.b, static_cast<Object *>(r[p_in.c].p))) {
 				assign(Kind::Obj, r[p_in.a], made);
 			}
 			break;
@@ -91,12 +56,6 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			call_value(p_function, p_in);
 			break;
 	}
-}
-
-// A function value's `length`: the parameters it declares, without what it takes first or `...rest`.
-int32_t Interpreter::function_length(Object *p_function) const {
-	const Function &callee = module_.functions[static_cast<uint32_t>(p_function->fields()[ir::FUNCTION_INDEX].i)];
-	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
 // Native: the function's body is native code, which whoever holds it runs. The frame is found again by its
@@ -163,7 +122,7 @@ void Interpreter::arguments_array(const Instruction &p_in) {
 void Interpreter::callback_this(Slot p_callback, Slot p_this) {
 	const Object *callback = any::tag(p_callback) == AnyTag::Object ? static_cast<const Object *>(any::pointer(p_callback)) : nullptr;
 	const bool method = callback && callback->klass == module_.function_class &&
-			module_.functions[static_cast<uint32_t>(const_cast<Object *>(callback)->fields()[ir::FUNCTION_INDEX].i)].owner != NONE;
+			module_.functions[static_cast<uint32_t>(own_field(const_cast<Object *>(callback), ir::FUNCTION_INDEX).i)].owner != NONE;
 	const AnyTag given = any::tag(p_this);
 	if (method && given != AnyTag::Null && given != AnyTag::Undefined) {
 		raise(module_.type_error_class, "Error #1510: When the callback argument is a method of a class, the optional this argument must be null.");
@@ -182,13 +141,13 @@ void Interpreter::to_callable(const Instruction &p_in) {
 		put(Kind::Val, r[p_in.a], made);
 		return;
 	}
-	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	const uint32_t target = static_cast<uint32_t>(own_field(value, ir::FUNCTION_INDEX).i);
 	const Function &callee = module_.functions[target];
 	// A function expression that captured nothing is given nothing first: the value itself goes there.
-	Object *first = static_cast<Object *>(value->fields()[ir::FUNCTION_FIRST].p);
+	Object *first = static_cast<Object *>(own_field(value, ir::FUNCTION_FIRST).p);
 	Object *bound = callee.is_static || !first ? value : first;
 	const ir::Class &klass = module_.classes[bound->klass];
-	void *owner = !callee.is_static && !klass.native_base.empty() && !klass.fields.empty() ? bound->fields()[0].p : nullptr;
+	void *owner = !callee.is_static && !klass.native_base.empty() && !klass.fields.empty() ? owner_field(bound).p : nullptr;
 	std::string error;
 	made.p = host_.source.bind(bound, target, owner, &error);
 	if (!made.p) {
@@ -198,116 +157,27 @@ void Interpreter::to_callable(const Instruction &p_in) {
 	put(Kind::Val, r[p_in.a], made);
 }
 
-// Two function values of one method on one object are equal, as AVM2 has it (`f == obj.method`).
-bool Interpreter::same_function(const Object *p_a, const Object *p_b) const {
-	if (!p_a || !p_b || p_a->klass != module_.function_class || p_b->klass != module_.function_class) {
-		return false;
-	}
-	Object *a = const_cast<Object *>(p_a);
-	Object *b = const_cast<Object *>(p_b);
-	if (a->fields()[ir::FUNCTION_INDEX].i != b->fields()[ir::FUNCTION_INDEX].i) {
-		return false;
-	}
-	if (static_cast<uint32_t>(a->fields()[ir::FUNCTION_INDEX].i) == module_.library_function) {
-		// A method of the library, which both are (what such a one is bound to is a pair, the value and
-		// the name, where any other function's is its object): the same when read from the same value by
-		// the same name.
-		const Vector *bound_a = static_cast<const Vector *>(a->fields()[ir::FUNCTION_FIRST].p);
-		const Vector *bound_b = static_cast<const Vector *>(b->fields()[ir::FUNCTION_FIRST].p);
-		if (!bound_a || !bound_b || bound_a == bound_b) {
-			return bound_a && bound_a == bound_b;
-		}
-		const bool named = static_cast<const Str *>(any::pointer(bound_a->data[1]))->view() == static_cast<const Str *>(any::pointer(bound_b->data[1]))->view();
-		return named && bound_a->data[0].bits == bound_b->data[0].bits;
-	}
-	return a->fields()[ir::FUNCTION_INDEX].i == b->fields()[ir::FUNCTION_INDEX].i &&
-			a->fields()[ir::FUNCTION_FIRST].p == b->fields()[ir::FUNCTION_FIRST].p && a->fields()[ir::FUNCTION_FIRST].p;
-}
-
-// The function value an untyped or Function register holds, or null with AS3's TypeError #1006.
-Object *Interpreter::function_in(Kind p_kind, Slot p_value) {
-	Object *object = nullptr;
-	if (p_kind == Kind::Any) {
-		object = any::tag(p_value) == AnyTag::Object ? static_cast<Object *>(any::pointer(p_value)) : nullptr;
-	} else if (p_kind == Kind::Obj) {
-		object = static_cast<Object *>(p_value.p);
-	}
-	if (!object || object->klass != module_.function_class) {
-		const bool missing = p_kind == Kind::Any ? any::tag(p_value) == AnyTag::Null || any::tag(p_value) == AnyTag::Undefined : !object;
-		if (missing) {
-			raise_null();
-		} else {
-			raise(module_.type_error_class, "Error #1006: value is not a function.");
-		}
-		return nullptr;
-	}
-	return object;
-}
-
-// One untyped argument as the callee's parameter holds it: AS3's coercion, the class checked for an object
-// and the type for one of Godot's. False if it raised.
-bool Interpreter::argument_as(const Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out) {
-	const Kind kind = p_callee.registers[p_register];
-	const uint32_t klass = kind == Kind::Obj && p_register < p_callee.parameter_classes.size() ? p_callee.parameter_classes[p_register] : NONE;
-	if (!from_any(p_value, kind, klass, r_out)) {
-		return false;
-	}
-	const std::string *godot = ir::is_engine(kind) && p_register < p_callee.engine_types.size() ? &p_callee.engine_types[p_register] : nullptr;
-	if (godot && !godot->empty() && r_out->p && !host_.handles.is_class(r_out->p, *godot)) {
-		drop(kind, *r_out);
-		raise(module_.type_error_class, "Error #1034: Type Coercion failed: cannot convert a value to " + *godot + ".");
-		return false;
-	}
-	return true;
-}
-
 // What a call of a function value starts with: what it takes first, then each untyped argument as its
 // parameter holds it. One left out takes its default; too many is AS3's ArgumentError #1063, which says how
 // many are required whichever way the count is wrong (avmplus's "Expected %2", the required count). False if
 // it raised. p_values must not be in the stack: making an argument a String may run the program, which may
 // move the stack.
 bool Interpreter::function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
-	return function_arguments(static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i), static_cast<Object *>(p_value->fields()[ir::FUNCTION_FIRST].p),
+	return function_arguments(static_cast<uint32_t>(own_field(p_value, ir::FUNCTION_INDEX).i), static_cast<Object *>(own_field(p_value, ir::FUNCTION_FIRST).p),
 			p_count, p_values, r_values);
 }
 
 // The same for a function and what it takes first (a method's object), with no function value made.
 bool Interpreter::function_arguments(uint32_t p_target, Object *p_first, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values) {
-	const Function &callee = module_.functions[p_target];
-	const size_t first = callee.is_static ? 0 : 1;
-	const size_t most = callee.rest || callee.takes_extra ? SIZE_MAX : callee.parameters - first;
-	if (p_count > most || p_count + first < callee.required) {
-		raise(module_.argument_error_class != NONE ? module_.argument_error_class : module_.error_class,
-				"Error #1063: Argument count mismatch on " + callee.name + "(). Expected " +
-						std::to_string(callee.required - first) + ", got " + std::to_string(p_count) + ".");
-		return false;
-	}
-	r_values->assign(first + p_count, Slot());
-	if (first) {
-		(*r_values)[0].bits = 0;
-		(*r_values)[0].p = p_first;
-	}
-	const size_t fixed = callee.rest ? callee.parameters - 1 - first : callee.parameters - first;
-	for (size_t i = 0; i < p_count; i++) {
-		if (i >= fixed) {
-			(*r_values)[first + i] = share(Kind::Any, p_values[i]); // For the rest parameter or `arguments`, untyped.
-			continue;
-		}
-		if (!argument_as(callee, static_cast<uint32_t>(first + i), p_values[i], &(*r_values)[first + i])) {
-			r_values->resize(first + i);
-			let_go_arguments(callee, r_values);
-			return false;
-		}
-	}
-	return true;
+	r_values->assign(p_count + 1, Slot());
+	const std::optional<size_t> made = vm::function_arguments(library_, p_target, p_first, p_count, p_values, r_values->data());
+	r_values->resize(made.value_or(0));
+	return made.has_value();
 }
 
 // The arguments function_arguments() made, once the callee has taken references of its own.
 void Interpreter::let_go_arguments(const Function &p_callee, std::vector<Slot> *p_values) {
-	const size_t fixed = p_callee.rest ? p_callee.parameters - 1 : p_callee.parameters;
-	for (size_t made = p_callee.is_static ? 0 : 1; made < p_values->size(); made++) {
-		drop(made >= fixed ? Kind::Any : p_callee.registers[made], (*p_values)[made]);
-	}
+	vm::let_go_arguments(library_, p_callee, p_values->data(), p_values->size());
 }
 
 // f(a, b): the callee's parameters take the arguments as stores take untyped values. What it gives back is
@@ -325,7 +195,7 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 		for (const uint32_t each : list) {
 			given->push_back(share(Kind::Any, r[each]));
 		}
-		class_call(static_cast<uint32_t>(const_cast<Object *>(called)->fields()[ir::CLASS_CODE].i), *given, p_in.a);
+		class_call(static_cast<uint32_t>(own_field(const_cast<Object *>(called), ir::CLASS_CODE).i), *given, p_in.a);
 		for (Slot each : *given) {
 			drop_any(each);
 		}
@@ -345,7 +215,7 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 	if (!function_arguments(value, given->size(), given->data(), &*values)) {
 		return;
 	}
-	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	const uint32_t target = static_cast<uint32_t>(own_field(value, ir::FUNCTION_INDEX).i);
 	push(target, values->data(), values->size(), p_in.a); // It takes references of its own.
 	let_go_arguments(module_.functions[target], &*values);
 }
@@ -353,22 +223,8 @@ void Interpreter::call_value(const Function &p_function, const Instruction &p_in
 // A function value called from inside an instruction, with untyped arguments: what it gives back, untyped,
 // or nothing if it raised (the error is then on its way out, as call_within() leaves it).
 std::optional<Slot> Interpreter::call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count) {
-	SpareSlots values(spare_slots_);
-	if (!function_arguments(p_value, p_count, p_arguments, &*values)) {
-		return std::nullopt;
-	}
-	const uint32_t target = static_cast<uint32_t>(p_value->fields()[ir::FUNCTION_INDEX].i);
-	const Function &callee = module_.functions[target];
-	Slot result;
-	result.bits = 0;
-	const bool ok = call_within(target, values->data(), values->size(), &result);
-	let_go_arguments(callee, &*values);
-	if (!ok) {
-		return std::nullopt;
-	}
-	const Slot untyped = callee.result == Kind::Void ? any::undefined() : to_any(callee.result, result);
-	drop(callee.result, result);
-	return untyped;
+	Slot given = any::undefined();
+	return vm::function_call(library_, p_value, p_arguments, p_count, &given) ? std::optional<Slot>(given) : std::nullopt;
 }
 
 // f.apply(thisArg, array): the Array's elements are the arguments; null or undefined is none, and anything
@@ -404,17 +260,9 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	if (!ok) {
 		return;
 	}
-	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
+	const uint32_t target = static_cast<uint32_t>(own_field(value, ir::FUNCTION_INDEX).i);
 	push(target, values->data(), values->size(), p_in.a);
 	let_go_arguments(module_.functions[target], &*values);
-}
-
-bool Interpreter::Asked::call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
-	const std::optional<Slot> made = vm.call_function_within(p_function, p_arguments, p_count);
-	if (made) {
-		*r_result = *made;
-	}
-	return made.has_value();
 }
 
 } // namespace vm

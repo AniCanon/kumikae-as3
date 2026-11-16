@@ -303,8 +303,9 @@ Member find_member(uint32_t p_class, const StringName &p_name) {
 }
 
 Variant read_field(const vm::Object *p_object, uint32_t p_field) {
-	const ir::Field &field = Project::get().module().classes[p_object->klass].fields[p_field];
-	const vm::Slot value = const_cast<vm::Object *>(p_object)->fields()[p_field];
+	const ir::Class &klass = Project::get().module().classes[p_object->klass];
+	const ir::Field &field = klass.fields[p_field];
+	const vm::Slot value = vm::field(klass, const_cast<vm::Object *>(p_object), p_field);
 	const vm::Object *held = field.kind == ir::Kind::Obj ? static_cast<const vm::Object *>(value.p)
 			: field.kind == ir::Kind::Any && vm::any::tag(value) == vm::AnyTag::Object ? static_cast<const vm::Object *>(vm::any::pointer(value))
 																						 : nullptr;

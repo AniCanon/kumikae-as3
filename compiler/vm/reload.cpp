@@ -121,7 +121,7 @@ Object *Reload::object(Object *p_old) {
 	const ir::Class &old_class = from_.module_.classes[p_old->klass];
 	if (p_old->klass == from_.module_.class_class) {
 		// A class value: the class of the same name in the new program, whose one object for it this is.
-		const uint32_t code = static_cast<uint32_t>(p_old->fields()[ir::CLASS_CODE].i);
+		const uint32_t code = static_cast<uint32_t>(own_field(p_old, ir::CLASS_CODE).i);
 		const auto same = code < from_.module_.classes.size() ? classes_.find(from_.module_.classes[code].name) : classes_.end();
 		if (code < from_.module_.classes.size() && same == classes_.end()) {
 			return lost(code);
@@ -152,7 +152,7 @@ Object *Reload::object(Object *p_old) {
 	if (old_class.element != Kind::Void || new_class.element != Kind::Void) {
 		return moved_vector(static_cast<Vector *>(p_old), named->second);
 	}
-	Object *fresh = new_object(named->second, new_class.fields.size(), to_.heap_.list_for(named->second));
+	Object *fresh = new_object(named->second, slots_of(new_class), to_.heap_.list_for(named->second));
 	if (!fresh) {
 		return nullptr;
 	}
@@ -199,12 +199,12 @@ void Reload::carry_fields(Object *p_old, Object *p_fresh) {
 				continue;
 			}
 			if (old_class.fields[j].kind == field.kind) {
-				p_fresh->fields()[i] = carry_into(field.kind, field.klass, field.engine_type, p_old->fields()[j]);
+				vm::field(new_class, p_fresh, i) = carry_into(field.kind, field.klass, field.engine_type, vm::field(old_class, p_old, j));
 			}
 			carried = true;
 		}
 		if (!carried) {
-			p_fresh->fields()[i] = empty_value(field.kind == Kind::F64, field.starts_null);
+			vm::field(new_class, p_fresh, i) = empty_value(field.kind == Kind::F64, field.starts_null);
 		}
 	}
 }

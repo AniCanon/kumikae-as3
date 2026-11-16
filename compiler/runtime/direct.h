@@ -46,6 +46,23 @@ namespace rt {
 //     void vector_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 //     void array_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 //     void vector_from(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// String(x) of an untyped value, and of an object (null reads "null"): a toString() is the program's.
+//     void text_of_any(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+//     void text_of_object(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// CallFunction: the function value (p_which is the kind it is held as, untyped or an object), then the
+// untyped arguments. What it gives is untyped; the caller has made the result's register undefined
+// already, which is what a call that fails leaves there.
+//     void function_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// One of the untyped value's operators on untyped values (two, or one for AnyNeg): p_which is the instruction
+// (an ir::Op: AnyEq, AnyStrictEq, AnyAdd, AnyLt, AnyLe, AnyGt, AnyGe, AnySub, AnyMul, AnyDiv, AnyMod, AnyNeg).
+// A Boolean for an equality or an order, an untyped value for the rest (vm::any_operator_gives).
+//     void any_operate(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// MakeFunction: a function value of the function p_which, with what it is called with first (or nothing).
+// MakeMethod: the method numbered p_which in its class's table, taken from the object. FunctionLength: the
+// `length` of the function value held as the kind p_which.
+//     void function_make(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+//     void method_make(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+//     void function_length(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 
 } // namespace rt
 } // namespace kas3

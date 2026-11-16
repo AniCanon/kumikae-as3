@@ -108,7 +108,7 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 		return true;
 	}
 	if (const std::optional<uint32_t> field = klass.field(p_key.text, true)) {
-		*r_value = to_any(klass.fields[*field].kind, p_object->fields()[*field]);
+		*r_value = to_any(klass.fields[*field].kind, vm::field(klass, p_object, *field));
 		return true;
 	}
 	if (const std::optional<uint32_t> slot = named_method(klass, p_key.text)) {

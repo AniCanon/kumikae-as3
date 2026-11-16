@@ -9,6 +9,7 @@
 // must be let go (a number) is not visited.
 #pragma once
 
+#include "fields.h"
 #include "ir.h"
 #include "runtime.h"
 #include "table.h"
@@ -44,10 +45,9 @@ void each_held(const ir::Class &p_class, Object *p_object, Visit &&p_visit) {
 		}
 		return;
 	}
-	Slot *fields = p_object->fields();
-	for (size_t i = 0; i < p_class.fields.size(); i++) {
+	for (uint32_t i = 0; i < p_class.fields.size(); i++) {
 		if (ir::is_held(p_class.fields[i].kind)) {
-			p_visit(p_class.fields[i].kind, fields[i]);
+			p_visit(p_class.fields[i].kind, field(p_class, p_object, i));
 		}
 	}
 }

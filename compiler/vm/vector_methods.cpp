@@ -71,7 +71,7 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	}
 	if (p_call.method == VectorMethod::IndexOf || p_call.method == VectorMethod::IndexOfAny) {
 		for (uint32_t i = clamped(p_call.values[2].i, length); i < length && found < 0; i++) {
-			found = p_library.unmoved.element_is(kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
+			found = element_is(p_library, kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
 		}
 	} else {
 		// From the end if negative; before the start, there is nothing to look at.
@@ -79,7 +79,7 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 		int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
 		from = from >= length ? static_cast<int64_t>(length) - 1 : from;
 		for (int64_t i = from; i >= 0 && found < 0; i--) {
-			found = p_library.unmoved.element_is(kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
+			found = element_is(p_library, kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
 		}
 	}
 	give(p_library, p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));
@@ -94,13 +94,13 @@ void vector_join(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	std::string between(!joined ? std::string_view(",") : separator ? separator->view() : std::string_view("null"));
 	if (p_call.method == VectorMethod::JoinAny && any::tag(p_call.values[1]) != AnyTag::Undefined) {
 		between.clear();
-		if (!p_library.runner.text(p_call.values[1], &between)) {
+		if (!any_text(p_library, p_call.values[1], &between)) {
 			return;
 		}
 	}
 	std::string all;
 	retain(p_vector); // Kept while its elements speak for themselves, which may run the program.
-	const bool done = p_library.unmoved.vector_text(p_vector, between, &all, locale);
+	const bool done = vector_text(p_library, p_vector, between, &all, locale);
 	p_library.heap.release_object(p_vector);
 	if (done) {
 		give(p_library, p_call, Kind::Str, of_pointer(p_library.text(all)));

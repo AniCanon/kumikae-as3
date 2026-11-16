@@ -98,7 +98,7 @@ Object *new_table(uint32_t p_class, Object *p_list) {
 		delete entries;
 		return nullptr;
 	}
-	table->fields()[0].p = entries;
+	own_field(table, 0).p = entries;
 	return table;
 }
 

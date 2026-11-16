@@ -42,7 +42,7 @@ inline Object *made_object(Context *c, uint32_t p_class) {
 	found->gc_next = nullptr;
 	const uint32_t numbers = c->class_numbers[p_class];
 	for (uint32_t i = 0; i + 1 < size; i++) {
-		found->fields()[i] = (numbers >> i) & 1 ? slot(std::numeric_limits<double>::quiet_NaN()) : empty();
+		field<Slot>(found, i) = (numbers >> i) & 1 ? slot(std::numeric_limits<double>::quiet_NaN()) : empty();
 	}
 	return found;
 }
@@ -157,6 +157,16 @@ inline Slot to_any(Context *c, uint32_t p_value) {
 //     bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Slot *r_value);
 // Whether an untyped value is neither null nor undefined: one that is has no members, which the library says.
 //     bool has_members(Slot p_any);
+
+// Whether a register holds a function value, which the library's function_call() calls. Anything else is
+// the interpreter's to answer: a class called as a function converts what it is given, and the rest is an
+// error it words.
+inline bool holds_function(const Context *c, const Object *p_value) {
+	return p_value && p_value->klass == c->program->known.function;
+}
+inline bool holds_function(Context *c, Slot p_any) {
+	return holds_function(c, function_of_any(c, p_any));
+}
 
 // The function value a register holds, for call_value(): null for anything else.
 inline Object *function_of(Context *, Object *p_value) {

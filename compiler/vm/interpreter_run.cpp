@@ -490,7 +490,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					break;
 				}
 				Kind kind = function.registers[in.a];
-				put(kind, r[in.a], share(kind, object->fields()[in.c]));
+				put(kind, r[in.a], share(kind, field(module_.classes[object->klass], object, in.c)));
 				break;
 			}
 			case Op::SetField: {
@@ -499,8 +499,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 					raise_null();
 					break;
 				}
-				Kind kind = module_.classes[object->klass].fields[in.b].kind;
-				put(kind, object->fields()[in.b], share(kind, r[in.c]));
+				const ir::Class &klass = module_.classes[object->klass];
+				Kind kind = klass.fields[in.b].kind;
+				put(kind, field(klass, object, in.b), share(kind, r[in.c]));
 				break;
 			}
 			case Op::GetGlobal: {
@@ -663,7 +664,7 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 				}
 				Slot none;
 				none.bits = 0; // All of it: `{}` on a union clears its first member only.
-				put(Kind::Ref, r[in.a], object ? share(Kind::Ref, object->fields()[0]) : none);
+				put(Kind::Ref, r[in.a], object ? share(Kind::Ref, owner_field(object)) : none);
 				break;
 			}
 			case Op::Throw:

@@ -291,7 +291,7 @@ Outcome bind(Request &p_request) {
 	const uint32_t function = (operand & ir::BIND_SLOT) ? klass.methods[operand & ~ir::BIND_SLOT] : operand;
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Val;
-	p_request.result.p = p_request.host.source.bind(object, function, klass.native_base.empty() ? nullptr : object->fields()[0].p, &p_request.error);
+	p_request.result.p = p_request.host.source.bind(object, function, klass.native_base.empty() ? nullptr : owner_field(object).p, &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -355,7 +355,7 @@ std::optional<Outcome> own_member(Request &p_request, Object *p_object, std::str
 		p_request.error = not_a_signal(p_name);
 		return Outcome::Refused;
 	}
-	void *held = p_object->fields()[*found].p;
+	void *held = vm::field(klass, p_object, static_cast<uint32_t>(*found)).p;
 	p_request.result.p = held ? p_request.host.handles.copy(held) : nullptr;
 	return Outcome::Done;
 }
@@ -373,7 +373,7 @@ Outcome member(Request &p_request) {
 			return *own;
 		}
 		const ir::Class &klass = p_request.module.classes[object->klass];
-		receiver = klass.native_base.empty() ? nullptr : object->fields()[0].p;
+		receiver = klass.native_base.empty() ? nullptr : owner_field(object).p;
 		if (!receiver) {
 			p_request.error = not_a_signal(name->view());
 			return Outcome::Refused;
@@ -484,7 +484,7 @@ bool Interpreter::ask_engine(const Function &p_function, const Instruction &p_in
 		}
 	}
 	Request request(module_, host_, p_function, p_in, p_registers, null_text_);
-	request.operators = &operators_;
+	request.operators = &heap_.operators();
 	request.prepared = step.prepared;
 	if (p_in.op == Op::HostSingleton) {
 		if (singletons_.size() <= p_in.b) {

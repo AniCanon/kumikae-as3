@@ -145,7 +145,7 @@ bool kas3::as_godot_object(const vm::Object *p_object, Variant *r_out) {
 	}
 	// A freed Godot object is null, as to_variant() gives it. A reference-counted one taken off its script
 	// (counted.cpp) must not be copied: the copy would count a reference on freed memory.
-	const Variant *owner = static_cast<const Variant *>(const_cast<vm::Object *>(p_object)->fields()[0].p);
+	const Variant *owner = static_cast<const Variant *>(owner_field(const_cast<vm::Object *>(p_object)).p);
 	*r_out = owner && !kas3::is_freed(*owner) ? *owner : Variant();
 	return true;
 }

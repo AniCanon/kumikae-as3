@@ -1,5 +1,6 @@
 #include "function_writer.h"
 
+#include "library_entries.h"
 #include "names.h"
 
 #include <algorithm>
@@ -161,9 +162,23 @@ void FunctionWriter::null_check(uint32_t p_register) {
 }
 
 void FunctionWriter::by_thunk(const Instruction &p_in) {
+	if (p_in.op == Op::CallFunction && !ir::library_entry(function_, p_in).name.empty()) {
+		// The library's call is of a function value. A class called as a function converts what it is
+		// given, which is the interpreter's own still, and so are the words for anything else.
+		line("if (KAS3_LIKELY(holds_function(c, " + reg(p_in.b) + "))) {");
+		by_library(p_in);
+		line("} else {");
+		raw_thunk(p_in);
+		line("}");
+		return;
+	}
 	if (by_library(p_in)) {
 		return; // The library's function of plain values does it whole: no thunk.
 	}
+	raw_thunk(p_in);
+}
+
+void FunctionWriter::raw_thunk(const Instruction &p_in) {
 	const ThunkUse use = thunks_.use(function_, p_in);
 	mark();
 	line("{");

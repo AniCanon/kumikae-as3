@@ -102,7 +102,7 @@ bool from_any(Library &p_library, Slot p_value, Kind p_kind, uint32_t p_check, S
 	if (numeric && (any::tag(p_value) == AnyTag::Object || any::is_engine(p_value))) {
 		// An object as a number: its text, then that as a number (ECMAScript's ToPrimitive).
 		Slot primitive;
-		if (!p_library.unmoved.any_primitive(p_value, &primitive, true)) {
+		if (!any_primitive(p_library, p_value, &primitive, true)) {
 			return false;
 		}
 		const bool done = from_any(p_library, primitive, p_kind, p_check, r_out);
@@ -178,7 +178,7 @@ bool text_from_any(Library &p_library, Slot p_value, Slot *r_out) {
 		return true;
 	}
 	std::string words;
-	if (!p_library.runner.text(p_value, &words)) {
+	if (!any_text(p_library, p_value, &words)) {
 		return false;
 	}
 	r_out->p = p_library.text(words);

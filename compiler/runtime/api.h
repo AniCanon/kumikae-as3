@@ -28,6 +28,13 @@
 	X(array_new, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
 	X(vector_from, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
 	X(text_method, bool, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(text_of_any, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(text_of_object, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(function_call, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(any_operate, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(function_make, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(method_make, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(function_length, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
 	/* Errors (operations.h says what each is for). */ \
 	X(stack_overflow, void, (Context *c), (c)) \
 	X(raise_null, void, (Context *c), (c)) \

@@ -121,27 +121,6 @@ Object *Interpreter::table_of_engine(void *p_dictionary, uint32_t p_class) {
 	return made;
 }
 
-// The Object's own toString, when one of its properties is a function of that name: what String(o) and
-// trace(o) say. *r_own is false when it has none, and Object's own words are wanted.
-bool Interpreter::table_text(Object *p_table, std::string *r_text, bool *r_own) {
-	const std::optional<uint32_t> at = entries_of(p_table)->find_text("toString");
-	const Slot value = at ? entries_of(p_table)->value_at(*at) : any::undefined();
-	Object *function = held_object(value);
-	*r_own = function && function->klass == module_.function_class;
-	if (!*r_own) {
-		return true;
-	}
-	retain(function);
-	const std::optional<Slot> said = call_function_within(function, nullptr, 0);
-	release_object(function);
-	if (!said) {
-		return false;
-	}
-	const bool done = any_text(*said, r_text);
-	drop_any(*said);
-	return done;
-}
-
 // Pushes a call of the function with what it takes first, the result to go to the caller's register.
 void Interpreter::call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out) {
 	SpareSlots values(spare_slots_);
@@ -249,7 +228,7 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 	}
 	if (name == "toString" || name == "toLocaleString") {
 		std::string words;
-		const bool said = name == "toLocaleString" ? locale_element_text(Kind::Any, p_holder, &words) : any_text(p_holder, &words);
+		const bool said = name == "toLocaleString" ? vm::locale_text(library_, Kind::Any, p_holder, &words) : any_text(p_holder, &words);
 		if (said) {
 			if (Str *made = text(words)) {
 				give(Kind::Str, of_pointer(made));
@@ -294,8 +273,8 @@ void Interpreter::call_named(Slot p_holder, const PropertyKey &p_key, const std:
 	}
 	Object *function = held_object(value);
 	if (function && function->klass == module_.function_class) {
-		const uint32_t target = static_cast<uint32_t>(function->fields()[ir::FUNCTION_INDEX].i);
-		call_with(target, static_cast<Object *>(function->fields()[ir::FUNCTION_FIRST].p), p_given, p_out);
+		const uint32_t target = static_cast<uint32_t>(own_field(function, ir::FUNCTION_INDEX).i);
+		call_with(target, static_cast<Object *>(own_field(function, ir::FUNCTION_FIRST).p), p_given, p_out);
 	} else if (!own && (library_call(p_holder, p_key.text, p_given, p_out) || object_method(p_holder, p_key, p_given, p_out))) {
 		// The library's method, or Object's own, on a value with no property of that name.
 	} else if (own || (klass && klass->table)) {

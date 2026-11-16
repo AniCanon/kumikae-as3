@@ -4,10 +4,59 @@
 #include "held.h"
 #include "table.h"
 
+#include <cstdlib>
+
 namespace kas3 {
 namespace vm {
 
 using ir::Kind;
+
+Heap::Heap(const ir::Module &p_module, EngineHandles &p_handles, EngineSource &p_source, Clock &p_clock) :
+		module(p_module), handles(p_handles), source(p_source), clock(p_clock), collector(*this) {
+	methods_.resize(module.classes.size());
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		for (uint32_t method : module.classes[i].methods) {
+			const std::string &name = module.functions[method].name;
+			methods_[i][name.substr(name.rfind('/') == std::string::npos ? 0 : name.rfind('/') + 1)] = method;
+		}
+	}
+	operators_.resize(module.engine_names.size());
+	for (size_t i = 0; i < module.engine_names.size(); i++) {
+		// The description's names for the unary ones are "unary-" and "unary+".
+		std::string_view spelling = module.engine_names[i].name;
+		if (spelling.substr(0, 5) == "unary") {
+			spelling.remove_prefix(5);
+		}
+		// An operator's entry is "<name> <Godot's number>"; anything else is not an operator and has none.
+		const std::string &value = module.engine_names[i].value;
+		const size_t space = value.find(' ');
+		const bool numbered = module.engine_names[i].key.rfind("@operator.", 0) == 0 && space != std::string::npos;
+		operators_[i] = OperatorName{ spelling, spelling == "==" || spelling == "!=", numbered ? std::atoi(value.c_str() + space + 1) : -1 };
+	}
+}
+
+Object *&Heap::lone_function(uint32_t p_function) {
+	if (lone_functions_.size() <= p_function) {
+		lone_functions_.resize(module.functions.size(), nullptr);
+	}
+	return lone_functions_[p_function];
+}
+
+void Heap::release_lone_functions() {
+	for (Object *&kept : lone_functions_) {
+		Object *held = kept;
+		kept = nullptr;
+		release_object(held);
+	}
+}
+
+uint32_t Heap::find_method(uint32_t p_class, std::string_view p_name) const {
+	if (p_class >= methods_.size()) {
+		return ir::NONE;
+	}
+	auto found = methods_[p_class].find(std::string(p_name));
+	return found == methods_[p_class].end() ? ir::NONE : found->second;
+}
 
 // Gives up the reference a slot holds.
 void Heap::drop(Kind p_kind, Slot &p_slot) {
