@@ -2,6 +2,7 @@
 
 #include "callable.h"
 #include "program.h"
+#include "handles.h"
 
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -12,6 +13,34 @@
 using namespace godot;
 
 namespace kas3 {
+
+// Freed handles' memory, for the next (handles.h). Never destroyed: a handle may be freed as the game shuts
+// down, after static objects are gone.
+static std::vector<void *> &spare_handles() {
+	static std::vector<void *> *spare = new std::vector<void *>();
+	return *spare;
+}
+
+static constexpr size_t SPARE_HANDLES = 4096; // The most kept; more are freed.
+
+void *handle_memory() {
+	std::vector<void *> &spare = spare_handles();
+	if (spare.empty() || !on_main_thread()) {
+		return ::operator new(sizeof(Variant));
+	}
+	void *memory = spare.back();
+	spare.pop_back();
+	return memory;
+}
+
+void free_handle_memory(void *p_memory) {
+	std::vector<void *> &spare = spare_handles();
+	if (spare.size() >= SPARE_HANDLES || !on_main_thread()) {
+		::operator delete(p_memory);
+		return;
+	}
+	spare.push_back(p_memory);
+}
 
 // A handle on a reference-counted object that is gone. Copying it would count a reference on freed
 // memory. (Only a script's hold on its own owner can be one: any other handle keeps its object alive.) A
@@ -46,7 +75,7 @@ void *GodotHost::borrow(Object *p_object) {
 	// A Variant holding a reference-counted object counts as a reference to it. This one must not, so its
 	// reference is given back at once, and drop() frees the memory without running the Variant's
 	// destructor, which would give it back a second time. A Variant holding an object owns no other memory.
-	void *memory = ::operator new(sizeof(Variant));
+	void *memory = handle_memory();
 	new (memory) Variant(p_object);
 	if (RefCounted *counted = Object::cast_to<RefCounted>(p_object)) {
 		counted->unreference();
@@ -61,9 +90,9 @@ void *GodotHost::copy(void *p_value) {
 	}
 	Variant *value = static_cast<Variant *>(p_value);
 	if (is_dangling(*value)) {
-		return new Variant();
+		return make_handle();
 	}
-	return new Variant(*value);
+	return make_handle(*value);
 }
 
 void GodotHost::drop(void *p_value) {
@@ -73,10 +102,10 @@ void GodotHost::drop(void *p_value) {
 	auto borrowed = borrowed_.find(p_value);
 	if (borrowed != borrowed_.end()) {
 		borrowed_.erase(borrowed);
-		::operator delete(p_value);
+		free_handle_memory(p_value);
 		return;
 	}
-	delete static_cast<Variant *>(p_value);
+	free_handle(static_cast<Variant *>(p_value));
 }
 
 // A handle that counts as a reference to a reference-counted object, which may lead back to a script

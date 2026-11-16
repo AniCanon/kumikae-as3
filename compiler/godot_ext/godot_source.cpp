@@ -2,6 +2,7 @@
 // its singletons, and its classes' static methods; and the time (Clock).
 #include "godot_calls.h"
 #include "godot_host.h"
+#include "handles.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -105,7 +106,7 @@ void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {
 		*r_error = "Godot's '" + std::string(p_class) + "' is a " + std::string(got.get_data()) + ", not a " + std::string(p_class);
 		return nullptr;
 	}
-	return new Variant(object);
+	return make_handle(object);
 }
 
 bool GodotHost::constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
@@ -178,16 +179,16 @@ void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_argume
 			*r_error = "Godot can't make a '" + std::string(p_type) + "': it is a class to extend, not one to create";
 			return nullptr;
 		}
-		return new Variant(object);
+		return make_handle(object);
 	}
 	Arguments arguments(p_arguments, p_count);
-	Variant *made = new Variant();
+	Variant *made = make_handle();
 	GDExtensionCallError error;
 	error.error = GDEXTENSION_CALL_OK;
 	gdextension_interface::variant_construct((GDExtensionVariantType)type, made->_native_ptr(),
 			reinterpret_cast<GDExtensionConstVariantPtr *>(arguments.pointers()), (int32_t)p_count, &error);
 	if (error.error != GDEXTENSION_CALL_OK) {
-		delete made;
+		free_handle(made);
 		*r_error = describe(error, "new " + std::string(p_type));
 		return nullptr;
 	}

@@ -2,6 +2,7 @@
 #include "godot_host.h"
 
 #include "any.h"
+#include "handles.h"
 
 #include <godot_cpp/core/object_id.hpp>
 
@@ -77,9 +78,9 @@ std::optional<vm::Slot> untyped_from_variant(const Variant &p_value) {
 			if (((ObjectID)p_value).is_null()) {
 				return vm::any::null();
 			}
-			return vm::any::godot_object(new Variant(p_value));
+			return vm::any::godot_object(make_handle(p_value));
 		default:
-			return vm::any::godot_value(new Variant(p_value));
+			return vm::any::godot_value(make_handle(p_value));
 	}
 }
 

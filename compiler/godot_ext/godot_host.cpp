@@ -7,6 +7,7 @@
 #include "callable.h"
 #include "members.h"
 #include "program.h"
+#include "handles.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -246,7 +247,7 @@ std::optional<vm::Slot> from_variant(ir::Kind p_kind, const Variant &p_value) {
 			// An object-typed value that holds no object, or one that has been freed, is null, like null itself.
 			if (p_value.get_type() != Variant::NIL &&
 					!(p_value.get_type() == Variant::OBJECT && (((ObjectID)p_value).is_null() || !p_value.get_validated_object()))) {
-				slot.p = new Variant(p_value);
+				slot.p = make_handle(p_value);
 			}
 			break;
 		default:

@@ -3,6 +3,7 @@
 #include "program.h"
 #include "any.h"
 #include "table.h"
+#include "handles.h"
 
 #include <godot_cpp/variant/dictionary.hpp>
 
@@ -191,7 +192,7 @@ void *GodotHost::collection(std::string_view p_type, ir::Kind p_kind, const vm::
 		}
 		made = array;
 	}
-	return ok ? new Variant(made) : nullptr;
+	return ok ? make_handle(made) : nullptr;
 }
 
 } // namespace kas3

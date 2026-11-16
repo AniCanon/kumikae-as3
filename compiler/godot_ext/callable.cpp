@@ -1,6 +1,7 @@
 #include "bound_method.h"
 
 #include "any.h"
+#include "handles.h"
 
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable.hpp>
@@ -244,7 +245,7 @@ bool is_script_listener(const Callable &p_callable) {
 }
 
 Variant *make_callable(vm::Object *p_object, uint32_t p_function, Object *p_owner) {
-	return new Variant(Callable(memnew(BoundMethod(p_object, p_function, p_owner))));
+	return make_handle(Callable(memnew(BoundMethod(p_object, p_function, p_owner))));
 }
 
 } // namespace kas3
