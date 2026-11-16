@@ -99,6 +99,7 @@ class Typer {
 
 	bool members_known(Symbol *p_class);
 
+	const Type *static_member_type(const Type *p_object, Member *p_member);
 	const Type *member_type(const Type *p_object, Member *p_member);
 
 	const Type *number_literal(const NumberLit *p_literal) const;
