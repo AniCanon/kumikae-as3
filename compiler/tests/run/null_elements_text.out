@@ -4,3 +4,5 @@ undefined,null,2 undefined/null/2 undefined,null,2
 null,p
 ,,1 --1 ,,1
 null,1,,3
+,,2 ,1 undefined,null,2
+,1,,,4 null,1,null,,4

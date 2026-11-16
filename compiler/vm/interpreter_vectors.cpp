@@ -207,9 +207,10 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 	}
 }
 
-// The elements as text with p_separator between them, as join() and toString() give it. An element that
-// is an object says what it is in its own words, which runs the program: false if that failed.
-bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text) {
+// The elements as text with p_separator between them, as join() and toString() give it, or with p_locale
+// as toLocaleString() does. An element that is an object says what it is in its own words, which runs the
+// program: false if that failed.
+bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale) {
 	if (text_depth_ >= MAX_TEXT_DEPTH) {
 		stack_overflow(); // One that holds itself ends here too: avmplus's join has no guard but the stack's.
 		return false;
@@ -217,20 +218,41 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 	text_depth_++;
 	const Kind kind = module_.classes[p_vector->klass].element;
 	// An Array leaves null and undefined out (avmplus's Array.as, _join: `if (x != null)`, as ECMAScript 3
-	// has it); a Vector writes them as String() does (VectorImpl.as, join: `s += this[y]`).
-	const bool leaves_out = module_.classes[p_vector->klass].array && kind == Kind::Any;
+	// has it), and so does toLocaleString() of either (VectorImpl.as: `if (x !== undefined && x !== null)`);
+	// a Vector's join writes them as String() does (VectorImpl.as, join: `s += this[y]`).
+	const bool leaves_out = p_locale || (module_.classes[p_vector->klass].array && kind == Kind::Any);
 	bool done = true;
 	for (uint32_t i = 0; done && i < p_vector->length; i++) {
 		if (i) {
 			append_text(r_text, p_separator); // Text is joined as Concat joins it: two halves that meet are one character.
 		}
-		const AnyTag tag = leaves_out ? any::tag(p_vector->data[i]) : AnyTag::Object;
-		if (tag != AnyTag::Null && tag != AnyTag::Undefined) {
-			done = element_text(kind, p_vector->data[i], r_text);
+		const Slot element = p_vector->data[i];
+		const bool nothing = kind == Kind::Any ? any::tag(element) == AnyTag::Null || any::tag(element) == AnyTag::Undefined
+											   : held(kind) && !element.p;
+		if (leaves_out && nothing) {
+			continue;
 		}
+		done = p_locale ? locale_element_text(kind, element, r_text) : element_text(kind, element, r_text);
 	}
 	text_depth_--;
 	return done;
+}
+
+// An element as toLocaleString() asks for it: a vector, or a Date, in its own locale words; anything else
+// as its text.
+bool Interpreter::locale_element_text(Kind p_kind, Slot p_element, std::string *r_text) {
+	Object *object = p_kind == Kind::Obj ? static_cast<Object *>(p_element.p) : p_kind == Kind::Any ? held_object(p_element) : nullptr;
+	if (object && object->klass == module_.date_class) {
+		*r_text += date_text(object, ir::DateText::Locale);
+		return true;
+	}
+	if (!object || module_.classes[object->klass].element == Kind::Void) {
+		return element_text(p_kind, p_element, r_text);
+	}
+	retain(object); // Held while its elements speak, for the reason element_text() gives.
+	const bool said = vector_text(static_cast<Vector *>(object), ",", r_text, true);
+	release_object(object);
+	return said;
 }
 
 // One element of a vector of that kind as text, added to r_text. False if what it said failed.

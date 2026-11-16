@@ -188,7 +188,8 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 	}
 	if (name == "toString" || name == "toLocaleString") {
 		std::string words;
-		if (any_text(p_holder, &words)) {
+		const bool said = name == "toLocaleString" ? locale_element_text(Kind::Any, p_holder, &words) : any_text(p_holder, &words);
+		if (said) {
 			if (Str *made = text(words)) {
 				give(Kind::Str, of_pointer(made));
 			}

@@ -21,6 +21,18 @@ package {
 			trace(array, array.join("-"), String(array));
 			var nested:Array = [objects, [null, 3]];
 			trace(nested);
+			// toLocaleString leaves them out of a Vector too (VectorImpl.as: `if (x !== undefined && x !== null)`),
+			// and asks each element for its own, so a Vector inside one leaves them out as well.
+			// A typed Vector's toLocaleString() is not lowered yet: these are by name.
+			var held:* = any;
+			var heldObjects:* = objects;
+			trace(held.toLocaleString(), heldObjects.toLocaleString(), held.toString());
+			var outer:Vector.<Object> = new Vector.<Object>();
+			outer.push(objects);
+			outer.push(null);
+			outer.push([null, 4]);
+			var heldOuter:* = outer;
+			trace(heldOuter.toLocaleString(), outer);
 		}
 	}
 }

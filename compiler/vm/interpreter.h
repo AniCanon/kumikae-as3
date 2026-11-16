@@ -306,7 +306,8 @@ private:
 	bool sort_keys(ir::Kind p_kind, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, int32_t p_options,
 			std::vector<double> *r_numbers, std::vector<std::string> *r_texts);
 	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
-	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
+	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale = false);
+	bool locale_element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
 	// Vectors put into words inside one another's words (an Array in an Array, or one that holds itself)
 	// nest at most this deep, by recursion in C++; one more is Error #1023, as Flash's stack check gives.
 	static constexpr uint32_t MAX_TEXT_DEPTH = 1000;
