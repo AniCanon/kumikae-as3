@@ -13,6 +13,7 @@ called by the engine.
 | `members` | What Godot reaches of a script by name: public fields to read and write (an Array or a Dictionary as a copy of Godot's), public getters and setters, public methods, and the lists of them with Godot's types |
 | `godot_host` | The interpreter's four interfaces, done with Godot's calls; values to and from `Variant` |
 | `godot_handles.cpp` | What an engine value is (`present`, `is_class`, `text`), how long it lives (`borrow`, `copy`, `drop`), and what the cycle collector sees of it (`node`, `node_edges`, `let_go`) |
+| `handles.h` | Where every handle (a `godot::Variant` the interpreter holds) is made and freed; a freed one's memory is kept for the next on the main thread |
 | `godot_signals.cpp` | The AS3 way of listening to a signal (`@add`, `@addOnce`, `@remove`, `@has`, `@removeAll`, `@numListeners`), made from Godot's own calls |
 | `godot_source.cpp` | Where values come from (`EngineSource`): defaults, constants, constructors, singletons, static methods; and the time (`Clock`: Godot's clock, the C library's zone) |
 | `godot_calls.h` | What the host files share: the arguments of a call, a failed call in AS3's words, a freed object |

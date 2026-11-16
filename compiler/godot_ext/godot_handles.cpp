@@ -99,13 +99,17 @@ void GodotHost::drop(void *p_value) {
 	if (!p_value) {
 		return;
 	}
-	auto borrowed = borrowed_.find(p_value);
-	if (borrowed != borrowed_.end()) {
-		borrowed_.erase(borrowed);
-		free_handle_memory(p_value);
-		return;
+	Variant *value = static_cast<Variant *>(p_value);
+	// Only a handle on an object can be a borrowed one: a value (a Vector2) is freed without looking.
+	if (value->get_type() == Variant::OBJECT) {
+		const auto borrowed = borrowed_.find(p_value);
+		if (borrowed != borrowed_.end()) {
+			borrowed_.erase(borrowed);
+			free_handle_memory(p_value);
+			return;
+		}
 	}
-	free_handle(static_cast<Variant *>(p_value));
+	free_handle(value);
 }
 
 // A handle that counts as a reference to a reference-counted object, which may lead back to a script
