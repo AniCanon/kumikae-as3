@@ -104,7 +104,7 @@ private fun ToolBar(
             )
             BarSeparator()
             IconButton(AllIcons.Actions.More, "More", { under ->
-                prompts.choose(under, moreEntries(controller, state, prompts))
+                prompts.choose(under, moreEntries(controller, prompts))
             })
         }
     }
@@ -150,11 +150,7 @@ private fun DeviceBar(
     }
 }
 
-internal fun moreEntries(
-    controller: SimulatorWindowController,
-    state: SimulatorPanelState,
-    prompts: SimulatorPrompts,
-): List<MenuEntry> = listOfNotNull(
+internal fun moreEntries(controller: SimulatorWindowController, prompts: SimulatorPrompts): List<MenuEntry> = listOf(
     MenuEntry("Install app…") { prompts.appToInstall()?.let(controller::install) },
     MenuEntry(
         if (controller.inputEnabled) "Live picture and input are on" else "Switch input on for live picture…",
@@ -162,12 +158,6 @@ internal fun moreEntries(
     ) {
         if (prompts.confirmInput()) controller.enableInput()
     },
-    MenuEntry("Install idb…") {
-        if (prompts.confirmInstall()) {
-            state.consoleShown = true
-            controller.installIdb()
-        }
-    }.takeIf { controller.idbMissing },
     MenuEntry("Copy agent endpoint path", enabled = controller.endpointFile.isNotEmpty()) {
         prompts.copy(controller.endpointFile)
     },

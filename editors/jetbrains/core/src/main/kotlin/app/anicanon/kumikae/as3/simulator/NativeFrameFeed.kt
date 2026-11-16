@@ -16,7 +16,7 @@ internal class NativeFrameFeed(
     @Volatile override var failure: Throwable? = null
         private set
 
-    // Startup runs on the service worker; mapping failure must reach the fallback chooser immediately.
+    // Startup runs on the service worker; mapping failure must reach the stream controller immediately.
     private val mapped = NativeFrameReader(bridge.slot)
     private val worker = Thread({
         try {

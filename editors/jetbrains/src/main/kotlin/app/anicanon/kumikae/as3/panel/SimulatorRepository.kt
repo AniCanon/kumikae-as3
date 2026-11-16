@@ -17,7 +17,7 @@ internal interface SimulatorRepository : AutoCloseable {
 
     fun shutdown(device: String): SimulatorStatus
 
-    /** Switches input through idb on. False when idb is not installed. */
+    /** Switches input through native helper on. False when the bundled helper is missing. */
     fun enableInput(): Boolean
 
     fun install(device: String, appPath: String)

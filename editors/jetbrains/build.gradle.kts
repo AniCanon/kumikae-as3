@@ -51,7 +51,7 @@ allprojects {
 }
 
 kotlin { jvmToolchain(25) }
-// One install script: the one a person runs from tools/ is the one the plugin carries.
+// Ship the same iOS build script that a person can run from tools/.
 sourceSets.main { resources.srcDir("tools") }
 tasks.buildPlugin { dependsOn(tasks.ktlintCheck, project(":core").tasks.named("ktlintCheck")) }
 intellijPlatform {

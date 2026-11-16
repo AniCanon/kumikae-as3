@@ -14,23 +14,8 @@ class SimulatorWindowControllerTest {
     private val polling = ManualBackgroundTasks()
     private var allowed = false
     private val remembered = mutableListOf<Boolean>()
-    private val installer = FakeInstaller()
     private val controller =
-        SimulatorWindowController(repository, actions, polling, { allowed }, { remembered += it }, installer)
-
-    private class FakeInstaller : IdbInstaller {
-        var output = ""
-        var failure: IdbInstallFailed? = null
-        var then: () -> Unit = {}
-        var runs = 0
-
-        override fun install(): String {
-            runs++
-            failure?.let { throw it }
-            then()
-            return output
-        }
-    }
+        SimulatorWindowController(repository, actions, polling, { allowed }, { remembered += it })
 
     private fun open(select: SimulatorDevice? = repository.phone) {
         controller.shown()
@@ -171,10 +156,10 @@ class SimulatorWindowControllerTest {
         controller.gesture(checkNotNull(controller.frame), Pixel(1, 1), Pixel(1, 1), 80)
         assertFalse(actions.isBusy)
         repository.inputEnabled = true
-        repository.notice = "idb input is enabled."
+        repository.notice = "native helper input is enabled."
         pollOnce()
         assertTrue(controller.inputEnabled)
-        assertEquals("idb input is enabled.", controller.notice)
+        assertEquals("native helper input is enabled.", controller.notice)
         val frame = checkNotNull(controller.frame)
         controller.gesture(frame, Pixel(1, 1), Pixel(2, 2), 80)
         actions.finish()
@@ -340,14 +325,25 @@ class SimulatorWindowControllerTest {
         assertEquals(listOf(true), remembered)
     }
 
-    @Test fun `switching input on without idb says how to get it and remembers nothing`() {
+    @Test fun `switching input on without the helper says how to restore it and remembers nothing`() {
         open()
-        repository.idbInstalled = false
+        repository.nativeInstalled = false
         controller.enableInput()
         actions.finish()
         assertFalse(controller.inputEnabled)
-        assertTrue(controller.status.startsWith("idb is not installed."), controller.status)
+        assertTrue(controller.status.contains("native helper is missing"), controller.status)
         assertTrue(remembered.isEmpty())
+    }
+
+    @Test fun `remembered live mode with a missing helper reports failure without snapshot fallback`() {
+        allowed = true
+        repository.nativeInstalled = false
+        controller.shown()
+        actions.finish()
+        assertTrue(controller.status.contains("native helper is missing"), controller.status)
+        controller.poll()
+        assertFalse(polling.isBusy)
+        assertTrue(repository.calls.none { it.startsWith("screenshot") })
     }
 
     @Test fun `input that was switched on before is on again when the window opens`() {
@@ -355,47 +351,6 @@ class SimulatorWindowControllerTest {
         controller.shown()
         actions.finish()
         assertEquals(listOf("connect", "enableInput", "devices"), repository.calls)
-    }
-
-    @Test fun `input that finds no idb offers to install it`() {
-        open()
-        repository.idbInstalled = false
-        assertFalse(controller.idbMissing)
-        controller.enableInput()
-        actions.finish()
-        assertTrue(controller.idbMissing)
-    }
-
-    @Test fun `installing idb shows what the install said, then switches input on`() {
-        open()
-        repository.idbInstalled = false
-        controller.enableInput()
-        actions.finish()
-        repository.calls.clear()
-        installer.output = "==> Installing idb-companion\nInstalled 1 executable: idb\n"
-        installer.then = { repository.idbInstalled = true }
-        controller.installIdb()
-        assertEquals("Installing idb…", controller.status)
-        actions.finish()
-        assertEquals(1, installer.runs)
-        assertEquals(listOf("enableInput", "status"), repository.calls)
-        assertTrue(controller.console.contains("Installed 1 executable: idb"))
-        assertTrue(controller.inputEnabled)
-        assertFalse(controller.idbMissing)
-        assertEquals("idb is installed. Input is on.", controller.status)
-        assertEquals(listOf(true), remembered)
-    }
-
-    @Test fun `an install that fails says so, shows its output and can be tried again`() {
-        open()
-        installer.failure =
-            IdbInstallFailed("The install stopped with status 1.", "Homebrew is needed for idb's companion")
-        controller.installIdb()
-        actions.finish()
-        assertEquals("The install stopped with status 1.", controller.status)
-        assertTrue(controller.console.contains("Homebrew is needed"))
-        assertTrue(controller.idbMissing)
-        assertTrue(repository.calls.none { it == "enableInput" })
     }
 
     private companion object {

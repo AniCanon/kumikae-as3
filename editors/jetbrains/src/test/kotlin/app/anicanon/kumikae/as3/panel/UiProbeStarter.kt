@@ -133,7 +133,7 @@ class UiProbeStarter : ApplicationStarter {
             await("Home to be sent") { repository.calls.any { it.startsWith("input probe-phone") } }
             repository.installFailure = "An application bundle was not found at the provided path. " +
                 "Provide a valid path to the desired application bundle and try again."
-            onEdt { menu(moreEntries(controller, view.state, prompts), "Install app") }
+            onEdt { menu(moreEntries(controller, prompts), "Install app") }
             await("the failure") { shows(view, "An application bundle was not found") && screen(view).frame == null }
             check(console.text.contains("[Error] An application bundle")) { "The failure is missing from the console" }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-7-failed-input-on.png"))

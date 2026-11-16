@@ -22,7 +22,15 @@ class LiveControllerTest {
         controller.frameTick()
     }
 
-    @Test fun `input off keeps snapshots and does not start idb streaming`() {
+    @Test fun `live capture identifies native resolution`() {
+        connected()
+        streams.finish()
+        repository.feeds.last().next = repository.screenshot("A")
+        controller.frameTick()
+        assertEquals("Native · 4×8", controller.capture)
+    }
+
+    @Test fun `input off keeps snapshots and does not start native streaming`() {
         connected(false)
         assertFalse(streams.isBusy)
         controller.poll()
@@ -77,7 +85,7 @@ class LiveControllerTest {
         streams.finish()
         repository.feeds.last().close()
         controller.frameTick()
-        assertTrue(controller.status.startsWith("Reconnecting"))
+        assertTrue(controller.status.startsWith("Native picture unavailable:"))
         now = 500
         controller.frameTick()
         assertTrue(streams.isBusy)
@@ -89,7 +97,7 @@ class LiveControllerTest {
         repository.feeds.last().failure = IllegalStateException("lost video")
         controller.frameTick()
         // The status says what is happening; the cause goes to the IDE's log, for whoever looks into it.
-        assertEquals("Reconnecting to the simulator's screen…", controller.status)
+        assertEquals("Native picture unavailable: lost video. Retrying…", controller.status)
         now = 499
         controller.frameTick()
         assertFalse(streams.isBusy)
