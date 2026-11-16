@@ -369,6 +369,14 @@ compare("kept.gd", [
     "made and forgotten in AS3", "a resource that listens to itself goes", "a listener on another node goes",
     "attached, kept while AS3 holds it", "attached, freed when AS3 lets go too",
 ])
+# The cycle collector with such objects in loops: what nothing holds goes; what GDScript or AS3 holds stays
+# whole, its fields with it.
+compare("cycles.gd", [
+    "a getter read", "a loop held by nobody goes", "a loop through Godot's count goes", "a loop GDScript holds stays whole",
+    "a loop an AS3 static holds stays whole", "kept by Godot alone stays whole", "what a getter kept outlives GDScript's hold",
+    "what a setter kept outlives GDScript's hold", "a static's loop goes when the static lets go", "what a getter kept goes when AS3 lets go",
+    "what a setter kept goes when AS3 lets go", "a loop GDScript held goes when it lets go",
+])
 
 # A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give.
 with tempfile.TemporaryDirectory() as limited:

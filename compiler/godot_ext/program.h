@@ -13,6 +13,7 @@
 
 namespace godot {
 class Node;
+class RefCounted;
 }
 
 namespace kas3 {
@@ -82,8 +83,12 @@ struct Restart {
 // starts it once more when it is ready, so that its objects have one build's code throughout.
 void restart_scene(const Restart &p_restart);
 // The script object of the AS3 script attached to a Godot object, or null: the script instance holds a
-// reference to it.
+// reference to it, unless its Godot object is reference-counted (counted.cpp).
 vm::Object *script_object(const godot::Object *p_owner);
+// For the cycle collector (counted.cpp): whether a Godot object has a script object of a counted class;
+// what the collector sees of a reference-counted one: its count, and its script object, if it has one.
+bool joined_to_script(const godot::Object *p_owner);
+void script_edges(godot::RefCounted *p_counted, vm::EngineNode *r_node);
 
 // AS3 runs on one thread, the one the extension was started on. Godot can call a script from another (a
 // task given to its worker threads): such a call is refused, and said so, before it touches anything.

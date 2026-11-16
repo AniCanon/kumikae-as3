@@ -260,10 +260,12 @@ bool Collector::marking(size_t p_work) {
 			node_queue_.pop_back();
 			EngineNode edges;
 			if (ask(key, &edges)) {
-				for (Object *object : edges.objects) {
-					work_++;
-					if (object && object->gc_next) {
-						reach(object);
+				for (const std::vector<Object *> *held : { &edges.objects, &edges.joined }) {
+					for (Object *object : *held) {
+						work_++;
+						if (object && object->gc_next) {
+							reach(object);
+						}
 					}
 				}
 				for (uint64_t node : edges.nodes) {
@@ -392,9 +394,11 @@ void Collector::rescue() {
 		const uint64_t key = node_queue_.back();
 		node_queue_.pop_back();
 		const Node &node = nodes_[key];
-		for (Object *object : node.edges.objects) {
-			if (object && object->gc_next) {
-				use(object);
+		for (const std::vector<Object *> *held : { &node.edges.objects, &node.edges.joined }) {
+			for (Object *object : *held) {
+				if (object && object->gc_next) {
+					use(object);
+				}
 			}
 		}
 		for (uint64_t held : node.edges.nodes) {

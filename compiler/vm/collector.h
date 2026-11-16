@@ -22,7 +22,8 @@
 // A loop may pass through the engine: a script object holds a Godot object that has a listener that is a
 // method of the script object. The engine's side is asked about such nodes (EngineHandles::node and
 // node_edges) and, before a loop through them is freed, to let go of what holds them that it can't count
-// (EngineHandles::let_go).
+// (EngineHandles::let_go). A node's joined objects (EngineNode::joined) are in use while it is, and held
+// by no reference of its: nothing is taken off their counts.
 #pragma once
 
 #include "engine_types.h"

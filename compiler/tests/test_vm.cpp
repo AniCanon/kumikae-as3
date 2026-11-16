@@ -607,6 +607,8 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	struct Node {
 		uint64_t references = 1;
 		std::vector<vm::Object *> objects;
+		std::vector<vm::Object *> joined;
+		bool exact = false;
 		bool survives = false; // Something the collector can't see holds a copy of it.
 	};
 	std::map<intptr_t, uint64_t> node_boxes;
@@ -624,8 +626,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 			return false;
 		}
 		r_node->references = found->second.references;
-		r_node->exact = false;
+		r_node->exact = found->second.exact;
 		r_node->objects = found->second.objects;
+		r_node->joined = found->second.joined;
 		return true;
 	}
 	[[nodiscard]] std::vector<uint64_t> let_go(const std::vector<uint64_t> &p_nodes) override {
@@ -2428,6 +2431,66 @@ static void test_cycles_through_engine() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// A script object of a reference-counted class in a loop with a plain object. Its Godot object (node 9)
+// holds no reference to it but keeps it (joined), and its own handle on that Godot object counts as one of
+// the node's references. The loop stays whole while the engine or the host holds either half, and goes
+// when neither does.
+static void test_counted_cycles() {
+	const char *source = "package { import godot.*;\n"
+						 "public class Paired extends RefCounted { public var label:String = \"kept\"; public var partner:Partner;\n"
+						 "	public function pair():void { partner = new Partner(); partner.back = this; }\n"
+						 "	public function word():String { return partner && partner.back == this ? label : \"emptied\"; } }\n"
+						 "}\n"
+						 "class Partner { public var back:Paired; }\n";
+	ir::Module module;
+	compile_cycles(&module, source, "Paired.as");
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		engine.running = &interpreter;
+		CHECK(interpreter.start());
+		const size_t before = vm::live_objects();
+		vm::Object *paired = interpreter.construct(class_named(module, "Paired"), engine.box());
+		vm::Slot ignored;
+		CHECK(interpreter.call_method(paired, "pair", nullptr, 0, &ignored));
+		engine.node_boxes[engine.next - 1] = 9;
+		engine.nodes[9].exact = true;
+		engine.nodes[9].joined.push_back(paired);
+		auto word = [&]() {
+			vm::Slot result;
+			CHECK(interpreter.call_method(paired, "word", nullptr, 0, &result));
+			std::string text(static_cast<vm::Str *>(result.p)->view());
+			interpreter.discard(ir::Kind::Str, result);
+			return text;
+		};
+		// The host holds the script object; the engine holds nothing more than its handle.
+		engine.nodes[9].references = 1;
+		interpreter.collect();
+		CHECK_EQ(vm::live_objects(), before + 2);
+		CHECK_EQ(word(), std::string("kept"));
+		// The engine holds the Godot object (as GDScript would), and nothing else holds either half.
+		engine.nodes[9].references = 2;
+		engine.keeps = true;
+		interpreter.release_object(paired);
+		interpreter.collect();
+		CHECK_EQ(vm::live_objects(), before + 2);
+		vm::retain(paired);
+		CHECK_EQ(word(), std::string("kept"));
+		interpreter.release_object(paired);
+		// The engine lets go too: the loop goes, and its handle with it.
+		engine.nodes[9].references = 1;
+		engine.keeps = false;
+		engine.log.clear();
+		interpreter.collect();
+		CHECK_EQ(engine.log, std::string("keep Paired\n"));
+		CHECK_EQ(vm::live_objects(), before);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // A script object of a class that extends Godot's is written by its own public fields, as any other: the
 // Godot object it is attached to is not one of them. (One of Godot's values is refused: tests/godot_project.)
 static void test_json_script_object() {
@@ -2519,6 +2582,7 @@ static void test_json_out_of_memory() {
 int main() {
 	test_cycles();
 	test_cycles_through_engine();
+	test_counted_cycles();
 	test_host_construct_order();
 	test_interface_table();
 	test_kept_traces();

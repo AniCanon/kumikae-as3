@@ -67,6 +67,28 @@ bool GodotHost::keep(vm::Object *p_object) {
 	return false;
 }
 
+bool joined_to_script(const Object *p_owner) {
+	const vm::Object *object = script_object(p_owner);
+	return object && held().count(object);
+}
+
+// To the cycle collector the two are one. The script object's own handle on its Godot object counts as a
+// reference (GodotHost::node), and the instance's does not: it stands for the program's references, which
+// the collector counts on the script object itself. The script object lives as long as the Godot object,
+// which holds no reference to it: it is joined, never taken off. The instance of a script of another class
+// (one that extends Godot's Object) holds its script object, as an instance on any other object does.
+void script_edges(RefCounted *p_counted, vm::EngineNode *r_node) {
+	r_node->references = (uint64_t)p_counted->get_reference_count();
+	vm::Object *object = script_object(p_counted);
+	const auto found = object ? held().find(object) : held().end();
+	if (found != held().end()) {
+		r_node->references += found->second->holding ? 0 : 1;
+		r_node->joined.push_back(object);
+	} else if (object) {
+		r_node->objects.push_back(object);
+	}
+}
+
 void counted_freed(ScriptInstance *p_instance) {
 	vm::Object *object = p_instance->object;
 	if (!object) {

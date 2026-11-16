@@ -625,9 +625,9 @@ void GodotHost::drop(void *p_value) {
 
 // A handle that counts as a reference to a reference-counted object, which may lead back to a script
 // object: through a script of AS3's on it, or a listener on one of its signals. A borrowed handle (a
-// script's hold on what it is attached to) counts as none.
+// script's hold on what it is attached to) counts as one only to a counted script object (counted.cpp).
 uint64_t GodotHost::node(void *p_value) {
-	if (!p_value || borrowed_.count(p_value)) {
+	if (!p_value) {
 		return 0;
 	}
 	const Variant *value = static_cast<const Variant *>(p_value);
@@ -635,7 +635,7 @@ uint64_t GodotHost::node(void *p_value) {
 		return 0;
 	}
 	RefCounted *counted = Object::cast_to<RefCounted>(value->get_validated_object());
-	if (!counted) {
+	if (!counted || (borrowed_.count(p_value) && !joined_to_script(counted))) {
 		return 0;
 	}
 	return counted->get_instance_id();
@@ -651,11 +651,8 @@ bool GodotHost::node_edges(uint64_t p_node, vm::EngineNode *r_node) {
 	if (!counted) {
 		return false;
 	}
-	r_node->references = (uint64_t)counted->get_reference_count();
 	r_node->exact = true;
-	if (vm::Object *object = script_object(counted)) {
-		r_node->objects.push_back(object);
-	}
+	script_edges(counted, r_node);
 	listeners_of(counted, &r_node->nodes);
 	return true;
 }

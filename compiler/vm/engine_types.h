@@ -36,6 +36,9 @@ struct EngineNode {
 	bool exact = true;
 	std::vector<Object *> objects; // The script objects it holds, once for each reference it holds.
 	std::vector<uint64_t> nodes; // The nodes it holds, once for each reference.
+	// Script objects that live as long as it does, though it holds no reference to them (the script object
+	// of a reference-counted Godot object, ir::Class::counted): in use if it is, and never taken off.
+	std::vector<Object *> joined;
 };
 
 // Containers inside containers may go this deep to Godot: deeper is taken for one that holds itself. With
