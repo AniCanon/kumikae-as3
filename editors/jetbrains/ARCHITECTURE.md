@@ -14,6 +14,31 @@ a reply can cache old offsets under the new document version while the write is 
 The short, synchronous cache publication is not cancellable/retried because it has side effects.
 It checks project disposal inside the read action and adds no worker, queue or diagnostic cache.
 
+`As3Lsp4ijDiagnostics` rejects ranges outside the current document before building an annotation,
+including stale ranges after whole-document replacement. Empty-file diagnostics use an end-of-line
+annotation. `As3Lsp4ijClient` refreshes the client’s accepted diagnostic cache after publication, including
+identical diagnostics whose earlier repaint an edit invalidated. It rejects replies while an edit is
+uncommitted and skips refresh for mismatched versions or disposed clients. Cache publication and the
+refresh stamp share read access; the existing client queue coalesces refreshes. A signature-checked
+bridge reads LSP4IJ’s package-private version accessor, covered by the native probe. The server remains
+the source of diagnostic content.
+
+On Rider RD-262.10968.170, `RiderProjectLifetime` owns the native Current File Problems panel even when
+the split view replaces its component. Closing also releases the captured frame's callbacks and
+painters and any global focus root belonging to a released editor. Cleanup checks both disposal and
+frame ownership before touching the old root; another project's frame is left intact.
+`RiderFeedbackLifetime` preserves native feedback eligibility while owning its idle subscription.
+`RiderDatabaseLifetime` constructs the native database startup activity with a project service's scope,
+so a project closed during startup cancels that work. Service lookups check disposal under read access.
+The exact-build bridge validates and invokes its native startup entry point; reflective calls need runtime
+coverage even when static verification passes. Extension replacements register before removing
+the original and roll back on failure. Each repair reports failure independently.
+
+These bridges run only on the exact tested Rider build and validate native signatures before use.
+They do not modify IDE files. The plugin requires restart, and an unload veto protects native modules
+whose startup extensions it owns. The verifier cannot validate reflective calls: the stock IDE probes
+must pass before changing the supported build.
+
 AS3 language-block templates use that same client pipeline. Their ordinary source text and tab-stop
 spans originate in compiler queries; no template catalogue or snippet parser is duplicated in Kotlin.
 
@@ -36,7 +61,7 @@ scope/type semantics, wire capabilities, Unicode ranges and cache invalidation. 
 [results](../../docs/results/2026-11-completion.md) for observed coverage and remaining limitations.
 `UiProbeFocus` scopes the platform's window-deactivation test control to those background sandbox runs
 and restores it on exit. It prevents desktop focus changes from dismissing the test's live lookup;
-the production plugin contains no focus override.
+ordinary live-editor focus remains controlled by the IDE.
 
 ## Simulator composition
 

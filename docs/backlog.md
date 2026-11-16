@@ -64,15 +64,9 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Language server, first slice
 
-- **Manual editor acceptance remains pending.** Rider and free unified IDEA pass sandbox editing
-  checks; a person still needs to accept the full editing and navigation workflow. Paired ten-minute
-  AS3/plain-text probes retain all ten disposed projects and reproduce the `HighlightingPanel` warning.
-  The Rider diagnostic receive race now has a read-action guard and shrink/burst regressions. The
-  intermittent probe Undo dialog was traced to asynchronous ignore-file generation; fixture setup
-  and exact-editor Undo targeting now isolate completion history. LSP4IJ's caught invalid-range warning
-  and the separate shrink-then-parameter-help sequence still need investigation.
-  The exact GC root and platform resolution remain pending; see the
-  [retention results](results/2026-11-completion-followup.md#ide-lifecycle-investigation). **LS-2**
+- **Manual editor acceptance remains pending.** Automated Rider and free unified IDEA checks cover
+  completion, Undo, diagnostics and navigation. The plugin supplies the tested Rider lifetime repairs
+  while preserving split Problems; see [validation](results/2026-11-completion-followup.md). **LS-2**
 - **Windows runtime validation is pending.** Binary stdio, pipe readiness, UTF-8 filesystem paths, network
   share URIs and `.exe` discovery are implemented; host-side fixtures do not establish Windows support. **LS-2**
 - The same file reached through a symbolic link, or under a different letter case, or in a different

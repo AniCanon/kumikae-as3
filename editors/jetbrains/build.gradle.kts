@@ -113,6 +113,12 @@ if (providers.gradleProperty("uiProbe").isPresent) {
             },
         ).get().asFile
         args("kumikae-as3-ui-check", report.absolutePath)
+        if (listOf("KUMIKAE_COMPLETION_RETENTION_CHECK", "KUMIKAE_COMPLETION_RETENTION_PROBE")
+                .any { providers.environmentVariable(it).orNull == "1" }
+        ) {
+            // Leak checks must collect soft caches too; this flag applies only to the probe JVM.
+            jvmArgs("-XX:SoftRefLRUPolicyMSPerMB=0")
+        }
         timeout =
             Duration.ofMinutes(
                 if (providers.environmentVariable("KUMIKAE_COMPLETION_RETENTION_PROBE").orNull ==

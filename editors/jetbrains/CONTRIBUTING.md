@@ -97,11 +97,8 @@ is not changed or verified by it.
 
 For a lifecycle control, run `KUMIKAE_COMPLETION_CONTROL_PROBE=1 ./gradlew --offline runIde -PuiProbe`.
 It opens plain-text files, confirms each project closes and is disposed, and records the same heap
-samples. Save the reports before running another probe: both use `build/reports/ui/`. The control and
-AS3 probes both reproduce the pinned Rider's `HighlightingPanel` disposal warning. The paired
-ten-minute runs retain all ten disposed projects; see the
-[results](../../docs/results/2026-11-completion-followup.md#ide-lifecycle-investigation). The AS3 probe also verifies generated imports and override
-declarations are accepted and undone atomically. Generated-edit checks compare the whole document's
+samples. Save the reports before another probe overwrites `build/reports/ui/`.
+The AS3 probe also verifies generated imports and override declarations are accepted and undone atomically. Generated-edit checks compare the whole document's
 non-whitespace text, including closing braces, and check the final caret before the throwing body.
 Both a Godot method and the built-in `setPropertyIsEnumerable` override are covered in each client.
 Generated overrides repeat six times each. Undo resolves the exact `TextEditor` under test, including
@@ -111,7 +108,12 @@ the completion in Undo history. The probe neither clears history nor suppresses 
 unexpected Undo dialog is captured, cancelled and fails the check with its message and command state.
 `UiProbeRiderDiagnostics` checks read access at the installed native descriptor's receive boundary.
 `UiProbeDiagnostics` checks actual error highlights before and after an 80-line shrink and forty rapid
-replacements, then verifies errors can appear and clear again.
+replacements, then verifies errors can appear and clear again, followed by parameter help, navigation
+and outline checks. The probe scrolls the caret into view before requesting a visible parameter hint.
+IDEA also checks injected stale/current publications, an uncommitted edit, refresh requests for equal values
+and replies after client disposal through the production adapter and native diagnostic cache.
+The focused publication check holds write access before the cache monitor and observes the injected
+refresh boundary; the separate shrink/burst check verifies real editor highlights.
 `UiProbeStatementCompletion` checks seven language blocks, immediate insertion Undo, navigation through
 all tab stops and the final caret, and mirrored catch-name editing. Rider exposes the snippet as its
 lookup string; LSP4IJ exposes the item label. The probe matches either representation. Undo after Tab
@@ -119,10 +121,15 @@ navigation is a separate native template-history operation; the probe does not o
 
 Add `KUMIKAE_COMPLETION_RETENTION_PROBE=1` for ten projects across ten minutes, with live-GC histograms
 and weak closed-project counts. Combine it with the control flag for the same plain-text workload.
+`KUMIKAE_COMPLETION_RETENTION_CHECK=1` enables the same zero-retention assertion on the short run.
+These runs collect soft caches (`-XX:SoftRefLRUPolicyMSPerMB=0`, probe JVM only) and allow up to ten seconds
+for native delayed work to finish. They also check a reopened visible Problems window, concurrent
+projects and frame reuse. No native cache is cleared by the plugin. Do not compare these heap samples
+with runs using the default soft-cache policy. A final acceptance run must omit `KUMIKAE_COMPLETION_HEAP_DUMP`;
+that option is for diagnosing a failure. Keep each run's reports with its log to avoid reading stale counts.
 The test plugin cancels the pinned Rider's evaluation feedback survey and IDEA's first-run UI onboarding
 dialog, which otherwise block project opening. It matches those two exact classes and uses Cancel;
 license dialogs and production IDE settings are untouched. Callback failures fail the probe.
-
 
 ## Language-client compatibility checks
 

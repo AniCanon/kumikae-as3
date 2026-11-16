@@ -21,6 +21,7 @@ import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.psi.PsiDocumentManager
+import com.intellij.util.PlatformUtils
 import java.awt.event.WindowEvent
 import java.lang.management.ManagementFactory
 import java.lang.ref.WeakReference
@@ -34,6 +35,11 @@ object UiProbeCompletion {
 
     fun run(destination: Path, plainText: Boolean = false, missingClient: Boolean = false) = UiProbeFocus.run {
         projects.clear()
+        if (UiProbeRetention.enabled() && PlatformUtils.isRider() && !plainText && !missingClient) {
+            UiProbeRiderReopen.run(destination)
+            UiProbeRiderLifecycle.checkNativeUnload(destination)
+            UiProbeConcurrentProjects.run(destination)
+        }
         val endurance = System.getenv("KUMIKAE_COMPLETION_RETENTION_PROBE") == "1"
         val heap = mutableListOf<String>()
         val started = System.nanoTime()
@@ -283,6 +289,7 @@ object UiProbeCompletion {
         // platform's hint manager permits showing the real lookup without stealing desktop focus.
         activate(project)
         PsiDocumentManager.getInstance(project).commitAllDocuments()
+        check(UiProbeLsp.canComplete(project, editor)) { "Completion invoked while client indexing is not ready" }
         CodeCompletionHandlerBase(CompletionType.BASIC).invokeCompletion(project, editor)
     }
 

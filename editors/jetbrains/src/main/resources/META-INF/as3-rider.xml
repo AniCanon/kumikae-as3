@@ -2,5 +2,11 @@
     <extensions defaultExtensionNs="com.intellij">
         <platform.lsp.integrationProvider implementation="app.anicanon.kumikae.as3.language.As3LspSupportProvider"/>
         <gotoDeclarationHandler implementation="app.anicanon.kumikae.as3.language.As3GotoDeclaration"/>
+        <editorFactoryListener implementation="app.anicanon.kumikae.as3.language.RiderEditorLifetimeListener"/>
+        <ide.dynamicPluginVetoer implementation="app.anicanon.kumikae.as3.language.RiderStartupUnloadVetoer"/>
     </extensions>
+    <applicationListeners>
+        <listener class="app.anicanon.kumikae.as3.language.RiderLifetimeListener"
+                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
+    </applicationListeners>
 </idea-plugin>

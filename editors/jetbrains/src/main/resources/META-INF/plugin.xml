@@ -1,4 +1,4 @@
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>app.anicanon.kumikae.as3</id>
     <name>Kumikae AS3</name>
     <vendor>AniCanon</vendor>

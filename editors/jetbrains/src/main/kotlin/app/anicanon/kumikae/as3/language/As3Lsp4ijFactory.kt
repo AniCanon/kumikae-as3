@@ -5,7 +5,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport
 import com.redhat.devtools.lsp4ij.LanguageServerFactory
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
@@ -15,6 +17,11 @@ import org.eclipse.lsp4j.InitializeParams
 class As3Lsp4ijFactory :
     LanguageServerFactory,
     LanguageServerEnablementSupport {
+    override fun createLanguageClient(project: Project): LanguageClientImpl =
+        As3Lsp4ijClient(project) { file, document ->
+            LSPDiagnosticsApplier.getInstance(project).scheduleRefresh(file, document)
+        }
+
     override fun createClientFeatures(): LSPClientFeatures = object : LSPClientFeatures() {
         override fun initializeParams(params: InitializeParams) {
             super.initializeParams(params)

@@ -164,8 +164,9 @@ typing, lexical scopes, import paths, replacement edits, callable snippets and s
 complete stage 6. The [follow-up results](results/2026-11-completion-followup.md) cover auto-imports,
 override stubs (including qualified defaults and independent getter/setter slots), AS3 statement-block
 templates with linked Tab stops, body-only incremental
-checking and lifecycle controls. Empty override names work before following members, and background
-sandbox completion checks isolate window-deactivation cancellation. The optional LSP4IJ adapter
+checking, diagnostic range guards and plugin-owned Rider lifetime repairs with split Problems. Empty
+override names work before following members, and background sandbox completion checks isolate
+window-deactivation cancellation. The optional LSP4IJ adapter
 supports IntelliJ IDEA Community/free unified IDEA alongside Rider's native client. The installed
 IDEA and Rider endpoints pass sandbox editing checks; older Community builds and Windows runtime
 validation remain unverified. Android Studio is outside the scope.

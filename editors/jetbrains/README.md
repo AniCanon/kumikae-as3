@@ -6,20 +6,22 @@ In IDEA, install and enable **LSP4IJ** (tested version 0.21.0) in **Settings > P
 require it. It also provides project/run tools and an iOS Simulator panel. See
 [completion and typing assistance](../completion.md) for editor behavior, settings and limits, and
 [completion results](../../docs/results/2026-11-completion.md) for the checks and measurements.
-The Simulator's own measurements are described below. The [completion follow-up](../../docs/results/2026-11-completion-followup.md)
-records generated-edit acceptance and body-only checking. Its paired ten-minute AS3/plain-text
-controls retain all ten disposed projects in the pinned sandbox; the exact GC root remains unverified.
-The background completion probe suppresses window-deactivation cancellation only in its sandbox JVM,
-restoring the previous setting on exit. It also dispatches those focus events during lookup checks.
-The probe also checks diagnostic clearing after rapid document shrink and repeated immediate Undo.
-It prepares project ignore files before opening and targets the exact editor when undoing a completion.
+The Simulator's own measurements are described below. The [completion follow-up results](../../docs/results/2026-11-completion-followup.md)
+cover generated edits, diagnostics, Undo and project lifetime checks. The plugin keeps Rider's split
+Problems view and owns the cleanup needed by the tested Rider build. Install, update and uninstall
+require an IDE restart.
+
+**Current PR validation is blocked:** the final verifier rejects an internal LSP4IJ API call in the
+new diagnostic client. The table below records earlier validation, not acceptance of the current tree.
+See the [current results](../../docs/results/2026-11-completion-followup.md#validation).
+
 Production focus behavior and manual editor acceptance remain separate from this automated coverage.
 
 | Checked | By | Result |
 |---|---|---|
 | Compilation, style check and plugin zip | Automated build, 2026-11-15 | `./gradlew check buildPlugin` succeeds. |
 | Service tests (`core`) | Automated build | 82 pass; three opt-in live probes skip in ordinary checks and passed separately. |
-| Plugin tests (language, project tools, panel and adapters) | Automated build | 134 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
+| Plugin tests (language, project tools, panel and adapters) | Automated build | 168 pass; one opt-in retention probe skips in ordinary checks and passed separately. |
 | Plugin verifier against installed Rider and IDEA | `./gradlew verifyPlugin` | Compatible with RD-262.10968.170 and IU-261.22158.277, including LSP4IJ 0.21.0. |
 | Editor compatibility matrix | Four isolated sandbox probes | IDEA with/without LSP4IJ; Rider with/without LSP4IJ. Completion, parameter help, navigation and outline pass where the client is enabled; missing IDEA dependency is reported. |
 | Native Swift tests | `swift test` | 38 pass in 20 suites. |

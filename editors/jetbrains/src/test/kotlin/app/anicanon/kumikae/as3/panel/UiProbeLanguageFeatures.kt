@@ -6,6 +6,7 @@ import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.lang.LanguageStructureViewBuilder
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.psi.PsiDocumentManager
@@ -20,6 +21,13 @@ internal object UiProbeLanguageFeatures {
         check(call > source.indexOf("move(")) { "Expected both a method declaration and its completed call" }
         UiProbeCompletion.edt {
             editor.caretModel.moveToOffset(call + "move(".length)
+            editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
+        }
+        UiProbeCompletion.await("visible parameter-help caret") {
+            val caret = editor.visualPositionToXY(editor.caretModel.visualPosition)
+            editor.scrollingModel.visibleArea.contains(caret)
+        }
+        UiProbeCompletion.edt {
             UiProbeCompletion.activate(project)
             UiProbeCompletion.action(editor, IdeActions.ACTION_EDITOR_SHOW_PARAMETER_INFO)
         }
