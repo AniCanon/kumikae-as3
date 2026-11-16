@@ -22,20 +22,30 @@ namespace rt {
 // The operations the host itself asks of the library, each a thunk after the program's own.
 enum class Builtin : uint32_t { NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray };
 
-// The calls the interpreter's side makes back, as "engine" calls of these names (HostCallStatic).
-constexpr std::string_view BRIDGE = "kas3";
-constexpr std::string_view BRIDGE_CALL = "call"; // A function's stub body: run the generated function.
-constexpr std::string_view BRIDGE_CAUGHT = "caught"; // A thunk's catch: the error is the context's now.
-constexpr std::string_view BRIDGE_UPDATED = "updated"; // A thunk hands back a register it moved on.
-// The registers those calls read from the frame that made them, by these names (ir::Local).
-constexpr std::string_view LOCAL_ERROR = "e";
-constexpr std::string_view LOCAL_UPDATED = "u";
-std::string parameter_local(uint32_t p_index); // "p0"
-std::string missing_local(uint32_t p_index); // "m0": whether the caller left that parameter out.
+// What a Native instruction asks of the host (its second operand): a function's body run, or one of the
+// two things a thunk hands back.
+enum class NativeWhat : uint32_t {
+	Body, // The generated function, with the frame's arguments.
+	Caught, // A thunk's catch: the error in the register named is the context's now.
+	Updated, // A thunk hands back the register named, which its instruction moved on.
+};
 
-// The module the interpreter is given: the program's classes, globals and strings by their own numbers,
-// each function as a stub, then the program's thunks, then the host's (Builtin).
+// Where a host runs: what it prints to, the engine it asks, its clock, and the program's module where the
+// embedder has it (the Godot extension compiles the scripts itself; a program run on its own has only its
+// table, and the module is made from that).
+struct Embedder {
+	vm::Output &output;
+	vm::EngineHandles &handles;
+	vm::EngineSource &source;
+	vm::Clock &clock;
+	const ir::Module *module = nullptr;
+};
+
+// The module the interpreter is given, made from the program's table: its classes, globals and strings by
+// their own numbers, each function as a stub, then the program's thunks, then the host's (Builtin).
 ir::Module stub_module(const Program &p_program);
+// The same from the program's own module: every function's body replaced, the thunks added.
+ir::Module native_module(const ir::Module &p_module, const Program &p_program);
 
 // A trace kept for an error a finally caught, for when it is thrown again (as vm::Kept).
 struct KeptTrace {
@@ -45,23 +55,10 @@ struct KeptTrace {
 	size_t lines;
 };
 
-// The engine the interpreter is given: there is none, but for the calls of BRIDGE.
-class Bridge final : public vm::NoEngine {
-	Host &host_;
-
-public:
-	explicit Bridge(Host &p_host) :
-			host_(p_host) {}
-	[[nodiscard]] bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
-			const vm::Wanted &p_result, Slot *r_result, std::string *r_error) override;
-};
-
-struct Host {
+struct Host final : vm::NativeCode {
 	const Program &program;
 	ir::Module module;
-	vm::StandaloneOutput output;
-	Bridge bridge;
-	vm::SystemClock clock;
+	vm::Output &output;
 	std::unique_ptr<vm::Interpreter> interpreter;
 	Context context;
 	std::vector<Slot> globals;
@@ -82,8 +79,10 @@ struct Host {
 	bool carried = false;
 	uint32_t nesting = 0; // Thunks in progress, one inside another.
 
-	Host(const Program &p_program, std::optional<double> p_now);
-	~Host();
+	Host(const Program &p_program, const Embedder &p_embedder);
+	~Host() override;
+	[[nodiscard]] bool run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given,
+			Slot *r_result) override;
 	Host(const Host &) = delete;
 	Host &operator=(const Host &) = delete;
 

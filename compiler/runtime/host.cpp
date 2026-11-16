@@ -12,9 +12,11 @@ using ir::Kind;
 static_assert(MAX_DEPTH == vm::Interpreter::MAX_FRAMES, "generated code and the interpreter overflow at the same depth");
 static_assert(NONE == ir::NONE, "the program table and the IR write `none` alike");
 
-Host::Host(const Program &p_program, std::optional<double> p_now) :
-		program(p_program), module(stub_module(p_program)), bridge(*this), clock(p_now) {
-	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(output, bridge, bridge, clock));
+Host::Host(const Program &p_program, const Embedder &p_embedder) :
+		program(p_program), module(p_embedder.module ? native_module(*p_embedder.module, p_program) : stub_module(p_program)),
+		output(p_embedder.output) {
+	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(p_embedder.output, p_embedder.handles, p_embedder.source, p_embedder.clock));
+	interpreter->set_native(this);
 	globals.resize(program.global_count);
 	for (uint32_t i = 0; i < program.global_count; i++) {
 		globals[i] = vm::empty_value(static_cast<Kind>(program.globals[i].kind) == Kind::F64, program.globals[i].starts_null);

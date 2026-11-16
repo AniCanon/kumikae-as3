@@ -128,7 +128,7 @@ std::string thunk_tables(const Thunk &p_thunk, size_t p_index, std::string &r_ou
 	}
 	std::string info = "{ " + std::to_string(static_cast<unsigned>(p_thunk.op)) + ", " + number(p_thunk.a) + ", " + number(p_thunk.b) + ", " +
 			number(p_thunk.c) + ", ";
-	info += array(r_out, "const uint8_t", prefix + "_kinds", kinds) + ", " + std::to_string(kinds.size()) + ", " + std::to_string(p_thunk.given) + ", ";
+	info += array(r_out, "const uint8_t", prefix + "_kinds", kinds) + ", " + std::to_string(kinds.size()) + ", " + std::to_string(p_thunk.given) + ", nullptr, ";
 	info += array(r_out, "const uint32_t", prefix + "_list", numbers(p_thunk.list)) + ", " + std::to_string(p_thunk.list.size()) + ", ";
 	return info + number(p_thunk.result) + ", " + number(p_thunk.updated) + ", " + number(p_thunk.code_class) + " }";
 }

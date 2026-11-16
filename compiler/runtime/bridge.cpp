@@ -1,5 +1,5 @@
-// The calls the host's interpreter makes back: a stub's body runs the generated function, a thunk's catch
-// hands the error to the context. Everything else an engine would answer is refused, as vm::NoEngine does.
+// The host's side of the Native instruction (vm/native_code.h): a function's body is the generated function,
+// and a thunk hands back the error it caught or a register its instruction moved on.
 #include "host.h"
 
 namespace kas3 {
@@ -9,21 +9,10 @@ using ir::Kind;
 
 namespace {
 
-// A register of the frame that made the call, by its local's name: as it is held, with no new reference.
-Slot local(vm::Interpreter &p_interpreter, std::string_view p_name) {
-	Slot value = empty();
-	Kind kind = Kind::Void;
-	const bool found = p_interpreter.local_at(p_interpreter.depth() - 1, p_name, &value, &kind);
-	(void)found; // The stubs declare every local they are asked for (runtime/stub_module.cpp).
-	return value;
-}
-
 // A stub's body: the generated function, with the arguments the stub's frame was given.
-bool call_generated(Host &r_host, Slot *r_result, std::string *r_error) {
-	vm::Interpreter &interpreter = *r_host.interpreter;
-	const ir::Function &stub = interpreter.function_at(interpreter.depth() - 1);
-	const size_t index = static_cast<size_t>(&stub - r_host.module.functions.data());
-	const FunctionInfo &info = r_host.program.functions[index];
+bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, uint32_t p_given, Slot *r_result) {
+	const FunctionInfo &info = r_host.program.functions[p_function];
+	// Copied out of the frame first: what the function calls may move the interpreter's stack.
 	Slot few[16];
 	std::vector<Slot> many;
 	Slot *arguments = few;
@@ -31,22 +20,16 @@ bool call_generated(Host &r_host, Slot *r_result, std::string *r_error) {
 		many.resize(info.parameters);
 		arguments = many.data();
 	}
-	const uint32_t fixed = info.rest ? info.parameters - 1 : info.parameters;
-	uint32_t given = fixed;
 	for (uint32_t i = 0; i < info.parameters; i++) {
-		arguments[i] = local(interpreter, parameter_local(i));
-		if (i >= info.required && i < fixed && given == fixed && local(interpreter, missing_local(i)).b) {
-			given = i;
-		}
+		arguments[i] = p_registers[i];
 	}
 	Slot result = empty();
-	if (!r_host.set_up_by_library(static_cast<uint32_t>(index))) {
-		info.entry(&r_host.context, arguments, given, &result);
+	if (!r_host.set_up_by_library(p_function)) {
+		info.entry(&r_host.context, arguments, p_given, &result);
 	}
 	if (r_host.context.failing) {
 		// The error stays the context's. What the interpreter raises in its place only leaves its frames,
 		// as far as the thunk that began this, whose catch finds the context failing and drops it.
-		*r_error = "an error is on its way out of generated code";
 		return false;
 	}
 	if (r_result) {
@@ -59,12 +42,12 @@ bool call_generated(Host &r_host, Slot *r_result, std::string *r_error) {
 
 // A thunk's catch: an error the library raised is the context's now. With the context failing already,
 // this is what the interpreter raised in place of the error of a generated function (call_generated).
-void take_error(Host &r_host) {
+void take_error(Host &r_host, Slot p_error) {
 	if (r_host.context.failing && !r_host.carried) {
 		return;
 	}
 	r_host.carried = false;
-	const Slot error = local(*r_host.interpreter, LOCAL_ERROR);
+	const Slot error = p_error;
 	vm::retain(vm::any::counted(error));
 	// An Error the library made took its stack from the interpreter's frames, which are the thunk's: where
 	// the program reads stacks, it is given the generated functions'.
@@ -77,28 +60,22 @@ void take_error(Host &r_host) {
 	r_host.context.failing = true;
 }
 
-void take_updated(Host &r_host) {
-	if (r_host.updated) {
-		*r_host.updated = local(*r_host.interpreter, LOCAL_UPDATED);
-	}
-}
-
 } // namespace
 
-bool Bridge::call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *, size_t, const vm::Wanted &, Slot *r_result,
-		std::string *r_error) {
-	if (p_class != BRIDGE) {
-		return refuse(r_error);
+bool Host::run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given, Slot *r_result) {
+	switch (static_cast<NativeWhat>(p_what)) {
+		case NativeWhat::Body:
+			return p_function < program.function_count && call_generated(*this, p_function, p_registers, p_given, r_result);
+		case NativeWhat::Caught:
+			take_error(*this, p_registers[p_register]);
+			return true;
+		case NativeWhat::Updated:
+			if (updated) {
+				*updated = p_registers[p_register];
+			}
+			return true;
 	}
-	if (p_method == BRIDGE_CALL) {
-		return call_generated(host_, r_result, r_error);
-	}
-	if (p_method == BRIDGE_CAUGHT) {
-		take_error(host_);
-	} else if (p_method == BRIDGE_UPDATED) {
-		take_updated(host_);
-	}
-	return true;
+	return false;
 }
 
 } // namespace rt

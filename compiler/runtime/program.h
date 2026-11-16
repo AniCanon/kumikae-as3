@@ -106,6 +106,9 @@ struct ThunkInfo {
 	const uint8_t *kinds; // Its registers' kinds: the values handed in first, then what it writes.
 	uint32_t registers;
 	uint32_t given; // How many are handed in.
+	// Godot's name for the type of each register that holds one of Godot's values or objects, as the
+	// function it came from says (ir::Function::engine_types); null for the others, or for no table at all.
+	const char *const *types;
 	const uint32_t *list; // The instruction's argument list, if it takes one.
 	uint32_t list_size;
 	uint32_t result; // The register handed back, or NONE.

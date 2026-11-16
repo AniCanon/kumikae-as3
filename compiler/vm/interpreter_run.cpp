@@ -566,6 +566,9 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::Arguments:
 				arguments_array(in);
 				break;
+			case Op::Native:
+				native_op(in); // `frame` and `r` may be stale after this.
+				break;
 			case Op::ClassValue:
 			case Op::ClassIs:
 			case Op::ClassInstanceOf:
