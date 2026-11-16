@@ -128,6 +128,10 @@ void follow_calls(const ir::Module &p_module, Facts *r_facts) {
 } // namespace
 
 bool may_run_code(const ir::Module &p_module, const ir::Function &p_function, const Instruction &p_in) {
+	return may_run_code(p_module, p_function, p_in, std::vector<bool>());
+}
+
+bool may_run_code(const ir::Module &p_module, const ir::Function &p_function, const Instruction &p_in, const std::vector<bool> &p_counts_nothing) {
 	if (p_in.op == Op::Call) {
 		return may_end(p_module.functions[p_in.b].result); // Kept or not, a result is let go of in the end.
 	}
@@ -135,7 +139,8 @@ bool may_run_code(const ir::Module &p_module, const ir::Function &p_function, co
 		return true;
 	}
 	const char first = ir::op_shape(p_in.op)[0];
-	if ((first == 'R' || first == 'r') && p_in.a != NONE && !first_is_read(p_in.op) && may_end(p_function.registers[p_in.a])) {
+	if ((first == 'R' || first == 'r') && p_in.a != NONE && !first_is_read(p_in.op) && may_end(p_function.registers[p_in.a]) &&
+			!(p_in.a < p_counts_nothing.size() && p_counts_nothing[p_in.a])) {
 		return true; // What the register held is let go of.
 	}
 	// And what a field, a static field or an element held, when another is stored there.

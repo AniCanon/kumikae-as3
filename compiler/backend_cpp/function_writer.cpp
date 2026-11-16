@@ -60,6 +60,7 @@ void FunctionWriter::analyse() {
 	}
 	shadow_.assign(function_.registers.size(), std::string());
 	borrowed_.assign(function_.registers.size(), NONE);
+	lent_.assign(function_.registers.size(), false);
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();
@@ -79,6 +80,7 @@ std::string FunctionWriter::reg(uint32_t p_register) const {
 
 bool FunctionWriter::owns(uint32_t p_register) const {
 	return ir::is_held(kind(p_register)) && parts(p_register).empty() && alias_[p_register] == Alias::None && borrowed_[p_register] == NONE &&
+			!lent_[p_register] &&
 			(p_register >= function_.parameters || written_[p_register]);
 }
 
@@ -91,7 +93,12 @@ void FunctionWriter::line(const std::string &p_text) {
 }
 
 void FunctionWriter::put(uint32_t p_register, const std::string &p_owned) {
-	if (ir::is_held(kind(p_register))) {
+	if (lent_[p_register]) {
+		// What is handed over is counted once for this register, which counts nothing: the vector it was
+		// read from holds it all the while.
+		line(reg(p_register) + " = " + p_owned + ";");
+		line("release(c, " + reg(p_register) + ");");
+	} else if (ir::is_held(kind(p_register))) {
 		line("put(c, " + reg(p_register) + ", " + p_owned + ");");
 	} else {
 		line(reg(p_register) + " = " + p_owned + ";");
@@ -99,7 +106,7 @@ void FunctionWriter::put(uint32_t p_register, const std::string &p_owned) {
 }
 
 void FunctionWriter::share(uint32_t p_register, const std::string &p_borrowed) {
-	if (ir::is_held(kind(p_register))) {
+	if (ir::is_held(kind(p_register)) && !lent_[p_register]) {
 		line("store(c, " + reg(p_register) + ", " + p_borrowed + ");");
 	} else {
 		line(reg(p_register) + " = " + p_borrowed + ";");

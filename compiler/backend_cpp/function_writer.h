@@ -94,6 +94,10 @@ class FunctionWriter {
 	// counts no reference of its own), or NONE.
 	std::vector<uint32_t> borrowed_;
 	void find_borrowed();
+	// Per register: it holds an object read out of a vector (or copied from such a register) in a function
+	// where nothing can take the object out of the vector: it counts no reference of its own (rule 2).
+	std::vector<bool> lent_;
+	std::vector<bool> lent_candidates() const;
 	// GetField written: from the local a kept field is in, with no reference counted into a register that
 	// borrows, or as any other read.
 	void read_field(const ir::Instruction &p_in, const std::string &p_field);

@@ -81,6 +81,10 @@ with tempfile.TemporaryDirectory() as where:
         advance = functions(where, "frames_NBody.cpp").get("frames_NBody_advance", "")
         check("advance is found", bool(advance))
         check("a square root is the machine's, with no call of the runtime's", "std::sqrt(" in advance and "math_unary(" not in advance, advance)
+        inside = "".join(loops(advance))
+        check("advance's loops are found", bool(inside), advance)
+        check("a body read out of the vector counts no reference", "store(c" not in inside and "put(c" not in inside,
+              advance)
 
 with tempfile.TemporaryDirectory() as where:
     written = subprocess.run([kas3c, "cpp", "objects.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "bench"))
