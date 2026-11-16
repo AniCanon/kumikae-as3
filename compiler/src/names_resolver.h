@@ -65,6 +65,8 @@ class Resolver {
 	void name(Name *p_name);
 	void member(Member *p_member);
 	void expressions(const List<Expr *> &p_list);
+	void literal(Expr *p_expression);
+	void operation(Expr *p_expression);
 	void expression(Expr *p_expression);
 	void variables(VarDecl *p_decl);
 	void definition(Node *p_node, bool p_in_block);

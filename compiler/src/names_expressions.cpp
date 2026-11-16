@@ -124,24 +124,8 @@ void Resolver::expressions(const List<Expr *> &p_list) {
 	}
 }
 
-void Resolver::expression(Expr *p_expression) {
-	if (!p_expression) {
-		return;
-	}
+void Resolver::literal(Expr *p_expression) {
 	switch (p_expression->kind) {
-		case NodeKind::Name:
-			name(static_cast<Name *>(p_expression));
-			break;
-		case NodeKind::ThisExpr:
-			if (static_) {
-				error(p_expression->offset, "'this' can't be used in a static context");
-			}
-			break;
-		case NodeKind::SuperExpr:
-			if (static_ || !context_.klass || context_.klass->kind != SymbolKind::Class) {
-				error(p_expression->offset, "'super' can only be used in an instance method");
-			}
-			break;
 		case NodeKind::ArrayLit:
 			expressions(static_cast<ArrayLit *>(p_expression)->elements);
 			break;
@@ -154,28 +138,13 @@ void Resolver::expression(Expr *p_expression) {
 			type(static_cast<VectorLit *>(p_expression)->element_type);
 			expressions(static_cast<VectorLit *>(p_expression)->elements);
 			break;
-		case NodeKind::FunctionExpr:
-			function(static_cast<FunctionExpr *>(p_expression)->function, true);
+		default:
 			break;
-		case NodeKind::Member:
-			member(static_cast<Member *>(p_expression));
-			break;
-		case NodeKind::Index:
-			expression(static_cast<Index *>(p_expression)->object);
-			expression(static_cast<Index *>(p_expression)->index);
-			break;
-		case NodeKind::TypeApply:
-			expression(static_cast<TypeApply *>(p_expression)->base);
-			type(static_cast<TypeApply *>(p_expression)->argument);
-			break;
-		case NodeKind::Call:
-			expression(static_cast<Call *>(p_expression)->callee);
-			expressions(static_cast<Call *>(p_expression)->arguments);
-			break;
-		case NodeKind::New:
-			expression(static_cast<New *>(p_expression)->callee);
-			expressions(static_cast<New *>(p_expression)->arguments);
-			break;
+	}
+}
+
+void Resolver::operation(Expr *p_expression) {
+	switch (p_expression->kind) {
 		case NodeKind::Unary: {
 			Unary *unary = static_cast<Unary *>(p_expression);
 			if (unary->op == TokenKind::PlusPlus || unary->op == TokenKind::MinusMinus) {
@@ -200,6 +169,63 @@ void Resolver::expression(Expr *p_expression) {
 			expression(static_cast<Conditional *>(p_expression)->condition);
 			expression(static_cast<Conditional *>(p_expression)->then_value);
 			expression(static_cast<Conditional *>(p_expression)->else_value);
+			break;
+		default:
+			break;
+	}
+}
+
+void Resolver::expression(Expr *p_expression) {
+	if (!p_expression) {
+		return;
+	}
+	switch (p_expression->kind) {
+		case NodeKind::Name:
+			name(static_cast<Name *>(p_expression));
+			break;
+		case NodeKind::ThisExpr:
+			if (static_) {
+				error(p_expression->offset, "'this' can't be used in a static context");
+			}
+			break;
+		case NodeKind::SuperExpr:
+			if (static_ || !context_.klass || context_.klass->kind != SymbolKind::Class) {
+				error(p_expression->offset, "'super' can only be used in an instance method");
+			}
+			break;
+		case NodeKind::ArrayLit:
+		case NodeKind::ObjectLit:
+		case NodeKind::VectorLit:
+			literal(p_expression);
+			break;
+		case NodeKind::FunctionExpr:
+			function(static_cast<FunctionExpr *>(p_expression)->function, true);
+			break;
+		case NodeKind::Member:
+			member(static_cast<Member *>(p_expression));
+			break;
+		case NodeKind::Index:
+			expression(static_cast<Index *>(p_expression)->object);
+			expression(static_cast<Index *>(p_expression)->index);
+			break;
+		case NodeKind::TypeApply:
+			expression(static_cast<TypeApply *>(p_expression)->base);
+			type(static_cast<TypeApply *>(p_expression)->argument);
+			break;
+		case NodeKind::Call:
+			expression(static_cast<Call *>(p_expression)->callee);
+			expressions(static_cast<Call *>(p_expression)->arguments);
+			break;
+		case NodeKind::New:
+			expression(static_cast<New *>(p_expression)->callee);
+			expressions(static_cast<New *>(p_expression)->arguments);
+			break;
+		case NodeKind::Unary:
+		case NodeKind::Postfix:
+		case NodeKind::Binary:
+		case NodeKind::Assign:
+		case NodeKind::Conditional:
+			operation(p_expression);
 			break;
 		default:
 			break;
