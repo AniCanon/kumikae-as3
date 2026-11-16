@@ -61,6 +61,14 @@ enum class StringFunction : uint8_t {
 	Escape, Unescape, EncodeURI, EncodeURIComponent, DecodeURI, DecodeURIComponent
 };
 
+// Whether a StrCall of the function only reads text: it runs nothing of the program and raises nothing, so
+// a back end may call the library's function of plain values for it (vm/text_methods.h). split() may run
+// a delimiter's toString(), and the URI functions raise URIError: those are not.
+constexpr bool reads_text_only(StringFunction p_function) {
+	return p_function != StringFunction::Split && p_function != StringFunction::EncodeURI && p_function != StringFunction::EncodeURIComponent &&
+			p_function != StringFunction::DecodeURI && p_function != StringFunction::DecodeURIComponent;
+}
+
 // RegExp's methods and properties, in RegExpCall's second operand. After the RegExp, or the text for
 // String's methods:
 //   New                   the source, the flags (each a String, or untyped: a RegExp source is copied)  -> the RegExp

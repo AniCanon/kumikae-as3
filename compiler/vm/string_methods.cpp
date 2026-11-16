@@ -76,7 +76,7 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 		return;
 	}
 	Slot &out = p_registers[p_in.a];
-	if (!reads_text_only(which)) {
+	if (!ir::reads_text_only(which)) {
 		const Str *string = static_cast<const Str *>(p_registers[list[0]].p);
 		uri_function(which, string ? string->view() : std::string_view("null"), out);
 		return;

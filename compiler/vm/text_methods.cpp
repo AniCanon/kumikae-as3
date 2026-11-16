@@ -104,19 +104,6 @@ bool replace_first(const Slot &p_string, std::string_view p_pattern, std::string
 
 } // namespace
 
-bool reads_text_only(StringFunction p_function) {
-	switch (p_function) {
-		case StringFunction::Split:
-		case StringFunction::EncodeURI:
-		case StringFunction::EncodeURIComponent:
-		case StringFunction::DecodeURI:
-		case StringFunction::DecodeURIComponent:
-			return false;
-		default:
-			return true;
-	}
-}
-
 bool text_method(StringFunction p_function, const Values &p_values, Characters *p_characters, Slot *r_out) {
 	const auto text = [&](size_t p_index) { return text_of(p_values[p_index]); };
 	const auto number = [&](size_t p_index) { return p_values[p_index].d; };
@@ -177,7 +164,7 @@ bool text_method(StringFunction p_function, const Values &p_values, Characters *
 			return give_int(order < 0 ? -1 : order > 0 ? 1 : 0, r_out);
 		}
 		default:
-			return false; // Not one of these: see reads_text_only().
+			return false; // Not one of these: see ir::reads_text_only().
 	}
 }
 

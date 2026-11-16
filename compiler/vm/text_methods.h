@@ -25,11 +25,8 @@ struct Values {
 // A String of one character for each of the first 128, made once and kept by whoever holds the array.
 using Characters = std::array<Str *, 128>;
 
-// Whether the function is one of these: it runs nothing of the program and raises nothing. (split() may
-// run a delimiter's toString(), and the URI functions raise URIError: those are not.)
-bool reads_text_only(ir::StringFunction p_function);
-
-// The method, done. What it gives is written to r_out whole: a Number, an int, or a String with one
+// One of the methods ir::reads_text_only() names, done. What it gives is written to r_out whole: a Number,
+// an int, or a String with one
 // reference, the caller's. False, with nothing written, if memory ran out. p_characters may be null.
 bool text_method(ir::StringFunction p_function, const Values &p_values, Characters *p_characters, Slot *r_out);
 

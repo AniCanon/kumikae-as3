@@ -708,7 +708,8 @@ static void test_text_methods() {
 	CHECK(text_method(StringFunction::CharAt, Values{ at, nullptr, 2 }, &kept, &out));
 	CHECK(kept['e'] == out.p);
 	CHECK_EQ(text_of(out), std::string("e"));
-	CHECK(reads_text_only(StringFunction::Upper) && !reads_text_only(StringFunction::Split) && !reads_text_only(StringFunction::EncodeURI));
+	CHECK(kas3::ir::reads_text_only(StringFunction::Upper) && !kas3::ir::reads_text_only(StringFunction::Split) &&
+			!kas3::ir::reads_text_only(StringFunction::EncodeURI));
 	for (Str *each : kept) {
 		if (each && release(each)) {
 			free_string(each);
