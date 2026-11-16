@@ -296,30 +296,33 @@ static void check_override_allowed(Unit &p_unit, uint16_t p_modifiers, uint32_t 
 	}
 }
 
+void Compilation::declare_class(Unit &p_unit, ClassDecl *p_decl, bool p_in_block) {
+	Symbol *symbol = new_symbol(SymbolKind::Class, p_decl->name, &p_unit, p_decl->name_offset);
+	symbol->node = p_decl;
+	symbol->modifiers = p_decl->modifiers.bits;
+	classes_.emplace_back();
+	symbol->klass = &classes_.back();
+	symbol->klass->symbol = symbol;
+	p_decl->symbol = symbol;
+	if ((p_decl->modifiers.bits & Modifiers::Dynamic) && !p_unit.is_declaration) {
+		p_unit.diagnostics.error(p_decl->name_offset, "dynamic classes are not supported");
+	}
+	if (p_unit.is_builtin) {
+		for (const Metadata &tag : p_decl->metadata) {
+			symbol->klass->incomplete |= tag.name == "Incomplete";
+		}
+	}
+	check_override_allowed(p_unit, p_decl->modifiers.bits, p_decl->name_offset);
+	check_native(p_unit, p_decl->modifiers.bits, p_decl->name_offset);
+	declare_package_level(p_unit, symbol, p_in_block);
+	declare_class_members(p_unit, symbol, p_decl);
+}
+
 void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block) {
 	switch (p_node->kind) {
-		case NodeKind::ClassDecl: {
-			ClassDecl *decl = static_cast<ClassDecl *>(p_node);
-			Symbol *symbol = new_symbol(SymbolKind::Class, decl->name, &p_unit, decl->name_offset);
-			symbol->node = decl;
-			symbol->modifiers = decl->modifiers.bits;
-			classes_.emplace_back();
-			symbol->klass = &classes_.back();
-			symbol->klass->symbol = symbol;
-			decl->symbol = symbol;
-			if ((decl->modifiers.bits & Modifiers::Dynamic) && !p_unit.is_declaration) {
-				p_unit.diagnostics.error(decl->name_offset, "dynamic classes are not supported");
-			}
-			if (p_unit.is_builtin) {
-				for (const Metadata &tag : decl->metadata) {
-					symbol->klass->incomplete |= tag.name == "Incomplete";
-				}
-			}
-			check_override_allowed(p_unit, decl->modifiers.bits, decl->name_offset);
-			check_native(p_unit, decl->modifiers.bits, decl->name_offset);
-			declare_package_level(p_unit, symbol, p_in_block);
-			declare_class_members(p_unit, symbol, decl);
-		} break;
+		case NodeKind::ClassDecl:
+			declare_class(p_unit, static_cast<ClassDecl *>(p_node), p_in_block);
+			break;
 		case NodeKind::InterfaceDecl: {
 			InterfaceDecl *decl = static_cast<InterfaceDecl *>(p_node);
 			Symbol *symbol = new_symbol(SymbolKind::Interface, decl->name, &p_unit, decl->name_offset);

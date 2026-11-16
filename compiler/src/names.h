@@ -111,6 +111,7 @@ class Compilation {
 	// declare
 	void declare_unit(Unit &p_unit);
 	void declare_definition(Unit &p_unit, Node *p_node, bool p_in_block);
+	void declare_class(Unit &p_unit, ClassDecl *p_decl, bool p_in_block);
 	void declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_in_block);
 	void declare_class_members(Unit &p_unit, Symbol *p_class, ClassDecl *p_decl);
 	void declare_interface_members(Unit &p_unit, Symbol *p_interface, InterfaceDecl *p_decl);
