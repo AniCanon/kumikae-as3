@@ -98,21 +98,36 @@ uint32_t Calls::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	if (p_type == l_.array_ && l_.array_) {
 		return Vectors(l_).vector_new(l_.compilation_.instance_type(l_.array_), p_call->arguments, p_call->callee->offset); // Array(4) is new Array(4).
 	}
+	if (p_type == l_.object_ && p_call->arguments.count <= 1) {
+		return Dynamic(l_).object_from(p_call->arguments.count ? p_call->arguments[0] : nullptr, position);
+	}
 	Kind conversion = Kind::Void;
-	if (!l_.kind_of_class(p_type, &conversion) || p_call->arguments.count != 1) {
+	if (!l_.kind_of_class(p_type, &conversion) || p_call->arguments.count > 1) {
 		l_.refuse(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "'");
 		return l_.default_value(p_want, position);
 	}
-	if (conversion == Kind::Str && l_.untyped(p_call->arguments[0])) {
-		return l_.any_text(p_call->arguments[0]); // String(x): "undefined" and "null" are words.
+	return conversion_of(p_call->arguments, conversion, position);
+}
+
+uint32_t Calls::conversion_of(const List<Expr *> &p_arguments, Kind p_conversion, uint32_t p_position) {
+	if (p_arguments.count == 0) {
+		if (p_conversion == Kind::Str || p_conversion == Kind::F64) {
+			const uint32_t empty = l_.reg(p_conversion);
+			l_.emit(p_conversion == Kind::Str ? Op::ConstStr : Op::ConstF64, p_position, empty, p_conversion == Kind::Str ? l_.string("") : l_.number(0));
+			return empty;
+		}
+		return l_.default_value(p_conversion, p_position);
 	}
-	uint32_t value = written_value(p_call->arguments[0], conversion, position);
-	if (conversion != Kind::Str) {
+	if (p_conversion == Kind::Str && l_.untyped(p_arguments[0])) {
+		return l_.any_text(p_arguments[0]); // String(x): "undefined" and "null" are words.
+	}
+	uint32_t value = written_value(p_arguments[0], p_conversion, p_position);
+	if (p_conversion != Kind::Str) {
 		return value;
 	}
 	// The conversion written out always gives a string: a missing one becomes "null".
 	uint32_t text = l_.reg(Kind::Str);
-	l_.emit(Op::StrToStr, position, text, value);
+	l_.emit(Op::StrToStr, p_position, text, value);
 	return text;
 }
 

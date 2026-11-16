@@ -110,7 +110,15 @@ their identity and anything else by its text; properties by name on an `Object`,
 Array (`o.a`, `o["a"]`, `o.a = v`, `delete`, `in`, `hasOwnProperty`, a property that holds a function called
 as one); `for in` and `for each` over any of these; an untyped value that holds an object of a class of the
 program, by the names of its public fields, methods, getters and setters (Flash's ReferenceErrors #1069,
-#1056, #1037, #1074 and #1077 for the rest); Array's `sortOn`. `RegExp` (literals, `new RegExp`, the flags
+#1056, #1037, #1074 and #1077 for the rest); Array's `sortOn`. `Object`'s methods on any value, a number, a
+Boolean and a String included (`n.toLocaleString()`, `s.hasOwnProperty("length")`), with
+`setPropertyIsEnumerable`, which hides a property of an Object, a Dictionary or an Array from `for in`,
+`for each` and JSON (on a sealed object it is ReferenceError #1056, from recollection of avmplus); a
+number's `toString(radix)`, `toFixed`, `toExponential` and `toPrecision`, a Vector's `fixed` and a
+Function's `length` by name on an untyped value (a Vector takes no other property: ReferenceError #1056);
+`toLocaleString()` of an Array and a Vector; `new String(x)`, `new Number(x)` and the like, which give the
+value itself (AS3 has no wrapper objects), `String()` and `int()` with nothing to convert, and `Object(x)`
+(the value, or a new Object for null). `RegExp` (literals, `new RegExp`, the flags
 `g i m s x`, its properties, `exec` and `test` with `lastIndex`, which one that is not global keeps, as in
 avmplus) and String's `match`, `search`, `replace` (with `$1`, `$&` and the rest, or a function) and
 `split` by one; `Date`, with the host's clock and zone (its getters and setters, local and UTC, its texts,
@@ -125,8 +133,11 @@ so is an object on an Object (its `toString()`), but not on a Dictionary. A loop
 were when it began: one deleted on the way is passed over, one added is not reached.
 
 **What is refused, by name, until later slices:** `new Dictionary(true)` (weak keys, said when the program
-runs), a method of an Array, a Vector, a String or a number called or read by name on an untyped value
-(`u.push(1)`, said when it runs), a RegExp's or a Date's method read by name and not called, or a property
+runs), a method of an Array, a Vector, a String or a Function called by name on an untyped value
+(`u.push(1)`, said when it runs), any method of the built-in library read by name and not called
+(`u.push`, `o.toString`), an element written by name into a Vector of objects held untyped, `instanceof`,
+`arguments`, the conversions `Vector.<T>(x)`, `Function(x)` and `Class(x)`, `concat` of a Vector with one of
+another type or an Array, a RegExp's or a Date's method read by name and not called, or a property
 neither declares (both are dynamic in AS3), a property of one of Godot's values held untyped, by name, `this` and
 `super` written inside a function expression (AS3's `this` there is not the method's object), an
 interface's method that a class has only from Godot's API or the built-in library, a class that extends
@@ -179,7 +190,8 @@ from recollection of avmplus, not checked against Flash.
 
 **Values as text** follow avmplus's library source: an Array leaves null and undefined elements out of its
 text, and a Vector's `join` and `toString` write them as `null` and `undefined` (`toLocaleString` leaves
-them out of both); a function of any kind is `function Function() {}`; a RegExp's `lastIndex` is an `int`.
+them out of both, and asks each element for its own `toLocaleString()`: a class's own, a Date's, an Array's
+or a Vector's, and otherwise its text); a function of any kind is `function Function() {}`; a RegExp's `lastIndex` is an `int`.
 An Array or a Vector that holds itself, or nests more than 500 deep, put into words is Error #1023, as
 avmplus's stack check gives (its `join` has no other guard).
 

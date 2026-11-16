@@ -24,7 +24,7 @@ std::optional<VectorMethod> vector_method(std::string_view p_name) {
 		std::string_view name;
 		VectorMethod method;
 	};
-	static constexpr std::array<Method, 16> methods = { {
+	static constexpr std::array<Method, 17> methods = { {
 			{ "push", VectorMethod::Push },
 			{ "unshift", VectorMethod::Unshift },
 			{ "pop", VectorMethod::Pop },
@@ -36,6 +36,7 @@ std::optional<VectorMethod> vector_method(std::string_view p_name) {
 			{ "concat", VectorMethod::Concat },
 			{ "join", VectorMethod::Join },
 			{ "toString", VectorMethod::Join },
+			{ "toLocaleString", VectorMethod::LocaleText },
 			{ "insertAt", VectorMethod::InsertAt },
 			{ "removeAt", VectorMethod::RemoveAt },
 			{ "splice", VectorMethod::Splice },
@@ -121,6 +122,9 @@ VectorShape vector_shape(VectorMethod p_method, Kind p_element, bool p_array) {
 		case VectorMethod::Join:
 			fixed = { Kind::Str };
 			left_out = { 0 }; // A comma, made below.
+			result = Kind::Str;
+			break;
+		case VectorMethod::LocaleText:
 			result = Kind::Str;
 			break;
 		case VectorMethod::InsertAt:

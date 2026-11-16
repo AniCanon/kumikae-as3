@@ -25,13 +25,13 @@ std::optional<uint32_t> Entries::find_object(const void *p_object) const {
 	return found == objects_.end() ? std::nullopt : std::optional<uint32_t>(found->second);
 }
 
-void Entries::add(Slot p_key, Slot p_value) {
+void Entries::add(Slot p_key, Slot p_value, bool p_hidden) {
 	// Packed when more than half are deleted: a table used as a queue stays small.
 	if (entries_.size() - live_ > 8 && entries_.size() - live_ > live_) {
 		pack();
 	}
 	const uint32_t at = static_cast<uint32_t>(entries_.size());
-	entries_.push_back({ p_key, p_value });
+	entries_.push_back({ p_key, p_value, p_hidden });
 	if (any::tag(p_key) == AnyTag::String) {
 		texts_.emplace(text_of(p_key), at);
 	} else {
@@ -47,7 +47,7 @@ Entry Entries::remove(uint32_t p_at) {
 	} else {
 		objects_.erase(any::pointer(gone.key));
 	}
-	entries_[p_at] = { any::undefined(), any::undefined() };
+	entries_[p_at] = { any::undefined(), any::undefined(), false };
 	live_--;
 	return gone;
 }

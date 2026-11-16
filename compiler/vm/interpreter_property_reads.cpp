@@ -18,8 +18,9 @@ constexpr std::array<std::string_view, 7> OBJECT_METHODS = { "hasOwnProperty", "
 	"toLocaleString", "toString", "valueOf" };
 constexpr std::array<std::string_view, 20> ARRAY_METHODS = { "concat", "every", "filter", "forEach", "indexOf", "join", "lastIndexOf", "map", "pop",
 	"push", "reverse", "shift", "slice", "some", "sort", "sortOn", "splice", "unshift", "insertAt", "removeAt" };
-constexpr std::array<std::string_view, 16> STRING_METHODS = { "charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "localeCompare", "match",
-	"replace", "search", "slice", "split", "substr", "substring", "toLowerCase", "toUpperCase", "fromCharCode" };
+constexpr std::array<std::string_view, 18> STRING_METHODS = { "charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "localeCompare", "match",
+	"replace", "search", "slice", "split", "substr", "substring", "toLowerCase", "toUpperCase", "toLocaleLowerCase", "toLocaleUpperCase",
+	"fromCharCode" };
 constexpr std::array<std::string_view, 3> NUMBER_METHODS = { "toFixed", "toExponential", "toPrecision" };
 
 template <size_t Count>
@@ -81,7 +82,14 @@ bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Sl
 		*r_value = share(Kind::Any, p_vector->properties->value_at(*at));
 		return true;
 	}
-	if (listed(ARRAY_METHODS, p_key.text) || listed(OBJECT_METHODS, p_key.text) || p_key.text == "fixed") {
+	if (p_key.text == "fixed" && !klass.array) {
+		Slot fixed;
+		fixed.bits = 0;
+		fixed.b = p_vector->fixed;
+		*r_value = to_any(Kind::Bool, fixed);
+		return true;
+	}
+	if (listed(ARRAY_METHODS, p_key.text) || listed(OBJECT_METHODS, p_key.text)) {
 		raise_unsupported("reading '" + p_key.text + "' of " + (klass.array ? "an Array" : "a Vector") + " by its name");
 		return false;
 	}
@@ -98,6 +106,10 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 	const ir::Class &klass = module_.classes[p_object->klass];
 	if (const std::optional<bool> done = library_get(p_object, p_key.text, r_value)) {
 		return *done;
+	}
+	if (p_object->klass == module_.function_class && p_key.text == "length") {
+		*r_value = any::integer(function_length(p_object));
+		return true;
 	}
 	if (const std::optional<uint32_t> field = klass.field(p_key.text, true)) {
 		*r_value = to_any(klass.fields[*field].kind, p_object->fields()[*field]);

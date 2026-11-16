@@ -279,8 +279,12 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 		if (klass.array) {
 			return set_entry(properties_of(p_vector), p_key, p_value);
 		}
-		raise_unsupported("a property of a Vector other than its elements and length, by its name");
-		return false;
+		if (p_key.text == "fixed") {
+			p_vector->fixed = any::to_boolean(p_value);
+			return true;
+		}
+		// A Vector takes no property of its own, as a sealed object takes none.
+		return refuse_write("1056", "Cannot create property ", p_key.text, any::object(p_vector));
 	}
 	if (klass.element == Kind::Obj || ir::is_engine(klass.element)) {
 		raise_unsupported("writing an element of a Vector of objects held untyped");

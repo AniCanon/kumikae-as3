@@ -174,6 +174,7 @@ private:
 	void string_split(const ir::Function &p_function, const ir::Instruction &p_in);
 	void uri_function(ir::StringFunction p_which, std::string_view p_text, Slot &r_out);
 	void number_text(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
+	std::optional<std::string> number_words(ir::NumberFormat p_format, Slot p_value, bool p_wide, double p_digits);
 	// RegExp (vm/regexp_methods.cpp, vm/regexp_strings.cpp). A pattern is read once for each source and
 	// flags, and kept while anything uses it: a replacement function may make the cache forget it.
 	std::unordered_map<std::string, std::shared_ptr<const regex::Program>> patterns_;
@@ -264,6 +265,8 @@ private:
 	bool table_text(Object *p_table, std::string *r_text, bool *r_own);
 	void call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
+	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
+	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	void property_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	Entries *loop_entries(Slot p_holder) const;
@@ -308,6 +311,7 @@ private:
 	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale = false);
 	bool locale_element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
+	bool said_by(uint32_t p_method, Object *p_object, std::string *r_text);
 	// Vectors put into words inside one another's words (an Array in an Array, or one that holds itself)
 	// nest at most this deep, by recursion in C++; one more is Error #1023, as Flash's stack check gives.
 	// A level takes about 270 bytes of stack in a release build (measured): 500 fit in a third of the

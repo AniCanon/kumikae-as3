@@ -294,6 +294,7 @@ output = compare("functions.gd", [
     "lerp of anything", "lerp into the wrong type", "now", "zone", "a regular expression",
     "a freed object as text", "a freed object to hash and isSame", "str of a freed object and of null",
     "a freed object inside a collection", "a script object of no Godot class is not written as null", "a whole Number stays a float",
+    "a freed object in locale text",
 ])
 check("functions.gd: trace shows a freed object as null", "traced: null" in output, output[-1200:])
 check("functions.gd: print shows a freed object and a null as null", "freed: null null" in output, output[-1200:])

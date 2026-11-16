@@ -77,9 +77,7 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			break;
 		case Op::FunctionLength: {
 			if (Object *value = function_in(p_function.registers[p_in.b], r[p_in.b])) {
-				const Function &callee = module_.functions[static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i)];
-				const uint32_t declared = callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0);
-				set_int32(r[p_in.a], static_cast<int32_t>(declared));
+				set_int32(r[p_in.a], function_length(value));
 			}
 			break;
 		}
@@ -93,6 +91,12 @@ void Interpreter::function_op(const Function &p_function, const Instruction &p_i
 			call_value(p_function, p_in);
 			break;
 	}
+}
+
+// A function value's `length`: the parameters it declares, without what it takes first or `...rest`.
+int32_t Interpreter::function_length(Object *p_function) const {
+	const Function &callee = module_.functions[static_cast<uint32_t>(p_function->fields()[ir::FUNCTION_INDEX].i)];
+	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
 // CallbackThis: a method keeps its own object, so Flash will not be told another (Error #1510).

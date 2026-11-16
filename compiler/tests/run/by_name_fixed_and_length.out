@@ -1,0 +1,8 @@
+false false
+true true
+caught 1126
+false 3
+Error #1056: Cannot create property extra on __AS3__.vec.Vector.<int>.
+undefined
+2 2 1 2
+1,2,3

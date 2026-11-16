@@ -20,6 +20,8 @@ namespace vm {
 struct Entry {
 	Slot key;
 	Slot value;
+	// setPropertyIsEnumerable(name, false): passed over by `for in`, `for each` and JSON; there for the rest.
+	bool hidden = false;
 };
 
 // Holds a reference to each key and value; letting them go is the interpreter's, which knows how.
@@ -42,7 +44,7 @@ public:
 	Slot &value_at(uint32_t p_at) { return entries_[p_at].value; }
 	// A new property, last in order. It takes over the references the key and the value hold. Positions
 	// found before may change.
-	void add(Slot p_key, Slot p_value);
+	void add(Slot p_key, Slot p_value, bool p_hidden = false);
 	// Takes a property out: the references it held are the caller's.
 	Entry remove(uint32_t p_at);
 	// Takes every property out, in order: the references are the caller's.

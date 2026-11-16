@@ -77,6 +77,13 @@ package {
 			var nothing:*;
 			return [str(kept), str(kept, none), str(held), str(none), str(null), str(nothing), str("a", null, 1)].join(",");
 		}
+		// toLocaleString() leaves a null out of an Array and a Vector, and so a freed object.
+		public function freedLocale():String {
+			var none:Node = null;
+			var nodes:Vector.<Node> = new <Node>[kept, none];
+			var held:* = [kept, 2];
+			return nodes.toLocaleString() + ";" + [kept, none, 1].toLocaleString() + ";" + held.toLocaleString();
+		}
 		public function freedPrinted():void { print("freed: ", kept, " ", null); }
 		// Only a null is written so: a script object Godot has no form for is still refused.
 		public function plainStr():String {

@@ -33,6 +33,7 @@ public:
 	uint32_t literal(ObjectLit *p_literal);
 	// `new Object()` and `new Dictionary(weakKeys)`. Nothing if the class is neither.
 	std::optional<uint32_t> made(New *p_new, const Symbol *p_class);
+	uint32_t object_from(Expr *p_value, uint32_t p_position);
 	// `o.f(...)` where `f` is reached by name, or is one of Object's own methods. Nothing if it is not.
 	std::optional<uint32_t> call(Call *p_call);
 	uint32_t remove(Unary *p_delete);

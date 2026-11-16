@@ -151,6 +151,11 @@ uint32_t Expressions::new_value(Expr *p_expression) {
 	if (const std::optional<uint32_t> table = Dynamic(l_).made(made, symbol)) {
 		return *table;
 	}
+	Kind primitive = Kind::Void;
+	if (symbol && l_.kind_of_class(symbol, &primitive) && made->arguments.count <= 1) {
+		// AS3 has no wrapper objects: `new String(x)` is the String itself, as String(x) gives it.
+		return Calls(l_).conversion_of(made->arguments, primitive, position);
+	}
 	if (!symbol || !l_.class_index(symbol, &index)) {
 		l_.refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
 		return l_.default_value(Kind::Obj, position);
