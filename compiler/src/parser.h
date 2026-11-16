@@ -137,8 +137,6 @@ private:
 	Expr *parse_postfix();
 	Member *parse_member_link(Expr *p_object);
 	Expr *parse_call_member(bool p_allow_calls);
-	Expr *parse_literal_token();
-	Expr *parse_regex();
 	Expr *parse_parenthesized();
 	Expr *parse_primary();
 	Expr *parse_new();
@@ -147,6 +145,8 @@ private:
 	std::string_view parse_property_name(const char *p_what);
 
 	// Literals. In parser_literals.cpp.
+	Expr *parse_literal_token();
+	Expr *parse_regex();
 	Expr *parse_array_literal();
 	Expr *parse_object_literal();
 	Expr *parse_function_expression();

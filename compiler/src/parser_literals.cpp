@@ -1,7 +1,52 @@
-// Array, object and function literals.
+// Literals: numbers, strings, `true`, `false`, `null`, regular expressions, arrays, objects and functions.
 #include "parser.h"
 
 namespace kas3 {
+
+// A number, a string, `true`, `false` or `null`.
+Expr *Parser::parse_literal_token() {
+	switch (current_.kind) {
+		case TokenKind::Number: {
+			NumberLit *literal = node<NumberLit>(current_.offset);
+			literal->text = text(advance());
+			last_height_ = 1;
+			return finish(literal);
+		}
+		case TokenKind::String: {
+			StringLit *literal = node<StringLit>(current_.offset);
+			literal->text = text(advance());
+			last_height_ = 1;
+			return finish(literal);
+		}
+		case TokenKind::KwTrue:
+		case TokenKind::KwFalse: {
+			BoolLit *literal = node<BoolLit>(current_.offset);
+			literal->value = advance().kind == TokenKind::KwTrue;
+			last_height_ = 1;
+			return finish(literal);
+		}
+		case TokenKind::KwNull:
+			last_height_ = 1;
+			return finish(node<NullLit>(advance().offset));
+		default:
+			return missing_expression();
+	}
+}
+
+Expr *Parser::parse_regex() {
+	// Where an expression must begin, a slash starts a regular expression.
+	current_ = lexer_.rescan_as_regex(current_);
+	has_next_ = false;
+	note_current();
+	if (current_.kind != TokenKind::Regex) {
+		advance();
+		return missing_expression();
+	}
+	RegexLit *literal = node<RegexLit>(current_.offset);
+	literal->text = text(advance());
+	last_height_ = 1;
+	return finish(literal);
+}
 
 Expr *Parser::parse_array_literal() {
 	Restore allow_in(no_in_, false);
