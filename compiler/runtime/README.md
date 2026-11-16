@@ -39,11 +39,19 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
   error leaves (`leave_failed`).
 - **`kas3_program`** is the one symbol a program library exports.
 
-## The library is the interpreter's, through thunks
+## The library: called directly where it is a function of plain values, by thunk where it is not yet
 
-Strings' and vectors' methods, RegExp, Date, JSON, properties by name, the untyped value's conversions and
-function values are written once, in `vm/`, as members of `vm::Interpreter` that work on a frame's
-registers. Until they are split from it (the list below), the host keeps an interpreter of its own:
+AS3's library is written once, in `vm/`. The parts that are functions of plain values (`vm/library.h`: a
+String's methods, numbers as text, vectors and Arrays, the untyped value's conversions and `is`, objects
+and tables made) are called by generated code as they are: `ir/library_entries.h` names the function for an
+instruction, the generator writes a call of the runtime's function of that name (`direct.h`), and
+`direct.cpp` hands the values on. What such a function asks of whoever runs the program (`vm::Runner`:
+raise, out of memory, call a function value, a value's text) is answered for generated code there: an
+error is the context's at once, and a function value or a `toString()` is called as the C++ it is.
+
+The rest (RegExp, Date, JSON, properties by name, a value's text, the untyped value's operators, function
+values) are still members of `vm::Interpreter` that work on a frame's registers. For those, and for the
+parts of them a moved function still asks for (`vm::Unmoved`), the host keeps an interpreter of its own:
 
 - Its module (`stub_module.cpp`) has the program's classes, static fields and strings under their own
   numbers: made from the program's table for a program run on its own, and a copy of the program's own
@@ -64,7 +72,8 @@ registers. Until they are split from it (the list below), the host keeps an inte
 What this costs, until the split:
 
 - A thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
-  most operations take. `fast.h` exists for that reason.
+  most operations take. `fast.h` exists for that reason, and each family that becomes a function of plain
+  values loses its thunks.
 - The interpreter lets entries nest only `MAX_ENTRIES` (64) deep. A recursion that passes through a thunk
   that calls back on every level (a sort's comparison that sorts, a JSON reviver that parses, a getter
   reached by name that reads another) ends with Error #1023 at the 63rd, where the interpreter would go
@@ -93,28 +102,39 @@ What this costs, until the split:
 
 ## To split out of `vm/`, so that no interpreter is needed
 
-Each is used here through a thunk or a workaround, named so that the split can be checked against it:
+Done: `Heap` (who holds what, the collector, `list_for()`: `vm/heap.h`); a String's methods, `split()`,
+the URI functions and numbers as text; vectors and Arrays (elements, length, making, methods, `sort` and
+`sortOn`); `to_any`, `from_any`, `is` and `is_class`; `New` and `TableNew`; an Error's fields
+(`new_error()`), which native code fills in for an error it raises itself.
 
-1. The method wrappers, as functions of plain values with what they need passed in (the classes, a way to
-   call a function of the program, a way to raise): `string_methods.cpp`, `vector_methods.cpp`,
-   `vector_sort.cpp`, `interpreter_vectors.cpp`, `regexp_methods.cpp`, `regexp_strings.cpp`,
-   `date_methods.cpp`, `json_methods.cpp`, `json_stringify.cpp`, `library_members.cpp`.
-2. Properties by name and tables (`interpreter_properties*.cpp`, `interpreter_property_calls.cpp`), and the
-   untyped value's conversions and operators (`interpreter_any*.cpp`): `to_any`, `from_any`, `any_text`,
-   equality, `+`, `<`, `is`.
-3. Function values (`interpreter_functions.cpp`): making one (the one value of a static function is kept by
-   the interpreter), the arguments of a call through one, `apply`.
-4. Raising: `raise(class, message)`, the words of #1009, #1023 and #1000, an Error's fields filled in, and
-   `object_text` / `error_heading`. The host makes the interpreter raise each (`Builtin`).
-5. Lifetime: freeing an object with what it holds (`drop_object`, now reached through `free_kept()` and
-   `discard()`), and making one on the collector's list (`Collector::list_for` is the interpreter's own:
-   `new` of a class the collector looks at, a new Array, Vector, Object or Dictionary go by thunk for that
-   alone; `new_object()` makes the others). With both, allocation can have the inline fast path the design
-   asks for: today there is none, each object is one `calloc`.
-6. `any.h`: the tag and the payloads as inline functions, so that an untyped value is kept and let go of
+Still used here through a thunk, or asked of the interpreter by a moved function (`vm::Unmoved` lists
+exactly those), named so that the split can be checked against it:
+
+1. The method wrappers left: `regexp_methods.cpp`, `regexp_strings.cpp` (and with them `split()` by a
+   RegExp, which goes by the host's own thunk), `date_methods.cpp`, `json_methods.cpp`,
+   `json_stringify.cpp`, `library_members.cpp`.
+2. A value's text (`any_text`, a vector's text in `interpreter_vectors.cpp`, `object_text`), which needs
+   one more thing of the runner: a function of the program called by its number with typed values. With
+   it `Runner::text` and `Runner::call` become library functions themselves.
+3. Properties by name and tables (`interpreter_properties*.cpp`, `interpreter_property_calls.cpp`), and the
+   untyped value's operators (`interpreter_any_operators.cpp`: equality, `+`, `<`), `any_primitive` and
+   Godot's Arrays and Dictionaries copied.
+4. Function values (`interpreter_functions.cpp`): making one (the one value of a static function is kept
+   by the interpreter), the arguments of a call through one, `apply`. Until then a call the fast path
+   does not take is the library's `apply`, by the host's thunk.
+5. Raising: the words of #1009, #1023 and #1000 are still raised by the interpreter for the host
+   (`Builtin`), and `object_text` / `error_heading`.
+6. Lifetime: freeing an object with what it holds is the heap's (`Heap::drop_object`), still reached
+   through the interpreter's `free_kept()` and `discard()`; an inline allocation path on the context's
+   own free lists is not written.
+7. `any.h`: the tag and the payloads as inline functions, so that an untyped value is kept and let go of
    inline.
-7. Classes as the host's descriptors (`ClassInfo`) where the library now takes `ir::Class`: `each_held()`,
+8. Classes as the host's descriptors (`ClassInfo`) where the library takes `ir::Class`: `each_held()`,
    the collector, `is_class`.
+9. Callbacks nest as deep as the C++ stack allows where the library's function is called directly; the
+   interpreter (and any thunk) still allows 64 calls from outside in progress, so a recursion through a
+   library callback ends with Error #1023 there at the 64th. The interpreter needs the stack's floor, as
+   the context has (`stack_low`), in place of that count.
 
 ## Rules
 
