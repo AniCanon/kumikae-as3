@@ -281,12 +281,13 @@ says so; if not, a warning says why and the interpreter runs them. Nothing build
 cd game && kas3c cpp --godot $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
 c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden \
     -I compiler/runtime -I compiler/vm -I compiler/ir -I compiler/src \
-    -shared -undefined dynamic_lookup native/*.cpp -o bin/libkas3_program.dylib
+    -shared native/*.cpp -o bin/libkas3_program.dylib
 ```
 
 The files are given in the order the extension reads them (sorted by their place in the project), so that
 both compile the same module. The library shows one symbol, `kas3_program`, includes nothing of Godot's or
-godot-cpp's, and finds the runtime's functions in the extension's library, which is loaded already.
+godot-cpp's, and has no symbol of ours left to find when it is loaded: the host hands it the runtime's
+functions in a table (`runtime/api.h`), as it hands it the engine's.
 
 Everything the extension does goes on as before, through an interpreter the runtime's host keeps over the
 same module with each function's body native (`vm/native_code.h`): only what runs when a function is

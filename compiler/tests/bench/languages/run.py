@@ -39,10 +39,9 @@ WORKLOADS = (("spin", "calls"), ("work", "script"), ("vec", "vectors"))
 LANGUAGES = (("cs", "C#"), ("gd", "GDScript"), ("as", "AS3"))
 NATIVE = ("native", "AS3 native")
 COMPILER = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-# What generated code is built with (the design's flags), into a library that shows one symbol and finds the
-# runtime in the extension's library, which is loaded already.
-NATIVE_FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops", "-fvisibility=hidden", "-shared",
-                "-undefined", "dynamic_lookup"]
+# What generated code is built with (the design's flags), into a library that shows one symbol and needs
+# none of ours: the host hands it the runtime's functions in a table.
+NATIVE_FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops", "-fvisibility=hidden", "-shared"]
 # The project's own files: anything else in the folder (an earlier editor's .godot, an export) is left behind.
 PROJECT_FILES = ("CmpAs.as", "CmpCs.cs", "CmpCs.csproj", "CmpCs.sln", "CmpGd.gd", "export_presets.cfg", "main.gd",
                  "main.tscn", "project.godot")

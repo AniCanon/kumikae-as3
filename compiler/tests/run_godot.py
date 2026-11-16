@@ -681,7 +681,7 @@ def native_probe(kas3c):
         program = os.path.join(where, "libkas3_program.dylib")
         includes = [flag for each in ("runtime", "vm", "ir", "src") for flag in ("-I", os.path.join(root, each))]
         built = subprocess.run([compiler, "-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops", "-Wall",
-                                "-Wextra", "-Werror", "-fvisibility=hidden", "-shared", "-undefined", "dynamic_lookup", *includes,
+                                "-Wextra", "-Werror", "-fvisibility=hidden", "-shared", *includes,
                                 *sorted(glob.glob(os.path.join(where, "native", "*.cpp"))), "-o", program], capture_output=True, text=True,
                                timeout=600)
         check("native: the C++ builds without a warning", built.returncode == 0, built.stderr[-900:])

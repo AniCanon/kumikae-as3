@@ -8,8 +8,11 @@ For each program of run/ (the same ones run_programs.py holds the interpreter to
   1. `kas3c cpp` writes it as C++ into <work dir>/<name>. A program that uses something the backend does
      not translate yet is refused there with `not yet supported: <operation>`: it is counted as skipped,
      under that operation. Nothing but the generator decides that a program is skipped.
-  2. The C++ is built into a plain executable with the flags generated code is meant for, warnings as
-     errors, against the runtime (--include, --lib). The runtime's headers are precompiled once for the
+  2. The C++ is built with the flags generated code is meant for, warnings as errors, into a program
+     library: a shared library that shows one symbol, `kas3_program`, and is linked against nothing of
+     ours, so that a function of the runtime it reached by name and not through the host's table would be
+     an undefined symbol and fail the build. The executable is the runtime's `main` (--lib) with that
+     library. The runtime's headers are precompiled once for the
      run: every generated file reads them, and reading them is most of the time a file takes to build.
   3. The executable runs. Standard output must equal X.out; standard error (after what the compiler said,
      its warnings) must equal X.err, or be empty without one; the exit status is 1 for a program that ends
@@ -34,6 +37,9 @@ import sys
 # What generated code is built with (the design's flags), and as strictly as our own.
 FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops", "-Wall", "-Wextra",
          "-Werror"]
+# A program library: one symbol shown, and no symbol left to find when it is loaded (macOS's linker refuses
+# one by itself; the others are told to).
+LIBRARY_FLAGS = ["-shared", "-fPIC", "-fvisibility=hidden"] + ([] if sys.platform == "darwin" else ["-Wl,-z,defs"])
 NOT_YET = "kas3c: not yet supported: "
 
 
@@ -72,7 +78,7 @@ def precompiled():
     os.makedirs(folder_, exist_ok=True)
     header = os.path.join(folder_, "kas3_all.h")
     with open(header, "w") as handle:
-        handle.write('#include "kas3.h"\n\n#include <cmath>\n#include <cstdint>\n#include <limits>\n')
+        handle.write('#define KAS3_PROGRAM_LIBRARY 1\n#include "kas3.h"\n\n#include <cmath>\n#include <cstdint>\n#include <limits>\n')
     built = subprocess.run([given["--cxx"][0], *FLAGS, *given["--flag"], *includes, "-x", "c++-header", header, "-o", header + ".gch"],
                            capture_output=True, text=True, timeout=600)
     if built.returncode != 0:
@@ -98,10 +104,15 @@ def one(name):
         return "failed", "kas3c cpp: exit %d\n%s" % (written.returncode, written.stderr)
     executable = os.path.join(out, "program")
     sources = sorted(glob.glob(os.path.join(out, "*.cpp")))
-    built = subprocess.run([given["--cxx"][0], *FLAGS, *given["--flag"], *includes, *headers, *sources, *given["--lib"], "-o", executable],
+    library = os.path.join(out, "libprogram.dylib" if sys.platform == "darwin" else "libprogram.so")
+    built = subprocess.run([given["--cxx"][0], *FLAGS, *given["--flag"], *LIBRARY_FLAGS, *includes, *headers, *sources, "-o", library],
                            capture_output=True, text=True, timeout=600)
     if built.returncode != 0:
         return "failed", "the C++ did not build\n" + built.stderr[-4000:]
+    linked = subprocess.run([given["--cxx"][0], *given["--flag"], library, *given["--lib"], "-Wl,-rpath," + out, "-o", executable],
+                            capture_output=True, text=True, timeout=600)
+    if linked.returncode != 0:
+        return "failed", "the program did not link\n" + linked.stderr[-4000:]
     try:
         ran = subprocess.run([executable], capture_output=True, text=True, cwd=folder, timeout=120, env=environment)
     except subprocess.TimeoutExpired:

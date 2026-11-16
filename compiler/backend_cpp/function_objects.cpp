@@ -90,7 +90,7 @@ bool FunctionWriter::object(const Instruction &p_in) {
 			if (fixed > 0) {
 				line("const Slot g[] = { " + slots + " };");
 			}
-			line("const Slot f = thunk(c, " + std::to_string(thunks_.function_value(index_, bound)) + ", " + (bound ? "g" : "nullptr") + ");");
+			line("const Slot f = thunk(c, " + std::to_string(thunks_.function_value(index_, bound)) + ", " + (bound ? "g" : "nullptr") + ", nullptr);");
 			check();
 			line("Object *const e = arguments_of(c, " + std::to_string(index_) + ", " + (fixed > 0 ? "g" : "nullptr") + ", " +
 					(takes_count(function_) ? std::string("n") : std::to_string(fixed)) + ", static_cast<Object *>(f.p));");

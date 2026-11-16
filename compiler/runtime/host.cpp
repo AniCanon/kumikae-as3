@@ -39,6 +39,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	context.class_used = class_used.data();
 	context.classes = program.classes;
 	context.program = &program;
+	context.api = runtime_api();
 	context.host = this;
 }
 

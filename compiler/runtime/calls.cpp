@@ -15,23 +15,23 @@ namespace rt {
 using ir::Kind;
 using vm::AnyTag;
 
-Str *text_of(int32_t p_value) {
+Str *text_of_int(Context *, int32_t p_value) {
 	return vm::new_string(std::to_string(p_value));
 }
-Str *text_of(uint32_t p_value) {
+Str *text_of_uint(Context *, uint32_t p_value) {
 	return vm::new_string(std::to_string(p_value));
 }
-Str *text_of(int64_t p_value) {
+Str *text_of_wide(Context *, int64_t p_value) {
 	return vm::new_string(std::to_string(p_value));
 }
-Str *text_of(double p_value) {
+Str *text_of_number(Context *, double p_value) {
 	return vm::new_string(vm::number_to_string(p_value));
 }
-Str *text_of(bool p_value) {
+Str *text_of_flag(Context *, bool p_value) {
 	return vm::new_string(p_value ? "true" : "false");
 }
 
-bool number_to_any(double p_value, Slot *r_any) {
+bool number_to_any(Context *, double p_value, Slot *r_any) {
 	if (p_value != std::trunc(p_value)) {
 		*r_any = vm::any::number(p_value); // Not-a-number too: it is not equal to itself.
 		return true;
@@ -92,12 +92,12 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 	}
 }
 
-bool has_members(Slot p_any) {
+bool has_members(Context *, Slot p_any) {
 	const AnyTag tag = vm::any::tag(p_any);
 	return tag != AnyTag::Null && tag != AnyTag::Undefined;
 }
 
-Object *function_of(Slot p_any) {
+Object *function_of_any(Context *, Slot p_any) {
 	return vm::any::tag(p_any) == AnyTag::Object ? static_cast<Object *>(vm::any::pointer(p_any)) : nullptr;
 }
 
@@ -131,7 +131,7 @@ bool result_to_any(Context *c, Kind p_kind, Slot p_result, Slot *r_any) {
 			*r_any = p_result;
 			return true;
 		case Kind::F64:
-			if (number_to_any(p_result.d, r_any)) {
+			if (number_to_any(c, p_result.d, r_any)) {
 				return true;
 			}
 			*r_any = c->host->builtin(Builtin::NumberToAny, &p_result);

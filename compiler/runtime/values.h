@@ -20,6 +20,7 @@ using vm::Vector;
 
 struct Program; // runtime/program.h
 struct ClassInfo;
+struct Api; // runtime/api.h
 struct EngineApi; // runtime/engine.h
 struct Resolved;
 struct Host; // The host's own state: nothing generated code reads.
@@ -52,6 +53,7 @@ struct Context {
 	uint8_t *class_used = nullptr; // Per class: its static fields have been (or are being) given values.
 	const ClassInfo *classes = nullptr; // The program's, here too: a call through a method table starts from it.
 	const Program *program = nullptr;
+	const Api *api = nullptr; // The runtime's functions, as a program library reaches them.
 	// The engine, where the host has one (runtime/engine.h): its entry points, what the host worked out
 	// for each place the program asks it for something (never null: empty entries with no engine), and
 	// Godot's names for the Strings the program gives where a name is taken, each built once.
@@ -68,6 +70,14 @@ __attribute__((always_inline)) inline bool stack_low(const Context *c) {
 	return reinterpret_cast<uintptr_t>(__builtin_frame_address(0)) < c->stack_floor;
 }
 
+} // namespace rt
+} // namespace kas3
+
+#include "api.h"
+
+namespace kas3 {
+namespace rt {
+
 // A slot with nothing in it. (`Slot{}` clears the union's first member only: half of a pointer.)
 inline Slot empty() {
 	Slot slot;
@@ -76,9 +86,9 @@ inline Slot empty() {
 }
 
 // An object whose last reference went: what it holds is let go of, and it is freed.
-void free_object(Context *c, Object *p_object);
+//     void free_object(Context *c, Object *p_object);
 // The same for what an untyped value holds, if it holds something counted.
-void release_any_slow(Context *c, Slot p_value);
+//     void release_any_slow(Context *c, Slot p_value);
 
 // Every change to a count in generated code is one of these, so that the rule (plain counts now) changes
 // in one place.
@@ -94,7 +104,7 @@ inline void retain(Context *, Object *p_object) {
 }
 // An untyped value with a reference of its own: what it holds counted once more, or, for one of Godot's,
 // another handle on it.
-Slot shared_any(Context *c, Slot p_any);
+//     Slot shared_any(Context *c, Slot p_any);
 // A value as another holder takes it: the same String or object, counted once more.
 inline Str *shared(Context *c, Str *p_string) {
 	retain(c, p_string);
@@ -107,9 +117,9 @@ inline Object *shared(Context *c, Object *p_object) {
 inline Slot shared(Context *c, Slot p_any) {
 	return shared_any(c, p_any);
 }
-inline void release(Context *, Str *p_string) {
+inline void release(Context *c, Str *p_string) {
 	if (p_string && --p_string->references == 0) {
-		vm::free_string(p_string);
+		free_string(c, p_string);
 	}
 }
 inline void release(Context *c, Object *p_object) {
@@ -191,8 +201,8 @@ inline Slot slot(Slot p_value) {
 }
 
 // The object an untyped value holds, as it is held: for a catch that takes an object.
-inline Object *object_of(Slot p_any) {
-	return static_cast<Object *>(vm::any::pointer(p_any));
+inline Object *object_of(Context *c, Slot p_any) {
+	return static_cast<Object *>(any_pointer(c, p_any));
 }
 
 // A typed field of an object: the fields follow the header, eight bytes each (vm::Object::fields()).

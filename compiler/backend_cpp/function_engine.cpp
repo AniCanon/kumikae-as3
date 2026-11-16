@@ -191,7 +191,7 @@ bool FunctionWriter::engine_alias(const Instruction &p_in) {
 	if (!given.empty()) {
 		line("\tconst Slot t[] = { " + given + " };");
 	}
-	line("\tconst Slot o = thunk(c, " + std::to_string(thunk) + ", " + (given.empty() ? "nullptr" : "t") + ");");
+	line("\tconst Slot o = thunk(c, " + std::to_string(thunk) + ", " + (given.empty() ? "nullptr" : "t") + ", nullptr);");
 	line("\tif (KAS3_UNLIKELY(c->failing)) { " + fail() + " }");
 	line("\trelease(c, Ref{ o.p });");
 	line("}");

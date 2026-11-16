@@ -42,8 +42,8 @@ struct Resolved {
 	uint64_t defaults[2] = { 0, 0 }; // The parameters the call leaves out, as Godot declares them, bare.
 };
 
-void *copy_handle(Context *c, void *p_handle);
-void drop_handle(Context *c, void *p_handle);
+//     void *copy_handle(Context *c, void *p_handle);
+//     void drop_handle(Context *c, void *p_handle);
 
 inline Ref shared(Context *c, Ref p_value) {
 	return Ref{ p_value.handle ? copy_handle(c, p_value.handle) : nullptr };

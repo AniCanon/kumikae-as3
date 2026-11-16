@@ -161,7 +161,7 @@ void FunctionWriter::by_thunk(const Instruction &p_in) {
 		line("Slot u = empty();");
 	}
 	line(std::string(use.result != NONE ? "const Slot o = " : "") + "thunk(c, " + std::to_string(use.thunk) + ", " + given +
-			(use.updated != NONE ? ", &u" : "") + ");");
+			(use.updated != NONE ? ", &u" : ", nullptr") + ");");
 	check();
 	if (use.updated != NONE) {
 		put(use.updated, from_slot(kind(use.updated), "u"));
@@ -309,11 +309,11 @@ std::string FunctionWriter::handlers() const {
 			const std::string target = "goto L" + std::to_string(handler.target) + ";";
 			out += "\tif (catches(c, " + number(handler.type) + ")) {";
 			if (held == Kind::Obj || held == Kind::Any) {
-				out += " put(c, " + reg(handler.reg) + ", " + (held == Kind::Obj ? "object_of(" + error + ")" : error) + "); " + target + " }\n";
+				out += " put(c, " + reg(handler.reg) + ", " + (held == Kind::Obj ? "object_of(c, " + error + ")" : error) + "); " + target + " }\n";
 				continue;
 			}
 			// A catch of a String or a number: the value thrown as that kind, as a store makes it one.
-			out += "\n\t\tconst Slot e = " + error + ";\n\t\tconst Slot o = thunk(c, " + std::to_string(thunks_.from_any(held)) + ", &e);\n";
+			out += "\n\t\tconst Slot e = " + error + ";\n\t\tconst Slot o = thunk(c, " + std::to_string(thunks_.from_any(held)) + ", &e, nullptr);\n";
 			out += "\t\trelease(c, e);\n\t\tif (KAS3_UNLIKELY(c->failing)) goto failed;\n";
 			out += "\t\t" + (ir::is_held(held) ? "put(c, " + reg(handler.reg) + ", " + from_slot(held, "o") + ");" : reg(handler.reg) + " = " + from_slot(held, "o") + ";") +
 					"\n\t\t" + target + "\n\t}\n";
