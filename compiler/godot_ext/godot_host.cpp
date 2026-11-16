@@ -27,6 +27,9 @@
 #include <cmath>
 #include <cstdlib>
 #include <new>
+#include <optional>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace godot;
@@ -87,6 +90,38 @@ Variant to_variant(ir::Kind p_kind, const vm::Slot &p_slot) {
 	}
 }
 
+namespace {
+
+// Godot's value type of this name ("Vector2"), found without making text: the names are read once.
+std::optional<Variant::Type> value_type_named(std::string_view p_name) {
+	static const std::vector<std::pair<std::string, Variant::Type>> types = [] {
+		std::vector<std::pair<std::string, Variant::Type>> all;
+		for (int type = 0; type < Variant::VARIANT_MAX; type++) {
+			const CharString name = Variant::get_type_name((Variant::Type)type).utf8();
+			all.emplace_back(std::string(name.get_data(), (size_t)name.length()), (Variant::Type)type);
+		}
+		return all;
+	}();
+	for (const auto &[name, type] : types) {
+		if (name == p_name) {
+			return type;
+		}
+	}
+	return std::nullopt;
+}
+
+// Godot's text for a class name the program declares, made once: checking what arrives builds no text.
+const String &class_text(std::string_view p_name) {
+	static std::unordered_map<std::string, String> made;
+	const auto [entry, added] = made.try_emplace(std::string(p_name));
+	if (added) {
+		entry->second = to_godot(p_name);
+	}
+	return entry->second;
+}
+
+} // namespace
+
 bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_value) {
 	Variant::Type type = p_value.get_type();
 	bool number = type == Variant::INT || type == Variant::FLOAT;
@@ -131,7 +166,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 			if (type == Variant::OBJECT && !object) {
 				return true; // An object that has been freed: null, as it is to a script everywhere.
 			}
-			return object && (p_godot_type.empty() || object->is_class(to_godot(p_godot_type)));
+			return object && (p_godot_type.empty() || object->is_class(class_text(p_godot_type)));
 		}
 		case ir::Kind::Any:
 			return true; // Anything at all.
@@ -140,7 +175,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 			if (type == Variant::OBJECT) {
 				return false;
 			}
-			return type == Variant::NIL || p_godot_type.empty() || Variant::get_type_name(type) == to_godot(p_godot_type);
+			return type == Variant::NIL || p_godot_type.empty() || value_type_named(p_godot_type) == type;
 		default:
 			return false; // A script object can't come from Godot.
 	}
