@@ -81,6 +81,7 @@ static bool compile_project(ir::Module *r_module, std::string *r_errors, size_t 
 // Flash stops a script that runs too long, after 15 seconds; so does this, after the project's setting
 // `actionscript/limits/script_timeout_seconds` (0 for no limit).
 static std::unique_ptr<vm::Interpreter> new_interpreter(const ir::Module &p_module, GodotHost &p_host) {
+	p_host.new_program(); // What is worked out from here on is this program's.
 	auto made = std::make_unique<vm::Interpreter>(p_module, p_host);
 	const double seconds = ProjectSettings::get_singleton()->get_setting("actionscript/limits/script_timeout_seconds",
 			vm::Interpreter::FLASH_TIME_LIMIT / 1000.0);
@@ -278,6 +279,13 @@ void Project::reload() {
 	fresh->superseded(); // Godot's objects now hold the new program's script objects, not the old one's.
 	fresh.reset();
 	module.reset();
+	// The program just let go of was the only other one that held what the host worked out for it.
+	program->host_.release_unused();
+	if (std::getenv("KAS3_REPORT_PREPARED")) {
+		const auto [kept, used] = program->host_.own_places();
+		UtilityFunctions::print(String("ActionScript: ") + String::num_int64((int64_t)kept) + " calls keep a name of their own, " +
+				String::num_int64((int64_t)used) + " of them the running program's");
+	}
 	AS3Script::refresh_all();
 	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.");
 	restart.scenes = refresh_scenes();

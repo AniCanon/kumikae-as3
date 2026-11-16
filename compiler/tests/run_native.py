@@ -24,7 +24,8 @@ the number for each, which is small and does not grow with the loop: a change th
 it millions, and fails here and not only in a timing.
 
 deep_frames, whose calls each hold a great deal, is run once more with a stack too small for it
-(KAS3_STACK_KB): running out of stack must be Error #1023 too, never a crash.
+(KAS3_STACK_KB): running out of stack must be Error #1023 too, never a crash. So is callbacks_nest, whose
+calls pass through the library's own.
 
 With --unit each program is written as one file of C++ (`kas3c cpp --unit`), as a release is built: the
 sanitizer build runs the suite that way, the normal build with a file for each class, so both are held to
@@ -192,6 +193,15 @@ if outcomes.get("deep_frames", ("", ""))[0] == "passed":
     elif small.returncode != 1 or "Error #1023" not in small.stderr or "9968 more" in small.stderr:
         failures.append("deep_frames with a small stack: exit %d\n%s" % (small.returncode, small.stderr[-600:]))
 
+if outcomes.get("callbacks_nest", ("", ""))[0] == "passed":
+    small = step("callbacks_nest with a small stack", [os.path.join(work, "callbacks_nest", "program")], 120, cwd=folder,
+                 env=dict(environment, KAS3_STACK_KB="4096"))
+    if small is None:
+        failures.append("callbacks_nest with a small stack ran for more than 120 seconds")
+    else:
+        overflowed = "Error #1023" in small.stderr or "1023 " in small.stdout
+        if small.returncode not in (0, 1) or not overflowed or "Sanitizer" in small.stderr or (small.returncode == 1) != small.stderr.startswith("Error: Error #1023"):
+            failures.append("callbacks_nest with a small stack: exit %d\n%s%s" % (small.returncode, small.stdout[-300:], small.stderr[-600:]))
 
 def counted(name):
     """What the host counted while a benchmark program ran, as native_counts.txt writes it; or why there is none."""

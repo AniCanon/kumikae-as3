@@ -225,13 +225,15 @@ static int run_ir(int p_argc, char **p_argv) {
 	return 0;
 }
 
-static int run_run(int p_argc, char **p_argv) {
-	kas3::ir::Module module;
-	int status = 0;
-	if (!compile(p_argc, p_argv, &module, &status)) {
-		return status;
-	}
+struct ProgramRun {
+	const kas3::ir::Module &module;
 	bool ok = false;
+};
+
+static void run_module(void *p_run) {
+	ProgramRun &run = *static_cast<ProgramRun *>(p_run);
+	const kas3::ir::Module &module = run.module;
+	bool &ok = run.ok;
 	{
 		kas3::vm::StandaloneOutput output;
 		// KAS3_NOW fixes the time Date takes as now, in milliseconds since 1970 (for tests); TZ sets the zone,
@@ -243,6 +245,19 @@ static int run_run(int p_argc, char **p_argv) {
 		interpreter.set_time_limit(limit ? (uint32_t)std::strtoul(limit, nullptr, 10) : kas3::vm::Interpreter::FLASH_TIME_LIMIT);
 		ok = interpreter.run_program();
 	}
+}
+
+static int run_run(int p_argc, char **p_argv) {
+	kas3::ir::Module module;
+	int status = 0;
+	if (!compile(p_argc, p_argv, &module, &status)) {
+		return status;
+	}
+	// On a thread with a stack that holds as many calls as may nest (vm/stack.h), like the program built
+	// as native code: the library's calls back into the program are C++ calls here too.
+	ProgramRun run{ module };
+	kas3::vm::run_as_program(run_module, &run);
+	const bool ok = run.ok;
 	std::fflush(stdout);
 	// Everything the program made should be gone by now: as the interpreter goes, its cycle collector frees
 	// what is left in loops (vm/collector.h).

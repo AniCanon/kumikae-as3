@@ -41,7 +41,7 @@ void Interpreter::at_statement() {
 	const bool carry_on = hook_(*this, hook_data_);
 	frames_.back().pc++;
 	if (time_limit_) {
-		entered_ = std::chrono::steady_clock::now(); // A debugger's stop is not the program's time.
+		entered_ = host_.clock.elapsed(); // A debugger's stop is not the program's time.
 	}
 	if (!carry_on) {
 		stopped_ = true;

@@ -105,9 +105,12 @@ void Classes::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 		const uint32_t holds = kind == Kind::Obj ? l_.declared_class(declarator.type) : NONE;
 		// An untyped field starts undefined; one declared `Object` starts null.
 		const bool starts_null = l_.starts_null_type(kind, l_.compilation_.type_of(declarator.type));
+		const Type *type = declarator.type ? l_.compilation_.type_of(declarator.type) : nullptr;
+		const std::string engine_type = is_engine(kind) && type && type->symbol ? godot_name(type->symbol->name, std::string_view()).value_or(std::string())
+																				: std::string();
 		if (p_decl->modifiers.bits & Modifiers::Static) {
 			l_.globals_[declarator.symbol] = (uint32_t)l_.module_.globals.size();
-			l_.module_.globals.push_back({ l_.module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds, starts_null });
+			l_.module_.globals.push_back({ l_.module_.classes[p_class].name + "." + std::string(declarator.name), kind, holds, starts_null, engine_type });
 		} else {
 			l_.fields_[declarator.symbol] = (uint32_t)l_.module_.classes[p_class].fields.size();
 			l_.module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null });
@@ -115,10 +118,7 @@ void Classes::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 			field.is_public = (p_decl->modifiers.bits & Modifiers::Public) != 0;
 			field.is_protected = (p_decl->modifiers.bits & Modifiers::Protected) != 0;
 			field.constant = p_decl->is_const;
-			const Type *type = declarator.type ? l_.compilation_.type_of(declarator.type) : nullptr;
-			if (is_engine(kind) && type && type->symbol) {
-				field.engine_type = godot_name(type->symbol->name, std::string_view()).value_or(std::string());
-			}
+			field.engine_type = engine_type;
 			field.exported = declares_export(p_decl);
 			if (field.exported) {
 				field.first = first_value(declarator.initializer, kind, type, &Lowerer::literal_value, &Lowerer::unescape);

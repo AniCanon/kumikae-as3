@@ -47,6 +47,10 @@ struct GodotHost::Worked final : vm::Prepared {
 	// The type of each parameter: a Builtin's are exact; a Bound's say where a StringName is taken.
 	std::vector<int> parameters;
 	mutable std::vector<NameKept> names; // By parameter, for those that take a StringName.
+	// Worked out for one call alone (it keeps that call's names), and the last program that asked for it:
+	// an instruction's place is a program's own, so it goes when no program left uses it.
+	bool own_place = false;
+	mutable uint64_t program = 0;
 	// FieldGet, FieldSet: a part of one of Godot's values (Vector2's x).
 	GDExtensionPtrGetter getter = nullptr;
 	GDExtensionPtrSetter setter = nullptr;

@@ -15,6 +15,7 @@ The project is compiler/tests/godot_project: Player.as on a CharacterBody2D sets
 moveAndSlide() for 30 physics frames. At 200 units a second and 60 frames a second that is 100 units.
 """
 import glob
+import hashlib
 import os
 import re
 import shutil
@@ -26,6 +27,15 @@ import native_godot
 
 tests = os.path.abspath(sys.argv[1])
 project = os.path.join(tests, "godot_project")
+# Every build folder's run uses this one project (its .godot folder, the one extension library in its
+# bin): two runs at once would each rewrite what the other is reading. The second waits for the first,
+# on a lock that goes with the process however it ends.
+try:
+    import fcntl
+    held = open(os.path.join(tempfile.gettempdir(), "kas3-godot-" + hashlib.sha256(project.encode()).hexdigest()[:16] + ".lock"), "w")
+    fcntl.flock(held, fcntl.LOCK_EX)
+except ImportError:
+    held = None  # No such lock on this system: runs there are not made side by side.
 godot = os.environ.get("KAS3_GODOT") or shutil.which("godot")
 
 
@@ -181,7 +191,7 @@ check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" 
 output = compare("signals.gd", [
     "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "counts what scripts added", "remove all leaves others", "lasting or once, not both",
     "null argument and order", "arguments", "removes itself",
-    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "declared signal listed", "filter",
+    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "a signal's object", "declared signal listed", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed", "own signal field by name", "by name from a base: its own private field",
     "by name from a subclass: its own private field", "by name from a subclass: a base's private field is not reached", "by name in a function written in the base: its private field",
@@ -619,6 +629,7 @@ def reload_test(label, elsewhere):
                 file.write(text)
         environment = dict(os.environ)
         environment.pop("KAS3_SOURCE_DIR", None)
+        environment["KAS3_REPORT_PREPARED"] = "1"
         if elsewhere:
             sources = os.path.join(edited, "sources")
             shutil.copytree(copy, sources, ignore=shutil.ignore_patterns("bin", ".godot"))
@@ -639,6 +650,12 @@ def reload_test(label, elsewhere):
         check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 5, output[-1500:])
         check("%s: a script with an error is reported and not loaded" % label,
               "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
+        # What the host worked out for a call at its own place (one that takes a StringName keeps the name
+        # it made) is let go of with the program it was worked out for: after each reload, none is kept
+        # that the program now running does not use.
+        kept = re.findall(r"ActionScript: (\d+) calls keep a name of their own, (\d+) of them the running program's", output)
+        check("%s: a reload keeps no call's name the running program does not use" % label,
+              len(kept) == 5 and all(each[0] == each[1] for each in kept) and any(int(each[0]) > 0 for each in kept), str(kept))
 
 
 reload_test("reload.gd", False)

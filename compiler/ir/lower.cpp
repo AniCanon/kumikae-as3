@@ -215,7 +215,7 @@ void Lowerer::declare_package_level(Unit *p_unit, const List<Node *> &p_definiti
 				for (Declarator &declarator : static_cast<VarDecl *>(definition)->declarators) {
 					if (declarator.symbol) {
 						globals_[declarator.symbol] = (uint32_t)module_.globals.size();
-						module_.globals.push_back({ std::string(declarator.name), written_kind(declarator.type, declarator.offset, Kind::F64) });
+						module_.globals.push_back({ std::string(declarator.name), written_kind(declarator.type, declarator.offset, Kind::F64), NONE, false, {} });
 					}
 				}
 				break;

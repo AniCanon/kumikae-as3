@@ -39,15 +39,39 @@ Slot of_number(uint32_t p_value) {
 	return slot;
 }
 
+// An untyped value as the element of the kind it would have to be for === to find it: nothing is
+// converted, and undefined is null (avmplus's Vector.as, `indexOf(value:Object)`). Nothing where no element
+// of that kind can be it.
+std::optional<Slot> sought(Kind p_kind, Slot p_value) {
+	const AnyTag tag = any::tag(p_value);
+	if (p_kind == Kind::Bool) {
+		return tag == AnyTag::Boolean ? std::optional<Slot>(of_number(any::to_bool_payload(p_value) ? 1 : 0)) : std::nullopt;
+	}
+	if (tag == AnyTag::Null || tag == AnyTag::Undefined) {
+		return of_pointer(nullptr);
+	}
+	const AnyTag wanted = p_kind == Kind::Str ? AnyTag::String : p_kind == Kind::Obj ? AnyTag::Object : p_kind == Kind::Val ? AnyTag::Value : AnyTag::Godot;
+	return tag == wanted ? std::optional<Slot>(of_pointer(any::pointer(p_value))) : std::nullopt;
+}
+
 // indexOf and lastIndexOf: the index of the first element, from the start or from the end, that is the
 // value, or -1.
 void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
 	const Kind kind = p_library.module().classes[p_vector->klass].element;
 	const uint32_t length = p_vector->length;
 	int32_t found = -1;
-	if (p_call.method == VectorMethod::IndexOf) {
+	Slot value = p_call.values[1];
+	if (p_call.method == VectorMethod::IndexOfAny || p_call.method == VectorMethod::LastIndexOfAny) {
+		const std::optional<Slot> element = sought(kind, value);
+		if (!element) {
+			give(p_library, p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));
+			return;
+		}
+		value = *element;
+	}
+	if (p_call.method == VectorMethod::IndexOf || p_call.method == VectorMethod::IndexOfAny) {
 		for (uint32_t i = clamped(p_call.values[2].i, length); i < length && found < 0; i++) {
-			found = p_library.unmoved.element_is(kind, p_vector->data[i], p_call.values[1]) ? static_cast<int32_t>(i) : -1;
+			found = p_library.unmoved.element_is(kind, p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
 		}
 	} else {
 		// From the end if negative; before the start, there is nothing to look at.
@@ -55,18 +79,25 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 		int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
 		from = from >= length ? static_cast<int64_t>(length) - 1 : from;
 		for (int64_t i = from; i >= 0 && found < 0; i--) {
-			found = p_library.unmoved.element_is(kind, p_vector->data[i], p_call.values[1]) ? static_cast<int32_t>(i) : -1;
+			found = p_library.unmoved.element_is(kind, p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
 		}
 	}
 	give(p_library, p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));
 }
 
-// join: the elements as text, with the separator given between them. toLocaleString(): each element in
-// its locale words, with commas between.
+// join: the elements as text, with the separator given between them. toString(): with commas between.
+// toLocaleString(): each element in its locale words, with commas between.
 void vector_join(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
 	const bool locale = p_call.method == VectorMethod::LocaleText;
-	const Str *separator = locale ? nullptr : static_cast<const Str *>(p_call.values[1].p);
-	const std::string between(locale ? std::string_view(",") : separator ? separator->view() : std::string_view("null"));
+	const bool joined = p_call.method == VectorMethod::Join;
+	const Str *separator = joined ? static_cast<const Str *>(p_call.values[1].p) : nullptr;
+	std::string between(!joined ? std::string_view(",") : separator ? separator->view() : std::string_view("null"));
+	if (p_call.method == VectorMethod::JoinAny && any::tag(p_call.values[1]) != AnyTag::Undefined) {
+		between.clear();
+		if (!p_library.runner.text(p_call.values[1], &between)) {
+			return;
+		}
+	}
 	std::string all;
 	retain(p_vector); // Kept while its elements speak for themselves, which may run the program.
 	const bool done = p_library.unmoved.vector_text(p_vector, between, &all, locale);
@@ -258,6 +289,8 @@ bool vector_call(Library &p_library, VectorMethod p_method, const Slot *p_values
 			break;
 		case VectorMethod::IndexOf:
 		case VectorMethod::LastIndexOf:
+		case VectorMethod::IndexOfAny:
+		case VectorMethod::LastIndexOfAny:
 			vector_find(p_library, vector, call);
 			break;
 		case VectorMethod::Reverse:
@@ -269,7 +302,9 @@ bool vector_call(Library &p_library, VectorMethod p_method, const Slot *p_values
 			vector_copy(p_library, vector, call);
 			break;
 		case VectorMethod::Join:
+		case VectorMethod::JoinAny:
 		case VectorMethod::LocaleText:
+		case VectorMethod::Text:
 			vector_join(p_library, vector, call);
 			break;
 		case VectorMethod::Splice:

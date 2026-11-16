@@ -25,6 +25,10 @@ void Library::raise_null() {
 	runner.raise(heap.module.type_error_class, "Error #1009: Cannot access a property or method of a null object reference.");
 }
 
+void Library::raise_overflow() {
+	runner.raise(heap.module.error_class, "Error #1023: Stack overflow occurred.");
+}
+
 void Library::raise_unsupported(const std::string &p_what) {
 	runner.raise(heap.module.error_class, p_what + " is not supported by the interpreter yet");
 }

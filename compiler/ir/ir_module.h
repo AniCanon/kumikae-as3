@@ -186,6 +186,7 @@ struct Global {
 	Kind kind = Kind::Void;
 	uint32_t klass = NONE; // As for a field.
 	bool starts_null = false; // As for a field.
+	std::string engine_type = {}; // As for a field.
 };
 
 struct Module {

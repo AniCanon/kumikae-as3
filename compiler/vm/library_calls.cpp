@@ -125,8 +125,9 @@ bool LibraryCall::converted(const Taken *p_fixed, Takes p_takes, size_t p_index,
 	const bool left_out = p_index >= given_.size();
 	const Slot given = left_out ? any::undefined() : given_[p_index];
 	const bool text = p_takes == Takes::Text || p_takes == Takes::Words;
-	if (text && !method_.text_left_out.empty() && (left_out || any::tag(given) == AnyTag::Undefined)) {
-		r_value->p = vm_.text(std::string(method_.text_left_out)); // Undefined is the default, as for one left out.
+	if (text && !method_.text_left_out.empty() && left_out) {
+		// Only one left out: undefined given is null, as a store into a String makes it (avmplus's coerce_s).
+		r_value->p = vm_.text(std::string(method_.text_left_out));
 		return r_value->p != nullptr;
 	}
 	if (left_out && p_takes == Takes::Any) {
@@ -144,6 +145,10 @@ bool LibraryCall::converted(const Taken *p_fixed, Takes p_takes, size_t p_index,
 		vm_.drop_any(held);
 		r_value->p = said ? vm_.text(words) : nullptr;
 		return r_value->p != nullptr;
+	}
+	if (p_takes == Takes::Sought && *r_kind == Kind::Any) {
+		// Looked for as it is: nothing is converted, but for undefined in a Vector.<Object>, which is null.
+		return vm_.from_any(given, Kind::Any, klass && klass->element == Kind::Any ? klass->element_check : NONE, r_value);
 	}
 	uint32_t check = NONE;
 	if (p_takes == Takes::Element) {
@@ -191,7 +196,9 @@ void LibraryCall::typed() {
 	}
 	const Kind result = ir::kind_taken(method_.result, klass ? klass->element : Kind::Void);
 	const ir::Op op = method_.does == Does::VecCall ? ir::Op::VecCall : method_.does == Does::StrCall ? ir::Op::StrCall : ir::Op::RegExpCall;
-	if (const std::optional<Slot> made = run_typed(vm_, op, method_.which, kinds, values, result)) {
+	const uint32_t which = klass && method_.does == Does::VecCall ? static_cast<uint32_t>(ir::search_untyped(static_cast<ir::VectorMethod>(method_.which), klass->element))
+																  : method_.which;
+	if (const std::optional<Slot> made = run_typed(vm_, op, which, kinds, values, result)) {
 		give(result, *made);
 	}
 }

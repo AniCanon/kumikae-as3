@@ -9,6 +9,7 @@ host differs.
 | `interpreter_errors.cpp` | Errors: raising one, catching it, its stack trace, and reporting it to the host |
 | `interpreter_run.cpp` | The loop: one case per operation |
 | `interpreter_conversions.cpp`, `interpreter_time_limit.cpp` | What the loop hands on: an Int64 converted with a check, an object as text; the time limit on a call from outside (Error #1502) |
+| `stack` | The C++ stack a program runs on: where a thread's is nearly used up (Error #1023 for one more call from outside, for the interpreter and native code alike), and the thread with a large one that a program run on its own is given |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
 | `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
 | `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on |

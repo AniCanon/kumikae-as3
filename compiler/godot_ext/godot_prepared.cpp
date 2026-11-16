@@ -314,6 +314,15 @@ bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operan
 			return false;
 		}
 	}
+	if (p_worked.result == Variant::OBJECT) {
+		// A value type's method that gives an object (Signal's get_object) writes the bare pointer. Written
+		// inside a Variant it would be an object with no id, which reads as none: the Variant is made of
+		// the object instead.
+		GDExtensionObjectPtr object = nullptr;
+		p_worked.builtin(receiver, pointers, &object, (int)(p_count - first));
+		const Variant result = object ? Variant(internal::get_object_instance_binding(object)) : Variant();
+		return take(p_result, result, p_worked.name, r_result, r_error);
+	}
 	if (r_result && into_handle(p_result, p_worked.result)) {
 		Variant *made = result_handle(p_result, p_worked);
 		p_worked.builtin(receiver, pointers, inside(*made, p_worked.result), (int)(p_count - first));
@@ -638,12 +647,30 @@ const vm::Prepared *GodotHost::prepare(const ir::Module &p_module, const ir::Fun
 	// `isActionPressed("right")` each keep theirs, and neither is made again.
 	if (std::find(worked->parameters.begin(), worked->parameters.end(), (int)Variant::STRING_NAME) != worked->parameters.end()) {
 		key += " at " + std::to_string(reinterpret_cast<uintptr_t>(&p_in));
+		worked->own_place = true;
 	}
+	worked->program = program_;
 	// The same request elsewhere, or in a program loaded again, is worked out once.
 	if (auto found = worked_.find(key); found != worked_.end()) {
+		found->second->program = program_;
 		return found->second.get();
 	}
 	return keep(std::move(key), std::move(worked));
+}
+
+void GodotHost::release_unused() {
+	for (auto at = worked_.begin(); at != worked_.end();) {
+		at = at->second->own_place && at->second->program != program_ ? worked_.erase(at) : std::next(at);
+	}
+}
+
+std::pair<size_t, size_t> GodotHost::own_places() const {
+	size_t kept = 0, used = 0;
+	for (const auto &[key, worked] : worked_) {
+		kept += worked->own_place ? 1 : 0;
+		used += worked->own_place && worked->program == program_ ? 1 : 0;
+	}
+	return { kept, used };
 }
 
 bool GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,

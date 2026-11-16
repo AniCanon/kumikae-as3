@@ -22,6 +22,13 @@ package {
 		public function listenOwn():void { scored.add(onHit); }
 		public function score(n:int):void { scored.emit(n); }
 		public function ownSignalName():String { return scored.getName(); }
+		// The object a signal is of: this node for its own, and for one of Godot's.
+		public function ownSignalObject():Array {
+			var own:Signal = scored;
+			var whose:GodotObject = own.getObject();
+			var untyped:* = renamed.getObject();
+			return [whose == this, whose is Node, untyped == this, new Signal().getObject() == null];
+		}
 		// A loop of a listener and what it listens to; a listener nothing else holds; a signal in a field.
 		private var mine:Signal;
 		public function loop(r:Resource):void { var h:Holder = new Holder(); h.res = r; r.changed.add(h.heard); }

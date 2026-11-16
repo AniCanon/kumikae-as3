@@ -219,6 +219,18 @@ from recollection of avmplus, not checked against Flash.
 text, and a Vector's `join` and `toString` write them as `null` and `undefined` (`toLocaleString` leaves
 them out of both, and asks each element for its own `toLocaleString()`: a class's own, a Date's, an Array's
 or a Vector's, and otherwise its text); a function of any kind is `function Function() {}`; a RegExp's `lastIndex` is an `int`.
+Where the library's rules were read from avmplus's source (`core/Vector.as`, `VectorImpl.as`, `Array.as`,
+`String.as`, `MethodInfo`), the code says which file. Read: a vector of numbers converts what `indexOf` and
+`lastIndexOf` are given (`indexOf(value:int)`), and any other vector looks for the value as it is, by `===`
+(`value:Object`); an Array's `join` takes undefined for the comma (`sep === undefined ? "," : String(sep)`); a
+default is for an argument left out, so `"abc".indexOf(undefined)` looks for "null". Inferred from those
+declarations and not run in Flash: a Vector's `join(undefined)` gives "null" between the elements; by name, an
+Array's `toString("x")` is Error #1063 and a Vector's ignores the argument. Not as avmplus has it, and why: a
+`for each` over an Array passes over an element that is undefined (avmplus passes over holes only, and an
+Array here does not tell the two apart); `*`, `-` and `/` on two untyped Godot values give NaN, as AS3's
+ToNumber does, where typed code uses Godot's operator; a function that names `arguments` still refuses more
+arguments than it declares (avmplus takes them).
+
 An Array or a Vector that holds itself, or nests more than 500 deep, put into words is Error #1023, as
 avmplus's stack check gives (its `join` has no other guard).
 
@@ -491,7 +503,7 @@ How it works:
   by Godot's name, made into a StringName once. The same typed IR will give the native backend direct
   calls and inline values.
 - **Calls can nest.** The engine calls a script, which calls the engine, which may call a script again,
-  up to 64 levels deep.
+  for as long as the thread's stack lasts: with it nearly used up, one more is Error #1023 (`vm/stack.h`).
 
 Known fault, Godot's: the first time Godot's editor scans a project that has the extension and is told to
 quit at once (`godot --headless --import`, or `--editor --quit`), Godot crashes as it exits, after the scan
@@ -884,6 +896,10 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   byte-prefix of each corpus file, and each file with one byte missing, through all of them.
 - `tests/test_json.cpp`, `tests/test_workspace.cpp`: the server's JSON module, and the project as files on
   disk with open buffers over them.
+- `tests/test_watch.cpp`: when the extension's watch reads a file again (`godot_ext/watch.h`), with times of the
+  test's own. No test here waits on the wall clock where it can be given one: the limit on a script's time is
+  the host's clock's (`vm::Clock::elapsed`), the programs of `tests/run/` run with no limit, every group has
+  two hours, and the group that runs Godot runs alone and one run at a time over its project.
 - `tests/test_lsp.cpp`: the server driven in process, one message at a time. It also checks that what the
   server publishes for every golden error file is what `kas3c check` prints, and types through each corpus
   file as an editor would.
