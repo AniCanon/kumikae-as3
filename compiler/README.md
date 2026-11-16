@@ -114,7 +114,8 @@ program, by the names of its public fields, methods, getters and setters (Flash'
 Boolean and a String included (`n.toLocaleString()`, `s.hasOwnProperty("length")`), with
 `setPropertyIsEnumerable`, which hides a property of an Object, a Dictionary or an Array from `for in`,
 `for each` and JSON (on a sealed object it is ReferenceError #1056, from recollection of avmplus); a
-number's `toString(radix)`, `toFixed`, `toExponential` and `toPrecision` by name on an untyped value;
+number's `toString(radix)`, `toFixed`, `toExponential` and `toPrecision`, a Vector's `fixed` and a
+Function's `length` by name on an untyped value (a Vector takes no other property: ReferenceError #1056);
 `toLocaleString()` of an Array and a Vector; `new String(x)`, `new Number(x)` and the like, which give the
 value itself (AS3 has no wrapper objects), `String()` and `int()` with nothing to convert, and `Object(x)`
 (the value, or a new Object for null). `RegExp` (literals, `new RegExp`, the flags
@@ -134,7 +135,9 @@ were when it began: one deleted on the way is passed over, one added is not reac
 **What is refused, by name, until later slices:** `new Dictionary(true)` (weak keys, said when the program
 runs), a method of an Array, a Vector, a String or a Function called by name on an untyped value
 (`u.push(1)`, said when it runs), any method of the built-in library read by name and not called
-(`u.push`, `o.toString`), a Vector's `fixed` by name, a RegExp's or a Date's method read by name and not called, or a property
+(`u.push`, `o.toString`), an element written by name into a Vector of objects held untyped, `instanceof`,
+`arguments`, the conversions `Vector.<T>(x)`, `Function(x)` and `Class(x)`, `concat` of a Vector with one of
+another type or an Array, a RegExp's or a Date's method read by name and not called, or a property
 neither declares (both are dynamic in AS3), a property of one of Godot's values held untyped, by name, `this` and
 `super` written inside a function expression (AS3's `this` there is not the method's object), an
 interface's method that a class has only from Godot's API or the built-in library, a class that extends

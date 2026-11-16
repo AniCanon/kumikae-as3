@@ -169,6 +169,10 @@ bool Interpreter::set_enumerable(Slot p_holder, const std::vector<Slot> &p_given
 	}
 	const Object *object = held_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
+	const bool library = object && (object->klass == module_.date_class || object->klass == module_.regexp_class);
+	if (klass && !klass->table && !klass->array && (klass->built_in || library || klass->element != Kind::Void)) {
+		return true; // A Date, a RegExp, a Vector: dynamic in AS3, with no property here to hide.
+	}
 	if (!klass || !(klass->table || klass->array)) {
 		return refuse_write("1056", "Cannot create property ", asked.text, p_holder);
 	}

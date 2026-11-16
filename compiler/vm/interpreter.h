@@ -266,6 +266,7 @@ private:
 	void call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
+	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	void property_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	Entries *loop_entries(Slot p_holder) const;
