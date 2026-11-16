@@ -34,6 +34,23 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	for (const ir::Class &klass : module.classes) {
 		made_here.push_back(klass.element == Kind::Void && !klass.table && !klass.is_interface && klass.native_base.empty());
 	}
+	// Kept for the next `new`: objects that are numbers and Booleans and nothing more, which the collector
+	// does not look at and no one but the program holds.
+	for (uint32_t i = 0; i < module.classes.size(); i++) {
+		const ir::Class &klass = module.classes[i];
+		bool plain = made_here[i] && !klass.counted && !klass.array && !klass.dictionary && !klass.built_in &&
+				klass.fields.size() + 1 < ObjectCache::SIZES && !interpreter->heap().list_for(i);
+		uint32_t numbers = 0;
+		for (size_t at = 0; at < klass.fields.size() && plain; at++) {
+			plain = !ir::is_held(klass.fields[at].kind);
+			numbers |= klass.fields[at].kind == Kind::F64 ? uint32_t(1) << at : 0;
+		}
+		class_cached.push_back(plain ? static_cast<uint8_t>(klass.fields.size() + 1) : 0);
+		class_numbers.push_back(numbers);
+	}
+	context.class_numbers = class_numbers.data();
+	context.cache = &cache;
+	context.class_cached = class_cached.data();
 	if (std::getenv("KAS3_NATIVE_COUNTS")) {
 		thunk_counts.assign(module.functions.size() - program.function_count, 0);
 	}
@@ -94,6 +111,14 @@ Host::~Host() {
 	Host::clear_globals();
 	if (context.failing) {
 		interpreter->discard(Kind::Any, context.pending);
+	}
+	// What the cache kept is the heap's again.
+	for (Object *&list : cache.spare) {
+		while (Object *const block = list) {
+			list = block->gc_next;
+			block->gc_next = nullptr;
+			vm::free_object(block);
+		}
 	}
 	// As the interpreter goes, its collector frees what is left in loops.
 	interpreter.reset();

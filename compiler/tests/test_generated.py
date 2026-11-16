@@ -88,7 +88,7 @@ with tempfile.TemporaryDirectory() as where:
     if written.returncode == 0:
         made = functions(where, "objects.cpp").get("objects", "")
         inside = "".join(loops(made))
-        check("objects' loop is found", "new_object(" in inside, made)
+        check("objects' loop is found, and makes its object of one let go of where there is one", "made_object(" in inside, made)
         check("the object made in objects' loop is handed over, not shared", "store(c, " not in inside and "= nullptr;" in inside, inside)
 
 with tempfile.TemporaryDirectory() as where:

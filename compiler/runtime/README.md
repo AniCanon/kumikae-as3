@@ -32,6 +32,11 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
   struct), and a descriptor (`ClassInfo`): name, base, a hash of its layout, each field's name, kind and
   offset, its method table by method number. The host reads descriptors, never C++ types.
 - **Counts** change only in `retain(c, x)` and `release(c, x)` (`values.h`).
+- **Objects of numbers and Booleans** that the collector does not look at are not given back to the heap
+  when generated code lets go of the last reference: `release()` keeps the block on a list for its number of
+  fields (`ObjectCache`, the host's, reached through `c`), and `made_object()` takes the next `new` of such a
+  class from it, inline. A block is the heap's own all the while, so the library and the interpreter free
+  and make such objects as ever; what the cache holds goes back when the host ends.
 - **The depth of calls** is counted (`c->depth`), so that Error #1023 comes at the 10,001st call as it does
   under the interpreter. A generated function's frame is on the thread's stack, though, where the
   interpreter's are on the heap: a function that finds its frame below `c->stack_floor` raises the same
