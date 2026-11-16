@@ -106,32 +106,103 @@ class Reader {
 				case 't':
 					*r_out += '\t';
 					break;
-				case 'u': {
-					uint32_t code = 0;
-					if (!hex4(&code)) {
+				case 'u':
+					if (!unicode_escape(r_out)) {
 						return false;
 					}
-					if (code >= 0xD800 && code <= 0xDBFF) {
-						// The first half of a pair. Without its second half it stands for nothing.
-						uint32_t low = 0;
-						size_t back = at_;
-						if (text_.compare(at_, 2, "\\u") == 0 && (at_ += 2, hex4(&low)) && low >= 0xDC00 && low <= 0xDFFF) {
-							code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
-						} else {
-							at_ = back;
-							code = 0xFFFD;
-						}
-					} else if (code >= 0xDC00 && code <= 0xDFFF) {
-						code = 0xFFFD;
-					}
-					append_utf8(*r_out, code);
 					break;
-				}
 				default:
 					return false;
 			}
 		}
 		return false;
+	}
+	// After `\u`: four hex digits, or two such escapes for a character outside the first plane.
+	bool unicode_escape(std::string *r_out) {
+		uint32_t code = 0;
+		if (!hex4(&code)) {
+			return false;
+		}
+		if (code >= 0xD800 && code <= 0xDBFF) {
+			// The first half of a pair. Without its second half it stands for nothing.
+			uint32_t low = 0;
+			size_t back = at_;
+			if (text_.compare(at_, 2, "\\u") == 0 && (at_ += 2, hex4(&low)) && low >= 0xDC00 && low <= 0xDFFF) {
+				code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+			} else {
+				at_ = back;
+				code = 0xFFFD;
+			}
+		} else if (code >= 0xDC00 && code <= 0xDFFF) {
+			code = 0xFFFD;
+		}
+		append_utf8(*r_out, code);
+		return true;
+	}
+	bool object(Json *r_value, int p_depth) {
+		at_++;
+		*r_value = Json::object();
+		skip_space();
+		if (at_ < text_.size() && text_[at_] == '}') {
+			at_++;
+			return true;
+		}
+		while (true) {
+			skip_space();
+			if (at_ >= text_.size() || text_[at_] != '"') {
+				return false;
+			}
+			std::string key;
+			if (!string(&key)) {
+				return false;
+			}
+			skip_space();
+			if (at_ >= text_.size() || text_[at_] != ':') {
+				return false;
+			}
+			at_++;
+			Json member;
+			if (!value(&member, p_depth + 1)) {
+				return false;
+			}
+			r_value->append(std::move(key), std::move(member));
+			skip_space();
+			if (at_ < text_.size() && text_[at_] == ',') {
+				at_++;
+				continue;
+			}
+			if (at_ < text_.size() && text_[at_] == '}') {
+				at_++;
+				return true;
+			}
+			return false;
+		}
+	}
+	bool array(Json *r_value, int p_depth) {
+		at_++;
+		*r_value = Json::array();
+		skip_space();
+		if (at_ < text_.size() && text_[at_] == ']') {
+			at_++;
+			return true;
+		}
+		while (true) {
+			Json element;
+			if (!value(&element, p_depth + 1)) {
+				return false;
+			}
+			r_value->push(std::move(element));
+			skip_space();
+			if (at_ < text_.size() && text_[at_] == ',') {
+				at_++;
+				continue;
+			}
+			if (at_ < text_.size() && text_[at_] == ']') {
+				at_++;
+				return true;
+			}
+			return false;
+		}
 	}
 	bool number(Json *r_value) {
 		size_t start = at_;
@@ -181,69 +252,10 @@ public:
 		}
 		char c = text_[at_];
 		if (c == '{') {
-			at_++;
-			*r_value = Json::object();
-			skip_space();
-			if (at_ < text_.size() && text_[at_] == '}') {
-				at_++;
-				return true;
-			}
-			while (true) {
-				skip_space();
-				if (at_ >= text_.size() || text_[at_] != '"') {
-					return false;
-				}
-				std::string key;
-				if (!string(&key)) {
-					return false;
-				}
-				skip_space();
-				if (at_ >= text_.size() || text_[at_] != ':') {
-					return false;
-				}
-				at_++;
-				Json member;
-				if (!value(&member, p_depth + 1)) {
-					return false;
-				}
-				r_value->append(std::move(key), std::move(member));
-				skip_space();
-				if (at_ < text_.size() && text_[at_] == ',') {
-					at_++;
-					continue;
-				}
-				if (at_ < text_.size() && text_[at_] == '}') {
-					at_++;
-					return true;
-				}
-				return false;
-			}
+			return object(r_value, p_depth);
 		}
 		if (c == '[') {
-			at_++;
-			*r_value = Json::array();
-			skip_space();
-			if (at_ < text_.size() && text_[at_] == ']') {
-				at_++;
-				return true;
-			}
-			while (true) {
-				Json element;
-				if (!value(&element, p_depth + 1)) {
-					return false;
-				}
-				r_value->push(std::move(element));
-				skip_space();
-				if (at_ < text_.size() && text_[at_] == ',') {
-					at_++;
-					continue;
-				}
-				if (at_ < text_.size() && text_[at_] == ']') {
-					at_++;
-					return true;
-				}
-				return false;
-			}
+			return array(r_value, p_depth);
 		}
 		if (c == '"') {
 			std::string text;
