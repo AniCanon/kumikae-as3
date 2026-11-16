@@ -144,6 +144,10 @@ seeded edits; the suite runs a short version (about 800 edits and 300 server edi
 | Generated projects, seeds 2000–2119 (ASan/UBSan) | 19,500 | 1 difference, no sanitizer report |
 | Generated projects, seeds 3000–3599 (release) | 129,894 | 1 difference |
 | Server sessions, seeds 3000–3299; five external projects (release) | 71,933; 1,600 | 0 differences |
+| Final code (`9b0655e`): generated, seeds 7000–7299 (release) | 64,950 | 0 differences |
+| Final code: server sessions, seeds 7000–7149 (release) | 35,613 | 0 differences |
+| Final code: five external projects (release, Godot loaded) | 1,200 | 0 differences |
+| Final code: generated and server, seeds 8000– (ASan/UBSan) | 6,500 and 3,523 | 0 differences, no sanitizer report |
 
 The two differences were one bug: the names in a written type's type arguments (`Vector.<Particle>`) were
 not recorded as read by the declarations. It is fixed, with a named test, and both seeds pass. Each widening
