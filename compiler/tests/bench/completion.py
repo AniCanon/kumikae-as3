@@ -99,6 +99,7 @@ class Scenario:
             self.asked_text = text
             self.position = {'line': 5001, 'character': len('public function run():void { transform.origin.')}
             self.label = 'x'
+            self.class_position = {'line': 5000, 'character': len('package { import godot.*; public class ')}
             self.edited, self.edited_text = self.asked, text
             return
         # A file of the generated project, in the middle of the ring: Thing<n-1> calls its methods.
@@ -108,6 +109,8 @@ class Scenario:
         line = next(i for i, text in enumerate(self.asked_text.split('\n')) if 'var moved:Vector2 = shift' in text)
         self.position = {'line': line, 'character': len('\t\tvar moved:Vector2 = shift')}
         self.label = 'shift'
+        line = next(i for i, text in enumerate(self.asked_text.split('\n')) if text.startswith('public class '))
+        self.class_position = {'line': line, 'character': len('public class ')}
         self.edited = self.asked if mode == 'signature' else folder / 'game' / 'Hub.as'
         self.edited_text = self.edited.read_text(encoding='utf-8')
 
@@ -145,7 +148,12 @@ def measure(builds, folder, runs, seconds, mode):
                 client.send('textDocument/didOpen', {'textDocument': {
                     'uri': edited_uri, 'version': 1, 'languageId': 'actionscript', 'text': scenario.edited_text}})
             result, size = client.request('textDocument/completion', params)
-            print(f'{name} cold={1000*(time.perf_counter()-start):.3f} ms '
+            cold = 1000*(time.perf_counter()-start)
+            # A build that checks in the background finishes its first check before anything is timed: find
+            # references of the class waits for every file.
+            client.request('textDocument/references', {'textDocument': {'uri': uri}, 'context': {'includeDeclaration': True},
+                           'position': scenario.class_position})
+            print(f'{name} cold={cold:.3f} ms '
                   f'items={len(result["items"])} bytes={size} rss={client.rss()} KiB', flush=True)
         version = 1
         for kind in kinds:
