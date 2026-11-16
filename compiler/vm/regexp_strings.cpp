@@ -124,7 +124,7 @@ void Interpreter::string_match(const Function &p_function, const Instruction &p_
 		return;
 	}
 	const bool global = (program->flags & regex::GLOBAL) != 0;
-	if (regexp && (global || matches->empty())) {
+	if (regexp && global) { // One that is not global is left as it is, as its exec() leaves it.
 		regexp->fields()[ir::REGEXP_LAST_INDEX].d = 0;
 	}
 	Vector *array = nullptr;

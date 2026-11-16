@@ -240,7 +240,8 @@ void Interpreter::regexp_new(const Function &p_function, const Instruction &p_in
 }
 
 // exec(text) and test(text), as ECMAScript 3 has them (15.10.6.2): a global RegExp starts from lastIndex
-// and moves it past the match; a search that fails sets it to 0, global or not.
+// and moves it past the match, or to 0 when the search fails. One that is not global neither reads nor
+// writes it, as avmplus has it (ECMAScript 3 has a failed search set it to 0 either way).
 void Interpreter::regexp_exec(const Function &p_function, const Instruction &p_in) {
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 	Slot *r = stack_.data() + frames_.back().base;
@@ -277,7 +278,7 @@ bool Interpreter::regexp_run(Object *p_regexp, std::string_view p_text, bool p_t
 	if (failing_) {
 		return false;
 	}
-	if (!found || global) {
+	if (global) {
 		last = found ? found->captures[1] : 0;
 	}
 	r_out->bits = 0;

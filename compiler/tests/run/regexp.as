@@ -19,7 +19,8 @@ package {
 			trace(plain.exec("call 555- now"), plain.lastIndex);
 			plain.lastIndex = 3;
 			trace(plain.test("5-"), plain.lastIndex); // Not global: lastIndex is not read, nor written on a match.
-			trace(plain.test("none"), plain.lastIndex); // ECMAScript 3: a search that fails sets it to 0.
+			trace(plain.test("none"), plain.lastIndex, plain.exec("none"), plain.lastIndex); // Nor on a failure, as in avmplus.
+			trace("none".match(plain), plain.lastIndex); // match() of one not global is its exec().
 
 			var g:RegExp = /a/g;
 			g.lastIndex = 10;
