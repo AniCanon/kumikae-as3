@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <unordered_set>
 
 namespace kas3 {
@@ -447,10 +448,7 @@ public:
 			}
 		} else if (class_) {
 			if (std::optional<OverrideOffer> offer = queries_.overrides(unit_, nullptr, class_, start_, offset_)) {
-				for (Completion &item : offer->items) {
-					seen_.insert(item.name); // Its name is in the base's tree, which outlives the request.
-					found_.push_back(std::move(item));
-				}
+				std::move(offer->items.begin(), offer->items.end(), std::back_inserter(found_));
 				if (offer->after_function) {
 					return std::move(found_);
 				}
