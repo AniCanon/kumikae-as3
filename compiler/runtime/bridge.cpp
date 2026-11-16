@@ -75,6 +75,8 @@ void take_error(Host &r_host, Slot p_error) {
 bool Host::run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given, Slot *r_result) {
 	switch (static_cast<NativeWhat>(p_what)) {
 		case NativeWhat::Body:
+			// Whichever thread the embedder calls on: its stack's floor is what generated code looks at.
+			context.stack_floor = vm::stack_floor();
 			return p_function < program.function_count && call_generated(*this, p_function, p_registers, p_given, r_result);
 		case NativeWhat::Caught:
 			take_error(*this, p_registers[p_register]);

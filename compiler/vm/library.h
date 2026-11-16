@@ -69,6 +69,8 @@ struct Library {
 	Vector *fresh_vector(uint32_t p_class, uint64_t p_length);
 	// AS3's TypeError #1009: a member of nothing was asked for.
 	void raise_null();
+	// AS3's Error #1023: calls, or what they put into words, nest deeper than they may or than the stack holds.
+	void raise_overflow();
 	// An Error that says the thing is not supported yet.
 	void raise_unsupported(const std::string &p_what);
 };

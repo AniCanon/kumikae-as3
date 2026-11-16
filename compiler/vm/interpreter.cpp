@@ -222,7 +222,7 @@ void Interpreter::pop() {
 // that the next entry starts clean; an error that was already on its way out when this entry began is put
 // back afterwards.
 bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
-	if (entries_ >= MAX_ENTRIES) {
+	if (stack_used_up()) {
 		stack_overflow();
 		return false;
 	}
@@ -258,7 +258,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 
 	size_t depth = frames_.size();
 	bool ok = false;
-	if (entries_ >= MAX_ENTRIES) {
+	if (stack_used_up()) {
 		stack_overflow();
 	} else {
 		entering();

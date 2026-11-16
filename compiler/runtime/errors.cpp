@@ -70,7 +70,7 @@ bool error_constructor(const Host &p_host, uint32_t p_function) {
 } // namespace
 
 void stack_overflow(Context *c) {
-	c->host->builtin(Builtin::Overflow, nullptr);
+	c->host->library().raise_overflow();
 }
 
 void raise_null(Context *c) {

@@ -33,7 +33,8 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 - **The depth of calls** is counted (`c->depth`), so that Error #1023 comes at the 10,001st call as it does
   under the interpreter. A generated function's frame is on the thread's stack, though, where the
   interpreter's are on the heap: a function that finds its frame below `c->stack_floor` raises the same
-  Error rather than run off the stack's end (`stack_low`). The host with no engine runs a program on a
+  Error rather than run off the stack's end (`stack_low`). The floor is the thread's (`vm/stack.h`), the
+  one the interpreter refuses a call from outside at. A program run on its own, by either, runs on a
   thread with 512 MB of stack, so that the count is what ends a recursion.
 - **Errors** are `c->failing` and `c->pending`. A trace is built on the error path, by each function an
   error leaves (`leave_failed`).
@@ -66,20 +67,15 @@ parts of them a moved function still asks for (`vm::Unmoved`), the host keeps an
   instruction reads (`thunk(c, number, slots)`) and takes back what it writes. An error the instruction
   raises is caught inside the thunk and becomes the context's, so the error and its words are the
   library's.
-- The host's own needs go the same way (`Builtin`): Error #1009 and #1023 are raised by the interpreter,
-  never worded here.
+- The host's own needs go the same way (`Builtin`): Error #1009 is raised by the interpreter, never
+  worded here. Error #1023 is the library's own function (`Library::raise_overflow`).
 
 What this costs, until the split:
 
 - A thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
   most operations take. `fast.h` exists for that reason, and each family that becomes a function of plain
   values loses its thunks.
-- The interpreter lets entries nest only `MAX_ENTRIES` (64) deep, its own library's callbacks among them
-  (a sort's comparison that sorts ends with Error #1023 at the 64th under `kas3c run` too). A thunk is an
-  entry, so a recursion that passes through one on every level ends at the 63rd; a library function
-  called directly is none, and such a recursion goes on natively where the interpreter stops (see the
-  list below: the two are to agree by the stack's depth).
-- Where the interpreter itself refuses an entry (its own library's calls count too), it keeps the error
+- Where the interpreter itself refuses an entry (the stack nearly used up), it keeps the error
   until the instruction beneath ends; generated functions in between are left without their handlers
   being offered it (`Host::carried`): a `finally` there does not run.
 - A program run on its own has no limit on its time, where `kas3c run` stops one after 15 seconds
@@ -122,7 +118,7 @@ exactly those), named so that the split can be checked against it:
 4. Function values (`interpreter_functions.cpp`): making one (the one value of a static function is kept
    by the interpreter), the arguments of a call through one, `apply`. Until then a call the fast path
    does not take is the library's `apply`, by the host's thunk.
-5. Raising: the words of #1009, #1023 and #1000 are still raised by the interpreter for the host
+5. Raising: the words of #1009 and #1000 are still raised by the interpreter for the host
    (`Builtin`), and `object_text` / `error_heading`.
 6. Lifetime: freeing an object with what it holds is the heap's (`Heap::drop_object`), still reached
    through the interpreter's `free_kept()` and `discard()`; an inline allocation path on the context's
@@ -131,10 +127,6 @@ exactly those), named so that the split can be checked against it:
    inline.
 8. Classes as the host's descriptors (`ClassInfo`) where the library takes `ir::Class`: `each_held()`,
    the collector, `is_class`.
-9. Callbacks nest as deep as the C++ stack allows where the library's function is called directly; the
-   interpreter (and any thunk) still allows 64 calls from outside in progress, so a recursion through a
-   library callback ends with Error #1023 there at the 64th. The interpreter needs the stack's floor, as
-   the context has (`stack_low`), in place of that count.
 
 ## Rules
 

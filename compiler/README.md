@@ -465,7 +465,7 @@ How it works:
   by Godot's name, made into a StringName once. The same typed IR will give the native backend direct
   calls and inline values.
 - **Calls can nest.** The engine calls a script, which calls the engine, which may call a script again,
-  up to 64 levels deep.
+  for as long as the thread's stack lasts: with it nearly used up, one more is Error #1023 (`vm/stack.h`).
 
 Known fault, Godot's: the first time Godot's editor scans a project that has the extension and is told to
 quit at once (`godot --headless --import`, or `--editor --quit`), Godot crashes as it exits, after the scan

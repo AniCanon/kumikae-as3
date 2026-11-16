@@ -117,10 +117,9 @@ void trace(Context *c, Str *const *p_texts, uint32_t p_count) {
 
 Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 	Host &host = *c->host;
-	// The interpreter lets entries nest only so deep, and one that is refused has no frame to catch its
-	// error in. The last entry is kept for raising Error #1023 here, where generated code can catch it.
-	const uint32_t overflow = host.program.thunk_count + static_cast<uint32_t>(Builtin::Overflow);
-	if (host.nesting + 1 >= static_cast<uint32_t>(vm::Interpreter::MAX_ENTRIES) && p_thunk != overflow) {
+	// The interpreter refuses an entry with the stack nearly used up, and one that is refused has no frame
+	// to catch its error in: Error #1023 is raised here, where generated code can catch it.
+	if (vm::stack_below(vm::stack_floor())) {
 		stack_overflow(c);
 		return empty();
 	}

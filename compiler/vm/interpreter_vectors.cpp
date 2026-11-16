@@ -175,7 +175,7 @@ void Interpreter::vector_from(const Instruction &p_in) {
 // as toLocaleString() does. An element that is an object says what it is in its own words, which runs the
 // program: false if that failed.
 bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale) {
-	if (text_depth_ >= MAX_TEXT_DEPTH) {
+	if (text_depth_ >= MAX_TEXT_DEPTH || stack_used_up()) {
 		stack_overflow(); // One that holds itself ends here too: avmplus's join has no guard but the stack's.
 		return false;
 	}

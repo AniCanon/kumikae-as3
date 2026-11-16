@@ -76,6 +76,16 @@ for name in names:
     if os.path.exists(base + ".ir"):
         compare(name + " ir", run("ir", files, folder).stdout, base + ".ir")
 
+# With a stack too small for what a program does, it ends with Error #1023 and never with a crash: a library
+# callback that calls the library again (callbacks_nest: caught, where the stack holds its first part),
+# and words that nest in C++ alone (text_cycles). How much fits depends on the build, so only that is held.
+for name, kilobytes in (("callbacks_nest", "4096"), ("text_cycles", "2048"), ("deep_frames", "1024")):
+    small = subprocess.run([kas3c, "run", name + ".as"], capture_output=True, text=True, cwd=folder, timeout=120,
+                           env=dict(environment, KAS3_STACK_KB=kilobytes))
+    overflowed = "Error #1023" in small.stderr or "1023" in small.stdout
+    check(name + " with a small stack", small.returncode in (0, 1) and overflowed and "Sanitizer" not in small.stderr and
+          (small.returncode == 1) == small.stderr.startswith("Error: Error #1023"), "exit %d\n%s%s" % (small.returncode, small.stdout[-300:], small.stderr[-600:]))
+
 for path in sorted(glob.glob(os.path.join(folder, "godot", "*.as"))):
     name = "godot/" + os.path.basename(path)
     compare(name + " ir", run("ir", ["--godot", os.path.basename(path)], os.path.dirname(path)).stdout, path[:-3] + ".ir")

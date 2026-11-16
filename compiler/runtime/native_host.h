@@ -23,7 +23,7 @@ namespace rt {
 
 // The operations the host itself asks of the library, each a thunk after the program's own.
 enum class Builtin : uint32_t {
-	NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray,
+	NullCheck, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray,
 	Apply, // A function value called with an Array of untyped arguments, as apply() calls it.
 	AnyText, // String(x) of an untyped value.
 	SplitByPattern, // split() by a RegExp.
