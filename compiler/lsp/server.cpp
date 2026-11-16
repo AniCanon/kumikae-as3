@@ -278,14 +278,19 @@ int run_server(int p_input, int p_output, Workspace::Options p_options) {
 			batch.push_back(std::move(message));
 		}
 		server.handle_batch(batch, out);
+		// Answers go out before the check of what is left: a request checked only what it reads.
+		if (!channel.send(out)) {
+			return 1;
+		}
 		// While someone is typing, changes arrive faster than they can be checked. Check once the editor
 		// pauses, and stop for any message that arrives meanwhile: it is answered first, and the check goes
 		// on from where it stopped.
 		if (!server.exited() && !channel.waiting()) {
+			out.clear();
 			server.settle(out, [&channel] { return channel.waiting(); });
-		}
-		if (!channel.send(out)) {
-			return 1;
+			if (!channel.send(out)) {
+				return 1;
+			}
 		}
 	}
 	return server.exited() ? server.exit_code() : 1;
