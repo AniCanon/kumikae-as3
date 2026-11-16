@@ -32,7 +32,8 @@ Str *error_stack(Context *c, Object *p_error);
 // A function with a finally returns: traces kept for it and never taken are forgotten.
 void forget_kept(Context *c);
 
-// A class is used for the first time: its static fields, and its bases', are given their values.
+// A class is used for the first time by running code: its static fields, and its bases', are given their
+// values.
 void use_class(Context *c, uint32_t p_class);
 bool is_class(const Context *c, const Object *p_object, uint32_t p_class);
 

@@ -83,8 +83,10 @@ std::string class_tables(const ir::Module &p_module, uint32_t p_index, std::stri
 	for (const auto &[name, slot] : klass.named_methods) {
 		named.push_back("{ " + string_literal(name) + ", " + std::to_string(slot) + " }");
 	}
-	for (uint32_t method : klass.interface_methods) {
-		interface_code.push_back(code_pointer(p_module, method));
+	// As long as the program's list, whatever the class implements: a call by interface reads its entry
+	// with no look at the table's length, and finds nothing where the class has none.
+	for (size_t method = 0; method < p_module.interface_methods.size(); method++) {
+		interface_code.push_back(code_pointer(p_module, method < klass.interface_methods.size() ? klass.interface_methods[method] : NONE));
 	}
 	std::string info = "{ " + string_literal(klass.name) + ", " + number(klass.base) + ", " + layout_hash(klass) + ", " + kind_number(klass.element) + ", " +
 			boolean(klass.array) + ", " + boolean(klass.table) + ", " + boolean(klass.dictionary) + ", " + boolean(klass.built_in) + ", " +
@@ -96,7 +98,7 @@ std::string class_tables(const ir::Module &p_module, uint32_t p_index, std::stri
 	info += number(klass.constructor) + ", " + number(klass.static_init) + ", " + number(klass.to_string) + ", ";
 	info += array(r_out, "const uint32_t", prefix + "_interfaces", numbers(klass.interfaces)) + ", " + std::to_string(klass.interfaces.size()) + ", ";
 	info += array(r_out, "const uint32_t", prefix + "_interface_methods", numbers(klass.interface_methods)) + ", ";
-	info += array(r_out, "const Code", prefix + "_interface_code", interface_code) + ", " + std::to_string(interface_code.size()) + " }";
+	info += array(r_out, "const Code", prefix + "_interface_code", interface_code) + ", " + std::to_string(klass.interface_methods.size()) + " }";
 	return info;
 }
 
@@ -108,7 +110,9 @@ std::string function_tables(const ir::Module &p_module, uint32_t p_index, std::s
 		kinds.push_back(kind_number(function.registers[i]));
 		classes.push_back(number(i < function.parameter_classes.size() ? function.parameter_classes[i] : NONE));
 	}
-	std::string info = "{ " + string_literal(function.name) + ", " + std::to_string(function.file) + ", " + number(function.owner) + ", " +
+	const uint32_t starts = line_of(p_module, function.file, function.code.empty() ? function.position : function.code[0].position);
+	std::string info = "{ " + string_literal(function.name) + ", " + std::to_string(function.file) + ", " + std::to_string(starts) + ", " +
+			number(function.owner) + ", " +
 			number(function.written_in) + ", " + boolean(function.is_static) + ", " + boolean(function.is_public) + ", " + boolean(function.rest) + ", " +
 			kind_number(function.result) + ", " + std::to_string(function.parameters) + ", " + std::to_string(function.required) + ", ";
 	info += array(r_out, "const uint8_t", prefix + "_kinds", kinds) + ", ";

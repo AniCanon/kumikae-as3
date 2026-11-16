@@ -148,7 +148,12 @@ static void forget_class(Host &r_host, uint32_t p_class) {
 }
 
 void use_class(Context *c, uint32_t p_class) {
-	Host &host = *c->host;
+	c->host->use_class(p_class, true);
+}
+
+void Host::use_class(uint32_t p_class, bool p_from_code) {
+	Host &host = *this;
+	Context *c = &context;
 	// Marked before anything runs: a class that reads itself in a circle sees defaults.
 	std::vector<uint32_t> chain;
 	for (uint32_t at = p_class; at != NONE && !host.class_used[at]; at = host.program.classes[at].base) {
@@ -167,6 +172,15 @@ void use_class(Context *c, uint32_t p_class) {
 			// Not ready: the next use sets the fields again, and fails again, where carrying on would
 			// run with fields that were never set. The subclasses that were waiting are forgotten too.
 			forget_class(host, chain[i]);
+			// Under the interpreter, code that uses a class has every initializer waiting as a frame of
+			// its own before the first runs, and an error leaves each: a line for each one that had not
+			// begun, the nearest base's first.
+			for (size_t waiting = i; p_from_code && waiting-- > 0;) {
+				const uint32_t later = host.program.classes[chain[waiting]].static_init;
+				if (later != NONE) {
+					leave_failed(c, later, host.program.functions[later].line, false);
+				}
+			}
 			return;
 		}
 	}
@@ -186,7 +200,7 @@ bool Host::run() {
 		return true;
 	}
 	if (!class_used[entry]) {
-		use_class(&context, entry);
+		use_class(entry, false);
 	}
 	Slot made = empty();
 	if (!context.failing) {

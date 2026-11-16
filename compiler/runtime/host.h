@@ -116,6 +116,9 @@ struct Host {
 	Slot builtin(Builtin p_which, const Slot *p_given) {
 		return thunk(&context, program.thunk_count + static_cast<uint32_t>(p_which), p_given);
 	}
+	// A class's first use (operations.h, use_class). From running code, initializers that had not begun
+	// when one failed are in the error's trace, as the interpreter has them; from the host, they are not.
+	void use_class(uint32_t p_class, bool p_from_code);
 	// The package's variables are set, then the entry class is made. False if an error reached the top:
 	// it has been reported.
 	bool run();

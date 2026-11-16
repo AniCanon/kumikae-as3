@@ -61,7 +61,9 @@ struct ClassInfo {
 	const uint32_t *interfaces;
 	uint32_t interface_count;
 	const uint32_t *interface_methods; // By interface method: the function the class runs for it, or NONE.
-	const Code *interface_code; // The same as the functions themselves; null where there is none.
+	// The same as the functions themselves, null where there is none: one entry for every interface method
+	// of the program, not only for those the class's own list reaches.
+	const Code *interface_code;
 	uint32_t interface_method_count;
 };
 
@@ -73,6 +75,7 @@ using Entry = void (*)(Context *c, const Slot *p_arguments, uint32_t p_count, Sl
 struct FunctionInfo {
 	const char *name; // "Main/update", "Main" for a constructor, "helper" for a package function.
 	uint32_t file;
+	uint32_t line; // Where its code starts: the line a stack trace gives a function that had not begun.
 	uint32_t owner;
 	uint32_t written_in;
 	bool is_static;
