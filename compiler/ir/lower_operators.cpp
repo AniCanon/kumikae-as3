@@ -181,11 +181,41 @@ uint32_t Operators::godot_test(Binary *p_binary, uint32_t p_godot_class) {
 	return out;
 }
 
+// `x instanceof C`: whether C is in the chain of prototypes of x. For a class named, that is `is`, but
+// for an interface, which is in no chain, and for int and uint: a number's prototype is Number's
+// (avmplus's Toplevel::instanceof, from recollection).
+uint32_t Operators::instance_of(Binary *p_binary) {
+	const Symbol *symbol = l_.named_class(p_binary->right);
+	if (!symbol && !(p_binary->right->type && p_binary->right->type->kind == Type::ClassObject)) {
+		return class_test(p_binary, Op::ClassInstanceOf);
+	}
+	if (symbol && (symbol->kind == SymbolKind::Interface || symbol == l_.int_ || symbol == l_.uint_)) {
+		l_.expression(p_binary->left, Kind::Void);
+		return l_.default_value(Kind::Bool, p_binary->offset);
+	}
+	Binary test = *p_binary;
+	test.op = TokenKind::KwIs;
+	return type_test(&test);
+}
+
+// `x is c`, `x as c`, `x instanceof c` where c is no class named but a value that holds one.
+uint32_t Operators::class_test(Binary *p_binary, Op p_op) {
+	const uint32_t position = p_binary->offset;
+	const uint32_t value = l_.settled(l_.any_value(p_binary->left), p_binary->right, position);
+	const uint32_t klass = l_.any_value(p_binary->right);
+	const uint32_t out = l_.reg(p_op == Op::ClassAs ? Kind::Any : Kind::Bool);
+	l_.emit(p_op, position, out, value, klass);
+	return out;
+}
+
 uint32_t Operators::type_test(Binary *p_binary) {
 	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
 	Symbol *symbol = l_.named_class(right);
+	if (!symbol && !(right->type && right->type->kind == Type::ClassObject)) {
+		return class_test(p_binary, p_binary->op == TokenKind::KwIs ? Op::ClassIs : Op::ClassAs);
+	}
 	uint32_t index = 0;
 	// `v is Vector.<int>`: the type written is the class itself, and its instances are the vector.
 	const Type *written = right->type && right->type->kind == Type::ClassObject ? right->type->element : nullptr;
@@ -208,6 +238,21 @@ uint32_t Operators::type_test(Binary *p_binary) {
 		// Every object is an Object: only null is not.
 		uint32_t out = l_.reg(Kind::Bool);
 		l_.emit(Op::ObjToBool, position, out, l_.expression(left, Kind::Obj));
+		return out;
+	} else if (symbol == l_.object_ && l_.object_ && l_.natural(left) == Kind::Any) {
+		// An untyped value or an Object: everything but null and undefined is an Object, and stays what it is.
+		const uint32_t value = l_.any_value(left);
+		const uint32_t null = l_.reg(Kind::Any);
+		l_.emit(Op::AnyConst, position, null, 1);
+		if (p_binary->op == TokenKind::KwIs) {
+			const uint32_t missing = l_.reg(Kind::Bool);
+			l_.emit(Op::AnyEq, position, missing, value, null);
+			const uint32_t out = l_.reg(Kind::Bool);
+			l_.emit(Op::Not, position, out, missing);
+			return out;
+		}
+		const uint32_t out = l_.reg(Kind::Any);
+		l_.emit(Op::FromAny, position, out, value, 0);
 		return out;
 	} else if (!symbol || !l_.class_index(symbol, &index)) {
 		l_.refuse(right->offset, std::string(p_binary->op == TokenKind::KwIs ? "'is'" : "'as'") + " with this type");
@@ -263,7 +308,6 @@ uint32_t Operators::arithmetic(Binary *p_binary, Kind p_want) {
 }
 
 uint32_t Operators::binary(Binary *p_binary, Kind p_want) {
-	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
 	switch (p_binary->op) {
@@ -289,8 +333,7 @@ uint32_t Operators::binary(Binary *p_binary, Kind p_want) {
 		case TokenKind::KwIn:
 			return Dynamic(l_).in(p_binary);
 		case TokenKind::KwInstanceof:
-			l_.refuse(position, "'instanceof'");
-			return l_.default_value(Kind::Bool, position);
+			return instance_of(p_binary);
 		default:
 			return arithmetic(p_binary, p_want);
 	}

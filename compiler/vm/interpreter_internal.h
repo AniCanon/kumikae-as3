@@ -35,6 +35,14 @@ inline Slot of_bool(bool p_value) {
 	return out;
 }
 
+// A string, an object or a handle as a register holds it: the whole slot cleared, then the pointer.
+inline Slot of_object(void *p_value) {
+	Slot out;
+	out.bits = 0;
+	out.p = p_value;
+	return out;
+}
+
 // A list of slots taken from the interpreter's spares and given back, emptied, when it goes: a call through
 // a function value allocates nothing once the spares have grown. One per call in progress, since making an
 // argument its type may run the program, which may make such a call again.

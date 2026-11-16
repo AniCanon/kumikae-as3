@@ -557,6 +557,22 @@ bool Interpreter::run(size_t p_depth, Slot *r_result) {
 			case Op::VecSetFixed:
 				vector_op(function, in, r);
 				break;
+			case Op::VecFrom:
+				vector_from(in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::Arguments:
+				arguments_array(in);
+				break;
+			case Op::ClassValue:
+			case Op::ClassIs:
+			case Op::ClassInstanceOf:
+			case Op::ClassAs:
+			case Op::ClassNew:
+				class_op(function, in); // `frame` and `r` may be stale after this.
+				break;
+			case Op::CallLibrary:
+				call_library(in); // `frame` and `r` may be stale after this.
+				break;
 			case Op::AnyConst:
 			case Op::ToAny:
 			case Op::FromAny:

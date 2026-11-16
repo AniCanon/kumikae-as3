@@ -23,8 +23,7 @@ package { public class untyped_number_methods {
 		// On what is not a number the name is no method of it.
 		var text:* = "abc";
 		try { text.toFixed(1); } catch (e:Error) { trace("caught", e.message.indexOf("toFixed") >= 0); }
-		// A String's locale case methods by name are refused as its others are, not said to be missing.
-		try { text.toLocaleUpperCase(); } catch (e:Error) { trace(e.message); }
-		try { text.toLocaleLowerCase; } catch (e:Error) { trace(e.message); }
+		// A String's locale case methods by name are its plain ones.
+		trace(text.toLocaleUpperCase(), text.toLocaleLowerCase());
 	}
 } }

@@ -49,12 +49,40 @@ Symbol *Lowerer::named_class(Expr *p_expression) {
 	return symbol && symbol->is_type() ? symbol : nullptr;
 }
 
+// A class named where a value is wanted (`var c:Class = Player`): the class itself. Nothing if the
+// expression names no class.
+std::optional<uint32_t> Expressions::class_value(Expr *p_expression) {
+	const Type *type = p_expression->type;
+	if (!type || type->kind != Type::ClassObject) {
+		return std::nullopt;
+	}
+	const uint32_t position = p_expression->offset;
+	const std::optional<uint32_t> code = l_.class_code(type->element);
+	uint32_t klass = NONE;
+	if (!code || !l_.class_type_ || !l_.class_index(l_.class_type_, &klass)) {
+		l_.refuse(position, "the class '" + l_.compilation_.type_name(type->element) + "' as a value");
+		return l_.default_value(Kind::Obj, position);
+	}
+	if (const Symbol *symbol = l_.named_class(p_expression)) {
+		l_.touch(symbol, position); // A class named is set up, as in AVM2.
+	}
+	const uint32_t out = l_.reg(Kind::Obj);
+	l_.emit(Op::ClassValue, position, out, *code);
+	return out;
+}
+
 uint32_t Expressions::name_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	Name *name = static_cast<Name *>(p_expression);
+	if (const std::optional<uint32_t> klass = class_value(p_expression)) {
+		return *klass;
+	}
 	uint32_t constant = 0;
 	if (l_.builtin_constant(name->symbol, position, &constant)) {
 		return constant;
+	}
+	if (name->symbol && name->symbol->kind == SymbolKind::Arguments && l_.arguments_reg_ != NONE) {
+		return l_.arguments_reg_;
 	}
 	if (name->symbol && (name->symbol->kind == SymbolKind::Method || name->symbol->kind == SymbolKind::Function)) {
 		return Functions(l_).function_value(p_expression); // A method or a function as a value, not called.
@@ -67,6 +95,9 @@ uint32_t Expressions::member_value(Expr *p_expression) {
 	uint32_t position = p_expression->offset;
 	Member *member = static_cast<Member *>(p_expression);
 	Symbol *symbol = member->resolved();
+	if (const std::optional<uint32_t> klass = class_value(p_expression)) {
+		return *klass; // `flash.utils.Dictionary`, written with its package.
+	}
 	// The one member of a built-in value so far: a string's length.
 	if (symbol && symbol->owner == l_.string_ && symbol->name == "length") {
 		uint32_t text = l_.expression(member->object, Kind::Str);
@@ -156,8 +187,23 @@ uint32_t Expressions::new_value(Expr *p_expression) {
 		// AS3 has no wrapper objects: `new String(x)` is the String itself, as String(x) gives it.
 		return Calls(l_).conversion_of(made->arguments, primitive, position);
 	}
-	if (!symbol || !l_.class_index(symbol, &index)) {
-		l_.refuse(made->callee->offset, symbol ? "creating a '" + std::string(symbol->name) + "'" : std::string("this 'new'"));
+	if (!symbol) {
+		// `new c(a)`, the class held in a variable: found out, and made, as the line runs.
+		Dynamic(l_).table_class(false);
+		l_.vector_class(l_.compilation_.instance_type(l_.array_));
+		Functions(l_).use_argument_error();
+		const uint32_t klass = l_.settled(l_.any_value(made->callee), Lowerer::writer(made->arguments), position);
+		std::vector<uint32_t> list;
+		for (uint32_t i = 0; i < made->arguments.count; i++) {
+			Expr *later = Lowerer::writer(made->arguments, i + 1);
+			list.push_back(l_.settled(l_.any_value(made->arguments[i]), later, position));
+		}
+		const uint32_t out = l_.reg(Kind::Any);
+		l_.emit(Op::ClassNew, position, out, klass, l_.arguments(std::move(list)));
+		return out;
+	}
+	if (!l_.class_index(symbol, &index)) {
+		l_.refuse(made->callee->offset, "creating a '" + std::string(symbol->name) + "'");
 		return l_.default_value(Kind::Obj, position);
 	}
 	l_.touch(symbol, position);
@@ -301,6 +347,9 @@ uint32_t Expressions::evaluate(Expr *p_expression, Kind p_want) {
 		case NodeKind::Index:
 			return l_.load(l_.place_of(p_expression), position);
 		case NodeKind::TypeApply:
+			if (const std::optional<uint32_t> klass = class_value(p_expression)) {
+				return *klass; // `Vector.<int>` as a value.
+			}
 			l_.refuse(position, "a Vector");
 			break;
 		default:

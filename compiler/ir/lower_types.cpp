@@ -27,11 +27,17 @@ bool Lowerer::kind_of(const Type *p_type, Kind *r_kind) const {
 		*r_kind = Kind::Obj;
 		return kind_of(p_type->element, &element) && element != Kind::Void;
 	}
+	if (p_type->kind == Type::ClassObject) {
+		*r_kind = Kind::Obj; // A class itself: a class value.
+		return true;
+	}
 	if (p_type->kind != Type::Instance || !p_type->symbol) {
 		return false;
 	}
 	const Symbol *symbol = p_type->symbol;
-	if (symbol == int_) {
+	if (symbol == class_type_ && class_type_) {
+		*r_kind = Kind::Obj;
+	} else if (symbol == int_) {
 		*r_kind = Kind::I32;
 	} else if (symbol == uint_) {
 		*r_kind = Kind::U32;
@@ -117,6 +123,17 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	}
 	if (const std::optional<uint32_t> library = Library::class_of(*this, p_class)) {
 		*r_index = *library;
+		return true;
+	}
+	if (p_class && p_class == class_type_) {
+		// Class: the built-in class of class values (CLASS_CODE in ir_codes.h).
+		Class klass;
+		klass.name = "Class";
+		klass.fields = { { "class", Kind::I32 } };
+		klass.built_in = true;
+		module_.classes.push_back(std::move(klass));
+		module_.class_class = *r_index = (uint32_t)module_.classes.size() - 1;
+		classes_[p_class] = module_.class_class;
 		return true;
 	}
 	if (p_class && p_class == function_) {

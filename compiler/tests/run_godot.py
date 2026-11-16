@@ -580,6 +580,9 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 	private function onRenamed():void { h += %s; }%s
 	public function listenJoy():void { Input.joyConnectionChanged.add(onJoy); }
 	public function clearJoy():void { Input.joyConnectionChanged.removeAll(); }
+	private var kind:Class; private var pusher:Function; private var table:Object;
+	public function hold():void { kind = Hot; pusher = seen.push; table = {a: 1, b: 2}; table.setPropertyIsEnumerable("a", false); }
+	public function held():String { var keys:Array = []; for (var k:String in table) { keys.push(k); } return (kind == Hot) + " " + (this is kind) + " " + pusher(99) + " " + keys.join() + " " + table.a; }
 	private function onJoy(device:int, connected:Boolean):void { onRenamed(); }
 } }
 """
@@ -618,7 +621,7 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 20, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 21, output[-1500:])
         check("%s: a reload that would drop an object whose class is gone is refused, and names it" % label,
               "an object of the class 'Later' is alive" in output, output[-1500:])
         check("%s: a reload asked for while AS3 runs says it was not made" % label,

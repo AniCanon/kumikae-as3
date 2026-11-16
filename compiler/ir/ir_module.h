@@ -105,6 +105,12 @@ struct Class {
 	// For a Vector.<T>, what its elements are; Void for every other class. A vector class has no fields,
 	// no methods and no base, and its objects are vm::Vector.
 	Kind element = Kind::Void;
+	// For a Vector.<T> whose elements are checked beyond their kind: what an untyped value stored into one
+	// is checked against, as FromAny's third operand has it. The class, for objects (a class of the
+	// program, an interface, Function, another vector's class); Godot's name for the type, an index into
+	// the strings, for Godot's values and objects; 0 for a Vector.<Object>, where undefined is null; NONE
+	// for the rest.
+	uint32_t element_check = NONE;
 	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;
@@ -183,6 +189,11 @@ struct Module {
 	uint32_t argument_error_class = NONE; // Made when a program calls a function value: too many arguments.
 	// The built-in class of function values (FUNCTION_FIELDS), when the program has any.
 	uint32_t function_class = NONE;
+	uint32_t class_class = NONE; // Class: the built-in class of class values, when a program has any.
+	// The function behind every method of the library read by name and not called (`u.push`): it takes an
+	// Array of the value and the method's name first, then any number of arguments, and runs CallLibrary.
+	// Made when a program reaches properties by name.
+	uint32_t library_function = NONE;
 	uint32_t array_class = NONE; // The one class of every Array, when the program has any.
 	uint32_t object_class = NONE; // The class of `{}` and `new Object()`, when the program makes one.
 	uint32_t dictionary_class = NONE; // flash.utils.Dictionary, when the program makes one.

@@ -25,6 +25,7 @@ public:
 	uint32_t vector_new(const Type *p_type, const List<Expr *> &p_arguments, uint32_t p_position);
 	uint32_t vector_literal(Expr *p_literal, const List<Expr *> &p_elements);
 	uint32_t vector_call(Call *p_call);
+	uint32_t vector_from(Call *p_call); // Vector.<T>(x).
 	// An element of a vector, or its length or `fixed`, as a place. Nothing if the target is none of those.
 	std::optional<Place> vector_place(Expr *p_target, Expr *p_later);
 	// A vector where Godot takes one of its own collections: converted, element by element, to the type

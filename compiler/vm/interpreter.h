@@ -31,6 +31,7 @@ class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
 	friend class Collector; // Frees objects that refer to each other in a loop.
 	friend class Json; // JSON.parse and JSON.stringify (vm/json_work.h).
+	friend class LibraryCall; // A method of the library called by name (vm/library_calls.h).
 
 public:
 	// Calls may nest this deep. One more is an AS3 error.
@@ -265,6 +266,20 @@ private:
 	bool table_text(Object *p_table, std::string *r_text, bool *r_own);
 	void call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
+	// A method of a String, an Array, a Vector or a Function, called by name: true if the name is one.
+	bool library_call(Slot p_holder, std::string_view p_name, const std::vector<Slot> &p_given, uint32_t p_out);
+	bool library_name(Slot p_holder, std::string_view p_name) const; // Whether the name is such a method.
+	// A method of the library read and not called, as a function bound to the value. CallLibrary runs it.
+	bool method_value(Slot p_holder, std::string_view p_name, Slot *r_value);
+	void call_library(const ir::Instruction &p_in);
+	void arguments_array(const ir::Instruction &p_in);
+	// Classes as values (vm/class_values.cpp).
+	std::unordered_map<uint32_t, Object *> class_values_; // The one object for each class, kept until the interpreter goes.
+	Object *class_value(uint32_t p_code);
+	std::string class_name(uint32_t p_code) const;
+	std::optional<uint32_t> class_in(Slot p_class, std::string_view p_error); // The class an untyped value holds, or raised.
+	void class_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	void class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
 	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
@@ -311,6 +326,7 @@ private:
 	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale = false);
 	bool locale_element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
+	void vector_from(const ir::Instruction &p_in);
 	bool said_by(uint32_t p_method, Object *p_object, std::string *r_text);
 	// Vectors put into words inside one another's words (an Array in an Array, or one that holds itself)
 	// nest at most this deep, by recursion in C++; one more is Error #1023, as Flash's stack check gives.

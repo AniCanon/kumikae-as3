@@ -13,6 +13,8 @@ enum class MathFunction : uint8_t { Abs, Acos, Asin, Atan, Ceil, Cos, Exp, Floor
 // The fields of a function value: the function, and what it is called with first (the object of a method,
 // or the environment of a function expression), or null for a function that takes nothing first.
 constexpr uint32_t FUNCTION_INDEX = 0, FUNCTION_FIRST = 1;
+// The field of a class value: which class it is, as ClassValue's second operand says it.
+constexpr uint32_t CLASS_CODE = 0;
 
 // The fields of Error and of its built-in subclasses, which the interpreter fills in for an error it raises.
 constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK = 3;

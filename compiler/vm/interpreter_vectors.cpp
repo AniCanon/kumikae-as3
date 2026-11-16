@@ -207,6 +207,43 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 	}
 }
 
+// VecFrom, Vector.<T>(x): x itself if it is one. Otherwise a new one, as long as an Array or another
+// Vector, of its elements, each converted as a store into the vector converts it (which may run the
+// program: an element's text). Anything else, null included, is AS3's TypeError #1034 (avmplus's
+// VectorClass, from recollection).
+void Interpreter::vector_from(const Instruction &p_in) {
+	const size_t base = frames_.back().base;
+	const Slot source = share(Kind::Any, stack_[base + p_in.b]);
+	Object *object = held_object(source);
+	if (object && object->klass == p_in.c) {
+		put(Kind::Obj, stack_[base + p_in.a], share(Kind::Obj, of_object(object)));
+		drop_any(source);
+		return;
+	}
+	const Kind given = object ? module_.classes[object->klass].element : Kind::Void;
+	if (given == Kind::Void) {
+		coercion_failed(source, Kind::Obj, p_in.c);
+		drop_any(source);
+		return;
+	}
+	const Vector *from = static_cast<const Vector *>(object);
+	const ir::Class &klass = module_.classes[p_in.c];
+	Vector *made = fresh_vector(p_in.c, from->length);
+	bool ok = made != nullptr;
+	for (uint32_t i = 0; ok && i < made->length; i++) {
+		// One taken out of the source as an earlier element spoke is undefined.
+		const Slot element = i < from->length ? to_any(given, from->data[i]) : any::undefined();
+		ok = from_any(element, klass.element, klass.element_check, &made->data[i]);
+		drop_any(element);
+	}
+	if (ok) {
+		put(Kind::Obj, stack_[frames_.back().base + p_in.a], of_object(made));
+	} else if (made) {
+		release_object(made);
+	}
+	drop_any(source);
+}
+
 // The elements as text with p_separator between them, as join() and toString() give it, or with p_locale
 // as toLocaleString() does. An element that is an object says what it is in its own words, which runs the
 // program: false if that failed.

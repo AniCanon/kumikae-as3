@@ -99,6 +99,34 @@ int32_t Interpreter::function_length(Object *p_function) const {
 	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
+// Arguments: what the caller passed, as an Array, and the running function as its `callee`.
+void Interpreter::arguments_array(const Instruction &p_in) {
+	const Frame &frame = frames_.back();
+	const Function &function = module_.functions[frame.function];
+	const uint32_t first = function.is_static ? 0 : 1;
+	const uint32_t count = frame.arguments > first ? frame.arguments - first : 0;
+	Vector *made = fresh_vector(module_.array_class, count);
+	if (!made) {
+		return;
+	}
+	Slot *r = stack_.data() + frame.base;
+	for (uint32_t i = 0; i < count; i++) {
+		made->data[i] = to_any(function.registers[first + i], r[first + i]);
+	}
+	Object *callee = make_function(frame.function, first ? static_cast<Object *>(r[0].p) : nullptr);
+	Entries *properties = callee ? properties_of(made) : nullptr;
+	PropertyKey key;
+	key.text = "callee";
+	if (!properties || !set_entry(properties, key, any::object(callee))) {
+		release_object(callee);
+		release_object(made);
+		return;
+	}
+	properties->all()[*entry_of(properties, key)].hidden = true;
+	release_object(callee); // The Array holds it now.
+	put(Kind::Obj, r[p_in.a], of_object(made));
+}
+
 // CallbackThis: a method keeps its own object, so Flash will not be told another (Error #1510).
 void Interpreter::callback_this(Slot p_callback, Slot p_this) {
 	const Object *callback = any::tag(p_callback) == AnyTag::Object ? static_cast<const Object *>(any::pointer(p_callback)) : nullptr;
@@ -145,6 +173,13 @@ bool Interpreter::same_function(const Object *p_a, const Object *p_b) const {
 	}
 	Object *a = const_cast<Object *>(p_a);
 	Object *b = const_cast<Object *>(p_b);
+	const Vector *bound_a = static_cast<const Vector *>(a->fields()[ir::FUNCTION_FIRST].p);
+	const Vector *bound_b = static_cast<const Vector *>(b->fields()[ir::FUNCTION_FIRST].p);
+	if (static_cast<uint32_t>(a->fields()[ir::FUNCTION_INDEX].i) == module_.library_function && bound_a && bound_b && bound_a != bound_b) {
+		// A method of the library: the same when read from the same value by the same name.
+		const bool named = static_cast<const Str *>(any::pointer(bound_a->data[1]))->view() == static_cast<const Str *>(any::pointer(bound_b->data[1]))->view();
+		return b->fields()[ir::FUNCTION_INDEX].i == a->fields()[ir::FUNCTION_INDEX].i && named && bound_a->data[0].bits == bound_b->data[0].bits;
+	}
 	return a->fields()[ir::FUNCTION_INDEX].i == b->fields()[ir::FUNCTION_INDEX].i &&
 			a->fields()[ir::FUNCTION_FIRST].p == b->fields()[ir::FUNCTION_FIRST].p && a->fields()[ir::FUNCTION_FIRST].p;
 }

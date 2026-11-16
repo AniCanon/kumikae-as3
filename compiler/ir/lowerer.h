@@ -40,6 +40,7 @@ class Lowerer {
 	Symbol *godot_object_ = nullptr; // godot.GodotObject: what every Godot object class extends.
 	Symbol *signal_ = nullptr; // godot.Signal
 	Symbol *function_ = nullptr; // Function
+	Symbol *class_type_ = nullptr; // Class
 	Symbol *array_ = nullptr; // Array, and the one class all Arrays are of, once made
 	uint32_t array_class_ = NONE;
 
@@ -62,6 +63,7 @@ class Lowerer {
 	bool constructor_ = false;
 	const Type *result_type_ = nullptr; // What the function being lowered says it returns, if it says.
 	std::unordered_map<const Symbol *, uint32_t> locals_;
+	uint32_t arguments_reg_ = NONE; // `arguments` (untyped), in a function that names it.
 	std::vector<Loop> loops_;
 	std::vector<std::string_view> next_labels_; // Labels written just before the statement being lowered.
 	// Types already refused where they were written: a value of one is not refused again at each use.
@@ -89,6 +91,8 @@ class Lowerer {
 	const Function &fn() const { return module_.functions[function_index_]; }
 
 	void refuse(uint32_t p_offset, std::string_view p_what);
+	// An error in the program that only the lowering finds: said as it is, and the program does not run.
+	void error(uint32_t p_offset, std::string_view p_text);
 
 	uint32_t string(const std::string &p_text);
 
@@ -178,6 +182,11 @@ class Lowerer {
 	// a Vector.<T> is made the first time the type is met; nothing if its elements are of a kind not held.
 	bool is_vector(const Type *p_type) const { return p_type && (p_type->kind == Type::Vector || (array_ && p_type->symbol == array_)); }
 	std::optional<uint32_t> vector_class(const Type *p_type);
+	// What an untyped value stored where p_type is declared is checked against (FromAny's third operand):
+	// nothing if the type can't be checked here.
+	std::optional<uint32_t> check_for(const Type *p_type, Kind p_kind);
+	// A class as ClassValue names it: its index, or an ANY_IS_ code. Nothing for one that can't be a value here.
+	std::optional<uint32_t> class_code(const Type *p_class);
 	// The class a declaration says its value is of: a class of the program or a vector's. NONE otherwise.
 	uint32_t declared_class(TypeRef *p_type);
 	// The untyped value: ir/lower_any.cpp.
