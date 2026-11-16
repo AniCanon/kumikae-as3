@@ -80,7 +80,10 @@ parts of them a moved function still asks for (`vm::Unmoved`), the host keeps an
 
 What this costs, until the split:
 
-- A thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
+- An instruction that asks the engine is carried out with no frame (`engine_thunk.cpp`): the interpreter's
+  own request on the values handed over, and a function Godot calls back meanwhile is entered as generated
+  code (`entry.cpp`). It still goes by Godot's names and boxed values, which is most of what it costs.
+- Any other thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
   most operations take. `fast.h` exists for that reason, and each family that becomes a function of plain
   values loses its thunks.
 - Where the interpreter itself refuses an entry (the stack nearly used up), it keeps the error

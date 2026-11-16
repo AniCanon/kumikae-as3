@@ -332,7 +332,10 @@ functions in a table (`runtime/api.h`), as it hands it the engine's.
 
 Everything the extension does goes on as before, through an interpreter the runtime's host keeps over the
 same module with each function's body native (`vm/native_code.h`): only what runs when a function is
-called differs. What generated code does with the engine itself, and what it leaves to the library:
+called differs. Godot's own call of a script's function (`_process`, a listener of a signal, a method by
+name) runs the generated function itself, with no frame of that interpreter's, where nothing of the
+interpreter's is in progress; an error is reported, or comes out of the script's call of the engine that
+led there, as the interpreter does it (`runtime/entry.cpp`). What generated code does with the engine itself, and what it leaves to the library:
 
 - A value of one of Godot's types that has parts (`Vector2`, `Vector3`, `Color`, `Rect2`, `Transform3D` and
   the rest of the sixteen) that is never null (what Godot makes, computes or gives for a property) is a
