@@ -123,6 +123,66 @@ The later diagnostic-version change was also compared with its immediate baselin
 20-edit burst **12.073/13.434 → 11.519/12.752 ms**. The separate 31-sample recovery median was
 **31.345 → 31.161 ms**. These controls do not establish an improvement for every workload.
 
+## Incremental checking (November 16)
+
+General incremental checking replaced the body-only fast path: an edit redoes the declarations of the files
+it reaches, and bodies are checked a file at a time, the asked-about file first (design in the
+[editor guide](../../editors/completion.md#performance-and-ownership) and
+[src/README](../../compiler/src/README.md#checking-as-the-program-is-edited)).
+
+### Correctness
+
+`test_incremental` and `test_server_incremental` compare every answer with a fresh whole check after random,
+seeded edits; the suite runs a short version (about 800 edits and 300 server edits). Longer runs on
+2026-11-16, each sequence of 150 or 200 edits:
+
+| Run | Edits | Result |
+|---|---:|---|
+| Generated projects, seeds 1000–1599 (release) | 129,900 | 0 differences |
+| Server sessions, seeds 1000–1299 (release) | 71,773 | 0 differences |
+| as3-signals, flashpunk, flixel, as3corelib (release, Godot loaded) | 1,920 | 0 differences |
+| Generated projects, seeds 2000–2119 (ASan/UBSan) | 19,500 | 1 difference, no sanitizer report |
+| Generated projects, seeds 3000–3599 (release) | 129,894 | 1 difference |
+
+The two differences were one bug: the names in a written type's type arguments (`Vector.<Particle>`) were
+not recorded as read by the declarations. It is fixed, with a named test, and both seeds pass. Each widening
+of the generator found a bug before that (property-half signatures, packages gaining a definition through a
+moved declaration, interface obligations from repeated members, imports in local functions); each has a
+named test. The longest runs counted 21,277 cascades into readers' declarations, 371 rounds that took in a
+cycle, 11,212 symbols of gone declarations used again, 8,486 changes of which file defines a name first and
+258,943 doubt judgements. Breaking the dependencies on purpose (no member keys; no readers) makes the quick
+version fail at once.
+
+### Speed
+
+`tests/bench/recheck.py` runs `bench_recheck` from one source built in both trees, turn and turn about, on
+a project from `generate_project.py --hub` (every file calls `Hub.tick`; each file's `step0` is called by
+the file before it). Medians of five runs of ten edit/undo pairs, Godot loaded, ms. Measured at commit
+`09171b3`, before the body-only rechecks and collection speed-ups that followed.
+
+| Edit, until | 100k lines before | after | 1M lines before | after |
+|---|---:|---:|---:|---:|
+| Body, file checked | 0.275 | 0.313 | 0.755 | 0.683 |
+| Body, program checked | 0.275 | 0.314 | 0.755 | 0.688 |
+| Method parameters, file | 29.152 | 0.315 | 298.208 | 0.690 |
+| Method parameters, program | 29.152 | 0.442 | 298.209 | 0.847 |
+| New member, program | 28.992 | 0.308 | 266.334 | 0.768 |
+| Hub method, file (a request) | 28.914 | 0.062 | 279.002 | 0.744 |
+| Hub method, program | 28.914 | 26.794 | 279.002 | 392.095 |
+| First check | 89.6 | 101.7 | 903.5 | 981.7 |
+| Peak memory, MiB | 82.8 | 88.8 | 686.2 | 627.3 |
+
+Load average when each size started: 5.0 at 100k, 4.4 at 1M (it rose to about 18 during the 1M runs, whose
+before-ranges are wide: 212–1,262 ms for a parameter change). After the body-only rechecks (a file whose
+bodies alone read the change keeps its declarations), the hub edit's whole-program time on this build fell to
+25.5–26.5 ms at 100k against 28.6–29.2 ms before; it was not measured turn and turn about again at 1M,
+where it was 1.4 times the full check. A body edit costs 0.04 ms more than before at 100k: the file's
+declarations are redone and fingerprinted, and what it reads recorded. The first check costs 9–13% more,
+for fingerprints and dependency lists.
+
+A soak of 4,000 declaration renames (a method and a class renamed to a new name and back, `bench_recheck
+--soak`) at 100k lines held resident memory at 91.3 MiB from the 400th edit on.
+
 ## Validation boundaries
 
 Only the stated macOS IDE endpoints were exercised; other IDE builds need a download and were not
@@ -131,7 +191,8 @@ application has the desktop's focus, as it does in the background sandbox. Windo
 host-side regressions but still need Windows runtime validation. Human acceptance of the complete
 editing workflow remains separate from automated sandbox checks.
 
-Incremental reuse covers supported body edits after a clean check; declaration changes and malformed
-syntax still use full checking. Cancellation skips queued work, not an executing semantic check.
+A file added to or removed from the program, an edited `--declarations` file or another project folder
+starts the declarations over (bodies are still checked lazily). An edit to a declaration every file reads
+checks every file's bodies again, in the background. The idle check stops between files for any message.
 Dynamic receivers need a known type for member completion. The [editor guide](../../editors/completion.md)
 describes completion behavior; broader language-server work remains in the [backlog](../backlog.md).
