@@ -87,6 +87,22 @@ void Resolver::declare_local_function(FunctionDecl *p_function) {
 	}
 }
 
+void Resolver::hoist_switch(Switch *p_switch, std::vector<Import *> *r_imports) {
+	for (SwitchCase &branch : p_switch->cases) {
+		for (Stmt *statement : branch.body) {
+			hoist(statement, r_imports);
+		}
+	}
+}
+
+void Resolver::hoist_try(Try *p_try, std::vector<Import *> *r_imports) {
+	hoist(p_try->body, r_imports);
+	for (CatchClause &clause : p_try->catches) {
+		hoist(clause.body, r_imports);
+	}
+	hoist(p_try->finally_block, r_imports);
+}
+
 // Walks the statements of one function body, not entering nested functions. With r_imports, collects the
 // body's import statements; without, declares its variables and nested functions.
 void Resolver::hoist(Stmt *p_statement, std::vector<Import *> *r_imports) {
@@ -136,20 +152,11 @@ void Resolver::hoist(Stmt *p_statement, std::vector<Import *> *r_imports) {
 			hoist(loop->body, r_imports);
 		} break;
 		case NodeKind::Switch:
-			for (SwitchCase &branch : static_cast<Switch *>(p_statement)->cases) {
-				for (Stmt *statement : branch.body) {
-					hoist(statement, r_imports);
-				}
-			}
+			hoist_switch(static_cast<Switch *>(p_statement), r_imports);
 			break;
-		case NodeKind::Try: {
-			Try *attempt = static_cast<Try *>(p_statement);
-			hoist(attempt->body, r_imports);
-			for (CatchClause &clause : attempt->catches) {
-				hoist(clause.body, r_imports);
-			}
-			hoist(attempt->finally_block, r_imports);
-		} break;
+		case NodeKind::Try:
+			hoist_try(static_cast<Try *>(p_statement), r_imports);
+			break;
 		case NodeKind::Labeled:
 			hoist(static_cast<Labeled *>(p_statement)->body, r_imports);
 			break;

@@ -48,6 +48,8 @@ class Resolver {
 
 	void declare_locals(VarDecl *p_decl);
 	void declare_local_function(FunctionDecl *p_function);
+	void hoist_switch(Switch *p_switch, std::vector<Import *> *r_imports);
+	void hoist_try(Try *p_try, std::vector<Import *> *r_imports);
 	void hoist(Stmt *p_statement, std::vector<Import *> *r_imports);
 	Scope &retain_scope(Scope &p_fallback, const Node *p_extent);
 	void body_imports(FunctionDecl *p_function, ImportScope &r_imports);
