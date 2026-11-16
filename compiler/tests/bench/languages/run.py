@@ -157,6 +157,9 @@ def program_library(kas3c, where, tree, unit=True):
     out = os.path.join(where, "native")
     written = subprocess.run([kas3c, "cpp", "--godot", *(["--unit"] if unit else []), *scripts(), "-o", out], cwd=HERE, capture_output=True,
                              text=True)
+    if written.returncode == 2 and unit:
+        # An earlier build's kas3c, which does not know --unit: a file for each class, as it was built then.
+        written = subprocess.run([kas3c, "cpp", "--godot", *scripts(), "-o", out], cwd=HERE, capture_output=True, text=True)
     if written.returncode != 0:
         return None, written.stderr.strip()
     includes = [flag for each in ("runtime", "vm", "ir", "src") for flag in ("-I", os.path.join(tree, each))]
