@@ -251,7 +251,7 @@ translate exactly is refused with `kas3c: not yet supported: <what>` and status 
 With `--godot` the files are scripts for Godot, as for `kas3c ir --godot`, and the C++ is the project's
 program library (below).
 
-Linked with `libkas3runtime.a` and the interpreter's libraries, the C++ is a plain executable that runs the
+Linked with `libkas3standalone.a` (its `main`), `libkas3runtime.a` and the interpreter's libraries, the C++ is a plain executable that runs the
 program as `kas3c run` does: the same traces, the same report of an error nothing catches, the same exit
 status. That executable is the backend's oracle. `tests/run_native.py` (the `native` test group) takes
 every program of `tests/run/`, writes it as C++, builds it, runs it, and holds its output, its errors and its
@@ -868,6 +868,8 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   lists the programs the backend refuses and why; a program newly refused, or one on the list that now
   runs, fails until the list says so (`--update`). The sanitizer build builds the generated programs with
   the sanitizers too.
+- `tests/test_backend.cpp`: the C++ backend on modules made by hand: what it refuses, by name and with
+  nothing written.
 - `tests/test_ir.cpp`, `tests/test_runtime.cpp`, `tests/test_vm.cpp`: the IR printer, the number rules
   (checked against Node), the hook and frames a debugger will use, calls into the interpreter that nest
   and fail, and a script run against a fake engine that records every request.

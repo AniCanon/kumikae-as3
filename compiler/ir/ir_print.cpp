@@ -242,8 +242,30 @@ std::string print(const Module &p_module) {
 
 uint64_t fingerprint(const Module &p_module) {
 	uint64_t hash = 0xcbf29ce484222325ull; // FNV-1a.
-	for (const char each : print(p_module)) {
-		hash = (hash ^ static_cast<unsigned char>(each)) * 0x100000001b3ull;
+	const auto text = [&](std::string_view p_text) {
+		for (const char each : p_text) {
+			hash = (hash ^ static_cast<unsigned char>(each)) * 0x100000001b3ull;
+		}
+	};
+	const auto number = [&](uint64_t p_value) { text(std::to_string(p_value) + ";"); };
+	text(print(p_module));
+	// What the text leaves out and code built from the module depends on: where each line of the sources
+	// starts and each instruction is (a stack trace's lines), and what Godot's name table said of each name
+	// (a method's hash, its parameters' types). Not the files' names, which are whoever read them's.
+	for (const std::vector<uint32_t> &lines : p_module.lines) {
+		for (uint32_t each : lines) {
+			number(each);
+		}
+	}
+	for (const Function &function : p_module.functions) {
+		number(function.position);
+		for (const Instruction &in : function.code) {
+			number(in.position);
+		}
+	}
+	for (const EngineName &name : p_module.engine_names) {
+		text(name.key);
+		text(name.value);
 	}
 	return hash;
 }
