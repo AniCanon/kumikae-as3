@@ -1,16 +1,21 @@
-// A String's methods that may run the program or raise, as functions of plain values (vm/library.h).
+// A String's methods that may run the program or raise, and a number put into words in a radix or in so
+// many digits, as functions of plain values (vm/library.h).
 #include "library.h"
 
 #include "any.h"
+#include "number_text.h"
+#include "numeric.h"
 #include "text_units.h"
 #include "uri_text.h"
 
+#include <cmath>
 #include <optional>
 #include <vector>
 
 namespace kas3 {
 namespace vm {
 
+using ir::NumberFormat;
 using ir::StringFunction;
 
 namespace {
@@ -98,6 +103,56 @@ bool text_call(Library &p_library, StringFunction p_function, const Slot *p_valu
 	}
 	const Str *string = p_count > 0 ? static_cast<const Str *>(p_values[0].p) : nullptr;
 	return uri(p_library, p_function, string ? string->view() : std::string_view("null"), r_out);
+}
+
+namespace {
+
+// A number in the digits asked for, which are in range: from a Number, or from an Int64's own digits.
+std::string formatted(NumberFormat p_format, Slot p_value, bool p_wide, int p_digits) {
+	switch (p_format) {
+		case NumberFormat::Radix:
+			return p_wide ? wide_radix_text(p_value.l, p_digits) : radix_text(p_value.d, p_digits);
+		case NumberFormat::Fixed:
+			return p_wide ? wide_fixed_text(p_value.l, p_digits) : fixed_text(p_value.d, p_digits);
+		case NumberFormat::Exponential:
+			return p_wide ? wide_exponential_text(p_value.l, p_digits) : exponential_text(p_value.d, p_digits);
+		case NumberFormat::Precision:
+			return p_wide ? wide_precision_text(p_value.l, p_digits) : precision_text(p_value.d, p_digits);
+	}
+	return std::string();
+}
+
+} // namespace
+
+std::optional<std::string> number_words(Library &p_library, NumberFormat p_format, Slot p_value, bool p_wide, double p_digits) {
+	const double digits = to_integer(p_digits);
+	double least = 0, most = MAX_FIXED_DIGITS;
+	if (p_format == NumberFormat::Radix) {
+		least = 2;
+		most = 36;
+	} else if (p_format == NumberFormat::Precision) {
+		least = 1;
+		most = MAX_PRECISION;
+	}
+	if (!p_wide && (p_format == NumberFormat::Exponential || p_format == NumberFormat::Precision) && !std::isfinite(p_value.d)) {
+		// toExponential and toPrecision look at NaN and Infinity before the digits.
+		return number_to_string(p_value.d);
+	}
+	if (digits < least || digits > most) {
+		p_library.runner.raise(p_library.module().range_error_class, p_format == NumberFormat::Radix ? radix_error(digits) : digits_error());
+		return std::nullopt;
+	}
+	return formatted(p_format, p_value, p_wide, static_cast<int>(digits));
+}
+
+bool number_text(Library &p_library, NumberFormat p_format, bool p_wide, const Slot *p_values, size_t p_count, Slot *r_out) {
+	const std::optional<std::string> words = p_count == 2 ? number_words(p_library, p_format, p_values[0], p_wide, p_values[1].d) : std::nullopt;
+	Str *made = words ? p_library.text(*words) : nullptr;
+	if (made) {
+		r_out->bits = 0;
+		r_out->p = made;
+	}
+	return made != nullptr;
 }
 
 } // namespace vm

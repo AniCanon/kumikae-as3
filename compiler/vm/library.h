@@ -8,6 +8,7 @@
 #include "ir.h"
 #include "runtime.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -56,6 +57,12 @@ Object *new_error(Heap &p_heap, uint32_t p_class, Str *p_message);
 // by a delimiter that is not a RegExp, as StrCall lists its values (the String, the delimiter untyped,
 // the most pieces as a Number), and the URI functions (the text, where null reads "null").
 [[nodiscard]] bool text_call(Library &p_library, ir::StringFunction p_function, const Slot *p_values, size_t p_count, Slot *r_out);
+
+// toString(radix), toFixed, toExponential or toPrecision of a Number, or of an Int64 (p_wide), as text.
+// Nothing, with AS3's RangeError raised, for a radix or a count of digits out of range.
+std::optional<std::string> number_words(Library &p_library, ir::NumberFormat p_format, Slot p_value, bool p_wide, double p_digits);
+// NumText: the same as a String, of its values (the number, then the radix or the digits as a Number).
+[[nodiscard]] bool number_text(Library &p_library, ir::NumberFormat p_format, bool p_wide, const Slot *p_values, size_t p_count, Slot *r_out);
 
 } // namespace vm
 } // namespace kas3

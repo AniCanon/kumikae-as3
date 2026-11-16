@@ -194,7 +194,6 @@ private:
 	// The standard library (vm/string_methods.cpp): StrCall and NumText.
 	void string_call(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void number_text(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
-	std::optional<std::string> number_words(ir::NumberFormat p_format, Slot p_value, bool p_wide, double p_digits);
 	// RegExp (vm/regexp_methods.cpp, vm/regexp_strings.cpp). A pattern is read once for each source and
 	// flags, and kept while anything uses it: a replacement function may make the cache forget it.
 	std::unordered_map<std::string, std::shared_ptr<const regex::Program>> patterns_;

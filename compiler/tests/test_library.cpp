@@ -6,6 +6,7 @@
 #include "library.h"
 #include "no_engine.h"
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -166,9 +167,45 @@ void test_new_error() {
 	CHECK_EQ(live_strings(), static_cast<size_t>(0));
 }
 
+void test_number_text() {
+	kas3::ir::Module module = module_of_three();
+	module.range_error_class = ERROR;
+	Heap heap(module, NoEngine::instance());
+	Recorder recorder;
+	Library library{ heap, recorder };
+	Slot out = of_number(0);
+	const Slot hex[] = { of_number(255), of_number(16) };
+	CHECK(number_text(library, kas3::ir::NumberFormat::Radix, false, hex, 2, &out));
+	Str *made = static_cast<Str *>(out.p);
+	CHECK_EQ(std::string(made->view()), std::string("ff"));
+	if (release(made)) {
+		free_string(made);
+	}
+	Slot wide = of_number(0);
+	wide.l = -9007199254740993;
+	const Slot fixed[] = { wide, of_number(2) };
+	CHECK(number_text(library, kas3::ir::NumberFormat::Fixed, true, fixed, 2, &out));
+	made = static_cast<Str *>(out.p);
+	CHECK_EQ(std::string(made->view()), std::string("-9007199254740993.00"));
+	if (release(made)) {
+		free_string(made);
+	}
+	// A radix out of range is the RangeError the program's runner is asked to raise.
+	const Slot radix[] = { of_number(255), of_number(37) };
+	out = of_number(7);
+	CHECK(!number_text(library, kas3::ir::NumberFormat::Radix, false, radix, 2, &out));
+	CHECK_EQ(out.d, 7.0);
+	CHECK_EQ(recorder.raised.size(), static_cast<size_t>(1));
+	CHECK(recorder.raised[0].find("Error #1003") == 0);
+	CHECK(number_words(library, kas3::ir::NumberFormat::Precision, of_number(1.5), false, 0) == std::nullopt);
+	CHECK_EQ(number_words(library, kas3::ir::NumberFormat::Precision, of_number(NAN), false, 0).value_or("?"), std::string("NaN"));
+	CHECK_EQ(live_strings(), static_cast<size_t>(0));
+}
+
 } // namespace
 
 int main() {
+	test_number_text();
 	test_split();
 	test_uri();
 	test_new_error();

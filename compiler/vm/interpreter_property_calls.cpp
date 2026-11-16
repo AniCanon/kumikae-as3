@@ -246,7 +246,7 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 				value.d = any::to_number(p_holder);
 			}
 			const double digits = p_given.empty() ? (*format == ir::NumberFormat::Radix ? 10 : 0) : any::to_number(p_given[0]);
-			if (const std::optional<std::string> words = number_words(*format, value, tag == AnyTag::Wide, digits)) {
+			if (const std::optional<std::string> words = number_words(library_, *format, value, tag == AnyTag::Wide, digits)) {
 				if (Str *made = text(*words)) {
 					give(Kind::Str, of_pointer(made));
 				}

@@ -1,10 +1,8 @@
 #include "interpreter_internal.h"
 
-#include "number_text.h"
 #include "text_methods.h"
 #include "text_units.h"
 
-#include <cmath>
 
 namespace kas3 {
 namespace vm {
@@ -65,55 +63,14 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 	}
 }
 
-namespace {
-
-// A number in the digits asked for, which are in range: from a Number, or from an Int64's own digits.
-std::string formatted(NumberFormat p_format, Slot p_value, bool p_wide, int p_digits) {
-	switch (p_format) {
-		case NumberFormat::Radix:
-			return p_wide ? wide_radix_text(p_value.l, p_digits) : radix_text(p_value.d, p_digits);
-		case NumberFormat::Fixed:
-			return p_wide ? wide_fixed_text(p_value.l, p_digits) : fixed_text(p_value.d, p_digits);
-		case NumberFormat::Exponential:
-			return p_wide ? wide_exponential_text(p_value.l, p_digits) : exponential_text(p_value.d, p_digits);
-		case NumberFormat::Precision:
-			return p_wide ? wide_precision_text(p_value.l, p_digits) : precision_text(p_value.d, p_digits);
-	}
-	return std::string();
-}
-
-} // namespace
-
+// NumText: toString(radix), toFixed, toExponential or toPrecision, by the library's function.
 void Interpreter::number_text(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
-	const bool wide = p_function.registers[list[0]] == Kind::I64;
-	const std::optional<std::string> words = number_words(static_cast<NumberFormat>(p_in.b), p_registers[list[0]], wide, p_registers[list[1]].d);
-	if (words) {
-		assign(Kind::Str, p_registers[p_in.a], text(*words));
+	const Slot given[2] = { p_registers[list[0]], p_registers[list[1]] };
+	Slot made;
+	if (vm::number_text(library_, static_cast<NumberFormat>(p_in.b), p_function.registers[list[0]] == Kind::I64, given, 2, &made)) {
+		assign(Kind::Str, p_registers[p_in.a], made.p);
 	}
-}
-
-// toString(radix), toFixed, toExponential or toPrecision of a Number, or of an Int64 (p_wide). Nothing,
-// with AS3's RangeError raised, for a radix or a count of digits out of range.
-std::optional<std::string> Interpreter::number_words(NumberFormat p_format, Slot p_value, bool p_wide, double p_digits) {
-	const double digits = to_integer(p_digits);
-	double least = 0, most = MAX_FIXED_DIGITS;
-	if (p_format == NumberFormat::Radix) {
-		least = 2;
-		most = 36;
-	} else if (p_format == NumberFormat::Precision) {
-		least = 1;
-		most = MAX_PRECISION;
-	}
-	if (!p_wide && (p_format == NumberFormat::Exponential || p_format == NumberFormat::Precision) && !std::isfinite(p_value.d)) {
-		// toExponential and toPrecision look at NaN and Infinity before the digits.
-		return number_to_string(p_value.d);
-	}
-	if (digits < least || digits > most) {
-		raise(module_.range_error_class, p_format == NumberFormat::Radix ? radix_error(digits) : digits_error());
-		return std::nullopt;
-	}
-	return formatted(p_format, p_value, p_wide, static_cast<int>(digits));
 }
 
 void Interpreter::any_null_check(Slot p_value) {
