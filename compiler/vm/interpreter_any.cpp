@@ -14,13 +14,6 @@ using ir::Op;
 
 namespace {
 
-Slot of_bool(bool p_value) {
-	Slot out;
-	out.bits = 0;
-	out.b = p_value;
-	return out;
-}
-
 const char *tag_name(AnyTag p_tag) {
 	switch (p_tag) {
 		case AnyTag::Undefined:
@@ -92,8 +85,13 @@ bool Interpreter::any_text(Slot p_value, std::string *r_text) {
 		release_object(object);
 		return said;
 	}
-	// A Godot value or object: a handle of its own while the engine speaks, which can run a script.
-	void *held = host_.handles.copy(any::pointer(p_value));
+	return engine_text(any::pointer(p_value), r_text);
+}
+
+// Godot's text for one of its values or objects (null for no handle), by a handle of its own while the
+// engine speaks, which can run a script. False if memory ran out, or if that script's toString() failed.
+bool Interpreter::engine_text(void *p_handle, std::string *r_text) {
+	void *held = p_handle ? host_.handles.copy(p_handle) : nullptr;
 	Str *text = held ? host_.handles.text(held) : nullptr;
 	*r_text += text ? text->view() : std::string_view("null");
 	if (release(text)) {
@@ -127,7 +125,6 @@ bool Interpreter::from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_
 		return true; // A Godot object that has been freed is null, so false.
 	}
 	const AnyTag tag = any::tag(p_value);
-	const bool nothing = tag == AnyTag::Undefined || tag == AnyTag::Null;
 	switch (p_kind) {
 		// A large integer wraps (the owner's ruling): an Int64 by its own low bits, not a rounded Number's.
 		case Kind::I32:
@@ -144,67 +141,15 @@ bool Interpreter::from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_
 		case Kind::Bool:
 			r_out->b = any::to_boolean(p_value);
 			return true;
-		case Kind::I64: {
-			if (tag == AnyTag::Wide) {
-				r_out->l = static_cast<Wide *>(any::pointer(p_value))->value;
-				return true;
-			}
-			const double number = any::to_number(p_value);
-			const std::optional<int64_t> whole = number_to_wide(number);
-			if (!whole || static_cast<double>(*whole) != number) {
-				raise(module_.range_error_class, number_to_string(number) + " does not fit an Int64.");
-				return false;
-			}
-			r_out->l = *whole;
-			return true;
-		}
-		case Kind::Str: {
-			if (nothing) {
-				return true;
-			}
-			if (tag == AnyTag::String) {
-				retain(static_cast<Str *>(any::pointer(p_value)));
-				r_out->p = any::pointer(p_value);
-				return true;
-			}
-			std::string words;
-			if (!any_text(p_value, &words)) {
-				return false;
-			}
-			r_out->p = text(words);
-			return true;
-		}
-		case Kind::Obj: {
-			Object *object = tag == AnyTag::Object ? static_cast<Object *>(any::pointer(p_value)) : nullptr;
-			if (nothing || (object && (p_check == NONE || is_class(object, p_check)))) {
-				retain(object);
-				r_out->p = object;
-				return true;
-			}
-			if (p_check != NONE && engine_array(p_value, p_check)) {
-				// One of Godot's Arrays where an Array is wanted: a new Array of its elements.
-				Vector *made = array_of_engine(any::pointer(p_value), p_check);
-				r_out->p = made;
-				return made != nullptr;
-			}
-			if (p_check != NONE && engine_dictionary(p_value, p_check)) {
-				// One of Godot's Dictionaries where a Dictionary is wanted: a new one of its keys and values.
-				Object *made = table_of_engine(any::pointer(p_value), p_check);
-				r_out->p = made;
-				return made != nullptr;
-			}
-			break;
-		}
+		case Kind::I64:
+			return wide_from_any(p_value, r_out);
+		case Kind::Str:
+			return text_from_any(p_value, r_out);
+		case Kind::Obj:
+			return object_from_any(p_value, p_check, r_out);
 		case Kind::Val:
-		case Kind::Ref: {
-			const bool fits = (p_kind == Kind::Val ? tag == AnyTag::Value : tag == AnyTag::Godot) &&
-					(p_check == NONE || host_.handles.is_class(any::pointer(p_value), module_.strings[p_check]));
-			if (nothing || fits) {
-				r_out->p = nothing ? nullptr : host_.handles.copy(any::pointer(p_value));
-				return true;
-			}
-			break;
-		}
+		case Kind::Ref:
+			return engine_from_any(p_value, p_kind, p_check, r_out);
 		case Kind::Any:
 			// Into an `Object` (any check given): undefined becomes null. Into a `*`: as it is.
 			*r_out = p_check != NONE && tag == AnyTag::Undefined ? any::null() : share(Kind::Any, p_value);
@@ -212,14 +157,92 @@ bool Interpreter::from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_
 		default:
 			return true;
 	}
-	// Flash's words: the value as text where it has one, else its type, and the type it was to be.
+}
+
+// An untyped value into an Int64: one held as an Int64 as it is, and a Number only if it is a whole one an
+// Int64 holds exactly.
+bool Interpreter::wide_from_any(Slot p_value, Slot *r_out) {
+	if (any::tag(p_value) == AnyTag::Wide) {
+		r_out->l = static_cast<Wide *>(any::pointer(p_value))->value;
+		return true;
+	}
+	const double number = any::to_number(p_value);
+	const std::optional<int64_t> whole = number_to_wide(number);
+	if (!whole || static_cast<double>(*whole) != number) {
+		raise(module_.range_error_class, number_to_string(number) + " does not fit an Int64.");
+		return false;
+	}
+	r_out->l = *whole;
+	return true;
+}
+
+// An untyped value into a String: null and undefined are null, and anything else is its text.
+bool Interpreter::text_from_any(Slot p_value, Slot *r_out) {
+	const AnyTag tag = any::tag(p_value);
+	if (tag == AnyTag::Undefined || tag == AnyTag::Null) {
+		return true;
+	}
+	if (tag == AnyTag::String) {
+		retain(static_cast<Str *>(any::pointer(p_value)));
+		r_out->p = any::pointer(p_value);
+		return true;
+	}
+	std::string words;
+	if (!any_text(p_value, &words)) {
+		return false;
+	}
+	r_out->p = text(words);
+	return true;
+}
+
+// An untyped value into an object of the class p_check (any object for NONE).
+bool Interpreter::object_from_any(Slot p_value, uint32_t p_check, Slot *r_out) {
+	const AnyTag tag = any::tag(p_value);
+	const bool nothing = tag == AnyTag::Undefined || tag == AnyTag::Null;
+	Object *object = tag == AnyTag::Object ? static_cast<Object *>(any::pointer(p_value)) : nullptr;
+	if (nothing || (object && (p_check == NONE || is_class(object, p_check)))) {
+		retain(object);
+		r_out->p = object;
+		return true;
+	}
+	if (p_check != NONE && engine_array(p_value, p_check)) {
+		// One of Godot's Arrays where an Array is wanted: a new Array of its elements.
+		Vector *made = array_of_engine(any::pointer(p_value), p_check);
+		r_out->p = made;
+		return made != nullptr;
+	}
+	if (p_check != NONE && engine_dictionary(p_value, p_check)) {
+		// One of Godot's Dictionaries where a Dictionary is wanted: a new one of its keys and values.
+		Object *made = table_of_engine(any::pointer(p_value), p_check);
+		r_out->p = made;
+		return made != nullptr;
+	}
+	return coercion_failed(p_value, Kind::Obj, p_check);
+}
+
+// An untyped value into one of Godot's values or objects, of the class named by p_check if it is not NONE.
+bool Interpreter::engine_from_any(Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_out) {
+	const AnyTag tag = any::tag(p_value);
+	const bool nothing = tag == AnyTag::Undefined || tag == AnyTag::Null;
+	const bool fits = (p_kind == Kind::Val ? tag == AnyTag::Value : tag == AnyTag::Godot) &&
+			(p_check == NONE || host_.handles.is_class(any::pointer(p_value), module_.strings[p_check]));
+	if (nothing || fits) {
+		r_out->p = nothing ? nullptr : host_.handles.copy(any::pointer(p_value));
+		return true;
+	}
+	return coercion_failed(p_value, p_kind, p_check);
+}
+
+// AS3's TypeError #1034, in Flash's words: the value as text where it has one, else its type, and the type
+// it was to be. False.
+bool Interpreter::coercion_failed(Slot p_value, Kind p_kind, uint32_t p_check) {
 	std::string wanted = ir::kind_name(p_kind);
 	if (p_check != NONE) {
 		wanted = p_kind == Kind::Obj ? module_.classes[p_check].name : module_.strings[p_check];
 	}
 	const std::optional<std::string> shown = any::text(p_value);
-	raise(module_.type_error_class, "Error #1034: Type Coercion failed: cannot convert " + (shown ? *shown : std::string(tag_name(tag))) +
-			" to " + wanted + ".");
+	raise(module_.type_error_class, "Error #1034: Type Coercion failed: cannot convert " +
+			(shown ? *shown : std::string(tag_name(any::tag(p_value)))) + " to " + wanted + ".");
 	return false;
 }
 
@@ -286,52 +309,6 @@ Vector *Interpreter::array_of_engine(void *p_array, uint32_t p_class) {
 		}
 	}
 	return made;
-}
-
-// `==` and `===` where the values alone do not say: two Godot values, which Godot compares, or an object
-// against a text or a number, compared by its text.
-bool Interpreter::any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
-	if (any::tag(p_a) == AnyTag::Object && any::tag(p_b) == AnyTag::Object &&
-			same_function(static_cast<const Object *>(any::pointer(p_a)), static_cast<const Object *>(any::pointer(p_b)))) {
-		*r_equal = true; // One method of one object, taken twice: as EqRef has it.
-		return true;
-	}
-	const std::optional<bool> plain = p_strict ? any::strict_equal(p_a, p_b) : any::loose_equal(p_a, p_b);
-	if (plain) {
-		*r_equal = *plain;
-		return true;
-	}
-	if (any::is_engine(p_a) && any::is_engine(p_b)) {
-		const Argument both[2] = { Argument{ any::tag(p_a) == AnyTag::Value ? Kind::Val : Kind::Ref, Slot{} },
-			Argument{ any::tag(p_b) == AnyTag::Value ? Kind::Val : Kind::Ref, Slot{} } };
-		Argument operands[2] = { both[0], both[1] };
-		operands[0].slot.p = any::pointer(p_a);
-		operands[1].slot.p = any::pointer(p_b);
-		Wanted wanted;
-		wanted.kind = Kind::Bool;
-		Slot result;
-		result.bits = 0;
-		std::string error;
-		if (!host_.handles.operate("==", operands, 2, wanted, &result, &error)) {
-			*r_equal = false; // Godot has no `==` between these two: they are not equal.
-			return true;
-		}
-		*r_equal = result.b;
-		return true;
-	}
-	// An object and a primitive, by `==`: the object's text against the other.
-	const bool first_is_object = any::tag(p_a) == AnyTag::Object || any::is_engine(p_a);
-	std::string words;
-	if (!any_text(first_is_object ? p_a : p_b, &words)) {
-		return false;
-	}
-	Str *as_text = text(words);
-	if (!as_text) {
-		return false; // No memory for it: the error is on its way out.
-	}
-	*r_equal = any::loose_equal(any::string(as_text), first_is_object ? p_b : p_a).value_or(false);
-	free_string(as_text);
-	return true;
 }
 
 // An untyped value as a primitive, for `+` and `<`: an object or a Godot value becomes its text.
@@ -416,34 +393,13 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 			}
 			break;
 		}
-		case Op::AnyTypeof: {
-			Slot out;
-			out.bits = 0;
-			const bool function = any::tag(b) == AnyTag::Object && static_cast<const Object *>(any::pointer(b))->klass == module_.function_class;
-			const std::string_view name = function ? std::string_view("function") : any::type_of(b);
-			for (Str *each : type_names_) {
-				out.p = each->view() == name ? each : out.p;
-			}
-			retain(static_cast<Str *>(out.p));
-			result(Kind::Str, out);
+		case Op::AnyTypeof:
+			result(Kind::Str, type_name(b));
 			break;
-		}
 		case Op::AnyEq:
 		case Op::AnyStrictEq: {
-			// A Godot object that has been freed is null. Both are held only when one is a script object,
-			// whose text may run code that lets go of the other.
-			const Slot first = present_or_null(b);
-			const Slot second = present_or_null(c);
-			const bool speaks = any::tag(first) == AnyTag::Object || any::tag(second) == AnyTag::Object;
-			const Slot x = speaks ? share(Kind::Any, first) : first;
-			const Slot y = speaks ? share(Kind::Any, second) : second;
 			bool equal = false;
-			const bool done = any_equal(x, y, p_in.op == Op::AnyStrictEq, &equal);
-			if (speaks) {
-				drop_any(x);
-				drop_any(y);
-			}
-			if (done) {
+			if (any_equality(b, c, p_in.op == Op::AnyStrictEq, &equal)) {
 				result(Kind::Bool, of_bool(equal));
 			}
 			break;
@@ -464,6 +420,36 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 		default:
 			break;
 	}
+}
+
+// What typeof gives for an untyped value, as a String with a reference of its own: one of the names made
+// once, in type_names_.
+Slot Interpreter::type_name(Slot p_value) {
+	Slot out;
+	out.bits = 0;
+	const bool function = any::tag(p_value) == AnyTag::Object && static_cast<const Object *>(any::pointer(p_value))->klass == module_.function_class;
+	const std::string_view name = function ? std::string_view("function") : any::type_of(p_value);
+	for (Str *each : type_names_) {
+		out.p = each->view() == name ? each : out.p;
+	}
+	retain(static_cast<Str *>(out.p));
+	return out;
+}
+
+// AnyEq and AnyStrictEq. A Godot object that has been freed is null. Both are held only when one is a
+// script object, whose text may run code that lets go of the other. False if it raised.
+bool Interpreter::any_equality(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
+	const Slot first = present_or_null(p_a);
+	const Slot second = present_or_null(p_b);
+	const bool speaks = any::tag(first) == AnyTag::Object || any::tag(second) == AnyTag::Object;
+	const Slot x = speaks ? share(Kind::Any, first) : first;
+	const Slot y = speaks ? share(Kind::Any, second) : second;
+	const bool done = any_equal(x, y, p_strict, r_equal);
+	if (speaks) {
+		drop_any(x);
+		drop_any(y);
+	}
+	return done;
 }
 
 // A number as an untyped value, held as AVM2 holds one: a whole number as an `int` where it fits one, and
@@ -491,107 +477,6 @@ Slot Interpreter::any_wide(int64_t p_value) {
 		return any::undefined();
 	}
 	return any::wide(wide);
-}
-
-// Two numbers added. Two whole ones stay whole; with an Int64 on a side, the sum wraps at 64 bits as a
-// typed Int64's does.
-Slot Interpreter::add_numbers(Slot p_a, Slot p_b) {
-	const AnyTag a = any::tag(p_a);
-	const AnyTag b = any::tag(p_b);
-	const auto whole = [](Slot p_value, AnyTag p_tag) {
-		return p_tag == AnyTag::Wide ? static_cast<const Wide *>(any::pointer(p_value))->value : static_cast<int64_t>(any::to_int_payload(p_value));
-	};
-	if ((a == AnyTag::Int || a == AnyTag::Wide) && (b == AnyTag::Int || b == AnyTag::Wide)) {
-		const uint64_t sum = static_cast<uint64_t>(whole(p_a, a)) + static_cast<uint64_t>(whole(p_b, b));
-		return any_wide(static_cast<int64_t>(sum));
-	}
-	return any_number(any::to_number(p_a) + any::to_number(p_b));
-}
-
-// `+` with a Godot value on a side and no text on either: Godot's own operator, where it has one
-// (Vector2 + Vector2). True if that settled it, with the result or the error in place.
-bool Interpreter::engine_add(const Instruction &p_in, Slot p_b, Slot p_c) {
-	const AnyTag b = any::tag(p_b);
-	const AnyTag c = any::tag(p_c);
-	if ((!any::is_engine(p_b) && !any::is_engine(p_c)) || b == AnyTag::String || c == AnyTag::String ||
-			b == AnyTag::Object || c == AnyTag::Object) {
-		return false;
-	}
-	const Argument operands[2] = { Argument{ Kind::Any, p_b }, Argument{ Kind::Any, p_c } };
-	Wanted wanted;
-	wanted.kind = Kind::Any;
-	Slot result;
-	result.bits = 0;
-	std::string error;
-	if (!host_.handles.operate("+", operands, 2, wanted, &result, &error)) {
-		if (error == OUT_OF_MEMORY) {
-			raise(module_.error_class, error);
-			return true;
-		}
-		return false; // No such operator in Godot: AS3's rule, which joins their text.
-	}
-	put(Kind::Any, stack_[frames_.back().base + p_in.a], result);
-	return true;
-}
-
-// `+`, `<` and `<=` with an untyped operand, as ECMAScript has them: both become primitives; `+` joins
-// text if either is text and adds numbers otherwise; `<` compares text if both are text.
-void Interpreter::any_arithmetic(const Instruction &p_in, Slot p_b, Slot p_c) {
-	const size_t base = frames_.back().base;
-	if (p_in.op == Op::AnyAdd && engine_add(p_in, p_b, p_c)) {
-		return;
-	}
-	Slot first;
-	Slot second;
-	const bool number = p_in.op != Op::AnyAdd; // `+` takes a Date's text; `<` its time.
-	if (!any_primitive(p_b, &first, number)) {
-		return;
-	}
-	if (!any_primitive(p_c, &second, number)) {
-		drop_any(first);
-		return;
-	}
-	const bool texts = any::tag(first) == AnyTag::String || any::tag(second) == AnyTag::String;
-	Slot out;
-	out.bits = 0;
-	if (p_in.op == Op::AnyAdd && texts) {
-		// A string is joined as it is held; only the other side, a number or a word, is made into text.
-		const auto view = [](Slot p_side, std::string *r_words) {
-			if (any::tag(p_side) == AnyTag::String) {
-				return static_cast<const Str *>(any::pointer(p_side))->view();
-			}
-			*r_words = *any::text(p_side);
-			return std::string_view(*r_words);
-		};
-		std::string first_words, second_words;
-		const std::string_view first_text = view(first, &first_words);
-		Str *joined = join_strings(first_text, view(second, &second_words));
-		if (!joined) {
-			out_of_memory();
-		} else {
-			put(Kind::Any, stack_[base + p_in.a], any::string(joined));
-		}
-	} else if (p_in.op == Op::AnyAdd) {
-		put(Kind::Any, stack_[base + p_in.a], add_numbers(first, second));
-	} else {
-		// `a > b` is `b < a` once both are primitives; the left one was made one first.
-		const bool flipped = p_in.op == Op::AnyGt || p_in.op == Op::AnyGe;
-		const bool or_equal = p_in.op == Op::AnyLe || p_in.op == Op::AnyGe;
-		const Slot x_value = flipped ? second : first;
-		const Slot y_value = flipped ? first : second;
-		bool answer = false;
-		if (any::tag(x_value) == AnyTag::String && any::tag(y_value) == AnyTag::String) {
-			const std::string_view x = static_cast<Str *>(any::pointer(x_value))->view();
-			const std::string_view y = static_cast<Str *>(any::pointer(y_value))->view();
-			const int order = compare_utf16(x, y);
-			answer = or_equal ? order <= 0 : order < 0;
-		} else if (const std::optional<int> exact = any::compare_numbers(x_value, y_value)) {
-			answer = or_equal ? *exact <= 0 : *exact < 0;
-		}
-		put(Kind::Bool, stack_[base + p_in.a], of_bool(answer));
-	}
-	drop_any(first);
-	drop_any(second);
 }
 
 } // namespace vm

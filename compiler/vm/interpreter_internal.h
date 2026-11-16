@@ -27,6 +27,14 @@ inline void set_uint32(Slot &r_slot, uint32_t p_value) {
 	r_slot.u = p_value;
 }
 
+// A Boolean as a register holds it, for put(): the whole slot cleared, then the flag.
+inline Slot of_bool(bool p_value) {
+	Slot out;
+	out.bits = 0;
+	out.b = p_value;
+	return out;
+}
+
 // A list of slots taken from the interpreter's spares and given back, emptied, when it goes: a call through
 // a function value allocates nothing once the spares have grown. One per call in progress, since making an
 // argument its type may run the program, which may make such a call again.

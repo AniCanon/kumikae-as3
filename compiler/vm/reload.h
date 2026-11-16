@@ -33,6 +33,8 @@ class Reload {
 	Slot carry_into(ir::Kind p_kind, uint32_t p_class, Slot p_value);
 	Slot carry(ir::Kind p_kind, Slot p_value);
 	void carry_entries(const Entries &p_from, Entries *p_to);
+	Object *moved_vector(Vector *p_old, uint32_t p_class);
+	void carry_fields(Object *p_old, Object *p_fresh);
 
 public:
 	Reload(Interpreter &p_from, Interpreter &p_to);

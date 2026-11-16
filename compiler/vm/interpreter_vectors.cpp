@@ -45,7 +45,6 @@ void Interpreter::raise_range(double p_index, uint32_t p_length) {
 			"Error #1125: The index " + number_to_string(p_index) + " is out of range " + std::to_string(p_length) + ".");
 }
 
-// Gives the vector the length asked for: elements past it are let go, and new ones are empty.
 // new Array(), Array(n), new Array(a, b): one argument that is a number is the length, which must be a whole
 // number below 2^32 (AS3's RangeError #1005); anything else is the elements.
 void Interpreter::array_new(const Function &p_function, const Instruction &p_in) {
@@ -77,6 +76,7 @@ void Interpreter::array_new(const Function &p_function, const Instruction &p_in)
 	put(Kind::Obj, stack_[base + p_in.a], out);
 }
 
+// Gives the vector the length asked for: elements past it are let go, and new ones are empty.
 bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 	if (length_is_fixed(p_vector)) {
 		return false;
@@ -105,21 +105,51 @@ bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 	return true;
 }
 
-void Interpreter::vector_op(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
+// ArrayNew, and VecNew: a vector of the length asked for, fixed or not.
+void Interpreter::vector_new(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	Slot *r = p_registers;
 	if (p_in.op == Op::ArrayNew) {
 		array_new(p_function, p_in);
 		return;
 	}
-	if (p_in.op == Op::VecNew) {
-		const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
-		const uint32_t length = r[list[0]].u;
-		Vector *made = length <= MAX_VECTOR_LENGTH ? new_vector(p_in.b, length, r[list[1]].b, collector_.list_for(p_in.b)) : nullptr;
-		if (!made) {
-			out_of_memory();
-			return;
-		}
-		assign(Kind::Obj, r[p_in.a], made);
+	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	const uint32_t length = r[list[0]].u;
+	Vector *made = length <= MAX_VECTOR_LENGTH ? new_vector(p_in.b, length, r[list[1]].b, collector_.list_for(p_in.b)) : nullptr;
+	if (!made) {
+		out_of_memory();
+		return;
+	}
+	assign(Kind::Obj, r[p_in.a], made);
+}
+
+// VecGet at an index that names no element: of an Array, the property named by the number; of a Vector,
+// AS3's RangeError.
+void Interpreter::get_outside(Vector *p_vector, double p_index, Slot &r_out) {
+	if (module_.classes[p_vector->klass].array) {
+		array_number_get(p_vector, p_index, r_out);
+		return;
+	}
+	raise_range(p_index, p_vector->length);
+}
+
+// VecSet at an index that names no element and is not the one past the end that a Vector may add.
+void Interpreter::set_outside(Vector *p_vector, Kind p_index_kind, const Slot &p_index, Slot p_value) {
+	const bool array = module_.classes[p_vector->klass].array;
+	if (array && !element_index(p_index_kind, p_index, UINT32_MAX)) {
+		array_number_set(p_vector, index_number(p_index_kind, p_index), p_value);
+		return;
+	}
+	if (array) {
+		out_of_memory(); // An index past the most elements an Array may hold here.
+		return;
+	}
+	raise_range(index_number(p_index_kind, p_index), p_vector->length);
+}
+
+void Interpreter::vector_op(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
+	Slot *r = p_registers;
+	if (p_in.op == Op::ArrayNew || p_in.op == Op::VecNew) {
+		vector_new(p_function, p_in, p_registers);
 		return;
 	}
 	const bool reads = p_in.op == Op::VecGet || p_in.op == Op::VecLength || p_in.op == Op::VecFixed;
@@ -133,12 +163,8 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		case Op::VecGet: {
 			const Kind index = p_function.registers[p_in.c];
 			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
-			if (!at && module_.classes[vector->klass].array) {
-				array_number_get(vector, index_number(index, r[p_in.c]), r[p_in.a]);
-				return;
-			}
 			if (!at) {
-				raise_range(index_number(index, r[p_in.c]), vector->length);
+				get_outside(vector, index_number(index, r[p_in.c]), r[p_in.a]);
 				return;
 			}
 			put(kind, r[p_in.a], share(kind, vector->data[*at]));
@@ -151,16 +177,8 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			const bool array = module_.classes[vector->klass].array;
 			const uint32_t limit = array ? MAX_VECTOR_LENGTH : vector->fixed ? vector->length : vector->length + 1;
 			const std::optional<uint32_t> at = element_index(index, r[p_in.b], limit);
-			if (!at && array && !element_index(index, r[p_in.b], UINT32_MAX)) {
-				array_number_set(vector, index_number(index, r[p_in.b]), r[p_in.c]);
-				return;
-			}
-			if (!at && array) {
-				out_of_memory(); // An index past the most elements an Array may hold here.
-				return;
-			}
 			if (!at) {
-				raise_range(index_number(index, r[p_in.b]), vector->length);
+				set_outside(vector, index, r[p_in.b], r[p_in.c]);
 				return;
 			}
 			if (*at >= vector->length && !resize_vector(vector, *at + 1)) {
@@ -179,8 +197,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 			}
 			break;
 		case Op::VecFixed:
-			r[p_in.a].bits = 0;
-			r[p_in.a].b = vector->fixed;
+			r[p_in.a] = of_bool(vector->fixed);
 			break;
 		case Op::VecSetFixed:
 			vector->fixed = r[p_in.b].b;
@@ -198,78 +215,64 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 		if (i) {
 			append_text(r_text, p_separator); // Text is joined as Concat joins it: two halves that meet are one character.
 		}
-		const Slot element = p_vector->data[i];
-		switch (kind) {
-			case Kind::I32:
-				*r_text += std::to_string(element.i);
-				break;
-			case Kind::U32:
-				*r_text += std::to_string(element.u);
-				break;
-			case Kind::I64:
-				*r_text += std::to_string(element.l);
-				break;
-			case Kind::F64:
-				*r_text += number_to_string(element.d);
-				break;
-			case Kind::Bool:
-				*r_text += element.b ? "true" : "false";
-				break;
-			case Kind::Str:
-				append_text(r_text, element.p ? static_cast<Str *>(element.p)->view() : std::string_view("null"));
-				break;
-			case Kind::Any: {
-				// Null and undefined are left out, as join() leaves them (ECMAScript, and avmplus's generic
-				// join that Vector shares). Held while it speaks, for the reason below.
-				const AnyTag tag = any::tag(element);
-				if (tag == AnyTag::Null || tag == AnyTag::Undefined) {
-					break;
-				}
-				const Slot held = share(Kind::Any, element);
-				std::string said;
-				const bool done = any_text(held, &said);
-				drop_any(held);
-				if (!done) {
-					return false;
-				}
-				append_text(r_text, said);
-				break;
-			}
-			case Kind::Obj: {
-				// Held while it speaks: what it says may run the program, which may take it out of
-				// this vector, and then nothing else would be holding it.
-				Object *object = static_cast<Object *>(element.p);
-				retain(object);
-				const bool said = object_as_text(object, r_text);
-				release_object(object);
-				if (!said) {
-					return false;
-				}
-				break;
-			}
-			default: {
-				// A handle of its own, for the same reason: Godot's text for an object can run a script.
-				void *held = element.p ? host_.handles.copy(element.p) : nullptr;
-				Str *text = held ? host_.handles.text(held) : nullptr;
-				*r_text += text ? text->view() : std::string_view("null");
-				if (release(text)) {
-					free_string(text);
-				}
-				if (held) {
-					host_.handles.drop(held);
-					if (!text) {
-						out_of_memory();
-						return false;
-					}
-				}
-				if (carried_.held) {
-					return false; // As in any_text(): the script's toString() failed.
-				}
-				break;
-			}
+		if (!element_text(kind, p_vector->data[i], r_text)) {
+			return false;
 		}
 	}
 	return true;
+}
+
+// One element of a vector of that kind as text, added to r_text. False if what it said failed.
+bool Interpreter::element_text(Kind p_kind, Slot p_element, std::string *r_text) {
+	switch (p_kind) {
+		case Kind::I32:
+			*r_text += std::to_string(p_element.i);
+			return true;
+		case Kind::U32:
+			*r_text += std::to_string(p_element.u);
+			return true;
+		case Kind::I64:
+			*r_text += std::to_string(p_element.l);
+			return true;
+		case Kind::F64:
+			*r_text += number_to_string(p_element.d);
+			return true;
+		case Kind::Bool:
+			*r_text += p_element.b ? "true" : "false";
+			return true;
+		case Kind::Str:
+			append_text(r_text, p_element.p ? static_cast<Str *>(p_element.p)->view() : std::string_view("null"));
+			return true;
+		case Kind::Any: {
+			// Null and undefined are left out, as join() leaves them (ECMAScript, and avmplus's generic
+			// join that Vector shares). Held while it speaks, for the reason below.
+			const AnyTag tag = any::tag(p_element);
+			if (tag == AnyTag::Null || tag == AnyTag::Undefined) {
+				return true;
+			}
+			const Slot held = share(Kind::Any, p_element);
+			std::string said;
+			const bool done = any_text(held, &said);
+			drop_any(held);
+			if (!done) {
+				return false;
+			}
+			append_text(r_text, said);
+			return true;
+		}
+		case Kind::Obj: {
+			// Held while it speaks: what it says may run the program, which may take it out of
+			// this vector, and then nothing else would be holding it.
+			Object *object = static_cast<Object *>(p_element.p);
+			retain(object);
+			const bool said = object_as_text(object, r_text);
+			release_object(object);
+			return said;
+		}
+		default:
+			// A handle of its own, for the same reason: Godot's text for an object can run a script.
+			return engine_text(p_element.p, r_text);
+	}
 }
 
 // An object as String() gives it: a vector's elements, a class's own toString(), or "[object Name]".

@@ -5,19 +5,22 @@ host differs.
 
 | Files | Job |
 |---|---|
-| `interpreter.h`, `interpreter.cpp` | Frames, calls, errors, the public entry points |
+| `interpreter.h`, `interpreter_records.h`, `interpreter.cpp` | Frames, calls, the public entry points; the records the class keeps (a frame, a kept trace, a property's key and the rest) |
+| `interpreter_errors.cpp` | Errors: raising one, catching it, its stack trace, and reporting it to the host |
 | `interpreter_run.cpp` | The loop: one case per operation |
+| `interpreter_conversions.cpp`, `interpreter_time_limit.cpp` | What the loop hands on: an Int64 converted with a check, an object as text; the time limit on a call from outside (Error #1502) |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
+| `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
 | `interpreter_objects.cpp`, `runtime` | Lifetime of objects and strings |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
 | `interpreter_vectors.cpp`, `vector_methods.cpp` | `Vector.<T>`: an object whose class says what its elements are; making, indexing, length, its methods, its text |
-| `table`, `interpreter_properties.cpp`, `interpreter_property_calls.cpp` | Objects and Dictionaries (`vm::Table`: an object whose one slot holds its `Entries`, keys and values in the order each key was first set) and an Array's properties beyond its indices; a property by name on anything (`DynGet` and the rest), a property called by its name, the loops over properties, and Godot's Dictionaries copied in |
+| `table`, `interpreter_properties.cpp`, `interpreter_property_reads.cpp`, `interpreter_property_calls.cpp` | Objects and Dictionaries (`vm::Table`: an object whose one slot holds its `Entries`, keys and values in the order each key was first set) and an Array's properties beyond its indices; a property by name on anything (`DynGet` and the rest; reading one, and whether one is there, in its own file), a property called by its name, the loops over properties, and Godot's Dictionaries copied in |
 | `reload` | Moves a running program's objects, vectors and static fields onto a newer build, by name; what the program's static fields reach, and the container classes a newer build must keep |
-| `any`, `interpreter_any.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, equality, `+`, `<` |
+| `any`, `interpreter_any.cpp`, `interpreter_any_operators.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, then its equality, `+`, `<` |
 | `numeric`, `math.cpp` | Conversions C++ alone would leave undefined; `Math` where AS3 and C's library differ |
 | `text_units`, `case_table.cpp` | Strings by UTF-16 unit: indexing, cutting, searching and joining text held as UTF-8, and changing case (the table is written by `tools/case_table.py`) |
-| `regex.h`, `regex_tree.h`, `regex_parse.cpp`, `regex_classes.cpp`, `regex_compile.cpp`, `regex_match.cpp` | Regular expressions on their own: a pattern read into a tree, the tree written as a small program, and a backtracking matcher over UTF-16 units that counts its steps and stops at a limit |
+| `regex.h`, `regex_tree.h`, `regex_parser.h`, `regex_parse.cpp`, `regex_parse_escapes.cpp`, `regex_classes.cpp`, `regex_compile.cpp`, `regex_match.cpp` | Regular expressions on their own: a pattern read into a tree (its structure, then its escapes and classes), the tree written as a small program, and a backtracking matcher over UTF-16 units that counts its steps and stops at a limit |
 | `regexp_methods.cpp`, `regexp_strings.cpp` | The instructions of RegExp (`new`, `exec`, `test`, its properties) and of String's methods that take one (`match`, `search`, `replace`, `split`); the patterns read, kept by source and flags |
 | `date_time`, `date_parse.cpp`, `date_methods.cpp` | Date: ECMAScript's arithmetic of times, AS3's texts and what `Date.parse` reads, and the instructions, with local time from the host's clock |
 | `library_members.cpp` | RegExp's and Date's properties and methods by name on an untyped value (`u.lastIndex`, `u.getTime()`), by the names `ir/library_names.h` gives |

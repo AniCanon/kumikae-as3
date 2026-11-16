@@ -44,10 +44,58 @@ Slot of_pointer(void *p_value) {
 	return slot;
 }
 
+// The pieces split() gives of a text by a delimiter that is text: the whole of it with none (p_whole), each
+// UTF-16 unit for an empty one; at most p_most pieces.
+std::vector<std::string> split_text(std::string_view p_self, bool p_whole, const std::string &p_by, uint32_t p_most) {
+	const uint32_t length = static_cast<uint32_t>(utf16_length(p_self));
+	std::vector<std::string> pieces;
+	if (p_whole) {
+		pieces.emplace_back(p_self);
+	} else if (p_by.empty()) {
+		for (uint32_t i = 0; i < length && pieces.size() < p_most; i++) {
+			pieces.push_back(units_between(p_self, i, i + 1));
+		}
+	} else if (length > 0) {
+		const uint32_t step = static_cast<uint32_t>(utf16_length(p_by));
+		uint32_t from = 0;
+		while (pieces.size() < p_most) {
+			const int32_t found = find_units(p_self, p_by, from);
+			const uint32_t end = found < 0 ? length : static_cast<uint32_t>(found);
+			pieces.push_back(units_between(p_self, from, end));
+			if (found < 0) {
+				break;
+			}
+			from = end + step;
+		}
+	} else {
+		pieces.emplace_back(); // An empty string with a delimiter: one empty piece.
+	}
+	if (pieces.size() > p_most) {
+		pieces.resize(p_most);
+	}
+	return pieces;
+}
+
+// substr(start, count), substring(a, b) and slice(start, end), their arguments made whole.
+std::string string_part(StringFunction p_which, std::string_view p_self, uint32_t p_length, double p_first, double p_second) {
+	if (p_which == StringFunction::Substr) {
+		const uint32_t start = from_end(p_first, p_length);
+		return units_between(p_self, start, p_second <= 0 ? start : start + within(p_second, p_length - start));
+	}
+	if (p_which == StringFunction::Substring) {
+		const uint32_t a = within(p_first, p_length), b = within(p_second, p_length);
+		return units_between(p_self, a < b ? a : b, a < b ? b : a);
+	}
+	const uint32_t start = from_end(p_first, p_length), end = from_end(p_second, p_length);
+	return units_between(p_self, start, end > start ? end : start);
+}
+
 constexpr std::string_view URI_FUNCTIONS[] = { "encodeURI", "encodeURIComponent", "decodeURI", "decodeURIComponent" };
 
 } // namespace
 
+// StrCall: String.fromCharCode(), split(), parseInt(), parseFloat(), escape() and the URI functions here,
+// and the rest of a String's methods by string_method().
 void Interpreter::string_call(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 	const auto text = [&](size_t p_index) {
@@ -57,7 +105,6 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 	const auto number = [&](size_t p_index) { return p_registers[list[p_index]].d; };
 	Slot &out = p_registers[p_in.a];
 	const auto give_text = [&](const std::string &p_text) { assign(Kind::Str, out, this->text(p_text)); };
-	const auto give_int = [&](int32_t p_value) { set_int32(out, p_value); };
 	const StringFunction which = static_cast<StringFunction>(p_in.b);
 	if (which == StringFunction::FromCharCode) {
 		std::string made;
@@ -75,29 +122,32 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 		out.d = which == StringFunction::ParseInt ? parse_int(text(0), p_registers[list[1]].i) : parse_float(text(0));
 		return;
 	}
-	const std::string_view self = text(0);
-	const uint32_t length = static_cast<uint32_t>(utf16_length(self));
 	if (which >= StringFunction::Escape) {
-		uri_function(which, self, out);
+		uri_function(which, text(0), out);
 		return;
 	}
+	string_method(p_function, p_in, p_registers);
+}
+
+// The methods of a String itself, its text the first argument.
+void Interpreter::string_method(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
+	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
+	const auto text = [&](size_t p_index) {
+		const Str *string = static_cast<const Str *>(p_registers[list[p_index]].p);
+		return string ? string->view() : std::string_view("null");
+	};
+	const auto number = [&](size_t p_index) { return p_registers[list[p_index]].d; };
+	Slot &out = p_registers[p_in.a];
+	const auto give_text = [&](const std::string &p_text) { assign(Kind::Str, out, this->text(p_text)); };
+	const auto give_int = [&](int32_t p_value) { set_int32(out, p_value); };
+	const StringFunction which = static_cast<StringFunction>(p_in.b);
+	const std::string_view self = text(0);
+	const uint32_t length = static_cast<uint32_t>(utf16_length(self));
 	switch (which) {
 		case StringFunction::CharAt:
-		case StringFunction::CharCodeAt: {
-			const double at = whole(number(1));
-			const std::optional<uint16_t> unit = at < 0 || at >= length ? std::nullopt : unit_at(self, static_cast<uint32_t>(at));
-			if (which == StringFunction::CharCodeAt) {
-				out.d = unit ? *unit : std::nan("");
-			} else if (unit && *unit < characters_.size()) {
-				Str *&character = characters_[*unit];
-				character = character ? character : this->text(std::string(1, static_cast<char>(*unit)));
-				retain(character);
-				assign(Kind::Str, out, character);
-			} else {
-				give_text(unit ? units_between(self, static_cast<uint32_t>(at), static_cast<uint32_t>(at) + 1) : std::string());
-			}
+		case StringFunction::CharCodeAt:
+			char_at(which, self, length, whole(number(1)), out);
 			break;
-		}
 		case StringFunction::IndexOf:
 			give_int(find_units(self, text(1), within(whole(number(2)), length)));
 			break;
@@ -106,22 +156,11 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 			give_int(find_last_units(self, text(1), within(from, length)));
 			break;
 		}
-		case StringFunction::Substr: {
-			const uint32_t start = from_end(whole(number(1)), length);
-			const double count = whole(number(2));
-			give_text(units_between(self, start, count <= 0 ? start : start + within(count, length - start)));
+		case StringFunction::Substr:
+		case StringFunction::Substring:
+		case StringFunction::Slice:
+			give_text(string_part(which, self, length, whole(number(1)), whole(number(2))));
 			break;
-		}
-		case StringFunction::Substring: {
-			const uint32_t a = within(whole(number(1)), length), b = within(whole(number(2)), length);
-			give_text(units_between(self, a < b ? a : b, a < b ? b : a));
-			break;
-		}
-		case StringFunction::Slice: {
-			const uint32_t start = from_end(whole(number(1)), length), end = from_end(whole(number(2)), length);
-			give_text(units_between(self, start, end > start ? end : start));
-			break;
-		}
 		case StringFunction::Concat: {
 			std::string all(self);
 			for (size_t i = 1; i < list.size(); i++) {
@@ -134,19 +173,9 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 		case StringFunction::Lower:
 			give_text(which == StringFunction::Upper ? upper_case(self) : lower_case(self));
 			break;
-		case StringFunction::Replace: {
-			// AS3 replaces the first match only, with the replacement as it is written.
-			const int32_t at = find_units(self, text(1), 0);
-			if (at < 0) {
-				assign(Kind::Str, out, share(Kind::Str, p_registers[list[0]]).p);
-				break;
-			}
-			std::string replaced = units_between(self, 0, static_cast<uint32_t>(at));
-			append_text(&replaced, text(2));
-			append_text(&replaced, units_between(self, static_cast<uint32_t>(at + utf16_length(text(1))), length));
-			give_text(replaced);
+		case StringFunction::Replace:
+			replace_first(p_registers[list[0]], self, length, text(1), text(2), out);
 			break;
-		}
 		case StringFunction::LocaleCompare: {
 			const int order = compare_utf16(self, text(1));
 			give_int(order < 0 ? -1 : order > 0 ? 1 : 0);
@@ -155,6 +184,36 @@ void Interpreter::string_call(const Function &p_function, const Instruction &p_i
 		default:
 			break;
 	}
+}
+
+// charAt (a String of one character, made once for each ASCII one) and charCodeAt (a Number, NaN outside
+// the string), at a whole index.
+void Interpreter::char_at(StringFunction p_which, std::string_view p_self, uint32_t p_length, double p_at, Slot &r_out) {
+	const std::optional<uint16_t> unit = p_at < 0 || p_at >= p_length ? std::nullopt : unit_at(p_self, static_cast<uint32_t>(p_at));
+	if (p_which == StringFunction::CharCodeAt) {
+		r_out.d = unit ? *unit : std::nan("");
+	} else if (unit && *unit < characters_.size()) {
+		Str *&character = characters_[*unit];
+		character = character ? character : text(std::string(1, static_cast<char>(*unit)));
+		retain(character);
+		assign(Kind::Str, r_out, character);
+	} else {
+		assign(Kind::Str, r_out, text(unit ? units_between(p_self, static_cast<uint32_t>(p_at), static_cast<uint32_t>(p_at) + 1) : std::string()));
+	}
+}
+
+// replace(text, with): AS3 replaces the first match only, with the replacement as it is written. With no
+// match, the string itself.
+void Interpreter::replace_first(Slot p_string, std::string_view p_self, uint32_t p_length, std::string_view p_pattern, std::string_view p_with, Slot &r_out) {
+	const int32_t at = find_units(p_self, p_pattern, 0);
+	if (at < 0) {
+		assign(Kind::Str, r_out, share(Kind::Str, p_string).p);
+		return;
+	}
+	std::string replaced = units_between(p_self, 0, static_cast<uint32_t>(at));
+	append_text(&replaced, p_with);
+	append_text(&replaced, units_between(p_self, static_cast<uint32_t>(at + utf16_length(p_pattern)), p_length));
+	assign(Kind::Str, r_out, text(replaced));
 }
 
 // escape, unescape and the URI functions. One that can't read or write its text is AS3's URIError #1052.
@@ -254,34 +313,7 @@ void Interpreter::string_split(const Function &p_function, const Instruction &p_
 		}
 	}
 	const Str *string = static_cast<const Str *>(at(0).p);
-	const std::string_view self = string ? string->view() : std::string_view();
-	const uint32_t most = to_uint32(at(2).d);
-	const uint32_t length = static_cast<uint32_t>(utf16_length(self));
-	std::vector<std::string> pieces;
-	if (whole) {
-		pieces.emplace_back(self);
-	} else if (by.empty()) {
-		for (uint32_t i = 0; i < length && pieces.size() < most; i++) {
-			pieces.push_back(units_between(self, i, i + 1));
-		}
-	} else if (length > 0) {
-		const uint32_t step = static_cast<uint32_t>(utf16_length(by));
-		uint32_t from = 0;
-		while (pieces.size() < most) {
-			const int32_t found = find_units(self, by, from);
-			const uint32_t end = found < 0 ? length : static_cast<uint32_t>(found);
-			pieces.push_back(units_between(self, from, end));
-			if (found < 0) {
-				break;
-			}
-			from = end + step;
-		}
-	} else {
-		pieces.emplace_back(); // An empty string with a delimiter: one empty piece.
-	}
-	if (pieces.size() > most) {
-		pieces.resize(most);
-	}
+	const std::vector<std::string> pieces = split_text(string ? string->view() : std::string_view(), whole, by, to_uint32(at(2).d));
 	Vector *made = fresh_vector(module_.array_class, pieces.size());
 	for (size_t i = 0; made && i < pieces.size(); i++) {
 		Str *piece = text(pieces[i]);
