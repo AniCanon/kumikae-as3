@@ -28,6 +28,17 @@ struct Member {
 // protected and internal members are not reached from Godot.
 Member find_member(uint32_t p_class, const godot::StringName &p_name);
 
+// What Godot reaches of a script by a name: the member find_member() gives, and the public getter and
+// setter of that AS3 name ("get x", "set x"), each NONE if there is none. Made once per class and name for
+// the program that runs, on the main thread: Godot asks the script about every property set or read on its
+// object (`position` too), and the answer must not cost a conversion of the name each time.
+struct Reach {
+	Member member;
+	uint32_t getter = ir::NONE;
+	uint32_t setter = ir::NONE;
+};
+Reach reach(uint32_t p_class, const godot::StringName &p_name);
+
 // A field as Godot is given it. Godot gets null for a script object it can't hold, and is told so.
 godot::Variant read_field(const vm::Object *p_object, uint32_t p_field);
 // A value from Godot stored in a field, converted as a store into the field converts: an Array field takes

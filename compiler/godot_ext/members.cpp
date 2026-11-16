@@ -12,6 +12,7 @@
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 
 #include <cmath>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -187,29 +188,73 @@ bool made_value(const ir::Constant &p_first, Variant *r_value) {
 
 } // namespace
 
-Member find_member(uint32_t p_class, const StringName &p_name) {
-	Member found;
-	Project &program = Project::get();
-	if (!program.valid() || p_class >= program.module().classes.size()) {
-		return found;
-	}
-	const ir::Module &module = program.module();
-	const ir::Class &klass = module.classes[p_class];
+namespace {
+
+// The public method of the class of that name, or NONE.
+uint32_t public_method(Project &p_program, uint32_t p_class, std::string_view p_name) {
+	const uint32_t method = p_program.interpreter().find_method(p_class, p_name);
+	return method != ir::NONE && p_program.module().functions[method].is_public ? method : ir::NONE;
+}
+
+Reach look_up(Project &p_program, uint32_t p_class, const StringName &p_name) {
+	Reach found;
+	const ir::Class &klass = p_program.module().classes[p_class];
 	const CharString utf8 = String(p_name).utf8();
 	const std::string_view name = text_of(utf8);
+	found.getter = public_method(p_program, p_class, "get " + std::string(name));
+	found.setter = public_method(p_program, p_class, "set " + std::string(name));
 	for (const auto &[godot, function] : klass.virtuals) {
 		if (godot == name) {
-			return Member{ Member::What::Method, function };
+			found.member = Member{ Member::What::Method, function };
+			return found;
 		}
 	}
-	const uint32_t method = program.interpreter().find_method(p_class, name);
-	if (method != ir::NONE && module.functions[method].is_public) {
-		return Member{ Member::What::Method, method };
-	}
-	if (const std::optional<uint32_t> field = klass.field(name, true)) {
-		return Member{ Member::What::Field, *field };
+	if (const uint32_t method = public_method(p_program, p_class, name); method != ir::NONE) {
+		found.member = Member{ Member::What::Method, method };
+	} else if (const std::optional<uint32_t> field = klass.field(name, true)) {
+		found.member = Member{ Member::What::Field, *field };
 	}
 	return found;
+}
+
+// reach()'s answers for one program, by class and by the name's interned text, which equal names share. Each
+// keeps its name, so that the text is not freed and taken by another name while the answer stands.
+struct Reached {
+	uint64_t generation = UINT64_MAX;
+	std::vector<std::unordered_map<const void *, std::pair<StringName, Reach>>> by_class;
+};
+
+const void *interned(const StringName &p_name) {
+	return *reinterpret_cast<const void *const *>(p_name._native_ptr());
+}
+
+} // namespace
+
+Reach reach(uint32_t p_class, const StringName &p_name) {
+	Project &program = Project::get();
+	if (!program.valid() || p_class >= program.module().classes.size()) {
+		return Reach{};
+	}
+	if (!on_main_thread()) {
+		return look_up(program, p_class, p_name); // Refused by the caller; the answers are the main thread's.
+	}
+	static Reached reached;
+	if (reached.generation != Project::generation()) {
+		reached.by_class.assign(program.module().classes.size(), {});
+		reached.generation = Project::generation();
+	}
+	auto &answers = reached.by_class[p_class];
+	const auto found = answers.find(interned(p_name));
+	if (found != answers.end()) {
+		return found->second.second;
+	}
+	const Reach answer = look_up(program, p_class, p_name);
+	answers.emplace(interned(p_name), std::make_pair(p_name, answer));
+	return answer;
+}
+
+Member find_member(uint32_t p_class, const StringName &p_name) {
+	return reach(p_class, p_name).member;
 }
 
 Variant read_field(const vm::Object *p_object, uint32_t p_field) {

@@ -87,16 +87,10 @@ void kas3::move_instances(vm::Interpreter &p_old, vm::Reload &p_reload) {
 	}
 }
 
-// The script's public getter or setter of that AS3 name, "get x" or "set x" among its methods; NONE if it has none.
-static uint32_t accessor(const vm::Object *p_object, const char *p_half, GDExtensionConstStringNamePtr p_name) {
-	CharString name = String(*reinterpret_cast<const StringName *>(p_name)).utf8();
-	const uint32_t found = Project::get().interpreter().find_method(p_object->klass, std::string(p_half) + name.get_data());
-	return found != ir::NONE && Project::get().module().functions[found].is_public ? found : ir::NONE;
-}
 
 // GDScript writing `node.x = v` where the script has a setter.
 static GDExtensionBool set_by_setter(ScriptInstance *p_instance, GDExtensionConstStringNamePtr p_name, GDExtensionConstVariantPtr p_value) {
-	const uint32_t setter = accessor(p_instance->object, "set ", p_name);
+	const uint32_t setter = kas3::reach(p_instance->object->klass, *reinterpret_cast<const StringName *>(p_name)).setter;
 	if (setter == ir::NONE) {
 		return false;
 	}
@@ -148,7 +142,7 @@ bool kas3::as_godot_object(const vm::Object *p_object, Variant *r_out) {
 
 // The script's getter of that name, called as GDScript reads `node.x`.
 static GDExtensionBool get_by_getter(ScriptInstance *p_instance, GDExtensionConstStringNamePtr p_name, GDExtensionVariantPtr r_value) {
-	const uint32_t getter = accessor(p_instance->object, "get ", p_name);
+	const uint32_t getter = kas3::reach(p_instance->object->klass, *reinterpret_cast<const StringName *>(p_name)).getter;
 	if (getter == ir::NONE) {
 		return false;
 	}
