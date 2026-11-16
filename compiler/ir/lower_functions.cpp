@@ -102,6 +102,55 @@ uint32_t Functions::value_call(Call *p_call, Kind p_want) {
 	return out;
 }
 
+// What map and filter make, a vector of the class, and what some and every start from; nothing for forEach.
+uint32_t Vectors::each_result(std::string_view p_name, uint32_t p_class, uint32_t p_limit, uint32_t p_position) {
+	const bool map = p_name == "map", filter = p_name == "filter", some = p_name == "some", every = p_name == "every";
+	uint32_t out = NONE;
+	if (map || filter) {
+		out = l_.reg(Kind::Obj);
+		const bool sized = map && !l_.module_.classes[p_class].array;
+		l_.emit(Op::VecNew, p_position, out, p_class, l_.arguments({ sized ? p_limit : l_.default_value(Kind::U32, p_position), l_.default_value(Kind::Bool, p_position) }));
+	} else if (some || every) {
+		out = l_.reg(Kind::Bool);
+		l_.emit(Op::ConstBool, p_position, out, every ? 1 : 0);
+	}
+	return out;
+}
+
+// What the function's answer for one element does: map keeps it, filter keeps the element when the answer
+// is true, and the first that settles some() or every() ends the loop. The jump out of it, or NONE.
+uint32_t Vectors::each_answer(Call *p_call, uint32_t p_class, uint32_t p_out, uint32_t p_at, uint32_t p_item, uint32_t p_answer,
+		uint32_t p_yes) {
+	const uint32_t position = p_call->offset;
+	Member *callee = static_cast<Member *>(p_call->callee);
+	const std::string_view name = callee->name;
+	const bool map = name == "map", filter = name == "filter", some = name == "some", every = name == "every";
+	const Kind element = l_.module_.classes[p_class].element;
+	// Whether the function answered true itself, not just something that is true as a condition.
+	const auto answered_true = [&](uint32_t p_value) {
+		const uint32_t out = l_.reg(Kind::Bool);
+		l_.emit(Op::AnyStrictEq, position, out, p_value, p_yes);
+		return out;
+	};
+	uint32_t found = NONE;
+	if (map && l_.module_.classes[p_class].array) {
+		l_.emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), l_.arguments({ p_out, p_answer }));
+	} else if (map) {
+		l_.emit(Op::VecSet, position, p_out, p_at, l_.from_untyped(p_answer, callee->object->type->element, element, position));
+	} else if (filter) {
+		const uint32_t skip = l_.emit(Op::JumpIfNot, position, answered_true(p_answer), 0);
+		l_.emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), l_.arguments({ p_out, p_item }));
+		l_.patch(skip, l_.here());
+	} else if (some || every) {
+		// The first that answers true for some(), false for every(), settles it.
+		const uint32_t carry_on = l_.emit(every ? Op::JumpIf : Op::JumpIfNot, position, answered_true(p_answer), 0);
+		l_.emit(Op::ConstBool, position, p_out, some ? 1 : 0);
+		found = l_.emit(Op::Jump, position, 0);
+		l_.patch(carry_on, l_.here());
+	}
+	return found;
+}
+
 // v.forEach(f), map, filter, some and every: a loop that calls the function with each element, its index and
 // the vector, as Flash's own Vector does (avmplus): the length read once, before the first call, and each
 // element read as it is reached (one taken out by then is AS3's RangeError). Only an answer of true counts
@@ -131,15 +180,7 @@ uint32_t Vectors::vector_each(Call *p_call) {
 	Functions(l_).use_argument_error();
 	const uint32_t limit = l_.reg(Kind::U32);
 	l_.emit(Op::VecLength, position, limit, vector);
-	uint32_t out = NONE;
-	if (map || filter) {
-		out = l_.reg(Kind::Obj);
-		const bool sized = map && !l_.module_.classes[*klass].array;
-		l_.emit(Op::VecNew, position, out, *klass, l_.arguments({ sized ? limit : l_.default_value(Kind::U32, position), l_.default_value(Kind::Bool, position) }));
-	} else if (some || every) {
-		out = l_.reg(Kind::Bool);
-		l_.emit(Op::ConstBool, position, out, every ? 1 : 0);
-	}
+	uint32_t out = each_result(name, *klass, limit, position);
 	const uint32_t absent = l_.emit(Op::JumpIfNot, position, l_.convert(function, Kind::Bool, position), 0);
 	uint32_t yes = NONE;
 	if (filter || some || every) {
@@ -147,12 +188,6 @@ uint32_t Vectors::vector_each(Call *p_call) {
 		l_.emit(Op::ConstBool, position, truth, 1);
 		yes = l_.convert(truth, Kind::Any, position);
 	}
-	// Whether the function answered true itself, not just something that is true as a condition.
-	const auto answered_true = [&](uint32_t p_answer) {
-		const uint32_t out = l_.reg(Kind::Bool);
-		l_.emit(Op::AnyStrictEq, position, out, p_answer, yes);
-		return out;
-	};
 	const uint32_t end = l_.convert(limit, Kind::F64, position);
 	const uint32_t at = l_.reg(Kind::F64);
 	l_.emit(Op::ConstF64, position, at, l_.number(0));
@@ -165,22 +200,7 @@ uint32_t Vectors::vector_each(Call *p_call) {
 	const uint32_t index = l_.convert(l_.convert(at, Kind::I32, position), Kind::Any, position);
 	const uint32_t answer = map || filter || some || every ? l_.reg(Kind::Any) : NONE;
 	l_.emit(Op::CallFunction, position, answer, function, l_.arguments({ l_.convert(item, Kind::Any, position), index, l_.convert(vector, Kind::Any, position) }));
-	uint32_t found = NONE;
-	if (map && l_.module_.classes[*klass].array) {
-		l_.emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), l_.arguments({ out, answer }));
-	} else if (map) {
-		l_.emit(Op::VecSet, position, out, at, l_.from_untyped(answer, callee->object->type->element, element, position));
-	} else if (filter) {
-		const uint32_t skip = l_.emit(Op::JumpIfNot, position, answered_true(answer), 0);
-		l_.emit(Op::VecCall, position, NONE, static_cast<uint32_t>(VectorMethod::Push), l_.arguments({ out, item }));
-		l_.patch(skip, l_.here());
-	} else if (some || every) {
-		// The first that answers true for some(), false for every(), settles it.
-		const uint32_t carry_on = l_.emit(every ? Op::JumpIf : Op::JumpIfNot, position, answered_true(answer), 0);
-		l_.emit(Op::ConstBool, position, out, some ? 1 : 0);
-		found = l_.emit(Op::Jump, position, 0);
-		l_.patch(carry_on, l_.here());
-	}
+	const uint32_t found = each_answer(p_call, *klass, out, at, item, answer, yes);
 	const uint32_t one = l_.reg(Kind::F64);
 	l_.emit(Op::ConstF64, position, one, l_.number(1));
 	l_.emit(Op::AddF64, position, at, at, one);

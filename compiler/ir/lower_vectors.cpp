@@ -199,6 +199,39 @@ std::optional<VectorMethod> vector_method(std::string_view p_name) {
 	return std::nullopt;
 }
 
+// Concat, SortOn and Sort, which an Array takes otherwise than a Vector.
+VectorShape array_or_vector_shape(VectorMethod p_method, bool p_array) {
+	const Kind own = Kind::Obj;
+	std::vector<Kind> fixed;
+	std::vector<std::optional<int64_t>> left_out;
+	std::optional<Kind> rest;
+	Kind result = Kind::Void;
+	switch (p_method) {
+		case VectorMethod::Concat:
+			rest = p_array ? Kind::Any : own; // An Array's takes anything: an Array is spread, the rest added.
+			result = own;
+			break;
+		case VectorMethod::SortOn: // An Array's: the names and the options, each untyped.
+			rest = Kind::Any;
+			result = Kind::Any;
+			break;
+		case VectorMethod::Sort:
+			// A Vector's takes one; an Array's none to two, and gives the array, 0 or an Array of indices.
+			if (p_array) {
+				rest = Kind::Any;
+				result = Kind::Any;
+			} else {
+				fixed = { Kind::Any };
+				left_out = { std::nullopt };
+				result = own;
+			}
+			break;
+		default:
+			break;
+	}
+	return { fixed, left_out, rest, result };
+}
+
 VectorShape vector_shape(VectorMethod p_method, Kind p_element, bool p_array) {
 	const Kind element = p_element;
 	const Kind own = Kind::Obj;
@@ -231,9 +264,9 @@ VectorShape vector_shape(VectorMethod p_method, Kind p_element, bool p_array) {
 			result = own;
 			break;
 		case VectorMethod::Concat:
-			rest = p_array ? Kind::Any : own; // An Array's takes anything: an Array is spread, the rest added.
-			result = own;
-			break;
+		case VectorMethod::SortOn:
+		case VectorMethod::Sort:
+			return array_or_vector_shape(p_method, p_array);
 		case VectorMethod::Join:
 			fixed = { Kind::Str };
 			left_out = { 0 }; // A comma, made below.
@@ -254,26 +287,31 @@ VectorShape vector_shape(VectorMethod p_method, Kind p_element, bool p_array) {
 			rest = element;
 			result = own;
 			break;
-		case VectorMethod::SortOn: // An Array's: the names and the options, each untyped.
-			rest = Kind::Any;
-			result = Kind::Any;
-			break;
-		case VectorMethod::Sort:
-			// A Vector's takes one; an Array's none to two, and gives the array, 0 or an Array of indices.
-			if (p_array) {
-				rest = Kind::Any;
-				result = Kind::Any;
-			} else {
-				fixed = { Kind::Any };
-				left_out = { std::nullopt };
-				result = own;
-			}
-			break;
 	}
 	return { fixed, left_out, rest, result };
 }
 
 } // namespace
+
+std::optional<uint32_t> Vectors::never_found(Call *p_call, Kind p_element) {
+	const uint32_t position = p_call->offset;
+	Member *callee = static_cast<Member *>(p_call->callee);
+	const Kind searched = Lowerer::is_null(p_call->arguments[0]) ? Kind::Void : l_.natural(p_call->arguments[0]);
+	const bool engine_and_null = is_engine(p_element) && searched == Kind::Void;
+	if (!engine_and_null && !(is_engine(p_element) && searched == p_element) && !Lowerer::can_be_equal(p_element, searched)) {
+		// A value of another type is never one of its elements (the search is by ===): -1, once the
+		// vector and the arguments are worked out, as the call would.
+		const uint32_t vector = l_.settled(l_.expression(callee->object, Kind::Obj), Lowerer::writer(p_call->arguments), position);
+		for (Expr *argument : p_call->arguments) {
+			l_.expression(argument, Kind::Void);
+		}
+		l_.emit(Op::NullCheck, position, vector);
+		uint32_t none = l_.reg(Kind::I32);
+		l_.emit(Op::ConstI32, position, none, static_cast<uint32_t>(-1));
+		return none;
+	}
+	return std::nullopt;
+}
 
 uint32_t Vectors::vector_call(Call *p_call) {
 	const uint32_t position = p_call->offset;
@@ -305,19 +343,8 @@ uint32_t Vectors::vector_call(Call *p_call) {
 		return l_.default_value(Kind::Obj, position);
 	}
 	if ((*method == VectorMethod::IndexOf || *method == VectorMethod::LastIndexOf) && count > 0) {
-		const Kind searched = Lowerer::is_null(p_call->arguments[0]) ? Kind::Void : l_.natural(p_call->arguments[0]);
-		const bool engine_and_null = is_engine(element) && searched == Kind::Void;
-		if (!engine_and_null && !(is_engine(element) && searched == element) && !Lowerer::can_be_equal(element, searched)) {
-			// A value of another type is never one of its elements (the search is by ===): -1, once the
-			// vector and the arguments are worked out, as the call would.
-			const uint32_t vector = l_.settled(l_.expression(callee->object, Kind::Obj), Lowerer::writer(p_call->arguments), position);
-			for (Expr *argument : p_call->arguments) {
-				l_.expression(argument, Kind::Void);
-			}
-			l_.emit(Op::NullCheck, position, vector);
-			uint32_t none = l_.reg(Kind::I32);
-			l_.emit(Op::ConstI32, position, none, static_cast<uint32_t>(-1));
-			return none;
+		if (const std::optional<uint32_t> none = never_found(p_call, element)) {
+			return *none;
 		}
 	}
 	std::vector<uint32_t> list;

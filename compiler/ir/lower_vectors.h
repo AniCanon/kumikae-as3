@@ -13,6 +13,10 @@ class Vectors {
 	Lowerer &l_;
 
 	uint32_t vector_each(Call *p_call);
+	uint32_t each_result(std::string_view p_name, uint32_t p_class, uint32_t p_limit, uint32_t p_position);
+	uint32_t each_answer(Call *p_call, uint32_t p_class, uint32_t p_out, uint32_t p_at, uint32_t p_item, uint32_t p_answer, uint32_t p_yes);
+	// indexOf or lastIndexOf: -1 when what is looked for is of a type no element can be equal to.
+	std::optional<uint32_t> never_found(Call *p_call, Kind p_element);
 
 public:
 	explicit Vectors(Lowerer &p_lowerer) :
