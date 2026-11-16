@@ -217,10 +217,16 @@ def frame_once(program, bench, language, library=None, more=()):
     environment.pop("KAS3_PROGRAM_LIBRARY", None)
     if library:
         environment["KAS3_PROGRAM_LIBRARY"] = library
-    done = subprocess.run([program, "--headless", "--fixed-fps", "60", "--", "--bench=" + bench, "--lang=" + language, "--mode=measure", *more],
-                          cwd=os.path.dirname(program), capture_output=True, text=True, timeout=1800, env=environment)
-    rows = [line for line in done.stdout.splitlines() if line.startswith("{")]
-    if done.returncode != 0 or len(rows) != 1:
+    command = [program, "--headless", "--fixed-fps", "60", "--", "--bench=" + bench, "--lang=" + language, "--mode=measure", *more]
+    # A run that dies is run again, twice at most, and said: Godot .NET now and then crashes as it starts or
+    # ends on a loaded machine, whatever the language. A benchmark that never gives its row is a failure.
+    for attempt in range(3):
+        done = subprocess.run(command, cwd=os.path.dirname(program), capture_output=True, text=True, timeout=1800, env=environment)
+        rows = [line for line in done.stdout.splitlines() if line.startswith("{")]
+        if done.returncode == 0 and len(rows) == 1:
+            break
+        print("languages: %s in %s died (exit %d), attempt %d" % (bench, language, done.returncode, attempt + 1), flush=True)
+    else:
         sys.exit("languages: %s in %s failed (exit %d):\n%s" % (bench, language, done.returncode, (done.stdout + done.stderr)[-1500:]))
     return json.loads(rows[0])
 
