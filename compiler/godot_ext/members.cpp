@@ -98,7 +98,7 @@ Dictionary describe(const ir::Module &p_module, std::string_view p_name, ir::Kin
 			type = Variant::STRING;
 			break;
 		case ir::Kind::Val:
-			type = p_engine_type.empty() ? -1 : value_type(p_engine_type);
+			type = value_type(p_engine_type).value_or(-1);
 			break;
 		case ir::Kind::Ref:
 			type = Variant::OBJECT;
@@ -165,8 +165,8 @@ Dictionary method_info(const ir::Module &p_module, const ir::Function &p_functio
 
 // One of Godot's values made from numbers, as `new` makes it: a whole number goes as an integer.
 bool made_value(const ir::Constant &p_first, Variant *r_value) {
-	const int type = value_type(p_first.text);
-	if (type <= 0) {
+	const std::optional<int> type = value_type(p_first.text);
+	if (!type) {
 		return false;
 	}
 	std::vector<Variant> parts;
@@ -180,7 +180,7 @@ bool made_value(const ir::Constant &p_first, Variant *r_value) {
 	GDExtensionCallError error;
 	error.error = GDEXTENSION_CALL_OK;
 	Variant made;
-	gdextension_interface::variant_construct((GDExtensionVariantType)type, made._native_ptr(), pointers.data(), (int32_t)pointers.size(), &error);
+	gdextension_interface::variant_construct((GDExtensionVariantType)*type, made._native_ptr(), pointers.data(), (int32_t)pointers.size(), &error);
 	*r_value = made;
 	return error.error == GDEXTENSION_CALL_OK;
 }

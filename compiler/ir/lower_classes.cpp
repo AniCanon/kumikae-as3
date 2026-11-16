@@ -23,10 +23,10 @@ Class Classes::inherited_class(ClassDecl *p_decl) {
 	Class klass;
 	klass.name = l_.class_name(symbol);
 	Symbol *base = symbol->klass->base;
-	std::string godot_base;
-	if (base && Lowerer::is_godot(base) && l_.is_godot_object(base) && godot_name(base->name, std::string_view(), &godot_base)) {
+	std::optional<std::string> godot_base;
+	if (base && Lowerer::is_godot(base) && l_.is_godot_object(base) && (godot_base = godot_name(base->name, std::string_view()))) {
 		// A script: it is attached to an object of that Godot class, kept in its first field.
-		klass.native_base = godot_base;
+		klass.native_base = *godot_base;
 		klass.fields.push_back({ "$owner", Kind::Ref });
 	} else if (base && base != l_.object_) {
 		// A Dictionary's objects are tables, with no fields to add to; a RegExp's or a Date's are the library's.
@@ -67,14 +67,18 @@ static Constant first_value(const Expr *p_written, Kind p_kind, const Type *p_ty
 	const NumberLit *number = written_number(p_written, &negative);
 	if (!p_written && p_kind == Kind::Val && p_type && p_type->symbol && p_type->symbol->klass && value_has_parts(p_type->symbol)) {
 		// It starts at its type's zero, as the constructor makes it.
-		out.form = godot_name(p_type->symbol->name, std::string_view(), &out.text) ? Constant::Form::Value : Constant::Form::None;
+		const std::optional<std::string> godot = godot_name(p_type->symbol->name, std::string_view());
+		out.form = godot ? Constant::Form::Value : Constant::Form::None;
+		out.text = godot.value_or(std::string());
 	} else if (!p_written) {
 		out.form = Constant::Form::Empty;
 	} else if (number) {
 		out.form = Constant::Form::Number;
 		out.number = (negative ? -1 : 1) * p_number(number);
 	} else if (p_written->kind == NodeKind::New && p_written->type && p_written->type->symbol && export_constant(p_written)) {
-		out.form = godot_name(p_written->type->symbol->name, std::string_view(), &out.text) ? Constant::Form::Value : Constant::Form::None;
+		const std::optional<std::string> godot = godot_name(p_written->type->symbol->name, std::string_view());
+		out.form = godot ? Constant::Form::Value : Constant::Form::None;
+		out.text = godot.value_or(std::string());
 		for (const Expr *argument : static_cast<const New *>(p_written)->arguments) {
 			const NumberLit *part = written_number(argument, &negative);
 			out.parts.push_back((negative ? -1 : 1) * p_number(part));
@@ -113,7 +117,7 @@ void Classes::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 			field.constant = p_decl->is_const;
 			const Type *type = declarator.type ? l_.compilation_.type_of(declarator.type) : nullptr;
 			if (is_engine(kind) && type && type->symbol) {
-				godot_name(type->symbol->name, std::string_view(), &field.engine_type);
+				field.engine_type = godot_name(type->symbol->name, std::string_view()).value_or(std::string());
 			}
 			field.exported = declares_export(p_decl);
 			if (field.exported) {
@@ -133,17 +137,16 @@ void Classes::record_godot_virtual(uint32_t p_class, const Symbol *p_symbol, Fun
 		if (inherited == at->klass->members.end() || !Lowerer::is_godot(inherited->second)) {
 			continue; // Not here, or a script class's override of it: Godot's declaration is further up.
 		}
-		std::string godot;
-		if (godot_name(at->name, p_function->name, &godot)) {
+		if (const std::optional<std::string> godot = godot_name(at->name, p_function->name)) {
 			bool replaced = false;
 			for (auto &entry : l_.module_.classes[p_class].virtuals) {
-				if (entry.first == godot) {
+				if (entry.first == *godot) {
 					entry.second = p_made;
 					replaced = true;
 				}
 			}
 			if (!replaced) {
-				l_.module_.classes[p_class].virtuals.push_back({ godot, p_made });
+				l_.module_.classes[p_class].virtuals.push_back({ *godot, p_made });
 			}
 		}
 		return;

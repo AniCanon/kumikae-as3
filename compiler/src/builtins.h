@@ -1,6 +1,7 @@
 // The built-in declaration files, embedded at build time from compiler/builtins/*.as.
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -21,9 +22,9 @@ inline const char *const GODOT_DECLARATIONS_PATH = "<godot>/godot.as";
 
 // Godot's own spelling of what godot.as declares, for calling the engine: "move_and_slide" for
 // ("CharacterBody2D", "moveAndSlide"), "Object" for the class "GodotObject" (an empty member). The class is
-// the one that declares the member, not a subclass. False if nothing of that name is declared. The names
+// the one that declares the member, not a subclass. Nothing if nothing of that name is declared. The names
 // come from Godot's API description (compiler/godot/godot_names.txt), never from reversing the AS3 name.
-bool godot_name(std::string_view p_class, std::string_view p_member, std::string *r_name);
+std::optional<std::string> godot_name(std::string_view p_class, std::string_view p_member);
 std::string godot_names_text();
 
 } // namespace kas3

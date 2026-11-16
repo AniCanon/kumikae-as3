@@ -26,12 +26,12 @@ uint32_t Lowerer::reg(Kind p_kind) {
 
 uint32_t Lowerer::engine_reg(Kind p_kind, const Type *p_type) {
 	uint32_t out = reg(p_kind);
-	std::string godot;
-	if (is_engine(p_kind) && p_type && p_type->symbol && godot_name(p_type->symbol->name, std::string_view(), &godot)) {
+	std::optional<std::string> godot;
+	if (is_engine(p_kind) && p_type && p_type->symbol && (godot = godot_name(p_type->symbol->name, std::string_view()))) {
 		if (fn().engine_types.size() <= out) {
 			fn().engine_types.resize(out + 1);
 		}
-		fn().engine_types[out] = godot;
+		fn().engine_types[out] = *godot;
 	}
 	return out;
 }

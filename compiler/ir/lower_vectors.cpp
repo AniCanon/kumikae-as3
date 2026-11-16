@@ -273,9 +273,11 @@ auto Vectors::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::opti
 		return l_.default_value(Kind::Val, position);
 	}
 	// Godot's name for what it takes here: a packed array, or an Array where it takes that or anything.
-	std::string wanted = "Array";
-	const bool named = p_wanted && p_wanted->kind == Type::Instance && Lowerer::is_godot(p_wanted->symbol) &&
-			godot_name(p_wanted->symbol->name, std::string_view(), &wanted);
+	const std::optional<std::string> godot = p_wanted && p_wanted->kind == Type::Instance && Lowerer::is_godot(p_wanted->symbol)
+			? godot_name(p_wanted->symbol->name, std::string_view())
+			: std::nullopt;
+	const bool named = godot.has_value();
+	const std::string wanted = godot.value_or("Array");
 	if (p_wanted && p_wanted->kind != Type::Any && !named) {
 		l_.refuse(position, "passing a Vector where '" + l_.compilation_.type_name(p_wanted) + "' is expected");
 		return l_.default_value(Kind::Val, position);

@@ -70,11 +70,11 @@ bool Lowerer::is_godot_object(const Symbol *p_class) const {
 }
 
 bool Lowerer::engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_string) {
-	std::string name;
-	if (!p_class || !godot_name(p_class->name, p_member, &name)) {
+	const std::optional<std::string> name = p_class ? godot_name(p_class->name, p_member) : std::nullopt;
+	if (!name) {
 		return false;
 	}
-	*r_string = string(name);
+	*r_string = string(*name);
 	return true;
 }
 

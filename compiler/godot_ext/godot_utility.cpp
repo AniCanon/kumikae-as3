@@ -38,8 +38,7 @@ std::optional<int> type_of_name(std::string_view p_name) {
 	if (p_name == "Object") {
 		return Variant::OBJECT;
 	}
-	const int type = value_type(p_name);
-	return type >= 0 ? std::optional<int>(type) : std::nullopt;
+	return value_type(p_name);
 }
 
 // Whether a value may be given where a global function declares this type. Godot's own conversion would
