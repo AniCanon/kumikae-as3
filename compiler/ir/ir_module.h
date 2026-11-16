@@ -192,6 +192,10 @@ struct Global {
 	uint32_t klass = NONE; // As for a field.
 	bool starts_null = false; // As for a field.
 	std::string engine_type = {}; // As for a field.
+	// A class's public static field, which the class held as a value gives by name (`c.count`); and
+	// whether it is a constant, which is not written.
+	bool is_public = false;
+	bool is_const = false;
 };
 
 struct Module {

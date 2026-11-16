@@ -32,6 +32,9 @@ struct NativeCode {
 	[[nodiscard]] virtual bool hand_over(NativeError *r_error) = 0;
 	// The static fields and package variables native code keeps are emptied: Interpreter::clear_globals().
 	virtual void clear_globals() = 0;
+	// Where native code keeps a static field or package variable (by its number in the module): what the
+	// interpreter reads and writes for one reached by name (`c.count`, a class held as a value).
+	virtual Slot *global(uint32_t p_index) = 0;
 	// Carries out a Native instruction of the function (by its number in the module): `p_what` and
 	// `p_register` are the instruction's second and third operands, which only the native side reads.
 	// p_registers are the frame's, valid until the native side calls anything; p_given is how many

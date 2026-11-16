@@ -29,7 +29,7 @@ host differs.
 | `regexp_methods.cpp`, `regexp_strings.cpp` | The instructions of RegExp (`new`, `exec`, `test`, its properties) and of String's methods that take one (`match`, `search`, `replace`, `split`); the patterns read, kept by source and flags |
 | `date_time`, `date_parse.cpp`, `date_methods.cpp` | Date: ECMAScript's arithmetic of times, AS3's texts and what `Date.parse` reads, and the instructions, with local time from the host's clock |
 | `library_calls.h`, `library_calls.cpp` | A method of the library called by name on an untyped value (`u.push(1)`), or read as a function bound to its value (`u.push`): the arguments converted as `ir/library_methods.h` says, and the typed operation run on registers set past the running frame's, by one helper class (`LibraryCall`), a friend of the interpreter |
-| `class_values.cpp` | Classes as values: the one object for each class, `x is c`, `new c(a)` |
+| `class_values.cpp`, `class_statics.cpp` | Classes as values: the one object for each class, `x is c`, `new c(a)`, `c(x)`; and a class's public static members by name on such a value (`c.create()`, `c.count`) |
 | `library_members.cpp` | RegExp's and Date's properties and methods by name on an untyped value (`u.lastIndex`, `u.getTime()`), by the names `ir/library_names.h` gives |
 | `json_text` | JSON text on its own: the grammar read into a builder's calls, with a stack of its own (no recursion), and a String written as Quote() writes it |
 | `json_work.h`, `json_methods.cpp`, `json_stringify.cpp` | JsonCall: what is read made into Objects and Arrays and revived, and stringify, by one helper class (`Json`), a friend of the interpreter |

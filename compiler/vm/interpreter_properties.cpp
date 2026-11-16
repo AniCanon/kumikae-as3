@@ -224,6 +224,9 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_value, Slot p_holder) {
 	const ir::Class &klass = module_.classes[p_object->klass];
 	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.text, p_holder); };
+	if (const std::optional<bool> done = static_set(p_object, p_key, p_holder, p_value)) {
+		return *done;
+	}
 	if (const std::optional<bool> done = library_set(p_object, p_key.text, p_value)) {
 		return *done;
 	}

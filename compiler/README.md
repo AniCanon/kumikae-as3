@@ -125,7 +125,8 @@ untyped value, each as its typed call (`u.push(1)`, `u.charAt(0)`, `u.forEach(f)
 read without being called, as functions bound to their value (`u.push`, `list.sort`, `text.charAt`); an
 element written by name into a Vector, checked as a typed store is; `Vector.<T>(x)`; `Function(x)` and
 `Class(x)`; `instanceof`; `arguments`, with `arguments.callee`; classes as values (`var c:Class = Player`,
-`x is c`, `new c(a)`). `RegExp` (literals, `new RegExp`, the flags
+`x is c`, `new c(a)`, `c(x)`, and the class's public static members by name: `c.create()`, `c.count`, which
+a subclass does not have, as AS3's statics are not inherited). `RegExp` (literals, `new RegExp`, the flags
 `g i m s x`, its properties, `exec` and `test` with `lastIndex`, which one that is not global keeps, as in
 avmplus) and String's `match`, `search`, `replace` (with `$1`, `$&` and the rest, or a function) and
 `split` by one; `Date`, with the host's clock and zone (its getters and setters, local and UTC, its texts,
@@ -159,8 +160,6 @@ Not built yet, and what each needs:
 - **A property added to a Date, a RegExp, an Error or a Function** (dynamic in AS3): these hold their
   fields in fixed places, and need a table of properties beside them, as an Array has. One read that a
   Date or a RegExp does not declare is `undefined`.
-- **A static member through a class held in a variable** (`c.create()`): the IR lists a class's instance
-  methods by name, not its static ones.
 - **One of Godot's classes as a value** (`var c:Class = Node`): a class value names a class of the
   program or the library; Godot's are known by Godot's name only where their type is declared.
 - **A function of the library that belongs to no value, as a value:** `Math.max`, `String.fromCharCode`,

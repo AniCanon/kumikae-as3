@@ -97,6 +97,8 @@ struct GlobalInfo {
 	uint8_t kind;
 	uint32_t klass;
 	bool starts_null;
+	bool is_public; // A class's public static field: the class held as a value gives it by name.
+	bool is_const;
 };
 
 // An operation the host carries out with the library it shares with the interpreter (runtime/thunks.h):

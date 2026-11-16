@@ -201,7 +201,7 @@ std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, 
 	}
 	for (const ir::Global &global : p_module.globals) {
 		globals.push_back("{ " + string_literal(global.name) + ", " + kind_number(global.kind) + ", " + number(global.klass) + ", " +
-				boolean(global.starts_null) + " }");
+				boolean(global.starts_null) + ", " + boolean(global.is_public) + ", " + boolean(global.is_const) + " }");
 	}
 	for (const std::string &text : p_module.strings) {
 		strings.push_back("{ " + string_literal(text) + ", " + std::to_string(text.size()) + " }");

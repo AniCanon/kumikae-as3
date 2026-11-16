@@ -309,6 +309,15 @@ private:
 	void class_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
 	void class_call(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
+	// A class value's public static members by name (class_statics.cpp); nothing where it has none of that name.
+	std::unordered_map<std::string, uint32_t> statics_;
+	bool statics_listed_ = false;
+	std::optional<uint32_t> static_member(uint32_t p_class, char p_joint, std::string_view p_prefix, std::string_view p_name);
+	std::optional<uint32_t> statics_of(const Object *p_object, bool *r_raised);
+	std::optional<bool> static_get(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
+	std::optional<bool> static_set(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot p_value);
+	bool static_has(const Object *p_object, const PropertyKey &p_key);
+	bool static_call(Object *p_object, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
 	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);

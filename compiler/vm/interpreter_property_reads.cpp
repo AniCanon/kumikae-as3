@@ -97,6 +97,9 @@ bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Sl
 // or what a getter gives.
 bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value) {
 	const ir::Class &klass = module_.classes[p_object->klass];
+	if (const std::optional<bool> done = static_get(p_object, p_key, p_holder, r_value)) {
+		return *done;
+	}
 	if (const std::optional<bool> done = library_get(p_object, p_key.text, r_value)) {
 		return *done;
 	}
@@ -127,7 +130,7 @@ bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Sl
 	if (p_object->klass == module_.regexp_class || p_object->klass == module_.date_class) {
 		return true; // Dynamic in AS3, and nothing can be added to one here: undefined.
 	}
-	if (klass.built_in) {
+	if (klass.built_in && p_object->klass != module_.class_class) {
 		raise_unsupported("reading '" + p_key.text + "' of " + holder_name(p_holder) + " by its name");
 		return false;
 	}
@@ -189,7 +192,7 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		raise_unsupported("a property of one of Godot's values or objects held untyped, by its name");
 		return false;
 	}
-	bool has = p_prototype && listed(OBJECT_METHODS, p_key.text);
+	bool has = (p_prototype && listed(OBJECT_METHODS, p_key.text)) || static_has(object, p_key);
 	if (klass && klass->table) {
 		has = has || entry_of(entries_of(object), p_key).has_value();
 	} else if (klass && klass->element != Kind::Void) {
