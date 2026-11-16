@@ -168,7 +168,21 @@ private:
 	Stmt *parse_with();
 	Block *parse_block();
 	Stmt *parse_if();
+	Stmt *parse_var_statement(uint32_t p_start);
+	Stmt *parse_function_statement(uint32_t p_start);
+	Stmt *parse_labeled(uint32_t p_start);
+	// What `for (` and its first clause were, before it is known which loop it is.
+	struct ForHead {
+		uint32_t start;
+		bool each;
+		Token open;
+		VarDecl *declaration;
+		Expr *first;
+		uint32_t first_offset;
+	};
 	Stmt *parse_for();
+	Stmt *parse_for_in(const ForHead &p_head);
+	Stmt *parse_for_clauses(const ForHead &p_head);
 	Stmt *parse_switch();
 	Stmt *parse_try();
 	VarDecl *parse_variable_declaration(Modifiers p_modifiers, List<Metadata> p_metadata, bool p_allow_in);

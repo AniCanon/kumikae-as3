@@ -185,6 +185,31 @@ Stmt *Parser::parse_with() {
 	return finish(node<Empty>(start));
 }
 
+Stmt *Parser::parse_var_statement(uint32_t p_start) {
+	VarStmt *statement = node<VarStmt>(p_start);
+	statement->decl = parse_variable_declaration(Modifiers(), List<Metadata>(), true);
+	end_statement();
+	return finish(statement);
+}
+
+// A named function nested in a function.
+Stmt *Parser::parse_function_statement(uint32_t p_start) {
+	FunctionStmt *statement = node<FunctionStmt>(advance().offset);
+	statement->function = parse_function_rest(p_start, Modifiers(), List<Metadata>(), true, false, true);
+	// The nested function's height counts toward the body it sits in.
+	last_height_ = function_height_ + 1;
+	note_height();
+	return finish(statement);
+}
+
+Stmt *Parser::parse_labeled(uint32_t p_start) {
+	Labeled *labeled = node<Labeled>(p_start);
+	labeled->label = text(advance());
+	advance();
+	labeled->body = parse_statement();
+	return finish(labeled);
+}
+
 Stmt *Parser::parse_statement_inner() {
 	uint32_t start = current_.offset;
 	switch (current_.kind) {
@@ -194,12 +219,8 @@ Stmt *Parser::parse_statement_inner() {
 			advance();
 			return finish(node<Empty>(start));
 		case TokenKind::KwVar:
-		case TokenKind::KwConst: {
-			VarStmt *statement = node<VarStmt>(start);
-			statement->decl = parse_variable_declaration(Modifiers(), List<Metadata>(), true);
-			end_statement();
-			return finish(statement);
-		}
+		case TokenKind::KwConst:
+			return parse_var_statement(start);
 		case TokenKind::KwIf:
 			return parse_if();
 		case TokenKind::KwFor:
@@ -223,12 +244,7 @@ Stmt *Parser::parse_statement_inner() {
 		case TokenKind::KwFunction:
 			// A named function nested in a function. Without a name it is a function expression.
 			if (peek2().kind == TokenKind::Identifier) {
-				FunctionStmt *statement = node<FunctionStmt>(advance().offset);
-				statement->function = parse_function_rest(start, Modifiers(), List<Metadata>(), true, false, true);
-				// The nested function's height counts toward the body it sits in.
-				last_height_ = function_height_ + 1;
-				note_height();
-				return finish(statement);
+				return parse_function_statement(start);
 			}
 			break;
 		case TokenKind::KwWith:
@@ -240,11 +256,7 @@ Stmt *Parser::parse_statement_inner() {
 		}
 		case TokenKind::Identifier:
 			if (peek2().kind == TokenKind::Colon) {
-				Labeled *labeled = node<Labeled>(start);
-				labeled->label = text(advance());
-				advance();
-				labeled->body = parse_statement();
-				return finish(labeled);
+				return parse_labeled(start);
 			}
 			break;
 		default:
@@ -291,28 +303,37 @@ Stmt *Parser::parse_for() {
 		first = parse_expression();
 	}
 
-	if (at(TokenKind::KwIn)) {
-		ForIn *loop = node<ForIn>(start);
-		loop->each = each;
-		if (declaration) {
-			if (declaration->declarators.count != 1 || declaration->declarators[0].initializer) {
-				error_at(first_offset, "invalid left-hand side in for-in", false);
-			}
-			loop->declaration = declaration;
-		} else {
-			if (!first || (first->kind != NodeKind::Name && first->kind != NodeKind::Member &&
-								  first->kind != NodeKind::Index)) {
-				error_at(first_offset, "invalid left-hand side in for-in", false);
-			}
-			loop->target = first;
-		}
-		advance();
-		loop->collection = parse_expression();
-		expect_close(TokenKind::RParen, open);
-		loop->body = parse_statement();
-		return finish(loop);
-	}
+	const ForHead head{ start, each, open, declaration, first, first_offset };
+	return at(TokenKind::KwIn) ? parse_for_in(head) : parse_for_clauses(head);
+}
 
+// `for (k in o)` and `for each (v in o)`, after the first clause.
+Stmt *Parser::parse_for_in(const ForHead &p_head) {
+	const auto &[start, each, open, declaration, first, first_offset] = p_head;
+	ForIn *loop = node<ForIn>(start);
+	loop->each = each;
+	if (declaration) {
+		if (declaration->declarators.count != 1 || declaration->declarators[0].initializer) {
+			error_at(first_offset, "invalid left-hand side in for-in", false);
+		}
+		loop->declaration = declaration;
+	} else {
+		if (!first || (first->kind != NodeKind::Name && first->kind != NodeKind::Member &&
+							  first->kind != NodeKind::Index)) {
+			error_at(first_offset, "invalid left-hand side in for-in", false);
+		}
+		loop->target = first;
+	}
+	advance();
+	loop->collection = parse_expression();
+	expect_close(TokenKind::RParen, open);
+	loop->body = parse_statement();
+	return finish(loop);
+}
+
+// `for (init; condition; update)`, after the first clause.
+Stmt *Parser::parse_for_clauses(const ForHead &p_head) {
+	const auto &[start, each, open, declaration, first, first_offset] = p_head;
 	For *loop = node<For>(start);
 	if (each) {
 		error_expected("'in'");
