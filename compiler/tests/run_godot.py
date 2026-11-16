@@ -1,10 +1,14 @@
 """AS3 inside Godot: runs the test project in headless Godot and checks what the script did.
 
-Usage: run_godot.py <tests dir>
+Usage: run_godot.py <tests dir> [<kas3c>]
 
 Needs the extension library (built when CMake is given -DKAS3_GODOT_CPP=<godot-cpp checkout>) and Godot 4.7
 (`godot` on the PATH, or the KAS3_GODOT environment variable). Without either, the test is skipped and says
 so: it does not fail.
+
+With kas3c and a C++ compiler, tests/godot_native's Probe.as is also run as native code: written as C++ by
+`kas3c cpp --godot`, built into a program library, loaded by the extension (KAS3_PROGRAM_LIBRARY), and held
+to what the interpreter prints for the same script, line for line.
 
 The project is compiler/tests/godot_project: Player.as on a CharacterBody2D sets its velocity and calls
 moveAndSlide() for 30 physics frames. At 200 units a second and 60 frames a second that is 100 units.
@@ -651,6 +655,61 @@ with tempfile.TemporaryDirectory() as packed:
         output = run.stdout + run.stderr
         check("from a pack: %s runs" % driver, run.returncode == 0 and "were not loaded" not in output and "no script" not in output and
               (wanted is None or wanted in output), output[-700:])
+
+
+
+def native_probe(kas3c):
+    """The probe by the interpreter and as native code: what each run prints of it."""
+    compiler = shutil.which("c++")
+    if not kas3c or not os.path.exists(kas3c) or not compiler:
+        print("godot: the native probe was not run (it needs kas3c and a C++ compiler)")
+        return
+    root = os.path.dirname(tests)
+    with tempfile.TemporaryDirectory() as where:
+        probe = os.path.join(where, "project")
+        shutil.copytree(os.path.join(tests, "godot_native"), probe)
+        shutil.copy(os.path.join(project, "kas3.gdextension"), probe)
+        os.makedirs(os.path.join(probe, "bin"))
+        for library in glob.glob(os.path.join(project, "bin", "libkas3_godot.*")):
+            shutil.copy(library, os.path.join(probe, "bin"))
+        subprocess.run([godot, *FIRST_SCAN, "--path", probe], capture_output=True, text=True, timeout=300)
+        written = subprocess.run([kas3c, "cpp", "--godot", "Probe.as", "-o", os.path.join(where, "native")], capture_output=True, text=True,
+                                 cwd=probe, timeout=300)
+        check("native: the probe is written as C++", written.returncode == 0, written.stderr[-600:])
+        if written.returncode != 0:
+            return
+        program = os.path.join(where, "libkas3_program.dylib")
+        includes = [flag for each in ("runtime", "vm", "ir", "src") for flag in ("-I", os.path.join(root, each))]
+        built = subprocess.run([compiler, "-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops", "-Wall",
+                                "-Wextra", "-Werror", "-fvisibility=hidden", "-shared", "-undefined", "dynamic_lookup", *includes,
+                                *sorted(glob.glob(os.path.join(where, "native", "*.cpp"))), "-o", program], capture_output=True, text=True,
+                               timeout=600)
+        check("native: the C++ builds without a warning", built.returncode == 0, built.stderr[-900:])
+        if built.returncode != 0:
+            return
+        said = {}
+        for label, library in (("interpreter", None), ("native", program)):
+            environment = dict(os.environ)
+            environment.pop("KAS3_PROGRAM_LIBRARY", None)
+            if library:
+                environment["KAS3_PROGRAM_LIBRARY"] = library
+            ran = subprocess.run([godot, "--headless", "--path", probe, "-s", "probe.gd"], capture_output=True, text=True, timeout=300,
+                                 env=environment)
+            text = ran.stdout + ran.stderr
+            check("native: the probe runs (%s)" % label, ran.returncode == 0, "exit %d\n%s" % (ran.returncode, text[-600:]))
+            check("native: %s" % ("the program library is used" if library else "no library without one"),
+                  ("ActionScript: the scripts run as native code." in text) == bool(library), text[-600:])
+            # What the probe gave, and the error Godot was told of with its trace.
+            said[label] = [line for line in text.split("\n") if line.startswith("PROBE ") or line.startswith("SCRIPT ERROR") or
+                           line.lstrip().startswith("at ") or line.lstrip().startswith("at: ")]
+        check("native: the probe said something", len(said["interpreter"]) >= 8, "\n".join(said["interpreter"]))
+        for ours, theirs in zip(said["native"], said["interpreter"]):
+            check("native: as the interpreter says it", ours == theirs, "native       %s\ninterpreter  %s" % (ours, theirs))
+        check("native: as many lines", len(said["native"]) == len(said["interpreter"]),
+              "%d and %d" % (len(said["native"]), len(said["interpreter"])))
+
+
+native_probe(os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None)
 
 for failure in failures:
     print("FAIL " + failure)
