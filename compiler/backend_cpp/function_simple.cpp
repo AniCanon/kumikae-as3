@@ -44,10 +44,31 @@ bool FunctionWriter::constant(const Instruction &p_in) {
 	}
 }
 
+// The functions of Math that IEEE 754 gives one answer for, whoever computes it: written as the machine's
+// own, where the others are the runtime's (which is the interpreter's, to the last bit).
+std::string_view exact_math(uint32_t p_function) {
+	switch (static_cast<ir::MathFunction>(p_function)) {
+		case ir::MathFunction::Abs:
+			return "std::fabs";
+		case ir::MathFunction::Ceil:
+			return "std::ceil";
+		case ir::MathFunction::Floor:
+			return "std::floor";
+		case ir::MathFunction::Sqrt:
+			return "std::sqrt";
+		default:
+			return {};
+	}
+}
+
 bool FunctionWriter::simple(const Instruction &p_in) {
 	const Pattern *pattern = pattern_of(p_in.op);
 	if (!pattern) {
 		return false;
+	}
+	if (const std::string_view exact = p_in.op == ir::Op::MathUnary ? exact_math(p_in.c) : std::string_view(); !exact.empty()) {
+		line(reg(p_in.a) + " = " + std::string(exact) + "(" + reg(p_in.b) + ");");
+		return true;
 	}
 	const uint32_t operands[3] = { p_in.a, p_in.b, p_in.c };
 	std::string out;

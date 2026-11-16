@@ -50,6 +50,13 @@ public:
 	bool valid() const { return valid_; }
 	vm::Interpreter &interpreter() { return native_ ? native_->interpreter() : *interpreter_; }
 	bool native() const { return native_ != nullptr; }
+	// Godot calling a function of the scripts, by whichever runs them: the first argument of a method is
+	// its object, and a result is the caller's to give up. False if it failed: the error has been reported,
+	// or is carried to the script's own call of the engine that led here.
+	[[nodiscard]] bool call_function(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result) {
+		return native_ ? native_->call(p_function, p_arguments, p_count, r_result)
+					   : interpreter_->call_function(p_function, p_arguments, p_count, r_result);
+	}
 	void instance_freed() {
 		if (native_) {
 			native_->instance_freed();

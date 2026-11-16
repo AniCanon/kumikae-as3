@@ -37,6 +37,10 @@ struct Facts {
 // end of a Godot object, which a script is told of.
 // For a Call it answers for the call alone (a result that is let go of), not for what the callee does.
 bool may_run_code(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in);
+// The same, where writing a register lets go of nothing because the register counts nothing (p_counts_nothing
+// says which): what is left is what the instruction does besides.
+bool may_run_code(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in,
+		const std::vector<bool> &p_counts_nothing);
 
 // Found by writing every function once, into nothing: what can fail is what the writer writes a way out
 // for, so the two cannot come apart.

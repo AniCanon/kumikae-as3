@@ -38,6 +38,17 @@ struct StackFrame {
 	StackFrame *below;
 };
 
+// Objects let go of, kept to be the next ones made (rule 14: objects from free lists by size): for each
+// number of fields, a list of blocks through `gc_next`. Only objects of classes that hold nothing counted
+// and that the collector does not look at are kept (Context::class_cached), so one let go of has nothing
+// to give up; each block is the heap's own, and goes back to it when the host ends.
+struct ObjectCache {
+	static constexpr uint32_t SIZES = 33; // Objects of up to 32 fields.
+	static constexpr uint32_t MOST = 8192; // Blocks kept of one size.
+	Object *spare[SIZES] = {};
+	uint32_t count[SIZES] = {};
+};
+
 // One per thread, the host's. Generated code keeps no state of its own: what changes as a program runs is
 // reached through this.
 struct Context {
@@ -69,6 +80,11 @@ struct Context {
 	const Resolved *resolved = nullptr;
 	const void *const *names = nullptr;
 	Host *host = nullptr;
+	// The host's cache of objects, and for each class 0, or one more than its number of fields if its
+	// objects are kept there.
+	ObjectCache *cache = nullptr;
+	const uint8_t *class_cached = nullptr;
+	const uint32_t *class_numbers = nullptr; // For such a class: bit i says its field i is a Number, which starts NaN.
 };
 
 // Whether the function this is written in has its frame below the context's floor: the C++ stack is nearly
@@ -132,7 +148,15 @@ inline void release(Context *c, Str *p_string) {
 }
 inline void release(Context *c, Object *p_object) {
 	if (p_object && --p_object->references == 0) {
-		free_object(c, p_object);
+		const uint32_t size = c->class_cached[p_object->klass];
+		ObjectCache *const cache = c->cache;
+		if (size && cache->count[size] < ObjectCache::MOST) {
+			p_object->gc_next = cache->spare[size];
+			cache->spare[size] = p_object;
+			cache->count[size]++;
+		} else {
+			free_object(c, p_object);
+		}
 	}
 }
 inline void release(Context *c, Slot p_any) {

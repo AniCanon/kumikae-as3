@@ -176,6 +176,15 @@ private:
 	Slot share(ir::Kind p_kind, Slot p_value) { return heap_.share(p_kind, p_value); }
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned) { heap_.put(p_kind, p_target, p_owned); }
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	// The request itself, on those registers: what the engine gave and the register it goes to (NONE for
+	// none), or false with an error raised if the engine refuses.
+	struct EngineAnswer {
+		uint32_t target;
+		ir::Kind kind;
+		Slot result;
+	};
+	bool ask_engine(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers, EngineAnswer *r_asked);
+	void settle_asked(const EngineAnswer &p_asked, Slot &r_target);
 	std::optional<std::string> godot_refuses(Slot p_value, int p_depth) const;
 	std::optional<std::string> refused_by_godot(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers) const;
 	// Whether any operand of an instruction is untyped: only such an operand is ever refused_by_godot().
@@ -381,10 +390,7 @@ public:
 	// Who carries out the Native instructions of a module whose functions are native code. Without one,
 	// such an instruction raises an error.
 	void set_native(NativeCode *p_native) { native_ = p_native; }
-	void set_statement_hook(StatementHook p_hook, void *p_data) {
-		hook_ = p_hook;
-		hook_data_ = p_data;
-	}
+	void set_statement_hook(StatementHook p_hook, void *p_data) { hook_ = p_hook, hook_data_ = p_data; }
 	// A call from outside that runs, with all it calls, for longer than this (in milliseconds) is stopped
 	// with Flash's Error #1502, which no catch or finally stops: an endless loop ends. 0, as an interpreter
 	// starts, for no limit. Time a debugger's hook keeps the program stopped is not counted.
@@ -394,12 +400,9 @@ public:
 	// the host has been given it.
 	bool run_program();
 
-	// For a host that keeps the interpreter and calls into it.
-	//
-	// Each of these is an entry from outside. An error that nothing catches ends that entry only: the host
-	// is given it, and the interpreter is fit for the next call. An entry may be made while another is in
-	// progress.
-
+	// For a host that keeps the interpreter and calls into it. Each of these is an entry from outside. An
+	// error that nothing catches ends that entry only: the host is given it, and the interpreter is fit for
+	// the next call. An entry may be made while another is in progress.
 	// Runs the static initializers, the first time it is called.
 	bool start();
 	// A new object of the class, its constructor run with no arguments. One reference, the caller's: give
@@ -441,14 +444,7 @@ public:
 	Heap &heap() { return heap_; }
 	// And what its library still asks of the interpreter itself (vm/library.h, Unmoved).
 	Unmoved &unmoved() { return asked_; }
-	// An error one of those left on its way out, called with none of this interpreter's code running to
-	// carry it: taken over by the host, which is running the program. `stopped`: not even the error could
-	// be made, and what there was to say has been reported.
-	struct Left {
-		bool error = false;
-		bool stopped = false;
-		Slot value{};
-	};
+	using Left = LeftError; // An error one of those left on its way out (vm/native_code.h).
 	bool left_error() const { return failing_ || stopped_; }
 	// With p_carried, an error carried back from a call the engine made beneath the host's own call of the
 	// library (carries() moved on meanwhile) is taken as well: there is no instruction of this
@@ -459,6 +455,12 @@ public:
 	// the engine runs meanwhile is carried back to that call, as to an instruction.
 	void direct_began() { direct_++; }
 	void direct_ended() { direct_--; }
+	// For a host whose native code is the program (native_code.h says what each is for).
+	void engine_instruction(uint32_t p_function, Slot *p_registers);
+	bool idle(uint32_t p_direct = 0) const { return frames_.empty() && direct_ == p_direct && !failing_ && !stopped_ && !halted_ && !carried_.held; }
+	void entered() { entering(), entries_++; }
+	void left() { entries_--; }
+	void report_native(NativeError p_error);
 
 	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
 	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of

@@ -74,12 +74,36 @@ with tempfile.TemporaryDirectory() as where:
         check("vec, which calls nothing, keeps no count of the depth", vec and "c->depth" not in vec, vec)
 
 with tempfile.TemporaryDirectory() as where:
+    sources = os.path.join(tests, "bench", "languages")
+    written = subprocess.run([kas3c, "cpp", "--godot", "frames/NBody.as", "-o", where], capture_output=True, text=True, cwd=sources)
+    check("NBody.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        advance = functions(where, "frames_NBody.cpp").get("frames_NBody_advance", "")
+        check("advance is found", bool(advance))
+        check("a square root is the machine's, with no call of the runtime's", "std::sqrt(" in advance and "math_unary(" not in advance, advance)
+        inside = "".join(loops(advance))
+        check("advance's loops are found", bool(inside), advance)
+        check("a body read out of the vector counts no reference", "store(c" not in inside and "put(c" not in inside,
+              advance)
+
+with tempfile.TemporaryDirectory() as where:
+    sources = os.path.join(tests, "bench", "languages")
+    written = subprocess.run([kas3c, "cpp", "--godot", "frames/Saxpy.as", "-o", where], capture_output=True, text=True, cwd=sources)
+    check("Saxpy.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        process = functions(where, "frames_Saxpy.cpp").get("frames_Saxpy__process", "")
+        inside = "".join(loops(process))
+        check("Saxpy's loops are found", bool(inside), process)
+        check("a static field no code in the function can write is read once, not in its loops", "c->globals[" not in inside and
+              "c->globals[" in process, process)
+
+with tempfile.TemporaryDirectory() as where:
     written = subprocess.run([kas3c, "cpp", "objects.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "bench"))
     check("objects.as is written as C++", written.returncode == 0, written.stderr)
     if written.returncode == 0:
         made = functions(where, "objects.cpp").get("objects", "")
         inside = "".join(loops(made))
-        check("objects' loop is found", "new_object(" in inside, made)
+        check("objects' loop is found, and makes its object of one let go of where there is one", "made_object(" in inside, made)
         check("the object made in objects' loop is handed over, not shared", "store(c, " not in inside and "= nullptr;" in inside, inside)
 
 with tempfile.TemporaryDirectory() as where:

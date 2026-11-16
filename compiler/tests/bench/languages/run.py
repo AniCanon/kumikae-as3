@@ -3,6 +3,8 @@
 release export.
 
     python3 run.py [<extension project>] [--against <other extension project>] [--runs N] [--no-frames]
+                   [--no-workloads] [--only <bench>,...] [--columns cs,gd,as,native] [--keep <folder>]
+                   [--frames N] [--warmup N] [--per-class]
 
 An extension project is a folder with `kas3.gdextension` and `bin/libkas3_godot.dylib` (by default
 compiler/tests/godot_project, where build-godot writes the library). With --against, a second export is
@@ -11,7 +13,15 @@ made with the other library, and the two are run turn and turn about.
 "AS3 native" is the same script written as C++ by `kas3c cpp --godot` (the kas3c beside the extension's
 build, or --kas3c <path>), built with the system's C++ compiler into a program library, and run by the same
 export with KAS3_PROGRAM_LIBRARY naming it: each round runs the export once without it and once with it,
-turn and turn about. Without kas3c or a compiler the column is left out, and said so.
+turn and turn about. Without kas3c or a compiler the column is left out, and said so. The library is built as a
+release is, from the whole program in one file of C++ (`kas3c cpp --unit`); --per-class builds it from a file
+for each class, as an editor does.
+
+For a quick look while working: --only and --columns leave out frame benchmarks and languages, --no-workloads
+the four workloads, --frames and --warmup shorten a measured run, and --keep <folder> makes the exports
+there and uses them again the next time (an export is an editor scan and a .NET build), so only the program
+library is rebuilt: the extension's own library is copied into a kept export afresh each time. A table that
+is reported is a full one.
 
 Needs Godot .NET 4.7 (the KAS3_GODOT_DOTNET environment variable: the editor's executable), its export
 templates, and `dotnet` with Godot's packages already in the local NuGet cache: nothing is downloaded. On
@@ -82,9 +92,33 @@ def step(what, command, cwd, timeout=900):
     return done
 
 
+def exported(project):
+    """The program an export of the project made."""
+    app = os.path.join(project, "out", "cmp.app")
+    programs = os.listdir(os.path.join(app, "Contents", "MacOS"))
+    if len(programs) != 1:
+        sys.exit("languages: the export holds %d programs, not one: %s" % (len(programs), programs))
+    return os.path.join(app, "Contents", "MacOS", programs[0])
+
+
+def refreshed(project, extension):
+    """A kept export with the extension's library as it is now, signed again; the program."""
+    app = os.path.join(project, "out", "cmp.app")
+    name = os.path.basename(LIBRARY)
+    found = [os.path.join(folder, name) for folder, _, files in os.walk(app) if name in files]
+    if len(found) != 1:
+        sys.exit("languages: the kept export holds %d copies of %s, not one" % (len(found), name))
+    shutil.copy(os.path.join(extension, LIBRARY), found[0])
+    if sys.platform == "darwin":
+        step("signing", ["codesign", "--force", "--deep", "-s", "-", app], project)
+    return exported(project)
+
+
 def export(godot, extension, where):
     """A release export of the project with this extension's library; the path of the program it made."""
     project = os.path.join(where, "project")
+    if os.path.isdir(os.path.join(project, "out", "cmp.app")):
+        return refreshed(project, extension)
     os.makedirs(os.path.join(project, "bin"))
     for name in PROJECT_FILES:
         shutil.copy(os.path.join(HERE, name), project)
@@ -105,10 +139,7 @@ def export(godot, extension, where):
     app = os.path.join(project, "out", "cmp.app")
     if sys.platform == "darwin":
         step("signing", ["codesign", "--force", "--deep", "-s", "-", app], project)
-    programs = os.listdir(os.path.join(app, "Contents", "MacOS"))
-    if len(programs) != 1:
-        sys.exit("languages: the export holds %d programs, not one: %s" % (len(programs), programs))
-    return os.path.join(app, "Contents", "MacOS", programs[0])
+    return exported(project)
 
 
 def scripts():
@@ -116,7 +147,7 @@ def scripts():
     return sorted(["CmpAs.as"] + ["frames/" + name for name in os.listdir(os.path.join(HERE, "frames")) if name.endswith(".as")])
 
 
-def program_library(kas3c, where, tree):
+def program_library(kas3c, where, tree, unit=True):
     """The project's scripts as a program library built against a tree's runtime, or None with why not."""
     if not kas3c or not os.path.exists(kas3c):
         return None, "no kas3c at %s" % kas3c
@@ -124,7 +155,11 @@ def program_library(kas3c, where, tree):
     if not compiler:
         return None, "no c++ on the PATH"
     out = os.path.join(where, "native")
-    written = subprocess.run([kas3c, "cpp", "--godot", *scripts(), "-o", out], cwd=HERE, capture_output=True, text=True)
+    written = subprocess.run([kas3c, "cpp", "--godot", *(["--unit"] if unit else []), *scripts(), "-o", out], cwd=HERE, capture_output=True,
+                             text=True)
+    if written.returncode == 2 and unit:
+        # An earlier build's kas3c, which does not know --unit: a file for each class, as it was built then.
+        written = subprocess.run([kas3c, "cpp", "--godot", *scripts(), "-o", out], cwd=HERE, capture_output=True, text=True)
     if written.returncode != 0:
         return None, written.stderr.strip()
     includes = [flag for each in ("runtime", "vm", "ir", "src") for flag in ("-I", os.path.join(tree, each))]
@@ -182,53 +217,79 @@ def frame_once(program, bench, language, library=None, more=()):
     environment.pop("KAS3_PROGRAM_LIBRARY", None)
     if library:
         environment["KAS3_PROGRAM_LIBRARY"] = library
-    done = subprocess.run([program, "--headless", "--fixed-fps", "60", "--", "--bench=" + bench, "--lang=" + language, "--mode=measure", *more],
-                          cwd=os.path.dirname(program), capture_output=True, text=True, timeout=1800, env=environment)
-    rows = [line for line in done.stdout.splitlines() if line.startswith("{")]
-    if done.returncode != 0 or len(rows) != 1:
+    command = [program, "--headless", "--fixed-fps", "60", "--", "--bench=" + bench, "--lang=" + language, "--mode=measure", *more]
+    # A run that dies is run again, twice at most, and said: Godot .NET now and then crashes as it starts or
+    # ends on a loaded machine, whatever the language. A benchmark that never gives its row is a failure.
+    for attempt in range(3):
+        done = subprocess.run(command, cwd=os.path.dirname(program), capture_output=True, text=True, timeout=1800, env=environment)
+        rows = [line for line in done.stdout.splitlines() if line.startswith("{")]
+        if done.returncode == 0 and len(rows) == 1:
+            break
+        print("languages: %s in %s died (exit %d), attempt %d" % (bench, language, done.returncode, attempt + 1), flush=True)
+    else:
         sys.exit("languages: %s in %s failed (exit %d):\n%s" % (bench, language, done.returncode, (done.stdout + done.stderr)[-1500:]))
     return json.loads(rows[0])
 
 
-def frames(title, program, library, runs):
-    """The frame benchmarks in every column, turn and turn about; the table, and whether the checksums agree."""
-    columns = LANGUAGES + ((NATIVE,) if library else ())
+def frames(builds, runs, chosen):
+    """The frame benchmarks in every column of every build, turn and turn about: each benchmark is run in one
+    build's columns, then the other's, before the next. The tables, and whether the checksums agree.
+    builds: (title, program, library) each. chosen: the benchmarks and the columns wanted (None for all of
+    either), and what a measured run is given."""
+    wanted_benches, wanted_columns, more = chosen
+    benches = tuple(each for each in FRAMES if not wanted_benches or each in wanted_benches)
+    columns = {title: tuple(each for each in LANGUAGES + ((NATIVE,) if library else ()) if not wanted_columns or each[0] in wanted_columns)
+               for title, _, library in builds}
     medians = {}
     sums = {}
+
+    def once(build, bench, language, extra):
+        _title, program, library = build
+        native = language == NATIVE[0]
+        return frame_once(program, bench, "as" if native else language, library if native else None, extra)
+
     # What each ends with after ten frames, whatever its speed: a measured run goes on for as long as its
     # warm-up takes, so its checksum is its own.
-    for bench in FRAMES:
-        for language, _name in columns:
-            row = frame_once(program, bench, "as" if language == NATIVE[0] else language, library if language == NATIVE[0] else None,
-                             ["--mode=verify"])
-            sums[(bench, language)] = row["checksum"]
+    for build in builds:
+        for bench in benches:
+            for language, _name in columns[build[0]]:
+                sums[(build[0], bench, language)] = once(build, bench, language, ["--mode=verify"])["checksum"]
     for _ in range(runs):
-        for bench in FRAMES:
-            for language, _name in columns:
-                row = frame_once(program, bench, "as" if language == NATIVE[0] else language, library if language == NATIVE[0] else None)
-                medians.setdefault((bench, language), []).append(row["median_us"])
-    print("%s: frames (microseconds a frame, the median of 600; %d run%s)" % (title, runs, "" if runs == 1 else "s"))
-    print("%-18s" % "" + "".join("%12s" % name for _, name in columns) + ("%14s%16s%16s" % ("native / C#", "C# runs", "native runs") if library else ""))
+        for bench in benches:
+            for build in builds:
+                for language, _name in columns[build[0]]:
+                    medians.setdefault((build[0], bench, language), []).append(once(build, bench, language, more)["median_us"])
     agree = True
-    for bench in FRAMES:
-        cells = [statistics.median(medians[(bench, language)]) for language, _ in columns]
-        line = "%-18s" % bench + "".join("%12.0f" % cell for cell in cells)
-        if library:
-            ours, theirs = medians[(bench, NATIVE[0])], medians[(bench, "cs")]
-            line += "%13.2fx%16s%16s" % (cells[3] / max(cells[0], 1), "%d-%d" % (min(theirs), max(theirs)), "%d-%d" % (min(ours), max(ours)))
-        print(line)
-        wanted = sums[(bench, "gd")]
-        for language, name in columns:
-            if abs(sums[(bench, language)] - wanted) > 1e-6 * max(1.0, abs(wanted)):
-                agree = False
-                print("languages: %s ends with %r in %s and %r in GDScript" % (bench, sums[(bench, language)], name, wanted))
+    for title, _program, library in builds:
+        mine = columns[title]
+        print("%s: frames (microseconds a frame, the median of 600; %d run%s; load %s)" % (title, runs, "" if runs == 1 else "s", load()))
+        both = bool(library) and all(any(language == each for each, _ in mine) for language in ("cs", NATIVE[0]))
+        print("%-18s" % "" + "".join("%12s" % name for _, name in mine) + ("%14s%16s%16s" % ("native / C#", "C# runs", "native runs") if both else ""))
+        for bench in benches:
+            cells = [statistics.median(medians[(title, bench, language)]) for language, _ in mine]
+            line = "%-18s" % bench + "".join("%12.0f" % cell for cell in cells)
+            if both:
+                ours, theirs = medians[(title, bench, NATIVE[0])], medians[(title, bench, "cs")]
+                line += "%13.2fx%16s%16s" % (statistics.median(ours) / max(statistics.median(theirs), 1), "%d-%d" % (min(theirs), max(theirs)),
+                                             "%d-%d" % (min(ours), max(ours)))
+            print(line)
+            wanted = sums[(title, bench, mine[0][0])]
+            for language, name in mine:
+                if abs(sums[(title, bench, language)] - wanted) > 1e-6 * max(1.0, abs(wanted)):
+                    agree = False
+                    print("languages: %s ends with %r in %s and %r in %s" % (bench, sums[(title, bench, language)], name, wanted, mine[0][1]))
     return agree
+
+
+def load():
+    """The machine's load averages, in words: a timing is read beside them."""
+    return "%.0f %.0f %.0f" % os.getloadavg()
 
 
 def table(title, best):
     native = (WORKLOADS[0][0], NATIVE[0]) in best
     columns = LANGUAGES + ((NATIVE,) if native else ())
-    print("%s (ms, best of 5 after 35 warm-ups)" % title)
+    print("%s (ms, best of 5 after 35 warm-ups; load %s)" % (title, load()))
     print("%-10s" % "" + "".join("%12s" % name for _, name in columns) + "%12s" % "AS3 / C#" + ("%14s" % "native / C#" if native else ""))
     for workload, name in WORKLOADS:
         cells = [best[(workload, language)] / 1000.0 for language, _ in columns]
@@ -240,8 +301,12 @@ def main():
     arguments = sys.argv[1:]
     runs = int(arguments[arguments.index("--runs") + 1]) if "--runs" in arguments else 1
     other = os.path.abspath(arguments[arguments.index("--against") + 1]) if "--against" in arguments else None
+    valued = ("--runs", "--against", "--kas3c", "--only", "--columns", "--keep", "--frames", "--warmup")
+    value = lambda name: arguments[arguments.index(name) + 1] if name in arguments else None
     positional = [argument for index, argument in enumerate(arguments)
-                  if not argument.startswith("--") and (index == 0 or arguments[index - 1] not in ("--runs", "--against", "--kas3c"))]
+                  if not argument.startswith("--") and (index == 0 or arguments[index - 1] not in valued)]
+    chosen = (value("--only").split(",") if value("--only") else None, value("--columns").split(",") if value("--columns") else None,
+              ["--%s=%d" % (name, int(value("--" + name))) for name in ("frames", "warmup") if value("--" + name)])
     extension = os.path.abspath(positional[0] if positional else DEFAULT_EXTENSION)
     godot = os.environ.get("KAS3_GODOT_DOTNET")
     if sys.platform != "darwin":
@@ -256,7 +321,12 @@ def main():
     for which in [extension] + ([other] if other else []):
         if not os.path.exists(os.path.join(which, LIBRARY)):
             skip("no %s in %s: build the extension first" % (LIBRARY, which))
-    with tempfile.TemporaryDirectory() as where:
+    with tempfile.TemporaryDirectory() as made:
+        # A kept folder holds one export for each extension, by where the extension is.
+        where = made
+        if value("--keep"):
+            where = os.path.abspath(value("--keep"))
+            os.makedirs(where, exist_ok=True)
         builds = [(extension, export(godot, extension, os.path.join(where, "first")))]
         if other:
             builds.append((other, export(godot, other, os.path.join(where, "second"))))
@@ -269,11 +339,12 @@ def main():
                      else os.path.join(which, "..", "..", "build-godot", "kas3c"))
             # Built against the runtime of the tree the extension came from: its headers are what it was built with.
             tree = os.path.join(which, "..", "..")
-            libraries[which], why = program_library(kas3c, os.path.join(where, "native%d" % len(libraries)),
-                                                    tree if os.path.exists(os.path.join(tree, "runtime", "kas3.h")) else COMPILER)
+            libraries[which], why = program_library(kas3c, os.path.join(made, "native%d" % len(libraries)),
+                                                    tree if os.path.exists(os.path.join(tree, "runtime", "kas3.h")) else COMPILER,
+                                                    "--per-class" not in arguments)
             if why:
                 print("languages: no AS3 native column for %s (%s)" % (which, why))
-        for _ in range(runs):
+        for _ in range(0 if "--no-workloads" in arguments else runs):
             for which, program in builds:
                 for key, micros in run_once(program).items():
                     best[which][key] = min(micros, best[which].get(key, micros))
@@ -282,11 +353,10 @@ def main():
                         if language == "as":
                             key = (workload, NATIVE[0])
                             best[which][key] = min(micros, best[which].get(key, micros))
-        agree = True
-        for which, program in builds:
-            table(which, best[which])
-            if "--no-frames" not in arguments:
-                agree = frames(which, program, libraries[which], runs) and agree
+        for which, _program in builds:
+            if "--no-workloads" not in arguments:
+                table(which, best[which])
+        agree = "--no-frames" in arguments or frames([(which, program, libraries[which]) for which, program in builds], runs, chosen)
         if not agree:
             sys.exit("languages: the languages do not end with the same checksums")
 

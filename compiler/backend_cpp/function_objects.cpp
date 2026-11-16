@@ -20,6 +20,48 @@ std::string global(uint32_t p_global, Kind p_kind) {
 
 } // namespace
 
+void FunctionWriter::find_still() {
+	std::vector<bool> counts_nothing = lent_;
+	for (uint32_t i = 0; i < counts_nothing.size(); i++) {
+		counts_nothing[i] = counts_nothing[i] || borrowed_[i] != NONE;
+	}
+	std::vector<uint32_t> read, written;
+	for (const Instruction &in : function_.code) {
+		if (in.op == Op::Call || may_run_code(module_, function_, in, counts_nothing)) {
+			return; // Something in it may run code, and code may write any static field.
+		}
+		if (in.op == Op::GetGlobal && !ir::is_held(kind(in.a))) {
+			read.push_back(in.b);
+		} else if (in.op == Op::SetGlobal) {
+			written.push_back(in.a);
+		}
+	}
+	std::sort(read.begin(), read.end());
+	read.erase(std::unique(read.begin(), read.end()), read.end());
+	for (const uint32_t each : read) {
+		if (std::find(written.begin(), written.end(), each) == written.end()) {
+			still_.push_back(each);
+		}
+	}
+}
+
+void FunctionWriter::read_global(const Instruction &p_in) {
+	if (std::binary_search(still_.begin(), still_.end(), p_in.b)) {
+		line(reg(p_in.a) + " = g" + std::to_string(p_in.b) + ";");
+	} else {
+		share(p_in.a, global(p_in.b, kind(p_in.a)));
+	}
+}
+
+std::string FunctionWriter::still_declared() const {
+	std::string out;
+	for (const uint32_t each : still_) {
+		const Kind held = module_.globals[each].kind;
+		out += "\tconst " + std::string(type_of(held)) + " g" + std::to_string(each) + " = " + global(each, held) + ";\n";
+	}
+	return out;
+}
+
 bool FunctionWriter::object(const Instruction &p_in) {
 	// A field of the method's own object is read through the class's struct; any other object's class is
 	// not known here, and its field is reached by its number.
@@ -55,7 +97,7 @@ bool FunctionWriter::object(const Instruction &p_in) {
 			}
 			return true;
 		case Op::GetGlobal:
-			share(p_in.a, global(p_in.b, kind(p_in.a)));
+			read_global(p_in);
 			return true;
 		case Op::SetGlobal:
 			if (ir::is_held(kind(p_in.b))) {

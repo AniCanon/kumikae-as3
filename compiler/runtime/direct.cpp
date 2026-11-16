@@ -149,6 +149,10 @@ bool is_regexp(const Context *c, Slot p_any) {
 
 } // namespace
 
+void settle_direct(Context *c, uint32_t p_carries) {
+	settle(c, p_carries);
+}
+
 std::unique_ptr<vm::Runner> runner_for(Context *c) {
 	return std::make_unique<Asked>(c);
 }

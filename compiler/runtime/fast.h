@@ -6,6 +6,8 @@
 #include "program.h"
 #include "values.h"
 
+#include <limits>
+
 namespace kas3 {
 namespace rt {
 
@@ -24,6 +26,26 @@ inline Slot *element(Object *p_vector, uint32_t p_index) {
 // the caller's. Null for a class whose objects are more than fields (a vector, a table, one that extends one
 // of Godot's: the library makes those), and when there is no memory.
 //     Object *new_object(Context *c, uint32_t p_class);
+
+// The same from the host's cache, where the class's objects are kept there and one is: its fields are
+// numbers and Booleans only, each as an object's is before its constructor runs.
+inline Object *made_object(Context *c, uint32_t p_class) {
+	const uint32_t size = c->class_cached[p_class];
+	Object *const found = size ? c->cache->spare[size] : nullptr;
+	if (KAS3_UNLIKELY(!found)) {
+		return new_object(c, p_class);
+	}
+	c->cache->spare[size] = found->gc_next;
+	c->cache->count[size]--;
+	found->references = 1;
+	found->klass = p_class;
+	found->gc_next = nullptr;
+	const uint32_t numbers = c->class_numbers[p_class];
+	for (uint32_t i = 0; i + 1 < size; i++) {
+		found->fields()[i] = (numbers >> i) & 1 ? slot(std::numeric_limits<double>::quiet_NaN()) : empty();
+	}
+	return found;
+}
 
 // The element VecSet writes: one there already is, or the one just past the end of a vector that may grow,
 // which is added (empty). Nothing for any other index, a fixed vector or no memory.

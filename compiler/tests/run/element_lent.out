@@ -1,0 +1,7 @@
+15 175 7.5
+c2 c5 c4true
+null: Error #1009: Cannot access a property or method of a null object reference.
+past: Error #1125: The index 9 is out of range 6.
+c13new100 147 c5
+c0 3 0
+0.5

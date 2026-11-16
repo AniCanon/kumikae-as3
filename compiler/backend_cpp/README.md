@@ -6,7 +6,8 @@ class with code of its own, `program.h` (each class as a struct, every function 
 in [`runtime/`](../runtime/README.md), and says exactly what the interpreter does: `tests/run_native.py`
 holds every program of `tests/run/` to the same output under both.
 
-`kas3c cpp <file>... -o <folder>` is the command.
+`kas3c cpp <file>... -o <folder>` is the command. With `--unit` (`Options::one_unit`) every class's code
+goes into `program.cpp` too: one file for the C++ compiler, which a release is built from.
 
 | Files | Job |
 |---|---|
@@ -22,7 +23,7 @@ holds every program of `tests/run/` to the same output under both.
 | `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, Strings, untyped values, properties under a String key, a call through a function value |
 | `function_library.cpp` | An instruction one of the library's functions of plain values carries out whole (`ir/library_entries.h`): the runtime's function of that name called on the instruction's values, where a thunk would have been |
 | `function_engine.cpp` | What asks Godot, where generated code does it itself: which values are held inline, the maths the runtime has for `Vector2` and `Vector3`, a property or a method of a Godot object called on bare values by its method bind, the script's own Godot object and singletons borrowed for the whole function |
-| `function_borrowed.cpp` | A field of `this` that holds an object, read into a register only to be used at once: the register counts no reference |
+| `function_borrowed.cpp` | A field of `this` that holds an object, read into a register only to be used at once: the register counts no reference. An object read out of a vector into a variable, in a function that lets go of nothing: the variable counts none either |
 | `function_loops.cpp` | A loop over vectors of numbers written twice: first with each vector's length and elements in locals, which an index out of range leaves for the loop as it always was |
 | `function_values.cpp` | Godot's value types with parts: made from their parts and their members read where they are, and Godot's own code for the type (an operator, a method, a part, a constant) found once by the host and called on bare values |
 | `function_whole.cpp` | A sum of ints or uints converted back to one, as 32-bit arithmetic (exact, and three times as fast on `loop.as`), and two such sums compared as the integers they are |
@@ -61,6 +62,17 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   first copy (labels `V`) has each vector's length and elements in locals and holds an index against the
   local; an index not below it goes to the same instruction of the second copy (labels `S`), the loop as
   it would be alone, which makes the vector longer or raises the error (`tests/run/vector_loops.as`).
+- A variable given an element of a vector (`var b:Body = bodies[i]`), or a copy of such a variable, counts
+  no reference where the whole function lets go of nothing and runs no code that might: no call, nothing
+  stored where an object is held, no register that owns an object written (`lent_`, rule 2 of the
+  translation rules; `tests/run/element_lent.as`). The vector holds the object all the while. Anywhere else
+  the variable counts one, as before.
+- `new` of a class takes a block the host kept when one such object was let go of, inline, where the
+  class's objects are kept (`made_object`, `runtime/README.md`).
+- A static field of a number or a Boolean that a function reads and never writes is a local (`g4`), read once
+  as the function begins, where nothing in the function runs code that could write one (no call, no first
+  use of a class, nothing let go of): rule 12, for statics (`tests/run/static_still.as`).
+- `Math.sqrt`, `abs`, `floor` and `ceil` are the machine's own: IEEE 754 gives them one answer.
 - A null check is explicit, and left out on `this`.
 - `#line` markers point at the `.as` source.
 

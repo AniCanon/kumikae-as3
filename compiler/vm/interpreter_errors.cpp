@@ -236,6 +236,15 @@ bool Interpreter::take_carried(NativeError *r_error) {
 	return true;
 }
 
+void Interpreter::report_native(NativeError p_error) {
+	pending_ = p_error.error;
+	failing_ = true;
+	trace_ = std::move(p_error.trace);
+	trace_lines_ = p_error.lines;
+	thrown_at_ = Site{ std::move(p_error.function), std::move(p_error.file), p_error.line };
+	report();
+}
+
 void Interpreter::report_carried() {
 	const Slot error = pending_;
 	const bool failing = failing_;

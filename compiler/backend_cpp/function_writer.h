@@ -94,6 +94,17 @@ class FunctionWriter {
 	// counts no reference of its own), or NONE.
 	std::vector<uint32_t> borrowed_;
 	void find_borrowed();
+	// Per register: it holds an object read out of a vector (or copied from such a register) in a function
+	// where nothing can take the object out of the vector: it counts no reference of its own (rule 2).
+	std::vector<bool> lent_;
+	std::vector<bool> lent_candidates() const;
+	// The static fields of numbers and Booleans that are locals for the whole function (`g4`), each read
+	// once as it begins: those it reads and never writes, where nothing in it runs code that could write
+	// one (rule 12, for statics). Sorted.
+	std::vector<uint32_t> still_;
+	void find_still();
+	void read_global(const ir::Instruction &p_in);
+	std::string still_declared() const;
 	// GetField written: from the local a kept field is in, with no reference counted into a register that
 	// borrows, or as any other read.
 	void read_field(const ir::Instruction &p_in, const std::string &p_field);

@@ -20,7 +20,7 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 	}
 	switch (p_in.op) {
 		case Op::New:
-			line("if (Object *const e = new_object(c, " + std::to_string(p_in.b) + ")) {");
+			line("if (Object *const e = made_object(c, " + std::to_string(p_in.b) + ")) {");
 			put(p_in.a, "e");
 			break;
 		case Op::VecLength:

@@ -18,6 +18,7 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `errors.cpp` | Raising, catching, the stack trace, the report of an error nothing caught |
 | `direct.h`, `direct.cpp` | The library's functions of plain values (`vm/library.h`) called with no thunk: one entry for each name `ir/library_entries.h` gives an instruction, and what those functions ask of whoever runs the program (`vm::Runner`) answered for generated code: an error raised is the context's at once, a function value and a `toString()` are called as the C++ they are |
 | `calls.cpp`, `properties.cpp` | The fast paths that are not inline: typed and untyped values made of one another, a function value and a `toString()` called with no interpreter between; an Object's property under a String key, an element added at a vector's end |
+| `entry.cpp` | The engine calling a function of the program: the generated function itself, with no interpreter between, where nothing of the interpreter's is in progress (`Host::enter`); an error is reported, or kept for the call of the engine that generated code is making (`call_failed`), as `vm::Interpreter::call()` does for its own |
 | `stub_module.cpp`, `bridge.cpp` | The module the host's interpreter is given (every function's body one `Native` instruction, the thunks after them), and the host's side of that instruction (`vm/native_code.h`) |
 | `standalone.cpp`, `standalone_main.cpp` | A program library run as a plain program, on a thread whose stack holds 10,000 calls of any likely size; `main` |
 
@@ -31,6 +32,11 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
   struct), and a descriptor (`ClassInfo`): name, base, a hash of its layout, each field's name, kind and
   offset, its method table by method number. The host reads descriptors, never C++ types.
 - **Counts** change only in `retain(c, x)` and `release(c, x)` (`values.h`).
+- **Objects of numbers and Booleans** that the collector does not look at are not given back to the heap
+  when generated code lets go of the last reference: `release()` keeps the block on a list for its number of
+  fields (`ObjectCache`, the host's, reached through `c`), and `made_object()` takes the next `new` of such a
+  class from it, inline. A block is the heap's own all the while, so the library and the interpreter free
+  and make such objects as ever; what the cache holds goes back when the host ends.
 - **The depth of calls** is counted (`c->depth`), so that Error #1023 comes at the 10,001st call as it does
   under the interpreter. A generated function's frame is on the thread's stack, though, where the
   interpreter's are on the heap: a function that finds its frame below `c->stack_floor` raises the same
@@ -74,7 +80,10 @@ parts of them a moved function still asks for (`vm::Unmoved`), the host keeps an
 
 What this costs, until the split:
 
-- A thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
+- An instruction that asks the engine is carried out with no frame (`engine_thunk.cpp`): the interpreter's
+  own request on the values handed over, and a function Godot calls back meanwhile is entered as generated
+  code (`entry.cpp`). It still goes by Godot's names and boxed values, which is most of what it costs.
+- Any other thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
   most operations take. `fast.h` exists for that reason, and each family that becomes a function of plain
   values loses its thunks.
 - Where the interpreter itself refuses an entry (the stack nearly used up), it keeps the error

@@ -294,6 +294,13 @@ translate exactly is refused with `kas3c: not yet supported: <what>` and status 
 With `--godot` the files are scripts for Godot, as for `kas3c ir --godot`, and the C++ is the project's
 program library (below).
 
+With `--unit` the whole program is written into `program.cpp` alone (and a class's file left by an earlier
+run is taken away, so that building every `.cpp` of the folder still builds the program once). A release is
+built that way: the C++ compiler sees every function at once, and puts a small one (a constructor, a
+getter) inside what calls it. A file for each class is for the editor, which rebuilds only what an edit
+changed. Both give the same program: the native suite runs with a file for each class in the normal build
+and as one unit in the sanitizer build.
+
 Linked with `libkas3standalone.a` (its `main`), `libkas3runtime.a` and the interpreter's libraries, the C++ is a plain executable that runs the
 program as `kas3c run` does: the same traces, the same report of an error nothing catches, the same exit
 status. That executable is the backend's oracle. `tests/run_native.py` (the `native` test group) takes
@@ -328,11 +335,26 @@ are now (the module's fingerprint, `ir::fingerprint`), the scripts run as native
 says so; if not, a warning says why and the interpreter runs them. Nothing builds it by itself yet:
 
 ```sh
-cd game && kas3c cpp --godot $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
+cd game && kas3c cpp --godot --unit $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
 c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden \
     -I compiler/runtime -I compiler/vm -I compiler/ir -I compiler/src \
     -shared native/*.cpp -o bin/libkas3_program.dylib
 ```
+
+On Linux the same with `-fPIC -Wl,-z,defs -fno-math-errno -o bin/libkas3_program.so` (`-fno-math-errno` is
+what macOS's compiler does by itself: `Math.sqrt` is then the machine's instruction and nothing else). On
+Windows the library is `bin/kas3_program.dll`, loaded by the same code (`godot_ext/shared_library.cpp`); the
+flags below are written from the compilers' documentation and have **not been built or run**:
+
+```sh
+clang-cl /std:c++17 /O2 /GR- /EHs-c- /fp:precise -Xclang -ffp-contract=off -Xclang -fno-unroll-loops /LD native\*.cpp /Fe:bin\kas3_program.dll
+cl /std:c++17 /O2 /GR- /EHs-c- /fp:precise /LD native\*.cpp /Fe:bin\kas3_program.dll
+```
+
+`KAS3_EXPORT` is `__declspec(dllexport)` there, so `kas3_program` is the one symbol shown without a flag.
+MSVC has no switch for either `-ffp-contract=off` (its `/fp:precise` contracts nothing on x64, and may on
+ARM64) or `-fno-unroll-loops`, and the runtime's headers use `__builtin_expect` and
+`__builtin_frame_address`, which MSVC does not have: clang-cl is the compiler to start from.
 
 The files are given in the order the extension reads them (sorted by their place in the project), so that
 both compile the same module. The library shows one symbol, `kas3_program`, includes nothing of Godot's or
@@ -341,7 +363,10 @@ functions in a table (`runtime/api.h`), as it hands it the engine's.
 
 Everything the extension does goes on as before, through an interpreter the runtime's host keeps over the
 same module with each function's body native (`vm/native_code.h`): only what runs when a function is
-called differs. What generated code does with the engine itself, and what it leaves to the library:
+called differs. Godot's own call of a script's function (`_process`, a listener of a signal, a method by
+name) runs the generated function itself, with no frame of that interpreter's, where nothing of the
+interpreter's is in progress; an error is reported, or comes out of the script's call of the engine that
+led there, as the interpreter does it (`runtime/entry.cpp`). What generated code does with the engine itself, and what it leaves to the library:
 
 - A value of one of Godot's types that has parts (`Vector2`, `Vector3`, `Color`, `Rect2`, `Transform3D` and
   the rest of the sixteen) that is never null (what Godot makes, computes or gives for a property) is a

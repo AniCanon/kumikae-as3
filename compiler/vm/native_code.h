@@ -23,6 +23,29 @@ struct NativeError {
 	int32_t line = 0;
 };
 
+// An error the library left on its way out, called by a host with none of the interpreter's code running
+// to carry it: taken over by the host (Interpreter::take_error()). `stopped`: not even the error could be
+// made, and what there was to say has been reported.
+struct LeftError {
+	bool error = false;
+	bool stopped = false;
+	Slot value{};
+};
+
+// What such a host asks of the interpreter besides (vm::Interpreter):
+//
+//   engine_instruction()  One instruction that asks the engine, carried out on registers the host holds,
+//       with no frame: the first instruction of a function of one instruction. What it gives is put into
+//       its register there; an error it raises is the interpreter's (left_error()). The host says that it
+//       is calling (direct_began()), so that an error of a script the engine runs meanwhile comes back to
+//       this call.
+//   idle()  For a host that runs a function of the program itself when the engine calls one, with no frame
+//       of the interpreter's: whether nothing is in progress or held that such a call would have to answer
+//       to (a frame, an error on its way out or carried, a call of the library by the host beyond the
+//       p_direct it answers for itself).
+//   entered(), left()  Such a call is counted with the interpreter's own calls from outside, and starts
+//       the same clock.
+//   report_native()  An error of it that nothing takes is reported as one of the interpreter's own is.
 struct NativeCode {
 	virtual ~NativeCode() {}
 	// After run_native() gave false: the error that is on its way out of native code, if the interpreter

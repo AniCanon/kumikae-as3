@@ -1,0 +1,18 @@
+# What each frame benchmark, as native code, leaves to the library in its start and three frames
+# (native_godot.py): thunks, and the places the whole program asks Godot that the host could not work out.
+# A frame of Empty, MoveNodes, PerNodeProcess, NBody, Sieve, Saxpy, Shapes and Alloc leaves nothing: what
+# MoveNodes and PerNodeProcess count is their start, three for each of 20,000 nodes made (the node, its
+# place among the children, a Number as Godot's integer) and two. The others still ask in every frame:
+# SignalTraffic an emit for each signal; RayQueries the query, isEmpty and the element for each ray;
+# ArrayConversion the collections handed over. A number that grows is a fast path lost.
+Empty: thunks=0 unresolved=8
+MoveNodes: thunks=60000 unresolved=8
+PerNodeProcess: thunks=40000 unresolved=8
+RayQueries: thunks=18068 unresolved=8
+SignalTraffic: thunks=60004 unresolved=8
+NBody: thunks=0 unresolved=8
+Sieve: thunks=0 unresolved=8
+ArrayConversion: thunks=244 unresolved=8
+Saxpy: thunks=0 unresolved=8
+Shapes: thunks=0 unresolved=8
+Alloc: thunks=0 unresolved=8

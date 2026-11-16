@@ -446,18 +446,44 @@ Outcome perform(Request &p_request) {
 // One request to the engine. Raises an AS3 error if the engine refuses.
 void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	const size_t frame_index = frames_.size() - 1;
+	EngineAnswer asked;
+	if (!ask_engine(p_function, p_in, stack_.data() + frames_.back().base, &asked)) {
+		return;
+	}
+	// The frame is found again by its number: the engine may have called back in and moved the stack.
+	if (asked.target != NONE && frame_index < frames_.size()) {
+		settle_asked(asked, stack_[frames_[frame_index].base + asked.target]);
+	}
+}
+
+void Interpreter::engine_instruction(uint32_t p_function, Slot *p_registers) {
+	const Function &function = module_.functions[p_function];
+	EngineAnswer asked;
+	if (ask_engine(function, function.code[0], p_registers, &asked) && asked.target != NONE) {
+		settle_asked(asked, p_registers[asked.target]);
+	}
+}
+
+void Interpreter::settle_asked(const EngineAnswer &p_asked, Slot &r_target) {
+	// The engine wrote the result into the handle the register holds (Wanted::reuse): it stays.
+	if (!(ir::is_engine(p_asked.kind) && p_asked.result.p && p_asked.result.p == r_target.p)) {
+		put(p_asked.kind, r_target, p_asked.result);
+	}
+}
+
+bool Interpreter::ask_engine(const Function &p_function, const Instruction &p_in, Slot *p_registers, EngineAnswer *r_asked) {
 	EngineStep step;
 	if (const size_t f = (size_t)(&p_function - module_.functions.data()); !prepared_[f].empty()) {
 		step = prepared_[f][(size_t)(&p_in - p_function.code.data())];
 	}
 	// Only an untyped operand can hold what Godot can't take; a prepared instruction knows whether it has one.
 	if (!step.prepared || step.untyped) {
-		if (const std::optional<std::string> why = refused_by_godot(p_function, p_in, stack_.data() + frames_.back().base)) {
+		if (const std::optional<std::string> why = refused_by_godot(p_function, p_in, p_registers)) {
 			raise(module_.type_error_class, *why);
-			return;
+			return false;
 		}
 	}
-	Request request(module_, host_, p_function, p_in, stack_.data() + frames_.back().base, null_text_);
+	Request request(module_, host_, p_function, p_in, p_registers, null_text_);
 	request.operators = &operators_;
 	request.prepared = step.prepared;
 	if (p_in.op == Op::HostSingleton) {
@@ -472,7 +498,7 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	switch (outcome) {
 		case Outcome::Missing:
 			raise_null();
-			return;
+			return false;
 		case Outcome::Refused: {
 			// The engine's side may say that an error is AS3's TypeError: see engine_handles.h.
 			static const std::string_view type_error = "TypeError: ";
@@ -484,19 +510,13 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 			} else {
 				raise(module_.error_class, request.error.empty() ? "the engine refused" : request.error);
 			}
-			return;
+			return false;
 		}
 		case Outcome::Done:
 			break;
 	}
-	// The frame is found again by its number: the engine may have called back in and moved the stack.
-	if (request.target != NONE && frame_index < frames_.size()) {
-		Slot &target = stack_[frames_[frame_index].base + request.target];
-		// The engine wrote the result into the handle the register holds (Wanted::reuse): it stays.
-		if (!(ir::is_engine(request.kind) && request.result.p && request.result.p == target.p)) {
-			put(request.kind, target, request.result);
-		}
-	}
+	*r_asked = EngineAnswer{ request.target, request.kind, request.result };
+	return true;
 }
 
 } // namespace vm

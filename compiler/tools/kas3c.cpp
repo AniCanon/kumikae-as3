@@ -25,7 +25,7 @@ static const char *const USAGE =
 		"       kas3c check [--dump-names] [--dump-types] [--no-godot] [--declarations <file>]... <file>...\n"
 		"       kas3c run <file>...\n"
 		"       kas3c ir [--godot] <file>...\n"
-		"       kas3c cpp [--godot] <file>... -o <folder>\n"
+		"       kas3c cpp [--godot] [--unit] <file>... -o <folder>\n"
 		"       kas3c lsp [--stdio] [--no-godot] [--declarations <file>]...\n"
 		"       kas3c --version\n"
 		"       kas3c --help\n"
@@ -57,6 +57,8 @@ static const char *const USAGE =
 		"       refused with `not yet supported: <operation>`, and nothing is written.\n"
 		"       --godot  the files are scripts for Godot, as for `ir`: the C++ is built into\n"
 		"                the project's program library, which the Godot extension loads\n"
+		"       --unit   the whole program in program.cpp alone: what a release is built\n"
+		"                from, since the C++ compiler then sees every function at once\n"
 		"\n"
 		"lsp    Serve an editor over standard input and output with the Language Server\n"
 		"       Protocol: errors as you type, go to definition, find references, hover,\n"
@@ -280,12 +282,15 @@ static int run_cpp(int p_argc, char **p_argv) {
 	// compile() takes the files alone: `-o <folder>` is taken out first, wherever it is written.
 	std::vector<char *> rest(p_argv, p_argv + std::min(p_argc, 2));
 	const char *folder = nullptr;
+	kas3::backend_cpp::Options options;
 	for (int i = 2; i < p_argc; i++) {
 		if (std::strcmp(p_argv[i], "-o") == 0) {
 			if (folder || i + 1 >= p_argc) {
 				return usage_error();
 			}
 			folder = p_argv[++i];
+		} else if (std::strcmp(p_argv[i], "--unit") == 0) {
+			options.one_unit = true;
 		} else {
 			rest.push_back(p_argv[i]);
 		}
@@ -298,7 +303,7 @@ static int run_cpp(int p_argc, char **p_argv) {
 	if (!compile(static_cast<int>(rest.size()), rest.data(), &module, &status, true)) {
 		return status;
 	}
-	const kas3::backend_cpp::Generated generated = kas3::backend_cpp::generate(module);
+	const kas3::backend_cpp::Generated generated = kas3::backend_cpp::generate(module, options);
 	if (!generated.unsupported.empty()) {
 		std::fprintf(stderr, "kas3c: not yet supported: %s\n", generated.unsupported.c_str());
 		return 1;
@@ -310,6 +315,9 @@ static int run_cpp(int p_argc, char **p_argv) {
 			std::fprintf(stderr, "kas3c: cannot write %s in %s\n", file.name.c_str(), folder);
 			return 2;
 		}
+	}
+	for (const std::string &name : generated.not_written) {
+		std::filesystem::remove(std::filesystem::path(folder) / name, failed);
 	}
 	return 0;
 }
