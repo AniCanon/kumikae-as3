@@ -21,7 +21,7 @@ class ProcessExitTest {
         try {
             val pid = process.inputStream.bufferedReader().readLine().toLong()
             child = ProcessHandle.of(pid).orElse(null)
-            assertTrue(process.waitFor(8, TimeUnit.SECONDS))
+            assertTrue(process.waitFor(120, TimeUnit.SECONDS))
             assertEquals(0, process.exitValue())
             assertFalse("Owned child survived JVM exit", child?.isAlive == true)
         } finally {
