@@ -42,7 +42,7 @@ bool FunctionWriter::object(const Instruction &p_in) {
 			return true;
 		case Op::GetField:
 			null_check(p_in.b);
-			share(p_in.a, kept_local(p_in.b, p_in.c).value_or(field(p_in.b, p_in.c, kind(p_in.a))));
+			read_field(p_in, field(p_in.b, p_in.c, kind(p_in.a)));
 			return true;
 		case Op::SetField:
 			null_check(p_in.a);

@@ -51,7 +51,7 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 	std::set<uint32_t> vectors;
 	for (uint32_t pc = p_from; pc <= p_to; pc++) {
 		const Instruction &in = function_.code[pc];
-		if (may_run_code(module_, function_, in)) {
+		if (runs_code(in)) {
 			return {};
 		}
 		if (in.op == Op::Call && (facts_->functions[in.b].opaque || facts_->functions[in.b].stores_elements)) {
@@ -74,8 +74,17 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 	for (uint32_t pc = p_from; pc <= p_to; pc++) {
 		const Instruction &in = function_.code[pc];
 		const char first = ir::op_shape(in.op)[0];
-		if ((first == 'R' || first == 'r') && in.a != NONE && !first_is_read(in.op) && vectors.count(in.a)) {
+		// A register that borrows a field of `this` is read from it again each time round: the same vector,
+		// as long as nothing in the loop writes that field.
+		const bool written = (first == 'R' || first == 'r') && in.a != NONE && !first_is_read(in.op) && vectors.count(in.a);
+		if (written && borrowed_[in.a] == NONE) {
 			return {};
+		}
+		for (uint32_t each : vectors) {
+			const uint32_t slot = borrowed_[each];
+			if (slot != NONE && ((in.op == Op::SetField && in.b == slot) || (in.op == Op::Call && facts_->functions[in.b].writes.count(slot)))) {
+				return {};
+			}
 		}
 	}
 	if (vectors.size() > MOST_VECTORS) {
@@ -176,9 +185,10 @@ std::string FunctionWriter::fast_copy(const Twice &p_loop, const std::vector<boo
 	std::string locals;
 	for (uint32_t each : p_loop.vectors) {
 		const std::string number = std::to_string(each);
-		missing += (missing.empty() ? "!" : " || !") + register_name(each);
-		locals += "\td" + number + " = static_cast<Vector *>(" + register_name(each) + ")->data;\n\tn" + number + " = static_cast<Vector *>(" +
-				register_name(each) + ")->length;\n";
+		// A register that borrows a field may not have been read into yet: the field itself is what it will hold.
+		const std::string held = borrowed_[each] != NONE ? own_field(borrowed_[each]) : register_name(each);
+		missing += (missing.empty() ? "!" : " || !") + held;
+		locals += "\td" + number + " = static_cast<Vector *>(" + held + ")->data;\n\tn" + number + " = static_cast<Vector *>(" + held + ")->length;\n";
 	}
 	std::string out = "\tif (KAS3_UNLIKELY(" + missing + ")) goto L" + std::to_string(p_loop.from) + ";\n" + locals;
 	const uint32_t resume = pc_;

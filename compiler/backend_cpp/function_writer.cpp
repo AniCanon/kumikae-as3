@@ -59,9 +59,11 @@ void FunctionWriter::analyse() {
 		written_[handler.reg] = true;
 	}
 	shadow_.assign(function_.registers.size(), std::string());
+	borrowed_.assign(function_.registers.size(), NONE);
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();
+	find_borrowed();
 	find_kept();
 	find_last_uses();
 	find_twice();
@@ -76,7 +78,7 @@ std::string FunctionWriter::reg(uint32_t p_register) const {
 }
 
 bool FunctionWriter::owns(uint32_t p_register) const {
-	return ir::is_held(kind(p_register)) && parts(p_register).empty() && alias_[p_register] == Alias::None &&
+	return ir::is_held(kind(p_register)) && parts(p_register).empty() && alias_[p_register] == Alias::None && borrowed_[p_register] == NONE &&
 			(p_register >= function_.parameters || written_[p_register]);
 }
 

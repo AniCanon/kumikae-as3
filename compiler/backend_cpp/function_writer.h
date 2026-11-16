@@ -90,6 +90,15 @@ class FunctionWriter {
 	// read again after one that may change them. For NONE, all of them (the function's end, a handler).
 	std::string kept_written_back(uint32_t p_pc) const;
 	std::string kept_read_again(uint32_t p_pc) const;
+	// function_borrowed.cpp. Per register: the slot of the field of `this` it is read from and borrows (it
+	// counts no reference of its own), or NONE.
+	std::vector<uint32_t> borrowed_;
+	void find_borrowed();
+	// GetField written: from the local a kept field is in, with no reference counted into a register that
+	// borrows, or as any other read.
+	void read_field(const ir::Instruction &p_in, const std::string &p_field);
+	// may_run_code(), but that a field read into a register that borrows lets go of nothing.
+	bool runs_code(const ir::Instruction &p_in) const;
 	// Per instruction: it copies a register that nothing reads afterwards, so the reference is handed over
 	// and not shared (a Move, or a field or static field set).
 	std::vector<bool> hands_over_;

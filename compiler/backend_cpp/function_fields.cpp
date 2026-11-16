@@ -37,7 +37,7 @@ uint32_t own_slot(const Instruction &p_in) {
 
 FunctionWriter::Touch FunctionWriter::touch(uint32_t p_pc, uint32_t p_slot) const {
 	const Instruction &in = function_.code[p_pc];
-	if (may_run_code(module_, function_, in)) {
+	if (runs_code(in)) {
 		return Touch::Writes;
 	}
 	if (in.op == Op::Call) {
