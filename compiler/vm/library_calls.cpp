@@ -125,8 +125,9 @@ bool LibraryCall::converted(const Taken *p_fixed, Takes p_takes, size_t p_index,
 	const bool left_out = p_index >= given_.size();
 	const Slot given = left_out ? any::undefined() : given_[p_index];
 	const bool text = p_takes == Takes::Text || p_takes == Takes::Words;
-	if (text && !method_.text_left_out.empty() && (left_out || any::tag(given) == AnyTag::Undefined)) {
-		r_value->p = vm_.text(std::string(method_.text_left_out)); // Undefined is the default, as for one left out.
+	if (text && !method_.text_left_out.empty() && left_out) {
+		// Only one left out: undefined given is null, as a store into a String makes it (avmplus's coerce_s).
+		r_value->p = vm_.text(std::string(method_.text_left_out));
 		return r_value->p != nullptr;
 	}
 	if (left_out && p_takes == Takes::Any) {

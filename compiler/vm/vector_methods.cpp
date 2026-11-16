@@ -91,7 +91,13 @@ void vector_join(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	const bool locale = p_call.method == VectorMethod::LocaleText;
 	const bool joined = p_call.method == VectorMethod::Join;
 	const Str *separator = joined ? static_cast<const Str *>(p_call.values[1].p) : nullptr;
-	const std::string between(!joined ? std::string_view(",") : separator ? separator->view() : std::string_view("null"));
+	std::string between(!joined ? std::string_view(",") : separator ? separator->view() : std::string_view("null"));
+	if (p_call.method == VectorMethod::JoinAny && any::tag(p_call.values[1]) != AnyTag::Undefined) {
+		between.clear();
+		if (!p_library.runner.text(p_call.values[1], &between)) {
+			return;
+		}
+	}
 	std::string all;
 	retain(p_vector); // Kept while its elements speak for themselves, which may run the program.
 	const bool done = p_library.unmoved.vector_text(p_vector, between, &all, locale);
@@ -296,6 +302,7 @@ bool vector_call(Library &p_library, VectorMethod p_method, const Slot *p_values
 			vector_copy(p_library, vector, call);
 			break;
 		case VectorMethod::Join:
+		case VectorMethod::JoinAny:
 		case VectorMethod::LocaleText:
 		case VectorMethod::Text:
 			vector_join(p_library, vector, call);

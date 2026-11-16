@@ -123,6 +123,8 @@ uint32_t Vectors::vector_call(Call *p_call) {
 		const uint32_t filled = l_.reg(fixed[i]);
 		if (fixed[i] == Kind::Str) {
 			l_.emit(Op::ConstStr, position, filled, l_.string(std::string(row->text_left_out)));
+		} else if (fixed[i] == Kind::Any) {
+			l_.emit(Op::AnyConst, position, filled, static_cast<uint32_t>(*left_out[i]));
 		} else {
 			l_.emit(fixed[i] == Kind::U32 ? Op::ConstU32 : Op::ConstI32, position, filled, static_cast<uint32_t>(*left_out[i]));
 		}

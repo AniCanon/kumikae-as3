@@ -79,7 +79,7 @@ constexpr uint8_t each_code(EachMethod p_method) {
 	return static_cast<uint8_t>(p_method);
 }
 
-inline constexpr std::array<LibraryMethod, 44> LIBRARY_METHODS = { {
+inline constexpr std::array<LibraryMethod, 45> LIBRARY_METHODS = { {
 		{ "charAt", ON_TEXT, Does::StrCall, text_code(StringFunction::CharAt), { or_else(Takes::Number) }, Takes::Nothing, Takes::Text },
 		{ "charCodeAt", ON_TEXT, Does::StrCall, text_code(StringFunction::CharCodeAt), { or_else(Takes::Number) }, Takes::Nothing, Takes::Number },
 		{ "indexOf", ON_TEXT, Does::StrCall, text_code(StringFunction::IndexOf), { or_else(Takes::Text), or_else(Takes::Number) }, Takes::Nothing,
@@ -119,7 +119,10 @@ inline constexpr std::array<LibraryMethod, 44> LIBRARY_METHODS = { {
 		// An Array's concat takes anything: an Array is spread, the rest added. A Vector's, vectors of its class.
 		{ "concat", ON_ARRAY, Does::VecCall, list_code(VectorMethod::Concat), {}, Takes::Any, Takes::Own },
 		{ "concat", ON_VECTOR, Does::VecCall, list_code(VectorMethod::Concat), {}, Takes::Own, Takes::Own },
-		{ "join", ON_LIST, Does::VecCall, list_code(VectorMethod::Join), { or_else(Takes::Words) }, Takes::Nothing, Takes::Text, "," },
+		// Array.as: `join(sep=void 0)`, with `(sep === undefined) ? "," : String(sep)`. VectorImpl.as:
+		// `join(separator:String=",")`, where undefined given is null as for any String parameter.
+		{ "join", ON_ARRAY, Does::VecCall, list_code(VectorMethod::JoinAny), { or_else(Takes::Any) }, Takes::Nothing, Takes::Text },
+		{ "join", ON_VECTOR, Does::VecCall, list_code(VectorMethod::Join), { or_else(Takes::Text) }, Takes::Nothing, Takes::Text, "," },
 		// An Array's toString() takes nothing (Array.as: `prototype.toString = function():String`, which is
 		// held to its count); a Vector's ignores what it is given (VectorImpl.as: `prototype.toString =
 		// function()`, with no type in it, which avmplus leaves unchecked).
