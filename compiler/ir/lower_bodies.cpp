@@ -85,7 +85,7 @@ void Bodies::end(uint32_t p_position) {
 		l_.emit(Op::ReturnVoid, p_position);
 	} else {
 		// Falling off the end gives the type's default value.
-		l_.emit(Op::Return, p_position, l_.fn().result == Kind::Any ? l_.empty_untyped(l_.result_type_, p_position) : l_.default_value(l_.fn().result, p_position));
+		l_.emit(Op::Return, p_position, l_.fn().result == Kind::Any ? l_.empty_untyped(l_.result_type_, p_position) : l_.default_value(l_.fn().result, p_position, l_.result_type_));
 	}
 }
 
@@ -127,7 +127,7 @@ uint32_t Bodies::own_signal(std::string_view p_name, uint32_t p_position) {
 	l_.emit(Op::OwnerOf, p_position, owner, l_.self(p_position, true));
 	const uint32_t name = l_.reg(Kind::Str);
 	l_.emit(Op::ConstStr, p_position, name, l_.string(std::string(p_name)));
-	const uint32_t out = l_.reg(Kind::Val);
+	const uint32_t out = l_.engine_reg(Kind::Val, l_.module_.engine_names[type_name].name);
 	l_.emit(Op::HostNew, p_position, out, type_name, l_.arguments({ owner, name }));
 	return out;
 }

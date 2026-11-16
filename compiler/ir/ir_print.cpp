@@ -138,6 +138,18 @@ std::string print(const Module &p_module, const Function &p_function) {
 		out += (i ? ", r" : "r") + std::to_string(i) + ":" + kind_name(p_function.registers[i]);
 	}
 	out += std::string("):") + kind_name(p_function.result) + "\n";
+	// Godot's type of each register that holds one of its values ("?" where none is known), and of each
+	// one that holds one of its objects where the class is known.
+	std::string godot;
+	for (size_t i = 0; i < p_function.registers.size(); i++) {
+		const std::string *type = i < p_function.engine_types.size() && !p_function.engine_types[i].empty() ? &p_function.engine_types[i] : nullptr;
+		if (p_function.registers[i] == Kind::Val || (p_function.registers[i] == Kind::Ref && type)) {
+			godot += " r" + std::to_string(i) + ":" + (type ? *type : "?");
+		}
+	}
+	if (!godot.empty()) {
+		out += "  godot" + godot + "\n";
+	}
 	for (size_t i = 0; i < p_function.code.size(); i++) {
 		const Instruction &instruction = p_function.code[i];
 		if (instruction.op == Op::Stmt) {

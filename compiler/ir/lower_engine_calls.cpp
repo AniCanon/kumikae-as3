@@ -109,7 +109,7 @@ uint32_t EngineCalls::bound_method(Expr *p_expression) {
 		// Any other function value (a function expression, a static method, one held in a variable): a
 		// Godot Callable that calls it.
 		const uint32_t value = l_.expression(p_expression, Kind::Obj);
-		uint32_t out = l_.reg(Kind::Val);
+		uint32_t out = l_.engine_reg(Kind::Val, "Callable");
 		l_.emit(Op::FunctionToCallable, position, out, value);
 		return out;
 	}
@@ -135,7 +135,7 @@ uint32_t EngineCalls::bound_method(Expr *p_expression) {
 		object = l_.self(position);
 	}
 	bool exact = (symbol->modifiers & Modifiers::Private) != 0;
-	uint32_t out = l_.reg(Kind::Val);
+	uint32_t out = l_.engine_reg(Kind::Val, "Callable");
 	l_.emit(Op::HostBind, position, out, object, exact ? function->second : (l_.slots_[function->first] | ir::BIND_SLOT));
 	return out;
 }
@@ -167,12 +167,7 @@ uint32_t EngineCalls::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t
 	*r_object = l_.settled(object_reg, index->index, p_expression->offset);
 	*r_object = l_.settled(*r_object, p_later, p_expression->offset);
 	*r_name = l_.settled(l_.expression(index->index, Kind::Str), p_later, p_expression->offset);
-	uint32_t out = l_.reg(Kind::Val);
-	if (l_.fn().engine_types.size() <= out) {
-		l_.fn().engine_types.resize(out + 1);
-	}
-	l_.fn().engine_types[out] = "Signal";
-	return out;
+	return l_.engine_reg(Kind::Val, "Signal");
 }
 
 uint32_t EngineCalls::godot_default_argument(Expr *p_argument, const Type *p_type, uint32_t p_default) {

@@ -119,6 +119,7 @@ auto Vectors::vector_place(Expr *p_target, Expr *p_later) -> std::optional<Place
 	if (p_target->kind == NodeKind::Index && l_.is_vector(static_cast<Index *>(p_target)->object->type)) {
 		object = static_cast<Index *>(p_target)->object;
 		place.where = Place::Element;
+		place.type = p_target->type;
 		if (!l_.kind_of(p_target->type, &place.kind) || place.kind == Kind::Void) {
 			l_.refuse(p_target->offset, "an element of type '" + l_.compilation_.type_name(p_target->type) + "'");
 			return Place();
@@ -237,7 +238,7 @@ void Vectors::engine_loop(ForIn *p_loop) {
 		l_.refuse(position, "this loop variable");
 		return;
 	}
-	const uint32_t collection = l_.reg(Kind::Val);
+	const uint32_t collection = l_.engine_reg(Kind::Val, whole);
 	l_.emit(Op::Move, position, collection, l_.expression(p_loop->collection, Kind::Val));
 	const uint32_t at = l_.reg(Kind::I64);
 	l_.emit(Op::ConstI64, position, at, l_.wide(0));
@@ -282,7 +283,7 @@ auto Vectors::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::opti
 		l_.refuse(position, "passing a Vector where '" + l_.compilation_.type_name(p_wanted) + "' is expected");
 		return l_.default_value(Kind::Val, position);
 	}
-	const uint32_t out = named ? l_.engine_reg(Kind::Val, p_wanted) : l_.reg(Kind::Val);
+	const uint32_t out = named ? l_.engine_reg(Kind::Val, p_wanted) : l_.engine_reg(Kind::Val, "Array");
 	l_.emit(Op::HostCollection, position, out, l_.expression(p_value, Kind::Obj), *wanted);
 	return out;
 }

@@ -60,7 +60,8 @@ struct Request {
 		Wanted want;
 		if (target != NONE) {
 			want.kind = function.registers[target];
-			if (target < function.engine_types.size()) {
+			// "Variant" is any of Godot's values: no one type is asked for.
+			if (target < function.engine_types.size() && function.engine_types[target] != ir::ANY_GODOT_TYPE) {
 				want.type = function.engine_types[target];
 			}
 		}

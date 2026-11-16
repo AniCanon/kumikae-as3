@@ -27,7 +27,7 @@ struct Place {
 	uint32_t object = 0; // For FieldOf and Engine: the register holding the object.
 	Kind kind = Kind::F64;
 	bool of_value = false; // For Engine: a member of a value type, which is a copy.
-	const Type *type = nullptr; // For Engine: what the member is declared to be.
+	const Type *type = nullptr; // What the member, field, global or element is declared to be, where it is known.
 	uint32_t key = NONE; // For Engine: the place is an element (`value[key]`); the register holding the key.
 	bool constant = false; // One of Godot's constants: read from a register, and never written.
 	// For Engine: the script object whose Godot object `object` is, fetched when the place is read or

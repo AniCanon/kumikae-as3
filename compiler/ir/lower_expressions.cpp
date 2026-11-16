@@ -137,7 +137,7 @@ uint32_t Expressions::new_value(Expr *p_expression) {
 				}
 			}
 		}
-		uint32_t value = l_.reg(Kind::Val);
+		uint32_t value = l_.engine_reg(Kind::Val, l_.module_.engine_names[type_name].name);
 		l_.emit(Op::HostNew, position, value, type_name, l_.arguments(std::move(list)));
 		return value;
 	}
@@ -215,7 +215,7 @@ uint32_t Expressions::conditional(Expr *p_expression, Kind p_want) {
 	uint32_t position = p_expression->offset;
 	Conditional *conditional = static_cast<Conditional *>(p_expression);
 	Kind kind = p_want != Kind::Void ? p_want : l_.natural(p_expression);
-	uint32_t out = l_.reg(kind);
+	uint32_t out = l_.engine_reg(kind, p_expression->type);
 	uint32_t test = l_.expression(conditional->condition, Kind::Bool);
 	uint32_t to_else = l_.emit(Op::JumpIfNot, position, test, 0);
 	uint32_t then_value = l_.expression(conditional->then_value, kind);

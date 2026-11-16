@@ -51,6 +51,7 @@ function RangeError(r0:Object, r1:String, r2:int):void
   @5 SetField r0 .3 r4
   @6 ReturnVoid
 function Engine/values(r0:Object, r1:int):Number
+  godot r2:Vector2 r3:Vector2 r8:Vector2 r9:Vector2 r15:Vector2 r16:Vector2 r17:Vector2 r18:Vector2 r20:Vector2
   @1 ConstI64 r6 0
   @2 ConstF64 r7 0
   @3 HostNew r8 [Vector2] (r6, r7)
@@ -93,6 +94,7 @@ function Engine/values(r0:Object, r1:int):Number
   @47 ConstF64 r32 nan
   @48 Return r32
 function Engine/members(r0:Object):Boolean
+  godot r1:Node r2:Sprite2D r5:Vector2 r8:Vector2 r9:Vector2 r17:Node r18:Sprite2D
   @1 GetField r3 r0 .0
   @2 GetField r4 r0 .0
   @3 HostGet r5 r4 [Node2D.position]
@@ -135,6 +137,7 @@ function Engine/members(r0:Object):Boolean
   @45 ConstBool r30 0
   @46 Return r30
 function Engine/collections(r0:Object, r1:Object):int
+  godot r2:Line2D r4:Vector2 r5:Line2D r6:PackedVector2Array r8:PackedVector2Array r9:PackedVector2Array r13:Vector2
   @0 HostNew r4 [Vector2] ()
   @2 HostNew r5 [Line2D] ()
   @3 Move r2 r5
@@ -163,6 +166,7 @@ function Engine/collections(r0:Object, r1:Object):int
   @32 ConstI32 r19 0
   @33 Return r19
 function Engine/defaults(r0:Object, r1:GodotValue):GodotValue
+  godot r1:Color r2:Color r3:Color r5:Color r6:Color
   @1 HostDefault r2 [@default.Color.clamp.0]
   @2 Move r3 r1
   @3 HostPresent r4 r3
@@ -173,6 +177,7 @@ function Engine/defaults(r0:Object, r1:GodotValue):GodotValue
   @8 ConstNull r6
   @9 Return r6
 function Engine/signals(r0:Object):void
+  godot r2:Signal r3:Callable
   @1 GetField r1 r0 .0
   @2 HostGet r2 r1 [Node.ready]
   @3 HostBind r3 r0 8

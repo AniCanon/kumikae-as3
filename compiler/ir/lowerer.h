@@ -141,15 +141,20 @@ class Lowerer {
 
 	uint32_t reg(Kind p_kind);
 
-	// A register for what the engine gives back. The host checks what arrives against the type.
+	// A register of a kind, with Godot's type for it when it holds one of Godot's values or objects (every
+	// one of Godot's values has its type: a backend reads it, and the host checks what arrives against it).
 	uint32_t engine_reg(Kind p_kind, const Type *p_type);
+	// The same, with Godot's name for the type: "Vector2", "Callable", or "Variant" for any of Godot's values.
+	uint32_t engine_reg(Kind p_kind, std::string_view p_godot);
+	// A new register of the kind and Godot type of another.
+	uint32_t reg_like(uint32_t p_reg);
 
 	Kind kind_at(uint32_t p_reg) const;
 
 	uint32_t arguments(std::vector<uint32_t> p_list);
 
-	// The default value of a kind, in a new register.
-	uint32_t default_value(Kind p_kind, uint32_t p_position);
+	// The default value of a kind (of a type, if it is known), in a new register.
+	uint32_t default_value(Kind p_kind, uint32_t p_position, const Type *p_type = nullptr);
 
 	// The value in p_reg as p_to, in a new register unless it is that kind already.
 	// p_written: the program wrote the conversion itself (`int(x)`). That matters for an Int64 only: a

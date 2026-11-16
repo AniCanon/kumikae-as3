@@ -71,7 +71,7 @@ uint32_t Engine::zero_value(TypeRef *p_written, uint32_t p_position, uint32_t p_
 	if (!value_has_parts(type->symbol)) {
 		return NONE;
 	}
-	uint32_t out = p_into != NONE ? p_into : l_.reg(Kind::Val);
+	uint32_t out = p_into != NONE ? p_into : l_.engine_reg(Kind::Val, l_.module_.engine_names[name].name);
 	l_.emit(Op::HostNew, p_position, out, name, l_.arguments({}));
 	return out;
 }

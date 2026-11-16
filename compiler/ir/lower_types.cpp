@@ -233,8 +233,9 @@ bool Lowerer::error_class(const Symbol *p_class, uint32_t *r_index) {
 	return true;
 }
 
-uint32_t Lowerer::default_value(Kind p_kind, uint32_t p_position) {
-	uint32_t out = reg(p_kind == Kind::Void ? Kind::F64 : p_kind);
+uint32_t Lowerer::default_value(Kind p_kind, uint32_t p_position, const Type *p_type) {
+	const Kind kind = p_kind == Kind::Void ? Kind::F64 : p_kind;
+	uint32_t out = engine_reg(kind, p_type);
 	switch (p_kind) {
 		case Kind::I32:
 			emit(Op::ConstI32, p_position, out, 0);

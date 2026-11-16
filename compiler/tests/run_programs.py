@@ -80,6 +80,12 @@ for path in sorted(glob.glob(os.path.join(folder, "godot", "*.as"))):
     name = "godot/" + os.path.basename(path)
     compare(name + " ir", run("ir", ["--godot", os.path.basename(path)], os.path.dirname(path)).stdout, path[:-3] + ".ir")
 
+# Every register that holds one of Godot's values says which type, in each script of the Godot test project.
+project = os.path.join(tests, "godot_project")
+lowered = run("ir", ["--godot"] + sorted(os.path.basename(path) for path in glob.glob(os.path.join(project, "*.as"))), project)
+untyped = [line for line in lowered.stdout.splitlines() if line.startswith("  godot ") and ":?" in line]
+check("godot_project ir", lowered.returncode == 0 and not untyped, "\n".join(untyped[:5]) or lowered.stderr[-600:])
+
 refused = os.path.join(folder, "refused")
 for path in sorted(glob.glob(os.path.join(refused, "*.as"))):
     name = "refused/" + os.path.basename(path)

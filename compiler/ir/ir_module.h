@@ -32,6 +32,10 @@ struct Handler {
 	bool rethrows = false;
 };
 
+// The type of a register that may hold any of Godot's values (what a global function that gives back
+// anything gives, a null): Godot's own name for "any value".
+inline constexpr std::string_view ANY_GODOT_TYPE = "Variant";
+
 struct Function {
 	std::string name; // "Main/update", "Main" for a constructor, "helper" for a package function.
 	uint32_t file = 0; // An index into Module::files.
@@ -49,9 +53,10 @@ struct Function {
 	// passes those untyped, after the others, and as many as it likes.
 	bool rest = false;
 	Kind result = Kind::Void;
-	// For each register that takes a Godot value or object from outside (a parameter, or the result of a
-	// request to the engine): Godot's name for its type ("Vector2", "CharacterBody2D"), by register. Empty
-	// for the others, and the vector may be shorter than the registers. A host checks what arrives against it.
+	// Godot's name for the type of each register: for every one that holds one of Godot's values (Kind::Val:
+	// "Vector2", "Callable", or ANY_GODOT_TYPE where any may be there), and for one that holds one of
+	// Godot's objects where its class is known ("CharacterBody2D"). Empty for the others, and the vector may
+	// be shorter than the registers. A backend reads it; a host checks what arrives against it.
 	std::vector<std::string> engine_types;
 	// For each parameter that holds a script object: the class it is declared to hold, by register (NONE
 	// for the others; the vector may be shorter). A call through a function value checks what it passes.
