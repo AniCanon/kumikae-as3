@@ -17,6 +17,11 @@ internal object UiProbeLsp {
         UiProbeLsp4ij.canComplete(project, editor)
     }
 
+    /** Every edit made so far has reached the server before the next request is made. */
+    fun synchronize(project: Project, editor: Editor) {
+        if (!PlatformUtils.isRider()) UiProbeLsp4ij.flush(project, editor)
+    }
+
     fun ready(project: Project): Boolean {
         if (PlatformUtils.isRider()) {
             return UiProbeRiderLsp.ready(project)

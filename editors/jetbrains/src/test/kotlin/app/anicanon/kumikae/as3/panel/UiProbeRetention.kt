@@ -12,6 +12,7 @@ import java.awt.KeyboardFocusManager
 import java.lang.ref.WeakReference
 import java.nio.file.Files
 import java.nio.file.Path
+import javax.swing.JWindow
 
 /** Only weak references survive project closure; live histograms force collection in this test JVM. */
 internal object UiProbeRetention {
@@ -63,7 +64,7 @@ internal object UiProbeRetention {
         // Rider's error-icon queue has a native five-second timeout after its component disappears.
         val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
         do {
-            UiProbeCompletion.edt { }
+            UiProbeCompletion.edt { paintShowingWindows() }
             histogram = UiProbeHeap.collect()
             if (recordRetained(projects, destination) == 0) return
             Thread.sleep(200)
@@ -78,6 +79,26 @@ internal object UiProbeRetention {
         // A live heap dump can itself collect the final reference; report the latest observation.
         val retained = recordRetained(projects, destination)
         check(retained == 0) { "$retained of ${projects.size} closed projects remain reachable after full GC" }
+    }
+
+    /**
+     * Swing's buffer-strategy paint manager keeps the root pane it painted last until it paints another.
+     * When that was a closed project's frame, the frame and its project stay reachable from it (a heap
+     * path seen in IDEA: RepaintManager, BufferStrategyPaintManager.rootJ, IdeRootPane, the frame helper,
+     * the project). A person's next window paint lets go of it. With every project closed the sandbox may
+     * show no window at all, so the probe paints a one-pixel window of its own and closes it.
+     */
+    private fun paintShowingWindows() {
+        val window = JWindow().apply {
+            focusableWindowState = false
+            setBounds(0, 0, 1, 1)
+            isVisible = true
+        }
+        try {
+            window.rootPane.paintImmediately(0, 0, 1, 1)
+        } finally {
+            window.dispose()
+        }
     }
 
     private fun recordRetained(projects: List<WeakReference<Project>>, destination: Path): Int {
