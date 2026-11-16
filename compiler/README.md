@@ -177,6 +177,12 @@ the extension, the system's in `kas3c run`, where `KAS3_NOW` fixes the time and 
 are AS3's: `Thu Feb 29 13:05:09 GMT-0800 2024`, `Thu Feb 29 21:05:09 2024 UTC`, and the rest, written
 from recollection of avmplus, not checked against Flash.
 
+**Values as text** follow avmplus's library source: an Array leaves null and undefined elements out of its
+text, and a Vector's `join` and `toString` write them as `null` and `undefined` (`toLocaleString` leaves
+them out of both); a function of any kind is `function Function() {}`; a RegExp's `lastIndex` is an `int`.
+An Array or a Vector that holds itself, or nests more than 500 deep, put into words is Error #1023, as
+avmplus's stack check gives (its `join` has no other guard).
+
 **JSON** reads and writes by ECMA-262 5th edition (15.12), its grammar exactly (`vm/json_text.cpp`). What it
 reads is Objects, Arrays, Strings (a `\u` half of a character kept as the unit it is), Booleans, null and
 numbers, an `int` when whole. What it writes: toJSON() first, then the replacer; an Object's keys in their
