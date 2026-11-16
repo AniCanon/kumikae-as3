@@ -9,18 +9,15 @@ Block *Parser::parse_function_body() {
 	return parse_block();
 }
 
-// Called just after `function`. Handles `get`/`set`, the name, parameters, return type and body.
-FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata,
-		bool p_body_expected, bool p_allow_accessor, bool p_name_required) {
-	FunctionDecl *function = node<FunctionDecl>(p_offset);
-	function->modifiers = p_modifiers;
-	function->metadata = p_metadata;
+// `get`/`set` and the name. Returns where a missing name's trivia ends, or 0.
+uint32_t Parser::parse_function_name(FunctionDecl *p_function, Modifiers p_modifiers, bool p_allow_accessor,
+		bool p_name_required) {
 	// `function get name()` is an accessor; `function get()` is a function called `get`.
 	if (p_allow_accessor && (at_word("get") || at_word("set")) &&
 			(is_identifier_like(peek2().kind) || ((p_modifiers.bits & Modifiers::Override) &&
 					(peek2().kind == TokenKind::RBrace || peek2().kind == TokenKind::EndOfFile ||
 							(peek2().kind == TokenKind::LBracket && peek2().newline_before))))) {
-		function->accessor = text(advance()) == "get" ? FunctionDecl::Getter : FunctionDecl::Setter;
+		p_function->accessor = text(advance()) == "get" ? FunctionDecl::Getter : FunctionDecl::Setter;
 	}
 	uint32_t missing_name_end = 0;
 	// A declaration on the next line belongs to the enclosing list. A name followed by '(' is
@@ -28,19 +25,23 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	const bool next_declaration = p_name_required && current_.newline_before &&
 			(begins_statement(current_.kind) || at_modifier_word()) && peek2().kind != TokenKind::LParen;
 	if (!next_declaration && (at(TokenKind::Identifier) ||
-			(function->accessor != FunctionDecl::None && is_identifier_like(current_.kind)))) {
-		function->name_offset = current_.offset;
-		function->name = text(advance());
+			(p_function->accessor != FunctionDecl::None && is_identifier_like(current_.kind)))) {
+		p_function->name_offset = current_.offset;
+		p_function->name = text(advance());
 	} else if (p_name_required) {
-		function->name_offset = previous_end_;
+		p_function->name_offset = previous_end_;
 		missing_name_end = current_.offset;
 		error_expected("a function name");
 	}
+	return missing_name_end;
+}
 
+// The parameter list. Returns the height of the tallest default value.
+uint32_t Parser::parse_parameters(FunctionDecl *p_function) {
 	std::vector<Parameter> parameters;
 	uint32_t defaults_height = 0; // Tallest default value, which hangs below this function in the tree.
 	Token open = expect(TokenKind::LParen, "'('");
-	function->has_parameter_list = open.length != 0;
+	p_function->has_parameter_list = open.length != 0;
 	if (open.length) {
 		bool rest_seen = false;
 		uint32_t rest_offset = 0;
@@ -80,7 +81,18 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 		}
 		expect_close(TokenKind::RParen, open);
 	}
-	function->parameters = to_list(parameters);
+	p_function->parameters = to_list(parameters);
+	return defaults_height;
+}
+
+// Called just after `function`. Handles `get`/`set`, the name, parameters, return type and body.
+FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata,
+		bool p_body_expected, bool p_allow_accessor, bool p_name_required) {
+	FunctionDecl *function = node<FunctionDecl>(p_offset);
+	function->modifiers = p_modifiers;
+	function->metadata = p_metadata;
+	uint32_t missing_name_end = parse_function_name(function, p_modifiers, p_allow_accessor, p_name_required);
+	uint32_t defaults_height = parse_parameters(function);
 	if (accept(TokenKind::Colon)) {
 		function->return_type = parse_type();
 	}

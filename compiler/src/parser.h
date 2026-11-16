@@ -175,6 +175,9 @@ private:
 
 	// Functions. In parser_functions.cpp.
 	Block *parse_function_body();
+	uint32_t parse_function_name(FunctionDecl *p_function, Modifiers p_modifiers, bool p_allow_accessor,
+			bool p_name_required);
+	uint32_t parse_parameters(FunctionDecl *p_function);
 	FunctionDecl *parse_function_rest(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata,
 			bool p_body_expected, bool p_allow_accessor, bool p_name_required);
 
