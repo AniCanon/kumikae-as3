@@ -14,9 +14,22 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiManager
 import com.intellij.psi.search.GlobalSearchScope
 import java.net.URI
+import java.nio.file.Path
 
 internal class As3TestConsole(private val configuration: As3TestsConfiguration, executor: Executor) :
     SMTRunnerConsoleProperties(configuration, "AS3", executor) {
+    private val sourceRoot = Path.of(configuration.project.basePath.orEmpty())
+        .resolve(configuration.options.manifest).toAbsolutePath().parent
+
+    init {
+        addStackTraceFilter(As3FailureFilter(configuration.project, sourceRoot))
+    }
+
+    override fun getErrorNavigatable(location: Location<*>, stacktrace: String) =
+        As3FailureFrames.read(stacktrace).filterNot { it.framework }
+            .firstNotNullOfOrNull { it.descriptor(configuration.project, sourceRoot) }
+            ?: super.getErrorNavigatable(location, stacktrace)
+
     override fun getTestLocator() = object : SMTestLocator {
         override fun getLocation(
             protocol: String,
@@ -25,10 +38,13 @@ internal class As3TestConsole(private val configuration: As3TestsConfiguration, 
             scope: GlobalSearchScope,
         ): List<Location<*>> {
             if (protocol != "file") return emptyList()
-            val decoded = runCatching { URI("file://$path").path }.getOrNull() ?: return emptyList()
+            val uri = runCatching { URI("file://$path") }.getOrNull() ?: return emptyList()
+            val decoded = uri.path
             val file = LocalFileSystem.getInstance().findFileByPath(decoded) ?: return emptyList()
             val psi = PsiManager.getInstance(project).findFile(file) ?: return emptyList()
-            return listOf(PsiLocation(psi))
+            val method = uri.query?.takeIf { it.startsWith("method=") }?.removePrefix("method=")
+            val offset = TestSource.read(psi.text).methods.firstOrNull { it.name == method }?.offset
+            return listOf(PsiLocation(offset?.let { psi.findElementAt(it) } ?: psi))
         }
     }
 

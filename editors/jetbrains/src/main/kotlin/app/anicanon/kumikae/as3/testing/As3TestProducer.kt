@@ -18,7 +18,7 @@ class As3TestProducer : LazyRunConfigurationProducer<As3TestsConfiguration>() {
         sourceElement: Ref<PsiElement>,
     ): Boolean {
         val file = context.psiLocation?.containingFile?.virtualFile ?: return false
-        val tests = TestDiscovery.forFile(file)
+        val tests = TestDiscovery.forElement(context.psiLocation ?: return false)
         if (tests.isEmpty()) return false
         configuration.options.manifest = tests.first().manifest.path
         configuration.options.cases = tests.joinToString("\n") { it.name }
@@ -29,8 +29,7 @@ class As3TestProducer : LazyRunConfigurationProducer<As3TestsConfiguration>() {
         configuration: As3TestsConfiguration,
         context: ConfigurationContext,
     ): Boolean {
-        val file = context.psiLocation?.containingFile?.virtualFile ?: return false
-        val tests = TestDiscovery.forFile(file)
+        val tests = TestDiscovery.forElement(context.psiLocation ?: return false)
         return tests.isNotEmpty() && configuration.options.manifest == tests.first().manifest.path &&
             configuration.options.cases == tests.joinToString("\n") { it.name }
     }
@@ -38,11 +37,26 @@ class As3TestProducer : LazyRunConfigurationProducer<As3TestsConfiguration>() {
 
 class As3TestLineMarker : RunLineMarkerContributor() {
     override fun getInfo(element: PsiElement): Info? {
-        if (element.firstChild != null || element.text != "class") return null
+        if (element.firstChild != null || element.text !in listOf("class", "function")) return null
         val file = element.containingFile?.virtualFile ?: return null
-        if (file.extension != "as" || TestDiscovery.forFile(file).isEmpty()) return null
+        if (file.extension != "as") return null
+        val source = TestSource.read(element.containingFile.text)
+        val tests = TestDiscovery.forElement(element)
+        if (tests.isEmpty()) return null
+        if (element.text == "class" && element.textOffset != source.classOffset) return null
+        if (element.text == "function" &&
+            (tests.none { it.method != null } || source.methodAt(element.textOffset)?.offset != element.textOffset)
+        ) {
+            return null
+        }
         return Info(AllIcons.RunConfigurations.TestState.Run, ExecutorAction.getActions(0)) {
-            "Run registered AS3 tests"
+            if (element.text ==
+                "class"
+            ) {
+                "Run all tests in ${file.name}"
+            } else {
+                "Run ${source.methodAt(element.textOffset)?.name}"
+            }
         }
     }
 }

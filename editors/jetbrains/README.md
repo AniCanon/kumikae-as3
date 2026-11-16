@@ -368,3 +368,11 @@ owner's other JetBrains plugin. They are recorded here so they are easy to revis
 - The service and the plugin both target Java 25.
 - The default bundle in the panel stays `org.kumikae.as3test`, the test app's
   identifier. It is not the plugin's identity.
+
+### Running a file or one test
+
+Named case mappings in `kas3-tests.json` connect fixture methods to their suite
+identities. Use the class gutter or file context menu to run that file's cases;
+use a mapped method's gutter/context menu for that case only. Result navigation
+opens the method. Helpers have no Run icon. The [framework guide](../../testing/README.md)
+describes registration; `[Test]` metadata alone is not discovery.
