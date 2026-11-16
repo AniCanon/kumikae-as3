@@ -235,6 +235,20 @@ bool Workspace::in_project(const std::string &p_path) const {
 	return true;
 }
 
+std::string Workspace::dot_folder(const std::string &p_path) const {
+	if (root_.empty() || !inside(root_, p_path)) {
+		return std::string();
+	}
+	for (size_t at = root_.size(); at < p_path.size(); at++) {
+		if (p_path[at] == '/' && at + 1 < p_path.size() && p_path[at + 1] == '.') {
+			const size_t end = p_path.find('/', at + 1);
+			// The file's own name may start with a dot too: that is no folder.
+			return end == std::string::npos ? std::string() : p_path.substr(at + 1, end - at - 1);
+		}
+	}
+	return std::string();
+}
+
 bool Workspace::load(const std::string &p_path) {
 	std::string text;
 	std::error_code error;

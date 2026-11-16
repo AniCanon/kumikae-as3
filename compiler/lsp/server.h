@@ -8,12 +8,16 @@
 
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
 namespace kas3 {
+
+// A publishDiagnostics notification for the file, with that list.
+Json diagnostics_message(const std::string &p_uri, Json p_diagnostics);
 
 class Server {
 	Workspace workspace_;
@@ -72,6 +76,9 @@ class Server {
 	Json workspace_symbols(const Json &p_params);
 	void notification(const std::string &p_method, const Json &p_params, std::vector<std::string> &r_out);
 	void register_file_watcher(std::vector<std::string> &r_out);
+	// An opened file the program does not read (workspace.h, dot_folder()) says so in the editor.
+	void tell_outside(const std::string &p_path, const std::string &p_uri, std::vector<std::string> &r_out);
+	std::set<std::string> outside_; // The URIs told so, cleared when they are closed.
 	void did_change(const std::string &p_path, const Json &p_document, const Json &p_params,
 			std::vector<std::string> &r_out);
 	void did_close(const std::string &p_path);

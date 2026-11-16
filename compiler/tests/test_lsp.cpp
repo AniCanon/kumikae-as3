@@ -701,6 +701,29 @@ static void test_file_watching() {
 	CHECK_EQ(registration.get("registerOptions").get("watchers").at(0).get("globPattern").string(), std::string("**/*"));
 }
 
+// A file opened from a folder whose name starts with a dot (a staged copy of the project, say) is not part
+// of the program: nothing in it is checked or completed. The editor is told so in the file itself, where
+// an empty list of suggestions would say nothing.
+static void test_outside_program() {
+	const fs::path root = check::run_folder() / "outside";
+	write(root / "Main.as", "package {\npublic class Main {\n\tpublic var n:int;\n}\n}\n");
+	const std::string copy = uri_from_path((root / ".build" / "project" / "Main.as").string());
+	const std::string inside = uri_from_path((root / "Main.as").string());
+	Session session;
+	session.initialize(root.string());
+	session.open(copy, "package {\npublic class Main {\n\tpublic var n:int;\n}\n}\n");
+	CHECK_EQ(session.published(), copy + " 0:0-0:7 warning: this file is not part of the program: it is in '.build', a folder whose name starts "
+											"with a dot, which the program does not read. Nothing here is checked or completed\n");
+	session.settle();
+	CHECK_EQ(session.published(), std::string()); // And it stays: a check of the program does not clear it.
+	session.notify("textDocument/didClose", Json::object().set("textDocument", Json::object().set("uri", copy)));
+	CHECK_EQ(session.published(), copy + " clear\n");
+	// A file of the program is told nothing of the kind.
+	session.open(inside, "package {\npublic class Main {\n\tpublic var n:int;\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(), std::string());
+}
+
 // What the server publishes for a file is what `kas3c check` prints for it.
 static void test_agreement() {
 	int files = 0;
@@ -1260,6 +1283,7 @@ int main() {
 	test_file_limit();
 	test_ranged_changes();
 	test_file_watching();
+	test_outside_program();
 	test_agreement();
 	test_typing();
 	return check::finish();

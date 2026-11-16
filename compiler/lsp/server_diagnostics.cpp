@@ -68,6 +68,31 @@ std::string Server::diagnostics_json(const Unit &p_unit) const {
 	return write_json(list);
 }
 
+Json diagnostics_message(const std::string &p_uri, Json p_diagnostics) {
+	return Json::object()
+			.set("jsonrpc", "2.0")
+			.set("method", "textDocument/publishDiagnostics")
+			.set("params", Json::object().set("uri", p_uri).set("diagnostics", std::move(p_diagnostics)));
+}
+
+// An empty list of suggestions says nothing: a file that is not the program's says why, on its first word.
+void Server::tell_outside(const std::string &p_path, const std::string &p_uri, std::vector<std::string> &r_out) {
+	const std::string folder = workspace_.dot_folder(workspace_.resolve(p_path));
+	if (folder.empty()) {
+		return;
+	}
+	const auto place = [](int p_character) { return Json::object().set("line", 0).set("character", p_character); };
+	outside_.insert(p_uri);
+	r_out.push_back(write_json(diagnostics_message(p_uri,
+			Json::array().push(Json::object()
+									   .set("range", Json::object().set("start", place(0)).set("end", place(7)))
+									   .set("severity", 2)
+									   .set("source", "kas3c")
+									   .set("message", "this file is not part of the program: it is in '" + folder +
+															   "', a folder whose name starts with a dot, which the program does not read. "
+															   "Nothing here is checked or completed")))));
+}
+
 void Server::publish(std::vector<std::string> &r_out) {
 	if (workspace_.stale() || (workspace_.progress() == published_check_ && document_generation_ == published_document_generation_)) {
 		return;

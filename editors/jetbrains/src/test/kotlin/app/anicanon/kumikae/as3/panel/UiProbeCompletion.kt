@@ -261,6 +261,7 @@ object UiProbeCompletion {
             UiProbeDiagnostics.run(project, editor, observations)
             if (cycle == 0) {
                 UiProbeTestResults.run(project, destination)
+                UiProbeBuildFolders.run(project, folder, observations)
             }
         } finally {
             settings.AUTOCOMPLETE_ON_CODE_COMPLETION = autoComplete

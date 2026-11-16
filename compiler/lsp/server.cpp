@@ -151,12 +151,16 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 		if (!path.empty() && document.get("text").is_string() && accept_version(document, true, r_out)) {
 			uris_[workspace_.resolve(path)] = document.get("uri").string();
 			workspace_.open(path, document.get("text").string());
+			tell_outside(path, document.get("uri").string(), r_out);
 		}
 	} else if (p_method == "textDocument/didChange") {
 		did_change(path, document, p_params, r_out);
 	} else if (p_method == "textDocument/didClose") {
 		if (!path.empty()) {
 			did_close(path);
+		}
+		if (outside_.erase(document.get("uri").string()) > 0) {
+			r_out.push_back(write_json(diagnostics_message(document.get("uri").string(), Json::array())));
 		}
 	} else if (p_method == "workspace/didChangeWatchedFiles") {
 		for (const Json &change : p_params.get("changes").items()) {

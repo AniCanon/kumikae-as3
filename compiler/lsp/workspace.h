@@ -73,6 +73,9 @@ public:
 	// `project.godot`, or else the folder itself. Every .as file under the project is read.
 	void set_root(const std::string &p_folder);
 	const std::string &root() const { return root_; }
+	// For a file under the root that the program does not read because a folder on the way to it has a name
+	// that starts with a dot: that folder's name. Empty for any other file.
+	std::string dot_folder(const std::string &p_path) const;
 
 	// The one name the workspace has a file by, whatever name it was reached by: links are followed, and
 	// where the file system takes two spellings for one file (letter case, the form of an accented
