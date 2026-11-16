@@ -58,13 +58,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
   one that holds the loop's own listener's callable) is never freed: Godot tells an extension how many
   hold a reference-counted object, but not how many hold an Array or a Dictionary, which GDScript may
   share. **2d**
-- `other[name].add(f)` on another script object reaches only the Godot object's signals, not a signal the
-  other script keeps in a public field. `this[name]` finds a subclass's field before a base class's
-  private one of the same name. **2c**
-- When the scene tree is taken down, static fields are emptied and listeners stop working, so that Godot
-  objects are let go while they can still be freed. A script that runs after that sees null statics. If
-  the main loop is not a scene tree, an object held by a static field with a GDScript listener on it
-  still aborts Godot at exit. **2d**
 
 ## Stage 2b-3, part A: singletons, constants, static methods
 
@@ -122,24 +115,13 @@ any Godot value passing as a condition):
 
 ## Reload while running
 
-- A save that changes code that runs once starts the scene again, but only the scene that is running: an
-  object kept elsewhere (an autoload, a static field) keeps what the old code did. A static field keeps
-  its value when its first value is edited, and that edit starts nothing again. **2d**
-- Whether code that runs once changed is told by comparing it, with what it calls by name or on the
-  object itself; a method called on another object (`helper.go()` in `_ready`) is not followed, so an
-  edit there needs the scene started again by hand. **2d**
-- A second save in the one frame while a scene is being started again finds no scene, and says to start
-  it by hand; the scene then has the first save's constructors with the second save's `_ready`. **2d**
-- On the iOS Simulator the scene comes from the app's own copy: a scene file edited on the computer is not
-  seen until the game is built again. **2d**
 - Rider's hover was failing on code marked `actionscript` (fixed: the plugin names its own language); not
   yet seen working in Rider. **LS-2**
-- A reload is refused when a class with a live object was removed or renamed. **2d**
-- A game on a simulator reloads from the folder it is told of (`KAS3_SOURCE_DIR`); only scripts are read
-  there, so an edited scene or picture needs a new build. A real phone or tablet cannot see that folder:
-  it needs the edits sent to it. **2d**
-- Not tried: a reload while a debugger is stopped, in the Godot editor's own play mode with the editor
-  attached, or with more than a few hundred scripts. **2d**
+- A game on a simulator reads its scripts, scenes and text resources from the folder it is told of
+  (`KAS3_SOURCE_DIR`), but an edited picture (any file Godot imports) needs a new build: importing needs
+  Godot's editor. A real phone or tablet cannot see that folder: it needs the edits sent to it. **2d**
+- Not tried: a reload while a debugger is stopped at a breakpoint (the editor's play mode, and 2,034
+  scripts, were). **2d**
 
 ## Stage 2c-3: `try`, `catch`, `finally`, labels
 
@@ -157,8 +139,6 @@ any Godot value passing as a condition):
 ## Stage 2c-1: vectors, `switch` and `Math`
 
 - `new Vector.<Vector2>(3)` holds three nulls, as a vector of objects does, not three zero vectors. **decision**
-- A reload is refused when a vector that is alive has a type the new program no longer mentions, even if
-  the vector is empty. **2d**
 
 ## Stage 2a: interpreter core
 

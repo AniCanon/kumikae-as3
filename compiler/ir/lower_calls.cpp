@@ -271,7 +271,11 @@ uint32_t Lowerer::script_call(Call *p_call, Symbol *p_symbol, uint32_t p_functio
 	if (direct) {
 		emit(Op::Call, position, out, p_function, arguments(std::move(list)));
 	} else {
-		emit(Op::CallVirtual, position, out, slots_[decl], arguments(std::move(list)));
+		const uint32_t at = emit(Op::CallVirtual, position, out, slots_[decl], arguments(std::move(list)));
+		uint32_t declared = NONE;
+		if (on_another && class_index(p_symbol->owner, &declared)) {
+			fn().virtual_receivers.emplace_back(at, declared);
+		}
 	}
 	return out == NONE ? 0 : out;
 }
@@ -407,11 +411,12 @@ uint32_t Lowerer::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t *r_
 	if (object != Kind::Ref && !script) {
 		return NONE;
 	}
-	// `this` goes as itself: the name may be one of the script's own fields that holds a signal.
-	// Another script object goes as the Godot object behind it: its fields are its own business.
+	// A script object goes as itself: the name may be one of its fields that holds a signal, one the code
+	// here may see (the interpreter decides, by the class the code is written in). Else its Godot object's.
 	bool of_value = false;
-	uint32_t object_reg = script && index->object->kind == NodeKind::ThisExpr && !fn().is_static
-			? self(p_expression->offset, true)
+	const bool own = script && index->object->kind == NodeKind::ThisExpr && !fn().is_static;
+	uint32_t object_reg = own ? self(p_expression->offset, true)
+			: script && index->object->kind != NodeKind::ThisExpr ? expression(index->object, Kind::Obj)
 			: engine_receiver(index->object, p_expression->offset, &of_value);
 	*r_object = settled(object_reg, index->index, p_expression->offset);
 	*r_object = settled(*r_object, p_later, p_expression->offset);

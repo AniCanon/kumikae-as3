@@ -8,6 +8,7 @@
 #include "script.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
@@ -38,6 +39,17 @@ static std::unordered_map<const Object *, ScriptInstance *> &instances_on() {
 vm::Object *kas3::script_object(const Object *p_owner) {
 	auto found = instances_on().find(p_owner);
 	return found == instances_on().end() ? nullptr : found->second->object;
+}
+
+std::vector<std::pair<vm::Object *, Object *>> kas3::instances_outside(const Node *p_scene) {
+	std::vector<std::pair<vm::Object *, Object *>> outside;
+	for (const ScriptInstance *instance : instances()) {
+		const Node *node = Object::cast_to<Node>(instance->owner);
+		if (!p_scene || !node || (node != p_scene && !p_scene->is_ancestor_of(const_cast<Node *>(node)))) {
+			outside.emplace_back(instance->object, instance->owner);
+		}
+	}
+	return outside;
 }
 
 bool kas3::instances_can_move(vm::Reload &p_reload) {

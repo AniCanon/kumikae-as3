@@ -89,6 +89,11 @@ package {
 		public function listenFailing():void { renamed.add(fails); renamed.add(onRenamed); }
 		public function listenTo(other:Node):void { other.renamed.add(onRenamed); }
 		public function listenByName(other:Node, signal:String):void { other[signal].add(onRenamed); }
+		// Another script object's fields, by name: what is public in them, and nothing else.
+		private var fields:SignalDerived;
+		public function makeFields():SignalDerived { fields = new SignalDerived(); return fields; }
+		public function forgetFields():void { fields = null; }
+		public function listenOther(signal:String):void { fields[signal].add(onRenamed); }
 		// A signal's property and its emit(), by its name.
 		public function listenersByName(other:Node, signal:String):int { return other[signal].numListeners; }
 		public function emitByName(other:Node, signal:String):void { other[signal].emit(); }

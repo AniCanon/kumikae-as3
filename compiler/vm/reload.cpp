@@ -1,10 +1,12 @@
 #include "reload.h"
 
 #include "any.h"
+#include "held.h"
 #include "table.h"
 
 #include <algorithm>
 #include <limits>
+#include <unordered_set>
 
 namespace kas3 {
 namespace vm {
@@ -71,7 +73,8 @@ Slot Reload::carry_into(Kind p_kind, uint32_t p_class, Slot p_value) {
 	return out;
 }
 
-// Each property, in order. A key that is an object whose class is gone is left out, with its value.
+// Each property, in order. A key that is an object whose class is gone is left out, with its value, and
+// missing() names the class: a host refuses such a reload.
 void Reload::carry_entries(const Entries &p_from, Entries *p_to) {
 	for (const Entry &entry : p_from.all()) {
 		if (any::tag(entry.key) == AnyTag::Undefined) {
@@ -92,6 +95,15 @@ void Reload::carry_entries(const Entries &p_from, Entries *p_to) {
 	}
 }
 
+Object *Reload::lost(uint32_t p_old_class) {
+	if (missing_.empty()) {
+		missing_ = from_.module_.classes[p_old_class].name;
+	}
+	missing_classes_.resize(from_.module_.classes.size(), 0);
+	missing_classes_[p_old_class] = 1;
+	return nullptr;
+}
+
 Object *Reload::object(Object *p_old) {
 	if (!p_old) {
 		return nullptr;
@@ -103,20 +115,14 @@ Object *Reload::object(Object *p_old) {
 	const ir::Class &old_class = from_.module_.classes[p_old->klass];
 	const auto named = classes_.find(old_class.name);
 	if (named == classes_.end()) {
-		if (missing_.empty()) {
-			missing_ = old_class.name;
-		}
-		return nullptr;
+		return lost(p_old->klass);
 	}
 	const ir::Class &new_class = to_.module_.classes[named->second];
 	if (old_class.table || new_class.table) {
 		// An Object or a Dictionary: each key and value carried as an untyped field is.
 		Object *table = old_class.table == new_class.table ? new_table(named->second, to_.collector_.list_for(named->second)) : nullptr;
 		if (!table) {
-			if (missing_.empty()) {
-				missing_ = old_class.name;
-			}
-			return nullptr;
+			return lost(p_old->klass);
 		}
 		moved_.emplace(p_old, table);
 		retain(table);
@@ -129,10 +135,7 @@ Object *Reload::object(Object *p_old) {
 		const Vector *old = static_cast<const Vector *>(p_old);
 		Vector *vector = old_class.element == new_class.element ? new_vector(named->second, old->length, old->fixed, to_.collector_.list_for(named->second)) : nullptr;
 		if (!vector) {
-			if (missing_.empty()) {
-				missing_ = old_class.name;
-			}
-			return nullptr;
+			return lost(p_old->klass);
 		}
 		moved_.emplace(p_old, vector);
 		retain(vector);
@@ -204,6 +207,68 @@ bool Reload::alive(const std::vector<std::string> &p_classes) const {
 		}
 	}
 	return false;
+}
+
+bool Reload::statics_given(const std::string &p_class) const {
+	const auto found = classes_.find(p_class);
+	return found != classes_.end() && found->second < to_.class_used_.size() && to_.class_used_[found->second];
+}
+
+std::vector<uint8_t> Reload::reached(const Interpreter &p_program, const std::vector<Object *> &p_roots) {
+	const ir::Module &module = p_program.module_;
+	std::vector<uint8_t> classes(module.classes.size(), 0);
+	std::unordered_set<Object *> seen;
+	std::vector<Object *> pending;
+	const auto visit = [&](Kind p_kind, Slot p_value) {
+		Object *object = p_kind == Kind::Obj ? static_cast<Object *>(p_value.p)
+				: p_kind == Kind::Any && any::tag(p_value) == AnyTag::Object ? static_cast<Object *>(any::pointer(p_value))
+																			 : nullptr;
+		if (object && seen.insert(object).second) {
+			pending.push_back(object);
+		}
+	};
+	for (size_t i = 0; i < module.globals.size() && i < p_program.globals_.size(); i++) {
+		visit(module.globals[i].kind, p_program.globals_[i]);
+	}
+	for (Object *root : p_roots) {
+		if (root && seen.insert(root).second) {
+			pending.push_back(root);
+		}
+	}
+	while (!pending.empty()) {
+		Object *object = pending.back();
+		pending.pop_back();
+		classes[object->klass] = 1;
+		each_held(module.classes[object->klass], object, visit);
+	}
+	return classes;
+}
+
+bool Reload::keep_containers(const ir::Module &p_old, const std::vector<uint8_t> &p_live, ir::Module *r_new) {
+	std::unordered_set<std::string> named;
+	for (const ir::Class &klass : r_new->classes) {
+		named.insert(klass.name);
+	}
+	bool added = false;
+	for (size_t i = 0; i < p_old.classes.size() && i < p_live.size(); i++) {
+		const ir::Class &klass = p_old.classes[i];
+		// A container of the library: a name and what its elements are, with no code of its own to move.
+		const bool container = (klass.element != Kind::Void || klass.table) && klass.fields.empty() && klass.methods.empty() &&
+				klass.base == ir::NONE && klass.constructor == ir::NONE;
+		if (!p_live[i] || !container || named.count(klass.name)) {
+			continue;
+		}
+		const uint32_t index = static_cast<uint32_t>(r_new->classes.size());
+		r_new->classes.push_back(klass);
+		added = true;
+		uint32_t *kept = klass.array ? &r_new->array_class : klass.dictionary ? &r_new->dictionary_class
+				: klass.table													 ? &r_new->object_class
+																				 : nullptr;
+		if (kept && *kept == ir::NONE) {
+			*kept = index;
+		}
+	}
+	return added;
 }
 
 uint32_t Reload::function(uint32_t p_old) const {

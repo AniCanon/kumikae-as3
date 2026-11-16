@@ -252,22 +252,65 @@ std::string not_a_signal(std::string_view p_name) {
 	return "'" + std::string(p_name) + "' is not a signal";
 }
 
-// `object[name]` on a script object: one of its own fields by that name, which must hold a signal.
-// Nothing if it has no such field: the Godot object behind the script object is then asked.
+// The class of the object's that declares its field `p_field`: the first, from the object's own class down
+// its bases, whose base has fewer fields.
+uint32_t declaring_class(const ir::Module &p_module, uint32_t p_class, size_t p_field) {
+	uint32_t at = p_class;
+	while (p_module.classes[at].base != NONE && p_module.classes[p_module.classes[at].base].fields.size() > p_field) {
+		at = p_module.classes[at].base;
+	}
+	return at;
+}
+
+bool extends_class(const ir::Module &p_module, uint32_t p_class, uint32_t p_base) {
+	for (uint32_t at = p_class; at != NONE; at = p_module.classes[at].base) {
+		if (at == p_base) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Whether the code running may reach the field by name, as AS3 sees names: a public one from anywhere, a
+// protected one from the code of its class and of subclasses, any other from the code of its class.
+bool field_seen(const Request &p_request, uint32_t p_class, size_t p_field) {
+	const ir::Field &field = p_request.module.classes[p_class].fields[p_field];
+	const uint32_t code = p_request.function.owner != NONE ? p_request.function.owner : p_request.function.written_in;
+	if (field.is_public || code == NONE) {
+		return field.is_public;
+	}
+	const uint32_t declared = declaring_class(p_request.module, p_class, p_field);
+	return declared == code || (field.is_protected && extends_class(p_request.module, code, declared));
+}
+
+// `object[name]` on a script object: one of its fields by that name that the code may see, which must hold
+// a signal. A public field comes first, a subclass's before a base's: a base's private field does not hide
+// a subclass's public one. Nothing if it has none: the Godot object behind the script object is asked.
 std::optional<Outcome> own_member(Request &p_request, Object *p_object, std::string_view p_name) {
 	const ir::Class &klass = p_request.module.classes[p_object->klass];
-	for (size_t i = klass.fields.size(); i-- > 0;) {
-		if (klass.fields[i].name != p_name) {
+	std::optional<size_t> found, hidden;
+	for (size_t i = klass.fields.size(); i-- > 0 && !found;) {
+		if (klass.fields[i].name != p_name || !field_seen(p_request, p_object->klass, i)) {
 			continue;
 		}
-		if (klass.fields[i].kind != Kind::Val) {
-			p_request.error = not_a_signal(p_name);
-			return Outcome::Refused;
+		if (klass.fields[i].is_public) {
+			found = i;
+		} else if (!hidden) {
+			hidden = i;
 		}
-		p_request.result.p = p_request.host.handles.copy(p_object->fields()[i].p);
-		return Outcome::Done;
 	}
-	return std::nullopt;
+	found = found ? found : hidden;
+	if (!found) {
+		return std::nullopt;
+	}
+	const ir::Field &field = klass.fields[*found];
+	if (field.kind != Kind::Val || (!field.engine_type.empty() && field.engine_type != "Signal")) {
+		p_request.error = not_a_signal(p_name);
+		return Outcome::Refused;
+	}
+	void *held = p_object->fields()[*found].p;
+	p_request.result.p = held ? p_request.host.handles.copy(held) : nullptr;
+	return Outcome::Done;
 }
 
 Outcome member(Request &p_request) {

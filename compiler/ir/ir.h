@@ -301,6 +301,9 @@ struct Function {
 	uint32_t file = 0; // An index into Module::files.
 	uint32_t position = 0; // Of its name.
 	uint32_t owner = NONE; // The class, for a method or constructor.
+	// For a function written inside a method (owner NONE): the class whose code it is, which decides what
+	// it sees of objects by name.
+	uint32_t written_in = NONE;
 	bool is_static = false; // No receiver: a static method or a package function.
 	bool is_public = false; // A public method: Godot may call it by name.
 	// The first registers are the parameters; an instance method's first parameter is `this`.
@@ -317,6 +320,9 @@ struct Function {
 	// For each parameter that holds a script object: the class it is declared to hold, by register (NONE
 	// for the others; the vector may be shorter). A call through a function value checks what it passes.
 	std::vector<uint32_t> parameter_classes;
+	// For each CallVirtual on an object other than `this`: the instruction, and the class that declares the
+	// method called (what runs is its method or a subclass's override). Not printed: run_once_changes reads it.
+	std::vector<std::pair<uint32_t, uint32_t>> virtual_receivers;
 	std::vector<Kind> registers;
 	std::vector<Instruction> code;
 	std::vector<std::vector<uint32_t>> argument_lists;
@@ -346,6 +352,9 @@ struct Field {
 	// What Godot may do with it by name (`node.speed`): read a public field, and write one that is not a
 	// const. Godot is told of no other.
 	bool is_public = false;
+	// Protected: reached by name from the code of the class that declares it and of its subclasses. A field
+	// neither public nor protected is reached by name only from the code of the class that declares it.
+	bool is_protected = false;
 	bool constant = false;
 	// Godot's name for its type, when it holds one of Godot's values or objects ("Vector2", "Node").
 	std::string engine_type = {};
@@ -450,11 +459,18 @@ std::string print_operand(const Module &p_module, const Function &p_function, ch
 
 // The classes, by name, whose code that runs once for each object changed from one build to the next: a
 // constructor (which also gives fields their first values), `_ready`, `_enter_tree` or `_init` (its own or
-// inherited), or what those call by name or on the object itself (an override included). A field or
-// method of the object is compared by name, so one added before it changes nothing and one renamed does.
-// A method called on another object is not followed. Objects that are alive ran the old version, so a
+// inherited), or what those call: by name, on the object itself (an override included), on another object
+// through the class it is declared as (any subclass's override included) or through an interface (any
+// class's that implements it). A call on an untyped value, or through a function value, is not followed.
+// A field or method of the object a function runs on is compared by name, so
+// one added before it changes nothing and one renamed does. So a `_ready` that reaches much of the game
+// is changed by most edits to it. Objects that are alive ran the old version, so a
 // reload of the code alone does not show such a change. A class that is new, or gone, is not listed.
 std::vector<std::string> run_once_changes(const Module &p_old, const Module &p_new);
+// The classes, by name, whose static fields' first values changed from one build to the next (what the
+// class's static initializer runs, and what it calls). Static fields given their values keep them through a
+// reload, and through the scene started again.
+std::vector<std::string> static_changes(const Module &p_old, const Module &p_new);
 
 } // namespace ir
 } // namespace kas3

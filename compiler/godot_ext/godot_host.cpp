@@ -5,6 +5,7 @@
 
 #include "builtins.h"
 #include "callable.h"
+#include "members.h"
 #include "program.h"
 
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -547,12 +548,15 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 		CharString klass = String(at).utf8();
 		found = godot_name(std::string_view(klass.get_data()) == "Object" ? "GodotObject" : klass.get_data(), p_name, &godot);
 	}
-	if (!found) {
+	// Not one of Godot's: a public field of the AS3 script attached to it, as Godot itself would reach it.
+	const vm::Object *script = found ? nullptr : script_object(object);
+	const Member field = script ? find_member(script->klass, StringName(String::utf8(p_name.data(), (int64_t)p_name.size()))) : Member{};
+	if (!found && field.what != Member::What::Field) {
 		CharString klass = String(object->get_class()).utf8();
 		*r_error = "a " + std::string(klass.get_data()) + " has no '" + std::string(p_name) + "'";
 		return false;
 	}
-	Variant value = object->get(StringName(to_godot(godot)));
+	const Variant value = found ? object->get(StringName(to_godot(godot))) : read_field(script, field.index);
 	if (p_result.type == "Signal" && value.get_type() != Variant::SIGNAL) {
 		*r_error = "'" + std::string(p_name) + "' is not a signal";
 		return false;

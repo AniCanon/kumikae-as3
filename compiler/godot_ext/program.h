@@ -8,6 +8,12 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
+
+namespace godot {
+class Node;
+}
 
 namespace kas3 {
 
@@ -25,6 +31,11 @@ public:
 	// The one program, compiled from every .as file under the project folder the first time it is asked
 	// for. Errors are printed to Godot's output; the program is then not valid.
 	static Project &get();
+	// Godot is closing (its main loop, whatever kind, has finished; other scripting languages are still
+	// there): what the program holds beyond the scene (in static fields, and through listeners) is let go
+	// now. Later, when this library is unloaded, a Godot object that a listener of another language is
+	// attached to can no longer be freed safely. Until now, AS3 run as the scene tree goes works as ever.
+	static void before_shutdown();
 	// Forgets the program: the next get() compiles again. Every script instance must be gone.
 	static void unload();
 	// A number that changes every time the scripts are loaded afresh. What belongs to an earlier load
@@ -39,6 +50,8 @@ public:
 	// script object alive is moved onto the new code with what it holds. With errors, the errors are
 	// reported and the game carries on with the scripts it had. Not to be called while a script runs.
 	static void reload();
+	// The same, asked for now (the language's reload_scripts(), Godot's debugger): refused while AS3 runs.
+	static void reload_now();
 	// Once a frame while the project is a folder a person can edit: looks for changed scripts.
 	static void watch();
 	// Once a frame: a step of the cycle collector, if the program is loaded.
@@ -50,6 +63,24 @@ public:
 // For a reload: whether every script instance's object has a place in the new program, and the move.
 bool instances_can_move(vm::Reload &p_reload);
 void move_instances(vm::Interpreter &p_old, vm::Reload &p_reload);
+// The script objects of the Godot objects that a scene started again does not make again: those that are
+// neither the scene nor in it (an autoload, a resource), with each one's Godot object. All, with no scene.
+std::vector<std::pair<vm::Object *, godot::Object *>> instances_outside(const godot::Node *p_scene);
+
+// A scene started again after a reload (restart.cpp): code that runs once changed in `classes`, of which
+// objects are alive. What a restart would not make again is said: `kept` names it; `statics` names the
+// classes whose static fields' first values changed after the fields were given them; `scenes` the scene
+// files that changed (refresh_scenes): the running scene starts again if its own did.
+struct Restart {
+	std::vector<std::string> classes;
+	std::vector<std::string> kept;
+	std::vector<std::string> statics;
+	std::vector<std::string> scenes;
+};
+// Starts the running scene again, from its file, deferred to when Godot changes scenes; or says why not.
+// While a scene is being started again (from the deferred call to Godot saying the scene changed), a reload
+// starts it once more when it is ready, so that its objects have one build's code throughout.
+void restart_scene(const Restart &p_restart);
 // The script object of the AS3 script attached to a Godot object, or null: the script instance holds a
 // reference to it.
 vm::Object *script_object(const godot::Object *p_owner);

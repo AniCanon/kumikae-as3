@@ -43,6 +43,7 @@ struct Place {
 	enum Dispatch { Direct, Virtual, Interface } dispatch = Direct;
 	uint32_t getter = NONE;
 	uint32_t setter = NONE;
+	uint32_t declared = NONE; // For Accessor: the class that declares the property, when it is one of the program's.
 };
 struct Part {
 	Place whole; // Where the value is stored.
