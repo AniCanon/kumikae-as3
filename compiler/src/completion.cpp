@@ -391,6 +391,30 @@ class Completer {
 		return keyword == "new" || keyword == "extends" || keyword == "implements" || keyword == "is" || keyword == "as";
 	}
 
+	// Inside a function's body: locals, members, definitions, keywords and statement templates.
+	void offer_in_body() {
+		const bool is_static = function_->symbol && function_->symbol->is_static();
+		offer_locals();
+		if (class_) {
+			if (!is_static) {
+				offer_members(class_, false, true);
+			}
+			offer_members(class_, true, true);
+		}
+		offer_definitions(false);
+		put_parameter_name_first();
+		offer_keywords(IN_FUNCTION);
+		queries_.statement_templates(unit_, offset_, found_);
+		// Typing a keyword can turn a recovery gap into a known statement start.
+		incomplete_ |= prefix_.empty();
+		if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
+			Completion item;
+			item.name = "this";
+			item.is_keyword = true;
+			found_.push_back(std::move(item));
+		}
+	}
+
 public:
 	Completer(Queries &p_queries, Compilation &p_compilation, const Unit &p_unit, uint32_t p_offset) :
 			queries_(p_queries), compilation_(p_compilation), unit_(p_unit), source_(p_unit.source.text()), offset_(p_offset) {}
@@ -426,26 +450,7 @@ public:
 			return std::move(found_);
 		}
 		if (function_ && in_body_) {
-			const bool is_static = function_->symbol && function_->symbol->is_static();
-			offer_locals();
-			if (class_) {
-				if (!is_static) {
-					offer_members(class_, false, true);
-				}
-				offer_members(class_, true, true);
-			}
-			offer_definitions(false);
-			put_parameter_name_first();
-			offer_keywords(IN_FUNCTION);
-			queries_.statement_templates(unit_, offset_, found_);
-			// Typing a keyword can turn a recovery gap into a known statement start.
-			incomplete_ |= prefix_.empty();
-			if (class_ && !is_static && starts_with_any_case("this", prefix_)) {
-				Completion item;
-				item.name = "this";
-				item.is_keyword = true;
-				found_.push_back(std::move(item));
-			}
+			offer_in_body();
 		} else if (class_) {
 			if (std::optional<OverrideOffer> offer = queries_.overrides(unit_, nullptr, class_, start_, offset_)) {
 				std::move(offer->items.begin(), offer->items.end(), std::back_inserter(found_));

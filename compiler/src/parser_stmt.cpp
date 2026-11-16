@@ -1,21 +1,7 @@
-// Statements, variable declarations and functions.
+// Statements and variable declarations. What follows `function` is in parser_functions.cpp.
 #include "parser.h"
 
 namespace kas3 {
-
-namespace {
-
-struct Restore {
-	bool &flag;
-	bool saved;
-	Restore(bool &p_flag, bool p_value) :
-			flag(p_flag), saved(p_flag) {
-		flag = p_value;
-	}
-	~Restore() { flag = saved; }
-};
-
-} // namespace
 
 // Where the parser may pick up again after an error, when the token starts a line.
 bool Parser::begins_statement(TokenKind p_kind) {
@@ -85,12 +71,6 @@ Block *Parser::parse_block() {
 	expect_close(TokenKind::RBrace, open);
 	block->statements = to_list(statements);
 	return finish(block);
-}
-
-Block *Parser::parse_function_body() {
-	Restore allow_in(no_in_, false);
-	Restore brackets(bracket_ends_initializer_, false);
-	return parse_block();
 }
 
 Stmt *Parser::parse_statement() {
@@ -205,6 +185,31 @@ Stmt *Parser::parse_with() {
 	return finish(node<Empty>(start));
 }
 
+Stmt *Parser::parse_var_statement(uint32_t p_start) {
+	VarStmt *statement = node<VarStmt>(p_start);
+	statement->decl = parse_variable_declaration(Modifiers(), List<Metadata>(), true);
+	end_statement();
+	return finish(statement);
+}
+
+// A named function nested in a function.
+Stmt *Parser::parse_function_statement(uint32_t p_start) {
+	FunctionStmt *statement = node<FunctionStmt>(advance().offset);
+	statement->function = parse_function_rest(p_start, Modifiers(), List<Metadata>(), true, false, true);
+	// The nested function's height counts toward the body it sits in.
+	last_height_ = function_height_ + 1;
+	note_height();
+	return finish(statement);
+}
+
+Stmt *Parser::parse_labeled(uint32_t p_start) {
+	Labeled *labeled = node<Labeled>(p_start);
+	labeled->label = text(advance());
+	advance();
+	labeled->body = parse_statement();
+	return finish(labeled);
+}
+
 Stmt *Parser::parse_statement_inner() {
 	uint32_t start = current_.offset;
 	switch (current_.kind) {
@@ -214,12 +219,8 @@ Stmt *Parser::parse_statement_inner() {
 			advance();
 			return finish(node<Empty>(start));
 		case TokenKind::KwVar:
-		case TokenKind::KwConst: {
-			VarStmt *statement = node<VarStmt>(start);
-			statement->decl = parse_variable_declaration(Modifiers(), List<Metadata>(), true);
-			end_statement();
-			return finish(statement);
-		}
+		case TokenKind::KwConst:
+			return parse_var_statement(start);
 		case TokenKind::KwIf:
 			return parse_if();
 		case TokenKind::KwFor:
@@ -243,12 +244,7 @@ Stmt *Parser::parse_statement_inner() {
 		case TokenKind::KwFunction:
 			// A named function nested in a function. Without a name it is a function expression.
 			if (peek2().kind == TokenKind::Identifier) {
-				FunctionStmt *statement = node<FunctionStmt>(advance().offset);
-				statement->function = parse_function_rest(start, Modifiers(), List<Metadata>(), true, false, true);
-				// The nested function's height counts toward the body it sits in.
-				last_height_ = function_height_ + 1;
-				note_height();
-				return finish(statement);
+				return parse_function_statement(start);
 			}
 			break;
 		case TokenKind::KwWith:
@@ -260,11 +256,7 @@ Stmt *Parser::parse_statement_inner() {
 		}
 		case TokenKind::Identifier:
 			if (peek2().kind == TokenKind::Colon) {
-				Labeled *labeled = node<Labeled>(start);
-				labeled->label = text(advance());
-				advance();
-				labeled->body = parse_statement();
-				return finish(labeled);
+				return parse_labeled(start);
 			}
 			break;
 		default:
@@ -311,28 +303,37 @@ Stmt *Parser::parse_for() {
 		first = parse_expression();
 	}
 
-	if (at(TokenKind::KwIn)) {
-		ForIn *loop = node<ForIn>(start);
-		loop->each = each;
-		if (declaration) {
-			if (declaration->declarators.count != 1 || declaration->declarators[0].initializer) {
-				error_at(first_offset, "invalid left-hand side in for-in", false);
-			}
-			loop->declaration = declaration;
-		} else {
-			if (!first || (first->kind != NodeKind::Name && first->kind != NodeKind::Member &&
-								  first->kind != NodeKind::Index)) {
-				error_at(first_offset, "invalid left-hand side in for-in", false);
-			}
-			loop->target = first;
-		}
-		advance();
-		loop->collection = parse_expression();
-		expect_close(TokenKind::RParen, open);
-		loop->body = parse_statement();
-		return finish(loop);
-	}
+	const ForHead head{ start, each, open, declaration, first, first_offset };
+	return at(TokenKind::KwIn) ? parse_for_in(head) : parse_for_clauses(head);
+}
 
+// `for (k in o)` and `for each (v in o)`, after the first clause.
+Stmt *Parser::parse_for_in(const ForHead &p_head) {
+	const auto &[start, each, open, declaration, first, first_offset] = p_head;
+	ForIn *loop = node<ForIn>(start);
+	loop->each = each;
+	if (declaration) {
+		if (declaration->declarators.count != 1 || declaration->declarators[0].initializer) {
+			error_at(first_offset, "invalid left-hand side in for-in", false);
+		}
+		loop->declaration = declaration;
+	} else {
+		if (!first || (first->kind != NodeKind::Name && first->kind != NodeKind::Member &&
+							  first->kind != NodeKind::Index)) {
+			error_at(first_offset, "invalid left-hand side in for-in", false);
+		}
+		loop->target = first;
+	}
+	advance();
+	loop->collection = parse_expression();
+	expect_close(TokenKind::RParen, open);
+	loop->body = parse_statement();
+	return finish(loop);
+}
+
+// `for (init; condition; update)`, after the first clause.
+Stmt *Parser::parse_for_clauses(const ForHead &p_head) {
+	const auto &[start, each, open, declaration, first, first_offset] = p_head;
 	For *loop = node<For>(start);
 	if (each) {
 		error_expected("'in'");
@@ -480,109 +481,6 @@ VarDecl *Parser::parse_variable_declaration(Modifiers p_modifiers, List<Metadata
 	}
 	declaration->declarators = to_list(declarators);
 	return finish(declaration);
-}
-
-// Called just after `function`. Handles `get`/`set`, the name, parameters, return type and body.
-FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifiers, List<Metadata> p_metadata,
-		bool p_body_expected, bool p_allow_accessor, bool p_name_required) {
-	FunctionDecl *function = node<FunctionDecl>(p_offset);
-	function->modifiers = p_modifiers;
-	function->metadata = p_metadata;
-	// `function get name()` is an accessor; `function get()` is a function called `get`.
-	if (p_allow_accessor && (at_word("get") || at_word("set")) &&
-			(is_identifier_like(peek2().kind) || ((p_modifiers.bits & Modifiers::Override) &&
-					(peek2().kind == TokenKind::RBrace || peek2().kind == TokenKind::EndOfFile ||
-							(peek2().kind == TokenKind::LBracket && peek2().newline_before))))) {
-		function->accessor = text(advance()) == "get" ? FunctionDecl::Getter : FunctionDecl::Setter;
-	}
-	uint32_t missing_name_end = 0;
-	// A declaration on the next line belongs to the enclosing list. A name followed by '(' is
-	// still a valid multiline function/accessor signature, even when that name is a modifier word.
-	const bool next_declaration = p_name_required && current_.newline_before &&
-			(begins_statement(current_.kind) || at_modifier_word()) && peek2().kind != TokenKind::LParen;
-	if (!next_declaration && (at(TokenKind::Identifier) ||
-			(function->accessor != FunctionDecl::None && is_identifier_like(current_.kind)))) {
-		function->name_offset = current_.offset;
-		function->name = text(advance());
-	} else if (p_name_required) {
-		function->name_offset = previous_end_;
-		missing_name_end = current_.offset;
-		error_expected("a function name");
-	}
-
-	std::vector<Parameter> parameters;
-	uint32_t defaults_height = 0; // Tallest default value, which hangs below this function in the tree.
-	Token open = expect(TokenKind::LParen, "'('");
-	function->has_parameter_list = open.length != 0;
-	if (open.length) {
-		bool rest_seen = false;
-		uint32_t rest_offset = 0;
-		while (!at(TokenKind::RParen) && !at(TokenKind::EndOfFile)) {
-			Parameter parameter;
-			parameter.offset = current_.offset;
-			if (rest_seen) {
-				error_at(rest_offset, "a rest parameter must be last", false);
-			}
-			if (accept(TokenKind::Ellipsis)) {
-				parameter.is_rest = true;
-				rest_seen = true;
-				rest_offset = parameter.offset;
-			}
-			if (at(TokenKind::Identifier)) {
-				parameter.name = text(advance());
-			} else {
-				error_expected("a parameter name");
-				break;
-			}
-			if (accept(TokenKind::Colon)) {
-				parameter.type = parse_type();
-			}
-			if (accept(TokenKind::Assign)) {
-				Restore allow_in(no_in_, false);
-				Restore brackets(bracket_ends_initializer_, false);
-				parameter.default_value = parse_assignment();
-				if (last_height_ > defaults_height) {
-					defaults_height = last_height_;
-				}
-			}
-			parameter.end = previous_end_;
-			parameters.push_back(parameter);
-			if (!accept(TokenKind::Comma)) {
-				break;
-			}
-		}
-		expect_close(TokenKind::RParen, open);
-	}
-	function->parameters = to_list(parameters);
-	if (accept(TokenKind::Colon)) {
-		function->return_type = parse_type();
-	}
-	uint32_t height = defaults_height + 2;
-	if (at(TokenKind::LBrace)) {
-		// A function body starts a fresh count of statement nesting; its height is what the body reached.
-		uint32_t saved_depth = statement_depth_;
-		uint32_t saved_height = body_height_;
-		statement_depth_ = 0;
-		body_height_ = 0;
-		function->body = parse_function_body();
-		if (body_height_ + 3 > height) {
-			height = body_height_ + 3;
-		}
-		statement_depth_ = saved_depth;
-		body_height_ = saved_height;
-	} else if (p_body_expected) {
-		error_expected("'{'");
-	}
-	function_height_ = height;
-	if (height > MAX_HEIGHT) {
-		abort_too_deep();
-	}
-	finish(function);
-	// Retain the empty name's trivia span so completion can find the unfinished declaration.
-	if (function->end < missing_name_end) {
-		function->end = missing_name_end;
-	}
-	return function;
 }
 
 } // namespace kas3

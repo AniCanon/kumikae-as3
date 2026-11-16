@@ -127,6 +127,7 @@ class Queries {
 	static std::string line_break(const Unit &p_unit);
 	static std::string line_indent(const Unit &p_unit, uint32_t p_offset);
 	void statement_templates(const Unit &p_unit, uint32_t p_offset, std::vector<Completion> &p_items) const;
+	static bool block_start(const Unit &p_unit, const Block *p_block, uint32_t p_offset);
 	bool statement_start(const Unit &p_unit, uint32_t p_offset) const;
 	static uint32_t skip_trivia(const Unit &p_unit, uint32_t p_offset);
 

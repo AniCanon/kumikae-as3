@@ -12,11 +12,6 @@
 
 namespace kas3 {
 
-inline Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_table, std::string_view p_name) {
-	auto found = p_table.find(p_name);
-	return found == p_table.end() ? nullptr : found->second;
-}
-
 class Typer {
 	Compilation &compilation_;
 	Unit &unit_;
@@ -104,6 +99,7 @@ class Typer {
 
 	bool members_known(Symbol *p_class);
 
+	const Type *static_member_type(const Type *p_object, Member *p_member);
 	const Type *member_type(const Type *p_object, Member *p_member);
 
 	const Type *number_literal(const NumberLit *p_literal) const;
@@ -158,6 +154,14 @@ class Typer {
 	// package, or written with its package. An unknown name is reported where the tag is.
 	const Type *tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name);
 
+	struct TagArguments {
+		std::string_view op, left, right, returns, element, keyed;
+	};
+	static TagArguments tag_arguments(const Metadata &p_tag);
+	void constructor_tag(Symbol *p_class, const Metadata &p_tag, Described &r_result);
+	void operator_tag(Symbol *p_class, const Metadata &p_tag, const TagArguments &p_arguments, size_t p_inherited,
+			Described &r_result);
+
 	// What the class's declaration says about operators and indexing, or null if it says nothing.
 	const Described *described(const Type *p_type);
 
@@ -195,10 +199,17 @@ class Typer {
 
 	const Type *unary(Unary *p_unary);
 
+	const Type *object_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
+	const Type *int64_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
+	const Type *primitive_arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
 	const Type *arithmetic(TokenKind p_op, const Type *p_left, const Type *p_right);
 
 	const Type *binary(Binary *p_binary);
 
+	const Type *literal_type(Expr *p_expression);
+	const Type *applied_type(TypeApply *p_apply);
+	const Type *postfix_type(Postfix *p_postfix);
+	const Type *conditional_type(Conditional *p_choice);
 	const Type *compute(Expr *p_expression);
 	const Type *member_expression_type(Expr *p_expression);
 	const Type *index_type(Expr *p_expression);
@@ -216,6 +227,10 @@ class Typer {
 	bool godot_storable(const Type *p_type, bool p_in_node) const;
 	bool godot_value(const Type *p_type) const;
 
+	void loop_statement(Stmt *p_statement);
+	void for_in(ForIn *p_loop);
+	void switch_statement(Switch *p_switch);
+	void try_statement(Try *p_try);
 	void statement(Stmt *p_statement);
 
 	void returned(Return *p_return);

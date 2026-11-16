@@ -66,109 +66,129 @@ bool is_constructor(const Symbol *p_symbol) {
 			p_symbol->owner->klass->constructor == p_symbol;
 }
 
-void add_outline(std::vector<OutlineItem> &r_items, OutlineItem p_item) {
-	if (p_item.name_length == 0) {
-		return; // A declaration whose name is still to be typed.
-	}
-	p_item.offset = std::min(p_item.offset, p_item.name_offset);
-	p_item.end = std::max(p_item.end, p_item.name_offset + p_item.name_length);
-	r_items.push_back(std::move(p_item));
-}
-
-void outline_function(std::vector<OutlineItem> &r_items, const FunctionDecl *p_function, SymbolKind p_kind,
-		std::string_view p_class) {
-	OutlineItem item;
-	item.name = std::string(p_function->name);
-	item.kind = p_kind;
-	if (p_function->accessor != FunctionDecl::None) {
-		item.kind = SymbolKind::Property;
-		item.name = (p_function->accessor == FunctionDecl::Getter ? "get " : "set ") + item.name;
-	} else {
-		item.is_constructor = !p_class.empty() && p_function->name == p_class;
-	}
-	item.offset = p_function->offset;
-	item.end = p_function->end;
-	item.name_offset = p_function->name_offset;
-	item.name_length = (uint32_t)p_function->name.size();
-	add_outline(r_items, std::move(item));
-}
-
-void outline_variables(std::vector<OutlineItem> &r_items, const VarDecl *p_decl, SymbolKind p_kind) {
-	for (const Declarator &declarator : p_decl->declarators) {
-		OutlineItem item;
-		item.name = std::string(declarator.name);
-		item.kind = p_kind;
-		item.is_const = p_decl->is_const;
-		item.offset = declarator.offset;
-		item.end = declarator.end;
-		item.name_offset = declarator.offset;
-		item.name_length = (uint32_t)declarator.name.size();
-		add_outline(r_items, std::move(item));
+void add_occurrence(std::vector<Occurrence> &r_list, uint32_t p_offset, std::string_view p_name, Symbol *p_symbol,
+		bool p_declaration) {
+	if (p_symbol && !p_name.empty()) {
+		r_list.push_back({ p_offset, (uint32_t)p_name.size(), p_symbol, p_declaration });
 	}
 }
 
-void outline_definition(std::vector<OutlineItem> &r_items, const Node *p_node) {
+// `super(...)`: the base class's constructor, or the class if it declares none.
+void add_super_occurrence(Call *p_call, Symbol *p_enclosing, std::vector<Occurrence> &r_list) {
+	Symbol *base = p_enclosing && p_enclosing->klass ? p_enclosing->klass->base : nullptr;
+	if (p_call->callee && p_call->callee->kind == NodeKind::SuperExpr && base) {
+		Symbol *constructor = base->klass ? base->klass->constructor : nullptr;
+		add_occurrence(r_list, p_call->callee->offset, "super", constructor ? constructor : base, false);
+	}
+}
+
+void add_function_occurrences(FunctionDecl *p_function, std::vector<Occurrence> &r_list) {
+	add_occurrence(r_list, p_function->name_offset, p_function->name, p_function->symbol, true);
+	for (const Parameter &parameter : p_function->parameters) {
+		add_occurrence(r_list, parameter.offset, parameter.name, parameter.symbol, true);
+	}
+}
+
+// The names one node declares or uses. r_enclosing is the class whose members are being walked.
+void add_occurrences(Node *p_node, Symbol *&r_enclosing, std::vector<Occurrence> &r_list) {
 	switch (p_node->kind) {
-		case NodeKind::ClassDecl: {
-			const ClassDecl *decl = static_cast<const ClassDecl *>(p_node);
-			OutlineItem item;
-			item.name = std::string(decl->name);
-			item.kind = SymbolKind::Class;
-			item.offset = decl->offset;
-			item.end = decl->end;
-			item.name_offset = decl->name_offset;
-			item.name_length = (uint32_t)decl->name.size();
-			for (const Node *member : decl->members) {
-				if (member->kind == NodeKind::VarDecl) {
-					outline_variables(item.children, static_cast<const VarDecl *>(member), SymbolKind::Field);
-				} else if (member->kind == NodeKind::FunctionDecl) {
-					outline_function(item.children, static_cast<const FunctionDecl *>(member), SymbolKind::Method, decl->name);
-				}
+		case NodeKind::Name: {
+			Name *name = static_cast<Name *>(p_node);
+			add_occurrence(r_list, name->offset, name->text, name->symbol, false);
+			break;
+		}
+		case NodeKind::TypeRef: {
+			TypeRef *type = static_cast<TypeRef *>(p_node);
+			if (type->name.count > 0) {
+				uint32_t last = type->name.count - 1;
+				add_occurrence(r_list, type->name_offsets[last], type->name[last], type->symbol, false);
 			}
-			add_outline(r_items, std::move(item));
+			break;
+		}
+		case NodeKind::Member: {
+			Member *member = static_cast<Member *>(p_node);
+			add_occurrence(r_list, member->name_offset, member->name, member->resolved(), false);
+			break;
+		}
+		case NodeKind::Call:
+			add_super_occurrence(static_cast<Call *>(p_node), r_enclosing, r_list);
+			break;
+		case NodeKind::Import: {
+			Import *import = static_cast<Import *>(p_node);
+			if (import->name.count > 0 && !import->wildcard) {
+				uint32_t last = import->name.count - 1;
+				add_occurrence(r_list, import->name_offsets[last], import->name[last], import->symbol, false);
+			}
+			break;
+		}
+		case NodeKind::ClassDecl: {
+			ClassDecl *decl = static_cast<ClassDecl *>(p_node);
+			r_enclosing = decl->symbol; // Parents come first in the walk, and classes do not nest.
+			add_occurrence(r_list, decl->name_offset, decl->name, decl->symbol, true);
 			break;
 		}
 		case NodeKind::InterfaceDecl: {
-			const InterfaceDecl *decl = static_cast<const InterfaceDecl *>(p_node);
-			OutlineItem item;
-			item.name = std::string(decl->name);
-			item.kind = SymbolKind::Interface;
-			item.offset = decl->offset;
-			item.end = decl->end;
-			item.name_offset = decl->name_offset;
-			item.name_length = (uint32_t)decl->name.size();
-			for (const FunctionDecl *method : decl->methods) {
-				outline_function(item.children, method, SymbolKind::Method, std::string_view());
-			}
-			add_outline(r_items, std::move(item));
+			InterfaceDecl *decl = static_cast<InterfaceDecl *>(p_node);
+			add_occurrence(r_list, decl->name_offset, decl->name, decl->symbol, true);
 			break;
 		}
 		case NodeKind::FunctionDecl:
-			outline_function(r_items, static_cast<const FunctionDecl *>(p_node), SymbolKind::Function, std::string_view());
+			add_function_occurrences(static_cast<FunctionDecl *>(p_node), r_list);
 			break;
 		case NodeKind::VarDecl:
-			outline_variables(r_items, static_cast<const VarDecl *>(p_node), SymbolKind::Variable);
+			for (const Declarator &declarator : static_cast<VarDecl *>(p_node)->declarators) {
+				add_occurrence(r_list, declarator.offset, declarator.name, declarator.symbol, true);
+			}
+			break;
+		case NodeKind::Try:
+			for (const CatchClause &clause : static_cast<Try *>(p_node)->catches) {
+				add_occurrence(r_list, clause.name_offset, clause.name, clause.symbol, true);
+			}
 			break;
 		default:
 			break;
 	}
 }
 
-bool contains_ignoring_case(std::string_view p_text, std::string_view p_query) {
-	if (p_query.empty()) {
-		return true;
-	}
-	auto lower = [](char p_c) { return p_c >= 'A' && p_c <= 'Z' ? (char)(p_c - 'A' + 'a') : p_c; };
-	for (size_t start = 0; start + p_query.size() <= p_text.size(); start++) {
-		size_t i = 0;
-		while (i < p_query.size() && lower(p_text[start + i]) == lower(p_query[i])) {
-			i++;
+std::string class_text(const Unit &p_unit, const Symbol *p_symbol, const std::string &p_name) {
+	std::string out = "class " + p_name;
+	if (p_symbol->node && p_symbol->node->kind == NodeKind::ClassDecl) {
+		const ClassDecl *decl = static_cast<const ClassDecl *>(p_symbol->node);
+		if (decl->extends) {
+			out += " extends " + std::string(slice(p_unit, decl->extends->offset, decl->extends->end));
 		}
-		if (i == p_query.size()) {
-			return true;
+		for (uint32_t i = 0; i < decl->implements.count; i++) {
+			out += (i == 0 ? " implements " : ", ") +
+					std::string(slice(p_unit, decl->implements[i]->offset, decl->implements[i]->end));
 		}
 	}
-	return false;
+	return out;
+}
+
+std::string interface_text(const Unit &p_unit, const Symbol *p_symbol, const std::string &p_name) {
+	std::string out = "interface " + p_name;
+	if (p_symbol->node && p_symbol->node->kind == NodeKind::InterfaceDecl) {
+		const InterfaceDecl *decl = static_cast<const InterfaceDecl *>(p_symbol->node);
+		for (uint32_t i = 0; i < decl->extends.count; i++) {
+			out += (i == 0 ? " extends " : ", ") +
+					std::string(slice(p_unit, decl->extends[i]->offset, decl->extends[i]->end));
+		}
+	}
+	return out;
+}
+
+// A variable, a field or a local; a constant with its value.
+std::string variable_text(const Unit &p_unit, const Symbol *p_symbol, const std::string &p_prefix,
+		const std::string &p_name) {
+	std::string out = p_prefix + (p_symbol->is_const ? "const " : "var ") + p_name + type_text(p_unit, p_symbol->type);
+	if (p_symbol->is_const && p_symbol->node && p_symbol->node->kind == NodeKind::VarDecl) {
+		for (const Declarator &declarator : static_cast<const VarDecl *>(p_symbol->node)->declarators) {
+			if (declarator.symbol == p_symbol) {
+				out += value_text(p_unit, declarator.initializer);
+			}
+		}
+	}
+	return out;
 }
 
 } // namespace
@@ -179,83 +199,8 @@ const std::vector<Occurrence> &Queries::occurrences(const Unit &p_unit) {
 		return cached->second;
 	}
 	std::vector<Occurrence> &list = occurrences_[&p_unit];
-	auto add = [&](uint32_t p_offset, std::string_view p_name, Symbol *p_symbol, bool p_declaration) {
-		if (p_symbol && !p_name.empty()) {
-			list.push_back({ p_offset, (uint32_t)p_name.size(), p_symbol, p_declaration });
-		}
-	};
 	Symbol *enclosing = nullptr; // The class whose members are being walked.
-	walk(p_unit.tree, [&](Node *p_node) {
-		switch (p_node->kind) {
-			case NodeKind::Name: {
-				Name *name = static_cast<Name *>(p_node);
-				add(name->offset, name->text, name->symbol, false);
-				break;
-			}
-			case NodeKind::TypeRef: {
-				TypeRef *type = static_cast<TypeRef *>(p_node);
-				if (type->name.count > 0) {
-					uint32_t last = type->name.count - 1;
-					add(type->name_offsets[last], type->name[last], type->symbol, false);
-				}
-				break;
-			}
-			case NodeKind::Member: {
-				Member *member = static_cast<Member *>(p_node);
-				add(member->name_offset, member->name, member->resolved(), false);
-				break;
-			}
-			case NodeKind::Call: {
-				// `super(...)`: the base class's constructor, or the class if it declares none.
-				Call *call = static_cast<Call *>(p_node);
-				Symbol *base = enclosing && enclosing->klass ? enclosing->klass->base : nullptr;
-				if (call->callee && call->callee->kind == NodeKind::SuperExpr && base) {
-					Symbol *constructor = base->klass ? base->klass->constructor : nullptr;
-					add(call->callee->offset, "super", constructor ? constructor : base, false);
-				}
-				break;
-			}
-			case NodeKind::Import: {
-				Import *import = static_cast<Import *>(p_node);
-				if (import->name.count > 0 && !import->wildcard) {
-					uint32_t last = import->name.count - 1;
-					add(import->name_offsets[last], import->name[last], import->symbol, false);
-				}
-				break;
-			}
-			case NodeKind::ClassDecl: {
-				ClassDecl *decl = static_cast<ClassDecl *>(p_node);
-				enclosing = decl->symbol; // Parents come first in the walk, and classes do not nest.
-				add(decl->name_offset, decl->name, decl->symbol, true);
-				break;
-			}
-			case NodeKind::InterfaceDecl: {
-				InterfaceDecl *decl = static_cast<InterfaceDecl *>(p_node);
-				add(decl->name_offset, decl->name, decl->symbol, true);
-				break;
-			}
-			case NodeKind::FunctionDecl: {
-				FunctionDecl *function = static_cast<FunctionDecl *>(p_node);
-				add(function->name_offset, function->name, function->symbol, true);
-				for (const Parameter &parameter : function->parameters) {
-					add(parameter.offset, parameter.name, parameter.symbol, true);
-				}
-				break;
-			}
-			case NodeKind::VarDecl:
-				for (const Declarator &declarator : static_cast<VarDecl *>(p_node)->declarators) {
-					add(declarator.offset, declarator.name, declarator.symbol, true);
-				}
-				break;
-			case NodeKind::Try:
-				for (const CatchClause &clause : static_cast<Try *>(p_node)->catches) {
-					add(clause.name_offset, clause.name, clause.symbol, true);
-				}
-				break;
-			default:
-				break;
-		}
-	});
+	walk(p_unit.tree, [&](Node *p_node) { add_occurrences(p_node, enclosing, list); });
 	std::stable_sort(list.begin(), list.end(),
 			[](const Occurrence &p_a, const Occurrence &p_b) { return p_a.offset < p_b.offset; });
 	return list;
@@ -344,31 +289,10 @@ std::string Queries::describe(const Symbol *p_symbol) const {
 	const Unit &unit = *p_symbol->unit;
 	std::string prefix = p_symbol->is_static() ? "static " : "";
 	switch (p_symbol->kind) {
-		case SymbolKind::Class: {
-			std::string out = "class " + name;
-			if (p_symbol->node && p_symbol->node->kind == NodeKind::ClassDecl) {
-				const ClassDecl *decl = static_cast<const ClassDecl *>(p_symbol->node);
-				if (decl->extends) {
-					out += " extends " + std::string(slice(unit, decl->extends->offset, decl->extends->end));
-				}
-				for (uint32_t i = 0; i < decl->implements.count; i++) {
-					out += (i == 0 ? " implements " : ", ") +
-							std::string(slice(unit, decl->implements[i]->offset, decl->implements[i]->end));
-				}
-			}
-			return out;
-		}
-		case SymbolKind::Interface: {
-			std::string out = "interface " + name;
-			if (p_symbol->node && p_symbol->node->kind == NodeKind::InterfaceDecl) {
-				const InterfaceDecl *decl = static_cast<const InterfaceDecl *>(p_symbol->node);
-				for (uint32_t i = 0; i < decl->extends.count; i++) {
-					out += (i == 0 ? " extends " : ", ") +
-							std::string(slice(unit, decl->extends[i]->offset, decl->extends[i]->end));
-				}
-			}
-			return out;
-		}
+		case SymbolKind::Class:
+			return class_text(unit, p_symbol, name);
+		case SymbolKind::Interface:
+			return interface_text(unit, p_symbol, name);
 		case SymbolKind::Function:
 		case SymbolKind::Method:
 		case SymbolKind::LocalFunction:
@@ -386,17 +310,8 @@ std::string Queries::describe(const Symbol *p_symbol) const {
 		}
 		case SymbolKind::Variable:
 		case SymbolKind::Field:
-		case SymbolKind::Local: {
-			std::string out = prefix + (p_symbol->is_const ? "const " : "var ") + name + type_text(unit, p_symbol->type);
-			if (p_symbol->is_const && p_symbol->node && p_symbol->node->kind == NodeKind::VarDecl) {
-				for (const Declarator &declarator : static_cast<const VarDecl *>(p_symbol->node)->declarators) {
-					if (declarator.symbol == p_symbol) {
-						out += value_text(unit, declarator.initializer);
-					}
-				}
-			}
-			return out;
-		}
+		case SymbolKind::Local:
+			return variable_text(unit, p_symbol, prefix, name);
 		case SymbolKind::Parameter:
 			return (p_symbol->is_rest ? "..." : "") + name + type_text(unit, p_symbol->type);
 		case SymbolKind::CatchVariable:
@@ -439,73 +354,6 @@ std::string Queries::context(const Symbol *p_symbol) const {
 		return kind + " in package " + p_symbol->package->name;
 	}
 	return kind;
-}
-
-std::vector<OutlineItem> Queries::outline(const Unit &p_unit) const {
-	std::vector<OutlineItem> items;
-	if (!p_unit.tree) {
-		return items;
-	}
-	if (p_unit.tree->package) {
-		for (const Node *definition : p_unit.tree->package->definitions) {
-			outline_definition(items, definition);
-		}
-	}
-	for (const Node *definition : p_unit.tree->definitions) {
-		outline_definition(items, definition);
-	}
-	return items;
-}
-
-std::vector<FoundSymbol> Queries::find(std::string_view p_query, size_t p_limit) {
-	std::vector<FoundSymbol> found;
-	auto consider = [&](const Unit &p_unit, const OutlineItem &p_item, const std::string &p_container) {
-		std::string name = p_item.kind == SymbolKind::Property ? p_item.name.substr(4) : p_item.name;
-		if (found.size() >= p_limit || !contains_ignoring_case(name, p_query)) {
-			return;
-		}
-		// A property with a getter and a setter is one definition: its first accessor stands for it.
-		if (p_item.kind == SymbolKind::Property) {
-			for (const FoundSymbol &earlier : found) {
-				if (earlier.kind == SymbolKind::Property && earlier.unit == &p_unit && earlier.name == name && earlier.container == p_container) {
-					return;
-				}
-			}
-		}
-		FoundSymbol symbol;
-		symbol.name = std::move(name);
-		symbol.container = p_container;
-		symbol.kind = p_item.kind;
-		symbol.is_const = p_item.is_const;
-		symbol.is_constructor = p_item.is_constructor;
-		symbol.unit = &p_unit;
-		symbol.offset = p_item.name_offset;
-		symbol.length = p_item.name_length;
-		found.push_back(std::move(symbol));
-	};
-	// The program's own definitions first: with a limit, they are what is kept.
-	for (bool declared : { false, true }) {
-		if (declared && p_query.empty()) {
-			break; // Everything, unasked: the program is what is meant, not Godot's thousands of names.
-		}
-		for (const Unit &unit : compilation_.units()) {
-			if (unit.is_declaration != declared) {
-				continue;
-			}
-			const std::string package = unit.package ? unit.package->name : std::string();
-			for (const OutlineItem &item : outline(unit)) {
-				consider(unit, item, package);
-				const std::string container = package.empty() ? item.name : package + "." + item.name;
-				for (const OutlineItem &child : item.children) {
-					consider(unit, child, container);
-				}
-				if (found.size() >= p_limit) {
-					return found;
-				}
-			}
-		}
-	}
-	return found;
 }
 
 } // namespace kas3

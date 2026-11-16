@@ -1,160 +1,8 @@
-// The link pass: imports, package-level lookup, the class hierarchy, and the override rules.
+// The link pass: imports, the class hierarchy, and the override rules. Package-level lookup is in
+// names_lookup.cpp, and what a class has from its bases in names_members.cpp.
 #include "names.h"
 
 namespace kas3 {
-
-Context Compilation::context_of(Unit &p_unit, bool p_in_block) {
-	Context context;
-	context.unit = &p_unit;
-	context.package = p_unit.package;
-	context.imports = p_in_block ? &p_unit.block_imports : &p_unit.outer_imports;
-	return context;
-}
-
-Context Compilation::context_of(Symbol *p_class) {
-	Context context = context_of(*p_class->unit, !p_class->file_private);
-	context.imports = &p_class->klass->imports;
-	context.klass = p_class;
-	return context;
-}
-
-bool Compilation::visible(const Symbol *p_definition, const Context &p_from) const {
-	// A declaration file describes code that was compiled without this program: nothing the program defines
-	// can change what its names mean.
-	if (p_from.unit->is_declaration && !p_definition->unit->is_declaration) {
-		return false;
-	}
-	if (p_definition->file_private) {
-		return p_definition->unit == p_from.unit;
-	}
-	if (p_definition->modifiers & Modifiers::Public) {
-		return true;
-	}
-	return p_definition->package == p_from.package;
-}
-
-static void add_match(const Compilation &p_compilation, const Context &p_from, Symbol *p_symbol, Found &r_found) {
-	if (!p_symbol || p_symbol == r_found.first || p_symbol == r_found.second) {
-		return;
-	}
-	if (!p_compilation.visible(p_symbol, p_from)) {
-		if (!r_found.hidden) {
-			r_found.hidden = p_symbol;
-		}
-	} else if (!r_found.first) {
-		r_found.first = p_symbol;
-	} else if (!r_found.second) {
-		r_found.second = p_symbol;
-	}
-}
-
-static Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_table, std::string_view p_name) {
-	auto found = p_table.find(p_name);
-	return found == p_table.end() ? nullptr : found->second;
-}
-
-// AS3 opens every namespace in reach at once: the file's helpers, the current package, the top-level package,
-// and every import. Two different matches are an ambiguity, never a shadowing.
-//
-// A declaration file is different: its own package comes first, then its imports, then the top level, so that
-// a library's `Object` is the library's.
-Found Compilation::lookup_package_level(const Context &p_from, std::string_view p_name) const {
-	Found found;
-	bool ordered = p_from.unit->is_declaration;
-	add_match(*this, p_from, find_in(p_from.unit->helpers, p_name), found);
-	add_match(*this, p_from, find_in(p_from.package->definitions, p_name), found);
-	if (ordered && found.first) {
-		return found;
-	}
-	if (!ordered) {
-		add_match(*this, p_from, find_in(top_level_->definitions, p_name), found);
-	}
-	for (const ImportScope *scope = p_from.imports; scope; scope = scope->parent) {
-		for (const ResolvedImport &import : scope->imports) {
-			if (import.symbol) {
-				if (import.symbol->name == p_name) {
-					add_match(*this, p_from, import.symbol, found);
-				}
-			} else {
-				add_match(*this, p_from, find_in(import.package->definitions, p_name), found);
-			}
-		}
-	}
-	if (ordered && !found.first) {
-		add_match(*this, p_from, find_in(top_level_->definitions, p_name), found);
-	}
-	if (!found.first) {
-		for (const ImportScope *scope = p_from.imports; scope && !found.suppressed; scope = scope->parent) {
-			found.suppressed = scope->failed_wildcard;
-			for (std::string_view failed : scope->failed) {
-				found.suppressed |= failed == p_name;
-			}
-		}
-	}
-	return found;
-}
-
-Found Compilation::lookup_qualified(const Context &p_from, const std::string &p_package,
-		std::string_view p_name) const {
-	Found found;
-	auto package = packages_.find(p_package);
-	if (package != packages_.end()) {
-		add_match(*this, p_from, find_in(package->second.definitions, p_name), found);
-	}
-	return found;
-}
-
-std::string Compilation::ambiguous_message(std::string_view p_name, const Found &p_found) const {
-	return quoted(p_name) + " is ambiguous: it could be " + qualified_name(p_found.first) + " or " +
-			qualified_name(p_found.second);
-}
-
-Symbol *Compilation::resolve_type(const Context &p_from, TypeRef *p_type) {
-	if (!p_type || p_type->form == TypeRef::Any || p_type->form == TypeRef::Void || p_type->name.count == 0) {
-		return nullptr;
-	}
-	// Type arguments nest at most Parser::MAX_TYPE_DEPTH deep, so this recursion is shallow.
-	if (p_type->form == TypeRef::Applied) {
-		resolve_type(p_from, p_type->argument);
-	}
-	Diagnostics &diagnostics = p_from.unit->diagnostics;
-	uint32_t last = p_type->name.count - 1;
-	if (last == 0 && p_type->form == TypeRef::Named && p_from.klass == vector_ && p_type->name[0] == "T") {
-		if (!element_) {
-			element_ = new_symbol(SymbolKind::Class, "T", p_from.unit, 0);
-		}
-		p_type->symbol = element_;
-		return element_;
-	}
-	std::string shown = dotted_name(p_type->name, p_type->name.count);
-	Found found = last == 0 ? lookup_package_level(p_from, p_type->name[0])
-							: lookup_qualified(p_from, dotted_name(p_type->name, last), p_type->name[last]);
-	if (!found.first) {
-		if (found.hidden && last > 0) {
-			diagnostics.unresolved(p_type->offset, quoted(shown) + " is not public");
-		} else if (found.suppressed) {
-			// A failed import has been reported, and may be where this name was to come from.
-		} else {
-			diagnostics.unresolved(p_type->offset, "unknown type " + quoted(shown));
-		}
-		return nullptr;
-	}
-	if (found.second) {
-		diagnostics.error(p_type->offset, ambiguous_message(shown, found));
-		return nullptr;
-	}
-	if (!found.first->is_type()) {
-		diagnostics.error(p_type->offset, quoted(shown) + " is not a type");
-		return nullptr;
-	}
-	if (p_type->form == TypeRef::Applied && found.first != vector_) {
-		diagnostics.error(p_type->offset, "only Vector takes a type parameter");
-		return nullptr;
-	}
-	p_type->symbol = found.first;
-	p_from.unit->references.push_back({ p_type->name_offsets[last], p_type->name[last], found.first });
-	return found.first;
-}
 
 void Compilation::resolve_imports(Unit &p_unit, const List<Import *> &p_imports, ImportScope &r_scope) {
 	for (Import *import : p_imports) {
@@ -358,109 +206,6 @@ void Compilation::cut_interface_cycles() {
 	}
 }
 
-bool Compilation::hierarchy_broken(Symbol *p_class) const {
-	for (const ClassInfo *info = p_class->klass; info; info = info->base ? info->base->klass : nullptr) {
-		if (info->chain_known) {
-			return info->chain_broken;
-		}
-		if (info->broken || info->incomplete) {
-			return true;
-		}
-	}
-	return false;
-}
-
-FunctionDecl *Compilation::property_half(Symbol *p_through, const Symbol *p_property, FunctionDecl::Accessor p_half,
-		bool *r_known) {
-	const auto half = [&](const Symbol *p_symbol) { return p_half == FunctionDecl::Getter ? p_symbol->getter : p_symbol->setter; };
-	FunctionDecl *found = half(p_property);
-	Symbol *from = p_through && p_through->kind == SymbolKind::Interface ? p_through : p_property->owner;
-	bool known = from != nullptr;
-	if (!found && from && from->kind == SymbolKind::Interface) {
-		// The interface, then everything it extends: AVM2 finds an interface's member by its name.
-		std::vector<Symbol *> pending{ from };
-		for (size_t i = 0; i < pending.size() && !found; i++) {
-			ClassInfo *info = pending[i]->klass;
-			Symbol *member = find_in(info->members, p_property->name);
-			found = member && member->kind == SymbolKind::Property ? half(member) : nullptr;
-			const Node *node = pending[i]->node;
-			known = known && !info->broken && node && node->kind == NodeKind::InterfaceDecl &&
-					info->interfaces.size() == static_cast<const InterfaceDecl *>(node)->extends.count;
-			for (Symbol *parent : info->interfaces) {
-				known = known && parent;
-				if (parent && std::find(pending.begin(), pending.end(), parent) == pending.end()) {
-					pending.push_back(parent);
-				}
-			}
-		}
-	} else if (!found && from) {
-		known = !hierarchy_broken(from);
-	}
-	if (r_known) {
-		*r_known = known;
-	}
-	return found;
-}
-
-// Works the answer to hierarchy_broken out once for every class, so that a deep hierarchy is not walked
-// again for each question. Called when no base class will change any more.
-void Compilation::settle_hierarchy() {
-	std::vector<ClassInfo *> chain;
-	for (ClassInfo &start : classes_) {
-		chain.clear();
-		bool broken = false;
-		for (ClassInfo *info = &start; info; info = info->base ? info->base->klass : nullptr) {
-			if (info->chain_known) {
-				broken = info->chain_broken;
-				break;
-			}
-			chain.push_back(info);
-		}
-		for (size_t i = chain.size(); i-- > 0;) {
-			broken = broken || chain[i]->broken || chain[i]->incomplete;
-			chain[i]->chain_broken = broken;
-			chain[i]->chain_known = true;
-		}
-	}
-}
-
-bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package) {
-	if (p_member->modifiers & Modifiers::Private) {
-		return false;
-	}
-	if (p_member->modifiers & (Modifiers::Public | Modifiers::Protected)) {
-		return true;
-	}
-	return p_base->package == p_package;
-}
-
-Symbol *Compilation::find_member(Symbol *p_class, std::string_view p_name, bool p_static_only,
-		Symbol **r_instance, Symbol **r_hidden) const {
-	// An object's own members come before those of its class, as they do when the program runs.
-	for (int statics = 0; statics < 2; statics++) {
-		for (Symbol *owner = p_class; owner; owner = owner->klass->base) {
-			Symbol *member = find_in(owner->klass->table(statics != 0), p_name);
-			if (!member) {
-				continue;
-			}
-			if (owner != p_class && !inherited_visible(member, owner, p_class->package)) {
-				if (r_hidden && !*r_hidden) {
-					*r_hidden = member;
-				}
-				continue;
-			}
-			if (p_static_only && !statics) {
-				if (r_instance && !*r_instance) {
-					*r_instance = member;
-				}
-				break;
-			}
-			return member;
-		}
-	}
-	return nullptr;
-}
-
 // A class that declares one half of a property beside an inherited other half sees both. Bases first.
 void Compilation::inherit_properties(Symbol *p_class) {
 	std::vector<Symbol *> chain;
@@ -493,65 +238,72 @@ void Compilation::inherit_properties(Symbol *p_class) {
 	}
 }
 
+namespace {
+
+// The instance member of that name that a base class of p_class hands down, if any.
+Symbol *inherited_member(Symbol *p_class, std::string_view p_name) {
+	for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
+		Symbol *member = find_in(base->klass->members, p_name);
+		if (member && !member->is_static() && inherited_visible(member, base, p_class->package)) {
+			return member;
+		}
+	}
+	return nullptr;
+}
+
+// True if a built-in base declares the name at all, visible or not, static or not.
+bool builtin_base_has(Symbol *p_class, std::string_view p_name) {
+	for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
+		if (base->unit->is_builtin &&
+				(find_in(base->klass->members, p_name) || find_in(base->klass->statics, p_name))) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// The override rules for one method or one half of a property, against what a base hands down (p_base).
+void check_override(Diagnostics &p_diagnostics, Symbol *p_class, FunctionDecl *p_function, Symbol *p_base) {
+	// A built-in member may be redefined with or without `override`. Which one AS3 wants depends on
+	// whether the member is in the AS3 namespace, on the prototype, or public; that is not modelled.
+	if (p_base && p_base->unit->is_builtin) {
+		return;
+	}
+	if (!p_base && (p_function->modifiers.bits & Modifiers::Override) && builtin_base_has(p_class, p_function->name)) {
+		return;
+	}
+	std::string name = quoted(p_function->name);
+	uint32_t offset = p_function->name_offset;
+	FunctionDecl *overridden = nullptr;
+	bool free_slot = false; // The base has a property of this name, but not this half of it.
+	if (p_base) {
+		if (p_function->accessor == FunctionDecl::None) {
+			overridden = p_base->kind == SymbolKind::Method ? static_cast<FunctionDecl *>(p_base->node) : nullptr;
+		} else if (p_base->kind == SymbolKind::Property) {
+			overridden = p_function->accessor == FunctionDecl::Getter ? p_base->getter : p_base->setter;
+			free_slot = overridden == nullptr;
+		}
+	}
+	std::string base_name = p_base ? std::string(p_base->owner->name) : std::string();
+	if (p_function->modifiers.bits & Modifiers::Override) {
+		if (!p_base || free_slot) {
+			p_diagnostics.error(offset, name + " is marked 'override' but no base class has a method to override");
+		} else if (!overridden) {
+			p_diagnostics.error(offset, "can't override " + name + ": it is not a method in " + base_name);
+		} else if (overridden->modifiers.bits & Modifiers::Final) {
+			p_diagnostics.error(offset, "can't override " + name + ": it is final in " + base_name);
+		}
+	} else if (overridden) {
+		p_diagnostics.error(offset, name + " overrides a method of " + base_name + " and must be marked 'override'");
+	} else if (p_base && !free_slot) {
+		p_diagnostics.error(offset, name + " conflicts with " + name + " inherited from " + base_name);
+	}
+}
+
+} // namespace
+
 void Compilation::check_overrides(Symbol *p_class) {
 	Diagnostics &diagnostics = p_class->unit->diagnostics;
-	// The instance member of that name that a base class hands down, if any.
-	auto inherited = [&](std::string_view p_name) -> Symbol * {
-		for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
-			Symbol *member = find_in(base->klass->members, p_name);
-			if (member && !member->is_static() && inherited_visible(member, base, p_class->package)) {
-				return member;
-			}
-		}
-		return nullptr;
-	};
-	// True if a built-in base declares the name at all, visible or not, static or not.
-	auto builtin_has = [&](std::string_view p_name) {
-		for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
-			if (base->unit->is_builtin &&
-					(find_in(base->klass->members, p_name) || find_in(base->klass->statics, p_name))) {
-				return true;
-			}
-		}
-		return false;
-	};
-	// p_accessor: None for a plain method, Getter or Setter for half of a property.
-	auto check_function = [&](FunctionDecl *p_function, Symbol *p_base) {
-		// A built-in member may be redefined with or without `override`. Which one AS3 wants depends on
-		// whether the member is in the AS3 namespace, on the prototype, or public; that is not modelled.
-		if (p_base && p_base->unit->is_builtin) {
-			return;
-		}
-		if (!p_base && (p_function->modifiers.bits & Modifiers::Override) && builtin_has(p_function->name)) {
-			return;
-		}
-		std::string name = quoted(p_function->name);
-		uint32_t offset = p_function->name_offset;
-		FunctionDecl *overridden = nullptr;
-		bool free_slot = false; // The base has a property of this name, but not this half of it.
-		if (p_base) {
-			if (p_function->accessor == FunctionDecl::None) {
-				overridden = p_base->kind == SymbolKind::Method ? static_cast<FunctionDecl *>(p_base->node) : nullptr;
-			} else if (p_base->kind == SymbolKind::Property) {
-				overridden = p_function->accessor == FunctionDecl::Getter ? p_base->getter : p_base->setter;
-				free_slot = overridden == nullptr;
-			}
-		}
-		std::string base_name = p_base ? std::string(p_base->owner->name) : std::string();
-		if (p_function->modifiers.bits & Modifiers::Override) {
-			if (!p_base || free_slot) {
-				diagnostics.error(offset, name + " is marked 'override' but no base class has a method to override");
-			} else if (!overridden) {
-				diagnostics.error(offset, "can't override " + name + ": it is not a method in " + base_name);
-			} else if (overridden->modifiers.bits & Modifiers::Final) {
-				diagnostics.error(offset, "can't override " + name + ": it is final in " + base_name);
-			}
-		} else if (overridden) {
-			diagnostics.error(offset, name + " overrides a method of " + base_name + " and must be marked 'override'");
-		} else if (p_base && !free_slot) {
-			diagnostics.error(offset, name + " conflicts with " + name + " inherited from " + base_name);
-		}
-	};
 	// In the order written, so that the errors kept when there are too many are the first in the file.
 	for (Node *node : static_cast<ClassDecl *>(p_class->node)->members) {
 		if (node->kind == NodeKind::VarDecl) {
@@ -560,7 +312,7 @@ void Compilation::check_overrides(Symbol *p_class) {
 				continue;
 			}
 			for (Declarator &declarator : decl->declarators) {
-				Symbol *base = inherited(declarator.name);
+				Symbol *base = inherited_member(p_class, declarator.name);
 				if (base && !base->unit->is_builtin) {
 					diagnostics.error(declarator.offset, quoted(declarator.name) + " conflicts with " +
 																 quoted(declarator.name) + " inherited from " +
@@ -572,7 +324,7 @@ void Compilation::check_overrides(Symbol *p_class) {
 			if ((function->modifiers.bits & Modifiers::Static) || function->symbol == p_class->klass->constructor) {
 				continue;
 			}
-			check_function(function, inherited(function->name));
+			check_override(diagnostics, p_class, function, inherited_member(p_class, function->name));
 		}
 	}
 }

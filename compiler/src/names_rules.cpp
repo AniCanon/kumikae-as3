@@ -10,15 +10,6 @@ namespace kas3 {
 
 namespace {
 
-std::string quoted(std::string_view p_name) {
-	return "'" + std::string(p_name) + "'";
-}
-
-Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_table, std::string_view p_name) {
-	auto found = p_table.find(p_name);
-	return found == p_table.end() ? nullptr : found->second;
-}
-
 class Rules {
 	Compilation &compilation_;
 

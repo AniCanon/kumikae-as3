@@ -222,6 +222,31 @@ const FunctionDecl *overridable(const Symbol *p_member, const FunctionDecl *p_me
 	return p_member->kind == SymbolKind::Method ? p_method : nullptr;
 }
 
+// The item for one inherited method: its declaration as the edit, with the caret in a body that throws.
+Completion override_item(Completion p_item, const FunctionDecl &p_function, std::string p_text, const Written &p_written,
+		const CompletionRange &p_span, const std::string &p_newline, const std::string &p_indent) {
+	// Keep the filtering word in the primary single-line edit. Modifiers may span lines.
+	const size_t name_at = p_text.find(std::string(p_function.name) + "(");
+	if (!p_written.access) {
+		p_item.additional_edit = CompletionEdit{ p_written.modifiers_at, p_written.modifiers_at,
+			(p_written.after_metadata ? " " : "") + p_text.substr(0, p_text.find(' ') + 1) };
+	}
+	p_text.erase(0, name_at);
+	if (!p_written.function) {
+		const char *half = p_function.accessor == FunctionDecl::Getter ? "get " :
+				p_function.accessor == FunctionDecl::Setter ? "set " : "";
+		p_text.insert(0, std::string("function ") + half);
+	}
+	p_item.callable = false;
+	p_item.required_parameters.clear();
+	p_text += " {" + p_newline + p_indent + "\t";
+	const auto caret = static_cast<uint32_t>(p_text.size());
+	p_item.tab_stops.push_back({ caret, caret, 0 });
+	p_text += "throw new Error(\"Not implemented\");" + p_newline + p_indent + "}";
+	p_item.edit = CompletionEdit{ p_span.begin, p_span.end, std::move(p_text) };
+	return p_item;
+}
+
 } // namespace
 
 std::optional<OverrideOffer> Queries::overrides(const Unit &p_unit, const FunctionDecl *p_function, Symbol *p_class,
@@ -268,27 +293,8 @@ std::optional<OverrideOffer> Queries::overrides(const Unit &p_unit, const Functi
 			if (!text) {
 				continue;
 			}
-			Completion item = completion_item(member);
-			// Keep the filtering word in the primary single-line edit. Modifiers may span lines.
-			const size_t name_at = text->find(std::string(function->name) + "(");
-			if (!written.access) {
-				item.additional_edit = CompletionEdit{ written.modifiers_at, written.modifiers_at,
-					(written.after_metadata ? " " : "") + text->substr(0, text->find(' ') + 1) };
-			}
-			text->erase(0, name_at);
-			if (!written.function) {
-				const char *half = function->accessor == FunctionDecl::Getter ? "get " :
-						function->accessor == FunctionDecl::Setter ? "set " : "";
-				text->insert(0, std::string("function ") + half);
-			}
-			item.callable = false;
-			item.required_parameters.clear();
-			*text += " {" + newline + indent + "\t";
-			const auto caret = static_cast<uint32_t>(text->size());
-			item.tab_stops.push_back({ caret, caret, 0 });
-			*text += "throw new Error(\"Not implemented\");" + newline + indent + "}";
-			item.edit = CompletionEdit{ span.begin, span.end, std::move(*text) };
-			offer.items.push_back(std::move(item));
+			offer.items.push_back(
+					override_item(completion_item(member), *function, std::move(*text), written, span, newline, indent));
 		}
 	}
 	std::sort(offer.items.begin(), offer.items.end(), [](const Completion &p_a, const Completion &p_b) { return p_a.name < p_b.name; });

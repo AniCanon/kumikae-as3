@@ -1,4 +1,4 @@
-// Expressions and type annotations.
+// Expressions. Literals are in parser_literals.cpp, and type annotations in parser_types.cpp.
 #include "parser.h"
 
 #include <algorithm>
@@ -88,17 +88,6 @@ bool is_prefix_operator(TokenKind p_kind) {
 			return false;
 	}
 }
-
-// Restores a parser flag when a scope ends.
-struct Restore {
-	bool &flag;
-	bool saved;
-	Restore(bool &p_flag, bool p_value) :
-			flag(p_flag), saved(p_flag) {
-		flag = p_value;
-	}
-	~Restore() { flag = saved; }
-};
 
 } // namespace
 
@@ -271,6 +260,25 @@ List<Expr *> Parser::parse_arguments(uint32_t *r_height) {
 	return to_list(arguments);
 }
 
+// After the object: `.name`, and the E4X and namespace forms of it, which are reported.
+Member *Parser::parse_member_link(Expr *p_object) {
+	if (at(TokenKind::DotDot)) {
+		error_at(current_.offset, "E4X (XML syntax) is not supported", false);
+	} else if (at(TokenKind::ColonColon)) {
+		error_at(current_.offset, "namespaces are not supported", false);
+	}
+	advance();
+	if (at(TokenKind::At)) {
+		error_at(current_.offset, "E4X (XML syntax) is not supported", false);
+		advance();
+	}
+	Member *member = node<Member>(p_object->offset);
+	member->object = p_object;
+	member->name_offset = current_.offset;
+	member->name = parse_property_name("a property name");
+	return member;
+}
+
 // A primary expression followed by any number of `.name`, `[index]`, `.<Type>` and, if allowed, `(args)`.
 Expr *Parser::parse_call_member(bool p_allow_calls) {
 	Expr *left = parse_primary();
@@ -279,21 +287,7 @@ Expr *Parser::parse_call_member(bool p_allow_calls) {
 		Expr *link = nullptr;
 		uint32_t child_height = 0;
 		if (at(TokenKind::Dot) || at(TokenKind::DotDot) || at(TokenKind::ColonColon)) {
-			if (at(TokenKind::DotDot)) {
-				error_at(current_.offset, "E4X (XML syntax) is not supported", false);
-			} else if (at(TokenKind::ColonColon)) {
-				error_at(current_.offset, "namespaces are not supported", false);
-			}
-			advance();
-			if (at(TokenKind::At)) {
-				error_at(current_.offset, "E4X (XML syntax) is not supported", false);
-				advance();
-			}
-			Member *member = node<Member>(left->offset);
-			member->object = left;
-			member->name_offset = current_.offset;
-			member->name = parse_property_name("a property name");
-			link = member;
+			link = parse_member_link(left);
 		} else if (at(TokenKind::DotLess)) {
 			advance();
 			TypeApply *apply = node<TypeApply>(left->offset);
@@ -385,114 +379,38 @@ Expr *Parser::parse_new() {
 	return finish(create);
 }
 
-Expr *Parser::parse_array_literal() {
-	Restore allow_in(no_in_, false);
-	Restore brackets(bracket_ends_initializer_, false);
+Expr *Parser::parse_parenthesized() {
 	Token open = advance();
-	ArrayLit *array = node<ArrayLit>(open.offset);
-	std::vector<Expr *> elements;
-	uint32_t height = 0;
-	while (!at(TokenKind::RBracket) && !at(TokenKind::EndOfFile)) {
-		if (at(TokenKind::Comma)) {
-			advance();
-			elements.push_back(nullptr); // A hole: `[1, , 2]`.
-			continue;
-		}
-		uint32_t before = current_.offset;
-		elements.push_back(parse_assignment());
-		height = std::max(height, last_height_);
-		if (!accept(TokenKind::Comma) || current_.offset == before) {
-			break;
-		}
+	Expr *inner;
+	uint32_t height;
+	{
+		Restore allow_in(no_in_, false);
+		Restore brackets(bracket_ends_initializer_, false);
+		inner = parse_expression();
+		height = last_height_;
 	}
-	expect_close(TokenKind::RBracket, open);
-	array->elements = to_list(elements);
-	grow(height + 1);
-	return finish(array);
-}
-
-Expr *Parser::parse_object_literal() {
-	Restore allow_in(no_in_, false);
-	Restore brackets(bracket_ends_initializer_, false);
-	Token open = advance();
-	ObjectLit *object = node<ObjectLit>(open.offset);
-	std::vector<ObjectField> fields;
-	uint32_t height = 0;
-	while (!at(TokenKind::RBrace) && !at(TokenKind::EndOfFile)) {
-		ObjectField field;
-		field.offset = current_.offset;
-		if (is_identifier_like(current_.kind) || at(TokenKind::Number)) {
-			field.key = text(advance());
-		} else if (at(TokenKind::String)) {
-			std::string_view quoted = text(advance());
-			field.key = quoted.substr(1, quoted.size() - 2);
-			field.key_is_string = true;
-		} else {
-			error_expected("a property name");
-			break;
-		}
-		expect(TokenKind::Colon, "':'");
-		field.value = parse_assignment();
-		field.end = previous_end_;
-		height = std::max(height, last_height_);
-		fields.push_back(field);
-		if (!accept(TokenKind::Comma)) {
-			break;
-		}
+	expect_close(TokenKind::RParen, open);
+	// No node of its own: the inner expression is marked and its range widened to the parentheses.
+	inner->parenthesized = true;
+	inner->offset = open.offset;
+	if (previous_end_ > inner->end) {
+		inner->end = previous_end_;
 	}
-	expect_close(TokenKind::RBrace, open);
-	object->fields = to_list(fields);
-	grow(height + 2); // The literal and its field.
-	return finish(object);
-}
-
-Expr *Parser::parse_function_expression() {
-	Token keyword = advance();
-	FunctionExpr *expression = node<FunctionExpr>(keyword.offset);
-	expression->function = parse_function_rest(keyword.offset, Modifiers(), List<Metadata>(), true, false, false);
-	grow(function_height_ + 1);
-	return finish(expression);
+	last_height_ = height;
+	return inner;
 }
 
 Expr *Parser::parse_primary() {
 	switch (current_.kind) {
-		case TokenKind::Number: {
-			NumberLit *literal = node<NumberLit>(current_.offset);
-			literal->text = text(advance());
-			last_height_ = 1;
-			return finish(literal);
-		}
-		case TokenKind::String: {
-			StringLit *literal = node<StringLit>(current_.offset);
-			literal->text = text(advance());
-			last_height_ = 1;
-			return finish(literal);
-		}
 		case TokenKind::Slash:
-		case TokenKind::SlashAssign: {
-			// Where an expression must begin, a slash starts a regular expression.
-			current_ = lexer_.rescan_as_regex(current_);
-			has_next_ = false;
-			note_current();
-			if (current_.kind != TokenKind::Regex) {
-				advance();
-				return missing_expression();
-			}
-			RegexLit *literal = node<RegexLit>(current_.offset);
-			literal->text = text(advance());
-			last_height_ = 1;
-			return finish(literal);
-		}
+		case TokenKind::SlashAssign:
+			return parse_regex();
+		case TokenKind::Number:
+		case TokenKind::String:
 		case TokenKind::KwTrue:
-		case TokenKind::KwFalse: {
-			BoolLit *literal = node<BoolLit>(current_.offset);
-			literal->value = advance().kind == TokenKind::KwTrue;
-			last_height_ = 1;
-			return finish(literal);
-		}
+		case TokenKind::KwFalse:
 		case TokenKind::KwNull:
-			last_height_ = 1;
-			return finish(node<NullLit>(advance().offset));
+			return parse_literal_token();
 		case TokenKind::KwThis:
 			last_height_ = 1;
 			return finish(node<ThisExpr>(advance().offset));
@@ -505,26 +423,8 @@ Expr *Parser::parse_primary() {
 			last_height_ = 1;
 			return finish(name);
 		}
-		case TokenKind::LParen: {
-			Token open = advance();
-			Expr *inner;
-			uint32_t height;
-			{
-				Restore allow_in(no_in_, false);
-				Restore brackets(bracket_ends_initializer_, false);
-				inner = parse_expression();
-				height = last_height_;
-			}
-			expect_close(TokenKind::RParen, open);
-			// No node of its own: the inner expression is marked and its range widened to the parentheses.
-			inner->parenthesized = true;
-			inner->offset = open.offset;
-			if (previous_end_ > inner->end) {
-				inner->end = previous_end_;
-			}
-			last_height_ = height;
-			return inner;
-		}
+		case TokenKind::LParen:
+			return parse_parenthesized();
 		case TokenKind::LBracket:
 			return parse_array_literal();
 		case TokenKind::LBrace:
@@ -552,130 +452,6 @@ Expr *Parser::parse_primary() {
 			error_expected("an expression");
 			return missing_expression();
 	}
-}
-
-// One `>` closing a type argument list. The lexer applies longest match, so `Vector.<Vector.<int>>` ends in
-// a single `>>` token: take one `>` from it and leave the rest as the current token.
-void Parser::expect_type_close() {
-	TokenKind rest;
-	switch (current_.kind) {
-		case TokenKind::Greater:
-			advance();
-			return;
-		case TokenKind::ShiftRight:
-			rest = TokenKind::Greater;
-			break;
-		case TokenKind::ShiftRightUnsigned:
-			rest = TokenKind::ShiftRight;
-			break;
-		case TokenKind::GreaterEqual:
-			rest = TokenKind::Assign;
-			break;
-		case TokenKind::ShiftRightAssign:
-			rest = TokenKind::GreaterEqual;
-			break;
-		case TokenKind::ShiftRightUnsignedAssign:
-			rest = TokenKind::ShiftRightAssign;
-			break;
-		default:
-			error_expected("'>'");
-			return;
-	}
-	previous_end_ = current_.offset + 1;
-	current_.kind = rest;
-	current_.offset += 1;
-	current_.length -= 1;
-	current_.newline_before = false;
-}
-
-TypeRef *Parser::parse_type() {
-	TypeRef *type = node<TypeRef>(current_.offset);
-	type->completion_begin = previous_end_;
-	if (!enter()) {
-		return type;
-	}
-	// Type arguments nest by recursion and are not part of any expression's height, so they get their own,
-	// much smaller cap.
-	if (++type_depth_ > MAX_TYPE_DEPTH) {
-		abort_too_deep();
-	}
-	if (at(TokenKind::Star)) {
-		advance();
-	} else if (at(TokenKind::StarAssign)) {
-		// `var x:*=1` lexes `*=` as one token: the type is `*` and an `=` remains.
-		previous_end_ = current_.offset + 1;
-		current_.kind = TokenKind::Assign;
-		current_.offset += 1;
-		current_.length -= 1;
-		current_.newline_before = false;
-	} else if (at(TokenKind::KwVoid)) {
-		advance();
-		type->form = TypeRef::Void;
-	} else if (at(TokenKind::Identifier)) {
-		std::vector<std::string_view> parts;
-		std::vector<uint32_t> offsets;
-		offsets.push_back(current_.offset);
-		parts.push_back(text(advance()));
-		while (at(TokenKind::Dot) && peek2().kind == TokenKind::Identifier) {
-			advance();
-			offsets.push_back(current_.offset);
-			parts.push_back(text(advance()));
-		}
-		type->form = TypeRef::Named;
-		type->name = to_list(parts);
-		type->name_offsets = to_list(offsets);
-		if (at(TokenKind::DotLess)) {
-			advance();
-			type->form = TypeRef::Applied;
-			type->argument = parse_type();
-			expect_type_close();
-		}
-	} else {
-		error_expected("a type");
-		// Nothing is written. The type's place runs from what came before it to what follows, so that an
-		// editor can tell that a type goes there.
-		type->offset = previous_end_;
-		type->end = current_.offset;
-		type_depth_--;
-		leave();
-		return type;
-	}
-	type_depth_--;
-	leave();
-	return finish(type);
-}
-
-// `a.b.C`, and for imports `a.b.*`.
-List<std::string_view> Parser::parse_dotted_name(const char *p_what, bool *r_wildcard, List<uint32_t> *r_offsets) {
-	std::vector<std::string_view> parts;
-	std::vector<uint32_t> offsets;
-	if (r_wildcard) {
-		*r_wildcard = false;
-	}
-	if (!at(TokenKind::Identifier)) {
-		error_expected(p_what);
-		return to_list(parts);
-	}
-	offsets.push_back(current_.offset);
-	parts.push_back(text(advance()));
-	while (at(TokenKind::Dot)) {
-		advance();
-		if (r_wildcard && at(TokenKind::Star)) {
-			advance();
-			*r_wildcard = true;
-			break;
-		}
-		if (!is_identifier_like(current_.kind)) {
-			error_expected(p_what);
-			break;
-		}
-		offsets.push_back(current_.offset);
-		parts.push_back(text(advance()));
-	}
-	if (r_offsets) {
-		*r_offsets = to_list(offsets);
-	}
-	return to_list(parts);
 }
 
 } // namespace kas3

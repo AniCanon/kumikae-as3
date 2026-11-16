@@ -127,6 +127,31 @@ bool Typer::members_known(Symbol *p_class) {
 	return true;
 }
 
+// A member of a class itself (`Math.PI`): a static one.
+const Type *Typer::static_member_type(const Type *p_object, Member *p_member) {
+	const Type *instance = p_object->element;
+	Symbol *owner = instance->kind == Type::Vector ? compilation_.vector_class() : instance->symbol;
+	if (!owner) {
+		return unknown_;
+	}
+	Symbol *member = find_in(owner->klass->statics, p_member->name);
+	if (!member) {
+		if (find_in(owner->klass->members, p_member->name)) {
+			error(p_member->name_offset, quoted(p_member->name) + " is an instance member of " +
+												 std::string(owner->name) + "; it needs an object");
+		} else {
+			error(p_member->name_offset,
+					quoted(owner->name) + " has no static member " + quoted(p_member->name));
+		}
+		return unknown_;
+	}
+	if (!accessible(member, p_member->name_offset)) {
+		return unknown_;
+	}
+	p_member->member = member;
+	return symbol_type(member, nullptr);
+}
+
 const Type *Typer::member_type(const Type *p_object, Member *p_member) {
 	switch (p_object->kind) {
 		case Type::Any:
@@ -135,29 +160,8 @@ const Type *Typer::member_type(const Type *p_object, Member *p_member) {
 		case Type::Void:
 		case Type::Null:
 			return unknown_;
-		case Type::ClassObject: {
-			const Type *instance = p_object->element;
-			Symbol *owner = instance->kind == Type::Vector ? compilation_.vector_class() : instance->symbol;
-			if (!owner) {
-				return unknown_;
-			}
-			Symbol *member = find_in(owner->klass->statics, p_member->name);
-			if (!member) {
-				if (find_in(owner->klass->members, p_member->name)) {
-					error(p_member->name_offset, quoted(p_member->name) + " is an instance member of " +
-														 std::string(owner->name) + "; it needs an object");
-				} else {
-					error(p_member->name_offset,
-							quoted(owner->name) + " has no static member " + quoted(p_member->name));
-				}
-				return unknown_;
-			}
-			if (!accessible(member, p_member->name_offset)) {
-				return unknown_;
-			}
-			p_member->member = member;
-			return symbol_type(member, nullptr);
-		}
+		case Type::ClassObject:
+			return static_member_type(p_object, p_member);
 		case Type::Instance:
 		case Type::Vector: {
 			bool vector = p_object->kind == Type::Vector;

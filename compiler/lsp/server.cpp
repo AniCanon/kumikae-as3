@@ -8,7 +8,6 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
-#include <set>
 
 namespace kas3 {
 
@@ -29,223 +28,10 @@ std::string failure(const Json &p_id, int p_code, const char *p_message) {
 			Json::object().set("code", p_code).set("message", p_message)));
 }
 
-bool is_name_byte(unsigned char p_c) {
-	return (p_c >= 'a' && p_c <= 'z') || (p_c >= 'A' && p_c <= 'Z') || (p_c >= '0' && p_c <= '9') || p_c == '_' ||
-			p_c == '$' || p_c >= 0x80;
-}
-
-// How much of the text an error at this offset is about: the name, number or string there, or else one
-// character. Nothing at the end of a line.
-uint32_t extent(const std::string &p_text, uint32_t p_offset) {
-	if (p_offset >= p_text.size() || p_text[p_offset] == '\n' || p_text[p_offset] == '\r') {
-		return 0;
-	}
-	uint32_t end = p_offset;
-	char quote = p_text[p_offset];
-	if (quote == '"' || quote == '\'') {
-		// To the closing quote, if the line has one.
-		for (end = p_offset + 1; end < p_text.size() && p_text[end] != '\n' && p_text[end] != '\r'; end++) {
-			if (p_text[end] == '\\') {
-				end++;
-			} else if (p_text[end] == quote) {
-				return end + 1 - p_offset;
-			}
-		}
-		return 1;
-	}
-	while (end < p_text.size() && is_name_byte((unsigned char)p_text[end])) {
-		end++;
-	}
-	if (end > p_offset) {
-		return end - p_offset;
-	}
-	// One character, which may be several bytes.
-	end = p_offset + 1;
-	while (end < p_text.size() && ((unsigned char)p_text[end] & 0xC0) == 0x80) {
-		end++;
-	}
-	return end - p_offset;
-}
-
-int symbol_kind(SymbolKind p_kind, bool p_const, bool p_constructor) {
-	switch (p_kind) {
-		case SymbolKind::Class:
-			return 5;
-		case SymbolKind::Interface:
-			return 11;
-		case SymbolKind::Method:
-			return p_constructor ? 9 : 6;
-		case SymbolKind::Property:
-			return 7;
-		case SymbolKind::Field:
-			return p_const ? 14 : 8;
-		case SymbolKind::Function:
-		case SymbolKind::LocalFunction:
-			return 12;
-		default:
-			return p_const ? 14 : 13;
-	}
-}
-
 } // namespace
 
 Server::Server(Workspace::Options p_options) :
 		workspace_(std::move(p_options)) {}
-
-std::string Server::uri_of(const Unit &p_unit) {
-	std::string path = workspace_.real_path(p_unit);
-	if (path.empty()) {
-		return std::string();
-	}
-	auto known = uris_.find(path);
-	return known != uris_.end() ? known->second : uri_from_path(workspace_.shown_path(path));
-}
-
-Unit *Server::unit_of(const Json &p_params) {
-	std::string path = path_from_uri(p_params.get("textDocument").get("uri").string());
-	return path.empty() ? nullptr : workspace_.unit(path);
-}
-
-Json Server::position(const Unit &p_unit, uint32_t p_offset) const {
-	Position at = p_unit.source.position(p_offset);
-	std::string_view line = p_unit.source.line_text(at.line);
-	int character = character_at(line, (size_t)(at.column - 1), utf8_);
-	if (at.line == 1) {
-		character += mark_width(p_unit.source);
-	}
-	return Json::object().set("line", at.line - 1).set("character", character);
-}
-
-Json Server::range(const Unit &p_unit, uint32_t p_offset, uint32_t p_length) const {
-	return Json::object().set("start", position(p_unit, p_offset)).set("end", position(p_unit, p_offset + p_length));
-}
-
-Json Server::location(const Place &p_place) {
-	if (!p_place.unit) {
-		return Json();
-	}
-	std::string uri = uri_of(*p_place.unit);
-	if (uri.empty()) {
-		return Json();
-	}
-	return Json::object().set("uri", uri).set("range", range(*p_place.unit, p_place.offset, p_place.length));
-}
-
-uint32_t Server::offset_at(const Unit &p_unit, const Json &p_position) const {
-	return offset_in(p_unit.source, p_position);
-}
-
-uint32_t Server::offset_in(const Source &p_source, const Json &p_position) const {
-	int64_t line = p_position.get("line").integer(-1);
-	int64_t character = p_position.get("character").integer(0);
-	const Source &source = p_source;
-	if (line < 0) {
-		return 0;
-	}
-	if (line >= source.line_count()) {
-		return (uint32_t)source.text().size();
-	}
-	if (line == 0) {
-		character -= mark_width(source);
-	}
-	return source.line_start((int)line + 1) + bytes_before(source.line_text((int)line + 1), character, utf8_);
-}
-
-// What the editor counts before the first line's text: the byte-order mark it sent, if it sent one. A
-// file it has not opened is counted without: an editor shows a file from disk without its mark.
-int Server::mark_width(const Source &p_source) const {
-	if (!p_source.has_mark() || !workspace_.sent_with_mark(p_source.path())) {
-		return 0;
-	}
-	return utf8_ ? (int)BYTE_ORDER_MARK.size() : 1;
-}
-
-const Occurrence *Server::occurrence_at(const Json &p_params, Unit **r_unit) {
-	Unit *unit = unit_of(p_params);
-	if (!unit || !p_params.get("position").is_object()) {
-		return nullptr;
-	}
-	*r_unit = unit;
-	return workspace_.queries().at(*unit, offset_at(*unit, p_params.get("position")));
-}
-
-void Server::publish(std::vector<std::string> &r_out) {
-	if (workspace_.stale() || (workspace_.checks() == published_check_ && document_generation_ == published_document_generation_)) {
-		return;
-	}
-	published_check_ = workspace_.checks();
-	published_document_generation_ = document_generation_;
-	std::set<std::string> present;
-	auto send = [&](const std::string &p_uri, const std::string &p_diagnostics) {
-		// The list is JSON already.
-		const auto version = document_version(p_uri);
-		r_out.push_back("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":" +
-				write_json(Json(p_uri)) + ",\"diagnostics\":" + p_diagnostics +
-				(version ? ",\"version\":" + std::to_string(*version) : "") + "}}");
-	};
-	for (Unit *unit : workspace_.reported_units()) {
-		std::string uri = uri_of(*unit);
-		if (uri.empty()) {
-			continue;
-		}
-		present.insert(uri);
-		auto before = published_.find(uri);
-		const auto version = document_version(uri);
-		if (!unit->diagnostics.has_errors() && before == published_.end() && !version) {
-			continue;
-		}
-		Json list = Json::array();
-		for (const Diagnostic &item : unit->diagnostics.items()) {
-			list.push(Json::object()
-							  .set("range", range(*unit, item.offset, extent(unit->source.text(), item.offset)))
-							  .set("severity", item.warning ? 2 : 1)
-							  .set("source", "kas3c")
-							  .set("message", item.message));
-		}
-		int dropped = unit->diagnostics.dropped();
-		if (dropped > 0) {
-			list.push(Json::object()
-							  .set("range", range(*unit, 0, 0))
-							  .set("severity", 1)
-							  .set("source", "kas3c")
-							  .set("message", "too many errors (" + std::to_string(dropped) + " more)"));
-		}
-		std::string text = write_json(list);
-		if (before == published_.end() || before->second.diagnostics != text || before->second.version != version) {
-			send(uri, text);
-			if (!unit->diagnostics.has_errors() && !version) {
-				published_.erase(uri);
-			} else {
-				// A client typing ahead can discard a clear, so clean open versions need fresh clears too.
-				published_[uri] = { std::move(text), version };
-			}
-		}
-	}
-	// Files that left the program take their errors with them.
-	for (auto item = published_.begin(); item != published_.end();) {
-		if (present.count(item->first)) {
-			++item;
-		} else {
-			send(item->first, "[]");
-			item = published_.erase(item);
-		}
-	}
-}
-
-void Server::settle(std::vector<std::string> &r_out) {
-	if (!initialized_ || exited_) {
-		return;
-	}
-	workspace_.compilation();
-	if (workspace_.cut_off() && !warned_cut_off_) {
-		warned_cut_off_ = true;
-		std::string text = "Kumikae AS3: this project has more than " + std::to_string(workspace_.max_files()) +
-				" .as files. The rest are not read, so names they define are reported as unknown.";
-		r_out.push_back(write_json(Json::object().set("jsonrpc", "2.0").set("method", "window/showMessage").set("params",
-				Json::object().set("type", 2).set("message", text))));
-	}
-	publish(r_out);
-}
 
 Json Server::initialize(const Json &p_params) {
 	const Json &capabilities = p_params.get("capabilities");
@@ -290,100 +76,68 @@ Json Server::initialize(const Json &p_params) {
 			Json::object().set("name", "kas3c").set("version", "0.1.0"));
 }
 
-Json Server::definition(const Json &p_params) {
-	Unit *unit = unit_of(p_params);
-	if (!unit || !p_params.get("position").is_object()) {
-		return Json();
-	}
-	Json where = location(workspace_.queries().definition(*unit, offset_at(*unit, p_params.get("position"))));
-	// A list of one. The protocol allows a place on its own, and VS Code reads it, but the client
-	// library JetBrains' IDEs use reads only a list: with a bare place, go to definition does nothing.
-	return where.is_null() ? Json() : Json::array().push(std::move(where));
+// Asks the editor to say when files change on disk.
+void Server::register_file_watcher(std::vector<std::string> &r_out) {
+	Json watchers = Json::array().push(Json::object().set("globPattern", "**/*"));
+	Json registration = Json::object()
+								.set("id", "kas3c-watch")
+								.set("method", "workspace/didChangeWatchedFiles")
+								.set("registerOptions", Json::object().set("watchers", std::move(watchers)));
+	r_out.push_back(write_json(Json::object()
+									   .set("jsonrpc", "2.0")
+									   .set("id", "kas3c-" + std::to_string(next_request_++))
+									   .set("method", "client/registerCapability")
+									   .set("params", Json::object().set("registrations", Json::array().push(std::move(registration))))));
 }
 
-Json Server::references(const Json &p_params) {
-	Json list = Json::array();
-	Unit *unit = nullptr;
-	const Occurrence *found = occurrence_at(p_params, &unit);
-	if (!found) {
-		return list;
+void Server::did_change(const std::string &p_path, const Json &p_document, const Json &p_params,
+		std::vector<std::string> &r_out) {
+	if (p_path.empty() || !accept_version(p_document, false, r_out)) {
+		return;
 	}
-	bool with_declaration = p_params.get("context").get("includeDeclaration").boolean();
-	for (const Place &place : workspace_.queries().references(found->symbol, with_declaration)) {
-		Json where = location(place);
-		if (!where.is_null()) {
-			list.push(std::move(where));
-		}
+	// Each change applies to the text the one before it left: a range of it replaced, or, with no
+	// range, the whole of it.
+	const std::string *held = p_path.empty() ? nullptr : workspace_.text(p_path);
+	const Json &changes = p_params.get("contentChanges");
+	bool any = false;
+	std::string text = held ? *held : std::string();
+	if (held && workspace_.sent_with_mark(p_path)) {
+		text.insert(0, BYTE_ORDER_MARK); // Changed as the editor has it: the workspace keeps the mark out of the text.
 	}
-	return list;
-}
-
-Json Server::hover(const Json &p_params) {
-	Unit *unit = nullptr;
-	const Occurrence *found = occurrence_at(p_params, &unit);
-	if (!found) {
-		return Json();
-	}
-	Queries &queries = workspace_.queries();
-	std::string text = "```" + code_language_ + "\n" + queries.describe(found->symbol) + "\n```\n" + queries.context(found->symbol);
-	return Json::object()
-			.set("contents", Json::object().set("kind", "markdown").set("value", text))
-			.set("range", range(*unit, found->offset, found->length));
-}
-
-Json Server::document_symbols(const Json &p_params) {
-	Json list = Json::array();
-	Unit *unit = unit_of(p_params);
-	if (!unit) {
-		return list;
-	}
-	struct Convert {
-		const Server &server;
-		const Unit &unit;
-		Json operator()(const OutlineItem &p_item) const {
-			Json symbol = Json::object();
-			symbol.set("name", p_item.name);
-			symbol.set("kind", symbol_kind(p_item.kind, p_item.is_const, p_item.is_constructor));
-			symbol.set("range", server.range(unit, p_item.offset, p_item.end - p_item.offset));
-			symbol.set("selectionRange", server.range(unit, p_item.name_offset, p_item.name_length));
-			if (!p_item.children.empty()) {
-				Json children = Json::array();
-				for (const OutlineItem &child : p_item.children) {
-					children.push((*this)(child));
-				}
-				symbol.set("children", std::move(children));
-			}
-			return symbol;
-		}
-	};
-	Convert convert{ *this, *unit };
-	for (const OutlineItem &item : workspace_.queries().outline(*unit)) {
-		list.push(convert(item));
-	}
-	return list;
-}
-
-Json Server::workspace_symbols(const Json &p_params) {
-	Json list = Json::array();
-	for (const FoundSymbol &found : workspace_.queries().find(p_params.get("query").string(), 200)) {
-		Place place;
-		place.unit = found.unit;
-		place.offset = found.offset;
-		place.length = found.length;
-		Json where = location(place);
-		if (where.is_null()) {
+	for (const Json &change : changes.items()) {
+		if (!change.get("text").is_string()) {
 			continue;
 		}
-		Json symbol = Json::object();
-		symbol.set("name", found.name);
-		symbol.set("kind", symbol_kind(found.kind, found.is_const, found.is_constructor));
-		symbol.set("location", std::move(where));
-		if (!found.container.empty()) {
-			symbol.set("containerName", found.container);
+		const Json &range = change.get("range");
+		if (!range.is_object()) {
+			text = change.get("text").string();
+			held = &text; // From here on there is a whole text to change.
+		} else if (!held) {
+			continue; // A piece of a document the server was never given.
+		} else {
+			auto offset = [&](const Json &p_position) {
+				return offset_in_text(text, p_position.get("line").integer(-1), p_position.get("character").integer(0), utf8_);
+			};
+			uint32_t from = offset(range.get("start"));
+			uint32_t to = offset(range.get("end"));
+			if (to < from) {
+				std::swap(from, to);
+			}
+			text.replace(from, to - from, change.get("text").string());
 		}
-		list.push(std::move(symbol));
+		any = true;
 	}
-	return list;
+	if (!p_path.empty() && any) {
+		workspace_.change(p_path, std::move(text));
+	}
+}
+
+void Server::did_close(const std::string &p_path) {
+	const std::string key = workspace_.resolve(p_path);
+	workspace_.close(p_path);
+	versions_.erase(key);
+	++document_generation_;
+	uris_.erase(key);
 }
 
 void Server::notification(const std::string &p_method, const Json &p_params, std::vector<std::string> &r_out) {
@@ -391,16 +145,7 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 	std::string path = path_from_uri(document.get("uri").string());
 	if (p_method == "initialized") {
 		if (watch_files_) {
-			Json watchers = Json::array().push(Json::object().set("globPattern", "**/*"));
-			Json registration = Json::object()
-										.set("id", "kas3c-watch")
-										.set("method", "workspace/didChangeWatchedFiles")
-										.set("registerOptions", Json::object().set("watchers", std::move(watchers)));
-			r_out.push_back(write_json(Json::object()
-											   .set("jsonrpc", "2.0")
-											   .set("id", "kas3c-" + std::to_string(next_request_++))
-											   .set("method", "client/registerCapability")
-											   .set("params", Json::object().set("registrations", Json::array().push(std::move(registration))))));
+			register_file_watcher(r_out);
 		}
 	} else if (p_method == "textDocument/didOpen") {
 		if (!path.empty() && document.get("text").is_string() && accept_version(document, true, r_out)) {
@@ -408,51 +153,10 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 			workspace_.open(path, document.get("text").string());
 		}
 	} else if (p_method == "textDocument/didChange") {
-		if (path.empty() || !accept_version(document, false, r_out)) {
-			return;
-		}
-		// Each change applies to the text the one before it left: a range of it replaced, or, with no
-		// range, the whole of it.
-		const std::string *held = path.empty() ? nullptr : workspace_.text(path);
-		const Json &changes = p_params.get("contentChanges");
-		bool any = false;
-		std::string text = held ? *held : std::string();
-		if (held && workspace_.sent_with_mark(path)) {
-			text.insert(0, BYTE_ORDER_MARK); // Changed as the editor has it: the workspace keeps the mark out of the text.
-		}
-		for (const Json &change : changes.items()) {
-			if (!change.get("text").is_string()) {
-				continue;
-			}
-			const Json &range = change.get("range");
-			if (!range.is_object()) {
-				text = change.get("text").string();
-				held = &text; // From here on there is a whole text to change.
-			} else if (!held) {
-				continue; // A piece of a document the server was never given.
-			} else {
-				auto offset = [&](const Json &p_position) {
-					return offset_in_text(text, p_position.get("line").integer(-1), p_position.get("character").integer(0), utf8_);
-				};
-				uint32_t from = offset(range.get("start"));
-				uint32_t to = offset(range.get("end"));
-				if (to < from) {
-					std::swap(from, to);
-				}
-				text.replace(from, to - from, change.get("text").string());
-			}
-			any = true;
-		}
-		if (!path.empty() && any) {
-			workspace_.change(path, std::move(text));
-		}
+		did_change(path, document, p_params, r_out);
 	} else if (p_method == "textDocument/didClose") {
 		if (!path.empty()) {
-			const std::string key = workspace_.resolve(path);
-			workspace_.close(path);
-			versions_.erase(key);
-			++document_generation_;
-			uris_.erase(key);
+			did_close(path);
 		}
 	} else if (p_method == "workspace/didChangeWatchedFiles") {
 		for (const Json &change : p_params.get("changes").items()) {
@@ -475,6 +179,26 @@ void Server::handle(std::string_view p_message, std::vector<std::string> &r_out)
 		return;
 	}
 	handle_message(message, r_out);
+}
+
+// The answer to a request after `initialize`, or nothing for a method the server does not handle.
+std::optional<Json> Server::answer(const std::string &p_method, const Json &p_params) {
+	if (p_method == "textDocument/definition") {
+		return definition(p_params);
+	} else if (p_method == "textDocument/references") {
+		return references(p_params);
+	} else if (p_method == "textDocument/hover") {
+		return hover(p_params);
+	} else if (p_method == "textDocument/signatureHelp") {
+		return signature_help(p_params);
+	} else if (p_method == "textDocument/completion") {
+		return completion(p_params);
+	} else if (p_method == "textDocument/documentSymbol") {
+		return document_symbols(p_params);
+	} else if (p_method == "workspace/symbol") {
+		return workspace_symbols(p_params);
+	}
+	return std::nullopt;
 }
 
 void Server::handle_message(const Json &p_message, std::vector<std::string> &r_out) {
@@ -521,26 +245,12 @@ void Server::handle_message(const Json &p_message, std::vector<std::string> &r_o
 		r_out.push_back(response(id, Json()));
 		return;
 	}
-	Json result;
-	if (method == "textDocument/definition") {
-		result = definition(params);
-	} else if (method == "textDocument/references") {
-		result = references(params);
-	} else if (method == "textDocument/hover") {
-		result = hover(params);
-	} else if (method == "textDocument/signatureHelp") {
-		result = signature_help(params);
-	} else if (method == "textDocument/completion") {
-		result = completion(params);
-	} else if (method == "textDocument/documentSymbol") {
-		result = document_symbols(params);
-	} else if (method == "workspace/symbol") {
-		result = workspace_symbols(params);
-	} else {
+	std::optional<Json> result = answer(method, params);
+	if (!result) {
 		r_out.push_back(failure(id, METHOD_NOT_FOUND, "the server does not handle this request"));
 		return;
 	}
-	r_out.push_back(response(id, std::move(result)));
+	r_out.push_back(response(id, std::move(*result)));
 	// Answering made the server check the latest text: its errors are due as well.
 	publish(r_out);
 }

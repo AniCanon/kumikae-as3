@@ -104,7 +104,7 @@ const Type *Typer::assign_type(Expr *p_expression) {
 	return arithmetic(assign->op, target, value);
 }
 
-const Type *Typer::compute(Expr *p_expression) {
+const Type *Typer::literal_type(Expr *p_expression) {
 	switch (p_expression->kind) {
 		case NodeKind::NumberLit:
 			return number_literal(static_cast<NumberLit *>(p_expression));
@@ -116,18 +116,6 @@ const Type *Typer::compute(Expr *p_expression) {
 			return boolean_;
 		case NodeKind::NullLit:
 			return compilation_.null_type();
-		case NodeKind::ThisExpr:
-			if (static_) {
-				return unknown_; // Reported by the names pass.
-			}
-			// In a nested function, `this` is whatever the caller supplies.
-			return class_ && closures_ == 0 ? compilation_.instance_type(class_) : any_;
-		case NodeKind::SuperExpr:
-			return class_ && !static_ && class_->klass->base ? compilation_.instance_type(class_->klass->base)
-															 : unknown_;
-		case NodeKind::Name:
-			read(p_expression);
-			return symbol_type(static_cast<Name *>(p_expression)->symbol, nullptr);
 		case NodeKind::ArrayLit:
 			list(static_cast<ArrayLit *>(p_expression)->elements);
 			return array_;
@@ -141,6 +129,59 @@ const Type *Typer::compute(Expr *p_expression) {
 			list(literal->elements);
 			return compilation_.vector_type(compilation_.type_of(literal->element_type));
 		}
+		default:
+			return unknown_;
+	}
+}
+
+// `Vector.<T>` written as a value: the class of vectors of T.
+const Type *Typer::applied_type(TypeApply *p_apply) {
+	const Type *base = expression(p_apply->base);
+	if (base->kind == Type::ClassObject && base->element->kind == Type::Vector) {
+		return compilation_.class_object_type(compilation_.vector_type(compilation_.type_of(p_apply->argument)));
+	}
+	return unknown_;
+}
+
+const Type *Typer::postfix_type(Postfix *p_postfix) {
+	const Type *operand = expression(p_postfix->operand);
+	if (never_operator(p_postfix->op, operand, p_postfix->offset)) {
+		return unknown_;
+	}
+	written(p_postfix->operand);
+	return numeric(operand) ? operand : (primitive(operand) ? number_ : unknown_);
+}
+
+const Type *Typer::conditional_type(Conditional *p_choice) {
+	expression(p_choice->condition);
+	const Type *then_type = expression(p_choice->then_value);
+	const Type *else_type = expression(p_choice->else_value);
+	return join(then_type, else_type);
+}
+
+const Type *Typer::compute(Expr *p_expression) {
+	switch (p_expression->kind) {
+		case NodeKind::NumberLit:
+		case NodeKind::StringLit:
+		case NodeKind::RegexLit:
+		case NodeKind::BoolLit:
+		case NodeKind::NullLit:
+		case NodeKind::ArrayLit:
+		case NodeKind::ObjectLit:
+		case NodeKind::VectorLit:
+			return literal_type(p_expression);
+		case NodeKind::ThisExpr:
+			if (static_) {
+				return unknown_; // Reported by the names pass.
+			}
+			// In a nested function, `this` is whatever the caller supplies.
+			return class_ && closures_ == 0 ? compilation_.instance_type(class_) : any_;
+		case NodeKind::SuperExpr:
+			return class_ && !static_ && class_->klass->base ? compilation_.instance_type(class_->klass->base)
+															 : unknown_;
+		case NodeKind::Name:
+			read(p_expression);
+			return symbol_type(static_cast<Name *>(p_expression)->symbol, nullptr);
 		case NodeKind::FunctionExpr:
 			closures_++;
 			function(static_cast<FunctionExpr *>(p_expression)->function);
@@ -153,39 +194,22 @@ const Type *Typer::compute(Expr *p_expression) {
 		}
 		case NodeKind::Index:
 			return index_type(p_expression);
-		case NodeKind::TypeApply: {
-			TypeApply *apply = static_cast<TypeApply *>(p_expression);
-			const Type *base = expression(apply->base);
-			if (base->kind == Type::ClassObject && base->element->kind == Type::Vector) {
-				return compilation_.class_object_type(compilation_.vector_type(compilation_.type_of(apply->argument)));
-			}
-			return unknown_;
-		}
+		case NodeKind::TypeApply:
+			return applied_type(static_cast<TypeApply *>(p_expression));
 		case NodeKind::Call:
 			return call(static_cast<Call *>(p_expression));
 		case NodeKind::New:
 			return new_type(p_expression);
 		case NodeKind::Unary:
 			return unary(static_cast<Unary *>(p_expression));
-		case NodeKind::Postfix: {
-			const Type *operand = expression(static_cast<Postfix *>(p_expression)->operand);
-			if (never_operator(static_cast<Postfix *>(p_expression)->op, operand, p_expression->offset)) {
-				return unknown_;
-			}
-			written(static_cast<Postfix *>(p_expression)->operand);
-			return numeric(operand) ? operand : (primitive(operand) ? number_ : unknown_);
-		}
+		case NodeKind::Postfix:
+			return postfix_type(static_cast<Postfix *>(p_expression));
 		case NodeKind::Binary:
 			return binary(static_cast<Binary *>(p_expression));
 		case NodeKind::Assign:
 			return assign_type(p_expression);
-		case NodeKind::Conditional: {
-			Conditional *choice = static_cast<Conditional *>(p_expression);
-			expression(choice->condition);
-			const Type *then_type = expression(choice->then_value);
-			const Type *else_type = expression(choice->else_value);
-			return join(then_type, else_type);
-		}
+		case NodeKind::Conditional:
+			return conditional_type(static_cast<Conditional *>(p_expression));
 		default:
 			return unknown_;
 	}

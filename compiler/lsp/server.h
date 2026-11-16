@@ -49,6 +49,7 @@ class Server {
 	uint32_t offset_in(const Source &p_source, const Json &p_position) const;
 	int mark_width(const Source &p_source) const;
 	const Occurrence *occurrence_at(const Json &p_params, Unit **r_unit);
+	std::string diagnostics_json(const Unit &p_unit) const;
 	void publish(std::vector<std::string> &r_out);
 	void handle_message(const Json &p_message, std::vector<std::string> &r_out);
 	// The name a document is known by, whatever name the editor gives it: the workspace's for its file.
@@ -62,10 +63,17 @@ class Server {
 	Json references(const Json &p_params);
 	Json hover(const Json &p_params);
 	Json completion(const Json &p_params);
+	Json completion_item(const Unit &p_unit, const Completion &p_found, const CompletionRange &p_span,
+			const Json &p_edit_range, uint32_t p_priority) const;
 	Json signature_help(const Json &p_params);
 	Json document_symbols(const Json &p_params);
 	Json workspace_symbols(const Json &p_params);
 	void notification(const std::string &p_method, const Json &p_params, std::vector<std::string> &r_out);
+	void register_file_watcher(std::vector<std::string> &r_out);
+	void did_change(const std::string &p_path, const Json &p_document, const Json &p_params,
+			std::vector<std::string> &r_out);
+	void did_close(const std::string &p_path);
+	std::optional<Json> answer(const std::string &p_method, const Json &p_params);
 
 public:
 	explicit Server(Workspace::Options p_options);
