@@ -299,6 +299,7 @@ object UiProbeCompletion {
         activate(project)
         PsiDocumentManager.getInstance(project).commitAllDocuments()
         check(UiProbeLsp.canComplete(project, editor)) { "Completion invoked while client indexing is not ready" }
+        UiProbeLsp.synchronize(project, editor)
         CodeCompletionHandlerBase(CompletionType.BASIC).invokeCompletion(project, editor)
     }
 
