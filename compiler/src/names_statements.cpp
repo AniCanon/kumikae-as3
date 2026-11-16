@@ -128,6 +128,12 @@ void Resolver::continue_statement(Continue *p_continue) {
 	}
 }
 
+void Resolver::labeled_statement(Labeled *p_labeled) {
+	labels_.push_back({ p_labeled->label, p_labeled->body && is_loop(p_labeled->body) });
+	statement(p_labeled->body);
+	labels_.pop_back();
+}
+
 void Resolver::statement(Stmt *p_statement) {
 	if (!p_statement) {
 		return;
@@ -177,12 +183,9 @@ void Resolver::statement(Stmt *p_statement) {
 		case NodeKind::Try:
 			try_statement(static_cast<Try *>(p_statement));
 			break;
-		case NodeKind::Labeled: {
-			Labeled *labeled = static_cast<Labeled *>(p_statement);
-			labels_.push_back({ labeled->label, labeled->body && is_loop(labeled->body) });
-			statement(labeled->body);
-			labels_.pop_back();
-		} break;
+		case NodeKind::Labeled:
+			labeled_statement(static_cast<Labeled *>(p_statement));
+			break;
 		case NodeKind::FunctionStmt:
 			function(static_cast<FunctionStmt *>(p_statement)->function, false);
 			break;

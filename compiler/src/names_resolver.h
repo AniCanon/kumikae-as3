@@ -60,6 +60,7 @@ class Resolver {
 	void switch_statement(Switch *p_switch);
 	void break_statement(Break *p_break);
 	void continue_statement(Continue *p_continue);
+	void labeled_statement(Labeled *p_labeled);
 	void statement(Stmt *p_statement);
 	void assignable(Expr *p_target);
 	void name(Name *p_name);
