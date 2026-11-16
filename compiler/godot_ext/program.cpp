@@ -224,7 +224,6 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 }
 
 void Project::reload() {
-	free_instances_freed_elsewhere(); // Before the instances are looked through: their objects are gone.
 	if (!program || !program->valid_) {
 		// Nothing is running: the scripts had errors. They are simply loaded again.
 		unload();
@@ -243,6 +242,7 @@ void Project::reload() {
 				String::utf8(errors.c_str()));
 		return;
 	}
+	free_instances_freed_elsewhere(); // Before the instances are looked through: their objects are gone.
 	// Code that runs once (a constructor, a field's first value, `_ready`) does not run again for the
 	// objects that are alive: for an edit there to show, the scene is made again from its file.
 	Restart restart;
