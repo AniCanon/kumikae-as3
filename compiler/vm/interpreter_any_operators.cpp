@@ -17,6 +17,18 @@ bool Interpreter::any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
 		*r_equal = true; // One method of one object, taken twice: as EqRef has it.
 		return true;
 	}
+	// A script object whose class extends one of Godot's is that Godot object, as typed code has it
+	// (`node == this`): against one of Godot's objects held as such, it is its Godot object that is compared.
+	const auto as_godot = [this](Slot p_value) {
+		Object *object = held_object(p_value);
+		const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
+		const bool owned = klass && !klass->native_base.empty() && !klass->fields.empty() && object->fields()[0].p;
+		return owned ? any::godot_object(object->fields()[0].p) : p_value;
+	};
+	if ((any::tag(p_a) == AnyTag::Godot && any::tag(p_b) == AnyTag::Object) || (any::tag(p_a) == AnyTag::Object && any::tag(p_b) == AnyTag::Godot)) {
+		p_a = as_godot(p_a);
+		p_b = as_godot(p_b);
+	}
 	const std::optional<bool> plain = p_strict ? any::strict_equal(p_a, p_b) : any::loose_equal(p_a, p_b);
 	if (plain) {
 		*r_equal = *plain;
