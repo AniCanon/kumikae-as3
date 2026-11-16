@@ -25,8 +25,7 @@ bool FunctionWriter::object(const Instruction &p_in) {
 	// not known here, and its field is reached by its number.
 	const auto field = [&](uint32_t p_object, uint32_t p_field, Kind p_kind) {
 		if (is_this(p_object) && p_field < module_.classes[function_.owner].fields.size()) {
-			const ir::Class &klass = module_.classes[function_.owner];
-			return "static_cast<" + class_name(module_, function_.owner) + " *>(r0)->" + field_name(klass, p_field);
+			return own_field(p_field);
 		}
 		return "field<" + std::string(type_of(p_kind)) + ">(" + reg(p_object) + ", " + std::to_string(p_field) + ")";
 	};
@@ -38,11 +37,13 @@ bool FunctionWriter::object(const Instruction &p_in) {
 			return true;
 		case Op::GetField:
 			null_check(p_in.b);
-			share(p_in.a, field(p_in.b, p_in.c, kind(p_in.a)));
+			share(p_in.a, kept_local(p_in.b, p_in.c).value_or(field(p_in.b, p_in.c, kind(p_in.a))));
 			return true;
 		case Op::SetField:
 			null_check(p_in.a);
-			if (ir::is_held(kind(p_in.c))) {
+			if (const std::optional<std::string> local = kept_local(p_in.a, p_in.b)) {
+				line(*local + " = " + reg(p_in.c) + ";");
+			} else if (ir::is_held(kind(p_in.c))) {
 				line("store(c, " + field(p_in.a, p_in.b, kind(p_in.c)) + ", " + reg(p_in.c) + ");");
 			} else {
 				line(field(p_in.a, p_in.b, kind(p_in.c)) + " = " + reg(p_in.c) + ";");

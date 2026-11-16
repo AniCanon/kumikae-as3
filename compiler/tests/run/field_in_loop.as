@@ -32,6 +32,12 @@ package {
 			}
 			trace(twice(3), total, count);
 			trace(inner(4), total);
+			var nobody:field_in_loop = null;
+			try {
+				trace(nobody.plain(3));
+			} catch (e:TypeError) {
+				trace("nobody", e.errorID, total);
+			}
 		}
 
 		// Nothing else sees the fields while the loop runs.

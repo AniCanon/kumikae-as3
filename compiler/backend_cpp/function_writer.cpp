@@ -62,6 +62,7 @@ void FunctionWriter::analyse() {
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();
+	find_kept();
 }
 
 std::string_view FunctionWriter::parts(uint32_t p_register) const {
@@ -123,7 +124,9 @@ std::string FunctionWriter::fail() {
 	fails_ = true;
 	const uint32_t chain = chain_of(pc_);
 	const uint32_t at = line_of(module_, function_.file, function_.code[pc_].position);
-	return "line = " + std::to_string(at) + "; goto " + (chain == NONE ? std::string("failed") : "H" + std::to_string(chain)) + ";";
+	// A kept field the instruction may have changed is read again first: the local is what is written back.
+	const std::string again = kept_read_again(pc_);
+	return again + (again.empty() ? "" : " ") + "line = " + std::to_string(at) + "; goto " + (chain == NONE ? std::string("failed") : "H" + std::to_string(chain)) + ";";
 }
 
 void FunctionWriter::check() {
@@ -229,8 +232,17 @@ void FunctionWriter::generic(const Instruction &p_in) {
 }
 
 void FunctionWriter::instruction(const Instruction &p_in) {
+	// Around what may see or change a field kept in a local, memory and the local are made to agree.
+	const std::string before = kept_written_back(pc_);
+	const std::string after = kept_read_again(pc_);
+	if (!before.empty()) {
+		line(before);
+	}
 	if (!engine(p_in)) {
 		generic(p_in);
+	}
+	if (!after.empty()) {
+		line(after);
 	}
 
 	// What was known of a register is forgotten when it is written, and with it what was made from it.
@@ -291,6 +303,7 @@ std::string FunctionWriter::prologue() const {
 			add(reg(i) + " = shared(c, " + reg(i) + ");");
 		}
 	}
+	out += kept_declared();
 	if (has_owner_alias_) {
 		// The script's own Godot object: found once, and again only after the engine has freed a script's.
 		add("void *self = object_of(c, field<Ref>(r0, 0));");
@@ -304,12 +317,18 @@ std::string FunctionWriter::handlers() const {
 	std::string out;
 	for (size_t i = 0; i < chains_.size(); i++) {
 		out += "H" + std::to_string(i) + ":\n";
+		// Taking the error lets go of what the handler's register held, which may run code (facts.h).
+		const std::string back = kept_written_back(NONE);
+		const std::string again = kept_read_again(NONE);
+		if (!back.empty()) {
+			out += "\t" + back + "\n";
+		}
 		for (uint32_t each : chains_[i]) {
 			const ir::Handler &handler = function_.handlers[each];
 			const Kind held = kind(handler.reg);
 			const std::string error = "caught(c, " + std::to_string(index_) + ", line, " + std::to_string(handler.reg) + ", " +
 					(handler.rethrows ? "true" : "false") + ", &traced)";
-			const std::string target = "goto L" + std::to_string(handler.target) + ";";
+			const std::string target = again + (again.empty() ? "" : " ") + "goto L" + std::to_string(handler.target) + ";";
 			out += "\tif (catches(c, " + number(handler.type) + ")) {";
 			if (held == Kind::Obj || held == Kind::Any) {
 				out += " put(c, " + reg(handler.reg) + ", " + (held == Kind::Obj ? "object_of(c, " + error + ")" : error) + "); " + target + " }\n";
@@ -328,6 +347,9 @@ std::string FunctionWriter::handlers() const {
 
 std::string FunctionWriter::epilogue() const {
 	std::string out = "\tgoto done;\ndone:\n";
+	if (const std::string back = kept_written_back(NONE); !back.empty()) {
+		out += "\t" + back + "\n";
+	}
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
 		if (owns(i)) {
 			out += "\trelease(c, " + reg(i) + ");\n";

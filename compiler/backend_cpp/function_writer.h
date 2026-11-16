@@ -72,6 +72,23 @@ class FunctionWriter {
 	// given null (a field read, a call's result, an untyped value) stays a handle, which can say so.
 	std::vector<bool> inline_;
 	void find_inline();
+	// function_fields.cpp: the fields of the method's own object that are locals while it runs.
+	struct Kept {
+		uint32_t slot = 0;
+		bool written = false; // The function writes it: the local is written back where memory must be right.
+	};
+	std::vector<Kept> kept_;
+	// What an instruction may do to a field of the slot other than through `this` in this function.
+	enum class Touch : uint8_t { None, Reads, Writes };
+	Touch touch(uint32_t p_pc, uint32_t p_slot) const;
+	void find_kept();
+	std::string own_field(uint32_t p_slot) const; // The field of `this` in memory.
+	std::optional<std::string> kept_local(uint32_t p_object, uint32_t p_slot) const; // The local, if the field is kept.
+	std::string kept_declared() const; // The locals, each given its field's value.
+	// Statements, on one line: the locals written back before an instruction that may see their fields, and
+	// read again after one that may change them. For NONE, all of them (the function's end, a handler).
+	std::string kept_written_back(uint32_t p_pc) const;
+	std::string kept_read_again(uint32_t p_pc) const;
 	uint32_t pc_ = 0;
 
 	std::string reg(uint32_t p_register) const;

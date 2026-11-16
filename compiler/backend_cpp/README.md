@@ -12,7 +12,8 @@ holds every program of `tests/run/` to the same output under both.
 |---|---|
 | `generate.h`, `generate.cpp` | The entry point: the files, or the first thing not translated yet |
 | `support.h`, `support.cpp` | What is refused, asked before anything is written; whether the program reads an Error's stack |
-| `facts.h`, `facts.cpp` | What is known of every function before any is written: which cannot fail |
+| `facts.h`, `facts.cpp` | What is known of every function before any is written: which cannot fail, and which fields each may read or write |
+| `function_fields.cpp` | A field of the method's own object kept in a local for the whole function, when a loop uses it and nothing else in that loop can see it |
 | `names.h`, `names.cpp` | Identifiers, C++ types and literals for the things of a module |
 | `function_writer.h`, `function_writer.cpp` | One function: its registers as locals, who owns what, labels, the error paths and handlers, and its entry (the same function called with slots) |
 | `patterns.h`, `function_simple.cpp` | The operations that are one C++ statement, as a table (arithmetic, conversions, comparisons), and constants |
@@ -45,6 +46,11 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   depth and sets no error. A call of it looks at the depth first, in its place (`deep`, a local the caller
   sets once), and for no error afterwards; a call through a table, which may reach such a function, looks
   first as well. Error #1023 comes at the same call either way (`tests/run/deep_leaf.as`).
+- A number or Boolean field of `this` that a loop uses alone is a local (`k3`) from the function's start
+  to its end. Memory is brought up to date only around what may look at the field another way: a call of
+  a function that touches that slot, the slot through another register, anything that may run code
+  (the library, the engine, letting go of an object), and where the function or an error leaves
+  (`tests/run/field_in_loop.as`).
 - A null check is explicit, and left out on `this`.
 - `#line` markers point at the `.as` source.
 

@@ -5,6 +5,8 @@ Usage: test_generated.py <kas3c> <tests dir>
 run_native.py holds what generated code does to the interpreter; this holds how it does the things the
 timings rest on, so that a change that undoes one fails here and not only in a benchmark:
 
+  - a field of the method's own object, used in a loop nothing else can see it from, is read once before
+    and written once after: the loop itself has it in a local;
   - a method that calls nothing and cannot fail keeps no count of the depth, and a call of it is not
     followed by a look at whether an error is on its way out.
 """
@@ -53,6 +55,8 @@ with tempfile.TemporaryDirectory() as where:
         work = made.get("CmpAs_work", "")
         check("work is found", work and len(loops(work)) == 1, work)
         inside = "".join(loops(work))
+        check("work's loop does not touch the field `total`", "f1_total" not in inside, inside)
+        check("work reads `total` once and writes it once", work.count("->f1_total") == 2, work)
         check("work does not look for an error after calls that cannot fail", "c->failing" not in inside, inside)
         check("work calls its two methods", "CmpAs_scaled(" in inside and "CmpAs_bump(" in inside, inside)
         for leaf in ("CmpAs_scaled", "CmpAs_bump"):
