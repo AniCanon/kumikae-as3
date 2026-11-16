@@ -74,7 +74,7 @@ internal object UiProbeConcurrentProjects {
                 check(editor.document.text == SOURCE)
                 UiProbeRetention.checkSplitView(active, observations)
             }
-            checkCompletion(active, editor)
+            checkCompletion(active, editor, observations)
             observations += "Closing the other project preserves this frame, source, split view and native completion"
             val replacementPath = Files.createDirectories(folder.resolve("replacement"))
             Files.createDirectories(replacementPath.resolve(".idea"))
@@ -110,7 +110,7 @@ internal object UiProbeConcurrentProjects {
                 UiProbeRetention.checkSplitView(replacement, observations)
             }
             UiProbeCompletion.await("reused frame client") { UiProbeLsp.ready(replacement) }
-            checkCompletion(replacement, replacementEditor)
+            checkCompletion(replacement, replacementEditor, observations)
             observations += "Opening in the same frame preserves the new project root, split view and completion"
             return projects.map { WeakReference(it) }
         } finally {
@@ -130,17 +130,9 @@ internal object UiProbeConcurrentProjects {
         }
     }
 
-    private fun checkCompletion(project: Project, editor: Editor) {
-        UiProbeCompletion.await("surviving project completion readiness") {
-            if (UiProbeLsp.canComplete(project, editor)) {
-                UiProbeCompletion.invokeCompletion(project, editor)
-                true
-            } else {
-                false
-            }
-        }
-        UiProbeCompletion.await("surviving project native lookup") {
-            LookupManager.getActiveLookup(editor)?.items?.any { it.lookupString.startsWith("normalized") } == true
+    private fun checkCompletion(project: Project, editor: Editor, observations: MutableList<String>) {
+        UiProbeLookup.complete(project, editor, "surviving project native lookup", observations) {
+            it.lookupString.startsWith("normalized")
         }
         UiProbeCompletion.edt { LookupManager.getInstance(project).hideActiveLookup() }
     }

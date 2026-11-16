@@ -25,20 +25,20 @@ object UiProbeStatementCompletion {
             Triple("switch", "switch (value) {\n\tcase 0:\n\t\t\n\t\tbreak;\n\tdefault:\n\t\t\n\t\tbreak;\n}", 4),
         )
         for ((name, text, stops) in cases) {
-            val source = accept(project, editor, name, text)
+            val source = accept(project, editor, name, text, observations)
             UiProbeCompletion.edt {
                 UiProbeUndo.undo(project, editor)
                 check(editor.document.text == source) {
                     "$name insertion was not one undoable edit: ${editor.document.text}; expected $source"
                 }
             }
-            accept(project, editor, name, text)
+            accept(project, editor, name, text, observations)
             UiProbeCompletion.edt {
                 repeat(stops) { UiProbeCompletion.action(editor, IdeActions.ACTION_EDITOR_NEXT_TEMPLATE_VARIABLE) }
             }
             awaitExit(project, editor, name)
         }
-        accept(project, editor, "try", cases.first().second)
+        accept(project, editor, "try", cases.first().second, observations)
         UiProbeCompletion.edt {
             UiProbeCompletion.action(editor, IdeActions.ACTION_EDITOR_NEXT_TEMPLATE_VARIABLE)
             check(editor.selectionModel.selectedText == "error") { "Catch name is not selected" }
@@ -55,23 +55,22 @@ object UiProbeStatementCompletion {
             "Seven language blocks preserve text, Tab navigation and Undo; catch-name edits update the rethrow"
     }
 
-    private fun accept(project: Project, editor: Editor, name: String, expected: String): String {
+    private fun accept(
+        project: Project,
+        editor: Editor,
+        name: String,
+        expected: String,
+        observations: MutableList<String>,
+    ): String {
         val prefix = name.substringBefore(' ').take(2)
         val source = HEAD + prefix + "suffix" + TAIL
         UiProbeCompletion.edt {
             LookupManager.getInstance(project).hideActiveLookup()
             WriteCommandAction.runWriteCommandAction(project) { editor.document.setText(source) }
             editor.caretModel.moveToOffset(HEAD.length + prefix.length)
-            UiProbeCompletion.invokeCompletion(project, editor)
         }
-        try {
-            UiProbeCompletion.await("$name language template") {
-                LookupManager.getActiveLookup(editor)?.items?.any { matches(it.lookupString, name) } == true
-            }
-        } catch (failure: IllegalStateException) {
-            var offered: List<String>? = null
-            UiProbeCompletion.edt { offered = LookupManager.getActiveLookup(editor)?.items?.map { it.lookupString } }
-            error("$name template lookup failed: $offered; ${failure.message}")
+        UiProbeLookup.complete(project, editor, "$name language template", observations) {
+            matches(it.lookupString, name)
         }
         UiProbeCompletion.edt {
             val lookup = checkNotNull(LookupManager.getActiveLookup(editor))
