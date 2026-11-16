@@ -175,7 +175,11 @@ output = compare("signals.gd", [
     "null argument and order", "arguments", "removes itself",
     "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "declared signal listed", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
-    "deferred with its owner freed", "own signal field by name", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
+    "deferred with its owner freed", "own signal field by name", "by name from a base: its own private field",
+    "by name from a subclass: its own private field", "by name from a subclass: a base's private field is not reached",
+    "by name from a base: a subclass's public field first", "by name from outside: a public signal field",
+    "by name from outside, the object typed as a Node: a public signal field",
+    "by name from a subclass: a base's protected field", "by name from outside: a private or protected field is not reached", "a loop lives until the frame ends", "a loop is freed", "a longer loop is freed",
     "a removed listener that is still held keeps what it holds",
     "a loop with no listener is freed", "a loop through a script's Godot object is freed", "a loop through an untyped field is freed",
     "a loop whose listener is in two signals is freed",
@@ -192,9 +196,23 @@ check("Godot is told that a listener given arguments that don't fit was not call
 check("a field that is not a signal, by name, is an AS3 error", "'count' is not a signal" in output, output[-1200:])
 check("an error inside a listener is reported", "at Signals/fails()" in output, output[-800:])
 check("a wrong signal name is an AS3 error", output.count("at Signals/listenByName()") == 2, output[-800:])
+check("a private field reached by name from where it can't be seen is an AS3 error",
+      output.count("at Signals/listenOther()") == 2 and "at SignalDerived/listenFromDerived()" in output, output[-800:])
 check("add after addOnce, and the reverse, are AS3 errors", "at Signals/mixed()" in output and "at Signals/mixedBack()" in output,
       output[-800:])
 check("an empty signal says so", "the signal is empty" in output and "at Signals/empty()" in output, output[-800:])
+
+# Godot closing. As the scene tree is taken down, AS3's listeners still run and its static fields still
+# hold their values; and with a main loop that is not a scene tree, an object a static field holds, with a
+# GDScript listener on it, is let go while Godot can still free it.
+run = subprocess.run([godot, "--headless", "--path", project, "-s", "exit_tree.gd"], capture_output=True, text=True, timeout=300)
+output = run.stdout + run.stderr
+check("exit_tree.gd: a listener runs as the tree goes, and sees the static field", "LATE static=kept" in output, output[-800:])
+check("exit_tree.gd: no crash", run.returncode == 0 and "leaked" not in output.lower(), "exit %d\n%s" % (run.returncode, output[-800:]))
+run = subprocess.run([godot, "--headless", "--path", project, "-s", "exit_loop.gd"], capture_output=True, text=True, timeout=300)
+output = run.stdout + run.stderr
+check("exit_loop.gd: no crash at exit", run.returncode == 0 and "EXIT LOOP ready" in output and "leaked" not in output.lower(),
+      "exit %d\n%s" % (run.returncode, output[-800:]))
 
 # Singletons, constants and static methods, as GDScript works them out.
 output = compare("statics.gd", [

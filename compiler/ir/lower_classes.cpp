@@ -109,6 +109,7 @@ void Lowerer::declare_fields(uint32_t p_class, VarDecl *p_decl) {
 			module_.classes[p_class].fields.push_back({ std::string(declarator.name), kind, holds, starts_null, named });
 			Field &field = module_.classes[p_class].fields.back();
 			field.is_public = (p_decl->modifiers.bits & Modifiers::Public) != 0;
+			field.is_protected = (p_decl->modifiers.bits & Modifiers::Protected) != 0;
 			field.constant = p_decl->is_const;
 			const Type *type = declarator.type ? compilation_.type_of(declarator.type) : nullptr;
 			if (is_engine(kind) && type && type->symbol) {

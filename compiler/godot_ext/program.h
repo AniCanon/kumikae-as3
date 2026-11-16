@@ -25,6 +25,11 @@ public:
 	// The one program, compiled from every .as file under the project folder the first time it is asked
 	// for. Errors are printed to Godot's output; the program is then not valid.
 	static Project &get();
+	// Godot is closing (its main loop, whatever kind, has finished; other scripting languages are still
+	// there): what the program holds beyond the scene (in static fields, and through listeners) is let go
+	// now. Later, when this library is unloaded, a Godot object that a listener of another language is
+	// attached to can no longer be freed safely. Until now, AS3 run as the scene tree goes works as ever.
+	static void before_shutdown();
 	// Forgets the program: the next get() compiles again. Every script instance must be gone.
 	static void unload();
 	// A number that changes every time the scripts are loaded afresh. What belongs to an earlier load

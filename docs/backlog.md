@@ -57,13 +57,6 @@ fields are set on a class's first use, and a call on a null object evaluates its
   one that holds the loop's own listener's callable) is never freed: Godot tells an extension how many
   hold a reference-counted object, but not how many hold an Array or a Dictionary, which GDScript may
   share. **2d**
-- `other[name].add(f)` on another script object reaches only the Godot object's signals, not a signal the
-  other script keeps in a public field. `this[name]` finds a subclass's field before a base class's
-  private one of the same name. **2c**
-- When the scene tree is taken down, static fields are emptied and listeners stop working, so that Godot
-  objects are let go while they can still be freed. A script that runs after that sees null statics. If
-  the main loop is not a scene tree, an object held by a static field with a GDScript listener on it
-  still aborts Godot at exit. **2d**
 
 ## Stage 2b-3, part A: singletons, constants, static methods
 

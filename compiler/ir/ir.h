@@ -346,6 +346,9 @@ struct Field {
 	// What Godot may do with it by name (`node.speed`): read a public field, and write one that is not a
 	// const. Godot is told of no other.
 	bool is_public = false;
+	// Protected: reached by name from the code of the class that declares it and of its subclasses. A field
+	// neither public nor protected is reached by name only from the code of the class that declares it.
+	bool is_protected = false;
 	bool constant = false;
 	// Godot's name for its type, when it holds one of Godot's values or objects ("Vector2", "Node").
 	std::string engine_type = {};

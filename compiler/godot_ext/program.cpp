@@ -36,11 +36,7 @@ uint64_t Project::generation() {
 	return loads;
 }
 
-// The scene tree is being taken down: Godot is closing. What the program holds beyond the tree (in static
-// fields, and through listeners) is let go now. Later, when this library is unloaded, other scripting
-// languages are already gone, and a Godot object that one of their listeners is attached to can no longer
-// be freed safely.
-static void before_shutdown() {
+void Project::before_shutdown() {
 	if (program && program->valid()) {
 		release_listeners();
 		program->interpreter().clear_globals();
@@ -190,7 +186,6 @@ Project &Project::get() {
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
 	if (!watching && tree && tree->get_root()) {
 		watching = true;
-		tree->get_root()->connect("tree_exiting", callable_mp_static(&before_shutdown));
 		// Scripts are watched where a person can edit them: a project in a folder, run for development.
 		if (OS::get_singleton()->is_debug_build() && DirAccess::dir_exists_absolute(ProjectSettings::get_singleton()->globalize_path(scripts_root()))) {
 			tree->connect("process_frame", callable_mp_static(&Project::watch));
