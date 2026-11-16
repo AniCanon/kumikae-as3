@@ -719,22 +719,17 @@ static void test_corpus_prefixes() {
 }
 
 static void test_godot_names() {
-	std::string name;
-	CHECK(godot_name("CharacterBody2D", "moveAndSlide", &name));
-	CHECK_EQ(name, std::string("move_and_slide"));
-	CHECK(godot_name("Node", "_physicsProcess", &name));
-	CHECK_EQ(name, std::string("_physics_process"));
-	CHECK(godot_name("GodotObject", "", &name));
-	CHECK_EQ(name, std::string("Object"));
-	CHECK(godot_name("Node2D", "position", &name));
-	CHECK_EQ(name, std::string("position"));
+	CHECK_EQ(godot_name("CharacterBody2D", "moveAndSlide").value_or("?"), std::string("move_and_slide"));
+	CHECK_EQ(godot_name("Node", "_physicsProcess").value_or("?"), std::string("_physics_process"));
+	CHECK_EQ(godot_name("GodotObject", "").value_or("?"), std::string("Object"));
+	CHECK_EQ(godot_name("Node2D", "position").value_or("?"), std::string("position"));
 	// The declaring class is asked, not a subclass; and nothing is made up.
-	CHECK(!godot_name("CharacterBody2D", "position", &name));
-	CHECK(!godot_name("Node", "noSuchThing", &name));
-	CHECK(!godot_name("NoSuchClass", "", &name));
+	CHECK(!godot_name("CharacterBody2D", "position"));
+	CHECK(!godot_name("Node", "noSuchThing"));
+	CHECK(!godot_name("NoSuchClass", ""));
 	// AS3's own addition: Godot has no one method for it, so the name is marked for the binding to compose.
-	CHECK(godot_name("Signal", "add", &name) && name == "@add");
-	CHECK(godot_name("Signal", "numListeners", &name) && name == "@numListeners");
+	CHECK(godot_name("Signal", "add") == std::string("@add"));
+	CHECK(godot_name("Signal", "numListeners") == std::string("@numListeners"));
 }
 
 int main() {

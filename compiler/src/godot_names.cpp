@@ -4,7 +4,7 @@
 
 namespace kas3 {
 
-bool godot_name(std::string_view p_class, std::string_view p_member, std::string *r_name) {
+std::optional<std::string> godot_name(std::string_view p_class, std::string_view p_member) {
 	// Built on first use: "Class.member" or "Class" to Godot's name.
 	static const std::unordered_map<std::string, std::string> names = []() {
 		std::unordered_map<std::string, std::string> table;
@@ -30,10 +30,9 @@ bool godot_name(std::string_view p_class, std::string_view p_member, std::string
 	}
 	auto found = names.find(key);
 	if (found == names.end()) {
-		return false;
+		return std::nullopt;
 	}
-	*r_name = found->second;
-	return true;
+	return found->second;
 }
 
 } // namespace kas3

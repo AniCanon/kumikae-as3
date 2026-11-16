@@ -21,8 +21,8 @@ using namespace godot;
 
 namespace kas3 {
 
-// One of Godot's value types by its name ("Vector2"), or -1. The names are listed once.
-int value_type(std::string_view p_name) {
+// The names are listed once.
+std::optional<int> value_type(std::string_view p_name) {
 	static const std::unordered_map<std::string, int> types = [] {
 		std::unordered_map<std::string, int> found;
 		for (int i = 1; i < Variant::VARIANT_MAX; i++) {
@@ -33,7 +33,7 @@ int value_type(std::string_view p_name) {
 		return found;
 	}();
 	auto found = types.find(std::string(p_name));
-	return found == types.end() ? -1 : found->second;
+	return found == types.end() ? std::nullopt : std::optional<int>(found->second);
 }
 
 namespace {
@@ -110,10 +110,10 @@ void *GodotHost::singleton(std::string_view p_class, std::string *r_error) {
 }
 
 bool GodotHost::constant(std::string_view p_class, std::string_view p_name, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
-	int type = value_type(p_class);
+	const std::optional<int> type = value_type(p_class);
 	Variant value;
-	if (type >= 0) {
-		gdextension_interface::variant_get_constant_value((GDExtensionVariantType)type, name(p_name)._native_ptr(), value._native_ptr());
+	if (type) {
+		gdextension_interface::variant_get_constant_value((GDExtensionVariantType)*type, name(p_name)._native_ptr(), value._native_ptr());
 	}
 	// Godot answers an unknown name with the integer -1. No constant asked for here is a number (those have
 	// their values in the declarations), so a number where a Godot value is wanted means there is none.
@@ -137,9 +137,8 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 	Variant result;
 	GDExtensionCallError error;
 	error.error = GDEXTENSION_CALL_OK;
-	int type = value_type(p_class);
-	if (type >= 0) {
-		Variant::callp_static((Variant::Type)type, method_name, arguments.pointers(), (int)p_count, result, error);
+	if (const std::optional<int> type = value_type(p_class)) {
+		Variant::callp_static((Variant::Type)*type, method_name, arguments.pointers(), (int)p_count, result, error);
 	} else {
 		const std::string key = std::string(p_class) + "." + std::string(p_method);
 		auto found = static_methods_.find(key);
@@ -165,8 +164,8 @@ bool GodotHost::call_static(std::string_view p_class, std::string_view p_method,
 }
 
 void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *r_error) {
-	int type = value_type(p_type);
-	if (type < 0) {
+	const std::optional<int> type = value_type(p_type);
+	if (!type) {
 		// Not a value type: one of Godot's classes, made as `ClassName.new()` makes it.
 		const StringName &klass = name(p_type);
 		ClassDBSingleton *classes = ClassDBSingleton::get_singleton();
@@ -185,7 +184,7 @@ void *GodotHost::construct(std::string_view p_type, const vm::Argument *p_argume
 	Variant *made = make_handle();
 	GDExtensionCallError error;
 	error.error = GDEXTENSION_CALL_OK;
-	gdextension_interface::variant_construct((GDExtensionVariantType)type, made->_native_ptr(),
+	gdextension_interface::variant_construct((GDExtensionVariantType)*type, made->_native_ptr(),
 			reinterpret_cast<GDExtensionConstVariantPtr *>(arguments.pointers()), (int32_t)p_count, &error);
 	if (error.error != GDEXTENSION_CALL_OK) {
 		free_handle(made);

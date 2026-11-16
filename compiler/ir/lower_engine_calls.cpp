@@ -41,7 +41,8 @@ uint32_t EngineCalls::godot_call(Call *p_call, Symbol *p_method) {
 	uint32_t position = p_call->offset;
 	if (p_method->is_static()) {
 		if (Engine::is_singleton(p_method->owner) && Engine::on_object(p_call->callee)) {
-			return engine_call(p_call, p_method); // `i.isActionPressed()`: on the object `i` holds.
+			// `i.isActionPressed()`: on the object `i` holds.
+			return engine_call(p_call, p_method);
 		}
 		return Engine::is_singleton(p_method->owner) ? engine_call(p_call, p_method, Engine(l_).singleton(p_method->owner, position)) : static_call(p_call, p_method);
 	}
@@ -66,8 +67,8 @@ uint32_t EngineCalls::godot_call(Call *p_call, Symbol *p_method) {
 // signature, which the engine's entry for such functions needs.
 uint32_t EngineCalls::global_call(Call *p_call, Symbol *p_function, Kind p_want) {
 	uint32_t position = p_call->offset;
-	std::string signature;
-	if (!godot_name("@global", p_function->name, &signature)) {
+	const std::optional<std::string> signature = godot_name("@global", p_function->name);
+	if (!signature) {
 		l_.refuse(p_call->callee->offset, "calling '" + std::string(p_function->name) + "'");
 		return l_.default_value(p_want, position);
 	}
@@ -88,9 +89,10 @@ uint32_t EngineCalls::global_call(Call *p_call, Symbol *p_function, Kind p_want)
 	engine_arguments(decl, p_call->arguments, position, list);
 	uint32_t out = kind == Kind::Void ? NONE : l_.engine_reg(kind, type);
 	// No class before the dot: the engine's side reads that as a global function.
-	l_.emit(Op::HostCallStatic, position, out, l_.string("." + signature), l_.arguments(std::move(list)));
+	l_.emit(Op::HostCallStatic, position, out, l_.string("." + *signature), l_.arguments(std::move(list)));
 	if (out != NONE && (p_want == Kind::Str || p_want == Kind::I32 || p_want == Kind::U32) && kind != p_want) {
-		return l_.convert(out, p_want, position); // Godot's text for it; a Number cut to a whole one.
+		// Godot's text for it; a Number cut to a whole one.
+		return l_.convert(out, p_want, position);
 	}
 	return out == NONE ? 0 : out;
 }
@@ -172,11 +174,10 @@ uint32_t EngineCalls::signal_by_name(Expr *p_expression, Expr *p_later, uint32_t
 	return out;
 }
 
-// `null` where the default is one AS3 can't write, with arguments after it: Godot's own
-// default, from Godot's text for it. Written `null`, it is known now; a value that may be
-// null (`var c:Color = null`) is looked at as the call is made.
 uint32_t EngineCalls::godot_default_argument(Expr *p_argument, const Type *p_type, const std::string &p_default) {
 	uint32_t value = l_.engine_reg(Kind::Val, p_type);
+	// Written `null`, the default is known now; a value that may be null (`var c:Color = null`) is looked
+	// at as the call is made.
 	if (!Lowerer::is_null(p_argument)) {
 		// Into a register of its own: what comes later can't change it.
 		l_.emit(Op::Move, p_argument->offset, value, l_.expression(p_argument, Kind::Val));
@@ -192,7 +193,7 @@ uint32_t EngineCalls::godot_default_argument(Expr *p_argument, const Type *p_typ
 }
 
 void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
-		const std::string &p_defaults) {
+		std::optional<std::string_view> p_defaults) {
 	uint32_t count = p_function ? p_function->parameters.count : 0;
 	// A default that AS3 can't write is declared `= null`, and Godot fills in the real one when the
 	// argument is left out. A `null` written last for such a parameter is the same as leaving it out.
@@ -212,10 +213,10 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 				r_list.push_back(l_.settled(bound_method(p_arguments[i]), later, p_position));
 				continue;
 			}
-			std::string godot_default;
-			if (!p_defaults.empty() && p_function->parameters[i].default_value && Lowerer::is_null(p_function->parameters[i].default_value) &&
-					l_.kind_of(type, &kind) && kind == Kind::Val && godot_name("@default", p_defaults + "." + std::to_string(i), &godot_default)) {
-				r_list.push_back(godot_default_argument(p_arguments[i], type, godot_default));
+			std::optional<std::string> godot_default;
+			if (p_defaults && p_function->parameters[i].default_value && Lowerer::is_null(p_function->parameters[i].default_value) &&
+					l_.kind_of(type, &kind) && kind == Kind::Val && (godot_default = godot_name("@default", std::string(*p_defaults) + "." + std::to_string(i)))) {
+				r_list.push_back(godot_default_argument(p_arguments[i], type, *godot_default));
 				continue;
 			}
 			kind = Kind::Void;
@@ -226,11 +227,13 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 		}
 		Expr *later = Lowerer::writer(p_arguments, i + 1);
 		if (kind == Kind::Void && Lowerer::is_null(p_arguments[i])) {
-			kind = Kind::Ref; // `null` where Godot takes anything: nothing.
+			// `null` where Godot takes anything: nothing.
+			kind = Kind::Ref;
 		}
 		Kind own = Kind::Void;
 		if (kind == Kind::Void && l_.kind_of(p_arguments[i]->type, &own) && Lowerer::is_numeric(own) && l_.whole(p_arguments[i])) {
-			kind = Kind::I64; // Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
+			// Where Godot takes anything, `-5` and `2 * 3` are its integers, not 5.0 and 6.0.
+			kind = Kind::I64;
 		}
 		std::optional<uint32_t> collection = Vectors(l_).vector_to_engine(p_arguments[i], type);
 		collection = collection ? collection : Dynamic(l_).to_engine(p_arguments[i], type);
@@ -242,14 +245,16 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 	}
 }
 
-// "Class.method" in Godot's names: where the name table keeps a method's defaults that AS3 can't write.
-std::string EngineCalls::defaults_key(const Symbol *p_method) const {
-	std::string klass, method;
-	if (!p_method->owner || !godot_name(p_method->owner->name, std::string_view(), &klass) ||
-			!godot_name(p_method->owner->name, p_method->name, &method)) {
-		return std::string();
+std::optional<std::string> EngineCalls::defaults_key(const Symbol *p_method) const {
+	if (!p_method->owner) {
+		return std::nullopt;
 	}
-	return klass + "." + method;
+	const std::optional<std::string> klass = godot_name(p_method->owner->name, std::string_view());
+	const std::optional<std::string> method = klass ? godot_name(p_method->owner->name, p_method->name) : std::nullopt;
+	if (!method) {
+		return std::nullopt;
+	}
+	return *klass + "." + *method;
 }
 
 uint32_t EngineCalls::engine_call(Call *p_call, Symbol *p_method, uint32_t p_receiver, std::optional<Later> p_before) {
@@ -266,21 +271,25 @@ uint32_t EngineCalls::engine_call(Call *p_call, Symbol *p_method, uint32_t p_rec
 	bool of_value = false;
 	Expr *object = p_call->callee->kind == NodeKind::Member ? static_cast<Member *>(p_call->callee)->object : nullptr;
 	std::vector<uint32_t> list;
-	uint32_t script_object = NONE; // Set if the member is reached through another script object.
+	// Set if the member is reached through another script object.
+	uint32_t script_object = NONE;
 	const uint32_t receiver = p_receiver != NONE ? p_receiver : Engine(l_).engine_receiver(object, position, &of_value, &script_object);
 	if (script_object != NONE) {
 		script_object = l_.settled(script_object, Lowerer::writer(p_call->arguments), position);
-		list.push_back(receiver); // Filled in below, after the arguments.
+		// Filled in below, after the arguments.
+		list.push_back(receiver);
 	} else {
 		list.push_back(l_.settled(receiver, Lowerer::writer(p_call->arguments), position));
 	}
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
-	engine_arguments(decl, p_call->arguments, position, list, defaults_key(p_method));
+	const std::optional<std::string> defaults = defaults_key(p_method);
+	engine_arguments(decl, p_call->arguments, position, list, defaults);
 	if (script_object != NONE) {
 		Engine(l_).owner_of(script_object, receiver, object->offset);
 	}
 	if (p_before) {
-		l_.emit(p_before->op, p_before->position, p_before->a, p_before->b, p_before->c); // What the receiver still needs.
+		// What the receiver still needs.
+		l_.emit(p_before->op, p_before->position, p_before->a, p_before->b, p_before->c);
 	}
 	uint32_t out = kind == Kind::Void ? NONE : l_.engine_reg(kind, p_method->type ? l_.compilation_.type_of(p_method->type) : nullptr);
 	l_.emit(Op::HostCall, position, out, name, l_.arguments(std::move(list)));
@@ -289,9 +298,8 @@ uint32_t EngineCalls::engine_call(Call *p_call, Symbol *p_method, uint32_t p_rec
 
 uint32_t EngineCalls::static_call(Call *p_call, Symbol *p_method) {
 	uint32_t position = p_call->offset;
-	std::string klass, method;
-	if (!p_method->owner || !godot_name(p_method->owner->name, std::string_view(), &klass) ||
-			!godot_name(p_method->owner->name, p_method->name, &method)) {
+	const std::optional<std::string> key = defaults_key(p_method);
+	if (!key) {
 		l_.refuse(p_call->callee->offset, "calling '" + std::string(p_method->name) + "'");
 		return 0;
 	}
@@ -301,9 +309,9 @@ uint32_t EngineCalls::static_call(Call *p_call, Symbol *p_method) {
 	}
 	std::vector<uint32_t> list;
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
-	engine_arguments(decl, p_call->arguments, position, list, klass + "." + method);
+	engine_arguments(decl, p_call->arguments, position, list, key);
 	uint32_t out = kind == Kind::Void ? NONE : l_.engine_reg(kind, p_method->type ? l_.compilation_.type_of(p_method->type) : nullptr);
-	l_.emit(Op::HostCallStatic, position, out, l_.string(klass + "." + method), l_.arguments(std::move(list)));
+	l_.emit(Op::HostCallStatic, position, out, l_.string(*key), l_.arguments(std::move(list)));
 	return out == NONE ? 0 : out;
 }
 

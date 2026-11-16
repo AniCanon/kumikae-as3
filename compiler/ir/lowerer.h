@@ -88,7 +88,7 @@ class Lowerer {
 	Function &fn() { return module_.functions[function_index_]; }
 	const Function &fn() const { return module_.functions[function_index_]; }
 
-	void refuse(uint32_t p_offset, const std::string &p_what);
+	void refuse(uint32_t p_offset, std::string_view p_what);
 
 	uint32_t string(const std::string &p_text);
 

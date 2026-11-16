@@ -104,8 +104,6 @@ any Godot value passing as a condition):
 - A Number variable that holds a whole value reaches a parameter that takes anything as a float
   (`str(x)` gives `2.0`, as GDScript does for a float). Only expressions that are whole by their form are
   sent as integers. **decision**
-- New code that the guide would write otherwise: an empty string and an out-parameter where it asks for
-  `std::optional`, `const std::string &` for `std::string_view`, two comments out of place. **clean-up**
 
 ## Reload while running
 

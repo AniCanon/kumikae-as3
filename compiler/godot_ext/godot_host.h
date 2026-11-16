@@ -60,7 +60,8 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	std::unordered_map<std::string, GDExtensionMethodBindPtr> static_methods_;
 	const godot::StringName &name(std::string_view p_text);
 	const godot::Variant *evaluated(std::string_view p_expression, std::string *r_error);
-	const godot::String &text_of(std::string_view p_text); // name() as a String, made once.
+	// name() as a String, made once.
+	const godot::String &text_of(std::string_view p_text);
 
 	// One of Godot's global functions, found once: see godot_utility.cpp.
 	struct Utility;
@@ -128,7 +129,7 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const godot::Varian
 // What Godot gave, as the interpreter asked for it; refused, with a message that names p_from, if it is
 // something else.
 bool take(const vm::Wanted &p_wanted, const godot::Variant &p_value, std::string_view p_from, vm::Slot *r_result, std::string *r_error);
-// One of Godot's value types by its name ("Vector2"), or -1.
-int value_type(std::string_view p_name);
+// One of Godot's value types by its name ("Vector2"); nothing for a name that is not one.
+std::optional<int> value_type(std::string_view p_name);
 
 } // namespace kas3

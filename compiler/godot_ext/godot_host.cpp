@@ -278,14 +278,13 @@ void GodotHost::print(std::string_view p_text) {
 	UtilityFunctions::print(to_godot(p_text));
 }
 
-// An uncaught AS3 error, shown as Godot shows a script's own: the place it was raised is given as the
-// error's source, so that the editor can open the line. The text is the error and its AS3 stack, whose
-// first line reads "\tat Class/method()[file:line]".
+// An error with no place it was thrown: there is no line for the editor to open.
 void GodotHost::error(std::string_view p_text) {
-	UtilityFunctions::push_error(to_godot(p_text)); // An error with no stack: nothing to point at.
+	UtilityFunctions::push_error(to_godot(p_text));
 }
 
-// Shown as Godot shows a script's own error, with the script's file and line as its source.
+// Shown as Godot shows a script's own error: the script's file and line are given as the error's source,
+// so that the editor can open the line.
 void GodotHost::error_at(std::string_view p_text, std::string_view p_function, std::string_view p_file, int32_t p_line) {
 	const std::string text(p_text), function(p_function), file(p_file);
 	gdextension_interface::print_script_error(text.c_str(), function.c_str(), file.c_str(), p_line, false);
@@ -318,7 +317,7 @@ bool GodotHost::call(void *p_receiver, std::string_view p_method, const vm::Argu
 }
 
 // AS3's spelling of an operator, as Godot's. With one operand, '-' and '+' are the unary ones.
-static bool operator_of(std::string_view p_operator, size_t p_count, Variant::Operator *r_operator) {
+static std::optional<Variant::Operator> operator_of(std::string_view p_operator, size_t p_count) {
 	static const struct {
 		const char *spelling;
 		Variant::Operator op;
@@ -330,28 +329,25 @@ static bool operator_of(std::string_view p_operator, size_t p_count, Variant::Op
 	};
 	if (p_count == 1) {
 		if (p_operator == "-" || p_operator == "+") {
-			*r_operator = p_operator == "-" ? Variant::OP_NEGATE : Variant::OP_POSITIVE;
-			return true;
+			return p_operator == "-" ? Variant::OP_NEGATE : Variant::OP_POSITIVE;
 		}
 		if (p_operator == "~") {
-			*r_operator = Variant::OP_BIT_NEGATE;
-			return true;
+			return Variant::OP_BIT_NEGATE;
 		}
-		return false;
+		return std::nullopt;
 	}
 	for (const auto &entry : TABLE) {
 		if (p_operator == entry.spelling) {
-			*r_operator = entry.op;
-			return true;
+			return entry.op;
 		}
 	}
-	return false;
+	return std::nullopt;
 }
 
 bool GodotHost::operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 		vm::Slot *r_result, std::string *r_error) {
-	Variant::Operator op = Variant::OP_ADD;
-	if (p_count < 1 || p_count > 2 || !operator_of(p_operator, p_count, &op)) {
+	const std::optional<Variant::Operator> op = p_count < 1 || p_count > 2 ? std::nullopt : operator_of(p_operator, p_count);
+	if (!op) {
 		*r_error = "Godot has no operator '" + std::string(p_operator) + "'";
 		return false;
 	}
@@ -359,10 +355,10 @@ bool GodotHost::operate(std::string_view p_operator, const vm::Argument *p_argum
 	Variant right = p_count == 2 ? to_variant(p_arguments[1].kind, p_arguments[1].slot) : Variant();
 	Variant result;
 	bool valid = false;
-	Variant::evaluate(op, left, right, result, valid);
-	if (!valid && (op == Variant::OP_EQUAL || op == Variant::OP_NOT_EQUAL)) {
+	Variant::evaluate(*op, left, right, result, valid);
+	if (!valid && (*op == Variant::OP_EQUAL || *op == Variant::OP_NOT_EQUAL)) {
 		// Two things Godot can't compare are not equal, as in AS3: `vector == 5` is false.
-		result = op == Variant::OP_NOT_EQUAL;
+		result = *op == Variant::OP_NOT_EQUAL;
 		valid = true;
 	}
 	if (!valid) {
@@ -480,12 +476,12 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 		return false;
 	}
 	// The name is AS3's. Godot's own comes from the name table, for the object's class or one it extends.
-	std::string godot;
-	bool found = false;
-	for (StringName at = object->get_class(); !found && !String(at).is_empty(); at = ClassDB::get_parent_class(at)) {
+	std::optional<std::string> godot;
+	for (StringName at = object->get_class(); !godot && !String(at).is_empty(); at = ClassDB::get_parent_class(at)) {
 		CharString klass = String(at).utf8();
-		found = godot_name(std::string_view(klass.get_data()) == "Object" ? "GodotObject" : klass.get_data(), p_name, &godot);
+		godot = godot_name(std::string_view(klass.get_data()) == "Object" ? "GodotObject" : klass.get_data(), p_name);
 	}
+	const bool found = godot.has_value();
 	// Not one of Godot's: a public field of the AS3 script attached to it, as Godot itself would reach it.
 	const vm::Object *script = found ? nullptr : script_object(object);
 	const Member field = script ? find_member(script->klass, StringName(String::utf8(p_name.data(), (int64_t)p_name.size()))) : Member{};
@@ -494,7 +490,7 @@ bool GodotHost::member(void *p_receiver, std::string_view p_name, const vm::Want
 		*r_error = "a " + std::string(klass.get_data()) + " has no '" + std::string(p_name) + "'";
 		return false;
 	}
-	const Variant value = found ? object->get(StringName(to_godot(godot))) : read_field(script, field.index);
+	const Variant value = found ? object->get(StringName(to_godot(*godot))) : read_field(script, field.index);
 	if (p_result.type == "Signal" && value.get_type() != Variant::SIGNAL) {
 		*r_error = "'" + std::string(p_name) + "' is not a signal";
 		return false;

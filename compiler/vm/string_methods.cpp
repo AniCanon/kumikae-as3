@@ -46,7 +46,7 @@ Slot of_pointer(void *p_value) {
 
 // The pieces split() gives of a text by a delimiter that is text: the whole of it with none (p_whole), each
 // UTF-16 unit for an empty one; at most p_most pieces.
-std::vector<std::string> split_text(std::string_view p_self, bool p_whole, const std::string &p_by, uint32_t p_most) {
+std::vector<std::string> split_text(std::string_view p_self, bool p_whole, std::string_view p_by, uint32_t p_most) {
 	const uint32_t length = static_cast<uint32_t>(utf16_length(p_self));
 	std::vector<std::string> pieces;
 	if (p_whole) {

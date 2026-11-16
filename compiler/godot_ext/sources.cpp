@@ -29,8 +29,8 @@ String scripts_root() {
 }
 
 // A script by its place in the project ("res://game/Player.as"), wherever it is read from.
-std::string project_path(const std::string &p_file, const String &p_root) {
-	return "res://" + p_file.substr((size_t)p_root.utf8().length());
+std::string project_path(std::string_view p_file, const String &p_root) {
+	return "res://" + std::string(p_file.substr((size_t)p_root.utf8().length()));
 }
 
 // Every .as file under a folder, by where it is. Folders and files whose name starts with a dot are not

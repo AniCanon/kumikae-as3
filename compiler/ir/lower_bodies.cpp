@@ -42,10 +42,10 @@ void Bodies::parameters(FunctionDecl *p_function) {
 			if (is_engine(kind) && parameter.type) {
 				// What the engine must be handing over for this parameter.
 				const Type *type = l_.compilation_.type_of(parameter.type);
-				std::string godot;
-				if (type && type->symbol && godot_name(type->symbol->name, std::string_view(), &godot)) {
+				std::optional<std::string> godot;
+				if (type && type->symbol && (godot = godot_name(type->symbol->name, std::string_view()))) {
 					l_.fn().engine_types.resize(local + 1);
-					l_.fn().engine_types[local] = godot;
+					l_.fn().engine_types[local] = *godot;
 				}
 			}
 			if (parameter.symbol) {

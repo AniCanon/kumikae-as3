@@ -25,8 +25,11 @@ class EngineCalls {
 	// found when the line runs.
 	uint32_t bound_method(Expr *p_expression);
 
-	std::string defaults_key(const Symbol *p_method) const;
-	// The value of an argument whose default is one AS3 can't write, Godot's own when it is null.
+	// "Class.method" in Godot's names: where the name table keeps a method's defaults that AS3 can't write,
+	// and the name a static method is called by. Nothing for a method Godot has no name for.
+	std::optional<std::string> defaults_key(const Symbol *p_method) const;
+	// The value of an argument whose default is one AS3 can't write, written with arguments after it: what
+	// it holds, or Godot's own default, from Godot's text for it, when it is null.
 	uint32_t godot_default_argument(Expr *p_argument, const Type *p_type, const std::string &p_default);
 
 public:
@@ -47,7 +50,7 @@ public:
 	// Arguments for the engine: each as its parameter says, or as it comes where the parameter takes anything.
 	// p_defaults: "Class.method" in Godot's names, for a method whose defaults Godot's description gives.
 	void engine_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list,
-			const std::string &p_defaults = std::string());
+			std::optional<std::string_view> p_defaults = std::nullopt);
 };
 
 } // namespace ir

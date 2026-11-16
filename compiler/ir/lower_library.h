@@ -22,7 +22,7 @@ public:
 	Library(Lowerer &p_lowerer, Call *p_call, Symbol *p_function);
 
 	Expr *object() const;
-	uint32_t refused(const std::string &p_why, Kind p_kind);
+	uint32_t refused(std::string_view p_why, Kind p_kind);
 	Expr *later(uint32_t p_from) const;
 	// The value a declaration gives a parameter left out: a number, a string, or `undefined` (NaN).
 	uint32_t left_out(const Parameter &p_parameter, Kind p_kind);

@@ -150,8 +150,8 @@ void add_occurrences(Node *p_node, Symbol *&r_enclosing, std::vector<Occurrence>
 	}
 }
 
-std::string class_text(const Unit &p_unit, const Symbol *p_symbol, const std::string &p_name) {
-	std::string out = "class " + p_name;
+std::string class_text(const Unit &p_unit, const Symbol *p_symbol, std::string_view p_name) {
+	std::string out = "class " + std::string(p_name);
 	if (p_symbol->node && p_symbol->node->kind == NodeKind::ClassDecl) {
 		const ClassDecl *decl = static_cast<const ClassDecl *>(p_symbol->node);
 		if (decl->extends) {
@@ -165,8 +165,8 @@ std::string class_text(const Unit &p_unit, const Symbol *p_symbol, const std::st
 	return out;
 }
 
-std::string interface_text(const Unit &p_unit, const Symbol *p_symbol, const std::string &p_name) {
-	std::string out = "interface " + p_name;
+std::string interface_text(const Unit &p_unit, const Symbol *p_symbol, std::string_view p_name) {
+	std::string out = "interface " + std::string(p_name);
 	if (p_symbol->node && p_symbol->node->kind == NodeKind::InterfaceDecl) {
 		const InterfaceDecl *decl = static_cast<const InterfaceDecl *>(p_symbol->node);
 		for (uint32_t i = 0; i < decl->extends.count; i++) {
@@ -178,9 +178,8 @@ std::string interface_text(const Unit &p_unit, const Symbol *p_symbol, const std
 }
 
 // A variable, a field or a local; a constant with its value.
-std::string variable_text(const Unit &p_unit, const Symbol *p_symbol, const std::string &p_prefix,
-		const std::string &p_name) {
-	std::string out = p_prefix + (p_symbol->is_const ? "const " : "var ") + p_name + type_text(p_unit, p_symbol->type);
+std::string variable_text(const Unit &p_unit, const Symbol *p_symbol, std::string_view p_prefix, std::string_view p_name) {
+	std::string out = std::string(p_prefix) + (p_symbol->is_const ? "const " : "var ") + std::string(p_name) + type_text(p_unit, p_symbol->type);
 	if (p_symbol->is_const && p_symbol->node && p_symbol->node->kind == NodeKind::VarDecl) {
 		for (const Declarator &declarator : static_cast<const VarDecl *>(p_symbol->node)->declarators) {
 			if (declarator.symbol == p_symbol) {
