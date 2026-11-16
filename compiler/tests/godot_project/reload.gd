@@ -48,6 +48,7 @@ func _process(_delta: float) -> bool:
 		ask("fill")
 		ask("bump")
 		ask("bump")
+		ask("hold")
 		other.name = "first"
 		show("before: value", ask("value"), 1)
 		show("before: heard", ask("heard"), 1)
@@ -59,6 +60,8 @@ func _process(_delta: float) -> bool:
 		show("after an edit: a static field keeps its value", ask("total"), 2)
 		show("after an edit: a vector field keeps its elements", ask("seenText"), "1,2")
 		show("after an edit: a method that is new can be called", ask("added"), "new")
+		# A class as a value, a method of the library as a value, and a property hidden from loops.
+		show("after an edit: a class value, a method value and a hidden property are kept", ask("held"), "true true 3 b 1")
 		show("after an edit: a vector of a type the new code does not name keeps its elements", ask("bagText"), "2")
 		show("after an edit: a counted object keeps its field", counted.get("n"), 5)
 		var weak: WeakRef = weakref(counted)
