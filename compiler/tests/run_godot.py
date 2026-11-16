@@ -380,7 +380,11 @@ compare("cycles.gd", [
     "what a setter kept outlives GDScript's hold", "a static's loop goes when the static lets go", "what a getter kept goes when AS3 lets go",
     "what a setter kept goes when AS3 lets go", "a loop GDScript held goes when it lets go",
     "a function listening to its own object's signal goes with it", "and stays, still listening, while GDScript holds the object",
-    "so does the listening one",
+    "so does the listening one", "a script whose base is Object goes on a RefCounted",
+    "on a RefCounted, a loop through Godot's count held by nobody goes", "on a RefCounted, a loop held by nobody goes",
+    "on a RefCounted, a loop GDScript holds stays whole", "on a RefCounted, what an AS3 static holds stays whole",
+    "on a RefCounted, what an AS3 static holds keeps its Godot object", "on a RefCounted, a loop GDScript held goes when it lets go",
+    "on a RefCounted, what a static held goes when the static lets go",
 ])
 
 # A script stuck in a loop is stopped with Flash's error, after the limit the project's settings give.
