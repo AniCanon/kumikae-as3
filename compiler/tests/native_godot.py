@@ -5,6 +5,8 @@ Two things are held:
 
   probe      tests/godot_native's scripts say, as native code, what they say interpreted, line for line.
   workloads  each workload of tests/bench/languages' CmpAs.as, run small, stays on the fast paths.
+  frames     each frame benchmark of tests/bench/languages/frames, run for a few frames, leaves to the
+             library what frames/native_counts.txt says: nothing in a loop that should be free of it.
 
 The second is by the host's counts (KAS3_NATIVE_COUNTS): how many times generated code left an operation
 to the library (a thunk), and how many of the places it asks Godot directly the host could not work out.
@@ -27,6 +29,8 @@ FIRST_SCAN = ["--headless", "--editor", "--quit-after", "300"]
 USED = "ActionScript: the scripts run as native code."
 # How many rounds a workload is run for the counts: enough that a thunk in its loop shows.
 ROUNDS = 1000
+# And how many frames a frame benchmark is run for.
+FRAMES = 3
 
 
 class Runner:
@@ -76,12 +80,12 @@ class Runner:
         self.check("native: the C++ of %s builds without a warning" % label, built.returncode == 0, built.stderr[-900:])
         return program if built.returncode == 0 else None
 
-    def run(self, project, script, library, arguments=()):
+    def run(self, project, script, library, arguments=(), flags=()):
         environment = dict(os.environ, KAS3_NATIVE_COUNTS="1")
         environment.pop("KAS3_PROGRAM_LIBRARY", None)
         if library:
             environment["KAS3_PROGRAM_LIBRARY"] = library
-        command = [self.godot, "--headless", "--path", project, "-s", script, *(["--", *arguments] if arguments else [])]
+        command = [self.godot, "--headless", *flags, "--path", project, "-s", script, *(["--", *arguments] if arguments else [])]
         try:
             ran = subprocess.run(command, capture_output=True, text=True, timeout=300, env=environment)
         except subprocess.TimeoutExpired as late:
@@ -144,3 +148,25 @@ class Runner:
                 self.check("native: the workload %s runs" % name, status == 0 and USED in text and "COUNTED " + name in text,
                            "exit %d\n%s" % (status, text[-600:]))
                 self.counts("the workload %s" % name, text, listed, name)
+
+    def frames(self):
+        """Each frame benchmark as native code for a few frames, counted."""
+        if not self.able("the count of the frame benchmarks"):
+            return
+        sources = os.path.join(self.tests, "bench", "languages")
+        listed = os.path.join(sources, "frames", "native_counts.txt")
+        names = [line.split(": ")[0] for line in open(listed).read().splitlines() if line and not line.startswith("#")]
+        with tempfile.TemporaryDirectory() as where:
+            project = self.project(where, sources, ["frame_counts.gd", os.path.join(self.tests, "godot_native", "project.godot")])
+            scripts = sorted("frames/" + name for name in os.listdir(os.path.join(sources, "frames")) if name.endswith(".as"))
+            os.makedirs(os.path.join(project, "frames"))
+            for script in scripts:
+                shutil.copy(os.path.join(sources, script), os.path.join(project, "frames"))
+            program = self.library("the frame benchmarks", project, scripts, where)
+            if not program:
+                return
+            for name in names:
+                status, text = self.run(project, "frame_counts.gd", program, [name, str(FRAMES)], ["--fixed-fps", "60"])
+                self.check("native: the frame benchmark %s runs" % name, status == 0 and USED in text and "COUNTED " + name in text,
+                           "exit %d\n%s" % (status, text[-600:]))
+                self.counts("the frame benchmark %s" % name, text, listed, name)

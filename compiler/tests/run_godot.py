@@ -680,6 +680,7 @@ with tempfile.TemporaryDirectory() as packed:
 native = native_godot.Runner(godot, project, tests, os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None, check)
 native.probe()
 native.workloads()
+native.frames()
 
 for failure in failures:
     print("FAIL " + failure)
