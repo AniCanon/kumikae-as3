@@ -48,16 +48,9 @@ void Interpreter::dynamic_op(const Function &p_function, const Instruction &p_in
 void Interpreter::table_new(const Function &p_function, const Instruction &p_in) {
 	Slot *r = stack_.data() + frames_.back().base;
 	(void)p_function;
-	if (p_in.c != NONE && r[p_in.c].b) {
-		raise_unsupported("a Dictionary with weak keys");
-		return;
+	if (Object *made = vm::table_new(library_, p_in.b, p_in.c != NONE && r[p_in.c].b)) {
+		assign(Kind::Obj, r[p_in.a], made);
 	}
-	Object *made = new_table(p_in.b, collector_.list_for(p_in.b));
-	if (!made) {
-		out_of_memory();
-		return;
-	}
-	assign(Kind::Obj, r[p_in.a], made);
 }
 
 // Whether a value is one of Godot's Dictionaries and the class is flash.utils.Dictionary: AS3 takes one as
@@ -93,7 +86,7 @@ Object *Interpreter::table_of_engine(void *p_dictionary, uint32_t p_class) {
 	whole.kind = Kind::I64;
 	Slot size;
 	size.bits = 0;
-	Object *made = keys.p && host_.handles.call(keys.p, "size", nullptr, 0, whole, &size, &error) ? new_table(p_class, collector_.list_for(p_class)) : nullptr;
+	Object *made = keys.p && host_.handles.call(keys.p, "size", nullptr, 0, whole, &size, &error) ? new_table(p_class, heap_.list_for(p_class)) : nullptr;
 	bool ok = made != nullptr;
 	if (!ok && error.empty()) {
 		out_of_memory();
@@ -246,7 +239,7 @@ bool Interpreter::object_method(Slot p_holder, const PropertyKey &p_key, const s
 				value.d = any::to_number(p_holder);
 			}
 			const double digits = p_given.empty() ? (*format == ir::NumberFormat::Radix ? 10 : 0) : any::to_number(p_given[0]);
-			if (const std::optional<std::string> words = number_words(*format, value, tag == AnyTag::Wide, digits)) {
+			if (const std::optional<std::string> words = number_words(library_, *format, value, tag == AnyTag::Wide, digits)) {
 				if (Str *made = text(*words)) {
 					give(Kind::Str, of_pointer(made));
 				}

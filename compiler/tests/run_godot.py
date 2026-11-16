@@ -629,14 +629,14 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 21, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 22, output[-1500:])
         check("%s: a reload that would drop an object whose class is gone is refused, and names it" % label,
               "an object of the class 'Later' is alive" in output, output[-1500:])
         check("%s: a reload asked for while AS3 runs says it was not made" % label,
               "can't be reloaded while AS3 runs" in output, output[-1500:])
         for name, got, want in values:
             check("%s: %s" % (label, name), got == want, "got %r, expected %r" % (got, want))
-        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 3, output[-1500:])
+        check("%s: Godot is told the scripts were reloaded" % label, output.count("ActionScript: reloaded") == 5, output[-1500:])
         check("%s: a script with an error is reported and not loaded" % label,
               "were not reloaded" in output and "Hot.as:" in output, output[-1500:])
 

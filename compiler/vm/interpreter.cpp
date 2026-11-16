@@ -16,7 +16,7 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host), collector_(*this) {
+		module_(p_module), host_(p_host), heap_(p_module, p_host.handles, p_host.source) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}
@@ -96,7 +96,7 @@ Interpreter::~Interpreter() {
 	}
 	forget_subject();
 	// With every root let go of, what is left in loops is held only by itself, or by the host.
-	collector_.collect();
+	heap_.collector.collect();
 	for (Str *constant : strings_) {
 		if (release(constant)) {
 			free_string(constant);
@@ -269,7 +269,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	// This program's code is running an instruction beneath this call: the error goes back to it, as Flash
 	// has an error in a listener come out of the dispatch that ran it. Only the first: a later listener's
 	// error, with one already carried, is reported here, where it happened.
-	const bool carry = !ok && depth > 0 && failing_ && !outer_failing && !outer_stopped && !aside;
+	const bool carry = !ok && (depth > 0 || direct_ > 0) && failing_ && !outer_failing && !outer_stopped && !aside;
 	if (!ok && !carry) {
 		report();
 	}

@@ -260,8 +260,9 @@ skipped under what it lacks, and `tests/native_skipped.txt` lists those, so that
 unseen. It prints `native: P passed, S skipped, F failed`.
 
 What generated code looks like, and why, is in [backend_cpp/README.md](backend_cpp/README.md); what it runs
-on, how it shares the interpreter's library (through thunks, until that library is split out of the
-interpreter) and what is to be split is in [runtime/README.md](runtime/README.md).
+on, how it shares the interpreter's library (called directly where a part of it is a function of plain
+values, through thunks where it is still the interpreter's own) and what is left to split is in
+[runtime/README.md](runtime/README.md).
 
 With `KAS3_NATIVE_COUNTS` set, the host says on standard error, as it goes, how many times generated code
 left an operation to the library and which (`kas3: counts thunks=N unresolved=M`, then a line for each):

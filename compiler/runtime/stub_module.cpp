@@ -175,6 +175,14 @@ void add_builtins(const Program &p_program, ir::Module &r_module) {
 	static const uint32_t array_given[] = { 0, 1 };
 	const uint32_t array = p_program.known.array;
 	add(ThunkInfo{ static_cast<uint8_t>(array == NONE ? Op::ConstNull : Op::VecNew), 2, array, 0, array_made, 3, 2, nullptr, array_given, 2, 2, NONE, NONE, NONE });
+	static const uint8_t applied[] = { static_cast<uint8_t>(Kind::Any), static_cast<uint8_t>(Kind::Any), static_cast<uint8_t>(Kind::Any) };
+	add(ThunkInfo{ static_cast<uint8_t>(Op::ApplyFunction), 2, 0, 1, applied, 3, 2, nullptr, nullptr, 0, 2, NONE, NONE, NONE });
+	static const uint8_t any_words[] = { static_cast<uint8_t>(Kind::Any), static_cast<uint8_t>(Kind::Str) };
+	add(ThunkInfo{ static_cast<uint8_t>(Op::AnyText), 1, 0, 0, any_words, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE, NONE });
+	static const uint8_t split[] = { static_cast<uint8_t>(Kind::Str), static_cast<uint8_t>(Kind::Any), static_cast<uint8_t>(Kind::F64), static_cast<uint8_t>(Kind::Obj) };
+	static const uint32_t split_given[] = { 0, 1, 2 };
+	add(ThunkInfo{ static_cast<uint8_t>(Op::StrCall), 3, static_cast<uint32_t>(ir::StringFunction::Split), 0, split, 4, 3, nullptr, split_given, 3, 3, NONE,
+			NONE, NONE });
 }
 
 void add_thunks(const Program &p_program, ir::Module &r_module) {

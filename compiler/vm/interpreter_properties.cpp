@@ -68,7 +68,7 @@ std::string Interpreter::holder_name(Slot p_holder) const {
 }
 
 void Interpreter::raise_unsupported(const std::string &p_what) {
-	raise(module_.error_class, p_what + " is not supported by the interpreter yet");
+	library_.raise_unsupported(p_what);
 }
 
 void Interpreter::raise_not_found(const PropertyKey &p_key, Slot p_holder) {
@@ -331,7 +331,8 @@ bool Interpreter::delete_property(Slot p_holder, const PropertyKey &p_key, bool 
 		*r_done = klass->array && !p_key.index && p_key.text != "length";
 		entries = klass->array ? vector->properties : nullptr;
 	} else if (klass && !klass->table) {
-		*r_done = !klass->field(p_key.text, true) && !named_method(*klass, p_key.text);
+		*r_done = !klass->field(p_key.text, true) && !named_method(*klass, p_key.text) && !named_method(*klass, p_key.text, "get ") &&
+				!named_method(*klass, p_key.text, "set ");
 	} else if (!klass && (any::tag(p_holder) == AnyTag::Null || any::tag(p_holder) == AnyTag::Undefined)) {
 		any_null_check(p_holder);
 		return false;

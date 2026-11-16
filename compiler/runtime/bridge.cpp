@@ -119,7 +119,7 @@ void Host::restore() {
 bool Host::hand_over(vm::NativeError *r_error) {
 	const bool of_later_call = later;
 	later = false;
-	if ((nesting > 0 && !of_later_call) || !context.failing || stopped || carried) {
+	if (((nesting > 0 || direct > 0) && !of_later_call) || !context.failing || stopped || carried) {
 		return false;
 	}
 	r_error->error = context.pending;

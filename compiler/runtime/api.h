@@ -7,6 +7,27 @@
 #pragma once
 
 #define KAS3_RUNTIME_API(X) \
+	/* The library's functions of plain values (direct.h). */ \
+	X(text_call, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(text_of_value, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(text_joined, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(number_text, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(value_to_any, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(any_to_value, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(any_is_type, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(object_new, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(table_new, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_call, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_get, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_set, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_length, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_set_length, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_fixed, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_set_fixed, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_new, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(array_new, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(vector_from, void, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
+	X(text_method, bool, (Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out), (c, p_which, p_values, p_count, r_out)) \
 	/* Errors (operations.h says what each is for). */ \
 	X(stack_overflow, void, (Context *c), (c)) \
 	X(raise_null, void, (Context *c), (c)) \

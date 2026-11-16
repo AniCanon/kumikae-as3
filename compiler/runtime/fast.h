@@ -21,8 +21,8 @@ inline Slot *element(Object *p_vector, uint32_t p_index) {
 }
 
 // A new object of the class, its fields as an object's are before its constructor runs, with one reference,
-// the caller's. Null for a class whose objects the cycle collector looks at (they are made on its list,
-// which is the library's), and when there is no memory.
+// the caller's. Null for a class whose objects are more than fields (a vector, a table, one that extends one
+// of Godot's: the library makes those), and when there is no memory.
 //     Object *new_object(Context *c, uint32_t p_class);
 
 // The element VecSet writes: one there already is, or the one just past the end of a vector that may grow,
@@ -69,6 +69,14 @@ inline Str *key_of(Context *c, Slot p_any) {
 // One String after another, a missing one reading "null". Null if there is no memory for it.
 inline Str *join(Context *c, const Str *p_first, const Str *p_second) {
 	return join_text(c, p_first, p_second);
+}
+// One of a String's methods that only read text (vm/text_methods.h; p_which is StrCall's second operand),
+// on the values StrCall lists: what it gives, whole. False, with nothing given, if there is no memory.
+//     bool text_method(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+template <class... Given>
+inline bool text_method_of(Context *c, uint32_t p_which, Slot *r_out, Given... p_given) {
+	const Slot values[] = { p_given..., empty() }; // One more than given: no array is empty.
+	return text_method(c, p_which, values, static_cast<uint32_t>(sizeof...(Given)), r_out);
 }
 // Two Strings are the same text, or both missing.
 inline bool same_text(const Str *p_a, const Str *p_b) {

@@ -151,6 +151,9 @@ void FunctionWriter::null_check(uint32_t p_register) {
 }
 
 void FunctionWriter::by_thunk(const Instruction &p_in) {
+	if (by_library(p_in)) {
+		return; // The library's function of plain values does it whole: no thunk.
+	}
 	const ThunkUse use = thunks_.use(function_, p_in);
 	mark();
 	line("{");

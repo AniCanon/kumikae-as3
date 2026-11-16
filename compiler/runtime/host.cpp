@@ -20,6 +20,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 		output(p_embedder.output), handles(p_embedder.handles) {
 	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(p_embedder.output, p_embedder.handles, p_embedder.source, p_embedder.clock));
 	interpreter->set_native(this);
+	asked = runner_for(&context);
 	globals.resize(program.global_count);
 	for (uint32_t i = 0; i < program.global_count; i++) {
 		globals[i] = vm::empty_value(static_cast<Kind>(program.globals[i].kind) == Kind::F64, program.globals[i].starts_null);
@@ -31,7 +32,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	context.null_text = null_text;
 	class_used.assign(program.class_count, 0);
 	for (const ir::Class &klass : module.classes) {
-		made_here.push_back(klass.element == Kind::Void && !klass.table && !klass.is_interface && !vm::may_hold_objects(klass));
+		made_here.push_back(klass.element == Kind::Void && !klass.table && !klass.is_interface && klass.native_base.empty());
 	}
 	if (std::getenv("KAS3_NATIVE_COUNTS")) {
 		thunk_counts.assign(module.functions.size() - program.function_count, 0);
@@ -58,7 +59,7 @@ void Host::clear_globals() {
 }
 
 // What a thunk asks of the library, for the counts: the operation, and Godot's name where it asks Godot.
-static std::string asked(const ir::Module &p_module, const ir::Instruction &p_in) {
+static std::string asked_of(const ir::Module &p_module, const ir::Instruction &p_in) {
 	std::string text = ir::op_name(p_in.op);
 	const bool by_b = p_in.op == Op::HostCall || p_in.op == Op::HostNew || p_in.op == Op::HostOperate || p_in.op == Op::HostSet ||
 			p_in.op == Op::HostSingleton || p_in.op == Op::HostConstant || p_in.op == Op::HostCallStatic;
@@ -77,12 +78,12 @@ void Host::say_counts() const {
 	std::fprintf(stderr, "kas3: counts thunks=%llu unresolved=%zu\n", static_cast<unsigned long long>(all), unresolved.size());
 	for (size_t i = 0; i < thunk_counts.size(); i++) {
 		if (thunk_counts[i]) {
-			const std::string what = asked(module, module.functions[thunk_function(static_cast<uint32_t>(i))].code[0]);
+			const std::string what = asked_of(module, module.functions[thunk_function(static_cast<uint32_t>(i))].code[0]);
 			std::fprintf(stderr, "kas3:   %llu %s\n", static_cast<unsigned long long>(thunk_counts[i]), what.c_str());
 		}
 	}
 	for (uint32_t use : unresolved) {
-		std::fprintf(stderr, "kas3:   unresolved %s\n", asked(module, module.functions[thunk_function(program.uses[use])].code[0]).c_str());
+		std::fprintf(stderr, "kas3:   unresolved %s\n", asked_of(module, module.functions[thunk_function(program.uses[use])].code[0]).c_str());
 	}
 }
 
@@ -109,7 +110,7 @@ Object *new_object(Context *c, uint32_t p_class) {
 		return nullptr;
 	}
 	const ClassInfo &klass = c->classes[p_class];
-	Object *object = vm::new_object(p_class, klass.field_count, nullptr);
+	Object *object = vm::new_object(p_class, klass.field_count, c->host->interpreter->heap().list_for(p_class));
 	for (uint32_t i = 0; object && i < klass.field_count; i++) {
 		object->fields()[i] = vm::empty_value(static_cast<Kind>(klass.fields[i].kind) == Kind::F64, klass.fields[i].starts_null);
 	}

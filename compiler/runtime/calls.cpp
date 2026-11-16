@@ -6,6 +6,7 @@
 
 #include "native_host.h"
 #include "table.h"
+#include "text_methods.h"
 
 #include <cmath>
 
@@ -14,6 +15,10 @@ namespace rt {
 
 using ir::Kind;
 using vm::AnyTag;
+
+bool text_method(Context *, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+	return vm::text_method(static_cast<ir::StringFunction>(p_which), vm::Values{ p_values, nullptr, p_count }, nullptr, r_out);
+}
 
 Str *text_of_int(Context *, int32_t p_value) {
 	return vm::new_string(std::to_string(p_value));

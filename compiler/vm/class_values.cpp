@@ -23,7 +23,7 @@ Object *Interpreter::class_value(uint32_t p_code) {
 	if (const auto found = class_values_.find(p_code); found != class_values_.end()) {
 		return found->second;
 	}
-	Object *made = module_.class_class == NONE ? nullptr : new_object(module_.class_class, 1, collector_.list_for(module_.class_class));
+	Object *made = module_.class_class == NONE ? nullptr : new_object(module_.class_class, 1, heap_.list_for(module_.class_class));
 	if (!made) {
 		out_of_memory();
 		return nullptr;
@@ -135,7 +135,7 @@ void Interpreter::class_new(uint32_t p_code, const std::vector<Slot> &p_given, u
 		}
 		const AnyTag tag = p_given.empty() ? AnyTag::Undefined : any::tag(p_given[0]);
 		if (object && (tag == AnyTag::Undefined || tag == AnyTag::Null)) {
-			Object *made = module_.object_class == NONE ? nullptr : new_table(module_.object_class, collector_.list_for(module_.object_class));
+			Object *made = module_.object_class == NONE ? nullptr : new_table(module_.object_class, heap_.list_for(module_.object_class));
 			if (made) {
 				give(Kind::Obj, of_object(made));
 			} else {
@@ -207,7 +207,7 @@ void Interpreter::class_new(uint32_t p_code, const std::vector<Slot> &p_given, u
 			count_error(1);
 		} else if (!p_given.empty() && any::to_boolean(p_given[0])) {
 			raise_unsupported("a Dictionary with weak keys");
-		} else if (Object *made = new_table(p_code, collector_.list_for(p_code))) {
+		} else if (Object *made = new_table(p_code, heap_.list_for(p_code))) {
 			give(Kind::Obj, of_object(made));
 		} else {
 			out_of_memory();

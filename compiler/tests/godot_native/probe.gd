@@ -18,6 +18,7 @@ func _initialize() -> void:
 	print("PROBE script=", probe.call("script", 1000))
 	print("PROBE script again=", probe.call("script", 10))
 	print("PROBE listeners=", probe.call("listeners"))
+	print("PROBE speaks=", probe.call("speaks"))
 	print("PROBE fail=", probe.call("fail", 3))
 	print("PROBE after=", probe.call("script", 1))
 	# A node whose script's object is freed while its _process runs: see Probe.as.

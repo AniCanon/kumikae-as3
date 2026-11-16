@@ -23,7 +23,7 @@ Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
 			return kept;
 		}
 	}
-	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, collector_.list_for(module_.function_class));
+	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, heap_.list_for(module_.function_class));
 	if (!made) {
 		if (module_.function_class != NONE) {
 			out_of_memory();
@@ -382,6 +382,14 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	const uint32_t target = static_cast<uint32_t>(value->fields()[ir::FUNCTION_INDEX].i);
 	push(target, values->data(), values->size(), p_in.a);
 	let_go_arguments(module_.functions[target], &*values);
+}
+
+bool Interpreter::Asked::call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
+	const std::optional<Slot> made = vm.call_function_within(p_function, p_arguments, p_count);
+	if (made) {
+		*r_result = *made;
+	}
+	return made.has_value();
 }
 
 } // namespace vm
