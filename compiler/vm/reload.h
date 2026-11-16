@@ -35,6 +35,7 @@ class Reload {
 	void carry_entries(const Entries &p_from, Entries *p_to);
 	Object *moved_vector(Vector *p_old, uint32_t p_class);
 	void carry_fields(Object *p_old, Object *p_fresh);
+	void constants_again(const std::string &p_class);
 
 public:
 	Reload(Interpreter &p_from, Interpreter &p_to);
@@ -48,8 +49,9 @@ public:
 	// (a library class made on first use, such as Date, counts: a build that no longer uses it lacks it).
 	Object *object(Object *p_old);
 	// Static fields and package variables, by name. A class whose static fields had been given their
-	// values is not given them again; one of its fields that is new starts empty.
-	void globals();
+	// values is not given them again; one of its fields that is new starts empty. Of the classes named
+	// (those whose static fields' first values changed: ir::static_changes), the constants take the new code's.
+	void globals(const std::vector<std::string> &p_changed = {});
 	// Where a function of the old program is in the new one, by its name. NONE if it is gone.
 	uint32_t function(uint32_t p_old) const;
 	const std::string &missing() const { return missing_; }

@@ -209,7 +209,7 @@ void Reload::carry_fields(Object *p_old, Object *p_fresh) {
 	}
 }
 
-void Reload::globals() {
+void Reload::globals(const std::vector<std::string> &p_changed) {
 	const ir::Module &old = from_.module_;
 	const ir::Module &fresh = to_.module_;
 	std::unordered_map<std::string_view, size_t> held;
@@ -228,6 +228,42 @@ void Reload::globals() {
 		if (named != classes_.end() && named->second < to_.class_used_.size()) {
 			to_.class_used_[named->second] = from_.class_used_[i];
 		}
+	}
+	for (const std::string &name : p_changed) {
+		constants_again(name);
+	}
+}
+
+// A class whose static fields' first values changed, and which had been given them. A constant is never
+// written by the program, so it takes what the new code gives it. That code is one function for the whole
+// class and runs again whole: the class's variables are set aside meanwhile and put back, so they keep what
+// the program made of them.
+void Reload::constants_again(const std::string &p_class) {
+	const auto found = classes_.find(p_class);
+	if (found == classes_.end() || found->second >= to_.class_used_.size() || !to_.class_used_[found->second]) {
+		return;
+	}
+	const ir::Class &klass = to_.module_.classes[found->second];
+	const std::vector<ir::Global> &globals = to_.module_.globals;
+	if (klass.static_init == ir::NONE) {
+		return;
+	}
+	const auto own = [&](const ir::Global &p_global) {
+		const std::string_view name = p_global.name;
+		return name.size() > klass.name.size() + 1 && name.compare(0, klass.name.size(), klass.name) == 0 && name[klass.name.size()] == '.' &&
+				name.find('.', klass.name.size() + 1) == std::string_view::npos;
+	};
+	std::vector<std::pair<size_t, Slot>> kept;
+	for (size_t i = 0; i < globals.size() && i < to_.globals_.size(); i++) {
+		if (own(globals[i]) && !globals[i].is_const) {
+			kept.emplace_back(i, to_.globals_[i]);
+			to_.globals_[i] = empty_value(globals[i].kind == Kind::F64, globals[i].starts_null);
+		}
+	}
+	(void)to_.call(klass.static_init, nullptr, 0); // An error in it is reported as on the class's first use.
+	for (const auto &[index, value] : kept) {
+		to_.drop(globals[index].kind, to_.globals_[index]);
+		to_.globals_[index] = value;
 	}
 }
 

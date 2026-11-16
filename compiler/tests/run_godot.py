@@ -490,27 +490,30 @@ RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 	private var word:String;
 	override public function _ready():void { word = "%s"; }
 	public function said():String { return word%s; }
+	public function limit():String { return LIMIT; }
+	public function firstNow():String { return first; }
 } }
 """
 with tempfile.TemporaryDirectory() as edited:
     copy = os.path.join(edited, "project")
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
     # The second version also adds a field before the one `_ready` sets: nothing that ran changed. The third
-    # edits `_ready` and a static field's first value. The fourth and fifth are saved one after the other,
+    # edits `_ready`, a static variable's first value and a constant's: the constant has the new value at
+    # once, the variable keeps the one it was given. The fourth and fifth are saved one after the other,
     # the fifth while the scene the fourth started is being made: its constructors have run, its `_ready` not.
     unused = "\n\tpublic var unused:int;"
-    first = "\n\tpublic static var first:String = \"%s\";"
+    first = "\n\tpublic static var first:String = \"%s\";\n\tpublic static const LIMIT:String = \"%s\";"
     made = "\n\tpublic var made:String = \"%s\";"
-    for name, text in {"Restart.as": RESTART % (first % "a", "one", ""), "restart_body.txt": RESTART % (unused + first % "a", "one", ' + "!"'),
-                       "restart_ready.txt": RESTART % (unused + first % "b", "three", ' + "!"'),
-                       "restart_four.txt": RESTART % (unused + first % "b" + made % "four", "four", ' + "!" + made'),
-                       "restart_five.txt": RESTART % (unused + first % "b" + made % "five", "five", ' + "!" + made')}.items():
+    for name, text in {"Restart.as": RESTART % (first % ("a", "a"), "one", ""), "restart_body.txt": RESTART % (unused + first % ("a", "a"), "one", ' + "!"'),
+                       "restart_ready.txt": RESTART % (unused + first % ("b", "b"), "three", ' + "!"'),
+                       "restart_four.txt": RESTART % (unused + first % ("b", "b") + made % "four", "four", ' + "!" + made'),
+                       "restart_five.txt": RESTART % (unused + first % ("b", "b") + made % "five", "five", ' + "!" + made')}.items():
         with open(os.path.join(copy, name), "w") as file:
             file.write(text)
     run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300)
     output = run.stdout + run.stderr
     values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 7, output[-1500:])
+    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 9, output[-1500:])
     for name, got, want in values:
         check("restart.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
     check("restart.gd: Godot is told why the scene started again", "so the scene starts again" in output, output[-1500:])

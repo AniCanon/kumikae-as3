@@ -1595,6 +1595,44 @@ static void test_reload_alive() {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// A constant is never written by the program, so after a reload it has what the new code gives it; a
+// static variable keeps what the program made of it.
+static void test_reload_constants() {
+	const auto source = [](int p_first) {
+		const std::string n = std::to_string(p_first);
+		return "package { public class Game { public static const SPEED:Number = " + n + "; public static const NAMES:Array = [" + n +
+				"]; public static var best:int = " + n +
+				"; public function play():void { best = 5; } public function speed():Number { return SPEED; }"
+				" public function name():int { return NAMES[0]; } public function bestNow():int { return best; } } }\n";
+	};
+	ir::Module old_module, new_module;
+	compile(source(1).c_str(), &old_module, "Game.as");
+	compile(source(9).c_str(), &new_module, "Game.as");
+	{
+		Recorder recorder;
+		vm::Interpreter running(old_module, recorder);
+		CHECK(running.start());
+		vm::Object *game = running.construct(class_named(old_module, "Game"), nullptr);
+		vm::Slot result;
+		CHECK(running.call_method(game, "play", nullptr, 0, &result));
+		CHECK(running.call_method(game, "speed", nullptr, 0, &result) && result.d == 1);
+		vm::Interpreter fresh(new_module, recorder);
+		vm::Object *moved = nullptr;
+		{
+			vm::Reload reload(running, fresh);
+			reload.globals(ir::static_changes(old_module, new_module));
+			moved = reload.object(game);
+			CHECK(moved != nullptr);
+		}
+		CHECK(fresh.call_method(moved, "speed", nullptr, 0, &result) && result.d == 9);
+		CHECK(fresh.call_method(moved, "name", nullptr, 0, &result) && result.i == 9);
+		CHECK(fresh.call_method(moved, "bestNow", nullptr, 0, &result) && result.i == 5);
+		fresh.release_object(moved);
+		running.release_object(game);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 // A field whose Godot class changed takes the old field's object only if it is of the new class: the
 // calls prepared for the new class would otherwise run on an object of another.
 static void test_reload_engine_class() {
@@ -3023,6 +3061,7 @@ int main() {
 	test_static_changes();
 	test_reload_kept_containers();
 	test_reload_alive();
+	test_reload_constants();
 	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_loop_markers();

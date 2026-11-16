@@ -213,7 +213,7 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 		{
 			vm::Reload moving(p_running, *fresh);
 			if (instances_can_move(moving) && listeners_can_move(moving) && moving.missing().empty()) {
-				moving.globals();
+				moving.globals(p_statics); // Their constants take the new first values; their variables keep theirs.
 				move_instances(p_running, moving);
 				move_listeners(p_running, moving, loads + 1);
 				// A class whose code that runs once changed matters only if an object of it is alive.

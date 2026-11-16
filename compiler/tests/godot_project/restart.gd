@@ -70,6 +70,8 @@ func _process(_delta: float) -> bool:
 	elif stage == 2 and (str(said()).begins_with("three") or late):
 		show("_ready edited: the scene starts again", said(), "three!")
 		show("_ready edited: a new scene", current_scene.get_instance_id() != first_id, true)
+		show("a constant edited: it has its new value", current_scene.call("limit"), "b")
+		show("a static variable's first value edited: it keeps the one it was given", current_scene.call("firstNow"), "a")
 		# The fifth version is saved as Godot takes the old scene out: the new one is made (its constructors
 		# ran the fourth version's code) and not yet in the tree.
 		current_scene.tree_exited.connect(func():
