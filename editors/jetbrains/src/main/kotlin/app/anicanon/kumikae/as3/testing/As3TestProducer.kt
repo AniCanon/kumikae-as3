@@ -40,8 +40,9 @@ class As3TestLineMarker : RunLineMarkerContributor() {
         if (element.firstChild != null || element.text !in listOf("class", "function")) return null
         val file = element.containingFile?.virtualFile ?: return null
         if (file.extension != "as") return null
-        val source = TestSource.read(element.containingFile.text)
-        val tests = TestDiscovery.forElement(element)
+        val known = TestDiscovery.of(element.containingFile)
+        val source = known.source
+        val tests = known.at(element.textOffset)
         if (tests.isEmpty()) return null
         if (element.text == "class" && element.textOffset != source.classOffset) return null
         if (element.text == "function" &&
