@@ -64,7 +64,7 @@ The complete private surface used by the helper is:
 | Service context and device set | `defaultDeviceSetWithError:`, `availableDevices` |
 | Device | `UDID`, `state`, `bootGeneration`, `io`, `deviceType`, `lookup:error:` |
 | Device I/O and port | `ioPorts`, `descriptor` |
-| Display descriptor and properties | `screenProperties`, `uniqueId` (`PurpleMain`), `uiOrientation`, `framebufferSurface` |
+| Display descriptor and properties | `screenProperties`, `screenType` (0 for the built-in display), `uiOrientation`, `framebufferSurface` |
 | Device type | `productFamilyID`, `mainScreenScale` |
 | Runtime-loaded system libxpc | `xpc_endpoint_create_mach_port_4sim`, `xpc_connection_enable_sim2host_4sim` |
 | Guest DTUHID service | `com.apple.coredevice.feature.remote.hid.digitizer` |
@@ -76,14 +76,16 @@ argument and result encodings must match. Guard failures name the selected Xcode
 version/build and missing or changed symbol. C export signatures have no runtime
 introspection: only their presence is checked. Acceptance of another build is
 not evidence of a live test on that build. Missing display,
-service or endpoint also fails startup. The service falls back to installed idb,
-then screenshots. A later device failure ends the feed and revokes its geometry;
-reopening starts a new process. A typed `DEVICE_UNAVAILABLE` startup error keeps
-the native backend available for a later boot/reconnect; it does not exhaust the
-fallback list. An empty input-service startup barrier that times out after reboot
-also reports `DEVICE_UNAVAILABLE`. This classification applies before any real
-input is submitted; capability failures still permit fallback. Unknown input
-delivery is never replayed.
+service or endpoint also fails startup. The panel reports the failure and retries with
+bounded backoff. It never switches to the removed idb backend. A later device failure
+ends the feed and revokes its geometry; reopening starts a new process. A missing
+framebuffer or an empty input-service startup barrier that times out after reboot
+reports `DEVICE_UNAVAILABLE`. Unknown input delivery is never replayed.
+
+Display selection uses the unique built-in screen (`screenType` 0), not `uniqueId`:
+iOS 27 supplies UUID identifiers where earlier runtimes used `PurpleMain`. External
+and resizable screens are ignored; multiple built-in screens are rejected. The
+selected screen retains the same orientation and framebuffer checks.
 
 The XPC envelope uses `messageType`, `featureIdentifier`, `isBarrier` and `payload`.
 Touch payloads use normalized `pointOne.x/y`, `eventType` (down/move/up), `edge`

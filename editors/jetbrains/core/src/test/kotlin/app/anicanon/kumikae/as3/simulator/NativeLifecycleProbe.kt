@@ -31,7 +31,7 @@ class NativeLifecycleProbe {
             try {
                 val input =
                     NativeInput(executable.toString(), directory, OwnedStreamProcesses(4000), SimctlPasteboard(runner))
-                val backend = FallbackInput(listOf("native helper" to input))
+                val backend = input
                 SimulatorSession(directory, runner, backend).use { session ->
                     session.dispatch("select", parameters(id))
                     val stopped = assertFailsWith<SimulatorException> { session.openFrames(id) }

@@ -45,13 +45,22 @@ class NativeInput(
         // A previous feed may still be reaping. Its release callback must never own the new feed.
         disconnect()
         val opened = connection(device).also { streaming = true }
-        return NativeFrameFeed(device, opened, bind, stopped) {
-            synchronized(this) {
-                if (bridge === opened) disconnect()
+        return try {
+            NativeFrameFeed(device, opened, bind, stopped) {
+                synchronized(this) {
+                    if (bridge === opened) disconnect()
+                }
+            }.also {
+                activeFeed = it
+                it.start()
             }
-        }.also {
-            activeFeed = it
-            it.start()
+        } catch (failure: Exception) {
+            try {
+                disconnect()
+            } catch (cleanup: Exception) {
+                failure.addSuppressed(cleanup)
+            }
+            throw failure
         }
     }
 

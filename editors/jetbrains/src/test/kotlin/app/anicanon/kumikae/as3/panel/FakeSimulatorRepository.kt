@@ -14,14 +14,15 @@ internal class FakeSimulatorRepository : SimulatorRepository {
     var page = ConsolePage(emptyList(), 0, false)
     var failure: String? = null
     var closed = false
-    var idbInstalled = true
+    var nativeInstalled = true
     val feeds = mutableListOf<FakeFrames>()
 
     class FakeFrames : SimulatorFrames {
         var closed = false
         override val ended: Boolean get() = closed
         override var failure: Throwable? = null
-        override fun poll(): SimulatorFrame? = null
+        var next: SimulatorFrame? = null
+        override fun poll(): SimulatorFrame? = next.also { next = null }
         override fun close() {
             closed = true
         }
@@ -69,8 +70,8 @@ internal class FakeSimulatorRepository : SimulatorRepository {
 
     override fun enableInput(): Boolean {
         record("enableInput")
-        inputEnabled = idbInstalled
-        return idbInstalled
+        inputEnabled = nativeInstalled
+        return nativeInstalled
     }
 
     override fun shutdown(device: String): SimulatorStatus {

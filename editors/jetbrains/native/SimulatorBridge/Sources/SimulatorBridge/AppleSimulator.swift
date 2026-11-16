@@ -104,23 +104,13 @@ public actor AppleSimulator: DeviceLookup, FrameSource, InputSink {
         "Xcode \(installation.version) (\(installation.build)) has no Simulator ioPorts")
     }
     generation = try runtime.integer(device, "bootGeneration", encoding: "Q")
-    for port in ports {
-      guard let descriptor = try runtime.object(port, "descriptor"),
-        (descriptor as? NSObjectProtocol)?.responds(to: NSSelectorFromString("screenProperties"))
-          == true,
-        let properties = try runtime.object(descriptor, "screenProperties"),
-        try runtime.object(properties, "uniqueId") as? String == "PurpleMain"
-      else {
-        continue
-      }
-      display = descriptor
-    }
+    display = try Self.mainDisplay(in: ports, runtime: runtime)
     guard let display,
       let surface = try runtime.object(display, "framebufferSurface") as? IOSurface,
       let deviceType = try runtime.object(device, "deviceType")
     else {
-      throw BridgeError.unavailable(
-        "Xcode \(installation.version) (\(installation.build)) has no PurpleMain screenProperties/framebufferSurface. Reconnect after booting."
+      throw BridgeError.deviceUnavailable(
+        "The built-in Simulator framebuffer is not ready. Reconnect after booting."
       )
     }
     typealias Family = @convention(c) (AnyObject, Selector) -> Int32

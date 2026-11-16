@@ -14,7 +14,6 @@ internal class SimulatorWindowController(
     private val polling: BackgroundTasks,
     private val inputAllowed: () -> Boolean = { false },
     private val rememberInput: (Boolean) -> Unit = {},
-    private val installer: IdbInstaller = IdbInstaller { throw IdbInstallFailed("No installer was given.", "") },
     streams: BackgroundTasks = polling,
     clock: () -> Long = { System.nanoTime() / 1_000_000 },
     touches: BackgroundTasks = actions,
@@ -45,10 +44,6 @@ internal class SimulatorWindowController(
         }
     }
 
-    /** Input was asked for and idb is not on this Mac: the menu then offers to install it. */
-    var idbMissing by mutableStateOf(false)
-        private set
-
     /** An action the person started is running: a boot, a launch, an install. */
     var working by mutableStateOf(false)
         private set
@@ -59,7 +54,7 @@ internal class SimulatorWindowController(
     private var pictureChanging = false
     private val live = PictureStreamController(repository, streams, clock, {
         frame = it
-        capture = if (it == null) "" else "Live"
+        capture = if (it == null) "" else "Native · ${it.image.width}×${it.image.height}"
     }, { status = it })
 
     fun frameTick() {
@@ -165,37 +160,13 @@ internal class SimulatorWindowController(
     /** Called after the owner agreed to private Simulator input. */
     fun enableInput() {
         run("Switching input on", { repository.enableInput() to repository.status() }) { (found, state) ->
-            if (found) inputIsOn(state, "Input is on.") else idbIsMissing(NO_IDB)
-        }
-    }
-
-    /** Called after the owner agreed to what the install puts on this Mac. Its output goes to the console. */
-    fun installIdb() {
-        val work = {
-            val said = runCatching { installer.install() }
-            val found = said.isSuccess && repository.enableInput()
-            Triple(said, found, if (found) repository.status() else null)
-        }
-        run("Installing idb", work) { (said, found, state) ->
-            val failure = said.exceptionOrNull()
-            append("\n[idb install]\n" + (said.getOrNull() ?: (failure as? IdbInstallFailed)?.output.orEmpty()) + "\n")
-            when {
-                failure != null -> idbIsMissing(failure.message ?: "The install failed.")
-                state != null && found -> inputIsOn(state, "idb is installed. Input is on.")
-                else -> idbIsMissing("The install finished, but idb was not found afterwards. See the console.")
-            }
+            if (found) inputIsOn(state, "Input is on.") else status = NO_NATIVE
         }
     }
 
     private fun inputIsOn(state: SimulatorStatus, say: String) {
-        idbMissing = false
         rememberInput(true)
         showStatus(state, fresh = false)
-        status = say
-    }
-
-    private fun idbIsMissing(say: String) {
-        idbMissing = true
         status = say
     }
 
@@ -296,8 +267,8 @@ internal class SimulatorWindowController(
 
     private fun connect(): Boolean = actions.submit({
         val file = repository.connect()
-        // The owner switched input on earlier; unavailable backends leave public screenshots.
-        if (inputAllowed()) repository.enableInput()
+        // A remembered live-mode request must never silently turn into snapshot polling.
+        if (inputAllowed() && !repository.enableInput()) error(NO_NATIVE)
         file to repository.devices()
     }) { result ->
         if (disposed) return@submit
@@ -410,7 +381,7 @@ internal class SimulatorWindowController(
     private companion object {
         const val BOOTED = "Booted"
         const val LIST_EVERY = 6
-        const val NO_IDB = "idb is not installed. Choose Install idb… in the menu."
+        const val NO_NATIVE = "The bundled native helper is missing. Reinstall the plugin to enable live pictures."
         const val BUSY = "Another Simulator action is still running. Try again when it finishes."
         const val TAP_SLOP = 6
         const val MAX_STATUS = 300

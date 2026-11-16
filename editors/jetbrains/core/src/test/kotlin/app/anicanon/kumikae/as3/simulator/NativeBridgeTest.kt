@@ -13,6 +13,31 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class NativeBridgeTest {
+    @Test fun failedFrameMappingReapsHelperBeforeAnyRetry() {
+        val directory = Files.createTempDirectory("native-map-failure")
+        val children = mutableListOf<Child>()
+        try {
+            NativeInput(
+                "/bridge",
+                directory,
+                StreamProcesses { command ->
+                    Files.write(java.nio.file.Path.of(command.last()), byteArrayOf())
+                    Child().also { children += it }
+                },
+                GuestPasteboard { _, _ -> error("Unexpected paste") },
+            ).use { input ->
+                repeat(2) {
+                    assertFailsWith<IllegalArgumentException> { input.frames("device", { _, _ -> 1L }, {}) }
+                    assertTrue(children.last().closed, "Failed stream startup must reap its helper immediately")
+                    Files.list(directory).use { assertEquals(0L, it.count()) }
+                }
+                assertEquals(2, children.size)
+            }
+        } finally {
+            Files.delete(directory)
+        }
+    }
+
     @Test fun closingAFeedNeverCallsSessionCodeOnTheCaller() {
         val directory = Files.createTempDirectory("native-close-test")
         val child = Child()

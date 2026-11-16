@@ -24,20 +24,13 @@ class LocalSession(
         }
     }
 
-    /** The owner's existing private-input switch covers the native helper and the idb fallback. */
+    /** The owner's private-input switch enables the bundled native helper. */
     fun enableInput(): Boolean {
-        val candidates = mutableListOf<Pair<String, InputBackend>>()
-        nativeExecutable?.takeIf { Files.isExecutable(it) && !Files.isDirectory(it) }?.let {
-            candidates +=
-                "native helper" to
-                NativeInput(it.toString(), directory, OwnedStreamProcesses(4000), SimctlPasteboard(runner))
-        }
-        (System.getenv("KUMIKAE_SIMULATOR_IDB") ?: IdbInput.find())?.let {
-            candidates +=
-                "idb" to IdbInput(it, runner, IdbDevices(it))
-        }
-        if (candidates.isEmpty()) return false
-        session.useInput(FallbackInput(candidates))
+        val executable = nativeExecutable?.takeIf { Files.isExecutable(it) && !Files.isDirectory(it) }
+            ?: return false
+        session.useInput(
+            NativeInput(executable.toString(), directory, OwnedStreamProcesses(4000), SimctlPasteboard(runner)),
+        )
         return true
     }
 

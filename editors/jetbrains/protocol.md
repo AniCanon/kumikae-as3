@@ -16,7 +16,7 @@ requests are refused. There is no remote host option, proxy, redirect or downloa
 The panel also uses its in-process session for binary pictures. This is an internal
 subscription, not an unauthenticated HTTP endpoint. It shares selection and geometry
 with this API. Agent screenshots and all version 1 requests and replies are unchanged.
-Live video requires the same owner-controlled idb switch as input.
+Live video requires the same owner-controlled private-input switch as input.
 
 ```json
 {"version":1,"id":"request-1","method":"devices","params":{}}
@@ -30,7 +30,7 @@ and `id`, plus either `result` or `error`. An invalid envelope can have a null i
 ```
 
 ```json
-{"version":1,"id":"request-2","error":{"code":"INPUT_DISABLED","message":"Input is off. Switch it on in the panel's menu; it needs idb."}}
+{"version":1,"id":"request-2","error":{"code":"INPUT_DISABLED","message":"Input is off. Switch it on in the panel's menu."}}
 ```
 
 HTTP 401 means missing or wrong authentication, 404 a wrong path, 405 a wrong
@@ -60,7 +60,7 @@ change its selection; a stale device request fails instead of reaching a new one
 | `screenshot` | `device`, optional `format`: `png` or `jpeg` (default `png`) | Frame described below. |
 | `tap` | `device`, `generation`, `width`, `height`, `x`, `y` | `{sent:true}`. |
 | `swipe` | Tap fields plus `endX`, `endY`, `durationMs` | `{sent:true}`. Duration 50–5,000 ms. |
-| `text` | `device`, `text`: 1–4096 UTF-16 code units, no ISO controls or unpaired surrogates | `{sent:true}`. Native Unicode uses the guest pasteboard; idb accepts ASCII only. |
+| `text` | `device`, `text`: 1–4096 UTF-16 code units, no ISO controls or unpaired surrogates | `{sent:true}`. Native Unicode uses the guest pasteboard. |
 | `button` | `device`, `button`: `home` or `lock` | `{sent:true}`. |
 | `rotate` | `device`, `orientation`: `portrait`, `portrait_upside_down`, `landscape_left`, `landscape_right` | `{sent:true}`. Invalidates geometry even if input fails. |
 | `install` | `device`, `path`: absolute existing `.app` directory | `{installed:true}` after `simctl` succeeds. 120-second limit. |
@@ -88,9 +88,9 @@ dimension change invalidates old geometry. Changes made outside this service are
 detected on the next capture; take a fresh screenshot before an agent gesture.
 
 The panel fits the image without stretching and ignores clicks in empty margins.
-The idb adapter reads the device's pixel density. Full-size screenshot coordinates
+The native adapter reads the device's pixel density. Full-size screenshot coordinates
 are divided by that density and rounded down to whole points. Internal live pictures
-are scaled; their dimensions and generation are validated before coordinates are
+are full resolution; their dimensions and generation are validated before coordinates are
 mapped to native pixels and then points. Both presentations share the same geometry
 generation, so an agent screenshot does not invalidate a live picture. There is one
 display and one pointer gesture at a time. `sent:true` means the active backend acknowledged the
@@ -112,7 +112,7 @@ They describe the console launcher. Inspect its output and the app's test report
 before concluding that the app started or passed its checks.
 
 Closing the IDE project or standalone service removes the endpoint and temporary
-files, stops the HTTP listener, and stops its console process and every native or idb child
+files, stops the HTTP listener, and stops its console process and every native child
 it started. `simctl` forwards
 signals and may stop that app. The Simulator stays booted. After a crash, an old
 descriptor may remain; it is not a live session and must not be reused.
@@ -129,8 +129,8 @@ private-input opt-in described in the README.
 
 This is a local implementation detail, separate from HTTP version 1. The same
 remembered private-input switch permits the bundled helper. With it off, pictures
-remain public `simctl` screenshots. Startup tries native, installed idb, then
-screenshots; the panel notice names the active route and the reason for fallback.
+remain public `simctl` screenshots. Live capture uses only the native helper. Startup failures are reported and retried
+with bounded backoff; they never switch to compressed video or snapshots.
 `continuousTouch` is true only for the native route. `pixelsPerPoint` is the last
 known density, initially 1 until a picture or explicit input discovers it; clients
 must continue to send screenshot pixels with their geometry and generation.
@@ -143,7 +143,7 @@ and validates/publishes its first frame before writing a ready JSON line contain
 `DEVICE_UNAVAILABLE` means the selected device is stopped, restarting, or its
 input service has not acknowledged the empty startup barrier: retain the native
 route for a later reconnect. Other startup failures, including missing capabilities,
-permit fallback. Closing stdin cancels input even while a command is in flight,
+are reported to the panel. Closing stdin cancels input even while a command is in flight,
 releases held controls, unmaps the slot and releases device objects. The service
 reaps the child before deleting its files. Closing a picture only signals its
 worker; file and process cleanup happen away from the EDT.
