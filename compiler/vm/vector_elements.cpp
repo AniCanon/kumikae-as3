@@ -107,6 +107,11 @@ bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length) {
 // where the class says so (ir::Class::element_zero). False, with the error raised, if the engine can't make one.
 bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from) {
 	const ir::Class &klass = p_library.class_of(p_vector);
+	if (klass.element == Kind::Any && klass.element_check != ir::NONE) {
+		// A Vector.<Object>: what an Object variable starts as, where a Vector.<*>'s place is undefined.
+		std::fill(p_vector->data + p_from, p_vector->data + p_vector->length, any::null());
+		return true;
+	}
 	if (!klass.element_zero) {
 		return true;
 	}

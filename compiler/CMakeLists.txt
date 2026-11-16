@@ -174,3 +174,9 @@ add_test(NAME style COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/to
 add_test(NAME style_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_style.py --self-test)
 add_test(NAME godot COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/godot -p "test_*.py")
 set_tests_properties(godot PROPERTIES ENVIRONMENT "KAS3C=$<TARGET_FILE:kas3c>")
+# A group under the sanitizers on a busy machine takes several times its usual minutes: none is cut off at
+# ctest's own 1500 seconds. The one that runs Godot waits on the engine's frames and on files being seen
+# within seconds, so no other group runs beside it.
+get_property(KAS3_ALL_TESTS DIRECTORY PROPERTY TESTS)
+set_tests_properties(${KAS3_ALL_TESTS} PROPERTIES TIMEOUT 7200)
+set_tests_properties(godot_extension PROPERTIES RUN_SERIAL TRUE)

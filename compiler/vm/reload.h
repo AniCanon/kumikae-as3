@@ -29,8 +29,8 @@ class Reload {
 	Object *lost(uint32_t p_old_class);
 
 	// What a field or a static field held, as the new one holds it: nothing, if the new one is declared
-	// to hold another class of object than the one that was there.
-	Slot carry_into(ir::Kind p_kind, uint32_t p_class, Slot p_value);
+	// to hold another class of object (or of Godot's, by its name there) than the one that was there.
+	Slot carry_into(ir::Kind p_kind, uint32_t p_class, std::string_view p_engine_type, Slot p_value);
 	Slot carry(ir::Kind p_kind, Slot p_value);
 	void carry_entries(const Entries &p_from, Entries *p_to);
 	Object *moved_vector(Vector *p_old, uint32_t p_class);

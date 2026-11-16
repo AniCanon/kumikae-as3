@@ -41,6 +41,9 @@ VectorShape vector_shape(const LibraryMethod &p_method, Kind p_element) {
 } // namespace
 
 std::optional<uint32_t> Vectors::never_found(Call *p_call, Kind p_element) {
+	if (holds_numbers(p_element)) {
+		return std::nullopt; // Whatever it is given becomes a number of its kind, which may be an element.
+	}
 	const uint32_t position = p_call->offset;
 	Member *callee = static_cast<Member *>(p_call->callee);
 	const Kind searched = Lowerer::is_null(p_call->arguments[0]) ? Kind::Void : l_.natural(p_call->arguments[0]);
@@ -66,7 +69,7 @@ uint32_t Vectors::vector_call(Call *p_call) {
 	const std::optional<uint32_t> klass = l_.vector_class(callee->object->type);
 	const bool array = klass && l_.module_.classes[*klass].array;
 	const LibraryMethod *row = library_method(callee->name, array ? ON_ARRAY : ON_VECTOR);
-	const std::optional<VectorMethod> method = row && row->does == Does::VecCall ? std::optional<VectorMethod>(static_cast<VectorMethod>(row->which)) : std::nullopt;
+	std::optional<VectorMethod> method = row && row->does == Does::VecCall ? std::optional<VectorMethod>(static_cast<VectorMethod>(row->which)) : std::nullopt;
 	const uint32_t count = p_call->arguments.count;
 	for (std::string_view loop : { "forEach", "map", "filter", "some", "every" }) {
 		if (klass && callee->name == loop) {
@@ -78,7 +81,7 @@ uint32_t Vectors::vector_call(Call *p_call) {
 		return l_.default_value(Kind::Obj, position);
 	}
 	const Kind element = l_.module_.classes[*klass].element;
-	const auto [fixed, left_out, rest, result] = vector_shape(*row, element);
+	auto [fixed, left_out, rest, result] = vector_shape(*row, element);
 	bool fits = rest || count <= fixed.size();
 	for (size_t i = count; i < fixed.size(); i++) {
 		fits = fits && left_out[i].has_value();
@@ -91,6 +94,14 @@ uint32_t Vectors::vector_call(Call *p_call) {
 		if (const std::optional<uint32_t> none = never_found(p_call, element)) {
 			return *none;
 		}
+		// A vector of numbers converts what it is given (avmplus's Vector.as: `indexOf(value:int)`). Any
+		// other looks for the value as it is: one whose type is not known until it runs is handed over
+		// untyped, and one of the elements' own kind as that.
+		if (l_.natural(p_call->arguments[0]) == Kind::Any) {
+			method = search_untyped(*method, element);
+		} else {
+			fixed[0] = element;
+		}
 	}
 	std::vector<uint32_t> list;
 	list.push_back(l_.settled(l_.expression(callee->object, Kind::Obj), Lowerer::writer(p_call->arguments), position));
@@ -99,14 +110,21 @@ uint32_t Vectors::vector_call(Call *p_call) {
 		// concat takes vectors of this very type: one of another, or an Array, is found out as it runs
 		// (AS3's TypeError #1034, as avmplus's castToThisType gives).
 		const bool checked = *method == VectorMethod::Concat && !array && p_call->arguments[i]->type != callee->object->type;
+		// What is stored into a Vector.<Object>, or looked for in one, is an Object's value: undefined is null.
+		const Takes takes = i < fixed.size() ? row->fixed[i].kind : row->rest;
+		const Kind kind = i < fixed.size() ? fixed[i] : *rest;
+		const bool as_object = !array && (takes == Takes::Element || takes == Takes::Sought) && l_.starts_null_type(kind, callee->object->type->element);
 		const uint32_t value = checked ? l_.from_untyped(l_.any_value(p_call->arguments[i]), callee->object->type, Kind::Obj, position)
-									   : l_.expression(p_call->arguments[i], i < fixed.size() ? fixed[i] : *rest);
+							 : as_object ? l_.typed(p_call->arguments[i], callee->object->type->element, kind)
+										 : l_.expression(p_call->arguments[i], kind);
 		list.push_back(l_.settled(value, later, position));
 	}
 	for (size_t i = count; i < fixed.size(); i++) {
 		const uint32_t filled = l_.reg(fixed[i]);
 		if (fixed[i] == Kind::Str) {
 			l_.emit(Op::ConstStr, position, filled, l_.string(std::string(row->text_left_out)));
+		} else if (fixed[i] == Kind::Any) {
+			l_.emit(Op::AnyConst, position, filled, static_cast<uint32_t>(*left_out[i]));
 		} else {
 			l_.emit(fixed[i] == Kind::U32 ? Op::ConstU32 : Op::ConstI32, position, filled, static_cast<uint32_t>(*left_out[i]));
 		}

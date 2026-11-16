@@ -12,11 +12,11 @@
 #include "library.h"
 #include "native_code.h"
 #include "runtime.h"
+#include "stack.h"
 #include "text_methods.h"
 
 #include <array>
 #include <memory>
-#include <chrono>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -40,10 +40,6 @@ public:
 	static const size_t MAX_FRAMES = 10000;
 	// A stack trace shows this many frames, then how many more there were.
 	static const size_t MAX_TRACE = 32;
-	// A call from outside may be made while another is in progress (the engine calls a script, which calls
-	// the engine, which calls a script) this many levels deep.
-	static const int MAX_ENTRIES = 64;
-
 	// Flash's limit on how long one run may last, in milliseconds.
 	static constexpr uint32_t FLASH_TIME_LIMIT = 15000;
 	// The clock is looked at once in this many statements.
@@ -131,6 +127,10 @@ private:
 	bool started_ = false; // The package-level initializers have run.
 	std::vector<uint8_t> class_used_; // Per class: its static fields have been (or are being) given values.
 	int entries_ = 0; // Calls from outside in progress.
+	// A call from outside may be made while another is in progress (the engine calls a script, which calls
+	// the engine; a sort calls its comparison) for as long as the thread's stack lasts: with it nearly
+	// used up one more is Error #1023 (vm/stack.h).
+	__attribute__((always_inline)) static bool stack_used_up() { return stack_below(vm::stack_floor()); }
 	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
 	StatementHook hook_ = nullptr;
 	NativeCode *native_ = nullptr;
@@ -138,7 +138,7 @@ private:
 	void *hook_data_ = nullptr;
 	uint32_t time_limit_ = 0; // In milliseconds; 0 for none.
 	uint32_t countdown_ = STATEMENTS_PER_LOOK; // Statements until the clock is looked at.
-	std::chrono::steady_clock::time_point entered_; // When the call from outside that is running began.
+	double entered_ = 0; // When the call from outside that is running began, on the host's clock (Clock::elapsed).
 	void look_at_clock();
 	void entering(); // A call from outside begins: one that no other is running inside starts the clock.
 

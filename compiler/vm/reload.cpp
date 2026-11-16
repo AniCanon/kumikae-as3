@@ -61,13 +61,19 @@ Slot Reload::carry(Kind p_kind, Slot p_value) {
 	return out;
 }
 
-Slot Reload::carry_into(Kind p_kind, uint32_t p_class, Slot p_value) {
+Slot Reload::carry_into(Kind p_kind, uint32_t p_class, std::string_view p_engine_type, Slot p_value) {
 	Slot out = carry(p_kind, p_value);
 	if (p_kind == Kind::Any) {
 		return out; // Any value fits.
 	}
 	if (p_kind == Kind::Obj && out.p && p_class != ir::NONE && !to_.is_class(static_cast<Object *>(out.p), p_class)) {
 		to_.release_object(static_cast<Object *>(out.p));
+		out.bits = 0;
+	}
+	// One of Godot's the new field's type does not take: the calls prepared for that type would run on
+	// an object of another.
+	if (ir::is_engine(p_kind) && out.p && !p_engine_type.empty() && !to_.host_.handles.is_class(out.p, p_engine_type)) {
+		to_.drop(p_kind, out);
 		out.bits = 0;
 	}
 	return out;
@@ -193,7 +199,7 @@ void Reload::carry_fields(Object *p_old, Object *p_fresh) {
 				continue;
 			}
 			if (old_class.fields[j].kind == field.kind) {
-				p_fresh->fields()[i] = carry_into(field.kind, field.klass, p_old->fields()[j]);
+				p_fresh->fields()[i] = carry_into(field.kind, field.klass, field.engine_type, p_old->fields()[j]);
 			}
 			carried = true;
 		}
@@ -214,7 +220,7 @@ void Reload::globals() {
 		const auto found = held.find(fresh.globals[i].name);
 		if (found != held.end() && old.globals[found->second].kind == fresh.globals[i].kind) {
 			to_.drop(fresh.globals[i].kind, to_.globals_[i]);
-			to_.globals_[i] = carry_into(fresh.globals[i].kind, fresh.globals[i].klass, from_.globals_[found->second]);
+			to_.globals_[i] = carry_into(fresh.globals[i].kind, fresh.globals[i].klass, fresh.globals[i].engine_type, from_.globals_[found->second]);
 		}
 	}
 	for (size_t i = 0; i < old.classes.size() && i < from_.class_used_.size(); i++) {

@@ -75,11 +75,19 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 public:
 	// An engine instruction worked out once (worked.h): public for the helpers of godot_prepared.cpp.
 	struct Worked;
+	// A program is about to be made (its interpreter asks for every engine instruction it has, once).
+	void new_program() { program_++; }
+	// The programs made before the last are gone: what was worked out for a call at its own place and
+	// is not the last program's is let go of.
+	void release_unused();
+	// How many calls worked out at their own place are kept, and how many of them are the last program's.
+	std::pair<size_t, size_t> own_places() const;
 
 private:
 	// Each kind of engine instruction worked out once (godot_prepared.cpp), by what it was worked out from.
 	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
 	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
+	uint64_t program_ = 0; // Which program is being worked out for: counted up as each is made.
 	std::unique_ptr<Worked> work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in, std::string *r_key);
 	bool run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result);
 	bool run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,

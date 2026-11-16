@@ -7,7 +7,7 @@ namespace vm {
 // A run that has gone on too long ends with Flash's error, which nothing catches.
 void Interpreter::look_at_clock() {
 	countdown_ = STATEMENTS_PER_LOOK;
-	if (!time_limit_ || failing_ || stopped_ || std::chrono::steady_clock::now() - entered_ <= std::chrono::milliseconds(time_limit_)) {
+	if (!time_limit_ || failing_ || stopped_ || host_.clock.elapsed() - entered_ <= time_limit_) {
 		return;
 	}
 	raise(module_.error_class, timeout_message(time_limit_));
@@ -16,7 +16,7 @@ void Interpreter::look_at_clock() {
 
 void Interpreter::entering() {
 	if (entries_ == 0 && time_limit_) {
-		entered_ = std::chrono::steady_clock::now();
+		entered_ = host_.clock.elapsed();
 		countdown_ = STATEMENTS_PER_LOOK;
 	}
 }

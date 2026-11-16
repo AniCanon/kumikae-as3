@@ -155,10 +155,6 @@ void add_builtins(const Program &p_program, ir::Module &r_module) {
 	const auto add = [&](const ThunkInfo &p_info) { r_module.functions.push_back(thunk_function(p_info)); };
 	const uint8_t null_check = static_cast<uint8_t>(Op::NullCheck);
 	add(ThunkInfo{ null_check, 0, 0, 0, object_in, 1, 1, nullptr, nullptr, 0, NONE, NONE, NONE, NONE });
-	// A function that calls itself until the interpreter's own limit raises Error #1023: the error and its
-	// words are the interpreter's, said once.
-	const uint32_t self = static_cast<uint32_t>(r_module.functions.size());
-	add(ThunkInfo{ static_cast<uint8_t>(Op::Call), ir::NONE, self, 0, nullptr, 0, 0, nullptr, nullptr, 0, NONE, NONE, NONE, NONE });
 	add(ThunkInfo{ static_cast<uint8_t>(Op::ObjectText), 1, 0, 0, text_of, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE, NONE });
 	const uint32_t entry = p_program.known.entry;
 	add(ThunkInfo{ static_cast<uint8_t>(entry == NONE ? Op::ConstNull : Op::New), 0, entry, 0, object_out, 1, 0, nullptr, nullptr, 0, 0, NONE, NONE, NONE });
@@ -203,7 +199,7 @@ ir::Module stub_module(const Program &p_program) {
 	}
 	for (uint32_t i = 0; i < p_program.global_count; i++) {
 		const GlobalInfo &from = p_program.globals[i];
-		module.globals.push_back(ir::Global{ from.name, static_cast<Kind>(from.kind), from.klass, from.starts_null });
+		module.globals.push_back(ir::Global{ from.name, static_cast<Kind>(from.kind), from.klass, from.starts_null, {} });
 	}
 	for (uint32_t i = 0; i < p_program.string_count; i++) {
 		module.strings.emplace_back(p_program.strings[i].data, p_program.strings[i].size);

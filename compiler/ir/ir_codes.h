@@ -34,8 +34,15 @@ constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK 
 // (forEach, map, filter, some and every are loops the lowerer writes, calling the function each time.)
 //   SortOn          the field names, the options (untyped), as Array's sortOn takes them   -> as Sort's
 //   LocaleText      nothing                          -> a String: toLocaleString()
+//   IndexOfAny, LastIndexOfAny   an untyped value, where to start (int)   -> the index (int), or -1: for a
+//                   vector that holds no numbers and no untyped values, where what is looked for is not
+//                   known to be an element; found by === (nothing is converted, undefined is null)
+//   Text            anything, which is ignored        -> a String: toString(), the elements joined by ","
+//   JoinAny         the separator, untyped            -> a String: an Array's join(), where undefined is ","
+//                   and anything else is its words (avmplus's Array.as, _join)
 enum class VectorMethod : uint8_t {
-	Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort, SortOn, LocaleText
+	Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort, SortOn, LocaleText,
+	IndexOfAny, LastIndexOfAny, Text, JoinAny
 };
 
 // String's methods and the functions on text, in StrCall's second operand. An index or a count is a
