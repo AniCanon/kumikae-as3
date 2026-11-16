@@ -12,17 +12,19 @@ host differs.
 | `stack` | The C++ stack a program runs on: where a thread's is nearly used up (Error #1023 for one more call from outside, for the interpreter and native code alike), and the thread with a large one that a program run on its own is given |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
 | `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
-| `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on |
+| `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on; and what the library reads once and no frame owns (the host's clock, methods and Godot's operators by name, the one value of each static function) |
 | `interpreter_objects.cpp` | Objects made, their class asked, fields read by a host |
+| `fields.h` | Where an object's fields are: the one accessor every read and write of a field goes through (`field()` by the class's description, `own_field()` for the library's own classes, `owner_field()` for a script object's Godot object), and how many slots a class's objects have |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
 | `library` | The standard library as functions of plain values (slots in, a slot out, no frame): what each is handed (`Library`: the heap, and `Runner`, the few things only whoever runs the program can do), and `Unmoved`, the parts still the interpreter's own that those functions ask for, which shrinks to nothing as each family moves |
+| `value_text.cpp`, `function_calls.cpp` | A value put into words (`String(x)`, a vector's elements, an object's own `toString()`, ECMAScript's ToPrimitive) and a function value made and called with untyped arguments, as such functions: the program's own code is run by its function's number (`Runner::run`) |
 | `text_methods`, `text_calls.cpp` | A String's methods, and a number in a radix or in digits, as such functions |
 | `vector_elements.cpp`, `vector_methods.cpp`, `vector_sort.cpp`, `vector_calls.h` | `Vector.<T>` and Array as such functions: making, indexing, length, the methods, sort and sortOn |
-| `interpreter_vectors.cpp`, `interpreter_library.cpp` | The interpreter's side of those: its instructions handing registers to the functions (an element in range is read and written in place), a vector's text, and what it answers for `Unmoved` |
+| `interpreter_vectors.cpp`, `interpreter_library.cpp` | The interpreter's side of those: its instructions handing registers to the functions (an element in range is read and written in place), and what it answers for `Unmoved` |
 | `table`, `interpreter_properties.cpp`, `interpreter_property_reads.cpp`, `interpreter_property_calls.cpp` | Objects and Dictionaries (`vm::Table`: an object whose one slot holds its `Entries`, keys and values in the order each key was first set) and an Array's properties beyond its indices; a property by name on anything (`DynGet` and the rest; reading one, and whether one is there, in its own file), a property called by its name, the loops over properties, and Godot's Dictionaries copied in |
 | `reload` | Moves a running program's objects, vectors and static fields onto a newer build, by name; what the program's static fields reach, and the container classes a newer build must keep |
-| `any`, `interpreter_any.cpp`, `interpreter_any_operators.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, then its equality, `+`, `<` |
+| `any`, `interpreter_any.cpp`, `any_operators.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, then its equality, `+`, `<`, `-` and the rest (Godot's own operator first, for one of its values) as functions of plain values |
 | `numeric`, `math.cpp` | Conversions C++ alone would leave undefined; `Math` where AS3 and C's library differ |
 | `text_units`, `case_table.cpp` | Strings by UTF-16 unit: indexing, cutting, searching and joining text held as UTF-8, and changing case (the table is written by `tools/case_table.py`) |
 | `regex.h`, `regex_tree.h`, `regex_parser.h`, `regex_parse.cpp`, `regex_parse_escapes.cpp`, `regex_classes.cpp`, `regex_compile.cpp`, `regex_match.cpp` | Regular expressions on their own: a pattern read into a tree (its structure, then its escapes and classes), the tree written as a small program, and a backtracking matcher over UTF-16 units that counts its steps and stops at a limit |
@@ -52,6 +54,10 @@ host differs.
 - **Nothing is allocated per instruction, and no text is built on the path that succeeds.**
 - **The loop is measured, not guessed.** A change to `interpreter_run.cpp` comes with
   `tests/bench/run_bench.py <build> --against <other build>`. A helper in a header has cost 3% before.
+- **Where a field is is said once, in `fields.h`.** Nothing else turns a field's number into a place in the
+  object, or counts an object's slots (`slots_of()`): a field that comes to take more than one slot changes
+  that file and the class's description, and no reader. `slot_at()` (`runtime.h`) is for that file and for
+  generated code's own accessor (`runtime/values.h`), which is handed the slot by the generator.
 - **What a container holds is said once, in `each_held()` (`held.h`).** An object's fields, a vector's
   elements, a function value's bound object or environment (its `FUNCTION_FIRST` field): freeing lets go of
   each slot it visits, and the cycle collector follows each. A new container (an Array, a keyed table for

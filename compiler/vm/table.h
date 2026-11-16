@@ -4,6 +4,7 @@
 #pragma once
 
 #include "any.h"
+#include "fields.h"
 #include "runtime.h"
 
 #include <optional>
@@ -55,7 +56,7 @@ public:
 // holds its Entries.
 Object *new_table(uint32_t p_class, Object *p_list); // One reference, the caller's, on the list (as new_object()). Null if out of memory.
 inline Entries *entries_of(Object *p_table) {
-	return static_cast<Entries *>(p_table->fields()[0].p);
+	return static_cast<Entries *>(own_field(p_table, 0).p);
 }
 void free_table(Object *p_table); // Its entries must have been taken out.
 // An Array's properties other than its indices, made the first time one is set. Null if out of memory.

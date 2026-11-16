@@ -23,11 +23,7 @@ bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, 
 	for (uint32_t i = 0; i < info.parameters; i++) {
 		arguments[i] = p_registers[i];
 	}
-	r_host.drop_extras();
-	const Slot *extras = p_registers + r_host.module.functions[p_function].registers.size();
-	for (uint32_t i = 0; i < p_extras; i++) {
-		r_host.extras.push_back(shared(&r_host.context, extras[i]));
-	}
+	r_host.keep_extras(p_registers + r_host.module.functions[p_function].registers.size(), p_extras);
 	// Called with an error on its way out already: the engine is going on (a signal's next listener). The
 	// function runs as any other, and its own error, if it has one, is reported where it ends.
 	const bool pending = r_host.context.failing;
@@ -78,6 +74,13 @@ void take_error(Host &r_host, Slot p_error) {
 }
 
 } // namespace
+
+void Host::keep_extras(const Slot *p_extras, uint32_t p_count) {
+	drop_extras();
+	for (uint32_t i = 0; i < p_count; i++) {
+		extras.push_back(shared(&context, p_extras[i]));
+	}
+}
 
 void Host::drop_extras() {
 	for (const Slot each : extras) {

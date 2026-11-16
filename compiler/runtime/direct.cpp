@@ -16,6 +16,8 @@ using vm::AnyTag;
 
 namespace {
 
+constexpr uint32_t USUAL_PARAMETERS = 16; // A function with more has its values on the heap for the call.
+
 // Whoever runs the program, where that is generated code. A function of the program is called as the C++
 // it is; an error is the context's from the moment it is raised.
 struct Asked final : vm::Runner {
@@ -45,40 +47,40 @@ struct Asked final : vm::Runner {
 	void out_of_memory() override { rt::out_of_memory(c); }
 	bool failing() const override { return c->failing || c->host->interpreter->left_error(); }
 
-	bool call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override {
-		if (call_value(c, p_function, p_arguments, static_cast<uint32_t>(p_count), r_result)) {
-			return !c->failing;
+	// The function's entry has a slot for every parameter: those left out are empty and take their
+	// defaults there, and the arguments past the others are the rest parameter's Array, made here, or
+	// what a function that names `arguments` finds with the host (Host::extras), as a stub's frame leaves them.
+	bool run(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override {
+		const FunctionInfo &callee = c->program->functions[p_function];
+		const uint32_t fixed = callee.rest ? callee.parameters - 1 : callee.parameters;
+		const uint32_t given = p_count < fixed ? static_cast<uint32_t>(p_count) : fixed;
+		Slot few[USUAL_PARAMETERS];
+		std::vector<Slot> many;
+		Slot *values = few;
+		if (callee.parameters > USUAL_PARAMETERS) {
+			many.resize(callee.parameters);
+			values = many.data();
 		}
-		// Anything but the usual (arguments to convert, to leave out or to gather) is the library's call,
-		// as apply() makes it, of an Array of them.
-		Object *list = new_array(c, p_arguments, static_cast<uint32_t>(p_count));
-		if (!list) {
-			return false;
+		for (uint32_t i = 0; i < callee.parameters; i++) {
+			values[i] = i < given ? p_arguments[i] : empty();
 		}
-		const Slot given[] = { vm::any::object(p_function), vm::any::object(list) };
-		*r_result = c->host->builtin(Builtin::Apply, given);
-		release(c, list);
+		Object *rest = nullptr;
+		if (callee.rest) {
+			rest = new_array(c, p_arguments + given, static_cast<uint32_t>(p_count) - given);
+			if (!rest) {
+				return false;
+			}
+			values[fixed].p = rest;
+		}
+		const bool extra = callee.takes_extra && p_count > callee.parameters;
+		c->host->keep_extras(extra ? p_arguments + callee.parameters : nullptr, extra ? static_cast<uint32_t>(p_count) - callee.parameters : 0);
+		callee.entry(c, values, given, r_result);
+		c->host->drop_extras(); // Had the function not begun, they are still here.
+		release(c, rest);
 		return !c->failing;
 	}
 
-	bool text(Slot p_value, std::string *r_text) override {
-		if (std::optional<std::string> plain = vm::any::text(p_value)) {
-			*r_text = std::move(*plain);
-			return true;
-		}
-		// An object whose class has a toString() of its own is asked as the C++ it is; the rest (a vector,
-		// an Object, one of Godot's) are the library's words.
-		Str *said = nullptr;
-		if (!any_text(c, p_value, &said)) {
-			said = static_cast<Str *>(c->host->builtin(Builtin::AnyText, &p_value).p);
-		}
-		if (c->failing) {
-			return false;
-		}
-		r_text->assign(said ? said->view() : std::string_view("null"));
-		release(c, said);
-		return true;
-	}
+	uint32_t carries() const override { return c->host->interpreter->carries(); }
 };
 
 // What a function made goes to whoever asked for it, or is let go of where nobody did.
@@ -328,6 +330,63 @@ void vector_from(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, S
 	Slot made = empty();
 	if (vm::vector_from(library, p_which, p_values[0], &made)) {
 		*r_out = made;
+	}
+}
+
+void text_of_any(Context *c, uint32_t, const Slot *p_values, uint32_t, Slot *r_out) {
+	Direct direct(c);
+	vm::Library library = direct.library();
+	std::string words;
+	if (vm::any_text(library, p_values[0], &words)) {
+		if (Str *made = library.text(words)) {
+			hand_back(c, Kind::Str, slot(made), r_out);
+		}
+	}
+}
+
+void text_of_object(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+	const Slot untyped = p_values[0].p ? vm::any::object(static_cast<Object *>(p_values[0].p)) : vm::any::null();
+	text_of_any(c, p_which, &untyped, p_count, r_out);
+}
+
+void function_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+	Direct direct(c);
+	vm::Library library = direct.library();
+	Object *function = vm::function_in(library, static_cast<Kind>(p_which), p_values[0]);
+	Slot made = empty();
+	if (function && vm::function_call(library, function, p_values + 1, p_count - 1, &made)) {
+		hand_back(c, Kind::Any, made, r_out);
+	}
+}
+
+void any_operate(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+	Direct direct(c);
+	vm::Library library = direct.library();
+	const ir::Op op = static_cast<ir::Op>(p_which);
+	Slot made = empty();
+	if (vm::any_operate(library, op, p_values, p_count, &made)) {
+		hand_back(c, vm::any_operator_gives(op), made, r_out);
+	}
+}
+
+void function_make(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	if (Object *made = vm::make_function(library, p_which, static_cast<Object *>(p_values[0].p))) {
+		hand_back(c, Kind::Obj, slot(made), r_out);
+	}
+}
+
+void method_make(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	if (Object *made = vm::make_method(library, p_which, static_cast<Object *>(p_values[0].p))) {
+		hand_back(c, Kind::Obj, slot(made), r_out);
+	}
+}
+
+void function_length(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	if (Object *function = vm::function_in(library, static_cast<Kind>(p_which), p_values[0])) {
+		hand_back(c, Kind::I32, slot(vm::function_length(library.module(), function)), r_out);
 	}
 }
 

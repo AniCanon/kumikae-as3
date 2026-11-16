@@ -59,7 +59,7 @@ bool split(Library &p_library, const Slot *p_values, Slot *r_out) {
 	const AnyTag tag = any::tag(p_values[1]);
 	const bool whole = tag == AnyTag::Null || tag == AnyTag::Undefined;
 	std::string by;
-	if (!whole && !p_library.runner.text(p_values[1], &by)) {
+	if (!whole && !any_text(p_library, p_values[1], &by)) {
 		return false;
 	}
 	const Str *string = static_cast<const Str *>(p_values[0].p);

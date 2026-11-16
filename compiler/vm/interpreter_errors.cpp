@@ -9,19 +9,6 @@ using ir::Function;
 using ir::Kind;
 using ir::NONE;
 
-// What Error's toString() gives: its name, and ": " and its message if it has one. With no name (it could
-// not be made, memory having run out), the class's.
-std::string Interpreter::error_heading(const Object *p_error) const {
-	Slot *fields = const_cast<Object *>(p_error)->fields();
-	const Str *name = static_cast<const Str *>(fields[ir::ERROR_NAME].p);
-	const Str *message = static_cast<const Str *>(fields[ir::ERROR_MESSAGE].p);
-	std::string text = name ? std::string(name->view()) : module_.classes[p_error->klass].name;
-	if (message && message->size > 0) {
-		text += ": " + std::string(message->view());
-	}
-	return text;
-}
-
 // "\tat Main/update()[Main.as:12]"
 // What an Error's getStackTrace() gives: "Name: message", then a line for each frame, innermost first,
 // from p_skip frames below the top. Null if there is no memory for it.
@@ -92,7 +79,7 @@ void Interpreter::out_of_memory() {
 // p_message is the error's own, or null; p_words are what is said if not even the error can be made.
 void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
 	if (Object *error = new_error(heap_, p_class, p_message)) {
-		error->fields()[ir::ERROR_STACK].p = stack_text(error, 0);
+		own_field(error, ir::ERROR_STACK).p = stack_text(error, 0);
 		pending_ = any::object(error);
 		failing_ = true;
 		return;

@@ -340,8 +340,8 @@ void LibraryCall::each() {
 // object, and a function expression can't use `this`. The call is left for the loop to carry on with.
 void LibraryCall::invoke() {
 	Object *function = vm_.held_object(holder_);
-	const uint32_t target = static_cast<uint32_t>(function->fields()[ir::FUNCTION_INDEX].i);
-	Object *first = static_cast<Object *>(function->fields()[ir::FUNCTION_FIRST].p);
+	const uint32_t target = static_cast<uint32_t>(own_field(function, ir::FUNCTION_INDEX).i);
+	Object *first = static_cast<Object *>(own_field(function, ir::FUNCTION_FIRST).p);
 	std::vector<Slot> arguments;
 	if (static_cast<ir::InvokeMethod>(method_.which) == ir::InvokeMethod::Call) {
 		for (size_t i = 1; i < given_.size(); i++) {

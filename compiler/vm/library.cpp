@@ -35,17 +35,17 @@ void Library::raise_unsupported(const std::string &p_what) {
 
 Object *new_error(Heap &p_heap, uint32_t p_class, Str *p_message) {
 	const ir::Module &module = p_heap.module;
-	Object *error = p_class != ir::NONE ? new_object(p_class, module.classes[p_class].fields.size(), p_heap.list_for(p_class)) : nullptr;
+	Object *error = p_class != ir::NONE ? new_object(p_class, slots_of(module.classes[p_class]), p_heap.list_for(p_class)) : nullptr;
 	if (!error) {
 		if (release(p_message)) {
 			free_string(p_message);
 		}
 		return nullptr;
 	}
-	error->fields()[ir::ERROR_MESSAGE].p = p_message;
-	error->fields()[ir::ERROR_NAME].p = new_string(module.classes[p_class].name);
+	own_field(error, ir::ERROR_MESSAGE).p = p_message;
+	own_field(error, ir::ERROR_NAME).p = new_string(module.classes[p_class].name);
 	const std::string_view words = p_message ? p_message->view() : std::string_view();
-	error->fields()[ir::ERROR_ID].i = words.compare(0, 7, "Error #") == 0 ? std::atoi(std::string(words.substr(7, 6)).c_str()) : 0;
+	own_field(error, ir::ERROR_ID).i = words.compare(0, 7, "Error #") == 0 ? std::atoi(std::string(words.substr(7, 6)).c_str()) : 0;
 	return error;
 }
 

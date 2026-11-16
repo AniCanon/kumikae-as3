@@ -51,10 +51,29 @@ void what_it_cannot_say_exactly_is_refused_by_name() {
 	CHECK(added.files.empty());
 }
 
+// A program that reads an Error's stack keeps a line for each function in progress, set before whatever
+// may raise. Where an operation is done here when it can be and left to the library when it cannot, the
+// line is set inside what is left to the library: set before it, the `else` would end at the line, and the
+// library would do the operation again after it was done here.
+void what_is_left_to_the_library_is_one_statement() {
+	ir::Module module = module_of({ ir::Kind::Str, ir::Kind::I32 }, { ir::Instruction{ ir::Op::I32ToStr, 0, 1, 0, 0 } });
+	module.strings.push_back("getStackTrace");
+	const backend_cpp::Generated made = backend_cpp::generate(module);
+	CHECK(made.unsupported.empty());
+	bool lines = false;
+	for (const backend_cpp::File &file : made.files) {
+		lines = lines || file.text.find("frame.line = ") != std::string::npos;
+		CHECK(file.text.find("else\n\tframe.line") == std::string::npos);
+		CHECK(file.text.find(")\n\tframe.line") == std::string::npos);
+	}
+	CHECK(lines);
+}
+
 } // namespace
 
 int main() {
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
+	what_is_left_to_the_library_is_one_statement();
 	return check::finish();
 }

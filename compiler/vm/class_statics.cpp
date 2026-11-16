@@ -42,7 +42,7 @@ std::optional<uint32_t> Interpreter::statics_of(const Object *p_object, bool *r_
 	if (!p_object || module_.class_class == NONE || p_object->klass != module_.class_class) {
 		return std::nullopt;
 	}
-	const uint32_t code = static_cast<uint32_t>(const_cast<Object *>(p_object)->fields()[ir::CLASS_CODE].i);
+	const uint32_t code = static_cast<uint32_t>(own_field(const_cast<Object *>(p_object), ir::CLASS_CODE).i);
 	if (code >= module_.classes.size()) {
 		return std::nullopt;
 	}

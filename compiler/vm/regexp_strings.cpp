@@ -76,7 +76,7 @@ std::shared_ptr<const regex::Program> Interpreter::pattern_argument(Slot p_patte
 	*r_regexp = nullptr;
 	if (is_regexp(p_pattern)) {
 		*r_regexp = static_cast<Object *>(any::pointer(p_pattern));
-		*r_source = text_in((*r_regexp)->fields()[ir::REGEXP_SOURCE].p);
+		*r_source = text_in(own_field((*r_regexp), ir::REGEXP_SOURCE).p);
 		return pattern_of(*r_regexp);
 	}
 	if (any::tag(p_pattern) != AnyTag::Undefined) {
@@ -125,7 +125,7 @@ void Interpreter::string_match(const Function &p_function, const Instruction &p_
 	}
 	const bool global = (program->flags & regex::GLOBAL) != 0;
 	if (regexp && global) { // One that is not global is left as it is, as its exec() leaves it.
-		set_int32(regexp->fields()[ir::REGEXP_LAST_INDEX], 0);
+		set_int32(own_field(regexp, ir::REGEXP_LAST_INDEX), 0);
 	}
 	Vector *array = nullptr;
 	if (!global && !matches->empty()) {
@@ -235,7 +235,7 @@ void Interpreter::string_replace(const Function &p_function, const Instruction &
 	std::shared_ptr<const regex::Program> program;
 	if (regexp) {
 		program = pattern_of(regexp);
-		needle = text_in(regexp->fields()[ir::REGEXP_SOURCE].p);
+		needle = text_in(own_field(regexp, ir::REGEXP_SOURCE).p);
 	} else {
 		const Slot held = share(Kind::Any, argument(1));
 		const bool said = any_text(held, &needle);
@@ -275,7 +275,7 @@ void Interpreter::string_replace(const Function &p_function, const Instruction &
 		previous = static_cast<size_t>(matches[i].captures[1]);
 	}
 	if (done && regexp && (program->flags & regex::GLOBAL)) {
-		set_int32(regexp->fields()[ir::REGEXP_LAST_INDEX], 0);
+		set_int32(own_field(regexp, ir::REGEXP_LAST_INDEX), 0);
 	}
 	release_object(function);
 	release_object(regexp);
@@ -293,7 +293,7 @@ Vector *Interpreter::split_by_pattern(Object *p_regexp, std::string_view p_text,
 	if (!program) {
 		return nullptr;
 	}
-	const std::string_view source = text_in(p_regexp->fields()[ir::REGEXP_SOURCE].p);
+	const std::string_view source = text_in(own_field(p_regexp, ir::REGEXP_SOURCE).p);
 	const std::u16string units = units_of(p_text);
 	std::vector<std::optional<std::u16string_view>> pieces;
 	const std::u16string_view all(units);

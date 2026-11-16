@@ -12,44 +12,6 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-// What String(x) gives for an untyped value. A script object speaks for itself, which runs the program:
-// the value is held while it does. False if that failed; its error is on its way out.
-bool Interpreter::any_text(Slot p_value, std::string *r_text) {
-	if (const std::optional<std::string> plain = any::text(p_value)) {
-		*r_text += *plain;
-		return true;
-	}
-	if (any::tag(p_value) == AnyTag::Object) {
-		Object *object = static_cast<Object *>(any::pointer(p_value));
-		retain(object);
-		const bool said = object_as_text(object, r_text);
-		release_object(object);
-		return said;
-	}
-	return engine_text(any::pointer(p_value), r_text);
-}
-
-// Godot's text for one of its values or objects (null for no handle), by a handle of its own while the
-// engine speaks, which can run a script. False if memory ran out, or if that script's toString() failed.
-bool Interpreter::engine_text(void *p_handle, std::string *r_text) {
-	const uint32_t carried_before = carries_;
-	void *held = p_handle ? host_.handles.copy(p_handle) : nullptr;
-	Str *text = held ? host_.handles.text(held) : nullptr;
-	*r_text += text ? text->view() : std::string_view("null");
-	if (release(text)) {
-		free_string(text);
-	}
-	if (held) {
-		host_.handles.drop(held);
-		if (!text) {
-			out_of_memory();
-			return false;
-		}
-	}
-	// A script's toString() Godot ran for this text failed: Godot's own text is not the value's.
-	return carries_ == carried_before;
-}
-
 // Whether a value is one of Godot's Arrays and the class is Array: AS3 takes one as an Array of its own.
 bool Interpreter::engine_array(Slot p_value, uint32_t p_class) const {
 	return any::tag(p_value) == AnyTag::Value && p_class < module_.classes.size() && module_.classes[p_class].array &&
@@ -93,54 +55,6 @@ Vector *Interpreter::array_of_engine(void *p_array, uint32_t p_class) {
 	return made;
 }
 
-// An untyped value as a primitive, for `+` and `<`: an object or a Godot value becomes its text.
-bool Interpreter::any_primitive(Slot p_value, Slot *r_out, bool p_number) {
-	if (any::tag(p_value) != AnyTag::Object && !any::is_engine(p_value)) {
-		*r_out = share(Kind::Any, p_value);
-		return true;
-	}
-	const Object *object = any::tag(p_value) == AnyTag::Object ? static_cast<const Object *>(any::pointer(p_value)) : nullptr;
-	if (p_number && object && object->klass == module_.date_class) {
-		*r_out = any_number(const_cast<Object *>(object)->fields()[ir::DATE_TIME].d); // A Date's valueOf().
-		return true;
-	}
-	// A class's own valueOf() comes first, if what it gives is not an object (ECMAScript's [[DefaultValue]]).
-	const uint32_t value_of = object && module_.classes[object->klass].element == Kind::Void ? find_method(object->klass, "valueOf") : NONE;
-	if (value_of != NONE) {
-		Slot self;
-		self.bits = 0;
-		self.p = const_cast<Object *>(object);
-		Slot result;
-		result.bits = 0;
-		retain(self.p ? static_cast<Object *>(self.p) : nullptr);
-		const bool called = call_within(value_of, &self, 1, &result);
-		const Kind kind = module_.functions[value_of].result;
-		const Slot given = called && kind != Kind::Void ? to_any(kind, result) : any::undefined();
-		if (called) {
-			drop(kind, result);
-		}
-		release_object(static_cast<Object *>(self.p));
-		if (!called) {
-			return false;
-		}
-		if (any::tag(given) != AnyTag::Object && !any::is_engine(given)) {
-			*r_out = given;
-			return true;
-		}
-		drop_any(given);
-	}
-	std::string words;
-	if (!any_text(p_value, &words)) {
-		return false;
-	}
-	*r_out = any::string(text(words));
-	return true;
-}
-
-Slot Interpreter::present_or_null(Slot p_value) {
-	return any::is_engine(p_value) && !host_.handles.present(any::pointer(p_value)) ? any::null() : p_value;
-}
-
 // One of the untyped value's operations. Anything that runs the program (an object's text) may move the
 // registers: the operands are copied first, and the result is written through the frame's place again.
 void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Slot *p_registers) {
@@ -180,9 +94,10 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 			break;
 		case Op::AnyEq:
 		case Op::AnyStrictEq: {
-			bool equal = false;
-			if (any_equality(b, c, p_in.op == Op::AnyStrictEq, &equal)) {
-				result(Kind::Bool, of_bool(equal));
+			const Slot both[] = { b, c };
+			Slot equal;
+			if (vm::any_operate(library_, p_in.op, both, 2, &equal)) {
+				result(Kind::Bool, equal);
 			}
 			break;
 		}
@@ -191,15 +106,19 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 		case Op::AnyLe:
 		case Op::AnyGt:
 		case Op::AnyGe:
-			any_arithmetic(p_in, b, c);
-			break;
 		case Op::AnySub:
 		case Op::AnyMul:
 		case Op::AnyDiv:
 		case Op::AnyMod:
-		case Op::AnyNeg:
-			any_operate(p_in, b, c);
+		case Op::AnyNeg: {
+			// Each stays held by its register, which nothing changes while this runs.
+			const Slot both[] = { b, c };
+			Slot made;
+			if (vm::any_operate(library_, p_in.op, both, p_in.op == Op::AnyNeg ? 1 : 2, &made)) {
+				result(any_operator_gives(p_in.op), made);
+			}
 			break;
+		}
 		case Op::AnyIs:
 			result(Kind::Bool, of_bool(any_is(b, p_in.c)));
 			break;
@@ -223,22 +142,6 @@ Slot Interpreter::type_name(Slot p_value) {
 	}
 	retain(static_cast<Str *>(out.p));
 	return out;
-}
-
-// AnyEq and AnyStrictEq. A Godot object that has been freed is null. Both are held only when one is a
-// script object, whose text may run code that lets go of the other. False if it raised.
-bool Interpreter::any_equality(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
-	const Slot first = present_or_null(p_a);
-	const Slot second = present_or_null(p_b);
-	const bool speaks = any::tag(first) == AnyTag::Object || any::tag(second) == AnyTag::Object;
-	const Slot x = speaks ? share(Kind::Any, first) : first;
-	const Slot y = speaks ? share(Kind::Any, second) : second;
-	const bool done = any_equal(x, y, p_strict, r_equal);
-	if (speaks) {
-		drop_any(x);
-		drop_any(y);
-	}
-	return done;
 }
 
 } // namespace vm

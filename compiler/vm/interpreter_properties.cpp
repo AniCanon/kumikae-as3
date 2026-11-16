@@ -42,10 +42,6 @@ std::optional<uint32_t> index_number(double p_value) {
 
 } // namespace
 
-Object *Interpreter::held_object(Slot p_value) const {
-	return any::tag(p_value) == AnyTag::Object ? static_cast<Object *>(any::pointer(p_value)) : nullptr;
-}
-
 // The name Flash's messages give what holds a property.
 std::string Interpreter::holder_name(Slot p_holder) const {
 	if (const Object *object = held_object(p_holder)) {
@@ -240,7 +236,7 @@ bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key
 		if (!from_any(p_value, declared.kind, declared.kind == Kind::Obj ? declared.klass : declared.starts_null ? 0 : NONE, &stored)) {
 			return false;
 		}
-		put(declared.kind, p_object->fields()[*field], stored);
+		put(declared.kind, vm::field(klass, p_object, *field), stored);
 		return true;
 	}
 	if (named_method(klass, p_key.text)) {

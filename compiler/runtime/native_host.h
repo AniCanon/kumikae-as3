@@ -24,8 +24,6 @@ namespace rt {
 // The operations the host itself asks of the library, each a thunk after the program's own.
 enum class Builtin : uint32_t {
 	NullCheck, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray,
-	Apply, // A function value called with an Array of untyped arguments, as apply() calls it.
-	AnyText, // String(x) of an untyped value.
 	SplitByPattern, // split() by a RegExp.
 };
 
@@ -140,11 +138,13 @@ struct Host final : vm::NativeCode {
 	// the context's.
 	uint32_t direct = 0;
 	// What a function that names `arguments` was given beyond its parameters (FunctionInfo::takes_extra),
-	// each with a reference: put here by the stub's frame as the function is entered, and taken by
+	// each with a reference: put here as the function is entered (by the stub's frame, or by the library's call of it), and taken by
 	// arguments_of(), the first thing such a function does. Empty for a call generated code makes itself,
 	// which passes no more than the parameters.
 	std::vector<Slot> extras;
 	void drop_extras();
+	// Those of the call about to be made, in place of any left: each with a reference of its own.
+	void keep_extras(const Slot *p_extras, uint32_t p_count);
 
 	// What the library's functions of plain values (vm/library.h) ask of whoever runs the program, answered
 	// for generated code (runtime/direct.cpp); and the library as those functions are handed it.

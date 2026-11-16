@@ -69,7 +69,7 @@ std::shared_ptr<const regex::Program> Interpreter::pattern(std::string_view p_so
 
 std::shared_ptr<const regex::Program> Interpreter::pattern_of(const Object *p_regexp) {
 	Object *regexp = const_cast<Object *>(p_regexp);
-	return pattern(text_in(static_cast<const Str *>(regexp->fields()[ir::REGEXP_SOURCE].p)), static_cast<uint8_t>(regexp->fields()[ir::REGEXP_FLAGS].i));
+	return pattern(text_in(static_cast<const Str *>(own_field(regexp, ir::REGEXP_SOURCE).p)), static_cast<uint8_t>(own_field(regexp, ir::REGEXP_FLAGS).i));
 }
 
 bool Interpreter::is_regexp(Slot p_any) const {
@@ -176,10 +176,10 @@ Slot Interpreter::regexp_read(Object *p_regexp, RegExpFunction p_property) {
 	Slot out;
 	out.bits = 0;
 	if (p_property == RegExpFunction::Source) {
-		out.p = p_regexp->fields()[ir::REGEXP_SOURCE].p;
+		out.p = own_field(p_regexp, ir::REGEXP_SOURCE).p;
 		retain(static_cast<Str *>(out.p));
 	} else {
-		out.b = (p_regexp->fields()[ir::REGEXP_FLAGS].i & bit_of(p_property)) != 0;
+		out.b = (own_field(p_regexp, ir::REGEXP_FLAGS).i & bit_of(p_property)) != 0;
 	}
 	return out;
 }
@@ -213,8 +213,8 @@ void Interpreter::regexp_new(const Function &p_function, const Instruction &p_in
 			return;
 		}
 		Object *from = static_cast<Object *>(any::pointer(first));
-		source = text_in(static_cast<const Str *>(from->fields()[ir::REGEXP_SOURCE].p));
-		flags = static_cast<uint8_t>(from->fields()[ir::REGEXP_FLAGS].i);
+		source = text_in(static_cast<const Str *>(own_field(from, ir::REGEXP_SOURCE).p));
+		flags = static_cast<uint8_t>(own_field(from, ir::REGEXP_FLAGS).i);
 	} else if (!words(0, &source) || !words(1, &flags_text)) {
 		return;
 	} else {
@@ -223,7 +223,7 @@ void Interpreter::regexp_new(const Function &p_function, const Instruction &p_in
 	if (!pattern(source, flags)) {
 		return;
 	}
-	Object *made = new_object(module_.regexp_class, module_.classes[module_.regexp_class].fields.size(), heap_.list_for(module_.regexp_class));
+	Object *made = new_object(module_.regexp_class, slots_of(module_.classes[module_.regexp_class]), heap_.list_for(module_.regexp_class));
 	Str *kept = made ? text(source) : nullptr;
 	if (!kept) {
 		if (made) {
@@ -232,8 +232,8 @@ void Interpreter::regexp_new(const Function &p_function, const Instruction &p_in
 		out_of_memory();
 		return;
 	}
-	made->fields()[ir::REGEXP_SOURCE].p = kept;
-	made->fields()[ir::REGEXP_FLAGS].i = flags;
+	own_field(made, ir::REGEXP_SOURCE).p = kept;
+	own_field(made, ir::REGEXP_FLAGS).i = flags;
 	put(Kind::Obj, stack_[frames_.back().base + p_in.a], pointer_slot(made));
 }
 
@@ -283,12 +283,12 @@ bool Interpreter::regexp_run(Object *p_regexp, Str *p_text, bool p_test, Slot *r
 	if (!program) {
 		return false;
 	}
-	const std::string_view source = text_in(static_cast<const Str *>(p_regexp->fields()[ir::REGEXP_SOURCE].p));
+	const std::string_view source = text_in(static_cast<const Str *>(own_field(p_regexp, ir::REGEXP_SOURCE).p));
 	// Held here: what this run makes can't run the program, but nothing is left to chance.
 	const std::shared_ptr<const std::u16string> held = subject_units(p_text);
 	const std::u16string &units = *held;
 	const bool global = (program->flags & regex::GLOBAL) != 0;
-	Slot &last = p_regexp->fields()[ir::REGEXP_LAST_INDEX];
+	Slot &last = own_field(p_regexp, ir::REGEXP_LAST_INDEX);
 	const int32_t from = global ? last.i : 0;
 	std::optional<Found> found;
 	if (from >= 0 && static_cast<uint32_t>(from) <= units.size()) {

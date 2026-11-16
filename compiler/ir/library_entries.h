@@ -76,6 +76,38 @@ inline LibraryEntry library_entry(const Function &p_function, const Instruction 
 			return LibraryEntry{ "array_new", p_in.b };
 		case Op::VecFrom:
 			return LibraryEntry{ "vector_from", p_in.c };
+		case Op::AnyEq:
+		case Op::AnyStrictEq:
+		case Op::AnyAdd:
+		case Op::AnyLt:
+		case Op::AnyLe:
+		case Op::AnyGt:
+		case Op::AnyGe:
+		case Op::AnySub:
+		case Op::AnyMul:
+		case Op::AnyDiv:
+		case Op::AnyMod:
+		case Op::AnyNeg:
+			return LibraryEntry{ "any_operate", static_cast<uint32_t>(p_in.op) };
+		case Op::MakeFunction:
+			return LibraryEntry{ "function_make", p_in.b };
+		case Op::MakeMethod:
+			return LibraryEntry{ "method_make", p_in.b };
+		case Op::FunctionLength:
+			return LibraryEntry{ "function_length", static_cast<uint32_t>(p_function.registers[p_in.b]) };
+		case Op::AnyText:
+			return LibraryEntry{ "text_of_any", 0 };
+		case Op::ObjToStr:
+			return LibraryEntry{ "text_of_object", 0 };
+		case Op::CallFunction: {
+			// The interpreter empties the result's register before the call: where that register is also
+			// one the call reads, the instruction stays the interpreter's own.
+			bool read = p_in.a == p_in.b;
+			for (const uint32_t each : p_function.argument_lists[p_in.c]) {
+				read = read || each == p_in.a;
+			}
+			return read ? LibraryEntry{} : LibraryEntry{ "function_call", static_cast<uint32_t>(p_function.registers[p_in.b]) };
+		}
 		default:
 			return LibraryEntry{};
 	}

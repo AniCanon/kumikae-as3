@@ -16,7 +16,7 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host), heap_(p_module, p_host.handles, p_host.source) {
+		module_(p_module), host_(p_host), heap_(p_module, p_host.handles, p_host.source, p_host.clock) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}
@@ -24,14 +24,6 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 	memory_text_ = new_string(OUT_OF_MEMORY);
 	for (const char *name : { "undefined", "boolean", "number", "string", "object", "function" }) {
 		type_names_.push_back(new_string(name));
-	}
-	// A method's function by name, for calls from outside: the class's own and what it inherits.
-	methods_.resize(module_.classes.size());
-	for (size_t i = 0; i < module_.classes.size(); i++) {
-		for (uint32_t method : module_.classes[i].methods) {
-			const std::string &name = module_.functions[method].name;
-			methods_[i][name.substr(name.rfind('/') == std::string::npos ? 0 : name.rfind('/') + 1)] = method;
-		}
 	}
 	class_used_.assign(module_.classes.size(), 0);
 	globals_.resize(module_.globals.size());
@@ -44,19 +36,6 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 // Each engine instruction is worked out by the host once, now, on the thread that loads the program: none
 // is looked up by its name as the program runs. A function with none keeps an empty list.
 void Interpreter::prepare_engine() {
-	operators_.resize(module_.engine_names.size());
-	for (size_t i = 0; i < module_.engine_names.size(); i++) {
-		// The description's names for the unary ones are "unary-" and "unary+".
-		std::string_view spelling = module_.engine_names[i].name;
-		if (spelling.substr(0, 5) == "unary") {
-			spelling.remove_prefix(5);
-		}
-		// An operator's entry is "<name> <Godot's number>"; anything else is not an operator and has none.
-		const std::string &value = module_.engine_names[i].value;
-		const size_t space = value.find(' ');
-		const bool numbered = module_.engine_names[i].key.rfind("@operator.", 0) == 0 && space != std::string::npos;
-		operators_[i] = OperatorName{ spelling, spelling == "==" || spelling == "!=", numbered ? std::atoi(value.c_str() + space + 1) : -1 };
-	}
 	prepared_.resize(module_.functions.size());
 	for (size_t f = 0; f < module_.functions.size(); f++) {
 		const Function &function = module_.functions[f];
@@ -82,9 +61,7 @@ Interpreter::~Interpreter() {
 			host_.handles.drop(kept);
 		}
 	}
-	for (Object *kept : lone_functions_) {
-		release_object(kept);
-	}
+	heap_.release_lone_functions();
 	for (auto &[code, kept] : class_values_) {
 		release_object(kept);
 	}

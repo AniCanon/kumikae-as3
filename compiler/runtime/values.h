@@ -237,10 +237,12 @@ inline Object *object_of(Context *c, Slot p_any) {
 	return static_cast<Object *>(any_pointer(c, p_any));
 }
 
-// A typed field of an object: the fields follow the header, eight bytes each (vm::Object::fields()).
+// A typed field of an object, for generated code, which knows the object's class as it is written: by the
+// slot the class's description gives the field (FieldInfo::offset says the same place in bytes; vm/fields.h
+// is the same rule for everything that has the class only as the program runs).
 template <typename T>
-inline T &field(Object *p_object, uint32_t p_index) {
-	return *reinterpret_cast<T *>(reinterpret_cast<char *>(p_object) + sizeof(Object) + 8 * static_cast<size_t>(p_index));
+inline T &field(Object *p_object, uint32_t p_slot) {
+	return *reinterpret_cast<T *>(&vm::slot_at(p_object, p_slot));
 }
 
 } // namespace rt
