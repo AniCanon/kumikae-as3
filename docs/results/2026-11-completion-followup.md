@@ -143,6 +143,7 @@ seeded edits; the suite runs a short version (about 800 edits and 300 server edi
 | as3-signals, flashpunk, flixel, as3corelib (release, Godot loaded) | 1,920 | 0 differences |
 | Generated projects, seeds 2000–2119 (ASan/UBSan) | 19,500 | 1 difference, no sanitizer report |
 | Generated projects, seeds 3000–3599 (release) | 129,894 | 1 difference |
+| Server sessions, seeds 3000–3299; five external projects (release) | 71,933; 1,600 | 0 differences |
 
 The two differences were one bug: the names in a written type's type arguments (`Vector.<Particle>`) were
 not recorded as read by the declarations. It is fixed, with a named test, and both seeds pass. Each widening
@@ -157,28 +158,53 @@ version fail at once.
 
 `tests/bench/recheck.py` runs `bench_recheck` from one source built in both trees, turn and turn about, on
 a project from `generate_project.py --hub` (every file calls `Hub.tick`; each file's `step0` is called by
-the file before it). Medians of five runs of ten edit/undo pairs, Godot loaded, ms. Measured at commit
-`09171b3`, before the body-only rechecks and collection speed-ups that followed.
+the file before it). Medians of five runs of ten edit/undo pairs, Godot loaded, ms, at `6bb5bec` against
+`5732e88`; load average 8.6 when the sizes started (it had been above 100 for an hour before).
 
 | Edit, until | 100k lines before | after | 1M lines before | after |
 |---|---:|---:|---:|---:|
-| Body, file checked | 0.275 | 0.313 | 0.755 | 0.683 |
-| Body, program checked | 0.275 | 0.314 | 0.755 | 0.688 |
-| Method parameters, file | 29.152 | 0.315 | 298.208 | 0.690 |
-| Method parameters, program | 29.152 | 0.442 | 298.209 | 0.847 |
-| New member, program | 28.992 | 0.308 | 266.334 | 0.768 |
-| Hub method, file (a request) | 28.914 | 0.062 | 279.002 | 0.744 |
-| Hub method, program | 28.914 | 26.794 | 279.002 | 392.095 |
-| First check | 89.6 | 101.7 | 903.5 | 981.7 |
-| Peak memory, MiB | 82.8 | 88.8 | 686.2 | 627.3 |
+| Body, file checked | 0.275 | 0.307 | 0.570 | 0.600 |
+| Body, program checked | 0.276 | 0.308 | 0.571 | 0.614 |
+| Method parameters, file | 30.897 | 0.306 | 227.109 | 0.603 |
+| Method parameters, program | 30.897 | 0.407 | 227.109 | 0.724 |
+| New member, program | 31.118 | 0.311 | 229.521 | 0.606 |
+| Hub method, file (a request) | 30.772 | 0.084 | 228.857 | 0.599 |
+| Hub method, program | 30.772 | 22.255 | 228.857 | 224.547 |
+| First check | 90.1 | 104.7 | 653.3 | 783.0 |
+| Peak memory, MiB | 82.8 | 85.1 | 558.4 | 580.8 |
 
-Load average when each size started: 5.0 at 100k, 4.4 at 1M (it rose to about 18 during the 1M runs, whose
-before-ranges are wide: 212–1,262 ms for a parameter change). After the body-only rechecks (a file whose
-bodies alone read the change keeps its declarations), the hub edit's whole-program time on this build fell to
-25.5–26.5 ms at 100k against 28.6–29.2 ms before; it was not measured turn and turn about again at 1M,
-where it was 1.4 times the full check. A body edit costs 0.04 ms more than before at 100k: the file's
-declarations are redone and fingerprinted, and what it reads recorded. The first check costs 9–13% more,
-for fingerprints and dependency lists.
+Over the protocol (`completion.py`, 21 samples each, both servers in turn; `program` is the edit followed by
+find references, which waits for every file):
+
+| Mode, size: request | before median / p95 | after median / p95 |
+|---|---:|---:|
+| Signature, 100k: edit + completion | 32.688 / 33.681 | 1.093 / 1.199 |
+| Signature, 100k: 20 edits + completion | 37.162 / 38.124 | 6.039 / 6.318 |
+| Signature, 100k: edit + program | 35.537 / 36.546 | 5.038 / 5.230 |
+| Signature, 1M: edit + completion | 226.712 / 240.350 | 3.764 / 5.251 |
+| Signature, 1M: edit + program | 268.062 / 309.268 | 44.510 / 54.290 |
+| Hub, 100k: edit + completion in another file | 34.014 / 35.565 | 0.847 / 1.029 |
+| Hub, 100k: edit + program | 35.841 / 39.628 | 27.321 / 30.371 |
+| Hub, 1M: edit + completion in another file | 223.557 / 238.121 | 4.435 / 4.932 |
+| Hub, 1M: edit + program | 259.288 / 262.469 | 264.703 / 268.689 |
+| Warm completion, 100k / 1M | 0.123 / 0.172 | 0.113 / 0.151 |
+| Recovery, 100k: edit + completion | 32.043 / 32.962 | 1.299 / 1.398 |
+| Recovery, 100k: 20 edits + completion | 42.510 / 43.172 | 11.802 / 12.485 |
+| Body, 100k: edit + completion | 1.313 / 1.452 | 1.479 / 1.813 |
+
+Load averages 4.4–6.0, except the hub 1M program row (first run, 4.5) and the recovery and body rows (first
+run, 4.6–4.7); a second run of those was taken at a load above 200 and is not used. Over the protocol the
+1M times include parsing the 5,003-line or generated file's JSON text. A request is answered once the
+edit's declarations and the asked file are checked; the rest follows in the background, and stops for any
+message. `kas3c check` of 100,000 lines (`run_bench.py --against`, 11 runs): 96.6 ms against 96.0 ms
+(+0.6%, within the 4–7 ms spread); `run`, `vectors` and `values` within their spreads.
+
+What costs more: a body edit, by 0.03–0.04 ms (the file's declarations are redone and fingerprinted, and
+what it read recorded); the first check, by 16–20% (fingerprints and dependency lists for every file;
+bodies are then checked in the background, so the first request waits only for declarations: cold
+completion at 1M lines took 535 ms against 640 ms); memory, by 3–4%. A file added or removed starts the
+declarations over, uninterruptibly; it was not timed on its own (the first check, 783 ms at 1M lines,
+includes it with parsing and every body).
 
 A soak of 4,000 declaration renames (a method and a class renamed to a new name and back, `bench_recheck
 --soak`) at 100k lines held resident memory at 91.3 MiB from the 400th edit on.

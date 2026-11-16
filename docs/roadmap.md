@@ -79,7 +79,7 @@ locals, classes, imports, inherited members and Godot's API.
 | Part | Status |
 |---|---|
 | The server: protocol, errors as you type, definition, references, hover, outline, symbols | Done. Tested by scripted sessions that send what an editor sends. |
-| Speed: a re-check of 100,000 lines in under 50 ms | Done, and for 1,000,000 lines: an edit checks again only the files that read what it changed, bodies a file at a time, and a running check stops for newer messages; a signature change is answered in under a millisecond at either size ([results](results/2026-11-completion-followup.md#incremental-checking-november-16)). |
+| Speed: a re-check of 100,000 lines in under 50 ms | Done, and for 1,000,000 lines: an edit checks again only the files that read what it changed, bodies a file at a time, and a running check stops for newer messages; a signature change is checked in under a millisecond at either size, and answered with a completion in about 1 ms (100,000 lines) or 4 ms (1,000,000) over the protocol ([results](results/2026-11-completion-followup.md#incremental-checking-november-16)). |
 | A VS Code client and the [set-up guide](../editors/README.md) | Done. |
 | Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. The owner confirmed the underlined errors by eye. |
 | Tried in Rider | Native plugin completion and typing validated in the pinned sandbox on 2026-11-15; see [results](results/2026-11-completion.md). Full manual editor acceptance remains pending. |

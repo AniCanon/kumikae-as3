@@ -389,8 +389,9 @@ How it works:
   declarations are checked at once, and those of the files that read a declaration whose fingerprint
   changed; bodies are checked one file at a time: the file a request asks about first, the rest while the
   editor pauses ([src/README.md](src/README.md#checking-as-the-program-is-edited)). On a generated project of
-  1,000,000 lines with Godot's API loaded, a change to a method's parameters is answered in under a
-  millisecond (`build/bench_recheck <folder>`; `tests/bench/generate_project.py` writes the project).
+  1,000,000 lines with Godot's API loaded, a change to a method's parameters is checked in under a
+  millisecond in process, about 4 ms with a completion over the protocol (`build/bench_recheck <folder>`;
+  `tests/bench/generate_project.py` writes the project).
 - **Typing bursts are checked once,** and a check of what is left stops for any message that arrives and
   goes on after it. A change marks the program as stale; edits are taken in when a request needs an
   answer or no further message is waiting.
