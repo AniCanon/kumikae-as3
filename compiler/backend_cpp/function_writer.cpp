@@ -193,7 +193,7 @@ std::string FunctionWriter::prologue() const {
 	if (fails_) {
 		add("uint32_t line = 0;");
 		add("bool traced = false;");
-		unused += " (void)traced;";
+		unused += " (void)traced; (void)line;";
 	}
 	add(unused);
 	const bool gives = function_.result != Kind::Void;
@@ -268,7 +268,9 @@ std::string FunctionWriter::epilogue() const {
 	out += function_.result != Kind::Void ? "\treturn result;\n" : "\treturn;\n";
 	out += handlers();
 	if (fails_) {
-		out += "failed:\n\tleave_failed(c, " + std::to_string(index_) + ", line, traced);\n\tgoto done;\n";
+		// The function behind the library's methods read by name is no place in the program: no line of it.
+		const bool hidden = index_ == module_.library_function;
+		out += "failed:\n" + (hidden ? std::string() : "\tleave_failed(c, " + std::to_string(index_) + ", line, traced);\n") + "\tgoto done;\n";
 	}
 	return out;
 }

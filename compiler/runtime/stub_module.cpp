@@ -122,6 +122,7 @@ ir::Class stub_class(const ClassInfo &p_info) {
 	klass.name = p_info.name;
 	klass.base = p_info.base;
 	klass.element = static_cast<Kind>(p_info.element);
+	klass.element_check = p_info.element_check;
 	klass.array = p_info.array;
 	klass.table = p_info.table;
 	klass.dictionary = p_info.dictionary;
@@ -174,6 +175,12 @@ void add_builtins(const Program &p_program, const Names &p_names, ir::Module &r_
 	static const uint8_t wide_boxed[] = { static_cast<uint8_t>(Kind::I64), static_cast<uint8_t>(Kind::Any) };
 	add(ThunkInfo{ static_cast<uint8_t>(Op::ToAny), 1, 0, 0, number_boxed, 2, 1, nullptr, 0, 1, NONE, NONE });
 	add(ThunkInfo{ static_cast<uint8_t>(Op::ToAny), 1, 0, 0, wide_boxed, 2, 1, nullptr, 0, 1, NONE, NONE });
+	// An Array of a length (VecNew: the length, whether it is fixed). Not ArrayNew, which takes one number
+	// for a length where an element was meant.
+	static const uint8_t array_made[] = { static_cast<uint8_t>(Kind::U32), static_cast<uint8_t>(Kind::Bool), static_cast<uint8_t>(Kind::Obj) };
+	static const uint32_t array_given[] = { 0, 1 };
+	const uint32_t array = p_program.known.array;
+	add(ThunkInfo{ static_cast<uint8_t>(array == NONE ? Op::ConstNull : Op::VecNew), 2, array, 0, array_made, 3, 2, array_given, 2, 2, NONE, NONE });
 }
 
 } // namespace
@@ -228,6 +235,8 @@ ir::Module stub_module(const Program &p_program) {
 	module.date_class = known.date;
 	module.syntax_error_class = known.syntax_error;
 	module.uri_error_class = known.uri_error;
+	module.class_class = known.class_value;
+	module.library_function = p_program.library_function;
 	return module;
 }
 

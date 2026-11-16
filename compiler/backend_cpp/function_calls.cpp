@@ -78,8 +78,7 @@ void FunctionWriter::call_function(const Instruction &p_in, const ir::Function &
 		if (!past.empty()) {
 			line("const Slot t[] = { " + slots + " };");
 		}
-		line("Object *const rest = static_cast<Object *>(thunk(c, " + std::to_string(thunks_.array_of(module_.array_class, past.size())) + ", " +
-				(past.empty() ? "nullptr" : "t") + ").p);");
+		line("Object *const rest = new_array(c, " + (past.empty() ? std::string("nullptr") : "t") + ", " + std::to_string(past.size()) + ");");
 		check();
 	}
 	const std::string call = p_target + "(" + arguments(p_callee, list) + ")";

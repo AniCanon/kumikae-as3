@@ -88,7 +88,7 @@ std::string class_tables(const ir::Module &p_module, uint32_t p_index, std::stri
 	for (size_t method = 0; method < p_module.interface_methods.size(); method++) {
 		interface_code.push_back(code_pointer(p_module, method < klass.interface_methods.size() ? klass.interface_methods[method] : NONE));
 	}
-	std::string info = "{ " + string_literal(klass.name) + ", " + number(klass.base) + ", " + layout_hash(klass) + ", " + kind_number(klass.element) + ", " +
+	std::string info = "{ " + string_literal(klass.name) + ", " + number(klass.base) + ", " + layout_hash(klass) + ", " + kind_number(klass.element) + ", " + number(klass.element_check) + ", " +
 			boolean(klass.array) + ", " + boolean(klass.table) + ", " + boolean(klass.dictionary) + ", " + boolean(klass.built_in) + ", " +
 			boolean(klass.is_interface) + ", ";
 	info += array(r_out, "const FieldInfo", prefix + "_fields", fields) + ", " + std::to_string(fields.size()) + ", ";
@@ -137,7 +137,8 @@ std::string known_classes(const ir::Module &p_module) {
 	std::string out = "{";
 	for (uint32_t each : { p_module.entry_class, p_module.error_class, p_module.type_error_class, p_module.range_error_class,
 				 p_module.argument_error_class, p_module.function_class, p_module.array_class, p_module.object_class, p_module.dictionary_class,
-				 p_module.reference_error_class, p_module.regexp_class, p_module.date_class, p_module.syntax_error_class, p_module.uri_error_class }) {
+				 p_module.reference_error_class, p_module.regexp_class, p_module.date_class, p_module.syntax_error_class, p_module.uri_error_class,
+				 p_module.class_class }) {
 		out += " " + number(each) + ",";
 	}
 	return out + " }";
@@ -218,7 +219,7 @@ std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, 
 	counted("const char *const", "INTERFACE_METHODS", interface_methods);
 	counted("const uint32_t", "INITIALIZERS", numbers(p_module.initializers));
 	counted("const ThunkInfo", "THUNKS", thunks);
-	program += known_classes(p_module) + ", " + boolean(p_keeps_stack) + " };\n";
+	program += known_classes(p_module) + ", " + number(p_module.library_function) + ", " + boolean(p_keeps_stack) + " };\n";
 	tables += program + "\n} // namespace\n\n} // namespace " + std::string(PROGRAM_NAMESPACE) + "\n\n";
 	tables += "extern \"C\" KAS3_EXPORT const kas3::rt::Program *kas3_program() {\n\treturn &" + std::string(PROGRAM_NAMESPACE) + "::PROGRAM;\n}\n";
 	return tables;

@@ -44,8 +44,8 @@ class ThunkTable {
 public:
 	// The thunk for an instruction of a function, made if there is none like it yet.
 	ThunkUse use(const ir::Function &p_function, const ir::Instruction &p_in);
-	// The thunk that makes an Array of that many untyped values: a rest parameter's.
-	uint32_t array_of(uint32_t p_array_class, size_t p_count);
+	// The thunk that makes a function's own value: bound to an object handed in, or to nothing.
+	uint32_t function_value(uint32_t p_function, bool p_bound);
 	// The thunk that makes an untyped value a value of the kind, as a store does: a catch's variable.
 	uint32_t from_any(ir::Kind p_kind);
 	const std::vector<Thunk> &all() const { return thunks_; }

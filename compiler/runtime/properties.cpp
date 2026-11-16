@@ -4,6 +4,7 @@
 // (vm/interpreter_properties.cpp, vm/interpreter_vectors.cpp); every other case is left to it.
 #include "fast.h"
 
+#include "host.h"
 #include "table.h"
 
 namespace kas3 {
@@ -42,6 +43,16 @@ bool set_property(Context *c, Object *p_holder, Str *p_key, Slot p_value) {
 	retain(c, p_value);
 	entries->add(vm::any::string(p_key), p_value);
 	return true;
+}
+
+Object *new_array(Context *c, const Slot *p_values, uint32_t p_count) {
+	const Slot asked[] = { slot(p_count), slot(false) };
+	Vector *made = static_cast<Vector *>(c->host->builtin(Builtin::NewArray, asked).p);
+	for (uint32_t i = 0; made && i < p_count; i++) {
+		retain(c, p_values[i]);
+		made->data[i] = p_values[i];
+	}
+	return made;
 }
 
 Slot *element_added(Object *p_vector, uint32_t p_index) {

@@ -77,6 +77,13 @@ void raise_null(Context *c) {
 	c->host->builtin(Builtin::NullCheck, &nothing);
 }
 
+void out_of_memory(Context *c) {
+	// The library raises it, and words it: asked for an object's text with no memory to write it in.
+	vm::fail_allocations(1);
+	const Slot nothing = empty();
+	c->host->builtin(Builtin::ObjectText, &nothing);
+}
+
 void throw_value(Context *c, Slot p_any) {
 	retain(c, p_any);
 	c->pending = p_any;

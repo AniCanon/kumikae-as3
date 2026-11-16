@@ -151,6 +151,23 @@ void use_class(Context *c, uint32_t p_class) {
 	c->host->use_class(p_class, true);
 }
 
+bool Host::set_up_by_library(uint32_t p_function) {
+	const uint32_t owner = program.functions[p_function].owner;
+	if (owner == NONE || program.classes[owner].static_init != p_function) {
+		return false;
+	}
+	if (class_used[owner]) {
+		return true; // Generated code used the class first: its fields have their values.
+	}
+	class_used[owner] = 1;
+	Slot none = empty();
+	program.functions[p_function].entry(&context, nullptr, 0, &none);
+	if (context.failing) {
+		forget_class(*this, owner);
+	}
+	return true;
+}
+
 void Host::use_class(uint32_t p_class, bool p_from_code) {
 	Host &host = *this;
 	Context *c = &context;

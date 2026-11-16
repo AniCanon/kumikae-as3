@@ -5,6 +5,7 @@
 #include "fast.h"
 
 #include "host.h"
+#include "table.h"
 
 #include <cmath>
 
@@ -142,6 +143,42 @@ bool result_to_any(Context *c, Kind p_kind, Slot p_result, Slot *r_any) {
 }
 
 } // namespace
+
+Object *arguments_of(Context *c, uint32_t p_function, const Slot *p_parameters, uint32_t p_given, Object *p_callee) {
+	const FunctionInfo &function = c->program->functions[p_function];
+	const uint32_t first = function.is_static ? 0 : 1;
+	const uint32_t count = p_given > first ? p_given - first : 0;
+	std::vector<Slot> values(count, empty());
+	for (uint32_t i = 0; i < count && !c->failing; i++) {
+		// Each as an untyped value with a reference of its own: result_to_any() takes over the one taken here.
+		const Kind kind = static_cast<Kind>(function.kinds[first + i]);
+		const Slot held = p_parameters[first + i];
+		if (kind == Kind::Str) {
+			retain(c, static_cast<Str *>(held.p));
+		} else if (kind == Kind::Obj) {
+			retain(c, static_cast<Object *>(held.p));
+		} else if (kind == Kind::Any) {
+			retain(c, held);
+		}
+		result_to_any(c, kind, held, &values[i]);
+	}
+	Object *made = c->failing ? nullptr : new_array(c, values.data(), count);
+	for (Slot each : values) {
+		release(c, each);
+	}
+	vm::Entries *properties = made ? vm::properties_of(static_cast<Vector *>(made)) : nullptr;
+	Str *name = properties ? vm::new_string("callee") : nullptr;
+	if (!name) {
+		release(c, p_callee);
+		release(c, made);
+		if (!c->failing) {
+			out_of_memory(c);
+		}
+		return nullptr;
+	}
+	properties->add(vm::any::string(name), vm::any::object(p_callee), true);
+	return made;
+}
 
 bool call_value(Context *c, Object *p_function, const Slot *p_arguments, uint32_t p_count, Slot *r_result) {
 	const Program &program = *c->program;

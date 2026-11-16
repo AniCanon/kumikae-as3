@@ -77,6 +77,28 @@ bool FunctionWriter::object(const Instruction &p_in) {
 		case Op::StrToStr:
 			share(p_in.a, "(" + reg(p_in.b) + " ? " + reg(p_in.b) + " : c->null_text)");
 			return true;
+		case Op::Arguments: {
+			// What the caller gave, from the parameters as they are before anything writes them.
+			const uint32_t fixed = function_.rest ? function_.parameters - 1 : function_.parameters;
+			std::string slots;
+			for (uint32_t i = 0; i < fixed; i++) {
+				slots += (i ? ", slot(" : "slot(") + reg(i) + ")";
+			}
+			const bool bound = !function_.is_static && fixed > 0;
+			mark();
+			line("{");
+			if (fixed > 0) {
+				line("const Slot g[] = { " + slots + " };");
+			}
+			line("const Slot f = thunk(c, " + std::to_string(thunks_.function_value(index_, bound)) + ", " + (bound ? "g" : "nullptr") + ");");
+			check();
+			line("Object *const e = arguments_of(c, " + std::to_string(index_) + ", " + (fixed > 0 ? "g" : "nullptr") + ", " +
+					(takes_count(function_) ? std::string("n") : std::to_string(fixed)) + ", static_cast<Object *>(f.p));");
+			check();
+			put(p_in.a, "e");
+			line("}");
+			return true;
+		}
 		case Op::ErrorStack:
 			// Only a program that reads it is given it: the others keep no frames to make it from.
 			put(p_in.a, keeps_stack_ ? "error_stack(c, " + reg(p_in.b) + ")" : std::string("nullptr"));

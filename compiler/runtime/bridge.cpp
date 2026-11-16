@@ -40,7 +40,9 @@ bool call_generated(Host &r_host, Slot *r_result, std::string *r_error) {
 		}
 	}
 	Slot result = empty();
-	info.entry(&r_host.context, arguments, given, &result);
+	if (!r_host.set_up_by_library(static_cast<uint32_t>(index))) {
+		info.entry(&r_host.context, arguments, given, &result);
+	}
 	if (r_host.context.failing) {
 		// The error stays the context's. What the interpreter raises in its place only leaves its frames,
 		// as far as the thunk that began this, whose catch finds the context failing and drops it.

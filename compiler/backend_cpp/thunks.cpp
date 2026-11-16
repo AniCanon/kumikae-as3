@@ -105,19 +105,15 @@ uint32_t ThunkTable::number_of(const Thunk &p_thunk) {
 	return found->second;
 }
 
-uint32_t ThunkTable::array_of(uint32_t p_array_class, size_t p_count) {
+uint32_t ThunkTable::function_value(uint32_t p_function, bool p_bound) {
 	Thunk thunk;
-	thunk.op = Op::ArrayNew;
-	const uint32_t count = static_cast<uint32_t>(p_count);
-	thunk.kinds.assign(p_count, ir::Kind::Any);
-	thunk.kinds.push_back(ir::Kind::Obj);
-	thunk.given = count;
-	for (uint32_t i = 0; i < count; i++) {
-		thunk.list.push_back(i);
-	}
-	thunk.a = count;
-	thunk.b = p_array_class;
-	thunk.result = count;
+	thunk.op = Op::MakeFunction;
+	thunk.kinds.assign(p_bound ? 2 : 1, ir::Kind::Obj);
+	thunk.given = p_bound ? 1 : 0;
+	thunk.a = thunk.given;
+	thunk.b = p_function;
+	thunk.c = p_bound ? 0 : NONE;
+	thunk.result = thunk.given;
 	return number_of(thunk);
 }
 

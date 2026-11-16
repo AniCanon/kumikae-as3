@@ -20,7 +20,7 @@ namespace kas3 {
 namespace rt {
 
 // The operations the host itself asks of the library, each a thunk after the program's own.
-enum class Builtin : uint32_t { NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny };
+enum class Builtin : uint32_t { NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray };
 
 // The calls the interpreter's side makes back, as "engine" calls of these names (HostCallStatic).
 constexpr std::string_view BRIDGE = "kas3";
@@ -94,6 +94,10 @@ struct Host {
 	// A class's first use (operations.h, use_class). From running code, initializers that had not begun
 	// when one failed are in the error's trace, as the interpreter has them; from the host, they are not.
 	void use_class(uint32_t p_class, bool p_from_code);
+	// The library uses classes too (`new c()` of a class held as a value), and keeps its own account of
+	// which are set up: when it runs a function that sets a class's static fields, they are set once,
+	// whoever used the class first. True if the function was one, and has been dealt with.
+	bool set_up_by_library(uint32_t p_function);
 	// The package's variables are set, then the entry class is made. False if an error reached the top:
 	// it has been reported.
 	bool run();

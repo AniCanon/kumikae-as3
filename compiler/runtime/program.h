@@ -43,6 +43,7 @@ struct ClassInfo {
 	uint32_t base;
 	uint64_t layout; // A hash of the fields' names, kinds and offsets: equal layouts hold objects alike.
 	uint8_t element; // For a Vector.<T>: the ir::Kind of its elements. Void (0) for every other class.
+	uint32_t element_check; // What a value stored into such a vector is checked against (ir::Class::element_check).
 	bool array;
 	bool table;
 	bool dictionary;
@@ -115,7 +116,7 @@ struct ThunkInfo {
 // The classes the library itself makes objects of, as the module names them (ir::Module).
 struct KnownClasses {
 	uint32_t entry, error, type_error, range_error, argument_error, function, array, object, dictionary, reference_error, regexp, date,
-			syntax_error, uri_error;
+			syntax_error, uri_error, class_value;
 };
 
 struct Program {
@@ -136,6 +137,8 @@ struct Program {
 	const ThunkInfo *thunks;
 	uint32_t thunk_count;
 	KnownClasses known;
+	// The function behind a method of the library read by name (ir::Module::library_function), or NONE.
+	uint32_t library_function;
 	bool keeps_stack; // Its functions keep a StackFrame each: it reads an Error's getStackTrace().
 };
 
