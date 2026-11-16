@@ -4,7 +4,7 @@
 // vm/interpreter_functions.cpp) and leaves every other case to it.
 #include "fast.h"
 
-#include "host.h"
+#include "native_host.h"
 #include "table.h"
 
 #include <cmath>
@@ -157,10 +157,8 @@ Object *arguments_of(Context *c, uint32_t p_function, const Slot *p_parameters, 
 			retain(c, static_cast<Str *>(held.p));
 		} else if (kind == Kind::Obj) {
 			retain(c, static_cast<Object *>(held.p));
-		} else if (kind == Kind::Any) {
-			retain(c, held);
 		}
-		result_to_any(c, kind, held, &values[i]);
+		result_to_any(c, kind, kind == Kind::Any ? shared(c, held) : held, &values[i]);
 	}
 	Object *made = c->failing ? nullptr : new_array(c, values.data(), count);
 	for (Slot each : values) {

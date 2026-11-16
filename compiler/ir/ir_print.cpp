@@ -240,5 +240,13 @@ std::string print(const Module &p_module) {
 	return out;
 }
 
+uint64_t fingerprint(const Module &p_module) {
+	uint64_t hash = 0xcbf29ce484222325ull; // FNV-1a.
+	for (const char each : print(p_module)) {
+		hash = (hash ^ static_cast<unsigned char>(each)) * 0x100000001b3ull;
+	}
+	return hash;
+}
+
 } // namespace ir
 } // namespace kas3

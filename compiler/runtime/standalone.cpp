@@ -5,7 +5,7 @@
 // on a thread with a stack large enough for 10,000 of any frame a program is likely to have, and a
 // function that finds the stack nearly used up all the same raises the same Error (values.h, stack_low)
 // instead of running off its end.
-#include "host.h"
+#include "native_host.h"
 
 #include <cstdio>
 #include <cstdlib>

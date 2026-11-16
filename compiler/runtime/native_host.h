@@ -7,6 +7,7 @@
 // used as it is: what should be split out of it so that no interpreter is needed is listed in the README.
 #pragma once
 
+#include "engine.h"
 #include "interpreter.h"
 #include "no_engine.h"
 #include "operations.h"
@@ -59,7 +60,12 @@ struct Host final : vm::NativeCode {
 	const Program &program;
 	ir::Module module;
 	vm::Output &output;
+	vm::EngineHandles &handles;
 	std::unique_ptr<vm::Interpreter> interpreter;
+	// One entry for each of the program's uses of the engine and each name it gives: filled by a host that
+	// has an engine (set_engine), empty otherwise.
+	std::vector<Resolved> resolved;
+	std::vector<const void *> names;
 	Context context;
 	std::vector<Slot> globals;
 	std::vector<Str *> strings;
@@ -72,6 +78,8 @@ struct Host final : vm::NativeCode {
 	// interpreter builds its own: vm/interpreter_errors.cpp).
 	std::string trace;
 	size_t trace_lines = 0;
+	uint32_t thrown_function = NONE; // Where the error on its way out was thrown: the trace's first line.
+	uint32_t thrown_line = 0;
 	std::vector<KeptTrace> kept;
 	Slot *updated = nullptr; // Where the thunk in progress hands back a register it moved on.
 	bool stopped = false; // The library could not go on (no memory even for an error): it has said why.
@@ -83,6 +91,8 @@ struct Host final : vm::NativeCode {
 	~Host() override;
 	[[nodiscard]] bool run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given,
 			Slot *r_result) override;
+	[[nodiscard]] bool hand_over(vm::NativeError *r_error) override;
+	void clear_globals() override;
 	Host(const Host &) = delete;
 	Host &operator=(const Host &) = delete;
 

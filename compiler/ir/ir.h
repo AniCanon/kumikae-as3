@@ -39,5 +39,9 @@ std::vector<std::string> run_once_changes(const Module &p_old, const Module &p_n
 // reload, and through the scene started again.
 std::vector<std::string> static_changes(const Module &p_old, const Module &p_new);
 
+// A number two modules that print alike share: a program compiled twice from the same sources, by whatever
+// reads them, gives the same one.
+uint64_t fingerprint(const Module &p_module);
+
 } // namespace ir
 } // namespace kas3

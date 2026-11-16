@@ -17,36 +17,6 @@ namespace {
 
 using Missing = std::optional<std::string>;
 
-// Anything that asks Godot: the engine is not part of the backend yet.
-bool asks_engine(Op p_op) {
-	switch (p_op) {
-		case Op::HostNew:
-		case Op::HostCall:
-		case Op::HostGet:
-		case Op::HostSet:
-		case Op::HostOperate:
-		case Op::HostIndexGet:
-		case Op::HostIndexSet:
-		case Op::HostBind:
-		case Op::HostMember:
-		case Op::HostToStr:
-		case Op::HostPresent:
-		case Op::HostIsClass:
-		case Op::HostAsClass:
-		case Op::HostDefault:
-		case Op::HostSingleton:
-		case Op::HostConstant:
-		case Op::HostCallStatic:
-		case Op::HostCollection:
-		case Op::AnyIsGodot:
-		case Op::OwnerOf:
-		case Op::FunctionToCallable:
-			return true;
-		default:
-			return false;
-	}
-}
-
 bool fits(char p_wanted, Kind p_kind) {
 	switch (p_wanted) {
 		case 'n':
@@ -154,9 +124,6 @@ bool reads_stack(const ir::Module &p_module, const ir::Function &p_function, con
 Missing instruction(const ir::Module &p_module, const ir::Function &p_function, uint32_t p_pc) {
 	const Instruction &in = p_function.code[p_pc];
 	const auto kind = [&](uint32_t p_register) { return p_function.registers[p_register]; };
-	if (asks_engine(in.op)) {
-		return "the engine (" + std::string(ir::op_name(in.op)) + ")";
-	}
 	if (const Pattern *pattern = pattern_of(in.op)) {
 		const uint32_t operands[3] = { in.a, in.b, in.c };
 		for (int n = 0; n < 3; n++) {
@@ -189,11 +156,6 @@ Missing instruction(const ir::Module &p_module, const ir::Function &p_function, 
 }
 
 Missing function(const ir::Module &p_module, const ir::Function &p_function) {
-	for (Kind kind : p_function.registers) {
-		if (ir::is_engine(kind)) {
-			return "the engine (a register that holds one of Godot's values or objects)";
-		}
-	}
 	for (uint32_t pc = 0; pc < p_function.code.size(); pc++) {
 		if (Missing missing = instruction(p_module, p_function, pc)) {
 			return missing;
@@ -205,17 +167,6 @@ Missing function(const ir::Module &p_module, const ir::Function &p_function) {
 } // namespace
 
 std::optional<std::string> first_unsupported(const ir::Module &p_module) {
-	for (const ir::Class &klass : p_module.classes) {
-		const bool engine_field = std::any_of(klass.fields.begin(), klass.fields.end(), [](const ir::Field &p_field) { return ir::is_engine(p_field.kind); });
-		if (!klass.native_base.empty() || engine_field || ir::is_engine(klass.element)) {
-			return "the engine (a class that extends or holds one of Godot's)";
-		}
-	}
-	for (const ir::Global &global : p_module.globals) {
-		if (ir::is_engine(global.kind)) {
-			return "the engine (a static field that holds one of Godot's values or objects)";
-		}
-	}
 	for (const ir::Function &each : p_module.functions) {
 		if (Missing missing = function(p_module, each)) {
 			return missing;

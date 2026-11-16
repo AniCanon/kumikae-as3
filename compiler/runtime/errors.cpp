@@ -1,6 +1,6 @@
 // Errors in generated code: raising, catching, the stack trace, and the report of one nothing caught.
 // Each follows what the interpreter does (vm/interpreter_errors.cpp), so that both say the same.
-#include "host.h"
+#include "native_host.h"
 
 namespace kas3 {
 namespace rt {
@@ -11,9 +11,10 @@ namespace {
 
 // "\tat Main/update()[Main.as:12]"
 std::string site_line(const Host &p_host, uint32_t p_function, uint32_t p_line) {
-	const FunctionInfo &function = p_host.program.functions[p_function];
-	const char *file = function.file < p_host.program.file_count ? p_host.program.files[function.file] : "?";
-	return "\tat " + std::string(function.name) + "()[" + file + ":" + std::to_string(p_line) + "]";
+	// The module's names for the files: the embedder's, where it compiled the program itself.
+	const ir::Function &function = p_host.module.functions[p_function];
+	const std::string file = function.file < p_host.module.files.size() ? p_host.module.files[function.file] : "?";
+	return "\tat " + function.name + "()[" + file + ":" + std::to_string(p_line) + "]";
 }
 
 // A function that an error leaves, added to its trace: a runaway recursion has thousands, and the first
@@ -85,8 +86,7 @@ void out_of_memory(Context *c) {
 }
 
 void throw_value(Context *c, Slot p_any) {
-	retain(c, p_any);
-	c->pending = p_any;
+	c->pending = shared(c, p_any);
 	c->failing = true;
 }
 
@@ -154,6 +154,10 @@ Slot caught(Context *c, uint32_t p_function, uint32_t p_line, uint32_t p_registe
 }
 
 void leave_failed(Context *c, uint32_t p_function, uint32_t p_line, bool p_traced) {
+	if (!p_traced && c->host->trace_lines == 0) {
+		c->host->thrown_function = p_function;
+		c->host->thrown_line = p_line;
+	}
 	if (!p_traced) {
 		traced(*c->host, p_function, p_line, &c->host->trace, &c->host->trace_lines);
 	}

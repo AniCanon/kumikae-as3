@@ -16,11 +16,13 @@ struct Thunk {
 	ir::Op op = ir::Op::Stmt;
 	uint32_t a = 0, b = 0, c = 0; // A register operand is a register of the thunk's.
 	std::vector<ir::Kind> kinds; // Its registers: those handed in first.
+	std::vector<std::string> types; // Godot's name for the type of each, where the function says one.
 	uint32_t given = 0;
 	std::vector<uint32_t> list; // The instruction's argument list, in the thunk's registers.
 	uint32_t result = ir::NONE;
 	uint32_t updated = ir::NONE;
 	uint32_t code_class = ir::NONE;
+	uint32_t self = ir::NONE; // The thunk's register that is the method's object, for an engine instruction.
 
 	bool operator<(const Thunk &p_other) const;
 };
@@ -35,10 +37,16 @@ struct ThunkUse {
 
 // Whether the operation's first operand, a register, is read and not written (VecSet's vector).
 bool first_is_read(ir::Op p_op);
+// The register an instruction reads and also changes where it is: a loop's cursor, and one of Godot's
+// values that Godot changes in place (a part of it set, a method called on it). NONE for the rest. The
+// library works on a copy of what it is handed, so such a register is handed back.
+uint32_t changed_in_place(const ir::Function &p_function, const ir::Instruction &p_in);
 
 class ThunkTable {
 	std::map<Thunk, uint32_t> numbers_;
 	std::vector<Thunk> thunks_;
+	std::vector<uint32_t> uses_;
+	std::vector<uint32_t> names_;
 	uint32_t number_of(const Thunk &p_thunk);
 
 public:
@@ -48,6 +56,12 @@ public:
 	uint32_t function_value(uint32_t p_function, bool p_bound);
 	// The thunk that makes an untyped value a value of the kind, as a store does: a catch's variable.
 	uint32_t from_any(ir::Kind p_kind);
+	// A place generated code asks the engine directly, as the thunk of the same instruction: its number
+	// among the uses the host resolves. And a String given as one of Godot's names, likewise.
+	uint32_t use_index(uint32_t p_thunk);
+	uint32_t name_index(uint32_t p_string);
+	const std::vector<uint32_t> &uses() const { return uses_; }
+	const std::vector<uint32_t> &names() const { return names_; }
 	const std::vector<Thunk> &all() const { return thunks_; }
 };
 

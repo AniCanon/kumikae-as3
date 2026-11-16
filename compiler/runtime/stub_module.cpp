@@ -2,7 +2,7 @@
 // fields, methods and names as it would under the interpreter; its functions have no bodies of their own:
 // each is one Native instruction (vm/native_code.h), which the host carries out by running the generated
 // function, and each thunk is one instruction of the library's.
-#include "host.h"
+#include "native_host.h"
 
 namespace kas3 {
 namespace rt {
@@ -71,6 +71,11 @@ ir::Function thunk_function(const ThunkInfo &p_info) {
 	function.name = "kas3$thunk";
 	function.is_static = true;
 	function.written_in = p_info.code_class;
+	if (p_info.self != NONE) {
+		function.owner = p_info.code_class;
+		function.is_static = false;
+		function.locals.push_back(ir::Local{ "this", p_info.self });
+	}
 	function.parameters = p_info.given;
 	function.required = p_info.given;
 	for (uint32_t i = 0; i < p_info.registers; i++) {
@@ -149,27 +154,27 @@ void add_builtins(const Program &p_program, ir::Module &r_module) {
 	static const uint8_t is_type[] = { static_cast<uint8_t>(Kind::Any), static_cast<uint8_t>(Kind::Bool) };
 	const auto add = [&](const ThunkInfo &p_info) { r_module.functions.push_back(thunk_function(p_info)); };
 	const uint8_t null_check = static_cast<uint8_t>(Op::NullCheck);
-	add(ThunkInfo{ null_check, 0, 0, 0, object_in, 1, 1, nullptr, nullptr, 0, NONE, NONE, NONE });
+	add(ThunkInfo{ null_check, 0, 0, 0, object_in, 1, 1, nullptr, nullptr, 0, NONE, NONE, NONE, NONE });
 	// A function that calls itself until the interpreter's own limit raises Error #1023: the error and its
 	// words are the interpreter's, said once.
 	const uint32_t self = static_cast<uint32_t>(r_module.functions.size());
-	add(ThunkInfo{ static_cast<uint8_t>(Op::Call), ir::NONE, self, 0, nullptr, 0, 0, nullptr, nullptr, 0, NONE, NONE, NONE });
-	add(ThunkInfo{ static_cast<uint8_t>(Op::ObjectText), 1, 0, 0, text_of, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE });
+	add(ThunkInfo{ static_cast<uint8_t>(Op::Call), ir::NONE, self, 0, nullptr, 0, 0, nullptr, nullptr, 0, NONE, NONE, NONE, NONE });
+	add(ThunkInfo{ static_cast<uint8_t>(Op::ObjectText), 1, 0, 0, text_of, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE, NONE });
 	const uint32_t entry = p_program.known.entry;
-	add(ThunkInfo{ static_cast<uint8_t>(entry == NONE ? Op::ConstNull : Op::New), 0, entry, 0, object_out, 1, 0, nullptr, nullptr, 0, 0, NONE, NONE });
+	add(ThunkInfo{ static_cast<uint8_t>(entry == NONE ? Op::ConstNull : Op::New), 0, entry, 0, object_out, 1, 0, nullptr, nullptr, 0, 0, NONE, NONE, NONE });
 	for (uint32_t code : { ir::ANY_IS_INT, ir::ANY_IS_UINT, ir::ANY_IS_NUMBER, ir::ANY_IS_STRING, ir::ANY_IS_BOOLEAN }) {
-		add(ThunkInfo{ static_cast<uint8_t>(Op::AnyIs), 1, 0, code, is_type, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE });
+		add(ThunkInfo{ static_cast<uint8_t>(Op::AnyIs), 1, 0, code, is_type, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE, NONE });
 	}
 	static const uint8_t number_boxed[] = { static_cast<uint8_t>(Kind::F64), static_cast<uint8_t>(Kind::Any) };
 	static const uint8_t wide_boxed[] = { static_cast<uint8_t>(Kind::I64), static_cast<uint8_t>(Kind::Any) };
-	add(ThunkInfo{ static_cast<uint8_t>(Op::ToAny), 1, 0, 0, number_boxed, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE });
-	add(ThunkInfo{ static_cast<uint8_t>(Op::ToAny), 1, 0, 0, wide_boxed, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE });
+	add(ThunkInfo{ static_cast<uint8_t>(Op::ToAny), 1, 0, 0, number_boxed, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE, NONE });
+	add(ThunkInfo{ static_cast<uint8_t>(Op::ToAny), 1, 0, 0, wide_boxed, 2, 1, nullptr, nullptr, 0, 1, NONE, NONE, NONE });
 	// An Array of a length (VecNew: the length, whether it is fixed). Not ArrayNew, which takes one number
 	// for a length where an element was meant.
 	static const uint8_t array_made[] = { static_cast<uint8_t>(Kind::U32), static_cast<uint8_t>(Kind::Bool), static_cast<uint8_t>(Kind::Obj) };
 	static const uint32_t array_given[] = { 0, 1 };
 	const uint32_t array = p_program.known.array;
-	add(ThunkInfo{ static_cast<uint8_t>(array == NONE ? Op::ConstNull : Op::VecNew), 2, array, 0, array_made, 3, 2, nullptr, array_given, 2, 2, NONE, NONE });
+	add(ThunkInfo{ static_cast<uint8_t>(array == NONE ? Op::ConstNull : Op::VecNew), 2, array, 0, array_made, 3, 2, nullptr, array_given, 2, 2, NONE, NONE, NONE });
 }
 
 void add_thunks(const Program &p_program, ir::Module &r_module) {

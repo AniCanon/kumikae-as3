@@ -121,6 +121,9 @@ Interpreter::~Interpreter() {
 }
 
 void Interpreter::clear_globals() {
+	if (native_) {
+		native_->clear_globals();
+	}
 	for (size_t i = 0; i < globals_.size(); i++) {
 		Slot value = globals_[i];
 		globals_[i].bits = 0;

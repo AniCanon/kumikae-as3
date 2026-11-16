@@ -128,9 +128,17 @@ std::string thunk_tables(const Thunk &p_thunk, size_t p_index, std::string &r_ou
 	}
 	std::string info = "{ " + std::to_string(static_cast<unsigned>(p_thunk.op)) + ", " + number(p_thunk.a) + ", " + number(p_thunk.b) + ", " +
 			number(p_thunk.c) + ", ";
-	info += array(r_out, "const uint8_t", prefix + "_kinds", kinds) + ", " + std::to_string(kinds.size()) + ", " + std::to_string(p_thunk.given) + ", nullptr, ";
+	info += array(r_out, "const uint8_t", prefix + "_kinds", kinds) + ", " + std::to_string(kinds.size()) + ", " + std::to_string(p_thunk.given) + ", ";
+	std::vector<std::string> types;
+	bool typed = false;
+	for (size_t i = 0; i < p_thunk.kinds.size(); i++) {
+		const bool named = i < p_thunk.types.size() && !p_thunk.types[i].empty();
+		types.push_back(named ? string_literal(p_thunk.types[i]) : std::string("nullptr"));
+		typed = typed || named;
+	}
+	info += (typed ? array(r_out, "const char *const", prefix + "_types", types) : std::string("nullptr")) + ", ";
 	info += array(r_out, "const uint32_t", prefix + "_list", numbers(p_thunk.list)) + ", " + std::to_string(p_thunk.list.size()) + ", ";
-	return info + number(p_thunk.result) + ", " + number(p_thunk.updated) + ", " + number(p_thunk.code_class) + " }";
+	return info + number(p_thunk.result) + ", " + number(p_thunk.updated) + ", " + number(p_thunk.code_class) + ", " + number(p_thunk.self) + " }";
 }
 
 std::string known_classes(const ir::Module &p_module) {
@@ -219,6 +227,9 @@ std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, 
 	counted("const char *const", "INTERFACE_METHODS", interface_methods);
 	counted("const uint32_t", "INITIALIZERS", numbers(p_module.initializers));
 	counted("const ThunkInfo", "THUNKS", thunks);
+	counted("const uint32_t", "USES", numbers(p_thunks.uses()));
+	counted("const uint32_t", "NAMES", numbers(p_thunks.names()));
+	program += std::to_string(ir::fingerprint(p_module)) + "ull, ";
 	program += known_classes(p_module) + ", " + number(p_module.library_function) + ", " + boolean(p_keeps_stack) + " };\n";
 	tables += program + "\n} // namespace\n\n} // namespace " + std::string(PROGRAM_NAMESPACE) + "\n\n";
 	tables += "extern \"C\" KAS3_EXPORT const kas3::rt::Program *kas3_program() {\n\treturn &" + std::string(PROGRAM_NAMESPACE) + "::PROGRAM;\n}\n";

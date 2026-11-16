@@ -114,6 +114,9 @@ struct ThunkInfo {
 	uint32_t result; // The register handed back, or NONE.
 	uint32_t updated; // A register handed in that the operation moves on, handed back too; or NONE.
 	uint32_t code_class; // The class whose code it is: what it may reach by name.
+	// For an instruction of a method that asks the engine: the register handed in that is the method's
+	// object, which the engine's side may ask for (whose listeners these are); NONE otherwise.
+	uint32_t self;
 };
 
 // The classes the library itself makes objects of, as the module names them (ir::Module).
@@ -139,6 +142,16 @@ struct Program {
 	uint32_t initializer_count;
 	const ThunkInfo *thunks;
 	uint32_t thunk_count;
+	// The places generated code calls the engine directly, each as the thunk of the same instruction: the
+	// host works each out once (Context::resolved, in this order).
+	const uint32_t *uses;
+	uint32_t use_count;
+	// The Strings the program gives where Godot takes a name, as numbers of its strings (Context::names).
+	const uint32_t *names;
+	uint32_t name_count;
+	// What ir::fingerprint() gives for the module the program was written from: a host that has the module
+	// runs the native code only if they agree.
+	uint64_t fingerprint;
 	KnownClasses known;
 	// The function behind a method of the library read by name (ir::Module::library_function), or NONE.
 	uint32_t library_function;

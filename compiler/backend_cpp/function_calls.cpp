@@ -51,7 +51,15 @@ std::string FunctionWriter::arguments(const ir::Function &p_callee, const std::v
 	const uint32_t fixed = p_callee.rest ? p_callee.parameters - 1 : p_callee.parameters;
 	std::string out = "c";
 	for (uint32_t i = 0; i < fixed; i++) {
-		out += ", " + (i < p_list.size() ? reg(p_list[i]) : std::string(zero_of(p_callee.registers[i])));
+		const std::string_view taken = parts_of(p_callee, i);
+		if (i >= p_list.size()) {
+			out += ", " + (taken.empty() ? std::string(zero_of(p_callee.registers[i])) : std::string(taken) + "{}");
+		} else if (!taken.empty()) {
+			// Held inline by the parameter: the register itself if it holds the same, or its handle's value.
+			out += ", " + (parts(p_list[i]) == taken ? register_name(p_list[i]) : "unbox<" + std::string(taken) + ">(c, " + reg(p_list[i]) + ".handle)");
+		} else {
+			out += ", " + reg(p_list[i]);
+		}
 	}
 	if (p_callee.rest) {
 		out += ", rest";
@@ -100,6 +108,26 @@ void FunctionWriter::call_function(const Instruction &p_in, const ir::Function &
 	line("}");
 }
 
+// The function a call's arguments are written for, or null for an instruction that is no call of the
+// program's functions (or an interface call nothing answers).
+const ir::Function *FunctionWriter::callee_of(const Instruction &p_in) const {
+	if (p_in.op == Op::Call) {
+		return &module_.functions[p_in.b];
+	}
+	if (p_in.op == Op::CallVirtual) {
+		return virtual_callee(p_in);
+	}
+	if (p_in.op != Op::CallInterface) {
+		return nullptr;
+	}
+	for (const ir::Class &each : module_.classes) {
+		if (p_in.b < each.interface_methods.size() && each.interface_methods[p_in.b] != NONE) {
+			return &module_.functions[each.interface_methods[p_in.b]];
+		}
+	}
+	return nullptr;
+}
+
 bool FunctionWriter::call(const Instruction &p_in) {
 	if (p_in.op == Op::Call) {
 		call_function(p_in, module_.functions[p_in.b], function_name(module_, p_in.b));
@@ -117,12 +145,7 @@ bool FunctionWriter::call(const Instruction &p_in) {
 		return true;
 	}
 	// A class that has no function for the interface's method is the library's to report (TypeError #1006).
-	const ir::Function *callee = nullptr;
-	for (const ir::Class &each : module_.classes) {
-		if (!callee && p_in.b < each.interface_methods.size() && each.interface_methods[p_in.b] != NONE) {
-			callee = &module_.functions[each.interface_methods[p_in.b]];
-		}
-	}
+	const ir::Function *callee = callee_of(p_in);
 	if (!callee) {
 		by_thunk(p_in);
 		return true;

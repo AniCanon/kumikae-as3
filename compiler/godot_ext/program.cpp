@@ -110,8 +110,20 @@ Project &Project::get() {
 				String::utf8(errors.c_str()));
 		return *program;
 	}
-	program->interpreter_ = new_interpreter(*program->module_, program->host_);
-	program->valid_ = program->interpreter_->start();
+	if (const std::string library = NativeProgram::path(); !library.empty()) {
+		std::string why;
+		program->native_ = NativeProgram::load(library, *program->module_, program->host_, &why);
+		if (program->native_) {
+			UtilityFunctions::print("ActionScript: the scripts run as native code.");
+		} else {
+			UtilityFunctions::push_warning(String("ActionScript: the program library ") + String::utf8(library.c_str()) + " is not used (" +
+					String::utf8(why.c_str()) + "): the interpreter runs the scripts.");
+		}
+	}
+	if (!program->native_) {
+		program->interpreter_ = new_interpreter(*program->module_, program->host_);
+	}
+	program->valid_ = program->interpreter().start();
 	static bool watching = false;
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
 	if (!watching && tree && tree->get_root()) {
@@ -133,7 +145,7 @@ void Project::collect_step() {
 	free_instances_freed_elsewhere();
 	free_detached();
 	if (program && program->valid_) {
-		program->interpreter_->collect_step(COLLECTOR_WORK);
+		program->interpreter().collect_step(COLLECTOR_WORK);
 	}
 }
 
@@ -224,6 +236,12 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 }
 
 void Project::reload() {
+	if (program && program->native_) {
+		// Native code is not moved onto new code yet: the game carries on with what it was built from.
+		UtilityFunctions::push_warning("ActionScript: the scripts changed, but they run as native code, which is not reloaded: build the "
+									   "program library again and start the game again.");
+		return;
+	}
 	if (!program || !program->valid_) {
 		// Nothing is running: the scripts had errors. They are simply loaded again.
 		unload();
@@ -267,7 +285,7 @@ void Project::reload() {
 }
 
 void Project::reload_now() {
-	if (program && program->valid_ && program->interpreter_->depth() > 0) {
+	if (program && program->valid_ && program->interpreter().depth() > 0) {
 		UtilityFunctions::push_error("ActionScript: the scripts can't be reloaded while AS3 runs: the reload was not made.");
 		return;
 	}

@@ -12,6 +12,7 @@
 #include "ir.h"
 #include "thunks.h"
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -51,6 +52,24 @@ class FunctionWriter {
 		uint32_t terms = 0;
 	};
 	std::vector<Whole> whole_;
+	// A String register that holds a constant of the program, by the string's number (NONE otherwise): what
+	// Godot takes as a name is then one the host built once.
+	std::vector<uint32_t> text_;
+	// What stands for a register while the instruction being written is one the library runs: a value
+	// held inline is boxed into a handle for it (function_engine.cpp). Empty: the register itself.
+	std::vector<std::string> shadow_;
+	// A register that holds one of Godot's objects and only ever the script's own, or one singleton: it
+	// borrows a handle that outlives the function, and owns nothing.
+	enum class Alias : uint8_t { None, Owner, Singleton };
+	std::vector<Alias> alias_;
+	std::vector<uint32_t> alias_name_; // For a singleton: its engine name.
+	std::vector<uint32_t> singleton_use_; // And the use the host resolves it by, once written.
+	bool has_owner_alias_ = false;
+	// Per register: it holds a value with parts inline. Only one that every instruction writing it gives a
+	// value to (what Godot makes, computes or gives for a property of that type): a register that may be
+	// given null (a field read, a call's result, an untyped value) stays a handle, which can say so.
+	std::vector<bool> inline_;
+	void find_inline();
 	uint32_t pc_ = 0;
 
 	std::string reg(uint32_t p_register) const;
@@ -76,6 +95,19 @@ class FunctionWriter {
 	bool call(const ir::Instruction &p_in); // function_calls.cpp
 	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target);
 	void by_thunk(const ir::Instruction &p_in);
+	std::string_view parts(uint32_t p_register) const; // The value with parts the register holds inline, if it does.
+	void dispatch(const ir::Instruction &p_in); // The instruction written by whichever part owns it.
+	void generic(const ir::Instruction &p_in); // dispatch(), with the values held inline boxed for it.
+	const ir::Function *callee_of(const ir::Instruction &p_in) const;
+	// function_engine.cpp
+	void find_aliases();
+	bool holds(uint32_t p_register, std::string_view p_type) const;
+	std::string object_behind(uint32_t p_register);
+	std::optional<std::string> bare_argument(uint32_t p_register, std::string_view p_type, size_t p_at, std::string *r_guard);
+	bool engine(const ir::Instruction &p_in);
+	bool engine_alias(const ir::Instruction &p_in);
+	bool engine_inline(const ir::Instruction &p_in);
+	bool engine_bound(const ir::Instruction &p_in);
 	void forget_whole(uint32_t p_register);
 	bool whole_conversion(const ir::Instruction &p_in);
 	void remember_whole(const ir::Instruction &p_in);

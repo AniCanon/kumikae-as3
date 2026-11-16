@@ -5,6 +5,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace kas3 {
 namespace backend_cpp {
@@ -31,6 +32,13 @@ std::string_view zero_of(ir::Kind p_kind);
 std::string_view slot_member(ir::Kind p_kind);
 // A slot's value as the kind's C++ type: "static_cast<Str *>(x.p)" for a String.
 std::string from_slot(ir::Kind p_kind, std::string_view p_slot);
+
+// Whether one of Godot's types is a value with parts, which generated code holds inline as the runtime's
+// struct of the same name (Vector2, Color); and the type a register holds that way, or nothing.
+bool has_parts(std::string_view p_godot_type);
+std::string_view parts_of(const ir::Function &p_function, uint32_t p_register);
+// The words of an engine name's value ("position property Vector2 get_position 334 set_position 743 -").
+std::vector<std::string_view> words_of(std::string_view p_text);
 
 // A Number as C++ reads back the very same one.
 std::string number_literal(double p_value);

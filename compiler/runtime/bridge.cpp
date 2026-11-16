@@ -1,6 +1,6 @@
 // The host's side of the Native instruction (vm/native_code.h): a function's body is the generated function,
 // and a thunk hands back the error it caught or a register its instruction moved on.
-#include "host.h"
+#include "native_host.h"
 
 namespace kas3 {
 namespace rt {
@@ -71,11 +71,39 @@ bool Host::run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register,
 			return true;
 		case NativeWhat::Updated:
 			if (updated) {
-				*updated = p_registers[p_register];
+				const Kind kind = module.functions[p_function].registers[p_register];
+				const Slot value = p_registers[p_register];
+				*updated = kind == Kind::Any ? shared(&context, value) : ir::is_engine(kind) ? slot(shared(&context, Val{ value.p }))
+						: kind == Kind::Str ? slot(shared(&context, static_cast<Str *>(value.p)))
+						: kind == Kind::Obj ? slot(shared(&context, static_cast<Object *>(value.p))) : value;
 			}
 			return true;
 	}
 	return false;
+}
+
+// With no thunk in progress, the function was called from outside generated code (the engine calling a
+// script, through the interpreter): the error is the interpreter's to carry out and report there. Inside
+// a thunk it stays the context's, which the thunk's caller is waiting to find.
+bool Host::hand_over(vm::NativeError *r_error) {
+	if (nesting > 0 || !context.failing || stopped || carried) {
+		return false;
+	}
+	r_error->error = context.pending;
+	r_error->trace = std::move(trace);
+	r_error->lines = trace_lines;
+	if (thrown_function != NONE) {
+		const ir::Function &function = module.functions[thrown_function];
+		r_error->function = function.name + "()";
+		r_error->file = function.file < module.files.size() ? module.files[function.file] : "?";
+		r_error->line = static_cast<int32_t>(thrown_line);
+	}
+	context.pending = empty();
+	context.failing = false;
+	trace.clear();
+	trace_lines = 0;
+	thrown_function = NONE;
+	return true;
 }
 
 } // namespace rt

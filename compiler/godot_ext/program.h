@@ -3,6 +3,7 @@
 
 #include "godot_host.h"
 #include "interpreter.h"
+#include "native_program.h"
 #include "ir.h"
 #include "reload.h"
 
@@ -23,6 +24,9 @@ class Project {
 	std::unique_ptr<ir::Module> module_ = std::make_unique<ir::Module>();
 	GodotHost host_;
 	std::unique_ptr<vm::Interpreter> interpreter_;
+	// The scripts as native code, where the project has a program library built from them as they are
+	// now: its host's interpreter is then the one everything here asks, and interpreter_ is not made.
+	std::unique_ptr<NativeProgram> native_;
 	bool loaded_ = false;
 	bool valid_ = false;
 
@@ -44,7 +48,8 @@ public:
 	static uint64_t generation();
 
 	bool valid() const { return valid_; }
-	vm::Interpreter &interpreter() { return *interpreter_; }
+	vm::Interpreter &interpreter() { return native_ ? native_->interpreter() : *interpreter_; }
+	bool native() const { return native_ != nullptr; }
 	GodotHost &host() { return host_; }
 	const ir::Module &module() const { return *module_; }
 	// The scripts were edited while the game runs: they are compiled again and, if they compile, every

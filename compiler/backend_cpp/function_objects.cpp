@@ -157,7 +157,7 @@ bool FunctionWriter::flow(const Instruction &p_in) {
 			if (owns(p_in.a)) {
 				line(reg(p_in.a) + " = " + std::string(zero_of(kind(p_in.a))) + ";");
 			} else if (ir::is_held(kind(p_in.a))) {
-				line("retain(c, result);");
+				line("result = shared(c, result);");
 			}
 			line("goto done;");
 			return true;

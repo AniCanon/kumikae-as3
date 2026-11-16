@@ -1,4 +1,4 @@
-#include "host.h"
+#include "native_host.h"
 
 #include "fast.h"
 #include "held.h"
@@ -14,7 +14,7 @@ static_assert(NONE == ir::NONE, "the program table and the IR write `none` alike
 
 Host::Host(const Program &p_program, const Embedder &p_embedder) :
 		program(p_program), module(p_embedder.module ? native_module(*p_embedder.module, p_program) : stub_module(p_program)),
-		output(p_embedder.output) {
+		output(p_embedder.output), handles(p_embedder.handles) {
 	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(p_embedder.output, p_embedder.handles, p_embedder.source, p_embedder.clock));
 	interpreter->set_native(this);
 	globals.resize(program.global_count);
@@ -30,6 +30,10 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	for (const ir::Class &klass : module.classes) {
 		made_here.push_back(klass.element == Kind::Void && !klass.table && !klass.is_interface && !vm::may_hold_objects(klass));
 	}
+	resolved.resize(program.use_count);
+	names.assign(program.name_count, nullptr);
+	context.resolved = resolved.data();
+	context.names = names.data();
 	context.globals = globals.data();
 	context.strings = strings.data();
 	context.class_used = class_used.data();
@@ -38,12 +42,16 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 	context.host = this;
 }
 
-Host::~Host() {
+void Host::clear_globals() {
 	for (uint32_t i = 0; i < program.global_count; i++) {
 		const Slot value = globals[i];
 		globals[i].bits = 0;
 		interpreter->discard(static_cast<Kind>(program.globals[i].kind), value);
 	}
+}
+
+Host::~Host() {
+	Host::clear_globals();
 	if (context.failing) {
 		interpreter->discard(Kind::Any, context.pending);
 	}
@@ -67,6 +75,26 @@ Object *new_object(Context *c, uint32_t p_class) {
 		object->fields()[i] = vm::empty_value(static_cast<Kind>(klass.fields[i].kind) == Kind::F64, klass.fields[i].starts_null);
 	}
 	return object;
+}
+
+void *copy_handle(Context *c, void *p_handle) {
+	return c->host->handles.copy(p_handle);
+}
+
+void drop_handle(Context *c, void *p_handle) {
+	c->host->handles.drop(p_handle);
+}
+
+Slot shared_any(Context *c, Slot p_any) {
+	const vm::AnyTag tag = vm::any::tag(p_any);
+	if (tag == vm::AnyTag::Value) {
+		return vm::any::godot_value(copy_handle(c, vm::any::pointer(p_any)));
+	}
+	if (tag == vm::AnyTag::Godot) {
+		return vm::any::godot_object(copy_handle(c, vm::any::pointer(p_any)));
+	}
+	vm::retain(vm::any::counted(p_any));
+	return p_any;
 }
 
 void free_object(Context *c, Object *p_object) {
