@@ -44,6 +44,9 @@ void clear_node(Node *p_node) {
 		case NodeKind::Import:
 			static_cast<Import *>(p_node)->symbol = nullptr;
 			break;
+		case NodeKind::ForIn:
+			static_cast<ForIn *>(p_node)->element = nullptr;
+			break;
 		default:
 			break;
 	}
