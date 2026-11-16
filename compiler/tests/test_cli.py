@@ -143,6 +143,27 @@ with tempfile.TemporaryDirectory() as folder:
         result = run("parse", "--dump-ast", deep)
         check(name, result.returncode == 1 and ": error: " in result.stderr, "exit %d" % result.returncode)
 
+    # cpp: the program as C++ in a folder, or refused by what it lacks with nothing written.
+    native = os.path.join(folder, "native")
+    result = run("cpp", good, "-o", native)
+    written = sorted(os.listdir(native)) if os.path.isdir(native) else []
+    check("cpp writes", result.returncode == 0 and result.stdout == "" and result.stderr == "" and
+          "program.h" in written and "program.cpp" in written and "Good.cpp" in written, "%d %r %r" % (result.returncode, result.stderr, written))
+    result = run("cpp", good)
+    check("cpp without a folder", result.returncode == 2 and "usage: kas3c parse" in result.stderr)
+    result = run("cpp", bad, "-o", os.path.join(folder, "never"))
+    check("cpp of a program with errors", result.returncode == 1 and "Bad.as:1:" in result.stderr and
+          not os.path.exists(os.path.join(folder, "never")), repr(result))
+    mover = os.path.join(folder, "Mover.as")
+    with open(mover, "w") as handle:
+        handle.write("package {\n\timport godot.*;\n\tpublic class Mover extends Node2D {\n"
+                     "\t\tpublic function step():void { position = new Vector2(1, 2); }\n\t}\n}\n")
+    refused = os.path.join(folder, "refused")
+    result = run("cpp", "--godot", mover, "-o", refused)
+    lines = result.stderr.splitlines()
+    check("cpp refuses the engine", result.returncode == 1 and result.stdout == "" and len(lines) == 1 and
+          lines[0].startswith("kas3c: not yet supported: the engine (") and not os.path.exists(refused), repr(result))
+
     # check: Godot's API is known without any option, under its AS3 names.
     player = os.path.join(folder, "Player.as")
     program = """package {

@@ -8,9 +8,10 @@ Every group runs under `ctest`. What each is, in more words, is in the
 | `test_*.cpp`, `check.h` | One part each, in C++ | A function with `CHECK` / `CHECK_EQ`, called from `main` |
 | `golden/` (`ok`, `errors`, `names`, `types`) | The front end: a `.as` file and the exact output expected | A new pair; `run_golden.py` finds it |
 | `run/` | Whole programs under `kas3c run`: `.as`, `.out`, and `.ir` where the IR is pinned | A new pair; `err_*` files expect an error |
+| `run_native.py`, `native_skipped.txt` | The programs of `run/` as native code: `kas3c cpp`, the system's C++ compiler, and the same `.out` and `.err` | Nothing to add: a program in `run/` is run both ways. A program the backend refuses goes on the list with `--update` |
 | `godot_project/` | AS3 inside Godot, compared with GDScript | A method in a `.as` script, a `show(name, ask(...), <what GDScript gives>)` line in its `.gd` driver, the name in `run_godot.py` |
 | `corpus/`, `external/` | Real AS3 from elsewhere must still parse (`external/` is fetched, not committed). `run_corpus.py` says which corpus programs the interpreter takes and what stops the others; `run_godot.py` runs the ones in `corpus/runs.txt` inside Godot | A program that starts to run: its name in `corpus/runs.txt`, or in `corpus/waits.txt` with what it waits for |
-| `bench/` | Timings, not pass or fail | `run_bench.py <build> [--godot tests] [--against <other build>]` |
+| `bench/` | Timings, not pass or fail | `run_bench.py <build> [--godot tests] [--against <other build>]`; `run_native_bench.py <build> [--against <other build>]` for native code against the interpreter |
 | `test_cli.py`, `test_lsp_stdio.py` | `kas3c` as a program | |
 | `build_ios.sh`, `build_ios_simulator_template.sh` | The extension for iOS, and a Simulator template from Godot's source | |
 

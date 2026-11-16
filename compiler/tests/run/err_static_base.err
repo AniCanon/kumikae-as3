@@ -1,0 +1,6 @@
+Error: no Root
+	at Root/fail()[err_static_base.as:24]
+	at Root$static()[err_static_base.as:21]
+	at Leaf$static()[err_static_base.as:29]
+	at err_static_base/helper()[err_static_base.as:15]
+	at err_static_base()[err_static_base.as:11]

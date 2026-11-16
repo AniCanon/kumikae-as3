@@ -16,7 +16,7 @@ import re
 import sys
 import tempfile
 
-FOLDERS = ["src", "ir", "vm", "godot_ext", "lsp", "tools"]
+FOLDERS = ["src", "ir", "vm", "backend_cpp", "runtime", "godot_ext", "lsp", "tools"]
 LIMITS = {".cpp": 800, ".h": 500}
 FUNCTION_LIMIT = 120
 # A dispatch switch whose cases each call a named function (guidelines, section 1).
