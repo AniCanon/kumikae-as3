@@ -208,6 +208,7 @@ class Lowerer {
 	friend class Functions; // Function expressions and function values: lower_functions.h
 	friend class Classes; // Each class's place in the module: lower_classes.h
 	friend class Bodies; // The body of each function: lower_bodies.h
+	friend class Calls; // Calls: lower_calls.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 
@@ -245,26 +246,12 @@ class Lowerer {
 
 	bool kind_of_class(const Symbol *p_class, Kind *r_kind);
 
-	// The arguments of a call as the function's parameters expect them, defaults filled in.
-	void call_arguments(FunctionDecl *p_function, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list);
-
 	// The first of the expressions from `p_from` up to `p_end` (all, by default) that can change a local, or null.
 	static Expr *writer(const List<Expr *> &p_expressions, uint32_t p_from = 0, uint32_t p_end = UINT32_MAX);
-
-	uint32_t call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind);
-
-	uint32_t super_call(Call *p_call);
-	uint32_t cast(Call *p_call, Symbol *p_type, Kind p_want);
-	uint32_t trace_call(Call *p_call);
-	uint32_t script_call(Call *p_call, Symbol *p_symbol, uint32_t p_function);
-	uint32_t call(Call *p_call, Kind p_want);
-
-	void constructor_arguments(Symbol *p_class, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list);
 
 	uint32_t evaluate(Expr *p_expression, Kind p_want);
 	uint32_t number_literal(Expr *p_expression, Kind p_want);
 	uint32_t number_constant(double p_value, Kind p_kind, Kind p_want, uint32_t p_position);
-	uint32_t written_value(Expr *p_value, Kind p_conversion, uint32_t p_position);
 	uint32_t name_value(Expr *p_expression);
 	uint32_t member_value(Expr *p_expression);
 	uint32_t new_value(Expr *p_expression);

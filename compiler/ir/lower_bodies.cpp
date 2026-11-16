@@ -1,4 +1,5 @@
 #include "lower_bodies.h"
+#include "lower_calls.h"
 #include "lower_engine.h"
 #include "lower_functions.h"
 #include "lower_statements.h"
@@ -185,7 +186,7 @@ void Bodies::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 	if (base && base != l_.object_ && l_.class_index(base, &base_index) && !(decl && decl->body && calls_super(decl->body))) {
 		std::vector<uint32_t> list = { 0 };
 		List<Expr *> none;
-		l_.constructor_arguments(base, none, p_class->name_offset, list);
+		Calls(l_).constructor_arguments(base, none, p_class->name_offset, list);
 		l_.emit(Op::Call, p_class->name_offset, NONE, l_.module_.classes[base_index].constructor, l_.arguments(std::move(list)));
 	}
 	if (decl && decl->body) {

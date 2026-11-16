@@ -1,3 +1,4 @@
+#include "lower_calls.h"
 #include "lower_dynamic.h"
 #include "lower_engine.h"
 #include "lower_engine_calls.h"
@@ -157,7 +158,7 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 	uint32_t out = reg(Kind::Obj);
 	emit(Op::New, position, out, index);
 	std::vector<uint32_t> list = { out };
-	constructor_arguments(symbol, made->arguments, position, list);
+	Calls(*this).constructor_arguments(symbol, made->arguments, position, list);
 	emit(Op::Call, position, NONE, module_.classes[index].constructor, arguments(std::move(list)));
 	return out;
 }
@@ -247,7 +248,7 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 		case NodeKind::Member:
 			return member_value(p_expression);
 		case NodeKind::Call:
-			return call(static_cast<Call *>(p_expression), p_want);
+			return Calls(*this).call(static_cast<Call *>(p_expression), p_want);
 		case NodeKind::New:
 			return new_value(p_expression);
 		case NodeKind::Unary:

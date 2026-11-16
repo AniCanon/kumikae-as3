@@ -9,6 +9,7 @@
 // one is an object and `is`, `as` and every check of a class work as they do for a class. A call through
 // one goes by the method's name, as in AVM2: each name an interface declares has a number, and each class
 // a table from those numbers to the functions it runs (CallInterface).
+#include "lower_calls.h"
 #include "lower_classes.h"
 #include "lower_members.h"
 
@@ -225,9 +226,9 @@ std::optional<uint32_t> Members::interface_call(Call *p_call, Symbol *p_method) 
 	const uint32_t position = p_call->offset;
 	std::vector<uint32_t> list = { l_.settled(l_.receiver(static_cast<Member *>(p_call->callee)->object), Lowerer::writer(p_call->arguments), position) };
 	// What is left out is left to the function that runs, which has its own defaults.
-	l_.call_arguments(declaration(p_method), p_call->arguments, position, list);
+	Calls(l_).call_arguments(declaration(p_method), p_call->arguments, position, list);
 	Kind kind = Kind::Void;
-	const uint32_t out = l_.call_result(p_method, position, &kind);
+	const uint32_t out = Calls(l_).call_result(p_method, position, &kind);
 	l_.emit(Op::CallInterface, position, out, *number, l_.arguments(std::move(list)));
 	return out == NONE ? 0 : out;
 }
