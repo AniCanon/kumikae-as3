@@ -75,8 +75,14 @@ def blank(text):
 def functions(lines):
     """(name, first line, length) of every function that is not inside another: in a namespace, a class
     or a nested class, whatever its head looks like."""
-    # A preprocessor line is not part of any head.
-    text = blank("\n".join("" if line.lstrip().startswith("#") else line for line in lines))
+    # A preprocessor directive, with the lines its trailing backslashes continue it onto (a table written as
+    # a macro), is not part of any head.
+    kept, directive = [], False
+    for line in lines:
+        directive = directive or line.lstrip().startswith("#")
+        kept.append("" if directive else line)
+        directive = directive and line.rstrip().endswith("\\")
+    text = blank("\n".join(kept))
     found = []
     stack = []  # One entry per open brace: "scope", ("function", name, first line) or "other".
     head_start = 0
@@ -164,7 +170,10 @@ def self_test():
             handle.write("// ---- helpers ----\nstatic int big(int p_value) {\n" + body + "\treturn p_value;\n}\n" +
                          "void Thing::small() const {\n\tif (true) {\n\t}\n}\n" + "int filler;\n" * 700)
         with open(os.path.join(root, "src", "fine.h"), "w") as handle:
-            handle.write("struct Fine {\n\tint get() const {\n\t\treturn 1;\n\t}\n};\n")
+            # A table written as a macro, one row per line, is no function, however long.
+            table = "#define TABLE(X) \\\n" + "".join("\tX(row%d, \"(\") \\\n" % i for i in range(130)) + "\n"
+            handle.write(table + "enum class Row { TABLE(NAME) };\n" +
+                         "struct Fine {\n\tint get() const {\n\t\treturn 1;\n\t}\n};\n")
         with open(os.path.join(root, "src", "wide.h"), "w") as handle:
             handle.write("int declared;\n" * 501)
         shapes = [
