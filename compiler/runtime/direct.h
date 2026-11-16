@@ -53,6 +53,9 @@ namespace rt {
 // untyped arguments. What it gives is untyped; the caller has made the result's register undefined
 // already, which is what a call that fails leaves there.
 //     void function_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// One of the untyped value's operators on two untyped values: p_which is the instruction (an ir::Op: AnyEq,
+// AnyStrictEq, AnyAdd, AnyLt, AnyLe, AnyGt, AnyGe). A Boolean, or for AnyAdd an untyped value.
+//     void any_operate(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 
 } // namespace rt
 } // namespace kas3

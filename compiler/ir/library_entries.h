@@ -76,6 +76,14 @@ inline LibraryEntry library_entry(const Function &p_function, const Instruction 
 			return LibraryEntry{ "array_new", p_in.b };
 		case Op::VecFrom:
 			return LibraryEntry{ "vector_from", p_in.c };
+		case Op::AnyEq:
+		case Op::AnyStrictEq:
+		case Op::AnyAdd:
+		case Op::AnyLt:
+		case Op::AnyLe:
+		case Op::AnyGt:
+		case Op::AnyGe:
+			return LibraryEntry{ "any_operate", static_cast<uint32_t>(p_in.op) };
 		case Op::AnyText:
 			return LibraryEntry{ "text_of_any", 0 };
 		case Op::ObjToStr:

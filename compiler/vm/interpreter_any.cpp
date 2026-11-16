@@ -94,9 +94,10 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 			break;
 		case Op::AnyEq:
 		case Op::AnyStrictEq: {
-			bool equal = false;
-			if (any_equality(b, c, p_in.op == Op::AnyStrictEq, &equal)) {
-				result(Kind::Bool, of_bool(equal));
+			const Slot both[] = { b, c };
+			Slot equal;
+			if (vm::any_operate(library_, p_in.op, both, 2, &equal)) {
+				result(Kind::Bool, equal);
 			}
 			break;
 		}
@@ -105,8 +106,14 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 		case Op::AnyLe:
 		case Op::AnyGt:
 		case Op::AnyGe:
-			any_arithmetic(p_in, b, c);
+		{
+			const Slot both[] = { b, c };
+			Slot made;
+			if (vm::any_operate(library_, p_in.op, both, 2, &made)) {
+				result(p_in.op == Op::AnyAdd ? Kind::Any : Kind::Bool, made);
+			}
 			break;
+		}
 		case Op::AnyIs:
 			result(Kind::Bool, of_bool(any_is(b, p_in.c)));
 			break;
@@ -130,22 +137,6 @@ Slot Interpreter::type_name(Slot p_value) {
 	}
 	retain(static_cast<Str *>(out.p));
 	return out;
-}
-
-// AnyEq and AnyStrictEq. A Godot object that has been freed is null. Both are held only when one is a
-// script object, whose text may run code that lets go of the other. False if it raised.
-bool Interpreter::any_equality(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
-	const Slot first = present_or_null(p_a);
-	const Slot second = present_or_null(p_b);
-	const bool speaks = any::tag(first) == AnyTag::Object || any::tag(second) == AnyTag::Object;
-	const Slot x = speaks ? share(Kind::Any, first) : first;
-	const Slot y = speaks ? share(Kind::Any, second) : second;
-	const bool done = any_equal(x, y, p_strict, r_equal);
-	if (speaks) {
-		drop_any(x);
-		drop_any(y);
-	}
-	return done;
 }
 
 } // namespace vm

@@ -12,54 +12,6 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
-namespace {
-
-// Whether two elements are the same value, as `===` has it.
-bool same_element(Kind p_kind, Slot p_a, Slot p_b) {
-	switch (p_kind) {
-		case Kind::F64:
-			return p_a.d == p_b.d;
-		case Kind::Bool:
-			return p_a.b == p_b.b;
-		case Kind::I64:
-			return p_a.l == p_b.l;
-		case Kind::Str: {
-			const Str *a = static_cast<const Str *>(p_a.p);
-			const Str *b = static_cast<const Str *>(p_b.p);
-			return a && b ? a->view() == b->view() : a == b;
-		}
-		case Kind::Obj:
-			return p_a.p == p_b.p;
-		default:
-			return p_a.u == p_b.u;
-	}
-}
-
-} // namespace
-
-// Whether an element is the value looked for. One of Godot's values or objects is the same as Godot says:
-// the same object, or an equal value. Null is only null.
-bool Interpreter::element_is(Kind p_kind, Slot p_element, Slot p_value) {
-	if (p_kind == Kind::Any) {
-		bool equal = false;
-		return any_equal(p_element, p_value, true, &equal) && equal;
-	}
-	if (!ir::is_engine(p_kind)) {
-		return same_element(p_kind, p_element, p_value);
-	}
-	if (!p_element.p || !p_value.p) {
-		return p_element.p == p_value.p;
-	}
-	const Argument both[2] = { Argument{ p_kind, p_element }, Argument{ p_kind, p_value } };
-	Wanted wanted;
-	wanted.kind = Kind::Bool;
-	Slot equal;
-	equal.bits = 0;
-	std::string error;
-	const OperatorName same = operator_named(module_.equal_operator, "==");
-	return host_.handles.operate(same.number, same.spelling, both, 2, wanted, &equal, &error) && equal.b;
-}
-
 // The element's property of that name, or undefined when it has none (a value that is not an object, or
 // an object without it): sortOn never raises #1069.
 bool Interpreter::sort_field(Slot p_element, Str *p_name, Slot *r_value) {

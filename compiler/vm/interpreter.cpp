@@ -36,19 +36,6 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 // Each engine instruction is worked out by the host once, now, on the thread that loads the program: none
 // is looked up by its name as the program runs. A function with none keeps an empty list.
 void Interpreter::prepare_engine() {
-	operators_.resize(module_.engine_names.size());
-	for (size_t i = 0; i < module_.engine_names.size(); i++) {
-		// The description's names for the unary ones are "unary-" and "unary+".
-		std::string_view spelling = module_.engine_names[i].name;
-		if (spelling.substr(0, 5) == "unary") {
-			spelling.remove_prefix(5);
-		}
-		// An operator's entry is "<name> <Godot's number>"; anything else is not an operator and has none.
-		const std::string &value = module_.engine_names[i].value;
-		const size_t space = value.find(' ');
-		const bool numbered = module_.engine_names[i].key.rfind("@operator.", 0) == 0 && space != std::string::npos;
-		operators_[i] = OperatorName{ spelling, spelling == "==" || spelling == "!=", numbered ? std::atoi(value.c_str() + space + 1) : -1 };
-	}
 	prepared_.resize(module_.functions.size());
 	for (size_t f = 0; f < module_.functions.size(); f++) {
 		const Function &function = module_.functions[f];

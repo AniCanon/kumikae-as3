@@ -71,7 +71,7 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	}
 	if (p_call.method == VectorMethod::IndexOf || p_call.method == VectorMethod::IndexOfAny) {
 		for (uint32_t i = clamped(p_call.values[2].i, length); i < length && found < 0; i++) {
-			found = p_library.unmoved.element_is(kind, p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
+			found = element_is(p_library, kind, p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
 		}
 	} else {
 		// From the end if negative; before the start, there is nothing to look at.
@@ -79,7 +79,7 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 		int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
 		from = from >= length ? static_cast<int64_t>(length) - 1 : from;
 		for (int64_t i = from; i >= 0 && found < 0; i--) {
-			found = p_library.unmoved.element_is(kind, p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
+			found = element_is(p_library, kind, p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
 		}
 	}
 	give(p_library, p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));

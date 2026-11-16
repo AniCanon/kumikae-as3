@@ -20,7 +20,6 @@ namespace {
 struct Recorder final : Runner, Unmoved {
 	bool failing() const override { return !raised.empty() || memory > 0; }
 	// Nothing here is still the interpreter's: these answer plainly.
-	bool element_is(Kind, Slot p_element, Slot p_value) override { return p_element.bits == p_value.bits; }
 	bool object_of_engine(Slot, uint32_t, bool *, Slot *) override { return false; }
 	bool engine_is(Slot, uint32_t) override { return false; }
 	bool array_number_get(Vector *, double, Slot *) override { return true; }
@@ -301,6 +300,26 @@ void test_untyped() {
 	CHECK_EQ(out.i, 0); // An Int64 wraps into an int by its own low bits.
 	CHECK(any_is(library, large, kas3::ir::ANY_IS_NUMBER) && !any_is(library, large, kas3::ir::ANY_IS_INT));
 	heap.drop_any(large);
+	// The operators: whole numbers stay whole, text joins, and text is ordered as text.
+	const Slot numbers[] = { any::integer(3), any::integer(4) };
+	CHECK(any_operate(library, kas3::ir::Op::AnyAdd, numbers, 2, &out));
+	CHECK(any::tag(out) == AnyTag::Int && any::to_number(out) == 7);
+	CHECK(any_operate(library, kas3::ir::Op::AnyLt, numbers, 2, &out) && out.b);
+	CHECK(any_operate(library, kas3::ir::Op::AnyGe, numbers, 2, &out) && !out.b);
+	CHECK(any_operate(library, kas3::ir::Op::AnyStrictEq, numbers, 2, &out) && !out.b);
+	Str *ten = new_string("10");
+	const Slot mixed[] = { any::string(ten), any::integer(9) };
+	CHECK(any_operate(library, kas3::ir::Op::AnyAdd, mixed, 2, &out));
+	CHECK_EQ(std::string(static_cast<Str *>(any::pointer(out))->view()), std::string("109"));
+	heap.drop_any(out);
+	CHECK(any_operate(library, kas3::ir::Op::AnyGt, mixed, 2, &out) && out.b); // 10 > 9, as numbers.
+	const Slot same[] = { any::string(ten), any::integer(10) };
+	CHECK(any_operate(library, kas3::ir::Op::AnyEq, same, 2, &out) && out.b);
+	CHECK(any_operate(library, kas3::ir::Op::AnyStrictEq, same, 2, &out) && !out.b);
+	CHECK(element_is(library, Kind::Any, same[0], same[0]) && !element_is(library, Kind::Any, same[0], same[1]));
+	if (release(ten)) {
+		free_string(ten);
+	}
 	// Into a String: null and undefined are null, a number is its text.
 	CHECK(from_any(library, any::undefined(), Kind::Str, kas3::ir::NONE, &out));
 	CHECK(out.p == nullptr);

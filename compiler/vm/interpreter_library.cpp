@@ -7,10 +7,6 @@ namespace vm {
 
 using ir::Kind;
 
-bool Interpreter::Asked::element_is(Kind p_kind, Slot p_element, Slot p_value) {
-	return vm.element_is(p_kind, p_element, p_value);
-}
-
 bool Interpreter::Asked::object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) {
 	Object *made = nullptr;
 	if (vm.engine_array(p_value, p_class)) {

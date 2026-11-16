@@ -18,6 +18,14 @@
 namespace kas3 {
 namespace vm {
 
+// An operator an engine instruction names, worked out once from its entry: AS3's spelling ("-" for the
+// description's "unary-"), and whether it compares (== and !=, which take a missing value).
+struct OperatorName {
+	std::string_view spelling;
+	bool compares = false;
+	int number = -1; // Godot's number for it (Variant::Operator), the entry's second word.
+};
+
 class Heap {
 public:
 	const ir::Module &module;
@@ -44,9 +52,16 @@ public:
 	// The function a class runs for a method of that name, its own or inherited, or NONE: read once from
 	// the module, for whatever looks a method up by its name as the program runs.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
+	// An operator by its engine name, or (NONE: a program built without Godot's names) none Godot can
+	// number; and all of them, by engine name.
+	OperatorName operator_named(uint32_t p_name, std::string_view p_spelling) const {
+		return p_name == ir::NONE ? OperatorName{ p_spelling, false, -1 } : operators_[p_name];
+	}
+	const std::vector<OperatorName> &operators() const { return operators_; }
 
 private:
 	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
+	std::vector<OperatorName> operators_; // By engine name: what an operator's entry says, read once.
 	std::vector<Object *> dying_; // Objects whose last reference is gone, still to be freed.
 	bool freeing_ = false; // drop_object() is freeing them: one called meanwhile adds to the list.
 	void let_go(ir::Kind p_kind, Slot &p_slot); // One slot of an object being freed.

@@ -351,5 +351,15 @@ void function_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t 
 	}
 }
 
+void any_operate(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
+	Direct direct(c);
+	vm::Library library = direct.library();
+	const ir::Op op = static_cast<ir::Op>(p_which);
+	Slot made = empty();
+	if (vm::any_operate(library, op, p_values, p_count, &made)) {
+		hand_back(c, op == ir::Op::AnyAdd ? Kind::Any : Kind::Bool, made, r_out);
+	}
+}
+
 } // namespace rt
 } // namespace kas3

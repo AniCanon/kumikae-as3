@@ -195,32 +195,6 @@ void Interpreter::to_callable(const Instruction &p_in) {
 	put(Kind::Val, r[p_in.a], made);
 }
 
-// Two function values of one method on one object are equal, as AVM2 has it (`f == obj.method`).
-bool Interpreter::same_function(const Object *p_a, const Object *p_b) const {
-	if (!p_a || !p_b || p_a->klass != module_.function_class || p_b->klass != module_.function_class) {
-		return false;
-	}
-	Object *a = const_cast<Object *>(p_a);
-	Object *b = const_cast<Object *>(p_b);
-	if (own_field(a, ir::FUNCTION_INDEX).i != own_field(b, ir::FUNCTION_INDEX).i) {
-		return false;
-	}
-	if (static_cast<uint32_t>(own_field(a, ir::FUNCTION_INDEX).i) == module_.library_function) {
-		// A method of the library, which both are (what such a one is bound to is a pair, the value and
-		// the name, where any other function's is its object): the same when read from the same value by
-		// the same name.
-		const Vector *bound_a = static_cast<const Vector *>(own_field(a, ir::FUNCTION_FIRST).p);
-		const Vector *bound_b = static_cast<const Vector *>(own_field(b, ir::FUNCTION_FIRST).p);
-		if (!bound_a || !bound_b || bound_a == bound_b) {
-			return bound_a && bound_a == bound_b;
-		}
-		const bool named = static_cast<const Str *>(any::pointer(bound_a->data[1]))->view() == static_cast<const Str *>(any::pointer(bound_b->data[1]))->view();
-		return named && bound_a->data[0].bits == bound_b->data[0].bits;
-	}
-	return own_field(a, ir::FUNCTION_INDEX).i == own_field(b, ir::FUNCTION_INDEX).i &&
-			own_field(a, ir::FUNCTION_FIRST).p == own_field(b, ir::FUNCTION_FIRST).p && own_field(a, ir::FUNCTION_FIRST).p;
-}
-
 // What a call of a function value starts with: what it takes first, then each untyped argument as its
 // parameter holds it. One left out takes its default; too many is AS3's ArgumentError #1063. False if it
 // raised. p_values must not be in the stack: making an argument a String may run the program, which may

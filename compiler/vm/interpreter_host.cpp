@@ -458,7 +458,7 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 		}
 	}
 	Request request(module_, host_, p_function, p_in, stack_.data() + frames_.back().base, null_text_);
-	request.operators = &operators_;
+	request.operators = &heap_.operators();
 	request.prepared = step.prepared;
 	if (p_in.op == Op::HostSingleton) {
 		if (singletons_.size() <= p_in.b) {

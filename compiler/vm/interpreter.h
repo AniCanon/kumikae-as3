@@ -74,7 +74,6 @@ private:
 		}
 		uint32_t carries() const override { return vm.carries_; }
 		// What is still the interpreter's own (vm/interpreter_library.cpp).
-		bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value) override;
 		bool object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) override;
 		bool engine_is(Slot p_value, uint32_t p_class) override;
 		bool array_number_get(Vector *p_array, double p_number, Slot *r_out) override;
@@ -91,10 +90,9 @@ private:
 	std::vector<void *> singletons_; // The engine's singletons, by the engine name of their class, once found.
 	// What the host worked out once for each engine instruction, by function and instruction: see prepare().
 	std::vector<std::vector<EngineStep>> prepared_;
-	std::vector<OperatorName> operators_; // By engine name: what an operator's entry says, read once.
 	// An operator by its engine name, or (NONE: a program built without Godot's names) none Godot can number.
 	OperatorName operator_named(uint32_t p_name, std::string_view p_spelling) const {
-		return p_name == ir::NONE ? OperatorName{ p_spelling, false, -1 } : operators_[p_name];
+		return heap_.operator_named(p_name, p_spelling);
 	}
 	void prepare_engine();
 	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
@@ -157,18 +155,13 @@ private:
 	Vector *array_of_engine(void *p_array, uint32_t p_class);
 	bool engine_dictionary(Slot p_value, uint32_t p_class) const;
 	Object *table_of_engine(void *p_dictionary, uint32_t p_class);
-	bool any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
 	// ECMAScript's ToPrimitive: an object's text, or with p_number (where a Number is wanted) a Date's time.
 	bool any_primitive(Slot p_value, Slot *r_out, bool p_number = false) { return vm::any_primitive(library_, p_value, r_out, p_number); }
 	Slot present_or_null(Slot p_value) { return vm::present_or_null(library_, p_value); }
 	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	Slot type_name(Slot p_value);
-	bool any_equality(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
-	void any_arithmetic(const ir::Instruction &p_in, Slot p_b, Slot p_c);
-	Slot add_numbers(Slot p_a, Slot p_b);
 	Slot any_number(double p_value) { return vm::any_number(library_, p_value); }
 	Slot any_wide(int64_t p_value) { return vm::any_wide(library_, p_value); }
-	bool engine_add(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value) { heap_.assign(p_kind, p_slot, p_value); }
 	Slot share(ir::Kind p_kind, Slot p_value) { return heap_.share(p_kind, p_value); }
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned) { heap_.put(p_kind, p_target, p_owned); }
@@ -253,7 +246,6 @@ private:
 	bool fill_zeroes(Vector *p_vector, uint32_t p_from) { return vm::fill_zeroes(library_, p_vector, p_from); }
 	bool length_is_fixed(const Vector *p_vector) { return vm::length_is_fixed(library_, p_vector); }
 	Vector *fresh_vector(uint32_t p_class, uint64_t p_length) { return library_.fresh_vector(p_class, p_length); }
-	bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value);
 	// Function values (interpreter_functions.cpp).
 	Object *make_function(uint32_t p_function, Object *p_first);
 	void function_op(const ir::Function &p_function, const ir::Instruction &p_in);
@@ -317,7 +309,7 @@ private:
 	std::optional<Slot> call_function_within(Object *p_value, const Slot *p_arguments, size_t p_count);
 	void apply_value(const ir::Function &p_function, const ir::Instruction &p_in);
 	void to_callable(const ir::Instruction &p_in);
-	bool same_function(const Object *p_a, const Object *p_b) const;
+	bool same_function(const Object *p_a, const Object *p_b) const { return vm::same_function(module_, p_a, p_b); }
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);

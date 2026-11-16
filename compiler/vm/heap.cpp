@@ -4,6 +4,8 @@
 #include "held.h"
 #include "table.h"
 
+#include <cstdlib>
+
 namespace kas3 {
 namespace vm {
 
@@ -17,6 +19,19 @@ Heap::Heap(const ir::Module &p_module, EngineHandles &p_handles, EngineSource &p
 			const std::string &name = module.functions[method].name;
 			methods_[i][name.substr(name.rfind('/') == std::string::npos ? 0 : name.rfind('/') + 1)] = method;
 		}
+	}
+	operators_.resize(module.engine_names.size());
+	for (size_t i = 0; i < module.engine_names.size(); i++) {
+		// The description's names for the unary ones are "unary-" and "unary+".
+		std::string_view spelling = module.engine_names[i].name;
+		if (spelling.substr(0, 5) == "unary") {
+			spelling.remove_prefix(5);
+		}
+		// An operator's entry is "<name> <Godot's number>"; anything else is not an operator and has none.
+		const std::string &value = module.engine_names[i].value;
+		const size_t space = value.find(' ');
+		const bool numbered = module.engine_names[i].key.rfind("@operator.", 0) == 0 && space != std::string::npos;
+		operators_[i] = OperatorName{ spelling, spelling == "==" || spelling == "!=", numbered ? std::atoi(value.c_str() + space + 1) : -1 };
 	}
 }
 

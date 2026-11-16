@@ -56,7 +56,7 @@ raise, out of memory, a function of the program run by its number on typed value
 generated code there: an error is the context's at once, and a function of the program is the C++ it is,
 called through its entry.
 
-The rest (RegExp, Date, JSON, properties by name, the untyped value's operators, function values made)
+The rest (RegExp, Date, JSON, properties by name, function values made)
 are still members of `vm::Interpreter` that work on a frame's registers. For those, and for the
 parts of them a moved function still asks for (`vm::Unmoved`), the host keeps an interpreter of its own:
 
@@ -111,7 +111,8 @@ the URI functions and numbers as text; vectors and Arrays (elements, length, mak
 `sortOn`); `to_any`, `from_any`, `is` and `is_class`; `New` and `TableNew`; an Error's fields
 (`new_error()`), which native code fills in for an error it raises itself; a value's text (`any_text`,
 `vector_text`, `object_text`, `any_primitive`) and a call through a function value (`function_call`), which
-run the program's own functions by number (`Runner::run`: for generated code, the function's entry).
+run the program's own functions by number (`Runner::run`: for generated code, the function's entry); the
+untyped value's equality, `+` and `<` (`any_operate`), and a vector's element compared (`element_is`).
 
 Still used here through a thunk, or asked of the interpreter by a moved function (`vm::Unmoved` lists
 exactly those), named so that the split can be checked against it:
@@ -121,9 +122,8 @@ exactly those), named so that the split can be checked against it:
    `json_stringify.cpp`, `library_members.cpp`.
 2. `sortOn`'s read of an element's property (`Unmoved::sort_field`), which is a property by name: it
    goes with 3.
-3. Properties by name and tables (`interpreter_properties*.cpp`, `interpreter_property_calls.cpp`), and the
-   untyped value's operators (`interpreter_any_operators.cpp`: equality, `+`, `<`) and Godot's Arrays and
-   Dictionaries copied.
+3. Properties by name and tables (`interpreter_properties*.cpp`, `interpreter_property_calls.cpp`), `typeof`,
+   and Godot's Arrays and Dictionaries copied.
 4. Function values (`interpreter_functions.cpp`): making one (the one value of a static function is kept
    by the interpreter) and `apply`. A call through one is the library's function already.
 5. Raising: the words of #1009 and #1000 are still raised by the interpreter for the host

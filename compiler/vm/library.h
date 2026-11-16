@@ -44,8 +44,6 @@ struct Runner {
 // these are its host's interpreter's, and an error one raises is the interpreter's until the host takes it.
 struct Unmoved {
 	virtual ~Unmoved() {}
-	// Whether a vector's element of the kind is the value looked for, as `===` has it.
-	virtual bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value) = 0;
 	// One of Godot's Arrays or Dictionaries where an object of the class is wanted and the class is Array
 	// or Dictionary: *r_taken, and a new one of what it holds in r_out (false if the engine refused).
 	virtual bool object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) = 0;
@@ -157,6 +155,14 @@ void let_go_arguments(Library &p_library, const ir::Function &p_callee, Slot *p_
 [[nodiscard]] bool argument_as(Library &p_library, const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
 // The function a class runs for a method of that name, its own or inherited, or NONE.
 uint32_t find_method(const Library &p_library, uint32_t p_class, std::string_view p_name);
+
+// One of the untyped value's operators (AnyEq, AnyStrictEq, AnyAdd, AnyLt, AnyLe, AnyGt, AnyGe) on two
+// untyped values, as ECMAScript has them: a Boolean, or for AnyAdd an untyped value that is the caller's.
+[[nodiscard]] bool any_operate(Library &p_library, ir::Op p_op, const Slot *p_values, size_t p_count, Slot *r_out);
+// Whether a vector's element of the kind is the value looked for, as `===` has it.
+bool element_is(Library &p_library, ir::Kind p_kind, Slot p_element, Slot p_value);
+// Two function values of one method on one object are equal, as AVM2 has it (`f == obj.method`).
+bool same_function(const ir::Module &p_module, const Object *p_a, const Object *p_b);
 
 // String(x) of an untyped value, added to r_text: an object's toString() is the program's, and Godot's
 // text for one of its own can run a script. False if it raised.
