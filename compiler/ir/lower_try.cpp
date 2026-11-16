@@ -127,6 +127,20 @@ void Statements::finish_finally(TryBlock &p_try, uint32_t p_error, uint32_t p_po
 	l_.patch(to_past, l_.here());
 }
 
+// An error in the body or a catch, from p_start to p_end: kept, the finally runs, and it goes on.
+void Statements::finally_on_error(TryBlock &p_block, uint32_t p_start, uint32_t p_end, uint32_t p_position) {
+	Handler anything;
+	anything.start = p_start;
+	anything.end = p_end;
+	anything.target = l_.here();
+	anything.reg = l_.reg(Kind::Any);
+	anything.rethrows = true;
+	l_.fn().handlers.push_back(anything);
+	l_.emit(Op::ConstI32, p_position, p_block.exit_reg, 1);
+	p_block.to_finally.push_back(l_.emit(Op::Jump, p_position, 0));
+	finish_finally(p_block, anything.reg, p_position);
+}
+
 // try { body } catch (e:T) { ... } ... finally { ... }
 //
 // Laid out as: the body; each catch; for a finally, a catch of anything that keeps the error; then the
@@ -176,17 +190,7 @@ void Statements::try_statement(Try *p_try) {
 	// The innermost first: this try's catches, in the order written, then its finally.
 	l_.fn().handlers.insert(l_.fn().handlers.end(), catches.begin(), catches.end());
 	if (p_try->finally_block) {
-		// An error in the body or a catch: kept, the finally runs, and it goes on.
-		Handler anything;
-		anything.start = body_start;
-		anything.end = catches_end;
-		anything.target = l_.here();
-		anything.reg = l_.reg(Kind::Any);
-		anything.rethrows = true;
-		l_.fn().handlers.push_back(anything);
-		l_.emit(Op::ConstI32, position, block.exit_reg, 1);
-		block.to_finally.push_back(l_.emit(Op::Jump, position, 0));
-		finish_finally(block, anything.reg, position);
+		finally_on_error(block, body_start, catches_end, position);
 	}
 	for (uint32_t jump : to_end) {
 		l_.patch(jump, l_.here());

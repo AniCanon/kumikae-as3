@@ -11,12 +11,15 @@ namespace ir {
 class Statements {
 	Lowerer &l_;
 
+	void by_kind(Stmt *p_statement);
 	void if_statement(Stmt *p_statement);
 	void while_loop(Stmt *p_statement);
 	void do_while_loop(Stmt *p_statement);
 	void for_loop(Stmt *p_statement);
 	void switch_statement(Stmt *p_statement);
+	void for_in_loop(ForIn *p_loop);
 	void try_statement(Try *p_try);
+	void finally_on_error(TryBlock &p_block, uint32_t p_start, uint32_t p_end, uint32_t p_position);
 	void labeled(Labeled *p_labeled);
 	// Leaves for a loop (break or continue) or the function (return), through the `finally` of every
 	// try statement on the way: the innermost one runs first, and goes on from there.

@@ -10,9 +10,11 @@
 namespace kas3 {
 namespace ir {
 
-void Statements::declare_locals(Node *p_body) {
-	// A local that is given a value by its one declaration, written straight in the function's body,
-	// needs no starting value of its own: nothing below that line can see it without one.
+namespace {
+
+// A local that is given a value by its one declaration, written straight in the function's body,
+// needs no starting value of its own: nothing below that line can see it without one.
+std::unordered_set<const Symbol *> valued_locals(Node *p_body) {
 	std::unordered_map<const Symbol *, int> declared;
 	std::unordered_set<const Symbol *> valued;
 	walk(p_body, [&](Node *p_node) {
@@ -53,6 +55,13 @@ void Statements::declare_locals(Node *p_body) {
 			}
 		});
 	}
+	return valued;
+}
+
+} // namespace
+
+void Statements::declare_locals(Node *p_body) {
+	const std::unordered_set<const Symbol *> valued = valued_locals(p_body);
 	// A function's own locals: not those of a function written inside it, which are that one's.
 	walk(p_body, [&](Node *p_node) -> bool {
 		if (p_node->kind == NodeKind::FunctionExpr || p_node->kind == NodeKind::FunctionStmt) {
@@ -306,6 +315,12 @@ void Statements::statement(Stmt *p_statement) {
 	if (p_statement->kind != NodeKind::Block && p_statement->kind != NodeKind::Empty && !loop) {
 		l_.emit(Op::Stmt, position); // A loop marks its condition instead, once for each pass.
 	}
+	by_kind(p_statement);
+}
+
+// The statement's own lowering, by its kind.
+void Statements::by_kind(Stmt *p_statement) {
+	const uint32_t position = p_statement->offset;
 	switch (p_statement->kind) {
 		case NodeKind::Block:
 			for (Stmt *inner : static_cast<Block *>(p_statement)->statements) {
@@ -350,13 +365,7 @@ void Statements::statement(Stmt *p_statement) {
 			try_statement(static_cast<Try *>(p_statement));
 			break;
 		case NodeKind::ForIn:
-			if (l_.is_vector(static_cast<ForIn *>(p_statement)->collection->type) && !(l_.array_ && static_cast<ForIn *>(p_statement)->collection->type->symbol == l_.array_)) {
-				Vectors(l_).vector_loop(static_cast<ForIn *>(p_statement));
-			} else if (static_cast<ForIn *>(p_statement)->element) {
-				Vectors(l_).engine_loop(static_cast<ForIn *>(p_statement));
-			} else {
-				Dynamic(l_).loop(static_cast<ForIn *>(p_statement)); // An Array's properties too.
-			}
+			for_in_loop(static_cast<ForIn *>(p_statement));
 			break;
 		case NodeKind::Labeled:
 			labeled(static_cast<Labeled *>(p_statement));
@@ -367,6 +376,17 @@ void Statements::statement(Stmt *p_statement) {
 		default:
 			l_.refuse(position, "this statement");
 			break;
+	}
+}
+
+// `for in` and `for each`: over a vector, one of Godot's collections, or anything else by its properties.
+void Statements::for_in_loop(ForIn *p_loop) {
+	if (l_.is_vector(p_loop->collection->type) && !(l_.array_ && p_loop->collection->type->symbol == l_.array_)) {
+		Vectors(l_).vector_loop(p_loop);
+	} else if (p_loop->element) {
+		Vectors(l_).engine_loop(p_loop);
+	} else {
+		Dynamic(l_).loop(p_loop); // An Array's properties too.
 	}
 }
 
