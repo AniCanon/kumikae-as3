@@ -357,10 +357,16 @@ void Compilation::settle_classes(const std::vector<Symbol *> &p_classes) {
 	cut_class_cycles(p_classes);
 	cut_interface_cycles(p_classes);
 	settle_hierarchy(p_classes);
+	// Every class takes the halves its bases hand down before any override is checked: a half overridden here
+	// may be one that the base itself has only from its own base, whichever file was read first.
+	for (Symbol *symbol : p_classes) {
+		if (symbol->kind == SymbolKind::Class && !hierarchy_broken(symbol)) {
+			inherit_properties(symbol);
+		}
+	}
 	for (Symbol *symbol : p_classes) {
 		if (symbol->kind == SymbolKind::Class && !hierarchy_broken(symbol)) {
 			check_overrides(symbol);
-			inherit_properties(symbol);
 		}
 	}
 }
