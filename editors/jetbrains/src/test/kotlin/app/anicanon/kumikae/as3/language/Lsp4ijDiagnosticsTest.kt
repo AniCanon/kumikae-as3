@@ -6,8 +6,16 @@ import com.intellij.openapi.editor.impl.DocumentImpl
 import com.intellij.openapi.util.TextRange
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
+import org.eclipse.lsp4j.DidChangeTextDocumentParams
+import org.eclipse.lsp4j.DidCloseTextDocumentParams
+import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
+import org.eclipse.lsp4j.TextDocumentIdentifier
+import org.eclipse.lsp4j.TextDocumentItem
+import org.eclipse.lsp4j.VersionedTextDocumentIdentifier
+import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Proxy
 import kotlin.test.assertEquals
@@ -77,17 +85,44 @@ class Lsp4ijDiagnosticsTest {
         assertEquals(TextRange.EMPTY_RANGE, renderedRange)
     }
 
-    @Test fun `a publication older than one already published is stale, until the file is closed`() {
-        val versions = PublishedVersions<String>()
-        assertTrue(versions.current("a", 3))
-        assertTrue(versions.current("a", 3), "the same version again is current")
-        assertFalse(versions.current("a", 2), "an older one is stale")
-        assertTrue(versions.current("b", 1), "each file counts its own versions")
-        assertTrue(versions.current("a", null), "without a version nothing says it is stale")
-        assertTrue(versions.current("a", 4))
-        versions.forget("a")
-        assertTrue(versions.current("a", 1), "a file opened again counts from its first version")
+    @Test fun `a publication is current only for the version last sent for its document`() {
+        val versions = SentVersions()
+        assertTrue(versions.current("file:///a.as", 7), "nothing sent yet: nothing says it is stale")
+        versions.record(
+            notification(
+                "textDocument/didOpen",
+                DidOpenTextDocumentParams(TextDocumentItem("file:///a.as", "as3", 1, "")),
+            ),
+        )
+        assertTrue(versions.current("file:///a.as", 1))
+        versions.record(notification("textDocument/didChange", changed("file:///a.as", 2)))
+        assertFalse(versions.current("file:///a.as", 1), "an older version is stale")
+        assertTrue(versions.current("file:///a.as", 2))
+        versions.record(notification("textDocument/didChange", changed("file:///a.as", 3)))
+        assertFalse(versions.current("file:///a.as", 2), "a server behind the editor is stale too")
+        assertTrue(versions.current("file:///a.as", null), "without a version nothing says it is stale")
+        assertTrue(versions.current("file:///b.as", 1), "each document has its own versions")
+        versions.record(
+            notification("textDocument/didClose", DidCloseTextDocumentParams(TextDocumentIdentifier("file:///a.as"))),
+        )
+        versions.record(
+            notification(
+                "textDocument/didOpen",
+                DidOpenTextDocumentParams(TextDocumentItem("file:///a.as", "as3", 1, "")),
+            ),
+        )
+        assertTrue(versions.current("file:///a.as", 1), "opened again, it counts from its first version")
+        versions.record(RequestMessage().apply { method = "textDocument/completion" })
+        assertTrue(versions.current("file:///a.as", 1), "other messages say nothing of versions")
     }
+
+    private fun notification(method: String, params: Any) = NotificationMessage().apply {
+        this.method = method
+        this.params = params
+    }
+
+    private fun changed(uri: String, version: Int) =
+        DidChangeTextDocumentParams(VersionedTextDocumentIdentifier(uri, version), emptyList())
 
     private fun range(startLine: Int, start: Int, endLine: Int, end: Int) =
         Range(Position(startLine, start), Position(endLine, end))

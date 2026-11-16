@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.panel
 
 import app.anicanon.kumikae.as3.language.As3Lsp4ijClient
+import app.anicanon.kumikae.as3.language.As3ProjectLanguageService
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -30,7 +31,8 @@ internal object UiProbeLsp4ijDiagnostics {
         val diagnostic =
             Diagnostic(Range(Position(0, 0), Position(0, 7)), "publication probe", DiagnosticSeverity.Error, "probe")
         var refreshes = 0
-        val client = As3Lsp4ijClient(project) { target, document ->
+        val versions = project.getService(As3ProjectLanguageService::class.java).sentVersions
+        val client = As3Lsp4ijClient(project, versions) { target, document ->
             check(target == file && document === editor.document)
             refreshes++
         }

@@ -12,13 +12,15 @@ import com.redhat.devtools.lsp4ij.server.CannotStartProcessException
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
 import org.eclipse.lsp4j.InitializeParams
+import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.services.LanguageServer
 
 /** Loaded only with the optional LSP4IJ dependency. Rider retains its native client. */
 class As3Lsp4ijFactory :
     LanguageServerFactory,
     LanguageServerEnablementSupport {
     override fun createLanguageClient(project: Project): LanguageClientImpl =
-        As3Lsp4ijClient(project) { file, document ->
+        As3Lsp4ijClient(project, sentVersions(project)) { file, document ->
             LSPDiagnosticsApplier.getInstance(project).scheduleRefresh(file, document)
         }
 
@@ -28,6 +30,9 @@ class As3Lsp4ijFactory :
             // LSP4IJ filters mismatched versions, but does not advertise that support by default.
             params.capabilities.textDocument?.publishDiagnostics?.versionSupport = true
         }
+
+        override fun <S : LanguageServer> createLauncherBuilder(): Launcher.Builder<S> =
+            VersionTrackingLauncherBuilder(this, sentVersions(project))
     }.setCompletionFeature(As3Lsp4ijCompletion()).setDiagnosticFeature(As3Lsp4ijDiagnostics())
 
     override fun createConnectionProvider(project: Project): StreamConnectionProvider = As3Lsp4ijConnection(project)
@@ -38,6 +43,8 @@ class As3Lsp4ijFactory :
     override fun setEnabled(enabled: Boolean, project: Project) {
         PropertiesComponent.getInstance(project).setValue(ENABLED, enabled, true)
     }
+
+    private fun sentVersions(project: Project) = project.getService(As3ProjectLanguageService::class.java).sentVersions
 
     private companion object {
         const val ENABLED = "kumikae.as3.lsp4ij.enabled"
