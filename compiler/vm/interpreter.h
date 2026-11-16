@@ -238,6 +238,7 @@ private:
 	// Function values (interpreter_functions.cpp).
 	Object *make_function(uint32_t p_function, Object *p_first);
 	void function_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	void callback_this(Slot p_callback, Slot p_this);
 	Object *function_in(ir::Kind p_kind, Slot p_value);
 	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
 	bool function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values);
