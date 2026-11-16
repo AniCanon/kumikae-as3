@@ -18,7 +18,7 @@ turns the checked tree from `src/` into it.
 | `lower_expressions`, `lower_calls` | By what each lowers |
 | `lower_operators.h`, `lower_operators` | Operators on two values (the `Operators` class, a friend of the lowerer): arithmetic, bitwise, string, logical, comparisons, equality, `is` and `as` |
 | `lower_statements.h`, `lower_statements` | Statements (the `Statements` class, a friend of the lowerer): locals, `if`, the loops, `switch`, `break`, `continue`, `return`, `throw` |
-| `lower_classes` | Each class's place in the module, before any body is lowered: what it inherits, its fields, its methods and their table slots, Godot's virtuals it answers |
+| `lower_classes.h`, `lower_classes` | Each class's place in the module, before any body is lowered (the `Classes` class, a friend of the lowerer): what it inherits, its fields, its methods and their table slots, Godot's virtuals it answers |
 | `lower_bodies` | The body of each function: its start and end, its parameters, a method, a constructor (with the fields' first values), a class's static initializer, package variables |
 | `lower_literals` | Number and string literals (a string's escapes), and the built-in library's constants: `NaN`, `Infinity`, the limits of the number types, Array's sort options |
 | `lower_engine.h`, `lower_engine` | Godot's members (the `Engine` class, a friend of the lowerer): properties, constants, singletons, parts of a value, the zero of a value with parts, 32-bit integers, operators Godot carries out |

@@ -1,3 +1,4 @@
+#include "lower_classes.h"
 #include "lower_members.h"
 
 namespace kas3 {
@@ -258,10 +259,10 @@ bool Lowerer::run(LowerMode p_mode) {
 	Members(*this).reserve_interfaces(units);
 	const std::vector<ClassInUnit> classes = classes_in_order(units);
 	for (const ClassInUnit &entry : classes) {
-		reserve_class(entry.second);
+		Classes(*this).reserve_class(entry.second);
 	}
 	for (const ClassInUnit &entry : classes) {
-		declare_class(*entry.first, entry.second);
+		Classes(*this).declare_class(*entry.first, entry.second);
 	}
 	for (Unit *unit : units) {
 		unit_ = unit;

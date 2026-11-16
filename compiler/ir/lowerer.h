@@ -124,18 +124,6 @@ class Lowerer {
 	// The class's index, creating the built-in Error classes on first use.
 	bool class_index(const Symbol *p_class, uint32_t *r_index);
 
-	// Gives the class its place in the module, before any class is filled in: a field may be of a class
-	// declared later.
-	void reserve_class(ClassDecl *p_decl);
-
-	Class inherited_class(ClassDecl *p_decl);
-	uint32_t add_function(uint32_t p_class, const std::string &p_name, uint32_t p_position, bool p_static);
-	void declare_fields(uint32_t p_class, VarDecl *p_decl);
-	void record_godot_virtual(uint32_t p_class, const Symbol *p_symbol, FunctionDecl *p_function, uint32_t p_made);
-	void give_method_slot(uint32_t p_class, FunctionDecl *p_function, uint32_t p_made);
-	void declare_method(uint32_t p_class, const Symbol *p_symbol, FunctionDecl *p_function);
-	void declare_class(Unit &p_unit, ClassDecl *p_decl);
-
 	uint32_t emit(Op p_op, uint32_t p_position, uint32_t p_a = 0, uint32_t p_b = 0, uint32_t p_c = 0);
 
 	uint32_t here() const { return (uint32_t)fn().code.size(); }
@@ -218,6 +206,7 @@ class Lowerer {
 	friend class Engine; // Godot's members, values and operators: lower_engine.h
 	friend class Vectors; // A vector's lowering, once its class is made: lower_vectors.h
 	friend class Functions; // Function expressions and function values: lower_functions.h
+	friend class Classes; // Each class's place in the module: lower_classes.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 

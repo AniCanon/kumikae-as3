@@ -9,6 +9,7 @@
 // one is an object and `is`, `as` and every check of a class work as they do for a class. A call through
 // one goes by the method's name, as in AVM2: each name an interface declares has a number, and each class
 // a table from those numbers to the functions it runs (CallInterface).
+#include "lower_classes.h"
 #include "lower_members.h"
 
 namespace kas3 {
@@ -16,11 +17,11 @@ namespace ir {
 
 void Members::declare_accessor(uint32_t p_class, FunctionDecl *p_function) {
 	const bool is_static = (p_function->modifiers.bits & Modifiers::Static) != 0;
-	const uint32_t made = l_.add_function(p_class, l_.module_.classes[p_class].name + "/" + member_key(p_function), p_function->name_offset, is_static);
+	const uint32_t made = Classes(l_).add_function(p_class, l_.module_.classes[p_class].name + "/" + member_key(p_function), p_function->name_offset, is_static);
 	l_.functions_[p_function] = made;
 	l_.module_.functions[made].is_public = (p_function->modifiers.bits & Modifiers::Public) != 0; // Godot reaches it.
 	if (!is_static) {
-		l_.give_method_slot(p_class, p_function, made);
+		Classes(l_).give_method_slot(p_class, p_function, made);
 	}
 }
 
