@@ -161,11 +161,20 @@ void FunctionWriter::by_thunk(const Instruction &p_in) {
 }
 
 void FunctionWriter::instruction(const Instruction &p_in) {
-	const bool written = constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_vector(p_in) || fast_text(p_in) ||
-			fast_untyped(p_in) || fast_call(p_in);
+	const bool written = whole_conversion(p_in) || constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_vector(p_in) ||
+			fast_text(p_in) || fast_untyped(p_in) || fast_call(p_in);
 	if (!written) {
 		by_thunk(p_in);
 	}
+	// What was known of a register is forgotten when it is written, and with it what was made from it.
+	const char first = ir::op_shape(p_in.op)[0];
+	if ((first == 'R' || first == 'r') && p_in.a != NONE && !first_is_read(p_in.op)) {
+		forget_whole(p_in.a);
+	}
+	if (p_in.op == Op::DynNext) {
+		forget_whole(p_in.b);
+	}
+	remember_whole(p_in);
 }
 
 std::string FunctionWriter::prologue() const {
@@ -256,8 +265,16 @@ std::string FunctionWriter::epilogue() const {
 
 std::string FunctionWriter::write() {
 	std::vector<std::string> pieces;
+	std::vector<bool> landed = targets_; // Where code is reached from elsewhere, nothing is known.
+	for (const ir::Handler &handler : function_.handlers) {
+		landed[handler.target] = true;
+	}
+	whole_.assign(function_.registers.size(), Whole());
 	for (pc_ = 0; pc_ < function_.code.size(); pc_++) {
 		body_.clear();
+		if (landed[pc_]) {
+			whole_.assign(function_.registers.size(), Whole());
+		}
 		instruction(function_.code[pc_]);
 		pieces.push_back(body_);
 	}
