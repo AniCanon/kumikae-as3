@@ -18,6 +18,7 @@ holds every program of `tests/run/` to the same output under both.
 | `function_objects.cpp` | Fields, static fields, classes, jumps, returns and throws |
 | `function_calls.cpp` | Calls: direct, through the class's method table, by interface |
 | `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, Strings, untyped values, properties under a String key, a call through a function value |
+| `function_library.cpp` | An instruction one of the library's functions of plain values carries out whole (`ir/library_entries.h`): the runtime's function of that name called on the instruction's values, where a thunk would have been |
 | `function_engine.cpp` | What asks Godot, where generated code does it itself: a `Vector2` held inline and its maths, a property or a method of a Godot object called on bare values by its method bind, the script's own Godot object and singletons borrowed for the whole function |
 | `function_whole.cpp` | A sum of ints or uints converted back to one, as 32-bit arithmetic (exact, and three times as fast on `loop.as`) |
 | `thunks.h`, `thunks.cpp` | The operations left to the library the interpreter has, each one instruction the host carries out |

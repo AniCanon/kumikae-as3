@@ -9,6 +9,7 @@
 
 #include "engine.h"
 #include "interpreter.h"
+#include "library.h"
 #include "no_engine.h"
 #include "operations.h"
 #include "program.h"
@@ -21,7 +22,12 @@ namespace kas3 {
 namespace rt {
 
 // The operations the host itself asks of the library, each a thunk after the program's own.
-enum class Builtin : uint32_t { NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray };
+enum class Builtin : uint32_t {
+	NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny, NewArray,
+	Apply, // A function value called with an Array of untyped arguments, as apply() calls it.
+	AnyText, // String(x) of an untyped value.
+	SplitByPattern, // split() by a RegExp.
+};
 
 // What a Native instruction asks of the host (its second operand): a function's body run, or one of the
 // two things a thunk hands back.
@@ -101,6 +107,11 @@ struct Host final : vm::NativeCode {
 	bool carried = false;
 	uint32_t nesting = 0; // Thunks in progress, one inside another.
 
+	// What the library's functions of plain values (vm/library.h) ask of whoever runs the program, answered
+	// for generated code (runtime/direct.cpp); and the library as those functions are handed it.
+	std::unique_ptr<vm::Runner> asked;
+	vm::Library library() { return vm::Library{ interpreter->heap(), *asked }; }
+
 	Host(const Program &p_program, const Embedder &p_embedder);
 	~Host() override;
 	[[nodiscard]] bool run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register, Slot *p_registers, uint32_t p_given,
@@ -130,6 +141,9 @@ struct Host final : vm::NativeCode {
 	// Gives the error on its way out to standard error, with its trace, and forgets it.
 	void report();
 };
+
+// The runner for a context's generated code (runtime/direct.cpp).
+std::unique_ptr<vm::Runner> runner_for(Context *c);
 
 // Runs the program as `kas3c run` runs it under the interpreter: its traces on standard output, an error
 // nothing catches on standard error, and the same exit status.

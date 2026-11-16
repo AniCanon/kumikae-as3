@@ -17,6 +17,7 @@ Host::Host(const Program &p_program, const Embedder &p_embedder) :
 		output(p_embedder.output), handles(p_embedder.handles) {
 	interpreter = std::make_unique<vm::Interpreter>(module, vm::Host(p_embedder.output, p_embedder.handles, p_embedder.source, p_embedder.clock));
 	interpreter->set_native(this);
+	asked = runner_for(&context);
 	globals.resize(program.global_count);
 	for (uint32_t i = 0; i < program.global_count; i++) {
 		globals[i] = vm::empty_value(static_cast<Kind>(program.globals[i].kind) == Kind::F64, program.globals[i].starts_null);

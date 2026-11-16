@@ -95,6 +95,7 @@ class FunctionWriter {
 	bool call(const ir::Instruction &p_in); // function_calls.cpp
 	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target);
 	void by_thunk(const ir::Instruction &p_in);
+	bool by_library(const ir::Instruction &p_in); // function_library.cpp: the library's function, called direct.
 	std::string_view parts(uint32_t p_register) const; // The value with parts the register holds inline, if it does.
 	void dispatch(const ir::Instruction &p_in); // The instruction written by whichever part owns it.
 	void generic(const ir::Instruction &p_in); // dispatch(), with the values held inline boxed for it.

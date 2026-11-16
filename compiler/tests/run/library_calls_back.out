@@ -1,0 +1,4 @@
+3 a,b,c
+a+b
+1052 Error #1052: Invalid URI passed to decodeURI function.
+a%20b%26c a b

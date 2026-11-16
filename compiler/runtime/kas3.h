@@ -1,6 +1,7 @@
 // Everything generated code is written against.
 #pragma once
 
+#include "direct.h"
 #include "engine.h"
 #include "fast.h"
 #include "numbers.h"
