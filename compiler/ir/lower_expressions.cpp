@@ -1,6 +1,7 @@
 #include "lower_dynamic.h"
 #include "lower_engine_calls.h"
 #include "lower_library.h"
+#include "lower_operators.h"
 
 namespace kas3 {
 namespace ir {
@@ -251,7 +252,7 @@ uint32_t Lowerer::evaluate(Expr *p_expression, Kind p_want) {
 		case NodeKind::Postfix:
 			return postfix(p_expression);
 		case NodeKind::Binary:
-			return binary(static_cast<Binary *>(p_expression), p_want);
+			return Operators(*this).binary(static_cast<Binary *>(p_expression), p_want);
 		case NodeKind::Assign:
 			return assign(static_cast<Assign *>(p_expression));
 		case NodeKind::Conditional:
@@ -417,7 +418,7 @@ uint32_t Lowerer::assign(Assign *p_assign) {
 		if (engine) {
 			value = convert(engine_operate(p_assign->op, { old, right }, place.kind, p_assign->target->type, position), place.kind, position);
 		} else {
-			value = convert(operate(p_assign->op, old, right, strings, position), place.kind, position);
+			value = convert(Operators(*this).operate(p_assign->op, old, right, strings, position), place.kind, position);
 		}
 	}
 	store(place, value, position);

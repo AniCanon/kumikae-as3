@@ -191,7 +191,6 @@ class Lowerer {
 	uint32_t vector_new(const Type *p_type, const List<Expr *> &p_arguments, uint32_t p_position);
 	uint32_t vector_literal(Expr *p_literal, const List<Expr *> &p_elements);
 	uint32_t vector_call(Call *p_call);
-	uint32_t godot_object_of(uint32_t p_object, Expr *p_written, uint32_t p_position);
 	// The untyped value: ir/lower_any.cpp.
 	bool untyped(const Expr *p_expression) const;
 	bool untyped_type(const Type *p_type) const;
@@ -201,11 +200,7 @@ class Lowerer {
 	uint32_t empty_untyped(const Type *p_type, uint32_t p_position);
 	uint32_t any_value(Expr *p_expression);
 	uint32_t any_text(Expr *p_expression);
-	uint32_t any_equality(Binary *p_binary);
-	uint32_t any_comparison(Binary *p_binary);
-	uint32_t any_add(Binary *p_binary);
 	uint32_t any_typeof(Expr *p_operand, uint32_t p_position);
-	std::optional<uint32_t> any_type_test(Binary *p_binary);
 	// An expression stored where a type is declared: a value from an untyped one is checked against the
 	// class the place holds.
 	uint32_t typed(Expr *p_expression, const Type *p_type, Kind p_kind);
@@ -227,6 +222,7 @@ class Lowerer {
 	friend class Dynamic; // Properties by name: lower_dynamic.h
 	friend class EngineCalls; // Calls of Godot's methods and functions: lower_engine_calls.h
 	friend class Statements; // Statements and where control goes: lower_statements.h
+	friend class Operators; // Operators on two values, and `is` and `as`: lower_operators.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 
@@ -332,8 +328,6 @@ class Lowerer {
 	uint32_t vector_each(Call *p_call);
 	std::optional<uint32_t> function_method(Call *p_call);
 	void use_argument_error();
-	uint32_t wide_order(Expr *p_left, Expr *p_right, uint32_t p_position);
-	uint32_t number_zero(uint32_t p_position);
 	uint32_t name_value(Expr *p_expression);
 	uint32_t member_value(Expr *p_expression);
 	uint32_t new_value(Expr *p_expression);
@@ -364,18 +358,7 @@ class Lowerer {
 	// AS3 writes it; `v += w` is `v + w`.
 	uint32_t engine_operate(TokenKind p_op, std::vector<uint32_t> p_operands, Kind p_result, const Type *p_type, uint32_t p_position);
 
-	// An arithmetic, bitwise or string operation on two values already evaluated.
-	uint32_t concatenate(uint32_t p_left, uint32_t p_right, uint32_t p_position);
-	uint32_t operate(TokenKind p_op, uint32_t p_left, uint32_t p_right, bool p_string, uint32_t p_position);
-
 	bool is_string_type(const Type *p_type) const;
-
-	uint32_t binary(Binary *p_binary, Kind p_want);
-	uint32_t logical(Binary *p_binary, Kind p_want);
-	uint32_t type_test(Binary *p_binary);
-	uint32_t comparison(Binary *p_binary);
-	uint32_t equality(Binary *p_binary);
-	uint32_t arithmetic(Binary *p_binary, Kind p_want);
 
 	uint32_t assign(Assign *p_assign);
 

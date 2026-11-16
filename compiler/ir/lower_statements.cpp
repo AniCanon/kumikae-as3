@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_operators.h"
 #include "lower_statements.h"
 
 #include <algorithm>
@@ -233,7 +234,7 @@ void Statements::switch_statement(Stmt *p_statement) {
 				same.offset = each.offset;
 				same.left = choice->subject;
 				same.right = each.test;
-				to_body[at] = l_.emit(Op::JumpIf, each.offset, l_.equality(&same), 0);
+				to_body[at] = l_.emit(Op::JumpIf, each.offset, Operators(l_).equality(&same), 0);
 			} else {
 				l_.expression(each.test, Kind::Void); // Never equal, but what it does is still done.
 			}
