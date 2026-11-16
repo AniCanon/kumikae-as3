@@ -4,6 +4,14 @@
 
 namespace kas3 {
 
+// A mistake in a class's tag is said when the class's own file is checked, once: every file that uses the
+// class reads the tags again, and says nothing.
+void Typer::tag_error(const Symbol *p_class, const Metadata &p_tag, std::string p_message) {
+	if (p_class->unit == &unit_) {
+		unit_.diagnostics.error(p_tag.offset, std::move(p_message));
+	}
+}
+
 const Type *Typer::tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name) {
 	if (p_name == "*") {
 		return any_;
@@ -25,8 +33,7 @@ const Type *Typer::tag_type(Symbol *p_class, const Metadata &p_tag, std::string_
 			return compilation_.instance_type(found->second);
 		}
 	}
-	p_class->unit->diagnostics.error(p_tag.offset, "unknown type " + quoted(p_name) + " in an [" +
-														   std::string(p_tag.name) + "] tag");
+	tag_error(p_class, p_tag, "unknown type " + quoted(p_name) + " in an [" + std::string(p_tag.name) + "] tag");
 	return nullptr;
 }
 
@@ -78,7 +85,7 @@ void Typer::operator_tag(Symbol *p_class, const Metadata &p_tag, const TagArgume
 	const auto &[op, left, right, returns, element, keyed] = p_arguments;
 	r_result.complete = true;
 	if (!left.empty() && !right.empty()) {
-		p_class->unit->diagnostics.error(p_tag.offset, "an [Operator] tag names both a left and a right operand");
+		tag_error(p_class, p_tag, "an [Operator] tag names both a left and a right operand");
 		return;
 	}
 	OperatorRule rule;
@@ -101,7 +108,7 @@ void Typer::operator_tag(Symbol *p_class, const Metadata &p_tag, const TagArgume
 			const std::string where = rule.side == OperatorRule::Unary
 					? std::string(" with no other operand")
 					: " with " + quoted(compilation_.type_name(rule.other)) + (rule.side == OperatorRule::Left ? " on the left" : " on the right");
-			p_class->unit->diagnostics.error(p_tag.offset, "a second [Operator] tag for " + quoted(op) + where);
+			tag_error(p_class, p_tag, "a second [Operator] tag for " + quoted(op) + where);
 			return;
 		}
 		r_result.operators.push_back(rule);
