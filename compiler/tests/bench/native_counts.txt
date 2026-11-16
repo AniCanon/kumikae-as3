@@ -1,8 +1,7 @@
 # How many times each benchmark program, as native code, leaves an operation to the library (run_native.py).
 # loop, objects and vectors: making the program's own object, and vectors' one Vector. values: 300,000 object
-# literals and as many array literals, which the library makes, and the calls through a function value whose
-# argument is a whole number past an int.
+# literals and as many array literals, which the library makes.
 loop: thunks=1 unresolved=0
 objects: thunks=1 unresolved=0
-values: thunks=1068933 unresolved=0
+values: thunks=600002 unresolved=0
 vectors: thunks=2 unresolved=0

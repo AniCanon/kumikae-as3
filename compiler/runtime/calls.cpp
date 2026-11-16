@@ -68,10 +68,11 @@ bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Sl
 			}
 			return number;
 		case Kind::F64:
-			if (number) {
+			// A whole number past an int is held in a box (number_to_any): a Number all the same.
+			if (number || tag == AnyTag::Wide) {
 				r_value->d = vm::any::to_number(p_any);
 			}
-			return number;
+			return number || tag == AnyTag::Wide;
 		case Kind::Bool:
 			r_value->b = vm::any::to_bool_payload(p_any);
 			return tag == AnyTag::Boolean;
