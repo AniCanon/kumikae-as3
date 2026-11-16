@@ -171,6 +171,10 @@ supports IntelliJ IDEA Community/free unified IDEA alongside Rider's native clie
 IDEA and Rider endpoints pass sandbox editing checks; older Community builds and Windows runtime
 validation remain unverified. Android Studio is outside the scope.
 
+The [project experience](results/2026-11-rider-project-experience.md) adds a `project.godot`
+settings editor, compact AS3 packages, scene attachment navigation and [AS3 tests](../testing/README.md)
+with native Rider results. These are editor features, not completion of the debugger stage.
+
 Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 ### Later, designed separately

@@ -29,7 +29,7 @@ class OwnedStreamProcesses(private val graceMillis: Long = 1000) : StreamProcess
     @Synchronized override fun start(command: List<String>): StreamProcess {
         check(!closed) { "Process owner is closed" }
         if (shutdown == null) {
-            shutdown = Thread({ close() }, "kumikae-idb-shutdown").also {
+            shutdown = Thread({ close() }, "kumikae-simulator-shutdown").also {
                 Runtime.getRuntime().addShutdownHook(it)
             }
         }
@@ -83,7 +83,7 @@ class NativeStreamProcess(command: List<String>, private val graceMillis: Long =
                     }
                 }
             }
-        }, "kumikae-idb-errors").apply { isDaemon = true }.start()
+        }, "kumikae-simulator-errors").apply { isDaemon = true }.start()
     }
 
     override fun close() {
@@ -103,7 +103,7 @@ class NativeStreamProcess(command: List<String>, private val graceMillis: Long =
             } finally {
                 reaped.countDown()
             }
-        }, "kumikae-idb-reaper").apply { isDaemon = true }.start()
+        }, "kumikae-simulator-reaper").apply { isDaemon = true }.start()
     }
 
     override fun awaitClosed() {
@@ -117,7 +117,7 @@ class NativeStreamProcess(command: List<String>, private val graceMillis: Long =
 /** Bounded replies and a deadline keep a broken companion from hanging input indefinitely. */
 internal class ProcessLines(
     private val child: StreamProcess,
-    private val description: String = "idb",
+    private val description: String = "Simulator helper",
     private val timeoutMillis: Long = 15_000,
 ) : AutoCloseable {
     val alive: Boolean get() = child.alive

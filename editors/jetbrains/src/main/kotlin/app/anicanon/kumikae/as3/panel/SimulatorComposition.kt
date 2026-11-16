@@ -14,6 +14,5 @@ internal object SimulatorComposition {
         touches = BackgroundWorker("Kumikae AS3 Simulator touch"),
         inputAllowed = inputAllowed,
         rememberInput = rememberInput,
-        installer = ScriptIdbInstaller(),
     )
 }

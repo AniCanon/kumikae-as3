@@ -14,8 +14,6 @@ internal class UiProbePrompts : SimulatorPrompts {
 
     override fun confirmInput() = true
 
-    override fun confirmInstall() = true
-
     override fun choose(under: JComponent, entries: List<MenuEntry>) = Unit
 
     override fun copy(text: String) = Unit

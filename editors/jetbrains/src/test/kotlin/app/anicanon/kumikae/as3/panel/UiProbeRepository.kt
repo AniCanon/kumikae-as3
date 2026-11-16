@@ -32,7 +32,7 @@ internal class UiProbeRepository : SimulatorRepository {
     private fun current() = SimulatorStatus(
         selected,
         inputEnabled,
-        if (inputEnabled) "idb input is on for this device." else "Viewer mode. Use Device Hub for input.",
+        if (inputEnabled) "Native input is on for this device." else "Viewer mode. Use Device Hub for input.",
     )
 
     override fun connect(): String {

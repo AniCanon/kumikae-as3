@@ -29,7 +29,7 @@ class SimulatorToolWindowFactory :
     }
 
     private companion object {
-        // The owner's yes to input through idb, which uses private Apple interfaces. Asked once.
+        // The owner's yes to input through native helper, which uses private Apple interfaces. Asked once.
         const val INPUT_ALLOWED = "kumikae.as3.simulator.inputAllowed"
     }
 }

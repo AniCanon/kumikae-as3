@@ -68,9 +68,9 @@ internal class PictureStreamController(
         show(null)
         feed?.close()
         feed = null
-        // What a person needs to know is that the picture will come back, not when to the millisecond.
+        // Keep the failure visible while retrying; never disguise a missing native picture as live.
         LOG.info("The Simulator's live picture stopped; retrying in $retryMs ms", error)
-        say("Reconnecting to the simulator's screen…")
+        say("Native picture unavailable: ${error.message ?: "Unknown failure"}. Retrying…")
         retryAt = clock() + retryMs
         retryMs = (retryMs * 2).coerceAtMost(MAX_RETRY_MS)
     }

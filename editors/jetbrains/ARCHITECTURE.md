@@ -67,6 +67,25 @@ scope/type semantics, wire capabilities, Unicode ranges and cache invalidation. 
 and restores it on exit. It prevents desktop focus changes from dismissing the test's live lookup;
 ordinary live-editor focus remains controlled by the IDE.
 
+## Project editors and tests
+
+`settings/` separates source-preserving configuration models, an observable draft
+controller, the IDE document repository and the Compose form. The repository sees
+unsaved source edits, validates the entire draft, then changes both documents in
+one write command. Conflicting source revisions are rejected. Drafts are kept per
+export preset. Preview decoding belongs to the repository, never to composition.
+
+`scene/` parses node/resource headers and edits only an attachment. The IDE adapter
+checks a conservative direct native base and refuses unsupported scene inheritance.
+The outline controller owns selection/status; its Compose view forwards actions.
+Scene usages use project indexing and return source navigation targets.
+
+`testing/` integrates the IDE's bundled test runner with the repository's Python
+runner. A manifest declares executable argument arrays and source files. A normal
+Godot target produces one result; a framework suite emits validated events for
+individual cases. Failed-case reruns preserve suite/case identities. The compiler
+still owns language semantics; no AS3 reflection or new compiler syntax is added.
+
 ## Simulator composition
 
 ```text
@@ -96,7 +115,8 @@ same `LocalSession` directly, avoiding base64, JSON and loopback copies for imag
 There is still one selection, one geometry authority and one console. The agent
 protocol is unchanged; no extra unauthenticated image endpoint is exposed.
 
-`FallbackInput` chooses the bundled native helper, installed idb, then public screenshots.
+`LocalSession` enables the bundled native helper after the private-input switch.
+Native startup failures reach the panel and retry; there is no legacy backend fallback.
 `NativeInput` owns a helper and a private temporary frame slot. `NativeBridgeConnection`
 validates readiness, calibrates clocks and serializes small control messages.
 `NativeFrameReader` maps the shared slot and copies a new sequence into a matching
@@ -122,16 +142,9 @@ releases input and device references.
 See [the native package](native/SimulatorBridge/README.md) for the complete private
 surface and [protocol.md](protocol.md) for the shared frame layout.
 
-`IdbDevices` is the fallback. It owns a private companion socket and a persistent `idb shell` for the
-selected device. Input waits for the shell's acknowledgment, never replays a failed
-command, and rebuilds a failed connection on a later request. `OwnedStreamProcesses`
-reaps only its own children; session shutdown waits for forced cleanup if needed.
-A JVM shutdown hook also waits for those children if the IDE exits while project
-disposal is still closing the session. Normal close unregisters the hook.
-`LiveFrames` reads dynamic MJPEG at scale 0.33 and quality 0.6 on one worker and
-decodes on another. Both handoffs are single replaceable slots, not queues. Equal
-JPEGs are discarded before decoding. The parser understands segment lengths,
-escaped entropy bytes, truncated streams and a maximum encoded frame size.
+`OwnedStreamProcesses` reaps only its own children; session shutdown waits for forced
+cleanup if needed. A JVM shutdown hook also waits for those children if the IDE exits
+while project disposal is still closing the session. Normal close unregisters the hook.
 
 ## Repository
 
@@ -140,8 +153,7 @@ install, launch, screenshot, console page and input, in terms of
 `SimulatorDevice`, `SimulatorStatus`, `SimulatorFrame`, `ConsolePage` and
 `SimulatorInput`. Requests may block; reading a live frame slot never blocks or
 decodes. `ApiSimulatorRepository` is the only panel class that reads or writes
-protocol JSON. It decodes fallback snapshots on a worker; the core copies native frames or decodes
-fallback live JPEGs. Nothing above the repository sees JSON, HTTP or a process.
+protocol JSON. It decodes viewer snapshots on a worker; the core copies native frames. Nothing above the repository sees JSON, HTTP or a process.
 
 ## Controller
 
@@ -209,7 +221,6 @@ geometry or density changes replace it, so live frames do not rasterize the stat
 The cache is capped at 16 MiB; larger zoomed views paint decoration directly.
 Clearing a screen also releases its last-presented frame used by paint instrumentation.
 A settled native screen still has cheap seed polls, but no pixel copy or repaint.
-The idb fallback asks its source for changes dynamically.
 
 ## Compose Swing
 

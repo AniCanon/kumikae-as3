@@ -63,8 +63,8 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   service-owned Swift helper reads the Simulator framebuffer into one mapped slot.
   Copies happen off the UI thread; only the newest picture survives. Static device
   decoration is cached at display density, with a 16 MiB allocation limit. If the
-  helper cannot start, the panel tries installed idb MJPEG, then public screenshots
-  and names the route in its status line. With input off, the panel retains JPEG
+  helper cannot start, the panel reports the native failure and retries. The status
+  line identifies native capture and its pixel dimensions. With input off, the panel retains JPEG
   snapshots, capped at two requests per second. Hidden windows and the Simulators list stop pictures.
   Failed live streams report a retry with bounded backoff. A guest input service
   still starting after reboot keeps the native route available for that retry.
@@ -76,25 +76,69 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
   It saves PNG screenshots, reads logs and the test report, and offers input.
 - Native input tracks press, movement and release live; pending moves coalesce.
   Taps, ASCII keys, Unicode paste, Home and Lock use the same persistent helper. Native
-  rotation changes the guest orientation, turns the picture and remaps touch. The idb fallback retains its
-  release-time swipe and rotation behavior. Both routes require the owner's switch.
+  rotation changes the guest orientation, turns the picture and remaps touch. Native capture and input require the owner's switch.
 - Tests for protocol validation, geometry, device parsing, command construction,
   log limits, process timeouts, session cleanup and HTTP authentication, and for
   the panel's state: stale pictures, refused actions, failures, the console
   cursor, input permission, hidden windows and late results after closing.
 
-The bundled helper needs no idb at runtime. It loads private Apple interfaces only
+The bundled helper is the only live capture and input backend. It loads private Apple interfaces only
 after the existing opt-in. It accepts Apple-silicon iPhone and iPad devices when the selected Xcode passes the
 runtime capability checks; a build deny list can reject a known incompatibility
 with its reason. Only Xcode 27.0 build 27A266a has been measured. Missing or
-changed capabilities and unsupported devices fall back. The plugin
-installs idb only when you explicitly choose Install idb… and agree to its dialog.
+changed capabilities and unsupported devices report an error. The legacy idb backend
+and installer have been removed.
 
 This is the beginning of the one plugin planned in roadmap stage 6. It connects `kas3c lsp` for
 completion, argument help, errors and navigation; AS3 breakpoints and stepping remain planned.
 The Simulator panel is absent on Windows and Linux. The supported targets are Rider and IntelliJ IDEA
 Community/free unified IDEA. Android Studio is outside the scope. Other operating systems remain
 unverified; the compatibility range and exact tested builds are listed below.
+
+## Project settings, scenes and packages
+
+Open `project.godot` to use the **Settings** editor alongside its source editor.
+General contains the application name, main scene and icon chooser/preview. Display
+contains viewport size, stretch mode and the seven Godot orientation policies.
+Export edits the application identifier and icon of an existing iOS or Android
+preset. Apply changes the IDE documents in one undoable command. Save the project
+before exporting; rebuild an installed app to change its orientation policy.
+A landscape-only game's layout must still be adapted before using portrait.
+
+Unknown settings and comments are preserved. Invalid values and external source
+changes are reported. Reload discards the current draft and reads the source again.
+Preset-specific drafts survive switching presets. Signing settings remain in the
+export source. Create missing export presets in Godot, then reload.
+
+Open a `.tscn` to use its **Scene** editor. The outline shows native node types and
+attached AS3 paths. Open Script navigates to the source; Attach/Detach changes the
+script resource and node assignment, with undo. Attach currently accepts a script
+that directly extends the node's native type, with an explicit native import or
+qualified base name. Inherited/instanced scenes and other base relationships must
+be edited in Godot. The source editor remains available for the complete format.
+AS3 class gutters and **Find Attached Scene Nodes** in the editor menu navigate
+back to scenes that attach the script.
+
+The **Game** tree compacts empty directory chains under `src` and `tests` into
+package names such as `com.supportsprint`. Its context menu has **Compact AS3
+Packages** and **Show Generated Files**. These options change presentation;
+ordinary project views and physical directories remain available. Package rename
+refactoring is not implemented.
+
+## AS3 tests
+
+The **AS3 Tests** run configuration reads `kas3-tests.json` in the game project.
+Registered source classes get a gutter Run action. The native Tests tree shows
+individual framework cases, failures, source navigation and rerun-failed actions.
+The bundled Python runner uses installed `kas3c` and Godot programs. It rejects
+missing completion, malformed reports, unknown selected tests, runtime failures
+and timeouts. Cancellation terminates only its owned process group.
+
+The [testing guide](../../testing/README.md) describes the AS3 assertion library,
+`TestCase` setup/teardown, typed parameter cases, manifest and CLI. This is a new
+framework for this runtime, inspired by AS3, Kotlin, Swift and C# conventions;
+it does not implement FlexUnit metadata discovery. Existing Godot integration
+scenes can be registered as individual process-level tests.
 
 ## Build
 
@@ -258,33 +302,27 @@ The exact wire format is in [protocol.md](protocol.md).
 ## Input: the owner's switch
 
 The existing **⋮ > Switch input on…** confirmation permits private Apple interfaces
-for pictures and input and remembers the choice. The native helper is tried first;
-installed idb is the fallback. With the switch off, pictures use public `simctl`.
-Missing frameworks, symbols, unsupported Xcode builds or startup failures select
-the next route and display a reason. Input already submitted is never replayed.
+for pictures and input and remembers the choice. Live pictures use the bundled native
+helper. With the switch off, pictures use public `simctl`. Missing frameworks, symbols,
+unsupported Xcode builds or startup failures display a reason and retry with bounded
+backoff. Input already submitted is never replayed.
 
 The helper's private surface and Xcode guard are documented in
 [native/SimulatorBridge/README.md](native/SimulatorBridge/README.md). It owns no
 Simulator window and needs no Screen Recording permission. Hiding the panel stops
 its frame subscription and helper. Reopening creates a fresh connection.
 
-The optional **Install idb…** dialog explains and asks before running
-`tools/install-idb.sh`. Existing idb is found in
-`~/.local/bin`, Homebrew's folder or `PATH`. The fallback owns its companion, input
-shell and video child and leaves other tools' companions alone.
-
 The standalone service has no panel to ask. Set its explicit opt-in and helper path:
 
 ```sh
 export KUMIKAE_SIMULATOR_ALLOW_PRIVATE_INPUT=1
 export KUMIKAE_SIMULATOR_NATIVE=/absolute/path/to/simulator-bridge
-export KUMIKAE_SIMULATOR_IDB=/absolute/path/to/idb   # optional fallback override
 ```
 
 ASCII text uses US keyboard usages. Other printable Unicode uses the selected
 guest’s pasteboard and Command-V; accept the guest’s Allow Paste prompt when shown.
 Apps may refuse paste, particularly in secure fields. Controls, invalid surrogate
-pairs and text longer than 4096 UTF-16 code units are refused. idb remains ASCII-only. Native drags follow the pointer
+pairs and text longer than 4096 UTF-16 code units are refused. Native drags follow the pointer
 live. There is no multi-touch or audio. Lock is implemented but has
 not been visually verified on the shared device. Native rotation follows the
 guest's interface orientation; an app may restrict which orientations it accepts.

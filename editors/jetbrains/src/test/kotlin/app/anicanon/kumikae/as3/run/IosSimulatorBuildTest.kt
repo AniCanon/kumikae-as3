@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.run
 
+import app.anicanon.kumikae.as3.ShippedScript
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
@@ -10,6 +11,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IosSimulatorBuildTest {
+    @Test fun `plugin retains the iOS build script without the legacy installer`() {
+        assertTrue(ShippedScript.read("/build-ios-simulator.sh").contains("xcodebuild"))
+        assertNull(ShippedScript::class.java.getResource("/install-idb.sh"))
+    }
+
     private val root = Files.createTempDirectory("ios-build")
 
     private fun file(path: Path): Path {

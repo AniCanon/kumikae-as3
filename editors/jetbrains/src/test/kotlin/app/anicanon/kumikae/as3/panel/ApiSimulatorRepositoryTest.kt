@@ -35,7 +35,7 @@ class ApiSimulatorRepositoryTest {
 
     private val device = """{"id":"A","name":"Phone","runtime":"iOS 26.4","state":"Booted"}"""
     private val status =
-        """{"device":$device,"generation":3,"inputEnabled":true,"pixelsPerPoint":3.0,"inputNotice":"idb","launch":null}"""
+        """{"device":$device,"generation":3,"inputEnabled":true,"pixelsPerPoint":3.0,"inputNotice":"native helper","launch":null}"""
 
     private fun repository(vararg replies: Pair<String, String>) =
         FakeService(replies.toMap()).let { it to ApiSimulatorRepository(it) }
@@ -58,7 +58,7 @@ class ApiSimulatorRepositoryTest {
     @Test fun `status carries the selected device, input permission and notice`() {
         val (_, selected) = repository("status" to status)
         assertEquals(
-            SimulatorStatus(SimulatorDevice("A", "Phone", "iOS 26.4", "Booted"), true, "idb"),
+            SimulatorStatus(SimulatorDevice("A", "Phone", "iOS 26.4", "Booted"), true, "native helper"),
             selected.status(),
         )
         val (_, empty) = repository(

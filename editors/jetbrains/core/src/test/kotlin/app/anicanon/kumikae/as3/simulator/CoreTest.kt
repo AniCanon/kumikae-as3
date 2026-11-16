@@ -68,9 +68,5 @@ class CoreTest {
             ),
             Commands.launch("test-phone", "org.kumikae.as3test"),
         )
-        assertEquals(
-            listOf("/tools/idb", "ui", "text", "--udid", "test-phone", "--", "hello; $(false)"),
-            Commands.input("/tools/idb", "test-phone", "text", listOf("hello; $(false)")),
-        )
     }
 }

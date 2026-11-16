@@ -15,7 +15,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class NativeCancellationTest {
-    @Test fun interruptionWhileWaitingForReadyOrPingNeverStartsFallback() {
+    @Test fun interruptionWhileWaitingForReadyOrPingClosesTheConnection() {
         for (ready in listOf(false, true)) {
             val directory = Files.createTempDirectory("native-cancel-test")
             val waiting = CountDownLatch(1)
@@ -40,26 +40,16 @@ class NativeCancellationTest {
                     pipe.close()
                 }
             }
-            var fallbackStarted = false
             val native = object : InputBackend {
                 override val enabled = true
                 override fun scale(device: String): Double =
                     NativeBridgeConnection.open("/bridge", device, directory, StreamProcesses { child }).density
                 override fun send(device: String, operation: String, args: List<String>) = Unit
             }
-            val fallback = object : InputBackend {
-                override val enabled = true
-                override fun scale(device: String): Double {
-                    fallbackStarted = true
-                    return 1.0
-                }
-                override fun send(device: String, operation: String, args: List<String>) = Unit
-            }
-            val backend = FallbackInput(listOf("native" to native, "idb" to fallback))
             val failure = AtomicReference<Throwable?>()
             val worker = Thread {
                 try {
-                    backend.scale("device")
+                    native.scale("device")
                 } catch (error: Throwable) {
                     failure.set(error)
                 }
@@ -71,12 +61,11 @@ class NativeCancellationTest {
                 worker.join(2000)
                 assertFalse(worker.isAlive)
                 assertIs<InterruptedException>(failure.get())
-                assertFalse(fallbackStarted)
             } finally {
                 child.close()
                 worker.interrupt()
                 worker.join(2000)
-                backend.close()
+                native.close()
                 Files.delete(directory)
             }
         }

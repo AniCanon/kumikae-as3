@@ -29,9 +29,6 @@ internal interface SimulatorPrompts {
     /** The owner's yes to private Simulator interfaces. */
     fun confirmInput(): Boolean
 
-    /** The owner's yes to what the install puts on this Mac. */
-    fun confirmInstall(): Boolean
-
     fun choose(under: JComponent, entries: List<MenuEntry>)
 
     fun copy(text: String)
@@ -57,23 +54,10 @@ internal class IdePrompts(private val project: Project) : SimulatorPrompts {
         project,
         "Live pictures and controls use the bundled native helper through private Apple interfaces. " +
             "Apple can change those without notice.\n\n" +
-            "If the helper is unavailable, an installed idb is used, then public screenshots. " +
+            "If the helper is unavailable, the panel reports the failure and retries. " +
             "Nothing is installed by this.",
         "Switch Simulator Input On?",
         "Switch On",
-        "Cancel",
-        Messages.getQuestionIcon(),
-    ) == Messages.YES
-
-    override fun confirmInstall(): Boolean = Messages.showYesNoDialog(
-        project,
-        "This installs idb, Meta's tool for driving the Simulator, on this Mac:\n\n" +
-            "• idb-companion, with Homebrew, from Meta's tap (facebook/fb). " +
-            "Homebrew is told to trust that one formula.\n" +
-            "• the fb-idb client, in its own Python environment, as ~/.local/bin/idb.\n\n" +
-            "It needs Homebrew and can take a few minutes. What it prints is shown in the console.",
-        "Install idb?",
-        "Install",
         "Cancel",
         Messages.getQuestionIcon(),
     ) == Messages.YES
