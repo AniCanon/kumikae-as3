@@ -72,7 +72,7 @@ public:
 
 	// Handles one message and appends what to send back, each a complete JSON text.
 	void handle(std::string_view p_message, std::vector<std::string> &r_out);
-	// The bounded input batch preserves notification order and skips obsolete queued requests.
+	// The bounded input batch preserves notification order and skips queued requests that are cancelled or whose document is closed.
 	void handle_batch(const std::vector<std::string> &p_messages, std::vector<std::string> &r_out);
 	// Checks the program if it changed, and appends the diagnostics that differ from what the editor has.
 	// Call it when no further message is waiting.

@@ -345,7 +345,9 @@ for snippets in (False, True):
         check("try template replacement", edit.get("range") == {"start": {"line": 0, "character": start_at},
               "end": {"line": 0, "character": start_at + len("trsuffix")}}, repr(item))
 
-# Requests already cancelled or superseded in the input queue must not check old text.
+# A request cancelled in the input queue is not checked. One followed in the queue by an edit of its document is
+# answered for the text it was asked about: LSP 3.17 says a server must not send ContentModified for a change it
+# sees only in its unprocessed messages, and LSP4IJ's completion does not ask again after one.
 params = {"textDocument": {"uri": URI}, "position": {"line": 0, "character": 0}}
 code, messages, errors = session(START + opened("package { public class Main {} }") +
     request(2, "textDocument/completion", params) + notify("$/cancelRequest", {"id": 2}) +
@@ -353,7 +355,7 @@ code, messages, errors = session(START + opened("package { public class Main {} 
     request(4, "textDocument/completion", params) + END, "--no-godot")
 replies = {m.get("id"): m for m in messages or [] if "id" in m}
 check("cancel queued request", replies.get(2, {}).get("error", {}).get("code") == -32800, repr(replies.get(2)))
-check("superseded queued request", replies.get(3, {}).get("error", {}).get("code") == -32801, repr(replies.get(3)))
+check("edited queued request", "result" in replies.get(3, {}), repr(replies.get(3)))
 check("latest queued request", "result" in replies.get(4, {}), repr(replies.get(4)))
 
 for failure in failures:
