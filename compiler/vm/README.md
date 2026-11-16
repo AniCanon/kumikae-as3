@@ -12,7 +12,7 @@ host differs.
 | `stack` | The C++ stack a program runs on: where a thread's is nearly used up (Error #1023 for one more call from outside, for the interpreter and native code alike), and the thread with a large one that a program run on its own is given |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
 | `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
-| `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on |
+| `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on; and what the library reads once and no frame owns (the host's clock, methods and Godot's operators by name, the one value of each static function) |
 | `interpreter_objects.cpp` | Objects made, their class asked, fields read by a host |
 | `fields.h` | Where an object's fields are: the one accessor every read and write of a field goes through (`field()` by the class's description, `own_field()` for the library's own classes, `owner_field()` for a script object's Godot object), and how many slots a class's objects have |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |

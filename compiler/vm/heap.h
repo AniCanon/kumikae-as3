@@ -1,6 +1,8 @@
 // Who holds what, with no frame in sight: giving a value another holder, letting one go, and freeing an
 // object whose last reference went with all it holds. The interpreter has one; whatever else runs a
 // program over the same values (native code's host) reaches it, and the library works on it (vm/library.h).
+// It also keeps what the library reads of the module and its host once and no frame owns: the host's clock,
+// a class's methods by name, the engine's operators by name, and the one value of each static function.
 #pragma once
 
 #include "clock.h"
