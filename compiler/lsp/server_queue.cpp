@@ -2,16 +2,6 @@
 #include "uri.h"
 
 namespace kas3 {
-namespace {
-
-bool cancellable(const std::string &p_method) {
-	return p_method == "textDocument/completion" || p_method == "textDocument/signatureHelp" ||
-			p_method == "textDocument/hover" || p_method == "textDocument/definition" ||
-			p_method == "textDocument/references" || p_method == "textDocument/documentSymbol" ||
-			p_method == "workspace/symbol";
-}
-
-} // namespace
 
 void Server::handle_batch(const std::vector<std::string> &p_messages, std::vector<std::string> &r_out) {
 	std::vector<Json> messages(p_messages.size());
@@ -25,7 +15,7 @@ void Server::handle_batch(const std::vector<std::string> &p_messages, std::vecto
 	for (size_t i = 0; i < messages.size() && !exited_; ++i) {
 		const Json &message = messages[i];
 		int code = 0;
-		if (initialized_ && !shutdown_ && message.has("id") && cancellable(message.get("method").string())) {
+		if (initialized_ && !shutdown_ && message.has("id") && handler_of(message.get("method").string())) {
 			// A later edit of the document does not stop the request: LSP 3.17 says a server should not send
 			// ContentModified for a change it sees only in its unprocessed messages. It is answered for its text.
 			const std::string path = document_key(message.get("params").get("textDocument").get("uri").string());

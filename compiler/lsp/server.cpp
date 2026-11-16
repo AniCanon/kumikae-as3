@@ -183,22 +183,29 @@ void Server::handle(std::string_view p_message, std::vector<std::string> &r_out)
 
 // The answer to a request after `initialize`, or nothing for a method the server does not handle.
 std::optional<Json> Server::answer(const std::string &p_method, const Json &p_params) {
-	if (p_method == "textDocument/definition") {
-		return definition(p_params);
-	} else if (p_method == "textDocument/references") {
-		return references(p_params);
-	} else if (p_method == "textDocument/hover") {
-		return hover(p_params);
-	} else if (p_method == "textDocument/signatureHelp") {
-		return signature_help(p_params);
-	} else if (p_method == "textDocument/completion") {
-		return completion(p_params);
-	} else if (p_method == "textDocument/documentSymbol") {
-		return document_symbols(p_params);
-	} else if (p_method == "workspace/symbol") {
-		return workspace_symbols(p_params);
+	const Handler handler = handler_of(p_method);
+	if (!handler) {
+		return std::nullopt;
 	}
-	return std::nullopt;
+	return (this->*handler)(p_params);
+}
+
+Server::Handler Server::handler_of(std::string_view p_method) {
+	static constexpr std::pair<std::string_view, Handler> HANDLERS[] = {
+		{ "textDocument/definition", &Server::definition },
+		{ "textDocument/references", &Server::references },
+		{ "textDocument/hover", &Server::hover },
+		{ "textDocument/signatureHelp", &Server::signature_help },
+		{ "textDocument/completion", &Server::completion },
+		{ "textDocument/documentSymbol", &Server::document_symbols },
+		{ "workspace/symbol", &Server::workspace_symbols },
+	};
+	for (const auto &[method, handler] : HANDLERS) {
+		if (method == p_method) {
+			return handler;
+		}
+	}
+	return nullptr;
 }
 
 void Server::handle_message(const Json &p_message, std::vector<std::string> &r_out) {

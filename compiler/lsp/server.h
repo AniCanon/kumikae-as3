@@ -74,6 +74,10 @@ class Server {
 			std::vector<std::string> &r_out);
 	void did_close(const std::string &p_path);
 	std::optional<Json> answer(const std::string &p_method, const Json &p_params);
+	using Handler = Json (Server::*)(const Json &p_params);
+	// The handler of a request the server answers after `initialize` (each may be cancelled while queued),
+	// or null.
+	static Handler handler_of(std::string_view p_method);
 
 public:
 	explicit Server(Workspace::Options p_options);
