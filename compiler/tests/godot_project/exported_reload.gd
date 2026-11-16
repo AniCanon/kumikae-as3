@@ -20,7 +20,8 @@ func _initialize() -> void:
 	started = Time.get_ticks_msec()
 
 func _process(_delta: float) -> bool:
-	if Time.get_ticks_msec() - started < 2500:
+	# The watch sees the edit within a second or two; a machine that is busy may take longer.
+	if node.get("added") == null and Time.get_ticks_msec() - started < 15000:
 		return false
 	show("the new field", node.get("added"), 9)
 	show("a value set before stays", node.get("speed"), 8.0)
