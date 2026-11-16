@@ -9,6 +9,25 @@ namespace vm {
 
 using ir::Kind;
 
+Heap::Heap(const ir::Module &p_module, EngineHandles &p_handles, EngineSource &p_source, Clock &p_clock) :
+		module(p_module), handles(p_handles), source(p_source), clock(p_clock), collector(*this) {
+	methods_.resize(module.classes.size());
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		for (uint32_t method : module.classes[i].methods) {
+			const std::string &name = module.functions[method].name;
+			methods_[i][name.substr(name.rfind('/') == std::string::npos ? 0 : name.rfind('/') + 1)] = method;
+		}
+	}
+}
+
+uint32_t Heap::find_method(uint32_t p_class, std::string_view p_name) const {
+	if (p_class >= methods_.size()) {
+		return ir::NONE;
+	}
+	auto found = methods_[p_class].find(std::string(p_name));
+	return found == methods_[p_class].end() ? ir::NONE : found->second;
+}
+
 // Gives up the reference a slot holds.
 void Heap::drop(Kind p_kind, Slot &p_slot) {
 	if (p_kind == Kind::Str) {

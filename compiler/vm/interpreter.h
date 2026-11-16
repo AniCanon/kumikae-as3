@@ -69,16 +69,16 @@ private:
 		void raise(uint32_t p_class, const std::string &p_message) override { vm.raise(p_class, p_message); }
 		void out_of_memory() override { vm.out_of_memory(); }
 		bool failing() const override { return vm.failing_ || vm.stopped_; }
-		bool call(Object *p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override;
-		bool text(Slot p_value, std::string *r_text) override { return vm.any_text(p_value, r_text); }
+		bool run(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) override {
+			return vm.call_within(p_function, p_arguments, p_count, r_result);
+		}
+		uint32_t carries() const override { return vm.carries_; }
 		// What is still the interpreter's own (vm/interpreter_library.cpp).
 		bool element_is(ir::Kind p_kind, Slot p_element, Slot p_value) override;
-		bool any_primitive(Slot p_value, Slot *r_out, bool p_number) override;
 		bool object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) override;
 		bool engine_is(Slot p_value, uint32_t p_class) override;
 		bool array_number_get(Vector *p_array, double p_number, Slot *r_out) override;
 		bool array_number_set(Vector *p_array, double p_number, Slot p_value) override;
-		bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale) override;
 		bool sort_field(Slot p_element, Str *p_name, Slot *r_value) override;
 	} asked_{ *this };
 	Library library_{ heap_, asked_, asked_ };
@@ -131,7 +131,6 @@ private:
 	// the engine; a sort calls its comparison) for as long as the thread's stack lasts: with it nearly
 	// used up one more is Error #1023 (vm/stack.h).
 	__attribute__((always_inline)) static bool stack_used_up() { return stack_below(vm::stack_floor()); }
-	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
 	StatementHook hook_ = nullptr;
 	NativeCode *native_ = nullptr;
 	void native_op(const ir::Instruction &p_in);
@@ -149,8 +148,8 @@ private:
 	void drop_any(Slot p_value) { heap_.drop_any(p_value); }
 	// The untyped value: vm/interpreter_any.cpp.
 	Slot to_any(ir::Kind p_kind, Slot p_value) { return vm::to_any(library_, p_kind, p_value); }
-	bool any_text(Slot p_value, std::string *r_text);
-	bool engine_text(void *p_handle, std::string *r_text);
+	bool any_text(Slot p_value, std::string *r_text) { return vm::any_text(library_, p_value, r_text); }
+	bool engine_text(void *p_handle, std::string *r_text) { return vm::engine_text(library_, p_handle, r_text); }
 	bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out) { return vm::from_any(library_, p_value, p_kind, p_check, r_out); }
 	bool coercion_failed(Slot p_value, ir::Kind p_kind, uint32_t p_check) { return vm::coercion_failed(library_, p_value, p_kind, p_check); }
 	bool any_is(Slot p_value, uint32_t p_type) { return vm::any_is(library_, p_value, p_type); }
@@ -160,8 +159,8 @@ private:
 	Object *table_of_engine(void *p_dictionary, uint32_t p_class);
 	bool any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
 	// ECMAScript's ToPrimitive: an object's text, or with p_number (where a Number is wanted) a Date's time.
-	bool any_primitive(Slot p_value, Slot *r_out, bool p_number = false);
-	Slot present_or_null(Slot p_value); // A freed Godot object is null; anything else is as it is.
+	bool any_primitive(Slot p_value, Slot *r_out, bool p_number = false) { return vm::any_primitive(library_, p_value, r_out, p_number); }
+	Slot present_or_null(Slot p_value) { return vm::present_or_null(library_, p_value); }
 	void any_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	Slot type_name(Slot p_value);
 	bool any_equality(Slot p_a, Slot p_b, bool p_strict, bool *r_equal);
@@ -244,7 +243,7 @@ private:
 	bool date_apply(Object *p_date, uint32_t p_code, const double *p_given, size_t p_count, Slot *r_out);
 	double local_time(double p_time);
 	double utc_time(double p_local);
-	std::string date_text(const Object *p_date, ir::DateText p_which) const;
+	std::string date_text(const Object *p_date, ir::DateText p_which) const { return vm::date_text(library_, p_date, p_which); }
 	void json_call(const ir::Function &p_function, const ir::Instruction &p_in); // vm/json_methods.cpp
 	// AnyNullCheck: TypeError #1009 for null, #1010 for undefined.
 	void any_null_check(Slot p_value);
@@ -259,12 +258,14 @@ private:
 	Object *make_function(uint32_t p_function, Object *p_first);
 	void function_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void callback_this(Slot p_callback, Slot p_this);
-	Object *function_in(ir::Kind p_kind, Slot p_value);
-	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out);
+	Object *function_in(ir::Kind p_kind, Slot p_value) { return vm::function_in(library_, p_kind, p_value); }
+	bool argument_as(const ir::Function &p_callee, uint32_t p_register, Slot p_value, Slot *r_out) {
+		return vm::argument_as(library_, p_callee, p_register, p_value, r_out);
+	}
 	bool function_arguments(Object *p_value, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values);
 	bool function_arguments(uint32_t p_target, Object *p_first, size_t p_count, const Slot *p_values, std::vector<Slot> *r_values);
 	// Properties by name (interpreter_properties.cpp, interpreter_property_reads.cpp, interpreter_property_calls.cpp).
-	Object *held_object(Slot p_value) const;
+	Object *held_object(Slot p_value) const { return vm::held_object(p_value); }
 	std::string holder_name(Slot p_holder) const;
 	void raise_unsupported(const std::string &p_what);
 	void raise_not_found(const PropertyKey &p_key, Slot p_holder);
@@ -289,7 +290,6 @@ private:
 	void dynamic_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void property_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void table_new(const ir::Function &p_function, const ir::Instruction &p_in);
-	bool table_text(Object *p_table, std::string *r_text, bool *r_own);
 	void call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
 	// A method of a String, an Array, a Vector or a Function, called by name: true if the name is one.
@@ -302,7 +302,7 @@ private:
 	// Classes as values (vm/class_values.cpp).
 	std::unordered_map<uint32_t, Object *> class_values_; // The one object for each class, kept until the interpreter goes.
 	Object *class_value(uint32_t p_code);
-	std::string class_name(uint32_t p_code) const;
+	std::string class_name(uint32_t p_code) const { return vm::class_name(module_, p_code); }
 	std::optional<uint32_t> class_in(Slot p_class, std::string_view p_error); // The class an untyped value holds, or raised.
 	void class_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	void class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
@@ -321,18 +321,10 @@ private:
 	void vector_op(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void vector_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);
-	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale = false);
-	bool locale_element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
+	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale = false) {
+		return vm::vector_text(library_, p_vector, p_separator, r_text, p_locale);
+	}
 	void vector_from(const ir::Instruction &p_in);
-	bool said_by(uint32_t p_method, Object *p_object, std::string *r_text);
-	// Vectors put into words inside one another's words (an Array in an Array, or one that holds itself)
-	// nest at most this deep, by recursion in C++; one more is Error #1023, as Flash's stack check gives.
-	// A level takes about 270 bytes of stack in a release build (measured): 500 fit in a third of the
-	// 512 KB a secondary thread gets on macOS.
-	static constexpr uint32_t MAX_TEXT_DEPTH = 500;
-	uint32_t text_depth_ = 0; // How many vector_text() calls are in progress.
-	bool element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
-	bool object_as_text(Object *p_object, std::string *r_text);
 	void leave_failed_frame(); // A frame the error leaves: its line goes into the trace.
 	// Catches the error in a frame above p_depth that has a handler for it, innermost first: true, and
 	// that frame carries on at the handler. Otherwise the frames are left, each line put in the trace.
@@ -349,8 +341,9 @@ private:
 	void use_class(uint32_t p_class); // From running code: pushes what must run first.
 	bool use_class_now(uint32_t p_class); // From outside: runs it.
 	std::string site(const Frame &p_frame) const;
-	std::string object_text(Object *p_object) const;
-	std::string error_heading(const Object *p_error) const; // "Name: message", as Error's toString() gives it.
+	std::string object_text(Object *p_object) const { return vm::object_text(library_, p_object); }
+	// "Name: message", as Error's toString() gives it.
+	std::string error_heading(const Object *p_error) const { return vm::error_heading(module_, p_error); }
 	bool is_class(const Object *p_object, uint32_t p_class) const { return vm::is_class(module_, p_object, p_class); }
 	// The function the object's class runs for an interface method; NONE, with the error raised, if the
 	// object is missing or its class has none.
@@ -420,7 +413,7 @@ public:
 	// Dictionary keeps them (a number by its text), each value untyped.
 	Object *copy_engine_dictionary(void *p_dictionary, uint32_t p_class);
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
-	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
+	uint32_t find_method(uint32_t p_class, std::string_view p_name) const { return heap_.find_method(p_class, p_name); }
 	void release_object(Object *p_object) { heap_.release_object(p_object); }
 	// An object the engine kept (EngineHandles::keep()), with no reference left, freed now that the engine
 	// let go of it too.

@@ -39,31 +39,6 @@ uint32_t Interpreter::interface_function(const Object *p_object, uint32_t p_meth
 	return function;
 }
 
-std::string Interpreter::object_text(Object *p_object) const {
-	if (!p_object) {
-		return "null";
-	}
-	const std::string &name = module_.classes[p_object->klass].name;
-	std::string simple = name.substr(name.rfind('.') == std::string::npos ? 0 : name.rfind('.') + 1);
-	if (module_.error_class != NONE && is_class(p_object, module_.error_class)) {
-		return error_heading(p_object); // A class of the program's that extends Error is named "Error".
-	}
-	if (p_object->klass == module_.date_class) {
-		return date_text(p_object, ir::DateText::Full);
-	}
-	if (p_object->klass == module_.function_class) {
-		return "function Function() {}"; // avmplus's Function.as: no source text is kept, for any function.
-	}
-	if (p_object->klass == module_.class_class) {
-		return "[class " + class_name(static_cast<uint32_t>(p_object->fields()[ir::CLASS_CODE].i)) + "]";
-	}
-	if (p_object->klass == module_.regexp_class) {
-		const Str *source = static_cast<const Str *>(p_object->fields()[ir::REGEXP_SOURCE].p);
-		return regex::regexp_text(source ? source->view() : std::string_view(), static_cast<uint8_t>(p_object->fields()[ir::REGEXP_FLAGS].i));
-	}
-	return "[object " + simple + "]";
-}
-
 bool Interpreter::get_field(Object *p_object, std::string_view p_name, Slot *r_value, Kind *r_kind) const {
 	if (!p_object) {
 		return false;
@@ -118,14 +93,6 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		return nullptr;
 	}
 	return object;
-}
-
-uint32_t Interpreter::find_method(uint32_t p_class, std::string_view p_name) const {
-	if (p_class >= methods_.size()) {
-		return NONE;
-	}
-	auto found = methods_[p_class].find(std::string(p_name));
-	return found == methods_[p_class].end() ? NONE : found->second;
 }
 
 } // namespace vm

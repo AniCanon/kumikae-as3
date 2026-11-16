@@ -42,10 +42,6 @@ std::optional<uint32_t> index_number(double p_value) {
 
 } // namespace
 
-Object *Interpreter::held_object(Slot p_value) const {
-	return any::tag(p_value) == AnyTag::Object ? static_cast<Object *>(any::pointer(p_value)) : nullptr;
-}
-
 // The name Flash's messages give what holds a property.
 std::string Interpreter::holder_name(Slot p_holder) const {
 	if (const Object *object = held_object(p_holder)) {

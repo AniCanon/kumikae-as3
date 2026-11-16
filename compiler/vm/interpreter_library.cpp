@@ -11,10 +11,6 @@ bool Interpreter::Asked::element_is(Kind p_kind, Slot p_element, Slot p_value) {
 	return vm.element_is(p_kind, p_element, p_value);
 }
 
-bool Interpreter::Asked::any_primitive(Slot p_value, Slot *r_out, bool p_number) {
-	return vm.any_primitive(p_value, r_out, p_number);
-}
-
 bool Interpreter::Asked::object_of_engine(Slot p_value, uint32_t p_class, bool *r_taken, Slot *r_out) {
 	Object *made = nullptr;
 	if (vm.engine_array(p_value, p_class)) {
@@ -41,10 +37,6 @@ bool Interpreter::Asked::array_number_get(Vector *p_array, double p_number, Slot
 bool Interpreter::Asked::array_number_set(Vector *p_array, double p_number, Slot p_value) {
 	vm.array_number_set(p_array, p_number, p_value);
 	return !vm.failing_;
-}
-
-bool Interpreter::Asked::vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text, bool p_locale) {
-	return vm.vector_text(p_vector, p_separator, r_text, p_locale);
 }
 
 bool Interpreter::Asked::sort_field(Slot p_element, Str *p_name, Slot *r_value) {

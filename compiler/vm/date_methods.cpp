@@ -62,11 +62,6 @@ double Interpreter::utc_time(double p_local) {
 	return p_local - host_.clock.local_offset(guess);
 }
 
-std::string Interpreter::date_text(const Object *p_date, ir::DateText p_which) const {
-	const double time = const_cast<Object *>(p_date)->fields()[ir::DATE_TIME].d;
-	return date::text(p_which, time, std::isnan(time) ? 0 : host_.clock.local_offset(time));
-}
-
 // The parts from the year on, in p_list from p_first (15.9.3.1, 15.9.4.3): a year from 0 to 99 is one of
 // the 1900s; parts left out are the first day, at midnight.
 double Interpreter::date_from_parts(const std::vector<uint32_t> &p_list, size_t p_first, bool p_local) {

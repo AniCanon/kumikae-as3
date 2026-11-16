@@ -46,14 +46,15 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 
 AS3's library is written once, in `vm/`. The parts that are functions of plain values (`vm/library.h`: a
 String's methods, numbers as text, vectors and Arrays, the untyped value's conversions and `is`, objects
-and tables made) are called by generated code as they are: `ir/library_entries.h` names the function for an
+and tables made, a value's text, a function value called) are called by generated code as they are: `ir/library_entries.h` names the function for an
 instruction, the generator writes a call of the runtime's function of that name (`direct.h`), and
 `direct.cpp` hands the values on. What such a function asks of whoever runs the program (`vm::Runner`:
-raise, out of memory, call a function value, a value's text) is answered for generated code there: an
-error is the context's at once, and a function value or a `toString()` is called as the C++ it is.
+raise, out of memory, a function of the program run by its number on typed values) is answered for
+generated code there: an error is the context's at once, and a function of the program is the C++ it is,
+called through its entry.
 
-The rest (RegExp, Date, JSON, properties by name, a value's text, the untyped value's operators, function
-values) are still members of `vm::Interpreter` that work on a frame's registers. For those, and for the
+The rest (RegExp, Date, JSON, properties by name, the untyped value's operators, function values made)
+are still members of `vm::Interpreter` that work on a frame's registers. For those, and for the
 parts of them a moved function still asks for (`vm::Unmoved`), the host keeps an interpreter of its own:
 
 - Its module (`stub_module.cpp`) has the program's classes, static fields and strings under their own
@@ -105,7 +106,9 @@ What this costs, until the split:
 Done: `Heap` (who holds what, the collector, `list_for()`: `vm/heap.h`); a String's methods, `split()`,
 the URI functions and numbers as text; vectors and Arrays (elements, length, making, methods, `sort` and
 `sortOn`); `to_any`, `from_any`, `is` and `is_class`; `New` and `TableNew`; an Error's fields
-(`new_error()`), which native code fills in for an error it raises itself.
+(`new_error()`), which native code fills in for an error it raises itself; a value's text (`any_text`,
+`vector_text`, `object_text`, `any_primitive`) and a call through a function value (`function_call`), which
+run the program's own functions by number (`Runner::run`: for generated code, the function's entry).
 
 Still used here through a thunk, or asked of the interpreter by a moved function (`vm::Unmoved` lists
 exactly those), named so that the split can be checked against it:
@@ -113,15 +116,13 @@ exactly those), named so that the split can be checked against it:
 1. The method wrappers left: `regexp_methods.cpp`, `regexp_strings.cpp` (and with them `split()` by a
    RegExp, which goes by the host's own thunk), `date_methods.cpp`, `json_methods.cpp`,
    `json_stringify.cpp`, `library_members.cpp`.
-2. A value's text (`any_text`, a vector's text in `interpreter_vectors.cpp`, `object_text`), which needs
-   one more thing of the runner: a function of the program called by its number with typed values. With
-   it `Runner::text` and `Runner::call` become library functions themselves.
+2. `sortOn`'s read of an element's property (`Unmoved::sort_field`), which is a property by name: it
+   goes with 3.
 3. Properties by name and tables (`interpreter_properties*.cpp`, `interpreter_property_calls.cpp`), and the
-   untyped value's operators (`interpreter_any_operators.cpp`: equality, `+`, `<`), `any_primitive` and
-   Godot's Arrays and Dictionaries copied.
+   untyped value's operators (`interpreter_any_operators.cpp`: equality, `+`, `<`) and Godot's Arrays and
+   Dictionaries copied.
 4. Function values (`interpreter_functions.cpp`): making one (the one value of a static function is kept
-   by the interpreter), the arguments of a call through one, `apply`. Until then a call the fast path
-   does not take is the library's `apply`, by the host's thunk.
+   by the interpreter) and `apply`. A call through one is the library's function already.
 5. Raising: the words of #1009 and #1000 are still raised by the interpreter for the host
    (`Builtin`), and `object_text` / `error_heading`.
 6. Lifetime: freeing an object with what it holds is the heap's (`Heap::drop_object`), still reached

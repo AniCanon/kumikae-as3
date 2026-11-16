@@ -21,36 +21,31 @@ struct Recorder final : Runner, Unmoved {
 	bool failing() const override { return !raised.empty() || memory > 0; }
 	// Nothing here is still the interpreter's: these answer plainly.
 	bool element_is(Kind, Slot p_element, Slot p_value) override { return p_element.bits == p_value.bits; }
-	bool any_primitive(Slot p_value, Slot *r_out, bool) override {
-		*r_out = p_value;
-		return true;
-	}
 	bool object_of_engine(Slot, uint32_t, bool *, Slot *) override { return false; }
 	bool engine_is(Slot, uint32_t) override { return false; }
 	bool array_number_get(Vector *, double, Slot *) override { return true; }
 	bool array_number_set(Vector *, double, Slot) override { return true; }
-	bool vector_text(Vector *, std::string_view, std::string *, bool) override { return true; }
 	bool sort_field(Slot, Str *, Slot *) override { return true; }
 
 	std::vector<std::string> raised;
 	uint32_t raised_class = kas3::ir::NONE;
 	int memory = 0;
-	int calls = 0;
-	std::string says = "?";
+	// Each function of the program it was asked to run, with how many values; what such a run gives.
+	std::vector<std::pair<uint32_t, size_t>> ran;
+	Slot gives{};
 	void raise(uint32_t p_class, const std::string &p_message) override {
 		raised_class = p_class;
 		raised.push_back(p_message);
 	}
 	void out_of_memory() override { memory++; }
-	bool call(Object *, const Slot *p_arguments, size_t p_count, Slot *r_result) override {
-		calls++;
-		*r_result = p_count ? p_arguments[0] : any::undefined();
+	bool run(uint32_t p_function, const Slot *, size_t p_count, Slot *r_result) override {
+		ran.emplace_back(p_function, p_count);
+		*r_result = gives;
+		retain(static_cast<Str *>(gives.p)); // Every function of test_words() gives a String.
 		return true;
 	}
-	bool text(Slot p_value, std::string *r_text) override {
-		*r_text = any::text(p_value).value_or(says);
-		return true;
-	}
+	uint32_t carries() const override { return 0; }
+	uint32_t runner_depth() const { return wording; }
 };
 
 constexpr uint32_t ARRAY = 0, ERROR = 1, URI_ERROR = 2;
@@ -122,8 +117,7 @@ void test_split() {
 	CHECK(text_call(library, StringFunction::Split, two, 3, &out));
 	CHECK_EQ(static_cast<Vector *>(out.p)->length, 2u);
 	heap.release_object(static_cast<Object *>(out.p));
-	// A delimiter that is no String is put into words by whoever runs the program.
-	recorder.says = "b";
+	// A delimiter that is no String is put into words.
 	const Slot by_number[] = { of_text(text), any::boolean(true), of_number(4294967295.0) };
 	CHECK(text_call(library, StringFunction::Split, by_number, 3, &out));
 	CHECK_EQ(static_cast<Vector *>(out.p)->length, 1u); // "true" is nowhere in it.
@@ -368,9 +362,92 @@ void test_making() {
 	CHECK_EQ(live_objects(), static_cast<size_t>(0));
 }
 
+// A value's words and a function value's call run the program by a function's number, with typed values.
+void test_words() {
+	constexpr uint32_t FUNCTION = 3, POINT = 4, SAY = 0, VALUE = 1, JOIN = 2;
+	kas3::ir::Module module = module_of_three();
+	module.type_error_class = ERROR;
+	module.argument_error_class = ERROR;
+	kas3::ir::Class function;
+	function.name = "Function";
+	function.fields.resize(2);
+	function.fields[kas3::ir::FUNCTION_INDEX].kind = Kind::I32;
+	function.fields[kas3::ir::FUNCTION_FIRST].kind = Kind::Obj;
+	module.classes.push_back(function);
+	module.function_class = FUNCTION;
+	kas3::ir::Class point;
+	point.name = "geom.Point";
+	point.to_string = SAY;
+	point.methods = { SAY, VALUE };
+	module.classes.push_back(point);
+	for (const char *name : { "geom.Point/toString", "geom.Point/valueOf", "join" }) {
+		kas3::ir::Function made;
+		made.name = name;
+		made.result = Kind::Str;
+		made.owner = POINT;
+		made.parameters = made.required = 1;
+		made.registers = { Kind::Obj };
+		module.functions.push_back(made);
+	}
+	kas3::ir::Function &join = module.functions[JOIN];
+	join.owner = kas3::ir::NONE;
+	join.is_static = true;
+	join.parameters = 2;
+	join.registers = { Kind::F64, Kind::Str };
+	Heap heap(module, NoEngine::instance(), NoEngine::instance());
+	Recorder recorder;
+	Library library{ heap, recorder, recorder };
+	Str *said = new_string("(1, 2)");
+	recorder.gives = of_text(said);
+	Object *made = object_new(library, POINT);
+	// String(x) of an object is its class's toString(), run on the object alone.
+	std::string words;
+	CHECK(any_text(library, any::object(made), &words));
+	CHECK_EQ(words, std::string("(1, 2)"));
+	CHECK(recorder.ran.size() == 1 && recorder.ran[0] == std::make_pair(SAY, static_cast<size_t>(1)));
+	// An Array's words are its elements', and nothing of it and no undefined is written.
+	Vector *list = vector_new(library, ARRAY, 3, false);
+	list->data[0] = any::integer(7);
+	list->data[2] = any::object(made);
+	retain(made);
+	words.clear();
+	CHECK(vector_text(library, list, "-", &words));
+	CHECK_EQ(words, std::string("7--(1, 2)"));
+	CHECK_EQ(recorder.runner_depth(), 0u);
+	heap.release_object(list);
+	// As a primitive it is what its valueOf() gives.
+	recorder.ran.clear();
+	Slot primitive = any::undefined();
+	CHECK(any_primitive(library, any::object(made), &primitive));
+	CHECK(any::tag(primitive) == AnyTag::String && recorder.ran.size() == 1 && recorder.ran[0].first == VALUE);
+	heap.drop_any(primitive);
+	CHECK_EQ(object_text(library, made), std::string("[object Point]"));
+	// A function value is called with each argument as its parameter holds it; too many is the ArgumentError.
+	Object *value = object_new(library, FUNCTION);
+	value->fields()[kas3::ir::FUNCTION_INDEX].i = static_cast<int32_t>(JOIN);
+	recorder.ran.clear();
+	const Slot given[] = { any::integer(4), any::integer(5), any::integer(6) };
+	Slot result = any::undefined();
+	CHECK(function_call(library, value, given, 2, &result));
+	CHECK(any::tag(result) == AnyTag::String && recorder.ran.size() == 1 && recorder.ran[0] == std::make_pair(JOIN, static_cast<size_t>(2)));
+	heap.drop_any(result);
+	CHECK(!function_call(library, value, given, 3, &result));
+	CHECK(recorder.raised.back().find("Error #1063: Argument count mismatch on join(). Expected 2, got 3.") == 0);
+	CHECK(!function_call(library, made, given, 0, &result));
+	CHECK(recorder.raised.back().find("Error #1006") == 0);
+	heap.release_object(value);
+	heap.release_object(made);
+	if (release(said)) {
+		free_string(said);
+	}
+	CHECK_EQ(live_objects(), static_cast<size_t>(0));
+	CHECK_EQ(live_strings(), static_cast<size_t>(0));
+}
+
 } // namespace
 
 int main() {
+	test_words();
 	test_making();
 	test_untyped();
 	test_vectors();

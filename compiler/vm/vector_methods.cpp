@@ -94,13 +94,13 @@ void vector_join(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	std::string between(!joined ? std::string_view(",") : separator ? separator->view() : std::string_view("null"));
 	if (p_call.method == VectorMethod::JoinAny && any::tag(p_call.values[1]) != AnyTag::Undefined) {
 		between.clear();
-		if (!p_library.runner.text(p_call.values[1], &between)) {
+		if (!any_text(p_library, p_call.values[1], &between)) {
 			return;
 		}
 	}
 	std::string all;
 	retain(p_vector); // Kept while its elements speak for themselves, which may run the program.
-	const bool done = p_library.unmoved.vector_text(p_vector, between, &all, locale);
+	const bool done = vector_text(p_library, p_vector, between, &all, locale);
 	p_library.heap.release_object(p_vector);
 	if (done) {
 		give(p_library, p_call, Kind::Str, of_pointer(p_library.text(all)));

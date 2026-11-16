@@ -46,6 +46,13 @@ namespace rt {
 //     void vector_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 //     void array_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 //     void vector_from(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// String(x) of an untyped value, and of an object (null reads "null"): a toString() is the program's.
+//     void text_of_any(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+//     void text_of_object(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// CallFunction: the function value (p_which is the kind it is held as, untyped or an object), then the
+// untyped arguments. What it gives is untyped; the caller has made the result's register undefined
+// already, which is what a call that fails leaves there.
+//     void function_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 
 } // namespace rt
 } // namespace kas3

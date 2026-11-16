@@ -85,7 +85,7 @@ bool sort_order(Library &p_library, Kind p_kind, const std::vector<Slot> &p_elem
 		if (p_compare) {
 			Slot both[2] = { to_any(p_library, p_kind, p_elements[p_a]), to_any(p_library, p_kind, p_elements[p_b]) };
 			Slot answer = any::undefined();
-			const bool called = p_library.runner.call(p_compare, both, 2, &answer);
+			const bool called = function_call(p_library, p_compare, both, 2, &answer);
 			p_library.heap.drop_any(both[0]);
 			p_library.heap.drop_any(both[1]);
 			if (!called) {
@@ -140,7 +140,7 @@ bool sort_keys(Library &p_library, Kind p_kind, const std::vector<Slot> &p_eleme
 			(*r_numbers)[at] = number.d;
 		} else {
 			std::string text;
-			ok = p_library.runner.text(untyped, &text);
+			ok = any_text(p_library, untyped, &text);
 			(*r_texts)[at] = (p_options & CASE_INSENSITIVE) ? lower_case(text) : std::move(text);
 		}
 		p_library.heap.drop_any(untyped);
@@ -279,7 +279,7 @@ bool sort_on_fields(Library &p_library, const VectorCall &p_call, std::vector<So
 	}
 	for (Slot each : written) {
 		std::string name;
-		if (!p_library.runner.text(each, &name)) {
+		if (!any_text(p_library, each, &name)) {
 			return false;
 		}
 		r_fields->push_back({ std::move(name), 0 });
@@ -323,7 +323,7 @@ bool sort_on_keys(Library &p_library, const std::vector<SortField> &p_fields, co
 				(*r_numbers)[f * count + i] = as_number.d;
 			} else if (ok) {
 				std::string words;
-				ok = p_library.runner.text(value, &words);
+				ok = any_text(p_library, value, &words);
 				(*r_texts)[f * count + i] = (p_fields[f].options & CASE_INSENSITIVE) ? lower_case(words) : std::move(words);
 			}
 			p_library.heap.drop_any(value); // Undefined if it could not be read.

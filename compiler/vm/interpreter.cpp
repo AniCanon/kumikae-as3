@@ -16,7 +16,7 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host), heap_(p_module, p_host.handles, p_host.source) {
+		module_(p_module), host_(p_host), heap_(p_module, p_host.handles, p_host.source, p_host.clock) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}
@@ -24,14 +24,6 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 	memory_text_ = new_string(OUT_OF_MEMORY);
 	for (const char *name : { "undefined", "boolean", "number", "string", "object", "function" }) {
 		type_names_.push_back(new_string(name));
-	}
-	// A method's function by name, for calls from outside: the class's own and what it inherits.
-	methods_.resize(module_.classes.size());
-	for (size_t i = 0; i < module_.classes.size(); i++) {
-		for (uint32_t method : module_.classes[i].methods) {
-			const std::string &name = module_.functions[method].name;
-			methods_[i][name.substr(name.rfind('/') == std::string::npos ? 0 : name.rfind('/') + 1)] = method;
-		}
 	}
 	class_used_.assign(module_.classes.size(), 0);
 	globals_.resize(module_.globals.size());

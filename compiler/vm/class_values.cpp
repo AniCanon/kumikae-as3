@@ -34,29 +34,6 @@ Object *Interpreter::class_value(uint32_t p_code) {
 	return made;
 }
 
-// A class as AS3 names it in `[class Name]`: without its package.
-std::string Interpreter::class_name(uint32_t p_code) const {
-	switch (p_code) {
-		case ir::ANY_IS_INT:
-			return "int";
-		case ir::ANY_IS_UINT:
-			return "uint";
-		case ir::ANY_IS_NUMBER:
-			return "Number";
-		case ir::ANY_IS_STRING:
-			return "String";
-		case ir::ANY_IS_BOOLEAN:
-			return "Boolean";
-		case ir::ANY_IS_OBJECT:
-			return "Object";
-		default:
-			break;
-	}
-	const std::string &name = p_code < module_.classes.size() ? module_.classes[p_code].name : std::string("?");
-	const bool vector = p_code < module_.classes.size() && module_.classes[p_code].element != Kind::Void;
-	return vector || name.rfind('.') == std::string::npos ? name : name.substr(name.rfind('.') + 1);
-}
-
 std::optional<uint32_t> Interpreter::class_in(Slot p_class, std::string_view p_error) {
 	const Object *object = held_object(p_class);
 	if (object && module_.class_class != NONE && object->klass == module_.class_class) {
