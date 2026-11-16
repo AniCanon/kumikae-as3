@@ -95,9 +95,12 @@ std::optional<bool> Interpreter::library_call(Object *p_object, std::string_view
 		if (!p_given.empty() && !from_any(p_given[0], Kind::Str, ir::NONE, &text)) {
 			return false;
 		}
-		const Str *given = static_cast<const Str *>(text.p);
+		if (p_given.empty()) {
+			text.p = this->text(std::string());
+		}
+		Str *given = static_cast<Str *>(text.p);
 		const bool test = *which == ir::RegExpFunction::Test;
-		const bool ran = regexp_run(p_object, p_given.empty() ? std::string_view() : given ? given->view() : std::string_view("null"), test, &out);
+		const bool ran = (given || !p_given.empty()) && regexp_run(p_object, given ? given : null_text_, test, &out);
 		drop(Kind::Str, text);
 		if (!ran) {
 			return false;

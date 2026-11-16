@@ -95,7 +95,7 @@ std::optional<Interpreter::Found> Interpreter::find_match(const regex::Program &
 
 // What exec() gives: the match and each group, as Strings, undefined for a group that took no part; and as
 // its properties `index` (where the match starts), `input` (the text searched) and each named group.
-Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program) {
+Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program, Str *p_input) {
 	const size_t count = p_found.captures.size() / 2;
 	Vector *array = fresh_vector(module_.array_class, count);
 	for (size_t i = 0; array && i < count; i++) {
@@ -120,18 +120,17 @@ Vector *Interpreter::match_array(const Found &p_found, const std::u16string &p_t
 		drop_any(p_value);
 		return set;
 	};
-	Str *input = text(text_of_units(p_text));
+	// The text searched itself, shared: a loop of exec() makes no copy of it for each match.
+	Str *input = p_input ? p_input : null_text_;
+	retain(input);
 	// `input` first: the property takes the string and lets it go, whatever comes after.
-	bool ok = input && property("input", any::string(input)) && property("index", any::integer(p_found.captures[0]));
+	bool ok = property("input", any::string(input)) && property("index", any::integer(p_found.captures[0]));
 	for (size_t i = 0; ok && i < p_program.names.size(); i++) {
 		if (!p_program.names[i].empty() && i + 1 < count) {
 			ok = property(text_of_units(p_program.names[i]), share(Kind::Any, array->data[i + 1]));
 		}
 	}
 	if (!ok) {
-		if (!input) {
-			out_of_memory();
-		}
 		release_object(array);
 		return nullptr;
 	}
@@ -251,8 +250,9 @@ void Interpreter::regexp_exec(const Function &p_function, const Instruction &p_i
 		return;
 	}
 	const bool test = static_cast<RegExpFunction>(p_in.b) == RegExpFunction::Test;
+	Str *subject = r[list[1]].p ? static_cast<Str *>(r[list[1]].p) : null_text_;
 	Slot out;
-	if (regexp_run(regexp, text_in(static_cast<const Str *>(r[list[1]].p)), test, &out)) {
+	if (regexp_run(regexp, subject, test, &out)) {
 		if (test) {
 			r[p_in.a] = out;
 		} else {
@@ -261,13 +261,33 @@ void Interpreter::regexp_exec(const Function &p_function, const Instruction &p_i
 	}
 }
 
-bool Interpreter::regexp_run(Object *p_regexp, std::string_view p_text, bool p_test, Slot *r_out) {
+std::shared_ptr<const std::u16string> Interpreter::subject_units(Str *p_text) {
+	if (p_text != subject_ || !subject_units_) {
+		forget_subject();
+		subject_units_ = std::make_shared<const std::u16string>(units_of(p_text->view()));
+		retain(p_text);
+		subject_ = p_text;
+	}
+	return subject_units_;
+}
+
+void Interpreter::forget_subject() {
+	subject_units_.reset();
+	if (release(subject_)) {
+		free_string(subject_);
+	}
+	subject_ = nullptr;
+}
+
+bool Interpreter::regexp_run(Object *p_regexp, Str *p_text, bool p_test, Slot *r_out) {
 	const std::shared_ptr<const regex::Program> program = pattern_of(p_regexp);
 	if (!program) {
 		return false;
 	}
 	const std::string_view source = text_in(static_cast<const Str *>(p_regexp->fields()[ir::REGEXP_SOURCE].p));
-	const std::u16string units = units_of(p_text);
+	// Held here: what this run makes can't run the program, but nothing is left to chance.
+	const std::shared_ptr<const std::u16string> held = subject_units(p_text);
+	const std::u16string &units = *held;
 	const bool global = (program->flags & regex::GLOBAL) != 0;
 	double &last = p_regexp->fields()[ir::REGEXP_LAST_INDEX].d;
 	const double from = global && !std::isnan(last) ? std::trunc(last) : 0;
@@ -286,7 +306,7 @@ bool Interpreter::regexp_run(Object *p_regexp, std::string_view p_text, bool p_t
 		r_out->b = found.has_value();
 		return true;
 	}
-	Vector *array = found ? match_array(*found, units, *program) : nullptr;
+	Vector *array = found ? match_array(*found, units, *program, p_text) : nullptr;
 	if (found && !array) {
 		return false;
 	}

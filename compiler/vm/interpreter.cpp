@@ -57,6 +57,7 @@ Interpreter::~Interpreter() {
 	if (failing_) {
 		drop_any(pending_);
 	}
+	forget_subject();
 	// With every root let go of, what is left in loops is held only by itself, or by the host.
 	collector_.collect();
 	for (Str *constant : strings_) {
@@ -88,6 +89,7 @@ void Interpreter::clear_globals() {
 		globals_[i].bits = 0;
 		drop(module_.globals[i].kind, value);
 	}
+	forget_subject();
 }
 
 int Interpreter::line_at(size_t p_frame) const {

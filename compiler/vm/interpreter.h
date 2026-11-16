@@ -179,8 +179,14 @@ private:
 	void regexp_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	void regexp_new(const ir::Function &p_function, const ir::Instruction &p_in);
 	void regexp_exec(const ir::Function &p_function, const ir::Instruction &p_in);
-	// exec() (untyped: the match's Array, or null) or test() (a Boolean). False if it raised.
-	bool regexp_run(Object *p_regexp, std::string_view p_text, bool p_test, Slot *r_out);
+	// exec() (untyped: the match's Array, or null) or test() (a Boolean) on p_text, not null. False if it raised.
+	bool regexp_run(Object *p_regexp, Str *p_text, bool p_test, Slot *r_out);
+	// The last text exec() or test() searched, held, and its UTF-16 units: a loop over a global RegExp's
+	// matches converts its text once, not once a match. A String never changes, so the one held is the key.
+	Str *subject_ = nullptr;
+	std::shared_ptr<const std::u16string> subject_units_;
+	std::shared_ptr<const std::u16string> subject_units(Str *p_text);
+	void forget_subject();
 	Slot regexp_read(Object *p_regexp, ir::RegExpFunction p_property); // source (a new reference), or a flag
 	// RegExp's and Date's members by name on a value held untyped (vm/library_members.cpp): nothing if the
 	// object is neither, or has no member of that name; false if it raised. A call's result goes to p_out.
@@ -189,7 +195,8 @@ private:
 	std::optional<bool> library_call(Object *p_object, std::string_view p_name, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool library_has(const Object *p_object, std::string_view p_name) const;
 	std::optional<Found> find_match(const regex::Program &p_program, std::string_view p_source, const std::u16string &p_text, uint32_t p_from);
-	Vector *match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program);
+	// p_input is the text searched (null for "null"), which the Array's `input` shares.
+	Vector *match_array(const Found &p_found, const std::u16string &p_text, const regex::Program &p_program, Str *p_input);
 	std::shared_ptr<const regex::Program> pattern_argument(Slot p_pattern, Object **r_regexp, std::string *r_source);
 	void string_match(const ir::Function &p_function, const ir::Instruction &p_in);
 	void string_search(const ir::Function &p_function, const ir::Instruction &p_in);
