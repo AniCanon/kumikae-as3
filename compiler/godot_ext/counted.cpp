@@ -9,14 +9,22 @@
 // object goes, and the script object with it; if not, the script object is kept until Godot frees the
 // Godot object. Nothing here gives up a reference from inside Godot's own counting, where a last one can't
 // be let go (Godot waits for itself).
+//
+// A script taken off its Godot object (set_script(null), or another script put in its place) ends the pair:
+// the instance gives its reference back, and the script object, if the program still holds it, lives on
+// alone, as a script object whose Node was freed does. Its fields are AS3's; its handle on the Godot object
+// (field 0) is borrowed and keeps nothing, so the Godot object lives while Godot holds it, and once it is
+// gone a call on it is AS3's error about a freed object.
 #include "callable.h"
 #include "instance.h"
 #include "program.h"
 
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/core/object.hpp>
 
 #include <unordered_map>
+#include <vector>
 
 using namespace godot;
 
@@ -26,6 +34,14 @@ namespace {
 
 std::unordered_map<const vm::Object *, ScriptInstance *> &held() {
 	static std::unordered_map<const vm::Object *, ScriptInstance *> all;
+	return all;
+}
+
+// Godot objects whose last reference a script gave back as it was taken off them: Godot is inside
+// set_script() then, and goes on using the object, so it is freed later (free_detached()), by its id, in
+// case Godot freed it first. Its count is zero, and nothing can take a reference to it again.
+std::vector<ObjectID> &detached() {
+	static std::vector<ObjectID> all;
 	return all;
 }
 
@@ -97,6 +113,15 @@ void counted_freed(ScriptInstance *p_instance) {
 	if (!object) {
 		return; // The program let go of it, which is what freed the Godot object.
 	}
+	if (p_instance->holding) {
+		// Only a script taken off its object can be freed while it holds it: Godot frees a held object only
+		// when made to (memdelete), and then its id is gone before free_detached() looks.
+		p_instance->holding = false;
+		RefCounted *counted = Object::cast_to<RefCounted>(p_instance->owner);
+		if (counted && counted->unreference()) {
+			detached().push_back(ObjectID(counted->get_instance_id()));
+		}
+	}
 	held().erase(object);
 	forget_listeners(object);
 	p_instance->object = nullptr;
@@ -104,6 +129,15 @@ void counted_freed(ScriptInstance *p_instance) {
 	if (object->references == 0) {
 		Project::get().interpreter().free_kept(object);
 	}
+}
+
+void free_detached() {
+	for (const ObjectID id : detached()) {
+		if (Object *gone = ObjectDB::get_instance(id)) {
+			memdelete(gone);
+		}
+	}
+	detached().clear();
 }
 
 void counted_moved(const vm::Object *p_old, ScriptInstance *p_instance) {

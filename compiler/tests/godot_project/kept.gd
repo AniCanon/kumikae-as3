@@ -67,5 +67,31 @@ func _initialize() -> void:
 	show("attached, kept while AS3 holds it", [weak_attached.get_ref() != null, node.call("heldN")], [true, 3])
 	node.call("letGoOfHeld")
 	show("attached, freed when AS3 lets go too", weak_attached.get_ref() == null, true)
+
+	# Detached while AS3 holds it: the object no longer keeps its Godot object, which goes when Godot lets go.
+	attached = RefCounted.new()
+	attached.set_script(load("res://Counted.as"))
+	attached.set("n", 4)
+	attached.call("hold")
+	weak_attached = weakref(attached)
+	var held_count := attached.get_reference_count()
+	attached.set_script(null)
+	show("detached, AS3's hold given back", [held_count, attached.get_reference_count()], [2, 1])
+	attached = null
+	show("detached, freed when Godot lets go", [weak_attached.get_ref() == null, node.call("heldN")], [true, 4])
+	node.call("letGoOfHeld")
+
+	# Detached by its own script while only AS3 holds it: it goes, after the call that detached it.
+	attached = RefCounted.new()
+	attached.set_script(load("res://Counted.as"))
+	attached.set("n", 5)
+	attached.call("hold")
+	weak_attached = weakref(attached)
+	attached = null
+	node.call("detachHeld")
+	await process_frame # Freed at the end of a frame (the language's frame()): this one's, and the next.
+	await process_frame
+	show("detached by itself, freed once nothing holds it", [weak_attached.get_ref() == null, node.call("heldN")], [true, 5])
+	node.call("letGoOfHeld")
 	node.free()
 	quit()

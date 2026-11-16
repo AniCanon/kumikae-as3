@@ -2,6 +2,7 @@
 
 #include "builtins.h"
 #include "callable.h"
+#include "instance.h"
 #include "lower.h"
 #include "names.h"
 #include "script.h"
@@ -39,6 +40,7 @@ uint64_t Project::generation() {
 
 void Project::before_shutdown() {
 	forget_scenes();
+	free_detached();
 	if (program && program->valid()) {
 		release_listeners();
 		program->interpreter().clear_globals();
@@ -127,6 +129,7 @@ Project &Project::get() {
 static const size_t COLLECTOR_WORK = 10000;
 
 void Project::collect_step() {
+	free_detached();
 	if (program && program->valid_) {
 		program->interpreter_->collect_step(COLLECTOR_WORK);
 	}

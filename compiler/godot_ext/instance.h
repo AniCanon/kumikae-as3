@@ -30,6 +30,9 @@ void counted_attached(ScriptInstance *p_instance);
 void hold_if_referenced(vm::Object *p_object);
 // Godot frees the object a counted instance is on: its script object goes too, now.
 void counted_freed(ScriptInstance *p_instance);
+// The Godot objects whose last reference a script gave back as it was taken off them are freed: once a
+// frame, and as Godot shuts down. On the main thread, outside any call of Godot's.
+void free_detached();
 // A reload gave the instance its object in the new program.
 void counted_moved(const vm::Object *p_old, ScriptInstance *p_instance);
 
