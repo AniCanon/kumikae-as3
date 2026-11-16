@@ -62,6 +62,8 @@ class Server {
 	Json references(const Json &p_params);
 	Json hover(const Json &p_params);
 	Json completion(const Json &p_params);
+	Json completion_item(const Unit &p_unit, const Completion &p_found, const CompletionRange &p_span,
+			const Json &p_edit_range, uint32_t p_priority) const;
 	Json signature_help(const Json &p_params);
 	Json document_symbols(const Json &p_params);
 	Json workspace_symbols(const Json &p_params);

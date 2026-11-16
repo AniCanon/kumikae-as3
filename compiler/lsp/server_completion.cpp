@@ -74,6 +74,55 @@ static std::string edit_snippet(const Completion &p_item) {
 	return result + snippet_escape(text.substr(previous));
 }
 
+// One item of the list, in the order p_priority gives it.
+Json Server::completion_item(const Unit &p_unit, const Completion &p_found, const CompletionRange &p_span,
+		const Json &p_edit_range, uint32_t p_priority) const {
+	Json item = Json::object().set("label", p_found.name).set("kind", completion_kind(p_found));
+	if (!p_found.detail.empty()) {
+		item.set("detail", p_found.detail);
+	}
+	char order[16];
+	std::snprintf(order, sizeof(order), "%08u", p_priority);
+	item.set("sortText", order);
+	if (p_found.is_parameter_name) {
+		item.set("preselect", true);
+	}
+	const bool call = snippets_ && p_span.call && p_found.callable;
+	if (p_found.additional_edit) {
+		const auto &import = *p_found.additional_edit;
+		item.set("additionalTextEdits", Json::array().push(Json::object()
+				.set("range", range(p_unit, import.begin, import.end - import.begin)).set("newText", import.text)));
+	}
+	if (p_found.edit) {
+		const auto &primary = *p_found.edit;
+		std::string text = primary.text;
+		if (snippets_ && !p_found.tab_stops.empty()) {
+			text = edit_snippet(p_found);
+			item.set("insertTextFormat", 2);
+		} else if (p_found.is_keyword) {
+			text = p_found.name;
+		}
+		item.set("textEdit", Json::object().set("range", range(p_unit, primary.begin, primary.end - primary.begin))
+				.set("newText", std::move(text)));
+	} else if (default_edit_range_) {
+		if (call) {
+			item.set("textEditText", insertion(p_found, true));
+		}
+	} else {
+		Json edit = Json::object().set("newText", insertion(p_found, call));
+		if (insert_replace_) {
+			edit.set("insert", p_edit_range.get("insert")).set("replace", p_edit_range.get("replace"));
+		} else {
+			edit.set("range", p_edit_range);
+		}
+		item.set("textEdit", std::move(edit));
+	}
+	if (call) {
+		item.set("insertTextFormat", 2);
+	}
+	return item;
+}
+
 Json Server::completion(const Json &p_params) {
 	Json items = Json::array();
 	bool incomplete = false;
@@ -95,50 +144,7 @@ Json Server::completion(const Json &p_params) {
 		const auto completion = queries.complete(*unit, offset);
 		incomplete = completion.incomplete;
 		for (const Completion &found : completion.items) {
-			Json item = Json::object().set("label", found.name).set("kind", completion_kind(found));
-			if (!found.detail.empty()) {
-				item.set("detail", found.detail);
-			}
-			char order[16];
-			std::snprintf(order, sizeof(order), "%08u", priority++);
-			item.set("sortText", order);
-			if (found.is_parameter_name) {
-				item.set("preselect", true);
-			}
-			const bool call = snippets_ && span.call && found.callable;
-			if (found.additional_edit) {
-				const auto &import = *found.additional_edit;
-				item.set("additionalTextEdits", Json::array().push(Json::object()
-						.set("range", range(*unit, import.begin, import.end - import.begin)).set("newText", import.text)));
-			}
-			if (found.edit) {
-				const auto &primary = *found.edit;
-				std::string text = primary.text;
-				if (snippets_ && !found.tab_stops.empty()) {
-					text = edit_snippet(found);
-					item.set("insertTextFormat", 2);
-				} else if (found.is_keyword) {
-					text = found.name;
-				}
-				item.set("textEdit", Json::object().set("range", range(*unit, primary.begin, primary.end - primary.begin))
-						.set("newText", std::move(text)));
-			} else if (default_edit_range_) {
-				if (call) {
-					item.set("textEditText", insertion(found, true));
-				}
-			} else {
-				Json edit = Json::object().set("newText", insertion(found, call));
-				if (insert_replace_) {
-					edit.set("insert", edit_range.get("insert")).set("replace", edit_range.get("replace"));
-				} else {
-					edit.set("range", edit_range);
-				}
-				item.set("textEdit", std::move(edit));
-			}
-			if (call) {
-				item.set("insertTextFormat", 2);
-			}
-			items.push(std::move(item));
+			items.push(completion_item(*unit, found, span, edit_range, priority++));
 		}
 	}
 	Json result = Json::object().set("isIncomplete", incomplete).set("items", std::move(items));
