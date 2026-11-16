@@ -31,10 +31,11 @@ static int completion_kind(const Completion &p_item) {
 	}
 }
 
-static std::string snippet_escape(std::string_view p_text) {
+static std::string snippet_escape(std::string_view p_text, bool p_placeholder = false) {
 	std::string result;
 	for (char c : p_text) {
-		if (c == '$' || c == '}' || c == '\\') {
+		// Only a placeholder uses '}' as a delimiter. Rider preserves an unnecessary top-level escape.
+		if (c == '$' || c == '\\' || (p_placeholder && c == '}')) {
 			result += '\\';
 		}
 		result += c;
@@ -51,13 +52,31 @@ static std::string insertion(const Completion &p_item, bool p_call) {
 		if (i) {
 			result += ", ";
 		}
-		result += "${" + std::to_string(i + 1) + ":" + snippet_escape(p_item.required_parameters[i]) + "}";
+		result += "${" + std::to_string(i + 1) + ":" + snippet_escape(p_item.required_parameters[i], true) + "}";
 	}
 	return result + ")$0";
 }
 
+static std::string edit_snippet(const Completion &p_item) {
+	const std::string_view text = p_item.edit->text;
+	std::string result;
+	uint32_t previous = 0;
+	for (const auto &stop : p_item.tab_stops) {
+		result += snippet_escape(text.substr(previous, stop.begin - previous));
+		if (stop.begin == stop.end) {
+			result += "$" + std::to_string(stop.index);
+		} else {
+			result += "${" + std::to_string(stop.index) + ":" +
+					snippet_escape(text.substr(stop.begin, stop.end - stop.begin), true) + "}";
+		}
+		previous = stop.end;
+	}
+	return result + snippet_escape(text.substr(previous));
+}
+
 Json Server::completion(const Json &p_params) {
 	Json items = Json::array();
+	bool incomplete = false;
 	Json defaults;
 	Unit *unit = unit_of(p_params);
 	if (unit && p_params.get("position").is_object()) {
@@ -73,7 +92,9 @@ Json Server::completion(const Json &p_params) {
 			defaults = Json::object().set("editRange", edit_range);
 		}
 		uint32_t priority = 0;
-		for (const Completion &found : queries.complete(*unit, offset)) {
+		const auto completion = queries.complete(*unit, offset);
+		incomplete = completion.incomplete;
+		for (const Completion &found : completion.items) {
 			Json item = Json::object().set("label", found.name).set("kind", completion_kind(found));
 			if (!found.detail.empty()) {
 				item.set("detail", found.detail);
@@ -82,7 +103,23 @@ Json Server::completion(const Json &p_params) {
 			std::snprintf(order, sizeof(order), "%08u", priority++);
 			item.set("sortText", order);
 			const bool call = snippets_ && span.call && found.callable;
-			if (default_edit_range_) {
+			if (found.additional_edit) {
+				const auto &import = *found.additional_edit;
+				item.set("additionalTextEdits", Json::array().push(Json::object()
+						.set("range", range(*unit, import.begin, import.end - import.begin)).set("newText", import.text)));
+			}
+			if (found.edit) {
+				const auto &primary = *found.edit;
+				std::string text = primary.text;
+				if (snippets_ && !found.tab_stops.empty()) {
+					text = edit_snippet(found);
+					item.set("insertTextFormat", 2);
+				} else if (found.is_keyword) {
+					text = found.name;
+				}
+				item.set("textEdit", Json::object().set("range", range(*unit, primary.begin, primary.end - primary.begin))
+						.set("newText", std::move(text)));
+			} else if (default_edit_range_) {
 				if (call) {
 					item.set("textEditText", insertion(found, true));
 				}
@@ -101,7 +138,7 @@ Json Server::completion(const Json &p_params) {
 			items.push(std::move(item));
 		}
 	}
-	Json result = Json::object().set("isIncomplete", false).set("items", std::move(items));
+	Json result = Json::object().set("isIncomplete", incomplete).set("items", std::move(items));
 	if (!defaults.is_null()) {
 		result.set("itemDefaults", std::move(defaults));
 	}

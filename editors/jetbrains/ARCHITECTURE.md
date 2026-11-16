@@ -8,6 +8,39 @@ semantics stay in `kas3c`; editor interaction stays in the IDE. AS3 debugging re
 `As3LspSupportProvider` starts one project-wide native LSP client using the located compiler.
 Completion, signature help, diagnostics and navigation come from that server. Standard LSP edits and
 snippets go through the platform lookup pipeline; the plugin does not override Tab globally.
+Rider's public notification-handler hook wraps diagnostic version validation and native cache insertion
+in one read action. Rider sends incremental changes from `beforeDocumentChange`; without this boundary,
+a reply can cache old offsets under the new document version while the write is still in progress.
+The short, synchronous cache publication is not cancellable/retried because it has side effects.
+It checks project disposal inside the read action and adds no worker, queue or diagnostic cache.
+
+`As3Lsp4ijDiagnostics` rejects ranges outside the current document before building an annotation,
+including stale ranges after whole-document replacement. Empty-file diagnostics use an end-of-line
+annotation. `As3Lsp4ijClient` refreshes the client’s accepted diagnostic cache after publication, including
+identical diagnostics whose earlier repaint an edit invalidated. It rejects replies while an edit is
+uncommitted and skips refresh for mismatched versions or disposed clients. Cache publication and the
+refresh stamp share read access; the existing client queue coalesces refreshes. A signature-checked
+bridge reads LSP4IJ’s package-private version accessor, covered by the native probe. The server remains
+the source of diagnostic content.
+
+On Rider RD-262.10968.170, `RiderProjectLifetime` owns the native Current File Problems panel even when
+the split view replaces its component. Closing also releases the captured frame's callbacks and
+painters and any global focus root belonging to a released editor. Cleanup checks both disposal and
+frame ownership before touching the old root; another project's frame is left intact.
+`RiderFeedbackLifetime` preserves native feedback eligibility while owning its idle subscription.
+`RiderDatabaseLifetime` constructs the native database startup activity with a project service's scope,
+so a project closed during startup cancels that work. Service lookups check disposal under read access.
+The exact-build bridge validates and invokes its native startup entry point; reflective calls need runtime
+coverage even when static verification passes. Extension replacements register before removing
+the original and roll back on failure. Each repair reports failure independently.
+
+These bridges run only on the exact tested Rider build and validate native signatures before use.
+They do not modify IDE files. The plugin requires restart, and an unload veto protects native modules
+whose startup extensions it owns. The verifier cannot validate reflective calls: the stock IDE probes
+must pass before changing the supported build.
+
+AS3 language-block templates use that same client pipeline. Their ordinary source text and tab-stop
+spans originate in compiler queries; no template catalogue or snippet parser is duplicated in Kotlin.
 
 `As3ParserDefinition` creates token-only PSI, sufficient for native editor integration. `As3Lexer`
 recognizes code, punctuation and non-code text, retaining lexical state at token boundaries for
@@ -26,6 +59,9 @@ The sandbox `UiProbeLanguage` exercises native typing actions. `UiProbeCompletio
 native lookup against the bundled server in a disposable project. The compiler tests separately cover
 scope/type semantics, wire capabilities, Unicode ranges and cache invalidation. See the
 [results](../../docs/results/2026-11-completion.md) for observed coverage and remaining limitations.
+`UiProbeFocus` scopes the platform's window-deactivation test control to those background sandbox runs
+and restores it on exit. It prevents desktop focus changes from dismissing the test's live lookup;
+ordinary live-editor focus remains controlled by the IDE.
 
 ## Simulator composition
 
@@ -176,8 +212,8 @@ The idb fallback asks its source for changes dynamically.
 Compose Swing UI is pinned to 0.1.0-alpha06 from JetBrains' Compose Maven
 repository; the Compose compiler matches the Kotlin compiler. It is Compose
 Runtime driving Swing components, with no separate renderer. Because the
-library is an alpha, the plugin accepts only the platform build it has been
-tried on. `ui/ComposeUi.kt` holds the few shared composables (`IconButton`,
+library is an alpha, the plugin limits its platform range to the tested IDEA and Rider endpoints;
+builds between them are not individually verified. `ui/ComposeUi.kt` holds the few shared composables (`IconButton`,
 `TitleButton`, `Pill`, `StatusLine`, `Native`, `NativeScrollPane`) and
 `ui/Controls.kt` the small painted controls behind them. `DeviceFrame` works out
 where the device and its screen sit in the view and draws the body around the
@@ -219,3 +255,37 @@ Native Unicode input uses shared string validation, copies unchanged UTF-8 throu
 injected guest pasteboard, then sends the native paste shortcut. A failed copy sends
 no shortcut. The command runner owns separate pipe workers for each child and joins
 them when that child ends; blocking pipe work never occupies the shared common pool.
+
+Language-server launch discovery and declaration refresh belong to `As3ProjectLanguageService`.
+Its disposable alarm drives one bounded refresh controller per project, instead of a sleeping worker
+for every opened file. Disposal cancels scheduled work; callbacks delivered after disposal do nothing.
+The missing-compiler warning is also project-owned. `DeclarationRefreshTest` checks scheduling,
+success, retry bounds and disposal with injected callbacks and no real threads.
+
+The local lexer carries expression/control/brace context in its restart state. Deep stacks use a
+prefix replay sentinel instead of keeping old document states. The UI probe checks auto-import and
+override additional edits through native completion acceptance and one Undo. Its plain-text-only mode
+(`KUMIKAE_COMPLETION_CONTROL_PROBE=1`) opens the same temporary projects without an AS3 session, to
+separate platform lifecycle warnings from completion activity.
+
+## Language-client adapters
+
+The base descriptor contains local typing, syntax and project tools. Optional descriptors load Rider's
+native integration only in Rider, and LSP4IJ's server, parameter help and outline only in IDEA. The
+IDEA condition is the outer dependency and LSP4IJ is nested inside it. Rider therefore has no LSP4IJ
+class-loader dependency, even when that plugin is installed. This keeps protocol classes and editor
+handlers isolated. No native LSP class is loaded on the IDEA path.
+
+`As3ServerLaunch` owns compiler launch arguments and initialization options. Both clients use the same
+project language service for compiler discovery and bounded declaration refresh. LSP4IJ owns its
+connection provider and process shutdown; there is no additional worker or response cache.
+`As3Lsp4ijCompletion` uses LSP4IJ's public completion feature extension to refresh suggestions after
+prefix changes. Its lookup data stores the request-time caret and server item. A public lookup listener
+selects Enter's insert range or Tab's replacement range before insertion and copies positions before the
+client adjusts them. The lookup owns that data and listener; there is no project or global item cache.
+All snippet insertion, additional edits, cancellation and Undo remain in the client. Initialization
+advertises the diagnostic-version filtering that LSP4IJ already implements, so the server can tag its
+publications and the client can reject mismatched versions.
+
+An IDEA project without enabled LSP4IJ receives one actionable notification when an AS3 file opens.
+That listener imports no optional client classes, so missing dependencies cannot break local typing.

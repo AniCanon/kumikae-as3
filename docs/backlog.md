@@ -28,7 +28,7 @@ it stands.
 | **LS-2** | Language server, second slice (after 2c) | 14 | Windows, Rider, positions, references. Completion was brought forward and built on 2026-11-14, at the owner's word |
 | **2d** | Editor features | 25 | The cycle collector and everything about listener loops, what GDScript sees of a script, exit and first-scan crashes |
 | **clean-up** | A pass that closes stage 2 | 55 | What is left |
-| **decision** | The owner | 11 | See each item |
+| **decision** | The owner | 10 | See each item |
 
 A stage's plan lists its backlog items as tasks, and its "done when" includes them.
 
@@ -64,11 +64,11 @@ fields are set on a class's first use, and a call on a null object evaluates its
 
 ## Language server, first slice
 
-- **Manual Rider acceptance remains pending.** The native plugin passes sandbox completion and typing
-  checks; a person still needs to accept the full editing and navigation workflow. The completion probe
-  also reports a platform `HighlightingPanel` retained on rapid project close; isolate it in a sustained
-  IDE heap profile. **LS-2**
-- **Windows is not supported:** text-mode reads and writes, and `/` assumed in paths. **LS-2**
+- **Manual editor acceptance remains pending.** Automated Rider and free unified IDEA checks cover
+  completion, Undo, diagnostics and navigation. The plugin supplies the tested Rider lifetime repairs
+  while preserving split Problems; see [validation](results/2026-11-completion-followup.md). **LS-2**
+- **Windows runtime validation is pending.** Binary stdio, pipe readiness, UTF-8 filesystem paths, network
+  share URIs and `.exe` discovery are implemented; host-side fixtures do not establish Windows support. **LS-2**
 - The same file reached through a symbolic link, or under a different letter case, or in a different
   Unicode form, counts as two files. **LS-2**
 - Symbol search covers the project only, not Godot's classes. **LS-2**
@@ -238,12 +238,12 @@ any Godot value passing as a condition):
 
 - Completion after a dot needs the value's type: nothing is offered for `*`, for a value whose type could
   not be worked out, or for a package path (`flash.utils.`). **LS-2**
-- No completion of a parameter's name in a call or of an override's signature. **LS-2**
-- The local JetBrains lexer cannot distinguish every regex from division after a closing brace.
-  Compiler completion and signature queries use the parser's regex regions; local pairing needs fuller
-  syntax context in this ambiguous case. **LS-2**
-- Whether a `name:` is a type's place is read from the text before it, not from the tree, when the type
-  has not been started (`var a:`). **LS-2**
+- Parameter-name completion inside an existing call is not implemented. Override stubs require an
+  unfinished `override function` name; existing signatures are left intact. **LS-2**
+- General incremental checking remains pending. The body-only fast path falls back for declaration
+  changes, syntax errors, accessors, interfaces and function-local imports. **LS-2**
+- Cancellation skips queued requests; a semantic check already running cannot be interrupted. A future
+  cooperative checker must preserve single-owner mutable AST access and differential equivalence. **LS-2**
 
 ## Reload while running
 

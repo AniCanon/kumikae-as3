@@ -29,6 +29,21 @@ Every group runs under `ctest`. What each is, in more words, is in the
 capability negotiation, snippets, insertion/replacement ranges (including Unicode whitespace), and
 argument help. `test_lsp_stdio.py` repeats protocol cases against the executable. `test_workspace`
 checks cache counts across repeated requests, forty changed compilations, and document close.
+Override wire tests compare the complete insertion text, including the closing brace and final caret,
+with snippet support enabled/disabled and with CRLF source.
+`test_statement_completion` checks language-block text, fresh compilation of generated defaults,
+ordered/mirrored tab-stop spans, partial/full keywords, nested statements, expression/header exclusions,
+empty recovery gaps, CRLF and suffix replacement. The stdio group negotiates language templates with
+snippet support and completion-list defaults independently. Real client insertion, Tab navigation,
+mirrored-name editing and immediate Undo run in the JetBrains sandbox probe.
+
+`test_override_completion` covers qualified default constants, inaccessible references, independent
+getter/setter overrides and final modifiers in either declaration order. It also covers inherited
+accessor slots, shadowing during error recovery and empty-name completion. Accepted edits are checked
+with a fresh compiler. `query_completion.h` shares completion fixtures and edit application with
+`test_query`; it contains no production rules.
+Empty-name cases include following methods, fields, modifiers and metadata with comments and CRLF.
+`test_parser` checks that recovery retains those declarations and accepts valid multiline names.
 
 For alternating completion timings, build the unchanged revision separately before editing, then run:
 
@@ -42,3 +57,17 @@ of twenty changes, with Godot loaded, in small and generated 100,000-line projec
 has 5,003 lines. Run without concurrent builds for comparable timings. RSS samples describe process
 pages; the workspace tests provide separate evidence about live cache ownership. Keep check/run
 controls from `bench/run_bench.py --against` alongside these results.
+
+The completion driver also accepts `--valid-body`: it changes a comment inside a valid method while
+requesting members at a dot. Run both modes. The default malformed-expression fixture measures the
+full-check recovery path; it must not be presented as evidence for incremental body reuse. The baseline
+and candidate always receive identical source and edit sequences.
+
+Follow-up regressions cover fresh-check equivalence after body edits, imports moved between functions,
+cross-file batch ordering, released parse snapshots, generated edits, stale document versions, queued
+cancellation and partial-frame responsiveness. Windows URI fixtures run on the host platform; executing
+the Windows runtime branches remains a separate validation requirement.
+Diagnostic clearing tests reproduce an error followed by successive clean versions: even if the client
+discards an earlier clear, the next version supplies another. In-process checks also cover unchanged
+text at a new version, duplicate suppression, an unrelated file's check, close/reopen and clients
+without version support. The stdio test waits for each actual publication before sending the next edit.

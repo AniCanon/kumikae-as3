@@ -1,0 +1,17 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="kumikae.as3" name="ActionScript 3"
+                factoryClass="app.anicanon.kumikae.as3.language.As3Lsp4ijFactory"/>
+        <languageMapping language="KumikaeAS3" languageId="actionscript" serverId="kumikae.as3"/>
+    </extensions>
+    <extensions defaultExtensionNs="com.intellij">
+        <codeInsight.parameterInfo language="KumikaeAS3"
+            implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
+        <lang.psiStructureViewFactory language="KumikaeAS3"
+            implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+    </extensions>
+    <projectListeners>
+        <listener class="app.anicanon.kumikae.as3.language.As3Lsp4ijLookupListener"
+            topic="com.intellij.codeInsight.lookup.LookupManagerListener"/>
+    </projectListeners>
+</idea-plugin>

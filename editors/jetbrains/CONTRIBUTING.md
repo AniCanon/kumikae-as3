@@ -88,3 +88,72 @@ probe plugin is excluded from the distributable ZIP.
 The native lookup probe supplies an activation event to its sandbox frame when launched in the
 background; it does not steal desktop focus or test OS activation. It trusts only its generated
 fixture path and restores the sandbox's trust settings when finished.
+During the completion probe, `UiProbeFocus` also enables the IDE's test control for window deactivation
+events, then restores its previous value on the UI thread even when a check fails. Without it, a delayed
+background-window event can close a valid lookup through the popup manager. Regression checks dispatch
+deactivation and lost-focus events while a lookup is open, then continue native typing, Backspace,
+Enter/Tab and Undo checks. This control exists only in the sandbox probe; ordinary IDE focus behavior
+is not changed or verified by it.
+
+For a lifecycle control, run `KUMIKAE_COMPLETION_CONTROL_PROBE=1 ./gradlew --offline runIde -PuiProbe`.
+It opens plain-text files, confirms each project closes and is disposed, and records the same heap
+samples. Save the reports before another probe overwrites `build/reports/ui/`.
+The AS3 probe also verifies generated imports and override declarations are accepted and undone atomically. Generated-edit checks compare the whole document's
+non-whitespace text, including closing braces, and check the final caret before the throwing body.
+Both a Godot method and the built-in `setPropertyIsEnumerable` override are covered in each client.
+Generated overrides repeat six times each. Undo resolves the exact `TextEditor` under test, including
+when another tab with a local or global edit is selected. Temporary projects contain `.idea/.gitignore`
+before opening: Rider's asynchronous creation of that file otherwise inserts a global command above
+the completion in Undo history. The probe neither clears history nor suppresses confirmation. An
+unexpected Undo dialog is captured, cancelled and fails the check with its message and command state.
+`UiProbeRiderDiagnostics` checks read access at the installed native descriptor's receive boundary.
+`UiProbeDiagnostics` checks actual error highlights before and after an 80-line shrink and forty rapid
+replacements, then verifies errors can appear and clear again, followed by parameter help, navigation
+and outline checks. The probe scrolls the caret into view before requesting a visible parameter hint.
+IDEA also checks injected stale/current publications, an uncommitted edit, refresh requests for equal values
+and replies after client disposal through the production adapter and native diagnostic cache.
+The focused publication check holds write access before the cache monitor and observes the injected
+refresh boundary; the separate shrink/burst check verifies real editor highlights.
+`UiProbeStatementCompletion` checks seven language blocks, immediate insertion Undo, navigation through
+all tab stops and the final caret, and mirrored catch-name editing. Rider exposes the snippet as its
+lookup string; LSP4IJ exposes the item label. The probe matches either representation. Undo after Tab
+navigation is a separate native template-history operation; the probe does not override that history.
+
+Add `KUMIKAE_COMPLETION_RETENTION_PROBE=1` for ten projects across ten minutes, with live-GC histograms
+and weak closed-project counts. Combine it with the control flag for the same plain-text workload.
+`KUMIKAE_COMPLETION_RETENTION_CHECK=1` enables the same zero-retention assertion on the short run.
+These runs collect soft caches (`-XX:SoftRefLRUPolicyMSPerMB=0`, probe JVM only) and allow up to ten seconds
+for native delayed work to finish. They also check a reopened visible Problems window, concurrent
+projects and frame reuse. No native cache is cleared by the plugin. Do not compare these heap samples
+with runs using the default soft-cache policy. A final acceptance run must omit `KUMIKAE_COMPLETION_HEAP_DUMP`;
+that option is for diagnosing a failure. Keep each run's reports with its log to avoid reading stale counts.
+The test plugin cancels the pinned Rider's evaluation feedback survey and IDEA's first-run UI onboarding
+dialog, which otherwise block project opening. It matches those two exact classes and uses Cancel;
+license dialogs and production IDE settings are untouched. Callback failures fail the probe.
+
+## Language-client compatibility checks
+
+After changing a client adapter, run the following sequentially with installed JDK 25, Rider and IDEA.
+The build resolves the declared LSP4IJ 0.21.0 dependency; use `--offline` after caching it. IDE binaries
+come from `RIDER_HOME` and `IDEA_HOME` (or the application defaults in the build), never a download task.
+
+```sh
+./gradlew --offline check buildPlugin verifyPlugin
+./gradlew --offline runIdeaWithoutLsp4ij -PuiProbe
+./gradlew --offline runIdea -PuiProbe
+./gradlew --offline runIde -PuiProbe
+./gradlew --offline runRiderWithoutLsp4ij -PuiProbe
+```
+
+`runIdea` uses LSP4IJ; `runIde` checks Rider's native client with LSP4IJ installed but no competing AS3
+server or handlers. The two `WithoutLsp4ij` tasks disable that plugin in separate sandboxes. IDEA then
+checks the install notification and local editing; Rider still runs the complete semantic probe.
+Reports are under `build/reports/ui-idea`, `ui`, `ui-runIdeaWithoutLsp4ij` and
+`ui-runRiderWithoutLsp4ij`, respectively. Preserve them before another run.
+
+Each semantic run opens and disposes three projects. It checks Enter/Tab, continued typing and
+Backspace, snippet navigation, prefix refresh, generated edits and Undo, parameter help, go to
+declaration and outline. The probe waits for each client's indexing gate before invoking the first
+completion; IDEA checks LSP4IJ's readiness in the same UI-thread turn as invocation. Parameter help
+waits for the live template to finish and activates the sandbox before displaying its hint. No fixed
+delay stands in for readiness. It also mounts the panel and writes light/dark images for inspection.

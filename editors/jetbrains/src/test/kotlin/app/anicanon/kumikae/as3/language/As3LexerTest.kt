@@ -78,4 +78,42 @@ class As3LexerTest {
     @Test fun `an empty file has no tokens`() {
         assertEquals(emptyList(), tokens(""))
     }
+
+    @Test fun `closing a statement block permits regex but closing a value permits division`() {
+        for (source in listOf(
+            "if (ready) {} /[()]/",
+            "{ if (ready) {} } /[()]/",
+            "function run():void {} /[()]/",
+            "class Main { public function run():void {} } /[()]/",
+        )) {
+            assertEquals("AS3_REGEX:/[()]/", tokens(source).last(), source)
+        }
+        for (source in listOf(
+            "var value = {} / divisor",
+            "var fn = function():Number {} / divisor",
+            "var value = { nested: {} } / divisor",
+            "call(function():void {}) / divisor",
+        )) {
+            assertEquals("AS3_WORD:divisor", tokens(source).last(), source)
+        }
+    }
+
+    @Test fun `deep brace context survives lexer restarts and changed prefixes`() {
+        val nested = "{".repeat(32) + "}".repeat(32) + " /[()]/"
+        assertEquals("AS3_REGEX:/[()]/", tokens(nested).last())
+        for (prefix in listOf("if (ready)", "var object =", "if (other())", "var other =")) {
+            val suffix = if (prefix.startsWith("if")) " /[()]/" else " / divisor"
+            val expected = if (prefix.startsWith("if")) "AS3_REGEX:/[()]/" else "AS3_WORD:divisor"
+            assertEquals(expected, tokens("$prefix {}$suffix").last())
+        }
+    }
+
+    @Test fun `object keys and conditional colons do not introduce statement blocks`() {
+        for (keyword in listOf("if", "while", "function", "class")) {
+            val actual = tokens("var object:Object = { $keyword: call() / divisor }")
+            assertEquals(true, actual.contains("AS3_WORD:divisor"))
+        }
+        assertEquals("AS3_WORD:divisor", tokens("var value = ready ? 1 : {} / divisor").last())
+        assertEquals("AS3_REGEX:/literal/", tokens("label: {} /literal/").last())
+    }
 }

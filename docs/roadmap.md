@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 137 items; each
+**Everything a review put off has a stage that fixes it.** The [backlog](backlog.md) holds 136 items; each
 is marked with its stage, and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -83,7 +83,7 @@ locals, classes, imports, inherited members and Godot's API.
 | A VS Code client and the [set-up guide](../editors/README.md) | Done. |
 | Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. The owner confirmed the underlined errors by eye. |
 | Tried in Rider | Native plugin completion and typing validated in the pinned sandbox on 2026-11-15; see [results](results/2026-11-completion.md). Full manual editor acceptance remains pending. |
-| Windows | Not yet: the server runs on macOS and Linux only. To do before the slice is called done. |
+| Windows | Binary transport and UTF-8 paths are implemented; Windows runtime validation remains required. |
 
 **Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
 stage faster to build. The owner left the order to the builder. Completion and the native JetBrains
@@ -112,7 +112,7 @@ properties, signals and hot reload.
 | 2c-4 to 2c-6. The rest of the language | In the order the corpus asks for: `Array`, `Object` literals and dynamic access, `Dictionary`, `for in` in general, rest parameters; closures, and the collection methods that take one; accessors and interfaces; the standard library (`String`, `Number`, the top-level functions, `JSON`, `Date`, `RegExp`) | The corpus programs run, and the backlog items marked 2c are closed. | Planned |
 | Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Completion built ahead, on 2026-11-14, and working in VS Code and Rider on macOS; the rest planned |
 | 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Hot reload built ahead, on 2026-11-14: on desktop and on the iOS Simulator; the rest planned |
-| Clean-up pass | The 50 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
+| Clean-up pass | The 55 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
 
 Godot comes before the rest of the language because the engine boundary decides how values are represented.
 
@@ -161,7 +161,15 @@ through a native helper, at about 60 frames a second with live touch, rotation a
 Completion improvements are described in the [editor guide](../editors/completion.md): native paired
 typing, lexical scopes, import paths, replacement edits, callable snippets and signature help. The
 [results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
-complete stage 6 or add Windows support.
+complete stage 6. The [follow-up results](results/2026-11-completion-followup.md) cover auto-imports,
+override stubs (including qualified defaults and independent getter/setter slots), AS3 statement-block
+templates with linked Tab stops, body-only incremental
+checking, diagnostic range guards and plugin-owned Rider lifetime repairs with split Problems. Empty
+override names work before following members, and background sandbox completion checks isolate
+window-deactivation cancellation. The optional LSP4IJ adapter
+supports IntelliJ IDEA Community/free unified IDEA alongside Rider's native client. The installed
+IDEA and Rider endpoints pass sandbox editing checks; older Community builds and Windows runtime
+validation remain unverified. Android Studio is outside the scope.
 
 Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
@@ -219,14 +227,15 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) gives every deferred item a stage:** none left in 2b-3, 22 in 2c, 13 in the
-  language server's second slice, 21 in 2d, 50 in a clean-up pass that closes stage 2, and 8 that wait on
+- **The [backlog](backlog.md) gives every deferred item a stage:** none left in 2b-3, 32 in 2c, 14 in the
+  language server's second slice, 25 in 2d, 55 in a clean-up pass that closes stage 2, and 10 that wait on
   the owner.
 - **Listener loops:** a loop of objects that passes through a listener is found and freed. Any other loop
   waits for the cycle collector (2d).
 - **Known fault:** the first editor scan of a project with the extension crashes as Godot exits. Later runs
   are clean.
-- **Language server:** Rider is not yet tried (the plugin is installed); Windows is not supported.
+- **Language server:** Rider and free unified IDEA pass automated sandbox editing checks. Manual
+  acceptance, older Community builds and Windows runtime validation remain unverified.
 
 ## Decisions made
 

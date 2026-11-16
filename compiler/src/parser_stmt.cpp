@@ -489,19 +489,31 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	function->modifiers = p_modifiers;
 	function->metadata = p_metadata;
 	// `function get name()` is an accessor; `function get()` is a function called `get`.
-	if (p_allow_accessor && (at_word("get") || at_word("set")) && is_identifier_like(peek2().kind)) {
+	if (p_allow_accessor && (at_word("get") || at_word("set")) &&
+			(is_identifier_like(peek2().kind) || ((p_modifiers.bits & Modifiers::Override) &&
+					(peek2().kind == TokenKind::RBrace || peek2().kind == TokenKind::EndOfFile ||
+							(peek2().kind == TokenKind::LBracket && peek2().newline_before))))) {
 		function->accessor = text(advance()) == "get" ? FunctionDecl::Getter : FunctionDecl::Setter;
 	}
-	if (at(TokenKind::Identifier) || (function->accessor != FunctionDecl::None && is_identifier_like(current_.kind))) {
+	uint32_t missing_name_end = 0;
+	// A declaration on the next line belongs to the enclosing list. A name followed by '(' is
+	// still a valid multiline function/accessor signature, even when that name is a modifier word.
+	const bool next_declaration = p_name_required && current_.newline_before &&
+			(begins_statement(current_.kind) || at_modifier_word()) && peek2().kind != TokenKind::LParen;
+	if (!next_declaration && (at(TokenKind::Identifier) ||
+			(function->accessor != FunctionDecl::None && is_identifier_like(current_.kind)))) {
 		function->name_offset = current_.offset;
 		function->name = text(advance());
 	} else if (p_name_required) {
+		function->name_offset = previous_end_;
+		missing_name_end = current_.offset;
 		error_expected("a function name");
 	}
 
 	std::vector<Parameter> parameters;
 	uint32_t defaults_height = 0; // Tallest default value, which hangs below this function in the tree.
 	Token open = expect(TokenKind::LParen, "'('");
+	function->has_parameter_list = open.length != 0;
 	if (open.length) {
 		bool rest_seen = false;
 		uint32_t rest_offset = 0;
@@ -565,7 +577,12 @@ FunctionDecl *Parser::parse_function_rest(uint32_t p_offset, Modifiers p_modifie
 	if (height > MAX_HEIGHT) {
 		abort_too_deep();
 	}
-	return finish(function);
+	finish(function);
+	// Retain the empty name's trivia span so completion can find the unfinished declaration.
+	if (function->end < missing_name_end) {
+		function->end = missing_name_end;
+	}
+	return function;
 }
 
 } // namespace kas3

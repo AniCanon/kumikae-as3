@@ -170,6 +170,8 @@ void Compilation::check(bool p_through_syntax_errors) {
 	resolve_bodies(*this);
 	check_class_rules(*this);
 	type_bodies(*this);
+	reusable_bodies_ = !has_errors();
+	initial_type_count_ = types_.size();
 }
 
 bool Compilation::has_errors() const {
@@ -190,8 +192,11 @@ std::string Compilation::format_diagnostics() const {
 }
 
 Symbol *Compilation::new_symbol(SymbolKind p_kind, std::string_view p_name, Unit *p_unit, uint32_t p_offset) {
-	symbols_.emplace_back();
-	Symbol *symbol = &symbols_.back();
+	const bool body = p_kind == SymbolKind::Parameter || p_kind == SymbolKind::Local ||
+			p_kind == SymbolKind::LocalFunction || p_kind == SymbolKind::CatchVariable || p_kind == SymbolKind::Arguments;
+	auto &storage = body && p_unit ? p_unit->body_symbols : symbols_;
+	storage.emplace_back();
+	Symbol *symbol = &storage.back();
 	symbol->kind = p_kind;
 	symbol->name = p_name;
 	symbol->unit = p_unit;

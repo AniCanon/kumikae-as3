@@ -43,6 +43,7 @@ private:
 	bool stale_ = true;
 	bool cut_off_ = false; // The project has more files than are read.
 	int checks_ = 0;
+	int full_checks_ = 0;
 
 	void scan(const std::string &p_folder);
 	int declaration(const std::string &p_path) const; // Its place in declarations_, or -1.
@@ -51,6 +52,7 @@ private:
 	bool in_project(const std::string &p_path) const;
 	bool load(const std::string &p_path);
 	void check();
+	bool update_bodies();
 	const std::string &support_folder();
 
 public:
@@ -77,6 +79,7 @@ public:
 	// True if the project had more .as files than the limit, so some were left out.
 	bool cut_off() const { return cut_off_; }
 	size_t max_files() const { return options_.max_files; }
+	int full_checks() const { return full_checks_; } // Rebuilds of the whole semantic environment.
 	int checks() const { return checks_; } // How many times the program has been checked.
 	// All three check the program first if anything changed. What they return is good until the next
 	// change.

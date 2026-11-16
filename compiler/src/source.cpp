@@ -2,51 +2,59 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <filesystem>
 
 namespace kas3 {
 
-Source::Source(std::string p_path, std::string p_text) :
-		path_(std::move(p_path)), text_(std::move(p_text)) {
-	if (text_.size() >= 3 && (unsigned char)text_[0] == 0xEF && (unsigned char)text_[1] == 0xBB &&
-			(unsigned char)text_[2] == 0xBF) {
-		text_.erase(0, 3);
+Source::Data::Data(std::string p_path, std::string p_text) :
+		path(std::move(p_path)), text(std::move(p_text)) {
+	if (text.size() >= 3 && (unsigned char)text[0] == 0xEF && (unsigned char)text[1] == 0xBB &&
+			(unsigned char)text[2] == 0xBF) {
+		text.erase(0, 3);
 	}
 	// "\n", "\r\n" and "\r" each end one line.
-	line_starts_.push_back(0);
-	for (size_t i = 0; i < text_.size(); i++) {
-		char c = text_[i];
+	line_starts.push_back(0);
+	for (size_t i = 0; i < text.size(); i++) {
+		char c = text[i];
 		if (c == '\r') {
-			if (i + 1 < text_.size() && text_[i + 1] == '\n') {
+			if (i + 1 < text.size() && text[i + 1] == '\n') {
 				i++;
 			}
-			line_starts_.push_back((uint32_t)(i + 1));
+			line_starts.push_back((uint32_t)(i + 1));
 		} else if (c == '\n') {
-			line_starts_.push_back((uint32_t)(i + 1));
+			line_starts.push_back((uint32_t)(i + 1));
 		}
 	}
 }
 
+Source::Source(std::string p_path, std::string p_text) :
+		data_(std::make_shared<Data>(std::move(p_path), std::move(p_text))) {}
+
 Position Source::position(uint32_t p_offset) const {
-	uint32_t offset = std::min<uint32_t>(p_offset, (uint32_t)text_.size());
-	auto after = std::upper_bound(line_starts_.begin(), line_starts_.end(), offset);
-	int line = (int)(after - line_starts_.begin());
-	return Position{ line, (int)(offset - line_starts_[(size_t)line - 1]) + 1 };
+	uint32_t offset = std::min<uint32_t>(p_offset, (uint32_t)data_->text.size());
+	auto after = std::upper_bound(data_->line_starts.begin(), data_->line_starts.end(), offset);
+	int line = (int)(after - data_->line_starts.begin());
+	return Position{ line, (int)(offset - data_->line_starts[(size_t)line - 1]) + 1 };
 }
 
 std::string_view Source::line_text(int p_line) const {
 	if (p_line < 1 || p_line > line_count()) {
 		return std::string_view();
 	}
-	uint32_t start = line_starts_[(size_t)p_line - 1];
-	uint32_t end = p_line < line_count() ? line_starts_[(size_t)p_line] : (uint32_t)text_.size();
-	while (end > start && (text_[end - 1] == '\n' || text_[end - 1] == '\r')) {
+	uint32_t start = data_->line_starts[(size_t)p_line - 1];
+	uint32_t end = p_line < line_count() ? data_->line_starts[(size_t)p_line] : (uint32_t)data_->text.size();
+	while (end > start && (data_->text[end - 1] == '\n' || data_->text[end - 1] == '\r')) {
 		end--;
 	}
-	return std::string_view(text_).substr(start, end - start);
+	return std::string_view(data_->text).substr(start, end - start);
 }
 
 bool read_file(const std::string &p_path, std::string *r_text) {
+#ifdef _WIN32
+	std::FILE *file = _wfopen(std::filesystem::u8path(p_path).c_str(), L"rb");
+#else
 	std::FILE *file = std::fopen(p_path.c_str(), "rb");
+#endif
 	if (!file) {
 		return false;
 	}

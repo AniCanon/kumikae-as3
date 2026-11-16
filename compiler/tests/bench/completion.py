@@ -79,12 +79,18 @@ def report(label, values):
           f'max={max(values):.3f} ms', flush=True)
 
 
-def measure(builds, folder, runs, seconds):
+def measure(builds, folder, runs, seconds, valid_body):
     clients = []
     # A long edited file exposes repeated lexical scans; both builds receive identical text.
     source = ('// completion context\n' * 5000 +
               'package { import godot.*; public class CompletionProbe extends Node2D {\n'
               'public function run():void { transform.origin.\n} } }')
+    if valid_body:
+        source = source.replace('transform.origin.\n', 'transform.origin.x; /* edit */\n')
+    def edited(serial):
+        if valid_body:
+            return source.replace('/* edit */', '/* edit %d */' % (serial % 2))
+        return source + '\n' * (1 + serial % 2)
     uri = (folder / 'CompletionProbe.as').as_uri()
     position = {'line': 5001, 'character': len('public function run():void { transform.origin.')}
     params = {'textDocument': {'uri': uri}, 'position': position}
@@ -108,7 +114,7 @@ def measure(builds, folder, runs, seconds):
                     if mode != 'warm':
                         for burst in range(20 if mode == 'burst' else 1):
                             client.send('textDocument/didChange', {'textDocument': {'uri': uri, 'version': version*20+burst},
-                                        'contentChanges': [{'text': source + '\n' * (1 + (version+burst) % 2)}]})
+                                        'contentChanges': [{'text': edited(version+burst)}]})
                     result, _ = client.request('textDocument/completion', params)
                     assert any(item['label'] == 'x' for item in result['items']), result
                     samples[name][mode].append(1000*(time.perf_counter()-start))
@@ -120,7 +126,7 @@ def measure(builds, folder, runs, seconds):
             version += 1
             for name, client in clients:
                 client.send('textDocument/didChange', {'textDocument': {'uri': uri, 'version': version*20},
-                            'contentChanges': [{'text': source + '\n' * (1 + version % 2)}]})
+                            'contentChanges': [{'text': edited(version)}]})
                 result, _ = client.request('textDocument/completion', params)
                 assert any(item['label'] == 'x' for item in result['items'])
             elapsed = time.monotonic() - start
@@ -140,6 +146,7 @@ def main():
     parser.add_argument('--against', type=Path, required=True)
     parser.add_argument('--runs', type=int, default=101)
     parser.add_argument('--seconds', type=int, default=0)
+    parser.add_argument('--valid-body', action='store_true', help='Edit a valid method body; default measures syntax-error recovery')
     args = parser.parse_args()
     builds = {'before': args.against.resolve(), 'after': args.build.resolve()}
     for lines in (0, 100000):
@@ -148,8 +155,8 @@ def main():
             if lines:
                 subprocess.run([sys.executable, str(Path(__file__).with_name('generate_project.py')),
                                 temporary, str(lines)], check=True, stdout=subprocess.DEVNULL)
-            print(f'project generated_lines={lines}, edited_file=5003 lines, Godot loaded', flush=True)
-            measure(builds, folder, args.runs, args.seconds if lines else 0)
+            print(f'project generated_lines={lines}, edited_file=5003 lines, Godot loaded, valid_body={args.valid_body}', flush=True)
+            measure(builds, folder, args.runs, args.seconds if lines else 0, args.valid_body)
 
 
 if __name__ == '__main__':

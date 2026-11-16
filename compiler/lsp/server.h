@@ -5,6 +5,7 @@
 #include "workspace.h"
 
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -22,14 +23,22 @@ class Server {
 	int exit_code_ = 1;
 	bool default_edit_range_ = false;
 	bool snippets_ = false;
+	bool diagnostic_versions_ = false;
 	bool insert_replace_ = false;
 	bool utf8_ = false; // Positions count bytes. Otherwise UTF-16 code units.
 	bool warned_cut_off_ = false; // The editor has been told the project is too big to read whole.
 	bool watch_files_ = false; // The editor lets the server ask to be told about files changing on disk.
 	int published_check_ = -1; // The check whose errors the editor has.
+	uint64_t document_generation_ = 0;
+	uint64_t published_document_generation_ = 0;
 	int next_request_ = 1;
 	std::unordered_map<std::string, std::string> uris_; // The URI the editor uses for a path.
-	std::map<std::string, std::string> published_; // By URI: the diagnostics last sent, as JSON.
+	std::unordered_map<std::string, int64_t> versions_; // Current open-document version, by normalized path.
+	struct Published {
+		std::string diagnostics;
+		std::optional<int64_t> version;
+	};
+	std::map<std::string, Published> published_; // By URI: the diagnostics last sent.
 
 	std::string uri_of(const Unit &p_unit);
 	Unit *unit_of(const Json &p_params);
@@ -40,6 +49,10 @@ class Server {
 	uint32_t offset_in(const Source &p_source, const Json &p_position) const;
 	const Occurrence *occurrence_at(const Json &p_params, Unit **r_unit);
 	void publish(std::vector<std::string> &r_out);
+	void handle_message(const Json &p_message, std::vector<std::string> &r_out);
+	static std::optional<int64_t> valid_version(const Json &p_document);
+	bool accept_version(const Json &p_document, bool p_open, std::vector<std::string> &r_out);
+	std::optional<int64_t> document_version(const std::string &p_uri) const;
 
 	Json initialize(const Json &p_params);
 	Json definition(const Json &p_params);
@@ -56,6 +69,8 @@ public:
 
 	// Handles one message and appends what to send back, each a complete JSON text.
 	void handle(std::string_view p_message, std::vector<std::string> &r_out);
+	// The bounded input batch preserves notification order and skips obsolete queued requests.
+	void handle_batch(const std::vector<std::string> &p_messages, std::vector<std::string> &r_out);
 	// Checks the program if it changed, and appends the diagnostics that differ from what the editor has.
 	// Call it when no further message is waiting.
 	void settle(std::vector<std::string> &r_out);
