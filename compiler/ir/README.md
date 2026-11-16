@@ -20,6 +20,7 @@ turns the checked tree from `src/` into it.
 | `lower_bodies` | The body of each function: its start and end, its parameters, a method, a constructor (with the fields' first values), a class's static initializer, package variables |
 | `lower_literals` | Number and string literals (a string's escapes), and the built-in library's constants: `NaN`, `Infinity`, the limits of the number types, Array's sort options |
 | `lower_engine` | Godot's members: properties, constants, singletons, parts of a value |
+| `lower_engine_calls.h`, `lower_engine_calls` | Calls of Godot's methods and global functions (the `EngineCalls` class, a friend of the lowerer): the arguments the engine is given, with Godot's own defaults; a method bound where Godot takes a function; a signal reached by its name (`timer[name].add(f)`) |
 | `lower_try` | `try`, `catch`, `finally` (handlers in `ir::Function`; the `finally` written once, every way out going through it) and labels |
 | `lower_any` | The untyped value: coercion where a type is declared, `==`, `<`, `+`, `typeof`, `is`/`as` |
 | `lower_dynamic` | Properties by name (`class Dynamic`, a friend of the lowerer): Object literals, `new Object()` and `flash.utils.Dictionary`, `o.a` and `o[k]` as places, `delete`, `in`, a property called by its name, `for in` and `for each` over anything that is not a vector |

@@ -1,4 +1,5 @@
 #include "lower_dynamic.h"
+#include "lower_engine_calls.h"
 #include "lower_library.h"
 
 namespace kas3 {
@@ -76,7 +77,7 @@ uint32_t Lowerer::member_value(Expr *p_expression) {
 		const Symbol *read = property != signal_->klass->members.end() && property->second->kind == SymbolKind::Property ? property->second : nullptr;
 		TypeRef *written = read ? (read->type ? read->type : read->getter ? read->getter->return_type : nullptr) : nullptr;
 		if (written && kind_of(compilation_.type_of(written), &kind) && engine_name(signal_, member->name, &getter)) {
-			const uint32_t found = signal_by_name(member->object, nullptr, &object, &name);
+			const uint32_t found = EngineCalls(*this).signal_by_name(member->object, nullptr, &object, &name);
 			if (found != NONE) {
 				emit(Op::HostMember, member->object->offset, found, object, name);
 				const uint32_t out = reg(kind);
@@ -121,7 +122,7 @@ uint32_t Lowerer::new_value(Expr *p_expression) {
 				? static_cast<FunctionDecl *>(constructor->node)
 				: nullptr;
 		std::vector<uint32_t> list;
-		engine_arguments(decl, made->arguments, position, list);
+		EngineCalls(*this).engine_arguments(decl, made->arguments, position, list);
 		if (stores_int32(made->type)) {
 			// Its constructor takes anything in its first places, so the width is checked here.
 			for (size_t i = 0; i < list.size() && i < made->arguments.count; i++) {
