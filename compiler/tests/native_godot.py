@@ -3,7 +3,7 @@ extension in the interpreter's place (KAS3_PROGRAM_LIBRARY).
 
 Two things are held:
 
-  probe      tests/godot_native's Probe.as says, as native code, what it says interpreted, line for line.
+  probe      tests/godot_native's scripts say, as native code, what they say interpreted, line for line.
   workloads  each workload of tests/bench/languages' CmpAs.as, run small, stays on the fast paths.
 
 The second is by the host's counts (KAS3_NATIVE_COUNTS): how many times generated code left an operation
@@ -106,7 +106,7 @@ class Runner:
         sources = os.path.join(self.tests, "godot_native")
         with tempfile.TemporaryDirectory() as where:
             project = self.project(where, sources)
-            program = self.library("the probe", project, ["Probe.as"], where)
+            program = self.library("the probe", project, sorted(name for name in os.listdir(sources) if name.endswith(".as")), where)
             if not program:
                 return
             said = {}

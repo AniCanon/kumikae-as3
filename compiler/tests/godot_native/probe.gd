@@ -1,9 +1,28 @@
 extends SceneTree
 
-# Calls each method of Probe.as and prints what it gives: run_godot.py runs this with the interpreter and
-# with the script as native code, and holds the two outputs to each other.
+# Calls each method of Probe.as and of Entry.as and prints what it gives: run_godot.py runs this with the
+# interpreter and with the scripts as native code, and holds the two outputs to each other.
 var killer: Node
+var entry: Node2D
 var frames := 0
+
+
+# Godot calling into a script (Entry.as).
+func _enter() -> void:
+	entry = Node2D.new()
+	entry.set_script(load("res://Entry.as"))
+	root.add_child(entry)
+	print("PROBE defaults=", entry.call("defaults", 1), "/", entry.call("defaults", 1, 2), "/", entry.call("defaults", 1, 2, "three", 4.0))
+	print("PROBE rest=", entry.call("rest", 1), "/", entry.call("rest", 1, 2, "three"))
+	for what in 6:
+		print("PROBE gives ", what, "=", entry.call("gives", what) if what != 1 else entry.call("gives", what) == entry)
+	print("PROBE takes=", entry.call("takes", Vector2(3, 4), entry, "text", [1, 2]), "/", entry.call("takes", Vector2(), null, "", null))
+	print("PROBE nested=", entry.call("nested", 5), "/", entry.call("nested", 40), "/", entry.call("nested", 100))
+	entry.call("listen")
+	print("PROBE unheard=", entry.call("unheard"))
+	print("PROBE both=", entry.call("both"))
+	print("PROBE rings=", entry.call("rings"))
+	print("PROBE rings again=", entry.call("rings"))
 
 
 func _initialize() -> void:
@@ -21,6 +40,7 @@ func _initialize() -> void:
 	print("PROBE speaks=", probe.call("speaks"))
 	print("PROBE fail=", probe.call("fail", 3))
 	print("PROBE after=", probe.call("script", 1))
+	_enter()
 	# A node whose script's object is freed while its _process runs: see Probe.as.
 	killer = Node.new()
 	killer.set_script(load("res://killer.gd"))
@@ -37,4 +57,5 @@ func _process(_delta: float) -> bool:
 	if frames < 4:
 		return false
 	print("PROBE freed=", killer.get("said") if killer else "no killer")
+	print("PROBE ticked=", entry.call("ticked"))
 	return true
