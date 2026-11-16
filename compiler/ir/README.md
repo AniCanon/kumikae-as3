@@ -12,7 +12,8 @@ turns the checked tree from `src/` into it.
 | `ir_print.cpp` | The text form the golden files hold |
 | `ir_compare.cpp` | What changed between two builds that a reload alone would not show (`run_once_changes`) |
 | `lower.h`, `lower.cpp` | The entry point, and units and classes in order |
-| `lowerer.h` | The one class: its state and every method's declaration |
+| `lowerer.h` | The one class: its state, the methods every part of the lowering uses (registers, constants, kinds and conversions, places, `expression()`), and the helper classes it befriends. Each helper holds `Lowerer &l_`, is made where it is needed (`Statements(*this).statement(s)`), and keeps nothing from one use to the next: what lasts is the lowerer's |
+| `lower_env.h` | Places (where a value is stored), and what is kept of the variables function expressions capture |
 | `lower_flow.h` | What is kept of the loops and `try` statements around the code being lowered (`Loop`, `TryBlock`, `TryExit`) |
 | `lower_emit`, `lower_types`, `lower_places` | Registers and constants; kinds, conversions, default values; what can be read and written |
 | `lower_expressions.h`, `lower_expressions` | Expressions: the lowerer's `expression()`, which converts a value to the kind wanted, and each kind of expression (the `Expressions` class, a friend of the lowerer) |
