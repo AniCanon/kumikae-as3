@@ -251,8 +251,13 @@ private:
 	bool set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p_value);
 	std::optional<uint32_t> named_method(const ir::Class &p_class, std::string_view p_name, std::string_view p_prefix = {}) const;
 	bool get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
+	bool vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
+	bool sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value);
+	bool call_getter(Object *p_object, uint32_t p_function, Slot *r_value);
 	bool primitive_property(Slot p_holder, const PropertyKey &p_key, Slot *r_value);
 	bool set_property(Slot p_holder, const PropertyKey &p_key, Slot p_value);
+	bool set_sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_value, Slot p_holder);
+	bool call_setter(Object *p_object, uint32_t p_function, Slot p_value);
 	bool set_element(Vector *p_vector, const PropertyKey &p_key, Slot p_value);
 	void array_number_get(Vector *p_array, double p_number, Slot &r_out);
 	void array_number_set(Vector *p_array, double p_number, Slot p_value);

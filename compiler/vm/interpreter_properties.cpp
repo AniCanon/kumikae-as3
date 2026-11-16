@@ -230,79 +230,94 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 		return true; // Nothing there: undefined.
 	}
 	if (klass && klass->element != Kind::Void) {
-		Vector *vector = static_cast<Vector *>(object);
-		if (p_key.index && *p_key.index < vector->length) {
-			*r_value = to_any(klass->element, vector->data[*p_key.index]);
-			return true;
-		}
-		if (p_key.index && !klass->array) {
-			raise_range(*p_key.index, vector->length);
-			return false;
-		}
-		if (p_key.text == "length") {
-			Slot length;
-			set_uint32(length, vector->length);
-			*r_value = to_any(Kind::U32, length);
-			return true;
-		}
-		if (const std::optional<uint32_t> at = entry_of(vector->properties, p_key); at && klass->array) {
-			*r_value = share(Kind::Any, vector->properties->value_at(*at));
-			return true;
-		}
-		if (listed(ARRAY_METHODS, p_key.text) || listed(OBJECT_METHODS, p_key.text) || p_key.text == "fixed") {
-			raise_unsupported("reading '" + p_key.text + "' of " + (klass->array ? "an Array" : "a Vector") + " by its name");
-			return false;
-		}
-		if (klass->array) {
-			return true; // Nothing there: undefined.
-		}
-		raise_not_found(p_key, p_holder);
-		return false;
+		return vector_property(static_cast<Vector *>(object), p_key, p_holder, r_value);
 	}
 	if (klass) {
-		if (const std::optional<bool> done = library_get(object, p_key.text, r_value)) {
-			return *done;
-		}
-		if (const std::optional<uint32_t> field = klass->field(p_key.text, true)) {
-			*r_value = to_any(klass->fields[*field].kind, object->fields()[*field]);
-			return true;
-		}
-		if (const std::optional<uint32_t> slot = named_method(*klass, p_key.text)) {
-			Object *made = make_function(klass->methods[*slot], object);
-			*r_value = made ? any::object(made) : any::undefined();
-			return made != nullptr;
-		}
-		if (const std::optional<uint32_t> getter = named_method(*klass, p_key.text, "get ")) {
-			// A public getter: called, on the object's class's own (it may be overridden).
-			const uint32_t function = klass->methods[*getter];
-			Slot self;
-			self.bits = 0;
-			self.p = object;
-			Slot result;
-			result.bits = 0;
-			retain(object); // Held while its getter runs.
-			const bool ok = call_within(function, &self, 1, &result);
-			release_object(object);
-			if (ok) {
-				const Kind kind = module_.functions[function].result;
-				*r_value = to_any(kind, result);
-				drop(kind, result);
-			}
-			return ok;
-		}
-		if (named_method(*klass, p_key.text, "set ")) {
-			raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
-					"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
-			return false;
-		}
-		if (klass->built_in || listed(OBJECT_METHODS, p_key.text)) {
-			raise_unsupported("reading '" + p_key.text + "' of " + holder_name(p_holder) + " by its name");
-			return false;
-		}
-		raise_not_found(p_key, p_holder);
-		return false;
+		return sealed_property(object, p_key, p_holder, r_value);
 	}
 	return primitive_property(p_holder, p_key, r_value);
+}
+
+// An element of an Array or a Vector held untyped, its length, or another property of an Array.
+bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value) {
+	const ir::Class &klass = module_.classes[p_vector->klass];
+	if (p_key.index && *p_key.index < p_vector->length) {
+		*r_value = to_any(klass.element, p_vector->data[*p_key.index]);
+		return true;
+	}
+	if (p_key.index && !klass.array) {
+		raise_range(*p_key.index, p_vector->length);
+		return false;
+	}
+	if (p_key.text == "length") {
+		Slot length;
+		set_uint32(length, p_vector->length);
+		*r_value = to_any(Kind::U32, length);
+		return true;
+	}
+	if (const std::optional<uint32_t> at = entry_of(p_vector->properties, p_key); at && klass.array) {
+		*r_value = share(Kind::Any, p_vector->properties->value_at(*at));
+		return true;
+	}
+	if (listed(ARRAY_METHODS, p_key.text) || listed(OBJECT_METHODS, p_key.text) || p_key.text == "fixed") {
+		raise_unsupported("reading '" + p_key.text + "' of " + (klass.array ? "an Array" : "a Vector") + " by its name");
+		return false;
+	}
+	if (klass.array) {
+		return true; // Nothing there: undefined.
+	}
+	raise_not_found(p_key, p_holder);
+	return false;
+}
+
+// A property of a sealed object: one of RegExp's or Date's, a public field, a method as a function value,
+// or what a getter gives.
+bool Interpreter::sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_holder, Slot *r_value) {
+	const ir::Class &klass = module_.classes[p_object->klass];
+	if (const std::optional<bool> done = library_get(p_object, p_key.text, r_value)) {
+		return *done;
+	}
+	if (const std::optional<uint32_t> field = klass.field(p_key.text, true)) {
+		*r_value = to_any(klass.fields[*field].kind, p_object->fields()[*field]);
+		return true;
+	}
+	if (const std::optional<uint32_t> slot = named_method(klass, p_key.text)) {
+		Object *made = make_function(klass.methods[*slot], p_object);
+		*r_value = made ? any::object(made) : any::undefined();
+		return made != nullptr;
+	}
+	if (const std::optional<uint32_t> getter = named_method(klass, p_key.text, "get ")) {
+		return call_getter(p_object, klass.methods[*getter], r_value);
+	}
+	if (named_method(klass, p_key.text, "set ")) {
+		raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
+				"Error #1077: Illegal read of write-only property " + p_key.text + " on " + holder_name(p_holder) + ".");
+		return false;
+	}
+	if (klass.built_in || listed(OBJECT_METHODS, p_key.text)) {
+		raise_unsupported("reading '" + p_key.text + "' of " + holder_name(p_holder) + " by its name");
+		return false;
+	}
+	raise_not_found(p_key, p_holder);
+	return false;
+}
+
+// A public getter: called, on the object's class's own (it may be overridden).
+bool Interpreter::call_getter(Object *p_object, uint32_t p_function, Slot *r_value) {
+	Slot self;
+	self.bits = 0;
+	self.p = p_object;
+	Slot result;
+	result.bits = 0;
+	retain(p_object); // Held while its getter runs.
+	const bool ok = call_within(p_function, &self, 1, &result);
+	release_object(p_object);
+	if (ok) {
+		const Kind kind = module_.functions[p_function].result;
+		*r_value = to_any(kind, result);
+		drop(kind, result);
+	}
+	return ok;
 }
 
 // A property of a String, a number or a Boolean held untyped; null and undefined have none.
@@ -350,49 +365,7 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 		return set_element(static_cast<Vector *>(object), p_key, p_value);
 	}
 	if (klass) {
-		if (const std::optional<bool> done = library_set(object, p_key.text, p_value)) {
-			return *done;
-		}
-		if (const std::optional<uint32_t> field = klass->field(p_key.text, true)) {
-			const ir::Field &declared = klass->fields[*field];
-			if (ir::is_engine(declared.kind)) {
-				raise_unsupported("writing a field of one of Godot's types by its name");
-				return false;
-			}
-			Slot stored;
-			if (!from_any(p_value, declared.kind, declared.kind == Kind::Obj ? declared.klass : declared.starts_null ? 0 : NONE, &stored)) {
-				return false;
-			}
-			put(declared.kind, object->fields()[*field], stored);
-			return true;
-		}
-		if (named_method(*klass, p_key.text)) {
-			return cannot("1037", "Cannot assign to a method ");
-		}
-		if (const std::optional<uint32_t> setter = named_method(*klass, p_key.text, "set ")) {
-			// A public setter: given the value as its parameter takes it.
-			const uint32_t function = klass->methods[*setter];
-			const ir::Function &callee = module_.functions[function];
-			Slot both[2];
-			both[0].bits = 0;
-			both[0].p = object;
-			if (!argument_as(callee, 1, p_value, &both[1])) {
-				return false;
-			}
-			retain(object);
-			const bool ok = call_within(function, both, 2, nullptr);
-			release_object(object);
-			drop(callee.registers[1], both[1]);
-			return ok;
-		}
-		if (named_method(*klass, p_key.text, "get ")) {
-			return cannot("1074", "Illegal write to read-only property ");
-		}
-		if (klass->built_in) {
-			raise_unsupported("adding a property to " + holder_name(p_holder));
-			return false;
-		}
-		return cannot("1056", "Cannot create property ");
+		return set_sealed_property(object, p_key, p_value, p_holder);
 	}
 	const AnyTag tag = any::tag(p_holder);
 	if (tag == AnyTag::Null || tag == AnyTag::Undefined) {
@@ -404,6 +377,58 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 		return false;
 	}
 	return cannot("1056", "Cannot create property ");
+}
+
+// holder[key] = value on a sealed object: one of RegExp's or Date's properties, a public field, or a setter.
+bool Interpreter::set_sealed_property(Object *p_object, const PropertyKey &p_key, Slot p_value, Slot p_holder) {
+	const ir::Class &klass = module_.classes[p_object->klass];
+	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.text, p_holder); };
+	if (const std::optional<bool> done = library_set(p_object, p_key.text, p_value)) {
+		return *done;
+	}
+	if (const std::optional<uint32_t> field = klass.field(p_key.text, true)) {
+		const ir::Field &declared = klass.fields[*field];
+		if (ir::is_engine(declared.kind)) {
+			raise_unsupported("writing a field of one of Godot's types by its name");
+			return false;
+		}
+		Slot stored;
+		if (!from_any(p_value, declared.kind, declared.kind == Kind::Obj ? declared.klass : declared.starts_null ? 0 : NONE, &stored)) {
+			return false;
+		}
+		put(declared.kind, p_object->fields()[*field], stored);
+		return true;
+	}
+	if (named_method(klass, p_key.text)) {
+		return cannot("1037", "Cannot assign to a method ");
+	}
+	if (const std::optional<uint32_t> setter = named_method(klass, p_key.text, "set ")) {
+		return call_setter(p_object, klass.methods[*setter], p_value);
+	}
+	if (named_method(klass, p_key.text, "get ")) {
+		return cannot("1074", "Illegal write to read-only property ");
+	}
+	if (klass.built_in) {
+		raise_unsupported("adding a property to " + holder_name(p_holder));
+		return false;
+	}
+	return cannot("1056", "Cannot create property ");
+}
+
+// A public setter: given the value as its parameter takes it.
+bool Interpreter::call_setter(Object *p_object, uint32_t p_function, Slot p_value) {
+	const ir::Function &callee = module_.functions[p_function];
+	Slot both[2];
+	both[0].bits = 0;
+	both[0].p = p_object;
+	if (!argument_as(callee, 1, p_value, &both[1])) {
+		return false;
+	}
+	retain(p_object);
+	const bool ok = call_within(p_function, both, 2, nullptr);
+	release_object(p_object);
+	drop(callee.registers[1], both[1]);
+	return ok;
 }
 
 // An element of an Array or a Vector held untyped, its length, or another property of an Array.
