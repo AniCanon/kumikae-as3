@@ -182,10 +182,15 @@ void resolve_unit_bodies(Compilation &p_compilation, Unit &p_unit) {
 	Resolver(p_compilation, p_unit).run();
 }
 
-void resolve_bodies(Compilation &p_compilation) {
-	for (Unit &unit : p_compilation.units()) {
-		resolve_unit_bodies(p_compilation, unit);
-	}
+void check_class_rules(Compilation &p_compilation, Unit &p_unit); // names_rules.cpp
+void type_unit(Compilation &p_compilation, Unit &p_unit); // typer.cpp
+
+// What a file's bodies say, and the rules its classes keep. Reads only what other files declare, so files
+// are checked one at a time, in any order, once every file's signatures are resolved.
+void check_unit_bodies(Compilation &p_compilation, Unit &p_unit) {
+	resolve_unit_bodies(p_compilation, p_unit);
+	check_class_rules(p_compilation, p_unit);
+	type_unit(p_compilation, p_unit);
 }
 
 } // namespace kas3
