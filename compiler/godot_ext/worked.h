@@ -25,7 +25,7 @@ struct NameKept {
 };
 
 struct GodotHost::Worked final : vm::Prepared {
-	enum class What { Operator, Builtin, Bound, Getter, Setter, FieldGet, FieldSet, Constant, Utility } what = What::Constant;
+	enum class What { Operator, Builtin, Bound, Getter, Setter, FieldGet, FieldSet, Constant, Utility, Construct } what = What::Constant;
 	std::string name; // Godot's name for it, for the errors it reports.
 	// Operator: Godot's evaluator for these types; the types of its operands, and of what it gives.
 	GDExtensionPtrOperatorEvaluator evaluator = nullptr;

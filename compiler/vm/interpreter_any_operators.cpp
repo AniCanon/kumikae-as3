@@ -33,7 +33,8 @@ bool Interpreter::any_equal(Slot p_a, Slot p_b, bool p_strict, bool *r_equal) {
 		Slot result;
 		result.bits = 0;
 		std::string error;
-		if (!host_.handles.operate("==", operands, 2, wanted, &result, &error)) {
+		const OperatorName equal = operator_named(module_.equal_operator, "==");
+		if (!host_.handles.operate(equal.number, equal.spelling, operands, 2, wanted, &result, &error)) {
 			*r_equal = false; // Godot has no `==` between these two: they are not equal.
 			return true;
 		}
@@ -85,7 +86,8 @@ bool Interpreter::engine_add(const Instruction &p_in, Slot p_b, Slot p_c) {
 	Slot result;
 	result.bits = 0;
 	std::string error;
-	if (!host_.handles.operate("+", operands, 2, wanted, &result, &error)) {
+	const OperatorName add = operator_named(module_.add_operator, "+");
+	if (!host_.handles.operate(add.number, add.spelling, operands, 2, wanted, &result, &error)) {
 		if (error == OUT_OF_MEMORY) {
 			raise(module_.error_class, error);
 			return true;

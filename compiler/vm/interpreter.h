@@ -73,6 +73,10 @@ private:
 	// What the host worked out once for each engine instruction, by function and instruction: see prepare().
 	std::vector<std::vector<EngineStep>> prepared_;
 	std::vector<OperatorName> operators_; // By engine name: what an operator's entry says, read once.
+	// An operator by its engine name, or (NONE: a program built without Godot's names) none Godot can number.
+	OperatorName operator_named(uint32_t p_name, std::string_view p_spelling) const {
+		return p_name == ir::NONE ? OperatorName{ p_spelling, false, -1 } : operators_[p_name];
+	}
 	void prepare_engine();
 	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().

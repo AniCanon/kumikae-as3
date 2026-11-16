@@ -370,6 +370,40 @@ bool GodotHost::run_bound(const Worked &p_worked, const vm::Argument *p_operands
 	return p_worked.what == What::Setter || take(p_result, result, p_worked.name, r_result, r_error);
 }
 
+// One of Godot's value types made from its arguments, by Godot's constructor for their types; into the
+// handle the result's register holds, where it holds one.
+bool GodotHost::run_construct(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+		std::string *r_error) {
+	if (!r_result) {
+		return false;
+	}
+	Values values;
+	const Variant *pointers[MOST];
+	for (size_t i = 0; i < p_count; i++) {
+		Variant &value = values.next();
+		value = to_variant(p_operands[i].kind, p_operands[i].slot);
+		pointers[i] = &value;
+	}
+	Variant made;
+	GDExtensionCallError error;
+	error.error = GDEXTENSION_CALL_OK;
+	// `made` holds nothing yet (it is null), so making the value over it lets go of nothing.
+	gdextension_interface::variant_construct((GDExtensionVariantType)p_worked.result, made._native_ptr(),
+			reinterpret_cast<GDExtensionConstVariantPtr *>(pointers), (int32_t)p_count, &error);
+	if (error.error != GDEXTENSION_CALL_OK) {
+		*r_error = describe(error, p_worked.name);
+		return false;
+	}
+	Variant *held = static_cast<Variant *>(p_result.reuse);
+	if (held && held->get_type() == p_worked.result) {
+		*held = made;
+		r_result->p = held;
+	} else {
+		r_result->p = make_handle(made);
+	}
+	return true;
+}
+
 bool GodotHost::run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error) {
 	Variant *held = p_operands[0].kind == ir::Kind::Val ? static_cast<Variant *>(p_operands[0].slot.p) : nullptr;
 	if (!held || held->get_type() != p_worked.receiver) {
@@ -523,7 +557,13 @@ std::unique_ptr<Worked> member_of(const ir::EngineName &p_entry, const std::vect
 
 std::unique_ptr<GodotHost::Worked> GodotHost::work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in,
 		std::string *r_key) {
-	const bool member = p_in.op == ir::Op::HostGet;
+	// Only these are worked out; each names its entry in its second operand, but HostGet in its third.
+	const ir::Op op = p_in.op;
+	if (op != ir::Op::HostOperate && op != ir::Op::HostCall && op != ir::Op::HostCallStatic && op != ir::Op::HostGet && op != ir::Op::HostSet &&
+			op != ir::Op::HostConstant && op != ir::Op::HostNew) {
+		return nullptr;
+	}
+	const bool member = op == ir::Op::HostGet;
 	const ir::EngineName &entry = p_module.engine_names[member ? p_in.c : p_in.b];
 	const std::vector<std::string_view> words = godot_words(entry.value);
 	*r_key = std::to_string((int)p_in.op) + " " + entry.key;
@@ -554,6 +594,19 @@ std::unique_ptr<GodotHost::Worked> GodotHost::work_out(const ir::Module &p_modul
 			*r_key += " " + std::to_string((int)receiver);
 			return member_of(entry, words, !member, receiver);
 		}
+		case ir::Op::HostNew: {
+			// One of Godot's value types (Vector2(x, y)); an object of one of its classes is made by name.
+			const std::optional<int> type = value_type(entry.name);
+			if (!type) {
+				return nullptr;
+			}
+			auto worked = std::make_unique<Worked>();
+			worked->what = Worked::What::Construct;
+			worked->name = "new " + entry.name;
+			worked->result = *type;
+			worked->zero = zero_of(*type);
+			return worked;
+		}
 		case ir::Op::HostConstant: {
 			const std::optional<int> type = value_type(entry.owner);
 			auto worked = std::make_unique<Worked>();
@@ -580,6 +633,11 @@ const vm::Prepared *GodotHost::prepare(const ir::Module &p_module, const ir::Fun
 	std::unique_ptr<Worked> worked = work_out(p_module, p_function, p_in, &key);
 	if (!worked) {
 		return nullptr;
+	}
+	// One that takes a StringName keeps the name it made for its own call: `isActionPressed("left")` and
+	// `isActionPressed("right")` each keep theirs, and neither is made again.
+	if (std::find(worked->parameters.begin(), worked->parameters.end(), (int)Variant::STRING_NAME) != worked->parameters.end()) {
+		key += " at " + std::to_string(reinterpret_cast<uintptr_t>(&p_in));
 	}
 	// The same request elsewhere, or in a program loaded again, is worked out once.
 	if (auto found = worked_.find(key); found != worked_.end()) {
@@ -610,6 +668,8 @@ bool GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operan
 			return take(p_result, worked.value, worked.name, r_result, r_error);
 		case What::Utility:
 			return call_utility(*worked.utility, p_operands, p_count, p_result, r_result, r_error);
+		case What::Construct:
+			return run_construct(worked, p_operands, p_count, p_result, r_result, r_error);
 	}
 	return false;
 }

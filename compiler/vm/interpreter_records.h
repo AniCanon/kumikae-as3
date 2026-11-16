@@ -81,6 +81,7 @@ struct VectorCall {
 struct OperatorName {
 	std::string_view spelling;
 	bool compares = false;
+	int number = -1; // Godot's number for it (Variant::Operator), the entry's second word.
 };
 
 struct Prepared; // vm/engine_handles.h

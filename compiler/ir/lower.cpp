@@ -257,6 +257,9 @@ bool Lowerer::run(LowerMode p_mode) {
 		return false;
 	}
 	find_error_classes();
+	// What untyped values holding Godot's values are compared and added with, wherever that happens.
+	module_.equal_operator = engine_operator("==").value_or(NONE);
+	module_.add_operator = engine_operator("+").value_or(NONE);
 	Members(*this).reserve_interfaces(units);
 	const std::vector<ClassInUnit> classes = classes_in_order(units);
 	for (const ClassInUnit &entry : classes) {

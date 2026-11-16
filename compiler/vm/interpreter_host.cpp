@@ -115,7 +115,10 @@ std::optional<Outcome> prepared(Request &p_request, const Argument *p_operands, 
 Outcome construct(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
 	p_request.into(p_request.in.a); // One of Godot's values, or one of its objects.
-	p_request.result.p = p_request.host.source.construct(p_request.name(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
+	if (const std::optional<Outcome> outcome = prepared(p_request, arguments.values(), arguments.count())) {
+		return *outcome;
+	}
+	p_request.result.p =p_request.host.source.construct(p_request.name(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -166,7 +169,7 @@ Outcome operate(Request &p_request) {
 	if (const std::optional<Outcome> outcome = prepared(p_request, arguments.values(), arguments.count())) {
 		return *outcome;
 	}
-	return p_request.done(p_request.host.handles.operate(op.spelling, arguments.values(), arguments.count(), p_request.wanted(), &p_request.result,
+	return p_request.done(p_request.host.handles.operate(op.number, op.spelling, arguments.values(), arguments.count(), p_request.wanted(), &p_request.result,
 			&p_request.error));
 }
 

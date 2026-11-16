@@ -114,7 +114,8 @@ bool Interpreter::element_is(Kind p_kind, Slot p_element, Slot p_value) {
 	Slot equal;
 	equal.bits = 0;
 	std::string error;
-	return host_.handles.operate("==", both, 2, wanted, &equal, &error) && equal.b;
+	const OperatorName same = operator_named(module_.equal_operator, "==");
+	return host_.handles.operate(same.number, same.spelling, both, 2, wanted, &equal, &error) && equal.b;
 }
 
 void Interpreter::vector_call(const Function &p_function, const Instruction &p_in) {

@@ -155,7 +155,7 @@ output = compare("values.gd", [
     "clamp default", "clamp one", "clamp trailing null", "clamp both null", "clamp middle null", "clamp null variable", "looking",
     "looking null", "whole numbers", "to string", "to string in AS3", "no to string", "no to string in AS3",
     "negative cells", "cells plus", "cells compound", "plain order", "compound order", "mixed", "big hash", "decode",
-    "anchors", "words", "action", "action known", "angled", "parts", "same twice", "zeroes",
+    "anchors", "words", "action", "action known", "angled", "parts", "same twice", "zeroes", "copies",
 ])
 check("a null that is not the last argument takes Godot's default, with no error", "at Values/clampMiddleNull()" not in output,
       output[-800:])

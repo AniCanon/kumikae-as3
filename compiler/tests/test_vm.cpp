@@ -581,7 +581,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		}
 		return vm::new_string("<#" + std::to_string((intptr_t)p_value) + ">");
 	}
-	[[nodiscard]] bool operate(std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
+	[[nodiscard]] bool operate(int, std::string_view p_operator, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
 			std::string *r_error) override {
 		log += "operate " + std::string(p_operator) + " (" + list(p_arguments, p_count) + ") as " + ir::kind_name(p_wanted.kind) +
 				(p_wanted.type.empty() ? "" : " " + std::string(p_wanted.type)) + "\n";

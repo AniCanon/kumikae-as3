@@ -58,9 +58,10 @@ struct EngineHandles {
 	// An element, by a number or another key: `vector[0]`.
 	[[nodiscard]] virtual bool index_get(void *p_receiver, const Argument &p_key, const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;
 	[[nodiscard]] virtual bool index_set(void *p_receiver, const Argument &p_key, const Argument &p_value, std::string *r_error) = 0;
-	// An operator as AS3 writes it ("+", "==", "<"), on one operand or two, at least one of them an engine
+	// An operator, by Godot's number for it (its name table entry's: Variant::Operator), with AS3's spelling for
+	// what is said of it ("+", "=="), on one operand or two, at least one of them an engine
 	// value.
-	[[nodiscard]] virtual bool operate(std::string_view p_operator, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
+	[[nodiscard]] virtual bool operate(int p_operator, std::string_view p_spelling, const Argument *p_arguments, size_t p_count, const Wanted &p_result,
 			Slot *r_result, std::string *r_error) = 0;
 
 	// For the cycle collector (vm/collector.h), which runs between calls into the program.

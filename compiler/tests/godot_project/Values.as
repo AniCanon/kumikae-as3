@@ -171,6 +171,22 @@ package {
 		public function angled(a:Number):Vector2 { return Vector2.fromAngle(a); }
 		public function parts(v:Vector2):Vector2 { var w:Vector2 = v; w.y = w.x * 2; w.x += 1; return w; }
 		public function zeroes(n:int):String { var v:Vector.<Vector2> = new Vector.<Vector2>(n); v.length = n + 1; var first:Vector2 = v[0]; first.x = 5; v[1] = first; return v[0] + " " + v[1] + " " + v[n]; }
+		// A value written into a variable that already holds one is still a copy: nothing that held the old
+		// one, or holds the new one, sees a later change.
+		private var keptValue:Vector2;
+		public function copies(v:Vector2):String {
+			var w:Vector2 = v;
+			keptValue = w;
+			var list:Vector.<Vector2> = new Vector.<Vector2>();
+			list.push(w);
+			var bump:Function = function():void { w = w + new Vector2(1, 1); };
+			for (var i:int = 0; i < 3; i++) {
+				w = w * 2;
+			}
+			bump();
+			v = v + new Vector2(10, 0);
+			return v + " " + w + " " + keptValue + " " + list[0];
+		}
 		public function sameTwice(v:Vector2, n:int):int { var count:int = 0; for (var i:int = 0; i < n; i++) { if (v * 2 == v + v) { count++; } } return count; }
 	}
 }

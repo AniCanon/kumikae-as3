@@ -190,6 +190,7 @@ func _physics_process(_delta: float) -> bool:
 	zeroes.resize(4)
 	zeroes[1] = Vector2(5, 0)
 	show("zeroes", ask("zeroes", [3]), str(zeroes[0]) + " " + str(zeroes[1]) + " " + str(zeroes[3]))
+	show("copies", ask("copies", [a]), str(a + Vector2(10, 0)) + " " + str(a * 8 + Vector2(1, 1)) + " " + str(a) + " " + str(a))
 	twin.free()
 	node.queue_free()
 	return true
