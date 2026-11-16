@@ -31,6 +31,7 @@ class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
 	friend class Collector; // Frees objects that refer to each other in a loop.
 	friend class Json; // JSON.parse and JSON.stringify (vm/json_work.h).
+	friend class LibraryCall; // A method of the library called by name (vm/library_calls.h).
 
 public:
 	// Calls may nest this deep. One more is an AS3 error.
@@ -265,6 +266,8 @@ private:
 	bool table_text(Object *p_table, std::string *r_text, bool *r_own);
 	void call_with(uint32_t p_target, Object *p_first, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool object_method(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
+	// A method of a String, an Array, a Vector or a Function, called by name: true if the name is one.
+	bool library_call(Slot p_holder, std::string_view p_name, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
 	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);

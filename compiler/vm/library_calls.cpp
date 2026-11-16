@@ -1,0 +1,290 @@
+#include "library_calls.h"
+
+#include <numeric>
+
+namespace kas3 {
+namespace vm {
+
+using ir::Does;
+using ir::EachMethod;
+using ir::Kind;
+using ir::NONE;
+using ir::Taken;
+using ir::Takes;
+
+bool Interpreter::library_call(Slot p_holder, std::string_view p_name, const std::vector<Slot> &p_given, uint32_t p_out) {
+	const ir::LibraryMethod *method = LibraryCall::find(*this, p_holder, p_name);
+	if (method) {
+		LibraryCall(*this, *method, p_holder, p_given, p_out).run();
+	}
+	return method != nullptr;
+}
+
+const ir::LibraryMethod *LibraryCall::find(const Interpreter &p_vm, Slot p_holder, std::string_view p_name) {
+	uint8_t on = 0;
+	if (any::tag(p_holder) == AnyTag::String) {
+		on = ir::ON_TEXT;
+	} else if (const Object *object = p_vm.held_object(p_holder)) {
+		const ir::Class &klass = p_vm.module_.classes[object->klass];
+		on = klass.array ? ir::ON_ARRAY : klass.element != Kind::Void ? ir::ON_VECTOR : object->klass == p_vm.module_.function_class ? ir::ON_FUNCTION : 0;
+	}
+	return on ? ir::library_method(p_name, on) : nullptr;
+}
+
+void LibraryCall::run() {
+	if (!counted()) {
+		return;
+	}
+	switch (method_.does) {
+		case Does::Each:
+			each();
+			break;
+		case Does::Invoke:
+			invoke();
+			break;
+		default:
+			typed();
+			break;
+	}
+}
+
+const ir::Class *LibraryCall::list_class() const {
+	const Object *object = vm_.held_object(holder_);
+	const ir::Class *klass = object ? &vm_.module_.classes[object->klass] : nullptr;
+	return klass && klass->element != Kind::Void ? klass : nullptr;
+}
+
+bool LibraryCall::counted() const {
+	size_t most = 0, least = 0;
+	for (const Taken &taken : method_.fixed) {
+		most += taken.kind != Takes::Nothing ? 1 : 0;
+		least += taken.kind != Takes::Nothing && taken.required ? 1 : 0;
+	}
+	const size_t count = given_.size();
+	if (count >= least && (count <= most || method_.rest != Takes::Nothing)) {
+		return true;
+	}
+	vm_.raise(vm_.module_.argument_error_class != NONE ? vm_.module_.argument_error_class : vm_.module_.error_class,
+			"Error #1063: Argument count mismatch on " + vm_.holder_name(holder_) + "/" + std::string(method_.name) + "(). Expected " +
+					std::to_string(count < least ? least : most) + ", got " + std::to_string(count) + ".");
+	return false;
+}
+
+bool LibraryCall::converted(const Taken *p_fixed, Takes p_takes, size_t p_index, Kind *r_kind, Slot *r_value) {
+	const ir::Class *klass = list_class();
+	*r_kind = ir::kind_taken(p_takes, klass ? klass->element : Kind::Void);
+	r_value->bits = 0;
+	const bool left_out = p_index >= given_.size();
+	const Slot given = left_out ? any::undefined() : given_[p_index];
+	const bool text = p_takes == Takes::Text || p_takes == Takes::Words;
+	if (text && !method_.text_left_out.empty() && (left_out || any::tag(given) == AnyTag::Undefined)) {
+		r_value->p = vm_.text(std::string(method_.text_left_out)); // Undefined is the default, as for one left out.
+		return r_value->p != nullptr;
+	}
+	if (left_out && p_takes == Takes::Any) {
+		*r_value = p_fixed && p_fixed->left_out != 0 ? any::null() : any::undefined();
+		return true;
+	}
+	if (left_out) {
+		const Slot number = any::number(p_fixed ? p_fixed->left_out : 0);
+		return text || vm_.from_any(number, *r_kind, NONE, r_value); // A String left out with no default is null.
+	}
+	if (p_takes == Takes::Words) {
+		std::string words;
+		const Slot held = vm_.share(Kind::Any, given);
+		const bool said = vm_.any_text(held, &words);
+		vm_.drop_any(held);
+		r_value->p = said ? vm_.text(words) : nullptr;
+		return r_value->p != nullptr;
+	}
+	uint32_t check = NONE;
+	if (p_takes == Takes::Element) {
+		check = klass->element_check;
+	} else if (p_takes == Takes::Own) {
+		check = vm_.held_object(holder_)->klass;
+	}
+	return vm_.from_any(given, *r_kind, check, r_value);
+}
+
+void LibraryCall::give(Kind p_kind, Slot p_owned) {
+	if (out_ != NONE && p_kind != Kind::Void) {
+		vm_.put(Kind::Any, vm_.stack_[vm_.frames_.back().base + out_], vm_.to_any(p_kind, p_owned));
+	}
+	vm_.drop(p_kind, p_owned);
+}
+
+// The row's operation, run on registers set past the running frame's: what it is called on, each argument
+// converted, and one more for what it gives. The operation is done before this returns (none of these
+// leaves a call for the loop to carry on with), so the registers are gone again after it.
+void LibraryCall::typed() {
+	const ir::Class *klass = list_class();
+	std::vector<Kind> kinds;
+	std::vector<Slot> values;
+	const Kind holder = klass ? Kind::Obj : Kind::Str;
+	kinds.push_back(holder);
+	values.push_back(vm_.share(holder, of_object(any::pointer(holder_))));
+	bool ok = true;
+	size_t at = 0;
+	for (; ok && at < method_.fixed.size() && method_.fixed[at].kind != Takes::Nothing; at++) {
+		kinds.emplace_back();
+		values.emplace_back();
+		ok = converted(&method_.fixed[at], method_.fixed[at].kind, at, &kinds.back(), &values.back());
+	}
+	for (; ok && method_.rest != Takes::Nothing && at < given_.size(); at++) {
+		kinds.emplace_back();
+		values.emplace_back();
+		ok = converted(nullptr, method_.rest, at, &kinds.back(), &values.back());
+	}
+	if (ok) {
+		const Kind result = ir::kind_taken(method_.result, klass ? klass->element : Kind::Void);
+		const size_t base = vm_.frames_.back().base;
+		const uint32_t first = static_cast<uint32_t>(vm_.stack_.size() - base);
+		Slot zero;
+		zero.bits = 0;
+		vm_.stack_.resize(vm_.stack_.size() + values.size() + 1, zero);
+		std::copy(values.begin(), values.end(), vm_.stack_.begin() + static_cast<std::ptrdiff_t>(base + first));
+		// The instruction, as the lowerer would have written it for a typed call, and enough of a function
+		// for it to be read from: the registers' kinds and the list of its arguments.
+		ir::Function scratch;
+		scratch.registers.assign(first, Kind::I32);
+		scratch.registers.insert(scratch.registers.end(), kinds.begin(), kinds.end());
+		scratch.registers.push_back(result == Kind::Void ? Kind::I32 : result);
+		scratch.argument_lists.emplace_back(values.size());
+		std::iota(scratch.argument_lists[0].begin(), scratch.argument_lists[0].end(), first);
+		ir::Instruction in;
+		in.a = result == Kind::Void ? NONE : first + static_cast<uint32_t>(values.size());
+		in.b = method_.which;
+		in.c = 0;
+		if (method_.does == Does::VecCall) {
+			vm_.vector_call(scratch, in);
+		} else if (method_.does == Does::StrCall) {
+			vm_.string_call(scratch, in, vm_.stack_.data() + base);
+		} else {
+			vm_.regexp_call(scratch, in);
+		}
+		const Slot made = vm_.stack_[base + first + values.size()];
+		if (vm_.failing_) {
+			Slot unused = made;
+			vm_.drop(result, unused);
+		} else {
+			give(result, made);
+		}
+		vm_.stack_.resize(base + first);
+	}
+	for (size_t i = 0; i < values.size(); i++) {
+		vm_.drop(kinds[i], values[i]);
+	}
+}
+
+// forEach, map, filter, some and every, as the lowerer writes them for a typed vector (lower_functions.cpp,
+// vector_each): the length read once, each element read as it is reached, and only an answer of true
+// counting for filter, some and every.
+void LibraryCall::each() {
+	const EachMethod which = static_cast<EachMethod>(method_.which);
+	Vector *vector = static_cast<Vector *>(vm_.held_object(holder_));
+	const uint32_t klass_index = vector->klass;
+	const ir::Class &klass = vm_.module_.classes[klass_index];
+	const Slot callback = given_[0];
+	if (which != EachMethod::Map && given_.size() > 1) {
+		vm_.callback_this(callback, given_[1]);
+		if (vm_.failing_) {
+			return;
+		}
+	}
+	const uint32_t limit = vector->length;
+	const bool collects = which == EachMethod::Map || which == EachMethod::Filter;
+	Vector *made = collects ? vm_.fresh_vector(klass_index, which == EachMethod::Map && !klass.array ? limit : 0) : nullptr;
+	if (collects && !made) {
+		return;
+	}
+	bool answer_all = which == EachMethod::Every;
+	bool ok = true;
+	Object *function = any::to_boolean(callback) ? vm_.function_in(Kind::Any, callback) : nullptr;
+	ok = !vm_.failing_;
+	for (uint32_t at = 0; ok && function && at < limit; at++) {
+		if (at >= vector->length && !klass.array) {
+			vm_.raise_range(at, vector->length);
+			ok = false;
+			break;
+		}
+		// The element as it is now: what the function does to the vector does not change what filter keeps.
+		Slot element = at < vector->length ? vm_.share(klass.element, vector->data[at]) : any::undefined();
+		const Slot item = vm_.to_any(klass.element, element);
+		const Slot arguments[3] = { item, any::integer(static_cast<int32_t>(at)), holder_ };
+		const std::optional<Slot> answer = vm_.call_function_within(function, arguments, 3);
+		ok = answer.has_value();
+		const bool yes = ok && any::tag(*answer) == AnyTag::Boolean && any::to_bool_payload(*answer);
+		bool settled = false;
+		if (ok && which == EachMethod::Map && klass.array) {
+			ok = vm_.resize_vector(made, made->length + 1);
+			if (ok) {
+				made->data[made->length - 1] = vm_.share(Kind::Any, *answer);
+			}
+		} else if (ok && which == EachMethod::Map) {
+			Slot value;
+			value.bits = 0;
+			ok = vm_.from_any(*answer, klass.element, klass.element_check, &value);
+			if (ok && at < made->length) {
+				vm_.put(klass.element, made->data[at], value);
+			} else if (ok) {
+				vm_.drop(klass.element, value);
+			}
+		} else if (ok && which == EachMethod::Filter && yes) {
+			ok = vm_.resize_vector(made, made->length + 1);
+			if (ok) {
+				made->data[made->length - 1] = vm_.share(klass.element, element);
+			}
+		} else if (ok && (which == EachMethod::Some || which == EachMethod::Every) && yes == (which == EachMethod::Some)) {
+			answer_all = which == EachMethod::Some;
+			settled = true;
+		}
+		if (answer) {
+			vm_.drop_any(*answer);
+		}
+		vm_.drop_any(item);
+		vm_.drop(klass.element, element);
+		if (settled) {
+			break;
+		}
+	}
+	if (!ok) {
+		if (made) {
+			vm_.release_object(made);
+		}
+	} else if (collects) {
+		give(Kind::Obj, of_object(made));
+	} else if (which != EachMethod::ForEach) {
+		give(Kind::Bool, of_bool(answer_all));
+	}
+}
+
+// A Function's call(thisArg, ...) and apply(thisArg, array). thisArg is set aside: a method keeps its own
+// object, and a function expression can't use `this`. The call is left for the loop to carry on with.
+void LibraryCall::invoke() {
+	Object *function = vm_.held_object(holder_);
+	const uint32_t target = static_cast<uint32_t>(function->fields()[ir::FUNCTION_INDEX].i);
+	Object *first = static_cast<Object *>(function->fields()[ir::FUNCTION_FIRST].p);
+	std::vector<Slot> arguments;
+	if (static_cast<ir::InvokeMethod>(method_.which) == ir::InvokeMethod::Call) {
+		for (size_t i = 1; i < given_.size(); i++) {
+			arguments.push_back(vm_.share(Kind::Any, given_[i]));
+		}
+	} else if (given_.size() > 1 && any::tag(given_[1]) != AnyTag::Null && any::tag(given_[1]) != AnyTag::Undefined) {
+		const Object *list = vm_.held_object(given_[1]);
+		if (!list || !vm_.module_.classes[list->klass].array) {
+			vm_.raise(vm_.module_.type_error_class, "Error #1116: second argument to Function.prototype.apply must be an array.");
+			return;
+		}
+		const Vector *array = static_cast<const Vector *>(list);
+		for (uint32_t i = 0; i < array->length; i++) {
+			arguments.push_back(vm_.share(Kind::Any, array->data[i]));
+		}
+	}
+	vm_.call_with(target, first, arguments, out_);
+	for (Slot each : arguments) {
+		vm_.drop_any(each);
+	}
+}
+
+} // namespace vm
+} // namespace kas3
