@@ -3,6 +3,8 @@
 #include "lower_engine_calls.h"
 #include "lower_vectors.h"
 
+#include "godot_names.h"
+
 namespace kas3 {
 namespace ir {
 
@@ -67,7 +69,7 @@ uint32_t EngineCalls::godot_call(Call *p_call, Symbol *p_method) {
 // signature, which the engine's entry for such functions needs.
 uint32_t EngineCalls::global_call(Call *p_call, Symbol *p_function, Kind p_want) {
 	uint32_t position = p_call->offset;
-	const std::optional<std::string> signature = godot_name("@global", p_function->name);
+	const std::optional<std::string_view> signature = godot_value("@global." + std::string(p_function->name));
 	if (!signature) {
 		l_.refuse(p_call->callee->offset, "calling '" + std::string(p_function->name) + "'");
 		return l_.default_value(p_want, position);
@@ -89,7 +91,7 @@ uint32_t EngineCalls::global_call(Call *p_call, Symbol *p_function, Kind p_want)
 	engine_arguments(decl, p_call->arguments, position, list);
 	uint32_t out = kind == Kind::Void ? NONE : l_.engine_reg(kind, type);
 	// No class before the dot: the engine's side reads that as a global function.
-	l_.emit(Op::HostCallStatic, position, out, l_.string("." + *signature), l_.arguments(std::move(list)));
+	l_.emit(Op::HostCallStatic, position, out, l_.string("." + std::string(*signature)), l_.arguments(std::move(list)));
 	if (out != NONE && (p_want == Kind::Str || p_want == Kind::I32 || p_want == Kind::U32) && kind != p_want) {
 		// Godot's text for it; a Number cut to a whole one.
 		return l_.convert(out, p_want, position);
@@ -213,10 +215,11 @@ void EngineCalls::engine_arguments(FunctionDecl *p_function, const List<Expr *> 
 				r_list.push_back(l_.settled(bound_method(p_arguments[i]), later, p_position));
 				continue;
 			}
-			std::optional<std::string> godot_default;
+			std::optional<std::string_view> godot_default;
 			if (p_defaults && p_function->parameters[i].default_value && Lowerer::is_null(p_function->parameters[i].default_value) &&
-					l_.kind_of(type, &kind) && kind == Kind::Val && (godot_default = godot_name("@default", std::string(*p_defaults) + "." + std::to_string(i)))) {
-				r_list.push_back(godot_default_argument(p_arguments[i], type, *godot_default));
+					l_.kind_of(type, &kind) && kind == Kind::Val &&
+					(godot_default = godot_value("@default." + std::string(*p_defaults) + "." + std::to_string(i)))) {
+				r_list.push_back(godot_default_argument(p_arguments[i], type, std::string(*godot_default)));
 				continue;
 			}
 			kind = Kind::Void;
@@ -311,7 +314,10 @@ uint32_t EngineCalls::static_call(Call *p_call, Symbol *p_method) {
 	FunctionDecl *decl = p_method->node && p_method->node->kind == NodeKind::FunctionDecl ? static_cast<FunctionDecl *>(p_method->node) : nullptr;
 	engine_arguments(decl, p_call->arguments, position, list, key);
 	uint32_t out = kind == Kind::Void ? NONE : l_.engine_reg(kind, p_method->type ? l_.compilation_.type_of(p_method->type) : nullptr);
-	l_.emit(Op::HostCallStatic, position, out, l_.string(*key), l_.arguments(std::move(list)));
+	// The class, then the method's whole entry: its hash finds it, and its types may hold dots.
+	const std::string_view signature = *godot_value(std::string(p_method->owner->name) + "." + std::string(p_method->name));
+	const std::string klass = key->substr(0, key->find('.'));
+	l_.emit(Op::HostCallStatic, position, out, l_.string(klass + "." + std::string(signature)), l_.arguments(std::move(list)));
 	return out == NONE ? 0 : out;
 }
 

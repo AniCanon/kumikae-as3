@@ -70,12 +70,57 @@ class Fixture(unittest.TestCase):
             self.assertNotIn(" class %s " % name, self.text)
         self.assertNotIn("toUpper", self.text)
 
-    def test_a_static_method_carries_its_hash(self):
-        # Called through its own entry, so that a wrong call is Godot's error to the script, not a message.
-        names = generate.Generator(fixture())
-        names.run()
-        self.assertEqual(names.godot_names["Node.printOrphanNodes"], "print_orphan_nodes 1")
-        self.assertEqual(names.godot_names["Node.getNode"], "get_node")
+    def names(self, api=None):
+        generator = generate.Generator(api or fixture())
+        generator.run()
+        return dict(line.split("=", 1) for line in generator.names_text().split("\n") if line)
+
+    def test_a_method_carries_its_signature(self):
+        # Godot's name, what it is, the hash its entry is found by, what it gives and what it takes: what a
+        # backend needs to find it once and call it with values of exact types.
+        names = self.names()
+        self.assertEqual(names["Node.printOrphanNodes"], "print_orphan_nodes method 1 void -")
+        self.assertEqual(names["Node.getNode"], "get_node method 1 Node NodePath")
+        self.assertEqual(names["Input.isActionPressed"], "is_action_pressed method 1 bool StringName,bool")
+        self.assertEqual(names["GodotObject.call"], "call method 1 Variant StringName varargs")
+        self.assertEqual(names["Vector2.distanceTo"], "distance_to method 1 float Vector2")
+        self.assertEqual(names["Vector2.fromAngle"], "from_angle method 1 Vector2 float")
+        self.assertEqual(names["Node._physicsProcess"].split(" ")[:2], ["_physics_process", "method"])
+
+    def test_a_method_godot_has_no_entry_for_has_no_hash(self):
+        # free() is the engine's own: there is nothing to find it by.
+        self.assertEqual(self.names()["GodotObject.free"], "free method - void -")
+
+    def test_a_property_carries_its_accessors(self):
+        names = self.names()
+        self.assertEqual(names["Node.name"], "name property StringName get_name 1 set_name 1 -")
+        self.assertEqual(names["Control.anchorLeft"], "anchor_left property float get_anchor 1 set_anchor 1 0")
+        self.assertEqual(names["Control.size"], "size property Vector2 get_size 1 - - -")
+        self.assertEqual(names["Control.theme"], "theme property Texture2D get_theme 1 set_theme 1 -")
+        # An accessor the description does not list has no hash to be found by.
+        self.assertEqual(names["Control.data"], "data property typedarray::Node _get_data - _set_data - -")
+
+    def test_a_signal_and_a_field_say_what_they_are(self):
+        names = self.names()
+        self.assertEqual(names["Node.ready"], "ready signal")
+        self.assertEqual(names["Vector2.x"], "x field float")
+
+    def test_operators_carry_godots_numbers(self):
+        # By the enumerator: the description's own name for "==" would end the key.
+        names = self.names()
+        self.assertEqual(names["@operator.OP_EQUAL"], "== 0")
+        self.assertEqual(names["@operator.OP_ADD"], "+ 6")
+        self.assertEqual(names["@operator.OP_MULTIPLY"], "* 8")
+        self.assertEqual(names["@operator.OP_NEGATE"], "unary- 10")
+        self.assertEqual(sorted(value.split(" ")[0] for key, value in names.items() if key.startswith("@operator.")),
+                         ["%", "&", "*", "**", "+", "<", "==", "in", "unary-"])
+
+    def test_an_operator_godot_does_not_number_is_refused(self):
+        api = fixture()
+        enum = [entry for entry in api["global_enums"] if entry["name"] == "Variant.Operator"][0]
+        enum["values"] = [value for value in enum["values"] if value["name"] != "OP_ADD"]
+        with self.assertRaises(generate.Refused):
+            self.names(api)
 
     def test_a_setter_keeps_the_element_type(self):
         # What the getter says of a typed array, the setter says of what it takes.
@@ -555,7 +600,7 @@ class RealApi(unittest.TestCase):
     def test_godot_names(self):
         # The Godot spelling of everything declared, for the bindings: never worked out backwards from the
         # AS3 name, which loses information (getNode3d).
-        names = dict(line.split("=") for line in self.generator.names_text().split("\n") if line)
+        names = dict(line.split("=", 1) for line in self.generator.names_text().split("\n") if line)
         self.assertEqual(names["Input.singleton"], "@singleton")
         # A global function's signature, for the entry that takes exact types.
         self.assertEqual(names["@global.lerpf"], "lerpf 998901048 float float,float,float")
@@ -571,16 +616,19 @@ class RealApi(unittest.TestCase):
         self.assertIn("Transform2D()", defaults)
         self.assertNotIn("Transform2D(1, 0, 0, 1, 0, 0)", defaults)
         self.assertFalse([value for value in defaults if value.startswith("Array[")])
-        self.assertEqual(names["CharacterBody2D.moveAndSlide"], "move_and_slide")
-        self.assertEqual(names["Node._physicsProcess"], "_physics_process")
-        self.assertEqual(names["Node2D.position"], "position")
-        self.assertEqual(names["CharacterBody2D.velocity"], "velocity")
-        self.assertEqual(names["Node.childEnteredTree"], "child_entered_tree")
+        self.assertEqual(names["CharacterBody2D.moveAndSlide"], "move_and_slide method 2240911060 bool -")
+        self.assertEqual(names["Node._physicsProcess"].split(" ")[:2], ["_physics_process", "method"])
+        self.assertEqual(names["Node2D.position"], "position property Vector2 get_position 3341600327 set_position 743155724 -")
+        self.assertEqual(names["CharacterBody2D.velocity"].split(" ")[:3], ["velocity", "property", "Vector2"])
+        self.assertEqual(names["Node.childEnteredTree"], "child_entered_tree signal")
         self.assertEqual(names["GodotObject"], "Object")
-        self.assertEqual(names["GodotObject.getInstanceID"], "get_instance_id")
-        self.assertEqual(names["Vector2.distanceTo"], "distance_to")
-        self.assertEqual(names["Vector2.x"], "x")
-        self.assertEqual(names["Input.isActionPressed"], "is_action_pressed")
+        self.assertEqual(names["GodotObject.getInstanceID"].split(" ")[:2], ["get_instance_id", "method"])
+        self.assertEqual(names["Vector2.distanceTo"], "distance_to method 3819070308 float Vector2")
+        self.assertEqual(names["Node.isInsideTree"], "is_inside_tree method 36873697 bool -")
+        self.assertEqual(names["Vector2.x"], "x field float")
+        self.assertEqual(names["Input.isActionPressed"].split(" ")[3:], ["bool", "StringName,bool"])
+        self.assertEqual(names["@operator.OP_ADD"], "+ 6")
+        self.assertEqual(names["@operator.OP_NEGATE"], "unary- 10")
         self.assertEqual(names["Node"], "Node")
         self.assertGreater(len(names), 15000)
         # Every member line of a Godot class in godot.as has its name here, except AS3's own additions.

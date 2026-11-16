@@ -167,9 +167,9 @@ Outcome constant(Request &p_request) {
 
 Outcome call_static(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
-	// "Vector2.from_angle": the type, and the method.
+	// "Vector2.from_angle method 3 ...": the type, and the method's entry, whose types may hold dots.
 	const std::string_view name = p_request.text(p_request.in.b);
-	const size_t dot = name.rfind('.');
+	const size_t dot = name.find('.');
 	p_request.into(p_request.in.a);
 	return p_request.done(p_request.host.source.call_static(name.substr(0, dot), name.substr(dot + 1), arguments.values(), arguments.count(),
 			p_request.wanted(), p_request.result_or_none(), &p_request.error));

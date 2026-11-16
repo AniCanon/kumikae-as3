@@ -562,7 +562,7 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	[[nodiscard]] bool call_static(std::string_view p_class, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count,
 			const vm::Wanted &p_wanted, vm::Slot *r_result, std::string *r_error) override {
 		log += "static " + std::string(p_class) + "." + std::string(p_method) + "(" + list(p_arguments, p_count) + ")\n";
-		if (p_method == missing) {
+		if (p_method.substr(0, p_method.find(' ')) == missing) {
 			*r_error = "Godot has no '" + missing + "'";
 			return false;
 		}
@@ -865,6 +865,7 @@ static void test_engine_statics() {
 						 "  public function up():Number { return Vector2.UP.y; }\n"
 						 "  public function made(a:Number, b:Number):Vector2 { return Vector2.fromAngle(a + b); }\n"
 						 "  public function shown():void { Node.printOrphanNodes(); }\n"
+						 "  public function opened(iv:PackedByteArray):FileAccess { return FileAccess.openEncrypted(\"p\", 1, iv, iv); }\n"
 						 "  public function mixed(a:Number):Number { return lerpf(a, 2, 0.5); }\n"
 						 "  private function note():int { trace(\"note\"); return 0; }\n"
 						 "  public function order(other:Pad):Node { return other.getChild(note()); }\n"
@@ -942,11 +943,11 @@ static void test_engine_statics() {
 		arguments[1].bits = 0;
 		arguments[1].d = 2;
 		CHECK(interpreter.call_method(object, "made", arguments, 2, &result));
-		CHECK_EQ(engine.log, std::string("static Vector2.from_angle(3)\n"));
+		CHECK_EQ(engine.log, std::string("static Vector2.from_angle method 889263119 Vector2 float(3)\n"));
 		engine.drop(result.p);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "shown", nullptr, 0, nullptr));
-		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes 3218959716()\n"));
+		CHECK_EQ(engine.log, std::string("static Node.print_orphan_nodes method 3218959716 void -()\n"));
 		// A global function is called on no class, with its signature for the engine's side.
 		engine.log.clear();
 		arguments[0].d = 1;
@@ -982,6 +983,13 @@ static void test_engine_statics() {
 		CHECK(interpreter.call_method(object, "nothing", nullptr, 0, &result));
 		CHECK(result.b);
 		CHECK_EQ(engine.boxes, 4); // The owner, the field, and the two singletons kept.
+		// A static method's default that AS3 can't write is Godot's, for a missing value given in its place.
+		engine.log.clear();
+		arguments[0].bits = 0;
+		CHECK(interpreter.call_method(object, "opened", arguments, 1, &result));
+		CHECK(engine.log.find("evaluate PackedByteArray() as PackedByteArray\n") != std::string::npos);
+		engine.drop(result.p);
+		CHECK_EQ(engine.boxes, 4);
 		// What the engine does not have is an AS3 error, and nothing is left behind. (A singleton not yet
 		// looked up: this interpreter has Input already.)
 		CHECK_EQ(engine.errors, std::string());
