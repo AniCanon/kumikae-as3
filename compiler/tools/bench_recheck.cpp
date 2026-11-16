@@ -1,6 +1,6 @@
 // How long the language server takes to check a project again after one file changes.
 //
-//   bench_recheck <project folder> [--no-godot] [--rounds N]
+//   bench_recheck <project folder> [--no-godot] [--rounds N] [--soak N]
 //
 // Opens the folder as a workspace (a project from tests/bench/generate_project.py), checks it whole, then
 // edits the file in the middle of the order N times for each kind of edit, undoing each edit the next time:
@@ -11,8 +11,10 @@
 //   hub        Hub.as's method, which every file calls (a project made with --hub)
 //
 // Each is timed twice: until the edited file is checked (what a request about it waits for), and until the
-// whole program is. Uses only what the Workspace has always offered, so the same source can be built against
-// an older compiler to measure turn and turn about (tests/bench/recheck.py).
+// whole program is. With --soak, N edits then rename a method and a class to names never used before, and
+// the resident memory is printed as they go: declarations that are gone must not make it grow. Uses only
+// what the Workspace has always offered, so the same source can be built against an older compiler to
+// measure turn and turn about (tests/bench/recheck.py).
 #include "workspace.h"
 
 #include <algorithm>
@@ -23,6 +25,9 @@
 #include <string>
 #include <vector>
 
+#ifdef __APPLE__
+#include <mach/mach.h>
+#endif
 #ifndef _WIN32
 #include <sys/resource.h>
 #endif
@@ -69,6 +74,35 @@ long resident_kib() {
 #endif
 }
 
+// Resident memory now, where the system says; 0 where it does not.
+long current_kib() {
+#ifdef __APPLE__
+	mach_task_basic_info_data_t info;
+	mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+	if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&info), &count) == KERN_SUCCESS) {
+		return (long)(info.resident_size / 1024);
+	}
+#endif
+	return 0;
+}
+
+void soak(kas3::Workspace &r_workspace, const std::string &p_path, const std::string &p_text, int p_edits) {
+	for (int i = 0; i < p_edits; i++) {
+		const std::string number = std::to_string(i);
+		std::string text = replaced(p_text, "step0(delta:Number, amount:int)", ("renamed" + number + "(delta:Number, amount:int)").c_str());
+		const size_t at = text.find("public class Thing");
+		const size_t end = text.find(' ', at + 13);
+		if (at != std::string::npos && end != std::string::npos) {
+			text.replace(at + 13, end - at - 13, "Renamed" + number);
+		}
+		r_workspace.change(p_path, i % 2 ? p_text : text);
+		r_workspace.compilation();
+		if (i % (p_edits / 10 > 0 ? p_edits / 10 : 1) == 0 || i + 1 == p_edits) {
+			std::printf("soak %6d edits: resident %ld KiB\n", i + 1, current_kib());
+		}
+	}
+}
+
 } // namespace
 
 int main(int p_argc, char **p_argv) {
@@ -78,11 +112,14 @@ int main(int p_argc, char **p_argv) {
 	}
 	kas3::Workspace::Options options;
 	int rounds = 20;
+	int soak_edits = 0;
 	for (int i = 2; i < p_argc; i++) {
 		if (std::strcmp(p_argv[i], "--no-godot") == 0) {
 			options.godot = false;
 		} else if (std::strcmp(p_argv[i], "--rounds") == 0 && i + 1 < p_argc) {
 			rounds = std::max(1, std::atoi(p_argv[++i]));
+		} else if (std::strcmp(p_argv[i], "--soak") == 0 && i + 1 < p_argc) {
+			soak_edits = std::max(0, std::atoi(p_argv[++i]));
 		}
 	}
 
@@ -139,5 +176,8 @@ int main(int p_argc, char **p_argv) {
 		report(edit.name, "program", program_times);
 	}
 	std::printf("peak resident memory: %ld KiB\n", resident_kib());
+	if (soak_edits) {
+		soak(workspace, path, text, soak_edits);
+	}
 	return workspace.compilation().has_errors() ? 1 : 0;
 }
