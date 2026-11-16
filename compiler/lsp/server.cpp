@@ -181,6 +181,26 @@ void Server::handle(std::string_view p_message, std::vector<std::string> &r_out)
 	handle_message(message, r_out);
 }
 
+// The answer to a request after `initialize`, or nothing for a method the server does not handle.
+std::optional<Json> Server::answer(const std::string &p_method, const Json &p_params) {
+	if (p_method == "textDocument/definition") {
+		return definition(p_params);
+	} else if (p_method == "textDocument/references") {
+		return references(p_params);
+	} else if (p_method == "textDocument/hover") {
+		return hover(p_params);
+	} else if (p_method == "textDocument/signatureHelp") {
+		return signature_help(p_params);
+	} else if (p_method == "textDocument/completion") {
+		return completion(p_params);
+	} else if (p_method == "textDocument/documentSymbol") {
+		return document_symbols(p_params);
+	} else if (p_method == "workspace/symbol") {
+		return workspace_symbols(p_params);
+	}
+	return std::nullopt;
+}
+
 void Server::handle_message(const Json &p_message, std::vector<std::string> &r_out) {
 	if (!p_message.is_object()) {
 		r_out.push_back(failure(Json(), INVALID_REQUEST, "the message is not a request"));
@@ -225,26 +245,12 @@ void Server::handle_message(const Json &p_message, std::vector<std::string> &r_o
 		r_out.push_back(response(id, Json()));
 		return;
 	}
-	Json result;
-	if (method == "textDocument/definition") {
-		result = definition(params);
-	} else if (method == "textDocument/references") {
-		result = references(params);
-	} else if (method == "textDocument/hover") {
-		result = hover(params);
-	} else if (method == "textDocument/signatureHelp") {
-		result = signature_help(params);
-	} else if (method == "textDocument/completion") {
-		result = completion(params);
-	} else if (method == "textDocument/documentSymbol") {
-		result = document_symbols(params);
-	} else if (method == "workspace/symbol") {
-		result = workspace_symbols(params);
-	} else {
+	std::optional<Json> result = answer(method, params);
+	if (!result) {
 		r_out.push_back(failure(id, METHOD_NOT_FOUND, "the server does not handle this request"));
 		return;
 	}
-	r_out.push_back(response(id, std::move(result)));
+	r_out.push_back(response(id, std::move(*result)));
 	// Answering made the server check the latest text: its errors are due as well.
 	publish(r_out);
 }

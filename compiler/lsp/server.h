@@ -70,6 +70,7 @@ class Server {
 	void did_change(const std::string &p_path, const Json &p_document, const Json &p_params,
 			std::vector<std::string> &r_out);
 	void did_close(const std::string &p_path);
+	std::optional<Json> answer(const std::string &p_method, const Json &p_params);
 
 public:
 	explicit Server(Workspace::Options p_options);
