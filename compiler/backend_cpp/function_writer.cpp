@@ -306,7 +306,7 @@ std::string FunctionWriter::write() {
 		}
 	}
 	const Signature signature = signature_of(function_);
-	std::string head = signature.result + " " + function_name(module_, index_) + "(Context *c";
+	std::string head = declared(function_.result, function_name(module_, index_)) + "(Context *c";
 	std::string passed = "c";
 	for (uint32_t i = 0; i < function_.parameters; i++) {
 		head += ", " + declared(kind(i), reg(i));

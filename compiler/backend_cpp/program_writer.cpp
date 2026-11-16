@@ -168,7 +168,7 @@ std::string write_header(const ir::Module &p_module) {
 	}
 	for (uint32_t i = 0; i < p_module.functions.size(); i++) {
 		const Signature signature = signature_of(p_module.functions[i]);
-		out += signature.result + " " + function_name(p_module, i) + "(";
+		out += declared(p_module.functions[i].result, function_name(p_module, i)) + "(";
 		for (size_t each = 0; each < signature.parameters.size(); each++) {
 			out += (each ? ", " : "") + signature.parameters[each];
 		}
