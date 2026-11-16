@@ -32,11 +32,11 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			share(p_in.a, from_slot(kind(p_in.a), "(*e)"));
 			break;
 		case Op::VecSet:
-			// An element there already is: one past the end, which grows the vector, is the library's.
+			// An element there is, or one added at the end: a gap, a fixed vector and the rest are the library's.
 			if (!whole(p_in.b)) {
 				return false;
 			}
-			line("if (Slot *const e = element(" + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
+			line("if (Slot *const e = element_to_write(" + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
 			line(ir::is_held(kind(p_in.c)) ? "\tstore_slot(c, *e, " + reg(p_in.c) + ");" : "\t*e = slot(" + reg(p_in.c) + ");");
 			break;
 		default:
@@ -108,6 +108,25 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 					", &w)) {");
 			share(p_in.a, from_slot(kind(p_in.a), "w"));
 			break;
+		case Op::DynGet:
+		case Op::DynSet: {
+			// A property of an Object or a Dictionary under a String key, where the table keeps it.
+			const uint32_t holder = p_in.op == Op::DynGet ? p_in.b : p_in.a;
+			const uint32_t key = p_in.op == Op::DynGet ? p_in.c : p_in.b;
+			const bool held = (kind(holder) == Kind::Obj || kind(holder) == Kind::Any) && (kind(key) == Kind::Str || kind(key) == Kind::Any);
+			if (!held || (p_in.op == Op::DynSet && kind(p_in.c) != Kind::Any)) {
+				return false;
+			}
+			const std::string place = "c, holder_of(" + reg(holder) + "), key_of(" + reg(key) + ")";
+			if (p_in.op == Op::DynSet) {
+				line("if (KAS3_UNLIKELY(!set_property(" + place + ", " + reg(p_in.c) + ")))");
+				by_thunk(p_in);
+				return true;
+			}
+			line("if (Slot *const e = property(" + place + ")) {");
+			share(p_in.a, "*e");
+			break;
+		}
 		case Op::AnyNullCheck:
 			line("if (KAS3_UNLIKELY(!has_members(" + reg(p_in.a) + ")))");
 			by_thunk(p_in);

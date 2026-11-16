@@ -9,12 +9,12 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `kas3.h` | Everything generated code includes |
 | `values.h` | The values (the runtime's own: `vm/runtime.h`'s `Str`, `Object`, `Vector`, `Slot`), the `Context` every generated function takes first, `retain`/`release`, `put`/`store` |
 | `numbers.h` | AS3's arithmetic and conversions on machine numbers, as the interpreter's loop does them |
-| `fast.h` | The inline fast paths: a vector's element in range, its length, a String joined to another |
+| `fast.h` | The fast paths of operations the library owns, each for the usual case only: a vector's element in range, a String joined to another, a new object of a class the collector does not look at, and the rest declared for `calls.cpp` and `properties.cpp` |
 | `operations.h` | What generated code calls out of line: errors and their traces, a class's first use, thunks, `trace` |
 | `program.h` | The table a program library gives its host (`kas3_program`): classes, functions, static fields, strings, thunks, all by number |
 | `host.h`, `host.cpp` | The host with no engine: the context's state, a program run as `kas3c run` runs it |
 | `errors.cpp` | Raising, catching, the stack trace, the report of an error nothing caught |
-| `calls.cpp` | A function value called from generated code without the interpreter between |
+| `calls.cpp`, `properties.cpp` | The fast paths that are not inline: typed and untyped values made of one another, a function value and a `toString()` called with no interpreter between; an Object's property under a String key, an element added at a vector's end |
 | `stub_module.cpp`, `bridge.cpp` | The interpreter the host keeps for the shared library (below) |
 | `standalone.cpp`, `standalone_main.cpp` | A program library run as a plain program, on a thread whose stack holds 10,000 calls of any likely size; `main` |
 

@@ -35,11 +35,19 @@ bool number_to_any(double p_value, Slot *r_any) {
 		*r_any = vm::any::number(p_value); // Not-a-number too: it is not equal to itself.
 		return true;
 	}
-	if (p_value >= INT32_MIN && p_value <= INT32_MAX && !(p_value == 0 && std::signbit(p_value))) {
+	constexpr double EXACT = 9007199254740992.0; // 2^53: past it a Number is not every whole number.
+	if (std::fabs(p_value) > EXACT || (p_value == 0 && std::signbit(p_value))) {
+		*r_any = vm::any::number(p_value);
+		return true;
+	}
+	if (p_value >= INT32_MIN && p_value <= INT32_MAX) {
 		*r_any = vm::any::integer(static_cast<int32_t>(p_value));
 		return true;
 	}
-	return false; // A whole number past an int, an infinity or -0: the library's to decide.
+	// A whole number past an int is held as an Int64, in a box.
+	vm::Wide *wide = vm::new_wide(static_cast<int64_t>(p_value));
+	*r_any = vm::any::wide(wide);
+	return wide != nullptr;
 }
 
 bool from_any(const Context *c, uint8_t p_kind, uint32_t p_class, Slot p_any, Slot *r_value) {

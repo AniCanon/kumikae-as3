@@ -25,6 +25,33 @@ inline Slot *element(Object *p_vector, uint32_t p_index) {
 // which is the library's), and when there is no memory.
 Object *new_object(Context *c, uint32_t p_class);
 
+// The element VecSet writes: one there already is, or the one just past the end of a vector that may grow,
+// which is added (empty). Nothing for any other index, a fixed vector or no memory.
+Slot *element_added(Object *p_vector, uint32_t p_index);
+inline Slot *element_to_write(Object *p_vector, uint32_t p_index) {
+	Slot *const there = element(p_vector, p_index);
+	return there ? there : element_added(p_vector, p_index);
+}
+inline Slot *element_to_write(Object *p_vector, int32_t p_index) {
+	return p_index < 0 ? nullptr : element_to_write(p_vector, static_cast<uint32_t>(p_index));
+}
+
+// What holds a property, and a key that is a String: null for a register that holds anything else.
+inline Object *holder_of(Object *p_object) {
+	return p_object;
+}
+Object *holder_of(Slot p_any);
+inline Str *key_of(Str *p_text) {
+	return p_text;
+}
+Str *key_of(Slot p_any);
+// The property an Object or a Dictionary has under a String key: where its value is held. Nothing for no
+// holder, another kind of object, no key, or no such property, all of which the library answers.
+Slot *property(const Context *c, Object *p_holder, const Str *p_key);
+// Writes that property, making it if it is not there. False, with nothing done, for no holder, another kind
+// of object or no key.
+bool set_property(Context *c, Object *p_holder, Str *p_key, Slot p_value);
+
 // One String after another, a missing one reading "null". Null if there is no memory for it.
 inline Str *join(const Str *p_first, const Str *p_second) {
 	return vm::join_strings(p_first ? p_first->view() : std::string_view("null"), p_second ? p_second->view() : std::string_view("null"));
@@ -59,8 +86,8 @@ inline Slot to_any(Context *c, Object *p_value) {
 inline Slot to_any(Context *, uint32_t p_value) {
 	return p_value <= static_cast<uint32_t>(INT32_MAX) ? vm::any::integer(static_cast<int32_t>(p_value)) : vm::any::number(p_value);
 }
-// A Number as an untyped value, where that needs nothing made (it is not a whole number, or it is one an
-// int holds): false for the rest, which the library boxes.
+// A Number as an untyped value, as the library makes one (vm/interpreter_any.cpp, any_number): a whole
+// number an int holds as an int, a larger one as an Int64 in a box. False only with no memory for the box.
 bool number_to_any(double p_value, Slot *r_any);
 
 // An untyped value as a value of the kind (an ir::Kind), where it already holds one: a number for a number,
