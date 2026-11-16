@@ -114,12 +114,39 @@ constructs the registered entry class. Original source files are never rewritten
 The temporary directory is removed on exit. CLI entry constructors must finish the
 suite and report its result. Godot integration targets are filtered at scene level.
 
+## Source actions for named methods
+
+A structured target can map its cases to fixture methods:
+
+```json
+"cases": [
+  {"source": "tests/CourseTest.as", "suite": "CourseTest", "name": "gapJump", "method": "gapJump"},
+  {"source": "tests/CourseTest.as", "suite": "CourseTest", "name": "magnetCollects", "method": "magnetCollects"}
+]
+```
+
+`suite` and `name` must match the emitted Suite/TestCase identities. `source` is
+relative to the manifest and `method` names a top-level AS3 fixture method.
+Duplicate identities are rejected. Parameter cases may share a source/method;
+its gutter runs all mapped datasets, while result reruns retain each identity. Helpers do not receive
+case gutters. Results navigate to the mapped method in the mapped source file.
+
+The sample marks scenario methods with familiar `[Test]` metadata and creates a
+fresh fixture for every registered case. Its `ModelSuite` and `ModelCase` are
+generated from the manifest by `tools/sync_test_cases.py`; `--check` detects stale
+registration. Typed helper arguments implement separately named parameter cases.
+Registration is explicit: adding `[Test]` alone does not register a case, and the
+framework does not yet implement reflective metadata discovery.
+
 ## Rider
 
 Choose **AS3 Tests** in Run Configurations and select the manifest. The sample
-ships that configuration. A gutter Run action appears on a registered source's
-class. The native Tests tree shows individual framework cases, details, source
-navigation, and **Rerun Failed Tests**. Suite/case identity is retained in the name.
+ships that configuration. The class gutter and file context menu run all cases
+registered for that file. A mapped method's gutter or context menu runs only that
+case; other files and cases are excluded. The native Tests tree shows individual
+framework cases, failure details, and **Rerun Failed Tests**. Error failures retain their
+AS3 stack: navigation opens the first application frame at its failing line, and each
+stack frame is clickable. Thrown values without a stack fall back to the registered method. Suite/case identity is retained in the name.
 The adapter uses the IDE's bundled test-runner module, not an external dependency.
 
 ## Protocol and verification

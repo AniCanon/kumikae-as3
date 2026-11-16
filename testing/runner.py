@@ -17,7 +17,16 @@ _protocol_spec = importlib.util.spec_from_file_location("kas3_protocol", Path(__
 _protocol = importlib.util.module_from_spec(_protocol_spec)
 _protocol_spec.loader.exec_module(_protocol)
 
+_mapping_spec = importlib.util.spec_from_file_location("kas3_mapping", Path(__file__).with_name("case_mapping.py"))
+_mapping = importlib.util.module_from_spec(_mapping_spec)
+_mapping_spec.loader.exec_module(_mapping)
+
 Result = namedtuple("Result", "passed output duration")
+
+
+def summary(details):
+    """A failure's one line for the results tree: the first of its details that says anything."""
+    return next((line.strip() for line in details.splitlines() if line.strip()), "Assertion failed")
 
 
 def escape(value):
@@ -45,6 +54,7 @@ def validate(manifest):
         if "::" in name or "\n" in name or "\r" in name:
             raise ValueError("Test names must be single-line and cannot contain ::")
         names.add(name)
+        _mapping.validate(case)
         command = case.get("command")
         if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
             raise ValueError("Each test needs a command argument array")
@@ -214,9 +224,9 @@ def main():
                     event = "testSuiteStarted" if kind == "suiteStarted" else "testSuiteFinished" if kind == "suiteFinished" else kind
                     attributes = {"name": full_name}
                     if kind == "testStarted":
-                        attributes["locationHint"] = location
+                        attributes["locationHint"] = _mapping.location(root, case, suite_name, name)
                     if kind == "testFailed":
-                        attributes.update(message=details or "Assertion failed", details=details)
+                        attributes.update(message=summary(details), details=details)
                     message(event, **attributes)
                 if not result.passed and not any(event[0] == "testFailed" for event in events):
                     message("testStarted", name=case["name"], locationHint=location)

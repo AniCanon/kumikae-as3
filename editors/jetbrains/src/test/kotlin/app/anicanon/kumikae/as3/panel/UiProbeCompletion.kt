@@ -46,7 +46,7 @@ object UiProbeCompletion {
         val heap = mutableListOf<String>()
         val started = System.nanoTime()
         repeat(
-            if (missingClient) {
+            if (missingClient || System.getenv("KUMIKAE_TEST_ACTIONS_PROBE") == "1") {
                 1
             } else if (endurance) {
                 10
@@ -156,6 +156,12 @@ object UiProbeCompletion {
                 UiProbeLsp.ready(project)
             }
             await("indexing") { !DumbService.getInstance(project).isDumb }
+            if (System.getenv("KUMIKAE_TEST_ACTIONS_PROBE") == "1") {
+                UiProbeTestActions.run(project, destination)
+                UiProbeTestResults.run(project, destination)
+                observations += "Native test actions, results and failure navigation passed"
+                return
+            }
             UiProbeLsp.checkDiagnostics(project)
             edt {
                 FileEditorManager.getInstance(project).openFile(file, true)
@@ -250,9 +256,12 @@ object UiProbeCompletion {
             UiProbeStatementCompletion.run(project, editor, observations)
             checkSnippet(project, editor, source)
             observations += "Required argument is selected; Tab exits the snippet after the call"
+            if (cycle == 0) UiProbeTestActions.run(project, destination)
             UiProbeLanguageFeatures.run(project, editor, observations)
             UiProbeDiagnostics.run(project, editor, observations)
-            if (cycle == 0) UiProbeTestResults.run(project, destination)
+            if (cycle == 0) {
+                UiProbeTestResults.run(project, destination)
+            }
         } finally {
             settings.AUTOCOMPLETE_ON_CODE_COMPLETION = autoComplete
             try {

@@ -24,3 +24,15 @@ class LibraryTest(unittest.TestCase):
         events = protocol.parse(result.stdout)
         self.assertEqual(sum(kind == "testStarted" for kind, _, _ in events), 6)
         self.assertEqual(sum(kind == "testFailed" for kind, _, _ in events), 3)
+
+    def test_failure_keeps_assertion_and_hook_lines(self):
+        command = [COMPILER, "run", str(ROOT / "tests/fixtures/LibraryTest.as"),
+                   str(ROOT / "tests/fixtures/ProbeCase.as"), *map(str, sorted((ROOT / "as3").rglob("*.as")))]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+        failures = {name: details for kind, name, details in protocol.parse(result.stdout) if kind == "testFailed"}
+        for name, statement in [("failure", 'Assert.assertTrue(!fail'),
+                                ("setup failure", 'throw new Error("Setup failed")'),
+                                ("cleanup failure", 'throw new Error("Cleanup failed")')]:
+            lines = (ROOT / "tests/fixtures/ProbeCase.as").read_text().splitlines()
+            line = next(i for i, text in enumerate(lines, 1) if statement in text)
+            self.assertIn("ProbeCase.as:" + str(line) + "]", failures[name])
