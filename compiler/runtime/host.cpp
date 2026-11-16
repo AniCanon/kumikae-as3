@@ -70,16 +70,27 @@ void trace(Context *c, Str *const *p_texts, uint32_t p_count) {
 
 Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 	Host &host = *c->host;
+	// The interpreter lets entries nest only so deep, and one that is refused has no frame to catch its
+	// error in. The last entry is kept for raising Error #1023 here, where generated code can catch it.
+	const uint32_t overflow = host.program.thunk_count + static_cast<uint32_t>(Builtin::Overflow);
+	if (host.nesting + 1 >= static_cast<uint32_t>(vm::Interpreter::MAX_ENTRIES) && p_thunk != overflow) {
+		stack_overflow(c);
+		return empty();
+	}
 	const uint32_t function = host.thunk_function(p_thunk);
 	Slot *const outer = host.updated;
 	host.updated = r_updated;
+	host.nesting++;
 	Slot result = empty();
 	const bool done = host.interpreter->call_function(function, p_given, host.module.functions[function].parameters, &result);
+	host.nesting--;
 	host.updated = outer;
 	if (!done && !c->failing) {
-		// Not an error of the program's, which the thunk would have caught: the library could not go on,
-		// and has said why. Everything is left as if by an error nothing catches.
-		host.stopped = true;
+		// Not an error the thunk caught. With the interpreter's frames beneath (it counts entries its own
+		// library makes too), the interpreter carries the error to the instruction that led here, whose
+		// thunk catches it: until then generated code is only left. With none, the library could not go on
+		// and has said why: everything is left as if by an error nothing catches.
+		(host.interpreter->depth() > 0 ? host.carried : host.stopped) = true;
 		c->pending = empty();
 		c->failing = true;
 	}

@@ -8,6 +8,7 @@
 #include <cstdint>
 
 #define KAS3_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#define KAS3_LIKELY(condition) __builtin_expect(!!(condition), 1)
 
 namespace kas3 {
 namespace rt {

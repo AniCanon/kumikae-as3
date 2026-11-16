@@ -68,6 +68,11 @@ class FunctionWriter {
 	bool call(const ir::Instruction &p_in); // function_calls.cpp
 	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target);
 	void by_thunk(const ir::Instruction &p_in);
+	// function_fast.cpp: an inline path for the usual case, and the thunk for the rest.
+	bool fast_vector(const ir::Instruction &p_in);
+	bool fast_text(const ir::Instruction &p_in);
+	bool fast_untyped(const ir::Instruction &p_in);
+	bool fast_call(const ir::Instruction &p_in);
 	std::string arguments(const ir::Function &p_callee, const std::vector<uint32_t> &p_list);
 	const ir::Function *virtual_callee(const ir::Instruction &p_in) const;
 

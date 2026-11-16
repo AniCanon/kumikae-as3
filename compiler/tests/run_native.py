@@ -9,7 +9,8 @@ For each program of run/ (the same ones run_programs.py holds the interpreter to
      not translate yet is refused there with `not yet supported: <operation>`: it is counted as skipped,
      under that operation. Nothing but the generator decides that a program is skipped.
   2. The C++ is built into a plain executable with the flags generated code is meant for, warnings as
-     errors, against the runtime (--include, --lib).
+     errors, against the runtime (--include, --lib). The runtime's headers are precompiled once for the
+     run: every generated file reads them, and reading them is most of the time a file takes to build.
   3. The executable runs. Standard output must equal X.out; standard error (after what the compiler said,
      its warnings) must equal X.err, or be empty without one; the exit status is 1 for a program that ends
      in an error nothing catches and 0 otherwise. Nothing the program made may be left alive (status 3).
@@ -62,6 +63,20 @@ environment = dict(os.environ, KAS3_REPORT_LEAKS="1", KAS3_NOW="1763217551123", 
 folder = os.path.join(tests, "run")
 
 
+def precompiled():
+    """The flags that give each build the runtime's headers, precompiled into the work folder."""
+    folder_ = os.path.join(work, "precompiled")
+    os.makedirs(folder_, exist_ok=True)
+    header = os.path.join(folder_, "kas3_all.h")
+    with open(header, "w") as handle:
+        handle.write('#include "kas3.h"\n\n#include <cmath>\n#include <cstdint>\n#include <limits>\n')
+    built = subprocess.run([given["--cxx"][0], *FLAGS, *given["--flag"], *includes, "-x", "c++-header", header, "-o", header + ".gch"],
+                           capture_output=True, text=True, timeout=600)
+    if built.returncode != 0:
+        sys.exit("the runtime's headers did not build\n" + built.stderr[-4000:])
+    return ["-include", header]
+
+
 def expected(path, missing=""):
     return open(path).read() if os.path.exists(path) else missing
 
@@ -80,8 +95,7 @@ def one(name):
         return "failed", "kas3c cpp: exit %d\n%s" % (written.returncode, written.stderr)
     executable = os.path.join(out, "program")
     sources = sorted(glob.glob(os.path.join(out, "*.cpp")))
-    includes = [flag for folder_ in given["--include"] for flag in ("-I", folder_)]
-    built = subprocess.run([given["--cxx"][0], *FLAGS, *given["--flag"], *includes, *sources, *given["--lib"], "-o", executable],
+    built = subprocess.run([given["--cxx"][0], *FLAGS, *given["--flag"], *includes, *headers, *sources, *given["--lib"], "-o", executable],
                            capture_output=True, text=True, timeout=600)
     if built.returncode != 0:
         return "failed", "the C++ did not build\n" + built.stderr[-4000:]
@@ -105,6 +119,8 @@ names = sorted({os.path.splitext(os.path.basename(path))[0]
                 for path in glob.glob(os.path.join(folder, "*.as")) + glob.glob(os.path.join(folder, "*.args"))})
 if given["--only"]:
     names = [name for name in names if name in given["--only"]]
+includes = [flag for folder_ in given["--include"] for flag in ("-I", folder_)]
+headers = precompiled()
 jobs = int(given["--jobs"][0]) if given["--jobs"] else (os.cpu_count() or 4)
 with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
     outcomes = dict(zip(names, pool.map(one, names)))

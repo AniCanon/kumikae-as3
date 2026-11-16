@@ -170,6 +170,10 @@ void add_builtins(const Program &p_program, const Names &p_names, ir::Module &r_
 	for (uint32_t code : { ir::ANY_IS_INT, ir::ANY_IS_UINT, ir::ANY_IS_NUMBER, ir::ANY_IS_STRING, ir::ANY_IS_BOOLEAN }) {
 		add(ThunkInfo{ static_cast<uint8_t>(Op::AnyIs), 1, 0, code, is_type, 2, 1, nullptr, 0, 1, NONE, NONE });
 	}
+	static const uint8_t number_boxed[] = { static_cast<uint8_t>(Kind::F64), static_cast<uint8_t>(Kind::Any) };
+	static const uint8_t wide_boxed[] = { static_cast<uint8_t>(Kind::I64), static_cast<uint8_t>(Kind::Any) };
+	add(ThunkInfo{ static_cast<uint8_t>(Op::ToAny), 1, 0, 0, number_boxed, 2, 1, nullptr, 0, 1, NONE, NONE });
+	add(ThunkInfo{ static_cast<uint8_t>(Op::ToAny), 1, 0, 0, wide_boxed, 2, 1, nullptr, 0, 1, NONE, NONE });
 }
 
 } // namespace

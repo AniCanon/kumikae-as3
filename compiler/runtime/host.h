@@ -19,7 +19,7 @@ namespace kas3 {
 namespace rt {
 
 // The operations the host itself asks of the library, each a thunk after the program's own.
-enum class Builtin : uint32_t { NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, Count };
+enum class Builtin : uint32_t { NullCheck, Overflow, ObjectText, NewEntry, IsInt, IsUint, IsNumber, IsString, IsBoolean, NumberToAny, WideToAny };
 
 // The calls the interpreter's side makes back, as "engine" calls of these names (HostCallStatic).
 constexpr std::string_view BRIDGE = "kas3";
@@ -100,6 +100,9 @@ struct Host {
 	std::vector<KeptTrace> kept;
 	Slot *updated = nullptr; // Where the thunk in progress hands back a register it moved on.
 	bool stopped = false; // The library could not go on (no memory even for an error): it has said why.
+	// The interpreter holds the error that is on its way out, until the instruction beneath ends: see thunk().
+	bool carried = false;
+	uint32_t nesting = 0; // Thunks in progress, one inside another.
 
 	Host(const Program &p_program, std::optional<double> p_now);
 	~Host();

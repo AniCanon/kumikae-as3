@@ -99,8 +99,8 @@ void rethrow(Context *c, Slot p_any, uint32_t p_register, bool *r_traced) {
 
 bool catches(Context *c, uint32_t p_type) {
 	Host &host = *c->host;
-	if (host.stopped) {
-		return false;
+	if (host.stopped || host.carried) {
+		return false; // Nothing generated code holds yet: see thunk().
 	}
 	if (p_type == NONE) {
 		return true;

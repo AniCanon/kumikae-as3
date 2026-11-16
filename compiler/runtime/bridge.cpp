@@ -63,9 +63,10 @@ bool call_generated(Host &r_host, Slot *r_result, std::string *r_error) {
 // A thunk's catch: an error the library raised is the context's now. With the context failing already,
 // this is what the interpreter raised in place of the error of a generated function (call_generated).
 void take_error(Host &r_host) {
-	if (r_host.context.failing) {
+	if (r_host.context.failing && !r_host.carried) {
 		return;
 	}
+	r_host.carried = false;
 	const Slot error = local(*r_host.interpreter, LOCAL_ERROR);
 	vm::retain(vm::any::counted(error));
 	// An Error the library made took its stack from the interpreter's frames, which are the thunk's: where

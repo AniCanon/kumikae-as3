@@ -161,7 +161,9 @@ void FunctionWriter::by_thunk(const Instruction &p_in) {
 }
 
 void FunctionWriter::instruction(const Instruction &p_in) {
-	if (!(constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in))) {
+	const bool written = constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_vector(p_in) || fast_text(p_in) ||
+			fast_untyped(p_in) || fast_call(p_in);
+	if (!written) {
 		by_thunk(p_in);
 	}
 }
