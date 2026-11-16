@@ -46,6 +46,34 @@ bool inherits(const std::string &p_class, const char *p_base) {
 	return ClassDBSingleton::get_singleton()->is_parent_class(StringName(p_class.c_str()), StringName(p_base));
 }
 
+// One of Godot's classes, as a property's class, and the hint that names it for a Resource or a Node.
+void object_hint(const std::string &p_engine_type, String *r_class_name, int *r_hint, String *r_hint_string) {
+	*r_class_name = String::utf8(p_engine_type.c_str());
+	if (!p_engine_type.empty() && inherits(p_engine_type, "Resource")) {
+		*r_hint = PROPERTY_HINT_RESOURCE_TYPE;
+		*r_hint_string = *r_class_name;
+	} else if (!p_engine_type.empty() && inherits(p_engine_type, "Node")) {
+		*r_hint = PROPERTY_HINT_NODE_TYPE;
+		*r_hint_string = *r_class_name;
+	}
+}
+
+// The type of a script object's property: an Array is Godot's Array, a Dictionary Godot's Dictionary; a
+// script object is its Godot object, when it has one. NIL for any other.
+int script_object_type(const ir::Module &p_module, uint32_t p_class, String *r_class_name) {
+	if (p_class < p_module.classes.size() && p_module.classes[p_class].array) {
+		return Variant::ARRAY;
+	}
+	if (p_class < p_module.classes.size() && p_module.classes[p_class].dictionary) {
+		return Variant::DICTIONARY;
+	}
+	if (p_class < p_module.classes.size() && !p_module.classes[p_class].native_base.empty()) {
+		*r_class_name = String::utf8(p_module.classes[p_class].native_base.c_str());
+		return Variant::OBJECT;
+	}
+	return Variant::NIL;
+}
+
 // How Godot describes a value of this kind: its type, class, hint and usage.
 Dictionary describe(const ir::Module &p_module, std::string_view p_name, ir::Kind p_kind, const std::string &p_engine_type, uint32_t p_class,
 		bool p_exported) {
@@ -74,26 +102,10 @@ Dictionary describe(const ir::Module &p_module, std::string_view p_name, ir::Kin
 			break;
 		case ir::Kind::Ref:
 			type = Variant::OBJECT;
-			class_name = String::utf8(p_engine_type.c_str());
-			if (!p_engine_type.empty() && inherits(p_engine_type, "Resource")) {
-				hint = PROPERTY_HINT_RESOURCE_TYPE;
-				hint_string = class_name;
-			} else if (!p_engine_type.empty() && inherits(p_engine_type, "Node")) {
-				hint = PROPERTY_HINT_NODE_TYPE;
-				hint_string = class_name;
-			}
+			object_hint(p_engine_type, &class_name, &hint, &hint_string);
 			break;
 		case ir::Kind::Obj:
-			// An Array is Godot's Array, a Dictionary Godot's Dictionary; a script object is its Godot
-			// object, when it has one.
-			if (p_class < p_module.classes.size() && p_module.classes[p_class].array) {
-				type = Variant::ARRAY;
-			} else if (p_class < p_module.classes.size() && p_module.classes[p_class].dictionary) {
-				type = Variant::DICTIONARY;
-			} else if (p_class < p_module.classes.size() && !p_module.classes[p_class].native_base.empty()) {
-				type = Variant::OBJECT;
-				class_name = String::utf8(p_module.classes[p_class].native_base.c_str());
-			}
+			type = script_object_type(p_module, p_class, &class_name);
 			break;
 		default:
 			type = -1; // Any value.
