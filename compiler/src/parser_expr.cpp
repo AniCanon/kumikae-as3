@@ -89,17 +89,6 @@ bool is_prefix_operator(TokenKind p_kind) {
 	}
 }
 
-// Restores a parser flag when a scope ends.
-struct Restore {
-	bool &flag;
-	bool saved;
-	Restore(bool &p_flag, bool p_value) :
-			flag(p_flag), saved(p_flag) {
-		flag = p_value;
-	}
-	~Restore() { flag = saved; }
-};
-
 } // namespace
 
 // A stand-in for an expression that could not be parsed, so that the tree stays well formed.

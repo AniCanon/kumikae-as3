@@ -3,20 +3,6 @@
 
 namespace kas3 {
 
-namespace {
-
-struct Restore {
-	bool &flag;
-	bool saved;
-	Restore(bool &p_flag, bool p_value) :
-			flag(p_flag), saved(p_flag) {
-		flag = p_value;
-	}
-	~Restore() { flag = saved; }
-};
-
-} // namespace
-
 // Where the parser may pick up again after an error, when the token starts a line.
 bool Parser::begins_statement(TokenKind p_kind) {
 	switch (p_kind) {

@@ -5,16 +5,6 @@ namespace kas3 {
 
 namespace {
 
-struct Restore {
-	bool &flag;
-	bool saved;
-	Restore(bool &p_flag, bool p_value) :
-			flag(p_flag), saved(p_flag) {
-		flag = p_value;
-	}
-	~Restore() { flag = saved; }
-};
-
 const uint16_t ACCESS_BITS = Modifiers::Public | Modifiers::Private | Modifiers::Protected | Modifiers::Internal;
 
 } // namespace

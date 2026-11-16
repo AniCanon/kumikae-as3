@@ -40,6 +40,17 @@ public:
 	Stmt *parse_single_statement();
 
 private:
+	// Restores a parser flag when a scope ends.
+	struct Restore {
+		bool &flag;
+		bool saved;
+		Restore(bool &p_flag, bool p_value) :
+				flag(p_flag), saved(p_flag) {
+			flag = p_value;
+		}
+		~Restore() { flag = saved; }
+	};
+
 	const Source &source_;
 	Arena &arena_;
 	Diagnostics &diagnostics_;
