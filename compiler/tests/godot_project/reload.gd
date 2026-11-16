@@ -27,6 +27,14 @@ func put(version: String) -> void:
 	file.close()
 	since = Time.get_ticks_msec()
 
+func same_time() -> String:
+	# A file whose time the saves of one step are all given.
+	return ProjectSettings.globalize_path("user://stamp")
+
+func put_at_same_time(version: String) -> void:
+	put(version)
+	OS.execute("touch", ["-r", same_time(), hot_path()])
+
 func waited(milliseconds: int) -> bool:
 	return Time.get_ticks_msec() - since > milliseconds
 
@@ -93,11 +101,19 @@ func _process(_delta: float) -> bool:
 	elif stage == 3 and (ask("value") == 3 or waited(8000)):
 		show("once the error is fixed, by a file in a new folder: the new code runs", ask("value"), 3)
 		show("once the error is fixed: the field still has its value", ask("count"), 2)
-		# A save of the same size with the same time as the last (two saves within one second): still seen.
-		var stamp := ProjectSettings.globalize_path("user://stamp")
-		OS.execute("touch", ["-r", hot_path(), stamp])
-		put("v4")
-		OS.execute("touch", ["-r", stamp, hot_path()])
+		# Saves of the same size that carry the same time (as two within one second do) are told apart by
+		# what they hold. The time is one set here, far ahead, and given to every save of this step: however
+		# long this machine takes between a save and the look at it, the saves stay "within one second" of
+		# each other and of that look. Nothing is waited for but the code each save brings.
+		OS.execute("touch", ["-t", "203701010000", same_time()])
+		put_at_same_time("v4")
+		stage = 31
+	elif stage == 31 and (ask("value") == 4 or waited(8000)):
+		put_at_same_time("broken") # The code that gives 3, of the same size as the one that gives 4.
+		stage = 32
+	elif stage == 32 and (ask("value") == 3 or waited(8000)):
+		show("a save of the same size at the same time is seen", ask("value"), 3)
+		put_at_same_time("v4")
 		stage = 4
 	elif stage == 4 and (ask("value") == 4 or waited(8000)):
 		show("a save of the same size in the same second is seen", ask("value"), 4)
