@@ -238,65 +238,72 @@ void Compilation::inherit_properties(Symbol *p_class) {
 	}
 }
 
+namespace {
+
+// The instance member of that name that a base class of p_class hands down, if any.
+Symbol *inherited_member(Symbol *p_class, std::string_view p_name) {
+	for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
+		Symbol *member = find_in(base->klass->members, p_name);
+		if (member && !member->is_static() && inherited_visible(member, base, p_class->package)) {
+			return member;
+		}
+	}
+	return nullptr;
+}
+
+// True if a built-in base declares the name at all, visible or not, static or not.
+bool builtin_base_has(Symbol *p_class, std::string_view p_name) {
+	for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
+		if (base->unit->is_builtin &&
+				(find_in(base->klass->members, p_name) || find_in(base->klass->statics, p_name))) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// The override rules for one method or one half of a property, against what a base hands down (p_base).
+void check_override(Diagnostics &p_diagnostics, Symbol *p_class, FunctionDecl *p_function, Symbol *p_base) {
+	// A built-in member may be redefined with or without `override`. Which one AS3 wants depends on
+	// whether the member is in the AS3 namespace, on the prototype, or public; that is not modelled.
+	if (p_base && p_base->unit->is_builtin) {
+		return;
+	}
+	if (!p_base && (p_function->modifiers.bits & Modifiers::Override) && builtin_base_has(p_class, p_function->name)) {
+		return;
+	}
+	std::string name = quoted(p_function->name);
+	uint32_t offset = p_function->name_offset;
+	FunctionDecl *overridden = nullptr;
+	bool free_slot = false; // The base has a property of this name, but not this half of it.
+	if (p_base) {
+		if (p_function->accessor == FunctionDecl::None) {
+			overridden = p_base->kind == SymbolKind::Method ? static_cast<FunctionDecl *>(p_base->node) : nullptr;
+		} else if (p_base->kind == SymbolKind::Property) {
+			overridden = p_function->accessor == FunctionDecl::Getter ? p_base->getter : p_base->setter;
+			free_slot = overridden == nullptr;
+		}
+	}
+	std::string base_name = p_base ? std::string(p_base->owner->name) : std::string();
+	if (p_function->modifiers.bits & Modifiers::Override) {
+		if (!p_base || free_slot) {
+			p_diagnostics.error(offset, name + " is marked 'override' but no base class has a method to override");
+		} else if (!overridden) {
+			p_diagnostics.error(offset, "can't override " + name + ": it is not a method in " + base_name);
+		} else if (overridden->modifiers.bits & Modifiers::Final) {
+			p_diagnostics.error(offset, "can't override " + name + ": it is final in " + base_name);
+		}
+	} else if (overridden) {
+		p_diagnostics.error(offset, name + " overrides a method of " + base_name + " and must be marked 'override'");
+	} else if (p_base && !free_slot) {
+		p_diagnostics.error(offset, name + " conflicts with " + name + " inherited from " + base_name);
+	}
+}
+
+} // namespace
+
 void Compilation::check_overrides(Symbol *p_class) {
 	Diagnostics &diagnostics = p_class->unit->diagnostics;
-	// The instance member of that name that a base class hands down, if any.
-	auto inherited = [&](std::string_view p_name) -> Symbol * {
-		for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
-			Symbol *member = find_in(base->klass->members, p_name);
-			if (member && !member->is_static() && inherited_visible(member, base, p_class->package)) {
-				return member;
-			}
-		}
-		return nullptr;
-	};
-	// True if a built-in base declares the name at all, visible or not, static or not.
-	auto builtin_has = [&](std::string_view p_name) {
-		for (Symbol *base = p_class->klass->base; base; base = base->klass->base) {
-			if (base->unit->is_builtin &&
-					(find_in(base->klass->members, p_name) || find_in(base->klass->statics, p_name))) {
-				return true;
-			}
-		}
-		return false;
-	};
-	// p_accessor: None for a plain method, Getter or Setter for half of a property.
-	auto check_function = [&](FunctionDecl *p_function, Symbol *p_base) {
-		// A built-in member may be redefined with or without `override`. Which one AS3 wants depends on
-		// whether the member is in the AS3 namespace, on the prototype, or public; that is not modelled.
-		if (p_base && p_base->unit->is_builtin) {
-			return;
-		}
-		if (!p_base && (p_function->modifiers.bits & Modifiers::Override) && builtin_has(p_function->name)) {
-			return;
-		}
-		std::string name = quoted(p_function->name);
-		uint32_t offset = p_function->name_offset;
-		FunctionDecl *overridden = nullptr;
-		bool free_slot = false; // The base has a property of this name, but not this half of it.
-		if (p_base) {
-			if (p_function->accessor == FunctionDecl::None) {
-				overridden = p_base->kind == SymbolKind::Method ? static_cast<FunctionDecl *>(p_base->node) : nullptr;
-			} else if (p_base->kind == SymbolKind::Property) {
-				overridden = p_function->accessor == FunctionDecl::Getter ? p_base->getter : p_base->setter;
-				free_slot = overridden == nullptr;
-			}
-		}
-		std::string base_name = p_base ? std::string(p_base->owner->name) : std::string();
-		if (p_function->modifiers.bits & Modifiers::Override) {
-			if (!p_base || free_slot) {
-				diagnostics.error(offset, name + " is marked 'override' but no base class has a method to override");
-			} else if (!overridden) {
-				diagnostics.error(offset, "can't override " + name + ": it is not a method in " + base_name);
-			} else if (overridden->modifiers.bits & Modifiers::Final) {
-				diagnostics.error(offset, "can't override " + name + ": it is final in " + base_name);
-			}
-		} else if (overridden) {
-			diagnostics.error(offset, name + " overrides a method of " + base_name + " and must be marked 'override'");
-		} else if (p_base && !free_slot) {
-			diagnostics.error(offset, name + " conflicts with " + name + " inherited from " + base_name);
-		}
-	};
 	// In the order written, so that the errors kept when there are too many are the first in the file.
 	for (Node *node : static_cast<ClassDecl *>(p_class->node)->members) {
 		if (node->kind == NodeKind::VarDecl) {
@@ -305,7 +312,7 @@ void Compilation::check_overrides(Symbol *p_class) {
 				continue;
 			}
 			for (Declarator &declarator : decl->declarators) {
-				Symbol *base = inherited(declarator.name);
+				Symbol *base = inherited_member(p_class, declarator.name);
 				if (base && !base->unit->is_builtin) {
 					diagnostics.error(declarator.offset, quoted(declarator.name) + " conflicts with " +
 																 quoted(declarator.name) + " inherited from " +
@@ -317,7 +324,7 @@ void Compilation::check_overrides(Symbol *p_class) {
 			if ((function->modifiers.bits & Modifiers::Static) || function->symbol == p_class->klass->constructor) {
 				continue;
 			}
-			check_function(function, inherited(function->name));
+			check_override(diagnostics, p_class, function, inherited_member(p_class, function->name));
 		}
 	}
 }
