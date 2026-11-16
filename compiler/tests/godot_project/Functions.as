@@ -61,6 +61,15 @@ package {
 			return ["" + kept, kept + "", String(kept), "" + held, String(held), "" + none, "" + nothing].join(",");
 		}
 		public function freedTraced():void { trace("traced:", kept); }
+		// Godot's functions that make text of their arguments (str, print and the rest) write null as AS3
+		// does, as C#'s GD.Str and GD.Print do; a freed object is one.
+		public function freedStr():String {
+			var none:Node = null;
+			var held:* = kept;
+			var nothing:*;
+			return [str(kept), str(kept, none), str(held), str(none), str(null), str(nothing), str("a", null, 1)].join(",");
+		}
+		public function freedPrinted():void { print("freed: ", kept, " ", null); }
 		public function freedSame():String {
 			var none:Node = null;
 			var held:* = kept;

@@ -292,9 +292,12 @@ package {
   `/` gives a `Number`, and a comparison with a `Number` is exact.
 - Godot's global functions: `print("x", n)`, `lerpf(a, b, t)`, `clampi(v, 0, 10)`, `randf()`, `str(...)`.
   One that can give back anything (`lerp`, `max`) is used where the program says what it expects:
-  `var x:Number = lerp(a, b, 0.5)`.
+  `var x:Number = lerp(a, b, 0.5)`. Those that make text of their arguments (`str`, `print`, `pushError`
+  and the rest) write a null, and so a freed object, as `null` and undefined as `undefined`, as C#'s
+  `GD.Str` and `GD.Print` write a null (GDScript writes `<null>`).
 - A Godot object that has been freed is `null` to a script: `node == null` is true, `if (node)` is
-  false, `"" + node`, `String(node)` and `trace(node)` give `null` (GDScript's text is `<Freed Object>`),
+  false, `"" + node`, `String(node)`, `trace(node)`, `str(node)` and `print(node)` give `null` (GDScript's
+  text is `<Freed Object>`),
   `hash` and `isSame` take it as null, and a member reached on it is AS3's null error, which says the
   object was freed.
 - `null` written for a default AS3 can't write takes Godot's own default, wherever it is in the call:

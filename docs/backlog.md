@@ -94,16 +94,11 @@ the review of the clean-up put off.
 
 - Godot's message for a listener that was not called names it `Node(Signals.as)::`, without the method.
   **clean-up**
-- A freed Godot object still reads as `<Freed Object>` as text, as in GDScript, though it is `null` in
-  every test. **decision**
 
 From the review of part C (its five important findings were fixed with it: `print()` with no arguments, a
 default `[]` shared between calls, a null answer taken silently as text, `-5` reaching Godot as `-5.0`, and
 any Godot value passing as a condition):
 
-- A freed object's text differs by path: `"" + x` gives `<Freed Object>`, `str(x)` and `print(x)` give
-  `<null>`; `hash` and `isSame` of freed objects differ from GDScript's. Settled with the decision above.
-  **decision**
 - A Number variable that holds a whole value reaches a parameter that takes anything as a float
   (`str(x)` gives `2.0`, as GDScript does for a float). Only expressions that are whole by their form are
   sent as integers. **decision**

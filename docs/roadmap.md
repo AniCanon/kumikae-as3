@@ -20,7 +20,7 @@ validated in the Rider sandbox; see [completion results](results/2026-11-complet
 singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
 type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
 
-**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 23 items;
+**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 21 items;
 none waits for a later stage (the owner, 2026-11-15), and stage 3 does not start while one of them is open.
 
 ![Roadmap](diagrams/roadmap.svg)
@@ -227,7 +227,7 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) is being worked off in full, now:** 23 items, of which 12 wait on the
+- **The [backlog](backlog.md) is being worked off in full, now:** 21 items, of which 10 wait on the
   owner's answer.
 - **Loops:** the cycle collector frees objects that refer to each other in a loop, also through Godot's
   reference-counted objects, their AS3 scripts and listeners, in a short step each frame. A loop through
@@ -253,6 +253,8 @@ Open items:
 | 64-bit integers | Decided on 2026-11-12: supported, in the way that is easiest to maintain. A real `Int64` type, given by one rule from Godot's description with no hand-kept table, converting to `int` or `Number` with a range check and never silently. Built in stage 2b-3; until then such values are declared `Number`. |
 | Static fields and null calls | Decided on 2026-11-12, and built: both follow Flash. A class's static fields are set on its first use, and a call on a null object evaluates its arguments before raising the error. |
 | A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
+| How a ruling is made | The owner's rule of 2026-11-16: best in class, as fast as Godot C# or faster, scalable, useful; where AS3 does not decide, C#'s behaviour is the bar. |
+| A freed Godot object as text | Decided on 2026-11-16, and built: it is `null` everywhere. `"" + x`, `String(x)`, `trace`, `str` and `print` give `null`, as C#'s `GD.Str` and `GD.Print` give for a null; `hash` and `isSame` take it as null. |
 | Godot naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
 
 ## Decisions waiting on the owner
