@@ -337,6 +337,12 @@ inline std::string quoted(std::string_view p_name) {
 	return result;
 }
 
+// The symbol a table holds under the name, or null.
+inline Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_table, std::string_view p_name) {
+	auto found = p_table.find(p_name);
+	return found == p_table.end() ? nullptr : found->second;
+}
+
 // What code in a class of package p_package may name on a base class p_base: p_member is not private, and
 // if it is internal, p_base is in that package.
 bool inherited_visible(const Symbol *p_member, const Symbol *p_base, const Package *p_package);

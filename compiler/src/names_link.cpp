@@ -48,11 +48,6 @@ static void add_match(const Compilation &p_compilation, const Context &p_from, S
 	}
 }
 
-static Symbol *find_in(const std::unordered_map<std::string_view, Symbol *> &p_table, std::string_view p_name) {
-	auto found = p_table.find(p_name);
-	return found == p_table.end() ? nullptr : found->second;
-}
-
 // AS3 opens every namespace in reach at once: the file's helpers, the current package, the top-level package,
 // and every import. Two different matches are an ambiguity, never a shadowing.
 //
