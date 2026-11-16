@@ -254,10 +254,10 @@ void Printer::print_for_in(const Node *p_node, int p_depth) {
 	at(p_node->offset);
 	if (loop->declaration) {
 		variable(loop->declaration, p_depth + 1);
-}
-node(loop->target, p_depth + 1);
-node(loop->collection, p_depth + 1);
-node(loop->body, p_depth + 1);
+	}
+	node(loop->target, p_depth + 1);
+	node(loop->collection, p_depth + 1);
+	node(loop->body, p_depth + 1);
 }
 
 void Printer::print_switch(const Node *p_node, int p_depth) {
@@ -270,7 +270,7 @@ void Printer::print_switch(const Node *p_node, int p_depth) {
 		at(clause.offset);
 		node(clause.test, p_depth + 2);
 		children(clause.body, p_depth + 2);
-}
+	}
 }
 
 void Printer::print_break(const Node *p_node, int p_depth) {
@@ -278,8 +278,8 @@ void Printer::print_break(const Node *p_node, int p_depth) {
 	std::string_view name = static_cast<const Break *>(p_node)->label;
 	if (!name.empty()) {
 		attribute("label", name);
-}
-at(p_node->offset);
+	}
+	at(p_node->offset);
 }
 
 void Printer::print_continue(const Node *p_node, int p_depth) {
@@ -287,8 +287,8 @@ void Printer::print_continue(const Node *p_node, int p_depth) {
 	std::string_view name = static_cast<const Continue *>(p_node)->label;
 	if (!name.empty()) {
 		attribute("label", name);
-}
-at(p_node->offset);
+	}
+	at(p_node->offset);
 }
 
 void Printer::print_try(const Node *p_node, int p_depth) {
@@ -302,8 +302,8 @@ void Printer::print_try(const Node *p_node, int p_depth) {
 		at(clause.offset);
 		node(clause.type, p_depth + 2);
 		node(clause.body, p_depth + 2);
-}
-labelled("finally:", attempt->finally_block, p_depth + 1);
+	}
+	labelled("finally:", attempt->finally_block, p_depth + 1);
 }
 
 void Printer::print_class_decl(const Node *p_node, int p_depth) {
@@ -317,8 +317,8 @@ void Printer::print_class_decl(const Node *p_node, int p_depth) {
 	if (decl->implements.count) {
 		label("implements:", p_depth + 1);
 		children(decl->implements, p_depth + 2);
-}
-children(decl->members, p_depth + 1);
+	}
+	children(decl->members, p_depth + 1);
 }
 
 void Printer::print_interface_decl(const Node *p_node, int p_depth) {
@@ -331,8 +331,8 @@ void Printer::print_interface_decl(const Node *p_node, int p_depth) {
 	if (decl->extends.count) {
 		label("extends:", p_depth + 1);
 		children(decl->extends, p_depth + 2);
-}
-children(decl->methods, p_depth + 1);
+	}
+	children(decl->methods, p_depth + 1);
 }
 
 void Printer::print_package_decl(const Node *p_node, int p_depth) {
@@ -340,10 +340,10 @@ void Printer::print_package_decl(const Node *p_node, int p_depth) {
 	head("PackageDecl", p_depth);
 	if (package->name.count) {
 		dotted_attribute("name", package->name);
-}
-at(p_node->offset);
-children(package->imports, p_depth + 1);
-children(package->definitions, p_depth + 1);
+	}
+	at(p_node->offset);
+	children(package->imports, p_depth + 1);
+	children(package->definitions, p_depth + 1);
 }
 
 void Printer::print_program(const Node *p_node, int p_depth) {
