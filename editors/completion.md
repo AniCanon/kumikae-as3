@@ -1,8 +1,8 @@
 # Completion and typing assistance
 
-Kumikae uses the compiler's names and types for completion. Rider's native LSP client and the VS Code
-client use the same `kas3c lsp` implementation, each in its own process. Local punctuation and indentation in Rider use the IDE's
-editor handlers; typing a bracket does not wait for the language server.
+Kumikae uses the compiler's names and types for completion. Rider's native LSP client, IntelliJ IDEA
+through LSP4IJ, and VS Code use the same `kas3c lsp` implementation. Local punctuation and indentation
+use editor handlers; typing a bracket does not wait for the language server.
 
 ## Using completion
 
@@ -180,6 +180,7 @@ See the [follow-up results](../docs/results/2026-11-completion-followup.md) for 
 - Rider uses its native LSP client. IntelliJ IDEA Community/free unified IDEA uses the optional LSP4IJ
   plugin (0.21.0); install and enable it in **Settings > Plugins**. A project notification explains this
   requirement if it is missing. Local syntax, punctuation pairing and indentation work without it.
+  Restart the IDE after installing or updating Kumikae AS3. Rider keeps its split Problems view.
   Android Studio is outside the scope. See the [tested builds](jetbrains/README.md#names-and-compatibility-the-owners-to-change).
 
 The [IntelliJ LSP documentation](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html)

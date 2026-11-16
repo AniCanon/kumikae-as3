@@ -1,8 +1,10 @@
 package app.anicanon.kumikae.as3.panel
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ex.ProjectManagerEx
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.util.PlatformUtils
 import java.awt.Container
@@ -18,10 +20,12 @@ internal object UiProbeRetention {
 
     fun closeProject(project: Project, observations: MutableList<String>) {
         var focusRoot: Container? = null
+        var panels: List<Disposable> = emptyList()
         val focusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
         try {
             checkSplitView(project, observations)
             if (enabled() && PlatformUtils.isRider()) {
+                panels = UiProbeRiderPanels.capture(project)
                 val editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
                 focusRoot = checkNotNull(editor.contentComponent.focusCycleRootAncestor)
                 check(focusRoot.javaClass.name == "com.intellij.openapi.fileEditor.impl.EditorCompositePanel")
@@ -33,6 +37,8 @@ internal object UiProbeRetention {
             check(project.isDisposed) { "Closed probe project was not disposed" }
             observations += "Project closed and disposed"
         }
+        check(panels.all(Disposer::isDisposed)) { "Native Current File panel survived project close" }
+        if (panels.isNotEmpty()) observations += "Native Current File panel owned by its tool window and disposed"
         if (focusRoot != null) {
             check(focusManager.currentFocusCycleRoot !== focusRoot) {
                 "Closed editor remains the global focus cycle root"
@@ -54,12 +60,14 @@ internal object UiProbeRetention {
 
     fun checkReleased(projects: List<WeakReference<Project>>, destination: Path) {
         var histogram = ""
-        repeat(5) {
+        // Rider's error-icon queue has a native five-second timeout after its component disappears.
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+        do {
             UiProbeCompletion.edt { }
             histogram = UiProbeHeap.collect()
             if (recordRetained(projects, destination) == 0) return
             Thread.sleep(200)
-        }
+        } while (System.nanoTime() < deadline)
         Files.writeString(destination.resolve("retained-projects.histo"), histogram)
         if (System.getenv("KUMIKAE_COMPLETION_HEAP_DUMP") == "1") {
             java.lang.management.ManagementFactory.getPlatformMXBean(
