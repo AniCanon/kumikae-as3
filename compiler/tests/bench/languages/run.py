@@ -56,11 +56,15 @@ def export(godot, extension, where):
         shutil.copy(os.path.join(HERE, name), project)
     shutil.copy(os.path.join(extension, "kas3.gdextension"), project)
     shutil.copy(os.path.join(extension, LIBRARY), os.path.join(project, "bin"))
+    # The local package cache is the only source, for this build and for the `dotnet publish` Godot runs as
+    # it exports: a package missing from it is an error, not a download.
+    with open(os.path.join(project, "NuGet.Config"), "w") as config:
+        config.write('<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n'
+                     '    <add key="cache" value="%s" />\n  </packageSources>\n</configuration>\n' % nuget_cache())
     # The editor's first scan learns of the extension and the C# project; quitting in the same frame crashes
     # Godot (see the compiler's README), so it is given time.
     step("the editor's first scan", [godot, "--headless", "--editor", "--quit-after", "300", "--path", project], project)
-    # The local package cache is the only source: a package missing from it is an error, not a download.
-    step("dotnet build", ["dotnet", "build", "CmpCs.csproj", "--source", nuget_cache(), "-v", "q"], project)
+    step("dotnet build", ["dotnet", "build", "CmpCs.csproj", "-v", "q"], project)
     os.makedirs(os.path.join(project, "out"))  # Godot exports only into a folder that is there.
     step("the export",[godot, "--headless", "--export-release", "macOS", "out/cmp.app"], project)
     app = os.path.join(project, "out", "cmp.app")
