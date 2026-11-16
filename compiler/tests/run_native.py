@@ -18,6 +18,11 @@ For each program of run/ (the same ones run_programs.py holds the interpreter to
      its warnings) must equal X.err, or be empty without one; the exit status is 1 for a program that ends
      in an error nothing catches and 0 otherwise. Nothing the program made may be left alive (status 3).
 
+The benchmark programs of bench/ are built the same way and run with KAS3_NATIVE_COUNTS set: the host then
+says how many times generated code left an operation to the library (a thunk). bench/native_counts.txt holds
+the number for each, which is small and does not grow with the loop: a change that loses a fast path makes
+it millions, and fails here and not only in a timing.
+
 deep_frames, whose calls each hold a great deal, is run once more with a stack too small for it
 (KAS3_STACK_KB): running out of stack must be Error #1023 too, never a crash.
 
@@ -90,13 +95,10 @@ def expected(path, missing=""):
     return open(path).read() if os.path.exists(path) else missing
 
 
-def one(name):
-    """A program's outcome: ("skipped", operation), ("passed", ""), or ("failed", why)."""
-    base = os.path.join(folder, name)
-    files = open(base + ".args").read().split() if os.path.exists(base + ".args") else [name + ".as"]
-    out = os.path.join(work, name)
+def build(files, sources_in, out):
+    """The files as an executable in out: ("", what kas3c said), ("skipped", operation) or ("failed", why)."""
     shutil.rmtree(out, ignore_errors=True)
-    written = subprocess.run([kas3c, "cpp", *files, "-o", out], capture_output=True, text=True, cwd=folder, timeout=120)
+    written = subprocess.run([kas3c, "cpp", *files, "-o", out], capture_output=True, text=True, cwd=sources_in, timeout=120)
     lines = written.stderr.splitlines()
     if written.returncode != 0:
         if lines and lines[-1].startswith(NOT_YET):
@@ -113,14 +115,25 @@ def one(name):
                             capture_output=True, text=True, timeout=600)
     if linked.returncode != 0:
         return "failed", "the program did not link\n" + linked.stderr[-4000:]
+    return "", written.stderr
+
+
+def one(name):
+    """A program's outcome: ("skipped", operation), ("passed", ""), or ("failed", why)."""
+    base = os.path.join(folder, name)
+    files = open(base + ".args").read().split() if os.path.exists(base + ".args") else [name + ".as"]
+    out = os.path.join(work, name)
+    what, said = build(files, folder, out)
+    if what:
+        return what, said
     try:
-        ran = subprocess.run([executable], capture_output=True, text=True, cwd=folder, timeout=120, env=environment)
+        ran = subprocess.run([os.path.join(out, "program")], capture_output=True, text=True, cwd=folder, timeout=120, env=environment)
     except subprocess.TimeoutExpired:
         return "failed", "it ran for more than 120 seconds"
     problems = []
     if ran.stdout != expected(base + ".out"):
         problems.append("--- output expected\n%s--- output\n%s" % (expected(base + ".out"), ran.stdout))
-    errors = written.stderr + ran.stderr
+    errors = said + ran.stderr
     if errors != expected(base + ".err"):
         problems.append("--- errors expected\n%s--- errors\n%s" % (expected(base + ".err"), errors))
     fails = any(": warning: " not in line for line in expected(base + ".err").splitlines())
@@ -148,6 +161,28 @@ if outcomes.get("deep_frames", ("", ""))[0] == "passed":
                            env=dict(environment, KAS3_STACK_KB="4096"))
     if small.returncode != 1 or "Error #1023" not in small.stderr or "9968 more" in small.stderr:
         failures.append("deep_frames with a small stack: exit %d\n%s" % (small.returncode, small.stderr[-600:]))
+
+
+def counted(name):
+    """What the host counted while a benchmark program ran, as native_counts.txt writes it; or why there is none."""
+    out = os.path.join(work, "bench_" + name)
+    what, said = build([name + ".as"], os.path.join(tests, "bench"), out)
+    if what:
+        return "%s: %s" % (what, said)
+    ran = subprocess.run([os.path.join(out, "program")], capture_output=True, text=True, timeout=300, env=dict(environment, KAS3_NATIVE_COUNTS="1"))
+    found = [line for line in ran.stderr.splitlines() if line.startswith("kas3: counts ")]
+    if ran.returncode != 0 or len(found) != 1:
+        return "exit %d, and no counts:\n%s" % (ran.returncode, ran.stderr[-600:])
+    return found[0][len("kas3: counts "):] + "".join("\n" + line for line in ran.stderr.splitlines() if line.startswith("kas3:   "))
+
+
+counts_path = os.path.join(tests, "bench", "native_counts.txt")
+if not given["--only"]:
+    wanted = dict(line.split(": ", 1) for line in expected(counts_path).splitlines() if not line.startswith("#"))
+    for name in sorted(wanted):
+        got = counted(name)
+        if got.split("\n")[0] != wanted[name]:
+            failures.append("bench/%s: native_counts.txt says %s, the run says %s" % (name, wanted[name], got))
 
 listed_path = os.path.join(tests, "native_skipped.txt")
 if not given["--only"]:

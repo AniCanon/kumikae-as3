@@ -1,0 +1,4 @@
+# What each workload of CmpAs.as, as native code, leaves to the library in 1000 rounds (native_godot.py).
+spin: thunks=0 unresolved=0
+work: thunks=0 unresolved=0
+vec: thunks=0 unresolved=0

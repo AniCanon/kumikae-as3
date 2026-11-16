@@ -263,6 +263,12 @@ What generated code looks like, and why, is in [backend_cpp/README.md](backend_c
 on, how it shares the interpreter's library (through thunks, until that library is split out of the
 interpreter) and what is to be split is in [runtime/README.md](runtime/README.md).
 
+With `KAS3_NATIVE_COUNTS` set, the host says on standard error, as it goes, how many times generated code
+left an operation to the library and which (`kas3: counts thunks=N unresolved=M`, then a line for each):
+in Godot too, where `unresolved` is the places the host could not work out for a direct call. The tests hold
+the benchmarks and the Godot probe to those numbers (`native_counts.txt` beside each), so that a change
+that loses a fast path fails a test and not only a timing.
+
 Timings, native against the interpreter (and one build's native code against another's):
 
 ```sh

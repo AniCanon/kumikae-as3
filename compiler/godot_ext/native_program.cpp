@@ -186,35 +186,44 @@ void NativeProgram::resolve(const rt::Program &p_program) {
 		const ir::Function &thunk = host.module.functions[host.thunk_function(p_program.uses[i])];
 		const ir::Instruction &in = thunk.code[0];
 		rt::Resolved &resolved = host.resolved[i];
-		if (in.op == ir::Op::HostSingleton) {
-			std::string error;
-			void *handle = engine_.singleton(host.module.engine_names[in.b].name, &error);
-			if (handle) {
-				singletons_.push_back(handle);
-				resolved.handle = handle;
-				resolved.object = object_behind(handle);
-			}
-			continue;
+		if (!resolve_use(thunk, in, &resolved)) {
+			host.unresolved.push_back(i);
 		}
-		const GodotHost::Worked *worked = static_cast<const GodotHost::Worked *>(engine_.prepare(host.module, thunk, in));
-		using What = GodotHost::Worked::What;
-		if (!worked || !worked->bound || worked->is_static || worked->index >= 0 ||
-				(worked->what != What::Bound && worked->what != What::Getter && worked->what != What::Setter)) {
-			continue;
-		}
-		bool bare = worked->result == NO_VALUE || crosses_bare(worked->result, false);
-		for (const int parameter : worked->parameters) {
-			bare = bare && crosses_bare(parameter, true);
-		}
-		// A method's arguments follow what it is called on, in the instruction's list; an accessor is given
-		// all it takes.
-		const size_t given = in.op == ir::Op::HostCall ? thunk.argument_lists[in.c].size() - 1 : worked->parameters.size();
-		const size_t missing = worked->parameters.size() - std::min(worked->parameters.size(), given);
-		if (!bare || missing > 2 || (missing > 0 && !defaults_of(host.module.engine_names[in.b], worked->parameters.size(), given, resolved.defaults))) {
-			continue;
-		}
-		resolved.bind = const_cast<void *>(worked->bound);
 	}
+}
+
+bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instruction &p_in, rt::Resolved *r_resolved) {
+	rt::Host &host = *host_;
+	if (p_in.op == ir::Op::HostSingleton) {
+		std::string error;
+		void *handle = engine_.singleton(host.module.engine_names[p_in.b].name, &error);
+		if (handle) {
+			singletons_.push_back(handle);
+			r_resolved->handle = handle;
+			r_resolved->object = object_behind(handle);
+		}
+		return handle != nullptr;
+	}
+	const GodotHost::Worked *worked = static_cast<const GodotHost::Worked *>(engine_.prepare(host.module, p_thunk, p_in));
+	using What = GodotHost::Worked::What;
+	if (!worked || !worked->bound || worked->is_static || worked->index >= 0 ||
+			(worked->what != What::Bound && worked->what != What::Getter && worked->what != What::Setter)) {
+		return false;
+	}
+	bool bare = worked->result == NO_VALUE || crosses_bare(worked->result, false);
+	for (const int parameter : worked->parameters) {
+		bare = bare && crosses_bare(parameter, true);
+	}
+	// A method's arguments follow what it is called on, in the instruction's list; an accessor is given
+	// all it takes.
+	const size_t given = p_in.op == ir::Op::HostCall ? p_thunk.argument_lists[p_in.c].size() - 1 : worked->parameters.size();
+	const size_t missing = worked->parameters.size() - std::min(worked->parameters.size(), given);
+	if (!bare || missing > 2 ||
+			(missing > 0 && !defaults_of(host.module.engine_names[p_in.b], worked->parameters.size(), given, r_resolved->defaults))) {
+		return false;
+	}
+	r_resolved->bind = const_cast<void *>(worked->bound);
+	return true;
 }
 
 NativeProgram::~NativeProgram() {
