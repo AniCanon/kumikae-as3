@@ -1,6 +1,6 @@
 // Operators on two values: arithmetic, bitwise, string, logical, comparisons, equality, `is` and `as`
-// (lower_operators.cpp; on untyped values, lower_any.cpp). A helper the lowerer makes where it needs one,
-// with the lowerer's own state.
+// (lower_operators.cpp; comparisons and equality, lower_comparisons.cpp; on untyped values, lower_any.cpp). A
+// helper the lowerer makes where it needs one, with the lowerer's own state.
 #pragma once
 
 #include "lowerer.h"

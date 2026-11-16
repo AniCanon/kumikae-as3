@@ -18,6 +18,7 @@ turns the checked tree from `src/` into it.
 | `lower_expressions.h`, `lower_expressions` | Expressions: the lowerer's `expression()`, which converts a value to the kind wanted, and each kind of expression (the `Expressions` class, a friend of the lowerer) |
 | `lower_calls.h`, `lower_calls` | Calls (the `Calls` class, a friend of the lowerer): what a call is, a method or function of the program, a conversion, `trace`, `super(...)`, and a call's arguments as the function's parameters expect them |
 | `lower_operators.h`, `lower_operators` | Operators on two values (the `Operators` class, a friend of the lowerer): arithmetic, bitwise, string, logical, comparisons, equality, `is` and `as` |
+| `lower_comparisons` | For `Operators`: comparisons and equality, an Int64 against another kind exactly |
 | `lower_statements.h`, `lower_statements` | Statements (the `Statements` class, a friend of the lowerer): locals, `if`, the loops, `switch`, `break`, `continue`, `return`, `throw` |
 | `lower_classes.h`, `lower_classes` | Each class's place in the module, before any body is lowered (the `Classes` class, a friend of the lowerer): what it inherits, its fields, its methods and their table slots, Godot's virtuals it answers |
 | `lower_bodies.h`, `lower_bodies` | The body of each function (the `Bodies` class, a friend of the lowerer): its start and end, its parameters, a method, a constructor (with the fields' first values), a class's static initializer, package variables |
