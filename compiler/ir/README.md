@@ -10,6 +10,7 @@ turns the checked tree from `src/` into it.
 | `ir_compare.cpp` | What changed between two builds that a reload alone would not show (`run_once_changes`) |
 | `lower.h`, `lower.cpp` | The entry point, and units and classes in order |
 | `lowerer.h` | The one class: its state and every method's declaration |
+| `lower_flow.h` | What is kept of the loops and `try` statements around the code being lowered (`Loop`, `TryBlock`, `TryExit`) |
 | `lower_emit`, `lower_types`, `lower_places` | Registers and constants; kinds, conversions, default values; what can be read and written |
 | `lower_expressions`, `lower_operators`, `lower_calls`, `lower_statements`, `lower_classes` | By what each lowers |
 | `lower_engine` | Godot's members: properties, constants, singletons, parts of a value |
