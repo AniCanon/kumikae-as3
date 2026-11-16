@@ -65,6 +65,7 @@ void FunctionWriter::analyse() {
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();
 	find_borrowed();
+	find_still();
 	find_kept();
 	find_last_uses();
 	find_twice();
@@ -317,7 +318,7 @@ std::string FunctionWriter::prologue() const {
 			add(reg(i) + " = shared(c, " + reg(i) + ");");
 		}
 	}
-	out += kept_declared() + twice_declared();
+	out += still_declared() + kept_declared() + twice_declared();
 	if (has_owner_alias_) {
 		// The script's own Godot object: found once, and again only after the engine has freed a script's.
 		add("void *self = object_of(c, field<Ref>(r0, 0));");

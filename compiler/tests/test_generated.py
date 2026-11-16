@@ -87,6 +87,17 @@ with tempfile.TemporaryDirectory() as where:
               advance)
 
 with tempfile.TemporaryDirectory() as where:
+    sources = os.path.join(tests, "bench", "languages")
+    written = subprocess.run([kas3c, "cpp", "--godot", "frames/Saxpy.as", "-o", where], capture_output=True, text=True, cwd=sources)
+    check("Saxpy.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        process = functions(where, "frames_Saxpy.cpp").get("frames_Saxpy__process", "")
+        inside = "".join(loops(process))
+        check("Saxpy's loops are found", bool(inside), process)
+        check("a static field no code in the function can write is read once, not in its loops", "c->globals[" not in inside and
+              "c->globals[" in process, process)
+
+with tempfile.TemporaryDirectory() as where:
     written = subprocess.run([kas3c, "cpp", "objects.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "bench"))
     check("objects.as is written as C++", written.returncode == 0, written.stderr)
     if written.returncode == 0:
