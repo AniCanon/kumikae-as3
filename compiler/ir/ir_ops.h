@@ -164,7 +164,11 @@ inline bool is_held(Kind p_kind) {
 	/* A method of the library called through a function value: out (untyped), an Array of the value and \
 	   the method's name, an Array of the arguments. It is called as DynCall calls it by name. Only the \
 	   module's library_function has it. */ \
-	X(CallLibrary, "RRR")
+	X(CallLibrary, "RRR") \
+	/* `arguments`: out (an Array) of what the caller passed to the running function, each untyped, with \
+	   the function itself as its property `callee` (which a loop over the Array passes by). The first \
+	   instruction of a function that names `arguments`. */ \
+	X(Arguments, "R--")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,

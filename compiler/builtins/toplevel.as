@@ -12,7 +12,7 @@
 //   giving a default, the parameters here are given defaults so that every documented call is accepted.
 package {
 	public dynamic native class Object {
-		public native function Object();
+		public native function Object(value:* = undefined);
 		public native function hasOwnProperty(name:* = null):Boolean;
 		public native function isPrototypeOf(theClass:* = null):Boolean;
 		public native function propertyIsEnumerable(name:* = null):Boolean;

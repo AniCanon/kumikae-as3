@@ -62,6 +62,7 @@ class Lowerer {
 	bool constructor_ = false;
 	const Type *result_type_ = nullptr; // What the function being lowered says it returns, if it says.
 	std::unordered_map<const Symbol *, uint32_t> locals_;
+	uint32_t arguments_reg_ = NONE; // `arguments` (untyped), in a function that names it.
 	std::vector<Loop> loops_;
 	std::vector<std::string_view> next_labels_; // Labels written just before the statement being lowered.
 	// Types already refused where they were written: a value of one is not refused again at each use.

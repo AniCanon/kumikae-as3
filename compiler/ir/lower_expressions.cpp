@@ -56,6 +56,9 @@ uint32_t Expressions::name_value(Expr *p_expression) {
 	if (l_.builtin_constant(name->symbol, position, &constant)) {
 		return constant;
 	}
+	if (name->symbol && name->symbol->kind == SymbolKind::Arguments && l_.arguments_reg_ != NONE) {
+		return l_.arguments_reg_;
+	}
 	if (name->symbol && (name->symbol->kind == SymbolKind::Method || name->symbol->kind == SymbolKind::Function)) {
 		return Functions(l_).function_value(p_expression); // A method or a function as a value, not called.
 	}

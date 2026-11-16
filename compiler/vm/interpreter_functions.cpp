@@ -99,6 +99,34 @@ int32_t Interpreter::function_length(Object *p_function) const {
 	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
+// Arguments: what the caller passed, as an Array, and the running function as its `callee`.
+void Interpreter::arguments_array(const Instruction &p_in) {
+	const Frame &frame = frames_.back();
+	const Function &function = module_.functions[frame.function];
+	const uint32_t first = function.is_static ? 0 : 1;
+	const uint32_t count = frame.arguments > first ? frame.arguments - first : 0;
+	Vector *made = fresh_vector(module_.array_class, count);
+	if (!made) {
+		return;
+	}
+	Slot *r = stack_.data() + frame.base;
+	for (uint32_t i = 0; i < count; i++) {
+		made->data[i] = to_any(function.registers[first + i], r[first + i]);
+	}
+	Object *callee = make_function(frame.function, first ? static_cast<Object *>(r[0].p) : nullptr);
+	Entries *properties = callee ? properties_of(made) : nullptr;
+	PropertyKey key;
+	key.text = "callee";
+	if (!properties || !set_entry(properties, key, any::object(callee))) {
+		release_object(callee);
+		release_object(made);
+		return;
+	}
+	properties->all()[*entry_of(properties, key)].hidden = true;
+	release_object(callee); // The Array holds it now.
+	put(Kind::Obj, r[p_in.a], of_object(made));
+}
+
 // CallbackThis: a method keeps its own object, so Flash will not be told another (Error #1510).
 void Interpreter::callback_this(Slot p_callback, Slot p_this) {
 	const Object *callback = any::tag(p_callback) == AnyTag::Object ? static_cast<const Object *>(any::pointer(p_callback)) : nullptr;

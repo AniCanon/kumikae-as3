@@ -272,6 +272,7 @@ private:
 	// A method of the library read and not called, as a function bound to the value. CallLibrary runs it.
 	bool method_value(Slot p_holder, std::string_view p_name, Slot *r_value);
 	void call_library(const ir::Instruction &p_in);
+	void arguments_array(const ir::Instruction &p_in);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
 	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);
