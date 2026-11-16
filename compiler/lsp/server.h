@@ -66,6 +66,10 @@ class Server {
 	Json document_symbols(const Json &p_params);
 	Json workspace_symbols(const Json &p_params);
 	void notification(const std::string &p_method, const Json &p_params, std::vector<std::string> &r_out);
+	void register_file_watcher(std::vector<std::string> &r_out);
+	void did_change(const std::string &p_path, const Json &p_document, const Json &p_params,
+			std::vector<std::string> &r_out);
+	void did_close(const std::string &p_path);
 
 public:
 	explicit Server(Workspace::Options p_options);

@@ -76,21 +76,76 @@ Json Server::initialize(const Json &p_params) {
 			Json::object().set("name", "kas3c").set("version", "0.1.0"));
 }
 
+// Asks the editor to say when files change on disk.
+void Server::register_file_watcher(std::vector<std::string> &r_out) {
+	Json watchers = Json::array().push(Json::object().set("globPattern", "**/*"));
+	Json registration = Json::object()
+								.set("id", "kas3c-watch")
+								.set("method", "workspace/didChangeWatchedFiles")
+								.set("registerOptions", Json::object().set("watchers", std::move(watchers)));
+	r_out.push_back(write_json(Json::object()
+									   .set("jsonrpc", "2.0")
+									   .set("id", "kas3c-" + std::to_string(next_request_++))
+									   .set("method", "client/registerCapability")
+									   .set("params", Json::object().set("registrations", Json::array().push(std::move(registration))))));
+}
+
+void Server::did_change(const std::string &p_path, const Json &p_document, const Json &p_params,
+		std::vector<std::string> &r_out) {
+	if (p_path.empty() || !accept_version(p_document, false, r_out)) {
+		return;
+	}
+	// Each change applies to the text the one before it left: a range of it replaced, or, with no
+	// range, the whole of it.
+	const std::string *held = p_path.empty() ? nullptr : workspace_.text(p_path);
+	const Json &changes = p_params.get("contentChanges");
+	bool any = false;
+	std::string text = held ? *held : std::string();
+	if (held && workspace_.sent_with_mark(p_path)) {
+		text.insert(0, BYTE_ORDER_MARK); // Changed as the editor has it: the workspace keeps the mark out of the text.
+	}
+	for (const Json &change : changes.items()) {
+		if (!change.get("text").is_string()) {
+			continue;
+		}
+		const Json &range = change.get("range");
+		if (!range.is_object()) {
+			text = change.get("text").string();
+			held = &text; // From here on there is a whole text to change.
+		} else if (!held) {
+			continue; // A piece of a document the server was never given.
+		} else {
+			auto offset = [&](const Json &p_position) {
+				return offset_in_text(text, p_position.get("line").integer(-1), p_position.get("character").integer(0), utf8_);
+			};
+			uint32_t from = offset(range.get("start"));
+			uint32_t to = offset(range.get("end"));
+			if (to < from) {
+				std::swap(from, to);
+			}
+			text.replace(from, to - from, change.get("text").string());
+		}
+		any = true;
+	}
+	if (!p_path.empty() && any) {
+		workspace_.change(p_path, std::move(text));
+	}
+}
+
+void Server::did_close(const std::string &p_path) {
+	const std::string key = workspace_.resolve(p_path);
+	workspace_.close(p_path);
+	versions_.erase(key);
+	++document_generation_;
+	uris_.erase(key);
+}
+
 void Server::notification(const std::string &p_method, const Json &p_params, std::vector<std::string> &r_out) {
 	const Json &document = p_params.get("textDocument");
 	std::string path = path_from_uri(document.get("uri").string());
 	if (p_method == "initialized") {
 		if (watch_files_) {
-			Json watchers = Json::array().push(Json::object().set("globPattern", "**/*"));
-			Json registration = Json::object()
-										.set("id", "kas3c-watch")
-										.set("method", "workspace/didChangeWatchedFiles")
-										.set("registerOptions", Json::object().set("watchers", std::move(watchers)));
-			r_out.push_back(write_json(Json::object()
-											   .set("jsonrpc", "2.0")
-											   .set("id", "kas3c-" + std::to_string(next_request_++))
-											   .set("method", "client/registerCapability")
-											   .set("params", Json::object().set("registrations", Json::array().push(std::move(registration))))));
+			register_file_watcher(r_out);
 		}
 	} else if (p_method == "textDocument/didOpen") {
 		if (!path.empty() && document.get("text").is_string() && accept_version(document, true, r_out)) {
@@ -98,51 +153,10 @@ void Server::notification(const std::string &p_method, const Json &p_params, std
 			workspace_.open(path, document.get("text").string());
 		}
 	} else if (p_method == "textDocument/didChange") {
-		if (path.empty() || !accept_version(document, false, r_out)) {
-			return;
-		}
-		// Each change applies to the text the one before it left: a range of it replaced, or, with no
-		// range, the whole of it.
-		const std::string *held = path.empty() ? nullptr : workspace_.text(path);
-		const Json &changes = p_params.get("contentChanges");
-		bool any = false;
-		std::string text = held ? *held : std::string();
-		if (held && workspace_.sent_with_mark(path)) {
-			text.insert(0, BYTE_ORDER_MARK); // Changed as the editor has it: the workspace keeps the mark out of the text.
-		}
-		for (const Json &change : changes.items()) {
-			if (!change.get("text").is_string()) {
-				continue;
-			}
-			const Json &range = change.get("range");
-			if (!range.is_object()) {
-				text = change.get("text").string();
-				held = &text; // From here on there is a whole text to change.
-			} else if (!held) {
-				continue; // A piece of a document the server was never given.
-			} else {
-				auto offset = [&](const Json &p_position) {
-					return offset_in_text(text, p_position.get("line").integer(-1), p_position.get("character").integer(0), utf8_);
-				};
-				uint32_t from = offset(range.get("start"));
-				uint32_t to = offset(range.get("end"));
-				if (to < from) {
-					std::swap(from, to);
-				}
-				text.replace(from, to - from, change.get("text").string());
-			}
-			any = true;
-		}
-		if (!path.empty() && any) {
-			workspace_.change(path, std::move(text));
-		}
+		did_change(path, document, p_params, r_out);
 	} else if (p_method == "textDocument/didClose") {
 		if (!path.empty()) {
-			const std::string key = workspace_.resolve(path);
-			workspace_.close(path);
-			versions_.erase(key);
-			++document_generation_;
-			uris_.erase(key);
+			did_close(path);
 		}
 	} else if (p_method == "workspace/didChangeWatchedFiles") {
 		for (const Json &change : p_params.get("changes").items()) {
