@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_statements.h"
 
 #include <array>
 
@@ -386,8 +386,8 @@ void Lowerer::vector_loop(ForIn *p_loop) {
 		}
 	}
 	store(target, convert(value, target.kind, position), position);
-	open_loop();
-	statement(p_loop->body);
+	Statements(*this).open_loop();
+	Statements(*this).statement(p_loop->body);
 	const uint32_t next_at = here();
 	if (hole != NONE) {
 		patch(hole, next_at);
@@ -398,7 +398,7 @@ void Lowerer::vector_loop(ForIn *p_loop) {
 	emit(Op::Jump, position, top);
 	patch(out, here());
 	patch(to_end, here());
-	finish_loop(next_at);
+	Statements(*this).finish_loop(next_at);
 }
 
 // for each (x in packed): one of Godot's collections that says what it holds, by index, first to last. Its
@@ -436,15 +436,15 @@ void Lowerer::engine_loop(ForIn *p_loop) {
 	const uint32_t value = engine_reg(element, p_loop->element);
 	emit(Op::HostIndexGet, position, value, collection, at);
 	store(target, convert(value, target.kind, position), position);
-	open_loop();
-	statement(p_loop->body);
+	Statements(*this).open_loop();
+	Statements(*this).statement(p_loop->body);
 	const uint32_t next_at = here();
 	const uint32_t one = reg(Kind::I64);
 	emit(Op::ConstI64, position, one, wide(1));
 	emit(Op::AddI64, position, at, at, one);
 	emit(Op::Jump, position, top);
 	patch(out, here());
-	finish_loop(next_at);
+	Statements(*this).finish_loop(next_at);
 }
 
 auto Lowerer::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::optional<uint32_t> {

@@ -1,4 +1,4 @@
-#include "lowerer.h"
+#include "lower_statements.h"
 
 namespace kas3 {
 namespace ir {
@@ -96,9 +96,9 @@ void Lowerer::lower_function(Unit &p_unit, Symbol *p_class, FunctionDecl *p_decl
 	parameters(p_decl);
 	fn().result = p_decl->return_type ? written_kind(p_decl->return_type, p_decl->return_type->offset, Kind::Void) : Kind::Any;
 	if (p_decl->body) {
-		declare_locals(p_decl->body);
+		Statements(*this).declare_locals(p_decl->body);
 		make_environment(p_decl);
-		statement(p_decl->body);
+		Statements(*this).statement(p_decl->body);
 	}
 	end(p_decl->end ? p_decl->end - 1 : p_decl->offset);
 	lower_pending_functions();
@@ -139,7 +139,7 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 	constructor_ = true;
 	parameters(decl);
 	if (decl && decl->body) {
-		declare_locals(decl->body);
+		Statements(*this).declare_locals(decl->body);
 		make_environment(decl);
 	}
 	// The class's own fields get their values first, before any constructor body runs. One of Godot's
@@ -186,7 +186,7 @@ void Lowerer::lower_constructor(Unit &p_unit, ClassDecl *p_class) {
 		emit(Op::Call, p_class->name_offset, NONE, module_.classes[base_index].constructor, arguments(std::move(list)));
 	}
 	if (decl && decl->body) {
-		statement(decl->body);
+		Statements(*this).statement(decl->body);
 	}
 	emit(Op::ReturnVoid, decl && decl->end ? decl->end - 1 : p_class->name_offset);
 	lower_pending_functions();

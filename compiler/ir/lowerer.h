@@ -226,6 +226,7 @@ class Lowerer {
 	friend class Members; // Getters, setters and interfaces (lower_members.cpp).
 	friend class Dynamic; // Properties by name: lower_dynamic.h
 	friend class EngineCalls; // Calls of Godot's methods and functions: lower_engine_calls.h
+	friend class Statements; // Statements and where control goes: lower_statements.h
 	std::optional<uint32_t> library_call(Call *p_call, Symbol *p_function);
 	Symbol * callee_symbol(Expr *p_callee);
 
@@ -377,32 +378,6 @@ class Lowerer {
 	uint32_t arithmetic(Binary *p_binary, Kind p_want);
 
 	uint32_t assign(Assign *p_assign);
-
-	void declare_locals(Node *p_body);
-
-	void statement(Stmt *p_statement);
-	void if_statement(Stmt *p_statement);
-	void while_loop(Stmt *p_statement);
-	void do_while_loop(Stmt *p_statement);
-	void for_loop(Stmt *p_statement);
-	void switch_statement(Stmt *p_statement);
-	void try_statement(Try *p_try);
-	void labeled(Labeled *p_labeled);
-	// Leaves for a loop (break or continue) or the function (return), through the `finally` of every
-	// try statement on the way: the innermost one runs first, and goes on from there.
-	void leave_to(size_t p_loop, bool p_break, uint32_t p_position);
-	void leave_return(uint32_t p_position, uint32_t p_value); // p_value NONE for a function that gives nothing.
-	void route(size_t p_try, TryExit p_exit);
-	void finish_finally(TryBlock &p_try, uint32_t p_error, uint32_t p_position);
-	void open_loop(); // A loop or switch begins: it takes the label written before it, if any.
-	uint32_t catch_type(const CatchClause &p_clause);
-	void break_or_continue(Stmt *p_statement);
-	void return_statement(Stmt *p_statement);
-	void throw_statement(Stmt *p_statement);
-
-	void finish_loop(uint32_t p_continue_at);
-
-	void variables(VarDecl *p_decl);
 
 	void begin(uint32_t p_function, Unit &p_unit, Symbol *p_class);
 

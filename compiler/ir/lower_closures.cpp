@@ -4,7 +4,7 @@
 // environment: an object made as the function starts, one field for each such variable, its first field
 // the environment the function itself was given. Every read and write of the variable, in the function
 // and in those written inside it, goes through that object, so that they all see one variable.
-#include "lowerer.h"
+#include "lower_statements.h"
 
 namespace kas3 {
 namespace ir {
@@ -190,9 +190,9 @@ void Lowerer::lower_pending_functions() {
 		fn().locals[0].name = "$environment";
 		fn().result = decl->return_type ? written_kind(decl->return_type, decl->return_type->offset, Kind::Void) : Kind::Any;
 		if (decl->body) {
-			declare_locals(decl->body);
+			Statements(*this).declare_locals(decl->body);
 			make_environment(decl);
-			statement(decl->body);
+			Statements(*this).statement(decl->body);
 		}
 		end(decl->end ? decl->end - 1 : decl->offset);
 	}
