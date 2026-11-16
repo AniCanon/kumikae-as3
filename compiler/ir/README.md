@@ -42,6 +42,10 @@ turns the checked tree from `src/` into it.
 
 - **Includes `src/` only.** No Godot header, nothing from `vm/`. Godot's own names come from the name table
   through `godot_name(...)`.
+- **An engine instruction names what it asks for by its entry in the name table,** never by text: an `E`
+  operand is an index into `Module::engine_names`, each a copy of one entry (`engine_entry()`,
+  `engine_name()`, `engine_operator()`), so that a backend finds Godot's method, property or operator
+  once, by that entry.
 - **A new operation** is one entry in `KAS3_IR_OPS`, with its shape letters, plus its case in
   `vm/interpreter_run.cpp`. `tests/test_ir.cpp` checks the letters; nothing else lists operations.
 - **What is not supported yet is refused by name** with `refuse(position, "...")`, never lowered to

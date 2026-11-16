@@ -69,7 +69,7 @@ private:
 	std::vector<Str *> strings_; // The module's string constants.
 	Str *null_text_ = nullptr; // "null"
 	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
-	std::vector<void *> singletons_; // The engine's singletons, by the string of their name, once found.
+	std::vector<void *> singletons_; // The engine's singletons, by the engine name of their class, once found.
 	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	// The strings of one ASCII character each, made the first time charAt() gives one: a loop over a

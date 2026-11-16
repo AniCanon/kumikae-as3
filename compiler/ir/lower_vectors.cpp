@@ -273,17 +273,17 @@ auto Vectors::vector_to_engine(Expr *p_value, const Type *p_wanted) -> std::opti
 		return l_.default_value(Kind::Val, position);
 	}
 	// Godot's name for what it takes here: a packed array, or an Array where it takes that or anything.
-	const std::optional<std::string> godot = p_wanted && p_wanted->kind == Type::Instance && Lowerer::is_godot(p_wanted->symbol)
-			? godot_name(p_wanted->symbol->name, std::string_view())
+	const std::optional<uint32_t> godot = p_wanted && p_wanted->kind == Type::Instance && Lowerer::is_godot(p_wanted->symbol)
+			? l_.engine_entry(p_wanted->symbol->name)
 			: std::nullopt;
 	const bool named = godot.has_value();
-	const std::string wanted = godot.value_or("Array");
-	if (p_wanted && p_wanted->kind != Type::Any && !named) {
+	const std::optional<uint32_t> wanted = named ? godot : l_.engine_entry("GodotArray");
+	if ((p_wanted && p_wanted->kind != Type::Any && !named) || !wanted) {
 		l_.refuse(position, "passing a Vector where '" + l_.compilation_.type_name(p_wanted) + "' is expected");
 		return l_.default_value(Kind::Val, position);
 	}
 	const uint32_t out = named ? l_.engine_reg(Kind::Val, p_wanted) : l_.reg(Kind::Val);
-	l_.emit(Op::HostCollection, position, out, l_.expression(p_value, Kind::Obj), l_.string(wanted));
+	l_.emit(Op::HostCollection, position, out, l_.expression(p_value, Kind::Obj), *wanted);
 	return out;
 }
 

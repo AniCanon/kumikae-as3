@@ -20,6 +20,9 @@ struct GodotEntry {
 std::optional<uint32_t> godot_entry(std::string_view p_key);
 // The entry of an id that godot_entry() gave.
 GodotEntry godot_entry_at(uint32_t p_id);
+// The entry of the operator Godot's description names so ("+", "unary-", "=="): an @operator entry, whose
+// value starts with that name.
+std::optional<uint32_t> godot_operator(std::string_view p_name);
 // The whole value of the entry of this key: a global function's signature, a default's text.
 std::optional<std::string_view> godot_value(std::string_view p_key);
 // The words of a value, split at its spaces: "position property Vector2 get_position 3341600327 ...".

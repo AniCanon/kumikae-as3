@@ -6,6 +6,7 @@
 
 #include "ast_walk.h"
 #include "builtins.h"
+#include "godot_names.h"
 #include "lower_env.h"
 #include "lower_flow.h"
 #include "whole_numbers.h"
@@ -52,6 +53,7 @@ class Lowerer {
 	std::unordered_map<std::string, uint32_t> strings_;
 	std::unordered_map<uint64_t, uint32_t> numbers_; // A Number constant by its bits.
 	std::unordered_map<int64_t, uint32_t> wides_;
+	std::unordered_map<uint32_t, uint32_t> engine_names_; // module_.engine_names by the name table's id.
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint32_t>> slot_names_; // Per class.
 	std::unordered_map<const Unit *, uint32_t> files_;
 
@@ -112,8 +114,13 @@ class Lowerer {
 	// A Godot class whose objects the engine owns (a node, a resource), as against a value type.
 	bool is_godot_object(const Symbol *p_class) const;
 
-	// Godot's own name for a member or (with no member) a class it declares.
-	bool engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_string);
+	// A member or (with no member) a class Godot declares, as an engine instruction names it: its entry in
+	// module_.engine_names (an E operand).
+	bool engine_name(const Symbol *p_class, std::string_view p_member, uint32_t *r_name);
+	// The entry of Godot's name table of this key, in module_.engine_names; nothing if the table has none.
+	std::optional<uint32_t> engine_entry(std::string_view p_key);
+	// The operator Godot's description names so ("+", "unary-", "=="), as an engine name.
+	std::optional<uint32_t> engine_operator(std::string_view p_name);
 
 	// The kind a written type names; refused if the interpreter has no such values yet.
 	Kind written_kind(TypeRef *p_type, uint32_t p_offset, Kind p_missing);

@@ -154,6 +154,17 @@ struct Class {
 	}
 };
 
+// One of Godot's classes, members, operators, global functions or defaults that the program names, as Godot's
+// name table (godot/godot_names.txt) has it: what an engine instruction's E operand points at. Copied into
+// the module so that the module stands alone; `id` says which entry of the table it was.
+struct EngineName {
+	uint32_t id = 0; // The entry's place in the name table the module was built with.
+	std::string key; // "Node2D.position", "Vector2", "@operator.OP_ADD"
+	std::string value; // The whole value: Godot's name, then what the table says of it ("position property ...").
+	std::string name; // Godot's name: the value's first word ("position", "Vector2", "+"), or a default's text.
+	std::string owner; // Godot's name for the class it is a member of ("Node2D"); empty for anything else.
+};
+
 struct Global {
 	std::string name; // "Main.count"
 	Kind kind = Kind::Void;
@@ -170,6 +181,7 @@ struct Module {
 	std::vector<std::string> strings;
 	std::vector<double> numbers;
 	std::vector<int64_t> wides; // Int64 constants.
+	std::vector<EngineName> engine_names; // What the engine instructions name, each once.
 	// Functions run once, in order, before anything else: package-level variables. (A class's static fields
 	// are set on the class's first use: Class::static_init.)
 	std::vector<uint32_t> initializers;

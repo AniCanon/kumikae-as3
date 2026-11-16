@@ -53,9 +53,9 @@ function RangeError(r0:Object, r1:String, r2:int):void
 function Engine/values(r0:Object, r1:int):Number
   @1 ConstI64 r6 0
   @2 ConstF64 r7 0
-  @3 HostNew r8 "Vector2" (r6, r7)
+  @3 HostNew r8 [Vector2] (r6, r7)
   @4 Move r2 r8
-  @6 HostConstant r9 "Vector2" "UP"
+  @6 HostConstant r9 [Vector2.UP]
   @7 Move r3 r9
   @9 ConstI32 r10 0
   @10 Move r4 r10
@@ -64,13 +64,13 @@ function Engine/values(r0:Object, r1:int):Number
   @14 LtF64 r13 r11 r12
   @15 JumpIfNot r13 @33
   @17 ConstF64 r14 0.5
-  @18 HostOperate r15 "*" (r3, r14)
-  @19 HostOperate r16 "+" (r2, r15)
+  @18 HostOperate r15 [@operator.OP_MULTIPLY] (r3, r14)
+  @19 HostOperate r16 [@operator.OP_ADD] (r2, r15)
   @20 Move r2 r16
-  @22 HostCall r17 "normalized" (r2)
-  @23 HostOperate r18 "-" (r17)
+  @22 HostCall r17 [Vector2.normalized] (r2)
+  @23 HostOperate r18 [@operator.OP_NEGATE] (r17)
   @24 ConstF64 r19 3
-  @25 HostOperate r20 "*" (r18, r19)
+  @25 HostOperate r20 [@operator.OP_MULTIPLY] (r18, r19)
   @26 Move r2 r20
   @27 I32ToF64 r21 r4
   @28 ConstF64 r22 1
@@ -78,9 +78,9 @@ function Engine/values(r0:Object, r1:int):Number
   @30 F64ToI32 r24 r23
   @31 Move r4 r24
   @32 Jump @11
-  @34 HostOperate r25 "==" (r2, r3)
+  @34 HostOperate r25 [@operator.OP_EQUAL] (r2, r3)
   @35 Move r5 r25
-  @37 HostGet r26 r2 "x"
+  @37 HostGet r26 r2 [Vector2.x]
   @38 JumpIfNot r5 @42
   @39 ConstI32 r28 1
   @40 Move r27 r28
@@ -95,36 +95,36 @@ function Engine/values(r0:Object, r1:int):Number
 function Engine/members(r0:Object):Boolean
   @1 GetField r3 r0 .0
   @2 GetField r4 r0 .0
-  @3 HostGet r5 r4 "position"
+  @3 HostGet r5 r4 [Node2D.position]
   @4 GetField r6 r0 .0
-  @5 HostGet r7 r6 "rotation"
-  @6 HostCallStatic r8 "Vector2.from_angle method 889263119 Vector2 float" (r7)
-  @7 HostOperate r9 "+" (r5, r8)
-  @8 HostSet r3 "position" r9
+  @5 HostGet r7 r6 [Node2D.rotation]
+  @6 HostCallStatic r8 [Vector2.fromAngle] (r7)
+  @7 HostOperate r9 [@operator.OP_ADD] (r5, r8)
+  @8 HostSet r3 [Node2D.position] r9
   @10 GetField r10 r0 .0
-  @11 HostGet r11 r10 "rotation"
+  @11 HostGet r11 r10 [Node2D.rotation]
   @12 ConstF64 r12 0
   @13 ConstF64 r13 1
   @14 ConstF64 r14 0.5
-  @15 HostCallStatic r15 ".lerpf 998901048 float float,float,float" (r12, r13, r14)
+  @15 HostCallStatic r15 [@global.lerpf] (r12, r13, r14)
   @16 AddF64 r16 r11 r15
-  @17 HostSet r10 "rotation" r16
-  @19 HostNew r17 "Node" ()
+  @17 HostSet r10 [Node2D.rotation] r16
+  @19 HostNew r17 [Node] ()
   @20 Move r1 r17
-  @22 HostAsClass r18 r1 "Sprite2D"
+  @22 HostAsClass r18 r1 [Sprite2D]
   @23 Move r2 r18
-  @25 HostCall _ "free" (r1)
+  @25 HostCall _ [GodotObject.free] (r1)
   @27 GetField r22 r0 .0
-  @28 HostCall r23 "is_inside_tree" (r22)
+  @28 HostCall r23 [Node.isInsideTree] (r22)
   @29 Move r21 r23
   @30 JumpIfNot r21 @35
-  @31 HostSingleton r24 "Input"
+  @31 HostSingleton r24 [Input]
   @32 ConstStr r25 "ui_accept"
-  @33 HostCall r26 "is_action_pressed" (r24, r25)
+  @33 HostCall r26 [Input.isActionPressed] (r24, r25)
   @34 Move r21 r26
   @35 Move r20 r21
   @36 JumpIfNot r20 @39
-  @37 HostIsClass r27 r1 "Node2D"
+  @37 HostIsClass r27 r1 [Node2D]
   @38 Move r20 r27
   @39 Move r19 r20
   @40 JumpIfNot r19 @44
@@ -135,17 +135,17 @@ function Engine/members(r0:Object):Boolean
   @45 ConstBool r30 0
   @46 Return r30
 function Engine/collections(r0:Object, r1:Object):int
-  @0 HostNew r4 "Vector2" ()
-  @2 HostNew r5 "Line2D" ()
+  @0 HostNew r4 [Vector2] ()
+  @2 HostNew r5 [Line2D] ()
   @3 Move r2 r5
-  @5 HostCollection r6 r1 "PackedVector2Array"
-  @6 HostSet r2 "points" r6
+  @5 HostCollection r6 r1 [PackedVector2Array]
+  @6 HostSet r2 [Line2D.points] r6
   @8 ConstI32 r7 0
   @9 Move r3 r7
-  @10 HostGet r9 r2 "points"
+  @10 HostGet r9 r2 [Line2D.points]
   @11 Move r8 r9
   @12 ConstI64 r10 0
-  @14 HostCall r11 "size" (r8)
+  @14 HostCall r11 [PackedVector2Array.size] (r8)
   @15 LtI64 r12 r10 r11
   @16 JumpIfNot r12 @28
   @17 HostIndexGet r13 r8 r10
@@ -158,25 +158,25 @@ function Engine/collections(r0:Object, r1:Object):int
   @25 ConstI64 r18 1
   @26 AddI64 r10 r10 r18
   @27 Jump @13
-  @29 HostCall _ "free" (r2)
+  @29 HostCall _ [GodotObject.free] (r2)
   @31 Return r3
   @32 ConstI32 r19 0
   @33 Return r19
 function Engine/defaults(r0:Object, r1:GodotValue):GodotValue
-  @1 HostDefault r2 "Color(0, 0, 0, 0)"
+  @1 HostDefault r2 [@default.Color.clamp.0]
   @2 Move r3 r1
   @3 HostPresent r4 r3
   @4 JumpIf r4 @6
-  @5 HostDefault r3 "Color(1, 1, 1, 1)"
-  @6 HostCall r5 "clamp" (r1, r2, r3)
+  @5 HostDefault r3 [@default.Color.clamp.1]
+  @6 HostCall r5 [Color.clamp] (r1, r2, r3)
   @7 Return r5
   @8 ConstNull r6
   @9 Return r6
 function Engine/signals(r0:Object):void
   @1 GetField r1 r0 .0
-  @2 HostGet r2 r1 "ready"
+  @2 HostGet r2 r1 [Node.ready]
   @3 HostBind r3 r0 8
-  @4 HostCall _ "@add" (r2, r3)
+  @4 HostCall _ [Signal.add] (r2, r3)
   @5 ReturnVoid
 function Engine/heard(r0:Object):void
   @0 ReturnVoid

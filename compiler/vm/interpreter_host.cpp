@@ -44,7 +44,9 @@ struct Request {
 		result.bits = 0; // All of it: `{}` on a union clears its first member only, which is half a pointer.
 	}
 
-	const std::string &text(uint32_t p_string) const { return module.strings[p_string]; }
+	// Godot's name for what an engine instruction names (an E operand).
+	const ir::EngineName &engine(uint32_t p_name) const { return module.engine_names[p_name]; }
+	const std::string &name(uint32_t p_name) const { return module.engine_names[p_name].name; }
 	void *handle(uint32_t p_register) const { return registers[p_register].p; }
 	Argument argument(uint32_t p_register) const { return Argument{ function.registers[p_register], registers[p_register] }; }
 
@@ -94,7 +96,7 @@ public:
 Outcome construct(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
 	p_request.into(p_request.in.a); // One of Godot's values, or one of its objects.
-	p_request.result.p = p_request.host.source.construct(p_request.text(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
+	p_request.result.p = p_request.host.source.construct(p_request.name(p_request.in.b), arguments.values(), arguments.count(), &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -108,7 +110,7 @@ Outcome collection(Request &p_request) {
 		return Outcome::Done;
 	}
 	const Kind element = p_request.module.classes[vector->klass].element;
-	p_request.result.p = p_request.host.source.collection(p_request.text(p_request.in.c), element, vector->data, vector->length, &p_request.error);
+	p_request.result.p = p_request.host.source.collection(p_request.name(p_request.in.c), element, vector->data, vector->length, &p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 
@@ -120,13 +122,17 @@ Outcome call(Request &p_request) {
 	}
 	const Gathered arguments(p_request, p_request.in.c, 1);
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.handles.call(receiver, p_request.text(p_request.in.b), arguments.values(), arguments.count(),
+	return p_request.done(p_request.host.handles.call(receiver, p_request.name(p_request.in.b), arguments.values(), arguments.count(),
 			p_request.wanted(), p_request.result_or_none(), &p_request.error));
 }
 
 Outcome operate(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
-	const std::string &op = p_request.text(p_request.in.b);
+	// The description's name, but for the unary ones ("unary-"): AS3's spelling, with one operand.
+	std::string_view op = p_request.name(p_request.in.b);
+	if (op.substr(0, 5) == "unary") {
+		op.remove_prefix(5);
+	}
 	// Only a comparison takes a missing value: `node == null`. Arithmetic on one is an error.
 	if (op != "==" && op != "!=") {
 		for (size_t i = 0; i < arguments.count(); i++) {
@@ -145,7 +151,7 @@ Outcome singleton(Request &p_request) {
 	p_request.target = p_request.in.a;
 	p_request.kind = Kind::Ref;
 	if (!*p_request.singleton) {
-		*p_request.singleton = p_request.host.source.singleton(p_request.text(p_request.in.b), &p_request.error);
+		*p_request.singleton = p_request.host.source.singleton(p_request.name(p_request.in.b), &p_request.error);
 		if (!*p_request.singleton) {
 			return Outcome::Refused;
 		}
@@ -156,23 +162,23 @@ Outcome singleton(Request &p_request) {
 
 Outcome evaluate(Request &p_request) {
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.source.evaluate(p_request.text(p_request.in.b), p_request.wanted(), &p_request.result, &p_request.error));
+	return p_request.done(p_request.host.source.evaluate(p_request.name(p_request.in.b), p_request.wanted(), &p_request.result, &p_request.error));
 }
 
 Outcome constant(Request &p_request) {
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.source.constant(p_request.text(p_request.in.b), p_request.text(p_request.in.c), p_request.wanted(),
-			&p_request.result, &p_request.error));
+	const ir::EngineName &constant = p_request.engine(p_request.in.b);
+	return p_request.done(p_request.host.source.constant(constant.owner, constant.name, p_request.wanted(), &p_request.result, &p_request.error));
 }
 
+// A class's method ("Vector2", and its whole entry, "from_angle method 889263119 Vector2 float"), or a
+// global function (no class, and its signature).
 Outcome call_static(Request &p_request) {
 	const Gathered arguments(p_request, p_request.in.c, 0);
-	// "Vector2.from_angle method 3 ...": the type, and the method's entry, whose types may hold dots.
-	const std::string_view name = p_request.text(p_request.in.b);
-	const size_t dot = name.find('.');
+	const ir::EngineName &method = p_request.engine(p_request.in.b);
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.source.call_static(name.substr(0, dot), name.substr(dot + 1), arguments.values(), arguments.count(),
-			p_request.wanted(), p_request.result_or_none(), &p_request.error));
+	return p_request.done(p_request.host.source.call_static(method.owner, method.value, arguments.values(), arguments.count(), p_request.wanted(),
+			p_request.result_or_none(), &p_request.error));
 }
 
 Outcome present(Request &p_request) {
@@ -186,7 +192,7 @@ Outcome present(Request &p_request) {
 // `is` and `as` with one of Godot's classes.
 Outcome class_test(Request &p_request) {
 	void *value = p_request.handle(p_request.in.b);
-	const bool fits = value != nullptr && p_request.host.handles.is_class(value, p_request.text(p_request.in.c));
+	const bool fits = value != nullptr && p_request.host.handles.is_class(value, p_request.name(p_request.in.c));
 	p_request.target = p_request.in.a;
 	if (p_request.in.op == Op::HostIsClass) {
 		p_request.kind = Kind::Bool;
@@ -222,7 +228,7 @@ Outcome get(Request &p_request) {
 		return Outcome::Missing;
 	}
 	p_request.into(p_request.in.a);
-	return p_request.done(p_request.host.handles.get(receiver, p_request.text(p_request.in.c), p_request.wanted(), &p_request.result,
+	return p_request.done(p_request.host.handles.get(receiver, p_request.name(p_request.in.c), p_request.wanted(), &p_request.result,
 			&p_request.error));
 }
 
@@ -231,7 +237,7 @@ Outcome set(Request &p_request) {
 	if (!receiver) {
 		return Outcome::Missing;
 	}
-	return p_request.done(p_request.host.handles.set(receiver, p_request.text(p_request.in.b), p_request.argument(p_request.in.c), &p_request.error));
+	return p_request.done(p_request.host.handles.set(receiver, p_request.name(p_request.in.b), p_request.argument(p_request.in.c), &p_request.error));
 }
 
 Outcome bind(Request &p_request) {
@@ -406,7 +412,7 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	Request request(module_, host_, p_function, p_in, stack_.data() + frames_.back().base, null_text_);
 	if (p_in.op == Op::HostSingleton) {
 		if (singletons_.size() <= p_in.b) {
-			singletons_.resize(module_.strings.size(), nullptr);
+			singletons_.resize(module_.engine_names.size(), nullptr);
 		}
 		request.singleton = &singletons_[p_in.b];
 	}

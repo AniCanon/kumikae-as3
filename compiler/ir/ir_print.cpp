@@ -123,6 +123,8 @@ std::string print_operand(const Module &p_module, const Function &p_function, ch
 			return "#" + std::to_string(p_value);
 		case 'M':
 			return p_value < p_module.interface_methods.size() ? "~" + p_module.interface_methods[p_value] : "?method";
+		case 'E':
+			return p_value < p_module.engine_names.size() ? "[" + p_module.engine_names[p_value].key + "]" : "?engine";
 		default:
 			return std::string();
 	}

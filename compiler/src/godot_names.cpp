@@ -53,6 +53,21 @@ GodotEntry godot_entry_at(uint32_t p_id) {
 	return table().entries[p_id];
 }
 
+std::optional<uint32_t> godot_operator(std::string_view p_name) {
+	// The operators' entries sit together, sorted by their key's prefix: a few dozen to look through.
+	constexpr std::string_view prefix = "@operator.";
+	const std::vector<GodotEntry> &entries = table().entries;
+	auto at = std::lower_bound(entries.begin(), entries.end(), prefix, [](const GodotEntry &p_entry, std::string_view p_wanted) {
+		return p_entry.key < p_wanted;
+	});
+	for (; at != entries.end() && at->key.substr(0, prefix.size()) == prefix; ++at) {
+		if (at->value.substr(0, at->value.find(' ')) == p_name) {
+			return static_cast<uint32_t>(at - entries.begin());
+		}
+	}
+	return std::nullopt;
+}
+
 std::optional<std::string_view> godot_value(std::string_view p_key) {
 	const std::optional<uint32_t> id = godot_entry(p_key);
 	return id ? std::optional<std::string_view>(godot_entry_at(*id).value) : std::nullopt;
