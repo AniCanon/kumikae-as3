@@ -73,7 +73,7 @@ struct Asked final : vm::Runner {
 			values[fixed].p = rest;
 		}
 		const bool extra = callee.takes_extra && p_count > callee.parameters;
-		c->host->keep_extras(p_arguments + callee.parameters, extra ? static_cast<uint32_t>(p_count) - callee.parameters : 0);
+		c->host->keep_extras(extra ? p_arguments + callee.parameters : nullptr, extra ? static_cast<uint32_t>(p_count) - callee.parameters : 0);
 		callee.entry(c, values, given, r_result);
 		c->host->drop_extras(); // Had the function not begun, they are still here.
 		release(c, rest);
