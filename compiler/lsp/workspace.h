@@ -5,6 +5,7 @@
 #include "names.h"
 #include "query.h"
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -45,6 +46,7 @@ private:
 	bool stale_ = true;
 	bool cut_off_ = false; // The project has more files than are read.
 	int checks_ = 0;
+	int progress_ = 0;
 	int full_checks_ = 0;
 
 	void scan(const std::string &p_folder);
@@ -54,7 +56,9 @@ private:
 	bool in_project(const std::string &p_path) const;
 	bool load(const std::string &p_path);
 	void check();
-	bool update_bodies();
+	bool update();
+	Compilation &current(); // The edits applied: declarations checked, bodies perhaps not.
+	void check_bodies(Unit &p_unit);
 	const std::string &support_folder();
 
 public:
@@ -93,14 +97,22 @@ public:
 	bool cut_off() const { return cut_off_; }
 	size_t max_files() const { return options_.max_files; }
 	int full_checks() const { return full_checks_; } // Rebuilds of the whole semantic environment.
-	int checks() const { return checks_; } // How many times the program has been checked.
-	// All three check the program first if anything changed. What they return is good until the next
-	// change.
+	int checks() const { return checks_; } // How many times edits have been taken in.
+	int progress() const { return progress_; } // Changes each time more of the program has been checked.
+	// Each applies the edits first. What they return is good until the next edit.
+	// The whole program, every file's bodies checked.
 	Compilation &compilation();
+	// Questions about the files whose bodies are checked; declarations are always checked.
 	Queries &queries();
-	Unit *unit(const std::string &p_path); // Null if the file is not part of the program.
-	std::vector<Unit *> program_units(); // The program's own files.
-	// The files errors are reported for: the program's, and the declaration files named in the options.
+	// Null if the file is not part of the program. Its bodies are checked; other files' may not be.
+	Unit *unit(const std::string &p_path);
+	// Checks what is left to check, asking p_yield after each file whether to stop for newer input. True
+	// if everything is checked. What is checked is kept, and the rest is checked on the next call.
+	bool settle(const std::function<bool()> &p_yield);
+	bool checked(const Unit &p_unit) const { return !p_unit.unchecked; }
+	// The program's own files, and the files errors are reported for (with the declaration files named in
+	// the options), checked or not.
+	std::vector<Unit *> program_units();
 	std::vector<Unit *> reported_units();
 	// A file an editor can open: the unit's own path, or for Godot's API and the built-in library a
 	// read-only copy written to the support folder. Empty if that copy can't be written.

@@ -471,7 +471,7 @@ static void test_body_recheck() {
 	}
 	workspace.change(path, prefix + "var item:Other; item.value;" + " } public function later():Number { return 1; } } }");
 	CHECK(!workspace.compilation().has_errors());
-	CHECK_EQ(workspace.full_checks(), initial + 1); // A signature change takes the full-check path.
+	CHECK_EQ(workspace.full_checks(), initial); // A signature change is checked in place too.
 }
 
 static void test_body_import_invalidates_signature() {
@@ -498,7 +498,7 @@ static void test_body_import_invalidates_signature() {
 		clean.check(true);
 		CHECK(clean.has_errors());
 		CHECK_EQ(workspace.compilation().format_diagnostics(), clean.format_diagnostics());
-		CHECK_EQ(workspace.full_checks(), 2);
+		CHECK_EQ(workspace.full_checks(), 1);
 	}
 }
 

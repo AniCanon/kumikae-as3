@@ -46,6 +46,7 @@ Json Server::references(const Json &p_params) {
 		return list;
 	}
 	bool with_declaration = p_params.get("context").get("includeDeclaration").boolean();
+	workspace_.compilation(); // Uses are in every file's bodies.
 	for (const Place &place : workspace_.queries().references(found->symbol, with_declaration)) {
 		Json where = location(place);
 		if (!where.is_null()) {

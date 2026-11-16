@@ -279,9 +279,10 @@ int run_server(int p_input, int p_output, Workspace::Options p_options) {
 		}
 		server.handle_batch(batch, out);
 		// While someone is typing, changes arrive faster than they can be checked. Check once the editor
-		// pauses.
+		// pauses, and stop for any message that arrives meanwhile: it is answered first, and the check goes
+		// on from where it stopped.
 		if (!server.exited() && !channel.waiting()) {
-			server.settle(out);
+			server.settle(out, [&channel] { return channel.waiting(); });
 		}
 		if (!channel.send(out)) {
 			return 1;

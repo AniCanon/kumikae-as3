@@ -108,8 +108,8 @@ struct CompletionResult {
 	bool incomplete = false; // More candidates become eligible once the user types a prefix.
 };
 
-// Built over one checked generation. Discard queries before the compilation's trees or body scopes
-// change, including a successful update_bodies that preserves the Compilation itself.
+// Built over one state of the declarations. Discard queries before an update of the compilation, and tell
+// them of each file whose bodies are checked.
 class Queries {
 	Compilation &compilation_;
 	std::unordered_map<const Unit *, std::vector<Occurrence>> occurrences_;
@@ -143,6 +143,8 @@ class Queries {
 public:
 	explicit Queries(Compilation &p_compilation) :
 			compilation_(p_compilation) {}
+	// Drops what was worked out from a file whose bodies were checked again.
+	void forget(const Unit &p_unit);
 
 	// The name the offset is in, or that ends right at it. Null if there is none, or it resolved to nothing.
 	const Occurrence *at(const Unit &p_unit, uint32_t p_offset);
@@ -157,6 +159,9 @@ public:
 	std::vector<Place> references(const Symbol *p_symbol, bool p_with_declaration);
 	// The declaration as one line of AS3: "function hit(by:Node, power:int = 1):void".
 	std::string describe(const Symbol *p_symbol) const;
+	// A parameter as its declaration writes it: "...rest", "power:int". From the declaration alone, so that
+	// it reads the same whether or not the function's file has had its bodies checked.
+	static std::string parameter_text(const Unit &p_unit, const Parameter &p_parameter);
 	// What it is and where it lives: "method of game.Player", "class in package godot", "local variable".
 	std::string context(const Symbol *p_symbol) const;
 	std::vector<OutlineItem> outline(const Unit &p_unit) const;

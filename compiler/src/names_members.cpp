@@ -48,14 +48,17 @@ FunctionDecl *Compilation::property_half(Symbol *p_through, const Symbol *p_prop
 	return found;
 }
 
-// Works the answer to hierarchy_broken out once for every class, so that a deep hierarchy is not walked
-// again for each question. Called when no base class will change any more.
-void Compilation::settle_hierarchy() {
+// Works the answer to hierarchy_broken out once for every class in the list, so that a deep hierarchy is not
+// walked again for each question. Called when no base class will change any more.
+void Compilation::settle_hierarchy(const std::vector<Symbol *> &p_classes) {
 	std::vector<ClassInfo *> chain;
-	for (ClassInfo &start : classes_) {
+	for (Symbol *symbol : p_classes) {
+		symbol->klass->chain_known = false;
+	}
+	for (Symbol *symbol : p_classes) {
 		chain.clear();
 		bool broken = false;
-		for (ClassInfo *info = &start; info; info = info->base ? info->base->klass : nullptr) {
+		for (ClassInfo *info = symbol->klass; info; info = info->base ? info->base->klass : nullptr) {
 			if (info->chain_known) {
 				broken = info->chain_broken;
 				break;

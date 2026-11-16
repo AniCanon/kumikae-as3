@@ -5,6 +5,8 @@
 
 #include "ast_walk.h"
 
+#include <algorithm>
+
 namespace kas3 {
 
 namespace {
@@ -112,12 +114,24 @@ public:
 
 } // namespace
 
-void Compilation::drop_doubtful_errors() {
+// A view over what the passes said: a file judged before keeps what it was told while nothing it rests on
+// changed, and is judged again from what the passes said when something did.
+void Compilation::settle_doubt() {
+	const bool any_broken = std::any_of(units_.begin(), units_.end(), [](const Unit &p_unit) { return p_unit.broken; });
 	Doubt doubt;
 	for (Unit &unit : units_) {
-		if (unit.broken || !(unit.diagnostics.has_errors() || unit.diagnostics.has_warnings())) {
+		if (unit.unchecked || unit.doubted_at == doubt_state_) {
+			continue;
+		}
+		unit.doubted_at = doubt_state_;
+		if (unit.undoubted) {
+			unit.diagnostics = std::move(*unit.undoubted);
+			unit.undoubted.reset();
+		}
+		if (!any_broken || unit.broken || !(unit.diagnostics.has_errors() || unit.diagnostics.has_warnings())) {
 			continue; // A broken file's own were never taken; a file with none has none to drop.
 		}
+		unit.undoubted = unit.diagnostics;
 		// An import that found nothing may have changed what the file's other names mean.
 		if (unit.failed_import || doubt.affected(unit)) {
 			unit.diagnostics.clear();

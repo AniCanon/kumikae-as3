@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -71,7 +72,18 @@ struct Unit {
 	// The imports written in a declared function's body, which its signature uses too: resolved by the
 	// signature pass, for the functions that write any.
 	std::unordered_map<const FunctionDecl *, ImportScope> function_imports;
+	std::vector<const Import *> signature_imports; // The imports that are.
 	std::deque<Symbol> body_symbols; // Replaced together with this unit's body semantics.
+	uint32_t rank = 0; // Its place among the files: of two definitions of one name, the first file's wins.
+	std::vector<Symbol *> declared; // What its declarations made, which a redo of them reuses.
+	std::vector<Symbol *> classes; // Its classes and interfaces, in the order written.
+	// Other files whose positions its messages give, and those whose property halves its classes took: a
+	// change there changes what is said here.
+	mutable std::vector<const Unit *> cited;
+	std::vector<const Unit *> halves_from;
+	std::optional<Diagnostics> undoubted; // What the passes said, when doubt took some of it back.
+	uint64_t doubted_at = 0; // The state of the broken files that doubt last judged it by.
+	bool unchecked = false; // Its bodies wait to be checked (an incremental compilation only).
 
 	explicit Unit(std::shared_ptr<Parsed> p_parsed) :
 			parsed(std::move(p_parsed)), source(parsed->source), diagnostics(parsed->diagnostics), tree(parsed->tree) {}
@@ -93,6 +105,9 @@ struct Found {
 	bool suppressed = false; // No match, but a failed import could have supplied one: stay quiet.
 };
 
+struct Dependency; // dependencies.h
+struct Tracking; // incremental.h
+
 class Compilation {
 	std::deque<Unit> units_;
 	std::deque<Symbol> symbols_;
@@ -103,8 +118,11 @@ class Compilation {
 	Symbol *vector_ = nullptr;
 	Symbol *element_ = nullptr; // `T`, the element type inside the built-in Vector.
 	bool checked_ = false;
-	bool reusable_bodies_ = false;
-	size_t initial_type_count_ = 0;
+	std::unique_ptr<Tracking> tracking_; // Set by prepare(): what an incremental compilation keeps.
+	Symbol *reuse_owner_ = nullptr; // The class whose members are being declared again.
+	uint32_t cycle_mark_ = 0;
+	bool interface_cycles_ = false; // An interface of the program extends itself.
+	uint64_t doubt_state_ = 1; // Changes whenever what a broken file declares may have.
 	std::deque<Type> types_;
 	std::unordered_map<const Symbol *, const Type *> instance_types_;
 	std::unordered_map<const Type *, const Type *> vector_types_;
@@ -121,17 +139,30 @@ class Compilation {
 	void declare_member(Unit &p_unit, Symbol *p_owner, Symbol *p_member);
 	void declare_accessor(Unit &p_unit, Symbol *p_owner, FunctionDecl *p_function);
 	void check_native(Unit &p_unit, uint16_t p_modifiers, uint32_t p_offset);
+	void class_info(Unit &p_unit, Symbol *p_symbol);
 
 	// link
 	void link_imports(Unit &p_unit);
-	void link_hierarchy();
+	// Then, in the order the files were added: cycles cut, the hierarchy settled, overrides checked.
+	void link_bases(const std::vector<Symbol *> &p_classes);
+	void settle_classes(const std::vector<Symbol *> &p_classes);
 	void link_class(Symbol *p_class);
 	void link_interface(Symbol *p_interface);
-	void cut_class_cycles();
-	void cut_interface_cycles();
+	void cut_class_cycles(const std::vector<Symbol *> &p_classes);
+	void cut_interface_cycles(const std::vector<Symbol *> &p_classes);
+	void settle_hierarchy(const std::vector<Symbol *> &p_classes);
 	void check_overrides(Symbol *p_class);
-	void drop_doubtful_errors();
 	void inherit_properties(Symbol *p_class);
+	void took_half(Symbol *p_class, const FunctionDecl *p_half);
+
+	// The declaration layer of some files (names_update.cpp): declare, link, signatures. Every file when
+	// checked whole; the files an edit touched when updated.
+	void declare_files(const std::vector<Unit *> &p_units);
+	void redeclare(std::vector<Unit *> &r_units, std::vector<Dependency> &r_changed);
+	std::vector<Unit *> cycle_files(const std::vector<Symbol *> &p_classes, const std::vector<Unit *> &p_units);
+	void retract(Unit &p_unit); // names_retract.cpp
+	void remove_definition(Symbol *p_symbol);
+	Symbol *reused(SymbolKind p_kind, std::string_view p_name, Unit *p_unit);
 
 public:
 	Compilation(); // Loads the built-in declarations.
@@ -149,10 +180,24 @@ public:
 	// in a file that has one, nothing in a file that uses what such a file declares, and nowhere that a
 	// name is missing (names_doubt.cpp).
 	void check(bool p_through_syntax_errors = false);
-	// Reuses declaration identities only when the source outside function bodies is unchanged.
-	// Drop queries before calling: a successful update invalidates changed units' body symbols,
-	// scopes and syntax pointers. False leaves the compilation unchanged and requests a full check.
-	bool update_bodies(const std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> &p_changes);
+
+	// Checking a program that is being edited, a part at a time. prepare() checks every file's declarations
+	// (through syntax errors) and leaves their bodies unchecked. update() takes new text for some files:
+	// their declarations, and those of the files that read what changed, are checked again, and the bodies
+	// of all of those wait. check_bodies() checks one file's; settle_doubt() then judges what a syntax error
+	// elsewhere makes doubtful. Between them, every answer about a file whose bodies are checked is what a
+	// whole check would give. Drop queries before an update or a body check.
+	~Compilation();
+	void prepare();
+	// False if the change can't be made in place (a declaration file changed): check again from the start.
+	bool update(const std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> &p_changes);
+	Unit *next_unchecked(); // Null when every file's bodies are checked.
+	// How many program files' declarations, and bodies, were checked since prepare(): for tests and
+	// benchmarks.
+	size_t declarations_checked() const;
+	size_t bodies_checked() const;
+	void check_bodies(Unit &p_unit);
+	void settle_doubt();
 	bool has_errors() const;
 	// The diagnostics of every file, in the order the files were added.
 	std::string format_diagnostics(bool p_warnings = true) const; // Without the warnings when false.
@@ -201,7 +246,6 @@ public:
 	// then a static one. With p_static_only, instance members are passed over, as they are for code in a
 	// static method; *r_instance receives the first one passed over. *r_hidden receives a match that exists
 	// but is not visible from the class.
-	void settle_hierarchy();
 	Symbol *find_member(Symbol *p_class, std::string_view p_name, bool p_static_only, Symbol **r_instance,
 			Symbol **r_hidden) const;
 	// True if the members that the class inherits are not all known: a base failed to resolve, or is a

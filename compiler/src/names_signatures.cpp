@@ -11,6 +11,7 @@ void Resolver::signature(FunctionDecl *p_function) {
 	std::vector<Import *> written;
 	hoist(p_function->body, &written);
 	if (!written.empty()) {
+		unit_.signature_imports.insert(unit_.signature_imports.end(), written.begin(), written.end());
 		ImportScope &scope = unit_.function_imports[p_function];
 		scope.parent = context_.imports;
 		List<Import *> list;

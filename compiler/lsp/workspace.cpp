@@ -350,7 +350,7 @@ bool Workspace::sent_with_mark(const std::string &p_path) const {
 	return found != files_.end() && found->second.open && found->second.parsed && found->second.parsed->source.has_mark();
 }
 
-bool Workspace::update_bodies() {
+bool Workspace::update() {
 	if (!compilation_) {
 		return false;
 	}
@@ -362,7 +362,7 @@ bool Workspace::update_bodies() {
 		}
 		auto found = units_.find(path);
 		if (found == units_.end()) {
-			return false;
+			return false; // A file joined the program.
 		}
 		++present;
 		if (found->second->parsed != file.parsed) {
@@ -381,18 +381,18 @@ bool Workspace::update_bodies() {
 			return false;
 		}
 	}
-	return present == expected && compilation_->update_bodies(changes);
+	return present == expected && (changes.empty() || compilation_->update(changes));
 }
 
 void Workspace::check() {
-	// The old compilation goes first: the new one writes onto the same trees.
 	queries_.reset();
-	if (update_bodies()) {
-		queries_ = std::make_unique<Queries>(*compilation_);
-		stale_ = false;
-		++checks_;
+	stale_ = false;
+	++checks_;
+	++progress_;
+	if (update()) {
 		return;
 	}
+	// The old compilation goes first: the new one writes onto the same trees.
 	compilation_.reset();
 	units_.clear();
 	compilation_ = std::make_unique<Compilation>(builtins_);
@@ -408,39 +408,73 @@ void Workspace::check() {
 			compilation_->add(file.second.parsed);
 		}
 	}
-	compilation_->check(true);
-	queries_ = std::make_unique<Queries>(*compilation_);
+	compilation_->prepare();
 	for (Unit &unit : compilation_->units()) {
 		const std::string &path = unit.source.path();
 		bool embedded = unit.is_builtin || path == GODOT_DECLARATIONS_PATH;
 		units_[embedded ? path_join(options_.support_folder, support_name(path)) : path] = &unit;
 	}
-	stale_ = false;
-	checks_++;
 	++full_checks_;
 }
 
-Compilation &Workspace::compilation() {
+Compilation &Workspace::current() {
 	if (stale_ || !compilation_) {
 		check();
 	}
 	return *compilation_;
 }
 
+void Workspace::check_bodies(Unit &p_unit) {
+	compilation_->check_bodies(p_unit);
+	if (queries_) {
+		queries_->forget(p_unit);
+	}
+	++progress_;
+}
+
+Compilation &Workspace::compilation() {
+	settle([] { return false; });
+	return *compilation_;
+}
+
 Queries &Workspace::queries() {
-	compilation();
+	current();
+	if (!queries_) {
+		queries_ = std::make_unique<Queries>(*compilation_);
+	}
 	return *queries_;
 }
 
 Unit *Workspace::unit(const std::string &p_path) {
-	compilation();
+	current();
 	auto found = units_.find(resolve(p_path));
-	return found == units_.end() ? nullptr : found->second;
+	if (found == units_.end()) {
+		return nullptr;
+	}
+	if (found->second->unchecked) {
+		check_bodies(*found->second);
+		compilation_->settle_doubt();
+	}
+	return found->second;
+}
+
+bool Workspace::settle(const std::function<bool()> &p_yield) {
+	Compilation &compilation = current();
+	bool done = true;
+	while (Unit *unit = compilation.next_unchecked()) {
+		check_bodies(*unit);
+		if (p_yield()) {
+			done = compilation.next_unchecked() == nullptr;
+			break;
+		}
+	}
+	compilation.settle_doubt();
+	return done;
 }
 
 std::vector<Unit *> Workspace::program_units() {
 	std::vector<Unit *> units;
-	for (Unit &unit : compilation().units()) {
+	for (Unit &unit : current().units()) {
 		if (!unit.is_declaration) {
 			units.push_back(&unit);
 		}
@@ -450,7 +484,7 @@ std::vector<Unit *> Workspace::program_units() {
 
 std::vector<Unit *> Workspace::reported_units() {
 	std::vector<Unit *> units;
-	for (Unit &unit : compilation().units()) {
+	for (Unit &unit : current().units()) {
 		if (!unit.is_builtin && unit.source.path() != GODOT_DECLARATIONS_PATH) {
 			units.push_back(&unit);
 		}

@@ -118,6 +118,8 @@ struct ClassInfo {
 struct Package {
 	std::string name; // Empty for the top-level package.
 	std::unordered_map<std::string_view, Symbol *> definitions;
+	// Further definitions of a name in other files: the first file's is in definitions.
+	std::unordered_multimap<std::string_view, Symbol *> repeated;
 };
 
 // A resolved use of a name, kept for `--dump-names` and for tools.
