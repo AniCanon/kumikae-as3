@@ -140,25 +140,34 @@ were when it began: one deleted on the way is passed over, one added is not reac
 **What is refused, and why.** A program that uses one of these does not run, or stops where it is used:
 the compiler or the interpreter says `... is not supported by the interpreter yet` at the place.
 
-- **Outside the language as it is taken here:** E4X, namespaces, `with` and `include` (see "What parses");
-  `prototype`, and the `constructor` property of an object, which belong to AS3's prototype chain: classes
+Outside the language as it is taken here, and staying so:
+
+- E4X, namespaces, `with` and `include` (see "What parses").
+- `prototype`, and the `constructor` property of an object, which belong to AS3's prototype chain: classes
   here are sealed, and the library's methods are found by the library's own table.
-- **AS3's `this` in a function expression** is the global object, not the method's object: `this` and
-  `super` written inside one are refused, so that neither silently means something else.
-- **Weak keys** (`new Dictionary(true)`): memory is reference-counted, and a key that does not count needs
-  the collector to clear it; a Dictionary that kept its keys alive would be silently wrong.
+- `this` and `super` written inside a function expression: AS3's `this` there is the global object, not
+  the method's object, and neither is let silently mean something else.
+- In `kas3c run`, the `godot` package: there is no engine.
+
+Not built yet, and what each needs:
+
+- **Weak keys** (`new Dictionary(true)`): memory is reference-counted, so a key that does not count needs
+  the collector to clear it when its object goes. Until then a Dictionary that kept its keys alive would
+  be silently wrong.
 - **A property added to a Date, a RegExp, an Error or a Function** (dynamic in AS3): these hold their
-  fields in fixed places. One read that a Date or a RegExp does not declare is `undefined`.
-- **Through a class held in a variable:** its static members (`c.create()`), which the IR does not list
-  by name. One of Godot's classes is no value (`var c:Class = Node`): Godot's
-  classes are not the program's.
+  fields in fixed places, and need a table of properties beside them, as an Array has. One read that a
+  Date or a RegExp does not declare is `undefined`.
+- **A static member through a class held in a variable** (`c.create()`): the IR lists a class's instance
+  methods by name, not its static ones.
+- **One of Godot's classes as a value** (`var c:Class = Node`): a class value names a class of the
+  program or the library; Godot's are known by Godot's name only where their type is declared.
 - **A function of the library that belongs to no value, as a value:** `Math.max`, `String.fromCharCode`,
-  `trace`. (A method of a value is one: `list.push`, `text.charAt`.)
+  `trace`. (A method of a value is one: `list.push`, `text.charAt`.) Each needs a row in the library's
+  table, as the methods have.
 - **One of Godot's values held untyped, reached by name** (`u.x` where `u:*` holds a `Vector2`), and
-  `for in` over one: Godot's members are found by the declared type.
+  `for in` over one: the host has to answer for a member by its AS3 name.
 - **An interface's method that a class has only from Godot's API or the built-in library,** and a class
   that extends `RegExp`.
-- **In `kas3c run`,** the `godot` package: there is no engine.
 
 How it works:
 
@@ -355,8 +364,8 @@ package {
   `Error #1502` and the game carries on. The project setting `actionscript/limits/script_timeout_seconds`
   gives another limit, or none with 0. Time a debugger keeps the program stopped is not counted.
 
-**Refused by name until the next slices:** elements of Godot's untyped collections, `as` from one of
-Godot's objects to a script class, and everything `kas3c run` refuses.
+**Not built yet:** elements of Godot's untyped collections, `as` from one of Godot's objects to a script
+class, and what `kas3c run` refuses (see "What is refused, and why").
 
 **Refused, and staying so:** a script object of a class that extends none of Godot's has no Godot object
 to give. An AS3 call that hands one to Godot is an AS3 error; when Godot reads one (a return, a field),
