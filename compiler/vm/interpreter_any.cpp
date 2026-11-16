@@ -193,6 +193,13 @@ void Interpreter::any_op(const Function &p_function, const Instruction &p_in, Sl
 		case Op::AnyGe:
 			any_arithmetic(p_in, b, c);
 			break;
+		case Op::AnySub:
+		case Op::AnyMul:
+		case Op::AnyDiv:
+		case Op::AnyMod:
+		case Op::AnyNeg:
+			any_operate(p_in, b, c);
+			break;
 		case Op::AnyIs:
 			result(Kind::Bool, of_bool(any_is(b, p_in.c)));
 			break;

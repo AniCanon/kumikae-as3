@@ -162,7 +162,14 @@ static void test_operators() {
 			{ "label + 1", "String" },
 			{ "1 + label", "String" },
 			{ "any + 1", "*" },
-			{ "count - any", "Number" },
+			// With an untyped side these are decided as they run, as `+` is: a Number, or what Godot's own
+			// operator gives for one of Godot's values.
+			{ "count - any", "*" },
+			{ "any * 2", "*" },
+			{ "any / any", "*" },
+			{ "any % count", "*" },
+			{ "-any", "*" },
+			{ "+any", "Number" },
 			{ "count * ratio", "Number" },
 			{ "count / 2", "Number" },
 			{ "count % 2", "Number" },

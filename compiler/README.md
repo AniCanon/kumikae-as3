@@ -230,8 +230,11 @@ by name and from Godot, and `arguments` holds them after the others. Inferred fr
 declarations and not run in Flash: a Vector's `join(undefined)` gives "null" between the elements; by name, an
 Array's `toString("x")` is Error #1063 and a Vector's ignores the argument. Not as avmplus has it, and why: a
 `for each` over an Array passes over an element that is undefined (avmplus passes over holes only, and an
-Array here does not tell the two apart); `*`, `-` and `/` on two untyped Godot values give NaN, as AS3's
-ToNumber does, where typed code uses Godot's operator.
+Array here does not tell the two apart). Beyond avmplus, which has no such values: `-`, `*`, `/`, `%`, unary
+`-` and the four comparisons on an untyped value that holds one of Godot's values ask Godot's own operator
+first, as `+` does and as typed code has it (`av * 3` is the Vector2 that `v * 3` is), so the type of such an
+expression with an untyped side is `*`; where Godot has no operator for what the two hold, the answer is
+AS3's (ToNumber on both, which is NaN for a Godot value; avmplus's multiply is `AvmCore::number` on both).
 
 An Array or a Vector that holds itself, or nests more than 500 deep, put into words is Error #1023, as
 avmplus's stack check gives (its `join` has no other guard).

@@ -1,2 +1,2 @@
 # What Probe.as, as native code, leaves to the library in one run of probe.gd (native_godot.py).
-probe: thunks=100 unresolved=1
+probe: thunks=113 unresolved=1

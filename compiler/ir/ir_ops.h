@@ -182,7 +182,12 @@ inline bool is_held(Kind p_kind) {
 	/* The body of a function whose code is native (the C++ backend's): out (or NONE), and two numbers the \
 	   native side reads. No lowering makes one: a host that holds native code for a module gives each of \
 	   its functions this body (vm/native_code.h). */ \
-	X(Native, "rII")
+	X(Native, "rII") \
+	/* `-`, `*`, `/`, `%` and unary `-` with an untyped operand: out (untyped), and the operands, untyped. \
+	   Where an operand holds one of Godot's values the operator is Godot's, as typed code has it \
+	   (HostOperate, by Module::subtract_operator and the rest); where Godot has none for what they hold, \
+	   and for everything else, it is AS3's: both made Numbers (which may run a valueOf()). */ \
+	X(AnySub, "RRR") X(AnyMul, "RRR") X(AnyDiv, "RRR") X(AnyMod, "RRR") X(AnyNeg, "RR-")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,

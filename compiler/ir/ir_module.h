@@ -229,6 +229,17 @@ struct Module {
 	// may compare or add them, the library's own functions too.
 	uint32_t equal_operator = NONE;
 	uint32_t add_operator = NONE;
+	// Godot's <, <=, > and >=, likewise: AnyLt, AnyLe, AnyGt and AnyGe ask them of Godot's values.
+	uint32_t less_operator = NONE;
+	uint32_t less_equal_operator = NONE;
+	uint32_t greater_operator = NONE;
+	uint32_t greater_equal_operator = NONE;
+	// And Godot's -, *, /, % and unary -, for AnySub, AnyMul, AnyDiv, AnyMod and AnyNeg.
+	uint32_t subtract_operator = NONE;
+	uint32_t multiply_operator = NONE;
+	uint32_t divide_operator = NONE;
+	uint32_t modulo_operator = NONE;
+	uint32_t negate_operator = NONE;
 	// Made when a program reaches a property by name: a sealed object's missing one (#1069, #1056).
 	uint32_t reference_error_class = NONE;
 	// RegExp and Date, and the errors their functions and the URI functions raise, when the program uses them.

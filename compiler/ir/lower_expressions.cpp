@@ -366,6 +366,10 @@ uint32_t Expressions::sign(Unary *p_unary, Kind p_want) {
 	if (is_engine(l_.natural(p_unary->operand)) && l_.kind_of(p_unary->type, &result) && result != Kind::Void) {
 		return Engine(l_).engine_operate(p_unary->op, { Engine(l_).operand(p_unary->operand) }, result, p_unary->type, position);
 	}
+	if (const std::optional<Op> op = !Lowerer::is_numeric(p_want) && l_.untyped(p_unary->operand) ? Operators(l_).untyped_operator(p_unary->op, true) : std::nullopt) {
+		// What the value holds decides as it runs: Godot's own `-` for one of Godot's values, or a Number.
+		return l_.convert(Operators(l_).any_operate(*op, l_.any_value(p_unary->operand), NONE, position), l_.natural(p_unary), position);
+	}
 	if (const std::optional<int64_t> exact = Lowerer::wide_literal(p_unary); exact && p_want == Kind::I64) {
 		uint32_t out = l_.reg(Kind::I64);
 		l_.emit(Op::ConstI64, position, out, l_.wide(*exact)); // The least Int64 has no positive to negate.
@@ -495,6 +499,10 @@ uint32_t Expressions::assign(Assign *p_assign) {
 		uint32_t sum = l_.reg(Kind::Any);
 		l_.emit(Op::AnyAdd, position, sum, old, l_.any_value(p_assign->value));
 		value = l_.convert(sum, place.kind, position);
+	} else if (const std::optional<Op> op = !Lowerer::is_numeric(place.kind) && (place.kind == Kind::Any || l_.untyped(p_assign->value)) ? Operators(l_).untyped_operator(p_assign->op, false) : std::nullopt) {
+		// `-=`, `*=`, `/=` and `%=` with an untyped side, likewise.
+		const uint32_t old = l_.settled(l_.convert(l_.load(place, position), Kind::Any, position), p_assign->value, position);
+		value = l_.convert(Operators(l_).any_operate(*op, old, l_.any_value(p_assign->value), position), place.kind, position);
 	} else {
 		uint32_t old = l_.settled(l_.load(place, position), p_assign->value, position);
 		Kind right_kind = Kind::Void;

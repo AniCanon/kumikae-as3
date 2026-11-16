@@ -279,6 +279,12 @@ uint32_t Operators::arithmetic(Binary *p_binary, Kind p_want) {
 	if (p_binary->op == TokenKind::Plus && (l_.untyped(left) || l_.untyped(right))) {
 		return any_add(p_binary);
 	}
+	// So are `-`, `*`, `/` and `%`: Godot's own for Godot values, as typed code has them, or numbers.
+	if (const std::optional<Op> op = !Lowerer::is_numeric(p_want) && (l_.untyped(left) || l_.untyped(right)) ? untyped_operator(p_binary->op, false) : std::nullopt) {
+		const uint32_t a = l_.settled(l_.any_value(left), right, position);
+		const uint32_t b = l_.any_value(right);
+		return l_.convert(any_operate(*op, a, b, position), l_.natural(p_binary), position);
+	}
 	Kind left_kind = Kind::Void, right_kind = Kind::Void;
 	l_.kind_of(left->type, &left_kind);
 	l_.kind_of(right->type, &right_kind);

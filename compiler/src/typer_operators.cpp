@@ -42,6 +42,9 @@ const Type *Typer::unary(Unary *p_unary) {
 					return int_;
 				}
 			}
+			if (operand->kind == Type::Any) {
+				return any_; // A Number, or what Godot's own `-` gives for one of Godot's values, decided when it runs.
+			}
 			return operand == int64_ ? int64_ : (primitive(operand) ? number_ : unknown_);
 		case TokenKind::Plus:
 			return operand == int64_ ? int64_ : (primitive(operand) ? number_ : unknown_);
@@ -146,6 +149,19 @@ const Type *Typer::primitive_arithmetic(TokenKind p_op, const Type *p_left, cons
 		case TokenKind::ShiftRightUnsigned:
 		case TokenKind::ShiftRightUnsignedAssign:
 			return uint_;
+		case TokenKind::Minus:
+		case TokenKind::MinusAssign:
+		case TokenKind::Star:
+		case TokenKind::StarAssign:
+		case TokenKind::Slash:
+		case TokenKind::SlashAssign:
+		case TokenKind::Percent:
+		case TokenKind::PercentAssign:
+			if (p_left->kind == Type::Any || p_right->kind == Type::Any) {
+				// A Number, or what Godot's own operator gives for one of Godot's values, decided when it runs.
+				return any_;
+			}
+			return number_;
 		default:
 			// AS3 computes int + int as a Number; the wrap to 32 bits happens when it is stored in an int.
 			return number_;

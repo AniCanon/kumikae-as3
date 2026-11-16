@@ -170,6 +170,8 @@ private:
 	Slot any_number(double p_value) { return vm::any_number(library_, p_value); }
 	Slot any_wide(int64_t p_value) { return vm::any_wide(library_, p_value); }
 	bool engine_add(const ir::Instruction &p_in, Slot p_b, Slot p_c);
+	bool engine_operate(const OperatorName &p_operator, const Slot *p_operands, size_t p_count, ir::Kind p_result, uint32_t p_out);
+	void any_operate(const ir::Instruction &p_in, Slot p_b, Slot p_c);
 	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value) { heap_.assign(p_kind, p_slot, p_value); }
 	Slot share(ir::Kind p_kind, Slot p_value) { return heap_.share(p_kind, p_value); }
 	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned) { heap_.put(p_kind, p_target, p_owned); }

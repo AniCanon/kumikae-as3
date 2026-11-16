@@ -129,6 +129,23 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 					", &w)) {");
 			share(p_in.a, from_slot(kind(p_in.a), "w"));
 			break;
+		case Op::AnySub:
+		case Op::AnyMul:
+		case Op::AnyDiv:
+		case Op::AnyMod:
+		case Op::AnyNeg: {
+			// Two numbers, here: AS3's arithmetic. Anything else (one of Godot's values, text, an object) is
+			// the library's.
+			const std::string number_kind = std::to_string(static_cast<unsigned>(Kind::F64));
+			const std::string second = p_in.op == Op::AnyNeg ? "" : " && from_any(c, " + number_kind + ", " + number(NONE) + ", " + reg(p_in.c) + ", &y)";
+			const std::string result = p_in.op == Op::AnySub ? "x.d - y.d" : p_in.op == Op::AnyMul ? "x.d * y.d" : p_in.op == Op::AnyDiv ? "x.d / y.d"
+					: p_in.op == Op::AnyMod ? "std::fmod(x.d, y.d)" : "-x.d";
+			line("if (Slot x = empty(), y = empty(), w = empty(); from_any(c, " + number_kind + ", " + number(NONE) + ", " + reg(p_in.b) + ", &x)" + second +
+					" && number_to_any(c, " + result + ", &w)) {");
+			line("(void)y;");
+			put(p_in.a, "w");
+			break;
+		}
 		case Op::DynGet:
 		case Op::DynSet: {
 			// A property of an Object or a Dictionary under a String key, where the table keeps it.

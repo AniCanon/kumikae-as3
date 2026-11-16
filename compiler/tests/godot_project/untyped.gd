@@ -85,6 +85,19 @@ func _physics_process(_delta: float) -> bool:
 	show("text plus-assigned a Godot value joins them", ask("addPosition", ["text"]), "text(1.0, 1.0)")
 	show("a Godot value plus a number joins them, as AS3 does", ask("plusPosition", [2]), "(1.0, 1.0)2")
 	show("a Godot value plus-assigned a Godot value", ask("addPosition", [Vector2(1, 2)]), Vector2(2, 3))
+	show("untyped Godot values multiplied, subtracted, divided and negated",
+		[ask("times", [Vector2(1, 2), 3]), ask("times", [3, Vector2(1, 2)]), ask("times", [Vector2(1, 2), Vector2(3, 4)]), ask("minus", [Vector2(3, 4), Vector2(1, 1)]),
+			ask("over", [Vector2(4, 2), 2]), ask("remainder", [Vector2i(7, 5), Vector2i(4, 3)]), ask("negated", [Vector2(1, -2)]),
+			ask("times", [Vector2i(1, 2), 3]), ask("times", [Vector2i(1, 2), 1.5])],
+		[Vector2(1, 2) * 3, 3 * Vector2(1, 2), Vector2(1, 2) * Vector2(3, 4), Vector2(3, 4) - Vector2(1, 1), Vector2(4, 2) / 2, Vector2i(7, 5) % Vector2i(4, 3), -Vector2(1, -2),
+			Vector2i(1, 2) * 3, Vector2i(1, 2) * 1.5])
+	show("untyped Godot values in order", [ask("ordered", [Vector2(1, 2), Vector2(1, 3)]), ask("ordered", [Vector2(2, 0), Vector2(1, 3)]), ask("ordered", [Vector2(1, 2), Vector2(1, 2)])],
+		["truetruefalsefalse", "falsefalsetruetrue", "falsetruefalsetrue"])
+	show("an untyped Godot value multiplied and subtracted in place", ask("scaled", [Vector2(1, 2), Vector2(3, 4)]), Vector2(1, 2) * Vector2(3, 4) - Vector2(3, 4))
+	show("a typed Godot value times an untyped one", [ask("positionTimes", [2]), ask("positionTimes", [Vector2(2, 3)])], [node.position * 2, node.position * Vector2(2, 3)])
+	show("untyped numbers stay AS3's", [ask("times", [3, 4]), typeof(ask("times", [3, 4])), ask("minus", ["7", 2]), ask("over", [1, 4]), ask("remainder", [7, 4]), ask("negated", ["3"])],
+		[12, TYPE_INT, 5, 0.25, 3, -3])
+	show("where Godot has no such operator the answer is AS3's", ask("timesText", [Vector2(1, 2), "x"]), "NaN NaN (-1.0, -2.0)")
 	show("caught in AS3", [ask("guarded", [Vector2(2, 3)]), ask("guarded", [Color(1, 1, 1)]), node.position], ["fits (2.0, 3.0)", "caught true", Vector2(1, 1)])
 	var thrower := Node.new()
 	thrower.set_script(load("res://Thrower.as"))

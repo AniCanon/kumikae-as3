@@ -74,6 +74,33 @@ uint32_t Operators::any_add(Binary *p_binary) {
 	return l_.convert(out, l_.natural(p_binary), position);
 }
 
+// The operation that carries out `-`, `*`, `/` or `%` (or the same written with `=`) on untyped operands, or
+// unary `-` on one; nothing for any other operator.
+std::optional<Op> Operators::untyped_operator(TokenKind p_op, bool p_unary) {
+	switch (p_op) {
+		case TokenKind::Minus:
+		case TokenKind::MinusAssign:
+			return p_unary ? Op::AnyNeg : Op::AnySub;
+		case TokenKind::Star:
+		case TokenKind::StarAssign:
+			return p_unary ? std::nullopt : std::optional<Op>(Op::AnyMul);
+		case TokenKind::Slash:
+		case TokenKind::SlashAssign:
+			return p_unary ? std::nullopt : std::optional<Op>(Op::AnyDiv);
+		case TokenKind::Percent:
+		case TokenKind::PercentAssign:
+			return p_unary ? std::nullopt : std::optional<Op>(Op::AnyMod);
+		default:
+			return std::nullopt;
+	}
+}
+
+uint32_t Operators::any_operate(Op p_op, uint32_t p_left, uint32_t p_right, uint32_t p_position) {
+	const uint32_t out = l_.reg(Kind::Any);
+	l_.emit(p_op, p_position, out, p_left, p_op == Op::AnyNeg ? 0 : p_right);
+	return out;
+}
+
 // typeof: of an untyped value, asked as the program runs; of anything else, known now.
 uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 	uint32_t out = reg(Kind::Str);
