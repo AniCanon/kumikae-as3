@@ -117,7 +117,7 @@ void counted_freed(ScriptInstance *p_instance) {
 		// Only a script taken off its object can be freed while it holds it: Godot frees a held object only
 		// when made to (memdelete), and then its id is gone before free_detached() looks.
 		p_instance->holding = false;
-		RefCounted *counted = Object::cast_to<RefCounted>(p_instance->owner);
+		RefCounted *counted = Object::cast_to<RefCounted>(ObjectDB::get_instance(p_instance->owner_id));
 		if (counted && counted->unreference()) {
 			detached().push_back(ObjectID(counted->get_instance_id()));
 		}

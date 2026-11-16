@@ -9,6 +9,7 @@
 struct ScriptInstance {
 	kas3::vm::Object *object;
 	godot::Object *owner;
+	godot::ObjectID owner_id; // To find the owner again where it may be gone (an instance freed on another thread).
 	godot::Ref<AS3Script> script; // Kept alive for as long as anything runs it.
 	// On a reference-counted object (counted_on()) the instance does not hold its script object: the
 	// program's references do. While the program has any, the instance holds one reference to the Godot

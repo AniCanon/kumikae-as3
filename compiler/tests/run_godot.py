@@ -238,6 +238,18 @@ check("statics.gd: a call from a worker thread is refused and says so",
 check("statics.gd: no AS3 error", "Error #" not in output and "does not run" not in output and "Godot has no" not in output,
       output[-900:])
 
+# A script reached from Godot's worker threads: what would run AS3 there is refused, and said so; what Godot
+# frees there is freed on the main thread.
+output = compare("threads.gd", [
+    "toString on the main thread", "toString from a worker is refused: Godot's own text",
+    "attached on a worker is refused: no script, no constructor run", "freed on a worker: nothing of AS3's freed there",
+    "freed on a worker: freed on the main thread",
+])
+check("threads.gd: toString from a worker is refused and says so",
+      "Threaded/toString() was called by Godot from another thread" in output, output[-900:])
+check("threads.gd: a script attached on a worker is refused and says so",
+      "res://Threaded.as was not attached to a RefCounted: Godot attached it from another thread" in output, output[-900:])
+
 
 # Int64 at Godot's edge, as GDScript works it out.
 output = compare("wide.gd", [

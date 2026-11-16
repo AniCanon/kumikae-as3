@@ -40,6 +40,7 @@ uint64_t Project::generation() {
 
 void Project::before_shutdown() {
 	forget_scenes();
+	free_instances_freed_elsewhere();
 	free_detached();
 	if (program && program->valid()) {
 		release_listeners();
@@ -129,6 +130,7 @@ Project &Project::get() {
 static const size_t COLLECTOR_WORK = 10000;
 
 void Project::collect_step() {
+	free_instances_freed_elsewhere();
 	free_detached();
 	if (program && program->valid_) {
 		program->interpreter_->collect_step(COLLECTOR_WORK);
@@ -222,6 +224,7 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 }
 
 void Project::reload() {
+	free_instances_freed_elsewhere(); // Before the instances are looked through: their objects are gone.
 	if (!program || !program->valid_) {
 		// Nothing is running: the scripts had errors. They are simply loaded again.
 		unload();
@@ -280,6 +283,8 @@ void Project::reload_now() {
 void Project::unload() {
 	// First, so that whatever is destroyed along with the program (a listener held through one of its
 	// static fields) knows the program is no longer there to be used.
+	free_instances_freed_elsewhere();
+	free_detached();
 	if (program && program->valid_) {
 		release_listeners(); // While the interpreter is still there to free what they hold.
 		// And what the program holds, with loops among it: freeing a Godot object can call back into the

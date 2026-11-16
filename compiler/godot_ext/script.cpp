@@ -97,6 +97,14 @@ StringName AS3Script::_get_instance_base_type() const {
 }
 
 void *AS3Script::_instance_create(Object *p_for_object) const {
+	if (!kas3::on_main_thread()) {
+		// Not made later on the main thread: until then the object would have a script that is not there, and
+		// what Godot does next on this thread (a loaded resource's values set) is refused anyway.
+		UtilityFunctions::push_error(String("ActionScript: ") + String::utf8(file_.c_str()) + " was not attached to a " +
+				p_for_object->get_class() + ": Godot attached it from another thread (a task of its worker threads, or a resource " +
+				"loaded in a thread). AS3 runs on the main thread only: attach it, or load what has it, there.");
+		return nullptr;
+	}
 	if (class_ == kas3::ir::NONE) {
 		return nullptr;
 	}

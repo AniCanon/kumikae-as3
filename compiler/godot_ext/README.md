@@ -35,7 +35,9 @@ called by the engine.
 - **A name Godot needs is made once and kept** (`GodotHost::name`). No `StringName` is built per call.
 - **Files are read through Godot** (`FileAccess`, `DirAccess`, `res://`), never the operating system's
   paths: an exported game keeps them in a pack.
-- **AS3 runs on the main thread.** A call from another thread is refused with a message.
+- **AS3 runs on the main thread.** A call from another thread (a method, a field, `toString`) is refused with
+  a message, and so is a script attached there; a script instance Godot frees there is freed on the main
+  thread, at the end of the frame.
 - **Every behaviour is compared with GDScript's** in `tests/godot_project/`: the driver prints what the AS3
   script gave beside what GDScript gives, and `tests/run_godot.py` checks they agree.
 - An Array or a Dictionary handed to Godot may be written by it: never hand the same one to two calls.

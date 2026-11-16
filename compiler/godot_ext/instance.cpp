@@ -15,8 +15,10 @@
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <atomic>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -39,7 +41,12 @@ static std::unordered_map<const Object *, ScriptInstance *> &instances_on() {
 
 vm::Object *kas3::script_object(const Object *p_owner) {
 	auto found = instances_on().find(p_owner);
-	return found == instances_on().end() ? nullptr : found->second->object;
+	// An instance freed on another thread stays here until the main thread frees it, and another object may
+	// have been made where its object was.
+	if (found == instances_on().end() || found->second->owner_id != ObjectID(p_owner->get_instance_id())) {
+		return nullptr;
+	}
+	return found->second->object;
 }
 
 std::vector<std::pair<vm::Object *, Object *>> kas3::instances_outside(const Node *p_scene) {
@@ -289,13 +296,17 @@ static void instance_call(GDExtensionScriptInstanceDataPtr p_data, GDExtensionCo
 static void instance_notification(GDExtensionScriptInstanceDataPtr, int32_t, GDExtensionBool) {}
 
 // Godot asking how the object reads (`str(node)`, `print(node)`): the script's toString(), if it has one.
-// Without one, Godot's own text stands.
+// Without one, or asked from another thread, Godot's own text stands.
 static void instance_to_string(GDExtensionScriptInstanceDataPtr p_data, GDExtensionBool *r_is_valid, GDExtensionStringPtr r_out) {
 	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
 	Project &program = Project::get();
 	*r_is_valid = false;
 	uint32_t own = program.module().classes[instance->object->klass].to_string;
 	if (own == ir::NONE) {
+		return;
+	}
+	if (!kas3::on_main_thread()) {
+		kas3::refuse_thread(own);
 		return;
 	}
 	vm::Slot self, result;
@@ -333,8 +344,7 @@ static GDExtensionBool instance_refcount_decremented(GDExtensionScriptInstanceDa
 	return true;
 }
 
-static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
-	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+static void free_instance(ScriptInstance *instance) {
 	instances().erase(instance);
 	auto on = instances_on().find(instance->owner);
 	if (on != instances_on().end() && on->second == instance) {
@@ -346,6 +356,48 @@ static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
 		Project::get().interpreter().release_object(instance->object);
 	}
 	delete instance;
+}
+
+// Script instances Godot freed on another thread (an object's last reference let go in a task of its worker
+// threads), to be freed on the main thread: nothing of AS3's is touched on another. Made once and never
+// destroyed, as a thread may free one while the game shuts down.
+struct FreedElsewhere {
+	std::mutex lock;
+	std::vector<ScriptInstance *> instances;
+	std::atomic<bool> any{ false }; // Read without the lock, so that the main thread takes it only when needed.
+};
+
+static FreedElsewhere &freed_elsewhere() {
+	static FreedElsewhere *freed = new FreedElsewhere();
+	return *freed;
+}
+
+static void instance_free(GDExtensionScriptInstanceDataPtr p_data) {
+	ScriptInstance *instance = static_cast<ScriptInstance *>(p_data);
+	if (kas3::on_main_thread()) {
+		free_instance(instance);
+		return;
+	}
+	FreedElsewhere &freed = freed_elsewhere();
+	const std::lock_guard<std::mutex> held(freed.lock);
+	freed.instances.push_back(instance);
+	freed.any.store(true, std::memory_order_release);
+}
+
+void kas3::free_instances_freed_elsewhere() {
+	FreedElsewhere &freed = freed_elsewhere();
+	if (!freed.any.load(std::memory_order_acquire)) {
+		return;
+	}
+	std::vector<ScriptInstance *> freeing;
+	{
+		const std::lock_guard<std::mutex> held(freed.lock);
+		freeing.swap(freed.instances);
+		freed.any.store(false, std::memory_order_relaxed);
+	}
+	for (ScriptInstance *instance : freeing) {
+		free_instance(instance);
+	}
 }
 
 // The script object being made by AS3's `new` (GodotHost::attach_new), for the script instance that its
@@ -399,6 +451,7 @@ void *create_script_instance(const AS3Script *p_script, Object *p_owner) {
 	ScriptInstance *instance = new ScriptInstance();
 	instance->object = object;
 	instance->owner = p_owner;
+	instance->owner_id = ObjectID(p_owner->get_instance_id());
 	instance->script = Ref<AS3Script>(const_cast<AS3Script *>(p_script));
 	instance->counted = counted;
 	instances().insert(instance);
