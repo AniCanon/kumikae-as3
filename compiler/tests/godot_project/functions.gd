@@ -57,6 +57,7 @@ func _physics_process(_delta: float) -> bool:
 	show("no arguments", ask("nothing"), true)
 	show("whole numbers", ask("wholes", [3]), str(-5, " ", 5, " ", -5 + 2, " ", 0x10, " ", 2 * 3, " ", 3 * 2, " ", 1.5, " ", 3 / 2.0))
 	show("no answer", ask("noAnswer"), null)
+	show("a whole Number stays a float", ask("wholeNumber", [2.0]), str(2.0) + " " + str(2.0))
 	show("anything as text", ask("shown", [1.0, 2.0, 0.5]), str(lerp(1.0, 2.0, 0.5)))
 	ask("run")
 	ask("run")
@@ -75,5 +76,6 @@ func _physics_process(_delta: float) -> bool:
 	ask("freedTraced")
 	show("str of a freed object and of null", ask("freedStr"), "null,nullnull,null,null,null,undefined,anull1")
 	ask("freedPrinted")
+	show("a script object of no Godot class is not written as null", ask("plainStr"), "refused")
 	node.free()
 	return false

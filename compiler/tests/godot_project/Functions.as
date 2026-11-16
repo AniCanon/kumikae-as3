@@ -41,6 +41,8 @@ package {
 		// Review of part C.
 		public function nothing():Boolean { print(); printerr(); pushWarning(); return true; }
 		public function wholes(i:int):String { return str(-5, " ", 5, " ", -5 + 2, " ", 0x10, " ", 2 * 3, " ", i * 2, " ", 1.5, " ", i / 2); }
+		// A Number goes to Godot as a float whatever its value, as C# keeps a double a double.
+		public function wholeNumber(n:Number):String { var meta:Node = new Node(); meta.setMeta("n", n); var back:* = meta.getMeta("n"); meta.free(); return str(n) + " " + str(back); }
 		public function noAnswer():String { var s:String = max("a", "b"); return s; }
 		public function shown(a:Number, b:Number, t:Number):String { var s:String = lerp(a, b, t); return s; }
 		public var pings:int = 0;
@@ -76,7 +78,12 @@ package {
 			return [str(kept), str(kept, none), str(held), str(none), str(null), str(nothing), str("a", null, 1)].join(",");
 		}
 		public function freedPrinted():void { print("freed: ", kept, " ", null); }
-		public function freedSame():String {
+		// Only a null is written so: a script object Godot has no form for is still refused.
+		public function plainStr():String {
+			var plain:* = new Plain();
+			try { return str(plain); } catch (e:Error) { return "refused"; }
+			return "carried on";
+		}		public function freedSame():String {
 			var none:Node = null;
 			var held:* = kept;
 			return [hash(kept) == hash(none), isSame(kept, none), isSame(kept, kept), hash(held) == hash(null), isSame(held, null)].join(",");
