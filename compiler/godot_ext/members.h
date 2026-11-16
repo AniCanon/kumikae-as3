@@ -29,9 +29,10 @@ struct Member {
 Member find_member(uint32_t p_class, const godot::StringName &p_name);
 
 // What Godot reaches of a script by a name: the member find_member() gives, and the public getter and
-// setter of that AS3 name ("get x", "set x"), each NONE if there is none. Made once per class and name for
-// the program that runs, on the main thread: Godot asks the script about every property set or read on its
-// object (`position` too), and the answer must not cost a conversion of the name each time.
+// setter of that AS3 name ("get x", "set x"), each NONE if there is none. Made once per class for the
+// program that runs, on the main thread, for every name of the class that reaches something: Godot asks the
+// script about every property set or read on its object (`position` too, and any name a game makes up),
+// and the answer must not cost a conversion of the name each time, nor keep the name.
 struct Reach {
 	Member member;
 	uint32_t getter = ir::NONE;

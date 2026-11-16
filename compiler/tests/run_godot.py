@@ -250,6 +250,15 @@ check("threads.gd: toString from a worker is refused and says so",
 check("threads.gd: a script attached on a worker is refused and says so",
       "res://Threaded.as was not attached to a RefCounted: Godot attached it from another thread" in output, output[-900:])
 
+# The names Godot asks a script about: only those that reach something are kept, and none is left at exit
+# (Godot lists a name still held then, with --verbose).
+compare("names.gd", ["names that reach nothing are not kept", "a field is still reached"])
+run = subprocess.run([godot, "--headless", "--verbose", "--path", project, "-s", "names.gd"], capture_output=True, text=True,
+                     timeout=300)
+left = re.findall(r"Orphan StringName: (\S+)", run.stdout + run.stderr)
+check("names.gd: no name the script was asked about is left at exit",
+      not [name for name in left if name in ("n", "hello", "heard") or "_unreached_" in name], left[:20])
+
 
 # Int64 at Godot's edge, as GDScript works it out.
 output = compare("wide.gd", [

@@ -295,6 +295,7 @@ void Project::unload() {
 	loads++;
 	delete program;
 	program = nullptr;
+	forget_reached();
 }
 
 uint32_t Project::class_of_file(std::string_view p_path) const {

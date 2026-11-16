@@ -217,15 +217,58 @@ Reach look_up(Project &p_program, uint32_t p_class, const StringName &p_name) {
 	return found;
 }
 
-// reach()'s answers for one program, by class and by the name's interned text, which equal names share. Each
-// keeps its name, so that the text is not freed and taken by another name while the answer stands.
-struct Reached {
-	uint64_t generation = UINT64_MAX;
-	std::vector<std::unordered_map<const void *, std::pair<StringName, Reach>>> by_class;
-};
-
 const void *interned(const StringName &p_name) {
 	return *reinterpret_cast<const void *const *>(p_name._native_ptr());
+}
+
+// What a class's names reach, by the name's interned text, which equal names share. Only names that reach
+// something are listed, all of them at once: Godot asks about any name set or read on the object
+// (`position`, or whatever a game makes up), and a name that is not listed reaches nothing, so what is kept
+// is bounded by the class. Each keeps its name, so that the text is not freed and taken by another name
+// while the answer stands.
+struct Answers {
+	bool listed = false;
+	std::unordered_map<const void *, std::pair<StringName, Reach>> reached;
+};
+
+// reach()'s answers for one program.
+struct Reached {
+	uint64_t generation = UINT64_MAX;
+	std::vector<Answers> by_class;
+};
+
+Reached &reached() {
+	static Reached all;
+	return all;
+}
+
+// Every name of the class that reaches something: its public fields, its public methods (a getter or a
+// setter by the name it gives), and Godot's virtuals it answers. look_up() says what each reaches.
+void list_reached(Project &p_program, uint32_t p_class, Answers *r_answers) {
+	const ir::Module &module = p_program.module();
+	const ir::Class &klass = module.classes[p_class];
+	std::unordered_set<std::string_view> names;
+	for (const ir::Field &field : klass.fields) {
+		names.insert(field.name);
+	}
+	for (const uint32_t method : klass.methods) {
+		std::string_view name = own_name(module.functions[method]);
+		if (name.size() > 4 && (name.substr(0, 4) == "get " || name.substr(0, 4) == "set ")) {
+			name.remove_prefix(4);
+		}
+		names.insert(name);
+	}
+	for (const auto &[godot, function] : klass.virtuals) {
+		names.insert(godot);
+	}
+	for (const std::string_view name : names) {
+		const StringName godot_name(String::utf8(name.data(), (int64_t)name.size()));
+		const Reach answer = look_up(p_program, p_class, godot_name);
+		if (answer.member.what != Member::What::None || answer.getter != ir::NONE || answer.setter != ir::NONE) {
+			r_answers->reached.emplace(interned(godot_name), std::make_pair(godot_name, answer));
+		}
+	}
+	r_answers->listed = true;
 }
 
 } // namespace
@@ -238,19 +281,21 @@ Reach reach(uint32_t p_class, const StringName &p_name) {
 	if (!on_main_thread()) {
 		return look_up(program, p_class, p_name); // Refused by the caller; the answers are the main thread's.
 	}
-	static Reached reached;
-	if (reached.generation != Project::generation()) {
-		reached.by_class.assign(program.module().classes.size(), {});
-		reached.generation = Project::generation();
+	Reached &all = reached();
+	if (all.generation != Project::generation()) {
+		all.by_class.assign(program.module().classes.size(), {});
+		all.generation = Project::generation();
 	}
-	auto &answers = reached.by_class[p_class];
-	const auto found = answers.find(interned(p_name));
-	if (found != answers.end()) {
-		return found->second.second;
+	Answers &answers = all.by_class[p_class];
+	if (!answers.listed) {
+		list_reached(program, p_class, &answers);
 	}
-	const Reach answer = look_up(program, p_class, p_name);
-	answers.emplace(interned(p_name), std::make_pair(p_name, answer));
-	return answer;
+	const auto found = answers.reached.find(interned(p_name));
+	return found == answers.reached.end() ? Reach{} : found->second.second;
+}
+
+void forget_reached() {
+	reached() = Reached{};
 }
 
 Member find_member(uint32_t p_class, const StringName &p_name) {

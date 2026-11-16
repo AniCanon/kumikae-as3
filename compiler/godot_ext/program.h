@@ -97,6 +97,8 @@ void note_main_thread();
 bool on_main_thread();
 // Reports the refusal: the function Godot tried to call.
 void refuse_thread(uint32_t p_function);
+// The program is unloaded: the names members.h's reach() keeps go, while Godot is there to free them.
+void forget_reached();
 // What Godot frees on another thread (a script instance, when an object's last reference goes in a worker's
 // task) is freed on the main thread: once a frame, before the instances are looked through (a reload), and
 // as Godot shuts down or the program is unloaded.
