@@ -1,5 +1,6 @@
 """The kas3c command line: exit codes and where output goes. Usage: test_cli.py <path to kas3c>"""
 import os
+import resource
 import re
 import subprocess
 import sys
@@ -12,6 +13,13 @@ failures = []
 
 def run(*args):
     return subprocess.run([KAS3C, *args], capture_output=True, text=True, timeout=60)
+
+
+def children_cpu():
+    """The processor time, in seconds, that the processes this test ran and waited for have used: to the
+    microsecond, and the same however busy the machine is."""
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return usage.ru_utime + usage.ru_stime
 
 
 def check(name, condition, detail=""):
@@ -257,13 +265,16 @@ with tempfile.TemporaryDirectory() as looping:
     with open(spin, "w") as handle:
         handle.write("package { public class Spin { public function Spin() { try { while (true) {} } catch (e:*) { trace(\"caught\"); } } } }\n")
     started = time.monotonic()
+    before = children_cpu()
     result = subprocess.run([KAS3C, "run", spin], capture_output=True, text=True, timeout=60,
                             env=dict(os.environ, KAS3_TIME_LIMIT_MS="200"))
     took = time.monotonic() - started
-    # No upper bound on the time: the message says the limit stopped it, and the run itself has a timeout.
-    check("an endless loop is stopped", result.returncode == 1 and result.stdout == "" and 0.2 <= took and
+    used = children_cpu() - before
+    # At least the limit by the clock; and by the processor time it used, which a busy machine does not
+    # stretch, not much more than the limit.
+    check("an endless loop is stopped", result.returncode == 1 and result.stdout == "" and 0.2 <= took and used < 5 and
           result.stderr.startswith("Error: Error #1502: A script has executed for longer than the timeout period of 0.2 seconds.\n\tat Spin()"),
-          repr((result.returncode, result.stdout, result.stderr[:300], took)))
+          repr((result.returncode, result.stdout, result.stderr[:300], took, used)))
 
 # A finally is written once, however many ways lead out of its try.
 once = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "finally_once.as")
@@ -276,10 +287,9 @@ check("finally written once", result.returncode == 0 and result.stdout.count('"c
 def best_time(*args):
     best = 1e9
     for _ in range(3):
-        before = os.times()
+        before = children_cpu()
         run(*args)
-        after = os.times()
-        best = min(best, (after.children_user + after.children_system) - (before.children_user + before.children_system))
+        best = min(best, children_cpu() - before)
     return best
 
 plain = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "small_fixes.as")
