@@ -69,7 +69,9 @@ bool Host::enter(uint32_t p_function, const Slot *p_arguments, uint32_t p_count,
 	const uint32_t before = context.depth;
 	Slot result = empty();
 	// The function looks at the stack itself (stack_low): calls from outside nest as deep as it allows.
-	context.stack_floor = vm::stack_floor();
+	if (!context.stack_floor) {
+		context.stack_floor = vm::stack_floor(); // Once: the context is one thread's, whose stack does not move.
+	}
 	// A method's object is kept for as long as the method runs: what it does may be the end of every
 	// other holder (its Godot object freed), and it borrows what it is given.
 	Object *const self = !info.is_static && given > 0 && static_cast<Kind>(info.kinds[0]) == Kind::Obj ? static_cast<Object *>(arguments[0].p) : nullptr;

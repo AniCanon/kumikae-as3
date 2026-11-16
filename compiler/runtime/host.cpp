@@ -183,7 +183,7 @@ Slot thunk(Context *c, uint32_t p_thunk, const Slot *p_given, Slot *r_updated) {
 	Host &host = *c->host;
 	// The interpreter refuses an entry with the stack nearly used up, and one that is refused has no frame
 	// to catch its error in: Error #1023 is raised here, where generated code can catch it.
-	if (vm::stack_below(vm::stack_floor())) {
+	if (vm::stack_below(c->stack_floor ? c->stack_floor : vm::stack_floor())) {
 		stack_overflow(c);
 		return empty();
 	}
