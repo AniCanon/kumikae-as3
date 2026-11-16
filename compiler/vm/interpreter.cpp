@@ -97,6 +97,13 @@ Interpreter::~Interpreter() {
 	}
 }
 
+void Interpreter::remember_constructions() {
+	if (!constructions_) {
+		constructions_ = std::make_unique<Constructions>(module_);
+		heap_.constructions = constructions_.get();
+	}
+}
+
 void Interpreter::clear_globals() {
 	if (native_) {
 		native_->clear_globals();
@@ -176,6 +183,9 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	}
 	if (rest) {
 		stack_[frame.base + fixed].p = rest; // Its one reference, the frame's.
+	}
+	if (constructions_) {
+		frame.constructs = constructions_->begun(p_function, source, p_count);
 	}
 	frames_.push_back(frame);
 	return true;

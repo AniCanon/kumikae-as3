@@ -1,6 +1,7 @@
 #include "heap.h"
 
 #include "any.h"
+#include "constructions.h"
 #include "held.h"
 #include "table.h"
 
@@ -174,6 +175,9 @@ void Heap::drop_object(Object *p_object) {
 			free_properties(static_cast<Vector *>(object));
 			free_vector(static_cast<Vector *>(object));
 		} else {
+			if (constructions) {
+				constructions->forget(object);
+			}
 			free_object(object);
 		}
 	}

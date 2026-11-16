@@ -24,6 +24,9 @@ Reload::Reload(Interpreter &p_from, Interpreter &p_to) :
 	}
 	// The new program does not start over: what ran at the start of the old one has run.
 	to_.started_ = from_.started_;
+	if (from_.constructions_) {
+		to_.remember_constructions(); // Before anything is made there.
+	}
 }
 
 Reload::~Reload() {
@@ -160,6 +163,7 @@ Object *Reload::object(Object *p_old) {
 	moved_.emplace(p_old, fresh);
 	retain(fresh);
 	carry_fields(p_old, fresh);
+	carry_record(p_old, fresh);
 	return fresh;
 }
 
@@ -233,6 +237,7 @@ void Reload::globals(const std::vector<std::string> &p_changed) {
 			to_.class_used_[named->second] = from_.class_used_[i];
 		}
 	}
+	changed_statics_ = p_changed;
 	for (const std::string &name : p_changed) {
 		constants_again(name);
 	}

@@ -24,6 +24,8 @@ struct Frame {
 	// How many more than its parameters (ir::Function::takes_extra): untyped, in stack_ after its registers.
 	uint32_t extras = 0;
 	bool traced = false; // Its line is already in the trace of the error on its way out.
+	// An object's own constructor, whose arguments are remembered: its return is told (vm/constructions.h).
+	bool constructs = false;
 };
 
 // Where an error was thrown, as the trace's first line says it.
