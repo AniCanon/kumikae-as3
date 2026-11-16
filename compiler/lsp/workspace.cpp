@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
+#include <functional>
 #include <system_error>
 
 namespace kas3 {
@@ -145,6 +146,7 @@ void Workspace::set_root(const std::string &p_folder) {
 	}
 	scan(root_);
 	stale_ = true;
+	every_file_ = true; // What is part of the program is decided by the folder: every file is looked at again.
 }
 
 int Workspace::declaration(const std::string &p_path) const {
@@ -245,7 +247,7 @@ bool Workspace::load(const std::string &p_path) {
 	}
 	file.parsed = parse_file(p_path, std::move(text));
 	file.open = false;
-	stale_ = true;
+	touch(p_path);
 	return true;
 }
 
@@ -268,7 +270,7 @@ void Workspace::open(const std::string &p_path, std::string p_text) {
 	}
 	file.parsed = parse_file(path, std::move(p_text));
 	file.open = true;
-	stale_ = true;
+	touch(path);
 }
 
 void Workspace::change(const std::string &p_path, std::string p_text) {
@@ -286,7 +288,7 @@ void Workspace::close(const std::string &p_path) {
 		return;
 	}
 	found->second.open = false;
-	stale_ = true;
+	touch(path);
 	if (!in_project(path) || !load(path)) {
 		files_.erase(path);
 	}
@@ -312,7 +314,7 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 	}
 	if (found != files_.end()) {
 		files_.erase(found);
-		stale_ = true;
+		touch(path);
 		return;
 	}
 	if (root_.empty() || !under(root_, path)) {
@@ -324,8 +326,8 @@ void Workspace::file_changed_on_disk(const std::string &p_path) {
 	const std::string prefix = path_join(path, "");
 	for (auto file = files_.lower_bound(prefix); file != files_.end() && file->first.compare(0, prefix.size(), prefix) == 0;) {
 		if (!file->second.open && !fs::is_regular_file(fs::u8path(file->first), error)) {
+			touch(file->first);
 			file = files_.erase(file);
-			stale_ = true;
 		} else {
 			++file;
 		}
@@ -361,43 +363,69 @@ bool Workspace::update() {
 			return false; // A declaration file changed: nothing the program reads of it is tracked.
 		}
 	}
-	bool any = false;
-	// A file that left the program: its unit goes, and what read its declarations is checked again.
-	for (auto unit = units_.begin(); unit != units_.end();) {
-		auto file = files_.find(unit->first);
-		if (!unit->second->is_declaration && (file == files_.end() || !included(unit->first))) {
-			compilation_->remove(*unit->second);
-			unit = units_.erase(unit);
-			any = true;
-		} else {
-			++unit;
+	// Only the files touched since the last time are looked at: an edit costs what it changes, not the
+	// number of files. From the last to the first, so that a file that joins knows the file it comes before.
+	std::vector<std::string> paths = std::move(touched_);
+	if (every_file_) {
+		for (const auto &[path, file] : files_) {
+			paths.push_back(path);
+		}
+		for (const auto &[path, unit] : units_) {
+			if (!unit->is_declaration) {
+				paths.push_back(path);
+			}
 		}
 	}
-	// From the last file to the first, so that a file that joined knows the file it comes before.
+	std::sort(paths.begin(), paths.end(), std::greater<>());
+	paths.erase(std::unique(paths.begin(), paths.end()), paths.end());
 	std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> changes;
-	const Unit *next = nullptr;
-	for (auto file = files_.rbegin(); file != files_.rend(); ++file) {
-		if (!included(file->first)) {
+	bool any = false;
+	for (const std::string &path : paths) {
+		auto file = files_.find(path);
+		auto unit = units_.find(path);
+		const bool part = file != files_.end() && included(path);
+		if (unit != units_.end() && unit->second->is_declaration) {
 			continue;
 		}
-		auto found = units_.find(file->first);
-		if (found == units_.end()) {
-			found = units_.emplace(file->first, compilation_->insert(file->second.parsed, next)).first;
+		if (!part && unit != units_.end()) {
+			compilation_->remove(*unit->second);
+			units_.erase(unit);
 			any = true;
-		} else if (found->second->parsed != file->second.parsed) {
-			changes.emplace_back(found->second, file->second.parsed);
+		} else if (part && unit == units_.end()) {
+			units_.emplace(path, compilation_->insert(file->second.parsed, unit_after(path)));
+			any = true;
+		} else if (part && unit->second->parsed != file->second.parsed) {
+			changes.emplace_back(unit->second, file->second.parsed);
 			any = true;
 		}
-		next = found->second;
 	}
 	return !any || compilation_->update(changes);
 }
 
+// The unit of the next file of the program after this path, in the order the files are checked in.
+const Unit *Workspace::unit_after(const std::string &p_path) const {
+	for (auto file = files_.upper_bound(p_path); file != files_.end(); ++file) {
+		auto unit = units_.find(file->first);
+		if (unit != units_.end() && !unit->second->is_declaration) {
+			return unit->second;
+		}
+	}
+	return nullptr;
+}
+
+void Workspace::touch(const std::string &p_path) {
+	touched_.push_back(p_path);
+	stale_ = true;
+}
+
 void Workspace::check() {
 	stale_ = false;
+	const bool updated = update();
+	touched_.clear();
+	every_file_ = false;
 	++checks_;
 	++progress_;
-	if (update()) {
+	if (updated) {
 		if (queries_) {
 			queries_->clear(); // Kept, for a caller that holds them: only what they worked out goes.
 		}

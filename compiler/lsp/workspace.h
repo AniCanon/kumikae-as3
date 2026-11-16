@@ -44,6 +44,8 @@ private:
 	std::unordered_map<std::string, Unit *> units_; // By the path an editor knows the file by.
 	std::string support_folder_; // Empty until the embedded declarations have been written.
 	bool stale_ = true;
+	std::vector<std::string> touched_; // The files whose text or presence changed since the edits were last taken in.
+	bool every_file_ = false; // The project folder changed: every file is looked at.
 	bool cut_off_ = false; // The project has more files than are read.
 	int checks_ = 0;
 	int progress_ = 0;
@@ -57,6 +59,8 @@ private:
 	bool load(const std::string &p_path);
 	void check();
 	bool update();
+	void touch(const std::string &p_path);
+	const Unit *unit_after(const std::string &p_path) const;
 	Compilation &current(); // The edits applied: declarations checked, bodies perhaps not.
 	void check_bodies(Unit &p_unit);
 	const std::string &support_folder();
