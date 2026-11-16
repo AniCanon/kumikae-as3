@@ -17,6 +17,15 @@ tests (one opt-in skip) and 65 core tests (three opt-in skips), no failures.
 Both installed IDE builds were accepted by Plugin Verifier: RD-262.10968.170 and
 IU-261.22158.277 with LSP4IJ 0.21.0.
 
+The final `buildPlugin verifyPlugin runIde runIdea -PuiProbe` run, with
+`KUMIKAE_TEST_ACTIONS_PROBE=1`, ended `BUILD SUCCESSFUL`. Both sandbox reports
+ended `passed`. Each uses real PSI and the bundled compiler/runner, verifies one
+passing and one failing result, opens the failing assertion through the native
+result descriptor, and clicks an actual console stack hyperlink. Both paths
+check the target file and editor caret line. File/method selections, helper
+exclusion and method navigation also passed. The clickable-console regression
+first failed with `Timed out waiting for clickable AS3 failure frame`.
+
 - Framework Python suite: 19 tests passed, including real compiler lifecycle,
   assertion/setup/cleanup stack locations and parameter-case mappings.
 - Plugin Python client/template suite: 9 tests passed, including the native Godot template.
