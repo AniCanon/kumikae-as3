@@ -149,6 +149,7 @@ void Interpreter::vector_call(const Function &p_function, const Instruction &p_i
 			vector_copy(vector, call);
 			break;
 		case VectorMethod::Join:
+		case VectorMethod::LocaleText:
 			vector_join(vector, call);
 			break;
 		case VectorMethod::Splice:
@@ -185,13 +186,15 @@ void Interpreter::vector_find(Vector *p_vector, const VectorCall &p_call) {
 	give(p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));
 }
 
-// join: the elements as text, with the separator given between them.
+// join: the elements as text, with the separator given between them. toLocaleString(): each element in
+// its locale words, with commas between.
 void Interpreter::vector_join(Vector *p_vector, const VectorCall &p_call) {
-	const Str *separator = static_cast<const Str *>(argument(p_call, 1).p);
-	const std::string between(separator ? separator->view() : std::string_view("null"));
+	const bool locale = p_call.method == VectorMethod::LocaleText;
+	const Str *separator = locale ? nullptr : static_cast<const Str *>(argument(p_call, 1).p);
+	const std::string between(locale ? std::string_view(",") : separator ? separator->view() : std::string_view("null"));
 	std::string all;
 	retain(p_vector); // Kept while its elements speak for themselves, which may run the program.
-	const bool done = vector_text(p_vector, between, &all);
+	const bool done = vector_text(p_vector, between, &all, locale);
 	release_object(p_vector);
 	if (done) {
 		give(p_call, Kind::Str, of_pointer(text(all)));

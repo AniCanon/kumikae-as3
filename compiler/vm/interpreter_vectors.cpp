@@ -229,14 +229,40 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 		const Slot element = p_vector->data[i];
 		// A freed Godot object is null here too.
 		const AnyTag tag = kind == Kind::Any ? any::tag(present_or_null(element)) : AnyTag::Undefined;
+		const bool engine = kind == Kind::Ref || kind == Kind::Val;
 		const bool nothing = kind == Kind::Any ? tag == AnyTag::Null || tag == AnyTag::Undefined
-											   : held(kind) && !element.p;
+											   : held(kind) && (!element.p || (engine && !host_.handles.present(element.p)));
 		if (leaves_out && nothing) {
 			continue;
 		}
 		done = p_locale ? locale_element_text(kind, element, r_text) : element_text(kind, element, r_text);
 	}
 	text_depth_--;
+	return done;
+}
+
+// What the object's method of no arguments gives, as text, added to r_text. False if the method failed.
+bool Interpreter::said_by(uint32_t p_method, Object *p_object, std::string *r_text) {
+	Slot self;
+	self.bits = 0;
+	self.p = p_object;
+	Slot result;
+	result.bits = 0;
+	retain(p_object); // Held while it speaks, for the reason element_text() gives.
+	const bool called = call_within(p_method, &self, 1, &result);
+	release_object(p_object);
+	if (!called) {
+		return false;
+	}
+	const Kind kind = module_.functions[p_method].result;
+	const Slot given = kind != Kind::Void ? to_any(kind, result) : any::undefined();
+	drop(kind, result);
+	std::string said;
+	const bool done = any_text(given, &said);
+	drop_any(given);
+	if (done) {
+		append_text(r_text, said);
+	}
 	return done;
 }
 
@@ -249,7 +275,10 @@ bool Interpreter::locale_element_text(Kind p_kind, Slot p_element, std::string *
 		return true;
 	}
 	if (!object || module_.classes[object->klass].element == Kind::Void) {
-		return element_text(p_kind, p_element, r_text);
+		// A class's own toLocaleString() is what avmplus asks each element for; Object's is its toString().
+		const uint32_t own = object ? find_method(object->klass, "toLocaleString") : NONE;
+		const bool callable = own != NONE && module_.functions[own].is_public && !module_.functions[own].is_static && module_.functions[own].required <= 1;
+		return callable ? said_by(own, object, r_text) : element_text(p_kind, p_element, r_text);
 	}
 	retain(object); // Held while its elements speak, for the reason element_text() gives.
 	const bool said = vector_text(static_cast<Vector *>(object), ",", r_text, true);

@@ -31,7 +31,10 @@ constexpr uint32_t ERROR_MESSAGE = 0, ERROR_NAME = 1, ERROR_ID = 2, ERROR_STACK 
 //   Sort            a function that compares two elements, or the options as a number (untyped)   -> the vector
 // (forEach, map, filter, some and every are loops the lowerer writes, calling the function each time.)
 //   SortOn          the field names, the options (untyped), as Array's sortOn takes them   -> as Sort's
-enum class VectorMethod : uint8_t { Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort, SortOn };
+//   LocaleText      nothing                          -> a String: toLocaleString()
+enum class VectorMethod : uint8_t {
+	Push, Unshift, Pop, Shift, IndexOf, LastIndexOf, Reverse, Slice, Concat, Join, InsertAt, RemoveAt, Splice, Sort, SortOn, LocaleText
+};
 
 // String's methods and the functions on text, in StrCall's second operand. An index or a count is a
 // Number as the program wrote it; text is a String, and a null one reads "null". After the string:

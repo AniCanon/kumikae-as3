@@ -179,7 +179,8 @@ from recollection of avmplus, not checked against Flash.
 
 **Values as text** follow avmplus's library source: an Array leaves null and undefined elements out of its
 text, and a Vector's `join` and `toString` write them as `null` and `undefined` (`toLocaleString` leaves
-them out of both); a function of any kind is `function Function() {}`; a RegExp's `lastIndex` is an `int`.
+them out of both, and asks each element for its own `toLocaleString()`: a class's own, a Date's, an Array's
+or a Vector's, and otherwise its text); a function of any kind is `function Function() {}`; a RegExp's `lastIndex` is an `int`.
 An Array or a Vector that holds itself, or nests more than 500 deep, put into words is Error #1023, as
 avmplus's stack check gives (its `join` has no other guard).
 
