@@ -179,10 +179,12 @@ A bounded lookahead batch skips a queued request that is cancelled, or whose doc
 checking. A request that a newer edit follows is still answered, for the text it was asked about: LSP 3.17
 says a server should not send ContentModified for a change it has only queued, and LSP4IJ does not ask again
 after one (which once left override suggestions unshown). Partial frames do not delay an
-already complete request. The check of what is left, while the editor pauses, stops after any file when a
-message arrives: the message is handled first (an edit checks declarations, a request its own file, for
-the text it was asked about), and the check goes on from where it stopped. Diagnostics are published for
-each file as it is checked; a file not yet checked keeps what the editor has. Cancellation and closing a
+already complete request. Answers are sent before anything else is checked. The check of what is left,
+while the editor pauses, takes the files open in the editor first and stops after any file when a message
+arrives: the message is handled first (an edit checks declarations, a request its own file, for the text it
+was asked about), and the check goes on from where it stopped. Diagnostics are published for each file as
+it is checked; a file not yet checked keeps what the editor has. While a file does not parse, the others
+are judged again for what that makes doubtful only when a declaration or the set of broken files changed. Cancellation and closing a
 document affect queued requests as before.
 See the [follow-up results](../docs/results/2026-11-completion-followup.md) for latency, memory and validation.
 

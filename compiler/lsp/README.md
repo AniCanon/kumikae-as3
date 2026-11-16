@@ -44,8 +44,9 @@ destroys them with the compilation), and a file whose bodies are checked drops w
 it. The synchronous loop coalesces waiting document changes. Lookahead holds at most 32 messages or about
 1 MiB before dispatch (a single allowed frame can exceed that byte threshold). It reads only currently
 available bytes and retains an incomplete frame for later. Cancellation applies to queued work. The
-compiler stays single-threaded: the check of what is left runs between batches and asks the channel after
-each file whether a message waits; if one does it stops, the batch is handled, and it goes on from there.
+compiler stays single-threaded: a batch's answers are sent first; then the check of what is left (open
+files first) runs and asks the channel after each file whether a message waits; if one does it stops, its
+diagnostics so far are sent, the next batch is handled, and it goes on from there.
 Diagnostics are published for each file once it is checked. Document versions and lookahead use the same
 integer validation.
 
