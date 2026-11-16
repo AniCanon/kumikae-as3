@@ -9,12 +9,14 @@
 //   KAS3_ORACLE_CORPUS=<folder of .as files> KAS3_ORACLE_SEEDS=20 test_incremental
 // KAS3_ORACLE_FIRST_SEED repeats a sequence that failed.
 #include "check.h"
+#include "scratch.h"
 #include "oracle_edits.h"
 
 #include "workspace.h"
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -32,7 +34,7 @@ long setting(const char *p_name, long p_default) {
 Workspace::Options options(bool p_godot) {
 	Workspace::Options result;
 	result.godot = p_godot;
-	result.support_folder = (fs::temp_directory_path() / "kas3-oracle-support").string();
+	result.support_folder = (check::run_folder() / "support").string();
 	return result;
 }
 
@@ -113,7 +115,19 @@ struct Totals {
 	long comparisons = 0;
 	long partial_settles = 0;
 	long lazy_questions = 0;
+	Compilation::Counts work; // Summed over every workspace: shows which hard paths the edits reached.
 };
+
+void add(Compilation::Counts &r_total, const Compilation::Counts &p_now, const Compilation::Counts &p_before) {
+	r_total.declarations += p_now.declarations - p_before.declarations;
+	r_total.bodies += p_now.bodies - p_before.bodies;
+	r_total.surprises += p_now.surprises - p_before.surprises;
+	r_total.cascades += p_now.cascades - p_before.cascades;
+	r_total.cycles += p_now.cycles - p_before.cycles;
+	r_total.reused += p_now.reused - p_before.reused;
+	r_total.firsts += p_now.firsts - p_before.firsts;
+	r_total.judged += p_now.judged - p_before.judged;
+}
 
 class Sequence {
 	uint64_t seed_;
@@ -127,6 +141,8 @@ class Sequence {
 	int allowed_rebuilds_ = 0;
 	std::vector<std::string> applied_; // The program's files when the workspace last applied the edits.
 	int added_ = 0;
+	Compilation::Counts counted_;
+	int counted_rebuilds_ = 0;
 
 	// The workspace applies the edits that wait: a file that left the program rebuilds it once.
 	void applying() {
@@ -204,6 +220,16 @@ class Sequence {
 		const int rebuilds = workspace_.full_checks() - 1; // The first is not a rebuild.
 		if (rebuilds != allowed_rebuilds_) {
 			return fail("whole-program rebuilds", std::to_string(rebuilds), std::to_string(allowed_rebuilds_));
+		}
+		const Compilation::Counts now = workspace_.compilation().counts();
+		if (rebuilds != counted_rebuilds_) {
+			counted_ = Compilation::Counts(); // A new compilation counts from zero.
+			counted_rebuilds_ = rebuilds;
+		}
+		add(totals_.work, now, counted_);
+		counted_ = now;
+		if (now.surprises) {
+			return fail("declarations that changed when only bodies read a change", std::to_string(now.surprises), "0");
 		}
 		return true;
 	}
@@ -341,12 +367,10 @@ std::ostream &operator<<(std::ostream &p_out, const Work &p_work) {
 }
 
 Work work_of(Workspace &p_workspace, const std::string &p_path, const std::string &p_text) {
-	Compilation &before = p_workspace.compilation();
-	const size_t declarations = before.declarations_checked();
-	const size_t bodies = before.bodies_checked();
+	const Compilation::Counts before = p_workspace.compilation().counts();
 	p_workspace.change(p_path, p_text);
-	Compilation &after = p_workspace.compilation();
-	return { after.declarations_checked() - declarations, after.bodies_checked() - bodies };
+	const Compilation::Counts after = p_workspace.compilation().counts();
+	return { after.declarations - before.declarations, after.bodies - before.bodies };
 }
 
 std::string replaced(std::string p_text, const std::string &p_from, const std::string &p_to) {
@@ -389,8 +413,113 @@ void test_scope() {
 
 } // namespace
 
+// A named sequence for what random edits seldom reach. After each step the workspace, asked about p_asked
+// first (only that file checked), then about everything, says what a fresh workspace says.
+void directed(const char *p_name, bool p_godot, oracle::Files p_files,
+		const std::vector<std::pair<std::string, std::string>> &p_steps, const std::string &p_asked, const char *p_marker) {
+	Workspace workspace(options(p_godot));
+	for (const auto &[path, text] : p_files) {
+		workspace.open(path, text);
+	}
+	workspace.compilation();
+	int step = 0;
+	int rebuilds = 1; // A file that joins or leaves the program rebuilds it.
+	for (const auto &[path, text] : p_steps) {
+		++step;
+		rebuilds += text.empty() || !p_files.count(path) ? 1 : 0;
+		if (text.empty()) {
+			workspace.close(path);
+			p_files.erase(path);
+		} else {
+			workspace.open(path, text);
+			p_files[path] = text;
+		}
+		Workspace reference(options(p_godot));
+		for (const auto &[file, written] : p_files) {
+			reference.open(file, written);
+		}
+		reference.compilation();
+		const std::string &asked = p_files[p_asked];
+		const size_t at = asked.find(p_marker);
+		const std::vector<uint32_t> offsets = { (uint32_t)(at == std::string::npos ? 0 : at + std::strlen(p_marker)) };
+		const std::string got = answers(workspace, p_asked, offsets);
+		const std::string wanted = answers(reference, p_asked, offsets);
+		const std::string state = program_state(workspace);
+		const std::string expected = program_state(reference);
+		CHECK(got == wanted && state == expected);
+		if (got != wanted || state != expected) {
+			std::printf("directed %s, step %d: %s\n", p_name, step,
+					got != wanted ? first_difference(got, wanted).c_str() : first_difference(state, expected).c_str());
+		}
+		CHECK_EQ(workspace.compilation().counts().surprises, (size_t)0);
+	}
+	CHECK_EQ(workspace.full_checks(), rebuilds);
+}
+
+void test_directed() {
+	const auto file = [](const std::string &p_package, const std::string &p_body) {
+		return "package " + p_package + (p_package.empty() ? "" : " ") + "{\n" + p_body + "\n}\n";
+	};
+	// Override completion writes a base class's default values, which the base file's bodies resolve.
+	directed("override defaults", false,
+			{ { "/p/Base.as", file("", "public class Base { public static const VALUE:int = 3;\n"
+									   "public function go(n:int = Base.VALUE, m:int = VALUE):void {} }") },
+					{ "/p/Main.as", file("", "public class Main extends Base { override function \n}") } },
+			{ { "/p/Base.as", file("", "public class Base { public static const VALUE:int = 4;\n"
+									   "public function go(n:int = Base.VALUE, m:int = VALUE):void {} }") },
+					{ "/p/Main.as", file("", "public class Main extends Base { override function g\n}") } },
+			"/p/Main.as", "override function ");
+	// An earlier interface comes to extend one in a cycle: where the cycle is cut depends on it.
+	directed("interface cycle", false,
+			{ { "/p/A.as", file("", "public interface A {}") }, { "/p/B.as", file("", "public interface B extends C {}") },
+					{ "/p/C.as", file("", "public interface C extends B {}") } },
+			{ { "/p/A.as", file("", "public interface A extends C {}") }, { "/p/A.as", file("", "public interface A extends B {}") },
+					{ "/p/C.as", file("", "public interface C {}") }, { "/p/A.as", file("", "public interface A extends A {}") } },
+			"/p/A.as", "interface ");
+	// The first file's definition of a name wins; another file defining it says so, until it is first.
+	directed("first definition", false,
+			{ { "/p/b/One.as", file("x", "public class One {}") }, { "/p/c/One.as", file("x", "public class One {}") },
+					{ "/p/User.as", file("", "import x.*;\npublic class User { var one:One; }") } },
+			{ { "/p/a/One.as", file("x", "public class One { public var v:int; }") }, { "/p/b/One.as", file("x", "public class Two {}") },
+					{ "/p/a/One.as", file("x", "public class One {") }, { "/p/a/One.as", file("x", "public class Three {}") } },
+			"/p/User.as", "one:");
+	// A setter inherited across files points into the base file's tree: a body edit there moves it.
+	directed("inherited half", false,
+			{ { "/p/Base.as", file("", "public class Base { public function get v():int { return 1; } public function set v(x:int):void {} }") },
+					{ "/p/Sub.as", file("", "public class Sub extends Base { override public function get v():int { return 2; }\n"
+											"function f():void { v = 3; v; } }") } },
+			{ { "/p/Base.as", file("", "public class Base { public function get v():int { return 1; } public function set v(x:int):void { x++; } }") },
+					{ "/p/Base.as", file("", "public class Base { public function get v():int { return 1; } }") },
+					{ "/p/Base.as", file("", "public class Base { public function get v():int { return 1; } public function set v(x:Number):void {} }") } },
+			"/p/Sub.as", "v = ");
+	// More than a hundred errors in one file, and edits around them.
+	std::string many = "public class Many {\n";
+	for (int i = 0; i < 130; ++i) {
+		many += "var f" + std::to_string(i) + ":Nope" + std::to_string(i % 3) + ";\n";
+	}
+	directed("many errors", false, { { "/p/Many.as", file("", many + "}") }, { "/p/Nope0.as", file("", "public class Nope1 {}") } },
+			{ { "/p/Nope0.as", file("", "public class Nope0 {}") }, { "/p/Many.as", file("", "var early:Nope2;\n" + many + "}") },
+					{ "/p/Nope0.as", file("", "public class Nope1 {}") } },
+			"/p/Many.as", "var f1");
+	// Two files that do not parse, then one repaired: what the other's errors make doubtful changes.
+	directed("two broken", false,
+			{ { "/p/A.as", file("", "public class A { public function f(t:T):void {} }") },
+					{ "/p/T.as", file("", "public class T extends B {}") }, { "/p/B.as", file("", "public class B { public var x:int; }") },
+					{ "/p/U.as", file("", "public class U { function g(a:A):void { a.f(null); a.h(); missing(); } }") } },
+			{ { "/p/B.as", file("", "public class B { public var x:int; ") }, { "/p/A.as", file("", "public class A { public function f(t:T):void { ") },
+					{ "/p/T.as", file("", "public class T {}") }, { "/p/B.as", file("", "public class B { public var x:int; }") },
+					{ "/p/A.as", file("", "public class A { public function f(t:T):void {} }") } },
+			"/p/U.as", "a.");
+	// Godot's API loaded, and a file that joins and leaves: Godot's declarations are never checked again.
+	directed("godot", true, { { "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Node2D { function f():void { position.x = 1; } }") } },
+			{ { "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Sprite2D { function f():void { position.x = 1; } }") },
+					{ "/p/Mover.as", file("", "import godot.*;\npublic class Mover extends Sprite2D { function f():void { position. } }") } },
+			"/p/Mover.as", "position.");
+}
+
 int main() {
 	test_scope();
+	test_directed();
 	const long seeds = setting("KAS3_ORACLE_SEEDS", 12);
 	const long edits = setting("KAS3_ORACLE_EDITS", 60);
 	const long classes = setting("KAS3_ORACLE_CLASSES", 10);
@@ -411,5 +540,9 @@ int main() {
 	}
 	std::printf("oracle: %ld edits, %ld comparisons, %ld yielding checks, %ld one-file questions\n", totals.edits,
 			totals.comparisons, totals.partial_settles, totals.lazy_questions);
+	const Compilation::Counts &work = totals.work;
+	std::printf("oracle: %zu declarations and %zu bodies checked; %zu cascades, %zu cycle rounds, %zu symbols reused, "
+				"%zu new first definitions, %zu doubt judgements, %zu surprises\n",
+			work.declarations, work.bodies, work.cascades, work.cycles, work.reused, work.firsts, work.judged, work.surprises);
 	return check::finish();
 }

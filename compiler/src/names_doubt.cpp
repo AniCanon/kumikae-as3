@@ -1,6 +1,7 @@
 // What a syntax error makes doubtful. A file that did not parse may have lost a declaration, or read one
 // wrongly (a modifier, a parameter, `extends`): an error that rests on what that file declares may be
 // false. Those are dropped, and the rest stay.
+#include "incremental.h"
 #include "names.h"
 
 #include "ast_walk.h"
@@ -117,7 +118,8 @@ public:
 // A view over what the passes said: a file judged before keeps what it was told while nothing it rests on
 // changed, and is judged again from what the passes said when something did.
 void Compilation::settle_doubt() {
-	const bool any_broken = std::any_of(units_.begin(), units_.end(), [](const Unit &p_unit) { return p_unit.broken; });
+	const bool any_broken = broken_files_ > 0 ||
+			std::any_of(units_.begin(), units_.end(), [](const Unit &p_unit) { return p_unit.broken; });
 	Doubt doubt;
 	for (Unit &unit : units_) {
 		if (unit.unchecked || unit.doubted_at == doubt_state_) {
@@ -132,6 +134,9 @@ void Compilation::settle_doubt() {
 			continue; // A broken file's own were never taken; a file with none has none to drop.
 		}
 		unit.undoubted = unit.diagnostics;
+		if (tracking_) {
+			tracking_->counts.judged++;
+		}
 		// An import that found nothing may have changed what the file's other names mean.
 		if (unit.failed_import || doubt.affected(unit)) {
 			unit.diagnostics.clear();

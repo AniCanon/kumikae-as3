@@ -39,8 +39,7 @@ struct Tracking {
 	Fingerprints prints;
 	DependencyIndex index;
 	std::set<uint32_t> unchecked; // The ranks of the files whose bodies wait.
-	size_t declarations_checked = 0; // Program files, since prepare(): for tests and benchmarks.
-	size_t bodies_checked = 0;
+	Compilation::Counts counts;
 };
 
 } // namespace kas3

@@ -143,8 +143,9 @@ class Queries {
 public:
 	explicit Queries(Compilation &p_compilation) :
 			compilation_(p_compilation) {}
-	// Drops what was worked out from a file whose bodies were checked again.
+	// Drops what was worked out from a file whose bodies were checked again, or from every file.
 	void forget(const Unit &p_unit);
+	void clear();
 
 	// The name the offset is in, or that ends right at it. Null if there is none, or it resolved to nothing.
 	const Occurrence *at(const Unit &p_unit, uint32_t p_offset);

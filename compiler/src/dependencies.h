@@ -75,8 +75,9 @@ private:
 public:
 	// Replaces what one part of a unit depends on.
 	void set(uint32_t p_unit, Part p_part, std::vector<Dependency> p_keys);
-	// The units whose current lists hold the key, added to r_units (which may then hold a unit twice).
-	void readers(const Dependency &p_key, std::vector<uint32_t> &r_units);
+	// The units whose current lists hold the key, added to r_declarations or r_bodies by the part whose list
+	// does (either may then hold a unit twice).
+	void readers(const Dependency &p_key, std::vector<uint32_t> &r_declarations, std::vector<uint32_t> &r_bodies);
 };
 
 } // namespace kas3

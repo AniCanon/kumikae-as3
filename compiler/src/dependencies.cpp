@@ -52,7 +52,7 @@ void DependencyIndex::set(uint32_t p_unit, Part p_part, std::vector<Dependency> 
 	}
 }
 
-void DependencyIndex::readers(const Dependency &p_key, std::vector<uint32_t> &r_units) {
+void DependencyIndex::readers(const Dependency &p_key, std::vector<uint32_t> &r_declarations, std::vector<uint32_t> &r_bodies) {
 	auto found = readers_.find(p_key);
 	if (found == readers_.end()) {
 		return;
@@ -61,7 +61,7 @@ void DependencyIndex::readers(const Dependency &p_key, std::vector<uint32_t> &r_
 	size_t kept = 0;
 	for (const Reader &reader : list) {
 		if (epochs_[reader.part][reader.unit] == reader.epoch) {
-			r_units.push_back(reader.unit);
+			(reader.part == Declarations ? r_declarations : r_bodies).push_back(reader.unit);
 			list[kept++] = reader;
 		}
 	}

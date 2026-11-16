@@ -146,6 +146,7 @@ void Compilation::redeclare(std::vector<Unit *> &r_units, std::vector<Dependency
 			break;
 		}
 		r_units.insert(r_units.end(), more.begin(), more.end());
+		tracking.counts.cycles++;
 	}
 	if (interface_cycles_ && std::any_of(classes.begin(), classes.end(), [](const Symbol *p_class) { return p_class->kind == SymbolKind::Interface; })) {
 		interface_cycles_ = false; // Every interface of the program is walked again: found anew.
@@ -153,6 +154,11 @@ void Compilation::redeclare(std::vector<Unit *> &r_units, std::vector<Dependency
 	settle_classes(classes);
 	for (Unit *unit : r_units) {
 		resolve_unit_signatures(*this, *unit);
+	}
+	if (broken_files_) {
+		// Doubt follows a symbol through its types to their bases, further than any file records: every file
+		// is judged again while a file does not parse.
+		++doubt_state_;
 	}
 	// What was not declared again is gone.
 	for (auto &[slot, symbols] : tracking.retracted) {
@@ -173,7 +179,7 @@ void Compilation::redeclare(std::vector<Unit *> &r_units, std::vector<Dependency
 		declaration_dependencies(*unit, keys);
 		tracking.index.set(unit->rank, DependencyIndex::Declarations, std::move(keys));
 	}
-	tracking.declarations_checked += r_units.size();
+	tracking.counts.declarations += r_units.size();
 }
 
 void Compilation::prepare() {
@@ -183,6 +189,7 @@ void Compilation::prepare() {
 	std::vector<Unit *> program;
 	for (Unit &unit : units_) {
 		unit.broken = unit.diagnostics.has_errors();
+		broken_files_ += unit.broken;
 		if (unit.broken) {
 			unit.diagnostics.mute();
 		}
@@ -226,32 +233,51 @@ bool Compilation::update(const std::vector<std::pair<Unit *, std::shared_ptr<Par
 		changed.push_back(on_halves(unit));
 		work.push_back(unit);
 	}
-	std::vector<Unit *> done;
+	return propagate(std::move(work), std::move(changed), {});
+}
+
+// Redoes the declarations of the files in p_work and of those that read a changed key in theirs, round by
+// round, until nothing more changes. A file whose bodies alone read a changed key waits: its bodies are
+// checked again, and its declarations redone with them. A file in p_done was redone in the round that made
+// the change, and read the changed declarations already.
+bool Compilation::propagate(std::vector<Unit *> p_work, std::vector<Dependency> p_changed, std::vector<Unit *> p_done) {
+	Tracking &tracking = *tracking_;
+	const auto done = [&](const Unit *p_unit) { return std::find(p_done.begin(), p_done.end(), p_unit) != p_done.end(); };
 	// A cascade this long means a mistake in the dependencies, not a program: check again from the start.
 	constexpr int MAX_ROUNDS = 64;
 	for (int round = 0;; ++round) {
-		std::vector<uint32_t> readers;
-		for (const Dependency &key : changed) {
-			tracking.index.readers(key, readers);
+		std::vector<uint32_t> declarations;
+		std::vector<uint32_t> bodies;
+		for (const Dependency &key : p_changed) {
+			tracking.index.readers(key, declarations, bodies);
 		}
-		for (uint32_t rank : readers) {
-			Unit *reader = &units_[rank];
-			// A file redone in the round that made the change read the changed declarations already.
-			if (std::find(done.begin(), done.end(), reader) == done.end()) {
-				work.push_back(reader);
+		for (uint32_t rank : declarations) {
+			if (!done(&units_[rank])) {
+				p_work.push_back(&units_[rank]);
 			}
 		}
-		if (work.empty()) {
+		for (uint32_t rank : bodies) {
+			Unit &reader = units_[rank];
+			if (!done(&reader) && std::find(p_work.begin(), p_work.end(), &reader) == p_work.end()) {
+				reader.redeclare = true;
+				if (!reader.unchecked) {
+					reader.unchecked = true;
+					tracking.unchecked.insert(reader.rank);
+				}
+			}
+		}
+		if (p_work.empty()) {
 			break;
 		}
 		if (round == MAX_ROUNDS) {
 			std::fprintf(stderr, "kas3c: an edit kept changing declarations; checking everything again\n");
 			return false;
 		}
-		changed.clear();
-		redeclare(work, changed);
-		done = std::move(work);
-		work.clear();
+		tracking.counts.cascades += round == 1 ? 1 : 0;
+		p_changed.clear();
+		redeclare(p_work, p_changed);
+		p_done = std::move(p_work);
+		p_work.clear();
 	}
 	tracking.retired.clear();
 	return true;
@@ -265,6 +291,17 @@ void Compilation::check_bodies(Unit &p_unit) {
 	if (!p_unit.unchecked) {
 		return;
 	}
+	if (p_unit.redeclare) {
+		std::vector<Unit *> one{ &p_unit };
+		std::vector<Dependency> changed;
+		redeclare(one, changed);
+		if (!changed.empty()) {
+			// What its declarations read did not change, so they did not; if they did, the files that read
+			// them are redone all the same.
+			tracking_->counts.surprises++;
+			propagate({}, std::move(changed), one);
+		}
+	}
 	check_unit_bodies(*this, p_unit);
 	p_unit.unchecked = false;
 	p_unit.doubted_at = 0;
@@ -273,16 +310,12 @@ void Compilation::check_bodies(Unit &p_unit) {
 		std::vector<Dependency> keys;
 		body_dependencies(p_unit, keys);
 		tracking_->index.set(p_unit.rank, DependencyIndex::Bodies, std::move(keys));
-		tracking_->bodies_checked++;
+		tracking_->counts.bodies++;
 	}
 }
 
-size_t Compilation::declarations_checked() const {
-	return tracking_ ? tracking_->declarations_checked : 0;
-}
-
-size_t Compilation::bodies_checked() const {
-	return tracking_ ? tracking_->bodies_checked : 0;
+Compilation::Counts Compilation::counts() const {
+	return tracking_ ? tracking_->counts : Counts();
 }
 
 } // namespace kas3

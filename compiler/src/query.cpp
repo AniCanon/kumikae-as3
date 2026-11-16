@@ -192,6 +192,14 @@ std::string variable_text(const Unit &p_unit, const Symbol *p_symbol, std::strin
 
 } // namespace
 
+void Queries::clear() {
+	occurrences_.clear();
+	completion_items_.clear();
+	context_nodes_.clear();
+	types_.clear();
+	types_listed_ = false;
+}
+
 void Queries::forget(const Unit &p_unit) {
 	occurrences_.erase(&p_unit);
 	context_nodes_.erase(&p_unit);

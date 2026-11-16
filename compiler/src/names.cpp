@@ -374,6 +374,7 @@ void Compilation::declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_i
 			table.erase(inserted.first);
 			table.emplace(p_symbol->name, p_symbol);
 			p_unit.package->repeated.emplace(first->name, first);
+			tracking_->counts.firsts++;
 			return;
 		}
 		p_unit.package->repeated.emplace(p_symbol->name, p_symbol);

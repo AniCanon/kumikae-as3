@@ -30,6 +30,7 @@ void Compilation::remove_definition(Symbol *p_symbol) {
 	}
 	package->definitions.erase(found);
 	if (first != end) {
+		tracking_->counts.firsts++;
 		Symbol *next = first->second;
 		package->repeated.erase(first);
 		package->definitions.emplace(next->name, next);
@@ -48,6 +49,7 @@ Symbol *Compilation::reused(SymbolKind p_kind, std::string_view p_name, Unit *p_
 	} else if (!tracking_->unused.empty()) {
 		symbol = tracking_->unused.back();
 		tracking_->unused.pop_back();
+		tracking_->counts.reused++;
 	} else {
 		return nullptr;
 	}
@@ -104,7 +106,11 @@ void Compilation::retract(Unit &p_unit) {
 	if (broken || p_unit.broken) {
 		++doubt_state_; // What a broken file declares may differ now.
 	}
+	if (broken != p_unit.broken) {
+		broken ? ++broken_files_ : --broken_files_;
+	}
 	p_unit.broken = broken;
+	p_unit.redeclare = false;
 	if (broken) {
 		p_unit.diagnostics.mute();
 	}

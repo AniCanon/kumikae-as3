@@ -5,6 +5,7 @@
 //
 // Longer: KAS3_ORACLE_SEEDS=100 KAS3_ORACLE_EDITS=300 test_server_incremental
 #include "check.h"
+#include "scratch.h"
 #include "oracle_edits.h"
 
 #include "json.h"
@@ -29,7 +30,7 @@ long setting(const char *p_name, long p_default) {
 Workspace::Options options() {
 	Workspace::Options result;
 	result.godot = false;
-	result.support_folder = (fs::temp_directory_path() / "kas3-oracle-support").string();
+	result.support_folder = (check::run_folder() / "support").string();
 	return result;
 }
 

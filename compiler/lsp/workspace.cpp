@@ -4,6 +4,7 @@
 #include "paths.h"
 #include "uri.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <system_error>
@@ -385,13 +386,16 @@ bool Workspace::update() {
 }
 
 void Workspace::check() {
-	queries_.reset();
 	stale_ = false;
 	++checks_;
 	++progress_;
 	if (update()) {
+		if (queries_) {
+			queries_->clear(); // Kept, for a caller that holds them: only what they worked out goes.
+		}
 		return;
 	}
+	queries_.reset();
 	// The old compilation goes first: the new one writes onto the same trees.
 	compilation_.reset();
 	units_.clear();
@@ -425,6 +429,9 @@ Compilation &Workspace::current() {
 }
 
 void Workspace::check_bodies(Unit &p_unit) {
+	if (!p_unit.unchecked) {
+		return;
+	}
 	compilation_->check_bodies(p_unit);
 	if (queries_) {
 		queries_->forget(p_unit);
@@ -451,11 +458,30 @@ Unit *Workspace::unit(const std::string &p_path) {
 	if (found == units_.end()) {
 		return nullptr;
 	}
-	if (found->second->unchecked) {
-		check_bodies(*found->second);
+	Unit *unit = found->second;
+	bool checked = unit->unchecked;
+	check_bodies(*unit);
+	// Completing `override` writes a base class's default values, which its file's bodies resolve.
+	std::vector<const Symbol *> pending(unit->classes.begin(), unit->classes.end());
+	for (size_t i = 0; i < pending.size(); ++i) {
+		const ClassInfo *info = pending[i]->klass;
+		if (pending[i]->unit && pending[i]->unit->unchecked) {
+			checked = true;
+			check_bodies(*pending[i]->unit);
+		}
+		for (const Symbol *super : info->interfaces) {
+			if (super && std::find(pending.begin(), pending.end(), super) == pending.end()) {
+				pending.push_back(super);
+			}
+		}
+		if (info->base && std::find(pending.begin(), pending.end(), info->base) == pending.end()) {
+			pending.push_back(info->base);
+		}
+	}
+	if (checked) {
 		compilation_->settle_doubt();
 	}
-	return found->second;
+	return unit;
 }
 
 bool Workspace::settle(const std::function<bool()> &p_yield) {

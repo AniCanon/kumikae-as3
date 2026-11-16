@@ -84,6 +84,9 @@ struct Unit {
 	std::optional<Diagnostics> undoubted; // What the passes said, when doubt took some of it back.
 	uint64_t doubted_at = 0; // The state of the broken files that doubt last judged it by.
 	bool unchecked = false; // Its bodies wait to be checked (an incremental compilation only).
+	// Its bodies read something that changed, its declarations nothing: they are made again, unchanged,
+	// when its bodies are checked, rather than at the edit.
+	bool redeclare = false;
 
 	explicit Unit(std::shared_ptr<Parsed> p_parsed) :
 			parsed(std::move(p_parsed)), source(parsed->source), diagnostics(parsed->diagnostics), tree(parsed->tree) {}
@@ -123,6 +126,7 @@ class Compilation {
 	uint32_t cycle_mark_ = 0;
 	bool interface_cycles_ = false; // An interface of the program extends itself.
 	uint64_t doubt_state_ = 1; // Changes whenever what a broken file declares may have.
+	size_t broken_files_ = 0;
 	std::deque<Type> types_;
 	std::unordered_map<const Symbol *, const Type *> instance_types_;
 	std::unordered_map<const Type *, const Type *> vector_types_;
@@ -159,6 +163,7 @@ class Compilation {
 	// checked whole; the files an edit touched when updated.
 	void declare_files(const std::vector<Unit *> &p_units);
 	void redeclare(std::vector<Unit *> &r_units, std::vector<Dependency> &r_changed);
+	bool propagate(std::vector<Unit *> p_work, std::vector<Dependency> p_changed, std::vector<Unit *> p_done);
 	std::vector<Unit *> cycle_files(const std::vector<Symbol *> &p_classes, const std::vector<Unit *> &p_units);
 	void retract(Unit &p_unit); // names_retract.cpp
 	void remove_definition(Symbol *p_symbol);
@@ -192,10 +197,20 @@ public:
 	// False if the change can't be made in place (a declaration file changed): check again from the start.
 	bool update(const std::vector<std::pair<Unit *, std::shared_ptr<Parsed>>> &p_changes);
 	Unit *next_unchecked(); // Null when every file's bodies are checked.
-	// How many program files' declarations, and bodies, were checked since prepare(): for tests and
-	// benchmarks.
-	size_t declarations_checked() const;
-	size_t bodies_checked() const;
+	// What the checks since prepare() did, for tests and benchmarks.
+	struct Counts {
+		size_t declarations = 0; // Program files whose declarations were checked.
+		size_t bodies = 0; // Program files whose bodies were checked.
+		// Redos of a file's declarations, made only because its bodies read a change, that found them
+		// changed after all. Zero unless a dependency is missing from what declarations record.
+		size_t surprises = 0;
+		size_t cascades = 0; // Edits whose changes reached files that read declarations they changed.
+		size_t cycles = 0; // Rounds that took in the other files of a cycle of bases.
+		size_t reused = 0; // Symbols of declarations that were gone, used again.
+		size_t firsts = 0; // Times another file's definition of a name became the first.
+		size_t judged = 0; // Files judged again for what a syntax error elsewhere makes doubtful.
+	};
+	Counts counts() const;
 	void check_bodies(Unit &p_unit);
 	void settle_doubt();
 	bool has_errors() const;
