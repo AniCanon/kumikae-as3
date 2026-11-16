@@ -21,8 +21,8 @@ internal class As3TestConsole(private val configuration: As3TestsConfiguration, 
     private val sourceRoot = Path.of(configuration.project.basePath.orEmpty())
         .resolve(configuration.options.manifest).toAbsolutePath().parent
 
-    init {
-        addStackTraceFilter(As3FailureFilter(configuration.project, sourceRoot))
+    override fun createConsole(): ConsoleView = super.createConsole().also {
+        it.addMessageFilter(As3FailureFilter(configuration.project, sourceRoot))
     }
 
     override fun getErrorNavigatable(location: Location<*>, stacktrace: String) =

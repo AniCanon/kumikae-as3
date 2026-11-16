@@ -132,7 +132,8 @@ internal object UiProbeTestResults {
                 val failed = console.resultsViewer.testsRootNode.allTests.single { it.name.endsWith("::failing case") }
                 check(failed.stacktrace.orEmpty().contains("ProbeCase.as:" + (failureLine + 1)))
                 failed.getDescriptor(
-                    failed.getLocation(project, GlobalSearchScope.allScope(project)), properties,
+                    failed.getLocation(project, GlobalSearchScope.allScope(project)),
+                    properties,
                 ) as? OpenFileDescriptor
             }
             ApplicationManager.getApplication().invokeAndWait {
@@ -146,6 +147,7 @@ internal object UiProbeTestResults {
                 }
                 FileEditorManager.getInstance(project).closeFile(descriptor.file)
             }
+            UiProbeTestLinks.run(project, properties, fixture, failureLine)
             check(verified) { "Native Rider test tree did not show one pass and one failure" }
             Files.writeString(
                 destination.resolve("test-results.txt"),

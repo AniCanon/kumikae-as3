@@ -367,5 +367,6 @@ owner's other JetBrains plugin. They are recorded here so they are easy to revis
 Named case mappings in `kas3-tests.json` connect fixture methods to their suite
 identities. Use the class gutter or file context menu to run that file's cases;
 use a mapped method's gutter/context menu for that case only. Result navigation
-opens the method. Helpers have no Run icon. The [framework guide](../../testing/README.md)
+opens the method for passing tests and the failing assertion line for Error failures.
+The native failure details show clickable AS3 stack frames. Helpers have no Run icon. The [framework guide](../../testing/README.md)
 describes registration; `[Test]` metadata alone is not discovery.
