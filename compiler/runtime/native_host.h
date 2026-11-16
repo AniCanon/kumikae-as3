@@ -77,8 +77,8 @@ struct Host final : vm::NativeCode {
 	std::vector<Str *> strings;
 	Str *null_text = nullptr;
 	std::vector<uint8_t> class_used;
-	// Per class: its objects are plain fields that can lead to no other object, so the cycle collector
-	// does not look at them and new_object() can make one.
+	// Per class: its objects are fields and nothing more (no vector, no table, no Godot object made with
+	// one), so new_object() can make one, on the collector's list where the collector looks at the class.
 	std::vector<uint8_t> made_here;
 	// The stack trace of the error on its way out, built as generated functions are left (as the
 	// interpreter builds its own: vm/interpreter_errors.cpp).

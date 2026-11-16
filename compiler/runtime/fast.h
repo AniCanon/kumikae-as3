@@ -21,8 +21,8 @@ inline Slot *element(Object *p_vector, uint32_t p_index) {
 }
 
 // A new object of the class, its fields as an object's are before its constructor runs, with one reference,
-// the caller's. Null for a class whose objects the cycle collector looks at (they are made on its list,
-// which is the library's), and when there is no memory.
+// the caller's. Null for a class whose objects are more than fields (a vector, a table, one that extends one
+// of Godot's: the library makes those), and when there is no memory.
 Object *new_object(Context *c, uint32_t p_class);
 
 // The element VecSet writes: one there already is, or the one just past the end of a vector that may grow,

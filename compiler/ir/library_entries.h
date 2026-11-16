@@ -44,6 +44,10 @@ inline LibraryEntry library_entry(const Function &p_function, const Instruction 
 			const bool wide = p_function.registers[p_function.argument_lists[p_in.c][0]] == Kind::I64;
 			return LibraryEntry{ "number_text", p_in.b | (wide ? NUMBER_TEXT_WIDE : 0) };
 		}
+		case Op::New:
+			return LibraryEntry{ "object_new", p_in.b };
+		case Op::TableNew:
+			return LibraryEntry{ "table_new", p_in.b };
 		case Op::ToAny:
 			return LibraryEntry{ "value_to_any", static_cast<uint32_t>(p_function.registers[p_in.b]) };
 		case Op::FromAny:

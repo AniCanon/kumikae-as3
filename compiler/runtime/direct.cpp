@@ -234,6 +234,20 @@ void any_is_type(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, S
 	r_out->b = vm::any_is(library, p_values[0], p_which);
 }
 
+void object_new(Context *c, uint32_t p_which, const Slot *, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	if (Object *made = vm::object_new(library, p_which)) {
+		r_out->p = made;
+	}
+}
+
+void table_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	if (Object *made = vm::table_new(library, p_which, p_values[0].b)) {
+		r_out->p = made;
+	}
+}
+
 void vector_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
 	const Direct direct(c);
 	vm::Library library = direct.library();

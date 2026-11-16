@@ -24,6 +24,10 @@ void number_text(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_
 void value_to_any(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 void any_to_value(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 void any_is_type(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// New: an object of the class p_which, as it is before its constructor runs. TableNew: an Object or a
+// Dictionary of the class p_which (its one value: whether its keys are held weakly, or nothing).
+void object_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void table_new(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 // VecCall: p_which is the method (an ir::VectorMethod); the vector, then what the method takes.
 void vector_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 // A vector's element read (the vector, the index) and written (the vector, the index, the value): p_which
