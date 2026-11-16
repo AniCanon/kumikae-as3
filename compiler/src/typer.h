@@ -211,6 +211,10 @@ class Typer {
 	bool godot_storable(const Type *p_type, bool p_in_node) const;
 	bool godot_value(const Type *p_type) const;
 
+	void loop_statement(Stmt *p_statement);
+	void for_in(ForIn *p_loop);
+	void switch_statement(Switch *p_switch);
+	void try_statement(Try *p_try);
 	void statement(Stmt *p_statement);
 
 	void returned(Return *p_return);

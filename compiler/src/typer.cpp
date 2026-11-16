@@ -25,6 +25,67 @@ void Typer::declarators(VarDecl *p_decl) {
 	}
 }
 
+void Typer::loop_statement(Stmt *p_statement) {
+	switch (p_statement->kind) {
+		case NodeKind::While:
+			expression(static_cast<While *>(p_statement)->condition);
+			statement(static_cast<While *>(p_statement)->body);
+			break;
+		case NodeKind::DoWhile:
+			statement(static_cast<DoWhile *>(p_statement)->body);
+			expression(static_cast<DoWhile *>(p_statement)->condition);
+			break;
+		case NodeKind::For: {
+			For *loop = static_cast<For *>(p_statement);
+			statement(loop->init);
+			expression(loop->condition);
+			expression(loop->update);
+			statement(loop->body);
+		} break;
+		default:
+			break;
+	}
+}
+
+void Typer::for_in(ForIn *p_loop) {
+	expression(p_loop->target);
+	const Type *collection = expression(p_loop->collection);
+	if (p_loop->each && collection) {
+		// Over one of Godot's collections that says what it holds: each element is stored in the
+		// variable as an assignment stores it, and checked as one is.
+		const Described *rules = described(collection);
+		if (rules && rules->element && !rules->keyed && rules->element->kind != Type::Any) {
+			p_loop->element = rules->element;
+			const Type *variable = p_loop->declaration && p_loop->declaration->declarators.count == 1
+					? compilation_.type_of(p_loop->declaration->declarators[0].type)
+					: p_loop->target ? p_loop->target->type : nullptr;
+			if (variable && fits(p_loop->element, variable) != Fit::Yes) {
+				error(p_loop->collection->offset, "can't use a value of type " + quoted(compilation_.type_name(p_loop->element)) +
+														" where " + quoted(compilation_.type_name(variable)) + " is expected");
+			}
+		}
+	}
+	statement(p_loop->body);
+}
+
+void Typer::switch_statement(Switch *p_switch) {
+	expression(p_switch->subject);
+	for (SwitchCase &branch : p_switch->cases) {
+		expression(branch.test);
+		for (Stmt *inner : branch.body) {
+			statement(inner);
+		}
+	}
+}
+
+void Typer::try_statement(Try *p_try) {
+	statement(p_try->body);
+	for (CatchClause &clause : p_try->catches) {
+		statement(clause.body);
+	}
+	statement(p_try->finally_block);
+}
+
 void Typer::statement(Stmt *p_statement) {
 	if (!p_statement) {
 		return;
@@ -48,51 +109,16 @@ void Typer::statement(Stmt *p_statement) {
 			statement(branch->else_branch);
 		} break;
 		case NodeKind::While:
-			expression(static_cast<While *>(p_statement)->condition);
-			statement(static_cast<While *>(p_statement)->body);
-			break;
 		case NodeKind::DoWhile:
-			statement(static_cast<DoWhile *>(p_statement)->body);
-			expression(static_cast<DoWhile *>(p_statement)->condition);
+		case NodeKind::For:
+			loop_statement(p_statement);
 			break;
-		case NodeKind::For: {
-			For *loop = static_cast<For *>(p_statement);
-			statement(loop->init);
-			expression(loop->condition);
-			expression(loop->update);
-			statement(loop->body);
-		} break;
-		case NodeKind::ForIn: {
-			ForIn *loop = static_cast<ForIn *>(p_statement);
-			expression(loop->target);
-			const Type *collection = expression(loop->collection);
-			if (loop->each && collection) {
-				// Over one of Godot's collections that says what it holds: each element is stored in the
-				// variable as an assignment stores it, and checked as one is.
-				const Described *rules = described(collection);
-				if (rules && rules->element && !rules->keyed && rules->element->kind != Type::Any) {
-					loop->element = rules->element;
-					const Type *variable = loop->declaration && loop->declaration->declarators.count == 1
-							? compilation_.type_of(loop->declaration->declarators[0].type)
-							: loop->target ? loop->target->type : nullptr;
-					if (variable && fits(loop->element, variable) != Fit::Yes) {
-						error(loop->collection->offset, "can't use a value of type " + quoted(compilation_.type_name(loop->element)) +
-																" where " + quoted(compilation_.type_name(variable)) + " is expected");
-					}
-				}
-			}
-			statement(loop->body);
-		} break;
-		case NodeKind::Switch: {
-			Switch *choice = static_cast<Switch *>(p_statement);
-			expression(choice->subject);
-			for (SwitchCase &branch : choice->cases) {
-				expression(branch.test);
-				for (Stmt *inner : branch.body) {
-					statement(inner);
-				}
-			}
-		} break;
+		case NodeKind::ForIn:
+			for_in(static_cast<ForIn *>(p_statement));
+			break;
+		case NodeKind::Switch:
+			switch_statement(static_cast<Switch *>(p_statement));
+			break;
 		case NodeKind::Return:
 			returned(static_cast<Return *>(p_statement));
 			break;
@@ -100,14 +126,9 @@ void Typer::statement(Stmt *p_statement) {
 			expression(static_cast<Throw *>(p_statement)->value);
 			leaves_ = true;
 			break;
-		case NodeKind::Try: {
-			Try *attempt = static_cast<Try *>(p_statement);
-			statement(attempt->body);
-			for (CatchClause &clause : attempt->catches) {
-				statement(clause.body);
-			}
-			statement(attempt->finally_block);
-		} break;
+		case NodeKind::Try:
+			try_statement(static_cast<Try *>(p_statement));
+			break;
 		case NodeKind::Labeled:
 			statement(static_cast<Labeled *>(p_statement)->body);
 			break;
