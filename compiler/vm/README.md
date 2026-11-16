@@ -8,6 +8,7 @@ host differs.
 | `interpreter.h`, `interpreter.cpp` | Frames, calls, errors, the public entry points |
 | `interpreter_run.cpp` | The loop: one case per operation |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
+| `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
 | `interpreter_objects.cpp`, `runtime` | Lifetime of objects and strings |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
