@@ -144,7 +144,7 @@ def main():
                 for key, micros in run_once(program).items():
                     best[which][key] = min(micros, best[which].get(key, micros))
         for which, _ in builds:
-            table(os.path.relpath(which), best[which])
+            table(which, best[which])
 
 
 if __name__ == "__main__":
