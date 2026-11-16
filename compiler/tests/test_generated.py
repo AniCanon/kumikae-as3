@@ -11,6 +11,8 @@ timings rest on, so that a change that undoes one fails here and not only in a b
     over with its reference: none is taken and given back;
   - two whole numbers (ints, uints, sums of them, whole constants) are compared as integers, not as the
     Numbers the IR makes of them first: a loop's test is then one the C++ compiler can reason about;
+  - a loop over a vector of numbers has a copy in which the vector's length and elements are locals: no
+    look at the vector itself, and one test of each index against the local;
   - a method that calls nothing and cannot fail keeps no count of the depth, and a call of it is not
     followed by a look at whether an error is on its way out.
 """
@@ -42,7 +44,7 @@ def functions(folder, file):
 def loops(body):
     """The text of each loop: from a label to the last jump back to it."""
     found = []
-    for label in re.findall(r"^(L\d+):;$", body, re.M):
+    for label in re.findall(r"^([LV]\d+):;$", body, re.M):
         start = body.index(label + ":;")
         back = body.rfind("goto %s;" % label)
         if back > start:
@@ -79,6 +81,17 @@ with tempfile.TemporaryDirectory() as where:
         inside = "".join(loops(made))
         check("objects' loop is found", "new_object(" in inside, made)
         check("the object made in objects' loop is handed over, not shared", "store(c, " not in inside and "= nullptr;" in inside, inside)
+
+with tempfile.TemporaryDirectory() as where:
+    written = subprocess.run([kas3c, "cpp", "vectors.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "bench"))
+    check("vectors.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        made = functions(where, "vectors.cpp").get("vectors", "")
+        fast = [loop for loop in loops(made) if "goto S" in loop]
+        check("vectors' loops have a copy with locals", len(fast) >= 1, made)
+        for loop in fast:
+            check("the copy with locals does not look at the vector", "->length" not in loop and "element" not in loop and "thunk(" not in loop,
+                  loop)
 
 for failure in failures:
     print("FAIL " + failure[:2500])

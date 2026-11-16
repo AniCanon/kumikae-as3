@@ -97,6 +97,21 @@ class FunctionWriter {
 	// Stores a register's value where the instruction says; the register gives up its reference if this
 	// is its last use.
 	void keep(const std::string &p_place, uint32_t p_register, bool p_is_slot);
+	// function_loops.cpp: a loop over vectors of numbers, written twice.
+	struct Twice {
+		uint32_t from = 0; // The instruction its jump back goes to, and that jump.
+		uint32_t to = 0;
+		std::vector<uint32_t> vectors; // The registers whose vectors' length and elements are locals in the first copy.
+	};
+	std::vector<Twice> twice_;
+	const Twice *fast_ = nullptr; // The loop whose copy with locals is being written, if one is.
+	std::vector<bool> retried_; // Per instruction: the copy with locals leaves for it in the other (label S).
+	std::vector<uint32_t> loop_vectors(uint32_t p_from, uint32_t p_to) const;
+	void find_twice();
+	bool fast_vector(const ir::Instruction &p_in);
+	std::string label(uint32_t p_target) const; // "L12", or "V12" for a jump inside the copy with locals.
+	std::string fast_copy(const Twice &p_loop, const std::vector<bool> &p_landed);
+	std::string twice_declared() const;
 	uint32_t pc_ = 0;
 
 	std::string reg(uint32_t p_register) const;

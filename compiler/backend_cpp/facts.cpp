@@ -94,6 +94,7 @@ void look(const ir::Module &p_module, const ir::Function &p_function, FunctionFa
 	r_facts->opaque = false;
 	for (const Instruction &in : p_function.code) {
 		r_facts->opaque = r_facts->opaque || may_run_code(p_module, p_function, in);
+		r_facts->stores_elements = r_facts->stores_elements || in.op == Op::VecSet;
 		if (in.op == Op::GetField) {
 			r_facts->reads.insert(in.c);
 		} else if (in.op == Op::SetField) {
@@ -113,11 +114,12 @@ void follow_calls(const ir::Module &p_module, Facts *r_facts) {
 					continue;
 				}
 				const FunctionFacts &callee = r_facts->functions[in.b];
-				const size_t before = own.reads.size() + own.writes.size();
+				const size_t before = own.reads.size() + own.writes.size() + (own.stores_elements ? 1 : 0);
+				own.stores_elements = own.stores_elements || callee.stores_elements;
 				own.opaque = callee.opaque;
 				own.reads.insert(callee.reads.begin(), callee.reads.end());
 				own.writes.insert(callee.writes.begin(), callee.writes.end());
-				changed = changed || own.opaque || own.reads.size() + own.writes.size() != before;
+				changed = changed || own.opaque || own.reads.size() + own.writes.size() + (own.stores_elements ? 1 : 0) != before;
 			}
 		}
 	}

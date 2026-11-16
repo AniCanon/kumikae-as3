@@ -21,6 +21,7 @@ holds every program of `tests/run/` to the same output under both.
 | `function_calls.cpp` | Calls: direct, through the class's method table, by interface |
 | `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, Strings, untyped values, properties under a String key, a call through a function value |
 | `function_engine.cpp` | What asks Godot, where generated code does it itself: a `Vector2` held inline and its maths, a property or a method of a Godot object called on bare values by its method bind, the script's own Godot object and singletons borrowed for the whole function |
+| `function_loops.cpp` | A loop over vectors of numbers written twice: first with each vector's length and elements in locals, which an index out of range leaves for the loop as it always was |
 | `function_whole.cpp` | A sum of ints or uints converted back to one, as 32-bit arithmetic (exact, and three times as fast on `loop.as`), and two such sums compared as the integers they are |
 | `thunks.h`, `thunks.cpp` | The operations left to the library the interpreter has, each one instruction the host carries out |
 | `program_writer.h`, `program_writer.cpp` | `program.h` and the program's table |
@@ -53,6 +54,10 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   a function that touches that slot, the slot through another register, anything that may run code
   (the library, the engine, letting go of an object), and where the function or an error leaves
   (`tests/run/field_in_loop.as`).
+- A loop that only does sums and reads and writes elements of vectors of numbers is written twice. The
+  first copy (labels `V`) has each vector's length and elements in locals and holds an index against the
+  local; an index not below it goes to the same instruction of the second copy (labels `S`), the loop as
+  it would be alone, which makes the vector longer or raises the error (`tests/run/vector_loops.as`).
 - A null check is explicit, and left out on `this`.
 - `#line` markers point at the `.as` source.
 

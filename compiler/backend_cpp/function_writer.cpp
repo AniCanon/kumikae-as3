@@ -64,6 +64,7 @@ void FunctionWriter::analyse() {
 	find_aliases();
 	find_kept();
 	find_last_uses();
+	find_twice();
 }
 
 std::string_view FunctionWriter::parts(uint32_t p_register) const {
@@ -304,7 +305,7 @@ std::string FunctionWriter::prologue() const {
 			add(reg(i) + " = shared(c, " + reg(i) + ");");
 		}
 	}
-	out += kept_declared();
+	out += kept_declared() + twice_declared();
 	if (has_owner_alias_) {
 		// The script's own Godot object: found once, and again only after the engine has freed a script's.
 		add("void *self = object_of(c, field<Ref>(r0, 0));");
@@ -384,7 +385,13 @@ std::string FunctionWriter::write() {
 	}
 	whole_.assign(function_.registers.size(), Whole());
 	text_.assign(function_.registers.size(), NONE);
+	std::vector<std::string> copies(function_.code.size() + 1); // Before an instruction: a loop's copy with locals.
 	for (pc_ = 0; pc_ < function_.code.size(); pc_++) {
+		for (const Twice &loop : twice_) {
+			if (loop.from == pc_) {
+				copies[pc_] = fast_copy(loop, landed);
+			}
+		}
 		body_.clear();
 		if (landed[pc_]) {
 			whole_.assign(function_.registers.size(), Whole());
@@ -403,8 +410,12 @@ std::string FunctionWriter::write() {
 	}
 	body_.clear();
 	for (size_t pc = 0; pc <= function_.code.size(); pc++) {
+		body_ += copies[pc];
 		if (labelled[pc]) {
 			body_ += "L" + std::to_string(pc) + ":;\n";
+		}
+		if (retried_[pc]) {
+			body_ += "S" + std::to_string(pc) + ":;\n";
 		}
 		if (pc < pieces.size()) {
 			body_ += pieces[pc];

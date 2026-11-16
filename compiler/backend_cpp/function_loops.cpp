@@ -1,0 +1,201 @@
+// A loop over vectors of numbers, written twice.
+//
+// An element read or written by its index looks at the vector each time: is there one, is the index below
+// its length, where are its elements. In a loop that is most of what the loop does, and a write through
+// an element makes the C++ compiler read the length and the place again. So a loop in which nothing can
+// change a vector but its own writes of elements is written a second time, before the first: there the
+// length and the elements of each vector it indexes are locals, set as the loop is entered, and an index
+// is held against the local. An index that is not below it leaves for the same instruction of the loop as
+// it always was, which does whatever is to be done (a longer vector, an error) and finishes the loop.
+// With every vector there and every index in range, only the copy with the locals runs.
+//
+// Which loops: one closed by a plain jump back, in which every instruction is one that runs no code
+// (facts.h), a call is of a function that runs none and stores no element, every element stored is a
+// number or a Boolean under an int or uint index, and no register holding a vector it indexes is written.
+#include "function_writer.h"
+
+#include "names.h"
+
+#include <algorithm>
+#include <set>
+
+namespace kas3 {
+namespace backend_cpp {
+
+using ir::Instruction;
+using ir::Kind;
+using ir::NONE;
+using ir::Op;
+
+namespace {
+
+constexpr size_t MOST_VECTORS = 4; // Of one loop, each with two locals.
+
+bool is_whole(Kind p_kind) {
+	return p_kind == Kind::I32 || p_kind == Kind::U32;
+}
+
+bool is_number(Kind p_kind) {
+	return is_whole(p_kind) || p_kind == Kind::F64 || p_kind == Kind::Bool;
+}
+
+// Where an instruction jumps to, or NONE.
+uint32_t target_of(const Instruction &p_in) {
+	return p_in.op == Op::Jump ? p_in.a : p_in.op == Op::JumpIf || p_in.op == Op::JumpIfNot ? p_in.b : NONE;
+}
+
+} // namespace
+
+// The vector registers the loop indexes, if it is one to write twice: none otherwise.
+std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_to) const {
+	std::set<uint32_t> vectors;
+	for (uint32_t pc = p_from; pc <= p_to; pc++) {
+		const Instruction &in = function_.code[pc];
+		if (may_run_code(module_, function_, in)) {
+			return {};
+		}
+		if (in.op == Op::Call && (facts_->functions[in.b].opaque || facts_->functions[in.b].stores_elements)) {
+			return {};
+		}
+		if (in.op == Op::VecSet) {
+			if (!is_whole(kind(in.b)) || !is_number(kind(in.c))) {
+				return {};
+			}
+			vectors.insert(in.a);
+		} else if (in.op == Op::VecGet && is_whole(kind(in.c)) && is_number(kind(in.a))) {
+			vectors.insert(in.b);
+		}
+	}
+	for (const ir::Handler &handler : function_.handlers) {
+		if (vectors.count(handler.reg)) {
+			return {};
+		}
+	}
+	for (uint32_t pc = p_from; pc <= p_to; pc++) {
+		const Instruction &in = function_.code[pc];
+		const char first = ir::op_shape(in.op)[0];
+		if ((first == 'R' || first == 'r') && in.a != NONE && !first_is_read(in.op) && vectors.count(in.a)) {
+			return {};
+		}
+	}
+	if (vectors.size() > MOST_VECTORS) {
+		return {};
+	}
+	return std::vector<uint32_t>(vectors.begin(), vectors.end());
+}
+
+void FunctionWriter::find_twice() {
+	retried_.assign(function_.code.size() + 1, false);
+	if (!facts_) {
+		return;
+	}
+	std::vector<std::pair<uint32_t, uint32_t>> loops;
+	for (uint32_t pc = 0; pc < function_.code.size(); pc++) {
+		if (function_.code[pc].op == Op::Jump && function_.code[pc].a <= pc) {
+			loops.emplace_back(function_.code[pc].a, pc);
+		}
+	}
+	// The widest first: a loop inside one that is written twice is in both of its copies already.
+	std::sort(loops.begin(), loops.end(), [](const auto &p_a, const auto &p_b) { return p_a.second - p_a.first > p_b.second - p_b.first; });
+	for (const std::pair<uint32_t, uint32_t> &loop : loops) {
+		const uint32_t from = loop.first;
+		const uint32_t to = loop.second;
+		const bool apart = std::all_of(twice_.begin(), twice_.end(), [&](const Twice &p_each) { return to < p_each.from || from > p_each.to; });
+		if (!apart) {
+			continue;
+		}
+		std::vector<uint32_t> vectors = loop_vectors(from, to);
+		if (!vectors.empty()) {
+			twice_.push_back(Twice{ from, to, std::move(vectors) });
+		}
+	}
+}
+
+std::string FunctionWriter::label(uint32_t p_target) const {
+	const bool fast = fast_ && p_target >= fast_->from && p_target <= fast_->to;
+	return (fast ? "V" : "L") + std::to_string(p_target);
+}
+
+std::string FunctionWriter::twice_declared() const {
+	std::set<uint32_t> vectors;
+	for (const Twice &each : twice_) {
+		vectors.insert(each.vectors.begin(), each.vectors.end());
+	}
+	std::string out;
+	for (uint32_t each : vectors) {
+		const std::string number = std::to_string(each);
+		out += "\tSlot *d" + number + " = nullptr;\n\tuint32_t n" + number + " = 0;\n\t(void)d" + number + "; (void)n" + number + ";\n";
+	}
+	return out;
+}
+
+// An element or the length of a vector whose length and elements are locals here.
+bool FunctionWriter::fast_vector(const Instruction &p_in) {
+	const auto local = [&](uint32_t p_register) { return std::find(fast_->vectors.begin(), fast_->vectors.end(), p_register) != fast_->vectors.end(); };
+	const auto element = [&](uint32_t p_vector, uint32_t p_index) {
+		const std::string index = "static_cast<uint32_t>(" + reg(p_index) + ")";
+		line("if (KAS3_UNLIKELY(" + index + " >= n" + std::to_string(p_vector) + ")) goto S" + std::to_string(pc_) + ";");
+		retried_[pc_] = true;
+		return "d" + std::to_string(p_vector) + "[" + index + "]";
+	};
+	switch (p_in.op) {
+		case Op::VecLength:
+			if (!local(p_in.b)) {
+				return false;
+			}
+			line(reg(p_in.a) + " = static_cast<" + std::string(type_of(kind(p_in.a))) + ">(n" + std::to_string(p_in.b) + ");");
+			return true;
+		case Op::VecGet:
+			if (!local(p_in.b) || !is_whole(kind(p_in.c)) || !is_number(kind(p_in.a))) {
+				return false;
+			}
+			line(reg(p_in.a) + " = " + from_slot(kind(p_in.a), element(p_in.b, p_in.c)) + ";");
+			return true;
+		case Op::VecSet:
+			if (!local(p_in.a)) {
+				return false;
+			}
+			line(element(p_in.a, p_in.b) + " = slot(" + reg(p_in.c) + ");");
+			return true;
+		default:
+			return false;
+	}
+}
+
+// The loop's copy with the locals: entered only with every vector there, and left by its own jumps or
+// for the other copy.
+std::string FunctionWriter::fast_copy(const Twice &p_loop, const std::vector<bool> &p_landed) {
+	std::vector<bool> inside(function_.code.size() + 1, false); // What a jump of the loop itself goes to.
+	for (uint32_t pc = p_loop.from; pc <= p_loop.to; pc++) {
+		const uint32_t target = target_of(function_.code[pc]);
+		if (target != NONE && target >= p_loop.from && target <= p_loop.to) {
+			inside[target] = true;
+		}
+	}
+	std::string missing;
+	std::string locals;
+	for (uint32_t each : p_loop.vectors) {
+		const std::string number = std::to_string(each);
+		missing += (missing.empty() ? "!" : " || !") + register_name(each);
+		locals += "\td" + number + " = static_cast<Vector *>(" + register_name(each) + ")->data;\n\tn" + number + " = static_cast<Vector *>(" +
+				register_name(each) + ")->length;\n";
+	}
+	std::string out = "\tif (KAS3_UNLIKELY(" + missing + ")) goto L" + std::to_string(p_loop.from) + ";\n" + locals;
+	const uint32_t resume = pc_;
+	fast_ = &p_loop;
+	for (pc_ = p_loop.from; pc_ <= p_loop.to; pc_++) {
+		body_.clear();
+		if (p_landed[pc_]) {
+			whole_.assign(function_.registers.size(), Whole());
+			text_.assign(function_.registers.size(), NONE);
+		}
+		instruction(function_.code[pc_]);
+		out += (inside[pc_] ? "V" + std::to_string(pc_) + ":;\n" : std::string()) + body_;
+	}
+	fast_ = nullptr;
+	pc_ = resume;
+	return out;
+}
+
+} // namespace backend_cpp
+} // namespace kas3

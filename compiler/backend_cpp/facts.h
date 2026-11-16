@@ -22,6 +22,8 @@ struct FunctionFacts {
 	bool opaque = true;
 	std::set<uint32_t> reads;
 	std::set<uint32_t> writes;
+	// It, or a function it calls, stores an element of a vector: which may make the vector longer.
+	bool stores_elements = false;
 };
 
 struct Facts {

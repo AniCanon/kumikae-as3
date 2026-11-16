@@ -149,13 +149,13 @@ bool FunctionWriter::flow(const Instruction &p_in) {
 			return true;
 		}
 		case Op::Jump:
-			line("goto L" + std::to_string(p_in.a) + ";");
+			line("goto " + label(p_in.a) + ";");
 			return true;
 		case Op::JumpIf:
-			line("if (" + reg(p_in.a) + ") goto L" + std::to_string(p_in.b) + ";");
+			line("if (" + reg(p_in.a) + ") goto " + label(p_in.b) + ";");
 			return true;
 		case Op::JumpIfNot:
-			line("if (!" + reg(p_in.a) + ") goto L" + std::to_string(p_in.b) + ";");
+			line("if (!" + reg(p_in.a) + ") goto " + label(p_in.b) + ";");
 			return true;
 		case Op::Return:
 			// The result is the caller's: a register that owns its reference hands it over.
