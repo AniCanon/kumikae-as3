@@ -204,6 +204,9 @@ void Typer::definition(Node *p_node) {
 		case NodeKind::ClassDecl: {
 			ClassDecl *decl = static_cast<ClassDecl *>(p_node);
 			class_ = decl->symbol;
+			if (unit_.is_declaration && decl->symbol && decl->metadata.count) {
+				described(compilation_.instance_type(decl->symbol)); // Its tags are read here, mistakes and all.
+			}
 			for (Node *member : decl->members) {
 				if (member->kind == NodeKind::VarDecl) {
 					static_ = (static_cast<VarDecl *>(member)->modifiers.bits & Modifiers::Static) != 0;

@@ -166,9 +166,11 @@ compares the two after each of thousands of edits (see the [follow-up results](.
 A syntax error is confined to its file: its declarations, as the parser recovered them, are compared like
 those of any edit, so files that read nothing it changed are not checked again; they are only judged again
 for what a file that does not parse makes doubtful. Declarations that are gone leave their symbols to be
-used again by the next ones, so a long session does not grow. A file added to or removed from the program,
-an edited `--declarations` file, or another project folder starts the declarations over; bodies are then
-checked as above.
+used again by the next ones, and a package that no file names any more is forgotten, so a long session
+does not grow. A file added to or removed from the program is an edit like any other: what it declares is
+new, or gone, to the files that read it, and no other file is checked again. A chain of classes of any
+depth is followed a class at a time. Only an edited `--declarations` file starts the declarations over;
+bodies are then checked as above.
 
 Document changes with old or duplicate versions are ignored with a log message. Diagnostic versions are
 sent when the client advertises support, including empty diagnostic lists for each newly checked clean
@@ -204,7 +206,7 @@ See the [follow-up results](../docs/results/2026-11-completion-followup.md) for 
 - Unknown callable signatures cannot show argument help.
 - An edit to a declaration that every file reads (a method of a class all files call) checks every file's
   bodies again in the background: a request is still answered at once, and errors arrive file by file.
-  A file added to or removed from the project starts the declarations of the whole program over.
+  An edit to a file given with `--declarations` starts the declarations of the whole program over.
 - Rider uses its native LSP client. IntelliJ IDEA Community/free unified IDEA uses the optional LSP4IJ
   plugin (0.21.0); install and enable it in **Settings > Plugins**. A project notification explains this
   requirement if it is missing. Local syntax, punctuation pairing and indentation work without it.

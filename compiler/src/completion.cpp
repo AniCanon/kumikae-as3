@@ -166,7 +166,8 @@ class Completer {
 				sorted.push_back(p_symbol);
 			}
 		};
-		for (Unit &other : compilation_.units()) {
+		for (Unit *file : compilation_.files()) {
+			Unit &other = *file;
 			if (other.package && packages.insert(other.package).second) {
 				for (const auto &[name, symbol] : other.package->definitions) {
 					take(symbol);
@@ -225,7 +226,8 @@ class Completer {
 	void offer_package(std::string_view p_path, bool p_types_only) {
 		const Context context = compilation_.context_of(const_cast<Unit &>(unit_), true);
 		std::unordered_set<const Package *> seen;
-		for (Unit &unit : compilation_.units()) {
+		for (Unit *file : compilation_.files()) {
+			Unit &unit = *file;
 			if (!unit.package || !seen.insert(unit.package).second) {
 				continue;
 			}

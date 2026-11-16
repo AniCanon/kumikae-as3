@@ -39,7 +39,12 @@ struct Tracking {
 	std::vector<std::shared_ptr<Parsed>> retired; // Old text that symbols may still point into, this update.
 	Fingerprints prints;
 	DependencyIndex index;
-	std::set<uint32_t> unchecked; // The ranks of the files whose bodies wait.
+	std::set<uint32_t> unchecked; // The ids of the files whose bodies wait.
+	std::vector<Unit *> joining; // Files that joined or left since the last update.
+	std::vector<Unit *> leaving;
+	std::vector<Unit *> left; // Places of files that left, for files that join.
+	// The packages whose files were redone this round, with whether each was known before it.
+	std::unordered_map<std::string, bool> packages;
 	Compilation::Counts counts;
 };
 

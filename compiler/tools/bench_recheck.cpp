@@ -9,12 +9,13 @@
 //   signature  a method's parameters: the file whose method calls it reads that
 //   member     a method added to the class: no other file names it
 //   hub        Hub.as's method, which every file calls (a project made with --hub)
+//   join       a new file opened in the editor, which joins the program; leave: it is closed again
 //
 // Each is timed twice: until the edited file is checked (what a request about it waits for), and until the
-// whole program is. With --soak, N edits then rename a method and a class to names never used before, and
-// the resident memory is printed as they go: declarations that are gone must not make it grow. Uses only
-// what the Workspace has always offered, so the same source can be built against an older compiler to
-// measure turn and turn about (tests/bench/recheck.py).
+// whole program is. With --soak, N edits then rename a method, a class and a package to names never used
+// before, and the resident memory is printed as they go: declarations that are gone must not make it grow.
+// Uses only what the Workspace has always offered, so the same source can be built against an older compiler
+// to measure turn and turn about (tests/bench/recheck.py).
 #include "workspace.h"
 
 #include <algorithm>
@@ -94,6 +95,11 @@ void soak(kas3::Workspace &r_workspace, const std::string &p_path, const std::st
 		const size_t end = text.find(' ', at + 13);
 		if (at != std::string::npos && end != std::string::npos) {
 			text.replace(at + 13, end - at - 13, "Renamed" + number);
+		}
+		// And moved to a package no other file is in, which then exists for one edit only.
+		const size_t package = text.find("package game {");
+		if (package != std::string::npos) {
+			text.replace(package, 12, "package game.soak" + number);
 		}
 		r_workspace.change(p_path, i % 2 ? p_text : text);
 		r_workspace.compilation();
@@ -175,6 +181,27 @@ int main(int p_argc, char **p_argv) {
 		report(edit.name, "file", file_times);
 		report(edit.name, "program", program_times);
 	}
+	// A file that joins the program (opened in the editor, not yet on disk) and then leaves it (closed).
+	const std::string joined = path.substr(0, path.rfind('/') + 1) + "Joined.as";
+	const std::string joined_text = "package game {\npublic class Joined {\n\tpublic function f(n:int):int { return n; }\n}\n}\n";
+	std::vector<double> join_file;
+	std::vector<double> join_program;
+	std::vector<double> leave_program;
+	for (int round = 0; round < rounds; round++) {
+		start = std::chrono::steady_clock::now();
+		workspace.open(joined, joined_text);
+		workspace.unit(joined);
+		join_file.push_back(milliseconds(start));
+		workspace.compilation();
+		join_program.push_back(milliseconds(start));
+		start = std::chrono::steady_clock::now();
+		workspace.close(joined);
+		workspace.compilation();
+		leave_program.push_back(milliseconds(start));
+	}
+	report("join", "file", join_file);
+	report("join", "program", join_program);
+	report("leave", "program", leave_program);
 	std::printf("peak resident memory: %ld KiB\n", resident_kib());
 	if (soak_edits) {
 		soak(workspace, path, text, soak_edits);

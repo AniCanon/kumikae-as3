@@ -3,6 +3,7 @@
 #include "check.h"
 #include "names.h"
 
+#include <array>
 #include <filesystem>
 #include <initializer_list>
 #include <string>
@@ -376,6 +377,24 @@ static void test_overrides() {
 
 
 // A method body inside `package { public class Main extends Base { ... } }`, with Base declared below.
+// A half of a property overridden in a class, the other half in a class between it and the one that has both:
+// whatever order the files are read in.
+static void test_override_order() {
+	const std::pair<const char *, const char *> files[] = {
+		{ "A_D.as", "package { public class A_D extends M { override public function set x(v:int):void { } } }" },
+		{ "B.as", "package { public class B { public function get x():int { return 1; } public function set x(v:int):void { } } }" },
+		{ "M.as", "package { public class M extends B { override public function get x():int { return 2; } } }" },
+	};
+	for (const auto &order : { std::array<int, 3>{ 0, 1, 2 }, std::array<int, 3>{ 1, 2, 0 }, std::array<int, 3>{ 2, 0, 1 } }) {
+		Compilation compilation;
+		for (int file : order) {
+			compilation.add(files[file].first, files[file].second);
+		}
+		compilation.check();
+		CHECK_EQ(compilation.format_diagnostics(), std::string());
+	}
+}
+
 static std::string in_method(const std::string &p_body) {
 	return "package { public class Main extends Base {\n"
 		   "public var field:int;\n"
@@ -740,6 +759,7 @@ int main() {
 	test_type_names();
 	test_hierarchy();
 	test_overrides();
+	test_override_order();
 	test_bodies_resolve();
 	test_bodies_errors();
 	test_bodies_limits();

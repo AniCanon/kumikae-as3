@@ -206,12 +206,56 @@ message. `kas3c check` of 100,000 lines (`run_bench.py --against`, 11 runs): 96.
 What costs more: a body edit, by 0.03–0.04 ms (the file's declarations are redone and fingerprinted, and
 what it read recorded); the first check, by 16–20% (fingerprints and dependency lists for every file;
 bodies are then checked in the background, so the first request waits only for declarations: cold
-completion at 1M lines took 535 ms against 640 ms); memory, by 3–4%. A file added or removed starts the
-declarations over, uninterruptibly; it was not timed on its own (the first check, 783 ms at 1M lines,
-includes it with parsing and every body).
+completion at 1M lines took 535 ms against 640 ms); memory, by 3–4%.
 
 A soak of 4,000 declaration renames (a method and a class renamed to a new name and back, `bench_recheck
 --soak`) at 100k lines held resident memory at 91.3 MiB from the 400th edit on.
+
+### After the review (2026-11-16)
+
+A review of the above found that a file added or removed started the declarations over (so did a chain
+of more than 64 classes), that a package was kept for every name ever seen, that a declaration file's tag
+errors were added again at every body check, and that an override check depended on the order of the files.
+Each is fixed with a named test in `test_incremental_named` or `test_names`, and the oracle now adds and
+removes files, renames packages, overrides accessor halves along a chain and has a declaration file with
+mistaken tags in one sequence in four; a sequence fails if anything but a changed declaration file starts
+the declarations over. A file is redone at most eight times in one edit before the check starts over (a
+guard; no test or oracle run reaches it): a changed class takes every class below it in the same round, so
+a chain of 70 and of 1,000 classes is an edit.
+
+Runs on the final code (`ccb82b9`), each sequence 150 edits (40 for the external projects):
+
+| Run | Edits | Result |
+|---|---:|---|
+| Generated projects, seeds 11000–11299 (release) | 48,750, 2,519 changes of the files | 0 differences |
+| Server sessions, seeds 11000–11149 (release) | 28,480 | 0 differences |
+| as3-signals, flashpunk, flixel, as3corelib, starling (release, Godot loaded) | 1,200 | 0 differences |
+| Generated and server, seeds 12000– (ASan/UBSan) | 4,900 and 3,088 | 0 differences, no sanitizer report |
+
+Before the last three fixes, at `21000c1`: 86,600 generated edits (4,505 changes of the files), 50,360
+server edits, 1,200 on the external projects and 6,500 and 3,814 under ASan/UBSan, no difference.
+
+A file joining and leaving the program (`bench_recheck`, as above; before is the first round, `d39fd67`),
+ms, load average 27–29:
+
+| Until the program is checked | 100k lines before | after | 1M lines before | after |
+|---|---:|---:|---:|---:|
+| A file joins | 108.657 | 0.036 | 880.257 | 0.066 |
+| A file leaves | 107.336 | 0.008 | 962.251 | 0.034 |
+| Body edit | 0.578 | 0.477 | 1.531 | 0.517 |
+| Method parameters | 0.695 | 0.621 | 1.832 | 0.704 |
+| Hub method | 51.565 | 50.717 | 541.393 | 507.417 |
+
+The machine was busy (the hub edit at 1M lines took 225 ms on 2026-11-15), so only each pair is
+comparable. The `Workspace` now looks only at the files touched since it last checked, which is what the
+body edit at 1M lines gains. Against `5732e88` in the same session: a file joins in 0.059 ms against
+367.264 ms at 1M lines, and leaves in 0.034 ms against 362.954 ms.
+
+A soak of 20,000 renames at 100k lines (a method, a class and a package, each to a new name and back) held
+resident memory at 88.4 MiB from the 10,000th on, from 86.8 MiB at its start.
+
+Reading a declaration file's tags when it is declared, not when a body first uses the class, means its
+mistakes are said even when no file uses the class.
 
 ## Validation boundaries
 
@@ -221,8 +265,8 @@ application has the desktop's focus, as it does in the background sandbox. Windo
 host-side regressions but still need Windows runtime validation. Human acceptance of the complete
 editing workflow remains separate from automated sandbox checks.
 
-A file added to or removed from the program, an edited `--declarations` file or another project folder
-starts the declarations over (bodies are still checked lazily). An edit to a declaration every file reads
+An edited `--declarations` file starts the declarations over (bodies are still checked lazily); a file
+added to or removed from the program no longer does. An edit to a declaration every file reads
 checks every file's bodies again, in the background. The idle check stops between files for any message.
 Dynamic receivers need a known type for member completion. The [editor guide](../../editors/completion.md)
 describes completion behavior; broader language-server work remains in the [backlog](../backlog.md).

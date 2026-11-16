@@ -121,7 +121,8 @@ void Compilation::settle_doubt() {
 	const bool any_broken = tracking_ ? broken_files_ > 0
 			: std::any_of(units_.begin(), units_.end(), [](const Unit &p_unit) { return p_unit.broken; });
 	Doubt doubt;
-	for (Unit &unit : units_) {
+	for (Unit *file : files_) {
+		Unit &unit = *file;
 		if (unit.unchecked || unit.doubted_at == doubt_state_) {
 			continue;
 		}

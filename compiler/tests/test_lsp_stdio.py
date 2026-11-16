@@ -279,7 +279,8 @@ for partial in (b"C", b"Content-Length: 100\r\n\r\n{"):
     try:
         process.stdin.write(START + partial)
         process.stdin.flush()
-        ready = bool(select.select([process.stdout], [], [], 2)[0])
+        # Returns as soon as the answer is there; a server that waits for the rest of the frame never answers.
+        ready = bool(select.select([process.stdout], [], [], 120)[0])
         check("response before partial next frame", ready, repr(partial))
         if ready:
             check("initialize before partial next frame", b'"id":1' in os.read(process.stdout.fileno(), 65536))

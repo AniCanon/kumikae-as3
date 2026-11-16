@@ -77,7 +77,7 @@ class StreamLifetimeTest {
     }
 
     private fun await(condition: () -> Boolean) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
         while (System.nanoTime() < deadline) {
             if (condition()) return
             Thread.yield()

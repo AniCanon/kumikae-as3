@@ -94,7 +94,8 @@ const std::vector<const Symbol *> &Queries::types() {
 				types_.push_back(p_symbol);
 			}
 		};
-		for (const Unit &unit : compilation_.units()) {
+		for (const Unit *file : compilation_.files()) {
+			const Unit &unit = *file;
 			if (unit.package && packages.insert(unit.package).second) {
 				for (const auto &[name, symbol] : unit.package->definitions) {
 					take(symbol);

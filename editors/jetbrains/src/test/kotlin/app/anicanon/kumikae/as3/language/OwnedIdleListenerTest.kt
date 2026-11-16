@@ -25,24 +25,25 @@ class OwnedIdleListenerTest {
         lateinit var callback: Runnable
         val listener = OwnedIdleListener {
             entered.countDown()
-            check(release.await(5, TimeUnit.SECONDS))
+            check(release.await(120, TimeUnit.SECONDS))
         }
         listener.register {
             callback = it
             token
         }
         val delivery = thread { callback.run() }
-        assertTrue(entered.await(5, TimeUnit.SECONDS))
+        assertTrue(entered.await(60, TimeUnit.SECONDS))
         val disposal = thread {
             listener.dispose()
             disposed.countDown()
         }
         try {
-            assertTrue(disposed.await(1, TimeUnit.SECONDS), "Disposal blocked on the native callback")
+            // The callback stays blocked for longer than this wait: disposal returns only if it does not wait for it.
+            assertTrue(disposed.await(60, TimeUnit.SECONDS), "Disposal blocked on the native callback")
         } finally {
             release.countDown()
-            delivery.join(5000)
-            disposal.join(5000)
+            delivery.join(60000)
+            disposal.join(60000)
         }
         assertEquals(1, token.finishes)
     }

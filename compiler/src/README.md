@@ -74,8 +74,15 @@ once every signature is resolved. The full check is the same pipeline with every
 - **Doubt** (`names_doubt`) is a view: what the passes said is kept, and judged again when what a broken file
   declares may have changed.
 
-A file added or removed, or a declaration file changed, starts over (`Workspace`). `test_incremental`
-compares every answer with a fresh check after random edits; see `tests/README.md`.
+- **Files join and leave** (`insert`, `remove`) as edits: a file keeps its place in the storage (`Unit::id`)
+  and its place in the order (`rank`, which decides the first definition of a name and where a cycle is
+  cut) is renumbered; `files()` is the list to walk, in order, without the places of files that left. A
+  package is known while a file's block names it, and forgotten with the last.
+- A change goes down a chain of classes a round at a time, however deep; only a file redone many times in
+  one edit is taken for a mistake in the dependencies and starts the check over.
+
+Only a declaration file that changed starts over (`Workspace`). `test_incremental` compares every answer
+with a fresh check after random edits; see `tests/README.md`.
 
 Override completion uses the same inherited visibility rule as name resolution. Its primary edit covers
 only the filtering word; additional edits insert visibility without rewriting metadata or comments.
