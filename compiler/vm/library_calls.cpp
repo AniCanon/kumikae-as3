@@ -183,45 +183,68 @@ void LibraryCall::typed() {
 		values.emplace_back();
 		ok = converted(nullptr, method_.rest, at, &kinds.back(), &values.back());
 	}
-	if (ok) {
-		const Kind result = ir::kind_taken(method_.result, klass ? klass->element : Kind::Void);
-		const size_t base = vm_.frames_.back().base;
-		const uint32_t first = static_cast<uint32_t>(vm_.stack_.size() - base);
-		Slot zero;
-		zero.bits = 0;
-		vm_.stack_.resize(vm_.stack_.size() + values.size() + 1, zero);
-		std::copy(values.begin(), values.end(), vm_.stack_.begin() + static_cast<std::ptrdiff_t>(base + first));
-		// The instruction, as the lowerer would have written it for a typed call, and enough of a function
-		// for it to be read from: the registers' kinds and the list of its arguments.
-		ir::Function scratch;
-		scratch.registers.assign(first, Kind::I32);
-		scratch.registers.insert(scratch.registers.end(), kinds.begin(), kinds.end());
-		scratch.registers.push_back(result == Kind::Void ? Kind::I32 : result);
-		scratch.argument_lists.emplace_back(values.size());
-		std::iota(scratch.argument_lists[0].begin(), scratch.argument_lists[0].end(), first);
-		ir::Instruction in;
-		in.a = result == Kind::Void ? NONE : first + static_cast<uint32_t>(values.size());
-		in.b = method_.which;
-		in.c = 0;
-		if (method_.does == Does::VecCall) {
-			vm_.vector_call(scratch, in);
-		} else if (method_.does == Does::StrCall) {
-			vm_.string_call(scratch, in, vm_.stack_.data() + base);
-		} else {
-			vm_.regexp_call(scratch, in);
+	if (!ok) {
+		for (size_t i = 0; i < values.size(); i++) {
+			vm_.drop(kinds[i], values[i]);
 		}
-		const Slot made = vm_.stack_[base + first + values.size()];
-		if (vm_.failing_) {
-			Slot unused = made;
-			vm_.drop(result, unused);
-		} else {
-			give(result, made);
-		}
-		vm_.stack_.resize(base + first);
+		return;
 	}
-	for (size_t i = 0; i < values.size(); i++) {
-		vm_.drop(kinds[i], values[i]);
+	const Kind result = ir::kind_taken(method_.result, klass ? klass->element : Kind::Void);
+	const ir::Op op = method_.does == Does::VecCall ? ir::Op::VecCall : method_.does == Does::StrCall ? ir::Op::StrCall : ir::Op::RegExpCall;
+	if (const std::optional<Slot> made = run_typed(vm_, op, method_.which, kinds, values, result)) {
+		give(result, *made);
 	}
+}
+
+std::optional<Slot> LibraryCall::run_typed(Interpreter &p_vm, ir::Op p_op, uint32_t p_which, const std::vector<Kind> &p_kinds,
+		std::vector<Slot> &p_values, Kind p_result) {
+	const size_t base = p_vm.frames_.back().base;
+	const uint32_t first = static_cast<uint32_t>(p_vm.stack_.size() - base);
+	const size_t count = p_values.size();
+	Slot zero;
+	zero.bits = 0;
+	p_vm.stack_.resize(p_vm.stack_.size() + count + 1, zero);
+	std::copy(p_values.begin(), p_values.end(), p_vm.stack_.begin() + static_cast<std::ptrdiff_t>(base + first));
+	// The instruction, as the lowerer would have written it for a typed call, and enough of a function
+	// for it to be read from: the registers' kinds and the list of its arguments.
+	ir::Function scratch;
+	scratch.registers.assign(first, Kind::I32);
+	scratch.registers.insert(scratch.registers.end(), p_kinds.begin(), p_kinds.end());
+	scratch.registers.push_back(p_result == Kind::Void ? Kind::I32 : p_result);
+	scratch.argument_lists.emplace_back(count);
+	std::iota(scratch.argument_lists[0].begin(), scratch.argument_lists[0].end(), first);
+	ir::Instruction in;
+	in.op = p_op;
+	in.a = p_result == Kind::Void ? NONE : first + static_cast<uint32_t>(count);
+	in.b = p_which;
+	in.c = 0;
+	switch (p_op) {
+		case ir::Op::VecCall:
+			p_vm.vector_call(scratch, in);
+			break;
+		case ir::Op::StrCall:
+			p_vm.string_call(scratch, in, p_vm.stack_.data() + base);
+			break;
+		case ir::Op::RegExpCall:
+			p_vm.regexp_call(scratch, in);
+			break;
+		case ir::Op::DateCall:
+			p_vm.date_call(scratch, in);
+			break;
+		default: // VecNew and ArrayNew.
+			p_vm.vector_op(scratch, in, p_vm.stack_.data() + base);
+			break;
+	}
+	Slot made = p_vm.stack_[base + first + count];
+	for (size_t i = 0; i < count; i++) {
+		p_vm.drop(p_kinds[i], p_vm.stack_[base + first + i]);
+	}
+	p_vm.stack_.resize(base + first);
+	if (p_vm.failing_) {
+		p_vm.drop(p_result, made);
+		return std::nullopt;
+	}
+	return made;
 }
 
 // forEach, map, filter, some and every, as the lowerer writes them for a typed vector (lower_functions.cpp,

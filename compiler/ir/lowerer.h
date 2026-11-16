@@ -40,6 +40,7 @@ class Lowerer {
 	Symbol *godot_object_ = nullptr; // godot.GodotObject: what every Godot object class extends.
 	Symbol *signal_ = nullptr; // godot.Signal
 	Symbol *function_ = nullptr; // Function
+	Symbol *class_type_ = nullptr; // Class
 	Symbol *array_ = nullptr; // Array, and the one class all Arrays are of, once made
 	uint32_t array_class_ = NONE;
 
@@ -184,6 +185,8 @@ class Lowerer {
 	// What an untyped value stored where p_type is declared is checked against (FromAny's third operand):
 	// nothing if the type can't be checked here.
 	std::optional<uint32_t> check_for(const Type *p_type, Kind p_kind);
+	// A class as ClassValue names it: its index, or an ANY_IS_ code. Nothing for one that can't be a value here.
+	std::optional<uint32_t> class_code(const Type *p_class);
 	// The class a declaration says its value is of: a class of the program or a vector's. NONE otherwise.
 	uint32_t declared_class(TypeRef *p_type);
 	// The untyped value: ir/lower_any.cpp.

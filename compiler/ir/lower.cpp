@@ -141,6 +141,7 @@ Lowerer::Lowerer(Compilation &p_compilation, Module &p_module) :
 		signal_ = found == godot->definitions.end() ? nullptr : found->second;
 	}
 	function_ = compilation_.builtin("Function");
+	class_type_ = compilation_.builtin("Class");
 	array_ = compilation_.builtin("Array");
 }
 

@@ -98,9 +98,9 @@ uint32_t Calls::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	if (p_type == l_.array_ && l_.array_) {
 		return Vectors(l_).vector_new(l_.compilation_.instance_type(l_.array_), p_call->arguments, p_call->callee->offset); // Array(4) is new Array(4).
 	}
-	if (p_type == l_.function_ && l_.function_ && p_call->arguments.count == 1) {
-		// Function(x): a cast, which a store into a Function is. Not a function, AS3's TypeError #1034.
-		return l_.from_untyped(l_.any_value(p_call->arguments[0]), l_.compilation_.instance_type(l_.function_), Kind::Obj, position);
+	if ((p_type == l_.function_ || p_type == l_.class_type_) && p_type && p_call->arguments.count == 1) {
+		// Function(x), Class(x): a cast, which a store into one is. Not one, AS3's TypeError #1034.
+		return l_.from_untyped(l_.any_value(p_call->arguments[0]), l_.compilation_.instance_type(p_type), Kind::Obj, position);
 	}
 	if (p_type == l_.object_ && p_call->arguments.count <= 1) {
 		return Dynamic(l_).object_from(p_call->arguments.count ? p_call->arguments[0] : nullptr, position);

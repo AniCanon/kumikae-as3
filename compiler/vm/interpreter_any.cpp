@@ -264,6 +264,8 @@ bool Interpreter::any_is(Slot p_value, uint32_t p_type) const {
 			return tag == AnyTag::String;
 		case ir::ANY_IS_BOOLEAN:
 			return tag == AnyTag::Boolean;
+		case ir::ANY_IS_OBJECT:
+			return tag != AnyTag::Null && tag != AnyTag::Undefined;
 		default:
 			return (tag == AnyTag::Object && is_class(static_cast<const Object *>(any::pointer(p_value)), p_type)) || engine_array(p_value, p_type) ||
 					engine_dictionary(p_value, p_type);

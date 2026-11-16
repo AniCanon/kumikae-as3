@@ -14,6 +14,7 @@ class Expressions {
 	uint32_t boolean_literal(BoolLit *p_literal);
 	uint32_t this_value(uint32_t p_position);
 	uint32_t name_value(Expr *p_expression);
+	std::optional<uint32_t> class_value(Expr *p_expression);
 	uint32_t member_value(Expr *p_expression);
 	uint32_t new_value(Expr *p_expression);
 	uint32_t postfix(Expr *p_expression);

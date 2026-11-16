@@ -36,6 +36,11 @@ public:
 	LibraryCall(Interpreter &p_vm, const ir::LibraryMethod &p_method, Slot p_holder, const std::vector<Slot> &p_given, uint32_t p_out) :
 			vm_(p_vm), method_(p_method), holder_(p_holder), given_(p_given), out_(p_out) {}
 
+	// One typed operation of the library (p_op, with p_which its second operand), run on registers set
+	// past the running frame's: the values, each of its kind, are its arguments. The values are taken
+	// over. What it made, of p_result's kind and the caller's now, or nothing if it raised.
+	static std::optional<Slot> run_typed(Interpreter &p_vm, ir::Op p_op, uint32_t p_which, const std::vector<ir::Kind> &p_kinds,
+			std::vector<Slot> &p_values, ir::Kind p_result);
 	// The method of that name that such a value has, or null.
 	static const ir::LibraryMethod *find(const Interpreter &p_vm, Slot p_holder, std::string_view p_name);
 	// Done, or raised: the interpreter's error says which.

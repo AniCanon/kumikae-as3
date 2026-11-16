@@ -186,6 +186,9 @@ uint32_t Operators::godot_test(Binary *p_binary, uint32_t p_godot_class) {
 // (avmplus's Toplevel::instanceof, from recollection).
 uint32_t Operators::instance_of(Binary *p_binary) {
 	const Symbol *symbol = l_.named_class(p_binary->right);
+	if (!symbol && !(p_binary->right->type && p_binary->right->type->kind == Type::ClassObject)) {
+		return class_test(p_binary, Op::ClassInstanceOf);
+	}
 	if (symbol && (symbol->kind == SymbolKind::Interface || symbol == l_.int_ || symbol == l_.uint_)) {
 		l_.expression(p_binary->left, Kind::Void);
 		return l_.default_value(Kind::Bool, p_binary->offset);
@@ -195,11 +198,24 @@ uint32_t Operators::instance_of(Binary *p_binary) {
 	return type_test(&test);
 }
 
+// `x is c`, `x as c`, `x instanceof c` where c is no class named but a value that holds one.
+uint32_t Operators::class_test(Binary *p_binary, Op p_op) {
+	const uint32_t position = p_binary->offset;
+	const uint32_t value = l_.settled(l_.any_value(p_binary->left), p_binary->right, position);
+	const uint32_t klass = l_.any_value(p_binary->right);
+	const uint32_t out = l_.reg(p_op == Op::ClassAs ? Kind::Any : Kind::Bool);
+	l_.emit(p_op, position, out, value, klass);
+	return out;
+}
+
 uint32_t Operators::type_test(Binary *p_binary) {
 	uint32_t position = p_binary->offset;
 	Expr *left = p_binary->left;
 	Expr *right = p_binary->right;
 	Symbol *symbol = l_.named_class(right);
+	if (!symbol && !(right->type && right->type->kind == Type::ClassObject)) {
+		return class_test(p_binary, p_binary->op == TokenKind::KwIs ? Op::ClassIs : Op::ClassAs);
+	}
 	uint32_t index = 0;
 	// `v is Vector.<int>`: the type written is the class itself, and its instances are the vector.
 	const Type *written = right->type && right->type->kind == Type::ClassObject ? right->type->element : nullptr;

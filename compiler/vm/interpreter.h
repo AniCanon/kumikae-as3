@@ -273,6 +273,13 @@ private:
 	bool method_value(Slot p_holder, std::string_view p_name, Slot *r_value);
 	void call_library(const ir::Instruction &p_in);
 	void arguments_array(const ir::Instruction &p_in);
+	// Classes as values (vm/class_values.cpp).
+	std::unordered_map<uint32_t, Object *> class_values_; // The one object for each class, kept until the interpreter goes.
+	Object *class_value(uint32_t p_code);
+	std::string class_name(uint32_t p_code) const;
+	std::optional<uint32_t> class_in(Slot p_class, std::string_view p_error); // The class an untyped value holds, or raised.
+	void class_op(const ir::Function &p_function, const ir::Instruction &p_in);
+	void class_new(uint32_t p_code, const std::vector<Slot> &p_given, uint32_t p_out);
 	bool set_enumerable(Slot p_holder, const std::vector<Slot> &p_given);
 	int32_t function_length(Object *p_function) const;
 	void call_named(Slot p_holder, const PropertyKey &p_key, const std::vector<Slot> &p_given, uint32_t p_out);

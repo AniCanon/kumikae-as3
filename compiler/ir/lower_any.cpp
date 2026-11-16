@@ -1,3 +1,4 @@
+#include "lower_dynamic.h"
 #include "lower_operators.h"
 
 namespace kas3 {
@@ -181,6 +182,25 @@ uint32_t Lowerer::from_untyped(uint32_t p_any, const Type *p_type, Kind p_kind, 
 	uint32_t out = reg(Kind::Obj);
 	emit(Op::FromAny, p_position, out, p_any, *check);
 	return out;
+}
+
+std::optional<uint32_t> Lowerer::class_code(const Type *p_class) {
+	if (is_vector(p_class)) {
+		return vector_class(p_class);
+	}
+	const Symbol *symbol = p_class && p_class->kind == Type::Instance ? p_class->symbol : nullptr;
+	uint32_t index = NONE;
+	if (symbol == int_ || symbol == uint_ || symbol == number_ || symbol == string_ || symbol == boolean_) {
+		return symbol == int_ ? ANY_IS_INT : symbol == uint_ ? ANY_IS_UINT : symbol == number_ ? ANY_IS_NUMBER : symbol == string_ ? ANY_IS_STRING : ANY_IS_BOOLEAN;
+	}
+	if (symbol && symbol == object_) {
+		Dynamic(*this).table_class(false); // What `new` of it makes.
+		return ANY_IS_OBJECT;
+	}
+	if (!symbol || is_godot(symbol) || !class_index(symbol, &index)) {
+		return std::nullopt;
+	}
+	return index;
 }
 
 std::optional<uint32_t> Lowerer::check_for(const Type *p_type, Kind p_kind) {

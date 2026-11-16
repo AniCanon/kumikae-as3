@@ -168,7 +168,15 @@ inline bool is_held(Kind p_kind) {
 	/* `arguments`: out (an Array) of what the caller passed to the running function, each untyped, with \
 	   the function itself as its property `callee` (which a loop over the Array passes by). The first \
 	   instruction of a function that names `arguments`. */ \
-	X(Arguments, "R--")
+	X(Arguments, "R--") \
+	/* Classes as values. A class value is an object of the module's class_class whose one field \
+	   (CLASS_CODE) says which class: a class index, or one of the ANY_IS_ codes (int, uint, Number, \
+	   String, Boolean, Object), as AnyIs's third operand does. ClassValue: out (an object), that code; \
+	   the same object every time for one class. The rest take the class as an untyped register, found \
+	   out as they run (what is no class is AS3's TypeError): ClassIs and ClassInstanceOf out (Boolean), \
+	   the value (untyped), the class: `x is c`, `x instanceof c`; ClassAs out (untyped: the value, or \
+	   null), the value, the class; ClassNew out (untyped), the class, [the arguments, untyped]: `new c(a)`. */ \
+	X(ClassValue, "RI-") X(ClassIs, "RRR") X(ClassInstanceOf, "RRR") X(ClassAs, "RRR") X(ClassNew, "RRA")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,
@@ -186,6 +194,7 @@ const uint32_t ANY_IS_UINT = 0xFFFFFFF1u;
 const uint32_t ANY_IS_NUMBER = 0xFFFFFFF2u;
 const uint32_t ANY_IS_STRING = 0xFFFFFFF3u;
 const uint32_t ANY_IS_BOOLEAN = 0xFFFFFFF4u;
+const uint32_t ANY_IS_OBJECT = 0xFFFFFFF5u; // Anything but null and undefined. Only a class value holds it.
 const uint32_t BIND_SLOT = 0x80000000u; // In HostBind: the operand is a method-table slot.
 
 struct Instruction {

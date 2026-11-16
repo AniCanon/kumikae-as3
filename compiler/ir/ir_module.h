@@ -189,6 +189,7 @@ struct Module {
 	uint32_t argument_error_class = NONE; // Made when a program calls a function value: too many arguments.
 	// The built-in class of function values (FUNCTION_FIELDS), when the program has any.
 	uint32_t function_class = NONE;
+	uint32_t class_class = NONE; // Class: the built-in class of class values, when a program has any.
 	// The function behind every method of the library read by name and not called (`u.push`): it takes an
 	// Array of the value and the method's name first, then any number of arguments, and runs CallLibrary.
 	// Made when a program reaches properties by name.

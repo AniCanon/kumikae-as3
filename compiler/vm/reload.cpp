@@ -113,6 +113,20 @@ Object *Reload::object(Object *p_old) {
 		return found->second;
 	}
 	const ir::Class &old_class = from_.module_.classes[p_old->klass];
+	if (p_old->klass == from_.module_.class_class) {
+		// A class value: the class of the same name in the new program, whose one object for it this is.
+		const uint32_t code = static_cast<uint32_t>(p_old->fields()[ir::CLASS_CODE].i);
+		const auto same = code < from_.module_.classes.size() ? classes_.find(from_.module_.classes[code].name) : classes_.end();
+		if (code < from_.module_.classes.size() && same == classes_.end()) {
+			return lost(code);
+		}
+		Object *fresh = to_.module_.class_class == ir::NONE ? nullptr : to_.class_value(same == classes_.end() ? code : same->second);
+		if (!fresh) {
+			return lost(p_old->klass);
+		}
+		retain(fresh);
+		return fresh;
+	}
 	const auto named = classes_.find(old_class.name);
 	if (named == classes_.end()) {
 		return lost(p_old->klass);

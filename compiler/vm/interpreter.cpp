@@ -51,6 +51,9 @@ Interpreter::~Interpreter() {
 	for (Object *kept : lone_functions_) {
 		release_object(kept);
 	}
+	for (auto &[code, kept] : class_values_) {
+		release_object(kept);
+	}
 	for (size_t i = 0; i < globals_.size(); i++) {
 		drop(module_.globals[i].kind, globals_[i]);
 	}
