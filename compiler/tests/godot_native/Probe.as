@@ -11,6 +11,69 @@ package {
 		private var heard:Array = [];
 		[Signal] public var struck:Signal;
 
+		// A function value that gives one of Godot's values or objects, called every way there is, and
+		// `arguments` of a function whose parameters are such values.
+		private function giveVector():Vector2 {
+			return new Vector2(5, 6);
+		}
+
+		private function giveNode():Node2D {
+			return this;
+		}
+
+		private function giveNothing():Node2D {
+			return null;
+		}
+
+		private function echo(at:Vector2, node:Node2D, deep:Vector3):String {
+			return arguments[0] + " " + (arguments[1] === node) + " " + arguments[2] + " " + arguments.length;
+		}
+
+		public function given():String {
+			var out:Array = [];
+			var vector:Function = giveVector;
+			var untyped:* = vector();
+			var typed:Vector2 = vector();
+			out.push(untyped, typed.x, vector.call(null));
+			var node:Function = giveNode;
+			var found:* = node();
+			var same:Node2D = node();
+			out.push(found === this, same === this, node.call(null) === this);
+			var nothing:Function = giveNothing;
+			out.push(nothing(), nothing() === null);
+			out.push(echo(new Vector2(1, 2), this, new Vector3(1, 2, 3)));
+			return out.join("|");
+		}
+
+		// An error raised by a listener while Godot runs a method this function called on bare values: it
+		// comes out of that call, to this function's catch, after its finally.
+		private var raising:Boolean = false;
+
+		private function onShown():void {
+			if (raising) {
+				throw new Error("in listener");
+			}
+		}
+
+		public function carried():String {
+			var said:String = "";
+			visibilityChanged.add(onShown);
+			raising = true;
+			try {
+				try {
+					hide();
+					said += "after-hide ";
+				} finally {
+					said += "finally ";
+				}
+			} catch (e:Error) {
+				said += "caught " + e.message;
+			}
+			raising = false;
+			show();
+			return said + " end " + visible;
+		}
+
 		// Each of Godot's value types that has parts: made, its parts read and written, its operators, a
 		// method or two, a constant. Native code holds each in a local as the bytes Godot holds, and asks
 		// Godot's own code for the type with nothing between, or does the same sums itself.
@@ -190,6 +253,12 @@ package {
 				out.push(position.x);
 			} catch (e:Error) {
 				out.push("read: " + e.message);
+			}
+			try {
+				position = new Vector2(3, 4);
+				out.push("moved");
+			} catch (e:Error) {
+				out.push("move: " + e.message);
 			}
 			try {
 				rotation = 1;

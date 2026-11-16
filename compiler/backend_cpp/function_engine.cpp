@@ -354,6 +354,8 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 		line(type + " v{};");
 	}
 	line("c->engine->call(bind, on, " + std::string(parameters.empty() ? "nullptr" : "p") + ", " + (gives ? "&v" : "nullptr") + ");");
+	// What Godot ran meanwhile may have been a listener of the program's, and that may have raised.
+	line("if (KAS3_UNLIKELY(c->listener_failed) && call_failed(c)) { " + fail() + " }");
 	if (out != NONE) {
 		line(reg(out) + " = " + (result == "bool" ? "v != 0" : "v") + ";");
 	}

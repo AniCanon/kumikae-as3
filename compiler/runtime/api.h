@@ -10,6 +10,7 @@
 	/* Errors (operations.h says what each is for). */ \
 	X(stack_overflow, void, (Context *c), (c)) \
 	X(raise_null, void, (Context *c), (c)) \
+	X(call_failed, bool, (Context *c), (c)) \
 	X(out_of_memory, void, (Context *c), (c)) \
 	X(throw_value, void, (Context *c, Slot p_any), (c, p_any)) \
 	X(rethrow, void, (Context *c, Slot p_any, uint32_t p_register, bool *r_traced), (c, p_any, p_register, r_traced)) \

@@ -96,6 +96,10 @@ inline void *owner_object(const Context *c, Object *p_this, void *&r_found, uint
 	return r_found;
 }
 
+// After a call of Godot's that generated code made on bare values: whether a listener the call ran raised
+// an error that is this function's now (c->failing), as it is when the library makes the call.
+//     bool call_failed(Context *c);
+
 // Godot's own code for one of its value types, as the host found it (Resolved::bind): an operator's
 // evaluator, a method of the type, the getter or the setter of a part. Each takes bare values by their
 // addresses, as the type is held bare, and writes what it gives the same way.

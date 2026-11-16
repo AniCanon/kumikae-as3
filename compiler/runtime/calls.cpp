@@ -137,6 +137,13 @@ bool result_to_any(Context *c, Kind p_kind, Slot p_result, Slot *r_any) {
 			}
 			*r_any = c->host->builtin(Builtin::NumberToAny, &p_result);
 			return !c->failing;
+		// One of Godot's: the handle goes with it. With no handle there is nothing, which is null.
+		case Kind::Val:
+			*r_any = p_result.p ? vm::any::godot_value(p_result.p) : vm::any::null();
+			return true;
+		case Kind::Ref:
+			*r_any = p_result.p ? vm::any::godot_object(p_result.p) : vm::any::null();
+			return true;
 		default:
 			*r_any = c->host->builtin(Builtin::WideToAny, &p_result);
 			return !c->failing;
@@ -159,7 +166,9 @@ Object *arguments_of(Context *c, uint32_t p_function, const Slot *p_parameters, 
 		} else if (kind == Kind::Obj) {
 			retain(c, static_cast<Object *>(held.p));
 		}
-		result_to_any(c, kind, kind == Kind::Any ? shared(c, held) : held, &values[i]);
+		// A handle of its own, likewise, for one of Godot's.
+		const Slot own = kind == Kind::Any ? shared(c, held) : ir::is_engine(kind) ? slot(shared(c, Ref{ held.p })) : held;
+		result_to_any(c, kind, own, &values[i]);
 	}
 	Object *made = c->failing ? nullptr : new_array(c, values.data(), count);
 	for (Slot each : values) {

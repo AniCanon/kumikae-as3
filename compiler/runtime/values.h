@@ -62,6 +62,9 @@ struct Context {
 	// looks it up again when this has moved (engine.h, owner_object). Counted from any thread: Godot may
 	// free an object on one of its workers.
 	std::atomic<uint32_t> freed{ 0 };
+	// A function the engine called failed: its error may be carried for a call generated code made on bare
+	// values, which asks (engine.h, call_failed) and is given it.
+	bool listener_failed = false;
 	const EngineApi *engine = nullptr;
 	const Resolved *resolved = nullptr;
 	const void *const *names = nullptr;

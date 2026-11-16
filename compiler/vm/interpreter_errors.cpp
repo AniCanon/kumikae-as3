@@ -216,6 +216,35 @@ void Interpreter::raise_carried() {
 	carried_.error.bits = 0;
 }
 
+bool Interpreter::take_carried(NativeError *r_error) {
+	// A call made within a running instruction leaves its error as that instruction's own, not carried.
+	if (!carried_.held && failing_ && !stopped_) {
+		r_error->error = pending_;
+		r_error->trace = std::move(trace_);
+		r_error->lines = trace_lines_;
+		r_error->function = std::move(thrown_at_.function);
+		r_error->file = std::move(thrown_at_.file);
+		r_error->line = thrown_at_.line;
+		pending_.bits = 0;
+		failing_ = false;
+		trace_.clear();
+		trace_lines_ = 0;
+		return true;
+	}
+	if (!carried_.held || carried_.stopped) {
+		return false;
+	}
+	r_error->error = carried_.error;
+	r_error->trace = std::move(carried_.trace);
+	r_error->lines = carried_.lines;
+	r_error->function = std::move(carried_.at.function);
+	r_error->file = std::move(carried_.at.file);
+	r_error->line = carried_.at.line;
+	carried_ = Carried();
+	stopped_ = false; // Set so that the instruction beneath would end and raise it: there is none.
+	return true;
+}
+
 void Interpreter::report_carried() {
 	const Slot error = pending_;
 	const bool failing = failing_;
