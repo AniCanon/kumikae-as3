@@ -122,6 +122,7 @@ class UiProbeStarter : ApplicationStarter {
             press(view, "Show console")
             await("the console to open") { console.parent?.parent?.parent != null }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-6-console.png"))
+            checkConsoleWraps(console)
             press(view, "Copy screenshot")
             check(prompts.copiedImages == 1) { "The screenshot was not copied" }
             check(!controller.inputEnabled) { "Input is on before the owner agreed" }
@@ -135,6 +136,7 @@ class UiProbeStarter : ApplicationStarter {
             await("the failure") { shows(view, "An application bundle was not found") && screen(view).frame == null }
             check(console.text.contains("[Error] An application bundle")) { "The failure is missing from the console" }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-7-failed-input-on.png"))
+            checkConsoleWraps(console)
             onEdt { tab(view, "Probe Phone 17 Pro").doClose() }
             await("the shutdown") { shows(view, "Probe Phone 17 Pro is shut down.") }
             check("shutdown probe-phone" in repository.calls) { "Closing the tab sent ${repository.calls}" }
@@ -149,6 +151,11 @@ class UiProbeStarter : ApplicationStarter {
         }
         check(repository.closed) { "Closing the window left the service running" }
         await("the composition to be released") { view.component.componentCount == 0 }
+    }
+
+    private fun checkConsoleWraps(console: JTextArea) = onEdt {
+        val broken = UiProbeText.brokenWords(console)
+        check(broken.isEmpty()) { "The console breaks words although a space was free: $broken" }
     }
 
     private fun tab(view: SimulatorToolWindow, name: String) =
