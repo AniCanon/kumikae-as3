@@ -79,6 +79,13 @@ target_include_directories(kas3backend_cpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ba
 target_link_libraries(kas3backend_cpp PUBLIC kas3ir)
 target_compile_options(kas3backend_cpp PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 
+# What generated code is built against and, where there is no engine, the host it runs in.
+file(GLOB KAS3_RUNTIME_SOURCES CONFIGURE_DEPENDS runtime/*.cpp)
+add_library(kas3runtime STATIC ${KAS3_RUNTIME_SOURCES})
+target_include_directories(kas3runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
+target_link_libraries(kas3runtime PUBLIC kas3vm)
+target_compile_options(kas3runtime PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
+
 # The language server: JSON, the workspace and the message loop. The Godot editor does not need it.
 file(GLOB KAS3_LSP_SOURCES CONFIGURE_DEPENDS lsp/*.cpp)
 add_library(kas3lsp STATIC ${KAS3_LSP_SOURCES})
@@ -141,7 +148,10 @@ if(KAS3_SANITIZE)
 endif()
 add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_native.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR}/native
-    --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS})
+    --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS}
+    --include ${CMAKE_CURRENT_SOURCE_DIR}/runtime --include ${CMAKE_CURRENT_SOURCE_DIR}/vm
+    --include ${CMAKE_CURRENT_SOURCE_DIR}/ir --include ${CMAKE_CURRENT_SOURCE_DIR}/src
+    --lib $<TARGET_FILE:kas3runtime> --lib $<TARGET_FILE:kas3vm> --lib $<TARGET_FILE:kas3ir> --lib $<TARGET_FILE:kas3front>)
 # Which corpus programs can run in Godot, and what stops the others.
 add_test(NAME corpus COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_corpus.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
