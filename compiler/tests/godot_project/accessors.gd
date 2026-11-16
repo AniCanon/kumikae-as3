@@ -38,6 +38,8 @@ func _physics_process(_delta: float) -> bool:
 	node.health += 1
 	show("compound", node.health, 9)
 	show("through an interface", node.ownSize(), 90)
+	# As the method list says: a getter is the property, not a method by its AS3 name.
+	show("an accessor is no method by its AS3 name", [node.has_method("get health"), node.has_method("ownSize")], [false, true])
 	show("a getter's error reads as nothing", node.broken, null)
 	show("a native property still", node.position, Vector2.ZERO)
 	node.position = Vector2(3, 4)
