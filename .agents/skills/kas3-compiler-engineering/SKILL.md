@@ -33,7 +33,7 @@ lower layer owns.
 |---|---|
 | A syntax form | `src/parser_*.cpp` by kind, its node in `src/ast.h`, its walk in `ast_walk.h`, its print in `ast_printer.cpp` |
 | A type rule or a diagnostic | `src/typer_*.cpp` by what is typed; the message once, with `quoted()` |
-| An IR operation | One line in the table in `ir/ir.h` (name and shape letters), its case in `vm/interpreter_run.cpp`, its lowering in the `ir/lower_*.cpp` that owns that kind of code |
+| An IR operation | One line in the table in `ir/ir_ops.h` (name and shape letters), its case in `vm/interpreter_run.cpp`, its lowering in the `ir/lower_*.cpp` that owns that kind of code |
 | Something asked of Godot | An entry on `EngineHandles` (done to a value the interpreter holds) or `EngineSource` (where a value comes from); `NoEngine` answers it; the recorder in `tests/test_vm.cpp` records it; `godot_ext/godot_host*.cpp` does it |
 | Something about Godot's API as a whole | A rule in `godot/generate.py`, never a hand edit of `godot.as` or `godot_names.txt` |
 
