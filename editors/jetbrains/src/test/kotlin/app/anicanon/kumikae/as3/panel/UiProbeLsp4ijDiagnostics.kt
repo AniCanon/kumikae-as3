@@ -41,37 +41,51 @@ internal object UiProbeLsp4ijDiagnostics {
                 WriteCommandAction.runWriteCommandAction(project) {
                     // The native handler uses this monitor too. Keep real server replies out of this sequence.
                     synchronized(opened) {
-                        val version = versionMethod.invoke(synchronizer) as Int
-                        val accepted = PublishDiagnosticsParams(uri.toString(), listOf(diagnostic), version)
-                        client.publishDiagnostics(accepted)
-                        check(refreshes == 1 && opened.diagnostics.contains(diagnostic)) {
-                            "Current diagnostic was not accepted"
-                        }
-                        client.publishDiagnostics(PublishDiagnosticsParams(uri.toString(), emptyList(), version - 1))
-                        check(refreshes == 1 && opened.diagnostics.contains(diagnostic)) {
-                            "Rejected publication requested a repaint"
-                        }
-                        client.publishDiagnostics(accepted)
-                        check(refreshes == 2) { "Identical accepted diagnostic did not request a repaint" }
-                        val source = editor.document.text
-                        val psi = PsiDocumentManager.getInstance(project)
+                        val server = opened.diagnostics.toSet()
+                        check(server.isNotEmpty()) { "The server's own diagnostic is not showing" }
                         try {
-                            editor.document.insertString(0, " ")
-                            check(!psi.isCommitted(editor.document)) { "Expected an unsent edit" }
-                            client.publishDiagnostics(PublishDiagnosticsParams(uri.toString(), emptyList(), version))
+                            val version = versionMethod.invoke(synchronizer) as Int
+                            val accepted = PublishDiagnosticsParams(uri.toString(), listOf(diagnostic), version)
+                            client.publishDiagnostics(accepted)
+                            check(refreshes == 1 && opened.diagnostics.contains(diagnostic)) {
+                                "Current diagnostic was not accepted"
+                            }
+                            client.publishDiagnostics(
+                                PublishDiagnosticsParams(uri.toString(), emptyList(), version - 1),
+                            )
+                            check(refreshes == 1 && opened.diagnostics.contains(diagnostic)) {
+                                "Rejected publication requested a repaint"
+                            }
+                            client.publishDiagnostics(accepted)
+                            check(refreshes == 2) { "Identical accepted diagnostic did not request a repaint" }
+                            val source = editor.document.text
+                            val psi = PsiDocumentManager.getInstance(project)
+                            try {
+                                editor.document.insertString(0, " ")
+                                check(!psi.isCommitted(editor.document)) { "Expected an unsent edit" }
+                                client.publishDiagnostics(
+                                    PublishDiagnosticsParams(uri.toString(), emptyList(), version),
+                                )
+                                check(refreshes == 2 && opened.diagnostics.contains(diagnostic)) {
+                                    "Publication for old text was accepted during an uncommitted edit"
+                                }
+                            } finally {
+                                editor.document.setText(source)
+                                psi.commitDocument(editor.document)
+                            }
+                            client.dispose()
+                            val latest = versionMethod.invoke(synchronizer) as Int
+                            client.publishDiagnostics(PublishDiagnosticsParams(uri.toString(), emptyList(), latest))
                             check(refreshes == 2 && opened.diagnostics.contains(diagnostic)) {
-                                "Publication for old text was accepted during an uncommitted edit"
+                                "Disposed client changed diagnostics"
                             }
                         } finally {
-                            editor.document.setText(source)
-                            psi.commitDocument(editor.document)
+                            // Undo only the probe's publications, inside the monitor: no server reply lands
+                            // between, and the server's own diagnostics are what it left.
+                            val latest = versionMethod.invoke(synchronizer) as Int
+                            wrapper.updateDiagnostics(file, "lsp4ij.publish", server.toList(), latest)
                         }
-                        client.dispose()
-                        val latest = versionMethod.invoke(synchronizer) as Int
-                        client.publishDiagnostics(PublishDiagnosticsParams(uri.toString(), emptyList(), latest))
-                        check(refreshes == 2 && opened.diagnostics.contains(diagnostic)) {
-                            "Disposed client changed diagnostics"
-                        }
+                        check(opened.diagnostics.toSet() == server) { "Cleanup changed the server's own diagnostics" }
                     }
                 }
             }
@@ -79,7 +93,6 @@ internal object UiProbeLsp4ijDiagnostics {
                 "Stale, uncommitted and disposed replies are ignored; equal accepted diagnostics request repaint"
         } finally {
             if (!client.isDisposed) client.dispose()
-            wrapper.updateDiagnostics(file, "lsp4ij.publish", emptyList(), versionMethod.invoke(synchronizer) as Int)
         }
     }
 }

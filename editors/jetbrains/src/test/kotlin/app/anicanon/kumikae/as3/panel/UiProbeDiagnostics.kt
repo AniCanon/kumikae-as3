@@ -28,7 +28,16 @@ internal object UiProbeDiagnostics {
         observations += "Diagnostics appear, clear after shrink and forty edits, then appear and clear again"
         UiProbeLanguageFeatures.run(project, editor, observations)
         observations += "Parameter help, navigation and outline remain available after document shrink"
-        if (!PlatformUtils.isRider()) UiProbeLsp4ijDiagnostics.run(project, editor, observations)
+        if (!PlatformUtils.isRider()) {
+            // With the server's own error showing, so that cleanup touching it would be seen.
+            replace(project, editor, bad)
+            awaitError(project, editor)
+            UiProbeLsp4ijDiagnostics.run(project, editor, observations)
+            replace(project, editor, clean)
+            UiProbeCompletion.await("diagnostics clear after the publication probe") {
+                errors(project, editor).isEmpty()
+            }
+        }
     }
 
     private fun replace(project: Project, editor: Editor, text: String) = UiProbeCompletion.edt {
