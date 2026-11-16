@@ -57,9 +57,12 @@ that repeat across packages), over `corpus/` with Godot's API, and, one sequence
 folder on disk edited both in the editor and on disk. Between edits the workspace is left part-checked: a
 check that stops, a question about one file, or nothing. After them every file's errors, `dump_names`,
 `dump_types`, and completion, hover, definition and argument help at sampled places must equal a fresh,
-fully checked workspace's, with no rebuild but for files added or removed. Named sequences cover what
-random edits seldom reach (an interface cycle cut elsewhere, the first definition of a name changing,
-halves across files, more than 100 errors, broken files repaired, override defaults). `test_scope` pins how
+fully checked workspace's, with no rebuild at all: files copied in and removed, files moved between
+packages, accessor halves overridden along a chain and a declaration file with mistaken tags are among the
+edits. Named sequences cover what random edits seldom reach (an interface cycle cut elsewhere, the first
+definition of a name changing, halves across files and along a chain, more than 100 errors, broken files
+repaired, override defaults), and named tests a chain of 70 and of 1,000 classes, packages released, a
+declaration file's tag errors said once, and a tree checked twice. `test_scope` pins how
 many files an edit checks again. `test_server_incremental` does the same through `Server`: batches of edits
 and requests, checks that stop at random, and what the editor ends up holding per file.
 

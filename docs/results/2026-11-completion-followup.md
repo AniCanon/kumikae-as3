@@ -221,8 +221,8 @@ application has the desktop's focus, as it does in the background sandbox. Windo
 host-side regressions but still need Windows runtime validation. Human acceptance of the complete
 editing workflow remains separate from automated sandbox checks.
 
-A file added to or removed from the program, an edited `--declarations` file or another project folder
-starts the declarations over (bodies are still checked lazily). An edit to a declaration every file reads
+An edited `--declarations` file starts the declarations over (bodies are still checked lazily); a file
+added to or removed from the program no longer does. An edit to a declaration every file reads
 checks every file's bodies again, in the background. The idle check stops between files for any message.
 Dynamic receivers need a known type for member completion. The [editor guide](../../editors/completion.md)
 describes completion behavior; broader language-server work remains in the [backlog](../backlog.md).
