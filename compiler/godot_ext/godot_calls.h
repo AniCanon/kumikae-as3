@@ -1,4 +1,5 @@
-// What the calls into Godot share, in godot_host.cpp and godot_source.cpp. Not for other files.
+// What the calls into Godot share, in godot_host.cpp, godot_signals.cpp and godot_source.cpp. Not for other
+// files.
 #pragma once
 
 #include "godot_host.h"
@@ -47,9 +48,15 @@ public:
 	size_t count() const { return count_; }
 };
 
+// What reaching through an object Godot has freed is: AS3's null error, which says so.
+inline constexpr const char *FREED = "TypeError: Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.";
+
 // A failed call in AS3's words.
 std::string describe(const GDExtensionCallError &p_error, std::string_view p_what);
 // Text as Godot holds it.
 godot::String to_godot(std::string_view p_text);
+// The AS3 way of listening to a signal (`@add`, `@remove` and the rest), for GodotHost::call and get.
+bool signal_verb(const godot::Variant &p_receiver, std::string_view p_verb, const vm::Argument *p_arguments, size_t p_count,
+		const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error);
 
 } // namespace kas3
