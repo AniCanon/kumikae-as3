@@ -83,24 +83,34 @@ bool Host::enter(uint32_t p_function, const Slot *p_arguments, uint32_t p_count,
 	interpreter->left();
 	release(&context, self);
 	bool ok = !context.failing;
-	if (ok && held.active && held.depth > before) {
-		// A listener's error, kept for a call this function made, which did not ask for it: the function
-		// failed with it, as it does where the interpreter raises one it carried.
-		interpreter->discard(static_cast<Kind>(info.result), result);
-		held.active = false;
-		report_outside(*this, std::move(held.error));
-		ok = false;
-	} else if (!ok) {
+	// A listener's error kept for a call this function made, which did not ask for it: said here, where
+	// the function ends, as the interpreter says one it carried and nothing took.
+	const bool unasked = held.active && held.depth > before;
+	if (!ok) {
 		// Generated code is running a call of the engine's beneath this one: the error goes back to it, as
 		// Flash has a listener's error come out of the dispatch that ran it. Only the first.
-		if (before > 0 && !outer && !held.active && !stopped) {
-			held.error = taken(*this);
+		if (before > 0 && !outer && !(held.active && !unasked) && !stopped) {
+			Waiting own = taken(*this);
+			if (unasked) {
+				report_outside(*this, std::move(held.error));
+			}
+			held.error = std::move(own);
 			held.depth = before;
 			held.active = true;
 			context.listener_failed = true;
 		} else {
 			report_outside(*this, taken(*this));
+			if (unasked) {
+				held.active = false;
+				report_outside(*this, std::move(held.error));
+			}
 		}
+	} else if (unasked) {
+		// The function failed with it, as it does where the interpreter raises what it carried.
+		interpreter->discard(static_cast<Kind>(info.result), result);
+		held.active = false;
+		report_outside(*this, std::move(held.error));
+		ok = false;
 	}
 	if (outer) {
 		restore();
