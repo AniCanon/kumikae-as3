@@ -204,5 +204,7 @@ inline bool is_expression(NodeKind p_kind) {
 
 // Removes what name resolution and the types pass wrote onto the tree, so that it can be checked again.
 void clear_annotations(Program *p_tree);
+// The same for what checking the bodies wrote, leaving what the declarations and signatures did.
+void clear_body_annotations(Program *p_tree);
 
 } // namespace kas3

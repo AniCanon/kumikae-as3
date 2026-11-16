@@ -208,27 +208,25 @@ public:
 	explicit Rules(Compilation &p_compilation) :
 			compilation_(p_compilation) {}
 
-	void run() {
-		for (Unit &unit : compilation_.units()) {
-			if (unit.is_builtin) {
-				continue;
+	void run(Unit &p_unit) {
+		if (p_unit.is_builtin) {
+			return;
+		}
+		if (p_unit.tree->package) {
+			for (Node *node : p_unit.tree->package->definitions) {
+				definition(p_unit, node);
 			}
-			if (unit.tree->package) {
-				for (Node *node : unit.tree->package->definitions) {
-					definition(unit, node);
-				}
-			}
-			for (Node *node : unit.tree->definitions) {
-				definition(unit, node);
-			}
+		}
+		for (Node *node : p_unit.tree->definitions) {
+			definition(p_unit, node);
 		}
 	}
 };
 
 } // namespace
 
-void check_class_rules(Compilation &p_compilation) {
-	Rules(p_compilation).run();
+void check_class_rules(Compilation &p_compilation, Unit &p_unit) {
+	Rules(p_compilation).run(p_unit);
 }
 
 } // namespace kas3

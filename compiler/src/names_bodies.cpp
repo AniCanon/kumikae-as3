@@ -21,8 +21,19 @@ Scope &Resolver::retain_scope(Scope &p_fallback, const Node *p_extent) {
 }
 
 // Imports written in the body are in force for the whole function.
-void Resolver::body_imports(FunctionDecl *p_function, ImportScope &r_imports) {
+void Resolver::body_imports(FunctionDecl *p_function, ImportScope &r_imports, bool p_declared) {
 	r_imports.parent = context_.imports;
+	if (p_declared) {
+		// Resolved, and reported, with the signature.
+		auto found = unit_.function_imports.find(p_function);
+		if (found != unit_.function_imports.end()) {
+			r_imports.imports = found->second.imports;
+			r_imports.failed = found->second.failed;
+			r_imports.failed_wildcard = found->second.failed_wildcard;
+			context_.imports = &r_imports;
+		}
+		return;
+	}
 	if (p_function->body) {
 		std::vector<Import *> written;
 		hoist(p_function->body, &written);
@@ -37,9 +48,11 @@ void Resolver::body_imports(FunctionDecl *p_function, ImportScope &r_imports) {
 }
 
 // The parameters, the return type and the implicit `arguments`.
-void Resolver::declare_parameters(FunctionDecl *p_function, Scope &r_scope) {
+void Resolver::declare_parameters(FunctionDecl *p_function, Scope &r_scope, bool p_declared) {
 	for (Parameter &parameter : p_function->parameters) {
-		type(parameter.type);
+		if (!p_declared) {
+			type(parameter.type);
+		}
 		Symbol *symbol = compilation_.new_symbol(SymbolKind::Parameter, parameter.name, &unit_, parameter.offset);
 		symbol->type = parameter.type;
 		symbol->is_rest = parameter.is_rest;
@@ -48,7 +61,9 @@ void Resolver::declare_parameters(FunctionDecl *p_function, Scope &r_scope) {
 			error(parameter.offset, "duplicate parameter " + quoted(parameter.name));
 		}
 	}
-	type(p_function->return_type);
+	if (!p_declared) {
+		type(p_function->return_type);
+	}
 	if (!arguments_) {
 		arguments_ = compilation_.new_symbol(SymbolKind::Arguments, "arguments", &unit_, 0);
 		arguments_->unit = nullptr;
@@ -56,7 +71,7 @@ void Resolver::declare_parameters(FunctionDecl *p_function, Scope &r_scope) {
 	r_scope.names.emplace("arguments", arguments_);
 }
 
-void Resolver::function(FunctionDecl *p_function, bool p_expression) {
+void Resolver::function(FunctionDecl *p_function, bool p_expression, bool p_declared) {
 	// A named function expression can call itself by its name. The name sits just outside the body, so a
 	// parameter or local may reuse it.
 	Scope transient_self, transient_scope;
@@ -83,8 +98,8 @@ void Resolver::function(FunctionDecl *p_function, bool p_expression) {
 	loops_ = 0;
 	switches_ = 0;
 
-	body_imports(p_function, scope.imports);
-	declare_parameters(p_function, scope);
+	body_imports(p_function, scope.imports, p_declared);
+	declare_parameters(p_function, scope, p_declared);
 
 	scope_ = &scope;
 	function_scope_ = &scope;
@@ -104,9 +119,9 @@ void Resolver::function(FunctionDecl *p_function, bool p_expression) {
 	switches_ = outer_switches;
 }
 
+// A field's or a package-level variable's: its type was resolved with the signatures.
 void Resolver::variables(VarDecl *p_decl) {
 	for (Declarator &declarator : p_decl->declarators) {
-		type(declarator.type);
 		expression(declarator.initializer);
 	}
 }
@@ -124,7 +139,7 @@ void Resolver::definition(Node *p_node, bool p_in_block) {
 				} else if (member->kind == NodeKind::FunctionDecl) {
 					FunctionDecl *method = static_cast<FunctionDecl *>(member);
 					static_ = (method->modifiers.bits & Modifiers::Static) != 0;
-					function(method, false);
+					function(method, false, true);
 				}
 			}
 		} break;
@@ -133,13 +148,13 @@ void Resolver::definition(Node *p_node, bool p_in_block) {
 			context_ = compilation_.context_of(decl->symbol);
 			static_ = false;
 			for (FunctionDecl *method : decl->methods) {
-				function(method, false);
+				function(method, false, true);
 			}
 		} break;
 		case NodeKind::FunctionDecl:
 			context_ = compilation_.context_of(unit_, p_in_block);
 			static_ = false;
-			function(static_cast<FunctionDecl *>(p_node), false);
+			function(static_cast<FunctionDecl *>(p_node), false, true);
 			break;
 		case NodeKind::VarDecl:
 			context_ = compilation_.context_of(unit_, p_in_block);
@@ -167,10 +182,15 @@ void resolve_unit_bodies(Compilation &p_compilation, Unit &p_unit) {
 	Resolver(p_compilation, p_unit).run();
 }
 
-void resolve_bodies(Compilation &p_compilation) {
-	for (Unit &unit : p_compilation.units()) {
-		resolve_unit_bodies(p_compilation, unit);
-	}
+void check_class_rules(Compilation &p_compilation, Unit &p_unit); // names_rules.cpp
+void type_unit(Compilation &p_compilation, Unit &p_unit); // typer.cpp
+
+// What a file's bodies say, and the rules its classes keep. Reads only what other files declare, so files
+// are checked one at a time, in any order, once every file's signatures are resolved.
+void check_unit_bodies(Compilation &p_compilation, Unit &p_unit) {
+	resolve_unit_bodies(p_compilation, p_unit);
+	check_class_rules(p_compilation, p_unit);
+	type_unit(p_compilation, p_unit);
 }
 
 } // namespace kas3

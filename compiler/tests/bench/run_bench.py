@@ -11,7 +11,8 @@ Prints one line per benchmark: the median of the runs in milliseconds, and the s
 fastest and the slowest. A change is slower only if its median moved by more than the spread.
 
   check     a full `kas3c check` of a generated project of about 100,000 lines
-  recheck   the language server checking that project again after one edit (bench_recheck's median)
+  recheck   the language server checking that project again after a method's parameters change (bench_recheck's
+            median for the whole program; tests/bench/recheck.py times every kind of edit, for two builds)
   run       `kas3c run` of loop.as: arithmetic, calls and fields in a loop
   vectors   `kas3c run` of vectors.as: a vector's elements read and written in loops
   values    `kas3c run` of values.as: calls through function values, objects and arrays made in a loop
@@ -92,7 +93,7 @@ def main():
         samples = []
         for _ in range(runs):
             _, done = timed([os.path.join(build, "bench_recheck"), project])
-            found = re.search(r"re-check:\s+([0-9.]+) ms median", done.stdout)
+            found = re.search(r"^signature\s+program\s+([0-9.]+) ms median", done.stdout, re.M)
             if not found:
                 sys.exit("bench_recheck printed no median:\n" + done.stdout[-600:])
             samples.append(float(found.group(1)))

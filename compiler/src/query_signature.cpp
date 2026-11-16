@@ -81,7 +81,7 @@ std::optional<SignatureHelp> Queries::signature_help(const Unit &p_unit, uint32_
 	SignatureHelp help;
 	help.label = describe(decl->symbol);
 	for (const Parameter &parameter : decl->parameters) {
-		help.parameters.push_back(describe(parameter.symbol));
+		help.parameters.push_back(parameter_text(*decl->symbol->unit, parameter));
 	}
 	help.active_parameter = help.parameters.empty() ? 0 :
 			std::min(*active, static_cast<uint32_t>(help.parameters.size() - 1));

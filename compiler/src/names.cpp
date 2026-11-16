@@ -4,13 +4,12 @@
 #include "ast_walk.h"
 
 #include "builtins.h"
+#include "incremental.h"
 #include "parser.h"
 
 namespace kas3 {
 
-void resolve_bodies(Compilation &p_compilation); // names_bodies.cpp
-void type_bodies(Compilation &p_compilation); // names_types.cpp
-void check_class_rules(Compilation &p_compilation); // names_rules.cpp
+void check_unit_bodies(Compilation &p_compilation, Unit &p_unit); // names_bodies.cpp
 
 const char *symbol_kind_name(SymbolKind p_kind) {
 	switch (p_kind) {
@@ -112,6 +111,8 @@ std::vector<std::shared_ptr<Parsed>> parse_builtins() {
 Compilation::Compilation() :
 		Compilation(parse_builtins()) {}
 
+Compilation::~Compilation() = default;
+
 Compilation::Compilation(const std::vector<std::shared_ptr<Parsed>> &p_builtins) {
 	void_.kind = Type::Void;
 	null_.kind = Type::Null;
@@ -133,6 +134,7 @@ Unit *Compilation::add(std::shared_ptr<Parsed> p_parsed, bool p_is_declaration) 
 	p_parsed->used = true;
 	units_.emplace_back(std::move(p_parsed));
 	Unit &unit = units_.back();
+	unit.rank = (uint32_t)(units_.size() - 1);
 	unit.is_declaration = p_is_declaration;
 	return &unit;
 }
@@ -159,25 +161,15 @@ void Compilation::check(bool p_through_syntax_errors) {
 			}
 		}
 	}
+	std::vector<Unit *> all;
 	for (Unit &unit : units_) {
-		declare_unit(unit);
+		all.push_back(&unit);
 	}
-	auto object = top_level_->definitions.find("Object");
-	object_ = object == top_level_->definitions.end() ? nullptr : object->second;
-	auto vector = top_level_->definitions.find("Vector");
-	vector_ = vector == top_level_->definitions.end() ? nullptr : vector->second;
+	declare_files(all);
 	for (Unit &unit : units_) {
-		link_imports(unit);
+		check_unit_bodies(*this, unit);
 	}
-	link_hierarchy();
-	resolve_bodies(*this);
-	check_class_rules(*this);
-	type_bodies(*this);
-	if (syntax_errors) {
-		drop_doubtful_errors();
-	}
-	reusable_bodies_ = !has_errors();
-	initial_type_count_ = types_.size();
+	settle_doubt();
 }
 
 bool Compilation::has_errors() const {
@@ -200,9 +192,15 @@ std::string Compilation::format_diagnostics(bool p_warnings) const {
 Symbol *Compilation::new_symbol(SymbolKind p_kind, std::string_view p_name, Unit *p_unit, uint32_t p_offset) {
 	const bool body = p_kind == SymbolKind::Parameter || p_kind == SymbolKind::Local ||
 			p_kind == SymbolKind::LocalFunction || p_kind == SymbolKind::CatchVariable || p_kind == SymbolKind::Arguments;
-	auto &storage = body && p_unit ? p_unit->body_symbols : symbols_;
-	storage.emplace_back();
-	Symbol *symbol = &storage.back();
+	Symbol *symbol = body ? nullptr : reused(p_kind, p_name, p_unit);
+	if (!symbol) {
+		auto &storage = body && p_unit ? p_unit->body_symbols : symbols_;
+		storage.emplace_back();
+		symbol = &storage.back();
+	}
+	if (!body && p_unit) {
+		p_unit->declared.push_back(symbol);
+	}
 	symbol->kind = p_kind;
 	symbol->name = p_name;
 	symbol->unit = p_unit;
@@ -251,6 +249,7 @@ std::string Compilation::where(const Unit &p_from, const Symbol *p_symbol) const
 	if (p_symbol->unit == &p_from) {
 		return "at line " + std::to_string(position.line);
 	}
+	p_from.cited.push_back(p_symbol->unit); // A line moving there changes this message.
 	return "at " + p_symbol->unit->source.path() + ":" + std::to_string(position.line) + ":" +
 			std::to_string(position.column);
 }
@@ -300,9 +299,7 @@ void Compilation::declare_class(Unit &p_unit, ClassDecl *p_decl, bool p_in_block
 	Symbol *symbol = new_symbol(SymbolKind::Class, p_decl->name, &p_unit, p_decl->name_offset);
 	symbol->node = p_decl;
 	symbol->modifiers = p_decl->modifiers.bits;
-	classes_.emplace_back();
-	symbol->klass = &classes_.back();
-	symbol->klass->symbol = symbol;
+	class_info(p_unit, symbol);
 	p_decl->symbol = symbol;
 	if ((p_decl->modifiers.bits & Modifiers::Dynamic) && !p_unit.is_declaration) {
 		p_unit.diagnostics.error(p_decl->name_offset, "dynamic classes are not supported");
@@ -328,9 +325,7 @@ void Compilation::declare_definition(Unit &p_unit, Node *p_node, bool p_in_block
 			Symbol *symbol = new_symbol(SymbolKind::Interface, decl->name, &p_unit, decl->name_offset);
 			symbol->node = decl;
 			symbol->modifiers = decl->modifiers.bits;
-			classes_.emplace_back();
-			symbol->klass = &classes_.back();
-			symbol->klass->symbol = symbol;
+			class_info(p_unit, symbol);
 			decl->symbol = symbol;
 			declare_package_level(p_unit, symbol, p_in_block);
 			declare_interface_members(p_unit, symbol, decl);
@@ -369,6 +364,19 @@ void Compilation::declare_package_level(Unit &p_unit, Symbol *p_symbol, bool p_i
 	p_symbol->file_private = !p_in_block;
 	auto &table = p_in_block ? p_unit.package->definitions : p_unit.helpers;
 	auto inserted = table.emplace(p_symbol->name, p_symbol);
+	if (!inserted.second && p_in_block) {
+		Symbol *first = inserted.first->second;
+		if (first->unit->rank > p_unit.rank) {
+			// Declared again after an edit, in a file that comes first: this one is the definition now. The
+			// other file reads the name, so it is checked again and says it is defined twice.
+			table.erase(inserted.first);
+			table.emplace(p_symbol->name, p_symbol);
+			p_unit.package->repeated.emplace(first->name, first);
+			tracking_->counts.firsts++;
+			return;
+		}
+		p_unit.package->repeated.emplace(p_symbol->name, p_symbol);
+	}
 	if (!inserted.second) {
 		std::string message = quoted(p_symbol->name) + " is already defined " + where(p_unit, inserted.first->second);
 		if (inserted.first->second->unit && inserted.first->second->unit->broken) {
@@ -412,6 +420,7 @@ void Compilation::declare_accessor(Unit &p_unit, Symbol *p_owner, FunctionDecl *
 }
 
 void Compilation::declare_class_members(Unit &p_unit, Symbol *p_class, ClassDecl *p_decl) {
+	reuse_owner_ = p_class;
 	for (Node *member : p_decl->members) {
 		if (member->kind == NodeKind::VarDecl) {
 			VarDecl *decl = static_cast<VarDecl *>(member);
@@ -453,9 +462,11 @@ void Compilation::declare_class_members(Unit &p_unit, Symbol *p_class, ClassDecl
 			}
 		}
 	}
+	reuse_owner_ = nullptr;
 }
 
 void Compilation::declare_interface_members(Unit &p_unit, Symbol *p_interface, InterfaceDecl *p_decl) {
+	reuse_owner_ = p_interface;
 	for (FunctionDecl *decl : p_decl->methods) {
 		decl->modifiers.bits |= Modifiers::Public; // Interface members are always public.
 		if (decl->accessor != FunctionDecl::None) {
@@ -469,6 +480,22 @@ void Compilation::declare_interface_members(Unit &p_unit, Symbol *p_interface, I
 		decl->symbol = symbol;
 		declare_member(p_unit, p_interface, symbol);
 	}
+	reuse_owner_ = nullptr;
+}
+
+// A class keeps its ClassInfo when its declarations are made again.
+void Compilation::class_info(Unit &p_unit, Symbol *p_symbol) {
+	if (!p_symbol->klass && tracking_ && !tracking_->unused_classes.empty()) {
+		p_symbol->klass = tracking_->unused_classes.back();
+		tracking_->unused_classes.pop_back();
+		*p_symbol->klass = ClassInfo();
+	}
+	if (!p_symbol->klass) {
+		classes_.emplace_back();
+		p_symbol->klass = &classes_.back();
+	}
+	p_symbol->klass->symbol = p_symbol;
+	p_unit.classes.push_back(p_symbol);
 }
 
 } // namespace kas3

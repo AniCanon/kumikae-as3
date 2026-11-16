@@ -192,6 +192,20 @@ std::string variable_text(const Unit &p_unit, const Symbol *p_symbol, std::strin
 
 } // namespace
 
+void Queries::clear() {
+	occurrences_.clear();
+	completion_items_.clear();
+	context_nodes_.clear();
+	types_.clear();
+	types_listed_ = false;
+}
+
+void Queries::forget(const Unit &p_unit) {
+	occurrences_.erase(&p_unit);
+	context_nodes_.erase(&p_unit);
+	completion_items_.clear(); // Keyed by symbols, some of which the check replaced.
+}
+
 const std::vector<Occurrence> &Queries::occurrences(const Unit &p_unit) {
 	auto cached = occurrences_.find(&p_unit);
 	if (cached != occurrences_.end()) {
@@ -275,6 +289,10 @@ std::vector<Place> Queries::references(const Symbol *p_symbol, bool p_with_decla
 		places.push_back(declaration(p_symbol));
 	}
 	return places;
+}
+
+std::string Queries::parameter_text(const Unit &p_unit, const Parameter &p_parameter) {
+	return (p_parameter.is_rest ? "..." : "") + std::string(p_parameter.name) + type_text(p_unit, p_parameter.type);
 }
 
 std::string Queries::describe(const Symbol *p_symbol) const {

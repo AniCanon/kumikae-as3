@@ -77,6 +77,23 @@ static void diagnostic_limit() {
 	CHECK(text.size() > tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0);
 }
 
+// Past the limit, the errors kept are the first in the file, whatever order the passes found them in.
+static void diagnostic_limit_keeps_the_first() {
+	Source source("dir/A.as", std::string(300, 'x'));
+	Diagnostics diagnostics;
+	for (int i = 0; i < 150; i++) {
+		diagnostics.error((uint32_t)(149 - i), "e" + std::to_string(149 - i));
+	}
+	diagnostics.warning(5, "w");
+	diagnostics.error(200, "late");
+	CHECK_EQ((int)diagnostics.items().size(), 100);
+	CHECK_EQ(diagnostics.count(), 151);
+	CHECK_EQ(diagnostics.dropped(), 52);
+	CHECK_EQ(diagnostics.items().front().message, std::string("e0"));
+	CHECK_EQ(diagnostics.items()[6].message, std::string("w"));
+	CHECK_EQ(diagnostics.items().back().message, std::string("e98"));
+}
+
 static void read_missing_file_fails() {
 	std::string text;
 	CHECK(!read_file("/nonexistent/x.as", &text));
@@ -91,6 +108,7 @@ int main() {
 	diagnostic_format();
 	diagnostics_are_ordered_by_position();
 	diagnostic_limit();
+	diagnostic_limit_keeps_the_first();
 	read_missing_file_fails();
 	return check::finish();
 }

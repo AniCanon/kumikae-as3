@@ -275,10 +275,8 @@ void Typer::run() {
 	}
 }
 
-void type_bodies(Compilation &p_compilation) {
-	for (Unit &unit : p_compilation.units()) {
-		Typer(p_compilation, unit).run();
-	}
+void type_unit(Compilation &p_compilation, Unit &p_unit) {
+	Typer(p_compilation, p_unit).run();
 }
 
 } // namespace kas3
