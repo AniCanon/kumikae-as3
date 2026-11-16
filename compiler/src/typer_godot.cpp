@@ -27,8 +27,10 @@ const Type *Typer::tag_type(Symbol *p_class, const Metadata &p_tag, std::string_
 		if (!place) {
 			continue;
 		}
+		// A declaration file describes what was compiled without this program: a class of the program by
+		// the name is not what its tag means (and the file is checked once, whatever the program defines later).
 		auto found = place->definitions.find(name);
-		if (found != place->definitions.end() &&
+		if (found != place->definitions.end() && found->second->unit && found->second->unit->is_declaration &&
 				(found->second->kind == SymbolKind::Class || found->second->kind == SymbolKind::Interface)) {
 			return compilation_.instance_type(found->second);
 		}
