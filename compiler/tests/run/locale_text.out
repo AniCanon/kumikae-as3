@@ -7,6 +7,8 @@ true true
 1,,2,,s,3
 spoken,[object Plain],texted
 spoken,,spoken
+styled2
+Error #1063: Argument count mismatch on Demanding/toLocaleString(). Expected 1, got 0.
 1,two,,,3.5,true | a,,c
 spoken,1
 caught 1009

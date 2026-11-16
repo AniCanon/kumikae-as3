@@ -19,6 +19,10 @@ package { public class locale_text {
 		// An element's own toLocaleString() is what is asked of it; without one, its toString().
 		trace([new Spoken(), new Plain(), new Texted()].toLocaleString());
 		trace(new <Spoken>[new Spoken(), null, new Spoken()].toLocaleString());
+		// It is called with no arguments: a default is taken, and one that needs an argument is AS3's
+		// ArgumentError.
+		trace([new Styled()].toLocaleString());
+		try { [new Demanding()].toLocaleString(); } catch (e:ArgumentError) { trace(e.message); }
 		// By name, on an untyped value: the same.
 		var held:* = a;
 		var heldVector:* = names;
@@ -36,4 +40,6 @@ package { public class locale_text {
 } }
 class Spoken { public function toLocaleString():String { return "spoken"; } public function toString():String { return "plain"; } }
 class Plain {}
+class Styled { public function toLocaleString(style:String = "styled", times:int = 2):String { return style + times; } }
+class Demanding { public function toLocaleString(style:String):String { return style; } public function toString():String { return "demanding"; } }
 class Texted { public function toString():String { return "texted"; } }

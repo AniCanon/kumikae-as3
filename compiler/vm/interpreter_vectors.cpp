@@ -241,15 +241,17 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 	return done;
 }
 
-// What the object's method of no arguments gives, as text, added to r_text. False if the method failed.
+// What the object's method gives when called with no arguments, as text, added to r_text. False if the
+// method failed, or needs an argument (AS3's ArgumentError #1063).
 bool Interpreter::said_by(uint32_t p_method, Object *p_object, std::string *r_text) {
-	Slot self;
-	self.bits = 0;
-	self.p = p_object;
+	std::vector<Slot> self;
+	if (!function_arguments(p_method, p_object, 0, nullptr, &self)) {
+		return false;
+	}
 	Slot result;
 	result.bits = 0;
 	retain(p_object); // Held while it speaks, for the reason element_text() gives.
-	const bool called = call_within(p_method, &self, 1, &result);
+	const bool called = call_within(p_method, self.data(), self.size(), &result);
 	release_object(p_object);
 	if (!called) {
 		return false;
@@ -277,7 +279,7 @@ bool Interpreter::locale_element_text(Kind p_kind, Slot p_element, std::string *
 	if (!object || module_.classes[object->klass].element == Kind::Void) {
 		// A class's own toLocaleString() is what avmplus asks each element for; Object's is its toString().
 		const uint32_t own = object ? find_method(object->klass, "toLocaleString") : NONE;
-		const bool callable = own != NONE && module_.functions[own].is_public && !module_.functions[own].is_static && module_.functions[own].required <= 1;
+		const bool callable = own != NONE && module_.functions[own].is_public && !module_.functions[own].is_static;
 		return callable ? said_by(own, object, r_text) : element_text(p_kind, p_element, r_text);
 	}
 	retain(object); // Held while its elements speak, for the reason element_text() gives.
