@@ -2,6 +2,8 @@
 // every are in lower_functions.cpp).
 #include "lower_vectors.h"
 
+#include "library_methods.h"
+
 #include <array>
 
 namespace kas3 {
@@ -19,131 +21,21 @@ struct VectorShape {
 	Kind result = Kind::Void;
 };
 
-std::optional<VectorMethod> vector_method(std::string_view p_name) {
-	struct Method {
-		std::string_view name;
-		VectorMethod method;
-	};
-	static constexpr std::array<Method, 17> methods = { {
-			{ "push", VectorMethod::Push },
-			{ "unshift", VectorMethod::Unshift },
-			{ "pop", VectorMethod::Pop },
-			{ "shift", VectorMethod::Shift },
-			{ "indexOf", VectorMethod::IndexOf },
-			{ "lastIndexOf", VectorMethod::LastIndexOf },
-			{ "reverse", VectorMethod::Reverse },
-			{ "slice", VectorMethod::Slice },
-			{ "concat", VectorMethod::Concat },
-			{ "join", VectorMethod::Join },
-			{ "toString", VectorMethod::Join },
-			{ "toLocaleString", VectorMethod::LocaleText },
-			{ "insertAt", VectorMethod::InsertAt },
-			{ "removeAt", VectorMethod::RemoveAt },
-			{ "splice", VectorMethod::Splice },
-			{ "sort", VectorMethod::Sort },
-			{ "sortOn", VectorMethod::SortOn },
-	} };
-	for (const Method &each : methods) {
-		if (each.name == p_name) {
-			return each.method;
+// The shape of a vector's method, from its row in the library's table, for a vector of such elements.
+VectorShape vector_shape(const LibraryMethod &p_method, Kind p_element) {
+	VectorShape shape;
+	for (const Taken &taken : p_method.fixed) {
+		if (taken.kind == Takes::Nothing) {
+			break;
 		}
+		shape.fixed.push_back(kind_taken(taken.kind, p_element));
+		shape.left_out.push_back(taken.required ? std::nullopt : std::optional<int64_t>(static_cast<int64_t>(taken.left_out)));
 	}
-	return std::nullopt;
-}
-
-// Concat, SortOn and Sort, which an Array takes otherwise than a Vector.
-VectorShape array_or_vector_shape(VectorMethod p_method, bool p_array) {
-	const Kind own = Kind::Obj;
-	std::vector<Kind> fixed;
-	std::vector<std::optional<int64_t>> left_out;
-	std::optional<Kind> rest;
-	Kind result = Kind::Void;
-	switch (p_method) {
-		case VectorMethod::Concat:
-			rest = p_array ? Kind::Any : own; // An Array's takes anything: an Array is spread, the rest added.
-			result = own;
-			break;
-		case VectorMethod::SortOn: // An Array's: the names and the options, each untyped.
-			rest = Kind::Any;
-			result = Kind::Any;
-			break;
-		case VectorMethod::Sort:
-			// A Vector's takes one; an Array's none to two, and gives the array, 0 or an Array of indices.
-			if (p_array) {
-				rest = Kind::Any;
-				result = Kind::Any;
-			} else {
-				fixed = { Kind::Any };
-				left_out = { std::nullopt };
-				result = own;
-			}
-			break;
-		default:
-			break;
+	if (p_method.rest != Takes::Nothing) {
+		shape.rest = kind_taken(p_method.rest, p_element);
 	}
-	return { fixed, left_out, rest, result };
-}
-
-VectorShape vector_shape(VectorMethod p_method, Kind p_element, bool p_array) {
-	const Kind element = p_element;
-	const Kind own = Kind::Obj;
-	std::vector<Kind> fixed;
-	std::vector<std::optional<int64_t>> left_out;
-	std::optional<Kind> rest;
-	Kind result = Kind::Void;
-	switch (p_method) {
-		case VectorMethod::Push:
-		case VectorMethod::Unshift:
-			rest = element;
-			result = Kind::U32;
-			break;
-		case VectorMethod::Pop:
-		case VectorMethod::Shift:
-			result = element;
-			break;
-		case VectorMethod::IndexOf:
-		case VectorMethod::LastIndexOf:
-			fixed = { element, Kind::I32 };
-			left_out = { std::nullopt, p_method == VectorMethod::IndexOf ? 0 : INT32_MAX };
-			result = Kind::I32;
-			break;
-		case VectorMethod::Reverse:
-			result = own;
-			break;
-		case VectorMethod::Slice:
-			fixed = { Kind::I32, Kind::I32 };
-			left_out = { 0, 16777215 };
-			result = own;
-			break;
-		case VectorMethod::Concat:
-		case VectorMethod::SortOn:
-		case VectorMethod::Sort:
-			return array_or_vector_shape(p_method, p_array);
-		case VectorMethod::Join:
-			fixed = { Kind::Str };
-			left_out = { 0 }; // A comma, made below.
-			result = Kind::Str;
-			break;
-		case VectorMethod::LocaleText:
-			result = Kind::Str;
-			break;
-		case VectorMethod::InsertAt:
-			fixed = { Kind::I32, element };
-			left_out = { std::nullopt, std::nullopt };
-			break;
-		case VectorMethod::RemoveAt:
-			fixed = { Kind::I32 };
-			left_out = { std::nullopt };
-			result = element;
-			break;
-		case VectorMethod::Splice:
-			fixed = { Kind::I32, Kind::U32 };
-			left_out = { std::nullopt, UINT32_MAX };
-			rest = element;
-			result = own;
-			break;
-	}
-	return { fixed, left_out, rest, result };
+	shape.result = kind_taken(p_method.result, p_element);
+	return shape;
 }
 
 } // namespace
@@ -172,20 +64,21 @@ uint32_t Vectors::vector_call(Call *p_call) {
 	const uint32_t position = p_call->offset;
 	Member *callee = static_cast<Member *>(p_call->callee);
 	const std::optional<uint32_t> klass = l_.vector_class(callee->object->type);
-	const std::optional<VectorMethod> method = vector_method(callee->name);
+	const bool array = klass && l_.module_.classes[*klass].array;
+	const LibraryMethod *row = library_method(callee->name, array ? ON_ARRAY : ON_VECTOR);
+	const std::optional<VectorMethod> method = row && row->does == Does::VecCall ? std::optional<VectorMethod>(static_cast<VectorMethod>(row->which)) : std::nullopt;
 	const uint32_t count = p_call->arguments.count;
 	for (std::string_view loop : { "forEach", "map", "filter", "some", "every" }) {
 		if (klass && callee->name == loop) {
 			return vector_each(p_call);
 		}
 	}
-	if (!klass || !method || (callee->name == "toString" && count) || (*method == VectorMethod::SortOn && !l_.module_.classes[*klass].array)) {
+	if (!klass || !method || (callee->name == "toString" && count)) {
 		l_.refuse(callee->name_offset, "calling '" + std::string(callee->name) + "' on a Vector");
 		return l_.default_value(Kind::Obj, position);
 	}
 	const Kind element = l_.module_.classes[*klass].element;
-	const bool array = l_.module_.classes[*klass].array;
-	const auto [fixed, left_out, rest, result] = vector_shape(*method, element, array);
+	const auto [fixed, left_out, rest, result] = vector_shape(*row, element);
 	bool fits = rest || count <= fixed.size();
 	for (size_t i = count; i < fixed.size(); i++) {
 		fits = fits && left_out[i].has_value();
@@ -213,7 +106,7 @@ uint32_t Vectors::vector_call(Call *p_call) {
 	for (size_t i = count; i < fixed.size(); i++) {
 		const uint32_t filled = l_.reg(fixed[i]);
 		if (fixed[i] == Kind::Str) {
-			l_.emit(Op::ConstStr, position, filled, l_.string(","));
+			l_.emit(Op::ConstStr, position, filled, l_.string(std::string(row->text_left_out)));
 		} else {
 			l_.emit(fixed[i] == Kind::U32 ? Op::ConstU32 : Op::ConstI32, position, filled, static_cast<uint32_t>(*left_out[i]));
 		}
