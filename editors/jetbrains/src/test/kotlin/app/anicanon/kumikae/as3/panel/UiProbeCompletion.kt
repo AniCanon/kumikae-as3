@@ -18,6 +18,7 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -81,7 +82,12 @@ object UiProbeCompletion {
             lateinit var editor: Editor
             edt {
                 FileEditorManager.getInstance(project).openFile(file, true)
-                editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
+                editor =
+                    checkNotNull(
+                        FileEditorManager.getInstance(
+                            project,
+                        ).getEditors(file).filterIsInstance<TextEditor>().firstOrNull()?.editor,
+                    )
                 editor.caretModel.moveToOffset(source.indexOf("normsuffix") + 4)
             }
             await("LSP initialization") {
@@ -90,7 +96,12 @@ object UiProbeCompletion {
             }
             await("indexing") { !DumbService.getInstance(project).isDumb }
             edt {
-                editor = checkNotNull(FileEditorManager.getInstance(project).selectedTextEditor)
+                editor =
+                    checkNotNull(
+                        FileEditorManager.getInstance(
+                            project,
+                        ).getEditors(file).filterIsInstance<TextEditor>().firstOrNull()?.editor,
+                    )
                 editor.caretModel.moveToOffset(source.indexOf("normsuffix") + 4)
             }
             val times = mutableListOf<Double>()
@@ -164,6 +175,7 @@ object UiProbeCompletion {
             }
             checkSnippet(project, editor, source)
             observations += "Required argument is selected; Tab exits the snippet after the call"
+            if (cycle == 0) UiProbeTestResults.run(project, destination)
         } finally {
             settings.AUTOCOMPLETE_ON_CODE_COMPLETION = autoComplete
             try {

@@ -31,6 +31,7 @@ dependencies {
         local(riderHome.get())
         bundledPlugin("org.jetbrains.plugins.textmate")
         bundledModule("intellij.platform.lsp")
+        bundledPlugin("intellij.testRunner.plugin")
         pluginVerifier()
     }
     testImplementation(kotlin("test"))
@@ -96,6 +97,10 @@ if (providers.gradleProperty("uiProbe").isPresent) {
 val kas3Root = providers.gradleProperty("kas3Root").orElse(rootDir.resolve("../..").path)
 tasks.withType<PrepareSandboxTask>().configureEach {
     val root = file(kas3Root.get())
+    from(rootDir.resolve("../../testing")) {
+        include("*.py", "as3/**", "README.md")
+        into("${intellijPlatform.projectName.get()}/native/testing")
+    }
     from(root.resolve("compiler/build")) {
         include("kas3c")
         into("${intellijPlatform.projectName.get()}/native")

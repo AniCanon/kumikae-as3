@@ -4,9 +4,16 @@
     <vendor>AniCanon</vendor>
     <description>ActionScript 3 for Godot: colours, errors as you type, go to definition, find usages and hover from kas3c, and an iOS Simulator panel. AS3 breakpoints are planned.</description>
     <depends>com.intellij.modules.platform</depends>
+    <depends>intellij.testRunner.plugin</depends>
     <depends>org.jetbrains.plugins.textmate</depends>
     <depends>com.intellij.modules.lsp</depends>
     <extensions defaultExtensionNs="com.intellij">
+        <codeInsight.lineMarkerProvider language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.scene.AttachedScenesLineMarker"/>
+        <runConfigurationProducer implementation="app.anicanon.kumikae.as3.testing.As3TestProducer"/>
+        <runLineMarkerContributor language="KumikaeAS3" implementationClass="app.anicanon.kumikae.as3.testing.As3TestLineMarker"/>
+        <fileEditorProvider implementation="app.anicanon.kumikae.as3.scene.SceneEditorProvider"/>
+        <configurationType implementation="app.anicanon.kumikae.as3.testing.As3TestsType"/>
+        <fileEditorProvider implementation="app.anicanon.kumikae.as3.settings.ProjectSettingsEditorProvider"/>
         <platform.lsp.integrationProvider implementation="app.anicanon.kumikae.as3.language.As3LspSupportProvider"/>
         <textmate.bundleProvider implementation="app.anicanon.kumikae.as3.language.As3Grammar"/>
         <notificationGroup id="Kumikae AS3" displayType="BALLOON"/>
@@ -39,6 +46,15 @@
                     factoryClass="app.anicanon.kumikae.as3.panel.SimulatorToolWindowFactory"/>
     </extensions>
     <actions>
+        <action id="KumikaeAs3.FindAttachedScenes" class="app.anicanon.kumikae.as3.scene.FindAttachedScenesAction" text="Find Attached Scene Nodes">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action id="KumikaeAs3.CompactPackages" class="app.anicanon.kumikae.as3.project.CompactPackagesAction" text="Compact AS3 Packages">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+        <action id="KumikaeAs3.ShowGenerated" class="app.anicanon.kumikae.as3.project.ShowGeneratedAction" text="Show Generated Files">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
         <action id="KumikaeAs3.NewClass" class="app.anicanon.kumikae.as3.project.NewAs3FileAction">
             <add-to-group group-id="NewGroup" anchor="first"/>
         </action>

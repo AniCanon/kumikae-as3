@@ -163,6 +163,10 @@ typing, lexical scopes, import paths, replacement edits, callable snippets and s
 [results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
 complete stage 6 or add Windows support.
 
+The [project experience](results/2026-11-rider-project-experience.md) adds a `project.godot`
+settings editor, compact AS3 packages, scene attachment navigation and [AS3 tests](../testing/README.md)
+with native Rider results. These are editor features, not completion of the debugger stage.
+
 Basic editor highlighting and error reporting arrive earlier, with stage 2.
 
 ### Later, designed separately
