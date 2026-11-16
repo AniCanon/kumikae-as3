@@ -380,7 +380,7 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	// may take them out of the Array.
 	SpareSlots given(spare_slots_);
 	for (uint32_t i = 0; array && i < array->length; i++) {
-		given->push_back(share(Kind::Any, array->data[i]));
+		given->push_back(share(Kind::Any, any::filled(array->data[i])));
 	}
 	SpareSlots values(spare_slots_);
 	const bool ok = function_arguments(value, given->size(), given->data(), &*values);

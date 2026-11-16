@@ -71,6 +71,9 @@ Vector *array_new(Library &p_library, uint32_t p_class, const Slot *p_values, si
 	for (size_t i = 0; made && spread && i < p_count; i++) {
 		made->data[i] = p_library.heap.share(Kind::Any, p_values[i]);
 	}
+	if (made && !spread) {
+		std::fill(made->data, made->data + made->length, any::hole()); // A length alone: no element is written.
+	}
 	return made;
 }
 
@@ -86,6 +89,10 @@ bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length) {
 	const Kind kind = p_library.class_of(p_vector).element;
 	const uint32_t old = p_vector->length;
 	if (p_length >= old) {
+		if (p_library.class_of(p_vector).array) {
+			// An Array's new places are holes until something is written to them.
+			std::fill(p_vector->data + old, p_vector->data + p_length, any::hole());
+		}
 		p_vector->length = p_length;
 		return true;
 	}
@@ -142,7 +149,7 @@ Vector *vector_new(Library &p_library, uint32_t p_class, uint32_t p_length, bool
 bool vector_get(Library &p_library, Vector *p_vector, Kind p_index_kind, Slot p_index, Slot *r_out) {
 	const Kind kind = p_library.class_of(p_vector).element;
 	if (const std::optional<uint32_t> at = element_index(p_index_kind, p_index, p_vector->length)) {
-		*r_out = p_library.heap.share(kind, p_vector->data[*at]);
+		*r_out = p_library.heap.share(kind, kind == Kind::Any ? any::filled(p_vector->data[*at]) : p_vector->data[*at]);
 		return true;
 	}
 	// An index that names no element: of an Array, the property named by the number; of a Vector, AS3's
@@ -208,7 +215,7 @@ bool vector_from(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_ou
 	bool ok = made != nullptr;
 	for (uint32_t i = 0; ok && i < made->length; i++) {
 		// One taken out of the source as an earlier element spoke is undefined.
-		const Slot element = i < from->length ? to_any(p_library, given, from->data[i]) : any::undefined();
+		const Slot element = i < from->length ? to_any(p_library, given, given == Kind::Any ? any::filled(from->data[i]) : from->data[i]) : any::undefined();
 		ok = from_any(p_library, element, klass.element, klass.element_check, &made->data[i]);
 		p_library.heap.drop_any(element);
 	}

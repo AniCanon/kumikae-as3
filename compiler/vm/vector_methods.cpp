@@ -71,7 +71,7 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	}
 	if (p_call.method == VectorMethod::IndexOf || p_call.method == VectorMethod::IndexOfAny) {
 		for (uint32_t i = clamped(p_call.values[2].i, length); i < length && found < 0; i++) {
-			found = p_library.unmoved.element_is(kind, p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
+			found = p_library.unmoved.element_is(kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
 		}
 	} else {
 		// From the end if negative; before the start, there is nothing to look at.
@@ -79,7 +79,7 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 		int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
 		from = from >= length ? static_cast<int64_t>(length) - 1 : from;
 		for (int64_t i = from; i >= 0 && found < 0; i--) {
-			found = p_library.unmoved.element_is(kind, p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
+			found = p_library.unmoved.element_is(kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
 		}
 	}
 	give(p_library, p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));
@@ -150,7 +150,8 @@ void vector_take(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	// other numbers, false, null for the rest, and undefined itself for untyped elements.
 	Slot element = empty_value(kind == Kind::F64, false);
 	if (length != 0) {
-		element = p_vector->data[at];
+		// A hole taken out is undefined, as any read of one is.
+		element = kind == Kind::Any ? any::filled(p_vector->data[at]) : p_vector->data[at];
 		shift_slots(p_vector, static_cast<uint32_t>(at) + 1, length - static_cast<uint32_t>(at) - 1, -1);
 		p_vector->data[length - 1].bits = 0;
 		p_vector->length = length - 1;
@@ -167,7 +168,8 @@ void vector_copy(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 		const uint32_t end = std::max(start, clamped(p_call.values[2].i, length));
 		Vector *part = p_library.fresh_vector(p_vector->klass, end - start);
 		for (uint32_t i = start; part && i < end; i++) {
-			part->data[i - start] = p_library.heap.share(kind, p_vector->data[i]);
+			// avmplus's generic_slice sets every index of the copy: a hole is an element that holds undefined there.
+			part->data[i - start] = p_library.heap.share(kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i]);
 		}
 		if (part) {
 			give(p_library, p_call, Kind::Obj, of_pointer(part));

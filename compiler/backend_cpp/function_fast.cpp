@@ -32,7 +32,8 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 				return false;
 			}
 			line("if (Slot *const e = element(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
-			share(p_in.a, from_slot(kind(p_in.a), "(*e)"));
+			// An Array's hole is read as undefined (vm/any.h).
+			share(p_in.a, from_slot(kind(p_in.a), kind(p_in.a) == Kind::Any ? "kas3::vm::any::filled(*e)" : "(*e)"));
 			break;
 		case Op::VecSet:
 			// An element there is, or one added at the end: a gap, a fixed vector and the rest are the library's.

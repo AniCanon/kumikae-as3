@@ -324,7 +324,7 @@ bool Interpreter::delete_property(Slot p_holder, const PropertyKey &p_key, bool 
 		Vector *vector = static_cast<Vector *>(object);
 		if (p_key.index && klass->array) {
 			if (*p_key.index < vector->length) {
-				put(Kind::Any, vector->data[*p_key.index], any::undefined());
+				put(Kind::Any, vector->data[*p_key.index], any::hole());
 			}
 			return true;
 		}

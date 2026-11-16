@@ -124,7 +124,7 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		case Op::VecGet: {
 			const Kind index = p_function.registers[p_in.c];
 			if (const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length)) {
-				put(kind, r[p_in.a], share(kind, vector->data[*at]));
+				put(kind, r[p_in.a], share(kind, kind == Kind::Any ? any::filled(vector->data[*at]) : vector->data[*at]));
 				break;
 			}
 			Slot made;

@@ -321,7 +321,7 @@ std::optional<bool> strict_equal(Slot p_a, Slot p_b) {
 	if (a == AnyTag::String) {
 		return static_cast<Str *>(pointer(p_a))->view() == static_cast<Str *>(pointer(p_b))->view();
 	}
-	return p_a.bits == p_b.bits;
+	return a == AnyTag::Undefined || p_a.bits == p_b.bits;
 }
 
 std::optional<bool> loose_equal(Slot p_a, Slot p_b) {

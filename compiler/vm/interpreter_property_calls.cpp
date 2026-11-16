@@ -403,7 +403,7 @@ void Interpreter::property_loop(const Function &p_function, const Instruction &p
 	bool more = false;
 	for (; !more && elements && cursor >= 0 && cursor < elements->length; cursor++) {
 		const uint32_t at = static_cast<uint32_t>(cursor);
-		more = !klass->array || any::tag(elements->data[at]) != AnyTag::Undefined;
+		more = !klass->array || !any::is_hole(elements->data[at]);
 	}
 	cursor = more ? cursor : cursor >= 0 ? -1 : cursor;
 	const Entries *entries = loop_entries(holder);

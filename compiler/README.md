@@ -228,9 +228,21 @@ default is for an argument left out, so `"abc".indexOf(undefined)` looks for "nu
 `_allowExtraArgs = _needRest || _needArguments || _ignoreRest`), through a function value, `call`, `apply`,
 by name and from Godot, and `arguments` holds them after the others. Inferred from those
 declarations and not run in Flash: a Vector's `join(undefined)` gives "null" between the elements; by name, an
-Array's `toString("x")` is Error #1063 and a Vector's ignores the argument. Not as avmplus has it, and why: a
-`for each` over an Array passes over an element that is undefined (avmplus passes over holes only, and an
-Array here does not tell the two apart). Beyond avmplus, which has no such values: `-`, `*`, `/`, `%`, unary
+Array's `toString("x")` is Error #1063 and a Vector's ignores the argument.
+
+**An Array's holes** are avmplus's (`core/ArrayObject.cpp`, `ArrayClass.cpp`, read): an index never written
+(`new Array(3)`, a longer `length`, `a[10] = x` on a short Array) or deleted is a hole, which is not an
+element that holds undefined. `for in`, `for each`, `in`, hasOwnProperty and propertyIsEnumerable pass over
+holes only (`nextNameIndex`, `hasUintProperty`); reading one gives undefined, so forEach, map, filter, some,
+every and indexOf see every index, `indexOf(undefined)` finds a hole, join writes nothing for one and JSON
+writes null; sort puts what is defined first, then the elements that hold undefined, then the holes, and
+keeps the length (`ArraySort`); shift, unshift, splice, concat and reverse keep a hole a hole (the dense
+paths) and slice's copy holds undefined there (`generic_slice`). Not carried over: avmplus's sparse form
+(every Array here is dense, so one with a far index takes that much memory), and what its dense `pop` and
+`reverse` do to an Array whose last places are holes, which reading the code suggests is a fault (here
+`pop()` gives undefined for a hole and `reverse()` reverses every place). A Vector has no holes.
+
+Beyond avmplus, which has no such values: `-`, `*`, `/`, `%`, unary
 `-` and the four comparisons on an untyped value that holds one of Godot's values ask Godot's own operator
 first, as `+` does and as typed code has it (`av * 3` is the Vector2 that `v * 3` is), so the type of such an
 expression with an untyped side is `*`; where Godot has no operator for what the two hold, the answer is

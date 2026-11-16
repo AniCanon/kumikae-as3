@@ -89,7 +89,7 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 		array.resize(static_cast<int64_t>(vector->length));
 		for (uint32_t i = 0; i < vector->length; i++) {
 			// An object, typed or untyped, goes this same way, so that what it can't be is an error here.
-			const vm::Slot held = vector->data[i];
+			const vm::Slot held = element == ir::Kind::Any ? vm::any::filled(vector->data[i]) : vector->data[i];
 			const bool untyped_object = element == ir::Kind::Any && vm::any::tag(held) == vm::AnyTag::Object;
 			const vm::Object *object = element == ir::Kind::Obj ? static_cast<const vm::Object *>(held.p)
 					: untyped_object							? static_cast<const vm::Object *>(vm::any::pointer(held))

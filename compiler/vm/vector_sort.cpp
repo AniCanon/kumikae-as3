@@ -187,8 +187,16 @@ bool sort_behavior(Library &p_library, const VectorCall &p_call, Object **r_comp
 	return true;
 }
 
+// What is being sorted: the elements, where each was, and where an Array's holes were.
+struct Sorting {
+	std::vector<Slot> elements;
+	std::vector<uint32_t> places;
+	std::vector<uint32_t> holes;
+};
+Sorting elements_to_sort(Library &p_library, Vector *p_vector);
+
 // What sort() and sortOn() give, once the new order is known (see vector_sort).
-void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, bool p_twins,
+void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, const Sorting &p_sorting, const std::vector<uint32_t> &p_order, bool p_twins,
 		int32_t p_options);
 
 } // namespace
@@ -206,17 +214,14 @@ void vector_sort(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	if (!sort_behavior(p_library, p_call, &compare, &options)) {
 		return;
 	}
-	std::vector<Slot> elements(p_vector->length);
-	for (uint32_t i = 0; i < p_vector->length; i++) {
-		elements[i] = p_library.heap.share(kind, p_vector->data[i]);
-	}
+	Sorting sorting = elements_to_sort(p_library, p_vector);
 	retain(p_vector);
 	std::vector<uint32_t> order;
 	bool twins = false;
-	if (sort_order(p_library, kind, elements, compare, options, &order, &twins)) {
-		sorted(p_library, p_vector, p_call, elements, order, twins, options);
+	if (sort_order(p_library, kind, sorting.elements, compare, options, &order, &twins)) {
+		sorted(p_library, p_vector, p_call, sorting, order, twins, options);
 	}
-	for (Slot &each : elements) {
+	for (Slot &each : sorting.elements) {
 		p_library.heap.drop(kind, each);
 	}
 	p_library.heap.release_object(p_vector);
@@ -224,7 +229,24 @@ void vector_sort(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 
 namespace {
 
-void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order,
+// What a sort puts in order, each with a reference of its own: every element, but an Array's holes, which
+// stay out of it and come after everything, as avmplus's ArraySort has them ("undefined comes after
+// everything else, and missing properties come after that").
+Sorting elements_to_sort(Library &p_library, Vector *p_vector) {
+	const Kind kind = p_library.module().classes[p_vector->klass].element;
+	Sorting sorting;
+	for (uint32_t i = 0; i < p_vector->length; i++) {
+		if (kind == Kind::Any && any::is_hole(p_vector->data[i])) {
+			sorting.holes.push_back(i);
+			continue;
+		}
+		sorting.elements.push_back(p_library.heap.share(kind, p_vector->data[i]));
+		sorting.places.push_back(i);
+	}
+	return sorting;
+}
+
+void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, const Sorting &p_sorting, const std::vector<uint32_t> &p_order,
 		bool p_twins, int32_t p_options) {
 	const ir::Class &klass = p_library.module().classes[p_vector->klass];
 	const Kind kind = klass.element;
@@ -234,9 +256,12 @@ void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, cons
 	if (klass.array && p_twins) {
 		give(p_library, p_call, Kind::Any, any::integer(0));
 	} else if (klass.array && (p_options & INDEXED)) {
-		if (Vector *indices = p_library.fresh_vector(p_vector->klass, p_order.size())) {
+		if (Vector *indices = p_library.fresh_vector(p_vector->klass, p_order.size() + p_sorting.holes.size())) {
 			for (uint32_t i = 0; i < p_order.size(); i++) {
-				indices->data[i] = any::integer(static_cast<int32_t>(p_order[i]));
+				indices->data[i] = any::integer(static_cast<int32_t>(p_sorting.places[p_order[i]]));
+			}
+			for (size_t i = 0; i < p_sorting.holes.size(); i++) {
+				indices->data[p_order.size() + i] = any::integer(static_cast<int32_t>(p_sorting.holes[i]));
 			}
 			Slot made;
 			made.bits = 0;
@@ -246,7 +271,10 @@ void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, cons
 		}
 	} else {
 		for (uint32_t i = 0; !p_twins && !(p_options & INDEXED) && i < p_order.size() && i < p_vector->length; i++) {
-			p_library.heap.put(kind, p_vector->data[i], p_library.heap.share(kind, p_elements[p_order[i]]));
+			p_library.heap.put(kind, p_vector->data[i], p_library.heap.share(kind, p_sorting.elements[p_order[i]]));
+		}
+		for (uint32_t i = static_cast<uint32_t>(p_order.size()); !p_twins && !(p_options & INDEXED) && !p_sorting.holes.empty() && i < p_vector->length; i++) {
+			p_library.heap.put(kind, p_vector->data[i], any::hole());
 		}
 		const Kind gives = klass.array ? Kind::Any : Kind::Obj;
 		give(p_library, p_call, gives, gives == Kind::Any ? to_any(p_library, Kind::Obj, self) : p_library.heap.share(Kind::Obj, self));
@@ -345,11 +373,9 @@ void vector_sort_on(Library &p_library, Vector *p_vector, const VectorCall &p_ca
 	if (!sort_on_fields(p_library, p_call, &fields, &options)) {
 		return;
 	}
-	const uint32_t count = p_vector->length;
-	std::vector<Slot> elements(count);
-	for (uint32_t i = 0; i < count; i++) {
-		elements[i] = p_library.heap.share(Kind::Any, p_vector->data[i]);
-	}
+	Sorting sorting = elements_to_sort(p_library, p_vector);
+	std::vector<Slot> &elements = sorting.elements;
+	const uint32_t count = static_cast<uint32_t>(elements.size());
 	retain(p_vector);
 	std::vector<double> numbers;
 	std::vector<std::string> texts;
@@ -372,7 +398,7 @@ void vector_sort_on(Library &p_library, Vector *p_vector, const VectorCall &p_ca
 		for (size_t i = 1; (options & UNIQUE) && i < order.size() && !twins; i++) {
 			twins = *compare(order[i - 1], order[i]) == 0;
 		}
-		sorted(p_library, p_vector, p_call, elements, twins ? std::vector<uint32_t>() : order, twins, options);
+		sorted(p_library, p_vector, p_call, sorting, twins ? std::vector<uint32_t>() : order, twins, options);
 	}
 	for (Slot &each : elements) {
 		p_library.heap.drop_any(each);
