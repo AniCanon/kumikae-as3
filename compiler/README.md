@@ -22,7 +22,7 @@ anyone changing the repository are in [AGENTS.md](../AGENTS.md).
 | `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
 | `vm/` host | What the interpreter needs from where it runs | `host.h` holds four interfaces: `output.h`, `engine_handles.h` (what is done to a value the interpreter holds), `engine_source.h` (where values come from), `clock.h` (the time and the zone, for Date). `no_engine.h` answers where there is no engine |
 | `backend_cpp/` | The C++ backend: the IR written as C++ source. Includes `ir/` only; writes text | `generate` (the entry point), `support` (what is refused), `function_writer` and `function_*.cpp` (a function, by kind of operation), `patterns.h` (the one-statement operations as a table), `thunks` (what is left to the shared library), `program_writer` (the header and the program's table) |
-| `runtime/` | What generated C++ is built against, and the host a program library runs in where there is no engine. Includes `vm/` and `ir/`; no Godot header yet | `kas3.h` and what it includes (`values.h`, `numbers.h`, `fast.h`, `operations.h`, `program.h`), `host`, `errors.cpp`, `calls.cpp` and `properties.cpp` (the fast paths that are not inline), `stub_module.cpp` and `bridge.cpp` (the interpreter kept for the shared library), `standalone.cpp` and `standalone_main.cpp` (a program run on its own) |
+| `runtime/` | What generated C++ is built against, and the host a program library runs in where there is no engine. Includes `vm/` and `ir/`; no Godot header yet | `kas3.h` and what it includes (`values.h`, `numbers.h`, `fast.h`, `operations.h`, `program.h`), `engine.h` and `godot_values.h` (Godot's objects and values as generated code holds them), `native_host` (the host), `errors.cpp`, `calls.cpp` and `properties.cpp` (the fast paths that are not inline), `stub_module.cpp` and `bridge.cpp` (the interpreter kept for the shared library), `standalone.cpp` and `standalone_main.cpp` (a program run on its own) |
 | `godot_ext/` | The GDExtension | `godot_host` (the four interfaces, with Godot's calls), `callable` (a method as a Godot function, and listeners as the cycle collector sees them), `instance`, `script`, `program`, `language`, `register` |
 | `lsp/` | The language server | `server`, `workspace` (edits applied, files checked as asked), `json` |
 | `godot/` | The generator of Godot's API as AS3 declarations | `generate.py`, `naming.py`, the generated `godot.as` and `godot_names.txt` |
@@ -247,11 +247,11 @@ It writes one `.cpp` for each class, `program.h` (each class as a struct, every 
 `program.cpp` (the functions of no class, and the table the one exported function `kas3_program` returns).
 The C++ is built against `runtime/` with `-O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops`,
 and builds without a warning under `-Wall -Wextra`. A program that uses something the backend does not
-translate yet is refused with `kas3c: not yet supported: <what>` and status 1, and nothing is written:
-today that is anything that asks Godot (this first step has no engine), which is every script given with
-`--godot` (the files are scripts for Godot, as for `kas3c ir --godot`).
+translate exactly is refused with `kas3c: not yet supported: <what>` and status 1, and nothing is written.
+With `--godot` the files are scripts for Godot, as for `kas3c ir --godot`, and the C++ is the project's
+program library (below).
 
-Linked with `libkas3runtime.a` and the interpreter's libraries, the C++ is a plain executable that runs the
+Linked with `libkas3standalone.a` (its `main`), `libkas3runtime.a` and the interpreter's libraries, the C++ is a plain executable that runs the
 program as `kas3c run` does: the same traces, the same report of an error nothing catches, the same exit
 status. That executable is the backend's oracle. `tests/run_native.py` (the `native` test group) takes
 every program of `tests/run/`, writes it as C++, builds it, runs it, and holds its output, its errors and its
@@ -268,6 +268,44 @@ Timings, native against the interpreter (and one build's native code against ano
 ```sh
 python3 compiler/tests/bench/run_native_bench.py compiler/build [--against <other build>]
 ```
+
+### Native code inside Godot
+
+The project's scripts, written as C++ and built into one shared library, are the project's **program
+library**. The extension looks for it when it loads the scripts: the file `KAS3_PROGRAM_LIBRARY` names, or
+`bin/libkas3_program.dylib` (`.so`) in the project. If it is there and was built from the scripts as they
+are now (the module's fingerprint, `ir::fingerprint`), the scripts run as native code and Godot's output
+says so; if not, a warning says why and the interpreter runs them. Nothing builds it by itself yet:
+
+```sh
+cd game && kas3c cpp --godot $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
+c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden \
+    -I compiler/runtime -I compiler/vm -I compiler/ir -I compiler/src \
+    -shared -undefined dynamic_lookup native/*.cpp -o bin/libkas3_program.dylib
+```
+
+The files are given in the order the extension reads them (sorted by their place in the project), so that
+both compile the same module. The library shows one symbol, `kas3_program`, includes nothing of Godot's or
+godot-cpp's, and finds the runtime's functions in the extension's library, which is loaded already.
+
+Everything the extension does goes on as before, through an interpreter the runtime's host keeps over the
+same module with each function's body native (`vm/native_code.h`): only what runs when a function is
+called differs. What generated code does with the engine itself, and what it leaves to the library:
+
+- A `Vector2` that is never null (what Godot makes, computes or gives for a property) is a plain struct
+  in a local, and `+`, `-`, `*` and `/` by a Number, `normalized()`, `length()` and its `x` and `y` are
+  the runtime's own inline code, Godot's formulas to the last bit (`runtime/godot_values.h`).
+- A property read or written and a method called on a Godot object, when every value that crosses is a
+  number, a Boolean, a value with parts or a name written in the program, is Godot's method bind called
+  on the bare values. The script's own Godot object is found once in each function, a singleton once
+  when the program loads, a name's `StringName` once.
+- Everything else that asks Godot (any other value type's maths, Strings, Arrays, Callables and signals,
+  untyped values, a value kept in a field) is the interpreter's own instruction, run by its thunk.
+
+Not there yet, natively: reloading the scripts while the game runs (the game says so and carries on), and
+the limit on a script's time (Error #1502).
+
+`tests/bench/languages/run.py` times it beside C#, GDScript and the interpreter ("AS3 native").
 
 ## Inside Godot
 
@@ -834,6 +872,8 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   lists the programs the backend refuses and why; a program newly refused, or one on the list that now
   runs, fails until the list says so (`--update`). The sanitizer build builds the generated programs with
   the sanitizers too.
+- `tests/test_backend.cpp`: the C++ backend on modules made by hand: what it refuses, by name and with
+  nothing written.
 - `tests/test_ir.cpp`, `tests/test_runtime.cpp`, `tests/test_vm.cpp`: the IR printer, the number rules
   (checked against Node), the hook and frames a debugger will use, calls into the interpreter that nest
   and fail, and a script run against a fake engine that records every request.

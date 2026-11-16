@@ -9,6 +9,7 @@
 #include "interpreter_records.h"
 #include "host.h"
 #include "ir.h"
+#include "native_code.h"
 #include "runtime.h"
 
 #include <array>
@@ -110,6 +111,8 @@ private:
 	int entries_ = 0; // Calls from outside in progress.
 	std::vector<std::unordered_map<std::string, uint32_t>> methods_; // Per class: a method's function by name.
 	StatementHook hook_ = nullptr;
+	NativeCode *native_ = nullptr;
+	void native_op(const ir::Instruction &p_in);
 	void *hook_data_ = nullptr;
 	uint32_t time_limit_ = 0; // In milliseconds; 0 for none.
 	uint32_t countdown_ = STATEMENTS_PER_LOOK; // Statements until the clock is looked at.
@@ -380,6 +383,9 @@ public:
 	Interpreter(const Interpreter &) = delete;
 	Interpreter &operator=(const Interpreter &) = delete;
 
+	// Who carries out the Native instructions of a module whose functions are native code. Without one,
+	// such an instruction raises an error.
+	void set_native(NativeCode *p_native) { native_ = p_native; }
 	void set_statement_hook(StatementHook p_hook, void *p_data) {
 		hook_ = p_hook;
 		hook_data_ = p_data;

@@ -20,6 +20,8 @@ using vm::Vector;
 
 struct Program; // runtime/program.h
 struct ClassInfo;
+struct EngineApi; // runtime/engine.h
+struct Resolved;
 struct Host; // The host's own state: nothing generated code reads.
 
 // Calls may nest this deep; one more is AS3's Error #1023, as in the interpreter.
@@ -50,6 +52,12 @@ struct Context {
 	uint8_t *class_used = nullptr; // Per class: its static fields have been (or are being) given values.
 	const ClassInfo *classes = nullptr; // The program's, here too: a call through a method table starts from it.
 	const Program *program = nullptr;
+	// The engine, where the host has one (runtime/engine.h): its entry points, what the host worked out
+	// for each place the program asks it for something (never null: empty entries with no engine), and
+	// Godot's names for the Strings the program gives where a name is taken, each built once.
+	const EngineApi *engine = nullptr;
+	const Resolved *resolved = nullptr;
+	const void *const *names = nullptr;
 	Host *host = nullptr;
 };
 
@@ -84,8 +92,20 @@ inline void retain(Context *, Object *p_object) {
 		p_object->references++;
 	}
 }
-inline void retain(Context *, Slot p_any) {
-	vm::retain(vm::any::counted(p_any));
+// An untyped value with a reference of its own: what it holds counted once more, or, for one of Godot's,
+// another handle on it.
+Slot shared_any(Context *c, Slot p_any);
+// A value as another holder takes it: the same String or object, counted once more.
+inline Str *shared(Context *c, Str *p_string) {
+	retain(c, p_string);
+	return p_string;
+}
+inline Object *shared(Context *c, Object *p_object) {
+	retain(c, p_object);
+	return p_object;
+}
+inline Slot shared(Context *c, Slot p_any) {
+	return shared_any(c, p_any);
 }
 inline void release(Context *, Str *p_string) {
 	if (p_string && --p_string->references == 0) {
@@ -117,8 +137,7 @@ inline void put(Context *c, T &r_place, typename As<T>::type p_owned) {
 template <typename T>
 inline void store(Context *c, T &r_place, typename As<T>::type p_borrowed) {
 	const T value = p_borrowed;
-	retain(c, value);
-	put<T>(c, r_place, value);
+	put<T>(c, r_place, shared(c, value));
 }
 inline void store_slot(Context *c, Slot &r_place, Str *p_borrowed) {
 	Str *const old = static_cast<Str *>(r_place.p);

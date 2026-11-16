@@ -22,7 +22,8 @@ Signature signature_of(const ir::Function &p_function) {
 	signature.result = type_of(p_function.result);
 	signature.parameters.push_back("Context *");
 	for (uint32_t i = 0; i < p_function.parameters; i++) {
-		signature.parameters.push_back(std::string(type_of(p_function.registers[i])));
+		const std::string_view inline_type = parts_of(p_function, i);
+		signature.parameters.push_back(std::string(inline_type.empty() ? type_of(p_function.registers[i]) : inline_type));
 	}
 	signature.counted = takes_count(p_function);
 	if (signature.counted) {
@@ -49,21 +50,30 @@ void FunctionWriter::analyse() {
 		if ((first == 'R' || first == 'r') && in.a != NONE && !first_is_read(in.op)) {
 			written_[in.a] = true;
 		}
-		if (in.op == Op::DynNext) {
-			written_[in.b] = true;
+		if (const uint32_t changed = changed_in_place(function_, in); changed != NONE) {
+			written_[changed] = true;
 		}
 	}
 	for (const ir::Handler &handler : function_.handlers) {
 		written_[handler.reg] = true;
 	}
+	shadow_.assign(function_.registers.size(), std::string());
+	find_inline();
+	singleton_use_.assign(function_.registers.size(), NONE);
+	find_aliases();
+}
+
+std::string_view FunctionWriter::parts(uint32_t p_register) const {
+	return inline_[p_register] ? parts_of(function_, p_register) : std::string_view();
 }
 
 std::string FunctionWriter::reg(uint32_t p_register) const {
-	return register_name(p_register);
+	return shadow_[p_register].empty() ? register_name(p_register) : shadow_[p_register];
 }
 
 bool FunctionWriter::owns(uint32_t p_register) const {
-	return ir::is_held(kind(p_register)) && (p_register >= function_.parameters || written_[p_register]);
+	return ir::is_held(kind(p_register)) && parts(p_register).empty() && alias_[p_register] == Alias::None &&
+			(p_register >= function_.parameters || written_[p_register]);
 }
 
 bool FunctionWriter::is_this(uint32_t p_register) const {
@@ -129,7 +139,9 @@ void FunctionWriter::null_check(uint32_t p_register) {
 	if (is_this(p_register)) {
 		return;
 	}
-	line("if (KAS3_UNLIKELY(!" + reg(p_register) + ")) { raise_null(c); " + fail() + " }");
+	// One of Godot's is missing when there is no handle on it: a freed object is the engine's to find.
+	const std::string held = ir::is_engine(kind(p_register)) ? reg(p_register) + ".handle" : reg(p_register);
+	line("if (KAS3_UNLIKELY(!" + held + ")) { raise_null(c); " + fail() + " }");
 }
 
 void FunctionWriter::by_thunk(const Instruction &p_in) {
@@ -160,21 +172,78 @@ void FunctionWriter::by_thunk(const Instruction &p_in) {
 	line("}");
 }
 
-void FunctionWriter::instruction(const Instruction &p_in) {
+void FunctionWriter::dispatch(const Instruction &p_in) {
 	const bool written = whole_conversion(p_in) || constant(p_in) || simple(p_in) || object(p_in) || flow(p_in) || call(p_in) || fast_object(p_in) ||
 			fast_text(p_in) || fast_untyped(p_in) || fast_call(p_in);
 	if (!written) {
 		by_thunk(p_in);
 	}
+}
+
+// An instruction that is not Godot's own done inline. What it reads or writes of values held inline it is
+// given as handles: each is boxed first, and one it writes is copied back out. A call hands a value
+// straight to a parameter that holds the same type inline.
+void FunctionWriter::generic(const Instruction &p_in) {
+	const char *shape = ir::op_shape(p_in.op);
+	const uint32_t operands[3] = { p_in.a, p_in.b, p_in.c };
+	const ir::Function *callee = callee_of(p_in);
+	std::vector<uint32_t> boxed;
+	const auto box = [&](uint32_t p_register) {
+		if (!parts(p_register).empty() && std::find(boxed.begin(), boxed.end(), p_register) == boxed.end()) {
+			boxed.push_back(p_register);
+		}
+	};
+	for (int n = 0; n < 3; n++) {
+		if ((shape[n] == 'R' || shape[n] == 'r') && operands[n] != NONE) {
+			box(operands[n]);
+		} else if (shape[n] == 'A') {
+			const std::vector<uint32_t> &list = function_.argument_lists[operands[n]];
+			for (size_t i = 0; i < list.size(); i++) {
+				const bool straight = callee && i < callee->parameters && !parts(list[i]).empty() && parts_of(*callee, static_cast<uint32_t>(i)) == parts(list[i]);
+				if (!straight) {
+					box(list[i]);
+				}
+			}
+		}
+	}
+	if (boxed.empty()) {
+		dispatch(p_in);
+		return;
+	}
+	line("{");
+	for (uint32_t each : boxed) {
+		line("Boxed<" + std::string(parts(each)) + "> x" + std::to_string(each) + "(c, " + register_name(each) + ");");
+		shadow_[each] = "x" + std::to_string(each) + ".v";
+	}
+	dispatch(p_in);
+	const bool writes = (shape[0] == 'R' || shape[0] == 'r') && p_in.a != NONE && !first_is_read(p_in.op);
+	const uint32_t changed = changed_in_place(function_, p_in);
+	for (uint32_t each : boxed) {
+		if ((writes && each == p_in.a) || each == changed) {
+			line(register_name(each) + " = unbox<" + std::string(parts(each)) + ">(c, " + shadow_[each] + ".handle);");
+		}
+		shadow_[each].clear();
+	}
+	line("}");
+}
+
+void FunctionWriter::instruction(const Instruction &p_in) {
+	if (!engine(p_in)) {
+		generic(p_in);
+	}
+
 	// What was known of a register is forgotten when it is written, and with it what was made from it.
 	const char first = ir::op_shape(p_in.op)[0];
 	if ((first == 'R' || first == 'r') && p_in.a != NONE && !first_is_read(p_in.op)) {
 		forget_whole(p_in.a);
 	}
-	if (p_in.op == Op::DynNext) {
-		forget_whole(p_in.b);
+	if (const uint32_t changed = changed_in_place(function_, p_in); changed != NONE) {
+		forget_whole(changed);
 	}
 	remember_whole(p_in);
+	if (p_in.op == Op::ConstStr) {
+		text_[p_in.a] = p_in.b;
+	}
 }
 
 std::string FunctionWriter::prologue() const {
@@ -183,7 +252,8 @@ std::string FunctionWriter::prologue() const {
 	std::string unused = "(void)c;";
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
 		if (i >= function_.parameters) {
-			add(declared(kind(i), reg(i)) + " = " + std::string(zero_of(kind(i))) + ";");
+			add(parts(i).empty() ? declared(kind(i), reg(i)) + " = " + std::string(zero_of(kind(i))) + ";"
+								 : std::string(parts(i)) + " " + reg(i) + "{};");
 		}
 		unused += " (void)" + reg(i) + ";";
 	}
@@ -193,7 +263,7 @@ std::string FunctionWriter::prologue() const {
 	if (fails_) {
 		add("uint32_t line = 0;");
 		add("bool traced = false;");
-		unused += " (void)traced;";
+		unused += " (void)traced; (void)line;";
 	}
 	add(unused);
 	const bool gives = function_.result != Kind::Void;
@@ -216,8 +286,13 @@ std::string FunctionWriter::prologue() const {
 	}
 	for (uint32_t i = 0; i < function_.parameters; i++) {
 		if (owns(i)) {
-			add("retain(c, " + reg(i) + ");");
+			add(reg(i) + " = shared(c, " + reg(i) + ");");
 		}
+	}
+	if (has_owner_alias_) {
+		// The script's own Godot object, which lives as long as the script's object does: found once.
+		add("void *const self = object_of(c, field<Ref>(r0, 0));");
+		add("(void)self;");
 	}
 	return out;
 }
@@ -268,7 +343,9 @@ std::string FunctionWriter::epilogue() const {
 	out += function_.result != Kind::Void ? "\treturn result;\n" : "\treturn;\n";
 	out += handlers();
 	if (fails_) {
-		out += "failed:\n\tleave_failed(c, " + std::to_string(index_) + ", line, traced);\n\tgoto done;\n";
+		// The function behind the library's methods read by name is no place in the program: no line of it.
+		const bool hidden = index_ == module_.library_function;
+		out += "failed:\n" + (hidden ? std::string() : "\tleave_failed(c, " + std::to_string(index_) + ", line, traced);\n") + "\tgoto done;\n";
 	}
 	return out;
 }
@@ -280,10 +357,12 @@ std::string FunctionWriter::write() {
 		landed[handler.target] = true;
 	}
 	whole_.assign(function_.registers.size(), Whole());
+	text_.assign(function_.registers.size(), NONE);
 	for (pc_ = 0; pc_ < function_.code.size(); pc_++) {
 		body_.clear();
 		if (landed[pc_]) {
 			whole_.assign(function_.registers.size(), Whole());
+			text_.assign(function_.registers.size(), NONE);
 		}
 		instruction(function_.code[pc_]);
 		pieces.push_back(body_);
@@ -309,8 +388,9 @@ std::string FunctionWriter::write() {
 	std::string head = declared(function_.result, function_name(module_, index_)) + "(Context *c";
 	std::string passed = "c";
 	for (uint32_t i = 0; i < function_.parameters; i++) {
-		head += ", " + declared(kind(i), reg(i));
-		passed += ", " + from_slot(kind(i), "a[" + std::to_string(i) + "]");
+		const std::string given = "a[" + std::to_string(i) + "]";
+		head += ", " + (parts(i).empty() ? declared(kind(i), reg(i)) : std::string(parts(i)) + " " + reg(i));
+		passed += ", " + (parts(i).empty() ? from_slot(kind(i), given) : "unbox<" + std::string(parts(i)) + ">(c, " + given + ".p)");
 	}
 	if (signature.counted) {
 		head += ", uint32_t n";

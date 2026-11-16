@@ -178,7 +178,11 @@ inline bool is_held(Kind p_kind) {
 	   out as they run (what is no class is AS3's TypeError): ClassIs and ClassInstanceOf out (Boolean), \
 	   the value (untyped), the class: `x is c`, `x instanceof c`; ClassAs out (untyped: the value, or \
 	   null), the value, the class; ClassNew out (untyped), the class, [the arguments, untyped]: `new c(a)`. */ \
-	X(ClassValue, "RI-") X(ClassIs, "RRR") X(ClassInstanceOf, "RRR") X(ClassAs, "RRR") X(ClassNew, "RRA")
+	X(ClassValue, "RI-") X(ClassIs, "RRR") X(ClassInstanceOf, "RRR") X(ClassAs, "RRR") X(ClassNew, "RRA") \
+	/* The body of a function whose code is native (the C++ backend's): out (or NONE), and two numbers the \
+	   native side reads. No lowering makes one: a host that holds native code for a module gives each of \
+	   its functions this body (vm/native_code.h). */ \
+	X(Native, "rII")
 
 enum class Op : uint8_t {
 #define X(name, shape) name,

@@ -99,6 +99,35 @@ int32_t Interpreter::function_length(Object *p_function) const {
 	return static_cast<int32_t>(callee.parameters - (callee.is_static ? 0 : 1) - (callee.rest ? 1 : 0));
 }
 
+// Native: the function's body is native code, which whoever holds it runs. The frame is found again by its
+// number afterwards: native code may call back in and move the stack.
+void Interpreter::native_op(const Instruction &p_in) {
+	const size_t index = frames_.size() - 1;
+	const Frame &frame = frames_[index];
+	Slot result;
+	result.bits = 0;
+	const bool wanted = p_in.a != NONE;
+	const Kind kind = wanted ? module_.functions[frame.function].registers[p_in.a] : Kind::Void;
+	if (!native_ || !native_->run_native(frame.function, p_in.b, p_in.c, stack_.data() + frame.base, frame.arguments, wanted ? &result : nullptr)) {
+		NativeError error;
+		if (!native_ || failing_ || index >= frames_.size() || !native_->hand_over(&error)) {
+			raise(module_.error_class, "an error is on its way out of native code");
+			return;
+		}
+		// The error goes on from here as one thrown in this frame, whose line native code has put in.
+		pending_ = error.error;
+		failing_ = true;
+		trace_ = std::move(error.trace);
+		trace_lines_ = error.lines;
+		thrown_at_ = Site{ std::move(error.function), std::move(error.file), error.line };
+		frames_[index].traced = true;
+		return;
+	}
+	if (wanted && index < frames_.size()) {
+		put(kind, stack_[frames_[index].base + p_in.a], result);
+	}
+}
+
 // Arguments: what the caller passed, as an Array, and the running function as its `callee`.
 void Interpreter::arguments_array(const Instruction &p_in) {
 	const Frame &frame = frames_.back();

@@ -5,7 +5,7 @@
 // on a thread with a stack large enough for 10,000 of any frame a program is likely to have, and a
 // function that finds the stack nearly used up all the same raises the same Error (values.h, stack_low)
 // instead of running off its end.
-#include "host.h"
+#include "native_host.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -36,7 +36,9 @@ void run_here(Run *r_run) {
 	{
 		// KAS3_NOW fixes the time Date takes as now, as for `kas3c run`.
 		const char *fixed = std::getenv("KAS3_NOW");
-		Host host(*r_run->program, fixed ? std::optional<double>(std::strtod(fixed, nullptr)) : std::nullopt);
+		vm::StandaloneOutput output;
+		vm::SystemClock clock(fixed ? std::optional<double>(std::strtod(fixed, nullptr)) : std::nullopt);
+		Host host(*r_run->program, Embedder{ output, vm::NoEngine::instance(), vm::NoEngine::instance(), clock });
 		// A local's address is about where the stack is now: nearly all of it is still below.
 		const uintptr_t here = reinterpret_cast<uintptr_t>(&ran);
 		const size_t usable = r_run->stack > 2 * STACK_MARGIN ? r_run->stack - STACK_MARGIN : r_run->stack / 2;

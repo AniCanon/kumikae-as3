@@ -14,6 +14,8 @@ namespace rt {
 void stack_overflow(Context *c);
 // A member of nothing was asked for: AS3's TypeError #1009.
 void raise_null(Context *c);
+// Memory ran out where the runtime itself asked for some: AS3's Error #1000.
+void out_of_memory(Context *c);
 // `throw`: any value, null too. It takes a reference of its own.
 void throw_value(Context *c, Slot p_any);
 // The error a `finally` caught (in the register numbered p_register) thrown again, with the trace it had.

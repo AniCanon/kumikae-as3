@@ -81,6 +81,12 @@ target_compile_options(kas3backend_cpp PRIVATE -fno-exceptions -fno-rtti -Wall -
 
 # What generated code is built against and, where there is no engine, the host it runs in.
 file(GLOB KAS3_RUNTIME_SOURCES CONFIGURE_DEPENDS runtime/*.cpp)
+# `main` for a program library built as a plain program is a library of its own: the Godot extension takes
+# the whole runtime in, and has no use for one.
+list(FILTER KAS3_RUNTIME_SOURCES EXCLUDE REGEX "standalone_main\\.cpp$")
+add_library(kas3standalone STATIC runtime/standalone_main.cpp)
+target_include_directories(kas3standalone PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime ${CMAKE_CURRENT_SOURCE_DIR}/vm ${CMAKE_CURRENT_SOURCE_DIR}/ir ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(kas3standalone PRIVATE -fno-exceptions -fno-rtti -Wall -Wextra -Werror)
 add_library(kas3runtime STATIC ${KAS3_RUNTIME_SOURCES})
 target_include_directories(kas3runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
 target_link_libraries(kas3runtime PUBLIC kas3vm)
@@ -104,7 +110,13 @@ if(KAS3_GODOT_CPP)
     add_library(kas3_godot SHARED ${KAS3_GODOT_SOURCES})
     # godot-cpp's casts need run-time type information, so this glue has it; the interpreter does not.
     target_compile_options(kas3_godot PRIVATE -fno-exceptions)
-    target_link_libraries(kas3_godot PRIVATE godot-cpp kas3vm)
+    # The runtime and the interpreter go in whole: a program library (the C++ backend's output, built for
+    # the project) finds in this library every function generated code calls.
+    if(APPLE)
+        target_link_libraries(kas3_godot PRIVATE godot-cpp -Wl,-force_load,$<TARGET_FILE:kas3runtime> -Wl,-force_load,$<TARGET_FILE:kas3vm> kas3runtime kas3vm)
+    else()
+        target_link_libraries(kas3_godot PRIVATE godot-cpp -Wl,--whole-archive kas3runtime kas3vm -Wl,--no-whole-archive)
+    endif()
     # On this machine's own system the library goes beside the test project, which loads it. Built for
     # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
     if(CMAKE_CROSSCOMPILING)
@@ -122,7 +134,7 @@ file(GLOB KAS3_TESTS CONFIGURE_DEPENDS tests/test_*.cpp)
 foreach(test_source ${KAS3_TESTS})
     get_filename_component(test_name ${test_source} NAME_WE)
     add_executable(${test_name} ${test_source})
-    target_link_libraries(${test_name} PRIVATE kas3lsp kas3vm)
+    target_link_libraries(${test_name} PRIVATE kas3lsp kas3vm kas3backend_cpp)
     target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_compile_definitions(${test_name} PRIVATE KAS3_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME ${test_name} COMMAND ${test_name})
@@ -151,13 +163,13 @@ add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/t
     --cxx ${CMAKE_CXX_COMPILER} ${KAS3_NATIVE_FLAGS}
     --include ${CMAKE_CURRENT_SOURCE_DIR}/runtime --include ${CMAKE_CURRENT_SOURCE_DIR}/vm
     --include ${CMAKE_CURRENT_SOURCE_DIR}/ir --include ${CMAKE_CURRENT_SOURCE_DIR}/src
-    --lib $<TARGET_FILE:kas3runtime> --lib $<TARGET_FILE:kas3vm> --lib $<TARGET_FILE:kas3ir> --lib $<TARGET_FILE:kas3front>)
+    --lib $<TARGET_FILE:kas3standalone> --lib $<TARGET_FILE:kas3runtime> --lib $<TARGET_FILE:kas3vm> --lib $<TARGET_FILE:kas3ir> --lib $<TARGET_FILE:kas3front>)
 # Which corpus programs can run in Godot, and what stops the others.
 add_test(NAME corpus COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_corpus.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 # AS3 inside Godot. Skips itself, with a message, without the extension library or Godot 4.7.
 add_test(NAME godot_extension COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_godot.py
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests $<TARGET_FILE:kas3c>)
 add_test(NAME golden COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_golden.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 # The rules of docs/cpp-guidelines.md that a script can judge.

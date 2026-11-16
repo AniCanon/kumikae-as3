@@ -158,11 +158,13 @@ with tempfile.TemporaryDirectory() as folder:
     with open(mover, "w") as handle:
         handle.write("package {\n\timport godot.*;\n\tpublic class Mover extends Node2D {\n"
                      "\t\tpublic function step():void { position = new Vector2(1, 2); }\n\t}\n}\n")
-    refused = os.path.join(folder, "refused")
-    result = run("cpp", "--godot", mover, "-o", refused)
-    lines = result.stderr.splitlines()
-    check("cpp refuses the engine", result.returncode == 1 and result.stdout == "" and len(lines) == 1 and
-          lines[0].startswith("kas3c: not yet supported: the engine (") and not os.path.exists(refused), repr(result))
+    script = os.path.join(folder, "script")
+    result = run("cpp", "--godot", mover, "-o", script)
+    written = sorted(os.listdir(script)) if os.path.isdir(script) else []
+    check("cpp writes a script for Godot", result.returncode == 0 and result.stderr == "" and "Mover.cpp" in written and "program.cpp" in written,
+          "%d %r %r" % (result.returncode, result.stderr, written))
+    result = run("cpp", mover, "-o", os.path.join(folder, "never2"))
+    check("cpp of a Godot script without --godot", result.returncode == 1 and not os.path.exists(os.path.join(folder, "never2")), repr(result))
 
     # check: Godot's API is known without any option, under its AS3 names.
     player = os.path.join(folder, "Player.as")

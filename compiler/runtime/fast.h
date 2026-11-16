@@ -52,6 +52,14 @@ Slot *property(const Context *c, Object *p_holder, const Str *p_key);
 // of object or no key.
 bool set_property(Context *c, Object *p_holder, Str *p_key, Slot p_value);
 
+// A new Array of untyped values, each with a reference of its own: one reference, the caller's. Null with
+// an error on its way out if it could not be made.
+Object *new_array(Context *c, const Slot *p_values, uint32_t p_count);
+// `arguments`: an Array of what the caller gave the function (by its number), from every parameter's slot
+// and how many of them were given, with p_callee (the function's own value, whose reference is taken over)
+// as its hidden `callee`. Null with an error on its way out if it could not be made.
+Object *arguments_of(Context *c, uint32_t p_function, const Slot *p_parameters, uint32_t p_given, Object *p_callee);
+
 // One String after another, a missing one reading "null". Null if there is no memory for it.
 inline Str *join(const Str *p_first, const Str *p_second) {
 	return vm::join_strings(p_first ? p_first->view() : std::string_view("null"), p_second ? p_second->view() : std::string_view("null"));

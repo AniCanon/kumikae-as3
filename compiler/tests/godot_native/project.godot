@@ -1,0 +1,8 @@
+; The project run_godot.py runs twice, interpreted and as native code: Probe.as and its driver.
+
+config_version=5
+
+[application]
+
+config/name="kas3 native probe"
+config/features=PackedStringArray("4.7")

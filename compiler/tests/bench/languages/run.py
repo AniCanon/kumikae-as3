@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""The same three workloads in Godot C#, GDScript and AS3, timed in one release export.
+"""The same three workloads in Godot C#, GDScript and AS3 (interpreted, and as native code), timed in one
+release export.
 
     python3 run.py [<extension project>] [--against <other extension project>] [--runs N]
 
 An extension project is a folder with `kas3.gdextension` and `bin/libkas3_godot.dylib` (by default
 compiler/tests/godot_project, where build-godot writes the library). With --against, a second export is
 made with the other library, and the two are run turn and turn about.
+
+"AS3 native" is the same script written as C++ by `kas3c cpp --godot` (the kas3c beside the extension's
+build, or --kas3c <path>), built with the system's C++ compiler into a program library, and run by the same
+export with KAS3_PROGRAM_LIBRARY naming it: each round runs the export once without it and once with it,
+turn and turn about. Without kas3c or a compiler the column is left out, and said so.
 
 Needs Godot .NET 4.7 (the KAS3_GODOT_DOTNET environment variable: the editor's executable), its export
 templates, and `dotnet` with Godot's packages already in the local NuGet cache: nothing is downloaded. On
@@ -31,6 +37,12 @@ DEFAULT_EXTENSION = os.path.join(HERE, "..", "..", "godot_project")
 LIBRARY = os.path.join("bin", "libkas3_godot.dylib")
 WORKLOADS = (("spin", "calls"), ("work", "script"), ("vec", "vectors"))
 LANGUAGES = (("cs", "C#"), ("gd", "GDScript"), ("as", "AS3"))
+NATIVE = ("native", "AS3 native")
+COMPILER = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+# What generated code is built with (the design's flags), into a library that shows one symbol and finds the
+# runtime in the extension's library, which is loaded already.
+NATIVE_FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-fno-unroll-loops", "-fvisibility=hidden", "-shared",
+                "-undefined", "dynamic_lookup"]
 # The project's own files: anything else in the folder (an earlier editor's .godot, an export) is left behind.
 PROJECT_FILES = ("CmpAs.as", "CmpCs.cs", "CmpCs.csproj", "CmpCs.sln", "CmpGd.gd", "export_presets.cfg", "main.gd",
                  "main.tscn", "project.godot")
@@ -76,6 +88,24 @@ def export(godot, extension, where):
     return os.path.join(app, "Contents", "MacOS", programs[0])
 
 
+def program_library(kas3c, where):
+    """CmpAs.as as a program library, or None with why not."""
+    if not kas3c or not os.path.exists(kas3c):
+        return None, "no kas3c at %s" % kas3c
+    compiler = shutil.which("c++")
+    if not compiler:
+        return None, "no c++ on the PATH"
+    out = os.path.join(where, "native")
+    written = subprocess.run([kas3c, "cpp", "--godot", "CmpAs.as", "-o", out], cwd=HERE, capture_output=True, text=True)
+    if written.returncode != 0:
+        return None, written.stderr.strip()
+    includes = [flag for each in ("runtime", "vm", "ir", "src") for flag in ("-I", os.path.join(COMPILER, each))]
+    sources = sorted(os.path.join(out, name) for name in os.listdir(out) if name.endswith(".cpp"))
+    library = os.path.join(where, "libkas3_program.dylib")
+    step("building the program library", [compiler, *NATIVE_FLAGS, *includes, *sources, "-o", library], where)
+    return library, None
+
+
 def nuget_cache():
     return os.environ.get("NUGET_PACKAGES") or os.path.join(os.path.expanduser("~"), ".nuget", "packages")
 
@@ -98,9 +128,17 @@ def missing(godot):
     return None
 
 
-def run_once(program):
-    """{(workload, language): microseconds} from one run of an export."""
-    done = step("the run", [program, "--headless"], os.path.dirname(program), timeout=900)
+def run_once(program, library=None):
+    """{(workload, language): microseconds} from one run of an export; with a program library, AS3 is native."""
+    environment = dict(os.environ)
+    environment.pop("KAS3_PROGRAM_LIBRARY", None)
+    if library:
+        environment["KAS3_PROGRAM_LIBRARY"] = library
+    done = subprocess.run([program, "--headless"], cwd=os.path.dirname(program), capture_output=True, text=True, timeout=900, env=environment)
+    if done.returncode != 0:
+        sys.exit("languages: the run failed (exit %d):\n%s" % (done.returncode, (done.stdout + done.stderr)[-1500:]))
+    if library and "ActionScript: the scripts run as native code." not in done.stdout:
+        sys.exit("languages: the program library was not used:\n%s" % (done.stdout + done.stderr)[-1500:])
     found = {}
     for workload, language, micros in re.findall(r"^CMP (\w+) (\w+) (\d+)$", done.stdout, re.M):
         found[(workload, language)] = int(micros)
@@ -111,11 +149,14 @@ def run_once(program):
 
 
 def table(title, best):
+    native = (WORKLOADS[0][0], NATIVE[0]) in best
+    columns = LANGUAGES + ((NATIVE,) if native else ())
     print("%s (ms, best of 5 after 35 warm-ups)" % title)
-    print("%-10s" % "" + "".join("%12s" % name for _, name in LANGUAGES) + "%12s" % "AS3 / C#")
+    print("%-10s" % "" + "".join("%12s" % name for _, name in columns) + "%12s" % "AS3 / C#" + ("%14s" % "native / C#" if native else ""))
     for workload, name in WORKLOADS:
-        cells = [best[(workload, language)] / 1000.0 for language, _ in LANGUAGES]
-        print("%-10s" % name + "".join("%12.1f" % cell for cell in cells) + "%11.1fx" % (cells[2] / cells[0]))
+        cells = [best[(workload, language)] / 1000.0 for language, _ in columns]
+        print("%-10s" % name + "".join("%12.1f" % cell for cell in cells) + "%11.1fx" % (cells[2] / cells[0]) +
+              ("%13.2fx" % (cells[3] / cells[0]) if native else ""))
 
 
 def main():
@@ -123,7 +164,7 @@ def main():
     runs = int(arguments[arguments.index("--runs") + 1]) if "--runs" in arguments else 1
     other = os.path.abspath(arguments[arguments.index("--against") + 1]) if "--against" in arguments else None
     positional = [argument for index, argument in enumerate(arguments)
-                  if not argument.startswith("--") and (index == 0 or arguments[index - 1] not in ("--runs", "--against"))]
+                  if not argument.startswith("--") and (index == 0 or arguments[index - 1] not in ("--runs", "--against", "--kas3c"))]
     extension = os.path.abspath(positional[0] if positional else DEFAULT_EXTENSION)
     godot = os.environ.get("KAS3_GODOT_DOTNET")
     if sys.platform != "darwin":
@@ -143,10 +184,24 @@ def main():
         if other:
             builds.append((other, export(godot, other, os.path.join(where, "second"))))
         best = {which: {} for which, _ in builds}
+        # The scripts as native code, by the kas3c built with each extension (its build folder is beside
+        # compiler/tests, as build-godot is), unless one is named.
+        libraries = {}
+        for which, _ in builds:
+            kas3c = (os.path.abspath(arguments[arguments.index("--kas3c") + 1]) if "--kas3c" in arguments
+                     else os.path.join(which, "..", "..", "build-godot", "kas3c"))
+            libraries[which], why = program_library(kas3c, os.path.join(where, "native%d" % len(libraries)))
+            if why:
+                print("languages: no AS3 native column for %s (%s)" % (which, why))
         for _ in range(runs):
             for which, program in builds:
                 for key, micros in run_once(program).items():
                     best[which][key] = min(micros, best[which].get(key, micros))
+                if libraries[which]:
+                    for (workload, language), micros in run_once(program, libraries[which]).items():
+                        if language == "as":
+                            key = (workload, NATIVE[0])
+                            best[which][key] = min(micros, best[which].get(key, micros))
         for which, _ in builds:
             table(which, best[which])
 

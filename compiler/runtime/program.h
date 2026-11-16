@@ -43,6 +43,7 @@ struct ClassInfo {
 	uint32_t base;
 	uint64_t layout; // A hash of the fields' names, kinds and offsets: equal layouts hold objects alike.
 	uint8_t element; // For a Vector.<T>: the ir::Kind of its elements. Void (0) for every other class.
+	uint32_t element_check; // What a value stored into such a vector is checked against (ir::Class::element_check).
 	bool array;
 	bool table;
 	bool dictionary;
@@ -105,17 +106,23 @@ struct ThunkInfo {
 	const uint8_t *kinds; // Its registers' kinds: the values handed in first, then what it writes.
 	uint32_t registers;
 	uint32_t given; // How many are handed in.
+	// Godot's name for the type of each register that holds one of Godot's values or objects, as the
+	// function it came from says (ir::Function::engine_types); null for the others, or for no table at all.
+	const char *const *types;
 	const uint32_t *list; // The instruction's argument list, if it takes one.
 	uint32_t list_size;
 	uint32_t result; // The register handed back, or NONE.
 	uint32_t updated; // A register handed in that the operation moves on, handed back too; or NONE.
 	uint32_t code_class; // The class whose code it is: what it may reach by name.
+	// For an instruction of a method that asks the engine: the register handed in that is the method's
+	// object, which the engine's side may ask for (whose listeners these are); NONE otherwise.
+	uint32_t self;
 };
 
 // The classes the library itself makes objects of, as the module names them (ir::Module).
 struct KnownClasses {
 	uint32_t entry, error, type_error, range_error, argument_error, function, array, object, dictionary, reference_error, regexp, date,
-			syntax_error, uri_error;
+			syntax_error, uri_error, class_value;
 };
 
 struct Program {
@@ -135,7 +142,19 @@ struct Program {
 	uint32_t initializer_count;
 	const ThunkInfo *thunks;
 	uint32_t thunk_count;
+	// The places generated code calls the engine directly, each as the thunk of the same instruction: the
+	// host works each out once (Context::resolved, in this order).
+	const uint32_t *uses;
+	uint32_t use_count;
+	// The Strings the program gives where Godot takes a name, as numbers of its strings (Context::names).
+	const uint32_t *names;
+	uint32_t name_count;
+	// What ir::fingerprint() gives for the module the program was written from: a host that has the module
+	// runs the native code only if they agree.
+	uint64_t fingerprint;
 	KnownClasses known;
+	// The function behind a method of the library read by name (ir::Module::library_function), or NONE.
+	uint32_t library_function;
 	bool keeps_stack; // Its functions keep a StackFrame each: it reads an Error's getStackTrace().
 };
 

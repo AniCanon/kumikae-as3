@@ -12,10 +12,11 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `fast.h` | The fast paths of operations the library owns, each for the usual case only: a vector's element in range, a String joined to another, a new object of a class the collector does not look at, and the rest declared for `calls.cpp` and `properties.cpp` |
 | `operations.h` | What generated code calls out of line: errors and their traces, a class's first use, thunks, `trace` |
 | `program.h` | The table a program library gives its host (`kas3_program`): classes, functions, static fields, strings, thunks, all by number |
-| `host.h`, `host.cpp` | The host with no engine: the context's state, a program run as `kas3c run` runs it |
+| `engine.h`, `godot_values.h` | Godot with no header of Godot's: handles on its objects and values (`Ref`, `Val`), its values with parts as plain structs with their maths inline, what the host worked out for each place the program calls the engine (`Resolved`), the engine's few entry points (`EngineApi`) |
+| `native_host.h`, `host.cpp` | The host: the context's state, its interpreter, the engine it was given by what embeds it (`Embedder`: none for a program run on its own, the extension's inside Godot) |
 | `errors.cpp` | Raising, catching, the stack trace, the report of an error nothing caught |
 | `calls.cpp`, `properties.cpp` | The fast paths that are not inline: typed and untyped values made of one another, a function value and a `toString()` called with no interpreter between; an Object's property under a String key, an element added at a vector's end |
-| `stub_module.cpp`, `bridge.cpp` | The interpreter the host keeps for the shared library (below) |
+| `stub_module.cpp`, `bridge.cpp` | The module the host's interpreter is given (every function's body one `Native` instruction, the thunks after them), and the host's side of that instruction (`vm/native_code.h`) |
 | `standalone.cpp`, `standalone_main.cpp` | A program library run as a plain program, on a thread whose stack holds 10,000 calls of any likely size; `main` |
 
 ## The fixed shape
@@ -44,8 +45,14 @@ function values are written once, in `vm/`, as members of `vm::Interpreter` that
 registers. Until they are split from it (the list below), the host keeps an interpreter of its own:
 
 - Its module (`stub_module.cpp`) has the program's classes, static fields and strings under their own
-  numbers. Each function's body is one call of the bridge, which runs the generated function with the
-  frame's arguments: that is how the library calls back (a sort's comparison, a `toString()`, a getter).
+  numbers: made from the program's table for a program run on its own, and a copy of the program's own
+  module where the embedder compiled it (the Godot extension). Each function's body is one `Native`
+  instruction, which the interpreter hands to the host (`vm/native_code.h`) and the host carries out by
+  running the generated function with the frame's arguments: that is how the library, and Godot, call a
+  function without knowing its body is native (a sort's comparison, a `toString()`, `_process`).
+- An error that leaves a generated function called that way goes on in the interpreter as that error,
+  with the trace native code built (`hand_over`), unless generated code itself began what led to the
+  call: then it stays the context's, and the interpreter only leaves its own frames.
 - A **thunk** is one instruction as a function of that module. Generated code hands it the registers the
   instruction reads (`thunk(c, number, slots)`) and takes back what it writes. An error the instruction
   raises is caught inside the thunk and becomes the context's, so the error and its words are the
@@ -67,6 +74,21 @@ What this costs, until the split:
   being offered it (`Host::carried`): a `finally` there does not run.
 - A program run on its own has no limit on its time, where `kas3c run` stops one after 15 seconds
   (Error #1502): the limit is the interpreter's loop's.
+
+## Inside Godot
+
+- **No Godot header and no godot-cpp** in generated code, in this folder or in a program library. What a
+  program needs of the engine it is handed through the context: `c->engine` (the entry points),
+  `c->resolved` (for each place it calls the engine directly, what the host found once: a method bind, a
+  singleton's object, the defaults of parameters left out) and `c->names` (a `StringName` for each name
+  the program writes). The extension fills them from what it already works out for the interpreter
+  (`godot_ext/native_program.cpp`, from `godot_prepared.cpp`'s `prepare`).
+- **A value with parts held inline** is boxed into the host's handle wherever it crosses into what the
+  library and the host hold: an instruction run by thunk (`Boxed`), a field, an untyped value, an Array.
+  Only a register that can never be null is inline; a parameter, a field and a call's result are handles.
+- **The runtime's functions are found in the extension's library** by a program library when it is
+  loaded (`-undefined dynamic_lookup`): the extension links the whole runtime and interpreter in. A table
+  of them, handed over like the engine's, is what replaces that.
 
 ## To split out of `vm/`, so that no interpreter is needed
 
