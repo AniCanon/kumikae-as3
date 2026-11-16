@@ -7,7 +7,7 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
 |---|---|
 | `source`, `token`, `lexer` | Text to tokens |
 | `parser.cpp`, `parser_decl`, `parser_stmt`, `parser_expr`, `parser_literals`, `parser_types`, `parser_functions` | Tokens to the tree in `ast.h`, one file per kind of syntax |
-| `ast.h` (with `ast_node.h`, `ast_expr.h`, `ast_stmt.h`), `ast_walk.h`, `ast_printer`, `ast_reset`, `arena.h` | The tree, its one walk, its printed form, its memory |
+| `ast.h` (with `ast_node.h`, `ast_expr.h`, `ast_stmt.h`), `ast_walk.h`, `ast_printer` (the dispatch; the parts in `ast_printer_parts.cpp`, the class in `ast_printer_class.h`), `ast_reset`, `arena.h` | The tree, its one walk, its printed form, its memory |
 | `names*.cpp`, `names.h`, `names_symbols.h`, `names_resolver.h` | Declarations, scopes, imports, and the rules about them; `names_lookup` looks up a name at package level and `names_members` on a class; the bodies pass is `names_bodies`, `names_locals`, `names_statements` and `names_expressions` |
 | `typer.h`, `typer_*.cpp`, `type_table.cpp` | The type of each expression and what fits where, by what is typed |
 | `whole_numbers` | Rules the checker and the lowerer must agree on, written once |

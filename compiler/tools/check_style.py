@@ -23,7 +23,7 @@ FUNCTION_LIMIT = 120
 DISPATCH = {
     "vm/interpreter_run.cpp: Interpreter::run",  # The interpreter's loop, one case per operation.
     "src/ast_walk.h: walk",  # The children of each kind of node.
-    "src/ast_printer.cpp: node",  # The text of each kind of node.
+    "src/ast_printer.cpp: Printer::node",  # The text of each kind of node.
 }
 
 BANNER = re.compile(r"^\s*//\s*[-=*#]{3,}")
