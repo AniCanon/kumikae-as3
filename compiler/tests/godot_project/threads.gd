@@ -24,6 +24,19 @@ func _initialize() -> void:
 	WorkerThreadPool.wait_for_task_completion(task)
 	show("attached on a worker is refused: no script, no constructor run", [attached, on_main.call("madeCount") - before], [[true], 0])
 
+	# Its lists of properties and methods asked for on workers and on the main thread at once.
+	var listed := RefCounted.new()
+	listed.set_script(script)
+	var group := WorkerThreadPool.add_group_task(func(_i):
+		for k in 2000:
+			listed.get_property_list()
+			listed.get_method_list(), 4)
+	var counts := []
+	for k in 2000:
+		counts = [listed.get_property_list().size() > 0, listed.get_method_list().size() > 0]
+	WorkerThreadPool.wait_for_group_task_completion(group)
+	show("lists asked for on workers and on the main thread at once", counts, [true, true])
+
 	# The last reference let go on a worker: the script object goes on the main thread, at the end of a frame.
 	var box := [on_main]
 	var partner: int = on_main.call("partnerID")

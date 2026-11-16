@@ -205,9 +205,34 @@ struct Listed {
 	}
 };
 
-static std::unordered_map<const void *, std::unique_ptr<Listed>> &listed() {
-	static std::unordered_map<const void *, std::unique_ptr<Listed>> all;
-	return all;
+// The lists given out, until Godot frees each. Godot asks for them on any thread (a resource loaded in a
+// thread is asked for its properties), so they are kept and let go under a lock.
+struct AllListed {
+	std::mutex lock;
+	std::unordered_map<const void *, std::unique_ptr<Listed>> lists;
+
+	void keep(const void *p_list, std::unique_ptr<Listed> p_made) {
+		const std::lock_guard<std::mutex> held(lock);
+		lists[p_list] = std::move(p_made);
+	}
+	void free(const void *p_list) {
+		std::unique_ptr<Listed> freeing;
+		{
+			const std::lock_guard<std::mutex> held(lock);
+			const auto found = lists.find(p_list);
+			if (found == lists.end()) {
+				return;
+			}
+			freeing = std::move(found->second);
+			lists.erase(found);
+		}
+	}
+};
+
+// Made once and never destroyed, as a thread may free a list while the game shuts down.
+static AllListed &listed() {
+	static AllListed *all = new AllListed();
+	return *all;
 }
 
 static const GDExtensionPropertyInfo *instance_get_property_list(GDExtensionScriptInstanceDataPtr p_data, uint32_t *r_count) {
@@ -219,13 +244,13 @@ static const GDExtensionPropertyInfo *instance_get_property_list(GDExtensionScri
 	*r_count = (uint32_t)made->properties.size();
 	const GDExtensionPropertyInfo *out = made->properties.empty() ? nullptr : made->properties.data();
 	if (out) {
-		listed()[out] = std::move(made);
+		listed().keep(out, std::move(made));
 	}
 	return out;
 }
 
 static void instance_free_property_list(GDExtensionScriptInstanceDataPtr, const GDExtensionPropertyInfo *p_list, uint32_t) {
-	listed().erase(p_list);
+	listed().free(p_list);
 }
 
 static const GDExtensionMethodInfo *instance_get_method_list(GDExtensionScriptInstanceDataPtr p_data, uint32_t *r_count) {
@@ -256,13 +281,13 @@ static const GDExtensionMethodInfo *instance_get_method_list(GDExtensionScriptIn
 	*r_count = (uint32_t)made->methods.size();
 	const GDExtensionMethodInfo *out = made->methods.empty() ? nullptr : made->methods.data();
 	if (out) {
-		listed()[out] = std::move(made);
+		listed().keep(out, std::move(made));
 	}
 	return out;
 }
 
 static void instance_free_method_list(GDExtensionScriptInstanceDataPtr, const GDExtensionMethodInfo *p_list, uint32_t) {
-	listed().erase(p_list);
+	listed().free(p_list);
 }
 
 static GDExtensionObjectPtr instance_get_owner(GDExtensionScriptInstanceDataPtr p_data) {
