@@ -299,15 +299,27 @@ Everything the extension does goes on as before, through an interpreter the runt
 same module with each function's body native (`vm/native_code.h`): only what runs when a function is
 called differs. What generated code does with the engine itself, and what it leaves to the library:
 
-- A `Vector2` that is never null (what Godot makes, computes or gives for a property) is a plain struct
-  in a local, and `+`, `-`, `*` and `/` by a Number, `normalized()`, `length()` and its `x` and `y` are
-  the runtime's own inline code, Godot's formulas to the last bit (`runtime/godot_values.h`).
+- A value of one of Godot's types that has parts (`Vector2`, `Vector3`, `Color`, `Rect2`, `Transform3D` and
+  the rest of the sixteen) that is never null (what Godot makes, computes or gives for a property) is a
+  plain struct in a local, laid out as Godot lays it out. It is made from its parts and its members are
+  read and written where it is. An operator, a method of the type and any other part are Godot's own code
+  for the type, found once by the host and called on the bare values; a constant is copied from one the
+  host keeps. For `Vector2` and `Vector3`, `+`, `-`, `*` and `/` by a Number, `normalized()`, `length()`,
+  `dot()` and `cross()` are the runtime's own inline code, Godot's formulas to the last bit
+  (`runtime/godot_values.h`). A value of such a type in a handle (one read from a field, given as a
+  parameter or returned by a script's function, which may be null) is copied out of the handle for the
+  same calls.
 - A property read or written and a method called on a Godot object, when every value that crosses is a
   number, a Boolean, a value with parts or a name written in the program, is Godot's method bind called
   on the bare values. The script's own Godot object is found once in each function, a singleton once
   when the program loads, a name's `StringName` once.
-- Everything else that asks Godot (any other value type's maths, Strings, Arrays, Callables and signals,
-  untyped values, a value kept in a field) is the interpreter's own instruction, run by its thunk.
+- Everything else that asks Godot (Strings, Arrays, Callables and signals, untyped values, a method that
+  takes or gives one of those, a value stored in a field) is the interpreter's own instruction, run by
+  its thunk.
+- A field, a parameter and a result of such a type are still handles. A parameter or a result may be
+  null, which a struct can't say; a field's slot is read as a handle by everything that shares the
+  object with generated code (the library, the collector, Godot reading a property, a reload), by the
+  class's description in `vm/`.
 
 Not there yet, natively: reloading the scripts while the game runs (the game says so and carries on), and
 the limit on a script's time (Error #1502).

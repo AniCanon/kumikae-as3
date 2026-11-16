@@ -36,9 +36,13 @@ struct EngineApi {
 // where it could not, or where the place is not one generated code calls directly: the library's way,
 // through its thunk, is then the only one.
 struct Resolved {
-	void *bind = nullptr; // The method bind of a method or of a property's accessor, callable on bare values.
+	// The method bind of a method or of a property's accessor, callable on bare values; or, for one of
+	// Godot's value types, its own code for an operator, a method or a part (operate() and the rest, below).
+	void *bind = nullptr;
 	void *object = nullptr; // A singleton's object.
-	void *handle = nullptr; // A handle on it, the host's own: borrowed, never let go of by generated code.
+	// A handle on a singleton, or on a constant's value: the host's own, borrowed, never let go of by
+	// generated code.
+	void *handle = nullptr;
 	uint64_t defaults[2] = { 0, 0 }; // The parameters the call leaves out, as Godot declares them, bare.
 };
 
@@ -90,6 +94,22 @@ inline void *owner_object(const Context *c, Object *p_this, void *&r_found, uint
 		r_seen = now;
 	}
 	return r_found;
+}
+
+// Godot's own code for one of its value types, as the host found it (Resolved::bind): an operator's
+// evaluator, a method of the type, the getter or the setter of a part. Each takes bare values by their
+// addresses, as the type is held bare, and writes what it gives the same way.
+inline void operate(void *p_evaluator, const void *p_left, const void *p_right, void *r_result) {
+	reinterpret_cast<void (*)(const void *, const void *, void *)>(p_evaluator)(p_left, p_right, r_result);
+}
+inline void call_part(void *p_method, void *p_on, const void *const *p_arguments, void *r_result, int p_count) {
+	reinterpret_cast<void (*)(void *, const void *const *, void *, int)>(p_method)(p_on, p_arguments, r_result, p_count);
+}
+inline void get_part(void *p_getter, const void *p_of, void *r_value) {
+	reinterpret_cast<void (*)(const void *, void *)>(p_getter)(p_of, r_value);
+}
+inline void set_part(void *p_setter, void *p_of, const void *p_value) {
+	reinterpret_cast<void (*)(void *, const void *)>(p_setter)(p_of, p_value);
 }
 
 template <typename T>

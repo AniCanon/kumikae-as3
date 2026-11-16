@@ -61,7 +61,7 @@ void Host::clear_globals() {
 static std::string asked(const ir::Module &p_module, const ir::Instruction &p_in) {
 	std::string text = ir::op_name(p_in.op);
 	const bool by_b = p_in.op == Op::HostCall || p_in.op == Op::HostNew || p_in.op == Op::HostOperate || p_in.op == Op::HostSet ||
-			p_in.op == Op::HostSingleton;
+			p_in.op == Op::HostSingleton || p_in.op == Op::HostConstant || p_in.op == Op::HostCallStatic;
 	const uint32_t name = by_b ? p_in.b : p_in.op == Op::HostGet ? p_in.c : NONE;
 	if (name < p_module.engine_names.size()) {
 		text += " " + (p_module.engine_names[name].key.empty() ? p_module.engine_names[name].name : p_module.engine_names[name].key);

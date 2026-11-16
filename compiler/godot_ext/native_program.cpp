@@ -206,6 +206,10 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 	}
 	const GodotHost::Worked *worked = static_cast<const GodotHost::Worked *>(engine_.prepare(host.module, p_thunk, p_in));
 	using What = GodotHost::Worked::What;
+	if (worked && (worked->what == What::Operator || worked->what == What::Builtin || worked->what == What::FieldGet ||
+						  worked->what == What::FieldSet || worked->what == What::Constant)) {
+		return resolve_value(*worked, r_resolved);
+	}
 	if (!worked || !worked->bound || worked->is_static || worked->index >= 0 ||
 			(worked->what != What::Bound && worked->what != What::Getter && worked->what != What::Setter)) {
 		return false;
@@ -224,6 +228,42 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 	}
 	r_resolved->bind = const_cast<void *>(worked->bound);
 	return true;
+}
+
+// Godot's own code for one of its value types, where everything that crosses is held bare by generated
+// code as Godot holds it: a number, a Boolean, a value with parts. A constant is kept as a handle on it.
+bool NativeProgram::resolve_value(const GodotHost::Worked &p_worked, rt::Resolved *r_resolved) {
+	using What = GodotHost::Worked::What;
+	const auto bare = [](int p_type) { return p_type == Variant::BOOL || p_type == Variant::INT || p_type == Variant::FLOAT || has_parts(p_type); };
+	const bool gives = p_worked.result == NO_VALUE || bare(p_worked.result);
+	switch (p_worked.what) {
+		case What::Operator:
+			if (bare(p_worked.operands[0]) && (p_worked.operands[1] == Variant::NIL || bare(p_worked.operands[1])) && gives) {
+				r_resolved->bind = reinterpret_cast<void *>(p_worked.evaluator);
+			}
+			break;
+		case What::Builtin:
+			if (has_parts(p_worked.receiver) && gives && std::all_of(p_worked.parameters.begin(), p_worked.parameters.end(), bare)) {
+				r_resolved->bind = reinterpret_cast<void *>(p_worked.builtin);
+			}
+			break;
+		case What::FieldGet:
+		case What::FieldSet:
+			if (has_parts(p_worked.receiver) && bare(p_worked.result)) {
+				r_resolved->bind = p_worked.what == What::FieldGet ? reinterpret_cast<void *>(p_worked.getter) : reinterpret_cast<void *>(p_worked.setter);
+			}
+			break;
+		case What::Constant:
+			if (has_parts(p_worked.value.get_type())) {
+				Variant *kept = make_handle(p_worked.value);
+				singletons_.push_back(kept);
+				r_resolved->handle = kept;
+			}
+			break;
+		default:
+			break;
+	}
+	return r_resolved->bind != nullptr || r_resolved->handle != nullptr;
 }
 
 NativeProgram::~NativeProgram() {

@@ -20,7 +20,7 @@ class NativeProgram {
 	void *library_ = nullptr;
 	std::unique_ptr<rt::Host> host_;
 	std::vector<godot::StringName> names_; // The program's names, each built once; never moved once made.
-	std::vector<void *> singletons_; // The handles kept for the singletons it uses.
+	std::vector<void *> singletons_; // The handles kept for the singletons it uses, and for the constants.
 	GodotHost &engine_;
 
 	explicit NativeProgram(GodotHost &p_engine) :
@@ -28,6 +28,7 @@ class NativeProgram {
 	void resolve(const rt::Program &p_program);
 	// One use of the engine worked out; false if generated code is left to ask the library there.
 	bool resolve_use(const ir::Function &p_thunk, const ir::Instruction &p_in, rt::Resolved *r_resolved);
+	bool resolve_value(const GodotHost::Worked &p_worked, rt::Resolved *r_resolved);
 
 public:
 	// Where the project's program library is looked for: the file KAS3_PROGRAM_LIBRARY names, or

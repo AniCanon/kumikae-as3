@@ -151,6 +151,17 @@ class FunctionWriter {
 	bool engine_alias(const ir::Instruction &p_in);
 	bool engine_inline(const ir::Instruction &p_in);
 	bool engine_bound(const ir::Instruction &p_in);
+	// function_values.cpp: Godot's own code for a value type, called on bare values.
+	std::string_view value_type(uint32_t p_register) const;
+	std::optional<std::string> bare_operand(uint32_t p_register, size_t p_at, std::string *r_guard, std::string *r_inside);
+	bool value_call(const ir::Instruction &p_in, uint32_t p_out, std::string_view p_result, const std::string &p_guard, const std::string &p_inside,
+			const std::string &p_call);
+	void settle_use(const ir::Instruction &p_in, size_t p_from);
+	bool value_made(const ir::Instruction &p_in);
+	bool value_part(const ir::Instruction &p_in);
+	bool value_operation(const ir::Instruction &p_in);
+	bool value_constant(const ir::Instruction &p_in);
+	bool engine_value(const ir::Instruction &p_in);
 	void forget_whole(uint32_t p_register);
 	bool whole_conversion(const ir::Instruction &p_in);
 	bool whole_comparison(const ir::Instruction &p_in);

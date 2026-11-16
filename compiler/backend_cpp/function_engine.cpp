@@ -91,13 +91,9 @@ bool FunctionWriter::holds(uint32_t p_register, std::string_view p_type) const {
 
 void FunctionWriter::find_inline() {
 	inline_.assign(function_.registers.size(), false);
-	// Only a type the runtime has maths for: any other is quicker left in its handle than boxed into one
-	// for each thing Godot does with it.
-	const auto has_maths = [](std::string_view p_type) {
-		return std::any_of(std::begin(INLINE), std::end(INLINE), [&](const InlineOperation &p_each) { return p_each.result == p_type; });
-	};
+	// Every type with parts: what Godot does with one it does on the bare value (function_values.cpp).
 	for (uint32_t i = 0; i < function_.registers.size(); i++) {
-		inline_[i] = has_maths(parts_of(function_, i));
+		inline_[i] = !parts_of(function_, i).empty();
 	}
 	for (const ir::Handler &handler : function_.handlers) {
 		inline_[handler.reg] = false;
@@ -359,7 +355,7 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 }
 
 bool FunctionWriter::engine(const Instruction &p_in) {
-	return engine_alias(p_in) || engine_inline(p_in) || engine_bound(p_in);
+	return engine_alias(p_in) || engine_inline(p_in) || engine_value(p_in) || engine_bound(p_in);
 }
 
 } // namespace backend_cpp
