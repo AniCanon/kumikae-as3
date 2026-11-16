@@ -48,8 +48,10 @@ public:
 		}
 	}
 	~SpareSlots() {
-		slots_.clear();
-		spares_.push_back(std::move(slots_));
+		if (slots_.capacity() <= KEPT) { // One made for a huge apply() is let go, not kept for good.
+			slots_.clear();
+			spares_.push_back(std::move(slots_));
+		}
 	}
 	SpareSlots(const SpareSlots &) = delete;
 	SpareSlots &operator=(const SpareSlots &) = delete;
@@ -57,6 +59,7 @@ public:
 	std::vector<Slot> *operator->() { return &slots_; }
 
 private:
+	static constexpr size_t KEPT = 256; // The most slots a list given back may hold.
 	std::vector<std::vector<Slot>> &spares_;
 	std::vector<Slot> slots_;
 };
