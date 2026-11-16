@@ -13,7 +13,6 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
-#include <dlfcn.h>
 
 using namespace godot;
 
@@ -138,24 +137,18 @@ std::string NativeProgram::path() {
 	if (const char *named = std::getenv("KAS3_PROGRAM_LIBRARY")) {
 		return named;
 	}
-#if defined(__APPLE__)
-	const String beside = scripts_root().path_join("bin/libkas3_program.dylib");
-#else
-	const String beside = scripts_root().path_join("bin/libkas3_program.so");
-#endif
+	const String beside = scripts_root().path_join(String::utf8(("bin/" + SharedLibrary::file_name("kas3_program")).c_str()));
 	const String file = ProjectSettings::get_singleton()->globalize_path(beside);
 	return FileAccess::file_exists(file) ? std::string(file.utf8().get_data()) : std::string();
 }
 
 std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, const ir::Module &p_module, GodotHost &p_engine, std::string *r_why) {
 	std::unique_ptr<NativeProgram> made(new NativeProgram(p_engine));
-	made->library_ = dlopen(p_path.c_str(), RTLD_NOW | RTLD_LOCAL);
-	if (!made->library_) {
-		*r_why = dlerror();
+	if (!made->library_.open(p_path, r_why)) {
 		return nullptr;
 	}
 	using Table = const rt::Program *(*)();
-	const Table table = reinterpret_cast<Table>(dlsym(made->library_, "kas3_program"));
+	const Table table = reinterpret_cast<Table>(made->library_.symbol("kas3_program"));
 	const rt::Program *program = table ? table() : nullptr;
 	if (!program) {
 		*r_why = "it has no kas3_program";
@@ -273,9 +266,7 @@ NativeProgram::~NativeProgram() {
 		engine_.drop(handle);
 	}
 	names_.clear();
-	if (library_) {
-		dlclose(library_);
-	}
+	library_.close();
 }
 
 } // namespace kas3

@@ -310,6 +310,21 @@ c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops
     -shared native/*.cpp -o bin/libkas3_program.dylib
 ```
 
+On Linux the same with `-fPIC -Wl,-z,defs -fno-math-errno -o bin/libkas3_program.so` (`-fno-math-errno` is
+what macOS's compiler does by itself: `Math.sqrt` is then the machine's instruction and nothing else). On
+Windows the library is `bin/kas3_program.dll`, loaded by the same code (`godot_ext/shared_library.cpp`); the
+flags below are written from the compilers' documentation and have **not been built or run**:
+
+```sh
+clang-cl /std:c++17 /O2 /GR- /EHs-c- /fp:precise -Xclang -ffp-contract=off -Xclang -fno-unroll-loops /LD native\*.cpp /Fe:bin\kas3_program.dll
+cl /std:c++17 /O2 /GR- /EHs-c- /fp:precise /LD native\*.cpp /Fe:bin\kas3_program.dll
+```
+
+`KAS3_EXPORT` is `__declspec(dllexport)` there, so `kas3_program` is the one symbol shown without a flag.
+MSVC has no switch for either `-ffp-contract=off` (its `/fp:precise` contracts nothing on x64, and may on
+ARM64) or `-fno-unroll-loops`, and the runtime's headers use `__builtin_expect` and
+`__builtin_frame_address`, which MSVC does not have: clang-cl is the compiler to start from.
+
 The files are given in the order the extension reads them (sorted by their place in the project), so that
 both compile the same module. The library shows one symbol, `kas3_program`, includes nothing of Godot's or
 godot-cpp's, and has no symbol of ours left to find when it is loaded: the host hands it the runtime's

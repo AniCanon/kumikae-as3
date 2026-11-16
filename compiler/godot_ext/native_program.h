@@ -7,6 +7,7 @@
 
 #include "godot_host.h"
 #include "native_host.h"
+#include "shared_library.h"
 
 #include <godot_cpp/variant/string_name.hpp>
 
@@ -17,7 +18,7 @@
 namespace kas3 {
 
 class NativeProgram {
-	void *library_ = nullptr;
+	SharedLibrary library_;
 	std::unique_ptr<rt::Host> host_;
 	std::vector<godot::StringName> names_; // The program's names, each built once; never moved once made.
 	std::vector<void *> singletons_; // The handles kept for the singletons it uses, and for the constants.
