@@ -1,5 +1,5 @@
-// What the calls into Godot share, in godot_host.cpp, godot_signals.cpp and godot_source.cpp. Not for other
-// files.
+// What the calls into Godot share, in godot_host.cpp, godot_handles.cpp, godot_signals.cpp and
+// godot_source.cpp. Not for other files.
 #pragma once
 
 #include "godot_host.h"
@@ -50,6 +50,11 @@ public:
 
 // What reaching through an object Godot has freed is: AS3's null error, which says so.
 inline constexpr const char *FREED = "TypeError: Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object.";
+
+// An object Godot has freed. To a script it is null.
+inline bool is_freed(const godot::Variant &p_value) {
+	return p_value.get_type() == godot::Variant::OBJECT && !((godot::ObjectID)p_value).is_null() && !p_value.get_validated_object();
+}
 
 // A failed call in AS3's words.
 std::string describe(const GDExtensionCallError &p_error, std::string_view p_what);
