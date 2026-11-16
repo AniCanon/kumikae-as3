@@ -68,6 +68,9 @@ struct Unit {
 	std::vector<Reference> references;
 	std::vector<TypedExpression> typed;
 	std::deque<LocalScope> local_scopes;
+	// The imports written in a declared function's body, which its signature uses too: resolved by the
+	// signature pass, for the functions that write any.
+	std::unordered_map<const FunctionDecl *, ImportScope> function_imports;
 	std::deque<Symbol> body_symbols; // Replaced together with this unit's body semantics.
 
 	explicit Unit(std::shared_ptr<Parsed> p_parsed) :

@@ -8,6 +8,7 @@
 
 namespace kas3 {
 
+void resolve_unit_signatures(Compilation &p_compilation, Unit &p_unit);
 void resolve_unit_bodies(Compilation &p_compilation, Unit &p_unit);
 
 namespace {
@@ -183,6 +184,7 @@ bool Compilation::update_bodies(const std::vector<std::pair<Unit *, std::shared_
 		unit->references.clear();
 		unit->typed.clear();
 		unit->local_scopes.clear();
+		unit->function_imports.clear();
 		unit->body_symbols.clear();
 		unit->outer_imports = {};
 		unit->block_imports = {};
@@ -195,6 +197,7 @@ bool Compilation::update_bodies(const std::vector<std::pair<Unit *, std::shared_
 	for (const auto &[unit, parsed] : p_changes) {
 		link_imports(*unit);
 		hierarchy_references(*this, *unit);
+		resolve_unit_signatures(*this, *unit);
 		resolve_unit_bodies(*this, *unit);
 	}
 	for (const auto &[unit, parsed] : p_changes) {

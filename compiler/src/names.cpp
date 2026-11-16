@@ -8,6 +8,7 @@
 
 namespace kas3 {
 
+void resolve_signatures(Compilation &p_compilation); // names_signatures.cpp
 void resolve_bodies(Compilation &p_compilation); // names_bodies.cpp
 void type_bodies(Compilation &p_compilation); // names_types.cpp
 void check_class_rules(Compilation &p_compilation); // names_rules.cpp
@@ -170,6 +171,7 @@ void Compilation::check(bool p_through_syntax_errors) {
 		link_imports(unit);
 	}
 	link_hierarchy();
+	resolve_signatures(*this);
 	resolve_bodies(*this);
 	check_class_rules(*this);
 	type_bodies(*this);
