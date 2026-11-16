@@ -178,7 +178,7 @@ check("dividing whole numbers by zero is an AS3 error", "at Values/cellsOver()" 
 output = compare("signals.gd", [
     "add", "has", "one listener", "still once", "emit", "remove", "add once", "remove all", "counts what scripts added", "remove all leaves others", "lasting or once, not both",
     "null argument and order", "arguments", "removes itself",
-    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "declared signal listed", "filter",
+    "after a failing listener", "another object's signal", "by name", "by a wrong name", "listeners and emit by name", "a listener's error comes back out of emit", "a function written in a method sees its members", "user signal", "declared signal", "a signal's object", "declared signal listed", "filter",
     "valid while its owner lives", "gone with its owner", "deferred not yet", "deferred after the frame",
     "deferred with its owner freed", "own signal field by name", "by name from a base: its own private field",
     "by name from a subclass: its own private field", "by name from a subclass: a base's private field is not reached", "by name in a function written in the base: its private field",

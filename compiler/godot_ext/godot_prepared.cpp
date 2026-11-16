@@ -314,6 +314,15 @@ bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operan
 			return false;
 		}
 	}
+	if (p_worked.result == Variant::OBJECT) {
+		// A value type's method that gives an object (Signal's get_object) writes the bare pointer. Written
+		// inside a Variant it would be an object with no id, which reads as none: the Variant is made of
+		// the object instead.
+		GDExtensionObjectPtr object = nullptr;
+		p_worked.builtin(receiver, pointers, &object, (int)(p_count - first));
+		const Variant result = object ? Variant(internal::get_object_instance_binding(object)) : Variant();
+		return take(p_result, result, p_worked.name, r_result, r_error);
+	}
 	if (r_result && into_handle(p_result, p_worked.result)) {
 		Variant *made = result_handle(p_result, p_worked);
 		p_worked.builtin(receiver, pointers, inside(*made, p_worked.result), (int)(p_count - first));
