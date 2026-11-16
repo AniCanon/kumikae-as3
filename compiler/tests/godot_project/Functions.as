@@ -50,6 +50,22 @@ package {
 		// Date's clock and zone are the host's: compared with GDScript's, so that nothing depends on where it runs.
 		public function since(godot:Number):Boolean { return Math.abs(new Date().time - godot) < 5000; }
 		public function zone():int { return int(-new Date().timezoneOffset); }
+		// A freed object is null on every path that makes text, as a null is: AS3's text, which is also what
+		// C#'s GD.Str and GD.Print give for a null. hash and isSame take it as null.
+		private var kept:Node;
+		public function keep(n:Node):void { kept = n; }
+		public function freedTexts():String {
+			var none:Node = null;
+			var held:* = kept;
+			var nothing:* = none;
+			return ["" + kept, kept + "", String(kept), "" + held, String(held), "" + none, "" + nothing].join(",");
+		}
+		public function freedTraced():void { trace("traced:", kept); }
+		public function freedSame():String {
+			var none:Node = null;
+			var held:* = kept;
+			return [hash(kept) == hash(none), isSame(kept, none), isSame(kept, kept), hash(held) == hash(null), isSame(held, null)].join(",");
+		}
 		public function marked(text:String):String { return text.replace(/(\d+)/g, "<$1>") + " " + escape(text) + " " + encodeURIComponent("é"); }
 	}
 }

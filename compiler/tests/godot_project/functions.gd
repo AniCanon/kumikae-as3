@@ -64,5 +64,13 @@ func _physics_process(_delta: float) -> bool:
 	show("now", ask("since", [Time.get_unix_time_from_system() * 1000.0]), true)
 	show("zone", ask("zone"), Time.get_time_zone_from_system().bias)
 	show("a regular expression", ask("marked", ["a1 b22"]), "a<1> b<22> a1%20b22 %C3%A9")
+	# A freed object is null to the script on every path, text included: AS3's null text, which C#'s
+	# GD.Str and GD.Print give for a null too (GDScript gives `<Freed Object>` and `<null>`).
+	var gone := Node.new()
+	ask("keep", [gone])
+	gone.free()
+	show("a freed object as text", ask("freedTexts"), "null,null,null,null,null,null,null")
+	show("a freed object to hash and isSame", ask("freedSame"), "true,true,true,true,true")
+	ask("freedTraced")
 	node.free()
 	return false

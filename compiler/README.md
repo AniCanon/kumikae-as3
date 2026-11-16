@@ -294,7 +294,9 @@ package {
   One that can give back anything (`lerp`, `max`) is used where the program says what it expects:
   `var x:Number = lerp(a, b, 0.5)`.
 - A Godot object that has been freed is `null` to a script: `node == null` is true, `if (node)` is
-  false, and a member reached on it is AS3's null error, which says the object was freed.
+  false, `"" + node`, `String(node)` and `trace(node)` give `null` (GDScript's text is `<Freed Object>`),
+  `hash` and `isSame` take it as null, and a member reached on it is AS3's null error, which says the
+  object was freed.
 - `null` written for a default AS3 can't write takes Godot's own default, wherever it is in the call:
   `color.clamp(null, max)`.
 - What Godot gives back is checked against its declared type. A value of another type is an AS3 error,

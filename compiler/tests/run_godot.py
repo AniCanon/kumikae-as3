@@ -289,7 +289,9 @@ output = compare("functions.gd", [
     "anything as text", "a default is not shared",
     "max past what a Number holds", "lerp of vectors", "int of lerp cuts", "Boolean of max", "lerp and max as text",
     "lerp of anything", "lerp into the wrong type", "now", "zone", "a regular expression",
+    "a freed object as text", "a freed object to hash and isSame",
 ])
+check("functions.gd: trace shows a freed object as null", "traced: null" in output, output[-1200:])
 check("functions.gd: a wide whole number into a Number is a RangeError",
       "RangeError: 9007199254740993 does not fit a Number exactly.\n\tat Functions/widest()" in output, output[-1500:])
 
