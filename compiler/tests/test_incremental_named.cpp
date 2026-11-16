@@ -13,6 +13,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -288,21 +289,19 @@ void test_deep_chain() {
 	}
 }
 
-// A file whose signatures name every class of a chain reads each class's chain: a change to the root's
-// header reaches it once, with the whole chain, and is still an edit.
-void test_reader_of_a_chain() {
+// A chain of 40 files, each made from its number by p_link (the root from 0), and a file that names every
+// one of them in its signatures and uses each in a body: it reads every class's chain and members. An edit to
+// the root reaches it once, with the whole chain, and is still an edit.
+void reader_of_a_chain(const char *p_name, const std::function<std::string(int)> &p_link, const std::string &p_use,
+		const std::string &p_from, const std::string &p_to) {
 	oracle::Files files;
-	const std::string root = "package { public class C0 { } }";
-	files["/p/C0.as"] = root;
 	files["/p/Marked.as"] = "package { public interface Marked { } }";
 	std::string fields = "package { public class Fields {\n";
 	for (int i = 0; i < 40; ++i) {
-		const std::string name = "C" + std::to_string(i);
-		if (i) {
-			files["/p/" + name + ".as"] = "package { public class " + name + " extends C" + std::to_string(i - 1) + " { } }";
-		}
-		fields += "\tvar f" + std::to_string(i) + ":" + name + ";\n\tfunction g" + std::to_string(i) + "(m:Marked):void { g" +
-				std::to_string(i) + "(f" + std::to_string(i) + "); }\n";
+		const std::string number = std::to_string(i);
+		files["/p/C" + number + ".as"] = p_link(i);
+		fields += "\tvar f" + number + ":C" + number + ";\n\tfunction g" + number + "(m:Marked):void { " +
+				replaced(p_use, "$", "f" + number) + " }\n";
 	}
 	files["/p/Fields.as"] = fields + "} }";
 	Workspace workspace(options(false));
@@ -310,16 +309,49 @@ void test_reader_of_a_chain() {
 		workspace.open(path, text);
 	}
 	workspace.compilation();
-	for (const std::string &text : { replaced(root, "class C0 {", "class C0 implements Marked {"), root }) {
+	const std::string root = files["/p/C0.as"];
+	for (const std::string &text : { replaced(root, p_from, p_to), root }) {
 		workspace.change("/p/C0.as", text);
 		files["/p/C0.as"] = text;
 		Workspace reference(options(false));
 		for (const auto &[path, written] : files) {
 			reference.open(path, written);
 		}
-		CHECK(program_state(workspace) == program_state(reference));
+		const std::string got = program_state(workspace);
+		const std::string wanted = program_state(reference);
+		CHECK(got == wanted);
+		if (got != wanted) {
+			std::printf("reader of a chain, %s: %s\n", p_name, first_difference(got, wanted).c_str());
+		}
 	}
 	CHECK_EQ(workspace.full_checks(), 1);
+}
+
+void test_reader_of_a_chain() {
+	const auto below = [](int p_i, const char *p_word) {
+		return p_i ? std::string(p_word) + " C" + std::to_string(p_i - 1) + " " : std::string();
+	};
+	// The root's header: every class's chain changes.
+	reader_of_a_chain(
+			"header", [&](int p_i) { return "package { public class C" + std::to_string(p_i) + " " + below(p_i, "extends") + "{ } }"; },
+			"trace($);", "class C0 {", "class C0 implements Marked {");
+	// A member every class overrides: each override is checked against the one above, down the chain, and
+	// the reader calls every one of them.
+	reader_of_a_chain(
+			"member",
+			[&](int p_i) {
+				return "package { public class C" + std::to_string(p_i) + " " + below(p_i, "extends") + "{ " + (p_i ? "override " : "") +
+						"public function m(a:int):int { return a; } } }";
+			},
+			"trace($.m(1));", "m(a:int):int", "m(a:int, b:int = 0):int");
+	// A chain of interfaces, and a member of the root that every one of them inherits.
+	reader_of_a_chain(
+			"interfaces",
+			[&](int p_i) {
+				return "package { public interface C" + std::to_string(p_i) + " " + below(p_i, "extends") + "{ " +
+						(p_i ? "" : "function m(a:int):int;") + " } }";
+			},
+			"trace($.m(1));", "m(a:int):int", "m(a:int, b:int = 0):int");
 }
 
 // A package that nothing declares any more is forgotten: a file moved from package to package for a whole
