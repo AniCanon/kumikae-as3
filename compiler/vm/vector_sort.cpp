@@ -65,27 +65,8 @@ bool Interpreter::sort_order(Kind p_kind, const std::vector<Slot> &p_elements, O
 	std::vector<double> numbers;
 	std::vector<std::string> texts;
 	const bool numeric = p_options & NUMERIC;
-	if (!p_compare) {
-		// Each element's key, found once: its text (which may run the program) or its number.
-		numbers.resize(p_elements.size());
-		texts.resize(p_elements.size());
-		for (uint32_t at : *r_order) {
-			Slot untyped = to_any(p_kind, p_elements[at]);
-			bool ok = true;
-			if (numeric) {
-				Slot number;
-				ok = from_any(untyped, Kind::F64, NONE, &number);
-				numbers[at] = number.d;
-			} else {
-				std::string text;
-				ok = any_text(untyped, &text);
-				texts[at] = (p_options & CASE_INSENSITIVE) ? lower_case(text) : std::move(text);
-			}
-			drop_any(untyped);
-			if (!ok) {
-				return false;
-			}
-		}
+	if (!p_compare && !sort_keys(p_kind, p_elements, *r_order, p_options, &numbers, &texts)) {
+		return false;
 	}
 	const auto compare = [&](uint32_t p_a, uint32_t p_b) -> std::optional<double> {
 		double order = 0;
@@ -127,6 +108,32 @@ bool Interpreter::sort_order(Kind p_kind, const std::vector<Slot> &p_elements, O
 	r_order->insert(r_order->end(), undefined.begin(), undefined.end());
 	if (*r_twins) {
 		std::iota(r_order->begin(), r_order->end(), 0);
+	}
+	return true;
+}
+
+// Each element's key for sort() by its options, found once: its text (which may run the program) or, for
+// NUMERIC, its number. False if the program raised.
+bool Interpreter::sort_keys(Kind p_kind, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, int32_t p_options,
+		std::vector<double> *r_numbers, std::vector<std::string> *r_texts) {
+	r_numbers->resize(p_elements.size());
+	r_texts->resize(p_elements.size());
+	for (uint32_t at : p_order) {
+		Slot untyped = to_any(p_kind, p_elements[at]);
+		bool ok = true;
+		if (p_options & NUMERIC) {
+			Slot number;
+			ok = from_any(untyped, Kind::F64, NONE, &number);
+			(*r_numbers)[at] = number.d;
+		} else {
+			std::string text;
+			ok = any_text(untyped, &text);
+			(*r_texts)[at] = (p_options & CASE_INSENSITIVE) ? lower_case(text) : std::move(text);
+		}
+		drop_any(untyped);
+		if (!ok) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -291,6 +298,38 @@ bool Interpreter::sort_field(Slot p_element, Str *p_name, Slot *r_value) {
 	return !has || get_property(p_element, key, r_value);
 }
 
+// Each element's key for each field of sortOn(), found once: [field * count + element]. False if the program
+// raised, or memory ran out.
+bool Interpreter::sort_on_keys(const std::vector<SortField> &p_fields, const std::vector<Slot> &p_elements, std::vector<double> *r_numbers,
+		std::vector<std::string> *r_texts) {
+	const size_t count = p_elements.size();
+	r_numbers->assign(p_fields.size() * count, 0.0);
+	r_texts->assign(p_fields.size() * count, std::string());
+	bool ok = true;
+	for (size_t f = 0; ok && f < p_fields.size(); f++) {
+		Str *name = text(p_fields[f].name);
+		ok = name != nullptr;
+		for (uint32_t i = 0; ok && i < count; i++) {
+			Slot value;
+			ok = sort_field(p_elements[i], name, &value);
+			if (ok && (p_fields[f].options & NUMERIC)) {
+				Slot as_number;
+				ok = from_any(value, Kind::F64, NONE, &as_number);
+				(*r_numbers)[f * count + i] = as_number.d;
+			} else if (ok) {
+				std::string words;
+				ok = any_text(value, &words);
+				(*r_texts)[f * count + i] = (p_fields[f].options & CASE_INSENSITIVE) ? lower_case(words) : std::move(words);
+			}
+			drop_any(value); // Undefined if it could not be read.
+		}
+		if (release(name)) {
+			free_string(name);
+		}
+	}
+	return ok;
+}
+
 // sortOn(): by each field in turn, as text unless the field's options say NUMERIC, each field ascending
 // unless they say DESCENDING. Stable; what sort() gives is given (see sorted()).
 void Interpreter::vector_sort_on(Vector *p_vector, const VectorCall &p_call) {
@@ -305,31 +344,9 @@ void Interpreter::vector_sort_on(Vector *p_vector, const VectorCall &p_call) {
 		elements[i] = share(Kind::Any, p_vector->data[i]);
 	}
 	retain(p_vector);
-	// Each element's key for each field, found once: [field * count + element].
-	std::vector<double> numbers(fields.size() * count);
-	std::vector<std::string> texts(fields.size() * count);
-	bool ok = true;
-	for (size_t f = 0; ok && f < fields.size(); f++) {
-		Str *name = text(fields[f].name);
-		ok = name != nullptr;
-		for (uint32_t i = 0; ok && i < count; i++) {
-			Slot value;
-			ok = sort_field(elements[i], name, &value);
-			if (ok && (fields[f].options & NUMERIC)) {
-				Slot as_number;
-				ok = from_any(value, Kind::F64, NONE, &as_number);
-				numbers[f * count + i] = as_number.d;
-			} else if (ok) {
-				std::string words;
-				ok = any_text(value, &words);
-				texts[f * count + i] = (fields[f].options & CASE_INSENSITIVE) ? lower_case(words) : std::move(words);
-			}
-			drop_any(value); // Undefined if it could not be read.
-		}
-		if (release(name)) {
-			free_string(name);
-		}
-	}
+	std::vector<double> numbers;
+	std::vector<std::string> texts;
+	const bool ok = sort_on_keys(fields, elements, &numbers, &texts);
 	const auto compare = [&](uint32_t p_a, uint32_t p_b) -> std::optional<double> {
 		for (size_t f = 0; f < fields.size(); f++) {
 			const double a = numbers[f * count + p_a], b = numbers[f * count + p_b];

@@ -323,9 +323,13 @@ private:
 	};
 	bool sort_on_fields(const VectorCall &p_call, std::vector<SortField> *r_fields, int32_t *r_options);
 	bool sort_field(Slot p_element, Str *p_name, Slot *r_value);
+	bool sort_on_keys(const std::vector<SortField> &p_fields, const std::vector<Slot> &p_elements, std::vector<double> *r_numbers,
+			std::vector<std::string> *r_texts);
 	void vector_sort_on(Vector *p_vector, const VectorCall &p_call);
 	bool sort_order(ir::Kind p_kind, const std::vector<Slot> &p_elements, Object *p_compare, int32_t p_options, std::vector<uint32_t> *r_order,
 			bool *r_twins);
+	bool sort_keys(ir::Kind p_kind, const std::vector<Slot> &p_elements, const std::vector<uint32_t> &p_order, int32_t p_options,
+			std::vector<double> *r_numbers, std::vector<std::string> *r_texts);
 	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
 	bool element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
