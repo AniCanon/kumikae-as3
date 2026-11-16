@@ -1,26 +1,10 @@
+#include "library_names.h"
 #include "lower_library.h"
-
-#include <array>
 
 namespace kas3 {
 namespace ir {
 
 namespace {
-
-struct RegExpProperty {
-	std::string_view name;
-	RegExpFunction function;
-	Kind kind;
-};
-
-constexpr std::array<RegExpProperty, 6> REGEXP_PROPERTIES = { {
-		{ "source", RegExpFunction::Source, Kind::Str },
-		{ "global", RegExpFunction::Global, Kind::Bool },
-		{ "ignoreCase", RegExpFunction::IgnoreCase, Kind::Bool },
-		{ "multiline", RegExpFunction::Multiline, Kind::Bool },
-		{ "dotall", RegExpFunction::Dotall, Kind::Bool },
-		{ "extended", RegExpFunction::Extended, Kind::Bool },
-} };
 
 bool is_builtin_class(const Symbol *p_class, std::string_view p_name) {
 	return p_class && p_class->kind == SymbolKind::Class && p_class->name == p_name && p_class->unit && p_class->unit->is_builtin &&
@@ -118,18 +102,17 @@ std::optional<Place> Library::place(Lowerer &p_lowerer, Expr *p_target, Expr *p_
 	if (symbol->owner->name == "Date") {
 		return date_place(p_lowerer, member, p_later);
 	}
-	for (const RegExpProperty &property : REGEXP_PROPERTIES) {
-		if (property.name == symbol->name) {
-			Place place;
-			place.where = Place::Library;
-			place.op = Op::RegExpCall;
-			place.index = static_cast<uint32_t>(property.function);
-			place.kind = property.kind;
-			place.object = p_lowerer.settled(p_lowerer.receiver(member->object), p_later, member->name_offset);
-			return place;
-		}
+	const RegExpProperty *property = regexp_property(symbol->name);
+	if (!property) {
+		return std::nullopt;
 	}
-	return std::nullopt;
+	Place place;
+	place.where = Place::Library;
+	place.op = Op::RegExpCall;
+	place.index = static_cast<uint32_t>(property->function);
+	place.kind = property->kind;
+	place.object = p_lowerer.settled(p_lowerer.receiver(member->object), p_later, member->name_offset);
+	return place;
 }
 
 bool Library::own_value_of(const Expr *p_value) {
@@ -161,17 +144,17 @@ void Library::store(Lowerer &p_lowerer, const Place &p_place, uint32_t p_value, 
 }
 
 uint32_t Library::regexp_method() {
-	const std::string_view name = function_->name;
-	if (name != "exec" && name != "test") {
+	const std::optional<RegExpFunction> which = ir::regexp_method(function_->name);
+	if (!which) {
 		return refused("", Kind::Any);
 	}
 	class_of(l_, function_->owner);
-	const bool exec = name == "exec";
+	const bool exec = *which == RegExpFunction::Exec;
 	if (exec) {
 		l_.vector_class(l_.compilation_.instance_type(l_.array_)); // What exec() gives.
 	}
 	std::vector<uint32_t> list = arguments(l_.receiver(object()));
-	return emit(Op::RegExpCall, static_cast<uint32_t>(exec ? RegExpFunction::Exec : RegExpFunction::Test), std::move(list), exec ? Kind::Any : Kind::Bool);
+	return emit(Op::RegExpCall, static_cast<uint32_t>(*which), std::move(list), exec ? Kind::Any : Kind::Bool);
 }
 
 // match(pattern), search(pattern), replace(pattern, replacement): each untyped, as String's declarations

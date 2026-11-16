@@ -166,14 +166,24 @@ void Interpreter::regexp_call(const Function &p_function, const Instruction &p_i
 		raise_null();
 		return;
 	}
+	const Slot read = regexp_read(regexp, which);
 	if (which == RegExpFunction::Source) {
-		Str *source = static_cast<Str *>(regexp->fields()[ir::REGEXP_SOURCE].p);
-		retain(source);
-		assign(Kind::Str, r[p_in.a], source);
-		return;
+		assign(Kind::Str, r[p_in.a], read.p);
+	} else {
+		r[p_in.a] = read;
 	}
-	r[p_in.a].bits = 0;
-	r[p_in.a].b = (regexp->fields()[ir::REGEXP_FLAGS].i & bit_of(which)) != 0;
+}
+
+Slot Interpreter::regexp_read(Object *p_regexp, RegExpFunction p_property) {
+	Slot out;
+	out.bits = 0;
+	if (p_property == RegExpFunction::Source) {
+		out.p = p_regexp->fields()[ir::REGEXP_SOURCE].p;
+		retain(static_cast<Str *>(out.p));
+	} else {
+		out.b = (p_regexp->fields()[ir::REGEXP_FLAGS].i & bit_of(p_property)) != 0;
+	}
+	return out;
 }
 
 // new RegExp(source, flags): each as its text, undefined as none; a RegExp as the source is copied, and
@@ -239,36 +249,48 @@ void Interpreter::regexp_exec(const Function &p_function, const Instruction &p_i
 		raise_null();
 		return;
 	}
-	const std::shared_ptr<const regex::Program> program = pattern_of(regexp);
-	if (!program) {
-		return;
+	const bool test = static_cast<RegExpFunction>(p_in.b) == RegExpFunction::Test;
+	Slot out;
+	if (regexp_run(regexp, text_in(static_cast<const Str *>(r[list[1]].p)), test, &out)) {
+		if (test) {
+			r[p_in.a] = out;
+		} else {
+			put(Kind::Any, r[p_in.a], out);
+		}
 	}
-	const std::string_view source = text_in(static_cast<const Str *>(regexp->fields()[ir::REGEXP_SOURCE].p));
-	const std::u16string units = units_of(text_in(static_cast<const Str *>(r[list[1]].p)));
+}
+
+bool Interpreter::regexp_run(Object *p_regexp, std::string_view p_text, bool p_test, Slot *r_out) {
+	const std::shared_ptr<const regex::Program> program = pattern_of(p_regexp);
+	if (!program) {
+		return false;
+	}
+	const std::string_view source = text_in(static_cast<const Str *>(p_regexp->fields()[ir::REGEXP_SOURCE].p));
+	const std::u16string units = units_of(p_text);
 	const bool global = (program->flags & regex::GLOBAL) != 0;
-	double &last = regexp->fields()[ir::REGEXP_LAST_INDEX].d;
+	double &last = p_regexp->fields()[ir::REGEXP_LAST_INDEX].d;
 	const double from = global && !std::isnan(last) ? std::trunc(last) : 0;
 	std::optional<Found> found;
 	if (from >= 0 && from <= units.size()) {
 		found = find_match(*program, source, units, static_cast<uint32_t>(from));
 	}
 	if (failing_) {
-		return;
+		return false;
 	}
 	if (!found || global) {
 		last = found ? found->captures[1] : 0;
 	}
-	Slot &out = r[p_in.a];
-	if (static_cast<RegExpFunction>(p_in.b) == RegExpFunction::Test) {
-		out.bits = 0;
-		out.b = found.has_value();
-		return;
+	r_out->bits = 0;
+	if (p_test) {
+		r_out->b = found.has_value();
+		return true;
 	}
 	Vector *array = found ? match_array(*found, units, *program) : nullptr;
 	if (found && !array) {
-		return;
+		return false;
 	}
-	put(Kind::Any, out, array ? any::object(array) : any::null());
+	*r_out = array ? any::object(array) : any::null();
+	return true;
 }
 
 } // namespace vm

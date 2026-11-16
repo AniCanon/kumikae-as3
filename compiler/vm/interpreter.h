@@ -185,6 +185,15 @@ private:
 	void regexp_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	void regexp_new(const ir::Function &p_function, const ir::Instruction &p_in);
 	void regexp_exec(const ir::Function &p_function, const ir::Instruction &p_in);
+	// exec() (untyped: the match's Array, or null) or test() (a Boolean). False if it raised.
+	bool regexp_run(Object *p_regexp, std::string_view p_text, bool p_test, Slot *r_out);
+	Slot regexp_read(Object *p_regexp, ir::RegExpFunction p_property); // source (a new reference), or a flag
+	// RegExp's and Date's members by name on a value held untyped (vm/library_members.cpp): nothing if the
+	// object is neither, or has no member of that name; false if it raised. A call's result goes to p_out.
+	std::optional<bool> library_get(Object *p_object, std::string_view p_name, Slot *r_value);
+	std::optional<bool> library_set(Object *p_object, std::string_view p_name, Slot p_value);
+	std::optional<bool> library_call(Object *p_object, std::string_view p_name, const std::vector<Slot> &p_given, uint32_t p_out);
+	bool library_has(const Object *p_object, std::string_view p_name) const;
 	// A match: where it and each group start and end, by unit (-1 for a group that took no part).
 	struct Found {
 		std::vector<int32_t> captures;
@@ -204,7 +213,8 @@ private:
 	void date_call(const ir::Function &p_function, const ir::Instruction &p_in);
 	void date_new(const ir::Function &p_function, const ir::Instruction &p_in);
 	double date_from_parts(const std::vector<uint32_t> &p_list, size_t p_first, bool p_local);
-	double date_set(double p_time, uint32_t p_code, const std::vector<uint32_t> &p_list);
+	double date_set(double p_time, uint32_t p_code, const double *p_given, size_t p_count);
+	bool date_apply(Object *p_date, uint32_t p_code, const double *p_given, size_t p_count, Slot *r_out);
 	double local_time(double p_time);
 	double utc_time(double p_local);
 	std::string date_text(const Object *p_date, ir::DateText p_which) const;
@@ -233,6 +243,7 @@ private:
 	std::string holder_name(Slot p_holder) const;
 	void raise_unsupported(const std::string &p_what);
 	void raise_not_found(const PropertyKey &p_key, Slot p_holder);
+	bool refuse_write(const char *p_number, const char *p_words, std::string_view p_name, Slot p_holder); // False.
 	bool property_key(Slot p_holder, Slot p_key, PropertyKey *r_key);
 	std::optional<uint32_t> entry_of(const Entries *p_entries, const PropertyKey &p_key) const;
 	bool set_entry(Entries *p_entries, const PropertyKey &p_key, Slot p_value);

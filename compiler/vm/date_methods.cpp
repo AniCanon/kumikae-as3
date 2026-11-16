@@ -2,6 +2,8 @@
 
 #include "date_time.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace kas3 {
@@ -80,13 +82,12 @@ double Interpreter::date_from_parts(const std::vector<uint32_t> &p_list, size_t 
 
 // setHours(h, m, s, ms) and the rest (15.9.5.28 to 15.9.5.41): the parts written from the setter's own,
 // the others kept as the date has them. setFullYear starts a date that is NaN from 1970.
-double Interpreter::date_set(double p_time, uint32_t p_code, const std::vector<uint32_t> &p_list) {
+double Interpreter::date_set(double p_time, uint32_t p_code, const double *p_given, size_t p_count) {
 	const DatePart part = static_cast<DatePart>((p_code >> 8) & 0xFF);
 	const bool utc = (p_code >> 16) != 0;
 	const double from = part == DatePart::FullYear && std::isnan(p_time) ? 0 : utc ? p_time : local_time(p_time);
 	const date::Parts at = date::parts_of(from);
-	const size_t base = frames_.back().base;
-	const auto given = [&](size_t p_index, double p_kept) { return p_index + 1 < p_list.size() ? stack_[base + p_list[p_index + 1]].d : p_kept; };
+	const auto given = [&](size_t p_index, double p_kept) { return p_index < p_count ? p_given[p_index] : p_kept; };
 	const double within = from - date::day_of(from) * date::MS_PER_DAY;
 	double made = NOT_A_NUMBER;
 	switch (part) {
@@ -178,33 +179,54 @@ void Interpreter::date_call(const Function &p_function, const Instruction &p_in)
 		raise_null();
 		return;
 	}
-	double &time = date->fields()[ir::DATE_TIME].d;
-	switch (function) {
+	// A setter takes four parts at most; what is given beyond them is not read.
+	std::array<double, 4> given{};
+	const size_t count = std::min(list.size() - 1, given.size());
+	for (size_t i = 0; i < count; i++) {
+		given[i] = r[list[i + 1]].d;
+	}
+	Slot out;
+	if (date_apply(date, p_in.b, given.data(), count, &out)) {
+		if (function == DateFunction::Text) {
+			assign(Kind::Str, r[p_in.a], static_cast<Str *>(out.p));
+		} else {
+			r[p_in.a].d = out.d;
+		}
+	}
+}
+
+// One of a Date's methods or properties other than new, parse and UTC, on the parts given: a Number, or
+// for a text a String with a reference of its own. False if it raised.
+bool Interpreter::date_apply(Object *p_date, uint32_t p_code, const double *p_given, size_t p_count, Slot *r_out) {
+	double &time = p_date->fields()[ir::DATE_TIME].d;
+	r_out->bits = 0;
+	switch (static_cast<DateFunction>(p_code & 0xFF)) {
 		case DateFunction::Time:
-			r[p_in.a].d = time;
+			r_out->d = time;
 			break;
 		case DateFunction::SetTime:
-			time = date::time_clip(list.size() > 1 ? r[list[1]].d : NOT_A_NUMBER);
-			r[p_in.a].d = time;
+			time = date::time_clip(p_count > 0 ? p_given[0] : NOT_A_NUMBER);
+			r_out->d = time;
 			break;
 		case DateFunction::TimezoneOffset:
-			r[p_in.a].d = std::isnan(time) ? time : (time - local_time(time)) / 60000.0;
+			r_out->d = std::isnan(time) ? time : (time - local_time(time)) / 60000.0;
 			break;
 		case DateFunction::Get: {
-			const bool utc = (p_in.b >> 16) != 0;
-			r[p_in.a].d = part_of(date::parts_of(utc ? time : local_time(time)), static_cast<DatePart>((p_in.b >> 8) & 0xFF));
+			const bool utc = (p_code >> 16) != 0;
+			r_out->d = part_of(date::parts_of(utc ? time : local_time(time)), static_cast<DatePart>((p_code >> 8) & 0xFF));
 			break;
 		}
 		case DateFunction::Set:
-			time = date_set(time, p_in.b, list);
-			r[p_in.a].d = time;
+			time = date_set(time, p_code, p_given, p_count);
+			r_out->d = time;
 			break;
 		case DateFunction::Text:
-			assign(Kind::Str, r[p_in.a], text(date_text(date, static_cast<ir::DateText>((p_in.b >> 8) & 0xFF))));
-			break;
+			r_out->p = text(date_text(p_date, static_cast<ir::DateText>((p_code >> 8) & 0xFF)));
+			return r_out->p != nullptr;
 		default:
 			break;
 	}
+	return true;
 }
 
 } // namespace vm

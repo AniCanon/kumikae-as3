@@ -267,6 +267,9 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 		return false;
 	}
 	if (klass) {
+		if (const std::optional<bool> done = library_get(object, p_key.text, r_value)) {
+			return *done;
+		}
 		if (const std::optional<uint32_t> field = named_field(*klass, p_key.text)) {
 			*r_value = to_any(klass->fields[*field].kind, object->fields()[*field]);
 			return true;
@@ -334,16 +337,19 @@ bool Interpreter::primitive_property(Slot p_holder, const PropertyKey &p_key, Sl
 	return false;
 }
 
+// AS3's ReferenceError for a write a sealed object refuses: "Error #1056: Cannot create property x on C.".
+bool Interpreter::refuse_write(const char *p_number, const char *p_words, std::string_view p_name, Slot p_holder) {
+	raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
+			std::string("Error #") + p_number + ": " + p_words + std::string(p_name) + " on " + holder_name(p_holder) + ".");
+	return false;
+}
+
 // holder[key] = value. A sealed object takes a value into a public field, coerced as a store into it is; a
 // name it lacks is AS3's ReferenceError #1056, and one of its methods #1037.
 bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_value) {
 	Object *object = held_object(p_holder);
 	const ir::Class *klass = object ? &module_.classes[object->klass] : nullptr;
-	const auto cannot = [&](const char *p_number, const char *p_words) {
-		raise(module_.reference_error_class != NONE ? module_.reference_error_class : module_.error_class,
-				std::string("Error #") + p_number + ": " + p_words + p_key.text + " on " + holder_name(p_holder) + ".");
-		return false;
-	};
+	const auto cannot = [&](const char *p_number, const char *p_words) { return refuse_write(p_number, p_words, p_key.text, p_holder); };
 	if (klass && klass->table) {
 		return set_entry(entries_of(object), p_key, p_value);
 	}
@@ -351,6 +357,9 @@ bool Interpreter::set_property(Slot p_holder, const PropertyKey &p_key, Slot p_v
 		return set_element(static_cast<Vector *>(object), p_key, p_value);
 	}
 	if (klass) {
+		if (const std::optional<bool> done = library_set(object, p_key.text, p_value)) {
+			return *done;
+		}
 		if (const std::optional<uint32_t> field = named_field(*klass, p_key.text)) {
 			const ir::Field &declared = klass->fields[*field];
 			if (ir::is_engine(declared.kind)) {
@@ -498,7 +507,7 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed") ||
 				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && listed(ARRAY_METHODS, p_key.text));
 	} else if (klass) {
-		has = has || named_field(*klass, p_key.text) || named_method(*klass, p_key.text);
+		has = has || named_field(*klass, p_key.text) || named_method(*klass, p_key.text) || library_has(object, p_key.text);
 	} else if (tag == AnyTag::String) {
 		has = has || p_key.text == "length" || (p_prototype && listed(STRING_METHODS, p_key.text));
 	} else if (tag != AnyTag::Boolean) {

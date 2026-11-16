@@ -1,0 +1,20 @@
+o(b)? true false false false false 0
+o, 3 3
+false 0 false 0
+1 b 3
+true true true false
+2024 2 5 2 14 7 9 250
+2024 2 14 true true
+2000 0 5
+true 1 2 3
+0 1970 Thu Jan 1 00:00:00 1970 UTC 1970 4
+13 13
+true true true false
+1074 Error #1074: Illegal write to read-only property source on RegExp.
+1037 Error #1037: Cannot assign to a method exec on RegExp.
+1074 Error #1074: Illegal write to read-only property day on Date.
+1074 Error #1074: Illegal write to read-only property timezoneOffset on Date.
+0 reading 'nothing', which a RegExp does not declare, by its name is not supported by the interpreter yet
+0 adding a property to a Date is not supported by the interpreter yet
+reading the method 'exec' of a RegExp without calling it is not supported by the interpreter yet
+reading the method 'getTime' of a Date without calling it is not supported by the interpreter yet
