@@ -10,7 +10,8 @@ Every group runs under `ctest`. What each is, in more words, is in the
 | `run/` | Whole programs under `kas3c run`: `.as`, `.out`, and `.ir` where the IR is pinned | A new pair; `err_*` files expect an error |
 | `godot_project/` | AS3 inside Godot, compared with GDScript | A method in a `.as` script, a `show(name, ask(...), <what GDScript gives>)` line in its `.gd` driver, the name in `run_godot.py` |
 | `corpus/`, `external/` | Real AS3 from elsewhere must still parse (`external/` is fetched, not committed). `run_corpus.py` says which corpus programs the interpreter takes and what stops the others; `run_godot.py` runs the ones in `corpus/runs.txt` inside Godot | A program that starts to run: its name in `corpus/runs.txt`, or in `corpus/waits.txt` with what it waits for |
-| `bench/` | Timings, not pass or fail | `run_bench.py <build> [--godot tests] [--against <other build>]` |
+| `bench/` | Timings, not pass or fail | `run_bench.py <build> [--godot tests] [--against <other build>]`; `recheck.py <build> --against <other> --lines 100000 1000000`; `completion.py` |
+| `test_incremental.cpp`, `test_server_incremental.cpp`, `oracle_project.h`, `oracle_edits.h` | Incremental checking against a fresh whole check | A named sequence in `test_directed`, or an edit kind in `oracle_edits.h` |
 | `test_cli.py`, `test_lsp_stdio.py` | `kas3c` as a program | |
 | `build_ios.sh`, `build_ios_simulator_template.sh` | The extension for iOS, and a Simulator template from Godot's source | |
 
@@ -45,11 +46,39 @@ with a fresh compiler. `query_completion.h` shares completion fixtures and edit 
 Empty-name cases include following methods, fields, modifiers and metadata with comments and CRLF.
 `test_parser` checks that recovery retains those declarations and accepts valid multiline names.
 
+## The incremental oracle
+
+`test_incremental` applies random, seeded edits (words replaced, lines deleted or pasted, characters typed,
+modifiers, `extends` and `implements`, imports, statements, undo, files copied and removed) to one
+long-lived `Workspace`, over generated projects (three packages, inheritance, interfaces, accessors, names
+that repeat across packages), over `corpus/` with Godot's API, and, one sequence in three, over a project
+folder on disk edited both in the editor and on disk. Between edits the workspace is left part-checked: a
+check that stops, a question about one file, or nothing. After them every file's errors, `dump_names`,
+`dump_types`, and completion, hover, definition and argument help at sampled places must equal a fresh,
+fully checked workspace's, with no rebuild but for files added or removed. Named sequences cover what
+random edits seldom reach (an interface cycle cut elsewhere, the first definition of a name changing,
+halves across files, more than 100 errors, broken files repaired, override defaults). `test_scope` pins how
+many files an edit checks again. `test_server_incremental` does the same through `Server`: batches of edits
+and requests, checks that stop at random, and what the editor ends up holding per file.
+
+The suite runs a short version. Longer, and under `build-san` too:
+
+```sh
+KAS3_ORACLE_SEEDS=600 KAS3_ORACLE_EDITS=200 compiler/build/test_incremental
+KAS3_ORACLE_SEEDS=300 KAS3_ORACLE_EDITS=200 compiler/build/test_server_incremental
+KAS3_ORACLE_CORPUS=compiler/tests/external/flixel KAS3_ORACLE_SEEDS=6 compiler/build/test_incremental
+```
+
+A failure prints the seed and the last edits; `KAS3_ORACLE_FIRST_SEED=<seed> KAS3_ORACLE_SEEDS=1` repeats it
+and `KAS3_ORACLE_DUMP=<folder>` keeps the files and both answers.
+
 For alternating completion timings, build the unchanged revision separately before editing, then run:
 
 ```sh
 python3 compiler/tests/bench/completion.py compiler/build --against compiler/build-baseline --runs 101
 python3 compiler/tests/bench/completion.py compiler/build --against compiler/build-baseline --seconds 600
+python3 compiler/tests/bench/completion.py compiler/build --against compiler/build-baseline --mode hub --lines 100000 1000000
+python3 compiler/tests/bench/recheck.py compiler/build --against compiler/build-baseline --lines 100000 1000000
 ```
 
 The driver reports cold initialization/first completion, warm requests, edit/request pairs and bursts
@@ -58,10 +87,11 @@ has 5,003 lines. Run without concurrent builds for comparable timings. RSS sampl
 pages; the workspace tests provide separate evidence about live cache ownership. Keep check/run
 controls from `bench/run_bench.py --against` alongside these results.
 
-The completion driver also accepts `--valid-body`: it changes a comment inside a valid method while
-requesting members at a dot. Run both modes. The default malformed-expression fixture measures the
-full-check recovery path; it must not be presented as evidence for incremental body reuse. The baseline
-and candidate always receive identical source and edit sequences.
+The completion driver also accepts `--mode body` (or `--valid-body`): it changes a comment inside a valid
+method while requesting members at a dot; `--mode signature` changes a method's parameters in a generated
+file another calls, and `--mode hub` the method every generated file calls. Its `program` timing follows
+the edit with find references, which waits for every file. The baseline and candidate always receive
+identical source and edit sequences.
 
 Follow-up regressions cover fresh-check equivalence after body edits, imports moved between functions,
 cross-file batch ordering, released parse snapshots, generated edits, stale document versions, queued

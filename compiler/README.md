@@ -22,7 +22,7 @@ anyone changing the repository are in [AGENTS.md](../AGENTS.md).
 | `vm/` | The interpreter. No Godot header | `interpreter.cpp` (frames, calls, errors), `interpreter_run.cpp` (the loop), `interpreter_host.cpp` (requests to the engine), `interpreter_objects.cpp` (lifetime), `numeric` (conversions C++ alone would not make safe), `runtime` (strings and objects) |
 | `vm/` host | What the interpreter needs from where it runs | `host.h` holds four interfaces: `output.h`, `engine_handles.h` (what is done to a value the interpreter holds), `engine_source.h` (where values come from), `clock.h` (the time and the zone, for Date). `no_engine.h` answers where there is no engine |
 | `godot_ext/` | The GDExtension | `godot_host` (the four interfaces, with Godot's calls), `callable` (a method as a Godot function, and listeners as the cycle collector sees them), `instance`, `script`, `program`, `language`, `register` |
-| `lsp/` | The language server | `server`, `workspace`, `json` |
+| `lsp/` | The language server | `server`, `workspace` (edits applied, files checked as asked), `json` |
 | `godot/` | The generator of Godot's API as AS3 declarations | `generate.py`, `naming.py`, the generated `godot.as` and `godot_names.txt` |
 | `tests/` | Tests, and `bench/` for the timings | See [Tests](#tests) |
 
@@ -385,12 +385,15 @@ How it works:
 - **The project** is the nearest folder at or above the opened one that has a `project.godot`, or else the
   opened folder. Every `.as` file under it is part of the program, except in folders whose name starts with
   a dot. An open file's text in the editor stands in for the file on disk.
-- **Every change checks the whole program again.** A file that did not change keeps its syntax tree, so
-  only the changed file is parsed again. On a generated project of 100,000 lines a re-check takes about
-  27 ms with Godot's API loaded (`build/bench_recheck <folder>`; `tests/bench/generate_project.py` writes
-  the project).
-- **Typing bursts are checked once.** A change marks the program as stale; the check runs when no further
-  message is waiting, or when a request needs an answer.
+- **A change checks again only what it can change.** Only the changed file is parsed again. Its
+  declarations are checked at once, and those of the files that read a declaration whose fingerprint
+  changed; bodies are checked one file at a time: the file a request asks about first, the rest while the
+  editor pauses ([src/README.md](src/README.md#checking-as-the-program-is-edited)). On a generated project of
+  1,000,000 lines with Godot's API loaded, a change to a method's parameters is answered in under a
+  millisecond (`build/bench_recheck <folder>`; `tests/bench/generate_project.py` writes the project).
+- **Typing bursts are checked once,** and a check of what is left stops for any message that arrives and
+  goes on after it. A change marks the program as stale; edits are taken in when a request needs an
+  answer or no further message is waiting.
 - **A syntax error silences only what it may have caused,** as in `kas3c check`: the rest of its own file,
   every file that uses something that file declares, and every complaint that a name is missing. Other
   errors are still shown. Names are still resolved, so go to definition, hover and the outline keep working

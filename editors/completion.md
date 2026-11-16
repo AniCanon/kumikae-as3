@@ -139,18 +139,36 @@ The parser records non-code text intervals once; editor queries search those int
 scanning the file from its beginning on every request. The resolver's scopes belong to the current
 compilation. Completion caches declaration descriptions and a compact list of relevant syntax nodes
 within that same compilation. An edit releases those caches before rechecking; no old syntax pointers
-or history of prefix results survives the generation.
+or history of prefix results survives the generation. A file whose bodies are checked again drops only
+what was worked out from it.
 
 Clients advertising LSP completion-list edit defaults receive the shared range once. Older clients
 receive a range with each item. Snippets and separate insert/replace edits are also capability-gated.
 Every result describes the document as it was when the request was made.
 
-After a clean check, edits confined to method/function bodies reuse stable declaration symbols and
-recheck the changed units. Sources are immutable shared snapshots; body symbols and scopes belong to
-the changed unit and are replaced together. Declaration changes, syntax errors, interfaces, accessors,
-function-local imports and recovery from an initially invalid program use a full check. Type-table growth
-is bounded by periodically rebuilding the semantic environment. This is a conservative fast path, not
-a general dependency graph for incremental checking.
+An edit checks again only what it can change. The program is checked in two layers:
+
+- **Declarations**, what other files can see: classes and interfaces with their bases, members, accessors,
+  signatures and imports, including the imports a function body writes for its own signature. The edited
+  file's declarations are checked at once, and each declaration gets a fingerprint: its text outside any
+  body, and what its written types resolved to. A file is checked again when a fingerprint it read
+  changed: a declaration it found, a class it uses as a type (its chain of supertypes), a class it extends
+  or implements (all its members), a member or package-level name it looked up whether or not anything
+  was found, a package it imports whole, another file's position quoted in its messages, or a property
+  half its class took from another file. That goes on round by round until nothing changes.
+- **Bodies.** Each file's bodies read only what other files declare, so files are checked one at a time,
+  in any order. A request checks the file it asks about, and the files of its classes' bases (whose
+  default values an `override` writes); find references checks every file. The rest are checked when the
+  editor pauses. A file whose bodies alone read a change has only its bodies checked again.
+
+Every answer about a checked file is what a check of the whole program would give: a random-edit oracle
+compares the two after each of thousands of edits (see the [follow-up results](../docs/results/2026-11-completion-followup.md)).
+A syntax error is confined to its file: its declarations, as the parser recovered them, are compared like
+those of any edit, so files that read nothing it changed are not checked again; they are only judged again
+for what a file that does not parse makes doubtful. Declarations that are gone leave their symbols to be
+used again by the next ones, so a long session does not grow. A file added to or removed from the program,
+an edited `--declarations` file, or another project folder starts the declarations over; bodies are then
+checked as above.
 
 Document changes with old or duplicate versions are ignored with a log message. Diagnostic versions are
 sent when the client advertises support, including empty diagnostic lists for each newly checked clean
@@ -161,7 +179,11 @@ A bounded lookahead batch skips a queued request that is cancelled, or whose doc
 checking. A request that a newer edit follows is still answered, for the text it was asked about: LSP 3.17
 says a server should not send ContentModified for a change it has only queued, and LSP4IJ does not ask again
 after one (which once left override suggestions unshown). Partial frames do not delay an
-already complete request. A check already running remains synchronous and cannot be interrupted.
+already complete request. The check of what is left, while the editor pauses, stops after any file when a
+message arrives: the message is handled first (an edit checks declarations, a request its own file, for
+the text it was asked about), and the check goes on from where it stopped. Diagnostics are published for
+each file as it is checked; a file not yet checked keeps what the editor has. Cancellation and closing a
+document affect queued requests as before.
 See the [follow-up results](../docs/results/2026-11-completion-followup.md) for latency, memory and validation.
 
 ## Troubleshooting and limits
@@ -177,8 +199,10 @@ See the [follow-up results](../docs/results/2026-11-completion-followup.md) for 
 - Windows transport uses binary stdio, pipe readiness checks, UTF-8 filesystem paths and `.exe` compiler
   discovery, and Windows paths are tested on every system. The server has not yet been built or run on
   Windows itself.
-- Unknown callable signatures cannot show argument help. General incremental declaration checking and
-  interruption of a running check remain pending.
+- Unknown callable signatures cannot show argument help.
+- An edit to a declaration that every file reads (a method of a class all files call) checks every file's
+  bodies again in the background: a request is still answered at once, and errors arrive file by file.
+  A file added to or removed from the project starts the declarations of the whole program over.
 - Rider uses its native LSP client. IntelliJ IDEA Community/free unified IDEA uses the optional LSP4IJ
   plugin (0.21.0); install and enable it in **Settings > Plugins**. A project notification explains this
   requirement if it is missing. Local syntax, punctuation pairing and indentation work without it.
