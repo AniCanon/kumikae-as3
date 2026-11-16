@@ -71,7 +71,7 @@ private:
 	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
 	std::vector<void *> singletons_; // The engine's singletons, by the engine name of their class, once found.
 	// What the host worked out once for each engine instruction, by function and instruction: see prepare().
-	std::vector<std::vector<const Prepared *>> prepared_;
+	std::vector<std::vector<EngineStep>> prepared_;
 	std::vector<OperatorName> operators_; // By engine name: what an operator's entry says, read once.
 	void prepare_engine();
 	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
@@ -152,6 +152,8 @@ private:
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	std::optional<std::string> godot_refuses(Slot p_value, int p_depth) const;
 	std::optional<std::string> refused_by_godot(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers) const;
+	// Whether any operand of an instruction is untyped: only such an operand is ever refused_by_godot().
+	static bool untyped_operand(const ir::Function &p_function, const ir::Instruction &p_in);
 	bool push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result);
 	void pop();
 	void raise(uint32_t p_class, const std::string &p_message);

@@ -102,7 +102,11 @@ std::optional<Outcome> prepared(Request &p_request, const Argument *p_operands, 
 	if (!p_request.prepared) {
 		return std::nullopt;
 	}
-	if (p_request.host.handles.run(*p_request.prepared, p_operands, p_count, p_request.wanted(), p_request.result_or_none(), &p_request.error)) {
+	vm::Wanted wanted = p_request.wanted();
+	if (p_request.target != NONE && p_request.kind == Kind::Val) {
+		wanted.reuse = p_request.registers[p_request.target].p;
+	}
+	if (p_request.host.handles.run(*p_request.prepared, p_operands, p_count, wanted, p_request.result_or_none(), &p_request.error)) {
 		return Outcome::Done;
 	}
 	return p_request.error.empty() ? std::nullopt : std::optional<Outcome>(Outcome::Refused);
@@ -439,15 +443,20 @@ Outcome perform(Request &p_request) {
 // One request to the engine. Raises an AS3 error if the engine refuses.
 void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	const size_t frame_index = frames_.size() - 1;
-	if (const std::optional<std::string> why = refused_by_godot(p_function, p_in, stack_.data() + frames_.back().base)) {
-		raise(module_.type_error_class, *why);
-		return;
+	EngineStep step;
+	if (const size_t f = (size_t)(&p_function - module_.functions.data()); !prepared_[f].empty()) {
+		step = prepared_[f][(size_t)(&p_in - p_function.code.data())];
+	}
+	// Only an untyped operand can hold what Godot can't take; a prepared instruction knows whether it has one.
+	if (!step.prepared || step.untyped) {
+		if (const std::optional<std::string> why = refused_by_godot(p_function, p_in, stack_.data() + frames_.back().base)) {
+			raise(module_.type_error_class, *why);
+			return;
+		}
 	}
 	Request request(module_, host_, p_function, p_in, stack_.data() + frames_.back().base, null_text_);
 	request.operators = &operators_;
-	if (const size_t f = (size_t)(&p_function - module_.functions.data()); !prepared_[f].empty()) {
-		request.prepared = prepared_[f][(size_t)(&p_in - p_function.code.data())];
-	}
+	request.prepared = step.prepared;
 	if (p_in.op == Op::HostSingleton) {
 		if (singletons_.size() <= p_in.b) {
 			singletons_.resize(module_.engine_names.size(), nullptr);
@@ -479,7 +488,11 @@ void Interpreter::host_op(const Function &p_function, const Instruction &p_in) {
 	}
 	// The frame is found again by its number: the engine may have called back in and moved the stack.
 	if (request.target != NONE && frame_index < frames_.size()) {
-		put(request.kind, stack_[frames_[frame_index].base + request.target], request.result);
+		Slot &target = stack_[frames_[frame_index].base + request.target];
+		// The engine wrote the result into the handle the register holds (Wanted::reuse): it stays.
+		if (!(ir::is_engine(request.kind) && request.result.p && request.result.p == target.p)) {
+			put(request.kind, target, request.result);
+		}
 	}
 }
 

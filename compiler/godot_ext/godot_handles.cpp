@@ -96,6 +96,11 @@ void *GodotHost::copy(void *p_value) {
 	return make_handle(*value);
 }
 
+bool GodotHost::assign(void *p_to, const void *p_from) {
+	*static_cast<Variant *>(p_to) = *static_cast<const Variant *>(p_from);
+	return true;
+}
+
 void GodotHost::drop(void *p_value) {
 	if (!p_value) {
 		return;

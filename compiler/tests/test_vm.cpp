@@ -1043,14 +1043,27 @@ struct PreparingEngine : FakeEngine {
 			return false;
 		}
 		log += "run " + static_cast<const Worked &>(p_prepared).what + " (" + list(p_operands, p_count) + ")\n";
+		if (in_place && p_wanted.reuse) {
+			log += "into #" + std::to_string((intptr_t)p_wanted.reuse) + "\n";
+			r_result->p = p_wanted.reuse; // The handle the register holds, written over: no new one.
+			return true;
+		}
 		give(p_wanted.kind, r_result, 1, "");
 		return true;
+	}
+	// Write results into the handle the register holds, and assign values into handles, where it can.
+	bool in_place = false;
+	int assigned = 0;
+	[[nodiscard]] bool assign(void *, const void *) override {
+		assigned += in_place;
+		return in_place;
 	}
 };
 
 static void test_engine_prepared() {
 	const char *source = "package { import godot.*; public class Mover extends Node2D {\n"
 						 "  public function step(by:Vector2, n:int):Boolean { var v:Vector2 = position + by * n; return v == by; }\n"
+						 "  public function grow(by:Vector2, n:int):Vector2 { var v:Vector2 = by; for (var i:int = 0; i < n; i++) { v = v + by; } return v; }\n"
 						 "} }\n";
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -1094,6 +1107,17 @@ static void test_engine_prepared() {
 													  "run @operator.OP_EQUAL (#5, #2)\n"));
 		}
 		CHECK_EQ(engine.boxes, 2);
+		// A loop's value made in the handle its register already holds, and assigned into the variable's:
+		// no handle is made for either once the loop runs, and none is lost.
+		engine.refuse_to_run = false;
+		engine.in_place = true;
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "grow", arguments, 2, &result));
+		CHECK_EQ(engine.log, std::string("run @operator.OP_ADD (#2, #2)\nrun @operator.OP_ADD (#2, #2)\ninto #9\nrun @operator.OP_ADD (#2, #2)\n"
+										 "into #9\n"));
+		CHECK_EQ(engine.assigned, 3); // Into the zero the variable starts at, then each time round.
+		CHECK_EQ(engine.boxes, 3); // The owner, the argument, and the result.
+		engine.drop(result.p);
 		engine.drop(arguments[0].p);
 		interpreter.release_object(object);
 	}

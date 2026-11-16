@@ -83,6 +83,15 @@ struct OperatorName {
 	bool compares = false;
 };
 
+struct Prepared; // vm/engine_handles.h
+
+// What the host worked out for one engine instruction when the program was loaded, and whether any of its
+// operands is untyped (what refused_by_godot() has to look at as it runs).
+struct EngineStep {
+	const Prepared *prepared = nullptr;
+	bool untyped = false;
+};
+
 // A field sortOn() sorts by, and its options.
 struct SortField {
 	std::string name;

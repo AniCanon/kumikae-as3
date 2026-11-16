@@ -32,6 +32,9 @@ struct EngineHandles {
 	// Another handle for the same value (for a value type, a copy of it), and giving one up.
 	[[nodiscard]] virtual void *copy(void *p_value) = 0;
 	virtual void drop(void *p_value) = 0;
+	// One of Godot's values (never an object) copied into a handle that holds one already, in place of a new
+	// handle: what assigning to a variable that has one costs. False if the engine can't: copy() then.
+	[[nodiscard]] virtual bool assign(void *, const void *) { return false; }
 	// Whether a handle still has something behind it: not if it is null, or an object the engine has freed.
 	// A freed object is null to a script.
 	[[nodiscard]] virtual bool present(void *p_value) = 0;

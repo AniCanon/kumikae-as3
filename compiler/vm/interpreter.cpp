@@ -62,8 +62,8 @@ void Interpreter::prepare_engine() {
 				continue;
 			}
 			if (const Prepared *prepared = host_.handles.prepare(module_, function, function.code[i])) {
-				prepared_[f].resize(function.code.size(), nullptr);
-				prepared_[f][i] = prepared;
+				prepared_[f].resize(function.code.size());
+				prepared_[f][i] = EngineStep{ prepared, untyped_operand(function, function.code[i]) };
 			}
 		}
 	}

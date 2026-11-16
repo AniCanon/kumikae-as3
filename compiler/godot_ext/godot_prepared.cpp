@@ -13,8 +13,10 @@
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 #include <memory>
+#include <new>
 #include <optional>
 
 using namespace godot;
@@ -161,11 +163,98 @@ void argument(const GodotHost::Worked &p_worked, size_t p_parameter, const vm::A
 	*r_value = to_variant(p_value.kind, p_value.slot);
 }
 
+// The Variants one call holds, made only as they are needed: a Variant is made and let go through Godot,
+// so sixteen of them for a call of one argument would cost more than the call.
+class Values {
+	alignas(Variant) unsigned char memory_[MOST][sizeof(Variant)];
+	size_t made_ = 0;
+
+public:
+	Values() = default;
+	Values(const Values &) = delete;
+	Values &operator=(const Values &) = delete;
+	~Values() {
+		for (size_t i = 0; i < made_; i++) {
+			reinterpret_cast<Variant *>(memory_[i])->~Variant();
+		}
+	}
+	Variant &next() { return *new (memory_[made_++]) Variant(); }
+};
+
+// The handle to make a result of one of Godot's value types in: the one the result's register holds, if it
+// holds that type (each handle is its register's own), or a new one.
+Variant *result_handle(const vm::Wanted &p_result, const GodotHost::Worked &p_worked) {
+	Variant *held = static_cast<Variant *>(p_result.reuse);
+	return held && held->get_type() == p_worked.result ? held : make_handle(p_worked.zero);
+}
+
+// Whether a result goes straight into a handle: one of Godot's value types where the register holds that.
+bool into_handle(const vm::Wanted &p_result, int p_type) {
+	return p_result.kind == ir::Kind::Val && p_type > Variant::STRING && p_type < Variant::OBJECT;
+}
+
+// Whether a type is one a method bind takes and gives bare where a Variant would hold it inline: a number,
+// a Boolean, or a value type from Vector2 to Color.
+bool held_bare(int p_type) {
+	return p_type == Variant::BOOL || p_type == Variant::INT || p_type == Variant::FLOAT || (p_type >= Variant::VECTOR2 && p_type <= Variant::COLOR);
+}
+
+// A method bind called on the bare values (Worked::bare), when every argument is given and the register the
+// result goes to is of the kind it gives: true, or nothing to call it with Variants. Godot checks nothing
+// here; what it takes is what the name table says it takes, and the arguments are of those types.
+std::optional<bool> run_bare(const GodotHost::Worked &p_worked, GDExtensionObjectPtr p_object, const vm::Argument *p_arguments, size_t p_count,
+		const vm::Wanted &p_result, vm::Slot *r_result) {
+	const size_t first = p_worked.index >= 0 ? 1 : 0;
+	if (p_count + first != p_worked.parameters.size()) {
+		return std::nullopt;
+	}
+	Scalar scalars[MOST];
+	GDExtensionConstTypePtr pointers[MOST];
+	if (first) {
+		scalars[0].integer = p_worked.index;
+		pointers[0] = &scalars[0];
+	}
+	for (size_t i = 0; i < p_count; i++) {
+		if (!(pointers[first + i] = bare(p_arguments[i], p_worked.parameters[first + i], &scalars[first + i]))) {
+			return std::nullopt;
+		}
+	}
+	const int type = p_worked.result;
+	const ir::Kind kind = p_result.kind;
+	Scalar out;
+	out.integer = 0;
+	if (type == NO_VALUE) {
+		gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, nullptr);
+		return true;
+	}
+	if (!r_result) {
+		return std::nullopt;
+	}
+	if ((type == Variant::BOOL && kind == ir::Kind::Bool) || (type == Variant::FLOAT && kind == ir::Kind::F64) || (type == Variant::INT && kind == ir::Kind::I64)) {
+		gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, &out);
+		if (type == Variant::BOOL) {
+			r_result->b = out.boolean != 0;
+		} else if (type == Variant::FLOAT) {
+			r_result->d = out.number;
+		} else {
+			r_result->l = out.integer;
+		}
+		return true;
+	}
+	if (!into_handle(p_result, type)) {
+		return std::nullopt;
+	}
+	Variant *made = result_handle(p_result, p_worked);
+	gdextension_interface::object_method_bind_ptrcall(p_worked.bound, p_object, pointers, inside(*made, type));
+	r_result->p = made;
+	return true;
+}
+
 } // namespace
 
 // A Variant's internal pointer is taken for a handle's own value: a method that changes its value (append)
 // changes the handle, as a call by name on it does.
-bool GodotHost::run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, vm::Slot *r_result) {
+bool GodotHost::run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result) {
 	Scalar left_scalar, right_scalar;
 	const void *left = bare(p_operands[0], p_worked.operands[0], &left_scalar);
 	const void *right = p_count == 2 ? bare(p_operands[1], p_worked.operands[1], &right_scalar) : nullptr;
@@ -188,7 +277,7 @@ bool GodotHost::run_operator(const Worked &p_worked, const vm::Argument *p_opera
 			r_result->l = out.integer;
 			return true;
 		default: {
-			Variant *made = make_handle(p_worked.zero);
+			Variant *made = result_handle(p_result, p_worked);
 			p_worked.evaluator(left, right, inside(*made, p_worked.result));
 			r_result->p = made;
 			return true;
@@ -200,7 +289,7 @@ bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operan
 		std::string *r_error) {
 	const size_t first = p_worked.is_static ? 0 : 1;
 	Scalar scalars[MOST];
-	Variant values[MOST];
+	Values values;
 	GDExtensionConstTypePtr pointers[MOST];
 	void *receiver = nullptr;
 	if (!p_worked.is_static) {
@@ -214,14 +303,22 @@ bool GodotHost::run_builtin(const Worked &p_worked, const vm::Argument *p_operan
 		const int type = p_worked.parameters[i - first];
 		const vm::Argument &given = p_operands[i];
 		if (type == ANY_VALUE) {
-			values[i] = to_variant(given.kind, given.slot);
-			pointers[i - first] = &values[i];
+			Variant &value = values.next();
+			value = to_variant(given.kind, given.slot);
+			pointers[i - first] = &value;
 		} else if ((type == Variant::STRING || type == Variant::STRING_NAME) && given.kind == ir::Kind::Str && given.slot.p) {
-			argument(p_worked, i - first, given, &values[i]);
-			pointers[i - first] = inside(values[i], type);
+			Variant &value = values.next();
+			argument(p_worked, i - first, given, &value);
+			pointers[i - first] = inside(value, type);
 		} else if (!(pointers[i - first] = bare(given, type, &scalars[i]))) {
 			return false;
 		}
+	}
+	if (r_result && into_handle(p_result, p_worked.result)) {
+		Variant *made = result_handle(p_result, p_worked);
+		p_worked.builtin(receiver, pointers, inside(*made, p_worked.result), (int)(p_count - first));
+		r_result->p = made;
+		return true;
 	}
 	Variant result = p_worked.result == ANY_VALUE ? Variant() : p_worked.zero;
 	void *out = p_worked.result == NO_VALUE ? nullptr : p_worked.result == ANY_VALUE ? (void *)&result : inside(result, p_worked.result);
@@ -240,17 +337,26 @@ bool GodotHost::run_bound(const Worked &p_worked, const vm::Argument *p_operands
 		*r_error = FREED;
 		return false;
 	}
-	Variant values[MOST];
+	if (p_worked.bare) {
+		if (const std::optional<bool> done = run_bare(p_worked, object, p_operands + first, p_count - first, p_result, r_result)) {
+			return *done;
+		}
+	}
+	Values values;
 	const Variant *pointers[MOST];
 	size_t count = 0;
 	if (p_worked.index >= 0) {
-		values[count] = p_worked.index;
-		pointers[count] = &values[count];
-		count++;
+		Variant &index = values.next();
+		index = p_worked.index;
+		pointers[count++] = &index;
+	}
+	if (p_count - first + count > MOST) {
+		return false;
 	}
 	for (size_t i = first; i < p_count; i++, count++) {
-		argument(p_worked, count, p_operands[i], &values[count]);
-		pointers[count] = &values[count];
+		Variant &value = values.next();
+		argument(p_worked, count, p_operands[i], &value);
+		pointers[count] = &value;
 	}
 	Variant result;
 	GDExtensionCallError error;
@@ -276,6 +382,16 @@ bool GodotHost::run_field(const Worked &p_worked, const vm::Argument *p_operands
 			p_worked.setter(inside(*held, p_worked.receiver), value);
 		}
 		return value != nullptr;
+	}
+	if (r_result && p_result.kind == ir::Kind::F64 && p_worked.result == Variant::FLOAT) {
+		p_worked.getter(inside(*held, p_worked.receiver), &r_result->d); // A part that is a Number: no Variant at all.
+		return true;
+	}
+	if (r_result && into_handle(p_result, p_worked.result)) {
+		Variant *made = result_handle(p_result, p_worked);
+		p_worked.getter(inside(*held, p_worked.receiver), inside(*made, p_worked.result));
+		r_result->p = made;
+		return true;
 	}
 	Variant result = p_worked.zero;
 	p_worked.getter(inside(*held, p_worked.receiver), inside(result, p_worked.result));
@@ -347,13 +463,15 @@ std::unique_ptr<Worked> method_of(const ir::EngineName &p_entry, const std::vect
 	worked->result = type_named(p_words[3]);
 	worked->zero = zero_of(worked->result);
 	const std::optional<int> value_type_of_owner = value_type(p_entry.owner);
+	const bool varargs = p_words.size() > 5;
 	if (!value_type_of_owner) {
 		worked->what = Worked::What::Bound;
 		worked->bound = method_bind(p_entry.owner, p_words[0], p_words[2]);
+		worked->bare = !varargs && (worked->result == NO_VALUE || held_bare(worked->result)) &&
+				std::all_of(worked->parameters.begin(), worked->parameters.end(), held_bare);
 		return worked->bound ? std::move(worked) : nullptr;
 	}
 	// Called on the bare value, a value type's method takes every argument, of its exact type.
-	const bool varargs = p_words.size() > 5;
 	if (varargs || worked->parameters.size() != p_arguments || (!p_static && p_receiver != *value_type_of_owner)) {
 		return nullptr;
 	}
@@ -373,6 +491,18 @@ std::unique_ptr<Worked> member_of(const ir::EngineName &p_entry, const std::vect
 		worked->what = p_set ? Worked::What::Setter : Worked::What::Getter;
 		worked->bound = method_bind(p_entry.owner, p_words[p_set ? 5 : 3], p_words[p_set ? 6 : 4]);
 		worked->index = p_words[7] == "-" ? -1 : std::atoll(std::string(p_words[7]).c_str());
+		// What the accessor takes: the index first, if it has one, then a setter's value; a getter gives it.
+		const int type = type_named(p_words[2]);
+		if (worked->index >= 0) {
+			worked->parameters.push_back(Variant::INT);
+		}
+		if (p_set) {
+			worked->parameters.push_back(type);
+		}
+		worked->names.resize(worked->parameters.size());
+		worked->result = p_set ? NO_VALUE : type;
+		worked->zero = zero_of(worked->result);
+		worked->bare = held_bare(type);
 		return worked->bound ? std::move(worked) : nullptr;
 	}
 	const std::optional<int> owner = value_type(p_entry.owner);
@@ -466,7 +596,7 @@ bool GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operan
 	}
 	switch (worked.what) {
 		case What::Operator:
-			return run_operator(worked, p_operands, p_count, r_result);
+			return run_operator(worked, p_operands, p_count, p_result, r_result);
 		case What::Builtin:
 			return run_builtin(worked, p_operands, p_count, p_result, r_result, r_error);
 		case What::Bound:

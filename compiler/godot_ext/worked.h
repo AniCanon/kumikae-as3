@@ -40,6 +40,9 @@ struct GodotHost::Worked final : vm::Prepared {
 	// static. An accessor that serves several properties takes `index` first.
 	GDExtensionMethodBindPtr bound = nullptr;
 	bool is_static = false;
+	// Every parameter and the result are numbers, Booleans or value types held inline (Vector2, Color): with
+	// every argument given, the method bind is called on the bare values, with no Variant at all.
+	bool bare = false;
 	int64_t index = -1;
 	// The type of each parameter: a Builtin's are exact; a Bound's say where a StringName is taken.
 	std::vector<int> parameters;

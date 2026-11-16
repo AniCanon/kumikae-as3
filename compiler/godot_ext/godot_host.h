@@ -81,7 +81,7 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
 	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
 	std::unique_ptr<Worked> work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in, std::string *r_key);
-	bool run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, vm::Slot *r_result);
+	bool run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result);
 	bool run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
 			std::string *r_error);
 	bool run_bound(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
@@ -132,6 +132,7 @@ public:
 	[[nodiscard]] bool keep(vm::Object *p_object) override; // counted.cpp
 	[[nodiscard]] void *copy(void *p_value) override;
 	void drop(void *p_value) override;
+	[[nodiscard]] bool assign(void *p_to, const void *p_from) override;
 	// For the cycle collector: a reference-counted object that a script listens to or that has a script
 	// is a node (by its id), and so is a listener (callable.h).
 	[[nodiscard]] uint64_t node(void *p_value) override;
