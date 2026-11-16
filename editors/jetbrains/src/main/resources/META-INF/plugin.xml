@@ -36,6 +36,7 @@
         <lang.syntaxHighlighterFactory language="KumikaeAS3"
                                        implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
         <treeStructureProvider implementation="app.anicanon.kumikae.as3.project.GameProjectView"/>
+        <directoryIndexExcludePolicy implementation="app.anicanon.kumikae.as3.project.BuildFoldersExcluded"/>
         <projectViewPane implementation="app.anicanon.kumikae.as3.project.GamePane"/>
         <internalFileTemplate name="AS3 Node Script"/>
         <internalFileTemplate name="AS3 Class"/>

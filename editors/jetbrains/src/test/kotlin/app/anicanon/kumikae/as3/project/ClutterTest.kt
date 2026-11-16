@@ -33,6 +33,20 @@ class ClutterTest {
         }
     }
 
+    @Test fun `build folders at a game's root are kept out of the IDE's index`() {
+        // A Simulator build stages a copy of the project in `.build`: indexed, search and navigation offered
+        // those copies beside the game's own files, and nothing is completed in a copy.
+        val root = "/games/sprint"
+        assertTrue("/games/sprint/.build" in Clutter.unindexed(root))
+        assertTrue("/games/sprint/build" in Clutter.unindexed(root))
+        assertTrue("/games/sprint/bin" in Clutter.unindexed(root))
+        // The IDE's own folder is its own business, and Godot's holds what the Godot plugin registers.
+        assertFalse("/games/sprint/.idea" in Clutter.unindexed(root))
+        assertFalse("/games/sprint/.godot" in Clutter.unindexed(root))
+        // Only at the root: a package named build is the game's.
+        assertFalse(Clutter.unindexed(root).any { it.startsWith("/games/sprint/src") })
+    }
+
     @Test fun `source packages named build remain visible`() {
         assertFalse(Clutter.hideFolder("build", projectRoot = false))
         assertTrue(Clutter.hideFolder("build", projectRoot = true))

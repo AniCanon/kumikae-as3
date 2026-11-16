@@ -18,6 +18,14 @@ internal object Clutter {
 
     fun hideFolder(name: String, projectRoot: Boolean): Boolean = projectRoot && isClutter(name, isFolder = true)
 
+    /**
+     * The folders at a game's root that hold builds, not the game: a Simulator build stages a copy of the
+     * project in `.build`. The IDE does not index them, so search and navigation never offer a copy of a
+     * script, in which nothing is completed. `.idea` is the IDE's own, and `.godot` holds what Rider's Godot
+     * support registers.
+     */
+    fun unindexed(root: String): List<String> = (folders - setOf(".idea", ".godot")).map { "$root/$it" }
+
     fun isClutter(name: String, isFolder: Boolean): Boolean =
         if (isFolder) name in folders else endings.any(name::endsWith)
 }
