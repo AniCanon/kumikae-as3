@@ -16,7 +16,7 @@ using ir::NONE;
 using ir::Op;
 
 Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
-		module_(p_module), host_(p_host), collector_(*this) {
+		module_(p_module), host_(p_host), heap_(p_module, p_host.handles) {
 	for (const std::string &constant : module_.strings) {
 		strings_.push_back(new_string(constant));
 	}
@@ -96,7 +96,7 @@ Interpreter::~Interpreter() {
 	}
 	forget_subject();
 	// With every root let go of, what is left in loops is held only by itself, or by the host.
-	collector_.collect();
+	heap_.collector.collect();
 	for (Str *constant : strings_) {
 		if (release(constant)) {
 			free_string(constant);

@@ -140,7 +140,7 @@ bool Json::string(std::string_view p_text) {
 
 bool Json::begin_object() {
 	const uint32_t klass = vm_.module_.object_class;
-	Object *made = new_table(klass, vm_.collector_.list_for(klass));
+	Object *made = new_table(klass, vm_.heap_.list_for(klass));
 	if (!made) {
 		vm_.out_of_memory();
 		return false;

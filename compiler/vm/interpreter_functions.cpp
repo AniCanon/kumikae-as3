@@ -23,7 +23,7 @@ Object *Interpreter::make_function(uint32_t p_function, Object *p_first) {
 			return kept;
 		}
 	}
-	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, collector_.list_for(module_.function_class));
+	Object *made = module_.function_class == NONE ? nullptr : new_object(module_.function_class, 2, heap_.list_for(module_.function_class));
 	if (!made) {
 		if (module_.function_class != NONE) {
 			out_of_memory();

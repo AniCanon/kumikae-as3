@@ -11,7 +11,8 @@ host differs.
 | `interpreter_conversions.cpp`, `interpreter_time_limit.cpp` | What the loop hands on: an Int64 converted with a check, an object as text; the time limit on a call from outside (Error #1502) |
 | `interpreter_host.cpp` | Requests to the engine, one function per operation |
 | `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
-| `interpreter_objects.cpp`, `runtime` | Lifetime of objects and strings |
+| `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on |
+| `interpreter_objects.cpp` | Objects made, their class asked, fields read by a host |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
 | `interpreter_vectors.cpp`, `vector_methods.cpp` | `Vector.<T>`: an object whose class says what its elements are; making, indexing, length, its methods, its text |
@@ -51,7 +52,7 @@ host differs.
   elements, a function value's bound object or environment (its `FUNCTION_FIRST` field): freeing lets go of
   each slot it visits, and the cycle collector follows each. A new container (an Array, a keyed table for
   Object literals and Dictionary) adds its slots there and nowhere else; `may_hold_objects()` beside it
-  says which classes the collector looks at. Every object is made with `collector_.list_for(class)` as its
+  says which classes the collector looks at. Every object is made with `heap_.list_for(class)` as its
   list, so that the collector sees it.
 - **The cycle collector deletes by trial** (`collector.h`): an object whose count of references is more than
   the references from other objects is held from outside, and so is what it reaches. It needs no list of

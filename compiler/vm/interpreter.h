@@ -5,7 +5,7 @@
 // resumed.
 #pragma once
 
-#include "collector.h"
+#include "heap.h"
 #include "interpreter_records.h"
 #include "host.h"
 #include "ir.h"
@@ -31,7 +31,6 @@ struct Program;
 
 class Interpreter {
 	friend class Reload; // Moves a running program's objects onto a newer build.
-	friend class Collector; // Frees objects that refer to each other in a loop.
 	friend class Json; // JSON.parse and JSON.stringify (vm/json_work.h).
 	friend class LibraryCall; // A method of the library called by name (vm/library_calls.h).
 
@@ -65,7 +64,7 @@ private:
 
 	const ir::Module &module_;
 	Host host_;
-	Collector collector_; // After the module: it reads the classes.
+	Heap heap_; // Who holds what, and the cycle collector (vm/heap.h). After the module: it reads the classes.
 	std::vector<Slot> stack_;
 	std::vector<Frame> frames_;
 	std::vector<Slot> globals_;
@@ -121,13 +120,11 @@ private:
 	void look_at_clock();
 	void entering(); // A call from outside begins: one that no other is running inside starts the clock.
 
-	void drop(ir::Kind p_kind, Slot &p_slot);
-	void drop_object(Object *p_object);
-	void let_go(ir::Kind p_kind, Slot &p_slot); // One slot of an object being freed.
-	std::vector<Object *> dying_; // Objects whose last reference is gone, still to be freed.
-	bool freeing_ = false; // drop_object() is freeing them: one called meanwhile adds to the list.
+	// Lifetime is the heap's: these only say it shorter.
+	void drop(ir::Kind p_kind, Slot &p_slot) { heap_.drop(p_kind, p_slot); }
+	void drop_object(Object *p_object) { heap_.drop_object(p_object); }
 	std::vector<std::vector<Slot>> spare_slots_; // For SpareSlots: argument lists of calls through values.
-	void drop_any(Slot p_value); // Gives up what an untyped value holds.
+	void drop_any(Slot p_value) { heap_.drop_any(p_value); }
 	// The untyped value: vm/interpreter_any.cpp.
 	Slot to_any(ir::Kind p_kind, Slot p_value);
 	bool any_text(Slot p_value, std::string *r_text);
@@ -155,9 +152,9 @@ private:
 	Slot any_number(double p_value);
 	Slot any_wide(int64_t p_value);
 	bool engine_add(const ir::Instruction &p_in, Slot p_b, Slot p_c);
-	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value); // Takes over one reference.
-	Slot share(ir::Kind p_kind, Slot p_value); // The value with a reference of its own.
-	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned); // Stores it, giving up what was there.
+	void assign(ir::Kind p_kind, Slot &p_slot, void *p_value) { heap_.assign(p_kind, p_slot, p_value); }
+	Slot share(ir::Kind p_kind, Slot p_value) { return heap_.share(p_kind, p_value); }
+	void put(ir::Kind p_kind, Slot &p_target, Slot p_owned) { heap_.put(p_kind, p_target, p_owned); }
 	void host_op(const ir::Function &p_function, const ir::Instruction &p_in);
 	std::optional<std::string> godot_refuses(Slot p_value, int p_depth) const;
 	std::optional<std::string> refused_by_godot(const ir::Function &p_function, const ir::Instruction &p_in, const Slot *p_registers) const;
@@ -436,7 +433,7 @@ public:
 	Object *copy_engine_dictionary(void *p_dictionary, uint32_t p_class);
 	// The method's function, or NONE: for a host that looks a name up once and keeps the answer.
 	uint32_t find_method(uint32_t p_class, std::string_view p_name) const;
-	void release_object(Object *p_object);
+	void release_object(Object *p_object) { heap_.release_object(p_object); }
 	// An object the engine kept (EngineHandles::keep()), with no reference left, freed now that the engine
 	// let go of it too.
 	void free_kept(Object *p_object) { drop_object(p_object); }
@@ -446,11 +443,11 @@ public:
 	// work, about as many objects and references to look at; it does nothing while a call from outside is
 	// in progress. True if a collection ended. collect() makes a whole collection at once: between calls, or
 	// at a statement (from the statement hook). When the interpreter goes, it collects once more.
-	bool collect_step(size_t p_work) { return entries_ == 0 && collector_.step(p_work); }
-	void collect() { collector_.collect(); }
+	bool collect_step(size_t p_work) { return entries_ == 0 && heap_.collector.step(p_work); }
+	void collect() { heap_.collector.collect(); }
 	// Another interpreter has taken over the program (a reload): the engine's objects hold its script
 	// objects now, not this one's, so this one's collector no longer looks through them.
-	void superseded() { collector_.ignore_engine(); }
+	void superseded() { heap_.collector.ignore_engine(); }
 
 	// How many traces finallies are keeping for errors they will throw again: one at most for each.
 	size_t kept_traces() const { return kept_traces_.size(); }

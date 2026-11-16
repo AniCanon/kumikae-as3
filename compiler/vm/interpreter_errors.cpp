@@ -91,7 +91,7 @@ void Interpreter::out_of_memory() {
 
 // p_message is the error's own, or null; p_words are what is said if not even the error can be made.
 void Interpreter::throw_new(uint32_t p_class, Str *p_message, std::string_view p_words) {
-	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size(), collector_.list_for(p_class)) : nullptr;
+	Object *error = p_class != NONE ? new_object(p_class, module_.classes[p_class].fields.size(), heap_.list_for(p_class)) : nullptr;
 	if (error) {
 		// What a script reads of it: its name, its number ("Error #1009: ..." is 1009), and the stack.
 		error->fields()[ir::ERROR_MESSAGE].p = p_message;

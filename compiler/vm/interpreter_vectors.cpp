@@ -132,7 +132,7 @@ void Interpreter::vector_new(const Function &p_function, const Instruction &p_in
 	}
 	const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 	const uint32_t length = r[list[0]].u;
-	Vector *made = length <= MAX_VECTOR_LENGTH ? new_vector(p_in.b, length, r[list[1]].b, collector_.list_for(p_in.b)) : nullptr;
+	Vector *made = length <= MAX_VECTOR_LENGTH ? new_vector(p_in.b, length, r[list[1]].b, heap_.list_for(p_in.b)) : nullptr;
 	if (!made) {
 		out_of_memory();
 		return;

@@ -70,7 +70,7 @@ bool Interpreter::length_is_fixed(const Vector *p_vector) {
 }
 
 Vector *Interpreter::fresh_vector(uint32_t p_class, uint64_t p_length) {
-	Vector *fresh = p_length <= MAX_VECTOR_LENGTH ? new_vector(p_class, static_cast<uint32_t>(p_length), false, collector_.list_for(p_class)) : nullptr;
+	Vector *fresh = p_length <= MAX_VECTOR_LENGTH ? new_vector(p_class, static_cast<uint32_t>(p_length), false, heap_.list_for(p_class)) : nullptr;
 	if (!fresh) {
 		out_of_memory();
 	}
