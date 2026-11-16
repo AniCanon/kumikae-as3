@@ -19,6 +19,11 @@ void text_of_value(Context *c, uint32_t p_which, const Slot *p_values, uint32_t 
 void text_joined(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 // NumText: p_which is the format (an ir::NumberFormat), with ir::NUMBER_TEXT_WIDE for an Int64.
 void number_text(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+// A typed value (p_which its kind) as an untyped one; an untyped value stored into a place (p_which the
+// class or engine name checked, or NONE; after the value, the place's kind); `is` (p_which the type).
+void value_to_any(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void any_to_value(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
+void any_is_type(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 // VecCall: p_which is the method (an ir::VectorMethod); the vector, then what the method takes.
 void vector_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out);
 // A vector's element read (the vector, the index) and written (the vector, the index, the value): p_which

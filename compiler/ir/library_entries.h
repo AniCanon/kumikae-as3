@@ -15,6 +15,9 @@ namespace ir {
 struct LibraryEntry {
 	std::string_view name; // Empty: the instruction has none.
 	uint32_t which = 0;
+	// A second number, where the entry needs two: handed after the instruction's values, as a value.
+	bool has_more = false;
+	uint32_t more = 0;
 };
 
 // With NumText's format (a NumberFormat): the number is an Int64.
@@ -41,6 +44,13 @@ inline LibraryEntry library_entry(const Function &p_function, const Instruction 
 			const bool wide = p_function.registers[p_function.argument_lists[p_in.c][0]] == Kind::I64;
 			return LibraryEntry{ "number_text", p_in.b | (wide ? NUMBER_TEXT_WIDE : 0) };
 		}
+		case Op::ToAny:
+			return LibraryEntry{ "value_to_any", static_cast<uint32_t>(p_function.registers[p_in.b]) };
+		case Op::FromAny:
+			// The class or engine name the store checks, and after the value the kind of the place stored to.
+			return LibraryEntry{ "any_to_value", p_in.c, true, static_cast<uint32_t>(p_function.registers[p_in.a]) };
+		case Op::AnyIs:
+			return LibraryEntry{ "any_is_type", p_in.c };
 		case Op::VecCall:
 			return LibraryEntry{ "vector_call", p_in.b };
 		case Op::VecGet:

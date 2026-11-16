@@ -35,6 +35,9 @@ bool FunctionWriter::by_library(const Instruction &p_in) {
 			}
 		}
 	}
+	if (entry.has_more) {
+		values += (count++ ? ", " : "") + ("slot(static_cast<uint32_t>(" + std::to_string(entry.more) + "))");
+	}
 	mark();
 	line("{");
 	line("const Slot t[] = { " + values + (count ? ", " : "") + "empty() };"); // One more than given: no array is empty.

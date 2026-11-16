@@ -212,6 +212,28 @@ void number_text(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_
 	}
 }
 
+void value_to_any(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	const Slot made = vm::to_any(library, static_cast<Kind>(p_which), p_values[0]);
+	if (!c->failing) {
+		*r_out = made;
+	}
+}
+
+void any_to_value(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	const Direct direct(c);
+	vm::Library library = direct.library();
+	Slot made = empty();
+	if (vm::from_any(library, p_values[0], static_cast<Kind>(p_values[1].u), p_which, &made)) {
+		*r_out = made;
+	}
+}
+
+void any_is_type(Context *c, uint32_t p_which, const Slot *p_values, uint32_t, Slot *r_out) {
+	vm::Library library = c->host->library();
+	r_out->b = vm::any_is(library, p_values[0], p_which);
+}
+
 void vector_call(Context *c, uint32_t p_which, const Slot *p_values, uint32_t p_count, Slot *r_out) {
 	const Direct direct(c);
 	vm::Library library = direct.library();
