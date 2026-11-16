@@ -20,6 +20,42 @@ Scope &Resolver::retain_scope(Scope &p_fallback, const Node *p_extent) {
 	return scope;
 }
 
+// Imports written in the body are in force for the whole function.
+void Resolver::body_imports(FunctionDecl *p_function, ImportScope &r_imports) {
+	r_imports.parent = context_.imports;
+	if (p_function->body) {
+		std::vector<Import *> written;
+		hoist(p_function->body, &written);
+		if (!written.empty()) {
+			List<Import *> list;
+			list.items = written.data();
+			list.count = (uint32_t)written.size();
+			compilation_.resolve_imports(unit_, list, r_imports);
+			context_.imports = &r_imports;
+		}
+	}
+}
+
+// The parameters, the return type and the implicit `arguments`.
+void Resolver::declare_parameters(FunctionDecl *p_function, Scope &r_scope) {
+	for (Parameter &parameter : p_function->parameters) {
+		type(parameter.type);
+		Symbol *symbol = compilation_.new_symbol(SymbolKind::Parameter, parameter.name, &unit_, parameter.offset);
+		symbol->type = parameter.type;
+		symbol->is_rest = parameter.is_rest;
+		parameter.symbol = symbol;
+		if (!r_scope.names.emplace(parameter.name, symbol).second) {
+			error(parameter.offset, "duplicate parameter " + quoted(parameter.name));
+		}
+	}
+	type(p_function->return_type);
+	if (!arguments_) {
+		arguments_ = compilation_.new_symbol(SymbolKind::Arguments, "arguments", &unit_, 0);
+		arguments_->unit = nullptr;
+	}
+	r_scope.names.emplace("arguments", arguments_);
+}
+
 void Resolver::function(FunctionDecl *p_function, bool p_expression) {
 	// A named function expression can call itself by its name. The name sits just outside the body, so a
 	// parameter or local may reuse it.
@@ -47,37 +83,8 @@ void Resolver::function(FunctionDecl *p_function, bool p_expression) {
 	loops_ = 0;
 	switches_ = 0;
 
-	// Imports written in the body are in force for the whole function.
-	ImportScope &imports = scope.imports;
-	imports.parent = context_.imports;
-	if (p_function->body) {
-		std::vector<Import *> written;
-		hoist(p_function->body, &written);
-		if (!written.empty()) {
-			List<Import *> list;
-			list.items = written.data();
-			list.count = (uint32_t)written.size();
-			compilation_.resolve_imports(unit_, list, imports);
-			context_.imports = &imports;
-		}
-	}
-
-	for (Parameter &parameter : p_function->parameters) {
-		type(parameter.type);
-		Symbol *symbol = compilation_.new_symbol(SymbolKind::Parameter, parameter.name, &unit_, parameter.offset);
-		symbol->type = parameter.type;
-		symbol->is_rest = parameter.is_rest;
-		parameter.symbol = symbol;
-		if (!scope.names.emplace(parameter.name, symbol).second) {
-			error(parameter.offset, "duplicate parameter " + quoted(parameter.name));
-		}
-	}
-	type(p_function->return_type);
-	if (!arguments_) {
-		arguments_ = compilation_.new_symbol(SymbolKind::Arguments, "arguments", &unit_, 0);
-		arguments_->unit = nullptr;
-	}
-	scope.names.emplace("arguments", arguments_);
+	body_imports(p_function, scope.imports);
+	declare_parameters(p_function, scope);
 
 	scope_ = &scope;
 	function_scope_ = &scope;

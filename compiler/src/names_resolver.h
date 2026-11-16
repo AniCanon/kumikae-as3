@@ -50,10 +50,16 @@ class Resolver {
 	void declare_local_function(FunctionDecl *p_function);
 	void hoist(Stmt *p_statement, std::vector<Import *> *r_imports);
 	Scope &retain_scope(Scope &p_fallback, const Node *p_extent);
+	void body_imports(FunctionDecl *p_function, ImportScope &r_imports);
+	void declare_parameters(FunctionDecl *p_function, Scope &r_scope);
 	void function(FunctionDecl *p_function, bool p_expression);
 	const Label *find_label(std::string_view p_name) const;
 	void loop_body(Stmt *p_body);
 	void try_statement(Try *p_try);
+	void loop_statement(Stmt *p_statement);
+	void switch_statement(Switch *p_switch);
+	void break_statement(Break *p_break);
+	void continue_statement(Continue *p_continue);
 	void statement(Stmt *p_statement);
 	void assignable(Expr *p_target);
 	void name(Name *p_name);

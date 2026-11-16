@@ -59,31 +59,8 @@ void Resolver::try_statement(Try *p_try) {
 	statement(p_try->finally_block);
 }
 
-void Resolver::statement(Stmt *p_statement) {
-	if (!p_statement) {
-		return;
-	}
+void Resolver::loop_statement(Stmt *p_statement) {
 	switch (p_statement->kind) {
-		case NodeKind::Block:
-			for (Stmt *inner : static_cast<Block *>(p_statement)->statements) {
-				statement(inner);
-			}
-			break;
-		case NodeKind::ExprStmt:
-			expression(static_cast<ExprStmt *>(p_statement)->expr);
-			break;
-		case NodeKind::VarStmt:
-			// The names and types were handled when the function was entered.
-			for (Declarator &declarator : static_cast<VarStmt *>(p_statement)->decl->declarators) {
-				expression(declarator.initializer);
-			}
-			break;
-		case NodeKind::If: {
-			If *branch = static_cast<If *>(p_statement);
-			expression(branch->condition);
-			statement(branch->then_branch);
-			statement(branch->else_branch);
-		} break;
 		case NodeKind::While: {
 			While *loop = static_cast<While *>(p_statement);
 			expression(loop->condition);
@@ -110,42 +87,87 @@ void Resolver::statement(Stmt *p_statement) {
 			expression(loop->collection);
 			loop_body(loop->body);
 		} break;
-		case NodeKind::Switch: {
-			Switch *choice = static_cast<Switch *>(p_statement);
-			expression(choice->subject);
-			switches_++;
-			for (SwitchCase &branch : choice->cases) {
-				expression(branch.test);
-				for (Stmt *inner : branch.body) {
-					statement(inner);
-				}
+		default:
+			break;
+	}
+}
+
+void Resolver::switch_statement(Switch *p_switch) {
+	expression(p_switch->subject);
+	switches_++;
+	for (SwitchCase &branch : p_switch->cases) {
+		expression(branch.test);
+		for (Stmt *inner : branch.body) {
+			statement(inner);
+		}
+	}
+	switches_--;
+}
+
+void Resolver::break_statement(Break *p_break) {
+	if (p_break->label.empty()) {
+		if (!loops_ && !switches_) {
+			error(p_break->offset, "'break' is only allowed in a loop or switch");
+		}
+	} else if (!find_label(p_break->label)) {
+		error(p_break->label_offset, "undefined label " + quoted(p_break->label));
+	}
+}
+
+void Resolver::continue_statement(Continue *p_continue) {
+	if (p_continue->label.empty()) {
+		if (!loops_) {
+			error(p_continue->offset, "'continue' is only allowed in a loop");
+		}
+	} else if (const Label *label = find_label(p_continue->label)) {
+		if (!label->loop) {
+			error(p_continue->label_offset, quoted(p_continue->label) + " does not label a loop");
+		}
+	} else {
+		error(p_continue->label_offset, "undefined label " + quoted(p_continue->label));
+	}
+}
+
+void Resolver::statement(Stmt *p_statement) {
+	if (!p_statement) {
+		return;
+	}
+	switch (p_statement->kind) {
+		case NodeKind::Block:
+			for (Stmt *inner : static_cast<Block *>(p_statement)->statements) {
+				statement(inner);
 			}
-			switches_--;
-		} break;
-		case NodeKind::Break: {
-			Break *jump = static_cast<Break *>(p_statement);
-			if (jump->label.empty()) {
-				if (!loops_ && !switches_) {
-					error(jump->offset, "'break' is only allowed in a loop or switch");
-				}
-			} else if (!find_label(jump->label)) {
-				error(jump->label_offset, "undefined label " + quoted(jump->label));
+			break;
+		case NodeKind::ExprStmt:
+			expression(static_cast<ExprStmt *>(p_statement)->expr);
+			break;
+		case NodeKind::VarStmt:
+			// The names and types were handled when the function was entered.
+			for (Declarator &declarator : static_cast<VarStmt *>(p_statement)->decl->declarators) {
+				expression(declarator.initializer);
 			}
+			break;
+		case NodeKind::If: {
+			If *branch = static_cast<If *>(p_statement);
+			expression(branch->condition);
+			statement(branch->then_branch);
+			statement(branch->else_branch);
 		} break;
-		case NodeKind::Continue: {
-			Continue *jump = static_cast<Continue *>(p_statement);
-			if (jump->label.empty()) {
-				if (!loops_) {
-					error(jump->offset, "'continue' is only allowed in a loop");
-				}
-			} else if (const Label *label = find_label(jump->label)) {
-				if (!label->loop) {
-					error(jump->label_offset, quoted(jump->label) + " does not label a loop");
-				}
-			} else {
-				error(jump->label_offset, "undefined label " + quoted(jump->label));
-			}
-		} break;
+		case NodeKind::While:
+		case NodeKind::DoWhile:
+		case NodeKind::For:
+		case NodeKind::ForIn:
+			loop_statement(p_statement);
+			break;
+		case NodeKind::Switch:
+			switch_statement(static_cast<Switch *>(p_statement));
+			break;
+		case NodeKind::Break:
+			break_statement(static_cast<Break *>(p_statement));
+			break;
+		case NodeKind::Continue:
+			continue_statement(static_cast<Continue *>(p_statement));
+			break;
 		case NodeKind::Return:
 			expression(static_cast<Return *>(p_statement)->value);
 			break;
