@@ -153,6 +153,14 @@ class Typer {
 	// package, or written with its package. An unknown name is reported where the tag is.
 	const Type *tag_type(Symbol *p_class, const Metadata &p_tag, std::string_view p_name);
 
+	struct TagArguments {
+		std::string_view op, left, right, returns, element, keyed;
+	};
+	static TagArguments tag_arguments(const Metadata &p_tag);
+	void constructor_tag(Symbol *p_class, const Metadata &p_tag, Described &r_result);
+	void operator_tag(Symbol *p_class, const Metadata &p_tag, const TagArguments &p_arguments, size_t p_inherited,
+			Described &r_result);
+
 	// What the class's declaration says about operators and indexing, or null if it says nothing.
 	const Described *described(const Type *p_type);
 

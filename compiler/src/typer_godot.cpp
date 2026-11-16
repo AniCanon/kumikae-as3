@@ -30,6 +30,84 @@ const Type *Typer::tag_type(Symbol *p_class, const Metadata &p_tag, std::string_
 	return nullptr;
 }
 
+// The named arguments of a tag that describes a class's operators or indexing.
+Typer::TagArguments Typer::tag_arguments(const Metadata &p_tag) {
+	TagArguments result;
+	for (const MetadataArg &argument : p_tag.args) {
+		if (argument.key == "op") {
+			result.op = argument.value;
+		} else if (argument.key == "left") {
+			result.left = argument.value;
+		} else if (argument.key == "right") {
+			result.right = argument.value;
+		} else if (argument.key == "returns") {
+			result.returns = argument.value;
+		} else if (argument.key == "element") {
+			result.element = argument.value;
+		} else if (argument.key == "keyed") {
+			result.keyed = argument.value;
+		}
+	}
+	return result;
+}
+
+// A [Constructor(args="A,B")] tag: one form of the constructor, kept when every type it names is known.
+void Typer::constructor_tag(Symbol *p_class, const Metadata &p_tag, Described &r_result) {
+	std::vector<const Type *> form;
+	std::string_view args;
+	for (const MetadataArg &argument : p_tag.args) {
+		args = argument.key == "args" ? argument.value : args;
+	}
+	bool known = true;
+	for (size_t start = 0; !args.empty() && start <= args.size();) {
+		size_t comma = args.find(',', start);
+		const Type *type = tag_type(p_class, p_tag, args.substr(start, comma == std::string_view::npos ? std::string_view::npos : comma - start));
+		known = known && type;
+		form.push_back(type);
+		start = comma == std::string_view::npos ? args.size() + 1 : comma + 1;
+	}
+	if (known) {
+		r_result.forms.push_back(std::move(form));
+	}
+}
+
+// An [Operator(op, left or right, returns)] tag. p_inherited operators came from the base, which a class may
+// repeat.
+void Typer::operator_tag(Symbol *p_class, const Metadata &p_tag, const TagArguments &p_arguments, size_t p_inherited,
+		Described &r_result) {
+	const auto &[op, left, right, returns, element, keyed] = p_arguments;
+	r_result.complete = true;
+	if (!left.empty() && !right.empty()) {
+		p_class->unit->diagnostics.error(p_tag.offset, "an [Operator] tag names both a left and a right operand");
+		return;
+	}
+	OperatorRule rule;
+	rule.op = op;
+	rule.result = tag_type(p_class, p_tag, returns);
+	if (!left.empty()) {
+		rule.side = OperatorRule::Left;
+		rule.other = tag_type(p_class, p_tag, left);
+	} else if (!right.empty()) {
+		rule.other = tag_type(p_class, p_tag, right);
+	} else {
+		rule.side = OperatorRule::Unary;
+	}
+	// A tag that names a type the program does not have describes nothing.
+	if (!op.empty() && rule.result && (rule.other || rule.side == OperatorRule::Unary)) {
+		const auto same = [&](const OperatorRule &p_other) {
+			return p_other.op == rule.op && p_other.side == rule.side && p_other.other == rule.other;
+		};
+		if (std::any_of(r_result.operators.begin() + static_cast<std::ptrdiff_t>(p_inherited), r_result.operators.end(), same)) {
+			const std::string where = rule.side == OperatorRule::Unary
+					? std::string(" with no other operand")
+					: " with " + quoted(compilation_.type_name(rule.other)) + (rule.side == OperatorRule::Left ? " on the left" : " on the right");
+			p_class->unit->diagnostics.error(p_tag.offset, "a second [Operator] tag for " + quoted(op) + where);
+			return;
+		}
+		r_result.operators.push_back(rule);
+	}
+}
+
 auto Typer::described(const Type *p_type) -> const Described * {
 	Symbol *symbol = p_type->kind == Type::Instance ? p_type->symbol : nullptr;
 	if (!symbol || symbol->kind != SymbolKind::Class || !symbol->unit || !symbol->unit->is_declaration ||
@@ -49,77 +127,18 @@ auto Typer::described(const Type *p_type) -> const Described * {
 	}
 	const size_t inherited = result.operators.size(); // A class may say again what its base says.
 	for (const Metadata &tag : static_cast<ClassDecl *>(symbol->node)->metadata) {
-		std::string_view op, left, right, returns, element, keyed;
-		for (const MetadataArg &argument : tag.args) {
-			if (argument.key == "op") {
-				op = argument.value;
-			} else if (argument.key == "left") {
-				left = argument.value;
-			} else if (argument.key == "right") {
-				right = argument.value;
-			} else if (argument.key == "returns") {
-				returns = argument.value;
-			} else if (argument.key == "element") {
-				element = argument.value;
-			} else if (argument.key == "keyed") {
-				keyed = argument.value;
-			}
-		}
+		const TagArguments arguments = tag_arguments(tag);
 		if (tag.name == "Indexed") {
-			if (const Type *type = tag_type(symbol, tag, element)) {
+			if (const Type *type = tag_type(symbol, tag, arguments.element)) {
 				result.element = type;
-				result.keyed = keyed == "true";
+				result.keyed = arguments.keyed == "true";
 			}
 		} else if (tag.name == "Constructor") {
-			std::vector<const Type *> form;
-			std::string_view args;
-			for (const MetadataArg &argument : tag.args) {
-				args = argument.key == "args" ? argument.value : args;
-			}
-			bool known = true;
-			for (size_t start = 0; !args.empty() && start <= args.size();) {
-				size_t comma = args.find(',', start);
-				const Type *type = tag_type(symbol, tag, args.substr(start, comma == std::string_view::npos ? std::string_view::npos : comma - start));
-				known = known && type;
-				form.push_back(type);
-				start = comma == std::string_view::npos ? args.size() + 1 : comma + 1;
-			}
-			if (known) {
-				result.forms.push_back(std::move(form));
-			}
+			constructor_tag(symbol, tag, result);
 		} else if (tag.name == "Operators") {
 			result.complete = true;
 		} else if (tag.name == "Operator") {
-			result.complete = true;
-			if (!left.empty() && !right.empty()) {
-				symbol->unit->diagnostics.error(tag.offset, "an [Operator] tag names both a left and a right operand");
-				continue;
-			}
-			OperatorRule rule;
-			rule.op = op;
-			rule.result = tag_type(symbol, tag, returns);
-			if (!left.empty()) {
-				rule.side = OperatorRule::Left;
-				rule.other = tag_type(symbol, tag, left);
-			} else if (!right.empty()) {
-				rule.other = tag_type(symbol, tag, right);
-			} else {
-				rule.side = OperatorRule::Unary;
-			}
-			// A tag that names a type the program does not have describes nothing.
-			if (!op.empty() && rule.result && (rule.other || rule.side == OperatorRule::Unary)) {
-				const auto same = [&](const OperatorRule &p_other) {
-					return p_other.op == rule.op && p_other.side == rule.side && p_other.other == rule.other;
-				};
-				if (std::any_of(result.operators.begin() + static_cast<std::ptrdiff_t>(inherited), result.operators.end(), same)) {
-					const std::string where = rule.side == OperatorRule::Unary
-							? std::string(" with no other operand")
-							: " with " + quoted(compilation_.type_name(rule.other)) + (rule.side == OperatorRule::Left ? " on the left" : " on the right");
-					symbol->unit->diagnostics.error(tag.offset, "a second [Operator] tag for " + quoted(op) + where);
-					continue;
-				}
-				result.operators.push_back(rule);
-			}
+			operator_tag(symbol, tag, arguments, inherited, result);
 		}
 	}
 	const Described &stored = described_.emplace(symbol, std::move(result)).first->second;
