@@ -18,6 +18,7 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `errors.cpp` | Raising, catching, the stack trace, the report of an error nothing caught |
 | `direct.h`, `direct.cpp` | The library's functions of plain values (`vm/library.h`) called with no thunk: one entry for each name `ir/library_entries.h` gives an instruction, and what those functions ask of whoever runs the program (`vm::Runner`) answered for generated code: an error raised is the context's at once, a function value and a `toString()` are called as the C++ they are |
 | `calls.cpp`, `properties.cpp` | The fast paths that are not inline: typed and untyped values made of one another, a function value and a `toString()` called with no interpreter between; an Object's property under a String key, an element added at a vector's end |
+| `entry.cpp` | The engine calling a function of the program: the generated function itself, with no interpreter between, where nothing of the interpreter's is in progress (`Host::enter`); an error is reported, or kept for the call of the engine that generated code is making (`call_failed`), as `vm::Interpreter::call()` does for its own |
 | `stub_module.cpp`, `bridge.cpp` | The module the host's interpreter is given (every function's body one `Native` instruction, the thunks after them), and the host's side of that instruction (`vm/native_code.h`) |
 | `standalone.cpp`, `standalone_main.cpp` | A program library run as a plain program, on a thread whose stack holds 10,000 calls of any likely size; `main` |
 

@@ -81,6 +81,13 @@ void raise_null(Context *c) {
 bool call_failed(Context *c) {
 	c->listener_failed = false;
 	Host &host = *c->host;
+	if (host.held.active) {
+		// Kept by Host::enter() for this call: this function's now, with the trace it had.
+		host.held.active = false;
+		host.waiting.push_back(std::move(host.held.error));
+		host.restore();
+		return true;
+	}
 	if (c->failing) {
 		return true; // It never left the context: the interpreter was not given it.
 	}

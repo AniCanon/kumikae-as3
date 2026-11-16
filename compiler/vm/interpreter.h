@@ -447,6 +447,19 @@ public:
 	// the engine runs meanwhile is carried back to that call, as to an instruction.
 	void direct_began() { direct_++; }
 	void direct_ended() { direct_--; }
+	// For a host that runs a function of the program itself when the engine calls one (native code's, with
+	// no frame of this interpreter's): whether nothing here is in progress or held that such a call would
+	// have to answer to (a frame, an error on its way out or carried, a call of the library by the host).
+	// The call is then counted with this interpreter's own calls from outside (entered(), left()) and
+	// starts the same clock; an error of it that nothing takes is reported as one of this interpreter's own
+	// is (report_native()).
+	bool idle() const { return frames_.empty() && direct_ == 0 && !failing_ && !stopped_ && !halted_ && !carried_.held; }
+	void entered() {
+		entering();
+		entries_++;
+	}
+	void left() { entries_--; }
+	void report_native(NativeError p_error);
 
 	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host
 	// that keeps the interpreter calls collect_step() often (Godot's side, once a frame) with a budget of

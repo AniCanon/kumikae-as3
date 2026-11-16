@@ -100,6 +100,21 @@ struct Host final : vm::NativeCode {
 	bool later = false;
 	void set_aside();
 	void restore();
+	// The error of a function the engine ran while generated code was calling the engine on bare values,
+	// with no instruction of the interpreter's between: kept for that call, which asks (call_failed), and
+	// reported where the engine's call of generated code ends if nothing asked.
+	struct Held {
+		bool active = false;
+		uint32_t depth = 0; // The generated functions in progress when it was kept.
+		Waiting error{};
+	};
+	Held held;
+	// The engine calling a function of the program (a script's method, a listener): the generated function
+	// itself, with no interpreter between, where nothing of the interpreter's is in progress; its own call
+	// otherwise. Either way an error is reported or carried as the interpreter does it (vm::Interpreter::call),
+	// and one already on its way out is put back afterwards. The arguments are in the parameters' kinds, the
+	// caller's; a result is the caller's to release. False if the function failed.
+	[[nodiscard]] bool enter(uint32_t p_function, const Slot *p_arguments, uint32_t p_count, Slot *r_result);
 	std::vector<KeptTrace> kept;
 	Slot *updated = nullptr; // Where the thunk in progress hands back a register it moved on.
 	bool stopped = false; // The library could not go on (no memory even for an error): it has said why.

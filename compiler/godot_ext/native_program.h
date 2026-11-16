@@ -42,6 +42,11 @@ public:
 	NativeProgram &operator=(const NativeProgram &) = delete;
 
 	vm::Interpreter &interpreter() { return *host_->interpreter; }
+	// Godot calling a function of the scripts: the generated function itself where nothing of the
+	// interpreter's is in progress (rt::Host::enter).
+	[[nodiscard]] bool call(uint32_t p_function, const vm::Slot *p_arguments, size_t p_count, vm::Slot *r_result) {
+		return host_->enter(p_function, p_arguments, static_cast<uint32_t>(p_count), r_result);
+	}
 	// The engine freed a script instance: generated code that kept an object it found looks again.
 	void instance_freed() { host_->context.freed.fetch_add(1, std::memory_order_relaxed); }
 };

@@ -173,7 +173,7 @@ void kas3::call_script(vm::Object *p_object, uint32_t p_function, const Variant 
 	}
 	vm::Slot result;
 	result.bits = 0;
-	bool ok = program.interpreter().call_function(method, arguments.data(), arguments.size(), &result);
+	bool ok = program.call_function(method, arguments.data(), arguments.size(), &result);
 	// What was made for the call is given up again.
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		program.interpreter().discard(parameters.kind_at(i + first), arguments[i + first]);
