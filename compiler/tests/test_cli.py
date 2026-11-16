@@ -149,6 +149,13 @@ with tempfile.TemporaryDirectory() as folder:
     written = sorted(os.listdir(native)) if os.path.isdir(native) else []
     check("cpp writes", result.returncode == 0 and result.stdout == "" and result.stderr == "" and
           "program.h" in written and "program.cpp" in written and "Good.cpp" in written, "%d %r %r" % (result.returncode, result.stderr, written))
+    # --unit: the whole program in program.cpp, and a class's file of an earlier run taken away, so that
+    # building every .cpp in the folder builds the program once.
+    result = run("cpp", "--unit", good, "-o", native)
+    written = sorted(os.listdir(native)) if os.path.isdir(native) else []
+    whole = open(os.path.join(native, "program.cpp")).read() if "program.cpp" in written else ""
+    check("cpp --unit writes one file of C++", result.returncode == 0 and result.stderr == "" and written == ["program.cpp", "program.h"] and
+          "kas3_program" in whole and "Good" in whole, "%d %r %r" % (result.returncode, result.stderr, written))
     result = run("cpp", good)
     check("cpp without a folder", result.returncode == 2 and "usage: kas3c parse" in result.stderr)
     result = run("cpp", bad, "-o", os.path.join(folder, "never"))

@@ -6,7 +6,8 @@ class with code of its own, `program.h` (each class as a struct, every function 
 in [`runtime/`](../runtime/README.md), and says exactly what the interpreter does: `tests/run_native.py`
 holds every program of `tests/run/` to the same output under both.
 
-`kas3c cpp <file>... -o <folder>` is the command.
+`kas3c cpp <file>... -o <folder>` is the command. With `--unit` (`Options::one_unit`) every class's code
+goes into `program.cpp` too: one file for the C++ compiler, which a release is built from.
 
 | Files | Job |
 |---|---|

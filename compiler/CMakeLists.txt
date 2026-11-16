@@ -153,7 +153,8 @@ add_test(NAME programs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}
 # The same programs as native code: written as C++ by `kas3c cpp`, built and run (tests/run_native.py).
 set(KAS3_NATIVE_FLAGS "")
 if(KAS3_SANITIZE)
-    set(KAS3_NATIVE_FLAGS --flag -fsanitize=address,undefined --flag -fno-omit-frame-pointer --flag -g)
+    # And each program as one file of C++, as a release is built: the normal build has a file for each class.
+    set(KAS3_NATIVE_FLAGS --unit --flag -fsanitize=address,undefined --flag -fno-omit-frame-pointer --flag -g)
 endif()
 add_test(NAME native COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_native.py
     $<TARGET_FILE:kas3c> ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR}/native

@@ -251,6 +251,13 @@ translate exactly is refused with `kas3c: not yet supported: <what>` and status 
 With `--godot` the files are scripts for Godot, as for `kas3c ir --godot`, and the C++ is the project's
 program library (below).
 
+With `--unit` the whole program is written into `program.cpp` alone (and a class's file left by an earlier
+run is taken away, so that building every `.cpp` of the folder still builds the program once). A release is
+built that way: the C++ compiler sees every function at once, and puts a small one (a constructor, a
+getter) inside what calls it. A file for each class is for the editor, which rebuilds only what an edit
+changed. Both give the same program: the native suite runs with a file for each class in the normal build
+and as one unit in the sanitizer build.
+
 Linked with `libkas3standalone.a` (its `main`), `libkas3runtime.a` and the interpreter's libraries, the C++ is a plain executable that runs the
 program as `kas3c run` does: the same traces, the same report of an error nothing catches, the same exit
 status. That executable is the backend's oracle. `tests/run_native.py` (the `native` test group) takes
@@ -285,7 +292,7 @@ are now (the module's fingerprint, `ir::fingerprint`), the scripts run as native
 says so; if not, a warning says why and the interpreter runs them. Nothing builds it by itself yet:
 
 ```sh
-cd game && kas3c cpp --godot $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
+cd game && kas3c cpp --godot --unit $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
 c++ -std=c++17 -O2 -fno-exceptions -fno-rtti -ffp-contract=off -fno-unroll-loops -fvisibility=hidden \
     -I compiler/runtime -I compiler/vm -I compiler/ir -I compiler/src \
     -shared native/*.cpp -o bin/libkas3_program.dylib

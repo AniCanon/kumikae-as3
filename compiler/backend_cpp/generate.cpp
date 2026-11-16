@@ -23,7 +23,7 @@ std::string opening() {
 
 } // namespace
 
-Generated generate(const ir::Module &p_module) {
+Generated generate(const ir::Module &p_module, const Options &p_options) {
 	Generated out;
 	if (std::optional<std::string> missing = first_unsupported(p_module)) {
 		out.unsupported = std::move(*missing);
@@ -41,6 +41,7 @@ Generated generate(const ir::Module &p_module) {
 	out.files.push_back(File{ std::string(HEADER), write_header(p_module) });
 	// Two classes of one name in two packages, or one called `program`, still get a file each.
 	std::set<std::string> taken = { std::string(TABLE) };
+	std::string of_classes;
 	for (uint32_t i = 0; i < p_module.classes.size(); i++) {
 		if (by_class[i].empty()) {
 			continue;
@@ -50,11 +51,16 @@ Generated generate(const ir::Module &p_module) {
 			name += "_" + std::to_string(i);
 			taken.insert(name);
 		}
+		if (p_options.one_unit) {
+			of_classes += by_class[i];
+			out.not_written.push_back(name + ".cpp");
+			continue;
+		}
 		out.files.push_back(File{ name + ".cpp", generated_notice("the class " + p_module.classes[i].name) + opening() + by_class[i] + "} // namespace " +
 											std::string(PROGRAM_NAMESPACE) + "\n" });
 	}
 	out.files.push_back(File{ std::string(TABLE) + ".cpp",
-			generated_notice("the whole program") + opening() + of_no_class + write_table(p_module, thunks, keeps_stack) });
+			generated_notice("the whole program") + opening() + of_classes + of_no_class + write_table(p_module, thunks, keeps_stack) });
 	return out;
 }
 

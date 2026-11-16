@@ -1,7 +1,7 @@
 """The programs of run/ as native code: the oracle of the C++ backend.
 
 Usage: run_native.py <kas3c> <tests dir> <work dir> --cxx <compiler> [--include <dir>]... [--lib <archive>]...
-                     [--flag <flag>]... [--jobs N] [--only <name>]... [--update]
+                     [--flag <flag>]... [--jobs N] [--only <name>]... [--update] [--unit]
 
 For each program of run/ (the same ones run_programs.py holds the interpreter to):
 
@@ -25,6 +25,10 @@ it millions, and fails here and not only in a timing.
 
 deep_frames, whose calls each hold a great deal, is run once more with a stack too small for it
 (KAS3_STACK_KB): running out of stack must be Error #1023 too, never a crash.
+
+With --unit each program is written as one file of C++ (`kas3c cpp --unit`), as a release is built: the
+sanitizer build runs the suite that way, the normal build with a file for each class, so both are held to
+the same output.
 
 native_skipped.txt lists the programs skipped and why. A program that is skipped and not on the list, or on
 it and not skipped, fails: support is never lost unseen, and the list never goes stale. --update rewrites it;
@@ -66,12 +70,15 @@ timed_out = []
 
 
 def options(arguments):
-    found = {"--cxx": [], "--include": [], "--lib": [], "--flag": [], "--jobs": [], "--only": []}
+    found = {"--cxx": [], "--include": [], "--lib": [], "--flag": [], "--jobs": [], "--only": [], "--unit": []}
     update = False
     i = 0
     while i < len(arguments):
         if arguments[i] == "--update":
             update = True
+            i += 1
+        elif arguments[i] == "--unit":
+            found["--unit"] = ["--unit"]
             i += 1
         elif arguments[i] in found and i + 1 < len(arguments):
             found[arguments[i]].append(arguments[i + 1])
@@ -115,7 +122,7 @@ def build(files, sources_in, out):
     """The files as an executable in out: ("", what kas3c said), ("skipped", operation) or ("failed", why)."""
     shutil.rmtree(out, ignore_errors=True)
     name = os.path.basename(out)
-    written = step("%s: kas3c cpp" % name, [kas3c, "cpp", *files, "-o", out], 120, cwd=sources_in)
+    written = step("%s: kas3c cpp" % name, [kas3c, "cpp", *given["--unit"], *files, "-o", out], 120, cwd=sources_in)
     if written is None:
         return "failed", "kas3c cpp took more than 120 seconds"
     lines = written.stderr.splitlines()
