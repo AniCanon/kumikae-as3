@@ -264,26 +264,12 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 				}
 				break;
 			}
-			default: {
+			default:
 				// A handle of its own, for the same reason: Godot's text for an object can run a script.
-				void *held = element.p ? host_.handles.copy(element.p) : nullptr;
-				Str *text = held ? host_.handles.text(held) : nullptr;
-				*r_text += text ? text->view() : std::string_view("null");
-				if (release(text)) {
-					free_string(text);
-				}
-				if (held) {
-					host_.handles.drop(held);
-					if (!text) {
-						out_of_memory();
-						return false;
-					}
-				}
-				if (carried_.held) {
-					return false; // As in any_text(): the script's toString() failed.
+				if (!engine_text(element.p, r_text)) {
+					return false;
 				}
 				break;
-			}
 		}
 	}
 	return true;

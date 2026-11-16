@@ -85,8 +85,13 @@ bool Interpreter::any_text(Slot p_value, std::string *r_text) {
 		release_object(object);
 		return said;
 	}
-	// A Godot value or object: a handle of its own while the engine speaks, which can run a script.
-	void *held = host_.handles.copy(any::pointer(p_value));
+	return engine_text(any::pointer(p_value), r_text);
+}
+
+// Godot's text for one of its values or objects (null for no handle), by a handle of its own while the
+// engine speaks, which can run a script. False if memory ran out, or if that script's toString() failed.
+bool Interpreter::engine_text(void *p_handle, std::string *r_text) {
+	void *held = p_handle ? host_.handles.copy(p_handle) : nullptr;
 	Str *text = held ? host_.handles.text(held) : nullptr;
 	*r_text += text ? text->view() : std::string_view("null");
 	if (release(text)) {

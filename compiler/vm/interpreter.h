@@ -134,6 +134,7 @@ private:
 	// The untyped value: vm/interpreter_any.cpp.
 	Slot to_any(ir::Kind p_kind, Slot p_value);
 	bool any_text(Slot p_value, std::string *r_text);
+	bool engine_text(void *p_handle, std::string *r_text);
 	bool from_any(Slot p_value, ir::Kind p_kind, uint32_t p_check, Slot *r_out);
 	bool wide_from_any(Slot p_value, Slot *r_out);
 	bool text_from_any(Slot p_value, Slot *r_out);
