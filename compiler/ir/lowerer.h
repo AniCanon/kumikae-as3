@@ -123,6 +123,8 @@ class Lowerer {
 
 	// The class's index, creating the built-in Error classes on first use.
 	bool class_index(const Symbol *p_class, uint32_t *r_index);
+	// Error, or one of its built-in subclasses, made the first time it is used (class_index()).
+	bool error_class(const Symbol *p_class, uint32_t *r_index);
 
 	uint32_t emit(Op p_op, uint32_t p_position, uint32_t p_a = 0, uint32_t p_b = 0, uint32_t p_c = 0);
 
@@ -148,6 +150,8 @@ class Lowerer {
 	// written is AS3's own, which cuts, rounds or holds at the end.
 	uint32_t convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p_written = false);
 	uint32_t convert_wide(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p_written);
+	// Between int, uint, Number, Boolean and String; an object to a Boolean or a String.
+	uint32_t convert_primitive(uint32_t p_reg, Kind p_to, uint32_t p_position);
 
 	Kind natural(Expr *p_expression);
 

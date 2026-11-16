@@ -133,22 +133,17 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	if (!p_class || !p_class->unit || !p_class->unit->is_builtin || !is_error(p_class)) {
 		return false;
 	}
-	// Error and its built-in subclasses: message, name, errorID and the stack trace (ERROR_FIELDS in ir.h),
-	// and a constructor that stores the message and the id, and takes the trace where it is made, as
-	// Flash does.
-	uint32_t base = NONE;
-	if (p_class != error_ && !class_index(p_class->klass->base, &base)) {
-		return false;
-	}
-	Class klass;
-	klass.name = class_name(p_class);
-	klass.base = base;
-	klass.fields = { { "message", Kind::Str, NONE, false, true }, { "name", Kind::Str, NONE, false, true }, { "errorID", Kind::I32, NONE, false, true },
-		{ "stack", Kind::Str } };
-	klass.built_in = true;
+	return error_class(p_class, r_index);
+}
+
+namespace {
+
+// The constructor error_class() gives each class it makes. p_name: the class's own name, among the module's
+// strings.
+Function error_constructor(const std::string &p_class_name, uint32_t p_owner, uint32_t p_name) {
 	Function constructor;
-	constructor.name = klass.name;
-	constructor.owner = (uint32_t)module_.classes.size();
+	constructor.name = p_class_name;
+	constructor.owner = p_owner;
 	constructor.parameters = 3;
 	constructor.registers = { Kind::Obj, Kind::Str, Kind::I32, Kind::Str, Kind::Str };
 	const auto op = [&](Op p_op, uint32_t p_a, uint32_t p_b, uint32_t p_c) {
@@ -161,11 +156,31 @@ bool Lowerer::class_index(const Symbol *p_class, uint32_t *r_index) {
 	};
 	op(Op::SetField, 0, ERROR_MESSAGE, 1);
 	op(Op::SetField, 0, ERROR_ID, 2);
-	op(Op::ConstStr, 3, string(std::string(p_class->name)), 0);
+	op(Op::ConstStr, 3, p_name, 0);
 	op(Op::SetField, 0, ERROR_NAME, 3);
 	op(Op::ErrorStack, 4, 0, 0);
 	op(Op::SetField, 0, ERROR_STACK, 4);
 	op(Op::ReturnVoid, 0, 0, 0);
+	return constructor;
+}
+
+} // namespace
+
+// Error and its built-in subclasses: message, name, errorID and the stack trace (ERROR_FIELDS in ir.h),
+// and a constructor that stores the message and the id, and takes the trace where it is made, as
+// Flash does.
+bool Lowerer::error_class(const Symbol *p_class, uint32_t *r_index) {
+	uint32_t base = NONE;
+	if (p_class != error_ && !class_index(p_class->klass->base, &base)) {
+		return false;
+	}
+	Class klass;
+	klass.name = class_name(p_class);
+	klass.base = base;
+	klass.fields = { { "message", Kind::Str, NONE, false, true }, { "name", Kind::Str, NONE, false, true }, { "errorID", Kind::I32, NONE, false, true },
+		{ "stack", Kind::Str } };
+	klass.built_in = true;
+	Function constructor = error_constructor(klass.name, (uint32_t)module_.classes.size(), string(std::string(p_class->name)));
 	klass.constructor = (uint32_t)module_.functions.size();
 	module_.functions.push_back(std::move(constructor));
 	module_.classes.push_back(std::move(klass));
@@ -304,6 +319,47 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 		refuse(p_position, is_engine(from) ? "converting a Godot value" : "passing this value where a Godot value is expected");
 		return default_value(p_to, p_position);
 	}
+	return convert_primitive(p_reg, p_to, p_position);
+}
+
+namespace {
+
+// The operation that makes a Boolean of a value of the kind (int, uint, Number, String, or an object).
+Op to_boolean_op(Kind p_from) {
+	switch (p_from) {
+		case Kind::I32:
+			return Op::I32ToBool;
+		case Kind::U32:
+			return Op::U32ToBool;
+		case Kind::F64:
+			return Op::F64ToBool;
+		case Kind::Str:
+			return Op::StrToBool;
+		default:
+			return Op::ObjToBool;
+	}
+}
+
+// The operation that makes a String of a value of the kind (int, uint, Number, Boolean, or an object).
+Op to_string_op(Kind p_from) {
+	switch (p_from) {
+		case Kind::I32:
+			return Op::I32ToStr;
+		case Kind::U32:
+			return Op::U32ToStr;
+		case Kind::F64:
+			return Op::F64ToStr;
+		case Kind::Bool:
+			return Op::BoolToStr;
+		default:
+			return Op::ObjToStr;
+	}
+}
+
+} // namespace
+
+uint32_t Lowerer::convert_primitive(uint32_t p_reg, Kind p_to, uint32_t p_position) {
+	const Kind from = kind_at(p_reg);
 	auto via = [&](Op p_op, Kind p_kind, uint32_t p_source) {
 		uint32_t out = reg(p_kind);
 		emit(p_op, p_position, out, p_source);
@@ -342,31 +398,9 @@ uint32_t Lowerer::convert(uint32_t p_reg, Kind p_to, uint32_t p_position, bool p
 			}
 			return via(Op::F64ToU32, Kind::U32, to_number());
 		case Kind::Bool:
-			switch (from) {
-				case Kind::I32:
-					return via(Op::I32ToBool, Kind::Bool, p_reg);
-				case Kind::U32:
-					return via(Op::U32ToBool, Kind::Bool, p_reg);
-				case Kind::F64:
-					return via(Op::F64ToBool, Kind::Bool, p_reg);
-				case Kind::Str:
-					return via(Op::StrToBool, Kind::Bool, p_reg);
-				default:
-					return via(Op::ObjToBool, Kind::Bool, p_reg);
-			}
+			return via(to_boolean_op(from), Kind::Bool, p_reg);
 		case Kind::Str:
-			switch (from) {
-				case Kind::I32:
-					return via(Op::I32ToStr, Kind::Str, p_reg);
-				case Kind::U32:
-					return via(Op::U32ToStr, Kind::Str, p_reg);
-				case Kind::F64:
-					return via(Op::F64ToStr, Kind::Str, p_reg);
-				case Kind::Bool:
-					return via(Op::BoolToStr, Kind::Str, p_reg);
-				default:
-					return via(Op::ObjToStr, Kind::Str, p_reg);
-			}
+			return via(to_string_op(from), Kind::Str, p_reg);
 		case Kind::Obj:
 			refuse(p_position, "converting a value to an object");
 			return default_value(Kind::Obj, p_position);
