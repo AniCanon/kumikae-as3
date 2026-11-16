@@ -6,10 +6,13 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.util.PopupUtil
+import com.intellij.openapi.wm.FocusWatcher
+import com.intellij.openapi.wm.ex.WindowManagerEx
 import com.intellij.psi.PsiDocumentManager
 import java.awt.Component
 import java.awt.Container
 import java.awt.Window
+import java.awt.event.FocusEvent
 import javax.swing.JEditorPane
 
 /**
@@ -65,10 +68,25 @@ internal object UiProbeHover {
         UiProbeCompletion.await("visible documentation target") {
             editor.scrollingModel.visibleArea.contains(editor.offsetToXY(offset))
         }
+        // Quick documentation casts the window's focused component, and the platform's answer is the window
+        // itself while it is the active window and no component of it has been given the focus: so it is in
+        // a sandbox started behind another application. The window's focus watcher is told what the desktop
+        // would have told it had the sandbox been in front.
         UiProbeCompletion.edt {
             UiProbeCompletion.activate(project)
-            UiProbeCompletion.action(editor, IdeActions.ACTION_QUICK_JAVADOC)
+            val component = editor.contentComponent
+            val focused = WindowManagerEx.getInstanceEx().getFocusedComponent(project)
+            if (focused != null && focused !== component) {
+                val gained = FocusEvent(component, FocusEvent.FOCUS_GAINED)
+                component.focusListeners.filterIsInstance<FocusWatcher>().forEach { it.focusGained(gained) }
+            }
         }
+        // No focused component at all (the window is not the active one) is an answer the platform takes.
+        UiProbeCompletion.await("the editor to be the window's focused component") {
+            val focused = WindowManagerEx.getInstanceEx().getFocusedComponent(project)
+            focused == null || focused === editor.contentComponent
+        }
+        UiProbeCompletion.edt { UiProbeCompletion.action(editor, IdeActions.ACTION_QUICK_JAVADOC) }
     }
 
     private fun close(text: String) {
