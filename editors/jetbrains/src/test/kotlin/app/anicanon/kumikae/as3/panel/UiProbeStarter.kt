@@ -137,6 +137,11 @@ class UiProbeStarter : ApplicationStarter {
             check(console.text.contains("[Error] An application bundle")) { "The failure is missing from the console" }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-7-failed-input-on.png"))
             checkConsoleWraps(console)
+            onEdt {
+                check(UiProbeText.whole(view.component, "An application bundle was not found")) {
+                    "The status line cuts the failure off at the panel's narrow width"
+                }
+            }
             onEdt { tab(view, "Probe Phone 17 Pro").doClose() }
             await("the shutdown") { shows(view, "Probe Phone 17 Pro is shut down.") }
             check("shutdown probe-phone" in repository.calls) { "Closing the tab sent ${repository.calls}" }
@@ -168,8 +173,10 @@ class UiProbeStarter : ApplicationStarter {
     private fun screen(view: SimulatorToolWindow) = view.screen
 
     /** What the composed view displays, which can lag behind the controller's state by one recomposition. */
-    private fun shows(view: SimulatorToolWindow, text: String) =
-        descendants(view.component).filterIsInstance<JLabel>().any { it.text.startsWith(text) }
+    private fun shows(view: SimulatorToolWindow, text: String) = descendants(view.component).any {
+        (it is JLabel && it.text.startsWith(text)) ||
+            (it is JTextArea && it !== view.console && it.text.startsWith(text))
+    }
 
     private fun icon(view: SimulatorToolWindow, name: String) =
         descendants(view.component).filterIsInstance<IconButtonControl>().single { it.name == name }

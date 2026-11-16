@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -17,6 +18,8 @@ import org.jetbrains.compose.swing.node.SwingNode
 import java.awt.Dimension
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -138,22 +141,50 @@ internal fun BarSeparator(modifier: SwingModifier = SwingModifier) {
     SwingNode(factory = { BarSeparatorControl() }, modifier = modifier)
 }
 
-/** One quiet line of text that is cut with an ellipsis, and shown whole in its tooltip. */
+/**
+ * Quiet text under a page. It wraps between words and is never cut: a trailing value (a timing) stays on
+ * one line at the end, everything else takes the rows it needs at the width it is given.
+ */
 @Composable
 internal fun StatusLine(text: String, modifier: SwingModifier = SwingModifier, trailing: Boolean = false) {
-    SwingNode(factory = {
-        JBLabel().apply {
-            font = JBFont.small()
-            foreground = UIUtil.getContextHelpForeground()
-            border = JBUI.Borders.empty(2, 8, 4, 8)
-            horizontalAlignment = if (trailing) SwingConstants.RIGHT else SwingConstants.LEFT
-        }
-    }, modifier = modifier, update = {
-        set(text) {
-            this.text = it
-            toolTipText = it.ifEmpty { null }
-        }
-    })
+    if (trailing) {
+        SwingNode(factory = {
+            JBLabel().apply {
+                font = JBFont.small()
+                foreground = UIUtil.getContextHelpForeground()
+                border = JBUI.Borders.empty(2, 8, 4, 8)
+                horizontalAlignment = SwingConstants.RIGHT
+            }
+        }, modifier = modifier, update = { set(text) { this.text = it } })
+    } else {
+        SwingNode(factory = { WrappedNote() }, modifier = modifier, update = { set(text) { this.text = it } })
+    }
+}
+
+/** Read-only text that wraps between words and asks for a new layout when its width changes its height. */
+private class WrappedNote : JBTextArea() {
+    private var laidOutWidth = 0
+
+    init {
+        isEditable = false
+        isFocusable = false
+        isOpaque = false
+        lineWrap = true
+        wrapStyleWord = true
+        font = JBFont.small()
+        foreground = UIUtil.getContextHelpForeground()
+        border = JBUI.Borders.empty(2, 8, 4, 8)
+        addComponentListener(
+            object : ComponentAdapter() {
+                override fun componentResized(event: ComponentEvent) {
+                    if (width != laidOutWidth) {
+                        laidOutWidth = width
+                        revalidate()
+                    }
+                }
+            },
+        )
+    }
 }
 
 /** Attach caller-owned controls only while applying the composition, never inside remember. */
