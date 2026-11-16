@@ -235,7 +235,7 @@ class Lowerer {
 	// of it runs, as GDScript does: `position.x = f()` keeps the `y` that `position` had before `f()`.
 	uint32_t whole_of(const Place &p_place, uint32_t p_position);
 
-	bool extends_counted(const Symbol *p_class) const;
+	bool may_be_counted(const Symbol *p_class) const;
 
 	Place place_of_symbol(Symbol *p_symbol, uint32_t p_object, uint32_t p_position);
 

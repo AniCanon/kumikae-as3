@@ -246,7 +246,8 @@ package {
 - A script class may extend another script class. One that extends a reference-counted class (`RefCounted`,
   a `Resource`) may be attached from GDScript or made with `new` in AS3: the object lives while AS3 or
   Godot holds it, and goes when neither does. Neither keeps the other alive in a loop, and a listener it
-  adds does not keep it, as a Godot callable does not keep its object.
+  adds does not keep it, as a Godot callable does not keep its object. The same holds for a script whose
+  base is `GodotObject` that GDScript attaches to a `RefCounted`.
 - A Godot object can be compared with `null`. Calling a method on one that Godot has freed is an AS3 error.
 - Operators on Godot's values are Godot's own: `position + velocity * delta`, `-v`, `v == w`, `v += w`. Two
   Godot objects are equal when they are the same object.

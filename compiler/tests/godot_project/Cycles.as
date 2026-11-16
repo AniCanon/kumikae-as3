@@ -43,5 +43,9 @@ package {
 		public function readWord():String { return Paired.read ? Paired.read.label + " " + Paired.read.partnerWord() : "gone"; }
 		public function writtenWord():String { return Paired.written ? Paired.written.label : "gone"; }
 		public function letGoOfRead():void { Paired.read = null; Paired.written = null; }
+		// What a static holds of a script whose base is Godot's Object, on a RefCounted (Unjoined.as).
+		public function unjoinedWord():String { return Unjoined.held ? Unjoined.held.word() : "gone"; }
+		public function unjoinedIsCounted():Boolean { return Unjoined.held.isClass("RefCounted"); }
+		public function letGoOfUnjoined():void { Unjoined.held = null; }
 	}
 }
