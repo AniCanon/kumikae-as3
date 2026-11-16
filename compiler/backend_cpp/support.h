@@ -13,5 +13,9 @@ namespace backend_cpp {
 // "not yet supported: ...", or nothing if it translates all of it.
 std::optional<std::string> first_unsupported(const ir::Module &p_module);
 
+// Whether the program may read what an Error's getStackTrace() gives: the stack where the error was made,
+// which generated code keeps only for a program that does (runtime/values.h, StackFrame).
+bool reads_error_stack(const ir::Module &p_module);
+
 } // namespace backend_cpp
 } // namespace kas3

@@ -59,6 +59,7 @@ bool FunctionWriter::object(const Instruction &p_in) {
 			}
 			return true;
 		case Op::InitClass:
+			mark();
 			line("if (KAS3_UNLIKELY(!c->class_used[" + std::to_string(p_in.a) + "])) {");
 			line("\tuse_class(c, " + std::to_string(p_in.a) + ");");
 			line("\tif (KAS3_UNLIKELY(c->failing)) { " + fail() + " }");
@@ -77,8 +78,8 @@ bool FunctionWriter::object(const Instruction &p_in) {
 			share(p_in.a, "(" + reg(p_in.b) + " ? " + reg(p_in.b) + " : c->null_text)");
 			return true;
 		case Op::ErrorStack:
-			// What getStackTrace() gives is not kept: a program that reads it is refused (support.cpp).
-			put(p_in.a, "nullptr");
+			// Only a program that reads it is given it: the others keep no frames to make it from.
+			put(p_in.a, keeps_stack_ ? "error_stack(c, " + reg(p_in.b) + ")" : std::string("nullptr"));
 			return true;
 		case Op::ArgMissing:
 			line(reg(p_in.a) + " = " + (takes_count(function_) ? std::to_string(p_in.b) + " >= n" : std::string("false")) + ";");

@@ -31,8 +31,8 @@ Signature signature_of(const ir::Function &p_function) {
 	return signature;
 }
 
-FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks) :
-		module_(p_module), index_(p_function), function_(p_module.functions[p_function]), thunks_(r_thunks) {
+FunctionWriter::FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack) :
+		module_(p_module), index_(p_function), function_(p_module.functions[p_function]), thunks_(r_thunks), keeps_stack_(p_keeps_stack) {
 	analyse();
 }
 
@@ -119,6 +119,12 @@ void FunctionWriter::check() {
 	line("if (KAS3_UNLIKELY(c->failing)) { " + fail() + " }");
 }
 
+void FunctionWriter::mark() {
+	if (keeps_stack_) {
+		line("frame.line = " + std::to_string(line_of(module_, function_.file, function_.code[pc_].position)) + ";");
+	}
+}
+
 void FunctionWriter::null_check(uint32_t p_register) {
 	if (is_this(p_register)) {
 		return;
@@ -128,6 +134,7 @@ void FunctionWriter::null_check(uint32_t p_register) {
 
 void FunctionWriter::by_thunk(const Instruction &p_in) {
 	const ThunkUse use = thunks_.use(function_, p_in);
+	mark();
 	line("{");
 	std::string given = "nullptr";
 	if (!use.given.empty()) {
@@ -173,7 +180,6 @@ std::string FunctionWriter::prologue() const {
 		unused += " (void)n;";
 	}
 	if (fails_) {
-		add("static const Site site = { " + string_literal(function_.name) + ", " + std::to_string(function_.file) + " };");
 		add("uint32_t line = 0;");
 		add("bool traced = false;");
 		unused += " (void)traced;";
@@ -185,6 +191,10 @@ std::string FunctionWriter::prologue() const {
 	}
 	add(std::string("if (KAS3_UNLIKELY(c->depth >= MAX_DEPTH)) { stack_overflow(c); return") + (gives ? " result" : "") + "; }");
 	add("c->depth++;");
+	if (keeps_stack_) {
+		add("StackFrame frame = { " + std::to_string(index_) + ", 0, c->frames };");
+		add("c->frames = &frame;");
+	}
 	for (uint32_t i = 0; i < function_.parameters; i++) {
 		if (owns(i)) {
 			add("retain(c, " + reg(i) + ");");
@@ -199,10 +209,20 @@ std::string FunctionWriter::handlers() const {
 		out += "H" + std::to_string(i) + ":\n";
 		for (uint32_t each : chains_[i]) {
 			const ir::Handler &handler = function_.handlers[each];
-			const std::string error = "caught(c, &site, line, " + std::to_string(handler.reg) + ", " + (handler.rethrows ? "true" : "false") + ", &traced)";
-			const std::string owned = kind(handler.reg) == Kind::Obj ? "object_of(" + error + ")" : error;
-			out += "\tif (catches(c, " + number(handler.type) + ")) { put(c, " + reg(handler.reg) + ", " + owned + "); goto L" +
-					std::to_string(handler.target) + "; }\n";
+			const Kind held = kind(handler.reg);
+			const std::string error = "caught(c, " + std::to_string(index_) + ", line, " + std::to_string(handler.reg) + ", " +
+					(handler.rethrows ? "true" : "false") + ", &traced)";
+			const std::string target = "goto L" + std::to_string(handler.target) + ";";
+			out += "\tif (catches(c, " + number(handler.type) + ")) {";
+			if (held == Kind::Obj || held == Kind::Any) {
+				out += " put(c, " + reg(handler.reg) + ", " + (held == Kind::Obj ? "object_of(" + error + ")" : error) + "); " + target + " }\n";
+				continue;
+			}
+			// A catch of a String or a number: the value thrown as that kind, as a store makes it one.
+			out += "\n\t\tconst Slot e = " + error + ";\n\t\tconst Slot o = thunk(c, " + std::to_string(thunks_.from_any(held)) + ", &e);\n";
+			out += "\t\trelease(c, e);\n\t\tif (KAS3_UNLIKELY(c->failing)) goto failed;\n";
+			out += "\t\t" + (ir::is_held(held) ? "put(c, " + reg(handler.reg) + ", " + from_slot(held, "o") + ");" : reg(handler.reg) + " = " + from_slot(held, "o") + ";") +
+					"\n\t\t" + target + "\n\t}\n";
 		}
 		out += "\tgoto failed;\n";
 	}
@@ -216,6 +236,9 @@ std::string FunctionWriter::epilogue() const {
 			out += "\trelease(c, " + reg(i) + ");\n";
 		}
 	}
+	if (keeps_stack_) {
+		out += "\tc->frames = frame.below;\n";
+	}
 	out += "\tc->depth--;\n";
 	const bool keeps = std::any_of(function_.handlers.begin(), function_.handlers.end(), [](const ir::Handler &p_each) { return p_each.rethrows; });
 	if (keeps) {
@@ -224,7 +247,7 @@ std::string FunctionWriter::epilogue() const {
 	out += function_.result != Kind::Void ? "\treturn result;\n" : "\treturn;\n";
 	out += handlers();
 	if (fails_) {
-		out += "failed:\n\tleave_failed(c, &site, line, traced);\n\tgoto done;\n";
+		out += "failed:\n\tleave_failed(c, " + std::to_string(index_) + ", line, traced);\n\tgoto done;\n";
 	}
 	return out;
 }

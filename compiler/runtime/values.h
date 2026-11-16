@@ -24,12 +24,22 @@ struct Host; // The host's own state: nothing generated code reads.
 // Calls may nest this deep; one more is AS3's Error #1023, as in the interpreter.
 constexpr uint32_t MAX_DEPTH = 10000;
 
+// A generated function in progress, in a program that reads stack traces of errors nothing threw (an
+// Error's getStackTrace()): the function, the line of the call it is making, and its caller's. Other
+// programs keep none: a trace of an error on its way out is built as functions are left.
+struct StackFrame {
+	uint32_t function;
+	uint32_t line;
+	StackFrame *below;
+};
+
 // One per thread, the host's. Generated code keeps no state of its own: what changes as a program runs is
 // reached through this.
 struct Context {
 	bool failing = false; // An error is on its way out: `pending` holds it.
 	Slot pending{}; // What was thrown, untyped, with a reference of its own.
 	uint32_t depth = 0; // Generated functions in progress.
+	StackFrame *frames = nullptr; // The innermost of them, where they are kept.
 	Slot *globals = nullptr; // Static fields and package variables, by the module's numbers.
 	Str *const *strings = nullptr; // The program's string constants.
 	Str *null_text = nullptr; // "null": what a missing String reads as.

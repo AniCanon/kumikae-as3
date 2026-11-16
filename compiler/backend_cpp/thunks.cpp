@@ -121,5 +121,17 @@ uint32_t ThunkTable::array_of(uint32_t p_array_class, size_t p_count) {
 	return number_of(thunk);
 }
 
+uint32_t ThunkTable::from_any(ir::Kind p_kind) {
+	Thunk thunk;
+	thunk.op = Op::FromAny;
+	thunk.kinds = { ir::Kind::Any, p_kind };
+	thunk.given = 1;
+	thunk.a = 1;
+	thunk.b = 0;
+	thunk.c = NONE;
+	thunk.result = 1;
+	return number_of(thunk);
+}
+
 } // namespace backend_cpp
 } // namespace kas3

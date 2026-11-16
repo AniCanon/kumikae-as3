@@ -8,12 +8,6 @@
 namespace kas3 {
 namespace rt {
 
-// A generated function, as a stack trace names it. A constant, used only once an error is on its way out.
-struct Site {
-	const char *function; // "Main/update"
-	uint32_t file;
-};
-
 // Errors. One that is raised sets c->failing; the function it is raised in then leaves by its error path.
 
 // A call one deeper than MAX_DEPTH was asked for: AS3's Error #1023.
@@ -29,9 +23,12 @@ void rethrow(Context *c, Slot p_any, uint32_t p_register, bool *r_traced);
 bool catches(Context *c, uint32_t p_type);
 // The error is caught: it is no longer on its way out, and is the caller's, untyped. A finally's catch
 // (p_rethrows) keeps the trace, with this function's line, for when the error is thrown again.
-Slot caught(Context *c, const Site *p_site, uint32_t p_line, uint32_t p_register, bool p_rethrows, bool *r_traced);
-// The function is left by an error: its line goes into the trace, unless it is in already.
-void leave_failed(Context *c, const Site *p_site, uint32_t p_line, bool p_traced);
+Slot caught(Context *c, uint32_t p_function, uint32_t p_line, uint32_t p_register, bool p_rethrows, bool *r_traced);
+// The function (by its number) is left by an error: its line goes into the trace, unless it is in already.
+void leave_failed(Context *c, uint32_t p_function, uint32_t p_line, bool p_traced);
+// What an Error's getStackTrace() gives, for the error being made now: its name and message, then the
+// functions in progress below its constructors. Only in a program that keeps frames (Program::keeps_stack).
+Str *error_stack(Context *c, Object *p_error);
 // A function with a finally returns: traces kept for it and never taken are forgotten.
 void forget_kept(Context *c);
 

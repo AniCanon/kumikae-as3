@@ -134,22 +134,21 @@ Missing interface_call(const ir::Module &p_module, const ir::Function &p_functio
 	return first ? call_fits(p_function, p_in, *first) : std::nullopt;
 }
 
-// What getStackTrace() gives is the stack where the error was made, which generated code does not keep.
-// It is read as the Error's field: refused wherever that field may be the one read.
-Missing reads_stack(const ir::Module &p_module, const ir::Function &p_function, const Instruction &p_in) {
+// getStackTrace() is a read of the Error's field: any read that may be of that field counts. The class of
+// the object read is not in the IR, but for the method's own object.
+bool reads_stack(const ir::Module &p_module, const ir::Function &p_function, const Instruction &p_in) {
 	if (p_in.op != Op::GetField || p_in.c != ir::ERROR_STACK || p_module.error_class == NONE || p_function.registers[p_in.a] != Kind::Str) {
-		return std::nullopt;
+		return false;
 	}
-	// The method's own object is of the method's class.
 	if (p_in.b == 0 && p_function.owner != NONE && !p_function.is_static) {
 		for (uint32_t at = p_function.owner; at != NONE; at = p_module.classes[at].base) {
 			if (at == p_module.error_class) {
-				return "Error.getStackTrace()";
+				return true;
 			}
 		}
-		return std::nullopt;
+		return false;
 	}
-	return "Error.getStackTrace()";
+	return true;
 }
 
 Missing instruction(const ir::Module &p_module, const ir::Function &p_function, uint32_t p_pc) {
@@ -165,9 +164,6 @@ Missing instruction(const ir::Module &p_module, const ir::Function &p_function, 
 				return std::string(ir::op_name(in.op)) + " on a register of another kind";
 			}
 		}
-	}
-	if (const Missing stack = reads_stack(p_module, p_function, in)) {
-		return stack;
 	}
 	switch (in.op) {
 		case Op::Move:
@@ -198,11 +194,6 @@ Missing function(const ir::Module &p_module, const ir::Function &p_function) {
 			return "the engine (a register that holds one of Godot's values or objects)";
 		}
 	}
-	for (const ir::Handler &handler : p_function.handlers) {
-		if (p_function.registers[handler.reg] != Kind::Obj && p_function.registers[handler.reg] != Kind::Any) {
-			return "a catch of a value that is not an object";
-		}
-	}
 	for (uint32_t pc = 0; pc < p_function.code.size(); pc++) {
 		if (Missing missing = instruction(p_module, p_function, pc)) {
 			return missing;
@@ -225,16 +216,27 @@ std::optional<std::string> first_unsupported(const ir::Module &p_module) {
 			return "the engine (a static field that holds one of Godot's values or objects)";
 		}
 	}
-	// A property reached by a name the program builds may be an Error's getStackTrace: see reads_stack().
-	if (std::find(p_module.strings.begin(), p_module.strings.end(), "getStackTrace") != p_module.strings.end()) {
-		return "Error.getStackTrace()";
-	}
 	for (const ir::Function &each : p_module.functions) {
 		if (Missing missing = function(p_module, each)) {
 			return missing;
 		}
 	}
 	return std::nullopt;
+}
+
+bool reads_error_stack(const ir::Module &p_module) {
+	// A property reached by a name the program writes or builds may be getStackTrace too.
+	if (std::find(p_module.strings.begin(), p_module.strings.end(), "getStackTrace") != p_module.strings.end()) {
+		return true;
+	}
+	for (const ir::Function &function : p_module.functions) {
+		for (const Instruction &in : function.code) {
+			if (reads_stack(p_module, function, in)) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 } // namespace backend_cpp

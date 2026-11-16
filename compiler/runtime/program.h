@@ -133,6 +133,7 @@ struct Program {
 	const ThunkInfo *thunks;
 	uint32_t thunk_count;
 	KnownClasses known;
+	bool keeps_stack; // Its functions keep a StackFrame each: it reads an Error's getStackTrace().
 };
 
 } // namespace rt

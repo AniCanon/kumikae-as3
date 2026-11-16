@@ -10,18 +10,29 @@ using ir::Kind;
 namespace {
 
 // "\tat Main/update()[Main.as:12]"
-std::string site_line(const Host &p_host, const Site *p_site, uint32_t p_line) {
-	const char *file = p_site->file < p_host.program.file_count ? p_host.program.files[p_site->file] : "?";
-	return "\tat " + std::string(p_site->function) + "()[" + file + ":" + std::to_string(p_line) + "]";
+std::string site_line(const Host &p_host, uint32_t p_function, uint32_t p_line) {
+	const FunctionInfo &function = p_host.program.functions[p_function];
+	const char *file = function.file < p_host.program.file_count ? p_host.program.files[function.file] : "?";
+	return "\tat " + std::string(function.name) + "()[" + file + ":" + std::to_string(p_line) + "]";
 }
 
 // A function that an error leaves, added to its trace: a runaway recursion has thousands, and the first
 // few and a count say as much.
-void traced(Host &r_host, const Site *p_site, uint32_t p_line, std::string *r_trace, size_t *r_lines) {
+void traced(Host &r_host, uint32_t p_function, uint32_t p_line, std::string *r_trace, size_t *r_lines) {
 	if (*r_lines < vm::Interpreter::MAX_TRACE) {
-		*r_trace += site_line(r_host, p_site, p_line) + "\n";
+		*r_trace += site_line(r_host, p_function, p_line) + "\n";
 	}
 	(*r_lines)++;
+}
+
+// An object in the library's own words for it (an Error's name and message), whatever its class says.
+std::string object_words(Host &r_host, Object *p_object) {
+	const Slot object = slot(p_object);
+	const Slot words = r_host.builtin(Builtin::ObjectText, &object);
+	Str *text = static_cast<Str *>(words.p);
+	std::string out = text ? std::string(text->view()) : std::string(vm::OUT_OF_MEMORY);
+	release(&r_host.context, text);
+	return out;
 }
 
 // The error on its way out, as its report begins.
@@ -30,20 +41,29 @@ std::string error_text(Host &r_host) {
 	if (vm::any::tag(error) != vm::AnyTag::Object) {
 		return vm::any::text(error).value_or(std::string());
 	}
-	// Put aside while the library is asked for the object's own words.
+	// Put aside while the library is asked for the object's words.
 	r_host.context.failing = false;
-	Slot object = empty();
-	object.p = vm::any::pointer(error);
-	const Slot words = r_host.builtin(Builtin::ObjectText, &object);
-	Str *text = static_cast<Str *>(words.p);
-	std::string out = text ? std::string(text->view()) : std::string(vm::OUT_OF_MEMORY);
-	release(&r_host.context, text);
+	std::string out = object_words(r_host, static_cast<Object *>(vm::any::pointer(error)));
 	if (r_host.context.failing) {
 		r_host.interpreter->discard(Kind::Any, r_host.context.pending);
 	}
 	r_host.context.pending = error;
 	r_host.context.failing = true;
 	return out;
+}
+
+// Whether the function is the constructor of Error or of a class that extends it.
+bool error_constructor(const Host &p_host, uint32_t p_function) {
+	const uint32_t owner = p_host.program.functions[p_function].owner;
+	if (owner == NONE || p_host.program.classes[owner].constructor != p_function) {
+		return false;
+	}
+	for (uint32_t at = owner; at != NONE; at = p_host.program.classes[at].base) {
+		if (at == p_host.program.known.error) {
+			return true;
+		}
+	}
+	return false;
 }
 
 } // namespace
@@ -98,12 +118,12 @@ bool catches(Context *c, uint32_t p_type) {
 	return is;
 }
 
-Slot caught(Context *c, const Site *p_site, uint32_t p_line, uint32_t p_register, bool p_rethrows, bool *r_traced) {
+Slot caught(Context *c, uint32_t p_function, uint32_t p_line, uint32_t p_register, bool p_rethrows, bool *r_traced) {
 	Host &host = *c->host;
 	if (p_rethrows) {
 		KeptTrace kept{ c->depth, p_register, host.trace, host.trace_lines };
 		if (!*r_traced) {
-			traced(host, p_site, p_line, &kept.trace, &kept.lines);
+			traced(host, p_function, p_line, &kept.trace, &kept.lines);
 		}
 		// A finally that catches again replaces what it kept: one left behind is never taken by another.
 		bool replaced = false;
@@ -126,9 +146,9 @@ Slot caught(Context *c, const Site *p_site, uint32_t p_line, uint32_t p_register
 	return error;
 }
 
-void leave_failed(Context *c, const Site *p_site, uint32_t p_line, bool p_traced) {
+void leave_failed(Context *c, uint32_t p_function, uint32_t p_line, bool p_traced) {
 	if (!p_traced) {
-		traced(*c->host, p_site, p_line, &c->host->trace, &c->host->trace_lines);
+		traced(*c->host, p_function, p_line, &c->host->trace, &c->host->trace_lines);
 	}
 }
 
@@ -137,6 +157,22 @@ void forget_kept(Context *c) {
 	while (!kept.empty() && kept.back().depth > c->depth) {
 		kept.pop_back();
 	}
+}
+
+std::string Host::stack_text(Object *p_error, bool p_skip_constructors) {
+	std::string text = object_words(*this, p_error);
+	const StackFrame *frame = context.frames;
+	while (p_skip_constructors && frame && error_constructor(*this, frame->function)) {
+		frame = frame->below;
+	}
+	for (size_t lines = 0; frame && lines < vm::Interpreter::MAX_TRACE; frame = frame->below, lines++) {
+		text += "\n" + site_line(*this, frame->function, frame->line);
+	}
+	return text;
+}
+
+Str *error_stack(Context *c, Object *p_error) {
+	return vm::new_string(c->host->stack_text(p_error, true));
 }
 
 void Host::report() {

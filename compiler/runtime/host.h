@@ -113,6 +113,9 @@ struct Host {
 	// The package's variables are set, then the entry class is made. False if an error reached the top:
 	// it has been reported.
 	bool run();
+	// An error's name and message, then the generated functions in progress, innermost first; without the
+	// error's own constructors, for an error the program is making.
+	std::string stack_text(Object *p_error, bool p_skip_constructors);
 	// Gives the error on its way out to standard error, with its trace, and forgets it.
 	void report();
 };

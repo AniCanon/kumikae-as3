@@ -68,6 +68,13 @@ void take_error(Host &r_host) {
 	}
 	const Slot error = local(*r_host.interpreter, LOCAL_ERROR);
 	vm::retain(vm::any::counted(error));
+	// An Error the library made took its stack from the interpreter's frames, which are the thunk's: where
+	// the program reads stacks, it is given the generated functions'.
+	Object *object = vm::any::tag(error) == vm::AnyTag::Object ? static_cast<Object *>(vm::any::pointer(error)) : nullptr;
+	if (r_host.program.keeps_stack && object && is_class(&r_host.context, object, r_host.program.known.error)) {
+		Str *&stack = field<Str *>(object, ir::ERROR_STACK);
+		put(&r_host.context, stack, vm::new_string(r_host.stack_text(object, false)));
+	}
 	r_host.context.pending = error;
 	r_host.context.failing = true;
 }

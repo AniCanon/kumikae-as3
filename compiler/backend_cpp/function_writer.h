@@ -33,6 +33,9 @@ class FunctionWriter {
 	const uint32_t index_;
 	const ir::Function &function_;
 	ThunkTable &thunks_;
+	// The program reads the stack of an error nothing threw: each function keeps a StackFrame, and says
+	// which line it is on before anything that may run code.
+	const bool keeps_stack_;
 	std::string body_;
 	std::vector<bool> targets_; // Per instruction: a jump lands on it.
 	std::vector<bool> written_; // Per register: an instruction writes it.
@@ -53,6 +56,7 @@ class FunctionWriter {
 	void share(uint32_t p_register, const std::string &p_borrowed);
 	std::string fail(); // "line = 12; goto failed;": where an error at this instruction goes.
 	void check(); // If an error is on its way out, go where fail() says.
+	void mark(); // Before what may run other code: the line this function is on, where frames are kept.
 	void null_check(uint32_t p_register);
 	uint32_t chain_of(uint32_t p_pc);
 
@@ -73,7 +77,7 @@ class FunctionWriter {
 	std::string handlers() const;
 
 public:
-	FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks);
+	FunctionWriter(const ir::Module &p_module, uint32_t p_function, ThunkTable &r_thunks, bool p_keeps_stack);
 	// The function's definition, and after it its entry (the function called with slots).
 	std::string write();
 };

@@ -65,6 +65,7 @@ std::string FunctionWriter::arguments(const ir::Function &p_callee, const std::v
 void FunctionWriter::call_function(const Instruction &p_in, const ir::Function &p_callee, const std::string &p_target) {
 	const std::vector<uint32_t> &list = function_.argument_lists[p_in.c];
 	const uint32_t fixed = p_callee.rest ? p_callee.parameters - 1 : p_callee.parameters;
+	mark();
 	line("{");
 	if (p_callee.rest) {
 		// The arguments past the others, untyped, are the rest parameter's Array: the caller's, let go

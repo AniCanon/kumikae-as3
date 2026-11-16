@@ -1,3 +1,0 @@
-error_members: Error.getStackTrace()
-errors: a catch of a value that is not an object
-try_ir: a catch of a value that is not an object

@@ -177,7 +177,7 @@ std::string write_header(const ir::Module &p_module) {
 	return out + "\n} // namespace " + std::string(PROGRAM_NAMESPACE) + "\n";
 }
 
-std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks) {
+std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, bool p_keeps_stack) {
 	std::string tables = "namespace {\n\n";
 	std::vector<std::string> classes, functions, globals, strings, files, interface_methods, thunks;
 	for (uint32_t i = 0; i < p_module.classes.size(); i++) {
@@ -214,7 +214,7 @@ std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks) 
 	counted("const char *const", "INTERFACE_METHODS", interface_methods);
 	counted("const uint32_t", "INITIALIZERS", numbers(p_module.initializers));
 	counted("const ThunkInfo", "THUNKS", thunks);
-	program += known_classes(p_module) + " };\n";
+	program += known_classes(p_module) + ", " + boolean(p_keeps_stack) + " };\n";
 	tables += program + "\n} // namespace\n\n} // namespace " + std::string(PROGRAM_NAMESPACE) + "\n\n";
 	tables += "extern \"C\" const kas3::rt::Program *kas3_program() {\n\treturn &" + std::string(PROGRAM_NAMESPACE) + "::PROGRAM;\n}\n";
 	return tables;
