@@ -129,22 +129,22 @@ bool is_program_class(const Symbol *p_symbol) {
 void Fingerprints::forget(const std::vector<Symbol *> &p_declared) {
 	for (const Symbol *symbol : p_declared) {
 		auto found = prints_.find(symbol);
-		if (found != prints_.end()) {
-			before_.emplace(symbol, found->second);
-			prints_.erase(found);
+		if (found != prints_.end() && !found->second.kept) {
+			found->second.kept = true;
+			before_.emplace_back(symbol, found->second);
 		}
 	}
 }
 
 void Fingerprints::begin_round(const std::vector<Unit *> &p_units) {
-	round_.clear();
-	fresh_.clear();
-	round_.insert(p_units.begin(), p_units.end());
+	++round_;
+	units_.clear();
+	units_.insert(p_units.begin(), p_units.end());
 }
 
 const Prints &Fingerprints::class_prints(const Symbol *p_class) {
 	Prints &prints = prints_[p_class];
-	if (!round_.count(p_class->unit) || fresh_.count(p_class) || !visiting_.insert(p_class).second) {
+	if (!units_.count(p_class->unit) || prints.classed == round_ || !visiting_.insert(p_class).second) {
 		return prints; // Settled before this round, or printed already (a cycle is cut, so this ends).
 	}
 	const ClassInfo *info = p_class->klass;
@@ -174,7 +174,7 @@ const Prints &Fingerprints::class_prints(const Symbol *p_class) {
 	Prints &stored = prints_[p_class]; // The map may have grown.
 	stored.chain = chain;
 	stored.shape = shape;
-	fresh_.insert(p_class);
+	stored.classed = round_;
 	visiting_.erase(p_class);
 	return stored;
 }
@@ -214,11 +214,13 @@ void Fingerprints::emit(const Symbol *p_symbol, const Prints *p_before, const Pr
 
 void Fingerprints::finish_round(std::vector<Dependency> &r_keys) {
 	std::vector<Symbol *> symbols;
-	for (const Unit *unit : round_) {
+	for (const Unit *unit : units_) {
 		symbols.insert(symbols.end(), unit->declared.begin(), unit->declared.end());
 	}
 	for (Symbol *symbol : symbols) {
 		Prints &prints = prints_[symbol];
+		prints.kept = false;
+		prints.printed = round_;
 		prints.signature = signature_print(symbol);
 		prints.package = !symbol->owner && !symbol->file_private ? symbol->package : nullptr;
 		prints.constructor = symbol->owner && symbol->owner->klass && symbol->owner->klass->constructor == symbol;
@@ -228,18 +230,24 @@ void Fingerprints::finish_round(std::vector<Dependency> &r_keys) {
 			class_prints(symbol);
 		}
 	}
-	for (Symbol *symbol : symbols) {
-		auto before = before_.find(symbol);
-		emit(symbol, before == before_.end() ? nullptr : &before->second, &prints_[symbol], r_keys);
-		if (before != before_.end()) {
-			before_.erase(before);
+	// What was printed before and again now is compared; what was printed before and not now is gone.
+	for (const auto &[symbol, before] : before_) {
+		auto now = prints_.find(symbol);
+		if (now->second.printed == round_) {
+			emit(symbol, &before, &now->second, r_keys);
+			now->second.compared = round_;
+		} else {
+			emit(symbol, &before, nullptr, r_keys);
+			prints_.erase(now);
 		}
 	}
-	// What was declared before and is not now.
-	for (const auto &[symbol, prints] : before_) {
-		emit(symbol, &prints, nullptr, r_keys);
-	}
 	before_.clear();
+	for (Symbol *symbol : symbols) {
+		const Prints &prints = prints_[symbol];
+		if (prints.compared != round_) {
+			emit(symbol, nullptr, &prints, r_keys); // New.
+		}
+	}
 }
 
 } // namespace kas3

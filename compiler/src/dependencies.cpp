@@ -1,19 +1,27 @@
 #include "dependencies.h"
 
 #include <algorithm>
+#include <cstring>
 #include <functional>
 #include <tuple>
 
 namespace kas3 {
 
 uint64_t name_hash(std::string_view p_name) {
-	// FNV-1a: the same name gives the same key in every file. Two names that collide only make a file
-	// checked again that need not be.
-	uint64_t hash = 14695981039346656037ull;
-	for (char c : p_name) {
-		hash = (hash ^ (uint8_t)c) * 1099511628211ull;
+	// Eight bytes at a time, each mixed in by a multiply: the same name gives the same key in every file.
+	// Two names that collide only make a file checked again that need not be.
+	uint64_t hash = 0x9E3779B97F4A7C15ull ^ p_name.size();
+	size_t at = 0;
+	for (; at + 8 <= p_name.size(); at += 8) {
+		uint64_t word;
+		std::memcpy(&word, p_name.data() + at, 8);
+		hash = (hash ^ word) * 0xFF51AFD7ED558CCDull;
+		hash ^= hash >> 32;
 	}
-	return hash;
+	uint64_t tail = 0;
+	std::memcpy(&tail, p_name.data() + at, p_name.size() - at);
+	hash = (hash ^ tail) * 0xC4CEB9FE1A85EC53ull;
+	return hash ^ (hash >> 29);
 }
 
 bool Dependency::operator<(const Dependency &p_other) const {
@@ -36,10 +44,27 @@ void DependencyIndex::set(uint32_t p_unit, Part p_part, std::vector<Dependency> 
 			counts.resize(p_unit + 1, 0);
 		}
 	}
-	const uint32_t epoch = ++epochs_[p_part][p_unit];
-	live_ -= counts_[p_part][p_unit];
+	for (std::vector<Digest> &digests : digests_) {
+		if (digests.size() <= p_unit) {
+			digests.resize(p_unit + 1);
+		}
+	}
 	std::sort(p_keys.begin(), p_keys.end());
 	p_keys.erase(std::unique(p_keys.begin(), p_keys.end()), p_keys.end());
+	// Most checks of a file read what the last one read: the list in the index then stays as it is. Two
+	// independent 64-bit sums tell lists apart.
+	Digest digest{ p_keys.size(), 0x9E3779B97F4A7C15ull };
+	for (const Dependency &key : p_keys) {
+		const uint64_t hash = DependencyHash()(key);
+		digest.first = (digest.first ^ hash) * 0x100000001B3ull;
+		digest.second = (digest.second + (hash ^ (hash >> 31))) * 0xFF51AFD7ED558CCDull;
+	}
+	if (epochs_[p_part][p_unit] != 0 && digests_[p_part][p_unit] == digest) {
+		return;
+	}
+	digests_[p_part][p_unit] = digest;
+	const uint32_t epoch = ++epochs_[p_part][p_unit];
+	live_ -= counts_[p_part][p_unit];
 	for (const Dependency &key : p_keys) {
 		readers_[key].push_back({ p_unit, epoch, p_part });
 	}

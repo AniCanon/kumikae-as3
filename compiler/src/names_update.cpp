@@ -13,6 +13,7 @@ void resolve_unit_signatures(Compilation &p_compilation, Unit &p_unit); // names
 void check_unit_bodies(Compilation &p_compilation, Unit &p_unit); // names_bodies.cpp
 void declaration_dependencies(const Unit &p_unit, std::vector<Dependency> &r_keys); // names_dependencies.cpp
 void body_dependencies(const Unit &p_unit, std::vector<Dependency> &r_keys);
+void clear_body_annotations(Program *p_tree); // ast_reset.cpp
 
 namespace {
 
@@ -38,6 +39,14 @@ void package_names(const Unit &p_unit, std::vector<Dependency> &r_keys) {
 	}
 }
 
+// What a file says once its declarations and signatures are checked: its bodies, checked again alone,
+// start from here.
+void keep_declared(Unit &p_unit) {
+	p_unit.declared_diagnostics = p_unit.diagnostics;
+	p_unit.declared_references = p_unit.references.size();
+	p_unit.declared_cited = p_unit.cited.size();
+}
+
 } // namespace
 
 void Compilation::declare_files(const std::vector<Unit *> &p_units) {
@@ -58,6 +67,7 @@ void Compilation::declare_files(const std::vector<Unit *> &p_units) {
 	settle_classes(classes);
 	for (Unit *unit : p_units) {
 		resolve_unit_signatures(*this, *unit);
+		keep_declared(*unit);
 	}
 }
 
@@ -154,6 +164,7 @@ void Compilation::redeclare(std::vector<Unit *> &r_units, std::vector<Dependency
 	settle_classes(classes);
 	for (Unit *unit : r_units) {
 		resolve_unit_signatures(*this, *unit);
+		keep_declared(*unit);
 	}
 	if (broken_files_) {
 		// Doubt follows a symbol through its types to their bases, further than any file records: every file
@@ -259,7 +270,7 @@ bool Compilation::propagate(std::vector<Unit *> p_work, std::vector<Dependency> 
 		for (uint32_t rank : bodies) {
 			Unit &reader = units_[rank];
 			if (!done(&reader) && std::find(p_work.begin(), p_work.end(), &reader) == p_work.end()) {
-				reader.redeclare = true;
+				reader.bodies_only = true;
 				if (!reader.unchecked) {
 					reader.unchecked = true;
 					tracking.unchecked.insert(reader.rank);
@@ -291,16 +302,26 @@ void Compilation::check_bodies(Unit &p_unit) {
 	if (!p_unit.unchecked) {
 		return;
 	}
-	if (p_unit.redeclare) {
-		std::vector<Unit *> one{ &p_unit };
-		std::vector<Dependency> changed;
-		redeclare(one, changed);
-		if (!changed.empty()) {
-			// What its declarations read did not change, so they did not; if they did, the files that read
-			// them are redone all the same.
-			tracking_->counts.surprises++;
-			propagate({}, std::move(changed), one);
+	if (p_unit.bodies_only) {
+		// Back to where its signatures left it.
+		p_unit.bodies_only = false;
+		p_unit.diagnostics = p_unit.declared_diagnostics;
+		p_unit.references.resize(p_unit.declared_references);
+		p_unit.cited.resize(p_unit.declared_cited);
+		p_unit.typed.clear();
+		p_unit.local_scopes.clear();
+		p_unit.body_symbols.clear();
+		p_unit.undoubted.reset();
+		// The imports a declared function's body writes belong to its signature: they keep what they found.
+		std::vector<Symbol *> imported;
+		for (const Import *import : p_unit.signature_imports) {
+			imported.push_back(import->symbol);
 		}
+		clear_body_annotations(p_unit.tree);
+		for (size_t i = 0; i < imported.size(); ++i) {
+			p_unit.signature_imports[i]->symbol = imported[i];
+		}
+		tracking_->counts.bodies_only++;
 	}
 	check_unit_bodies(*this, p_unit);
 	p_unit.unchecked = false;

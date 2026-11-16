@@ -72,7 +72,7 @@ struct Unit {
 	// The imports written in a declared function's body, which its signature uses too: resolved by the
 	// signature pass, for the functions that write any.
 	std::unordered_map<const FunctionDecl *, ImportScope> function_imports;
-	std::vector<const Import *> signature_imports; // The imports that are.
+	std::vector<Import *> signature_imports; // The imports that are.
 	std::deque<Symbol> body_symbols; // Replaced together with this unit's body semantics.
 	uint32_t rank = 0; // Its place among the files: of two definitions of one name, the first file's wins.
 	std::vector<Symbol *> declared; // What its declarations made, which a redo of them reuses.
@@ -84,9 +84,12 @@ struct Unit {
 	std::optional<Diagnostics> undoubted; // What the passes said, when doubt took some of it back.
 	uint64_t doubted_at = 0; // The state of the broken files that doubt last judged it by.
 	bool unchecked = false; // Its bodies wait to be checked (an incremental compilation only).
-	// Its bodies read something that changed, its declarations nothing: they are made again, unchanged,
-	// when its bodies are checked, rather than at the edit.
-	bool redeclare = false;
+	// Its bodies read something that changed, its declarations nothing: its bodies are checked again, with
+	// what its declarations said kept as it was when they were checked.
+	bool bodies_only = false;
+	Diagnostics declared_diagnostics; // What it said up to the end of its signatures.
+	size_t declared_references = 0;
+	size_t declared_cited = 0;
 
 	explicit Unit(std::shared_ptr<Parsed> p_parsed) :
 			parsed(std::move(p_parsed)), source(parsed->source), diagnostics(parsed->diagnostics), tree(parsed->tree) {}
@@ -201,9 +204,7 @@ public:
 	struct Counts {
 		size_t declarations = 0; // Program files whose declarations were checked.
 		size_t bodies = 0; // Program files whose bodies were checked.
-		// Redos of a file's declarations, made only because its bodies read a change, that found them
-		// changed after all. Zero unless a dependency is missing from what declarations record.
-		size_t surprises = 0;
+		size_t bodies_only = 0; // Of those, files checked again for what their bodies alone read.
 		size_t cascades = 0; // Edits whose changes reached files that read declarations they changed.
 		size_t cycles = 0; // Rounds that took in the other files of a cycle of bases.
 		size_t reused = 0; // Symbols of declarations that were gone, used again.

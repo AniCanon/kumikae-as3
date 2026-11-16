@@ -7,6 +7,8 @@
 #include "ast_walk.h"
 
 #include <algorithm>
+#include <array>
+#include <unordered_map>
 #include <functional>
 
 namespace kas3 {
@@ -33,7 +35,54 @@ bool local(const Symbol *p_symbol) {
 class Collector {
 	const Unit &unit_;
 	std::vector<Dependency> &keys_;
-	std::vector<const Symbol *> chain_;
+	// The same key comes again and again (every use of a field, every expression of one type): a small table of
+	// the latest keys drops most repeats before they are stored and sorted.
+	std::array<Dependency, 64> recent_{};
+	// The program classes a lookup through a class may reach, by class: worked out once per file. Most
+	// lookups in a row go through one class, which is kept at hand.
+	std::unordered_map<const Symbol *, std::vector<const Symbol *>> chains_;
+	const Symbol *last_class_ = nullptr;
+	const std::vector<const Symbol *> *last_chain_ = nullptr;
+
+	void push(const Dependency &p_key) {
+		Dependency &slot = recent_[DependencyHash()(p_key) & (recent_.size() - 1)];
+		if (!(slot == p_key)) {
+			slot = p_key;
+			keys_.push_back(p_key);
+		}
+	}
+
+	// The class, its bases, and the interfaces of each, as far as they are the program's: a declaration file's
+	// class extends only other declarations, which never change.
+	const std::vector<const Symbol *> &chain(const Symbol *p_class) {
+		if (p_class == last_class_) {
+			return *last_chain_;
+		}
+		auto [found, added] = chains_.try_emplace(p_class);
+		std::vector<const Symbol *> &chain = found->second;
+		last_class_ = p_class;
+		last_chain_ = &chain;
+		if (!added) {
+			return chain;
+		}
+		std::vector<const Symbol *> pending{ p_class };
+		for (size_t i = 0; i < pending.size(); ++i) {
+			if (!in_program(pending[i]) || !pending[i]->klass) {
+				continue;
+			}
+			chain.push_back(pending[i]);
+			const ClassInfo *info = pending[i]->klass;
+			for (const Symbol *next : info->interfaces) {
+				if (next && std::find(pending.begin(), pending.end(), next) == pending.end()) {
+					pending.push_back(next);
+				}
+			}
+			if (info->base && std::find(pending.begin(), pending.end(), info->base) == pending.end()) {
+				pending.push_back(info->base);
+			}
+		}
+		return chain;
+	}
 
 public:
 	Collector(const Unit &p_unit, std::vector<Dependency> &r_keys) :
@@ -41,9 +90,9 @@ public:
 
 	void symbol(const Symbol *p_symbol) {
 		if (in_program(p_symbol) && !local(p_symbol)) {
-			keys_.push_back(on_symbol(p_symbol));
+			push(on_symbol(p_symbol));
 			if (p_symbol->klass) {
-				keys_.push_back(on_chain(p_symbol));
+				push(on_chain(p_symbol));
 			}
 		}
 	}
@@ -51,14 +100,14 @@ public:
 	void type(const Type *p_type) {
 		for (; p_type; p_type = p_type->element) {
 			if (in_program(p_type->symbol) && p_type->symbol->klass) {
-				keys_.push_back(on_chain(p_type->symbol));
+				push(on_chain(p_type->symbol));
 			}
 		}
 	}
 
 	void type_ref(const TypeRef *p_type) {
 		if (p_type && p_type->name.count) {
-			keys_.push_back(on_name(p_type->name[p_type->name.count - 1]));
+			push(on_name(p_type->name[p_type->name.count - 1]));
 			symbol(p_type->symbol);
 		}
 	}
@@ -68,9 +117,9 @@ public:
 			return;
 		}
 		if (p_import->wildcard) {
-			keys_.push_back(on_package(dotted_name(p_import->name, p_import->name.count)));
+			push(on_package(dotted_name(p_import->name, p_import->name.count)));
 		} else {
-			keys_.push_back(on_name(p_import->name[p_import->name.count - 1]));
+			push(on_name(p_import->name[p_import->name.count - 1]));
 			symbol(p_import->symbol);
 		}
 	}
@@ -83,30 +132,18 @@ public:
 
 	// A member looked up by name through a class: whatever the class or one of its supertypes in the
 	// program declares under that name, now or after an edit, is what was found.
-	void members(const Symbol *p_class, std::string_view p_name) {
-		if (!p_class || !p_class->klass) {
+	void members(const Symbol *p_class, uint64_t p_name) {
+		if (!in_program(p_class)) {
 			return;
 		}
-		chain_.assign(1, p_class);
-		for (size_t i = 0; i < chain_.size(); ++i) {
-			const ClassInfo *info = chain_[i]->klass;
-			if (in_program(chain_[i])) {
-				keys_.push_back(on_member(chain_[i], p_name));
-			}
-			for (const Symbol *next : info->interfaces) {
-				if (next && next->klass && std::find(chain_.begin(), chain_.end(), next) == chain_.end()) {
-					chain_.push_back(next);
-				}
-			}
-			if (info->base && info->base->klass && std::find(chain_.begin(), chain_.end(), info->base) == chain_.end()) {
-				chain_.push_back(info->base);
-			}
+		for (const Symbol *klass : chain(p_class)) {
+			push({ DependencyKind::Member, klass, p_name });
 		}
 	}
 
 	void cited() {
 		for (const Unit *other : unit_.cited) {
-			keys_.push_back(on_positions(other));
+			push(on_positions(other));
 		}
 	}
 
@@ -117,11 +154,12 @@ public:
 				if (name->symbol && local(name->symbol)) {
 					break;
 				}
-				keys_.push_back(on_name(name->text));
-				members(p_class, name->text);
+				const uint64_t hash = name_hash(name->text);
+				push({ DependencyKind::Name, nullptr, hash });
+				members(p_class, hash);
 				symbol(name->symbol);
 				if (in_program(name->symbol) && name->symbol->klass) {
-					keys_.push_back(on_member(name->symbol, std::string_view())); // `new C()`: its constructor.
+					push(on_member(name->symbol, std::string_view())); // `new C()`: its constructor.
 				}
 			} break;
 			case NodeKind::Member: {
@@ -129,14 +167,14 @@ public:
 				const Type *object = member->object ? member->object->type : nullptr;
 				if (object && (object->kind == Type::Instance || object->kind == Type::ClassObject)) {
 					members(object->kind == Type::Instance ? object->symbol : object->element ? object->element->symbol : nullptr,
-							member->name);
+							name_hash(member->name));
 				} else {
-					keys_.push_back(on_name(member->name)); // A package path, or a value of no known type.
+					push(on_name(member->name)); // A package path, or a value of no known type.
 				}
 				const Symbol *found = member->resolved();
 				symbol(found);
 				if (in_program(found) && found->klass) {
-					keys_.push_back(on_member(found, std::string_view()));
+					push(on_member(found, std::string_view()));
 				}
 			} break;
 			case NodeKind::TypeRef:

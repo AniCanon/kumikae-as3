@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace kas3 {
@@ -69,6 +70,8 @@ private:
 	size_t entries_ = 0;
 	size_t live_ = 0;
 	std::vector<size_t> counts_[2]; // How many keys each unit's current list has.
+	using Digest = std::pair<uint64_t, uint64_t>;
+	std::vector<Digest> digests_[2]; // Of each unit's current list.
 
 	void compact();
 

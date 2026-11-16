@@ -19,6 +19,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 using namespace kas3;
@@ -121,7 +122,7 @@ struct Totals {
 void add(Compilation::Counts &r_total, const Compilation::Counts &p_now, const Compilation::Counts &p_before) {
 	r_total.declarations += p_now.declarations - p_before.declarations;
 	r_total.bodies += p_now.bodies - p_before.bodies;
-	r_total.surprises += p_now.surprises - p_before.surprises;
+	r_total.bodies_only += p_now.bodies_only - p_before.bodies_only;
 	r_total.cascades += p_now.cascades - p_before.cascades;
 	r_total.cycles += p_now.cycles - p_before.cycles;
 	r_total.reused += p_now.reused - p_before.reused;
@@ -143,6 +144,47 @@ class Sequence {
 	int added_ = 0;
 	Compilation::Counts counted_;
 	int counted_rebuilds_ = 0;
+	// With a root, the project is files on disk under it, as an editor opens a folder: an edit is sometimes
+	// made in the editor (the file is then open, its text the editor's) and sometimes on disk, and an open
+	// file is sometimes closed, which takes the text on disk again.
+	std::string root_;
+	std::set<std::string> open_;
+	std::map<std::string, std::string> disk_;
+
+	std::string where(const std::string &p_path) const { return root_ + p_path; }
+
+	void write_disk(const std::string &p_path, const std::string &p_text) {
+		fs::create_directories(fs::path(where(p_path)).parent_path());
+		std::ofstream(where(p_path), std::ios::binary) << p_text;
+		disk_[p_path] = p_text;
+	}
+
+	void put(const std::string &p_path, const std::string &p_text) {
+		files_[p_path] = p_text;
+		if (!root_.empty() && !open_.count(p_path) && random_.chance(40)) {
+			write_disk(p_path, p_text);
+			workspace_.file_changed_on_disk(where(p_path));
+			return;
+		}
+		open_.insert(p_path);
+		workspace_.change(where(p_path), p_text);
+	}
+
+	void drop(const std::string &p_path) {
+		files_.erase(p_path);
+		if (root_.empty()) {
+			workspace_.close(where(p_path));
+			return;
+		}
+		std::error_code error;
+		fs::remove(where(p_path), error);
+		disk_.erase(p_path);
+		if (open_.erase(p_path)) {
+			workspace_.close(where(p_path));
+		} else {
+			workspace_.file_changed_on_disk(where(p_path));
+		}
+	}
 
 	// The workspace applies the edits that wait: a file that left the program rebuilds it once.
 	void applying() {
@@ -161,6 +203,13 @@ class Sequence {
 		for (size_t i = log_.size() > 8 ? log_.size() - 8 : 0; i < log_.size(); ++i) {
 			std::printf("  edit %zu: %s\n", i, log_[i].c_str());
 		}
+		// A file whose text the workspace holds otherwise than the sequence does: a mistake in the sequence.
+		for (const auto &[path, text] : files_) {
+			const std::string *held = workspace_.text(where(path));
+			if (!held || *held != text) {
+				std::printf("  the workspace holds other text for %s\n", path.c_str());
+			}
+		}
 		// KAS3_ORACLE_DUMP=<folder> keeps the files, and both answers, to look into.
 		if (const char *dump = std::getenv("KAS3_ORACLE_DUMP")) {
 			for (const auto &[path, text] : files_) {
@@ -175,7 +224,7 @@ class Sequence {
 
 	void fresh(Workspace &r_workspace) const {
 		for (const auto &[path, text] : files_) {
-			r_workspace.open(path, text);
+			r_workspace.open(where(path), text);
 		}
 	}
 
@@ -206,8 +255,8 @@ class Sequence {
 		this->reference(reference);
 		for (const std::string &path : sampled_paths(p_edited)) {
 			const std::vector<uint32_t> offsets = probe_offsets(random_, files_[path], 4);
-			const std::string got = answers(workspace_, path, offsets);
-			const std::string wanted = answers(reference, path, offsets);
+			const std::string got = answers(workspace_, where(path), offsets);
+			const std::string wanted = answers(reference, where(path), offsets);
 			if (got != wanted) {
 				return fail("answers for " + path, got, wanted);
 			}
@@ -228,9 +277,6 @@ class Sequence {
 		}
 		add(totals_.work, now, counted_);
 		counted_ = now;
-		if (now.surprises) {
-			return fail("declarations that changed when only bodies read a change", std::to_string(now.surprises), "0");
-		}
 		return true;
 	}
 
@@ -241,10 +287,10 @@ class Sequence {
 		totals_.lazy_questions++;
 		check::checks()++;
 		const std::vector<uint32_t> offsets = probe_offsets(random_, files_[p_path], 3);
-		const std::string got = answers(workspace_, p_path, offsets);
+		const std::string got = answers(workspace_, where(p_path), offsets);
 		Workspace reference(options(godot_));
 		this->reference(reference);
-		const std::string wanted = answers(reference, p_path, offsets);
+		const std::string wanted = answers(reference, where(p_path), offsets);
 		return got == wanted || fail("a question about " + p_path + " only", got, wanted);
 	}
 
@@ -254,13 +300,17 @@ class Sequence {
 		r_path = at->first;
 		std::vector<std::string> &earlier = history_[r_path];
 		if (!earlier.empty() && random_.chance(8)) {
-			at->second = earlier[random_.below(earlier.size())];
-			workspace_.change(r_path, at->second);
+			put(r_path, earlier[random_.below(earlier.size())]);
 			return "undo " + r_path;
 		}
+		if (!root_.empty() && open_.count(r_path) && random_.chance(10)) {
+			open_.erase(r_path);
+			workspace_.close(where(r_path));
+			files_[r_path] = disk_[r_path];
+			return "close " + r_path;
+		}
 		if (random_.chance(3) && files_.size() > 2) {
-			workspace_.close(r_path);
-			files_.erase(at);
+			drop(r_path);
 			return "remove " + r_path;
 		}
 		if (random_.chance(3)) {
@@ -272,8 +322,13 @@ class Sequence {
 				text.replace(found, stem.size(), name);
 			}
 			r_path = r_path.substr(0, r_path.rfind('/') + 1) + name + ".as";
-			files_[r_path] = text;
-			workspace_.open(r_path, text);
+			if (!root_.empty()) {
+				write_disk(r_path, text); // On disk first, as a new file is.
+				workspace_.file_changed_on_disk(where(r_path));
+				files_[r_path] = text;
+			} else {
+				put(r_path, text);
+			}
 			return "add " + r_path;
 		}
 		earlier.push_back(at->second);
@@ -281,15 +336,24 @@ class Sequence {
 		std::advance(other, (long)random_.below(files_.size()));
 		const std::vector<std::string> words = oracle::vocabulary(files_);
 		oracle::Editor editor(random_, words);
-		const std::string what = editor.edit(at->second, other->second);
-		workspace_.change(r_path, at->second);
+		std::string text = at->second;
+		const std::string what = editor.edit(text, other->second);
+		put(r_path, text);
 		return what + " in " + r_path;
 	}
 
 public:
-	Sequence(uint64_t p_seed, bool p_godot, oracle::Files p_files, Totals &r_totals) :
+	Sequence(uint64_t p_seed, bool p_godot, oracle::Files p_files, Totals &r_totals, bool p_rooted = false) :
 			seed_(p_seed), godot_(p_godot), random_(p_seed), files_(std::move(p_files)), workspace_(options(p_godot)), totals_(r_totals) {
-		fresh(workspace_);
+		if (p_rooted) {
+			root_ = check::fresh_folder("root" + std::to_string(p_seed)).string();
+			for (const auto &[path, text] : files_) {
+				write_disk(path, text);
+			}
+			workspace_.set_root(root_);
+		} else {
+			fresh(workspace_);
+		}
 		for (const auto &[path, text] : files_) {
 			applied_.push_back(path);
 		}
@@ -397,14 +461,14 @@ void test_scope() {
 	const std::string hub = "/project/game/Hub.as";
 	// A body: that file alone.
 	both_ways(thing, "var total:Number = delta;", "var total:Number = delta * 2;", { 1, 1 });
-	// A method's signature: the file, and Thing4, which calls it.
-	both_ways(thing, "step(delta:Number)", "step(delta:Number, extra:int = 0)", { 2, 2 });
+	// A method's signature: the file, and the bodies of Thing4, which calls it.
+	both_ways(thing, "step(delta:Number)", "step(delta:Number, extra:int = 0)", { 1, 2 });
 	// A new method nobody calls: the file alone.
 	both_ways(thing, "\t}\n}", "\t\tpublic function extra():void {}\n\t}\n}", { 1, 1 });
 	// A syntax error in a body changes no declaration: the file alone. The others are only judged again.
 	both_ways(thing, "var total:Number = delta;", "var total:Number = ;", { 1, 1 });
-	// The hub's method, which every file calls: all of them.
-	both_ways(hub, "ping(n:int):int", "ping(n:Number):int", { 21, 21 });
+	// The hub's method, which every file calls: the bodies of all of them.
+	both_ways(hub, "ping(n:int):int", "ping(n:Number):int", { 1, 21 });
 	// A new member of the hub: the hub alone.
 	both_ways(hub, "\t}\n}", "\t\tpublic var count:int;\n\t}\n}", { 1, 1 });
 	CHECK_EQ(workspace.full_checks(), 1);
@@ -451,7 +515,6 @@ void directed(const char *p_name, bool p_godot, oracle::Files p_files,
 			std::printf("directed %s, step %d: %s\n", p_name, step,
 					got != wanted ? first_difference(got, wanted).c_str() : first_difference(state, expected).c_str());
 		}
-		CHECK_EQ(workspace.compilation().counts().surprises, (size_t)0);
 	}
 	CHECK_EQ(workspace.full_checks(), rebuilds);
 }
@@ -532,7 +595,8 @@ int main() {
 			continue;
 		}
 		oracle::Random random(seed * 7919);
-		Sequence(seed, false, oracle::generate(random, (int)classes), totals).run((int)edits);
+		// One sequence in three is a project folder on disk, edited in the editor and on disk.
+		Sequence(seed, false, oracle::generate(random, (int)classes), totals, seed % 3 == 2).run((int)edits);
 		// Godot's API is checked once and kept: a sequence with it shows that it is never checked again.
 		if (seed % 4 == 1) {
 			Sequence(seed, true, corpus(fs::path(KAS3_TESTS_DIR) / "corpus"), totals).run((int)edits / 3);
@@ -542,7 +606,7 @@ int main() {
 			totals.comparisons, totals.partial_settles, totals.lazy_questions);
 	const Compilation::Counts &work = totals.work;
 	std::printf("oracle: %zu declarations and %zu bodies checked; %zu cascades, %zu cycle rounds, %zu symbols reused, "
-				"%zu new first definitions, %zu doubt judgements, %zu surprises\n",
-			work.declarations, work.bodies, work.cascades, work.cycles, work.reused, work.firsts, work.judged, work.surprises);
+				"%zu new first definitions, %zu doubt judgements, %zu bodies checked alone\n",
+			work.declarations, work.bodies, work.cascades, work.cycles, work.reused, work.firsts, work.judged, work.bodies_only);
 	return check::finish();
 }

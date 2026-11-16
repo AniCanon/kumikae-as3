@@ -3,6 +3,8 @@
 // valid, and a declaration that did not change is, to every other file, the same one.
 #include "incremental.h"
 
+#include <algorithm>
+
 namespace kas3 {
 
 void clear_annotations(Program *p_tree); // ast_reset.cpp
@@ -42,15 +44,21 @@ Symbol *Compilation::reused(SymbolKind p_kind, std::string_view p_name, Unit *p_
 		return nullptr;
 	}
 	Symbol *symbol = nullptr;
-	auto found = tracking_->retracted.find({ p_unit, reuse_owner_, p_kind, std::string(p_name) });
-	if (found != tracking_->retracted.end() && !found->second.empty()) {
-		symbol = found->second.front();
-		found->second.pop_front();
-	} else if (!tracking_->unused.empty()) {
+	auto found = tracking_->retracted.find({ p_unit, reuse_owner_, p_kind, name_hash(p_name) });
+	if (found != tracking_->retracted.end()) {
+		std::vector<Symbol *> &waiting = found->second;
+		auto same = std::find_if(waiting.begin(), waiting.end(), [&](const Symbol *p_symbol) { return p_symbol->name == p_name; });
+		if (same != waiting.end()) {
+			symbol = *same;
+			waiting.erase(same); // The first written is the first taken: the order they were written in.
+		}
+	}
+	if (!symbol && !tracking_->unused.empty()) {
 		symbol = tracking_->unused.back();
 		tracking_->unused.pop_back();
 		tracking_->counts.reused++;
-	} else {
+	}
+	if (!symbol) {
 		return nullptr;
 	}
 	ClassInfo *klass = symbol->kind == p_kind ? symbol->klass : nullptr;
@@ -69,7 +77,7 @@ void Compilation::retract(Unit &p_unit) {
 		if (!symbol->owner && !symbol->file_private && symbol->package) {
 			remove_definition(symbol);
 		}
-		tracking.retracted[{ &p_unit, symbol->owner, symbol->kind, symbol->name }].push_back(symbol);
+		tracking.retracted[{ &p_unit, symbol->owner, symbol->kind, name_hash(symbol->name) }].push_back(symbol);
 	}
 	p_unit.declared.clear();
 	p_unit.classes.clear();
@@ -110,7 +118,7 @@ void Compilation::retract(Unit &p_unit) {
 		broken ? ++broken_files_ : --broken_files_;
 	}
 	p_unit.broken = broken;
-	p_unit.redeclare = false;
+	p_unit.bodies_only = false;
 	if (broken) {
 		p_unit.diagnostics.mute();
 	}
