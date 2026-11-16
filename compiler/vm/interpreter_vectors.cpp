@@ -45,7 +45,6 @@ void Interpreter::raise_range(double p_index, uint32_t p_length) {
 			"Error #1125: The index " + number_to_string(p_index) + " is out of range " + std::to_string(p_length) + ".");
 }
 
-// Gives the vector the length asked for: elements past it are let go, and new ones are empty.
 // new Array(), Array(n), new Array(a, b): one argument that is a number is the length, which must be a whole
 // number below 2^32 (AS3's RangeError #1005); anything else is the elements.
 void Interpreter::array_new(const Function &p_function, const Instruction &p_in) {
@@ -77,6 +76,7 @@ void Interpreter::array_new(const Function &p_function, const Instruction &p_in)
 	put(Kind::Obj, stack_[base + p_in.a], out);
 }
 
+// Gives the vector the length asked for: elements past it are let go, and new ones are empty.
 bool Interpreter::resize_vector(Vector *p_vector, uint32_t p_length) {
 	if (length_is_fixed(p_vector)) {
 		return false;
