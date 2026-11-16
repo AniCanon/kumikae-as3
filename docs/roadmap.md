@@ -227,7 +227,7 @@ and the elements of Godot's untyped collections.
 
 Open items:
 
-- **The [backlog](backlog.md) is being worked off in full, now:** 24 items, of which 11 wait on the
+- **The [backlog](backlog.md) is being worked off in full, now:** 24 items, of which 12 wait on the
   owner's answer.
 - **Loops:** the cycle collector frees objects that refer to each other in a loop, also through Godot's
   reference-counted objects, their AS3 scripts and listeners, in a short step each frame. A loop through

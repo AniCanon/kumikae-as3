@@ -84,8 +84,11 @@ fields are set on a class's first use, and a call on a null object evaluates its
 The limits of [the C++ guidelines](cpp-guidelines.md) hold and are checked. These are its aims, and what
 the review of the clean-up put off.
 
-- The interpreter makes a new handle for every value Godot gives back, which is most of what a call into
-  Godot now costs. A design change, for the native backend's stage. **clean-up**
+- **decision** The interpreter holds each of Godot's values through a handle. Its memory is now pooled and
+  the names Godot asks a script about are looked up once (the engine benchmark: 44.4 ms, from 90.9), so
+  making and dropping handles is about 12% of a call into Godot, most of it Godot's own destroy of the
+  value. Holding Godot's values inline, with no handle, is a change across `ir`, `vm` and the host; the
+  choice is whether it is worth that now.
 
 ## Stage 2b-3, part C: global functions and errors
 
