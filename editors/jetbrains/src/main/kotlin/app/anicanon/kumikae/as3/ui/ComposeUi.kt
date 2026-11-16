@@ -157,7 +157,27 @@ internal fun StatusLine(text: String, modifier: SwingModifier = SwingModifier, t
             }
         }, modifier = modifier, update = { set(text) { this.text = it } })
     } else {
-        SwingNode(factory = { WrappedNote() }, modifier = modifier, update = { set(text) { this.text = it } })
+        SwingNode(factory = { CenteredNote() }, modifier = modifier, update = { set(text) { note.text = it } })
+    }
+}
+
+/** Holds a note at its wrapped height, centred in a taller row such as one beside a toolbar. */
+private class CenteredNote : JPanel(null) {
+    val note = WrappedNote()
+
+    init {
+        isOpaque = false
+        add(note)
+    }
+
+    override fun getPreferredSize(): Dimension = note.preferredSize
+
+    override fun getMinimumSize(): Dimension = note.minimumSize
+
+    override fun doLayout() {
+        note.setSize(width, note.height)
+        val wanted = minOf(height, note.preferredSize.height)
+        note.setBounds(0, (height - wanted) / 2, width, wanted)
     }
 }
 
