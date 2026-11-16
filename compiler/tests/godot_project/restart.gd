@@ -51,10 +51,12 @@ func _initialize() -> void:
 
 func _process(_delta: float) -> bool:
 	frames += 1
-	# The watch acts on a save by its second look; a scene started again is in a few frames later. Past
-	# these, what was waited for did not happen, and the line that shows it says so.
+	# The watch acts on a save by its second look; a scene started again is in a few frames later, and
+	# ten more looks are many frames. Past these, what was waited for did not happen, and the line that
+	# shows it says so. (Frames alone would not do: many pass between two looks on a machine with nothing
+	# else to do.)
 	var acted := looks() >= mark + 2
-	var late := looks() >= mark + 12 or frames - frame_mark > 2000
+	var late := looks() >= mark + 12
 	if stage == 0 and current_scene and said() == "one":
 		first_id = current_scene.get_instance_id()
 		show("first", said(), "one")

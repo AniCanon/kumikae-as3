@@ -195,7 +195,8 @@ Json::Wrote Json::array(Vector *p_vector) {
 	const uint32_t length = p_vector->length;
 	out_ += '[';
 	for (uint32_t i = 0; i < length; i++) {
-		const Slot each = i < p_vector->length ? vm_.to_any(element, p_vector->data[i]) : any::undefined();
+		// A hole is undefined to a replacer, as to anything that reads it.
+		const Slot each = i < p_vector->length ? vm_.to_any(element, element == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i]) : any::undefined();
 		if (vm_.failing_ || member(i == 0, std::to_string(i), false, each) == Wrote::Failed) {
 			return Wrote::Failed;
 		}

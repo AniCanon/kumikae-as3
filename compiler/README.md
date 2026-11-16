@@ -239,8 +239,9 @@ on a sealed object or a primitive is ReferenceError #1056 and propertyIsEnumerab
 declarations and not run in Flash: a Vector's `join(undefined)` gives "null" between the elements; by name, an
 Array's `toString("x")` is Error #1063 and a Vector's ignores the argument; `"abc".hasOwnProperty("0")` is
 false (String's traits declare no such name); the Vector that `Vector.<T>(x)` makes is not fixed; an
-interface on the right of `instanceof` gives false; Vector.<T>(x) of a sealed object that declares no
-`length` makes an empty one. From recollection, neither read nor run: Date's texts, JSON's error numbers,
+interface on the right of `instanceof` gives false. Not as avmplus would have it: `Vector.<T>(x)` of a
+sealed object that declares no `length` makes an empty Vector, where avmplus's read of `length` is an
+ordinary one (ReferenceError #1069, inferred). From recollection, neither read nor run: Date's texts, JSON's error numbers,
 and the errors of the URI functions.
 
 **An Array's holes** are avmplus's (`core/ArrayObject.cpp`, `ArrayClass.cpp`, read): an index never written

@@ -36,6 +36,11 @@ uint32_t Functions::function_value(Expr *p_expression) {
 	}
 	uint32_t out = l_.reg(Kind::Obj);
 	if (symbol->kind != SymbolKind::Method || symbol->is_static()) {
+		if (symbol->kind == SymbolKind::Method && symbol->owner) {
+			// A static method read is a use of its class, which is set up first, as a call of it sets it up:
+			// the function may be called later from where nothing names the class.
+			l_.touch(symbol->owner, position);
+		}
 		l_.emit(Op::MakeFunction, position, out, function->second, NONE);
 		return out;
 	}

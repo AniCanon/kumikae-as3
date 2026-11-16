@@ -77,6 +77,15 @@ package {
 			trace(2 in held, 3 in held, held.hasOwnProperty(2), held.propertyIsEnumerable(2), held.propertyIsEnumerable(3));
 			var copied:Array = [last[2], last[3]];
 			trace(keys(copied), copied[0] === undefined);
+			// What a replacer is handed for a hole is undefined, and stays so wherever it is put.
+			var handed:Array = [];
+			JSON.stringify(new Array(2), function (p_key:String, p_value:*):* {
+				if (p_key != "") {
+					handed.push(p_value);
+				}
+				return p_value;
+			});
+			trace(keys(handed), handed.length);
 			var typed:Vector.<*> = new Vector.<*>(2);
 			var seen:int = 0;
 			for each (var each:* in typed) {
