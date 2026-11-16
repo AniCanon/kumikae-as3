@@ -162,3 +162,8 @@ with server text is shown. The probe waits for each client's indexing gate befor
 completion; IDEA checks LSP4IJ's readiness in the same UI-thread turn as invocation. Parameter help
 waits for the live template to finish and activates the sandbox before displaying its hint. No fixed
 delay stands in for readiness. It also mounts the panel and writes light/dark images for inspection.
+
+For changes confined to AS3 test integration, use `KUMIKAE_TEST_ACTIONS_PROBE=1` with
+`runIde -PuiProbe` and `runIdea -PuiProbe`. This opens one disposable project and
+checks file/method actions, helper exclusion, the bundled compiler/runner result tree
+and navigation to the actual failing assertion. It skips completion sampling.

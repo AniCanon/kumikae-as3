@@ -49,13 +49,13 @@ package kumikae.testing {
                     test.run();
                 } catch (error:*) {
                     failedCase = true;
-                    errorMessage = error is Error ? (error as Error).message : String(error);
+                    errorMessage = describe(error);
                 }
                 try {
                     test.tearDown();
                 } catch (cleanupError:*) {
                     failedCase = true;
-                    errorMessage += " Cleanup: " + String(cleanupError);
+                    errorMessage += " Cleanup: " + describe(cleanupError);
                 }
                 if (failedCase) {
                     failed++;
@@ -66,6 +66,17 @@ package kumikae.testing {
             emit("suiteFinished", name, "");
             trace("KAS3 SUITE COMPLETE", selected, failed);
             return failed == 0;
+        }
+
+        private function describe(error:*):String {
+            if (error is Error) {
+                var trace:String = (error as Error).getStackTrace();
+                if (trace != null && trace != "") {
+                    return trace;
+                }
+                return (error as Error).message;
+            }
+            return String(error);
         }
 
         private function selectedCase(label:String):Boolean {
