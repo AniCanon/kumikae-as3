@@ -81,6 +81,17 @@ inline void *object_of(const Context *c, Ref p_value) {
 	return c->engine && p_value.handle ? c->engine->object(p_value.handle) : nullptr;
 }
 
+// The script's own Godot object, which a function finds once: it is the same for as long as no script
+// instance has been freed, and is looked up again (null, if it was this one's) when one has.
+inline void *owner_object(const Context *c, Object *p_this, void *&r_found, uint32_t &r_seen) {
+	const uint32_t now = c->freed.load(std::memory_order_relaxed);
+	if (KAS3_UNLIKELY(now != r_seen)) {
+		r_found = object_of(c, field<Ref>(p_this, 0));
+		r_seen = now;
+	}
+	return r_found;
+}
+
 template <typename T>
 struct PartsOf;
 #define KAS3_PARTS(type) \

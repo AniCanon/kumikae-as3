@@ -5,6 +5,7 @@
 #include "any.h"
 #include "runtime.h"
 
+#include <atomic>
 #include <cstdint>
 
 #define KAS3_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
@@ -57,6 +58,10 @@ struct Context {
 	// The engine, where the host has one (runtime/engine.h): its entry points, what the host worked out
 	// for each place the program asks it for something (never null: empty entries with no engine), and
 	// Godot's names for the Strings the program gives where a name is taken, each built once.
+	// How many script instances the engine has freed: a function that keeps its script's own Godot object
+	// looks it up again when this has moved (engine.h, owner_object). Counted from any thread: Godot may
+	// free an object on one of its workers.
+	std::atomic<uint32_t> freed{ 0 };
 	const EngineApi *engine = nullptr;
 	const Resolved *resolved = nullptr;
 	const void *const *names = nullptr;

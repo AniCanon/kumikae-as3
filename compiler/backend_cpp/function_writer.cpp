@@ -290,9 +290,10 @@ std::string FunctionWriter::prologue() const {
 		}
 	}
 	if (has_owner_alias_) {
-		// The script's own Godot object, which lives as long as the script's object does: found once.
-		add("void *const self = object_of(c, field<Ref>(r0, 0));");
-		add("(void)self;");
+		// The script's own Godot object: found once, and again only after the engine has freed a script's.
+		add("void *self = object_of(c, field<Ref>(r0, 0));");
+		add("uint32_t self_seen = c->freed.load(std::memory_order_relaxed);");
+		add("(void)self; (void)self_seen;");
 	}
 	return out;
 }

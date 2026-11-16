@@ -39,6 +39,8 @@ public:
 	NativeProgram &operator=(const NativeProgram &) = delete;
 
 	vm::Interpreter &interpreter() { return *host_->interpreter; }
+	// The engine freed a script instance: generated code that kept an object it found looks again.
+	void instance_freed() { host_->context.freed.fetch_add(1, std::memory_order_relaxed); }
 };
 
 } // namespace kas3

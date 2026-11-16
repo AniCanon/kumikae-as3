@@ -161,7 +161,7 @@ void FunctionWriter::find_aliases() {
 // singleton, asked of the host for any other handle (null for none, or for one Godot has freed).
 std::string FunctionWriter::object_behind(uint32_t p_register) {
 	if (alias_[p_register] == Alias::Owner) {
-		return "self";
+		return "owner_object(c, r0, self, self_seen)";
 	}
 	if (alias_[p_register] == Alias::Singleton) {
 		return "c->resolved[" + std::to_string(singleton_use_[p_register]) + "].object";

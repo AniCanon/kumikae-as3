@@ -112,6 +112,40 @@ package {
 			throw new Error("from the second");
 		}
 
+		// The script's own Godot object is freed in the middle of a method (the killer does it, when asked),
+		// and the method goes on using it: what is asked of it from then on is asked of nothing. From
+		// _process, because Godot refuses to free an object while a call it was asked to make is running.
+		public var killer:Node;
+
+		override public function _process(delta:Number):void {
+			if (killer == null) {
+				return;
+			}
+			var asked:Node = killer;
+			killer = null;
+			var out:Array = [];
+			position = new Vector2(1, 2);
+			out.push(position.x);
+			asked.call("kill");
+			try {
+				out.push(position.x);
+			} catch (e:Error) {
+				out.push("read: " + e.message);
+			}
+			try {
+				rotation = 1;
+				out.push("written");
+			} catch (e:Error) {
+				out.push("write: " + e.message);
+			}
+			try {
+				out.push(isInsideTree());
+			} catch (e:Error) {
+				out.push("call: " + e.message);
+			}
+			asked.call("report", out.join("|"));
+		}
+
 		// An error nothing catches: Godot is told, with the trace, and carries on.
 		public function fail(depth:int):int {
 			if (depth == 0) {
