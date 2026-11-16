@@ -30,6 +30,10 @@ public:
 
 	uint32_t call_result(Symbol *p_function, uint32_t p_position, Kind *r_kind);
 
+	// A conversion written as a call, `int(x)`, or with `new`, `new String(x)`: of the one argument, or
+	// with none the type's empty value (0, false, "").
+	uint32_t conversion_of(const List<Expr *> &p_arguments, Kind p_conversion, uint32_t p_position);
+
 	void constructor_arguments(Symbol *p_class, const List<Expr *> &p_arguments, uint32_t p_position, std::vector<uint32_t> &r_list);
 };
 

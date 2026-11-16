@@ -1,0 +1,8 @@
+x 1.5 true 3 4294967295
+12! null undefined 1,2 2
+false false 0 16 5
+true 0 false 0 0
+true 0 false 0 0
+string number boolean true true
+2 2.5 true 3.5
+in an Object true

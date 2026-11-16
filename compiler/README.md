@@ -115,7 +115,9 @@ Boolean and a String included (`n.toLocaleString()`, `s.hasOwnProperty("length")
 `setPropertyIsEnumerable`, which hides a property of an Object, a Dictionary or an Array from `for in`,
 `for each` and JSON (on a sealed object it is ReferenceError #1056, from recollection of avmplus); a
 number's `toString(radix)`, `toFixed`, `toExponential` and `toPrecision` by name on an untyped value;
-`toLocaleString()` of an Array and a Vector. `RegExp` (literals, `new RegExp`, the flags
+`toLocaleString()` of an Array and a Vector; `new String(x)`, `new Number(x)` and the like, which give the
+value itself (AS3 has no wrapper objects), `String()` and `int()` with nothing to convert, and `Object(x)`
+(the value, or a new Object for null). `RegExp` (literals, `new RegExp`, the flags
 `g i m s x`, its properties, `exec` and `test` with `lastIndex`, which one that is not global keeps, as in
 avmplus) and String's `match`, `search`, `replace` (with `$1`, `$&` and the rest, or a function) and
 `split` by one; `Date`, with the host's clock and zone (its getters and setters, local and UTC, its texts,
