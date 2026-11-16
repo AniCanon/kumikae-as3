@@ -109,7 +109,7 @@ int Interpreter::line_at(size_t p_frame) const {
 bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_count, uint32_t p_result) {
 	const Function &function = module_.functions[p_function];
 	if (frames_.size() >= MAX_FRAMES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 		return false;
 	}
 	Frame frame;
@@ -181,7 +181,7 @@ void Interpreter::pop() {
 // back afterwards.
 bool Interpreter::call_within(uint32_t p_function, const Slot *p_arguments, size_t p_count, Slot *r_result) {
 	if (entries_ >= MAX_ENTRIES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 		return false;
 	}
 	const size_t depth = frames_.size();
@@ -209,7 +209,7 @@ bool Interpreter::call(uint32_t p_function, const Slot *p_arguments, size_t p_co
 	size_t depth = frames_.size();
 	bool ok = false;
 	if (entries_ >= MAX_ENTRIES) {
-		raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+		stack_overflow();
 	} else {
 		entering();
 		entries_++;

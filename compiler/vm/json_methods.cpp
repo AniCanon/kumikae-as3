@@ -16,7 +16,6 @@ namespace {
 
 // avmplus's words, from recollection; ECMAScript names no message.
 constexpr std::string_view PARSE_ERROR = "Error #1132: Invalid JSON parse input.";
-constexpr std::string_view TOO_DEEP = "Error #1023: Stack overflow occurred.";
 
 } // namespace
 
@@ -68,7 +67,7 @@ std::optional<Slot> Json::parse(Slot p_text, Object *p_reviver) {
 		if (fault == json::Fault::Syntax) {
 			vm_.raise(syntax, std::string(PARSE_ERROR));
 		} else if (fault == json::Fault::TooDeep) {
-			vm_.raise(vm_.module_.error_class, std::string(TOO_DEEP));
+			vm_.stack_overflow();
 		}
 		return std::nullopt; // Stopped: the builder raised.
 	}
@@ -182,7 +181,7 @@ std::optional<Slot> Json::walk(Slot p_owned, std::string_view p_name, size_t p_d
 	if (klass && (klass->array || klass->table)) {
 		if (p_depth == json::MAX_DEPTH) {
 			vm_.drop_any(p_owned);
-			vm_.raise(vm_.module_.error_class, std::string(TOO_DEEP));
+			vm_.stack_overflow();
 			return std::nullopt;
 		}
 		std::vector<Interpreter::PropertyKey> keys;

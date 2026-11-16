@@ -149,6 +149,7 @@ private:
 	void raise(uint32_t p_class, const std::string &p_message);
 	Str *stack_text(const Object *p_error, size_t p_skip);
 	void out_of_memory();
+	void stack_overflow(); // AS3's Error #1023: calls, or what they put into words, nest too deep.
 	void throw_new(uint32_t p_class, Str *p_message, std::string_view p_words);
 	// A member of nothing was asked for: AS3's TypeError #1009.
 	void raise_null();
@@ -295,6 +296,10 @@ private:
 			std::vector<double> *r_numbers, std::vector<std::string> *r_texts);
 	bool sort_behavior(const VectorCall &p_call, Object **r_compare, int32_t *r_options);
 	bool vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text);
+	// Vectors put into words inside one another's words (an Array in an Array, or one that holds itself)
+	// nest at most this deep, by recursion in C++; one more is Error #1023, as Flash's stack check gives.
+	static constexpr uint32_t MAX_TEXT_DEPTH = 1000;
+	uint32_t text_depth_ = 0; // How many vector_text() calls are in progress.
 	bool element_text(ir::Kind p_kind, Slot p_element, std::string *r_text);
 	bool object_as_text(Object *p_object, std::string *r_text);
 	void leave_failed_frame(); // A frame the error leaves: its line goes into the trace.

@@ -74,6 +74,10 @@ void Interpreter::raise(uint32_t p_class, const std::string &p_message) {
 }
 
 // Error #1000, with nothing more allocated than the error object itself.
+void Interpreter::stack_overflow() {
+	raise(module_.error_class, "Error #1023: Stack overflow occurred.");
+}
+
 void Interpreter::out_of_memory() {
 	if (failing_) {
 		return;

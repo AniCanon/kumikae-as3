@@ -210,16 +210,21 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 // The elements as text with p_separator between them, as join() and toString() give it. An element that
 // is an object says what it is in its own words, which runs the program: false if that failed.
 bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, std::string *r_text) {
+	if (text_depth_ >= MAX_TEXT_DEPTH) {
+		stack_overflow(); // One that holds itself ends here too: avmplus's join has no guard but the stack's.
+		return false;
+	}
+	text_depth_++;
 	const Kind kind = module_.classes[p_vector->klass].element;
-	for (uint32_t i = 0; i < p_vector->length; i++) {
+	bool done = true;
+	for (uint32_t i = 0; done && i < p_vector->length; i++) {
 		if (i) {
 			append_text(r_text, p_separator); // Text is joined as Concat joins it: two halves that meet are one character.
 		}
-		if (!element_text(kind, p_vector->data[i], r_text)) {
-			return false;
-		}
+		done = element_text(kind, p_vector->data[i], r_text);
 	}
-	return true;
+	text_depth_--;
+	return done;
 }
 
 // One element of a vector of that kind as text, added to r_text. False if what it said failed.

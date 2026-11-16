@@ -18,7 +18,6 @@ namespace {
 // another kind where Flash raises.
 constexpr std::string_view CYCLE = "Error #1129: Cyclic structure cannot be converted to JSON string.";
 constexpr std::string_view BAD_REPLACER = "Error #1131: Replacer argument to JSON stringifier must be an array or a two parameter function.";
-constexpr std::string_view TOO_DEEP = "Error #1023: Stack overflow occurred.";
 constexpr std::string_view ENGINE_VALUE = "JSON.stringify can't write one of Godot's values or objects; convert it to an AS3 value first";
 
 bool is_number(AnyTag p_tag) {
@@ -145,7 +144,7 @@ Json::Wrote Json::container(Object *p_object) {
 		}
 	}
 	if (open_.size() == json::MAX_DEPTH) {
-		vm_.raise(vm_.module_.error_class, std::string(TOO_DEEP));
+		vm_.stack_overflow();
 		return Wrote::Failed;
 	}
 	open_.push_back(p_object);
