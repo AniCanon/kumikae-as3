@@ -216,12 +216,18 @@ bool Interpreter::vector_text(Vector *p_vector, std::string_view p_separator, st
 	}
 	text_depth_++;
 	const Kind kind = module_.classes[p_vector->klass].element;
+	// An Array leaves null and undefined out (avmplus's Array.as, _join: `if (x != null)`, as ECMAScript 3
+	// has it); a Vector writes them as String() does (VectorImpl.as, join: `s += this[y]`).
+	const bool leaves_out = module_.classes[p_vector->klass].array && kind == Kind::Any;
 	bool done = true;
 	for (uint32_t i = 0; done && i < p_vector->length; i++) {
 		if (i) {
 			append_text(r_text, p_separator); // Text is joined as Concat joins it: two halves that meet are one character.
 		}
-		done = element_text(kind, p_vector->data[i], r_text);
+		const AnyTag tag = leaves_out ? any::tag(p_vector->data[i]) : AnyTag::Object;
+		if (tag != AnyTag::Null && tag != AnyTag::Undefined) {
+			done = element_text(kind, p_vector->data[i], r_text);
+		}
 	}
 	text_depth_--;
 	return done;
@@ -249,12 +255,7 @@ bool Interpreter::element_text(Kind p_kind, Slot p_element, std::string *r_text)
 			append_text(r_text, p_element.p ? static_cast<Str *>(p_element.p)->view() : std::string_view("null"));
 			return true;
 		case Kind::Any: {
-			// Null and undefined are left out, as join() leaves them (ECMAScript, and avmplus's generic
-			// join that Vector shares). Held while it speaks, for the reason below.
-			const AnyTag tag = any::tag(p_element);
-			if (tag == AnyTag::Null || tag == AnyTag::Undefined) {
-				return true;
-			}
+			// Held while it speaks, for the reason below.
 			const Slot held = share(Kind::Any, p_element);
 			std::string said;
 			const bool done = any_text(held, &said);
