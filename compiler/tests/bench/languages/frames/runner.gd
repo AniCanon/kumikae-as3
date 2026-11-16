@@ -3,12 +3,14 @@ extends Node
 ## the program is given `--bench`. The benchmark's script is put on a Node2D and left to Godot's frames; what
 ## is timed is each whole frame, after a warm-up.
 ## Usage: <program> --headless --fixed-fps 60 -- --bench=NAME --lang=gd|cs|as [--mode=verify|measure]
-## [--frames=N] [--warmup=N]
+## [--frames=N] [--warmup=N] [--verify-frames=N]
+## With --verify-frames a verify run ends after exactly that many frames, whatever the clock says: two such
+## runs of different lengths give what a frame costs in anything counted for the whole process.
 
 const BENCHES: PackedStringArray = ["empty", "move_nodes", "per_node_process", "ray_queries", "signal_traffic",
 		"nbody", "sieve", "array_conversion", "saxpy", "shapes", "alloc"]
 const LANGS: PackedStringArray = ["gd", "cs", "as"]
-const VERIFY_FRAMES := 10
+var VERIFY_FRAMES := 10
 # Warm-up ends only when BOTH are met. Frames alone are not enough: a benchmark that runs in 0.1 ms would
 # finish 300 frames before .NET has finished optimising its code.
 var WARMUP_FRAMES := 300
@@ -43,6 +45,8 @@ func _ready() -> void:
 			MEASURE_FRAMES = int(arg.trim_prefix("--frames="))
 		elif arg.begins_with("--warmup="):
 			WARMUP_FRAMES = int(arg.trim_prefix("--warmup="))
+		elif arg.begins_with("--verify-frames="):
+			VERIFY_FRAMES = int(arg.trim_prefix("--verify-frames="))
 	if _bench_name == "":
 		_fail("usage: -- --bench=NAME --lang=gd|cs|as --mode=verify|measure")
 		return
