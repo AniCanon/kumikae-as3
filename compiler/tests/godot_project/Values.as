@@ -156,5 +156,20 @@ package {
 		public function mixed(v:Vector2, n:Node):Boolean { return v == 5 || n == "x" || !(v != 5); }
 		public function bigHash(a:GodotArray):Number { return a.hash(); }
 		public function decode(b:PackedByteArray):Number { return b.decodeU32(0); }
+		// Each kind of request worked out once when the program loads: an accessor that serves several
+		// properties, a value's method that takes text, a value type's static method, a value's part.
+		public function anchors(left:Number):Number {
+			var box:Control = new Control();
+			box.anchorLeft = left;
+			box.anchorTop = left * 2;
+			var got:Number = box.anchorLeft + box.anchorTop * 10;
+			box.free();
+			return got;
+		}
+		public function words(list:PackedStringArray, word:String):String { return list.has(word) + " " + Color.html(word).g8; }
+		public function action(name:String):Boolean { return InputMap.hasAction(name) && InputMap.hasAction("ui_accept"); }
+		public function angled(a:Number):Vector2 { return Vector2.fromAngle(a); }
+		public function parts(v:Vector2):Vector2 { var w:Vector2 = v; w.y = w.x * 2; w.x += 1; return w; }
+		public function sameTwice(v:Vector2, n:int):int { var count:int = 0; for (var i:int = 0; i < n; i++) { if (v * 2 == v + v) { count++; } } return count; }
 	}
 }

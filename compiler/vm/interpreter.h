@@ -70,6 +70,10 @@ private:
 	Str *null_text_ = nullptr; // "null"
 	Str *memory_text_ = nullptr; // Error #1000's message, made before memory can run out.
 	std::vector<void *> singletons_; // The engine's singletons, by the engine name of their class, once found.
+	// What the host worked out once for each engine instruction, by function and instruction: see prepare().
+	std::vector<std::vector<const Prepared *>> prepared_;
+	std::vector<OperatorName> operators_; // By engine name: what an operator's entry says, read once.
+	void prepare_engine();
 	std::vector<Object *> lone_functions_; // The one function value of each static function, once made.
 	std::vector<Str *> type_names_; // What typeof gives, made once: see type_name().
 	// The strings of one ASCII character each, made the first time charAt() gives one: a loop over a

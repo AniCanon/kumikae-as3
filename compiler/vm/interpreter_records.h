@@ -76,6 +76,13 @@ struct VectorCall {
 	ir::VectorMethod method;
 };
 
+// An operator an engine instruction names, worked out once from its entry: AS3's spelling ("-" for the
+// description's "unary-"), and whether it compares (== and !=, which take a missing value).
+struct OperatorName {
+	std::string_view spelling;
+	bool compares = false;
+};
+
 // A field sortOn() sorts by, and its options.
 struct SortField {
 	std::string name;

@@ -69,6 +69,24 @@ class GodotHost final : public vm::Output, public vm::EngineHandles, public vm::
 	const Utility *utility(std::string_view p_signature, std::string *r_error);
 	bool call_utility(std::string_view p_signature, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result,
 			vm::Slot *r_result, std::string *r_error);
+	bool call_utility(const Utility &p_function, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error);
+
+public:
+	// An engine instruction worked out once (worked.h): public for the helpers of godot_prepared.cpp.
+	struct Worked;
+
+private:
+	// Each kind of engine instruction worked out once (godot_prepared.cpp), by what it was worked out from.
+	std::unordered_map<std::string, std::unique_ptr<Worked>> worked_;
+	const Worked *keep(std::string p_key, std::unique_ptr<Worked> p_worked);
+	std::unique_ptr<Worked> work_out(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in, std::string *r_key);
+	bool run_operator(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, vm::Slot *r_result);
+	bool run_builtin(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error);
+	bool run_bound(const Worked &p_worked, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error);
+	bool run_field(const Worked &p_worked, const vm::Argument *p_operands, const vm::Wanted &p_result, vm::Slot *r_result, std::string *r_error);
 
 public:
 	GodotHost();
@@ -77,6 +95,11 @@ public:
 	// script on a reference-counted object must not keep that object from being freed. Dropped like any
 	// other handle. Copies of it are ordinary handles.
 	void *borrow(godot::Object *p_object);
+
+	// The engine instructions, worked out once and run (godot_prepared.cpp).
+	[[nodiscard]] const vm::Prepared *prepare(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in) override;
+	[[nodiscard]] bool run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_result, vm::Slot *r_result,
+			std::string *r_error) override;
 
 	void print(std::string_view p_text) override;
 	void error(std::string_view p_text) override;

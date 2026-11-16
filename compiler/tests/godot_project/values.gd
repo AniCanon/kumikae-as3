@@ -172,6 +172,20 @@ func _physics_process(_delta: float) -> bool:
 	show("mixed", ask("mixed", [a, root]), false)
 	show("big hash", ask("bigHash", [[]]), float([].hash()))
 	show("decode", ask("decode", [PackedByteArray([255, 255, 255, 255])]), 4294967295.0)
+	var box := Control.new()
+	box.anchor_left = 0.25
+	box.anchor_top = 0.5
+	show("anchors", ask("anchors", [0.25]), box.anchor_left + box.anchor_top * 10)
+	box.free()
+	show("words", ask("words", [PackedStringArray(["a", "ff8000"]), "ff8000"]), "true " + str(Color.html("ff8000").g8))
+	show("action", ask("action", ["no_such_action"]), InputMap.has_action("no_such_action") and InputMap.has_action("ui_accept"))
+	show("action known", ask("action", ["ui_cancel"]), InputMap.has_action("ui_cancel") and InputMap.has_action("ui_accept"))
+	show("angled", ask("angled", [0.5]), Vector2.from_angle(0.5))
+	var w := a
+	w.y = w.x * 2
+	w.x += 1
+	show("parts", ask("parts", [a]), w)
+	show("same twice", ask("sameTwice", [a, 3]), 3)
 	twin.free()
 	node.queue_free()
 	return true

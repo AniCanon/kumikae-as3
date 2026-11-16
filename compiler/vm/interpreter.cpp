@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include <limits>
 
@@ -36,6 +37,35 @@ Interpreter::Interpreter(const ir::Module &p_module, Host p_host) :
 	globals_.resize(module_.globals.size());
 	for (size_t i = 0; i < globals_.size(); i++) {
 		globals_[i] = empty_value(module_.globals[i].kind == Kind::F64, module_.globals[i].starts_null);
+	}
+	prepare_engine();
+}
+
+// Each engine instruction is worked out by the host once, now, on the thread that loads the program: none
+// is looked up by its name as the program runs. A function with none keeps an empty list.
+void Interpreter::prepare_engine() {
+	operators_.resize(module_.engine_names.size());
+	for (size_t i = 0; i < module_.engine_names.size(); i++) {
+		// The description's names for the unary ones are "unary-" and "unary+".
+		std::string_view spelling = module_.engine_names[i].name;
+		if (spelling.substr(0, 5) == "unary") {
+			spelling.remove_prefix(5);
+		}
+		operators_[i] = OperatorName{ spelling, spelling == "==" || spelling == "!=" };
+	}
+	prepared_.resize(module_.functions.size());
+	for (size_t f = 0; f < module_.functions.size(); f++) {
+		const Function &function = module_.functions[f];
+		for (size_t i = 0; i < function.code.size(); i++) {
+			const char *shape = ir::op_shape(function.code[i].op);
+			if (std::strchr(shape, 'E') == nullptr) {
+				continue;
+			}
+			if (const Prepared *prepared = host_.handles.prepare(module_, function, function.code[i])) {
+				prepared_[f].resize(function.code.size(), nullptr);
+				prepared_[f][i] = prepared;
+			}
+		}
 	}
 }
 

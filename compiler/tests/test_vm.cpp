@@ -1019,6 +1019,87 @@ static void test_engine_statics() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// An engine that works out each operator once, as the program is loaded, and carries out with it what it
+// worked out; one it can't carry out (a value of another type) is left to its requests by name.
+struct PreparingEngine : FakeEngine {
+	struct Worked : vm::Prepared {
+		std::string what;
+	};
+	std::vector<std::unique_ptr<Worked>> worked;
+	int prepared = 0;
+	bool refuse_to_run = false; // Leave every one to the requests by name.
+	[[nodiscard]] const vm::Prepared *prepare(const ir::Module &p_module, const ir::Function &, const ir::Instruction &p_in) override {
+		prepared++;
+		if (p_in.op != ir::Op::HostOperate) {
+			return nullptr;
+		}
+		worked.push_back(std::make_unique<Worked>());
+		worked.back()->what = p_module.engine_names[p_in.b].key;
+		return worked.back().get();
+	}
+	[[nodiscard]] bool run(const vm::Prepared &p_prepared, const vm::Argument *p_operands, size_t p_count, const vm::Wanted &p_wanted, vm::Slot *r_result,
+			std::string *) override {
+		if (refuse_to_run) {
+			return false;
+		}
+		log += "run " + static_cast<const Worked &>(p_prepared).what + " (" + list(p_operands, p_count) + ")\n";
+		give(p_wanted.kind, r_result, 1, "");
+		return true;
+	}
+};
+
+static void test_engine_prepared() {
+	const char *source = "package { import godot.*; public class Mover extends Node2D {\n"
+						 "  public function step(by:Vector2, n:int):Boolean { var v:Vector2 = position + by * n; return v == by; }\n"
+						 "} }\n";
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Mover.as", source);
+	compilation.check();
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	size_t named = 0; // Engine instructions: those that name something of Godot's.
+	for (const ir::Function &function : module.functions) {
+		for (const ir::Instruction &in : function.code) {
+			named += std::strchr(ir::op_shape(in.op), 'E') != nullptr;
+		}
+	}
+	PreparingEngine engine;
+	{
+		vm::Interpreter interpreter(module, engine);
+		// Each was worked out once, when the program was loaded, and none is again as it runs.
+		CHECK_EQ((size_t)engine.prepared, named);
+		CHECK(interpreter.start());
+		uint32_t mover = 0;
+		for (size_t i = 0; i < module.classes.size(); i++) {
+			mover = module.classes[i].name == "Mover" ? (uint32_t)i : mover;
+		}
+		vm::Object *object = interpreter.construct(mover, engine.box());
+		vm::Slot arguments[2];
+		arguments[0].bits = 0;
+		arguments[0].p = engine.box();
+		arguments[1].bits = 0;
+		arguments[1].i = 3;
+		vm::Slot result;
+		for (bool refuse : { false, true }) {
+			engine.refuse_to_run = refuse;
+			engine.log.clear();
+			CHECK(interpreter.call_method(object, "step", arguments, 2, &result));
+			CHECK_EQ((size_t)engine.prepared, named);
+			// What the engine worked out runs, or what it leaves runs by name: never both.
+			CHECK_EQ(engine.log, refuse ? std::string("get #1.position\noperate * (#2, 3) as GodotValue Vector2\noperate + (#6, #7) as GodotValue Vector2\n"
+													  "operate == (#8, #2) as Boolean\n")
+										: std::string("get #1.position\nrun @operator.OP_MULTIPLY (#2, 3)\nrun @operator.OP_ADD (#3, #4)\n"
+													  "run @operator.OP_EQUAL (#5, #2)\n"));
+		}
+		CHECK_EQ(engine.boxes, 2);
+		engine.drop(arguments[0].p);
+		interpreter.release_object(object);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 // Operators on Godot's values are the engine's to carry out.
 static void test_engine_operators() {
 	const char *source = "package { import godot.*; public class Mover extends Node2D {\n"
@@ -2797,6 +2878,7 @@ int main() {
 	test_failed_static_initializer();
 	test_loop_markers();
 	test_engine_calls();
+	test_engine_prepared();
 	test_engine_operators();
 	test_kept_by_the_engine();
 	test_no_engine();

@@ -14,8 +14,21 @@
 namespace kas3 {
 namespace vm {
 
+// What a host worked out once for one engine instruction (an operator found for its operands' types, a
+// method's entry, a constant's value): its own, kept by the host for as long as the host lives.
+struct Prepared {
+	virtual ~Prepared() {}
+};
+
 struct EngineHandles {
 	virtual ~EngineHandles() {}
+	// Asked once for each engine instruction when a program is loaded, before any of it runs: what the host
+	// keeps of it, or null for one it carries out by the requests below each time.
+	[[nodiscard]] virtual const Prepared *prepare(const ir::Module &, const ir::Function &, const ir::Instruction &) { return nullptr; }
+	// Carries out an instruction prepare() worked out: its operands in order (a call's, get's or set's
+	// receiver first, never null), and the result wanted. False with r_error empty: the host can't here (an
+	// operand of another type than prepared for), and the instruction is carried out by the requests below.
+	[[nodiscard]] virtual bool run(const Prepared &, const Argument *, size_t, const Wanted &, Slot *, std::string *) { return false; }
 	// Another handle for the same value (for a value type, a copy of it), and giving one up.
 	[[nodiscard]] virtual void *copy(void *p_value) = 0;
 	virtual void drop(void *p_value) = 0;
