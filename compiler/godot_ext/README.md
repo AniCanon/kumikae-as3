@@ -7,6 +7,7 @@ called by the engine.
 |---|---|
 | `register.cpp`, `language.h` | Entry point; the script language Godot sees |
 | `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
+| `native_program` | The project's program library (the C++ backend's output, built for the project): found, loaded, checked against the scripts as they are, and given what it needs of Godot (method binds, singletons, names, the entry points). The runtime's host then keeps the interpreter everything else here asks (`Project::interpreter()`), with every function's body native |
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
 | `script_call.cpp` | Godot calling a function of a script object (`call_script`): the arguments counted, checked and converted, the result handed back |
 | `counted` | A script object whose Godot object is reference-counted (`counted_on`: a script whose base is Godot's Object, on a RefCounted, too): each lives while AS3 or Godot holds it. A script taken off its object ends the pair: AS3's hold on the Godot object is given back (a last one frees it at the end of the frame), and a script object AS3 still holds lives on alone, its handle on the Godot object keeping nothing |

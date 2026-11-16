@@ -18,6 +18,7 @@ holds every program of `tests/run/` to the same output under both.
 | `function_objects.cpp` | Fields, static fields, classes, jumps, returns and throws |
 | `function_calls.cpp` | Calls: direct, through the class's method table, by interface |
 | `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, Strings, untyped values, properties under a String key, a call through a function value |
+| `function_engine.cpp` | What asks Godot, where generated code does it itself: a `Vector2` held inline and its maths, a property or a method of a Godot object called on bare values by its method bind, the script's own Godot object and singletons borrowed for the whole function |
 | `function_whole.cpp` | A sum of ints or uints converted back to one, as 32-bit arithmetic (exact, and three times as fast on `loop.as`) |
 | `thunks.h`, `thunks.cpp` | The operations left to the library the interpreter has, each one instruction the host carries out |
 | `program_writer.h`, `program_writer.cpp` | `program.h` and the program's table |
@@ -44,6 +45,9 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
 
 ## Rules
 
+- **A value of Godot's with parts is inline only where it can't be null,** and only the operations
+  `function_engine.cpp` lists are done inline; each is in `tests/godot_native/Probe.as`, which Godot runs
+  both ways.
 - **Includes `ir/` only.** No header of `vm/`, `runtime/` or Godot: it writes text. What generated code
   needs from the runtime it names in that text.
 - **Identical to the interpreter, or refused.** A program the backend can't translate exactly is refused
