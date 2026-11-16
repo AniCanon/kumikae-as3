@@ -135,7 +135,11 @@ private:
 	Expr *parse_binary(int p_min_level);
 	Expr *parse_unary();
 	Expr *parse_postfix();
+	Member *parse_member_link(Expr *p_object);
 	Expr *parse_call_member(bool p_allow_calls);
+	Expr *parse_literal_token();
+	Expr *parse_regex();
+	Expr *parse_parenthesized();
 	Expr *parse_primary();
 	Expr *parse_new();
 	Expr *missing_expression();

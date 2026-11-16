@@ -260,6 +260,25 @@ List<Expr *> Parser::parse_arguments(uint32_t *r_height) {
 	return to_list(arguments);
 }
 
+// After the object: `.name`, and the E4X and namespace forms of it, which are reported.
+Member *Parser::parse_member_link(Expr *p_object) {
+	if (at(TokenKind::DotDot)) {
+		error_at(current_.offset, "E4X (XML syntax) is not supported", false);
+	} else if (at(TokenKind::ColonColon)) {
+		error_at(current_.offset, "namespaces are not supported", false);
+	}
+	advance();
+	if (at(TokenKind::At)) {
+		error_at(current_.offset, "E4X (XML syntax) is not supported", false);
+		advance();
+	}
+	Member *member = node<Member>(p_object->offset);
+	member->object = p_object;
+	member->name_offset = current_.offset;
+	member->name = parse_property_name("a property name");
+	return member;
+}
+
 // A primary expression followed by any number of `.name`, `[index]`, `.<Type>` and, if allowed, `(args)`.
 Expr *Parser::parse_call_member(bool p_allow_calls) {
 	Expr *left = parse_primary();
@@ -268,21 +287,7 @@ Expr *Parser::parse_call_member(bool p_allow_calls) {
 		Expr *link = nullptr;
 		uint32_t child_height = 0;
 		if (at(TokenKind::Dot) || at(TokenKind::DotDot) || at(TokenKind::ColonColon)) {
-			if (at(TokenKind::DotDot)) {
-				error_at(current_.offset, "E4X (XML syntax) is not supported", false);
-			} else if (at(TokenKind::ColonColon)) {
-				error_at(current_.offset, "namespaces are not supported", false);
-			}
-			advance();
-			if (at(TokenKind::At)) {
-				error_at(current_.offset, "E4X (XML syntax) is not supported", false);
-				advance();
-			}
-			Member *member = node<Member>(left->offset);
-			member->object = left;
-			member->name_offset = current_.offset;
-			member->name = parse_property_name("a property name");
-			link = member;
+			link = parse_member_link(left);
 		} else if (at(TokenKind::DotLess)) {
 			advance();
 			TypeApply *apply = node<TypeApply>(left->offset);
@@ -374,7 +379,8 @@ Expr *Parser::parse_new() {
 	return finish(create);
 }
 
-Expr *Parser::parse_primary() {
+// A number, a string, `true`, `false` or `null`.
+Expr *Parser::parse_literal_token() {
 	switch (current_.kind) {
 		case TokenKind::Number: {
 			NumberLit *literal = node<NumberLit>(current_.offset);
@@ -384,21 +390,6 @@ Expr *Parser::parse_primary() {
 		}
 		case TokenKind::String: {
 			StringLit *literal = node<StringLit>(current_.offset);
-			literal->text = text(advance());
-			last_height_ = 1;
-			return finish(literal);
-		}
-		case TokenKind::Slash:
-		case TokenKind::SlashAssign: {
-			// Where an expression must begin, a slash starts a regular expression.
-			current_ = lexer_.rescan_as_regex(current_);
-			has_next_ = false;
-			note_current();
-			if (current_.kind != TokenKind::Regex) {
-				advance();
-				return missing_expression();
-			}
-			RegexLit *literal = node<RegexLit>(current_.offset);
 			literal->text = text(advance());
 			last_height_ = 1;
 			return finish(literal);
@@ -413,6 +404,58 @@ Expr *Parser::parse_primary() {
 		case TokenKind::KwNull:
 			last_height_ = 1;
 			return finish(node<NullLit>(advance().offset));
+		default:
+			return missing_expression();
+	}
+}
+
+Expr *Parser::parse_regex() {
+	// Where an expression must begin, a slash starts a regular expression.
+	current_ = lexer_.rescan_as_regex(current_);
+	has_next_ = false;
+	note_current();
+	if (current_.kind != TokenKind::Regex) {
+		advance();
+		return missing_expression();
+	}
+	RegexLit *literal = node<RegexLit>(current_.offset);
+	literal->text = text(advance());
+	last_height_ = 1;
+	return finish(literal);
+}
+
+Expr *Parser::parse_parenthesized() {
+	Token open = advance();
+	Expr *inner;
+	uint32_t height;
+	{
+		Restore allow_in(no_in_, false);
+		Restore brackets(bracket_ends_initializer_, false);
+		inner = parse_expression();
+		height = last_height_;
+	}
+	expect_close(TokenKind::RParen, open);
+	// No node of its own: the inner expression is marked and its range widened to the parentheses.
+	inner->parenthesized = true;
+	inner->offset = open.offset;
+	if (previous_end_ > inner->end) {
+		inner->end = previous_end_;
+	}
+	last_height_ = height;
+	return inner;
+}
+
+Expr *Parser::parse_primary() {
+	switch (current_.kind) {
+		case TokenKind::Slash:
+		case TokenKind::SlashAssign:
+			return parse_regex();
+		case TokenKind::Number:
+		case TokenKind::String:
+		case TokenKind::KwTrue:
+		case TokenKind::KwFalse:
+		case TokenKind::KwNull:
+			return parse_literal_token();
 		case TokenKind::KwThis:
 			last_height_ = 1;
 			return finish(node<ThisExpr>(advance().offset));
@@ -425,26 +468,8 @@ Expr *Parser::parse_primary() {
 			last_height_ = 1;
 			return finish(name);
 		}
-		case TokenKind::LParen: {
-			Token open = advance();
-			Expr *inner;
-			uint32_t height;
-			{
-				Restore allow_in(no_in_, false);
-				Restore brackets(bracket_ends_initializer_, false);
-				inner = parse_expression();
-				height = last_height_;
-			}
-			expect_close(TokenKind::RParen, open);
-			// No node of its own: the inner expression is marked and its range widened to the parentheses.
-			inner->parenthesized = true;
-			inner->offset = open.offset;
-			if (previous_end_ > inner->end) {
-				inner->end = previous_end_;
-			}
-			last_height_ = height;
-			return inner;
-		}
+		case TokenKind::LParen:
+			return parse_parenthesized();
 		case TokenKind::LBracket:
 			return parse_array_literal();
 		case TokenKind::LBrace:
