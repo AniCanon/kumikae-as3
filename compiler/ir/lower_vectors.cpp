@@ -106,7 +106,9 @@ uint32_t Vectors::vector_literal(Expr *p_literal, const List<Expr *> &p_elements
 		const uint32_t where = element ? element->offset : position;
 		uint32_t value = NONE;
 		if (element) {
-			value = l_.expression(element, l_.module_.classes[*klass].element);
+			// Into a Vector.<Object>, undefined is null; an Array's element is untyped and keeps it.
+			const ir::Class &made = l_.module_.classes[*klass];
+			value = made.array ? l_.expression(element, made.element) : l_.typed(element, p_literal->type->element, made.element);
 		} else {
 			value = l_.reg(Kind::Any);
 			l_.emit(Op::AnyConst, where, value, 0);

@@ -110,8 +110,13 @@ uint32_t Vectors::vector_call(Call *p_call) {
 		// concat takes vectors of this very type: one of another, or an Array, is found out as it runs
 		// (AS3's TypeError #1034, as avmplus's castToThisType gives).
 		const bool checked = *method == VectorMethod::Concat && !array && p_call->arguments[i]->type != callee->object->type;
+		// What is stored into a Vector.<Object>, or looked for in one, is an Object's value: undefined is null.
+		const Takes takes = i < fixed.size() ? row->fixed[i].kind : row->rest;
+		const Kind kind = i < fixed.size() ? fixed[i] : *rest;
+		const bool as_object = !array && (takes == Takes::Element || takes == Takes::Sought) && l_.starts_null_type(kind, callee->object->type->element);
 		const uint32_t value = checked ? l_.from_untyped(l_.any_value(p_call->arguments[i]), callee->object->type, Kind::Obj, position)
-									   : l_.expression(p_call->arguments[i], i < fixed.size() ? fixed[i] : *rest);
+							 : as_object ? l_.typed(p_call->arguments[i], callee->object->type->element, kind)
+										 : l_.expression(p_call->arguments[i], kind);
 		list.push_back(l_.settled(value, later, position));
 	}
 	for (size_t i = count; i < fixed.size(); i++) {

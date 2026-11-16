@@ -146,8 +146,8 @@ bool LibraryCall::converted(const Taken *p_fixed, Takes p_takes, size_t p_index,
 		return r_value->p != nullptr;
 	}
 	if (p_takes == Takes::Sought && *r_kind == Kind::Any) {
-		*r_value = vm_.share(Kind::Any, given); // Looked for as it is: nothing is converted.
-		return true;
+		// Looked for as it is: nothing is converted, but for undefined in a Vector.<Object>, which is null.
+		return vm_.from_any(given, Kind::Any, klass && klass->element == Kind::Any ? klass->element_check : NONE, r_value);
 	}
 	uint32_t check = NONE;
 	if (p_takes == Takes::Element) {
