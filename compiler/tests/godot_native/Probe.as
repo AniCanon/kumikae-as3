@@ -8,6 +8,8 @@ package {
 		private var total:Number = 0;
 		private var kept:Vector2 = new Vector2(1.5, -2.25);
 		private var log:Array = [];
+		private var heard:Array = [];
+		[Signal] public var struck:Signal;
 
 		// Every operation generated code does inline on a Vector2, on values a float can't hold exactly,
 		// on large and small ones, and on the zero vector.
@@ -31,6 +33,11 @@ package {
 				walk = walk.normalized() * 3.0;
 			}
 			out.push(walk.x, walk.y, new Vector2(2, 0).x);
+			var part:Vector2 = new Vector2(1, 2);
+			part.x = 0.1;
+			part.y = part.x * 3 - 7.7;
+			part.x += part.y;
+			out.push(part.x, part.y);
 			return out.join(" ");
 		}
 
@@ -80,6 +87,29 @@ package {
 				log.push(e.errorID);
 			}
 			return checksum + " " + total + " " + log.join("|");
+		}
+
+		// Two listeners that both fail: the first one's error comes out of emit(), where it is caught; Godot
+		// goes on to the second all the same, whose error is reported as it ends.
+		public function listeners():String {
+			struck.add(first);
+			struck.add(second);
+			try {
+				struck.emit(3);
+			} catch (e:Error) {
+				heard.push("caught " + e.message);
+			}
+			return heard.join("|");
+		}
+
+		private function first(n:int):void {
+			heard.push("first " + n);
+			throw new Error("from the first");
+		}
+
+		private function second(n:int):void {
+			heard.push("second " + n);
+			throw new Error("from the second");
 		}
 
 		// An error nothing catches: Godot is told, with the trace, and carries on.

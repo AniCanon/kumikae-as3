@@ -80,6 +80,20 @@ struct Host final : vm::NativeCode {
 	size_t trace_lines = 0;
 	uint32_t thrown_function = NONE; // Where the error on its way out was thrown: the trace's first line.
 	uint32_t thrown_line = 0;
+	// An error on its way out, set aside while a function is called from outside all the same (Godot going
+	// on to a signal's next listener after one failed), to be on its way again when that call is over.
+	struct Waiting {
+		Slot error;
+		std::string trace;
+		size_t lines;
+		uint32_t thrown_function;
+		uint32_t thrown_line;
+	};
+	std::vector<Waiting> waiting;
+	// The error now on its way out is of such a call: the interpreter is handed it, and reports it there.
+	bool later = false;
+	void set_aside();
+	void restore();
 	std::vector<KeptTrace> kept;
 	Slot *updated = nullptr; // Where the thunk in progress hands back a register it moved on.
 	bool stopped = false; // The library could not go on (no memory even for an error): it has said why.

@@ -23,6 +23,12 @@ bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, 
 	for (uint32_t i = 0; i < info.parameters; i++) {
 		arguments[i] = p_registers[i];
 	}
+	// Called with an error on its way out already: the engine is going on (a signal's next listener). The
+	// function runs as any other, and its own error, if it has one, is reported where it ends.
+	const bool pending = r_host.context.failing;
+	if (pending) {
+		r_host.set_aside();
+	}
 	Slot result = empty();
 	if (!r_host.set_up_by_library(p_function)) {
 		info.entry(&r_host.context, arguments, p_given, &result);
@@ -30,7 +36,11 @@ bool call_generated(Host &r_host, uint32_t p_function, const Slot *p_registers, 
 	if (r_host.context.failing) {
 		// The error stays the context's. What the interpreter raises in its place only leaves its frames,
 		// as far as the thunk that began this, whose catch finds the context failing and drops it.
+		r_host.later = pending;
 		return false;
+	}
+	if (pending) {
+		r_host.restore();
 	}
 	if (r_result) {
 		*r_result = result;
@@ -85,8 +95,30 @@ bool Host::run_native(uint32_t p_function, uint32_t p_what, uint32_t p_register,
 // With no thunk in progress, the function was called from outside generated code (the engine calling a
 // script, through the interpreter): the error is the interpreter's to carry out and report there. Inside
 // a thunk it stays the context's, which the thunk's caller is waiting to find.
+void Host::set_aside() {
+	waiting.push_back(Waiting{ context.pending, std::move(trace), trace_lines, thrown_function, thrown_line });
+	context.pending = empty();
+	context.failing = false;
+	trace.clear();
+	trace_lines = 0;
+	thrown_function = NONE;
+}
+
+void Host::restore() {
+	Waiting &last = waiting.back();
+	context.pending = last.error;
+	context.failing = true;
+	trace = std::move(last.trace);
+	trace_lines = last.lines;
+	thrown_function = last.thrown_function;
+	thrown_line = last.thrown_line;
+	waiting.pop_back();
+}
+
 bool Host::hand_over(vm::NativeError *r_error) {
-	if (nesting > 0 || !context.failing || stopped || carried) {
+	const bool of_later_call = later;
+	later = false;
+	if ((nesting > 0 && !of_later_call) || !context.failing || stopped || carried) {
 		return false;
 	}
 	r_error->error = context.pending;
@@ -103,6 +135,9 @@ bool Host::hand_over(vm::NativeError *r_error) {
 	trace.clear();
 	trace_lines = 0;
 	thrown_function = NONE;
+	if (of_later_call) {
+		restore(); // The error that was on its way out before this call is again.
+	}
 	return true;
 }
 
