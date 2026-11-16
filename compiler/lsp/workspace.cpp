@@ -483,8 +483,17 @@ Unit *Workspace::unit(const std::string &p_path) {
 
 bool Workspace::settle(const std::function<bool()> &p_yield) {
 	Compilation &compilation = current();
+	// The files open in the editor first, whose errors the person is looking at; then the rest in order.
+	std::vector<Unit *> order;
+	for (const auto &[path, file] : files_) {
+		auto found = file.open ? units_.find(path) : units_.end();
+		if (found != units_.end() && found->second->unchecked) {
+			order.push_back(found->second);
+		}
+	}
+	size_t next = 0;
 	bool done = true;
-	while (Unit *unit = compilation.next_unchecked()) {
+	while (Unit *unit = next < order.size() ? order[next++] : compilation.next_unchecked()) {
 		check_bodies(*unit);
 		if (p_yield()) {
 			done = compilation.next_unchecked() == nullptr;

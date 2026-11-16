@@ -131,7 +131,8 @@ def measure(builds, folder, runs, seconds, mode):
     edited_uri = scenario.edited.as_uri()
     params = {'textDocument': {'uri': uri}, 'position': scenario.position}
     # After an edit, find references waits for every file: the time until the whole program is checked.
-    kinds = ('warm', 'edit', 'burst', 'program')
+    # In recovery the caret is after a dot, where no name is to find references of.
+    kinds = ('warm', 'edit', 'burst') if mode in ('recovery', 'body') else ('warm', 'edit', 'burst', 'program')
     samples = {name: {kind: [] for kind in kinds} for name in builds}
     try:
         for name, build in builds.items():
