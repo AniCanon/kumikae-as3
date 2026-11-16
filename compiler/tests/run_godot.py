@@ -14,6 +14,7 @@ The project is compiler/tests/godot_project: Player.as on a CharacterBody2D sets
 moveAndSlide() for 30 physics frames. At 200 units a second and 60 frames a second that is 100 units.
 """
 import glob
+import hashlib
 import os
 import re
 import shutil
@@ -23,6 +24,15 @@ import tempfile
 
 tests = os.path.abspath(sys.argv[1])
 project = os.path.join(tests, "godot_project")
+# Every build folder's run uses this one project (its .godot folder, the one extension library in its
+# bin): two runs at once would each rewrite what the other is reading. The second waits for the first,
+# on a lock that goes with the process however it ends.
+try:
+    import fcntl
+    held = open(os.path.join(tempfile.gettempdir(), "kas3-godot-" + hashlib.sha256(project.encode()).hexdigest()[:16] + ".lock"), "w")
+    fcntl.flock(held, fcntl.LOCK_EX)
+except ImportError:
+    held = None  # No such lock on this system: runs there are not made side by side.
 godot = os.environ.get("KAS3_GODOT") or shutil.which("godot")
 
 

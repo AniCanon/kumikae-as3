@@ -858,6 +858,10 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   byte-prefix of each corpus file, and each file with one byte missing, through all of them.
 - `tests/test_json.cpp`, `tests/test_workspace.cpp`: the server's JSON module, and the project as files on
   disk with open buffers over them.
+- `tests/test_watch.cpp`: when the extension's watch reads a file again (`godot_ext/watch.h`), with times of the
+  test's own. No test here waits on the wall clock where it can be given one: the limit on a script's time is
+  the host's clock's (`vm::Clock::elapsed`), the programs of `tests/run/` run with no limit, every group has
+  two hours, and the group that runs Godot runs alone and one run at a time over its project.
 - `tests/test_lsp.cpp`: the server driven in process, one message at a time. It also checks that what the
   server publishes for every golden error file is what `kas3c check` prints, and types through each corpus
   file as an editor would.

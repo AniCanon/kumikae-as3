@@ -103,16 +103,12 @@ static std::string wide_object(int p_keys) {
 	return text + ",\"k7\":-1}";
 }
 
-// The best of three reads of the text, in seconds.
+// One read of the text, in seconds.
 static double read_time(const std::string &p_text) {
-	double best = 1e9;
-	for (int run = 0; run < 3; run++) {
-		auto start = std::chrono::steady_clock::now();
-		Json value;
-		CHECK(parse_json(p_text, &value));
-		best = std::min(best, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
-	}
-	return best;
+	auto start = std::chrono::steady_clock::now();
+	Json value;
+	CHECK(parse_json(p_text, &value));
+	return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 }
 
 // A very wide object is read in time proportional to its size, and a key given twice keeps its last value.
@@ -120,8 +116,14 @@ static double read_time(const std::string &p_text) {
 // less than the sixteen times a cost that grows with the square would.
 static void test_wide() {
 	const std::string text = wide_object(200000);
-	const double small = read_time(wide_object(50000));
-	const double large = read_time(text);
+	const std::string quarter = wide_object(50000);
+	// The two are read turn and turn about and the best of each is kept: a machine that is busy for a
+	// while is busy for both, where one timed after the other could meet it alone.
+	double small = 1e9, large = 1e9;
+	for (int round = 0; round < 7; round++) {
+		small = std::min(small, read_time(quarter));
+		large = std::min(large, read_time(text));
+	}
 	CHECK(large < small * 10 + 0.05);
 	Json value;
 	CHECK(parse_json(text, &value));

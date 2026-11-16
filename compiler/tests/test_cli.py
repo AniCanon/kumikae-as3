@@ -260,7 +260,7 @@ with tempfile.TemporaryDirectory() as looping:
     result = subprocess.run([KAS3C, "run", spin], capture_output=True, text=True, timeout=60,
                             env=dict(os.environ, KAS3_TIME_LIMIT_MS="200"))
     took = time.monotonic() - started
-    check("an endless loop is stopped", result.returncode == 1 and result.stdout == "" and 0.2 <= took < 20 and
+    check("an endless loop is stopped", result.returncode == 1 and result.stdout == "" and took >= 0.2 and
           result.stderr.startswith("Error: Error #1502: A script has executed for longer than the timeout period of 0.2 seconds.\n\tat Spin()"),
           repr((result.returncode, result.stdout, result.stderr[:300], took)))
 

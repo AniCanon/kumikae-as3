@@ -89,19 +89,27 @@ static void test_time_limit() {
 		spin = module.classes[i].name == "Spin" ? (uint32_t)i : spin;
 	}
 	{
-		Recorder host;
+		// The time a run has taken is the host's clock's to say: this one moves on ten milliseconds each
+		// time it is asked, so how long the machine really takes changes nothing here.
+		struct Stepping : Recorder, vm::Clock {
+			double at = 0;
+			double now() override { return 0; }
+			double local_offset(double) override { return 0; }
+			double elapsed() override { return at += 10; }
+		};
+		Stepping host;
 		vm::Interpreter interpreter(module, host);
 		interpreter.set_time_limit(50);
 		CHECK(interpreter.start());
 		vm::Object *object = interpreter.construct(spin);
 		for (const char *method : { "forever", "loops", "down", "counting", "empty", "skipping", "caught" }) {
 			host.errors.clear();
-			const auto started = std::chrono::steady_clock::now();
+			const double started = host.at;
 			vm::Slot result;
 			result.bits = 0;
 			CHECK(!interpreter.call_method(object, method, nullptr, 0, &result));
-			const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
-			CHECK(took >= 50 && took < 5000);
+			// Stopped at the first look past the limit: the call began at the first tick after `started`.
+			CHECK_EQ(host.at - started, 70.0);
 			CHECK_EQ(host.errors.substr(0, host.errors.find('\n')),
 					std::string("Error: Error #1502: A script has executed for longer than the timeout period of 0.05 seconds."));
 			CHECK(host.errors.find(std::string("at Spin/") + method + "()") != std::string::npos);

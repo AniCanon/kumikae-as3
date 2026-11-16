@@ -17,7 +17,6 @@
 
 #include <array>
 #include <memory>
-#include <chrono>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -139,7 +138,7 @@ private:
 	void *hook_data_ = nullptr;
 	uint32_t time_limit_ = 0; // In milliseconds; 0 for none.
 	uint32_t countdown_ = STATEMENTS_PER_LOOK; // Statements until the clock is looked at.
-	std::chrono::steady_clock::time_point entered_; // When the call from outside that is running began.
+	double entered_ = 0; // When the call from outside that is running began, on the host's clock (Clock::elapsed).
 	void look_at_clock();
 	void entering(); // A call from outside begins: one that no other is running inside starts the clock.
 

@@ -32,6 +32,10 @@ double SystemClock::now() {
 	return static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(since).count());
 }
 
+double system_elapsed() {
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 double SystemClock::local_offset(double p_utc) {
 	return system_offset(p_utc);
 }
