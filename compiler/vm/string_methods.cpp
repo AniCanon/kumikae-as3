@@ -76,6 +76,20 @@ std::vector<std::string> split_text(std::string_view p_self, bool p_whole, const
 	return pieces;
 }
 
+// substr(start, count), substring(a, b) and slice(start, end), their arguments made whole.
+std::string string_part(StringFunction p_which, std::string_view p_self, uint32_t p_length, double p_first, double p_second) {
+	if (p_which == StringFunction::Substr) {
+		const uint32_t start = from_end(p_first, p_length);
+		return units_between(p_self, start, p_second <= 0 ? start : start + within(p_second, p_length - start));
+	}
+	if (p_which == StringFunction::Substring) {
+		const uint32_t a = within(p_first, p_length), b = within(p_second, p_length);
+		return units_between(p_self, a < b ? a : b, a < b ? b : a);
+	}
+	const uint32_t start = from_end(p_first, p_length), end = from_end(p_second, p_length);
+	return units_between(p_self, start, end > start ? end : start);
+}
+
 constexpr std::string_view URI_FUNCTIONS[] = { "encodeURI", "encodeURIComponent", "decodeURI", "decodeURIComponent" };
 
 } // namespace
@@ -186,20 +200,6 @@ void Interpreter::char_at(StringFunction p_which, std::string_view p_self, uint3
 	} else {
 		assign(Kind::Str, r_out, text(unit ? units_between(p_self, static_cast<uint32_t>(p_at), static_cast<uint32_t>(p_at) + 1) : std::string()));
 	}
-}
-
-// substr(start, count), substring(a, b) and slice(start, end), their arguments made whole.
-std::string Interpreter::string_part(StringFunction p_which, std::string_view p_self, uint32_t p_length, double p_first, double p_second) {
-	if (p_which == StringFunction::Substr) {
-		const uint32_t start = from_end(p_first, p_length);
-		return units_between(p_self, start, p_second <= 0 ? start : start + within(p_second, p_length - start));
-	}
-	if (p_which == StringFunction::Substring) {
-		const uint32_t a = within(p_first, p_length), b = within(p_second, p_length);
-		return units_between(p_self, a < b ? a : b, a < b ? b : a);
-	}
-	const uint32_t start = from_end(p_first, p_length), end = from_end(p_second, p_length);
-	return units_between(p_self, start, end > start ? end : start);
 }
 
 // replace(text, with): AS3 replaces the first match only, with the replacement as it is written. With no

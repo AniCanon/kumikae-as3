@@ -165,7 +165,6 @@ private:
 	void string_call(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void string_method(const ir::Function &p_function, const ir::Instruction &p_in, Slot *p_registers);
 	void char_at(ir::StringFunction p_which, std::string_view p_self, uint32_t p_length, double p_at, Slot &r_out);
-	std::string string_part(ir::StringFunction p_which, std::string_view p_self, uint32_t p_length, double p_first, double p_second);
 	void replace_first(Slot p_string, std::string_view p_self, uint32_t p_length, std::string_view p_pattern, std::string_view p_with, Slot &r_out);
 	void string_split(const ir::Function &p_function, const ir::Instruction &p_in);
 	void uri_function(ir::StringFunction p_which, std::string_view p_text, Slot &r_out);
