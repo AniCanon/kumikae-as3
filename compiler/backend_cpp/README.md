@@ -73,6 +73,9 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   a function that touches that slot, the slot through another register, anything that may run code
   (the library, the engine, letting go of an object), and where the function or an error leaves
   (`tests/run/field_in_loop.as`).
+- An element of a vector of ints or of uints is the number where the vector keeps it, four bytes
+  (`number()`, `number_to_write()`, `number_room()` in `runtime/fast.h`): which a vector is, is read from
+  the kind of the register its element is read into or stored from (`tests/run/vector_narrow.as`).
 - A loop that only does sums and reads and writes elements of vectors of numbers is written twice. The
   first copy (labels `V`) has each vector's length and elements in locals and holds an index against the
   local; an index not below it goes to the same instruction of the second copy (labels `S`), the loop as

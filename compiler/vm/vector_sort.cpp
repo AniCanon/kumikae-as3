@@ -238,12 +238,12 @@ Sorting elements_to_sort(Library &p_library, Vector *p_vector) {
 	const Kind kind = klass.element;
 	Sorting sorting;
 	for (uint32_t i = 0; i < p_vector->length; i++) {
-		if (kind == Kind::Any && any::is_hole(p_vector->data[i])) {
+		if (kind == Kind::Any && any::is_hole(slots_of(p_vector)[i])) {
 			sorting.holes.push_back(i);
 			continue;
 		}
 		Slot element;
-		if (!read_element(p_library, klass, p_vector->data[i], &element)) {
+		if (!read_element(p_library, klass, place(p_vector, i), &element)) {
 			break;
 		}
 		sorting.elements.push_back(element);
@@ -264,10 +264,10 @@ void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, cons
 	} else if (klass.array && (p_options & INDEXED)) {
 		if (Vector *indices = p_library.fresh_vector(p_vector->klass, p_order.size() + p_sorting.holes.size())) {
 			for (uint32_t i = 0; i < p_order.size(); i++) {
-				indices->data[i] = any::integer(static_cast<int32_t>(p_sorting.places[p_order[i]]));
+				slots_of(indices)[i] = any::integer(static_cast<int32_t>(p_sorting.places[p_order[i]]));
 			}
 			for (size_t i = 0; i < p_sorting.holes.size(); i++) {
-				indices->data[p_order.size() + i] = any::integer(static_cast<int32_t>(p_sorting.holes[i]));
+				slots_of(indices)[p_order.size() + i] = any::integer(static_cast<int32_t>(p_sorting.holes[i]));
 			}
 			Slot made;
 			made.bits = 0;
@@ -277,11 +277,11 @@ void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, cons
 		}
 	} else {
 		for (uint32_t i = 0; !p_twins && !(p_options & INDEXED) && i < p_order.size() && i < p_vector->length; i++) {
-			const bool stored = write_element(p_library, klass, p_vector->data[i], p_sorting.elements[p_order[i]]);
+			const bool stored = write_element(p_library, p_vector, i, p_sorting.elements[p_order[i]]);
 			(void)stored; // Each was read out of this vector: there is one to store.
 		}
 		for (uint32_t i = static_cast<uint32_t>(p_order.size()); !p_twins && !(p_options & INDEXED) && !p_sorting.holes.empty() && i < p_vector->length; i++) {
-			p_library.heap.put(kind, p_vector->data[i], any::hole());
+			p_library.heap.put(kind, slots_of(p_vector)[i], any::hole());
 		}
 		const Kind gives = klass.array ? Kind::Any : Kind::Obj;
 		give(p_library, p_call, gives, gives == Kind::Any ? to_any(p_library, Kind::Obj, self) : p_library.heap.share(Kind::Obj, self));
@@ -308,7 +308,7 @@ bool sort_on_fields(Library &p_library, const VectorCall &p_call, std::vector<So
 	};
 	std::vector<Slot> written;
 	if (const Vector *list = array_of(names)) {
-		written.assign(list->data, list->data + list->length);
+		written.assign(slots_of(list), slots_of(list) + list->length);
 	} else {
 		written.push_back(names);
 	}
@@ -322,7 +322,7 @@ bool sort_on_fields(Library &p_library, const VectorCall &p_call, std::vector<So
 	const Vector *each_option = array_of(options);
 	if (each_option && each_option->length == r_fields->size()) {
 		for (uint32_t i = 0; i < each_option->length; i++) {
-			if (!number(each_option->data[i], &(*r_fields)[i].options)) {
+			if (!number(slots_of(each_option)[i], &(*r_fields)[i].options)) {
 				return false;
 			}
 		}

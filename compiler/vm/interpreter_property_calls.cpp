@@ -350,7 +350,7 @@ void Interpreter::property_loop(const Function &p_function, const Instruction &p
 		uint32_t at = 0;
 		for (const Entry &entry : keys ? entries->all() : std::vector<Entry>()) {
 			if (any::tag(entry.key) != AnyTag::Undefined && !entry.hidden) {
-				keys->data[at++] = share(Kind::Any, entry.key);
+				slots_of(keys)[at++] = share(Kind::Any, entry.key);
 			}
 		}
 		if (keys) {
@@ -373,7 +373,7 @@ void Interpreter::property_loop(const Function &p_function, const Instruction &p
 			Str *made = text(number_to_string(cursor - 1));
 			key = made ? any::string(made) : any::undefined();
 		} else if (keys) {
-			key = share(Kind::Any, keys->data[static_cast<uint32_t>(-cursor - 2)]);
+			key = share(Kind::Any, slots_of(keys)[static_cast<uint32_t>(-cursor - 2)]);
 		}
 		put(Kind::Any, r[p_in.a], key);
 		drop_any(holder);
@@ -382,12 +382,12 @@ void Interpreter::property_loop(const Function &p_function, const Instruction &p
 	bool more = false;
 	for (; !more && elements && cursor >= 0 && cursor < elements->length; cursor++) {
 		const uint32_t at = static_cast<uint32_t>(cursor);
-		more = !klass->array || !any::is_hole(elements->data[at]);
+		more = !klass->array || !any::is_hole(slots_of(elements)[at]);
 	}
 	cursor = more ? cursor : cursor >= 0 ? -1 : cursor;
 	const Entries *entries = loop_entries(holder);
 	for (; !more && keys && entries && static_cast<uint32_t>(-cursor - 1) < keys->length; cursor--) {
-		const Slot key = keys->data[static_cast<uint32_t>(-cursor - 1)];
+		const Slot key = slots_of(keys)[static_cast<uint32_t>(-cursor - 1)];
 		more = any::tag(key) == AnyTag::String ? entries->find_text(static_cast<const Str *>(any::pointer(key))->view()).has_value()
 											   : entries->find_object(any::pointer(key)).has_value();
 	}

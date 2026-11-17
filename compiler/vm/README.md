@@ -64,6 +64,15 @@ host differs.
   object, or counts an object's slots (`slots_of()`): a field that comes to take more than one slot changes
   that file and the class's description, and no reader. `slot_at()` (`runtime.h`) is for that file and for
   generated code's own accessor (`runtime/values.h`), which is handed the slot by the generator.
+- **A vector of ints or of uints holds each number in four bytes** (`Vector::narrow`, by the class:
+  `narrow_places()` in `fields.h`), where every other vector's place is a slot of eight: half the memory a
+  loop over one reads, and what Godot's array of 32-bit integers holds, so that one is handed to Godot in
+  one copy. A vector's places are reached as slots (`slots_of()`: an Array's, and any that hold something
+  counted, which are never narrow), as numbers (`numbers_of()`), or as either by `place()` and
+  `set_place()` (`runtime.h`), which is what the library's functions of any vector use; places are moved
+  and emptied by `move_places()` and `clear_places()`, which go by the size. Nothing names the memory
+  itself (`Vector::places`) but those. A place written by its index is `write_element()` and
+  `put_element()`, which take the vector and the index.
 - **A vector of `Vector2`s or of `Vector2i`s holds each value in its place** (`ir::Class::element_bare`,
   `Vector::bare`): eight bytes, never a handle and never null, with nothing to count (`place_kind()` is then a
   kind that counts nothing, which is what moving, copying and letting go of places go by). A value crosses

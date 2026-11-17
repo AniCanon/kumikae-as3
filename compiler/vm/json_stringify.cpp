@@ -56,7 +56,7 @@ bool Json::options(Slot p_replacer, Slot p_space) {
 		listed_ = true;
 		const Vector *keys = static_cast<const Vector *>(replacer);
 		for (uint32_t i = 0; i < keys->length; i++) {
-			const Slot each = keys->data[i];
+			const Slot each = slots_of(keys)[i];
 			const std::optional<std::string> name = any::tag(each) == AnyTag::String || is_number(any::tag(each)) ? any::text(each) : std::nullopt;
 			bool seen = false;
 			for (const std::string &kept : keys_) {
@@ -197,7 +197,7 @@ Json::Wrote Json::array(Vector *p_vector) {
 	for (uint32_t i = 0; i < length; i++) {
 		// A hole is undefined to a replacer, as to anything that reads it.
 		Slot each = any::undefined();
-		if (i < p_vector->length && !element_to_any(vm_.library_, klass, p_vector->data[i], &each)) {
+		if (i < p_vector->length && !element_to_any(vm_.library_, klass, place(p_vector, i), &each)) {
 			return Wrote::Failed;
 		}
 		if (vm_.failing_ || member(i == 0, std::to_string(i), false, each) == Wrote::Failed) {

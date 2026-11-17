@@ -200,7 +200,7 @@ void a_loop_over_a_vector_of_objects_is_written_twice() {
 		return;
 	}
 	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
-	CHECK(has("d2 = static_cast<Vector *>(static_cast<C3_Holder *>(r0)->f0_items)->data;"));
+	CHECK(has("d2 = slots_in(static_cast<C3_Holder *>(r0)->f0_items);"));
 	CHECK(has("r3 = static_cast<Object *>(d2[static_cast<uint32_t>(r1)].p);"));
 	CHECK(has("if (Slot *const e = element(r2, r1)) {")); // The loop as it would be alone, which an index out of range leaves for.
 	CHECK(has("static_cast<C0_Point *>(r3)->f0_x = r4;"));
@@ -481,6 +481,44 @@ void a_receiver_of_no_known_class_is_called_through_the_table() {
 	CHECK(has("(c, r3);\n\tif (KAS3_UNLIKELY(c->failing))"));
 }
 
+// A vector of ints or of uints holds each number in four bytes: an element read into a register of that
+// kind, or stored from one, is read and written as the number where it is, and a loop over such a vector
+// has those numbers in its local. A Number's place is a slot, as every other is.
+void an_int_in_a_vector_is_four_bytes() {
+	using ir::Instruction;
+	using ir::Kind;
+	using ir::Op;
+	// one(v, w): i = 0; x = v[i]; v[i] = x; u = w[i]; w[i] = u; n = w[i]... and a loop: while (i < 3) { v[i] = v[i]; i = i + ... }
+	ir::Module module = module_of({ Kind::Obj, Kind::Obj, Kind::I32, Kind::I32, Kind::U32, Kind::F64, Kind::Bool, Kind::Obj },
+			{ Instruction{ Op::ConstI32, 2, 0, 0, 0 }, Instruction{ Op::VecGet, 3, 0, 2, 0 }, Instruction{ Op::VecSet, 0, 2, 3, 0 },
+					Instruction{ Op::VecGet, 4, 1, 2, 0 }, Instruction{ Op::VecSet, 1, 2, 4, 0 }, Instruction{ Op::VecGet, 5, 7, 2, 0 },
+					Instruction{ Op::VecSet, 7, 2, 5, 0 }, Instruction{ Op::VecCall, ir::NONE, static_cast<uint32_t>(ir::VectorMethod::Push), 0, 0 },
+					Instruction{ Op::EqRef, 6, 0, 1, 0 }, Instruction{ Op::JumpIfNot, 6, 14, 0, 0 }, Instruction{ Op::VecGet, 3, 0, 2, 0 },
+					Instruction{ Op::VecSet, 0, 2, 3, 0 }, Instruction{ Op::Jump, 8, 0, 0, 0 }, Instruction{ Op::Stmt, 0, 0, 0, 0 } });
+	module.functions[0].argument_lists.push_back({ 0, 3 });
+	module.functions[0].parameters = 2;
+	module.functions[0].required = 2;
+	const backend_cpp::Generated made = backend_cpp::generate(module);
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "program.cpp");
+	CHECK(text != nullptr);
+	if (!text) {
+		return;
+	}
+	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
+	CHECK(has("if (const int32_t *const e = number(r0, r2)) {\n\t\tr3 = static_cast<int32_t>(*e);"));
+	CHECK(has("if (int32_t *const e = number_to_write(c, r0, r2)) {\n\t\t*e = static_cast<int32_t>(r3);"));
+	CHECK(has("r4 = static_cast<uint32_t>(*e);"));
+	CHECK(has("if (int32_t *const e = number_to_write(c, r1, r2)) {\n\t\t*e = static_cast<int32_t>(r4);"));
+	CHECK(has("if (Slot *const e = element(r7, r2)) {")); // A Number's place is a slot.
+	CHECK(has("if (int32_t *const e = number_room(r0)) {\n\t\t*e = static_cast<int32_t>(r3);"));
+	// The loop: the numbers in a local, found only in a vector whose places are numbers.
+	CHECK(has("int32_t *d0 = nullptr;"));
+	CHECK(has("d0 = numbers_in(r0);"));
+	CHECK(has("r3 = static_cast<int32_t>(d0[static_cast<uint32_t>(r2)]);"));
+	CHECK(has("d0[static_cast<uint32_t>(r2)] = static_cast<int32_t>(r3);"));
+}
+
 int main() {
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
@@ -496,5 +534,6 @@ int main() {
 	a_field_written_through_any_object_may_be_the_callers();
 	a_method_nothing_overrides_is_called_by_name();
 	a_receiver_of_no_known_class_is_called_through_the_table();
+	an_int_in_a_vector_is_four_bytes();
 	return check::finish();
 }

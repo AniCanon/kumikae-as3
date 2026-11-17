@@ -129,17 +129,23 @@ bool vector_set_length(Library &p_library, Vector *p_vector, uint32_t p_length);
 // hole as undefined, a counted value counted once more, and one of Godot's values that the place holds whole
 // (ir::Class::element_bare) as a new handle on a copy of it. False, with the error raised, where the engine
 // can make no handle.
+// p_place is the place as a slot holds it (place(), runtime.h).
 [[nodiscard]] bool read_element(Library &p_library, const ir::Class &p_class, Slot p_place, Slot *r_value);
-// A value of the element's kind stored in a place of the vector. write_element() takes a reference of its
-// own to a value that stays the caller's; put_element() takes the caller's over. What the place held is let
-// go of. False, with AS3's TypeError #1034 raised and the place as it was, for no value (null) where the
-// place holds one whole; put_element() has let go of what it was given all the same.
-[[nodiscard]] bool write_element(Library &p_library, const ir::Class &p_class, Slot &r_place, Slot p_value);
-[[nodiscard]] bool put_element(Library &p_library, const ir::Class &p_class, Slot &r_place, Slot p_owned);
+// A value of the element's kind stored in a place of the vector, by the place's index (which is one the
+// vector has). write_element() takes a reference of its own to a value that stays the caller's;
+// put_element() takes the caller's over. What the place held is let go of. False, with AS3's TypeError
+// #1034 raised and the place as it was, for no value (null) where the place holds one whole;
+// put_element() has let go of what it was given all the same.
+[[nodiscard]] bool write_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_value);
+[[nodiscard]] bool put_element(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_owned);
+// What a place that holds nothing yet comes to hold for a value of the element's kind, with a reference of
+// its own where one is counted: for set_place(), once every value to be stored has passed. False, with
+// TypeError #1034 raised, for no value where a place holds one whole.
+[[nodiscard]] bool place_for(Library &p_library, const ir::Class &p_class, Slot p_value, Slot *r_place);
 // The same of an untyped value: what a place holds as one with a reference of its own, and one stored into
 // a place as a store into the vector converts it (from_any(), by the class's check). False if it raised.
 [[nodiscard]] bool element_to_any(Library &p_library, const ir::Class &p_class, Slot p_place, Slot *r_any);
-[[nodiscard]] bool element_from_any(Library &p_library, const ir::Class &p_class, Slot p_any, Slot &r_place);
+[[nodiscard]] bool element_from_any(Library &p_library, Vector *p_vector, uint32_t p_index, Slot p_any);
 // A new vector of a length, each place at its type's zero; a new Array as `new Array(...)` reads what it
 // is given. Null if it raised.
 Vector *vector_new(Library &p_library, uint32_t p_class, uint32_t p_length, bool p_fixed);

@@ -35,6 +35,12 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
   today slot and field number are the same, one slot a field. A class is a C++ struct deriving from `Object` (or from its base's
   struct), and a descriptor (`ClassInfo`): name, base, a hash of its layout, each field's name, kind and
   offset, its method table by method number. The host reads descriptors, never C++ types.
+- **A vector's places** are slots, but in a vector of ints or of uints, where each is the four bytes of the
+  number (`vm/README.md`). Generated code reads and writes a place by the kind of the element's register,
+  which is the kind the vector's class holds: `element()` for a slot, `number()` for a number
+  (`fast.h`), and each gives nothing for a vector of the other sort, which is then the library's like
+  any other unusual case. A loop that keeps a vector's places in a local takes them by `slots_in()` or
+  `numbers_in()`, which give none for the other sort either.
 - **Counts** change only in `retain(c, x)` and `release(c, x)` (`values.h`).
 - **Objects of numbers and Booleans** that the collector does not look at are not given back to the heap
   when generated code lets go of the last reference: `release()` keeps the block on a list for its number of

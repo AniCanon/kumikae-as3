@@ -37,8 +37,8 @@ bool Interpreter::method_value(Slot p_holder, std::string_view p_name, Slot *r_v
 		}
 		return false;
 	}
-	bound->data[0] = share(Kind::Any, p_holder);
-	bound->data[1] = any::string(name);
+	slots_of(bound)[0] = share(Kind::Any, p_holder);
+	slots_of(bound)[1] = any::string(name);
 	Object *made = make_function(module_.library_function, bound);
 	release_object(bound); // The function holds it now.
 	*r_value = made ? any::object(made) : any::undefined();
@@ -51,11 +51,11 @@ void Interpreter::call_library(const ir::Instruction &p_in) {
 	const Vector *bound = static_cast<const Vector *>(stack_[base + p_in.b].p);
 	const Vector *rest = static_cast<const Vector *>(stack_[base + p_in.c].p);
 	put(Kind::Any, stack_[base + p_in.a], any::undefined());
-	const Slot holder = share(Kind::Any, bound->data[0]);
-	const Slot name = share(Kind::Any, bound->data[1]);
+	const Slot holder = share(Kind::Any, slots_of(bound)[0]);
+	const Slot name = share(Kind::Any, slots_of(bound)[1]);
 	SpareSlots given(spare_slots_);
 	for (uint32_t i = 0; rest && i < rest->length; i++) {
-		given->push_back(share(Kind::Any, rest->data[i]));
+		given->push_back(share(Kind::Any, slots_of(rest)[i]));
 	}
 	PropertyKey key;
 	if (property_key(holder, name, &key)) {
@@ -287,7 +287,7 @@ void LibraryCall::each() {
 		}
 		// The element as it is now: what the function does to the vector does not change what filter keeps.
 		Slot element = any::undefined();
-		if (at < vector->length && !read_element(vm_.library_, klass, vector->data[at], &element)) {
+		if (at < vector->length && !read_element(vm_.library_, klass, place(vector, at), &element)) {
 			ok = false;
 			break;
 		}
@@ -300,21 +300,21 @@ void LibraryCall::each() {
 		if (ok && which == EachMethod::Map && klass.array) {
 			ok = vm_.resize_vector(made, made->length + 1);
 			if (ok) {
-				made->data[made->length - 1] = vm_.share(Kind::Any, *answer);
+				slots_of(made)[made->length - 1] = vm_.share(Kind::Any, *answer);
 			}
 		} else if (ok && which == EachMethod::Map) {
 			Slot value;
 			value.bits = 0;
 			ok = vm_.from_any(*answer, klass.element, klass.element_check, &value);
 			if (ok && at < made->length) {
-				ok = put_element(vm_.library_, klass, made->data[at], value);
+				ok = put_element(vm_.library_, made, at, value);
 			} else if (ok) {
 				vm_.drop(klass.element, value);
 			}
 		} else if (ok && which == EachMethod::Filter && yes) {
 			ok = vm_.resize_vector(made, made->length + 1);
 			if (ok) {
-				ok = write_element(vm_.library_, klass, made->data[made->length - 1], element);
+				ok = write_element(vm_.library_, made, made->length - 1, element);
 			}
 		} else if (ok && (which == EachMethod::Some || which == EachMethod::Every) && yes == (which == EachMethod::Some)) {
 			answer_all = which == EachMethod::Some;
@@ -359,7 +359,7 @@ void LibraryCall::invoke() {
 		}
 		const Vector *array = static_cast<const Vector *>(list);
 		for (uint32_t i = 0; i < array->length; i++) {
-			arguments.push_back(vm_.share(Kind::Any, any::filled(array->data[i])));
+			arguments.push_back(vm_.share(Kind::Any, any::filled(slots_of(array)[i])));
 		}
 	}
 	vm_.call_with(target, first, arguments, out_);

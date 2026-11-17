@@ -13,14 +13,31 @@ namespace kas3 {
 namespace rt {
 
 // A vector's element by an int or a uint index, if the index names one: nothing for no vector, a negative
-// index or one past the end.
-inline Slot *element(Object *p_vector, int32_t p_index) {
-	Vector *const vector = static_cast<Vector *>(p_vector);
-	return vector && static_cast<uint32_t>(p_index) < vector->length ? vector->data + static_cast<uint32_t>(p_index) : nullptr;
-}
+// index or one past the end. And nothing for a vector whose places are not what the code that asks reads
+// and writes there: element() is for places that are slots, number() for the four bytes of an int or a
+// uint (Vector::narrow). Generated code asks by the kind of the element's register, which is the kind
+// the vector's class holds; a vector of the other sort is the library's all the same.
 inline Slot *element(Object *p_vector, uint32_t p_index) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
-	return vector && p_index < vector->length ? vector->data + p_index : nullptr;
+	return vector && !vector->narrow && p_index < vector->length ? vm::slots_of(vector) + p_index : nullptr;
+}
+inline Slot *element(Object *p_vector, int32_t p_index) {
+	return element(p_vector, static_cast<uint32_t>(p_index));
+}
+inline int32_t *number(Object *p_vector, uint32_t p_index) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	return vector && vector->narrow && p_index < vector->length ? vm::numbers_of(vector) + p_index : nullptr;
+}
+inline int32_t *number(Object *p_vector, int32_t p_index) {
+	return number(p_vector, static_cast<uint32_t>(p_index));
+}
+// The places of a vector, for a loop that keeps them in a local: nothing for no vector, and for one whose
+// places are of the other sort.
+inline Slot *slots_in(Object *p_vector) {
+	return p_vector && !static_cast<Vector *>(p_vector)->narrow ? vm::slots_of(static_cast<Vector *>(p_vector)) : nullptr;
+}
+inline int32_t *numbers_in(Object *p_vector) {
+	return p_vector && static_cast<Vector *>(p_vector)->narrow ? vm::numbers_of(static_cast<Vector *>(p_vector)) : nullptr;
 }
 
 // The vector, if its places hold what the code that asks reads and writes there: one of Godot's values
@@ -59,22 +76,40 @@ inline Object *made_object(Context *c, uint32_t p_class) {
 
 // The element VecSet writes: one there already is, or the one just past the end of a vector that may grow,
 // which is added (empty). Nothing for any other index, a fixed vector or no memory.
-//     Slot *element_added(Object *p_vector, uint32_t p_index);
+//     void *element_added(Object *p_vector, uint32_t p_index);
 inline Slot *element_to_write(Context *c, Object *p_vector, uint32_t p_index) {
-	Slot *const there = element(p_vector, p_index);
-	return there ? there : element_added(c, p_vector, p_index);
+	if (Slot *const there = element(p_vector, p_index)) {
+		return there;
+	}
+	return p_vector && !static_cast<Vector *>(p_vector)->narrow ? static_cast<Slot *>(element_added(c, p_vector, p_index)) : nullptr;
 }
 inline Slot *element_to_write(Context *c, Object *p_vector, int32_t p_index) {
 	return p_index < 0 ? nullptr : element_to_write(c, p_vector, static_cast<uint32_t>(p_index));
+}
+inline int32_t *number_to_write(Context *c, Object *p_vector, uint32_t p_index) {
+	if (int32_t *const there = number(p_vector, p_index)) {
+		return there;
+	}
+	return p_vector && static_cast<Vector *>(p_vector)->narrow ? static_cast<int32_t *>(element_added(c, p_vector, p_index)) : nullptr;
+}
+inline int32_t *number_to_write(Context *c, Object *p_vector, int32_t p_index) {
+	return p_index < 0 ? nullptr : number_to_write(c, p_vector, static_cast<uint32_t>(p_index));
 }
 
 // Where push() of one value writes it, in a vector with room for one more: the room past a vector's end is
 // empty, so nothing is let go of there, and whoever writes it then counts the element in (`length`).
 // Nothing for no vector, a fixed one, or one that must grow first: the library's.
+inline bool has_room(const Vector *p_vector) {
+	return p_vector && !p_vector->fixed && p_vector->length < p_vector->capacity && p_vector->length < vm::MAX_VECTOR_LENGTH;
+}
 inline Slot *push_room(Object *p_vector) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
-	const bool room = vector && !vector->fixed && vector->length < vector->capacity && vector->length < vm::MAX_VECTOR_LENGTH;
-	return KAS3_LIKELY(room) ? vector->data + vector->length : nullptr;
+	return KAS3_LIKELY(has_room(vector) && !vector->narrow) ? vm::slots_of(vector) + vector->length : nullptr;
+}
+// The same in a vector of ints or of uints.
+inline int32_t *number_room(Object *p_vector) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	return KAS3_LIKELY(has_room(vector) && vector->narrow) ? vm::numbers_of(vector) + vector->length : nullptr;
 }
 
 // What holds a property, and a key that is a String: null for a register that holds anything else.

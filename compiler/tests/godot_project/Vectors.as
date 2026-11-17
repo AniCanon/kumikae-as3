@@ -28,6 +28,18 @@ package {
 			corners[0] = 3;
 			target.addPolygon(corners);
 		}
+		// A vector of ints is what Godot's array of 32-bit integers holds, and goes to it as it is; a vector
+		// of uints goes number by number, each of which must fit.
+		public function wholes(target:NavigationPolygon, keeper:Node):void {
+			var many:Vector.<int> = new <int>[7, -1, 2147483647, -2147483648, 0];
+			many.push(12);
+			many.unshift(-9);
+			target.addPolygon(many);
+			target.addPolygon(new <uint>[5, 6, 2147483647]);
+			target.addPolygon(new Vector.<int>());
+			keeper.setMeta("unsigned", new <uint>[4000000000, 1]);
+		}
+		public function unsignedTooBig(target:NavigationPolygon):void { target.addPolygon(new <uint>[1, 3000000000]); }
 		public function remember(target:Node, a:Node, b:Node):void {
 			target.setMeta("whole", new <int>[1, -2, 3]);
 			target.setMeta("fractions", new <Number>[0.5, 2]);

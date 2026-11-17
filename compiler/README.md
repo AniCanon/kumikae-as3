@@ -527,6 +527,11 @@ package {
   when no value is written, as in GDScript. `null` can still be assigned. Any other Godot value (an array,
   a signal) starts missing. So does each place of a vector of one: `new Vector.<Vector2>(3)` holds three
   zero vectors, as a C# array of structs does, and setting a longer `length` adds zeroes.
+- A place of a `Vector.<int>` or of a `Vector.<uint>` is the number itself, four bytes, as an element of
+  a C# `int[]` is, under the interpreter and in native code alike: a loop over one reads half the memory
+  it did, and a `Vector.<int>` handed to Godot where it takes a `PackedInt32Array` is copied in one go.
+  Nothing a program can see has changed. A `Vector.<Number>` holds eight bytes for each, and a
+  `Vector.<Boolean>` still does too.
 - A place of a `Vector.<Vector2>` or of a `Vector.<Vector2i>` holds the value itself, eight bytes, as an
   element of a packed array or of a C# array does, under the interpreter and in native code alike. It is
   never null. `null` written where an element goes (`v[0] = null`, an argument of `push()`, `unshift()`,

@@ -106,7 +106,7 @@ bool Json::add(Slot p_owned) {
 			vm_.out_of_memory();
 			return false;
 		}
-		array->data[array->length++] = p_owned;
+		slots_of(array)[array->length++] = p_owned;
 		return true;
 	}
 	Interpreter::PropertyKey key;
@@ -203,7 +203,7 @@ std::optional<Slot> Json::walk(Slot p_owned, std::string_view p_name, size_t p_d
 			Slot member = any::undefined();
 			if (klass->array) {
 				Vector *array = static_cast<Vector *>(object);
-				member = *key.index < array->length ? vm_.share(Kind::Any, any::filled(array->data[*key.index])) : any::undefined();
+				member = *key.index < array->length ? vm_.share(Kind::Any, any::filled(slots_of(array)[*key.index])) : any::undefined();
 			} else if (const std::optional<uint32_t> at = vm_.entry_of(entries_of(object), key)) {
 				member = vm_.share(Kind::Any, entries_of(object)->value_at(*at));
 			}

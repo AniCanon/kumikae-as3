@@ -185,7 +185,7 @@ Object *Reload::moved_vector(Vector *p_old, uint32_t p_class) {
 	moved_.emplace(p_old, vector);
 	retain(vector);
 	for (uint32_t i = 0; i < p_old->length; i++) {
-		vector->data[i] = carry(place_kind(new_class), p_old->data[i]);
+		set_place(vector, i, carry(place_kind(new_class), place(p_old, i)));
 	}
 	Entries *properties = p_old->properties && p_old->properties->size() ? properties_of(vector) : nullptr;
 	if (properties) {

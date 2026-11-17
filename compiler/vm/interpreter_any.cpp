@@ -46,7 +46,7 @@ Vector *Interpreter::array_of_engine(void *p_array, uint32_t p_class) {
 		key.kind = Kind::I64;
 		key.slot.bits = 0;
 		key.slot.l = i;
-		if (!host_.handles.index_get(p_array, key, untyped, &made->data[i], &error)) {
+		if (!host_.handles.index_get(p_array, key, untyped, &slots_of(made)[i], &error)) {
 			release_object(made);
 			raise(module_.error_class, error);
 			return nullptr;

@@ -534,11 +534,13 @@ check("a getter's error is reported as a script's own", re.search(r"SCRIPT ERROR
 # AS3's vectors handed to Godot: packed arrays by the element's type, arrays for the rest.
 output = compare("vectors.gd", [
     "points", "points type", "hull", "bytes", "empty", "too big for a byte", "below a byte", "offsets", "colors", "filters",
-    "polygons", "whole", "whole are integers", "fractions", "fractions are floats", "words", "flags", "nodes", "wide",
+    "polygons", "wholes", "unsigned", "an unsigned too big for 32 bits", "whole", "whole are integers", "fractions", "fractions are floats", "words", "flags", "nodes", "wide",
     "keep", "spread", "moved", "words of values", "forget", "array to Godot", "array from Godot", "Godot's array as an Array", "made a node", "the node is in the tree", "made a resource", "no vector", "no vector where Godot takes points",
     "added to while it is shortened", "what it let go of is freed, what was added is held", "and let go of in the end",
 ])
 check("vectors.gd: no vector where Godot takes a packed array is an AS3 error", "at Vectors/noPoints()" in output, output[-1500:])
+check("vectors.gd: a uint that does not fit 32 bits is an AS3 error that says so",
+      "3000000000 does not fit a 32-bit integer" in output and "at Vectors/unsignedTooBig()" in output, output[-1500:])
 check("vectors.gd: a value that does not fit a byte is an AS3 error that says so",
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
 
