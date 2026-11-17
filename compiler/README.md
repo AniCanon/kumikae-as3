@@ -451,10 +451,11 @@ through it:
 - **A build that fails** is never the scripts' mistake: one warning says where the compiler's output is,
   the interpreter runs the scripts, and the same build is not tried again (taking `.godot/kas3` away
   tries everything again). A library that can't be loaded is refused with why, as one given by hand is.
-- **The switch.** The project setting `actionscript/native/play` (on where it is not set) and the
-  environment's `KAS3_NATIVE_PLAY` (`0` against, `1` for), whose word is over the setting's. It is on by
-  default because native code is what a person should get first: it is level with or ahead of Godot C# on
-  every benchmark, where the interpreter is tens of times behind on a script's own code.
+- **The switch.** The project setting `actionscript/native/play` (off where it is not set) and the
+  environment's `KAS3_NATIVE_PLAY` (`0` against, `1` for), whose word is over the setting's. It is off by
+  default for now: an edit made while a game runs as native code moves the game onto the interpreter, and
+  the objects made before are not updated in place, so hot reload is weaker than under the interpreter.
+  It turns on by default when a reload is whole under native code.
 - **An edit while the game runs.** Native code is not reloaded into a running game yet. A game that runs
   as native code is moved onto the interpreter by the first edit, with everything it holds (its script
   objects, their fields, static fields, listeners: the objects are laid out the same under both, and the

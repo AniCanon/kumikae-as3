@@ -87,7 +87,9 @@ whose constructor can't be rerun, the interpreter keeps the first values too, an
 
 ## Limits
 
-- **Native code isn't reloaded yet.** Hot reload is a feature of the interpreter.
+- **Native code isn't reloaded yet.** Hot reload is a feature of the interpreter. If you edit a script
+  while the game runs as native code, the game moves onto the interpreter with its state, and reloads work
+  from there. Objects created before that move aren't updated in place.
 - **A real phone can't see the folder you edit.** Reload works in the iOS Simulator, which shares your
   disk. Sending edits to a device is planned.
 - **Removing a class that still has live objects stops the reload.** Godot tells you to restart.
