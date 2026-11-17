@@ -215,14 +215,25 @@ std::string FunctionWriter::fast_copy(const Twice &p_loop, const std::vector<boo
 	std::string missing;
 	std::string places;
 	std::string lengths;
+	std::vector<std::pair<std::string, std::string>> found; // What holds a vector, and the number of the first register it was read for.
 	for (uint32_t each : p_loop.vectors) {
 		const std::string number = std::to_string(each);
 		// A register that borrows a field may not have been read into yet: the field itself is what it will hold.
-		const std::string held = borrowed_[each] != NONE ? own_field(borrowed_[each]) : register_name(each);
+		const std::string held = (borrowed_[each] != NONE ? own_field(borrowed_[each]) : register_name(each)) + (narrow_vector(each) ? "/n" : "/s");
+		// Two registers read from one field hold one vector: the second's places are the first's, said so
+		// that the C++ compiler knows them for the same memory (`y[i] = a * x[i] + y[i]` reads `y` twice).
+		const auto same = std::find_if(found.begin(), found.end(), [&](const auto &p_each) { return p_each.first == held; });
+		if (same != found.end()) {
+			places += "\td" + number + " = d" + same->second + ";\n";
+			lengths += "\tn" + number + " = n" + same->second + ";\n";
+			continue;
+		}
+		found.emplace_back(held, number);
+		const std::string vector = held.substr(0, held.size() - 2);
 		// No places: no vector, one with no room yet, or one whose places are not what the loop reads there.
-		places += "\td" + number + " = " + (narrow_vector(each) ? "numbers_in(" : "slots_in(") + held + ");\n";
+		places += "\td" + number + " = " + (narrow_vector(each) ? "numbers_in(" : "slots_in(") + vector + ");\n";
 		missing += (missing.empty() ? "!d" : " || !d") + number;
-		lengths += "\tn" + number + " = static_cast<Vector *>(" + held + ")->length;\n";
+		lengths += "\tn" + number + " = static_cast<Vector *>(" + vector + ")->length;\n";
 	}
 	std::string out = places + "\tif (KAS3_UNLIKELY(" + missing + ")) goto L" + std::to_string(p_loop.from) + ";\n" + lengths;
 	const uint32_t resume = pc_;

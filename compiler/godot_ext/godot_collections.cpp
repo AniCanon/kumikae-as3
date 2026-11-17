@@ -218,8 +218,9 @@ bool whole_numbers(ir::Kind p_kind, const vm::Vector *p_vector, int64_t p_least,
 		*r_made = packed;
 		return true;
 	}
+	const vm::Slot *const slots = p_vector->narrow ? nullptr : vm::slots_of(p_vector);
 	for (size_t i = 0; i < p_count; i++) {
-		const Variant value = to_variant(p_kind, vm::place(p_vector, i));
+		const Variant value = to_variant(p_kind, slots ? slots[i] : vm::place(p_vector, i));
 		if (value.get_type() != Variant::INT) {
 			*r_error = "element " + std::to_string(i) + " of the Vector is not a whole number, and Godot takes " + std::string(p_holds) + " here";
 			return false;
@@ -242,8 +243,9 @@ bool values_of(ir::Kind p_kind, const vm::Vector *p_vector, Variant::Type p_type
 	const size_t p_count = p_vector->length;
 	Packed packed;
 	packed.resize(static_cast<int64_t>(p_count));
+	const vm::Slot *const slots = p_vector->narrow ? nullptr : vm::slots_of(p_vector);
 	for (size_t i = 0; i < p_count; i++) {
-		const Variant value = to_variant(p_kind, vm::place(p_vector, i));
+		const Variant value = to_variant(p_kind, slots ? slots[i] : vm::place(p_vector, i));
 		const bool missing_text = p_type == Variant::STRING && p_kind == ir::Kind::Str && value.get_type() == Variant::NIL;
 		if (value.get_type() != p_type && value.get_type() != p_also && !missing_text) {
 			*r_error = "element " + std::to_string(i) + " of the Vector is " + (value.get_type() == Variant::NIL ? std::string("null") : std::string("of another type")) +

@@ -13,13 +13,18 @@ namespace kas3 {
 namespace rt {
 
 // A vector's element by an int or a uint index, if the index names one: nothing for no vector, a negative
-// index or one past the end. And nothing for a vector whose places are not what the code that asks reads
-// and writes there: element() is for places that are slots, number() for the four bytes of an int or a
-// uint (Vector::narrow). Generated code asks by the kind of the element's register, which is the kind
-// the vector's class holds; a vector of the other sort is the library's all the same.
+// index or one past the end. element() is for places that are slots, number() for the four bytes of an int
+// or a uint (Vector::narrow). Which a vector's are is not asked here for a slot: generated code calls
+// element() where the element's register is of any kind but an int's or a uint's, the register's kind is
+// the kind the vector's class holds (the lowerer types an element by the vector's declared type, as the
+// interpreter relies on when it counts what it reads), and a register declared to hold a vector holds no
+// vector of another class: vector types do not convert to one another, and an untyped value is checked
+// against the class as it is stored (tests/run/vector_narrow.as). It is the same trust a pointer read
+// out of a place has always had. number() does ask, which costs a vector of ints one test and keeps a
+// read of four bytes inside a vector whose places are eight.
 inline Slot *element(Object *p_vector, uint32_t p_index) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
-	return vector && !vector->narrow && p_index < vector->length ? vm::slots_of(vector) + p_index : nullptr;
+	return vector && p_index < vector->length ? vm::slots_of(vector) + p_index : nullptr;
 }
 inline Slot *element(Object *p_vector, int32_t p_index) {
 	return element(p_vector, static_cast<uint32_t>(p_index));
@@ -78,10 +83,8 @@ inline Object *made_object(Context *c, uint32_t p_class) {
 // which is added (empty). Nothing for any other index, a fixed vector or no memory.
 //     void *element_added(Object *p_vector, uint32_t p_index);
 inline Slot *element_to_write(Context *c, Object *p_vector, uint32_t p_index) {
-	if (Slot *const there = element(p_vector, p_index)) {
-		return there;
-	}
-	return p_vector && !static_cast<Vector *>(p_vector)->narrow ? static_cast<Slot *>(element_added(c, p_vector, p_index)) : nullptr;
+	Slot *const there = element(p_vector, p_index);
+	return there ? there : static_cast<Slot *>(element_added(c, p_vector, p_index));
 }
 inline Slot *element_to_write(Context *c, Object *p_vector, int32_t p_index) {
 	return p_index < 0 ? nullptr : element_to_write(c, p_vector, static_cast<uint32_t>(p_index));
@@ -104,7 +107,7 @@ inline bool has_room(const Vector *p_vector) {
 }
 inline Slot *push_room(Object *p_vector) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
-	return KAS3_LIKELY(has_room(vector) && !vector->narrow) ? vm::slots_of(vector) + vector->length : nullptr;
+	return KAS3_LIKELY(has_room(vector)) ? vm::slots_of(vector) + vector->length : nullptr;
 }
 // The same in a vector of ints or of uints.
 inline int32_t *number_room(Object *p_vector) {

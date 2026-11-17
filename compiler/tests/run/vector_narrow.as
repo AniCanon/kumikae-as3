@@ -60,6 +60,21 @@ package {
 			var wide:Vector.<Number> = Vector.<Number>(copy);
 			var back:Vector.<uint> = Vector.<uint>(wide);
 			trace(copy, wide, back, back[2]);
+			// A vector of ints is never a vector of anything else: seen through an untyped value it converts to
+			// a new vector, and is refused where one of another type is declared.
+			var seen:Object = copy;
+			var other:Vector.<Number> = seen as Vector.<Number>;
+			var same:Vector.<int> = seen as Vector.<int>;
+			var made:Vector.<Number> = Vector.<Number>(seen);
+			made[4] = 0.5;
+			trace(other == null, same === copy, made === seen, made, copy);
+			try {
+				var loose:* = copy;
+				var wrong:Vector.<Number> = loose;
+				trace(wrong);
+			} catch (refused:Error) {
+				trace(refused.message);
+			}
 			var nested:Vector.<Vector.<int>> = new Vector.<Vector.<int>>();
 			nested.push(copy, counts.slice(38), new <int>[]);
 			trace(nested, nested[1][1], nested[2].length);

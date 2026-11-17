@@ -519,6 +519,49 @@ void an_int_in_a_vector_is_four_bytes() {
 	CHECK(has("d0[static_cast<uint32_t>(r2)] = static_cast<int32_t>(r3);"));
 }
 
+// `y[i] = y[i] + 1`, where y is a field, reads the field into two registers: one vector, and so one set of
+// places in the loop's locals, the second register's said to be the first's. Read apart, the C++ compiler
+// took them for two memories that might overlap, found that they did, and ran the loop one element at a time.
+void one_vector_read_twice_has_its_places_once() {
+	using ir::Instruction;
+	using ir::Kind;
+	using ir::Op;
+	ir::Module module = module_of(
+			{ Kind::Obj, Kind::I32, Kind::Obj, Kind::Obj, Kind::F64, Kind::F64, Kind::F64, Kind::Bool, Kind::I32, Kind::F64, Kind::F64 },
+			{ Instruction{ Op::ConstI32, 1, 0, 0, 0 }, Instruction{ Op::I32ToF64, 5, 1, 0, 0 }, Instruction{ Op::I32ToF64, 6, 8, 0, 0 },
+					Instruction{ Op::LtF64, 7, 5, 6, 0 }, Instruction{ Op::JumpIfNot, 7, 13, 0, 0 }, Instruction{ Op::GetField, 2, 0, 0, 0 },
+					Instruction{ Op::VecGet, 4, 2, 1, 0 }, Instruction{ Op::GetField, 3, 0, 0, 0 }, Instruction{ Op::VecSet, 3, 1, 4, 0 },
+					Instruction{ Op::ConstF64, 9, 0, 0, 0 }, Instruction{ Op::AddF64, 10, 5, 9, 0 }, Instruction{ Op::F64ToI32, 1, 10, 0, 0 },
+					Instruction{ Op::Jump, 1, 0, 0, 0 } });
+	module.numbers.push_back(1.0);
+	ir::Class numbers;
+	numbers.name = "Vector.<Number>";
+	numbers.element = Kind::F64;
+	module.classes.push_back(std::move(numbers));
+	ir::Class holder;
+	holder.name = "Holder";
+	holder.fields.push_back(ir::Field{ "items", Kind::Obj, 0 });
+	module.classes.push_back(std::move(holder));
+	ir::Function &adds = module.functions[0];
+	adds.name = "Holder/adds";
+	adds.is_static = false;
+	adds.owner = 1;
+	adds.parameters = 1;
+	adds.required = 1;
+	const backend_cpp::Generated made = backend_cpp::generate(module);
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "Holder.cpp");
+	CHECK(text != nullptr);
+	if (!text) {
+		return;
+	}
+	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
+	CHECK(has("d2 = slots_in(static_cast<C1_Holder *>(r0)->f0_items);"));
+	CHECK(has("\td3 = d2;\n"));
+	CHECK(has("\tn3 = n2;\n"));
+	CHECK(has("if (KAS3_UNLIKELY(!d2)) goto L1;"));
+}
+
 int main() {
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
@@ -535,5 +578,6 @@ int main() {
 	a_method_nothing_overrides_is_called_by_name();
 	a_receiver_of_no_known_class_is_called_through_the_table();
 	an_int_in_a_vector_is_four_bytes();
+	one_vector_read_twice_has_its_places_once();
 	return check::finish();
 }
