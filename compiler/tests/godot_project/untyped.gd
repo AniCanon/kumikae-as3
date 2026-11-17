@@ -61,7 +61,7 @@ func _physics_process(_delta: float) -> bool:
 	show("a property takes its type only", [ask("place", [Vector2(7, 8)]), ask("place", [Color(1, 1, 1)])], [Vector2(7, 8), null])
 	show("a script object returned", ask("giveScript"), null)
 	show("a script object in a field", node.get("keep"), null)
-	show("freed", ask("freed"), "truetruetruenotrue")
+	show("freed", ask("freed"), "truetruetruenotruetrue")
 	ask("throwValue", [Vector2(3, 4)])
 	node.position = Vector2(1, 1)
 	show("an int plus one stays an int", [ask("increment", [5]), typeof(ask("increment", [5]))], [6, TYPE_INT])

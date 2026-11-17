@@ -110,7 +110,9 @@ package {
 			var x:* = n;
 			var o:Object = n;
 			n.free();
-			return "" + (n == null) + (x == null) + (o == null) + (x ? "yes" : "no") + (o === null);
+			// Stored where a Node is declared, it is null there too.
+			var back:Node = x;
+			return "" + (n == null) + (x == null) + (o == null) + (x ? "yes" : "no") + (o === null) + (back == null);
 		}
 	}
 }
