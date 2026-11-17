@@ -56,8 +56,8 @@ std::vector<bool> FunctionWriter::lent_candidates() const {
 }
 
 void FunctionWriter::read_field(const Instruction &p_in, const std::string &p_field) {
-	if (signal_from_[p_in.a] != NONE) {
-		return; // The emit that follows reads the field itself.
+	if (signal_from_[p_in.a] != NONE || value_from_[p_in.a] != NONE) {
+		return; // The emit, or the operation on the value, that follows reads the field itself.
 	}
 	if (borrowed_[p_in.a] != NONE) {
 		line(reg(p_in.a) + " = " + p_field + ";");

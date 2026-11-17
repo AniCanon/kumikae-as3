@@ -76,6 +76,9 @@ struct Context {
 	// A function the engine called failed: its error may be carried for a call generated code made on bare
 	// values, which asks (engine.h, call_failed) and is given it.
 	bool listener_failed = false;
+	// How many of Godot's objects that the host found behind a handle (HandleHead::object) Godot has freed
+	// since: the host's own count, which moves from any thread. Null with no engine.
+	const std::atomic<uint64_t> *gone = nullptr;
 	const EngineApi *engine = nullptr;
 	const Resolved *resolved = nullptr;
 	const void *const *names = nullptr;

@@ -23,6 +23,29 @@ class Ear extends Node:
 		got.append("freeing")
 		victim.free()
 
+	# What Emits.as does with an Emits, done with an Ear.
+	var mate: Ear
+
+	func name_of(of: Ear) -> String:
+		return str(of.name) if of else "none"
+
+	func on_mate(of: Ear) -> void:
+		got.append("mate " + name_of(of))
+
+	func as_mate(of: Node) -> String:
+		var found := of as Ear
+		return "%s %s %s" % [of is Ear, name_of(found), found != null and found == mate]
+
+	func untyped_mate(of) -> Array:
+		return [of is Ear, (of as Ear) != null, of is EarChild, (of as EarChild) == null]
+
+	func parent_mate() -> String:
+		return name_of(get_parent() as Ear)
+
+
+class EarChild extends Ear:
+	pass
+
 
 var rows: Array = []
 var root: Node
@@ -58,6 +81,7 @@ func begin(p_root: Node) -> void:
 	_heard_otherwise()
 	_own()
 	_lifetimes()
+	_script_objects()
 
 
 ## After a frame has ended: what a listener added to be called later heard.
@@ -257,7 +281,79 @@ func _lifetimes() -> void:
 	row("a listener that changes the field the signal was emitted through", swapped, ["sent", "swapped 1", "sent", "", ear.said()])
 	node.sent.disconnect(ear.hear)
 	node.forget()
+	# What is emitted is worked out by a function that puts another signal in the field.
+	node.struck.connect(ear.hear)
+	var worked := [node.sendSwapping(7), ear.said()]
+	node.struck.emit(7, Vector2(7, 0))
+	row("emit: the signal a field held before a function called for what is emitted changed the field", worked, ["swapped", ear.said()])
+	node.struck.disconnect(ear.hear)
+	node.keepNone()
 	# Left for finish(): a listener called later, at the end of the frame.
 	node.listen("later")
 	node.strike(4)
 	row("a listener called later has heard nothing yet", node.said(), "")
+
+
+## A Godot object that carries the script, where the script's class is declared: beside a GDScript class's
+## object where that class is.
+func _script_objects() -> void:
+	var mate := fresh("Mate")
+	var child := Node.new()
+	child.set_script(load("res://EmitsChild.as"))
+	child.name = "Child"
+	node.add_child(child)
+	var twin := Ear.new()
+	twin.name = "Mate"
+	ear.add_child(twin)
+	var twin_child := EarChild.new()
+	twin_child.name = "Child"
+	ear.add_child(twin_child)
+	var gone := fresh("Gone")
+	gone.free()
+	row("a parameter of the script's class takes the object that carries the script, one of a class that extends it, and null",
+			[node.nameOf(mate), node.nameOf(child), node.nameOf(null)], [ear.name_of(twin), ear.name_of(twin_child), ear.name_of(null)])
+	# GDScript stops at a freed object or an object of another class given where an Ear is declared.
+	row("an object that has been freed is null there", node.nameOf(gone), "none")
+	row("an object without the script, or with another, is refused", [node.callv("nameOf", [other]), node.callv("nameOf", [ear]), node.callv("nameOf", [5])],
+			[null, null, null])
+	node.mate = mate
+	ear.mate = twin
+	row("a field of the script's class set from Godot", [node.mateName(), node.get("mate") == mate], [ear.name_of(ear.mate), ear.get("mate") == twin])
+	row("as and is on a node", [node.asMate(mate), node.asMate(child), node.asMate(other), node.asMate(null), node.asMate(gone)],
+			[ear.as_mate(twin), ear.as_mate(twin_child), ear.as_mate(other), ear.as_mate(null), "false none false"])
+	row("as and is on an untyped value", [node.untypedMate(mate), node.untypedMate(child), node.untypedMate(other), node.untypedMate(5), node.untypedMate(null)],
+			[ear.untyped_mate(twin), ear.untyped_mate(twin_child), ear.untyped_mate(other), [false, false, false, true], ear.untyped_mate(null)])
+	node.set("mate", other)
+	node.set("mate", 5)
+	row("such a field is not set to an object without the script", node.mateName(), "Mate")
+	node.set("mate", child)
+	ear.mate = twin_child
+	row("and is set to one of a class that extends it", node.mateName(), ear.name_of(ear.mate))
+	node.set("mate", null)
+	row("and to null", node.mateName(), "none")
+	row("an untyped value stored where the script's class is declared",
+			[node.keepUntyped(mate), node.keepUntyped(other), node.keepUntyped(null), node.keepUntyped(child), node.keepUntyped(gone)],
+			["Mate", "Error #1034: Type Coercion failed: cannot convert Object to Emits.", "none", "Child", "none"])
+	row("what an engine call gives, as the script's class", [child.parentMate() == str(node.name), node.parentMate()],
+			[twin_child.parent_mate() == str(ear.name), ear.parent_mate()])
+	row("a method of the class that extends it", child.childName(), "child Child")
+	# What a signal hands a listener whose parameter is of the script's class.
+	node.listen("mate")
+	ear.struck.connect(ear.on_mate)
+	node.sent.emit(mate)
+	node.sent.emit(child)
+	node.sent.emit(null)
+	ear.struck.emit(twin)
+	ear.struck.emit(twin_child)
+	ear.struck.emit(null)
+	row("a listener's parameter of the script's class", node.said(), ear.said())
+	node.sent.emit(other)
+	node.sent.emit("text")
+	row("such a listener is not given an object without the script", node.said(), "")
+	node.forget()
+	ear.struck.disconnect(ear.on_mate)
+	node.set("mate", null)
+	mate.queue_free()
+	child.queue_free()
+	twin.queue_free()
+	twin_child.queue_free()

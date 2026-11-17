@@ -15,6 +15,10 @@ package {
 			return counted.hello() + " " + counted.n + " " + resource.label;
 		}
 		public function drop():void { counted = null; resource = null; }
+		// One that Godot hands over, where a Counted is declared: kept as the script's object.
+		public function keep(other:Counted):void { counted = other; }
+		public function keepAs(other:RefCounted):void { counted = other as Counted; }
+		public function keptN():int { return counted ? counted.n : -1; }
 		public function giveCounted():Counted {
 			var made:Counted = new Counted();
 			made.n = 11;

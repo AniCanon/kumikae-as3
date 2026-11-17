@@ -236,21 +236,41 @@ bool FunctionWriter::engine_inline(const Instruction &p_in) {
 		if (each.op != p_in.op || each.key != key || operands.size() != wanted || !holds(p_in.a, each.result)) {
 			continue;
 		}
+		// An operand may be a register that stands for a field's handle (value_from_): the value is copied
+		// out of the handle first, and a field that holds none is the library's to say so.
+		const auto lent = [&](uint32_t p_register, std::string_view p_type) {
+			return value_from_[p_register] != NONE && has_parts(p_type) && value_type(p_register) == p_type;
+		};
 		const bool fit = std::equal(operands.begin(), operands.end(), each.operands, [&](uint32_t p_register, std::string_view p_type) {
-			return holds(p_register, p_type);
+			return holds(p_register, p_type) || lent(p_register, p_type);
 		});
 		if (!fit) {
 			continue;
 		}
 		std::string text(each.text);
+		std::string guard, copies;
 		for (size_t i = 0; i < operands.size(); i++) {
 			const std::string name = "$" + std::to_string(i);
-			const std::string value = each.operands[i] == "number" ? "static_cast<double>(" + reg(operands[i]) + ")" : reg(operands[i]);
+			std::string value = each.operands[i] == "number" ? "static_cast<double>(" + reg(operands[i]) + ")" : reg(operands[i]);
+			if (!holds(operands[i], each.operands[i])) {
+				const std::string handle = own_field(value_from_[operands[i]]) + ".handle";
+				value = "a" + std::to_string(i);
+				guard += (guard.empty() ? "" : " && ") + handle;
+				copies += "\tconst " + std::string(each.operands[i]) + " " + value + " = unbox<" + std::string(each.operands[i]) + ">(c, " + handle + ");\n";
+			}
 			for (size_t at = text.find(name); at != std::string::npos; at = text.find(name, at + value.size())) {
 				text.replace(at, name.size(), value);
 			}
 		}
+		if (guard.empty()) {
+			line(reg(p_in.a) + " = " + text + ";");
+			return true;
+		}
+		line("if (KAS3_LIKELY(" + guard + ")) {");
+		body_ += copies;
 		line(reg(p_in.a) + " = " + text + ";");
+		line("} else");
+		generic(p_in);
 		return true;
 	}
 	return false;

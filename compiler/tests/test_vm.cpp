@@ -667,7 +667,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	std::map<intptr_t, uint64_t> node_boxes;
 	std::map<uint64_t, Node> nodes;
 	vm::Interpreter *running = nullptr;
+	int handles_asked = 0; // How many times the collector asked whether a handle is on a node.
 	[[nodiscard]] uint64_t node(void *p_handle) override {
+		handles_asked++;
 		auto found = node_boxes.find((intptr_t)p_handle);
 		return found == node_boxes.end() ? 0 : found->second;
 	}
@@ -704,6 +706,20 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 			}
 		}
 		return survivors;
+	}
+	// The script objects the engine's objects carry, by their handles.
+	std::unordered_map<void *, vm::Object *> scripts;
+	[[nodiscard]] vm::Object *script_of(void *p_handle, uint32_t p_class, bool p_taken) override {
+		log += "script #" + std::to_string((intptr_t)p_handle) + " as " + (module ? module->classes[p_class].name : std::to_string(p_class)) +
+				(p_taken ? ", taken\n" : "\n");
+		const auto found = scripts.find(p_handle);
+		if (found == scripts.end() || !module || !vm::is_class(*module, found->second, p_class)) {
+			return nullptr;
+		}
+		if (p_taken) {
+			vm::retain(found->second);
+		}
+		return found->second;
 	}
 	// What keep() answers, and what it does first: free another object the engine kept, as Godot freeing one
 	// object can free another.
@@ -782,6 +798,94 @@ static void test_kept_by_the_engine() {
 		CHECK_EQ(engine.log, std::string("keep Counted\nkeep Unjoined\n"));
 		CHECK_EQ(vm::live_objects(), before);
 		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+// One of the engine's objects that carries a script, where the script's class is declared: `is`, `as` and a
+// store of an untyped value give the script's own object, by what the engine says the object carries. An
+// object with no script, or with a script of another class, is not one: null from `as`, and AS3's TypeError
+// #1034 from a store.
+static void test_script_object_arrives() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Mate.as", "package { import godot.*; public class Mate extends Node { public var n:int = 3;\n"
+							   "public function tell(node:Node, any:*):String {\n"
+							   "  var found:Mate = node as Mate;\n"
+							   "  var kept:Mate = any;\n"
+							   "  return (node is Mate) + \" \" + (found ? found.n : -1) + \" \" + (any is Mate) + \" \" + (kept ? kept.n : -1) + \" \" + (any is Further);\n"
+							   "}\n"
+							   "public function further(any:*):Boolean { var kept:Further = any; return kept != null; } } }");
+	compilation.add("Further.as", "package { public class Further extends Mate {} }");
+	compilation.add("Other.as", "package { import godot.*; public class Other extends Node {} }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	uint32_t mate = 0, further = 0, other = 0;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		mate = module.classes[i].name == "Mate" ? (uint32_t)i : mate;
+		further = module.classes[i].name == "Further" ? (uint32_t)i : further;
+		other = module.classes[i].name == "Other" ? (uint32_t)i : other;
+	}
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		// An untyped value keeps its tag in a handle's low bits: handles as an engine's are, sixteen bytes apart.
+		alignas(16) static char rooms[4][16];
+		void *handles[4] = { rooms[0], rooms[1], rooms[2], rooms[3] };
+		engine.boxes += 3; // The three that scripts are given as their own.
+		vm::Object *first = interpreter.construct(mate, handles[0]);
+		vm::Object *second = interpreter.construct(further, handles[1]);
+		vm::Object *third = interpreter.construct(other, handles[2]);
+		vm::Slot five;
+		five.bits = 0;
+		five.i = 5;
+		for (size_t i = 0; i < module.classes[further].fields.size(); i++) {
+			if (module.classes[further].fields[i].name == "n") {
+				interpreter.set_field(second, (uint32_t)i, five);
+			}
+		}
+		engine.scripts = { { handles[0], first }, { handles[1], second }, { handles[2], third } };
+		const auto tell = [&](void *p_node) {
+			vm::Slot arguments[2];
+			arguments[0].bits = 0;
+			arguments[0].p = p_node;
+			arguments[1] = p_node ? vm::any::godot_object(p_node) : vm::any::null();
+			vm::Slot result;
+			result.bits = 0;
+			engine.errors.clear();
+			const bool ok = interpreter.call_method(first, "tell", arguments, 2, &result);
+			std::string said = ok && result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : engine.errors.substr(0, engine.errors.find('\n'));
+			if (ok && result.p && vm::release(static_cast<vm::Str *>(result.p))) {
+				vm::free_string(static_cast<vm::Str *>(result.p));
+			}
+			return said;
+		};
+		CHECK_EQ(tell(handles[0]), std::string("true 3 true 3 false"));
+		CHECK_EQ(tell(handles[1]), std::string("true 5 true 5 true"));
+		CHECK_EQ(tell(nullptr), std::string("false -1 false -1 false"));
+		// With a script of another class, and with none: `as` gives null, and the store is refused.
+		CHECK_EQ(tell(handles[2]), std::string("TypeError: Error #1034: Type Coercion failed: cannot convert Object to Mate."));
+		CHECK_EQ(tell(handles[3]), std::string("TypeError: Error #1034: Type Coercion failed: cannot convert Object to Mate."));
+		// A class the object's class extends is not the object's.
+		vm::Slot any = vm::any::godot_object(handles[0]);
+		CHECK(!interpreter.call_method(first, "further", &any, 1, nullptr));
+		CHECK(engine.errors.find("cannot convert Object to Further.") != std::string::npos);
+		const uint32_t references = first->references;
+		any = vm::any::godot_object(handles[1]);
+		vm::Slot kept;
+		CHECK(interpreter.call_method(first, "further", &any, 1, &kept));
+		CHECK(kept.b);
+		// What a call was given is let go of when it ends.
+		CHECK_EQ(first->references, references);
+		interpreter.release_object(first);
+		interpreter.release_object(second);
+		interpreter.release_object(third);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
@@ -3174,6 +3278,87 @@ static void test_cycles() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// What the engine gives for a request may be the very handle the result's register holds, held once more
+// (a host that shares a handle on an object where it could copy it, as this one does): the register lets
+// go of what it held all the same, so that every hold is given back.
+static void test_engine_result_is_the_registers_own() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Again.as", "package { import godot.*; public class Again extends Node {\n"
+								"public function again(node:Node2D):Boolean {\n"
+								"  var held:Node = node;\n"
+								"  for (var i:int = 0; i < 3; i++) { held = held as Node2D; }\n"
+								"  return held != null;\n"
+								"} } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *again = interpreter.construct(class_named(module, "Again"), engine.box());
+		vm::Slot node;
+		node.bits = 0;
+		node.p = engine.box();
+		const int before = engine.boxes;
+		vm::Slot result;
+		CHECK(interpreter.call_method(again, "again", &node, 1, &result));
+		CHECK(result.b);
+		CHECK_EQ(engine.boxes, before);
+		engine.boxes--; // The node's own.
+		interpreter.release_object(again);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
+// A vector of Godot's objects of a class that is never reference-counted (nodes) holds nothing that leads
+// back to a script object: the cycle collector does not look at it, however long it is. One whose elements
+// may be reference-counted (a RefCounted, or Godot's Object, which any object is) is looked at as ever.
+static void test_collector_leaves_vectors_of_nodes() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Herd.as", "package { import godot.*; public class Herd extends Node {\n"
+							   "public var nodes:Vector.<Node2D> = new Vector.<Node2D>();\n"
+							   "public var counted:Vector.<RefCounted> = new Vector.<RefCounted>();\n"
+							   "public var any:Vector.<GodotObject> = new Vector.<GodotObject>();\n"
+							   "public function fill(many:int, few:int):void {\n"
+							   "  for (var i:int = 0; i < many; i++) { nodes.push(new Node2D()); }\n"
+							   "  for (var j:int = 0; j < few; j++) { counted.push(new RefCounted()); any.push(new Node2D()); }\n"
+							   "} } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK(!module.classes[class_named(module, "Vector.<Node2D>")].element_counted);
+	CHECK(module.classes[class_named(module, "Vector.<RefCounted>")].element_counted);
+	CHECK(module.classes[class_named(module, "Vector.<GodotObject>")].element_counted);
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *herd = interpreter.construct(class_named(module, "Herd"), engine.box());
+		vm::Slot counts[2];
+		counts[0].bits = counts[1].bits = 0;
+		counts[0].i = 100;
+		counts[1].i = 2;
+		CHECK(interpreter.call_method(herd, "fill", counts, 2, nullptr));
+		engine.handles_asked = 0;
+		interpreter.collect();
+		// The script's own Godot object, and the two elements of each of the two vectors that are looked at.
+		CHECK(engine.handles_asked > 0);
+		CHECK(engine.handles_asked < 100);
+		interpreter.release_object(herd);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // A loop that passes through the engine: a script object holds one of its objects, which holds the script
 // object back (as a Godot object holds a listener that is a method of it). The engine is asked to let go
 // of what it holds; if something else holds a copy, everything stays.
@@ -3610,6 +3795,9 @@ int main() {
 	test_vector_of_values();
 	test_engine_operators();
 	test_kept_by_the_engine();
+	test_script_object_arrives();
+	test_collector_leaves_vectors_of_nodes();
+	test_engine_result_is_the_registers_own();
 	test_no_engine();
 	test_engine_listeners();
 	test_engine_statics();

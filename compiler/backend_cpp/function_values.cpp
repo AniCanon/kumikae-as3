@@ -169,8 +169,10 @@ std::optional<std::string> FunctionWriter::bare_operand(uint32_t p_register, siz
 	if (!parts(p_register).empty()) {
 		return "&" + register_name(p_register);
 	}
-	*r_guard += " && " + register_name(p_register) + ".handle";
-	*r_inside += "\t" + std::string(type) + " " + temporary + " = unbox<" + std::string(type) + ">(c, " + register_name(p_register) + ".handle);\n";
+	// The register's handle, or the handle of the field the register stands for (value_from_).
+	const std::string handle = (value_from_[p_register] != NONE ? own_field(value_from_[p_register]) : register_name(p_register)) + ".handle";
+	*r_guard += " && " + handle;
+	*r_inside += "\t" + std::string(type) + " " + temporary + " = unbox<" + std::string(type) + ">(c, " + handle + ");\n";
 	return "&" + temporary;
 }
 

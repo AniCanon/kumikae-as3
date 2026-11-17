@@ -195,6 +195,17 @@ bool object_from_any(Library &p_library, Slot p_value, uint32_t p_check, Slot *r
 		r_out->p = object;
 		return true;
 	}
+	// One of Godot's objects that carries a script of the class, or of one that extends it: the script's own
+	// object. One that has been freed is null, as everywhere.
+	if (p_check != NONE && tag == AnyTag::Godot) {
+		if (!p_library.heap.handles.present(any::pointer(p_value))) {
+			return true;
+		}
+		if (Object *const script = p_library.heap.handles.script_of(any::pointer(p_value), p_check, true)) {
+			r_out->p = script;
+			return true;
+		}
+	}
 	// One of Godot's Arrays where an Array is wanted, or of its Dictionaries where a Dictionary is: a new one
 	// of what it holds.
 	if (p_check != NONE && any::tag(p_value) == AnyTag::Value) {
@@ -210,7 +221,9 @@ bool object_from_any(Library &p_library, Slot p_value, uint32_t p_check, Slot *r
 // An untyped value into one of Godot's values or objects, of the class named by p_check if it is not NONE.
 bool engine_from_any(Library &p_library, Slot p_value, Kind p_kind, uint32_t p_check, Slot *r_out) {
 	const AnyTag tag = any::tag(p_value);
-	const bool nothing = tag == AnyTag::Undefined || tag == AnyTag::Null;
+	// One of Godot's objects that has been freed is null where an object is declared, as everywhere.
+	const bool nothing = tag == AnyTag::Undefined || tag == AnyTag::Null ||
+			(tag == AnyTag::Godot && p_kind == Kind::Ref && !p_library.heap.handles.present(any::pointer(p_value)));
 	const bool fits = (p_kind == Kind::Val ? tag == AnyTag::Value : tag == AnyTag::Godot) &&
 			(p_check == NONE || p_library.heap.handles.is_class(any::pointer(p_value), p_library.module().engine_names[p_check].name));
 	if (nothing || fits) {
@@ -255,7 +268,8 @@ bool any_is(Library &p_library, Slot p_value, uint32_t p_type) {
 			return tag != AnyTag::Null && tag != AnyTag::Undefined;
 		default:
 			return (tag == AnyTag::Object && is_class(p_library.module(), static_cast<const Object *>(any::pointer(p_value)), p_type)) ||
-					(tag == AnyTag::Value && p_library.unmoved.engine_is(p_value, p_type));
+					(tag == AnyTag::Value && p_library.unmoved.engine_is(p_value, p_type)) ||
+					(tag == AnyTag::Godot && p_library.heap.handles.script_of(any::pointer(p_value), p_type, false));
 	}
 }
 

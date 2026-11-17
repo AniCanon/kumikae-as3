@@ -91,11 +91,17 @@ func _initialize() -> void:
 	show("a node field set to null", ask("buddyName"), "none")
 	other.free()
 
-	# A const is read, never written; a script object can't come from Godot.
+	# A const is read, never written. A field of the script's class takes the object that carries the script
+	# (emits_cases.gd has the rest), and no other.
 	node.set("FIXED", 30)
 	show("a const", node.get("FIXED"), 3)
+	var plain := Node.new()
+	node.set("mine", plain)
+	plain.free()
+	show("a script object field is not set to an object without the script", node.get("mine"), null)
 	node.set("mine", node)
-	show("a script object field is not set from Godot", node.get("mine"), null)
+	show("a script object field is set to the object that carries the script", node.get("mine"), node)
+	node.set("mine", null)
 
 	# Only public members are reachable.
 	for hidden in ["secret", "guarded", "inside", "plain"]:

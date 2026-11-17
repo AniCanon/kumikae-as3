@@ -55,9 +55,14 @@ bool FunctionWriter::only_values(const Instruction &p_in) const {
 // straight code after the field is read with nothing between that could write the field or run the
 // program's code, the emit is made through the field's own handle (engine_emit). A listener may put another
 // signal in the field while the emit goes on: the host reads nothing of the handle once Godot has begun.
+//
+// `p + velocity * delta`, where velocity is a field that holds a value with parts, is the same thing: the
+// register is read once, by an operator, a method or a part of the value, and what that needs is the
+// value, which is copied out of the field's handle before anything else is done (value_from_).
 void FunctionWriter::find_lent_signals() {
 	const size_t count = function_.registers.size();
 	signal_from_.assign(count, NONE);
+	value_from_.assign(count, NONE);
 	if (!is_this(0) || module_.classes[function_.owner].native_base.empty()) {
 		return;
 	}
@@ -101,21 +106,30 @@ void FunctionWriter::find_lent_signals() {
 		}
 		const Instruction &from = function_.code[written_at[i]];
 		const Instruction &emit = function_.code[read_at[i]];
-		// Only an emit generated code makes itself: one left to the library is handed the register.
-		if (from.op != Op::GetField || from.b != 0 || from.c >= klass.fields.size() || klass.fields[from.c].kind != Kind::Val ||
-				!emits_bare(emit) || function_.argument_lists[emit.c][0] != i) {
+		if (from.op != Op::GetField || from.b != 0 || from.c >= klass.fields.size() || klass.fields[from.c].kind != Kind::Val) {
+			continue;
+		}
+		// Only an emit generated code makes itself: one left to the library is handed the register. Or
+		// what asks Godot's own code for a value with parts, which is written with the value itself.
+		const bool emitted = emits_bare(emit) && function_.argument_lists[emit.c][0] == i;
+		const bool asked = !emitted && !value_type(i).empty() && parts(i).empty() &&
+				(emit.op == Op::HostOperate || emit.op == Op::HostGet || (emit.op == Op::HostCall && module_.engine_names[emit.b].key != "Signal.emit"));
+		if (!emitted && !asked) {
 			continue;
 		}
 		bool still = !lands[read_at[i]];
 		for (uint32_t pc = written_at[i] + 1; still && pc < read_at[i]; pc++) {
 			const Instruction &in = function_.code[pc];
-			const bool quiet = !may_run_code(module_, function_, in) && !(in.op == Op::SetField && in.b == from.c) &&
+			// A call is as its callee is: one that may write the field, or run code nothing looks into, is
+			// not quiet (while the facts are being found, none is).
+			const bool writes_field = in.op == Op::Call && (!facts_ || facts_->functions[in.b].opaque || facts_->functions[in.b].writes.count(from.c));
+			const bool quiet = !may_run_code(module_, function_, in) && !writes_field && !(in.op == Op::SetField && in.b == from.c) &&
 					std::string_view(ir::op_shape(in.op)).find('L') == std::string_view::npos && in.op != Op::Return && in.op != Op::ReturnVoid &&
 					in.op != Op::Throw && in.op != Op::Rethrow;
 			still = !lands[pc] && (quiet || only_values(in));
 		}
 		if (still) {
-			signal_from_[i] = from.c;
+			(emitted ? signal_from_ : value_from_)[i] = from.c;
 		}
 	}
 }

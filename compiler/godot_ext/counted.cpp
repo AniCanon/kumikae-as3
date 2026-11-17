@@ -17,6 +17,7 @@
 // gone a call on it is AS3's error about a freed object.
 #include "callable.h"
 #include "instance.h"
+#include "library.h"
 #include "program.h"
 
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -86,6 +87,26 @@ bool GodotHost::keep(vm::Object *p_object) {
 	forget_listeners(p_object);
 	memdelete(counted);
 	return false;
+}
+
+vm::Object *arriving_script(const Variant &p_value, uint32_t p_class) {
+	if (p_value.get_type() != Variant::OBJECT || p_class >= Project::get().module().classes.size()) {
+		return nullptr;
+	}
+	const Object *owner = p_value.get_validated_object();
+	vm::Object *object = owner ? script_object(owner) : nullptr;
+	return object && vm::is_class(Project::get().module(), object, p_class) ? object : nullptr;
+}
+
+vm::Object *taken_script(vm::Object *p_object) {
+	vm::retain(p_object);
+	hold_if_referenced(p_object);
+	return p_object;
+}
+
+vm::Object *GodotHost::script_of(void *p_handle, uint32_t p_class, bool p_taken) {
+	vm::Object *object = p_handle ? arriving_script(*static_cast<const Variant *>(p_handle), p_class) : nullptr;
+	return object && p_taken ? taken_script(object) : object;
 }
 
 bool joined_to_script(const Object *p_owner) {

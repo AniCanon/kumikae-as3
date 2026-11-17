@@ -105,6 +105,8 @@ public:
 	// script on a reference-counted object must not keep that object from being freed. Dropped like any
 	// other handle. Copies of it are ordinary handles.
 	void *borrow(godot::Object *p_object);
+	// Whether a handle on an object is one every holder shares (godot_handles.cpp).
+	bool shares(void *p_object_handle);
 
 	// The engine instructions, worked out once and run (godot_prepared.cpp).
 	[[nodiscard]] const vm::Prepared *prepare(const ir::Module &p_module, const ir::Function &p_function, const ir::Instruction &p_in) override;
@@ -142,6 +144,7 @@ public:
 	[[nodiscard]] bool is_class(void *p_value, std::string_view p_class) override;
 	[[nodiscard]] vm::Str *text(void *p_value) override;
 	[[nodiscard]] bool keep(vm::Object *p_object) override; // counted.cpp
+	[[nodiscard]] vm::Object *script_of(void *p_handle, uint32_t p_class, bool p_taken) override; // counted.cpp
 	[[nodiscard]] void *copy(void *p_value) override;
 	void drop(void *p_value) override;
 	[[nodiscard]] bool assign(void *p_to, const void *p_from) override;

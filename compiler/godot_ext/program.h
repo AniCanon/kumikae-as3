@@ -122,6 +122,16 @@ void restart_scene(const Restart &p_restart);
 // The script object of the AS3 script attached to a Godot object, or null: the script instance holds a
 // reference to it, unless its Godot object is reference-counted (counted.cpp).
 vm::Object *script_object(const godot::Object *p_owner);
+// What arrives where an object of the program's class p_class is declared and Godot gives p_value: the
+// script object of the Godot object p_value holds, if that object carries a script whose class is p_class
+// or extends it. Null for anything else: not an object, one freed, one with no script of the program's or
+// with a script of another class. Every way a value of Godot's reaches a place of a script's class asks
+// here (counted.cpp): a call's arguments and a field set from Godot (members.h, object_arrives), and the
+// program's own `is`, `as` and stores of an untyped value (GodotHost::script_of).
+vm::Object *arriving_script(const godot::Variant &p_value, uint32_t p_class);
+// One that arrived, as the place it arrives in holds it: with a reference of its own, and, where its Godot
+// object is reference-counted, that object held for as long as the program holds this one.
+vm::Object *taken_script(vm::Object *p_object);
 // For the cycle collector (counted.cpp): whether a Godot object has a script object of a counted class;
 // what the collector sees of a reference-counted one: its count, and its script object, if it has one.
 bool joined_to_script(const godot::Object *p_owner);

@@ -7,6 +7,7 @@ var killer: Node
 var entry: Node2D
 var emits: RefCounted
 var frames := 0
+var waiting: Node2D
 
 
 # Godot calling into a script (Entry.as).
@@ -62,6 +63,7 @@ func _initialize() -> void:
 	root.add_child(probe)
 	print("PROBE vectors=", probe.call("vectors"))
 	print("PROBE values=", probe.call("values"))
+	print("PROBE fields=", probe.call("fields"))
 	print("PROBE given=", probe.call("given"))
 	print("PROBE carried=", probe.call("carried"))
 	print("PROBE engine=", probe.call("engine"))
@@ -69,6 +71,10 @@ func _initialize() -> void:
 	print("PROBE script again=", probe.call("script", 10))
 	print("PROBE listeners=", probe.call("listeners"))
 	print("PROBE speaks=", probe.call("speaks"))
+	print("PROBE gone=", probe.call("gone"))
+	print("PROBE gone uncaught=", probe.call("goneUncaught"))
+	print("PROBE queued=", probe.call("queue"))
+	waiting = probe
 	print("PROBE fail=", probe.call("fail", 3))
 	print("PROBE after=", probe.call("script", 1))
 	_enter()
@@ -92,6 +98,7 @@ func _process(_delta: float) -> bool:
 	if frames < 4:
 		return false
 	print("PROBE freed=", killer.get("said") if killer else "no killer")
+	print("PROBE after the frame=", waiting.call("afterQueue"))
 	print("PROBE ticked=", entry.call("ticked"))
 	var said: int = emits.rows.size()
 	emits.finish()

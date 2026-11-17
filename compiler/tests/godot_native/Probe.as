@@ -133,6 +133,56 @@ package {
 			return out.join(" ");
 		}
 
+		// A value with parts that is a field of the script, read only to be used at once (an operator, a
+		// method, a part): native code reads it out of the field's own handle, with none made for the read.
+		// A field that holds none is AS3's null error where it is used, a field written between its read and
+		// its use is used as it was read, and a variable given the field keeps its own.
+		private var none:Vector2;
+		private var turned:Transform2D = new Transform2D(0.5, new Vector2(3, 4));
+		private var tint:Color = new Color(0.1, 0.2, 0.3, 0.4);
+
+		private function swap():Number {
+			kept = new Vector2(100, 100);
+			return 2;
+		}
+
+		public function fields():String {
+			var out:Array = [];
+			out.push(kept * 2.5, kept + kept, kept.length(), kept.x, kept.y, kept.dot(kept), -kept, kept == kept, kept.lerp(kept * 3, 0.5));
+			for (var i:int = 0; i < 3; i++) {
+				var p:Vector2 = new Vector2(i, 1);
+				p = p + kept * 0.5;
+				out.push(p);
+			}
+			out.push(turned * kept, turned.origin, turned.rotated(0.25), tint * 0.5, tint.g, tint.lerp(tint, 0.5));
+			var before:Vector2 = kept;
+			out.push(kept * swap(), before, kept * 2);
+			kept = new Vector2(1.5, -2.25);
+			out.push(before, none * 2, none.x);
+			none = null;
+			try {
+				out.push(none * 2);
+			} catch (e:TypeError) {
+				out.push(e.message);
+			}
+			try {
+				out.push(none.x);
+			} catch (e:TypeError) {
+				out.push(e.message);
+			}
+			try {
+				out.push(none.length());
+			} catch (e:TypeError) {
+				out.push(e.message);
+			}
+			try {
+				out.push(kept + none);
+			} catch (e:TypeError) {
+				out.push(e.message);
+			}
+			return out.join(" ");
+		}
+
 		// Every operation generated code does inline on a Vector2, on values a float can't hold exactly,
 		// on large and small ones, and on the zero vector.
 		public function vectors():String {
@@ -296,6 +346,125 @@ package {
 			}
 			mute = false;
 			return said + " " + nodes.join("+");
+		}
+
+		// One of Godot's objects that has been freed, used again: AS3's error, with its line, however native
+		// code holds the object. Freed between two uses in one function, inside a function called, by a
+		// listener the engine ran for a call, in the loop that moves a vector's nodes, and at a frame's end;
+		// and one a function called took out of the vector while a variable held it, which is alive still.
+		private var crowd:Vector.<Node2D> = new Vector.<Node2D>();
+		private var doomed:Node2D;
+		private var queued:Node2D;
+
+		private function freeing(node:Node2D):void {
+			node.free();
+		}
+
+		private function scatter():void {
+			crowd.length = 0;
+		}
+
+		private function onDoom():void {
+			if (doomed) {
+				doomed.free();
+			}
+		}
+
+		private function tell(node:Node2D):String {
+			try {
+				node.position = new Vector2(1, 2);
+				return "" + node.position;
+			} catch (e:Error) {
+				return e.message;
+			}
+			return "never";
+		}
+
+		public function gone():String {
+			var out:Array = [];
+			var b:Node2D = new Node2D();
+			b.position = new Vector2(3, 4);
+			var p:Vector2 = b.position;
+			b.free();
+			try {
+				b.position = p;
+				out.push("moved");
+			} catch (e:Error) {
+				out.push(e.message);
+			}
+			var c:Node2D = new Node2D();
+			c.position = p;
+			freeing(c);
+			try {
+				out.push(c.position);
+			} catch (e:Error) {
+				out.push(e.message);
+			}
+			var bell:Node2D = new Node2D();
+			doomed = new Node2D();
+			var d:Node2D = doomed;
+			bell.visibilityChanged.add(onDoom);
+			d.position = p;
+			bell.hide();
+			try {
+				d.position = p;
+				out.push("moved");
+			} catch (e:Error) {
+				out.push(e.message);
+			}
+			doomed = null;
+			bell.free();
+			for (var n:int = 0; n < 4; n++) {
+				crowd.push(new Node2D());
+			}
+			for (var i:int = 0; i < crowd.length; i++) {
+				var child:Node2D = crowd[i];
+				try {
+					var at:Vector2 = child.position;
+					at.x += i + 1;
+					child.position = at;
+					out.push(child.position.x);
+					if (i == 1) {
+						crowd[2].free();
+					}
+				} catch (e:Error) {
+					out.push(i + ": " + e.message);
+				}
+			}
+			var first:Node2D = crowd[0];
+			var second:Node2D = crowd[1];
+			var last:Node2D = crowd[3];
+			scatter();
+			out.push(tell(first), tell(second), first == second, crowd.length);
+			second.free();
+			last.free();
+			freeing(first);
+			out.push(tell(first), tell(second), tell(last), first == null);
+			return out.join(" | ");
+		}
+
+		public function goneUncaught():Number {
+			var node:Node2D = new Node2D();
+			node.free();
+			return node.position.x;
+		}
+
+		public function queue():String {
+			queued = new Node2D();
+			addChild(queued);
+			queued.position = new Vector2(5, 6);
+			queued.queueFree();
+			return "" + queued.position;
+		}
+
+		public function afterQueue():String {
+			try {
+				queued.position = new Vector2(7, 8);
+				return "" + queued.position;
+			} catch (e:Error) {
+				return e.message;
+			}
+			return "never";
 		}
 
 		// An error nothing catches: Godot is told, with the trace, and carries on.

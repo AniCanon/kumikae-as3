@@ -92,7 +92,8 @@ void Host::say_counts() const {
 	for (uint64_t each : thunk_counts) {
 		all += each;
 	}
-	std::fprintf(stderr, "kas3: counts thunks=%llu unresolved=%zu\n", static_cast<unsigned long long>(all), unresolved.size());
+	std::fprintf(stderr, "kas3: counts thunks=%llu unresolved=%zu handles=%llu lookups=%llu\n", static_cast<unsigned long long>(all), unresolved.size(),
+			static_cast<unsigned long long>(handle_copies), static_cast<unsigned long long>(object_lookups ? object_lookups() : 0));
 	for (size_t i = 0; i < thunk_counts.size(); i++) {
 		if (thunk_counts[i]) {
 			const std::string what = asked_of(module, module.functions[thunk_function(static_cast<uint32_t>(i))].code[0]);
@@ -143,6 +144,7 @@ Object *new_object(Context *c, uint32_t p_class) {
 }
 
 void *copy_handle(Context *c, void *p_handle) {
+	c->host->handle_copies++;
 	return c->host->handles.copy(p_handle);
 }
 

@@ -49,13 +49,56 @@ bool has_parts(int p_type) {
 	return false;
 }
 
-// The object behind a handle: by its id, so that one Godot has freed is null.
+// How many times generated code asked for the object behind a handle (rt::Host::object_lookups).
+uint64_t looked_up = 0;
+uint64_t lookups() {
+	return looked_up;
+}
+
+// How many of the objects found behind handles (object_behind) Godot has freed. It starts at one: a handle
+// nothing was found behind yet has seen none.
+std::atomic<uint64_t> gone{ 1 };
+
+// Godot tells whoever keeps a binding on an object when the object ends, as it tells C# and godot-cpp of
+// theirs: this one keeps nothing but the count. Under a token of its own, so that it is beside godot-cpp's
+// binding and not in its place. The extension is not one Godot reloads, and must not be made one
+// (`reloadable` in kas3.gdextension, which tests/run_godot.py holds every such file to): its bindings last
+// as long as it, and a callback into a library that has gone would be a crash.
+char watch_token = 0;
+void *watched(void *p_token, void *) {
+	return p_token;
+}
+void watched_freed(void *, void *, void *) {
+	gone.fetch_add(1, std::memory_order_relaxed);
+}
+const GDExtensionInstanceBindingCallbacks WATCH = { &watched, &watched_freed, nullptr };
+
+// The object behind a handle: by its id, so that one Godot has freed is null. Asked a second time of one
+// handle, the object is kept in the handle's head with what the count of objects freed read before the
+// look, and Godot is asked to say when the object ends: until the count moves, generated code reads the
+// object there (rt::object_of) and asks nothing. Godot takes an object out of those found by their ids,
+// then tells of its end, with nothing of a script's run between (Object::~Object): a freed object is
+// never read from a head whose count still matches.
 void *object_behind(void *p_handle) {
+	looked_up++;
 	const Variant *held = static_cast<const Variant *>(p_handle);
 	if (!held || held->get_type() != Variant::OBJECT) {
 		return nullptr;
 	}
-	return gdextension_interface::object_get_instance_from_id(gdextension_interface::variant_get_object_instance_id(held->_native_ptr()));
+	const uint64_t before = gone.load(std::memory_order_relaxed);
+	void *const object = gdextension_interface::object_get_instance_from_id(gdextension_interface::variant_get_object_instance_id(held->_native_ptr()));
+	rt::HandleHead *const head = rt::head_of(p_handle);
+	if (!object) {
+		return nullptr;
+	}
+	if (!head->asked) {
+		head->asked = 1; // A handle used once costs no binding.
+		return object;
+	}
+	gdextension_interface::object_get_instance_binding(object, &watch_token, &WATCH);
+	head->object = object;
+	head->seen = before;
+	return object;
 }
 
 void *box(rt::Parts p_type, const void *p_value) {
@@ -138,8 +181,36 @@ bool emit_bare(void *p_emitter, void *p_signal, const uint8_t *p_held, const voi
 
 // Godot's own entry for a call on bare values is handed over as it is: generated code calls it with nothing
 // between, as C# does.
+// Where a handle keeps each value with parts, as Godot itself says of a handle on one made here: inside the
+// handle for the smaller types, by a number that the handle starts with. If any handle does not start with
+// its type's number, nothing is taken for known, and every read is the host's (unbox).
+void find_values(rt::EngineApi *r_table) {
+	bool numbered = true;
+	for (size_t i = 0; i < PARTS; i++) {
+		const int type = godot_type(static_cast<rt::Parts>(i));
+		Variant made;
+		GDExtensionCallError error;
+		gdextension_interface::variant_construct((GDExtensionVariantType)type, made._native_ptr(), nullptr, 0, &error);
+		int32_t starts = -1;
+		std::memcpy(&starts, made._native_ptr(), sizeof(starts));
+		numbered = numbered && error.error == GDEXTENSION_CALL_OK && made.get_type() == type && starts == type;
+		const char *const from = reinterpret_cast<const char *>(made._native_ptr());
+		const char *const value = static_cast<const char *>(inside(made, type));
+		const bool within = value >= from + sizeof(starts) && value + PARTS_SIZES[i] <= from + sizeof(Variant);
+		r_table->value_at[i] = within ? static_cast<uint8_t>(value - from) : 0;
+		r_table->value_type[i] = type;
+	}
+	if (!numbered) {
+		std::memset(r_table->value_at, 0, sizeof(r_table->value_at));
+	}
+}
+
 const rt::EngineApi *api() {
-	static const rt::EngineApi table = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare };
+	static const rt::EngineApi table = [] {
+		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {} };
+		find_values(&made);
+		return made;
+	}();
 	return &table;
 }
 
@@ -230,6 +301,8 @@ std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, co
 void NativeProgram::resolve(const rt::Program &p_program) {
 	rt::Host &host = *host_;
 	host.context.engine = api();
+	host.context.gone = &gone;
+	host.object_lookups = &lookups;
 	names_.reserve(p_program.name_count);
 	for (uint32_t i = 0; i < p_program.name_count; i++) {
 		const rt::Text &text = p_program.strings[p_program.names[i]];

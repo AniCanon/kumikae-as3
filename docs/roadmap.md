@@ -129,8 +129,8 @@ passes on real compiled AS3 (not hand-written code, as in stage 0).
 **Built ahead, on 2026-11-16:** `kas3c cpp` writes a program as C++; every program of the run tests gives
 the interpreter's output as native code; the Godot extension loads a program library and Godot calls its
 functions directly. Against Godot C# (rough: measured on a loaded machine, last on 2026-11-17) it is ahead
-on calls into Godot, script-only code and both array benchmarks, about level on four, and behind on six
-(1.1 to 2.9 times): the speed gate is not passed. Handing arrays to Godot was the furthest behind (4.9
+on calls into Godot, script-only code and both array benchmarks, about level on five, and behind on five
+(1.2 to 1.7 times: `sieve`, `ray_queries`, `shapes`, `alloc`, `nbody`): the speed gate is not passed. Handing arrays to Godot was the furthest behind (4.9
 times) and is now ahead (0.33 ms a frame against C#'s 0.46, the median of five runs of each): a vector of
 `Vector2`s holds each in its place and goes to Godot in one copy, `push()` is written where the vector has
 room, and a number held untyped costs no call. Signals were the next furthest (3.6 times) and are now level
@@ -139,7 +139,16 @@ overlapping): `emit()` is Godot's `emit_signal` by its method bind on values mad
 through the field's own handle where the signal is a field, and a listener given exactly what its
 parameters hold is entered with nothing checked twice or allocated. About a third of that frame is Godot's
 own emitting, which no script language removes; what is left of ours is the `Vector2` a listener is still
-handed in a handle, and three looks for an object by its id for each signal. Decided on 2026-11-16: native code is to run in the editor's
+handed in a handle, and three looks for an object by its id for each signal. Moving twenty thousand nodes
+from one script was then the furthest behind (2.8 times, 3.12 ms a frame against C#'s 1.12) and is now
+level (1.03 ms against 0.99, the median of seven runs of each, turn and turn about, the ranges
+overlapping; 9.2 million instructions a frame where it took 31.4 and C# takes 10.0): a handle on a node
+is shared by a count and not copied, the node behind it is read from the handle for as long as Godot has
+freed none of those found (Godot says when one ends, as it tells C#), the script's `Vector2` field is
+read out of its own handle and multiplied where it is, and the cycle collector no longer walks a vector
+of nodes every frame. Most of what is left of that frame is Godot's own getting and setting of a
+position; of ours, the vector's count taken and given back for each node, and two atomic counts for each
+node's handle. Decided on 2026-11-16: native code is to run in the editor's
 play too, not only in exports, with the interpreter kept for a machine with no C++ toolchain; and tests are
 to run on Steam Deck and Nintendo Switch once build targets are configurations. Left: the library called
 directly everywhere (part done), Godot's values held inline in fields and parameters and, for the types

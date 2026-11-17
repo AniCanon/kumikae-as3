@@ -78,6 +78,10 @@ host differs.
   Object literals and Dictionary) adds its slots there and nowhere else; `may_hold_objects()` beside it
   says which classes the collector looks at. Every object is made with `heap_.list_for(class)` as its
   list, so that the collector sees it.
+- **The collector looks only at what can lead back to a script object** (`may_hold_objects()`, `held.h`): not
+  at a vector of numbers, and not at a vector of Godot's objects of a class that is never
+  reference-counted (`ir::Class::element_counted`, which the lowerer works out from the class: nodes),
+  since only a reference-counted object of Godot's is a node of the collector's.
 - **The cycle collector deletes by trial** (`collector.h`): an object whose count of references is more than
   the references from other objects is held from outside, and so is what it reaches. It needs no list of
   roots. The host calls `collect_step()` with a budget of work; the interpreter collects once more when it

@@ -178,7 +178,8 @@ bool arrives(ir::Kind p_kind, std::string_view p_godot_type, const Variant &p_va
 			}
 			return type == Variant::NIL || p_godot_type.empty() || value_type_named(p_godot_type) == type;
 		default:
-			return false; // A script object can't come from Godot.
+			// An object of the program's: which class is declared is not known here (members.h, object_arrives).
+			return false;
 	}
 }
 

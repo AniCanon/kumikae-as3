@@ -114,6 +114,16 @@ What this costs, until the split:
   singleton's object, the defaults of parameters left out) and `c->names` (a `StringName` for each name
   the program writes). The extension fills them from what it already works out for the interpreter
   (`godot_ext/native_program.cpp`, from `godot_prepared.cpp`'s `prepare`).
+- **A handle on one of Godot's objects has a head before it** (`HandleHead`, `engine.h`), the host's, which
+  generated code reads with no call. One on an object that is not reference-counted is shared: `shared()`
+  and `release()` count a holder there, and only the last one's letting go is the host's (`drop_handle`).
+  `object_of()` reads the object the host found behind the handle while the host's count of objects
+  freed (`Context::gone`) is what it was when the host found it; when the count has moved, or nothing was
+  found yet, the host looks by the object's id (`EngineApi::object`), which is where a freed object is
+  null. Only a handle on an object is looked at this way: a value lent for a call has no head.
+- **A value with parts in a handle is read where the handle keeps it** (`unbox()`): the host says where for
+  each type (`EngineApi::value_at`, `value_type`), found from what Godot says of a handle the host makes;
+  a type a handle keeps elsewhere, and a handle on anything else, are the host's `unbox`.
 - **A value with parts held inline** is boxed into the host's handle wherever it crosses into what the
   library and the host hold: an instruction run by thunk (`Boxed`), a field, an untyped value, an Array.
   Only a register that can never be null is inline; a parameter, a field and a call's result are handles.

@@ -70,14 +70,17 @@ inline std::vector<Entry> take_entries(const ir::Class &p_class, Object *p_objec
 // Whether an object of the class can hold anything that may lead back to it: another object, an untyped
 // value, or one of Godot's objects (which may listen to, or be scripted by, a script object). Only these are
 // looked at by the cycle collector. A value of one of Godot's value types (a Vector2, a Callable, an Array)
-// is not followed: Godot does not say how many hold one.
+// is not followed: Godot does not say how many hold one. Nor is a vector of Godot's objects of a class
+// that is never reference-counted (nodes: ir::Class::element_counted): the engine counts no reference to
+// such an object, so none of them is a node of the collector's (EngineHandles::node), and a frame of a
+// game that keeps twenty thousand nodes in a vector does not walk them.
 inline bool may_hold_objects(const ir::Class &p_class) {
 	auto leads = [](ir::Kind p_kind) { return p_kind == ir::Kind::Obj || p_kind == ir::Kind::Any || p_kind == ir::Kind::Ref; };
 	if (p_class.table || p_class.array) {
 		return true; // Untyped values, in its properties.
 	}
 	if (p_class.element != ir::Kind::Void) {
-		return leads(p_class.element);
+		return leads(p_class.element) && !(p_class.element == ir::Kind::Ref && !p_class.element_counted);
 	}
 	for (const ir::Field &field : p_class.fields) {
 		if (leads(field.kind)) {

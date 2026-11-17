@@ -9,12 +9,12 @@ called by the engine.
 | `program` | The project's scripts: found, read (from a folder or a pack), checked, lowered |
 | `native_program` | The project's program library (the C++ backend's output, built for the project): found, loaded, checked against the scripts as they are, and given what it needs of Godot (method binds, singletons, names, the entry points). The runtime's host then keeps the interpreter everything else here asks (`Project::interpreter()`), with every function's body native |
 | `script`, `instance` | A script resource; one object's instance and the calls Godot makes on it |
-| `script_call.cpp` | Godot calling a function of a script object (`call_script`): the arguments counted, checked and converted, the result handed back. Where Godot passes every argument and each is exactly of the type its parameter holds (worked out once for a function), they are taken as they come: a value with parts is lent as a copy on the stack, and nothing is checked twice or allocated |
-| `counted` | A script object whose Godot object is reference-counted (`counted_on`: a script whose base is Godot's Object, on a RefCounted, too): each lives while AS3 or Godot holds it. A script taken off its object ends the pair: AS3's hold on the Godot object is given back (a last one frees it at the end of the frame), and a script object AS3 still holds lives on alone, its handle on the Godot object keeping nothing |
+| `script_call.cpp` | Godot calling a function of a script object (`call_script`): the arguments counted, checked and converted, the result handed back. A parameter of a script's class takes the Godot object that carries such a script, as the script's object (`object_arrives`, `members.h`). Where Godot passes every argument and each is exactly of the type its parameter holds (worked out once for a function), they are taken as they come: a value with parts is lent as a copy on the stack, and nothing is checked twice or allocated |
+| `counted` | What arrives where a script's class is declared and Godot gives an object (`arriving_script`): the script object of the Godot object, if its script's class is that one or extends it, and nothing else; the one place every such arrival asks (a call's arguments, a field set from Godot, the program's own `is`, `as` and stores of an untyped value through `EngineHandles::script_of`), which holds the Godot object of a counted one for as long as the program holds what arrived (`taken_script`). A script object whose Godot object is reference-counted (`counted_on`: a script whose base is Godot's Object, on a RefCounted, too): each lives while AS3 or Godot holds it. A script taken off its object ends the pair: AS3's hold on the Godot object is given back (a last one frees it at the end of the frame), and a script object AS3 still holds lives on alone, its handle on the Godot object keeping nothing |
 | `members` | What Godot reaches of a script by name: public fields to read and write (an Array or a Dictionary as a copy of Godot's), public getters and setters, public methods, and the lists of them with Godot's types |
 | `godot_host` | The interpreter's four interfaces, done with Godot's calls; values to and from `Variant` |
-| `godot_handles.cpp` | What an engine value is (`present`, `is_class`, `text`), how long it lives (`borrow`, `copy`, `drop`), and what the cycle collector sees of it (`node`, `node_edges`, `let_go`) |
-| `handles.h` | Where every handle (a `godot::Variant` the interpreter holds) is made and freed; a freed one's memory is kept for the next on the main thread |
+| `godot_handles.cpp` | What an engine value is (`present`, `is_class`, `text`), how long it lives (`borrow`, `copy`, `drop`), and what the cycle collector sees of it (`node`, `node_edges`, `let_go`). A handle on an object that is not reference-counted is shared by whoever copies it (`shares`): it counts no reference of Godot's, is never written in place and is no node of the collector's, so one handle serves every holder, and goes when the last lets go |
+| `handles.h` | Where every handle (a `godot::Variant` the interpreter holds) is made and freed, each with its head before it (`rt::HandleHead`, which generated code reads too); a freed one's memory is kept for the next on the main thread |
 | `godot_signals.cpp` | The AS3 way of listening to a signal (`@add`, `@addOnce`, `@remove`, `@has`, `@removeAll`, `@numListeners`), made from Godot's own calls |
 | `godot_source.cpp` | Where values come from (`EngineSource`): defaults, constants, constructors, singletons, static methods; and the time (`Clock`: Godot's clock, the C library's zone) |
 | `godot_calls.h` | What the host files share: the arguments of a call, a failed call in AS3's words, a freed object |
@@ -36,6 +36,12 @@ called by the engine.
 - **A value from Godot is checked against the register's type before it is taken** (`arrives`, `take`).
   What does not fit is an AS3 error that names what gave it.
 - **A name Godot needs is made once and kept** (`GodotHost::name`). No `StringName` is built per call.
+- **An object found behind a handle for generated code is watched** (`native_program.cpp`, `object_behind`):
+  the host keeps a binding of its own on it, under its own token, whose only job is to count the object's
+  end (`gone`), which is what lets generated code read the object from the handle's head with no look by
+  its id. Godot takes an object out of those found by their ids before it tells of its end, with no
+  script run between. The extension must not be made one Godot reloads while a game runs: the bindings
+  last as long as the library does.
 - **Files are read through Godot** (`FileAccess`, `DirAccess`, `res://`), never the operating system's
   paths: an exported game keeps them in a pack.
 - **AS3 runs on the main thread.** A call from another thread (a method, a field, `toString`) is refused with

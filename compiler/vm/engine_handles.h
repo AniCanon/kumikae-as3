@@ -53,6 +53,12 @@ struct EngineHandles {
 	// with what it holds, for as long as the engine does, and given back with Interpreter::free_kept().
 	// False to free it now.
 	[[nodiscard]] virtual bool keep(Object *p_object) = 0;
+	// What arrives where an object of the program's class p_class is declared and the value is one of the
+	// engine's objects: the script object that object carries, if its class is p_class or extends it (a node
+	// whose script is a class is an object of that class). Null for a handle on anything else: no object, one
+	// freed, one with no script of the program's, or with a script of another class. With p_taken, it comes
+	// with a reference of its own, the caller's, and the engine knows the program holds it (keep()).
+	[[nodiscard]] virtual Object *script_of(void *p_handle, uint32_t p_class, bool p_taken) = 0;
 
 	[[nodiscard]] virtual bool call(void *p_receiver, std::string_view p_method, const Argument *p_arguments, size_t p_count,
 			const Wanted &p_result, Slot *r_result, std::string *r_error) = 0;

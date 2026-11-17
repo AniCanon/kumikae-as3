@@ -9,7 +9,7 @@ Every group runs under `ctest`. What each is, in more words, is in the
 | `golden/` (`ok`, `errors`, `names`, `types`) | The front end: a `.as` file and the exact output expected | A new pair; `run_golden.py` finds it |
 | `run/` | Whole programs under `kas3c run`: `.as`, `.out`, and `.ir` where the IR is pinned | A new pair; `err_*` files expect an error |
 | `run_native.py`, `native_skipped.txt` | The programs of `run/` as native code: `kas3c cpp`, the system's C++ compiler, and the same `.out` and `.err` | Nothing to add: a program in `run/` is run both ways. A program the backend refuses goes on the list with `--update` |
-| `godot_native/` | A script run in Godot by the interpreter and as native code (`run_godot.py`'s last part): the two must print the same. The test project's `Places.as` and `Emits.as` are run with them: `places.gd` and `emits.gd` hold them to GDScript under the interpreter, the probe to the interpreter as native code | A line in `Probe.as`'s methods; every operation the backend does inline on one of Godot's values belongs there |
+| `godot_native/` | A script run in Godot by the interpreter and as native code (`run_godot.py`'s last part): the two must print the same. The test project's `Places.as`, `Emits.as` and `EmitsChild.as` are run with them: `places.gd` and `emits.gd` hold them to GDScript under the interpreter, the probe to the interpreter as native code | A line in `Probe.as`'s methods; every operation the backend does inline on one of Godot's values belongs there |
 | `godot_project/` | AS3 inside Godot, compared with GDScript | A method in a `.as` script, a `show(name, ask(...), <what GDScript gives>)` line in its `.gd` driver, the name in `run_godot.py` |
 | `corpus/`, `external/` | Real AS3 from elsewhere must still parse (`external/` is fetched, not committed). `run_corpus.py` says which corpus programs the interpreter takes and what stops the others; `run_godot.py` runs the ones in `corpus/runs.txt` inside Godot | A program that starts to run: its name in `corpus/runs.txt`, or in `corpus/waits.txt` with what it waits for |
 | `bench/` | Timings, not pass or fail | `run_bench.py <build> [--godot tests] [--against <other build>]`; `run_native_bench.py <build> [--against <other build>]` for native code against the interpreter; `languages/run.py [--against <other extension project>]` for the same workloads in Godot C#, GDScript and AS3; `recheck.py <build> --against <other> --lines 100000 1000000`; `completion.py` |
@@ -25,6 +25,41 @@ Every group runs under `ctest`. What each is, in more words, is in the
 - **A clean-up changes no file here.** If a golden file changes, behaviour changed.
 - **Nothing here may hang:** a driver that waits for the engine quits on a frame count.
 - No project, device or personal identifier in a test project (`export_presets.cfg` holds a placeholder team).
+
+## The extension under the sanitizers
+
+`build-san` builds no Godot extension. One can be built, into a folder of its own so that it does not take
+the place of the one the test project loads:
+
+```sh
+cmake -S compiler -B compiler/build-san-godot -DKAS3_SANITIZE=ON -DKAS3_GODOT_CPP=<godot-cpp checkout> \
+    -DKAS3_GODOT_OUTPUT=$PWD/compiler/build-san-godot/out
+cmake --build compiler/build-san-godot --target kas3_godot
+```
+
+Godot must then load the sanitizer's runtime before the extension, and the Godot that is distributed
+refuses it ("Sanitizer load violates platform policy"). What works on macOS:
+
+1. A copy of Godot's app, signed again ad hoc with an entitlements file that has
+   `com.apple.security.cs.allow-dyld-environment-variables` and
+   `com.apple.security.cs.disable-library-validation` (and the three the app already has for its own
+   use: `allow-jit`, `allow-unsigned-executable-memory`, `disable-executable-page-protection`):
+   `codesign --force --deep -s - --entitlements <file> <copy of Godot.app>`. The installed app is left alone.
+2. A small script that starts that copy, and sets the variables itself (`nice`, `sh` and the system's
+   Python lose `DYLD_` variables on the way): `DYLD_INSERT_LIBRARIES` to what
+   `/usr/bin/c++ -print-file-name=libclang_rt.asan_osx_dynamic.dylib` gives (the runtime of the compiler
+   that built the extension), `ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:detect_container_overflow=0`
+   (Godot itself is not instrumented), `UBSAN_OPTIONS=print_stacktrace=1`, each with a `log_path`.
+3. A copy of `compiler/tests` beside copies of `runtime`, `vm`, `ir`, `src` and `godot` (what generated
+   code is built against), with the sanitized library in its `godot_project/bin`, and
+   `KAS3_GODOT=<the script> python3 <copy>/tests/run_godot.py <copy>/tests compiler/build/kas3c`.
+
+It is not part of `ctest`. It runs every driver, the reloads and the native probe with the extension's own
+code checked: handles and their heads, the look for the object behind one, vectors handed to Godot in one
+copy, listeners called. What it does not check: Godot's own code, and a program library's (generated
+code is built without the sanitizers, and reads a handle's head itself); a handle's memory is kept for
+the next handle when it is freed, so a handle used after it was let go of is not something the sanitizer
+sees either: the tests of freed objects are what hold that.
 
 ## Completion checks and timings
 

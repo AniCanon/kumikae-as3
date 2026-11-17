@@ -124,7 +124,9 @@ uint32_t Lowerer::any_typeof(Expr *p_operand, uint32_t p_position) {
 }
 
 // `is` and `as` asked of a value that is untyped or of a type the class can't be: what the value is now
-// decides. Nothing if the type written is not one this can test.
+// decides. One of Godot's objects is asked this way of a class that extends one of Godot's: the object that
+// carries the script is the script's own (vm/library.h, arriving_script). Nothing if the type written is not
+// one this can test.
 std::optional<uint32_t> Operators::any_type_test(Binary *p_binary) {
 	const uint32_t position = p_binary->offset;
 	const Symbol *symbol = l_.named_class(p_binary->right);
@@ -149,7 +151,7 @@ std::optional<uint32_t> Operators::any_type_test(Binary *p_binary) {
 			l_.is_vector(written) && l_.vector_class(written)) {
 		code = *l_.vector_class(written); // An Array, or a Vector.<T>: of that very class.
 		symbol = nullptr;
-	} else if (!symbol || !l_.class_index(symbol, &code) || !l_.module_.classes[code].native_base.empty()) {
+	} else if (!symbol || !l_.class_index(symbol, &code)) {
 		return std::nullopt;
 	}
 	const bool test = p_binary->op == TokenKind::KwIs;

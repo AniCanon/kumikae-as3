@@ -332,16 +332,13 @@ bool write_field(vm::Object *p_object, uint32_t p_field, const Variant &p_value)
 	vm::Slot taken;
 	taken.bits = 0;
 	if (field.kind == ir::Kind::Obj) {
-		// Only a container comes from Godot, copied: a script object or a Date can't.
-		const Variant::Type type = container_type(field.klass);
-		if (type == Variant::NIL || (p_value.get_type() != type && p_value.get_type() != Variant::NIL)) {
+		// A container comes from Godot, copied, and a script's object as the Godot object that carries it:
+		// an object of a class with no Godot object, or a Date, can't.
+		const std::optional<vm::Slot> arrived = object_arrives(field.klass, p_value) ? object_from_variant(field.klass, p_value) : std::nullopt;
+		if (!arrived) {
 			return false;
 		}
-		const std::optional<vm::Slot> copied = container_from_variant(field.klass, p_value);
-		if (!copied) {
-			return false;
-		}
-		taken = *copied;
+		taken = *arrived;
 	} else {
 		if (!arrives(field.kind, field.engine_type, p_value)) {
 			return false;
@@ -374,6 +371,33 @@ std::optional<vm::Slot> container_from_variant(uint32_t p_class, const Variant &
 	taken.p = container_type(p_class) == Variant::ARRAY ? static_cast<void *>(interpreter.copy_engine_array(&held, p_class))
 														: static_cast<void *>(interpreter.copy_engine_dictionary(&held, p_class));
 	return taken.p ? std::optional<vm::Slot>(taken) : std::nullopt;
+}
+
+bool object_arrives(uint32_t p_class, const Variant &p_value) {
+	const ir::Module &module = Project::get().module();
+	const Variant::Type type = container_type(p_class);
+	if (type != Variant::NIL) {
+		return p_value.get_type() == type || p_value.get_type() == Variant::NIL;
+	}
+	if (p_class >= module.classes.size() || module.classes[p_class].native_base.empty()) {
+		return false;
+	}
+	// Null, an object-typed value that holds none, and an object that has been freed are null there.
+	const bool nothing = p_value.get_type() == Variant::NIL ||
+			(p_value.get_type() == Variant::OBJECT && (((ObjectID)p_value).is_null() || !p_value.get_validated_object()));
+	return nothing || arriving_script(p_value, p_class) != nullptr;
+}
+
+std::optional<vm::Slot> object_from_variant(uint32_t p_class, const Variant &p_value) {
+	if (container_type(p_class) != Variant::NIL) {
+		return container_from_variant(p_class, p_value);
+	}
+	vm::Slot taken;
+	taken.bits = 0;
+	if (vm::Object *const script = arriving_script(p_value, p_class)) {
+		taken.p = taken_script(script);
+	}
+	return taken;
 }
 
 TypedArray<Dictionary> property_list(uint32_t p_class) {

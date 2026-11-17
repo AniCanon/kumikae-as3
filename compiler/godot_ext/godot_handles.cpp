@@ -23,23 +23,35 @@ static std::vector<void *> &spare_handles() {
 
 static constexpr size_t SPARE_HANDLES = 4096; // The most kept; more are freed.
 
+// An untyped value keeps its tag in the low bits of a handle's address: the head keeps it sixteen bytes apart.
+static_assert(sizeof(rt::HandleHead) % 16 == 0 && __STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 16, "a handle is sixteen bytes aligned");
+
 void *handle_memory() {
 	std::vector<void *> &spare = spare_handles();
+	void *memory = nullptr;
 	if (!on_main_thread() || spare.empty()) {
-		return ::operator new(sizeof(Variant));
+		memory = ::operator new(sizeof(rt::HandleHead) + sizeof(Variant));
+	} else {
+		memory = spare.back();
+		spare.pop_back();
 	}
-	void *memory = spare.back();
-	spare.pop_back();
-	return memory;
+	rt::HandleHead *head = new (memory) rt::HandleHead();
+	head->holders.store(1, std::memory_order_relaxed);
+	head->shared = rt::HANDLE_UNKNOWN;
+	head->asked = 0;
+	head->seen = 0;
+	head->object = nullptr;
+	return head + 1;
 }
 
 void free_handle_memory(void *p_memory) {
+	void *memory = rt::head_of(p_memory);
 	std::vector<void *> &spare = spare_handles();
 	if (!on_main_thread() || spare.size() >= SPARE_HANDLES) {
-		::operator delete(p_memory);
+		::operator delete(memory);
 		return;
 	}
-	spare.push_back(p_memory);
+	spare.push_back(memory);
 }
 
 // A handle on a reference-counted object that is gone. Copying it would count a reference on freed
@@ -90,11 +102,31 @@ void *GodotHost::borrow(Object *p_object) {
 	return memory;
 }
 
+// A handle on an object that is not reference-counted is shared by whoever copies it: one more holds it,
+// and no other handle is made (generated code counts itself in the same way: rt::shared). Such a handle
+// counts no reference of Godot's, is never written in place (only a value's is: assign(), Wanted::reuse)
+// and is no node of the cycle collector's, so one handle serves every holder; a freed object is as null
+// through it as through a copy. Not one on a reference-counted object, where each handle is a reference
+// the collector counts, nor a script's hold on what it is attached to, whose copies are ordinary handles.
+// Asked of a handle on an object only: a value lent for a call (script_call.cpp) has no head to look at.
+bool GodotHost::shares(void *p_object_handle) {
+	rt::HandleHead *head = rt::head_of(p_object_handle);
+	if (head->shared == rt::HANDLE_UNKNOWN) {
+		const ObjectID id = (ObjectID) * static_cast<const Variant *>(p_object_handle);
+		head->shared = !id.is_null() && !id.is_ref_counted() && !borrowed_.count(p_object_handle) ? rt::HANDLE_SHARED : rt::HANDLE_COPIED;
+	}
+	return head->shared == rt::HANDLE_SHARED;
+}
+
 void *GodotHost::copy(void *p_value) {
 	if (!p_value) {
 		return nullptr;
 	}
 	Variant *value = static_cast<Variant *>(p_value);
+	if (value->get_type() == Variant::OBJECT && shares(p_value)) {
+		rt::head_of(p_value)->holders.fetch_add(1, std::memory_order_relaxed);
+		return p_value;
+	}
 	if (is_dangling(*value)) {
 		return make_handle();
 	}
@@ -103,8 +135,9 @@ void *GodotHost::copy(void *p_value) {
 
 bool GodotHost::assign(void *p_to, const void *p_from) {
 	// An object (a value held as any of Godot's) is copied as copy() copies one: a freed one goes as null.
+	// Nor is a handle on an object ever written over: others may hold the same one (shares()).
 	const Variant *from = static_cast<const Variant *>(p_from);
-	if (from->get_type() == Variant::OBJECT) {
+	if (from->get_type() == Variant::OBJECT || static_cast<const Variant *>(p_to)->get_type() == Variant::OBJECT) {
 		return false;
 	}
 	*static_cast<Variant *>(p_to) = *from;
@@ -118,6 +151,11 @@ void GodotHost::drop(void *p_value) {
 	Variant *value = static_cast<Variant *>(p_value);
 	// Only a handle on an object can be a borrowed one: a value (a Vector2) is freed without looking.
 	if (value->get_type() == Variant::OBJECT) {
+		// A shared one goes when the last of those that hold it lets go.
+		rt::HandleHead *head = rt::head_of(p_value);
+		if (head->shared == rt::HANDLE_SHARED && head->holders.fetch_sub(1, std::memory_order_acq_rel) > 1) {
+			return;
+		}
 		const auto borrowed = borrowed_.find(p_value);
 		if (borrowed != borrowed_.end()) {
 			borrowed_.erase(borrowed);

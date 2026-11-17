@@ -3,7 +3,7 @@ extension in the interpreter's place (KAS3_PROGRAM_LIBRARY).
 
 These are held:
 
-  probe      tests/godot_native's scripts, and the test project's Places.as and Emits.as with them, say, as
+  probe      tests/godot_native's scripts, and the test project's Places.as, Emits.as and EmitsChild.as with them, say, as
              native code, what they say interpreted, line for line. Built with another number for the runtime's layout
              in its table (runtime/layout.h), the library is refused and the interpreter runs them.
   workloads  each workload of tests/bench/languages' CmpAs.as, run small, stays on the fast paths.
@@ -11,9 +11,11 @@ These are held:
              library what frames/native_counts.txt says: nothing in a loop that should be free of it.
 
 The second is by the host's counts (KAS3_NATIVE_COUNTS): how many times generated code left an operation
-to the library (a thunk), and how many of the places it asks Godot directly the host could not work out.
-`native_counts.txt` beside each script holds the two numbers, which do not grow with a loop: a change that
-loses a fast path makes the first thousands, and fails here and not only in a timing. When a number is
+to the library (a thunk), how many of the places it asks Godot directly the host could not work out, how
+many handles on Godot's values and objects it had the host copy, and how many times it asked the engine
+for the object behind a handle. `native_counts.txt` beside each script holds the numbers, which do not grow
+with a loop that is on its fast paths: a change that loses one makes a number thousands, and fails here and
+not only in a timing. When a number is
 meant to change, the failure says what was counted; write that into the file.
 """
 import glob
@@ -121,7 +123,7 @@ class Runner:
         with tempfile.TemporaryDirectory() as where:
             # With the scripts places.gd and emits.gd hold to GDScript under the interpreter: here each is held to
             # itself as native code.
-            shared = [os.path.join(self.tests, "godot_project", name) for name in ("Places.as", "Emits.as", "emits_cases.gd")]
+            shared = [os.path.join(self.tests, "godot_project", name) for name in ("Places.as", "Emits.as", "EmitsChild.as", "emits_cases.gd")]
             project = self.project(where, sources, sorted(os.listdir(sources)) + shared)
             scripts = sorted(name for name in os.listdir(project) if name.endswith(".as"))
             program = self.library("the probe", project, scripts, where)

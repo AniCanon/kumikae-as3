@@ -44,8 +44,9 @@ Reach reach(uint32_t p_class, const godot::StringName &p_name);
 godot::Variant read_field(const vm::Object *p_object, uint32_t p_field);
 // A value from Godot stored in a field, converted as a store into the field converts: an Array field takes
 // a copy of Godot's Array, a Dictionary field a copy of Godot's Dictionary, or null. False, the field
-// unchanged, when the value does not fit or the field can't be written from Godot (a const, a signal, a
-// script object, a Date).
+// unchanged, when the value does not fit or the field can't be written from Godot (a const, a signal, an
+// object of a class that extends none of Godot's, a Date). A field of a script's class takes the Godot
+// object that carries such a script, as that script's object.
 bool write_field(vm::Object *p_object, uint32_t p_field, const godot::Variant &p_value);
 
 // The one kind of Godot's value that comes into a register or field of this class, an AS3 container: an
@@ -54,6 +55,15 @@ bool write_field(vm::Object *p_object, uint32_t p_field, const godot::Variant &p
 godot::Variant::Type container_type(uint32_t p_class);
 // That value copied, or null for Godot's null. Nothing if the copy failed: the error has been reported.
 std::optional<vm::Slot> container_from_variant(uint32_t p_class, const godot::Variant &p_value);
+// Whether a value of Godot's may be taken where an object of the class is declared (a parameter, a field):
+// for an Array or a Dictionary, Godot's own or null; for a class that extends one of Godot's, the Godot
+// object that carries a script of that class or of one that extends it (program.h, arriving_script), null,
+// or an object that has been freed, which is null. Nothing else: an object of any other class of the
+// program has no Godot object to come by.
+bool object_arrives(uint32_t p_class, const godot::Variant &p_value);
+// What object_arrives() said yes to, as the place holds it, the caller's to let go of. Nothing if a copy
+// failed: the error has been reported.
+std::optional<vm::Slot> object_from_variant(uint32_t p_class, const godot::Variant &p_value);
 
 // The class's public fields, getters and setters as Godot describes properties, and its public methods as
 // Godot describes methods, those of its base classes included.

@@ -152,7 +152,12 @@ void BoundMethod::call(const Variant **p_arguments, int p_argcount, Variant &r_r
 			CharString given = Variant::get_type_name(p_arguments[r_call_error.argument]->get_type()).utf8();
 			const size_t at = (size_t)r_call_error.argument + (callee.is_static ? 0 : 1);
 			ir::Kind kind = callee.registers[at];
-			const std::string &type = at < callee.engine_types.size() ? callee.engine_types[at] : std::string();
+			// The type the parameter declares: Godot's, the program's class, or the kind's own name.
+			std::string type = at < callee.engine_types.size() ? callee.engine_types[at] : std::string();
+			if (type.empty() && kind == ir::Kind::Obj && at < callee.parameter_classes.size() &&
+					callee.parameter_classes[at] < Project::get().module().classes.size()) {
+				type = Project::get().module().classes[callee.parameter_classes[at]].name;
+			}
 			text = "TypeError: Error #1034: Type Coercion failed: cannot convert argument " + std::to_string(r_call_error.argument + 1) +
 					" of " + callee.name + "(), a " + given.get_data() + ", to " + (type.empty() ? ir::kind_name(kind) : type.c_str()) + ".";
 		} else {
