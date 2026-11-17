@@ -148,22 +148,20 @@ void a_register_of_two_classes_holds_what_they_share() {
 	CHECK(text->find("r1 = field<double>(r2, 0);") != std::string::npos);
 }
 
-// A loop that reads the elements of a vector of objects, in a method that lets go of nothing, is written
-// twice like a loop over numbers: the first copy has the vector's length and elements in locals. A field
-// written in the loop is of an element's class, which `this` is not: its number may be the number of the
-// field the vector is read from, and the loop is still written twice.
-void a_loop_over_a_vector_of_objects_is_written_twice() {
+// Holder.sum(), with its classes: i = 0; v = this.items; n = v.length; <p_first>; while (i < n) { v = this.items;
+// p = v[i]; <p_between>; p.x = p.x; i++ }. The loop is instructions 4 to 16; r11 is an object's register.
+ir::Module module_of_sum(ir::Instruction p_first, ir::Instruction p_between) {
 	using ir::Instruction;
 	using ir::Kind;
 	using ir::Op;
-	// sum(): i = 0; v = this.items; n = v.length; while (i < n) { v = this.items; p = v[i]; p.x = p.x; i++ }
 	ir::Module module = module_of(
-			{ Kind::Obj, Kind::I32, Kind::Obj, Kind::Obj, Kind::F64, Kind::F64, Kind::F64, Kind::Bool, Kind::I32, Kind::F64, Kind::F64 },
-			{ Instruction{ Op::ConstI32, 1, 0, 0, 0 }, Instruction{ Op::GetField, 2, 0, 0, 0 }, Instruction{ Op::VecLength, 8, 2, 0, 0 },
+			{ Kind::Obj, Kind::I32, Kind::Obj, Kind::Obj, Kind::F64, Kind::F64, Kind::F64, Kind::Bool, Kind::I32, Kind::F64, Kind::F64, Kind::Obj },
+			{ Instruction{ Op::ConstI32, 1, 0, 0, 0 }, Instruction{ Op::GetField, 2, 0, 0, 0 }, Instruction{ Op::VecLength, 8, 2, 0, 0 }, p_first,
 					Instruction{ Op::I32ToF64, 5, 1, 0, 0 }, Instruction{ Op::I32ToF64, 6, 8, 0, 0 }, Instruction{ Op::LtF64, 7, 5, 6, 0 },
-					Instruction{ Op::JumpIfNot, 7, 15, 0, 0 }, Instruction{ Op::GetField, 2, 0, 0, 0 }, Instruction{ Op::VecGet, 3, 2, 1, 0 },
-					Instruction{ Op::GetField, 4, 3, 0, 0 }, Instruction{ Op::SetField, 3, 0, 4, 0 }, Instruction{ Op::ConstF64, 9, 0, 0, 0 },
-					Instruction{ Op::AddF64, 10, 5, 9, 0 }, Instruction{ Op::F64ToI32, 1, 10, 0, 0 }, Instruction{ Op::Jump, 3, 0, 0, 0 } });
+					Instruction{ Op::JumpIfNot, 7, 17, 0, 0 }, Instruction{ Op::GetField, 2, 0, 0, 0 }, Instruction{ Op::VecGet, 3, 2, 1, 0 },
+					p_between, Instruction{ Op::GetField, 4, 3, 0, 0 }, Instruction{ Op::SetField, 3, 0, 4, 0 },
+					Instruction{ Op::ConstF64, 9, 0, 0, 0 }, Instruction{ Op::AddF64, 10, 5, 9, 0 }, Instruction{ Op::F64ToI32, 1, 10, 0, 0 },
+					Instruction{ Op::Jump, 4, 0, 0, 0 } });
 	module.numbers.push_back(1.0);
 	add_points(module);
 	ir::Class points;
@@ -181,7 +179,16 @@ void a_loop_over_a_vector_of_objects_is_written_twice() {
 	sum.owner = 3;
 	sum.parameters = 1;
 	sum.required = 1;
-	const backend_cpp::Generated made = backend_cpp::generate(module);
+	return module;
+}
+
+// A loop that reads the elements of a vector of objects, in a method that lets go of nothing, is written
+// twice like a loop over numbers: the first copy has the vector's length and elements in locals. A field
+// written in the loop is of an element's class, which `this` is not: its number may be the number of the
+// field the vector is read from, and the loop is still written twice.
+void a_loop_over_a_vector_of_objects_is_written_twice() {
+	const ir::Instruction nothing{ ir::Op::Stmt, 0, 0, 0, 0 };
+	const backend_cpp::Generated made = backend_cpp::generate(module_of_sum(nothing, nothing));
 	CHECK_EQ(made.unsupported, std::string());
 	const std::string *text = file_named(made, "Holder.cpp");
 	CHECK(text != nullptr);
@@ -195,6 +202,33 @@ void a_loop_over_a_vector_of_objects_is_written_twice() {
 	CHECK(has("static_cast<C0_Point *>(r3)->f0_x = r4;"));
 }
 
+// In a method that does let go of things (it makes an object into a register that held one), an element
+// read into a variable still counts no reference where every use of the variable follows the read at once,
+// with nothing between that could let go of anything: the vector holds the object until then. With
+// something between (an object made into a register that held one), the variable counts one, as ever.
+void an_element_used_at_once_counts_no_reference() {
+	const ir::Instruction nothing{ ir::Op::Stmt, 0, 0, 0, 0 };
+	const ir::Instruction makes{ ir::Op::New, 11, 0, 0, 0 };
+	const backend_cpp::Generated at_once = backend_cpp::generate(module_of_sum(makes, nothing));
+	const backend_cpp::Generated later = backend_cpp::generate(module_of_sum(nothing, makes));
+	CHECK_EQ(at_once.unsupported, std::string());
+	CHECK_EQ(later.unsupported, std::string());
+	const std::string *text = file_named(at_once, "Holder.cpp");
+	const std::string *counted = file_named(later, "Holder.cpp");
+	CHECK(text != nullptr && counted != nullptr);
+	if (!text || !counted) {
+		return;
+	}
+	CHECK(text->find("put(c, r11, e);") != std::string::npos);
+	CHECK(text->find("r3 = static_cast<Object *>(d2[static_cast<uint32_t>(r1)].p);") != std::string::npos);
+	CHECK(text->find("store(c, r3, ") == std::string::npos);
+	// What the library hands back for an index out of range is counted once for the register: given back at once.
+	CHECK(text->find("r3 = static_cast<Object *>(o.p);\n\trelease(c, r3);") != std::string::npos);
+	CHECK(text->find("put(c, r3, ") == std::string::npos);
+	CHECK(counted->find("store(c, r3, static_cast<Object *>((*e).p));") != std::string::npos);
+	CHECK(counted->find("put(c, r3, static_cast<Object *>(o.p));") != std::string::npos);
+}
+
 int main() {
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
@@ -202,5 +236,6 @@ int main() {
 	a_field_of_a_known_class_is_written_through_its_struct();
 	a_register_of_two_classes_holds_what_they_share();
 	a_loop_over_a_vector_of_objects_is_written_twice();
+	an_element_used_at_once_counts_no_reference();
 	return check::finish();
 }

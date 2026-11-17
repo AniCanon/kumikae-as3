@@ -26,7 +26,7 @@ bool FunctionWriter::runs_code(const Instruction &p_in) const {
 
 // The registers that are only ever given an element of a vector, or a copy of such a register: what
 // `var b:Body = bodies[i]` is. They count nothing if the function is one in which nothing lets go of
-// anything (find_borrowed decides).
+// anything, or if each is only used at once after it is read (find_borrowed decides).
 std::vector<bool> FunctionWriter::lent_candidates() const {
 	const size_t count = function_.registers.size();
 	std::vector<bool> candidate(count, false);
@@ -106,10 +106,10 @@ void FunctionWriter::find_borrowed() {
 	}
 	// With the registers that would borrow and those that would be lent counting nothing, does anything in
 	// the function still let go of something, or run code that might? If nothing does, no object leaves a
-	// vector while the function runs, and the lent registers are. (A register that then fails to borrow,
-	// below, lets go of what it held: the lent ones are given up, and the others found again without them.)
+	// vector while the function runs, and the lent registers are, wherever they are read.
 	const std::vector<uint32_t> hoped = borrowed_;
-	lent_ = lent_candidates();
+	const std::vector<bool> candidates = lent_candidates();
+	lent_ = candidates;
 	std::vector<bool> counts_nothing = lent_;
 	for (uint32_t i = 0; i < count; i++) {
 		counts_nothing[i] = counts_nothing[i] || borrowed_[i] != NONE;
@@ -118,13 +118,12 @@ void FunctionWriter::find_borrowed() {
 	for (const Instruction &in : function_.code) {
 		calm = calm && in.op != Op::Call && !may_run_code(module_, function_, in, counts_nothing);
 	}
-	if (!calm) {
-		lent_.assign(count, false);
-	}
-	// Every read of it follows a read of the field in straight code, with nothing between that could write
-	// the field or run code, and is itself of that kind. One that fails stops borrowing, which may make
-	// another's reads fail: until none does.
-	const auto settle_reads = [&]() {
+	// Every read of a register that borrows follows a read of the field in straight code, with nothing
+	// between that could write the field or run code, and is itself of that kind. One that fails stops
+	// borrowing, which may make another's reads fail: until none does. p_at_once: the same is asked of a
+	// register that is lent, of the read of the element: one used only at once counts nothing in a function
+	// that does let go of things, since nothing is let go of between the read and the use.
+	const auto settle_reads = [&](bool p_at_once) {
 		for (bool changed = true; changed;) {
 			changed = false;
 			std::vector<bool> fresh(count, false);
@@ -138,6 +137,10 @@ void FunctionWriter::find_borrowed() {
 				const auto read = [&](uint32_t p_register) {
 					if (borrowed_[p_register] != NONE && !(fresh[p_register] && quiet)) {
 						borrowed_[p_register] = NONE;
+						changed = true;
+					}
+					if (p_at_once && lent_[p_register] && !(fresh[p_register] && quiet)) {
+						lent_[p_register] = false;
 						changed = true;
 					}
 				};
@@ -158,18 +161,23 @@ void FunctionWriter::find_borrowed() {
 						fresh[i] = fresh[i] && borrowed_[i] != in.b;
 					}
 				}
-				if (written != NONE && borrowed_[written] != NONE) {
+				if (written != NONE && (borrowed_[written] != NONE || (p_at_once && lent_[written]))) {
 					fresh[written] = true;
 				}
 			}
 		}
 	};
-	settle_reads();
-	if (calm && borrowed_ != hoped) {
-		lent_.assign(count, false);
+	if (calm) {
+		settle_reads(false);
+		if (borrowed_ == hoped) {
+			return;
+		}
+		// A register failed to borrow, and lets go of what it held: the function is not one that lets go
+		// of nothing after all.
 		borrowed_ = hoped;
-		settle_reads();
+		lent_ = candidates;
 	}
+	settle_reads(true);
 }
 
 } // namespace backend_cpp

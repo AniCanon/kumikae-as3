@@ -72,8 +72,12 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
 - A variable given an element of a vector (`var b:Body = bodies[i]`), or a copy of such a variable, counts
   no reference where the whole function lets go of nothing and runs no code that might: no call, nothing
   stored where an object is held, no register that owns an object written (`lent_`, rule 2 of the
-  translation rules; `tests/run/element_lent.as`). The vector holds the object all the while. Anywhere else
-  the variable counts one, as before.
+  translation rules; `tests/run/element_lent.as`). The vector holds the object all the while. In a function
+  that does let go of things, the variable still counts none where every use of it follows the read at
+  once, in straight code with nothing between that could let go of anything or run code
+  (`var p:Particle = slots[i]; sum += p.x + p.vy;`): the rule of a field of `this` read to be used at
+  once, for an element. A variable used again later (after a call, an object stored, a jump) counts one,
+  as before.
 - `hit.emit(a, b)` asks the host for the emit it worked out once for that place (`c->engine->emit`), with
   the values where they are: nothing is boxed, and no name is looked up. Where `hit` is a field of `this`
   and nothing between the field's read and the emit could write the field or run the program's code, no
