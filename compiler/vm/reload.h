@@ -40,6 +40,9 @@ class Reload {
 	std::vector<std::string> changed_statics_; // What globals() was given: the classes whose static fields' code changed.
 	// By class of the new program: an object of it was made with arguments its new constructor does not take.
 	std::unordered_set<uint32_t> unfit_;
+	// For each object whose record is CARRIED: the class of the old program it was an object of. The old
+	// object itself may be gone before update_in_place(): a host lets go of each as it is moved.
+	std::unordered_map<Object *, uint32_t> carried_;
 
 	// An object of the class has no place in the new program: said, and null.
 	Object *lost(uint32_t p_old_class);
@@ -64,20 +67,20 @@ class Reload {
 	// the caller's to release. Null if there is no memory or the constructor failed, which is reported as
 	// any error of a call from outside is.
 	static Object *made_again(Interpreter &p_program, uint32_t p_class, const Constructions::Record &p_record);
-	// The first values of an object the old program remembered by its arguments alone, as the new one's
-	// fields hold them: what the old chain gives, run again; for a field that is new or of another kind,
-	// what the object holds. Each belongs to the throwaway it came from (`r_made`, the caller's to release
-	// with the old program) or to the object. False if the old chain could not be run.
-	bool first_values(Object *p_old, Object *p_fresh, std::vector<Slot> *r_values, Object **r_made);
+	// The first values of an object whose record is CARRIED, as the new program's fields hold them: what
+	// the old program's chain gives for the arguments carried (which its constructor takes as the new one
+	// does), run again on a throwaway of the old class; for a field that is new or of another kind, what
+	// the object holds. Each belongs to the throwaway it came from (`r_made`, the caller's to release with
+	// the old program) or to the object. False if the old chain could not be run.
+	bool first_values(Object *p_fresh, std::vector<Slot> *r_values, Object **r_made);
 	// A CARRIED record given its first values, and so ALL; forgotten if they can't be had.
-	void keep_first_values(Object *p_old, Object *p_fresh);
-	// The objects of one class of the new program, each with the old one it was moved from: what is still
-	// CARRIED of them is settled. Left to the new chain where that gives the same (`p_same`: the chain
-	// can be run again, and neither it nor a constant it reads changed), and else given its first values.
-	using Pairs = std::vector<std::pair<Object *, Object *>>;
-	void settle(const Pairs &p_objects, bool p_same);
+	void keep_first_values(Object *p_fresh);
+	// The objects of one class of the new program: what is still CARRIED of them is settled. Left to the
+	// new chain where that gives the same (`p_same`: the chain can be run again, and neither it nor a
+	// constant it reads changed), and else given its first values.
+	void settle(const std::vector<Object *> &p_objects, bool p_same);
 	enum class Again { Updated, NotRemembered, Failed };
-	Again construct_again(Object *p_old, Object *p_object);
+	Again construct_again(Object *p_object);
 
 public:
 	Reload(Interpreter &p_from, Interpreter &p_to);

@@ -1643,6 +1643,9 @@ struct Edited {
 	bool godot = false; // The sources name Godot's classes.
 	bool remember = true;
 	vm::NativeCode *native = nullptr; // Stands for a program's native code, which this one does not run.
+	// The old program's objects are let go of as soon as they are moved, as Godot's host lets go of each
+	// instance's: they are gone by the time the objects alive are updated.
+	bool let_go_early = false;
 
 	std::unique_ptr<ir::Module> build(const std::string &p_source) {
 		auto built = std::make_unique<ir::Module>();
@@ -1686,9 +1689,14 @@ struct Edited {
 			vm::Reload reload(*program, *fresh);
 			reload.globals(ir::static_changes(*module, *next));
 			moved = reload.object(game);
+			if (let_go_early) {
+				program->release_object(game);
+			}
 			done = reload.update_in_place(ir::run_once_changes(*module, *next));
 		}
-		program->release_object(game);
+		if (!let_go_early) {
+			program->release_object(game);
+		}
 		game = moved;
 		program = std::move(fresh);
 		module = std::move(next);
@@ -2012,6 +2020,7 @@ static void test_reload_in_place_turns() {
 			"class Quiet { public var n:Number; public var name:String; public var none:String;\n"
 			"  public function Quiet(p_n:Number, p_name:String = \"q\") { n = p_n + K.N; name = p_name + K.N; } }\n";
 	Edited edited;
+	edited.let_go_early = true;
 	edited.start(source);
 	edited.call("make");
 	// Loud's constructor counts: it can't be run again, and its objects are left. Quiet's can.

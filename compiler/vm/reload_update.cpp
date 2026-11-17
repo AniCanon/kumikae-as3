@@ -38,6 +38,7 @@ void Reload::carry_record(Object *p_old, Object *p_fresh) {
 	}
 	if (kept->kept != Constructions::ALL) {
 		record->kept = Constructions::CARRIED;
+		carried_[p_fresh] = p_old->klass;
 		return;
 	}
 	const std::vector<uint32_t> named = fields_by_name(old_class, new_class);
@@ -70,13 +71,14 @@ Object *Reload::made_again(Interpreter &p_program, uint32_t p_class, const Recor
 	return again;
 }
 
-bool Reload::first_values(Object *p_old, Object *p_fresh, std::vector<Slot> *r_values, Object **r_made) {
-	const Record *kept = from_.constructions_ ? from_.constructions_->of(p_old) : nullptr;
-	*r_made = kept ? made_again(from_, p_old->klass, *kept) : nullptr;
+bool Reload::first_values(Object *p_fresh, std::vector<Slot> *r_values, Object **r_made) {
+	const auto from = carried_.find(p_fresh);
+	const Record *kept = to_.constructions_->record(p_fresh);
+	*r_made = from != carried_.end() && kept ? made_again(from_, from->second, *kept) : nullptr;
 	if (!*r_made) {
 		return false;
 	}
-	const ir::Class &old_class = from_.module_.classes[p_old->klass];
+	const ir::Class &old_class = from_.module_.classes[from->second];
 	const ir::Class &new_class = to_.module_.classes[p_fresh->klass];
 	const std::vector<uint32_t> named = fields_by_name(old_class, new_class);
 	r_values->resize(new_class.fields.size());
@@ -88,12 +90,12 @@ bool Reload::first_values(Object *p_old, Object *p_fresh, std::vector<Slot> *r_v
 	return true;
 }
 
-void Reload::keep_first_values(Object *p_old, Object *p_fresh) {
+void Reload::keep_first_values(Object *p_fresh) {
 	Record *record = to_.constructions_->record(p_fresh);
 	const ir::Class &klass = to_.module_.classes[p_fresh->klass];
 	std::vector<Slot> first;
 	Object *made = nullptr;
-	bool plain = first_values(p_old, p_fresh, &first, &made);
+	bool plain = first_values(p_fresh, &first, &made);
 	for (uint32_t i = 0; plain && i < klass.fields.size(); i++) {
 		plain = Constructions::plain(klass.fields[i].kind, first[i]);
 	}
@@ -110,11 +112,11 @@ void Reload::keep_first_values(Object *p_old, Object *p_fresh) {
 	}
 }
 
-void Reload::settle(const Pairs &p_objects, bool p_same) {
+void Reload::settle(const std::vector<Object *> &p_objects, bool p_same) {
 	if (!to_.constructions_) {
 		return;
 	}
-	for (const auto &[old, fresh] : p_objects) {
+	for (Object *fresh : p_objects) {
 		Record *record = to_.constructions_->record(fresh);
 		if (!record || record->kept != Constructions::CARRIED) {
 			continue;
@@ -122,7 +124,7 @@ void Reload::settle(const Pairs &p_objects, bool p_same) {
 		if (p_same) {
 			record->kept = Constructions::ARGUMENTS;
 		} else {
-			keep_first_values(old, fresh);
+			keep_first_values(fresh);
 		}
 	}
 }
@@ -152,7 +154,7 @@ bool Reload::constant_changed(const std::string &p_name) const {
 
 // One object: the new constructor run on a throwaway with the arguments the object was made with, and
 // each field that still holds its old first value given the new one.
-Reload::Again Reload::construct_again(Object *p_old, Object *p_object) {
+Reload::Again Reload::construct_again(Object *p_object) {
 	Constructions *kept = to_.constructions_.get();
 	Record *record = kept ? kept->record(p_object) : nullptr;
 	// An object moved here has all of its record, or one still carried: its arguments alone would say
@@ -163,7 +165,7 @@ Reload::Again Reload::construct_again(Object *p_old, Object *p_object) {
 	const ir::Class &klass = to_.module_.classes[p_object->klass];
 	std::vector<Slot> was(record->values + record->arguments, record->values + record->arguments + klass.fields.size());
 	Object *before = nullptr;
-	if (record->kept == Constructions::CARRIED && !first_values(p_old, p_object, &was, &before)) {
+	if (record->kept == Constructions::CARRIED && !first_values(p_object, &was, &before)) {
 		kept->forget(p_object);
 		return Again::NotRemembered;
 	}
@@ -203,11 +205,11 @@ Reload::Again Reload::construct_again(Object *p_old, Object *p_object) {
 InPlace Reload::update_in_place(const std::vector<std::string> &p_run_once) {
 	// By class of the new program: its objects that are alive. A table, a vector and an object of the
 	// library's are never made again.
-	std::map<uint32_t, Pairs> alive;
+	std::map<uint32_t, std::vector<Object *>> alive;
 	for (const auto &[old, fresh] : moved_) {
 		const ir::Class &klass = to_.module_.classes[fresh->klass];
 		if (!klass.table && klass.element == Kind::Void && !klass.built_in) {
-			alive[fresh->klass].emplace_back(old, fresh);
+			alive[fresh->klass].push_back(fresh);
 		}
 	}
 	InPlace done;
@@ -226,7 +228,7 @@ InPlace Reload::update_in_place(const std::vector<std::string> &p_run_once) {
 		}
 		bool updated = false, unknown = false, failed = false;
 		for (size_t i = 0; i < objects.size() && !failed; i++) {
-			const Again result = construct_again(objects[i].first, objects[i].second);
+			const Again result = construct_again(objects[i]);
 			updated = updated || result == Again::Updated;
 			unknown = unknown || result == Again::NotRemembered;
 			failed = result == Again::Failed; // Once is enough: every object of the class would fail, and say so.
