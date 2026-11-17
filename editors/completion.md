@@ -162,7 +162,7 @@ An edit checks again only what it can change. The program is checked in two laye
   editor pauses. A file whose bodies alone read a change has only its bodies checked again.
 
 Every answer about a checked file is what a check of the whole program would give: a random-edit oracle
-compares the two after each of thousands of edits (see the [follow-up results](../docs/results/2026-11-completion-followup.md)).
+compares the two after each of thousands of edits.
 A syntax error is confined to its file: its declarations, as the parser recovered them, are compared like
 those of any edit, so files that read nothing it changed are not checked again; they are only judged again
 for what a file that does not parse makes doubtful. Declarations that are gone leave their symbols to be
@@ -188,7 +188,6 @@ was asked about), and the check goes on from where it stopped. Diagnostics are p
 it is checked; a file not yet checked keeps what the editor has. While a file does not parse, the others
 are judged again for what that makes doubtful only when a declaration or the set of broken files changed. Cancellation and closing a
 document affect queued requests as before.
-See the [follow-up results](../docs/results/2026-11-completion-followup.md) for latency, memory and validation.
 
 ## Troubleshooting and limits
 

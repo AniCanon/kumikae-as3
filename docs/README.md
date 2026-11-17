@@ -1,22 +1,29 @@
-# `docs/`
+# Documentation
 
-| Where | Holds |
+| Page | Read it to learn |
 |---|---|
-| [roadmap.md](roadmap.md) | The stages, what is done, what is next |
-| [backlog.md](backlog.md) | Old findings still owed, being fixed until the page is empty. Nothing is added to it: what is found is fixed at once (the owner's rule, 2026-11-15) |
-| [cpp-guidelines.md](cpp-guidelines.md) | How the C++ is written; `compiler/tools/check_style.py` enforces what a program can check |
-| `superpowers/specs/` | A design, approved by the owner before the work starts: `YYYY-MM-DD-<topic>-design.md` |
-| `superpowers/plans/` | The plan that carries a design out, task by task, with its review focus |
-| `results/` | What was measured or run, on what, on which date. Only what was observed: a thing not run is listed as not run |
-| `diagrams/` | `build.py` draws the `.svg` files; edit the script, not the picture |
+| [How it works](how-it-works.md) | How a script goes from an `.as` file to a running game |
+| [Performance](performance.md) | The numbers against Godot C#, and the techniques behind them |
+| [Hot reload](hot-reload.md) | What happens when you save a script while the game runs |
+| [Roadmap](roadmap.md) | What is built, what is in progress, what comes next, and the known limits |
+| [C++ guidelines](cpp-guidelines.md) | How the compiler's C++ is written |
 
-`superpowers/` is ignored by git: designs and plans are working papers, kept where they are written and never
-committed. What a design decided that others must know goes into the roadmap or a README.
+Each part of the code has its own README:
 
-## Rules
+| Part | README |
+|---|---|
+| The compiler, the interpreter and the Godot extension | [compiler/](../compiler/README.md) |
+| Editor support | [editors/](../editors/README.md) |
+| Testing in AS3 | [testing/](../testing/README.md) |
+| An example game | [examples/coin-dash/](../examples/coin-dash/README.md) |
 
-- Plain words, short sentences. A document says what is true now; history is in git.
-- A results file never claims more than was run. No device, team or personal identifier in one.
-- Nothing about a games console's SDK, tools or results.
-- A stage is not done until the roadmap and the README of what changed say so, and every finding of its
-  review is fixed.
+## Writing documentation
+
+- **Say what is true now.** History belongs in git. A page changes in the same pull request as the code it
+  describes.
+- **Write for someone new to the project.** Use plain words, short sentences and the second person.
+- **Don't claim more than was run.** A number comes with how it was measured. Something not tested is
+  listed as not tested.
+- **Draw diagrams with [`diagrams/build.py`](diagrams/build.py).** Edit the script and run it; don't edit an
+  `.svg` by hand.
+- **Leave out anything about a console's SDK, tools or results,** and any personal or device identifier.

@@ -74,9 +74,8 @@ cmake --build compiler/build-san -j8 && ctest --test-dir compiler/build-san -j4 
 
 4. One kind of change per commit: a move with no edits, a rename, or a rewrite. A clean-up changes no test
    and no golden file.
-5. Fix every finding of a review, of any size, in the same branch with a test. Never add to
-   `docs/backlog.md` (the owner's rule): it only shrinks. When an old item there is fixed, remove its line,
-   and keep its counts and the count in `docs/roadmap.md` right.
+5. Fix every finding of a review, of any size, in the same branch with a test. The project keeps no list
+   of findings to fix later. Keep `docs/roadmap.md` true in the same branch.
 
 ## Do not
 

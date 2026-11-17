@@ -846,7 +846,7 @@ its names mean: inside it, names resolve only to other declarations, and its own
 
 `godot/godot.as` declares all of Godot 4.7's API for AS3: 1,036 classes, 30 value and collection types, 22
 global enums and 112 global functions. `godot/generate.py` writes it from Godot's own API description under
-the naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`), and the build embeds it.
+the naming rules in `godot/naming.py`, and the build embeds it.
 
 | Godot | AS3 |
 |---|---|

@@ -20,15 +20,12 @@ part of the program.
 > **Editor validation:**
 > - **VS Code 1.145:** works. With the client below, VS Code started the server, opened a script that
 >   extends `CharacterBody2D`, received its two errors, and received the shorter list after the file changed.
->   This was confirmed from a log of the messages between the two, and the owner saw both errors underlined
->   in the editor.
+>   This was confirmed from a log of the messages between the two, and by eye in the editor.
 >   It found one fault, now fixed: VS Code starts a server with `--stdio`, which `kas3c lsp` used to reject.
 > - **Rider RD-262.10968.170:** the native plugin passes automated sandbox checks for pairing,
 >   completion lookup, Tab/Enter acceptance, undo and changed-document cancellation (2026-11-15).
->   See [completion results](../docs/results/2026-11-completion.md) for measurements and limits.
 > - **Free unified IDEA IU-261.22158.277 with LSP4IJ 0.21.0:** automated sandbox checks cover Enter/Tab,
->   snippets, imports, overrides, parameter help, navigation and outline. See the
->   [follow-up results](../docs/results/2026-11-completion-followup.md) for the compatibility matrix.
+>   snippets, imports, overrides, parameter help, navigation and outline.
 
 > **Windows: built for, not yet tried.** The server reads and writes its messages in binary, checks a
 > pipe for input without blocking, opens files by their UTF-8 names and spells Windows paths one way

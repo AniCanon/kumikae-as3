@@ -36,7 +36,7 @@ export prints one table; with --runs N, the best of the runs is kept per cell.
   vectors  1,000,000 rounds of Vector2 arithmetic and normalized()
   vectors3 1,000,000 rounds of Vector3 arithmetic, normalized() and dot()
 
-Then the frame benchmarks (frames/, the eleven of stage 0b: docs/results/2026-11-stage-0b-desktop.md), unless
+Then the frame benchmarks (frames/, described in docs/performance.md), unless
 --no-frames: each is a script on a node, left to Godot's frames at a fixed 60 a second, and what is timed is
 the whole frame. frames/runner.gd warms each up for 300 frames and two seconds, then takes the median of 600
 frames, in microseconds; with --runs N the median of the runs' medians is given, and for C# and native code
