@@ -23,11 +23,11 @@ goes into `program.cpp` too: one file for the C++ compiler, which a release is b
 | `function_calls.cpp` | Calls: direct, through the class's method table (by the function's name where the receiver's class says which it is), by interface |
 | `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, `push()` of one value where the vector has room, a `Vector2` or a `Vector2i` copied between a register that holds it inline and a vector's place that holds it whole, Strings, untyped values, properties under a String key, a call through a function value |
 | `function_library.cpp` | An instruction one of the library's functions of plain values carries out whole (`ir/library_entries.h`): the runtime's function of that name called on the instruction's values, where a thunk would have been |
-| `function_engine.cpp` | What asks Godot, where generated code does it itself: which values are held inline, the maths the runtime has for `Vector2` and `Vector3`, a property or a method of a Godot object called on bare values by its method bind, the script's own Godot object and singletons borrowed for the whole function |
+| `function_engine.cpp` | What asks Godot, where generated code does it itself: which values are held inline, the maths the runtime has for `Vector2` and `Vector3`, a property or a method of a Godot object called on bare values by its method bind (one of Godot's objects handed over as the object itself where the parameter is of exactly the register's class, a Dictionary or another value a handle keeps made where a new handle keeps it), the script's own Godot object and singletons borrowed for the whole function, and a register that is given a field's object again keeping the handle it has |
 | `function_signals.cpp` | A signal's `emit()` made by generated code itself: what it hands over is given to the host as it is held (a number, a Boolean, a value with parts by its address, a handle), and a signal that is a field of `this`, read only to be emitted, is emitted through the field's own handle. Which registers stand for a field's handle that way: a signal read to be emitted, and a value with parts read to be asked an operator, a method or a part |
 | `function_borrowed.cpp` | A field of `this` that holds an object, read into a register only to be used at once: the register counts no reference. An object read out of a vector into a variable, in a function that lets go of nothing: the variable counts none either |
 | `function_loops.cpp` | A loop over vectors of numbers, or of objects it only reads, written twice: first with each vector's length and elements in locals, which an index out of range leaves for the loop as it always was |
-| `function_values.cpp` | Godot's value types with parts: made from their parts and their members read where they are, and Godot's own code for the type (an operator, a method, a part, a constant) found once by the host and called on bare values |
+| `function_values.cpp` | Godot's value types with parts: made from their parts and their members read where they are, and Godot's own code for the type (an operator, a method, a part, a constant) found once by the host and called on bare values; a method of a value a handle keeps (a Dictionary's `isEmpty`) called where the handle keeps it; an element of a Dictionary under a key the program wrote, read as the value with parts it is to be |
 | `function_whole.cpp` | A sum of ints or uints converted back to one, as 32-bit arithmetic (exact, and three times as fast on `loop.as`), and two such sums compared as the integers they are |
 | `thunks.h`, `thunks.cpp` | The operations left to the library the interpreter has, each one instruction the host carries out |
 | `program_writer.h`, `program_writer.cpp` | `program.h` and the program's table |
@@ -112,6 +112,24 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   field's, with nothing between that could write the field or run the program's code (a call is as its
   callee is). A field that holds none, and anything the library is left, is the instruction by its thunk
   on a handle of its own (`Held`, `tests/godot_native/Probe.as`, `fields()`).
+- `params.from = v`, where `params` is a field that holds one of Godot's objects, reads the field into a
+  register each time it is written, which was a handle made and one let go of for every read (Godot counts
+  a reference for each, where it counts them) and a look for the object by its id. A register that a
+  property is read or written of, or a method called on, keeps the handle it has where the field still
+  holds the same object (`store_again`, `runtime/engine.h`): the very handle, or another on the object the
+  host found behind both. The register still has a handle of its own for as long as the call takes, so a
+  listener that empties the field meanwhile ends nothing Godot is in the middle of
+  (`tests/godot_native/Probe.as`, `fieldObjects()`).
+- `space.intersectRay(params)` is Godot's method called by its method bind on the objects themselves: an
+  argument that is one of Godot's objects is handed over as the object behind its handle (none for no
+  handle and for a freed object, as the library gives null for both) where the parameter is of exactly the
+  class the register is declared to hold, which is what makes it that class's object. What comes back in a
+  handle (a Dictionary, an Array, a Callable, a RID) is written by Godot where a new handle keeps it
+  (`EngineApi::call_kept`). `found.isEmpty()` is Godot's code for the type called where the register's own
+  handle keeps the value (`value_in`), and `var at:Vector2 = found["position"]` asks the host for the
+  element as that type at once (`EngineApi::keyed`), where the untyped value between the two instructions
+  is read by nothing else. Each keeps the instruction's thunk for the rest: no handle, a handle on
+  another type, no such key (`Probe.as`, `inHandles()`).
 - `new` of a class takes a block the host kept when one such object was let go of, inline, where the
   class's objects are kept (`made_object`, `runtime/README.md`).
 - A static field of a number or a Boolean that a function reads and never writes is a local (`g4`), read once

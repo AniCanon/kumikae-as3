@@ -67,6 +67,8 @@ func _initialize() -> void:
 	print("PROBE given=", probe.call("given"))
 	print("PROBE carried=", probe.call("carried"))
 	print("PROBE engine=", probe.call("engine"))
+	print("PROBE field objects=", probe.call("fieldObjects"))
+	print("PROBE in handles=", probe.call("inHandles"))
 	print("PROBE script=", probe.call("script", 1000))
 	print("PROBE script again=", probe.call("script", 10))
 	print("PROBE listeners=", probe.call("listeners"))

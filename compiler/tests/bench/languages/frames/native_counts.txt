@@ -3,22 +3,25 @@
 # A frame of Empty, MoveNodes, PerNodeProcess, SignalTraffic, NBody, Sieve, Saxpy, Shapes and Alloc leaves
 # nothing: what MoveNodes and PerNodeProcess count is their start, three for each of 20,000 nodes made (the
 # node, its place among the children, a Number as Godot's integer) and two, and what SignalTraffic counts is
-# its signal made and its listener added. The others still ask in every frame: RayQueries the query, isEmpty
-# and the element for each ray; ArrayConversion the collections handed over. A number that grows is a fast
-# path lost.
+# its signal made and its listener added. A frame of RayQueries leaves three, for the space it asks of the
+# world once: each ray's query is Godot's method called on the objects themselves, what it gives is made
+# where its handle keeps it, isEmpty is called there, and the element is asked for as the Vector2 it is.
+# What RayQueries counts besides is its start (64 bodies made, each with a shape). ArrayConversion still
+# asks in every frame: the collections handed over. A number that grows is a fast path lost.
 # handles: the handles on Godot's values and objects generated code had the host copy. lookups: the times
 # it asked the engine for the object behind a handle. Neither grows with the frames of MoveNodes or of
 # PerNodeProcess: a node's handle is copied by the host once, the first time it is shared (the host looks
 # at what it is on), and the object behind it is asked for twice, after which it is read from the handle
-# for as long as Godot frees nothing the host has found.
-Empty: thunks=0 unresolved=8 handles=0 lookups=0
-MoveNodes: thunks=60000 unresolved=8 handles=19976 lookups=40001
-PerNodeProcess: thunks=40000 unresolved=8 handles=0 lookups=80001
-RayQueries: thunks=18068 unresolved=8 handles=18000 lookups=12130
-SignalTraffic: thunks=4 unresolved=8 handles=1 lookups=0
-NBody: thunks=0 unresolved=8 handles=0 lookups=0
-Sieve: thunks=0 unresolved=8 handles=0 lookups=0
-ArrayConversion: thunks=244 unresolved=8 handles=1 lookups=2
-Saxpy: thunks=0 unresolved=8 handles=0 lookups=0
-Shapes: thunks=0 unresolved=8 handles=0 lookups=0
-Alloc: thunks=0 unresolved=8 handles=0 lookups=0
+# for as long as Godot frees nothing the host has found. Nor with the rays of RayQueries: the register the
+# query's parameters are read into keeps its handle while the field holds the same object.
+Empty: thunks=0 unresolved=2 handles=0 lookups=0
+MoveNodes: thunks=60000 unresolved=2 handles=19976 lookups=40001
+PerNodeProcess: thunks=40000 unresolved=2 handles=0 lookups=80001
+RayQueries: thunks=458 unresolved=2 handles=9 lookups=156
+SignalTraffic: thunks=4 unresolved=2 handles=1 lookups=0
+NBody: thunks=0 unresolved=2 handles=0 lookups=0
+Sieve: thunks=0 unresolved=2 handles=0 lookups=0
+ArrayConversion: thunks=244 unresolved=2 handles=1 lookups=2
+Saxpy: thunks=0 unresolved=2 handles=0 lookups=0
+Shapes: thunks=0 unresolved=2 handles=0 lookups=0
+Alloc: thunks=0 unresolved=2 handles=0 lookups=0

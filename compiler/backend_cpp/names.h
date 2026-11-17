@@ -37,6 +37,13 @@ std::string from_slot(ir::Kind p_kind, std::string_view p_slot);
 // struct of the same name (Vector2, Color); and the type a register holds that way, or nothing.
 bool has_parts(std::string_view p_godot_type);
 std::string_view parts_of(const ir::Function &p_function, uint32_t p_register);
+// Whether one of Godot's types is a value that a handle keeps where generated code can reach it: a register
+// holds the handle, a method bind gives such a value into a new handle (EngineApi::call_kept) and a method
+// of the type is called where the handle keeps the value (value_in()). Only types that every handle on
+// one value shares (a Dictionary, an Array) or that no method changes (a Callable, a RID): a method called
+// where one handle keeps the value is then the method called through any other. The host's list is the
+// same (godot_ext/native_program.cpp).
+bool in_handle(std::string_view p_godot_type);
 // The words of an engine name's value ("position property Vector2 get_position 334 set_position 743 -").
 std::vector<std::string_view> words_of(std::string_view p_text);
 

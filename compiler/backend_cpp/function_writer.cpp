@@ -285,7 +285,9 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 	if (!before.empty()) {
 		line(before);
 	}
-	if (!engine(p_in) && !fast_place(p_in)) {
+	if (pc_ == joined_) {
+		joined_ = NONE; // Written with the instruction before it.
+	} else if (!engine(p_in) && !fast_place(p_in)) {
 		generic(p_in);
 	}
 	if (!after.empty()) {

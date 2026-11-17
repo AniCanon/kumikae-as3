@@ -68,6 +68,10 @@ class FunctionWriter {
 	std::vector<uint32_t> alias_name_; // For a singleton: its engine name.
 	std::vector<uint32_t> singleton_use_; // And the use the host resolves it by, once written.
 	bool has_owner_alias_ = false;
+	// Per register: it holds one of Godot's objects that a property is read or written of or a method is
+	// called on, so that the object behind its handle is asked for. A field read into such a register again
+	// leaves the handle it has where the field still holds the same object (store_again, runtime/engine.h).
+	std::vector<bool> asked_;
 	// Per register: it holds a value with parts inline. Only one that every instruction writing it gives a
 	// value to (what Godot makes, computes or gives for a property of that type): a register that may be
 	// given null (a field read, a call's result, an untyped value) stays a handle, which can say so.
@@ -209,6 +213,8 @@ class FunctionWriter {
 	// function_engine.cpp
 	void find_aliases();
 	bool holds(uint32_t p_register, std::string_view p_type) const;
+	// Whether a register holds a handle on one of Godot's values or objects of exactly that type.
+	bool holds_handle(uint32_t p_register, std::string_view p_type) const;
 	std::string object_behind(uint32_t p_register);
 	std::optional<std::string> bare_argument(uint32_t p_register, std::string_view p_type, size_t p_at, std::string *r_guard);
 	bool engine(const ir::Instruction &p_in);
@@ -228,6 +234,10 @@ class FunctionWriter {
 	bool value_made(const ir::Instruction &p_in);
 	bool value_part(const ir::Instruction &p_in);
 	bool value_operation(const ir::Instruction &p_in);
+	bool kept_method(const ir::Instruction &p_in);
+	bool value_keyed(const ir::Instruction &p_in);
+	// The instruction that was written with the one before it (value_keyed), for which nothing more is.
+	uint32_t joined_ = ir::NONE;
 	bool value_constant(const ir::Instruction &p_in);
 	bool engine_value(const ir::Instruction &p_in);
 	void forget_whole(uint32_t p_register);

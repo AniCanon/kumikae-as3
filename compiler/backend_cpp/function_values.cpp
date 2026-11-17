@@ -355,6 +355,115 @@ bool FunctionWriter::value_operation(const Instruction &p_in) {
 	return true;
 }
 
+// A method of one of Godot's values that a handle keeps (a Dictionary's `is_empty`), on the register's own
+// handle: Godot's code for the type is called where the handle keeps the value, which is what the library
+// calls it on (a method that changes the value changes it there, in the handle the register has). Its
+// arguments are numbers, Booleans and values with parts, as the method takes them; what it gives is one of
+// those. No handle, or one on a value of another type, is the instruction by its thunk.
+bool FunctionWriter::kept_method(const Instruction &p_in) {
+	if (p_in.op != Op::HostCall || function_.argument_lists[p_in.c].empty()) {
+		return false;
+	}
+	const std::vector<uint32_t> &list = function_.argument_lists[p_in.c];
+	const ir::EngineName &entry = module_.engine_names[p_in.b];
+	const std::vector<std::string_view> words = words_of(entry.value);
+	if (words.size() != 5 || words[1] != "method" || !in_handle(entry.owner) || kind(list[0]) != Kind::Val || !holds_handle(list[0], entry.owner)) {
+		return false;
+	}
+	std::vector<std::string_view> parameters;
+	for (size_t at = 0; words[4] != "-" && at <= words[4].size();) {
+		const size_t comma = std::min(words[4].find(',', at), words[4].size());
+		parameters.push_back(words[4].substr(at, comma - at));
+		at = comma + 1;
+	}
+	const std::string before = body_;
+	line("{");
+	line("void *const bind = c->resolved[$U].bind;");
+	line("void *const on = value_in(c->resolved[$U], " + register_name(list[0]) + ".handle);");
+	std::string guard = "bind && on";
+	std::string inside, given;
+	bool fits = parameters.size() == list.size() - 1;
+	for (size_t i = 0; fits && i < parameters.size(); i++) {
+		const Kind held = kind(list[i + 1]);
+		fits = parameters[i] == "float" ? held == Kind::F64 : parameters[i] == "int" ? is_whole(held) : parameters[i] == "bool" ? held == Kind::Bool :
+				has_parts(parameters[i]) && value_type(list[i + 1]) == parameters[i];
+		const std::optional<std::string> operand = fits ? bare_operand(list[i + 1], i + 1, &guard, &inside) : std::nullopt;
+		fits = operand.has_value();
+		given += (i ? ", " : "") + operand.value_or(std::string());
+	}
+	if (!parameters.empty()) {
+		inside += "\tconst void *const p[] = { " + given + " };\n";
+	}
+	const std::string call = "call_part(bind, on, " + std::string(parameters.empty() ? "nullptr" : "p") + ", " + (words[3] == "void" ? "nullptr" : "&v") + ", " +
+			std::to_string(parameters.size()) + ")";
+	if (!fits || !value_call(p_in, p_in.a, words[3], guard, inside, call)) {
+		body_ = before;
+		return false;
+	}
+	settle_use(p_in, before.size());
+	return true;
+}
+
+// `var at:Vector2 = found["position"]`, where found is one of Godot's Dictionaries, reads the element as an
+// untyped value and then converts it: two instructions, a key made of the text, and two handles for a
+// value that is wanted as one. Where the key is text the program wrote, the untyped register is read by
+// that conversion and by nothing else, and the conversion is to a value with parts, the host is asked for
+// the element as that type at once (EngineApi::keyed) and gives it in the handle the typed register takes.
+// Whatever else it finds (no Dictionary, no such key, a value of another type) is the two instructions as
+// they would be alone, which say what that is.
+bool FunctionWriter::value_keyed(const Instruction &p_in) {
+	if (p_in.op != Op::HostIndexGet || pc_ + 1 >= function_.code.size() || targets_[pc_ + 1]) {
+		return false;
+	}
+	const Instruction &next = function_.code[pc_ + 1];
+	const uint32_t untyped = p_in.a;
+	const std::string_view type = next.op == Op::FromAny && next.a < function_.engine_types.size() ? std::string_view(function_.engine_types[next.a]) : "";
+	if (next.op != Op::FromAny || next.b != untyped || kind(untyped) != Kind::Any || kind(next.a) != Kind::Val || !has_parts(type) || !parts(next.a).empty() ||
+			kind(p_in.b) != Kind::Val || !holds_handle(p_in.b, "Dictionary") || kind(p_in.c) != Kind::Str || text_[p_in.c] == NONE) {
+		return false;
+	}
+	uint32_t reads = 0;
+	for (const Instruction &in : function_.code) {
+		const char *shape = ir::op_shape(in.op);
+		const uint32_t operands[3] = { in.a, in.b, in.c };
+		const bool writes_first = (shape[0] == 'R' || shape[0] == 'r') && in.a != NONE && !first_is_read(in.op);
+		for (int n = 0; n < 3; n++) {
+			if (shape[n] == 'A') {
+				const std::vector<uint32_t> &list = function_.argument_lists[operands[n]];
+				reads += static_cast<uint32_t>(std::count(list.begin(), list.end(), untyped));
+			} else if ((shape[n] == 'R' || shape[n] == 'r') && operands[n] == untyped && !(n == 0 && writes_first)) {
+				reads++;
+			}
+		}
+	}
+	const bool caught = std::any_of(function_.handlers.begin(), function_.handlers.end(), [&](const ir::Handler &p_each) { return p_each.reg == untyped; });
+	if (reads != 1 || caught) {
+		return false;
+	}
+	const std::string name = "c->names[" + std::to_string(thunks_.name_index(text_[p_in.c])) + "]";
+	line("{");
+	line("void *const made = c->engine && " + name + " ? c->engine->keyed(" + register_name(p_in.b) + ".handle, " + name + ", PartsOf<" + std::string(type) +
+			">::code) : nullptr;");
+	line("if (KAS3_LIKELY(made)) {");
+	put(untyped, std::string(zero_of(Kind::Any))); // What it held is let go of, as the element read into it would have.
+	put(next.a, "Val{ made }");
+	line("} else {");
+	generic(p_in);
+	pc_++;
+	if (const std::string before = kept_written_back(pc_); !before.empty()) {
+		line(before);
+	}
+	generic(next);
+	if (const std::string after = kept_read_again(pc_); !after.empty()) {
+		line(after);
+	}
+	pc_--;
+	line("}");
+	line("}");
+	joined_ = pc_ + 1;
+	return true;
+}
+
 // The place the host resolves is numbered once the instruction is known to be written this way: one that
 // turned out not to be leaves no place the host would look into for nothing.
 void FunctionWriter::settle_use(const Instruction &p_in, size_t p_from) {
@@ -378,7 +487,7 @@ bool FunctionWriter::value_constant(const Instruction &p_in) {
 }
 
 bool FunctionWriter::engine_value(const Instruction &p_in) {
-	return value_made(p_in) || value_part(p_in) || value_operation(p_in) || value_constant(p_in);
+	return value_made(p_in) || value_part(p_in) || value_operation(p_in) || kept_method(p_in) || value_keyed(p_in) || value_constant(p_in);
 }
 
 } // namespace backend_cpp

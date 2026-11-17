@@ -91,6 +91,9 @@ void FunctionWriter::read_field(const Instruction &p_in, const std::string &p_fi
 	}
 	if (borrowed_[p_in.a] != NONE) {
 		line(reg(p_in.a) + " = " + p_field + ";");
+	} else if (kind(p_in.a) == Kind::Ref && asked_[p_in.a] && owns(p_in.a)) {
+		// Read again in a loop, the field most often holds the object the register has a handle on already.
+		line("store_again(c, " + reg(p_in.a) + ", " + p_field + ");");
 	} else {
 		share(p_in.a, kept_local(p_in.b, p_in.c).value_or(p_field));
 	}
