@@ -178,6 +178,11 @@ inline std::string build_script(const Build &p_build) {
 	return script;
 }
 
+// What the project's setting is where the project does not set it. Off: an edit made while a game runs as
+// native code moves the game onto the interpreter, and the objects made before are not updated in place,
+// so native code is asked for until a reload is whole under it.
+inline constexpr bool BY_DEFAULT = false;
+
 // Whether Play builds and runs native code: what the environment says (KAS3_NATIVE_PLAY: 0, off or false
 // against; 1, on or true for), and the project's setting where it says neither.
 inline bool wanted(const char *p_environment, bool p_setting) {

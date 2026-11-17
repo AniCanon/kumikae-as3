@@ -318,7 +318,7 @@ bool builds() {
 #if (defined(__APPLE__) || defined(__linux__)) && !defined(__ANDROID__)
 	static const bool here = [] {
 		const String system = OS::get_singleton()->get_name();
-		const bool setting = ProjectSettings::get_singleton()->get_setting("actionscript/native/play", true);
+		const bool setting = ProjectSettings::get_singleton()->get_setting("actionscript/native/play", play::BY_DEFAULT);
 		const std::string said = environment("KAS3_NATIVE_PLAY");
 		return (system == "macOS" || system == "Linux") && !Engine::get_singleton()->is_editor_hint() && wanted(said.c_str(), setting);
 	}();

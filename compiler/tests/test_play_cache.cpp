@@ -187,6 +187,8 @@ static void test_switch() {
 	CHECK(play::wanted("", true));
 	CHECK(!play::wanted("", false));
 	CHECK(play::wanted("perhaps", true));
+	// With nothing said by either, Play builds nothing: native code is asked for.
+	CHECK(!play::BY_DEFAULT);
 }
 
 // A build another run began is waited for only while it can still be going on.
