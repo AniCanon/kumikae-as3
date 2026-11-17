@@ -238,11 +238,19 @@ output = compare("emits.gd", [
     "emit: a signal of an object freed since", "emit: no signal at all", "a listener freed by the one before it is not called",
     "a listener that changes the field the signal was emitted through", "a listener called later has heard nothing yet",
     "a listener called later hears what was emitted",
+    "a parameter of the script's class takes the object that carries the script, one of a class that extends it, and null",
+    "an object that has been freed is null there", "an object without the script, or with another, is refused",
+    "a field of the script's class set from Godot", "as and is on a node", "as and is on an untyped value",
+    "such a field is not set to an object without the script", "and is set to one of a class that extends it", "and to null",
+    "an untyped value stored where the script's class is declared", "what an engine call gives, as the script's class",
+    "a method of the class that extends it", "a listener's parameter of the script's class",
+    "such a listener is not given an object without the script",
 ])
 for refused in ("argument 1 of Emits/onStruck(), a String, to int", "argument 2 of Emits/onStruck(), a Vector3, to Vector2",
                 "argument 1 of Emits/onStruck(), a float, to int", "argument 2 of Emits/onStruck(), a Object, to Vector2",
                 "argument 2 of Emits/onWide(), a String, to Number", "argument 3 of Emits/onWide(), a int, to Boolean",
-                "argument 4 of Emits/onWide(), a float, to Int64", "argument 2 of Emits/onTurned(), a String, to int"):
+                "argument 4 of Emits/onWide(), a float, to Int64", "argument 2 of Emits/onTurned(), a String, to int",
+                "argument 1 of Emits/onMate(), a Object, to Emits", "argument 1 of Emits/onMate(), a String, to Emits"):
     check("emits.gd: a listener given the wrong kind of value is AS3's TypeError, which names it: " + refused,
           "TypeError: Error #1034: Type Coercion failed: cannot convert " + refused + "." in output, output[-1500:])
 check("emits.gd: a whole number too wide for a listener's int or uint is AS3's RangeError",
@@ -422,7 +430,8 @@ compare("members.gd", [
     "an array set to null", "an array refuses what is not one", "a dictionary is copied", "a dictionary set to null",
     "a dictionary refuses what is not one", "an object field", "a date field is not set from Godot", "a setter and its getter",
     "accessors and containers", "a node field", "a node field refuses another class",
-    "a node field set to null", "a const", "a script object field is not set from Godot", "hidden fields read",
+    "a node field set to null", "a const", "a script object field is not set to an object without the script",
+    "a script object field is set to the object that carries the script", "hidden fields read",
     "hidden fields are not written", "hidden methods", "public methods",
     "the script's properties", "the instance's properties", "their types", "a node's class", "not shown or stored",
     "untyped is any value", "the script's methods", "a method's arguments", "the instance's methods", "has_method agrees",
@@ -463,6 +472,9 @@ compare("kept.gd", [
     "freed when both let go", "freed when AS3 lets go", "given to Godot, alive while Godot holds them", "freed when Godot lets go",
     "made and forgotten in AS3", "a resource that listens to itself goes", "a listener on another node goes",
     "attached, kept while AS3 holds it", "attached, freed when AS3 lets go too",
+    "handed over by keep, kept while AS3 holds it", "handed over by keep, freed when AS3 lets go",
+    "handed over by keepAs, kept while AS3 holds it", "handed over by keepAs, freed when AS3 lets go",
+    "handed over by counted, kept while AS3 holds it", "handed over by counted, freed when AS3 lets go",
     "detached, AS3's hold given back", "detached, freed when Godot lets go", "detached and freed, to AS3 and Godot it is a freed object",
     "detached by itself, freed once nothing holds it",
 ])

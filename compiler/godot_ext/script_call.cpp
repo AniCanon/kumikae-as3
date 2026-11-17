@@ -52,11 +52,12 @@ struct Parameters {
 
 	ir::Kind kind_at(size_t p_at) const { return p_at >= fixed ? ir::Kind::Any : function.registers[p_at]; }
 
-	// An Array parameter takes one of Godot's Arrays, copied, or null; a Dictionary one of Godot's
-	// Dictionaries, copied, or null (members.h).
-	Variant::Type container_at(size_t p_at) const {
+	// The class of a parameter that holds an object of the program's: an Array takes one of Godot's Arrays,
+	// copied, a Dictionary one of Godot's Dictionaries, and a script's class the Godot object that carries
+	// such a script (members.h, object_arrives). Nothing for a parameter of any other kind.
+	std::optional<uint32_t> class_at(size_t p_at) const {
 		const bool object = p_at < fixed && function.registers[p_at] == ir::Kind::Obj && p_at < function.parameter_classes.size();
-		return object ? kas3::container_type(function.parameter_classes[p_at]) : Variant::NIL;
+		return object ? std::optional<uint32_t>(function.parameter_classes[p_at]) : std::nullopt;
 	}
 };
 
@@ -245,8 +246,8 @@ static bool arguments_fit(const Parameters &p_parameters, const Variant *const *
 	const size_t first = p_parameters.first;
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
 		ir::Kind kind = p_parameters.kind_at(i + first);
-		const Variant::Type container = p_parameters.container_at(i + first);
-		if (container != Variant::NIL && (p_args[i]->get_type() == container || p_args[i]->get_type() == Variant::NIL)) {
+		const std::optional<uint32_t> klass = p_parameters.class_at(i + first);
+		if (klass && kas3::object_arrives(*klass, *p_args[i])) {
 			continue;
 		}
 		const std::string godot_type = i + first < function.engine_types.size() ? function.engine_types[i + first] : std::string();
@@ -282,9 +283,9 @@ static bool convert_arguments(const Parameters &p_parameters, vm::Object *p_obje
 		arguments[0].p = p_object;
 	}
 	for (size_t i = 0; i < (size_t)p_argc; i++) {
-		const std::optional<vm::Slot> taken = p_parameters.container_at(i + first) != Variant::NIL
-				? kas3::container_from_variant(function.parameter_classes[i + first], *p_args[i])
-				: kas3::from_variant(p_parameters.kind_at(i + first), *p_args[i]);
+		const std::optional<uint32_t> klass = p_parameters.class_at(i + first);
+		const std::optional<vm::Slot> taken = klass ? kas3::object_from_variant(*klass, *p_args[i])
+													: kas3::from_variant(p_parameters.kind_at(i + first), *p_args[i]);
 		if (!taken) {
 			// As with any call that fails: the error said, and null for the caller.
 			for (size_t made = 0; made < i; made++) {

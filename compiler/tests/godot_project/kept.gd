@@ -68,6 +68,21 @@ func _initialize() -> void:
 	node.call("letGoOfHeld")
 	show("attached, freed when AS3 lets go too", weak_attached.get_ref() == null, true)
 
+	# Handed to AS3 where its class is declared (a parameter, a field, `as`), and kept there: AS3's hold keeps it.
+	for how in ["keep", "keepAs", "counted"]:
+		var arriving := RefCounted.new()
+		arriving.set_script(load("res://Counted.as"))
+		arriving.set("n", 5)
+		if how == "counted":
+			node.set("counted", arriving)
+		else:
+			node.call(how, arriving)
+		var weak_arriving: WeakRef = weakref(arriving)
+		arriving = null
+		show("handed over by %s, kept while AS3 holds it" % how, [weak_arriving.get_ref() != null, node.call("keptN")], [true, 5])
+		node.call("drop")
+		show("handed over by %s, freed when AS3 lets go" % how, weak_arriving.get_ref() == null, true)
+
 	# Detached while AS3 holds it: the object no longer keeps its Godot object, which goes when Godot lets go.
 	attached = RefCounted.new()
 	attached.set_script(load("res://Counted.as"))

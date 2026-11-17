@@ -705,6 +705,20 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		}
 		return survivors;
 	}
+	// The script objects the engine's objects carry, by their handles.
+	std::unordered_map<void *, vm::Object *> scripts;
+	[[nodiscard]] vm::Object *script_of(void *p_handle, uint32_t p_class, bool p_taken) override {
+		log += "script #" + std::to_string((intptr_t)p_handle) + " as " + (module ? module->classes[p_class].name : std::to_string(p_class)) +
+				(p_taken ? ", taken\n" : "\n");
+		const auto found = scripts.find(p_handle);
+		if (found == scripts.end() || !module || !vm::is_class(*module, found->second, p_class)) {
+			return nullptr;
+		}
+		if (p_taken) {
+			vm::retain(found->second);
+		}
+		return found->second;
+	}
 	// What keep() answers, and what it does first: free another object the engine kept, as Godot freeing one
 	// object can free another.
 	bool keeps = false;
@@ -782,6 +796,94 @@ static void test_kept_by_the_engine() {
 		CHECK_EQ(engine.log, std::string("keep Counted\nkeep Unjoined\n"));
 		CHECK_EQ(vm::live_objects(), before);
 		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
+// One of the engine's objects that carries a script, where the script's class is declared: `is`, `as` and a
+// store of an untyped value give the script's own object, by what the engine says the object carries. An
+// object with no script, or with a script of another class, is not one: null from `as`, and AS3's TypeError
+// #1034 from a store.
+static void test_script_object_arrives() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Mate.as", "package { import godot.*; public class Mate extends Node { public var n:int = 3;\n"
+							   "public function tell(node:Node, any:*):String {\n"
+							   "  var found:Mate = node as Mate;\n"
+							   "  var kept:Mate = any;\n"
+							   "  return (node is Mate) + \" \" + (found ? found.n : -1) + \" \" + (any is Mate) + \" \" + (kept ? kept.n : -1) + \" \" + (any is Further);\n"
+							   "}\n"
+							   "public function further(any:*):Boolean { var kept:Further = any; return kept != null; } } }");
+	compilation.add("Further.as", "package { public class Further extends Mate {} }");
+	compilation.add("Other.as", "package { import godot.*; public class Other extends Node {} }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	uint32_t mate = 0, further = 0, other = 0;
+	for (size_t i = 0; i < module.classes.size(); i++) {
+		mate = module.classes[i].name == "Mate" ? (uint32_t)i : mate;
+		further = module.classes[i].name == "Further" ? (uint32_t)i : further;
+		other = module.classes[i].name == "Other" ? (uint32_t)i : other;
+	}
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		// An untyped value keeps its tag in a handle's low bits: handles as an engine's are, sixteen bytes apart.
+		alignas(16) static char rooms[4][16];
+		void *handles[4] = { rooms[0], rooms[1], rooms[2], rooms[3] };
+		engine.boxes += 3; // The three that scripts are given as their own.
+		vm::Object *first = interpreter.construct(mate, handles[0]);
+		vm::Object *second = interpreter.construct(further, handles[1]);
+		vm::Object *third = interpreter.construct(other, handles[2]);
+		vm::Slot five;
+		five.bits = 0;
+		five.i = 5;
+		for (size_t i = 0; i < module.classes[further].fields.size(); i++) {
+			if (module.classes[further].fields[i].name == "n") {
+				interpreter.set_field(second, (uint32_t)i, five);
+			}
+		}
+		engine.scripts = { { handles[0], first }, { handles[1], second }, { handles[2], third } };
+		const auto tell = [&](void *p_node) {
+			vm::Slot arguments[2];
+			arguments[0].bits = 0;
+			arguments[0].p = p_node;
+			arguments[1] = p_node ? vm::any::godot_object(p_node) : vm::any::null();
+			vm::Slot result;
+			result.bits = 0;
+			engine.errors.clear();
+			const bool ok = interpreter.call_method(first, "tell", arguments, 2, &result);
+			std::string said = ok && result.p ? std::string(static_cast<vm::Str *>(result.p)->view()) : engine.errors.substr(0, engine.errors.find('\n'));
+			if (ok && result.p && vm::release(static_cast<vm::Str *>(result.p))) {
+				vm::free_string(static_cast<vm::Str *>(result.p));
+			}
+			return said;
+		};
+		CHECK_EQ(tell(handles[0]), std::string("true 3 true 3 false"));
+		CHECK_EQ(tell(handles[1]), std::string("true 5 true 5 true"));
+		CHECK_EQ(tell(nullptr), std::string("false -1 false -1 false"));
+		// With a script of another class, and with none: `as` gives null, and the store is refused.
+		CHECK_EQ(tell(handles[2]), std::string("TypeError: Error #1034: Type Coercion failed: cannot convert Object to Mate."));
+		CHECK_EQ(tell(handles[3]), std::string("TypeError: Error #1034: Type Coercion failed: cannot convert Object to Mate."));
+		// A class the object's class extends is not the object's.
+		vm::Slot any = vm::any::godot_object(handles[0]);
+		CHECK(!interpreter.call_method(first, "further", &any, 1, nullptr));
+		CHECK(engine.errors.find("cannot convert Object to Further.") != std::string::npos);
+		const uint32_t references = first->references;
+		any = vm::any::godot_object(handles[1]);
+		vm::Slot kept;
+		CHECK(interpreter.call_method(first, "further", &any, 1, &kept));
+		CHECK(kept.b);
+		// What a call was given is let go of when it ends.
+		CHECK_EQ(first->references, references);
+		interpreter.release_object(first);
+		interpreter.release_object(second);
+		interpreter.release_object(third);
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 	CHECK_EQ(vm::live_strings(), (size_t)0);
@@ -3610,6 +3712,7 @@ int main() {
 	test_vector_of_values();
 	test_engine_operators();
 	test_kept_by_the_engine();
+	test_script_object_arrives();
 	test_no_engine();
 	test_engine_listeners();
 	test_engine_statics();

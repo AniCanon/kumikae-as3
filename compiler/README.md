@@ -455,9 +455,18 @@ package {
 - Numbers, Booleans, strings, Godot objects and Godot values cross in both directions. GDScript reads and
   writes a script's public fields (`node.speed = 2`) and reads its public getters and writes its setters as
   properties (`node.health += 1`), a field converted as a store into the field converts: an
-  `Array` field takes a copy of Godot's Array. A `const`, a signal or a script object is not written from
+  `Array` field takes a copy of Godot's Array. A `const` or a signal is not written from
   Godot. A call from GDScript with too few arguments, the wrong kind of argument, or a number that does not
   fit an `int` is refused, never bent to fit; so is a value that does not fit a field.
+- A Godot object that carries a script is an object of the script's class, as a node whose script is a C#
+  class is that class: where a class of the program that extends one of Godot's is declared (`other:Enemy`),
+  the Godot object whose script's class is that one, or extends it, arrives as the script's own object. So
+  it is for a parameter Godot calls with (from GDScript, and what a signal hands a listener), a public
+  field set from Godot, and in AS3 itself for `node as Enemy`, `node is Enemy` (on one of Godot's objects
+  and on an untyped value) and an untyped value stored where the class is declared. Null, and an object
+  that has been freed, are null there. An object with no script, or with a script of another class, is
+  refused: `as` gives null, a store is AS3's TypeError #1034, a call from Godot is not made, and a field
+  keeps what it held. One decision serves all of them (`arriving_script`, `godot_ext/program.h`).
 - Only public members are reached from Godot. A private, protected or internal field or method is not
   there for GDScript, `get`, `set`, `call` or `has_method`: Godot's code is neither a subclass nor in the
   package. Godot's lists of a script's properties and methods give the public ones, with Godot's types.
@@ -554,8 +563,9 @@ package {
   (`res://tests` where it names none). A run that starts in one of them (its main scene, or a scene or
   script named on its command line) has them, as has one whose environment sets `KAS3_TESTS`.
 
-**Not built yet:** elements of Godot's untyped collections, `as` from one of Godot's objects to a script
-class, and what `kas3c run` refuses (see "What is refused, and why").
+**Not built yet:** elements of Godot's untyped collections, a cast written as a call to a class of the
+program (`Enemy(node)`: `node as Enemy` is there), and what `kas3c run` refuses (see "What is refused, and
+why").
 
 **Refused, and staying so:** a script object of a class that extends none of Godot's has no Godot object
 to give. An AS3 call that hands one to Godot is an AS3 error; when Godot reads one (a return, a field),

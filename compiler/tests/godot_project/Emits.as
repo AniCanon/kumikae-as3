@@ -121,6 +121,7 @@ package {
 				case "later": struck.add(onStruck, true); break;
 				case "once": struck.addOnce(onStruck); break;
 				case "again": again.add(onAgain); break;
+				case "mate": sent.add(onMate); break;
 				case "closure": struck.add(function (amount:int, at:Vector2):void { heard.push("closure " + amount + " " + at.x); }); break;
 			}
 		}
@@ -166,6 +167,31 @@ package {
 		public function swaps():void {
 			mine = struck;
 			mine.add(onSwap);
+		}
+
+		// A Godot object that carries this script, where an Emits is declared: it is the script's own object,
+		// as a node whose script is a C# class is that class. From Godot (a call, a field set, what a signal
+		// hands a listener) and in AS3 itself (`as`, `is`, an untyped value stored).
+		public var mate:Emits;
+		public function nameOf(other:Emits):String { return other ? String(other.name) : "none"; }
+		public function mateName():String { return mate ? String(mate.name) : "none"; }
+		public function onMate(other:Emits):void { heard.push("mate " + (other ? String(other.name) : "none")); }
+		public function asMate(other:Node):String {
+			var found:Emits = other as Emits;
+			return (other is Emits) + " " + (found ? String(found.name) : "none") + " " + (found != null && found === mate);
+		}
+		public function untypedMate(other:*):Array { return [other is Emits, (other as Emits) != null, other is EmitsChild, (other as EmitsChild) == null]; }
+		public function keepUntyped(other:*):String {
+			try {
+				mate = other;
+			} catch (error:TypeError) {
+				return error.message;
+			}
+			return mateName();
+		}
+		public function parentMate():String {
+			var found:Emits = getParent() as Emits;
+			return found ? String(found.name) : "none";
 		}
 	}
 }
