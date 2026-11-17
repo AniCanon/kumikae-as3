@@ -11,6 +11,7 @@ endif()
 option(KAS3_SANITIZE "Build everything with address and undefined-behaviour sanitizers" OFF)
 if(KAS3_SANITIZE)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    add_compile_definitions(ASAN_ENABLED UBSAN_ENABLED) # godot-cpp refuses to build under them unless told.
     add_link_options(-fsanitize=address,undefined)
 endif()
 
@@ -113,7 +114,10 @@ if(KAS3_GODOT_CPP)
     target_link_libraries(kas3_godot PRIVATE godot-cpp kas3runtime kas3vm)
     # On this machine's own system the library goes beside the test project, which loads it. Built for
     # another (iOS), it stays in the build folder: tests/build_ios.sh makes an .xcframework of it.
-    if(CMAKE_CROSSCOMPILING)
+    # -DKAS3_GODOT_OUTPUT=<folder> puts it elsewhere: a build under the sanitizers must not take the place of
+    # the one the test project loads (tests/README.md).
+    if(KAS3_GODOT_OUTPUT)
+    elseif(CMAKE_CROSSCOMPILING)
         set(KAS3_GODOT_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/out)
     else()
         set(KAS3_GODOT_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/tests/godot_project/bin)

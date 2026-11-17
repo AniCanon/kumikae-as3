@@ -4,6 +4,8 @@
 #
 #   tests/build_ios.sh <path to a godot-cpp checkout for Godot 4.7>
 #
+# KAS3_JOBS in the environment says how many files are compiled at once (8 where it is not set).
+#
 # Needs Xcode. Nothing is signed here: Godot's export and Xcode do that.
 set -e
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -27,7 +29,7 @@ for sdk in iphoneos iphonesimulator; do
 	cmake -S "$here" -B "$build" -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT="$(xcrun --sdk $sdk --show-sdk-path)" \
 		-DCMAKE_OSX_ARCHITECTURES="$architectures" -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DCMAKE_BUILD_TYPE=Release \
 		-DKAS3_GODOT_CPP="$godot_cpp" > "$build/build.log" 2>&1
-	cmake --build "$build" --target kas3_godot -j8 >> "$build/build.log" 2>&1
+	cmake --build "$build" --target kas3_godot -j"${KAS3_JOBS:-8}" >> "$build/build.log" 2>&1
 	libraries="$libraries -library $build/out/libkas3_godot.dylib"
 done
 # shellcheck disable=SC2086

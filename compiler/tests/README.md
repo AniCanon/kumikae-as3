@@ -26,6 +26,24 @@ Every group runs under `ctest`. What each is, in more words, is in the
 - **Nothing here may hang:** a driver that waits for the engine quits on a frame count.
 - No project, device or personal identifier in a test project (`export_presets.cfg` holds a placeholder team).
 
+## The extension under the sanitizers
+
+`build-san` builds no Godot extension. One can be built, into a folder of its own so that it does not take
+the place of the one the test project loads:
+
+```sh
+cmake -S compiler -B compiler/build-san-godot -DKAS3_SANITIZE=ON -DKAS3_GODOT_CPP=<godot-cpp checkout> \
+    -DKAS3_GODOT_OUTPUT=$PWD/compiler/build-san-godot/out
+cmake --build compiler/build-san-godot --target kas3_godot
+```
+
+Godot must then load the sanitizer's runtime before the extension (`DYLD_INSERT_LIBRARIES`, the path
+`/usr/bin/c++ -print-file-name=libclang_rt.asan_osx_dynamic.dylib` gives, set by what starts Godot itself:
+`nice`, `sh` and the system's Python lose such variables). The Godot that is distributed refuses it
+("Sanitizer load violates platform policy": its signature lets nothing unsigned by its maker in), so this
+is not a way the suite can be run yet: it needs a Godot whose signature allows it (one built here, or a
+copy signed again ad hoc), which has not been tried.
+
 ## Completion checks and timings
 
 `test_query` covers lexical scopes, imports, chained types and non-code contexts. `test_lsp` covers
