@@ -397,7 +397,9 @@ led there, as the interpreter does it (`runtime/entry.cpp`). What generated code
 Not there yet, natively: reloading the scripts while the game runs (the game says so and carries on), and
 the limit on a script's time (Error #1502).
 
-`tests/bench/languages/run.py` times it beside C#, GDScript and the interpreter ("AS3 native").
+`tests/bench/languages/run.py` times it beside C#, GDScript and the interpreter ("AS3 native"). A program
+library built for another version of the runtime (`runtime/layout.h`) is refused, and says it must be built
+again: the interpreter runs the scripts meanwhile.
 
 ## Inside Godot
 

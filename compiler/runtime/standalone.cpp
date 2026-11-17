@@ -42,6 +42,10 @@ void run_here(void *p_run) {
 } // namespace
 
 int run_standalone(const Program *p_program) {
+	if (!same_layout(*p_program)) {
+		std::fprintf(stderr, "kas3: the program is not run: %s\n", OTHER_LAYOUT);
+		return 2;
+	}
 	Run run{ p_program, 1 };
 	vm::run_as_program(run_here, &run);
 	return run.status;

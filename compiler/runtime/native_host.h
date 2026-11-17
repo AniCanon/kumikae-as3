@@ -9,6 +9,7 @@
 
 #include "engine.h"
 #include "interpreter.h"
+#include "layout.h"
 #include "library.h"
 #include "no_engine.h"
 #include "operations.h"

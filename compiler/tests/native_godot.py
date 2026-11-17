@@ -1,10 +1,11 @@
 """Generated code inside Godot, for run_godot.py: scripts built into a program library and run by the
 extension in the interpreter's place (KAS3_PROGRAM_LIBRARY).
 
-Two things are held:
+These are held:
 
   probe      tests/godot_native's scripts, and the test project's Places.as with them, say, as native code,
-             what they say interpreted, line for line.
+             what they say interpreted, line for line. Built with another number for the runtime's layout
+             in its table (runtime/layout.h), the library is refused and the interpreter runs them.
   workloads  each workload of tests/bench/languages' CmpAs.as, run small, stays on the fast paths.
   frames     each frame benchmark of tests/bench/languages/frames, run for a few frames, leaves to the
              library what frames/native_counts.txt says: nothing in a loop that should be free of it.
@@ -28,6 +29,7 @@ FLAGS = ["-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-ffp-contract=off
 # The editor's first scan of a project, which is given time (see run_godot.py).
 FIRST_SCAN = ["--headless", "--editor", "--quit-after", "300"]
 USED = "ActionScript: the scripts run as native code."
+OTHER_LAYOUT = "it was built for another version of the runtime: build the program library again"
 # How many rounds a workload is run for the counts: enough that a thunk in its loop shows.
 ROUNDS = 1000
 # And how many frames a frame benchmark is run for.
@@ -66,15 +68,22 @@ class Runner:
         subprocess.run([self.godot, *FIRST_SCAN, "--path", made], capture_output=True, text=True, timeout=300)
         return made
 
-    def library(self, label, project, scripts, where):
-        """The project's scripts as a program library, or None: what went wrong is a failed check."""
-        out = os.path.join(where, "native")
+    def library(self, label, project, scripts, where, other_layout=False):
+        """The project's scripts as a program library, or None: what went wrong is a failed check. With
+        other_layout, its table says it was built for another layout of the runtime than the one it was."""
+        out = os.path.join(where, "native_other" if other_layout else "native")
         written = subprocess.run([self.kas3c, "cpp", "--godot", *scripts, "-o", out], capture_output=True, text=True, cwd=project, timeout=300)
         self.check("native: %s is written as C++" % label, written.returncode == 0, written.stderr[-600:])
         if written.returncode != 0:
             return None
+        if other_layout:
+            table = os.path.join(out, "program.cpp")
+            text = open(table).read()
+            self.check("native: the program's table starts with the runtime's layout", text.count("{ RUNTIME_LAYOUT, ") == 1, text[-400:])
+            with open(table, "w") as file:
+                file.write(text.replace("{ RUNTIME_LAYOUT, ", "{ RUNTIME_LAYOUT + 1, "))
         root = os.path.dirname(self.tests)
-        program = os.path.join(where, "libkas3_program.dylib")
+        program = os.path.join(where, "libkas3_program_other.dylib" if other_layout else "libkas3_program.dylib")
         includes = [flag for each in ("runtime", "vm", "ir", "src") for flag in ("-I", os.path.join(root, each))]
         built = subprocess.run([self.compiler, *FLAGS, *includes, *sorted(glob.glob(os.path.join(out, "*.cpp"))), "-o", program],
                                capture_output=True, text=True, timeout=600)
@@ -112,7 +121,8 @@ class Runner:
         with tempfile.TemporaryDirectory() as where:
             # With the script places.gd holds to GDScript under the interpreter: here it is held to itself as native code.
             project = self.project(where, sources, sorted(os.listdir(sources)) + [os.path.join(self.tests, "godot_project", "Places.as")])
-            program = self.library("the probe", project, sorted(name for name in os.listdir(project) if name.endswith(".as")), where)
+            scripts = sorted(name for name in os.listdir(project) if name.endswith(".as"))
+            program = self.library("the probe", project, scripts, where)
             if not program:
                 return
             said = {}
@@ -131,6 +141,16 @@ class Runner:
                 self.check("native: as the interpreter says it", ours == theirs, "native       %s\ninterpreter  %s" % (ours, theirs))
             self.check("native: as many lines", len(said["native"]) == len(said["interpreter"]),
                        "%d and %d" % (len(said["native"]), len(said["interpreter"])))
+            # A program library built for another layout of the runtime is never read past its first word:
+            # it is refused, in words, and the interpreter runs the scripts.
+            other = self.library("the probe, for another runtime", project, scripts, where, other_layout=True)
+            if other:
+                status, text = self.run(project, "probe.gd", other)
+                refused = [line for line in text.split("\n") if line.startswith("PROBE ")]
+                self.check("native: a program library built for another version of the runtime is refused, and says so",
+                           status == 0 and USED not in text and OTHER_LAYOUT in text, "exit %d\n%s" % (status, text[-900:]))
+                self.check("native: the interpreter runs the scripts then", refused == [line for line in said["interpreter"] if line.startswith("PROBE ")],
+                           "\n".join(refused[:5]))
 
     def workloads(self):
         """Each workload of the languages benchmark as native code, counted."""

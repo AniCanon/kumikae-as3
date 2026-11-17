@@ -13,6 +13,7 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `api.h`, `api.cpp` | Every function of the runtime generated code calls out of line, once: the table a program library is handed, and the host's side of it |
 | `operations.h` | What generated code calls out of line: errors and their traces, a class's first use, thunks, `trace` |
 | `program.h` | The table a program library gives its host (`kas3_program`): classes, functions, static fields, strings, thunks, all by number |
+| `layout.h` | The number of the layout a program library and its host share (`RUNTIME_LAYOUT`), which a library's table starts with, and the sizes that hold it to the structs |
 | `engine.h`, `godot_values.h` | Godot with no header of Godot's: handles on its objects and values (`Ref`, `Val`), its values with parts as plain structs with their maths inline, what the host worked out for each place the program calls the engine (`Resolved`), the engine's few entry points (`EngineApi`) |
 | `native_host.h`, `host.cpp` | The host: the context's state, its interpreter, the engine it was given by what embeds it (`Embedder`: none for a program run on its own, the extension's inside Godot) |
 | `errors.cpp` | Raising, catching, the stack trace, the report of an error nothing caught |
@@ -50,6 +51,13 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 - **Errors** are `c->failing` and `c->pending`. A trace is built on the error path, by each function an
   error leaves (`leave_failed`).
 - **`kas3_program`** is the one symbol a program library exports.
+- **A program library says which layout of the runtime it was built for,** first thing in its table
+  (`Program::layout`, `layout.h`). A host reads nothing more of a table that names another: the extension
+  says the library was built for another version of the runtime and must be built again, and the
+  interpreter runs the scripts; a program run on its own says so and ends with status 2. `RUNTIME_LAYOUT` is
+  one number, raised by hand with every change a library built before it would be misread after (`layout.h`
+  lists them); the sizes of the shared structs are asserted beside it, so a struct that changes size without
+  the number moving does not build.
 
 ## The library: called directly where it is a function of plain values, by thunk where it is not yet
 

@@ -216,7 +216,8 @@ std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, 
 	for (size_t i = 0; i < p_thunks.all().size(); i++) {
 		thunks.push_back(thunk_tables(p_thunks.all()[i], i, tables));
 	}
-	std::string program = "const Program PROGRAM = { ";
+	// By its name: the number is the one of the runtime's headers the library is built against.
+	std::string program = "const Program PROGRAM = { RUNTIME_LAYOUT, ";
 	const auto counted = [&](const std::string &p_type, const std::string &p_name, const std::vector<std::string> &p_items) {
 		program += array(tables, p_type, p_name, p_items) + ", " + std::to_string(p_items.size()) + ", ";
 	};

@@ -130,6 +130,9 @@ struct KnownClasses {
 };
 
 struct Program {
+	// Which layout of the runtime the library was built for (runtime/layout.h, RUNTIME_LAYOUT): the first
+	// thing in the table, and all a host reads of one that names another.
+	uint64_t layout;
 	const char *const *files;
 	uint32_t file_count;
 	const ClassInfo *classes;
