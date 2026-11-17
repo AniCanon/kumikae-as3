@@ -1,6 +1,7 @@
 package app.anicanon.kumikae.as3.run
 
 import app.anicanon.kumikae.as3.project.GamePane
+import app.anicanon.kumikae.as3.project.GameSourceRoots
 import com.intellij.execution.RunManager
 import com.intellij.ide.projectView.ProjectView
 import com.intellij.ide.util.PropertiesComponent
@@ -21,6 +22,7 @@ class GodotProjectStartup : ProjectActivity {
         val base = project.basePath ?: return
         if (!GodotLaunch.isAs3Game(Path.of(base))) return
         withContext(Dispatchers.EDT) {
+            GameSourceRoots.register(project, Path.of(base))
             // The first time the project is opened, it opens in the Game view. After that the view is
             // whichever the person left it in.
             val remembered = PropertiesComponent.getInstance(project)
@@ -29,11 +31,18 @@ class GodotProjectStartup : ProjectActivity {
                 ProjectView.getInstance(project).changeView(GamePane.ID)
             }
             val manager = RunManager.getInstance(project)
-            val type = GodotConfigurationType()
-            if (manager.allSettings.any { it.type.id == GodotConfigurationType.ID }) return@withContext
-            val settings = manager.createConfiguration("Game", type.configurationFactories.first())
+            if (java.nio.file.Files.isRegularFile(Path.of(base, "kas3-tests.json")) &&
+                manager.allSettings.none { it.configuration is app.anicanon.kumikae.as3.testing.As3TestsConfiguration }
+            ) {
+                manager.addConfiguration(
+                    manager.createConfiguration("Game tests", KumikaeRunType.factory(KumikaeRunType.Kind.TESTS)),
+                )
+            }
+            val factory = KumikaeRunType.factory(KumikaeRunType.Kind.GAME)
+            if (manager.allSettings.any { it.configuration is GodotRunConfiguration }) return@withContext
+            val settings = manager.createConfiguration("Game", factory)
             manager.addConfiguration(settings)
-            manager.selectedConfiguration = settings
+            if (manager.selectedConfiguration == null) manager.selectedConfiguration = settings
         }
     }
 

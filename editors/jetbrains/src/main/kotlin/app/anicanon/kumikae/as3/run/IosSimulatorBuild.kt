@@ -2,6 +2,7 @@ package app.anicanon.kumikae.as3.run
 
 import app.anicanon.kumikae.as3.ScriptFailed
 import app.anicanon.kumikae.as3.ShippedScript
+import app.anicanon.kumikae.as3.settings.IosTarget
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -14,12 +15,13 @@ internal class IosSimulatorBuild(
     private val godot: Path,
     private val template: Path,
     private val library: Path?,
+    private val target: IosTarget? = null,
     private val script: () -> String = { ShippedScript.read("/build-ios-simulator.sh") },
 ) {
     /** The built .app. What the build prints is passed on as it comes. */
     fun build(say: (String, Boolean) -> Unit): String {
         val arguments = listOf(project, project.resolve(OUTPUT), godot, template).map(Path::toString) +
-            listOfNotNull(library?.toString())
+            listOf(library?.toString().orEmpty()) + listOfNotNull(target?.name, target?.section, target?.bundle)
         val printed = try {
             ShippedScript(script, limitMinutes = LIMIT_MINUTES).run(arguments) { say("$it\n", false) }
         } catch (failure: ScriptFailed) {

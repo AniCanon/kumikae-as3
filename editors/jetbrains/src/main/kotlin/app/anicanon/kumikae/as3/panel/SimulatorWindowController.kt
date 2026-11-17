@@ -28,8 +28,15 @@ internal class SimulatorWindowController(
         private set
     var selected by mutableStateOf<SimulatorDevice?>(null)
         private set
-    var frame by mutableStateOf<SimulatorFrame?>(null)
+    var onFrame: (SimulatorFrame?) -> Unit = {}
+    var hasFrame by mutableStateOf(false)
         private set
+    var frame: SimulatorFrame? = null
+        private set(value) {
+            field = value
+            hasFrame = value != null
+            onFrame(value)
+        }
     var capture by mutableStateOf("")
         private set
     var inputEnabled by mutableStateOf(false)

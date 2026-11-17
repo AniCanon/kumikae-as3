@@ -10,6 +10,7 @@ internal data class SceneNode(
     val script: String?,
     val editable: Boolean,
     val offset: Int,
+    val properties: Map<String, String> = emptyMap(),
 )
 
 /** Reads node/resource headers without normalizing any unrelated scene text. */
@@ -51,6 +52,9 @@ internal class SceneDocument(private val source: String) {
                 binding?.let { resources[it] ?: "Missing resource: $it" },
                 !inherited && attrs["type"] != null,
                 header.range.first,
+                body.lineSequence().filter { '=' in it && !it.startsWith(';') }.associate {
+                    it.substringBefore('=').trim() to it.substringAfter('=').trim()
+                }.filterKeys { it.isNotBlank() && it != "script" },
             )
         }
         require(nodes.map { it.path }.distinct().size == nodes.size) { "Duplicate node paths." }

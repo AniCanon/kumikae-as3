@@ -28,6 +28,7 @@ internal object UiProbeProjectExperience {
         val owner = Disposer.newDisposable()
         val repository = UiProbeSettingsRepository()
         val controller = SettingsController(repository)
+        var chosenResource = ""
         val scenes = UiProbeSceneRepository()
         val sceneController = SceneController(scenes)
         lateinit var frame: JFrame
@@ -36,11 +37,21 @@ internal object UiProbeProjectExperience {
             controller.reload()
             frame = JFrame()
             panel =
-                composePanel(owner) { ProjectSettingsView(controller, { _, callback -> callback("res://icon.svg") }) }
+                composePanel(owner) {
+                    ProjectSettingsView(controller, { kind, callback ->
+                        chosenResource = kind.title
+                        callback("res://new-icon.svg")
+                    })
+                }
             frame.contentPane.add(panel)
         }
         try {
-            await { descendants(panel).filterIsInstance<JTextField>().count() == 3 }
+            await { descendants(panel).filterIsInstance<JTextField>().count() == 2 }
+            edt {
+                descendants(panel).filterIsInstance<JButton>()
+                    .single { it.accessibleContext.accessibleName == "Choose application icon" }.doClick()
+            }
+            await { chosenResource == "Application icon" && controller.draft?.icon == "res://new-icon.svg" }
             render(panel, destination.resolve("$theme-project-general.png"))
             edt { descendants(panel).filterIsInstance<JTextField>().first().text = "Edited game" }
             click(panel, "Apply")
@@ -48,14 +59,12 @@ internal object UiProbeProjectExperience {
             tab(panel, "Display")
             await { descendants(panel).filterIsInstance<JTextField>().count() == 2 }
             render(panel, destination.resolve("$theme-project-display.png"))
-            edt { descendants(panel).filterIsInstance<JTextField>().first().text = "0" }
+            edt { descendants(panel).filterIsInstance<javax.swing.JSpinner>().first().value = 1280 }
             click(panel, "Apply")
-            await { controller.status.contains("between 1") }
-            check(repository.value.width == "1152")
-            render(panel, destination.resolve("$theme-project-invalid.png"))
+            await { repository.value.width == "1280" }
             click(panel, "Reload")
             tab(panel, "Export")
-            await { descendants(panel).filterIsInstance<JTextField>().count() == 2 }
+            await { descendants(panel).filterIsInstance<JTextField>().count() == 1 }
             render(panel, destination.resolve("$theme-project-export.png"))
             edt {
                 frame.contentPane.remove(panel)

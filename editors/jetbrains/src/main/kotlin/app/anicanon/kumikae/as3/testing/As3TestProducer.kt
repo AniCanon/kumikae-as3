@@ -1,8 +1,8 @@
 package app.anicanon.kumikae.as3.testing
 
+import app.anicanon.kumikae.as3.run.KumikaeRunType
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.actions.LazyRunConfigurationProducer
-import com.intellij.execution.configurations.ConfigurationTypeUtil
 import com.intellij.execution.lineMarker.ExecutorAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.icons.AllIcons
@@ -10,8 +10,7 @@ import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiElement
 
 class As3TestProducer : LazyRunConfigurationProducer<As3TestsConfiguration>() {
-    override fun getConfigurationFactory() =
-        ConfigurationTypeUtil.findConfigurationType(As3TestsType::class.java).configurationFactories.single()
+    override fun getConfigurationFactory() = KumikaeRunType.factory(KumikaeRunType.Kind.TESTS)
     override fun setupConfigurationFromContext(
         configuration: As3TestsConfiguration,
         context: ConfigurationContext,

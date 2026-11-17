@@ -29,6 +29,7 @@ internal object GodotLaunch {
     /** A folder with a Godot project file and at least one AS3 script, not counting what Godot keeps for itself. */
     fun isAs3Game(project: Path): Boolean {
         if (!Files.isRegularFile(project.resolve("project.godot"))) return false
+        if (Files.isRegularFile(project.resolve("kas3.gdextension"))) return true
         return Files.walk(project, DEPTH).use { found ->
             found.filter { path -> project.relativize(path).none { it.toString().startsWith(".") } }
                 .anyMatch { it.toString().endsWith(SCRIPT) && Files.isRegularFile(it) }

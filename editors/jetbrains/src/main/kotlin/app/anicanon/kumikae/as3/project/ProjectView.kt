@@ -13,7 +13,7 @@ import java.nio.file.Path
 
 /** What a person writing a game does not open: what Godot and the IDE keep for themselves. */
 internal object Clutter {
-    private val folders = setOf(".godot", ".idea", "bin", ".build", "build")
+    private val folders = setOf(".godot", ".idea", ".run", "bin", ".build", "build")
     private val endings = listOf(".uid", ".import", ".gdextension")
 
     fun hideFolder(name: String, projectRoot: Boolean): Boolean = projectRoot && isClutter(name, isFolder = true)
@@ -24,7 +24,7 @@ internal object Clutter {
      * script, in which nothing is completed. `.idea` is the IDE's own, and `.godot` holds what Rider's Godot
      * support registers.
      */
-    fun unindexed(root: String): List<String> = (folders - setOf(".idea", ".godot")).map { "$root/$it" }
+    fun unindexed(root: String): List<String> = (folders - setOf(".idea", ".godot", ".run")).map { "$root/$it" }
 
     fun isClutter(name: String, isFolder: Boolean): Boolean =
         if (isFolder) name in folders else endings.any(name::endsWith)
@@ -60,9 +60,21 @@ class GameProjectView : TreeStructureProvider {
                 }
             }
         }
-        if (!GameViewOptions.compact(project) || settings == null) return visible
-        return visible.mapTo(ArrayList()) { node ->
-            if (node is PsiDirectoryNode) packageNode(node, project, settings) else node
+        if (settings == null) return visible
+        if (parent is GameScenesGroup) return visible
+        val nodes = visible.mapTo(ArrayList()) { node ->
+            if (node !is PsiDirectoryNode) {
+                node
+            } else {
+                if (node.virtualFile?.path == project.basePath) return@mapTo GameRootNode(project, node)
+                gameFolder(node, project, settings)
+                    ?: if (GameViewOptions.compact(project)) packageNode(node, project, settings) else node
+            }
+        }
+        return if ((parent as? PsiDirectoryNode)?.virtualFile?.path == project.basePath) {
+            organizeGameRoot(project, settings, nodes)
+        } else {
+            nodes
         }
     }
 

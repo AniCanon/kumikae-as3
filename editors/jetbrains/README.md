@@ -1,5 +1,28 @@
 # Kumikae AS3 for JetBrains IDEs
 
+## Install in Rider
+
+In **Settings → Plugins → ⚙ → Install Plugin from Disk**, select the Kumikae AS3 ZIP and restart Rider.
+The macOS development distribution includes the compiler, test runner and mobile AS3 runtimes.
+Install Godot for desktop play and export. iOS also uses Xcode and an installed Simulator runtime.
+Android export uses the Android SDK, Build Tools, matching Godot export templates and an ARM64 device.
+
+Open the game's folder and double-click **project.godot** for its scene, artwork and viewport.
+Use **Run → Add Game Target…**, choose a Godot preset, pick a destination in the toolbar and press **Run**.
+**View → Tool Windows → Game Devices** lists the available iOS simulators and Android virtual devices.
+Desktop play, mobile launches and test suites share the **Kumikae AS3** group in Run Configurations.
+
+Click the game icon or splash thumbnail to choose an image from the project. The main scene
+list shows the project's scenes. **Display** previews the actual width, height and aspect ratio.
+Rider saves these settings to Godot's files. The **Game** project view identifies source and test
+roots, and the gutter beside an AS3 test runs that method or fixture. Open a scene to inspect its
+node tree and attached scripts. Use **Open in Godot** for the 2D or 3D canvas.
+
+The macOS 0.2.0 build was exercised in Rider 2026.2.3.1 with Support Sprint on iOS Simulator and an
+ARM64 Android emulator. The IDE probes covered target selection, embedded pointer input, the project
+artwork and viewport, test results and navigation to a failing assertion. The plugin verifier checked
+Rider RD-262.10968.170 and IntelliJ IDEA IU-261.22158.277.
+
 The plugin integrates ActionScript 3 with Rider's native LSP client and IntelliJ IDEA Community/free
 unified IDEA through LSP4IJ. Both use the same compiler language server and local typing handlers.
 In IDEA, install and enable **LSP4IJ** (tested version 0.21.0) in **Settings > Plugins**; Rider does not
@@ -57,7 +80,7 @@ parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 - A **Simulators** tab lists every simulator with a button to boot it or shut it down; each
   running one has its own tab, and closing the tab shuts it down. Zoom, a console drawer and a
   drawn device body (with the camera housing on the models that have one) are in the device's tab.
-- A macOS-only **iOS Simulator** tool window. Select a device, boot it, view its
+- The **iOS** tab of **Game Devices** on macOS. Select a device, boot it, view its
   screen, install an explicit `.app`, launch a bundle, and read console output.
 - Full-resolution native pictures after the owner's private-input switch. A
   service-owned Swift helper reads the Simulator framebuffer into one mapped slot.
@@ -335,14 +358,13 @@ guest's interface orientation; an app may restrict which orientations it accepts
 | `core/` | Kotlin service, Xcode commands, optional input adapter, protocol and tests. No IDE imports. Also the standalone service. |
 | `src/main/kotlin/.../panel/` | The tool window: repository, controller, composed view, the painted screen. |
 | `src/main/kotlin/.../ui/` | The Compose host and the small shared composables. |
-| `src/main/resources/META-INF/plugin.xml` | One plugin id; the tool window is offered on macOS only. |
+| `src/main/resources/META-INF/plugin.xml` | One plugin ID and a shared Game Devices window. |
 | `src/test/kotlin/` | Panel tests, the manual scheduler, and the UI probe. |
 | `src/uiProbe/plugin.xml` | Descriptor of the test-only probe plugin. |
 | `simulator.py` | Python standard-library agent client. Builds no Simulator commands. |
 | `tests/` | Client tests with a fake local service. No IDE or Simulator needed. |
 
-Android is out of scope. The protocol and input interface leave room for another
-backend without duplicating the panel or client.
+Android virtual devices use the Android SDK and a separate embedded display in the same Game Devices window. The local simulator service and its command-line client operate the iOS tab.
 
 ## Names and compatibility: the owner's to change
 
@@ -357,7 +379,7 @@ owner's other JetBrains plugin. They are recorded here so they are easy to revis
   IDEA 2026.1 (IU-261.22158.277, free unified distribution) and Rider 2026.2.3.1 (RD-262.10968.170).
   Other builds in that range and the older standalone Community distribution are unverified.
   Compose Swing is an alpha; widening the range requires runtime panel and editor checks.
-- The Simulator tool window is offered on macOS only.
+- iOS simulation and the embedded Android display use the macOS native helper.
 - The service and the plugin both target Java 25.
 - The default bundle in the panel stays `org.kumikae.as3test`, the test app's
   identifier. It is not the plugin's identity.

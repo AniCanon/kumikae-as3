@@ -17,6 +17,16 @@ class TestSourceTest {
         }
     """.trimIndent()
 
+    @Test fun discoversOnlyAnnotatedMethodsWithinTheConfiguredFolder() {
+        val manifest = """{"version":1,"tests":[{"name":"Models","discover":"tests"}]}"""
+        val source = TestSource.read(text)
+        assertEquals(
+            listOf("Models::game.CourseTest::gapJump", "Models::game.CourseTest::magnetCollects"),
+            TestCaseMappings.forFile(manifest, "tests/CourseTest.as", source).map { it.identity },
+        )
+        assertEquals(emptyList<TestSelection>(), TestCaseMappings.forFile(manifest, "src/CourseTest.as", source))
+    }
+
     @Test fun selectsOnlyTheActualMethodOrClass() {
         val source = TestSource.read(text)
         assertEquals(listOf("gapJump", "helper", "magnetCollects"), source.methods.map { it.name })

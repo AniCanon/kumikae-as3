@@ -38,3 +38,30 @@ internal fun packageNode(node: PsiDirectoryNode, project: Project, settings: Vie
     for (item in chain.dropLast(1).asReversed()) folder = PackageFolder(item.name, 0, listOf(folder))
     return PackageDirectoryNode(project, directory, settings, compactPackage(folder).joinToString("."))
 }
+
+internal class GameFolderNode(
+    project: Project,
+    directory: PsiDirectory,
+    settings: ViewSettings,
+    private val label: String,
+    private val icon: javax.swing.Icon,
+) : PsiDirectoryNode(project, directory, settings) {
+    override fun update(data: PresentationData) {
+        super.update(data)
+        data.presentableText = label
+        data.setIcon(icon)
+    }
+}
+
+internal fun gameFolder(node: PsiDirectoryNode, project: Project, settings: ViewSettings): PsiDirectoryNode? {
+    val dir = node.value ?: return null
+    if (dir.virtualFile.parent.path != project.basePath) return null
+    val (label, icon) = when (dir.name) {
+        "src" -> "Scripts" to AllIcons.Modules.SourceRoot
+        "tests" -> "Tests" to AllIcons.Modules.TestRoot
+        "assets" -> "Assets" to AllIcons.Modules.ResourcesRoot
+        "scenes" -> "Scenes" to AllIcons.Nodes.Folder
+        else -> return null
+    }
+    return GameFolderNode(project, dir, settings, label, icon)
+}

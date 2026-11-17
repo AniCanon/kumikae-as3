@@ -20,6 +20,14 @@ struct Main {
     signal(SIGPIPE, SIG_IGN)
     do {
       let arguments = Array(CommandLine.arguments.dropFirst())
+      if arguments.count == 2, arguments[0] == "--android-display-active" {
+        print(try AndroidDisplay.isActive(handle: arguments[1]) ? "active" : "inactive")
+        return
+      }
+      if arguments.count == 4, arguments[0] == "--android-display", let edge = Int(arguments[2]) {
+        try await AndroidDisplay.stream(handle: arguments[1], edge: edge, slot: arguments[3])
+        return
+      }
       let layout = try FrameLayout.load()
       if arguments == ["--version"] {
         print("SimulatorBridge 1; frame header \(layout.headerBytes) bytes")

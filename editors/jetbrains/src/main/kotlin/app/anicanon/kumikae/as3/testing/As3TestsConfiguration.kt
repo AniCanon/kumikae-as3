@@ -2,6 +2,7 @@ package app.anicanon.kumikae.as3.testing
 
 import app.anicanon.kumikae.as3.PluginFiles
 import app.anicanon.kumikae.as3.language.CompilerLocator
+import app.anicanon.kumikae.as3.run.KumikaeRunType
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.CommandLineState
 import com.intellij.execution.configurations.ConfigurationFactory
@@ -31,8 +32,10 @@ class As3TestsType :
             PluginFiles.mark
         },
     ) {
+    override fun isApplicable(project: Project) = false
+
     override fun createTemplateConfiguration(project: Project): RunConfiguration =
-        As3TestsConfiguration(project, this, "AS3 Tests")
+        KumikaeRunType.factory(KumikaeRunType.Kind.TESTS).createTemplateConfiguration(project)
     companion object {
         const val ID = "KumikaeAs3Tests"
     }
@@ -96,6 +99,9 @@ class As3TestsConfiguration(project: Project, factory: ConfigurationFactory, nam
                         "--compiler",
                         compiler.toString(),
                     )
+                app.anicanon.kumikae.as3.run.GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())?.let {
+                    command += listOf("--godot", it.toString())
+                }
                 for (name in options.cases.lines().filter { it.isNotBlank() }) command += listOf("--case", name.trim())
                 return KillableColoredProcessHandler(
                     GeneralCommandLine(command).withWorkDirectory(root().toFile()),

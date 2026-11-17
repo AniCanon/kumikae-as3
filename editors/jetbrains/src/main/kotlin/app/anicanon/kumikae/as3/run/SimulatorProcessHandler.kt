@@ -13,6 +13,7 @@ internal class SimulatorProcessHandler(
     appPath: String,
     build: (((String, Boolean) -> Unit) -> String)? = null,
     sources: String = "",
+    destination: String? = null,
 ) : ProcessHandler() {
     private val stopping = AtomicBoolean()
     private val run = SimulatorRun(
@@ -24,6 +25,7 @@ internal class SimulatorProcessHandler(
         },
         sources,
         build = build,
+        destination = destination,
     )
     private val worker = Thread(::follow, "Kumikae AS3 Simulator run").apply { isDaemon = true }
 
@@ -41,7 +43,6 @@ internal class SimulatorProcessHandler(
                 ended = run.pump()
                 if (ended == null) Thread.sleep(POLL_MILLIS)
             }
-            if (stopping.get()) run.stop()
             ended ?: 0
         } catch (interrupted: InterruptedException) {
             Thread.currentThread().interrupt()
@@ -50,11 +51,13 @@ internal class SimulatorProcessHandler(
             notifyTextAvailable("${failure.message ?: failure.javaClass.simpleName}\n", ProcessOutputTypes.STDERR)
             1
         }
-        notifyProcessTerminated(code)
+        if (!isProcessTerminated) notifyProcessTerminated(code)
     }
 
     override fun destroyProcessImpl() {
         stopping.set(true)
+        worker.interrupt()
+        com.intellij.util.concurrency.AppExecutorUtil.getAppExecutorService().execute(run::stop)
     }
 
     override fun detachProcessImpl() {

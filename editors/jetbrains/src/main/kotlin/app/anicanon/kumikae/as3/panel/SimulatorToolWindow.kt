@@ -24,8 +24,10 @@ internal class SimulatorToolWindow(val controller: SimulatorWindowController, va
     private val frames = Timer(8) { controller.frameTick() }
 
     init {
+        controller.onFrame = { screen.frame = it }
         component = composePanel(controller) { SimulatorView(controller, state, prompts, screen, console) }
         Disposer.register(controller) {
+            controller.onFrame = {}
             timer.stop()
             frames.stop()
         }

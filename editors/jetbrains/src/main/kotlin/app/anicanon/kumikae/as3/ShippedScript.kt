@@ -38,14 +38,26 @@ internal class ShippedScript(
                 environment()["HOMEBREW_NO_AUTO_UPDATE"] = "1"
             }.start()
             process.outputStream.close()
-            val output = StringBuilder()
-            process.inputStream.bufferedReader().forEachLine { line ->
-                output.append(line).append('\n')
-                onLine(line)
+            val output = StringBuffer()
+            val reader = Thread {
+                process.inputStream.bufferedReader().forEachLine { line ->
+                    output.append(line).append('\n')
+                    onLine(line)
+                }
+            }.apply {
+                isDaemon = true
+                start()
             }
-            if (!process.waitFor(limitMinutes, TimeUnit.MINUTES)) {
-                process.destroyForcibly()
-                throw ScriptFailed("It did not finish in $limitMinutes minutes.", output.toString())
+            try {
+                if (!process.waitFor(limitMinutes, TimeUnit.MINUTES)) {
+                    throw ScriptFailed("It did not finish in $limitMinutes minutes.", output.toString())
+                }
+                reader.join()
+            } finally {
+                if (process.isAlive) {
+                    process.descendants().use { children -> children.forEach { it.destroyForcibly() } }
+                    process.destroy()
+                }
             }
             if (process.exitValue() != 0) {
                 throw ScriptFailed("It stopped with status ${process.exitValue()}.", output.toString())

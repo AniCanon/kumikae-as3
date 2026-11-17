@@ -31,7 +31,14 @@ class UiProbeStarter : ApplicationStarter {
         Files.createDirectories(destination)
         val failure = runCatching {
             UiProbeFeedbackGuard.run(destination) {
-                if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
+                val game = System.getenv("KUMIKAE_GAME_RUN_PROBE")
+                if (System.getenv("KUMIKAE_DEVICE_PERF_PROBE") == "1") {
+                    UiProbeLive.run(destination)
+                } else if (game != null && System.getenv("KUMIKAE_ANDROID_PROBE_SERIAL") != null) {
+                    UiProbeAndroidRun.run(destination, Path.of(game), System.getenv("KUMIKAE_ANDROID_PROBE_SERIAL"))
+                } else if (game != null) {
+                    UiProbeGameRun.run(destination, Path.of(game))
+                } else if (System.getenv("KUMIKAE_MISSING_CLIENT_PROBE") == "1") {
                     UiProbeLanguage.run(destination)
                     UiProbeCompletion.run(destination, missingClient = true)
                 } else if (System.getenv("KUMIKAE_COMPLETION_CONTROL_PROBE") == "1") {

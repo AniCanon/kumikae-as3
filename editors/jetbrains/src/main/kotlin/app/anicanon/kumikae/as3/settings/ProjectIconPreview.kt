@@ -1,33 +1,42 @@
 package app.anicanon.kumikae.as3.settings
 
 import androidx.compose.runtime.Composable
+import com.intellij.icons.AllIcons
 import com.intellij.util.ui.JBUI
-import org.jetbrains.compose.swing.modifier.SwingModifier
+import org.jetbrains.compose.swing.components.layout.Panel
+import org.jetbrains.compose.swing.components.layout.PanelLayout
 import org.jetbrains.compose.swing.node.SwingNode
-import java.awt.Dimension
+import java.awt.Component
+import java.awt.FlowLayout
 import java.awt.Graphics
 import java.awt.image.BufferedImage
-import javax.swing.JComponent
+import javax.swing.Icon
+import javax.swing.JButton
 
-/** Native image painting keeps the icon crisp while the IDE supplies the surrounding form. */
 @Composable
-internal fun ProjectIconPreview(image: BufferedImage?, modifier: SwingModifier = SwingModifier) {
-    if (image == null) return
-    SwingNode(factory = { ProjectIconControl() }, modifier = modifier, update = {
-        set(image) {
-            this.image = it
-            repaint()
-        }
-    })
+internal fun ProjectIconPreview(image: BufferedImage?, title: String, choose: () -> Unit) {
+    Panel(PanelLayout.Flow(FlowLayout.LEFT, 0, 0)) {
+        SwingNode(factory = { ArtworkButton(title, choose) }, update = {
+            set(choose) { onChoose = it }
+            set(image) { icon = it?.let(::ArtworkThumbnail) ?: AllIcons.General.Add }
+        })
+    }
 }
 
-private class ProjectIconControl : JComponent() {
-    var image: BufferedImage? = null
+internal class ArtworkButton(title: String, var onChoose: () -> Unit) : JButton(AllIcons.General.Add) {
     init {
-        preferredSize = Dimension(JBUI.scale(96), JBUI.scale(96))
+        preferredSize = JBUI.size(96)
+        margin = JBUI.emptyInsets()
+        toolTipText = title
+        getAccessibleContext().accessibleName = title
+        addActionListener { onChoose() }
     }
-    override fun paintComponent(graphics: Graphics) {
-        super.paintComponent(graphics)
-        image?.let { graphics.drawImage(it, JBUI.scale(8), JBUI.scale(8), JBUI.scale(80), JBUI.scale(80), null) }
+}
+
+private class ArtworkThumbnail(private val image: BufferedImage) : Icon {
+    override fun getIconWidth() = JBUI.scale(80)
+    override fun getIconHeight() = iconWidth
+    override fun paintIcon(component: Component?, graphics: Graphics, x: Int, y: Int) {
+        graphics.drawImage(image, x, y, iconWidth, iconHeight, component)
     }
 }

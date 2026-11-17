@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.project
 
+import app.anicanon.kumikae.as3.settings.GameTargets
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -8,16 +9,13 @@ internal enum class Platform(val label: String) {
     DESKTOP("Desktop (this computer)"),
     IOS("iOS"),
     ANDROID("Android"),
-    CONSOLE("Nintendo Switch"),
     ;
 
     /** One line of the wizard: whether the platform can be chosen, and if not, why. */
     data class Choice(val platform: Platform, val available: Boolean, val always: Boolean, val note: String)
 
     companion object {
-        private const val CONSOLE_READY = "Adds a run target from Kumikae for Rider."
-
-        fun choices(consolePlugin: Boolean): List<Choice> = listOf(
+        fun choices(): List<Choice> = listOf(
             Choice(DESKTOP, available = true, always = true, note = "Runs with Godot from the Run button."),
             Choice(
                 IOS,
@@ -27,15 +25,9 @@ internal enum class Platform(val label: String) {
             ),
             Choice(
                 ANDROID,
-                available = false,
+                available = true,
                 always = false,
-                note = "Not available yet: the AS3 extension has no Android build.",
-            ),
-            Choice(
-                CONSOLE,
-                available = consolePlugin,
-                always = false,
-                note = if (consolePlugin) CONSOLE_READY else "Needs the Kumikae for Rider plugin.",
+                note = "Adds an Android export preset.",
             ),
         )
     }
@@ -51,6 +43,22 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
         put("main.tscn", SCENE)
         put("Main.as", SCRIPT)
         put("Hello.as", HELLO)
+        put("kas3-tests.json", """{"version":1,"tests":[{"name":"Game tests","discover":"tests"}]}""" + "\n")
+        put(
+            "tests/GameTest.as",
+            """package {
+    import kumikae.testing.Assert;
+
+    public class GameTest {
+        [Test]
+        public function startingScore():void {
+            var score:int = 0;
+            Assert.assertEquals(0, score);
+        }
+    }
+}
+""",
+        )
         // Godot will not export for a phone without an icon.
         put("icon.svg", icon())
         // What Godot's editor writes on its first import: with it, the game runs before the editor ever opens.
@@ -58,7 +66,11 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
         put("kas3.gdextension", EXTENSION)
         put(".gitignore", ".godot/\nbin\n")
         put("README.md", readme())
-        if (Platform.IOS in platforms) put("export_presets.cfg", IOS_PRESET.replace("{bundle}", bundle))
+        var exports = ""
+        for (platform in platforms.filter { it == Platform.IOS || it == Platform.ANDROID }) {
+            exports = GameTargets.add(exports, platform.label, platform.label, bundle)
+        }
+        if (exports.isNotEmpty()) put("export_presets.cfg", exports)
     }
 
     /**
@@ -103,16 +115,8 @@ internal class ProjectTemplate(private val name: String, private val platforms: 
         append("`bin` must hold the AS3 extension's library (`libkas3_godot`). ")
         append("The wizard links it to where the extension was built, when it finds it.\n")
         if (Platform.IOS in platforms) {
-            append(
-                "\n## iOS\n\n`export_presets.cfg` has an iOS preset. The team id in it is a stand-in, enough for the Simulator: set your own ",
-            )
-            append("and change the bundle identifier (`$bundle` is a placeholder). The \"iOS Simulator\" run ")
-            append("configuration launches that bundle on the simulator shown in the iOS Simulator panel; ")
-            append("the app has to be exported with Godot and installed first.\n")
-        }
-        if (Platform.CONSOLE in platforms) {
-            append("\n## Nintendo Switch\n\nBuilding and running there is done by the Kumikae for Rider plugin: ")
-            append("see its own run configuration.\n")
+            append("\n## iOS\n\nSelect the iOS Simulator run configuration and choose a device. ")
+            append("Run builds the export preset and launches its bundle identifier.\n")
         }
     }
 
@@ -262,30 +266,6 @@ compatibility_minimum = "4.7"
 macos = "res://bin/libkas3_godot.dylib"
 linux = "res://bin/libkas3_godot.so"
 ios = "res://bin/ios/kas3_godot.xcframework"
-"""
-
-        private const val IOS_PRESET = """[preset.0]
-
-name="iOS"
-platform="iOS"
-runnable=true
-advanced_options=false
-dedicated_server=false
-custom_features=""
-export_filter="all_resources"
-include_filter="*.as"
-exclude_filter=""
-export_path=""
-script_export_mode=0
-
-[preset.0.options]
-
-application/app_store_team_id="ABCDE12345"
-application/bundle_identifier="{bundle}"
-application/export_project_only=true
-application/short_version="1.0"
-application/version="1.0"
-architectures/arm64=true
 """
     }
 }

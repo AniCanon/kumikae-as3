@@ -1,5 +1,16 @@
 # AS3 tests
 
+Mark public no-argument instance methods with `[Test]` and point a manifest target at the fixture directory:
+
+```json
+{"version":1,"tests":[{"name":"Models","discover":"tests"}]}
+```
+
+The runner uses the compiler’s syntax tree and creates a fresh fixture for each test. Case IDs use the
+qualified class name. Set `suitePackage` on a target to omit a common package prefix from its displayed IDs.
+Rider uses the same IDs for the gutter, test results, reruns and source navigation.
+
+
 Kumikae Testing is a small first-party AS3 library, a Python command-line runner,
 and a Rider adapter. It uses the existing interpreter and Godot; it downloads
 nothing. Keep assertions and fixtures in AS3, process/protocol handling in Python,

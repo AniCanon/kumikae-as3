@@ -1,15 +1,16 @@
+<img src="editors/jetbrains/src/main/resources/META-INF/pluginIcon.svg" alt="Kumikae AS3" width="80" height="80">
+
 # Kumikae AS3
 
 ActionScript 3 as a first-class scripting language for Godot 4.
 
-You write AS3 classes that extend Godot's own classes. The same source runs in the editor, on desktop, on iOS
-and Android, and on Nintendo Switch through the Kumikae build.
+Write AS3 classes that extend Godot's own classes. The compiler checks scripts against Godot's API,
+and the Godot extension runs them in the game. Support Sprint exercises desktop play, iOS Simulator
+and Android ARM64. Additional export targets can be contributed by a companion plugin.
 
-> **Status: early.** Today the compiler checks an AS3 program against Godot's whole API and reports syntax,
-> name and type errors, on the command line and to an editor through its language server. A first
-> part of the language runs on the command line (`kas3c run`), and in headless Godot an AS3 script moves a
-> body, does arithmetic on Godot's values and listens to signals. Nothing runs in the Godot editor yet. The [roadmap](docs/roadmap.md) shows what comes next
-> and how you can tell when each stage is done.
+In Rider, open a game folder, double-click **project.godot** to edit its settings, and choose
+**Run → Add Game Target…** to run on a device. See the [Rider installation guide](editors/jetbrains/README.md)
+and the [language roadmap](docs/roadmap.md).
 
 ## What you will write
 

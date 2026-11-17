@@ -18,6 +18,15 @@ internal class IdeSceneRepository(private val project: Project, private val file
     private fun resource(path: String) = root().findFileByRelativePath(path.removePrefix("res://"))
         ?: error("Resource not found: $path")
 
+    override fun openInGodot() {
+        val godot = app.anicanon.kumikae.as3.run.GodotLaunch.findGodot("", System.getenv("PATH").orEmpty())
+            ?: error("Install Godot to open its scene editor.")
+        FileDocumentManager.getInstance().saveDocument(document())
+        val folder = root()
+        val relative = requireNotNull(com.intellij.openapi.vfs.VfsUtilCore.getRelativePath(file, folder))
+        ProcessBuilder(godot.toString(), "--editor", "--path", folder.path, "res://$relative")
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+    }
     override fun read() = document().text
     override fun open(path: String) {
         FileEditorManager.getInstance(project).openFile(resource(path), true)

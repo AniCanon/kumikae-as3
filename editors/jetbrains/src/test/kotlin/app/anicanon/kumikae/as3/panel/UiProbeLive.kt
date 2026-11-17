@@ -18,6 +18,8 @@ import javax.swing.JFrame
 /** Explicit opt-in measurement only: uses the already booted demo device, Home and Settings. */
 internal object UiProbeLive {
     fun run(destination: Path) {
+        val ownedDevice =
+            requireNotNull(System.getenv("KUMIKAE_SIMULATOR_PROBE_DEVICE")) { "Supply the probe-owned booted device." }
         val directory = Files.createTempDirectory("kumikae-live-probe")
         val service =
             LocalSimulatorService(
@@ -65,10 +67,10 @@ internal object UiProbeLive {
             }
         }
         try {
-            await { controller.devices.any { it.name == "Glass Dock Demo" && it.state == BOOTED } }
+            await { controller.devices.any { it.id == ownedDevice && it.state == BOOTED } }
             onEdt {
                 window.state.listShown = false
-                controller.open(controller.devices.single { it.name == "Glass Dock Demo" && it.state == BOOTED })
+                controller.open(controller.devices.single { it.id == ownedDevice && it.state == BOOTED })
             }
             await { window.screen.frame != null && controller.inputEnabled }
             check(onEdtValue { controller.continuousTouch }) {

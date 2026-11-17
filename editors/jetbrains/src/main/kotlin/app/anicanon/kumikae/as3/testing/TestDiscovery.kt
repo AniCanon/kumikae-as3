@@ -54,7 +54,7 @@ internal object TestDiscovery {
         val text =
             FileDocumentManager.getInstance().getDocument(manifest)?.immutableCharSequence?.toString() ?: return none
         val relative = VfsUtilCore.getRelativePath(virtual, root, '/') ?: return none
-        val cases = runCatching { TestCaseMappings.forFile(text, relative) }.getOrDefault(emptyList())
+        val cases = runCatching { TestCaseMappings.forFile(text, relative, source) }.getOrDefault(emptyList())
         return FileTests(source, manifest, cases)
     }
 }

@@ -4,10 +4,15 @@ import app.anicanon.kumikae.as3.language.As3Lexer
 import app.anicanon.kumikae.as3.language.As3Tokens
 import com.intellij.psi.TokenType
 
-internal data class TestMethod(val name: String, val offset: Int, val end: Int)
+internal data class TestMethod(val name: String, val offset: Int, val end: Int, val annotated: Boolean = false)
 
 /** Declaration locations only. The manifest remains the authority for runnable cases. */
-internal data class TestSource(val className: String, val classOffset: Int, val methods: List<TestMethod>) {
+internal data class TestSource(
+    val className: String,
+    val classOffset: Int,
+    val methods: List<TestMethod>,
+    val packageName: String = "",
+) {
     fun methodAt(offset: Int) = methods.firstOrNull { offset in it.offset until it.end }
 
     companion object {
@@ -69,7 +74,10 @@ internal data class TestSource(val className: String, val classOffset: Int, val 
                     } else {
                         end++
                     }
-                    methods += TestMethod(name, token.start, tokens.getOrNull(end - 1)?.end ?: text.length)
+                    val annotated =
+                        index >= 4 &&
+                            tokens.subList(index - 4, index).map { it.text } == listOf("[", "Test", "]", "public")
+                    methods += TestMethod(name, token.start, tokens.getOrNull(end - 1)?.end ?: text.length, annotated)
                     index = end
                     continue
                 }
@@ -77,7 +85,15 @@ internal data class TestSource(val className: String, val classOffset: Int, val 
                 if (token.text == "}") depth--
                 index++
             }
-            return TestSource(className, tokens[declaration].start, methods)
+            val pkg = tokens.indexOfFirst { it.text == "package" }
+            val prefix = if (pkg <
+                0
+            ) {
+                ""
+            } else {
+                tokens.drop(pkg + 1).takeWhile { it.text != "{" }.joinToString("") { it.text }
+            }
+            return TestSource(className, tokens[declaration].start, methods, prefix)
         }
     }
 }

@@ -21,6 +21,10 @@ _mapping_spec = importlib.util.spec_from_file_location("kas3_mapping", Path(__fi
 _mapping = importlib.util.module_from_spec(_mapping_spec)
 _mapping_spec.loader.exec_module(_mapping)
 
+_discovery_spec = importlib.util.spec_from_file_location("kas3_discovery", Path(__file__).with_name("discovery.py"))
+_discovery = importlib.util.module_from_spec(_discovery_spec)
+_discovery_spec.loader.exec_module(_discovery)
+
 Result = namedtuple("Result", "passed output duration")
 
 
@@ -54,6 +58,10 @@ def validate(manifest):
         if "::" in name or "\n" in name or "\r" in name:
             raise ValueError("Test names must be single-line and cannot contain ::")
         names.add(name)
+        if "discover" in case:
+            if not isinstance(case["discover"], str) or not case["discover"]:
+                raise ValueError("Choose a fixture directory inside the project.")
+            continue
         _mapping.validate(case)
         command = case.get("command")
         if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
@@ -188,7 +196,16 @@ def main():
     args = parser.parse_args()
     root = args.manifest.resolve().parent
     try:
-        tests = select(validate(json.loads(args.manifest.read_text())), args.case)
+        manifest = json.loads(args.manifest.read_text())
+        registered = validate(manifest)
+        selected_names = {value.partition("::")[0] for value in args.case}
+        for index, target in enumerate(registered):
+            if selected_names and target["name"] not in selected_names:
+                continue
+            if "discover" in target:
+                manifest["tests"][index] = _discovery.expand_target(root, target, args.compiler)
+                _mapping.validate(manifest["tests"][index])
+        tests = select(registered, args.case)
         if args.list:
             print(json.dumps(tests))
             return 0
@@ -201,6 +218,13 @@ def main():
             command_case = expand(root, case, args.compiler, args.godot)
             with tempfile.TemporaryDirectory(prefix="kas3-tests-") as temporary:
                 filters = case.get("_filters", [])
+                if "discover" in case:
+                    generated = _discovery.entry(Path(temporary), case, root)
+                    command = command_case["command"]
+                    files = list(dict.fromkeys(generated + command[2:]))
+                    if not any(Path(file).name == "TestCase.as" for file in files):
+                        files.extend(str(path) for path in (Path(__file__).parent / "as3").rglob("*.as"))
+                    command_case["command"] = command[:2] + files
                 if filters:
                     command = command_case["command"]
                     entry = case["entryClass"]

@@ -6,7 +6,14 @@ import kotlin.test.assertTrue
 
 class ClutterTest {
     @Test fun `what Godot and the IDE keep for themselves is clutter`() {
-        for (folder in listOf(".godot", ".idea", "bin")) assertTrue(Clutter.isClutter(folder, isFolder = true), folder)
+        for (folder in listOf(
+            ".godot",
+            ".idea",
+            ".run",
+            "bin",
+        )) {
+            assertTrue(Clutter.isClutter(folder, isFolder = true), folder)
+        }
         for (file in listOf("Main.as.uid", "icon.png.import", "kas3.gdextension", "kas3.gdextension.uid")) {
             assertTrue(Clutter.isClutter(file, isFolder = false), file)
         }

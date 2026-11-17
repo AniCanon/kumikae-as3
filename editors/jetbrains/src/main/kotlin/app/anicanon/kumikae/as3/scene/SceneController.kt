@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 internal interface SceneRepository {
     fun read(): String
     fun attach(expected: String, node: SceneNode, path: String?): String
+    fun openInGodot() = Unit
     fun open(path: String)
 }
 
@@ -33,6 +34,7 @@ internal class SceneController(private val repository: SceneRepository) {
         status = if (path == null) "Script detached." else "Script attached."
     }
 
+    fun openInGodot() = attempt { repository.openInGodot() }
     fun open() = attempt { selected?.script?.let(repository::open) }
 
     private fun attempt(action: () -> Unit) {

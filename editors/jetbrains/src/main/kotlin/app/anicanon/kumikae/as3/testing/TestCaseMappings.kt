@@ -14,12 +14,23 @@ internal object TestCaseMappings {
         return cases.filter { it.method == method }.ifEmpty { cases.filter { it.method == null } }
     }
 
-    fun forFile(source: String, relative: String): List<TestSelection> {
+    fun forFile(source: String, relative: String, declarations: TestSource? = null): List<TestSelection> {
         val manifest = JsonParser.parseString(source).asJsonObject
         require(manifest["version"].asInt == 1) { "Unsupported test manifest version" }
         return manifest.getAsJsonArray("tests").flatMap { value ->
             val test = value.asJsonObject
             val base = test["name"].asString
+            val folder = test["discover"]?.asString?.trimEnd('/')
+            if (folder != null && relative.startsWith("$folder/") && declarations != null) {
+                val qualified = listOf(
+                    declarations.packageName,
+                    declarations.className,
+                ).filter(String::isNotEmpty).joinToString(".")
+                val suite = test["suitePackage"]?.asString?.let { qualified.removePrefix("$it.") } ?: qualified
+                return@flatMap declarations.methods.filter { it.annotated }.map {
+                    TestSelection("$base::$suite::${it.name}", it.name)
+                }
+            }
             val mapped = test.getAsJsonArray("cases")?.mapNotNull { entry ->
                 val case = entry.asJsonObject
                 if (case["source"].asString != relative) {

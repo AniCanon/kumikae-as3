@@ -31,8 +31,6 @@ internal fun DevicePage(
     device: SimulatorDevice,
     modifier: SwingModifier,
 ) {
-    // The picture and the console text are pushed into their native controls only when they change.
-    LaunchedEffect(controller.frame) { screen.frame = controller.frame }
     // Read here, not inside the effect: only what composition reads brings the page back when it changes.
     val input = controller.inputEnabled
     val continuousTouch = controller.continuousTouch
@@ -138,7 +136,7 @@ private fun DeviceBar(
             AllIcons.Actions.Dump,
             "Copy screenshot",
             { controller.frame?.let { prompts.copy(it.image) } },
-            enabled = controller.frame != null,
+            enabled = controller.hasFrame,
         )
         IconButton(AllIcons.Actions.Edit, "Type text", {
             if (controller.inputEnabled) {

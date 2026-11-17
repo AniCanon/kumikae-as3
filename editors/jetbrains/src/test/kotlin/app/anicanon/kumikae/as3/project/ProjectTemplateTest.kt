@@ -29,6 +29,8 @@ class ProjectTemplateTest {
                 "main.tscn",
                 "Main.as",
                 "Hello.as",
+                "tests/GameTest.as",
+                "kas3-tests.json",
                 "icon.svg",
                 "kas3.gdextension",
                 ".gitignore",
@@ -60,7 +62,7 @@ class ProjectTemplateTest {
         assertTrue(presets.contains("application/bundle_identifier=\"org.example.starhopper2\""))
         assertTrue(presets.contains("include_filter=\"*.as\""))
         // Godot will not write the Xcode project without a team: a stand-in is enough for the Simulator.
-        assertTrue(presets.contains("application/app_store_team_id=\"ABCDE12345\""))
+        assertTrue(presets.contains("application/app_store_team_id=\"\""))
         assertTrue(template.files().getValue("README.md").contains("## iOS"))
     }
 
@@ -95,18 +97,13 @@ class ProjectTemplateTest {
     }
 
     @Test fun `what can be chosen says why when it can't`() {
-        val without = Platform.choices(consolePlugin = false)
-        assertEquals(
-            listOf(Platform.DESKTOP, Platform.IOS, Platform.ANDROID, Platform.CONSOLE),
-            without.map {
-                it.platform
-            },
-        )
-        assertTrue(without.first { it.platform == Platform.DESKTOP }.let { it.available && it.always })
-        assertTrue(without.first { it.platform == Platform.IOS }.available)
-        assertFalse(without.first { it.platform == Platform.ANDROID }.available)
-        assertFalse(without.first { it.platform == Platform.CONSOLE }.available)
-        assertTrue(Platform.choices(consolePlugin = true).first { it.platform == Platform.CONSOLE }.available)
+        val choices = Platform.choices()
+        assertEquals(listOf(Platform.DESKTOP, Platform.IOS, Platform.ANDROID), choices.map { it.platform })
+        assertTrue(choices.first().always)
+        val game = ProjectTemplate("Game", setOf(Platform.ANDROID, Platform.IOS))
+        val config = game.files().getValue("export_presets.cfg")
+        assertTrue(config.contains("package/unique_name="))
+        assertTrue(config.contains("application/bundle_identifier="))
     }
 
     @Test fun `a package name that is given is the app's identifier, and its shape is checked`() {

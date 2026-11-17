@@ -7,9 +7,9 @@ import java.nio.channels.FileChannel
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 
-internal data class NativePicture(val header: NativeFrameHeader, val image: BufferedImage)
+data class NativePicture(val header: NativeFrameHeader, val image: BufferedImage)
 
-internal class NativeFrameReader(
+class NativeFrameReader(
     path: Path,
     private val allocate: (Int, Int) -> BufferedImage = { width, height ->
         BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB_PRE)
@@ -35,9 +35,15 @@ internal class NativeFrameReader(
         lock.use {
             val header = readHeader() ?: return null
             if (header.width != image.width || header.height != image.height) return null
-            for (row in 0 until header.height) {
-                memory.position(NativeFrameLayout.headerBytes + row * header.stride)
-                memory.asIntBuffer().get(pixels, row * header.width, header.width)
+            memory.position(NativeFrameLayout.headerBytes)
+            val source = memory.asIntBuffer()
+            if (header.stride == header.width * 4) {
+                source.get(pixels, 0, header.width * header.height)
+            } else {
+                for (row in 0 until header.height) {
+                    source.position(row * (header.stride / 4))
+                    source.get(pixels, row * header.width, header.width)
+                }
             }
             sequence = header.sequence
             return NativePicture(header, image)

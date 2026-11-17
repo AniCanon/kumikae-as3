@@ -17,41 +17,20 @@ import java.awt.FlowLayout
 @Composable
 internal fun SceneView(controller: SceneController, choose: () -> Unit, modifier: SwingModifier = SwingModifier) {
     Panel(PanelLayout.Border(24, 16), modifier = modifier.emptyBorder(JBUI.insets(24))) {
-        Column(SwingModifier.north()) {
-            Label("Scene & AS3")
-            StatusLine("The scene creates each native node. Its attached script supplies AS3 behavior.")
-        }
-        ScrollPane(modifier = SwingModifier.center()) {
-            Panel(PanelLayout.Border(), modifier = SwingModifier.viewport()) {
-                Column(SwingModifier.north()) {
-                    for (node in controller.nodes) {
-                        TitleButton(
-                            if (node ==
-                                controller.selected
-                            ) {
-                                "› ${node.path} · ${node.name}"
-                            } else {
-                                "${node.path} · ${node.name}"
-                            },
-                            "${node.type.ifEmpty { "Inherited node" }} · ${node.script ?: "No script"}",
-                            { controller.selected = node },
-                            chevron = false,
-                        )
-                    }
-                }
-            }
-        }
+        SceneTree(controller, SwingModifier.center())
         Column(SwingModifier.south()) {
             val node = controller.selected
             Label(node?.let { "${it.name} · ${it.type}" } ?: "No node selected")
-            StatusLine(node?.script ?: "Attach an AS3 script to add lifecycle methods, signals and behavior.")
+            node?.properties?.entries?.take(8)?.forEach { (name, value) -> StatusLine("$name   $value") }
+            node?.script?.let { StatusLine(it) }
             if (node?.editable == false) StatusLine("Edit inherited or instanced scene attachments in Godot.")
             Panel(PanelLayout.Flow(FlowLayout.LEFT, 8, 8)) {
-                Button("Open Script", { controller.open() })
+                if (node?.script != null) Button("Open Script", { controller.open() })
                 if (node?.editable == true) {
                     Button("Attach Script…", choose)
-                    Button("Detach Script", { controller.attach(null) })
+                    if (node.script != null) Button("Detach Script", { controller.attach(null) })
                 }
+                Button("Open in Godot", { controller.openInGodot() })
                 Button("Reload", { controller.reload() })
             }
             StatusLine(controller.status)
