@@ -40,7 +40,7 @@ func grown() -> String:
 func refused() -> String:
 	var range := "Error #1125: The index %d is out of range 2."
 	return joined(["Error #1034: Type Coercion failed: cannot convert null to Vector2.", 2, 2, 2, 2, 2, 2, "literal", "made", range % 2, range % 3,
-			"Error #1126: Cannot change the length of a fixed Vector.", Vector2(3, 4), joined([Vector2(1, 2), Vector2(3, 4)], ",")], "|")
+			"Error #1126: Cannot change the length of a fixed Vector.", Vector2(3, 4), joined([Vector2(1, 2), Vector2(3, 4)], ",")], ";")
 
 func methods() -> String:
 	var said := []
@@ -73,7 +73,7 @@ func methods() -> String:
 	said.append_array([v.any(func(item): return item.y == 9), v.all(func(item): return item.y == 9)])
 	said.append_array([true, true, 0, true, true])
 	said.append_array([joined([Vector2(2, 1), v[0]], ","), 2])
-	return joined(said, "|")
+	return joined(said, ";")
 
 func _physics_process(_delta: float) -> bool:
 	frames += 1
@@ -98,7 +98,7 @@ func _physics_process(_delta: float) -> bool:
 	var red := Color(1, 0, 0.5)
 	var pale := Color(0.25, 0, 0)
 	show("a larger value type", ask("wider", [shade]), joined([2, 4, Color(), Color(0, 1, 0), true, red, pale, red, 2, 3, true, 3, 22,
-			Vector3(20, 2, -16), Vector3(1, 2, 3), false, joined([Vector3(18, 0, -18), Vector3(19, 0, -19)], ",")], "|"))
+			Vector3(20, 2, -16), Vector3(1, 2, 3), false, joined([Vector3(18, 0, -18), Vector3(19, 0, -19)], ",")], ";"))
 	show("a larger value type: to Godot", shade.colors, PackedColorArray([Color(), Color(0, 1, 0), pale]))
 	line.position = Vector2(-1, -2)
 	var list := [Vector2(0.5, 0.25), Vector3(1, 2, 3), null]
@@ -106,7 +106,7 @@ func _physics_process(_delta: float) -> bool:
 	show("taken", ask("taken", [line, list]), joined([
 			joined([Vector2(0, 0), list[0], line.position, Vector2(100, 200), list[0]], ","), cannot % "Object", 5,
 			joined([list[0], Vector2(0, 0)], ","), cannot % "Object", list[0], 6, 0, cannot % "Object", 6, list[0],
-			"Error #1034: Type Coercion failed: cannot convert Object to Vector2i.", Vector2i(1, 2)], "|"))
+			"Error #1034: Type Coercion failed: cannot convert Object to Vector2i.", Vector2i(1, 2)], ";"))
 	line.free()
 	keeper.free()
 	return true

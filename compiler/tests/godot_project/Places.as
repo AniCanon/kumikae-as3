@@ -44,7 +44,7 @@ package {
 			try { fixed.push(v[0]); } catch (p:RangeError) { said.push(p.message); }
 			fixed[0] = v[1];
 			said.push(fixed, v);
-			return said.join("|");
+			return said.join(";");
 		}
 
 		private function byX(a:Vector2, b:Vector2):Number {
@@ -84,7 +84,7 @@ package {
 			kept[0] = moved;
 			said.push(String(kept), kept.length);
 			kept.length = 1;
-			return said.join("|");
+			return said.join(";");
 		}
 
 		// Handed to Godot: the places as a packed array's elements, or each as a value of an Array.
@@ -129,7 +129,7 @@ package {
 			}
 			deep[1] = deep[0] + deep[21];
 			said.push(deep.length, deep[1], deep.shift(), deep[0] == deep[1], String(deep.slice(19)));
-			return said.join("|");
+			return said.join(";");
 		}
 
 		// What arrives from Godot, typed and untyped, stored into a place; and what is of another type refused.
@@ -158,7 +158,7 @@ package {
 			var cells:Vector.<Vector2i> = new <Vector2i>[new Vector2i(1, 2)];
 			try { untyped = cells; untyped[0] = list[0]; } catch (g:TypeError) { said.push(g.message); }
 			said.push(cells);
-			return said.join("|");
+			return said.join(";");
 		}
 	}
 }
