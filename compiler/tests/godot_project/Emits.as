@@ -65,6 +65,22 @@ package {
 			amount += 7;
 			heard.push("changed " + amount + " " + at);
 		}
+		// It keeps what it was given, in a field, in an Array and untyped: each is its own once the call is
+		// over, whatever Godot does with what it handed over.
+		private var keptAt:Vector2;
+		private var keptAll:Array = [];
+		private var keptAny:*;
+		public function onKeep(amount:int, at:Vector2):void {
+			keptAt = at;
+			keptAll.push(at);
+			keptAny = at;
+		}
+		public function kept():String {
+			var out:String = keptAt + " " + keptAll.join("/") + " " + keptAny;
+			keptAll = [];
+			return out;
+		}
+		public function onTurned(at:Vector2, amount:int):void { heard.push("turned " + at + " " + amount); }
 		public function onGiven(amount:int, at:Vector2):Vector2 {
 			at = at + new Vector2(1, 1);
 			return at;
@@ -98,6 +114,8 @@ package {
 				case "static": struck.add(onStatic); break;
 				case "changed": struck.add(onChanged); break;
 				case "given": struck.add(onGiven); break;
+				case "keep": struck.add(onKeep); break;
+				case "turned": struck.add(onTurned); break;
 				case "fail": struck.add(onFail); break;
 				case "free": struck.add(onFree); break;
 				case "later": struck.add(onStruck, true); break;

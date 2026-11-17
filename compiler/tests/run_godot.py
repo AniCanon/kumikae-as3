@@ -231,7 +231,8 @@ output = compare("emits.gd", [
     "a listener is not given what does not fit", "a listener's uint, Number, Boolean and Int64",
     "such a listener is not given what does not fit", "a listener's String, node, untyped value and Vector2",
     "a listener with a default, with the rest, a static one and a function", "the same, given less",
-    "a listener that changes what it was given changes its own", "AS3 emits to AS3", "AS3 emits what its own listener does not take",
+    "a listener that changes what it was given changes its own", "a listener that keeps what it was given keeps its own",
+    "a listener is not given what fits only in part", "AS3 emits to AS3", "AS3 emits what its own listener does not take",
     "a listener's error comes out of the emit", "a listener's error nothing catches ends the emitting function",
     "a listener that emits what it listens to", "a listener for once only", "emit: a signal kept in a field",
     "emit: a signal of an object freed since", "emit: no signal at all", "a listener freed by the one before it is not called",
@@ -241,7 +242,7 @@ output = compare("emits.gd", [
 for refused in ("argument 1 of Emits/onStruck(), a String, to int", "argument 2 of Emits/onStruck(), a Vector3, to Vector2",
                 "argument 1 of Emits/onStruck(), a float, to int", "argument 2 of Emits/onStruck(), a Object, to Vector2",
                 "argument 2 of Emits/onWide(), a String, to Number", "argument 3 of Emits/onWide(), a int, to Boolean",
-                "argument 4 of Emits/onWide(), a float, to Int64"):
+                "argument 4 of Emits/onWide(), a float, to Int64", "argument 2 of Emits/onTurned(), a String, to int"):
     check("emits.gd: a listener given the wrong kind of value is AS3's TypeError, which names it: " + refused,
           "TypeError: Error #1034: Type Coercion failed: cannot convert " + refused + "." in output, output[-1500:])
 check("emits.gd: a whole number too wide for a listener's int or uint is AS3's RangeError",

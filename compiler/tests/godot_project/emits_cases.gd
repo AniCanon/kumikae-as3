@@ -176,6 +176,17 @@ func _heard_otherwise() -> void:
 	node.struck.emit(1, Vector2(1, 2))
 	row("a listener that changes what it was given changes its own", node.said(), "changed 8 %s;1 %s" % [Vector2(100, 2), Vector2(1, 2)])
 	node.forget()
+	node.listen("keep")
+	node.struck.emit(1, Vector2(1, 2))
+	node.struck.emit(2, Vector2(3, 4))
+	row("a listener that keeps what it was given keeps its own", node.kept(), "%s %s/%s %s" % [Vector2(3, 4), Vector2(1, 2), Vector2(3, 4), Vector2(3, 4)])
+	node.forget()
+	# The Vector2 fits and the String after it does not: nothing of the call is made.
+	node.listen("turned")
+	node.struck.emit(Vector2(1, 2), 5)
+	node.struck.emit(Vector2(1, 2), "five")
+	row("a listener is not given what fits only in part", node.said(), "turned %s 5" % Vector2(1, 2))
+	node.forget()
 
 
 ## AS3's emit to a listener written in AS3, with nothing of GDScript's between.
