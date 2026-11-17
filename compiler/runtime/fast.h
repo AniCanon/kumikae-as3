@@ -58,6 +58,15 @@ inline Slot *element_to_write(Context *c, Object *p_vector, int32_t p_index) {
 	return p_index < 0 ? nullptr : element_to_write(c, p_vector, static_cast<uint32_t>(p_index));
 }
 
+// Where push() of one value writes it, in a vector with room for one more: the room past a vector's end is
+// empty, so nothing is let go of there, and whoever writes it then counts the element in (`length`).
+// Nothing for no vector, a fixed one, or one that must grow first: the library's.
+inline Slot *push_room(Object *p_vector) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	const bool room = vector && !vector->fixed && vector->length < vector->capacity && vector->length < vm::MAX_VECTOR_LENGTH;
+	return KAS3_LIKELY(room) ? vector->data + vector->length : nullptr;
+}
+
 // What holds a property, and a key that is a String: null for a register that holds anything else.
 inline Object *holder_of(Context *, Object *p_object) {
 	return p_object;

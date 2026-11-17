@@ -9,7 +9,7 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `kas3.h` | Everything generated code includes |
 | `values.h` | The values (the runtime's own: `vm/runtime.h`'s `Str`, `Object`, `Vector`, `Slot`), the `Context` every generated function takes first, `retain`/`release`, `put`/`store` |
 | `numbers.h` | AS3's arithmetic and conversions on machine numbers, as the interpreter's loop does them |
-| `fast.h` | The fast paths of operations the library owns, each for the usual case only: a vector's element in range, a String joined to another, a new object of a class the collector does not look at, and the rest declared for `calls.cpp` and `properties.cpp` |
+| `fast.h` | The fast paths of operations the library owns, each for the usual case only: a vector's element in range, the place `push()` writes in a vector with room, a String joined to another, a new object of a class the collector does not look at, and the rest declared for `calls.cpp` and `properties.cpp` |
 | `api.h`, `api.cpp` | Every function of the runtime generated code calls out of line, once: the table a program library is handed, and the host's side of it |
 | `operations.h` | What generated code calls out of line: errors and their traces, a class's first use, thunks, `trace` |
 | `program.h` | The table a program library gives its host (`kas3_program`): classes, functions, static fields, strings, thunks, all by number |

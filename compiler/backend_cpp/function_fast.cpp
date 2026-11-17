@@ -43,6 +43,19 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			line("if (Slot *const e = element_to_write(c, " + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
 			line(ir::is_held(kind(p_in.c)) ? "\tstore_slot(c, *e, " + reg(p_in.c) + ");" : "\t*e = slot(" + reg(p_in.c) + ");");
 			break;
+		case Op::VecCall: {
+			// push(x) where the vector has room for it: one that must grow, a fixed one and none at all are
+			// the library's. The value is counted before the vector is any longer.
+			const std::vector<uint32_t> &list = function_.argument_lists[p_in.c];
+			if (static_cast<ir::VectorMethod>(p_in.b) != ir::VectorMethod::Push || list.size() != 2) {
+				return false;
+			}
+			const std::string length = "static_cast<Vector *>(" + reg(list[0]) + ")->length";
+			line("if (Slot *const e = push_room(" + reg(list[0]) + ")) {");
+			line("\t*e = slot(" + (ir::is_held(kind(list[1])) ? "shared(c, " + reg(list[1]) + ")" : reg(list[1])) + ");");
+			line(p_in.a == NONE ? "\t" + length + "++;" : "\t" + reg(p_in.a) + " = ++" + length + ";");
+			break;
+		}
 		default:
 			return false;
 	}

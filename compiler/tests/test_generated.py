@@ -14,7 +14,8 @@ timings rest on, so that a change that undoes one fails here and not only in a b
   - a loop over a vector of numbers has a copy in which the vector's length and elements are locals: no
     look at the vector itself, and one test of each index against the local;
   - a method that calls nothing and cannot fail keeps no count of the depth, and a call of it is not
-    followed by a look at whether an error is on its way out.
+    followed by a look at whether an error is on its way out;
+  - push() of one value onto a vector with room for it is written where it is: no call of the library.
 """
 import os
 import re
@@ -96,6 +97,17 @@ with tempfile.TemporaryDirectory() as where:
         check("Saxpy's loops are found", bool(inside), process)
         check("a static field no code in the function can write is read once, not in its loops", "c->globals[" not in inside and
               "c->globals[" in process, process)
+
+with tempfile.TemporaryDirectory() as where:
+    sources = os.path.join(tests, "bench", "languages")
+    written = subprocess.run([kas3c, "cpp", "--godot", "frames/ArrayConversion.as", "-o", where], capture_output=True, text=True, cwd=sources)
+    check("ArrayConversion.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        process = functions(where, "frames_ArrayConversion.cpp").get("frames_ArrayConversion__process", "")
+        pushes = [loop for loop in loops(process) if loop.count("push_room(") == 1]
+        check("ArrayConversion's two loops of push() are found, each written where the vector has room", len(pushes) == 2, process)
+        for loop in pushes:
+            check("the library's push follows only where there is no room", loop.count("vector_call(") == 1 and "} else" in loop, loop)
 
 with tempfile.TemporaryDirectory() as where:
     written = subprocess.run([kas3c, "cpp", "objects.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "bench"))
