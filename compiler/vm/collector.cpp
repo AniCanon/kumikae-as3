@@ -33,6 +33,40 @@ void insert_after(Object *p_at, Object *p_object) {
 	p_at->gc_next = p_object;
 }
 
+// Per class: whether its objects go on the collector's list. What may_hold_objects() says of the class
+// alone, but for a vector of objects: one whose elements can hold nothing that leads back holds nothing
+// that does either. Its elements are of the class the vector is declared with or of one that extends it,
+// so every such class must be one that is not looked at; an interface, which any class may implement, and
+// a vector with no class to its elements are looked at as ever.
+std::vector<uint8_t> classes_looked_at(const ir::Module &p_module) {
+	const size_t count = p_module.classes.size();
+	std::vector<uint8_t> looked_at(count);
+	for (size_t i = 0; i < count; i++) {
+		looked_at[i] = may_hold_objects(p_module.classes[i]);
+	}
+	// Per class: whether it, or a class that extends it, is looked at.
+	std::vector<uint8_t> extended = looked_at;
+	for (size_t i = 0; i < count; i++) {
+		for (uint32_t base = p_module.classes[i].base; looked_at[i] && base < count; base = p_module.classes[base].base) {
+			extended[base] = true;
+		}
+	}
+	// A vector of vectors waits for the vector inside it: until nothing more is found.
+	for (bool changed = true; changed;) {
+		changed = false;
+		for (size_t i = 0; i < count; i++) {
+			const ir::Class &klass = p_module.classes[i];
+			const uint32_t element = klass.element_check;
+			const bool of_objects = looked_at[i] && klass.element == Kind::Obj && !klass.array && element < count;
+			if (of_objects && !p_module.classes[element].is_interface && !extended[element]) {
+				looked_at[i] = extended[i] = false;
+				changed = true;
+			}
+		}
+	}
+	return looked_at;
+}
+
 } // namespace
 
 Collector::Collector(Heap &p_heap) :
@@ -40,11 +74,7 @@ Collector::Collector(Heap &p_heap) :
 	for (Object *head : { &young_, &all_, &gray_, &done_, &suspects_ }) {
 		list_init(head);
 	}
-	const ir::Module &module = heap_.module;
-	looked_at_.resize(module.classes.size());
-	for (size_t i = 0; i < module.classes.size(); i++) {
-		looked_at_[i] = may_hold_objects(module.classes[i]);
-	}
+	looked_at_ = classes_looked_at(heap_.module);
 }
 
 Collector::~Collector() {

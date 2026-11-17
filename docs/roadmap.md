@@ -129,8 +129,8 @@ passes on real compiled AS3 (not hand-written code, as in stage 0).
 **Built ahead, on 2026-11-16:** `kas3c cpp` writes a program as C++; every program of the run tests gives
 the interpreter's output as native code; the Godot extension loads a program library and Godot calls its
 functions directly. Against Godot C# (rough: measured on a loaded machine, last on 2026-11-17) it is ahead
-on calls into Godot, script-only code and both array benchmarks, about level on five, and behind on five
-(1.2 to 1.7 times: `sieve`, `ray_queries`, `shapes`, `alloc`, `nbody`): the speed gate is not passed. Handing arrays to Godot was the furthest behind (4.9
+on calls into Godot, script-only code and both array benchmarks, about level on seven, and behind on three
+(1.1 to 1.5 times: `sieve`, `ray_queries`, `shapes`): the speed gate is not passed. Handing arrays to Godot was the furthest behind (4.9
 times) and is now ahead (0.33 ms a frame against C#'s 0.46, the median of five runs of each): a vector of
 `Vector2`s holds each in its place and goes to Godot in one copy, `push()` is written where the vector has
 room, and a number held untyped costs no call. Signals were the next furthest (3.6 times) and are now level
@@ -148,7 +148,24 @@ freed none of those found (Godot says when one ends, as it tells C#), the script
 read out of its own handle and multiplied where it is, and the cycle collector no longer walks a vector
 of nodes every frame. Most of what is left of that frame is Godot's own getting and setting of a
 position; of ours, the vector's count taken and given back for each node, and two atomic counts for each
-node's handle. Decided on 2026-11-16: native code is to run in the editor's
+node's handle. The n-body step and the frame that makes twenty thousand objects were then 1.7 and 1.6
+times behind and are now level (91 µs a frame against C#'s 96, and 108 against 111, the median of five
+runs of each, turn and turn about; 1.29 million instructions a frame against C#'s 1.23, and 2.24 against
+2.36): a field of an object whose class is known is written through the class's struct, so that the C++
+compiler knows which field a write is of (it read every Number field again after each write, and kept
+no two fields together), a loop that reads a vector of objects has the vector's length and elements in
+locals, the cycle collector no longer walks a vector of objects that hold no object, an element read to
+be used at once counts no reference, an object stored as the last thing done with it hands its reference
+over, and letting go of an object that holds only numbers is known to run no code. On that frame C#'s
+median leaves out its collector: its slowest frame in a hundred takes 627 µs, more than five times its
+median, where native code's takes 123. `sieve` is behind by 1.1 to 1.2 times, by the width of a vector's place: an `int`
+in a vector takes eight bytes where C#'s takes four, which alone costs that loop 8 to 23 per cent built
+outside the engine. `shapes` (1.5 times) is two calls through a class's table for each object, where C#
+guesses the object's class from the frames it has run and puts that class's method in the loop;
+`ray_queries` (1.45 times) still asks the library for each ray's Dictionary. A count of C#'s instructions is only right in a window after .NET has finished optimising
+the script: in its first few hundred frames it counts two to three times as many (3.4 million a frame of
+n-body where it settles at 1.2), which had made native code look ahead by instructions where it was
+behind. Decided on 2026-11-16: native code is to run in the editor's
 play too, not only in exports, with the interpreter kept for a machine with no C++ toolchain; and tests are
 to run on Steam Deck and Nintendo Switch once build targets are configurations. Left: the library called
 directly everywhere (part done), Godot's values held inline in fields and parameters and, for the types

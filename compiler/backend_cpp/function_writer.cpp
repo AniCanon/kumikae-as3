@@ -62,6 +62,7 @@ void FunctionWriter::analyse() {
 	shadow_.assign(function_.registers.size(), std::string());
 	borrowed_.assign(function_.registers.size(), NONE);
 	lent_.assign(function_.registers.size(), false);
+	find_classes();
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();

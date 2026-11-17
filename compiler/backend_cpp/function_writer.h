@@ -84,6 +84,21 @@ class FunctionWriter {
 	Touch touch(uint32_t p_pc, uint32_t p_slot) const;
 	void find_kept();
 	std::string own_field(uint32_t p_slot) const; // The field of `this` in memory.
+	// function_classes.cpp. Per register: the class of the program every object it is given is of (that
+	// class or one that extends it), or NONE where nothing says. A field of such an object is written
+	// through the class's struct (field_of), any other by its number.
+	std::vector<uint32_t> class_of_;
+	// Per register: every object it is given is of a class whose objects end alone (facts.h): letting go
+	// of what it held runs no code and takes nothing out of any vector.
+	std::vector<bool> ends_alone_;
+	// Whether the register holds a vector of objects of such a class: what a place of it held ends alone.
+	bool elements_end_alone(uint32_t p_vector) const;
+	uint32_t class_written(const ir::Instruction &p_in, const std::vector<uint32_t> &p_known) const;
+	void find_classes();
+	std::string field_of(uint32_t p_object, uint32_t p_slot, ir::Kind p_kind) const; // A field of an object, in memory.
+	// Whether the register's object may be the method's own: false only where its class and the method's
+	// are known and neither extends the other, so that a field written through it is never a field of `this`.
+	bool may_be_this(uint32_t p_register) const;
 	std::optional<std::string> kept_local(uint32_t p_object, uint32_t p_slot) const; // The local, if the field is kept.
 	std::string kept_declared() const; // The locals, each given its field's value.
 	// Statements, on one line: the locals written back before an instruction that may see their fields, and
@@ -102,8 +117,11 @@ class FunctionWriter {
 	// the instruction is left to it, is given a handle of its own for as long as it runs (generic).
 	std::vector<uint32_t> value_from_;
 	void find_borrowed();
-	// Per register: it holds an object read out of a vector (or copied from such a register) in a function
-	// where nothing can take the object out of the vector: it counts no reference of its own (rule 2).
+	void settle_reads(bool p_at_once, const std::vector<bool> &p_lands);
+	// Per register: it holds an object read out of a vector (or copied from such a register) where nothing
+	// can take the object out of the vector while the register is used: in a function that lets go of
+	// nothing, or one in which every use of the register follows the read at once. It counts no reference
+	// of its own (rule 2).
 	std::vector<bool> lent_;
 	std::vector<bool> lent_candidates() const;
 	// The static fields of numbers and Booleans that are locals for the whole function (`g4`), each read
@@ -116,7 +134,9 @@ class FunctionWriter {
 	// GetField written: from the local a kept field is in, with no reference counted into a register that
 	// borrows, or as any other read.
 	void read_field(const ir::Instruction &p_in, const std::string &p_field);
-	// may_run_code(), but that a field read into a register that borrows lets go of nothing.
+	// may_run_code(), but that a field read into a register that borrows lets go of nothing, a register of a
+	// class whose objects end alone lets go of nothing but its object, and a class with nothing to set up
+	// and an object of such a class are used and made with nothing run.
 	bool runs_code(const ir::Instruction &p_in) const;
 	// Per instruction: it copies a register that nothing reads afterwards, so the reference is handed over
 	// and not shared (a Move, or a field or static field set).
@@ -125,7 +145,7 @@ class FunctionWriter {
 	// Stores a register's value where the instruction says; the register gives up its reference if this
 	// is its last use.
 	void keep(const std::string &p_place, uint32_t p_register, bool p_is_slot);
-	// function_loops.cpp: a loop over vectors of numbers, written twice.
+	// function_loops.cpp: a loop over vectors of numbers, or of objects it only reads, written twice.
 	struct Twice {
 		uint32_t from = 0; // The instruction its jump back goes to, and that jump.
 		uint32_t to = 0;
@@ -135,6 +155,7 @@ class FunctionWriter {
 	const Twice *fast_ = nullptr; // The loop whose copy with locals is being written, if one is.
 	std::vector<bool> retried_; // Per instruction: the copy with locals leaves for it in the other (label S).
 	std::vector<uint32_t> loop_vectors(uint32_t p_from, uint32_t p_to) const;
+	bool reads_in_place(uint32_t p_register) const;
 	void find_twice();
 	bool fast_vector(const ir::Instruction &p_in);
 	std::string label(uint32_t p_target) const; // "L12", or "V12" for a jump inside the copy with locals.

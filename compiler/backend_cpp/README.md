@@ -19,13 +19,14 @@ goes into `program.cpp` too: one file for the C++ compiler, which a release is b
 | `function_writer.h`, `function_writer.cpp` | One function: its registers as locals, who owns what, labels, the error paths and handlers, and its entry (the same function called with slots) |
 | `patterns.h`, `function_simple.cpp` | The operations that are one C++ statement, as a table (arithmetic, conversions, comparisons), and constants |
 | `function_objects.cpp` | Fields, static fields, classes, jumps, returns and throws |
+| `function_classes.cpp` | The class an object register is known to hold (a parameter declared of it, a new object, a field or an element declared to hold it, a copy), so that a field of it is written through the class's struct, which tells the C++ compiler which field of which class a read or a write is of |
 | `function_calls.cpp` | Calls: direct, through the class's method table, by interface |
 | `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, `push()` of one value where the vector has room, a `Vector2` or a `Vector2i` copied between a register that holds it inline and a vector's place that holds it whole, Strings, untyped values, properties under a String key, a call through a function value |
 | `function_library.cpp` | An instruction one of the library's functions of plain values carries out whole (`ir/library_entries.h`): the runtime's function of that name called on the instruction's values, where a thunk would have been |
 | `function_engine.cpp` | What asks Godot, where generated code does it itself: which values are held inline, the maths the runtime has for `Vector2` and `Vector3`, a property or a method of a Godot object called on bare values by its method bind, the script's own Godot object and singletons borrowed for the whole function |
 | `function_signals.cpp` | A signal's `emit()` made by generated code itself: what it hands over is given to the host as it is held (a number, a Boolean, a value with parts by its address, a handle), and a signal that is a field of `this`, read only to be emitted, is emitted through the field's own handle. Which registers stand for a field's handle that way: a signal read to be emitted, and a value with parts read to be asked an operator, a method or a part |
 | `function_borrowed.cpp` | A field of `this` that holds an object, read into a register only to be used at once: the register counts no reference. An object read out of a vector into a variable, in a function that lets go of nothing: the variable counts none either |
-| `function_loops.cpp` | A loop over vectors of numbers written twice: first with each vector's length and elements in locals, which an index out of range leaves for the loop as it always was |
+| `function_loops.cpp` | A loop over vectors of numbers, or of objects it only reads, written twice: first with each vector's length and elements in locals, which an index out of range leaves for the loop as it always was |
 | `function_values.cpp` | Godot's value types with parts: made from their parts and their members read where they are, and Godot's own code for the type (an operator, a method, a part, a constant) found once by the host and called on bare values |
 | `function_whole.cpp` | A sum of ints or uints converted back to one, as 32-bit arithmetic (exact, and three times as fast on `loop.as`), and two such sums compared as the integers they are |
 | `thunks.h`, `thunks.cpp` | The operations left to the library the interpreter has, each one instruction the host carries out |
@@ -42,8 +43,8 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   table (`c->classes[object->klass].code[slot]`), an interface call through its interface table.
 - A register that holds a String, an object or an untyped value owns a reference, except a parameter
   that is never written, which borrows its caller's. A result is the caller's, and a register returned
-  hands its reference over. So does a register copied into a variable, a field or a static field as
-  the last thing done with it, in the plain case of a value made and then put where it is kept
+  hands its reference over. So does a register copied into a variable, a field, a static field or a
+  vector's place as the last thing done with it, in the plain case of a value made and then put where it is kept
   (`find_last_uses`, `tests/run/last_use.as`); any other last use still takes a reference and gives one
   back. Counts change only in `retain(c, x)` and `release(c, x)`.
 - An error is `c->failing`, tested after each operation that can raise one. The function then goes to
@@ -63,11 +64,28 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   first copy (labels `V`) has each vector's length and elements in locals and holds an index against the
   local; an index not below it goes to the same instruction of the second copy (labels `S`), the loop as
   it would be alone, which makes the vector longer or raises the error (`tests/run/vector_loops.as`).
+  An element that is an object is read the same way where the variable it is read into counts no
+  reference (the next rule): `var b:Body = bodies[i]` is then one comparison and one read. A field written
+  in the loop through a register whose class is neither the method's class nor one of its bases or
+  subclasses is no field of `this`, whatever its number: the loop still reads the vector's field once
+  (`tests/run/element_lent.as`).
 - A variable given an element of a vector (`var b:Body = bodies[i]`), or a copy of such a variable, counts
   no reference where the whole function lets go of nothing and runs no code that might: no call, nothing
   stored where an object is held, no register that owns an object written (`lent_`, rule 2 of the
-  translation rules; `tests/run/element_lent.as`). The vector holds the object all the while. Anywhere else
-  the variable counts one, as before.
+  translation rules; `tests/run/element_lent.as`). The vector holds the object all the while. In a function
+  that does let go of things, the variable still counts none where every use of it follows the read at
+  once, in straight code with nothing between that could let go of anything or run code
+  (`var p:Particle = slots[i]; sum += p.x + p.vy;`): the rule of a field of `this` read to be used at
+  once, for an element. A variable used again later (after a call, an object stored, a jump) counts one,
+  as before.
+- Letting go of an object runs no code where its class is one whose objects end alone (`facts.h`: it
+  holds numbers, Booleans and Strings only, it is the program's own, and every class that extends it is
+  the same). A register known to hold such a class is written, such an object is made (its constructor
+  is a call of its own) and a class with nothing to set up is used with what other registers borrow or
+  are lent still good afterwards; so is a call of a function that runs no code not looked into. In
+  `slots[i] = new Particle(i, frame)` the register `slots` is read into then counts nothing: what the
+  place held ends alone too, after the vector has been used (`tests/run/last_use.as`, where a
+  constructor that puts another vector in the field makes the register count one).
 - `hit.emit(a, b)` asks the host for the emit it worked out once for that place (`c->engine->emit`), with
   the values where they are: nothing is boxed, and no name is looked up. Where `hit` is a field of `this`
   and nothing between the field's read and the emit could write the field or run the program's code, no
@@ -87,6 +105,13 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   as the function begins, where nothing in the function runs code that could write one (no call, no first
   use of a class, nothing let go of): rule 12, for statics (`tests/run/static_still.as`).
 - `Math.sqrt`, `abs`, `floor` and `ceil` are the machine's own: IEEE 754 gives them one answer.
+- A field of an object other than `this` is written through the struct of the object's class
+  (`static_cast<C10_Body *>(r4)->f3_vx`) where every write of the register agrees on a class
+  (`function_classes.cpp`), and by its number (`field<double>(r4, 3)`) where none is known. Through the
+  struct, the C++ compiler knows that a write of `vx` leaves `mass` and `x` as they were, whichever
+  objects two registers hold: it reads each once, and keeps two fields that sit side by side together.
+  By its number a field is any Number of any object, and every write makes the others be read again. One
+  object reached through two registers is still one object either way (`tests/run/field_classes.as`).
 - A null check is explicit, and left out on `this`.
 - `#line` markers point at the `.as` source.
 

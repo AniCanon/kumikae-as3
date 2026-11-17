@@ -63,14 +63,7 @@ std::string FunctionWriter::still_declared() const {
 }
 
 bool FunctionWriter::object(const Instruction &p_in) {
-	// A field of the method's own object is read through the class's struct; any other object's class is
-	// not known here, and its field is reached by its number.
-	const auto field = [&](uint32_t p_object, uint32_t p_field, Kind p_kind) {
-		if (is_this(p_object) && p_field < module_.classes[function_.owner].fields.size()) {
-			return own_field(p_field);
-		}
-		return "field<" + std::string(type_of(p_kind)) + ">(" + reg(p_object) + ", " + std::to_string(p_field) + ")";
-	};
+	const auto field = [&](uint32_t p_object, uint32_t p_field, Kind p_kind) { return field_of(p_object, p_field, p_kind); };
 	switch (p_in.op) {
 		case Op::Move:
 			if (p_in.a == p_in.b) { // A register moved to itself is nothing, and C++ warns of it.

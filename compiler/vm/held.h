@@ -74,6 +74,9 @@ inline std::vector<Entry> take_entries(const ir::Class &p_class, Object *p_objec
 // that is never reference-counted (nodes: ir::Class::element_counted): the engine counts no reference to
 // such an object, so none of them is a node of the collector's (EngineHandles::node), and a frame of a
 // game that keeps twenty thousand nodes in a vector does not walk them.
+// This is what the class alone says. A vector of objects of the program's classes says more with the
+// classes its elements may be of, which the collector reads with the whole module before it (collector.cpp,
+// classes_looked_at): one whose elements hold nothing but numbers is not looked at either.
 inline bool may_hold_objects(const ir::Class &p_class) {
 	auto leads = [](ir::Kind p_kind) { return p_kind == ir::Kind::Obj || p_kind == ir::Kind::Any || p_kind == ir::Kind::Ref; };
 	if (p_class.table || p_class.array) {
