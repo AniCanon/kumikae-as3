@@ -6,14 +6,16 @@
 # its signal made and its listener added. The others still ask in every frame: RayQueries the query, isEmpty
 # and the element for each ray; ArrayConversion the collections handed over. A number that grows is a fast
 # path lost.
-Empty: thunks=0 unresolved=8
-MoveNodes: thunks=60000 unresolved=8
-PerNodeProcess: thunks=40000 unresolved=8
-RayQueries: thunks=18068 unresolved=8
-SignalTraffic: thunks=4 unresolved=8
-NBody: thunks=0 unresolved=8
-Sieve: thunks=0 unresolved=8
-ArrayConversion: thunks=244 unresolved=8
-Saxpy: thunks=0 unresolved=8
-Shapes: thunks=0 unresolved=8
-Alloc: thunks=0 unresolved=8
+# handles: the handles on Godot's values and objects generated code had the host copy. lookups: the times
+# it asked the engine for the object behind a handle.
+Empty: thunks=0 unresolved=8 handles=0 lookups=0
+MoveNodes: thunks=60000 unresolved=8 handles=99976 lookups=160001
+PerNodeProcess: thunks=40000 unresolved=8 handles=39974 lookups=100001
+RayQueries: thunks=18068 unresolved=8 handles=18000 lookups=12132
+SignalTraffic: thunks=4 unresolved=8 handles=1 lookups=0
+NBody: thunks=0 unresolved=8 handles=0 lookups=0
+Sieve: thunks=0 unresolved=8 handles=0 lookups=0
+ArrayConversion: thunks=244 unresolved=8 handles=62 lookups=5
+Saxpy: thunks=0 unresolved=8 handles=0 lookups=0
+Shapes: thunks=0 unresolved=8 handles=0 lookups=0
+Alloc: thunks=0 unresolved=8 handles=0 lookups=0

@@ -11,9 +11,11 @@ These are held:
              library what frames/native_counts.txt says: nothing in a loop that should be free of it.
 
 The second is by the host's counts (KAS3_NATIVE_COUNTS): how many times generated code left an operation
-to the library (a thunk), and how many of the places it asks Godot directly the host could not work out.
-`native_counts.txt` beside each script holds the two numbers, which do not grow with a loop: a change that
-loses a fast path makes the first thousands, and fails here and not only in a timing. When a number is
+to the library (a thunk), how many of the places it asks Godot directly the host could not work out, how
+many handles on Godot's values and objects it had the host copy, and how many times it asked the engine
+for the object behind a handle. `native_counts.txt` beside each script holds the numbers, which do not grow
+with a loop that is on its fast paths: a change that loses one makes a number thousands, and fails here and
+not only in a timing. When a number is
 meant to change, the failure says what was counted; write that into the file.
 """
 import glob

@@ -49,8 +49,15 @@ bool has_parts(int p_type) {
 	return false;
 }
 
+// How many times generated code asked for the object behind a handle (rt::Host::object_lookups).
+uint64_t looked_up = 0;
+uint64_t lookups() {
+	return looked_up;
+}
+
 // The object behind a handle: by its id, so that one Godot has freed is null.
 void *object_behind(void *p_handle) {
+	looked_up++;
 	const Variant *held = static_cast<const Variant *>(p_handle);
 	if (!held || held->get_type() != Variant::OBJECT) {
 		return nullptr;
@@ -230,6 +237,7 @@ std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, co
 void NativeProgram::resolve(const rt::Program &p_program) {
 	rt::Host &host = *host_;
 	host.context.engine = api();
+	host.object_lookups = &lookups;
 	names_.reserve(p_program.name_count);
 	for (uint32_t i = 0; i < p_program.name_count; i++) {
 		const rt::Text &text = p_program.strings[p_program.names[i]];

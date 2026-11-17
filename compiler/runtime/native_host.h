@@ -131,8 +131,13 @@ struct Host final : vm::NativeCode {
 	// With KAS3_NATIVE_COUNTS set, how many times each thunk ran, and the program's uses of the engine
 	// that the host could not work out (each then goes by its thunk): said on standard error as the host
 	// goes, for the tests that hold generated code to its fast paths. Empty, and nothing said, otherwise.
+	// And how many handles on Godot's values and objects generated code asked the host to copy, and how
+	// many times it asked the engine for the object behind a handle (what the embedder counted, asked as
+	// the counts are said): what a loop over Godot's objects costs beyond its calls of Godot.
 	std::vector<uint64_t> thunk_counts;
 	std::vector<uint32_t> unresolved;
+	uint64_t handle_copies = 0;
+	uint64_t (*object_lookups)() = nullptr;
 	void say_counts() const;
 	// Calls of the library's functions of plain values in progress (runtime/direct.cpp): like a thunk,
 	// generated code began what such a call leads to, and an error of a function called beneath it stays
