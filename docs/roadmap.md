@@ -128,13 +128,16 @@ passes on real compiled AS3 (not hand-written code, as in stage 0).
 
 **Built ahead, on 2026-11-16:** `kas3c cpp` writes a program as C++; every program of the run tests gives
 the interpreter's output as native code; the Godot extension loads a program library and Godot calls its
-functions directly. Against Godot C# (rough: measured on a loaded machine) it is ahead on calls into Godot,
-script-only code and one array benchmark, about level on three, and behind on eight (1.2 to 4.9 times):
-the speed gate is not passed. Decided the same day: native code is to run in the editor's play too, not
-only in exports, with the interpreter kept for a machine with no C++ toolchain; and tests are to run on
-Steam Deck and Nintendo Switch once build targets are configurations. Left: the library called directly
-everywhere (part done), Godot's values held inline in fields and parameters, building on Play, reloading
-native code, threads.
+functions directly. Against Godot C# (rough: measured on a loaded machine, last on 2026-11-17) it is ahead
+on calls into Godot, script-only code and both array benchmarks, about level on three, and behind on seven
+(1.2 to 3.6 times): the speed gate is not passed. Handing arrays to Godot was the furthest behind (4.9
+times) and is now ahead (0.33 ms a frame against C#'s 0.46, the median of five runs of each): a vector of
+`Vector2`s holds each in its place and goes to Godot in one copy, `push()` is written where the vector has
+room, and a number held untyped costs no call. Decided on 2026-11-16: native code is to run in the editor's
+play too, not only in exports, with the interpreter kept for a machine with no C++ toolchain; and tests are
+to run on Steam Deck and Nintendo Switch once build targets are configurations. Left: the library called
+directly everywhere (part done), Godot's values held inline in fields and parameters and, for the types
+larger than a `Vector2`, in vectors, building on Play, reloading native code, threads.
 
 ### Stage 4: mobile
 
