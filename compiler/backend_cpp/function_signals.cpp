@@ -193,7 +193,9 @@ bool FunctionWriter::engine_emit(const Instruction &p_in) {
 		shadow_[list[0]] = kept + ".v";
 	}
 	generic(p_in);
-	shadow_[list[0]].clear();
+	if (lent != NONE) {
+		shadow_[list[0]].clear();
+	}
 	line("}");
 	line("}");
 	return true;
