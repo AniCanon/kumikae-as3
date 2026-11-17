@@ -131,9 +131,10 @@ the interpreter's output as native code; the Godot extension loads a program lib
 functions directly. Against Godot C# (rough: measured on a machine other work loads, last on 2026-11-17)
 it is ahead on calls into Godot, script-only code, both array benchmarks and the overridden methods, and
 about level on the rest: no frame benchmark is behind by more than its own runs differ, the last three
-that were (`shapes`, `ray_queries`, `sieve`, below) among them. Moving nodes read 1.10 times C#'s in the
-last sitting and 0.85 in the one before, with the same code and the same count of instructions. Whether
-that passes the speed gate is for a whole table on a quiet machine to say. Handing arrays to Godot was the furthest behind (4.9
+that were (`shapes`, `ray_queries`, `sieve`, below) among them. Moving nodes read 1.04 to 1.05 times C#'s
+on a quiet machine, the ranges overlapping, and anything from 0.7 to 1.2 on a loaded one, where its runs
+ranged from 0.84 to 2.9 ms. Whether that passes the speed gate is for a whole table on a quiet machine to
+say. Handing arrays to Godot was the furthest behind (4.9
 times) and is now ahead (0.33 ms a frame against C#'s 0.46, the median of five runs of each): a vector of
 `Vector2`s holds each in its place and goes to Godot in one copy, `push()` is written where the vector has
 room, and a number held untyped costs no call. Signals were the next furthest (3.6 times) and are now level
