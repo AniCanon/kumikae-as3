@@ -2,8 +2,10 @@
 // them. Strings here are a stand-in: inside Godot they will be the engine's own.
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <string_view>
 
@@ -104,9 +106,21 @@ inline void set_place(Vector *p_vector, size_t p_index, Slot p_value) {
 	}
 }
 // The places from p_from up to p_to made empty (zero), and p_count places moved from p_from to p_to within
-// one vector or between two whose places are the same size. Nothing is counted.
-void clear_places(Vector *p_vector, size_t p_from, size_t p_to);
-void move_places(Vector *p_into, size_t p_to, const Vector *p_out_of, size_t p_from, size_t p_count);
+// one vector or between two whose places are the same size. Nothing is counted. Here, and not called: a
+// push() empties one place and moves none.
+inline void clear_places(Vector *p_vector, size_t p_from, size_t p_to) {
+	if (p_vector->narrow) {
+		std::fill(numbers_of(p_vector) + p_from, numbers_of(p_vector) + p_to, 0);
+	} else {
+		std::fill(slots_of(p_vector) + p_from, slots_of(p_vector) + p_to, Slot());
+	}
+}
+inline void move_places(Vector *p_into, size_t p_to, const Vector *p_out_of, size_t p_from, size_t p_count) {
+	if (p_count) {
+		const size_t size = place_size(p_into);
+		std::memmove(static_cast<char *>(p_into->places) + p_to * size, static_cast<const char *>(p_out_of->places) + p_from * size, p_count * size);
+	}
+}
 
 inline void retain(Counted *p_value) {
 	if (p_value) {

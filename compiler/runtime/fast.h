@@ -36,10 +36,10 @@ inline int32_t *number(Object *p_vector, uint32_t p_index) {
 inline int32_t *number(Object *p_vector, int32_t p_index) {
 	return number(p_vector, static_cast<uint32_t>(p_index));
 }
-// The places of a vector, for a loop that keeps them in a local: nothing for no vector, and for one whose
-// places are of the other sort.
+// The places of a vector, for a loop that keeps them in a local: nothing for no vector (and for one that
+// has no room yet). Which sort they are is asked for numbers and not for slots, as of one element.
 inline Slot *slots_in(Object *p_vector) {
-	return p_vector && !static_cast<Vector *>(p_vector)->narrow ? vm::slots_of(static_cast<Vector *>(p_vector)) : nullptr;
+	return p_vector ? vm::slots_of(static_cast<Vector *>(p_vector)) : nullptr;
 }
 inline int32_t *numbers_in(Object *p_vector) {
 	return p_vector && static_cast<Vector *>(p_vector)->narrow ? vm::numbers_of(static_cast<Vector *>(p_vector)) : nullptr;

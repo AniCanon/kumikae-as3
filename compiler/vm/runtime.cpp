@@ -169,20 +169,6 @@ bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 	return true;
 }
 
-void clear_places(Vector *p_vector, size_t p_from, size_t p_to) {
-	if (p_to > p_from) {
-		const size_t size = place_size(p_vector);
-		std::memset(static_cast<char *>(p_vector->places) + p_from * size, 0, (p_to - p_from) * size);
-	}
-}
-
-void move_places(Vector *p_into, size_t p_to, const Vector *p_out_of, size_t p_from, size_t p_count) {
-	if (p_count) {
-		const size_t size = place_size(p_into);
-		std::memmove(static_cast<char *>(p_into->places) + p_to * size, static_cast<const char *>(p_out_of->places) + p_from * size, p_count * size);
-	}
-}
-
 void free_vector(Vector *p_vector) {
 	list_remove(p_vector);
 	std::free(p_vector->places);
