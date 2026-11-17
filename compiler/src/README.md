@@ -12,6 +12,7 @@ and the type of every expression. `kas3c check`, the lowerer and the language se
 | `names_update`, `names_retract`, `names_dependencies`, `incremental.h`, `fingerprints`, `dependencies` | Checking as the program is edited: the declarations of what an edit reaches redone, symbols kept, what each file read, and bodies checked when asked for |
 | `typer.h`, `typer_*.cpp`, `type_table.cpp` | The type of each expression and what fits where, by what is typed |
 | `whole_numbers` | Rules the checker and the lowerer must agree on, written once |
+| `held_in_place.h` | Which of Godot's value types a vector holds in its places (`Vector2`, `Vector2i`), for the checker, which refuses `null` written where an element of one goes, and the lowerer, which makes the vector's class hold them so |
 | `godot_names.cpp`, `builtins.h` | The name table and AS3's own declarations |
 | `query*`, `completion*` | Editor queries (`query_symbols`: outline and symbol search), lexical context, completion candidates/edits and active-call signatures |
 | `diagnostics` | Every error, as `file:line:column: error: message` |

@@ -503,8 +503,12 @@ package {
   zero vectors, as a C# array of structs does, and setting a longer `length` adds zeroes.
 - A place of a `Vector.<Vector2>` or of a `Vector.<Vector2i>` holds the value itself, eight bytes, as an
   element of a packed array or of a C# array does, under the interpreter and in native code alike. It is
-  never null: storing `null` (`v[0] = null`, `v.push(none)`) is AS3's TypeError #1034, with the vector as
-  it was. What is read out is a copy, and what is stored is copied in. Handed to Godot where it takes a
+  never null. `null` written where an element goes (`v[0] = null`, an argument of `push()`, `unshift()`,
+  `insertAt()` or `splice()`, an element of `new <Vector2>[...]`) is an error as the program is checked,
+  which the editor shows: `null can't be stored in a 'Vector.<Vector2>': each of its places holds a
+  'Vector2' itself`. A value that turns out to be null as the program runs (`v.push(none)`, an untyped
+  value, a vector converted by `Vector.<Vector2>(list)`) is AS3's TypeError #1034, with the vector as it
+  was. What is read out is a copy, and what is stored is copied in. Handed to Godot where it takes a
   `PackedVector2Array`, the places are copied as they are, in one go. A vector of a larger value type
   (`Vector3`, `Color`) still holds a handle on each, which may be null.
 - Godot's integer is an AS3 type, `Int64`. `items.size()`, `randi()` and an object's id are `Int64`s.

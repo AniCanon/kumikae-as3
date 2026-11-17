@@ -69,7 +69,8 @@ host differs.
   kind that counts nothing, which is what moving, copying and letting go of places go by). A value crosses
   into a register, which holds a handle, by `read_element()`, and back by `write_element()` or `put_element()`
   (`library.h`; untyped, `element_to_any()` and `element_from_any()`): the host makes the handle and reads it
-  (`EngineHandles::boxed`, `unboxed`), and no value (null) stored is AS3's TypeError #1034. Nothing else reads a
+  (`EngineHandles::boxed`, `unboxed`), and no value (null) stored is AS3's TypeError #1034 (the checker
+  has refused `null` itself written there: `src/held_in_place.h` is where the types are named). Nothing else reads a
   place of such a vector as its element's kind.
 - **What a container holds is said once, in `each_held()` (`held.h`).** An object's fields, a vector's
   elements, a function value's bound object or environment (its `FUNCTION_FIRST` field): freeing lets go of

@@ -61,6 +61,10 @@ const Type *Typer::assign_type(Expr *p_expression) {
 	written(assign->target);
 	if (assign->op == TokenKind::Assign) {
 		store(assign->value, target);
+		if (assign->target->kind == NodeKind::Index) {
+			const Type *holder = static_cast<Index *>(assign->target)->object ? static_cast<Index *>(assign->target)->object->type : nullptr;
+			no_null_place(assign->value, holder && holder->kind == Type::Vector ? holder->element : nullptr);
+		}
 	}
 	if (target->kind == Type::Unknown) {
 		return unknown_;
@@ -127,7 +131,11 @@ const Type *Typer::literal_type(Expr *p_expression) {
 		case NodeKind::VectorLit: {
 			VectorLit *literal = static_cast<VectorLit *>(p_expression);
 			list(literal->elements);
-			return compilation_.vector_type(compilation_.type_of(literal->element_type));
+			const Type *element = compilation_.type_of(literal->element_type);
+			for (const Expr *each : literal->elements) {
+				no_null_place(each, element);
+			}
+			return compilation_.vector_type(element);
 		}
 		default:
 			return unknown_;

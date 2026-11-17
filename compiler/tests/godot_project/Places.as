@@ -24,7 +24,8 @@ package {
 					(v[0] == null) + " " + (v[1] != null);
 		}
 
-		// No value is none a place can hold: an error, with the vector as it was.
+		// No value is none a place can hold: an error, with the vector as it was. (`null` itself written there
+		// is refused by the checker; here it is in a variable.)
 		public function refused():String {
 			var v:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];
 			var none:Vector2 = null;
@@ -36,8 +37,7 @@ package {
 			try { v.unshift(none); } catch (e:TypeError) { said.push(v.length); }
 			try { v.insertAt(1, none); } catch (f:TypeError) { said.push(v.length); }
 			try { v.splice(0, 1, none); } catch (g:TypeError) { said.push(v.length); }
-			try { v[0] = null; } catch (h:TypeError) { said.push("literal"); }
-			try { var w:Vector.<Vector2> = new <Vector2>[new Vector2(5, 5), null]; said.push(w.length); } catch (k:TypeError) { said.push("made"); }
+			try { var w:Vector.<Vector2> = new <Vector2>[new Vector2(5, 5), none]; said.push(w.length); } catch (k:TypeError) { said.push("made"); }
 			try { said.push(v[2]); } catch (m:RangeError) { said.push(m.message); }
 			try { v[3] = v[0]; } catch (n:RangeError) { said.push(n.message); }
 			var fixed:Vector.<Vector2> = new Vector.<Vector2>(1, true);

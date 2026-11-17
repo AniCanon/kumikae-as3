@@ -1,6 +1,8 @@
 #include "lower_statements.h"
 #include "lower_vectors.h"
 
+#include "held_in_place.h"
+
 namespace kas3 {
 namespace ir {
 
@@ -41,7 +43,8 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 	if (element == Kind::Val && of && is_godot(of)) {
 		klass.element_type = godot_name(of->name, std::string_view()).value_or(std::string());
 		klass.element_zero = of->klass && value_has_parts(of);
-		klass.element_bare = klass.element_zero ? bare_named(klass.element_type) : Bare::None;
+		// Which types are held so is the checker's rule too (src/held_in_place.h): it refuses a null written there.
+		klass.element_bare = klass.element_zero && held_in_place(p_type->element) ? bare_named(klass.element_type) : Bare::None;
 	}
 	module_.classes.push_back(std::move(klass));
 	const uint32_t index = static_cast<uint32_t>(module_.classes.size()) - 1;

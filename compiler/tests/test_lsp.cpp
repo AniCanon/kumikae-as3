@@ -394,6 +394,21 @@ static void test_positions() {
 	CHECK(open_string.find(MAIN + " 1:15-1:16 ") == 0);
 }
 
+// What the checker says of Godot's types reaches the editor like any other error: `null` written where an
+// element of a vector that holds its values themselves goes.
+static void test_place_diagnostic() {
+	Session session(true);
+	session.initialize();
+	session.open(MAIN, "package {\nimport godot.Vector2;\npublic class Main {\n\tpublic function run(points:Vector.<Vector2>):void {\n"
+					   "\t\tpoints.push(null);\n\t}\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(), MAIN + " 4:14-4:18 null can't be stored in a 'Vector.<Vector2>': each of its places holds a 'Vector2' itself\n");
+	session.change(MAIN, "package {\nimport godot.Vector2;\npublic class Main {\n\tpublic function run(points:Vector.<Vector2>):void {\n"
+						 "\t\tpoints.push(new Vector2(1, 2));\n\t}\n}\n}\n");
+	session.settle();
+	CHECK_EQ(session.published(), MAIN + " clear\n");
+}
+
 static void test_navigation() {
 	fs::path root = fresh_folder("my project");
 	write(root / "project.godot", "");
@@ -1276,6 +1291,7 @@ int main() {
 	test_lifecycle();
 	test_code_language();
 	test_diagnostics();
+	test_place_diagnostic();
 	test_warnings_alone();
 	test_positions();
 	test_navigation();

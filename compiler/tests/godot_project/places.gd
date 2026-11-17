@@ -39,7 +39,7 @@ func grown() -> String:
 
 func refused() -> String:
 	var range := "Error #1125: The index %d is out of range 2."
-	return joined(["Error #1034: Type Coercion failed: cannot convert null to Vector2.", 2, 2, 2, 2, 2, 2, "literal", "made", range % 2, range % 3,
+	return joined(["Error #1034: Type Coercion failed: cannot convert null to Vector2.", 2, 2, 2, 2, 2, 2, "made", range % 2, range % 3,
 			"Error #1126: Cannot change the length of a fixed Vector.", Vector2(3, 4), joined([Vector2(1, 2), Vector2(3, 4)], ",")], ";")
 
 func methods() -> String:

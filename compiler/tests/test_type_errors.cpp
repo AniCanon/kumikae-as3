@@ -454,6 +454,33 @@ static void test_engine_collections() {
 			{ UNRELATED("Array", "GodotArray") });
 }
 
+// A vector of Vector2s or of Vector2is holds each value in its place, which can't be null: `null` written
+// where an element goes is said as the program is checked. A value that only turns out to be null as the
+// program runs is AS3's TypeError then; a vector of any other type, and a class of the same name that is
+// not Godot's, take null as ever.
+static void test_places_take_no_null() {
+#define NO_NULL(vector, element) "null can't be stored in a '" vector "': each of its places holds a '" element "' itself"
+	const std::string head = "package { import godot.*; public class Main extends Node {\n"
+							 "public function run(points:Vector.<Vector2>, cells:Vector.<Vector2i>, colors:Vector.<Color>, none:Vector2):void {\n";
+	expect_godot(head + "points[0] = /*!*/null; points.push(/*!*/null); points.push(none, /*!*/null, /*!*/(null));\n"
+						"points.unshift(/*!*/null); points.insertAt(1, /*!*/null); points.splice(0, 1, none, /*!*/null);\n"
+						"cells[1] = /*!*/null; cells.push(/*!*/null); var made:Vector.<Vector2> = new <Vector2>[none, /*!*/null];\n"
+						"var whole:Vector.<Vector2i> = new <Vector2i>[/*!*/null]; } } }\n",
+			{ NO_NULL("Vector.<Vector2>", "Vector2"), NO_NULL("Vector.<Vector2>", "Vector2"), NO_NULL("Vector.<Vector2>", "Vector2"),
+					NO_NULL("Vector.<Vector2>", "Vector2"), NO_NULL("Vector.<Vector2>", "Vector2"), NO_NULL("Vector.<Vector2>", "Vector2"),
+					NO_NULL("Vector.<Vector2>", "Vector2"), NO_NULL("Vector.<Vector2i>", "Vector2i"), NO_NULL("Vector.<Vector2i>", "Vector2i"),
+					NO_NULL("Vector.<Vector2>", "Vector2"), NO_NULL("Vector.<Vector2i>", "Vector2i") });
+	expect_godot(head + "points[0] = none; points.push(none); points.splice(0, 1); points.splice(null, 1, none); points.insertAt(null, none);\n"
+						"colors[0] = null; colors.push(null); var shades:Vector.<Color> = new <Color>[null]; points = null;\n"
+						"var all:Vector.<Vector2> = points.concat(null); points.length = 0; var words:Vector.<String> = new <String>[null];\n"
+						"var list:Array = [null]; list.push(null); list[0] = null; } } }\n",
+			{});
+	expect("package { public class Main { public function run(v:Vector.<Vector2>):void { v[0] = null; v.push(null); v = new <Vector2>[null]; } } }\n"
+		   "class Vector2 {}\n",
+			{});
+#undef NO_NULL
+}
+
 // What Godot's declarations say about creating and overriding.
 static void test_godot_classes() {
 	expect_godot("package { import godot.*; public class Main extends Node {\n"
@@ -498,6 +525,7 @@ int main() {
 	test_conversions_accepted();
 	test_conversions_rejected();
 	test_stores();
+	test_places_take_no_null();
 	test_unknown_is_silent();
 	return check::finish();
 }
