@@ -21,6 +21,31 @@ struct Val {
 	void *handle = nullptr;
 };
 
+// What the host keeps just before every handle it makes: what generated code reads of a handle on one of
+// Godot's objects with no call. (A value lent for a call, on the caller's stack, has none: only a handle on
+// an object is ever looked at this way, and every one of those is the host's.)
+struct HandleHead {
+	// How many hold the handle. One on an object that is not reference-counted is shared, never copied:
+	// another holder is one more here (HANDLE_SHARED, once the host has looked at what it is on). A handle
+	// on anything else is the host's to copy (copy_handle).
+	std::atomic<uint32_t> holders;
+	uint8_t shared;
+	uint8_t asked; // The host has been asked for the object behind it before (EngineApi::object).
+	uint16_t unused;
+	// The object behind the handle, as the host found it when Context::gone read `seen`. The host is told of
+	// the end of every object it has found this way, and counts it there: while the count reads the same,
+	// none of them has been freed, so this one is still there. 0: not found yet.
+	uint64_t seen;
+	void *object;
+	uint64_t unused_too; // The handle after it is sixteen bytes on, as an untyped value's tag needs.
+};
+inline constexpr uint8_t HANDLE_UNKNOWN = 0;
+inline constexpr uint8_t HANDLE_SHARED = 1;
+inline constexpr uint8_t HANDLE_COPIED = 2;
+inline HandleHead *head_of(void *p_handle) {
+	return static_cast<HandleHead *>(p_handle) - 1;
+}
+
 // The engine's entry points, given by the host that has an engine; a host with none gives no table.
 struct EngineApi {
 	// Godot's call of a method bind on bare values (object_method_bind_ptrcall): each argument by its
@@ -37,6 +62,12 @@ struct EngineApi {
 	// code in `p_held` says (GIVEN_WHOLE and the rest). False, with nothing done, where the handle holds no
 	// signal or the signal's object is gone: the instruction's thunk then says what that is.
 	bool (*emit)(void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count);
+	// For each value with parts: where a handle on one keeps it, in bytes from the handle's start (0 for a
+	// type a handle keeps elsewhere, and for every type where the host could not make sure), and the number
+	// a handle on one starts with. Found by the host as it starts, from what Godot itself says of a handle
+	// (unbox() reads a value there; anything else is the host's unbox).
+	uint8_t value_at[static_cast<size_t>(Parts::Count)];
+	int32_t value_type[static_cast<size_t>(Parts::Count)];
 };
 
 // How a value handed to EngineApi::emit is held: a whole number as an int64_t, a Number as a double, a
@@ -66,15 +97,32 @@ struct Resolved {
 //     void drop_handle(Context *c, void *p_handle);
 
 inline Ref shared(Context *c, Ref p_value) {
-	return Ref{ p_value.handle ? copy_handle(c, p_value.handle) : nullptr };
+	if (!p_value.handle) {
+		return Ref{};
+	}
+	// A handle on an object that is not reference-counted is held by one more: no other handle is made.
+	HandleHead *const head = head_of(p_value.handle);
+	if (KAS3_LIKELY(head->shared == HANDLE_SHARED)) {
+		head->holders.fetch_add(1, std::memory_order_relaxed);
+		return p_value;
+	}
+	return Ref{ copy_handle(c, p_value.handle) };
 }
 inline Val shared(Context *c, Val p_value) {
 	return Val{ p_value.handle ? copy_handle(c, p_value.handle) : nullptr };
 }
 inline void release(Context *c, Ref p_value) {
-	if (p_value.handle) {
-		drop_handle(c, p_value.handle);
+	if (!p_value.handle) {
+		return;
 	}
+	// One holder fewer of a shared handle that has others; the last one's is the host's to free.
+	HandleHead *const head = head_of(p_value.handle);
+	uint32_t holders = head->holders.load(std::memory_order_relaxed);
+	if (head->shared == HANDLE_SHARED && holders > 1 &&
+			head->holders.compare_exchange_strong(holders, holders - 1, std::memory_order_acq_rel, std::memory_order_relaxed)) {
+		return;
+	}
+	drop_handle(c, p_value.handle);
 }
 inline void release(Context *c, Val p_value) {
 	if (p_value.handle) {
@@ -93,12 +141,23 @@ inline void store_slot(Context *c, Slot &r_place, Ref p_borrowed) {
 	release(c, Ref{ old });
 }
 inline void store_slot(Context *c, Slot &r_place, Val p_borrowed) {
-	store_slot(c, r_place, Ref{ p_borrowed.handle });
+	void *const old = r_place.p;
+	r_place.p = shared(c, p_borrowed).handle;
+	release(c, Val{ old });
 }
 
 // The object behind a handle, for a call on bare values: null with no engine, no handle or a freed object.
+// The one the host found for the handle before, while Godot has freed none of the objects the host found
+// (HandleHead::seen); the host's look by the object's id otherwise, which is where a freed one is null.
 inline void *object_of(const Context *c, Ref p_value) {
-	return c->engine && p_value.handle ? c->engine->object(p_value.handle) : nullptr;
+	if (!c->engine || !p_value.handle) {
+		return nullptr;
+	}
+	const HandleHead *const head = head_of(p_value.handle);
+	if (KAS3_LIKELY(head->seen == c->gone->load(std::memory_order_relaxed))) {
+		return head->object;
+	}
+	return c->engine->object(p_value.handle);
 }
 
 // The script's own Godot object, which a function finds once: it is the same for as long as no script
@@ -159,7 +218,16 @@ template <typename T>
 inline T unbox(const Context *c, const void *p_handle) {
 	T value{};
 	if (c->engine && p_handle) {
-		c->engine->unbox(p_handle, PartsOf<T>::code, &value);
+		// Read where the handle keeps it, if it is a handle on that type and the host found where.
+		const size_t type = static_cast<size_t>(PartsOf<T>::code);
+		const uint8_t at = c->engine->value_at[type];
+		int32_t held;
+		std::memcpy(&held, p_handle, sizeof(held));
+		if (KAS3_LIKELY(at != 0 && held == c->engine->value_type[type])) {
+			std::memcpy(&value, static_cast<const char *>(p_handle) + at, sizeof(T));
+		} else {
+			c->engine->unbox(p_handle, PartsOf<T>::code, &value);
+		}
 	}
 	return value;
 }

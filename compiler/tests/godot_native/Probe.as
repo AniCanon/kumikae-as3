@@ -348,6 +348,125 @@ package {
 			return said + " " + nodes.join("+");
 		}
 
+		// One of Godot's objects that has been freed, used again: AS3's error, with its line, however native
+		// code holds the object. Freed between two uses in one function, inside a function called, by a
+		// listener the engine ran for a call, in the loop that moves a vector's nodes, and at a frame's end;
+		// and one a function called took out of the vector while a variable held it, which is alive still.
+		private var crowd:Vector.<Node2D> = new Vector.<Node2D>();
+		private var doomed:Node2D;
+		private var queued:Node2D;
+
+		private function freeing(node:Node2D):void {
+			node.free();
+		}
+
+		private function scatter():void {
+			crowd.length = 0;
+		}
+
+		private function onDoom():void {
+			if (doomed) {
+				doomed.free();
+			}
+		}
+
+		private function tell(node:Node2D):String {
+			try {
+				node.position = new Vector2(1, 2);
+				return "" + node.position;
+			} catch (e:Error) {
+				return e.message;
+			}
+			return "never";
+		}
+
+		public function gone():String {
+			var out:Array = [];
+			var b:Node2D = new Node2D();
+			b.position = new Vector2(3, 4);
+			var p:Vector2 = b.position;
+			b.free();
+			try {
+				b.position = p;
+				out.push("moved");
+			} catch (e:Error) {
+				out.push(e.message);
+			}
+			var c:Node2D = new Node2D();
+			c.position = p;
+			freeing(c);
+			try {
+				out.push(c.position);
+			} catch (e:Error) {
+				out.push(e.message);
+			}
+			var bell:Node2D = new Node2D();
+			doomed = new Node2D();
+			var d:Node2D = doomed;
+			bell.visibilityChanged.add(onDoom);
+			d.position = p;
+			bell.hide();
+			try {
+				d.position = p;
+				out.push("moved");
+			} catch (e:Error) {
+				out.push(e.message);
+			}
+			doomed = null;
+			bell.free();
+			for (var n:int = 0; n < 4; n++) {
+				crowd.push(new Node2D());
+			}
+			for (var i:int = 0; i < crowd.length; i++) {
+				var child:Node2D = crowd[i];
+				try {
+					var at:Vector2 = child.position;
+					at.x += i + 1;
+					child.position = at;
+					out.push(child.position.x);
+					if (i == 1) {
+						crowd[2].free();
+					}
+				} catch (e:Error) {
+					out.push(i + ": " + e.message);
+				}
+			}
+			var first:Node2D = crowd[0];
+			var second:Node2D = crowd[1];
+			var last:Node2D = crowd[3];
+			scatter();
+			out.push(tell(first), tell(second), first == second, crowd.length);
+			second.free();
+			last.free();
+			freeing(first);
+			out.push(tell(first), tell(second), tell(last), first == null);
+			return out.join(" | ");
+		}
+
+		public function goneUncaught():Number {
+			var node:Node2D = new Node2D();
+			node.free();
+			return node.position.x;
+		}
+
+		public function queue():String {
+			queued = new Node2D();
+			addChild(queued);
+			queued.position = new Vector2(5, 6);
+			queued.queueFree();
+			return "" + queued.position;
+		}
+
+		public function afterQueue():String {
+			try {
+				queued.position = new Vector2(7, 8);
+				return "" + queued.position;
+			} catch (e:Error) {
+				return e.message;
+			}
+			return "never";
+		}
+
 		// An error nothing catches: Godot is told, with the trace, and carries on.
 		public function fail(depth:int):int {
 			if (depth == 0) {
