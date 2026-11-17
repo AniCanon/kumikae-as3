@@ -72,7 +72,22 @@ void unbox(const void *p_handle, rt::Parts p_type, void *r_value) {
 	Variant *held = const_cast<Variant *>(static_cast<const Variant *>(p_handle));
 	const int type = godot_type(p_type);
 	if (held && held->get_type() == type) {
-		std::memcpy(r_value, inside(*held, type), PARTS_SIZES[static_cast<size_t>(p_type)]);
+		const void *value = inside(*held, type);
+		// The small ones are copied where they are: a size known only here would be a call for each.
+		switch (PARTS_SIZES[static_cast<size_t>(p_type)]) {
+			case 8:
+				std::memcpy(r_value, value, 8);
+				break;
+			case 12:
+				std::memcpy(r_value, value, 12);
+				break;
+			case 16:
+				std::memcpy(r_value, value, 16);
+				break;
+			default:
+				std::memcpy(r_value, value, PARTS_SIZES[static_cast<size_t>(p_type)]);
+				break;
+		}
 	}
 }
 
