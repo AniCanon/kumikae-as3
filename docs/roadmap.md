@@ -1,357 +1,124 @@
 # Roadmap
 
-This page is the plan for Kumikae AS3: what each stage delivers, how you can tell that it's done, and what is
-being built now. It's written for the project owner and for anyone who joins later.
-
-For why the project exists and how it works, see the [README](../README.md). For everything a review put
-off, see the [backlog](backlog.md): those items are owed, not dropped.
-
-## Where we are
-
-**Stage 1 of 6, the front end.** The parser, name resolution and type checking are built and checked against
-about 190,000 lines of real AS3. The compiler knows Godot's whole API under AS3 names, including arithmetic
-on its math types, and reports its errors to an editor through a language server. The front end is
-complete. The language server's first slice is built and passes its tests; it works in VS Code and is
-validated in the Rider sandbox; see [completion results](results/2026-11-completion.md).
-
-**Stage 2 is under way: five of its nine slices are built; the fifth is in its last review.** `kas3c run` executes AS3 on the command line
-(classes, inheritance, numbers, strings, loops). In headless Godot 4.7.2 an AS3 script attached to a
-`CharacterBody2D` moves the body, does arithmetic on Godot's values, listens to signals, and uses
-singletons such as `Input`, Godot's constants and its static methods. Godot's 64-bit integers are an AS3
-type, `Int64`. The same scripts have run on an iPhone. Godot's global functions (`print`, `lerpf`) run. The rest of the language (stage 2c) comes next.
-
-**Everything a review put off is being fixed now, on one branch.** The [backlog](backlog.md) holds 9 items;
-none waits for a later stage (the owner, 2026-11-15), and stage 3 does not start while one of them is open.
+This page says what Kumikae AS3 does today, what is being built, and what comes later. It changes when the
+state of the project changes.
 
 ![Roadmap](diagrams/roadmap.svg)
 
-## How to read a stage
+## Goals
 
-- **Each stage ends in something you can run.** A stage isn't done because code exists. It's done when the
-  "done when" line is true.
-- **Each stage gets its own step-by-step plan** in `docs/superpowers/plans/` (`docs/superpowers/plans/`), written
-  just before the stage starts.
-- **Each stage is reviewed independently before it merges.** The reviewer's findings are fixed, each with a
-  test that failed first.
-- **Measured claims come with their data.** Results are in [`docs/results/`](results/), with the raw rows.
-
-## The stages
-
-### Stage 0: speed spike (done)
-
-**Question:** can code compiled this way match Godot C#, before we build a compiler around the idea?
-
-**What was built:** hand-written C++ in the shape the compiler will generate, attached to nodes as scripts,
-and measured against C# and GDScript on desktop.
-
-**Result:**
-
-1. The first design lost to C# on four of six benchmarks.
-2. A redesign, based on published research, removed almost all the cost of AS3's safety checks.
-3. The second measurement was ahead of C# on seven of nine benchmarks and level on two, with steadier frames.
-4. The owner accepted that result on 2026-11-11.
-
-Read more: performance redesign (`docs/superpowers/specs/2026-11-11-performance-redesign.md`),
-[results](results/2026-11-stage-0b-desktop.md).
-
-### Stage 1: front end (in progress)
-
-**Delivers:** a command-line compiler, `kas3c`, that reads AS3 and reports every error with a file, line and
-column.
-
-| Part | Delivers | Done when | Status |
-|---|---|---|---|
-| 1a. Parser | `kas3c parse` | Every syntax error is reported with its position, and no input can crash the parser. | Done |
-| 1b. Names | `kas3c check` | Packages, imports, classes and scopes resolve. Unknown and duplicate names are reported. | Done |
-| 1c-1. Expression types | `kas3c check --dump-types` | Every expression has a type, and `a.b` resolves to a member with AS3's access rules. | Done |
-| 1c-2. Type errors | Type checking in `kas3c check` | A value that doesn't fit where it is used is reported: assignments, arguments, returns, overrides, interfaces, `const`. | Done |
-| 1d. Godot's API in AS3 | A generator that turns Godot's API description into AS3 declarations for the `godot` package, under the naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`) | `moveAndSlide()`, `position`, `timer.timeout.add(f)` and `Key.ESCAPE` all check, for all 1,036 Godot classes, and no generated name clashes with another. | Done |
-| 1e. Godot's math types | Operators and indexing on `Vector2` and its relatives | `position + velocity * delta` has a type, and a wrong operand is reported. | Done |
-
-### Language server, first slice (built; editor check pending)
-
-**Delivers:** `kas3c lsp`, the program an editor talks to. Errors as you type, go to definition, find
-references, hover, a document outline and symbol search.
-
-**Done when:** in VS Code and Rider, a typing mistake shows an error at once, and go to definition works on
-locals, classes, imports, inherited members and Godot's API.
-
-| Part | Status |
+| Goal | What it means |
 |---|---|
-| The server: protocol, errors as you type, definition, references, hover, outline, symbols | Done. Tested by scripted sessions that send what an editor sends. |
-| Speed: a re-check of 100,000 lines in under 50 ms | Done, and for 1,000,000 lines: an edit checks again only the files that read what it changed, bodies a file at a time, and a running check stops for newer messages; a signature change is checked in under a millisecond at either size, and answered with a completion in about 1 ms (100,000 lines) or 4 ms (1,000,000) over the protocol ([results](results/2026-11-completion-followup.md#incremental-checking-november-16)). |
-| A VS Code client and the [set-up guide](../editors/README.md) | Done. |
-| Tried in VS Code | Done on 2026-11-12, from a log of the messages between VS Code 1.145 and the server: errors arrive on open and after a change. It found that VS Code passes `--stdio`, which is now accepted. The owner confirmed the underlined errors by eye. |
-| Tried in Rider | Native plugin completion and typing validated in the pinned sandbox on 2026-11-15; see [results](results/2026-11-completion.md). Full manual editor acceptance remains pending. |
-| Windows | Built for on 2026-11-15: binary input and output, one spelling of Windows paths, drives and shares in URIs, `kas3c.exe` in the JetBrains plugin; tested with Windows paths on macOS. Not yet built or run on Windows itself. |
+| First-class in Godot | Scripts extend Godot classes, attach to nodes, export properties and use signals. |
+| One codebase | The same source runs on desktop, mobile and consoles, with no per-platform code. |
+| As fast as C#, or faster | Release builds are native code, measured against Godot C# on the same benchmarks. |
+| Easy to use | Write a script and press Play. Save, and the running game changes. |
+| Easy to debug | Errors with a file and a line everywhere, and breakpoints from the IDE. |
 
-**Why here and not in stage 6:** it is the first thing you can use in an editor, and it makes every later
-stage faster to build. The owner left the order to the builder. Completion and the native JetBrains
-plugin were brought forward; remaining editor work and Godot's documentation in hover stay in stage 6.
+## Built
 
-Read more: language server design (`docs/superpowers/specs/2026-11-12-language-server-design.md`),
-[how the server works](../compiler/README.md#language-server).
+### The compiler
 
-### Stage 2: interpreter in Godot (in progress)
+- **Parser, name resolution and type checking** for ActionScript 3, checked against about 190,000 lines of
+  open-source AS3.
+- **Godot's whole API as typed AS3:** 1,036 classes, with operators on `Vector2` and the other math types,
+  and Godot's 64-bit integers as an `Int64` type.
+- **Every error has a file, a line and a column.**
 
-**Delivers:** AS3 scripts that run in the Godot editor.
+### The language at run time
 
-**Done when:** an AS3 script on a `CharacterBody2D` moves a character in the editor, with exported
-properties, signals and hot reload.
+- **Classes, interfaces, accessors, closures, rest parameters,** `try`/`catch`/`finally`, labeled `break`
+  and `continue`.
+- **`Array`, `Vector.<T>`, `Dictionary`, `Object` literals,** untyped values (`*`), `for in` and `for each`.
+- **The standard library:** `String`, `Number`, `Math`, `JSON`, `Date`, `RegExp`, and the top-level
+  functions.
+- **AS3's runtime errors,** with stack traces that name the `.as` file and line.
 
-| Slice | Delivers | Done when | Status |
-|---|---|---|---|
-| 2a. Interpreter core | The typed IR, the interpreter, `kas3c run`, and the start of the conformance suite | A class with fields, methods, inheritance, numbers, strings and loops runs and traces the right output. | Done |
-| 2b-1. In Godot, first slice | The extension: a `.as` file is a script; Godot calls its methods; it reads and writes properties, calls methods and makes `Vector2`s | An AS3 script on a `CharacterBody2D` moves the body, in headless Godot 4.7.2. | Done |
-| 2b-2, part A. Godot's values | Operators and comparison on Godot's values, their text, `position.x = 5`, elements by index, defaults Godot fills in, a script's `toString()` shown by Godot | Each has a test in Godot that compares the result with GDScript's. | Done |
-| 2b-2, part B. Signals | A method as a listener; `add`, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`, `emit`; `timer[name].add(f)` | Each has a test in Godot. | Done |
-| 2b-3. The rest of Godot's API | Singletons (`Input`), constants, global functions (`print`), Godot's own error reporting, the `Int64` type | The test programs that need no unsupported language feature run in Godot, and the backlog items marked 2b-3 are closed. | Done |
-| 2c-1. Vectors, `switch`, `Math` | `Vector.<T>` with its methods, `for each` over one, vectors handed to Godot as packed arrays or arrays and carried across a reload; `switch`; `Math`; `new` of Godot's own classes | 8 of the 14 corpus programs run in Godot (`tests/run_corpus.py`, `tests/corpus/runs.txt`). | Done: reviewed, and merged on 2026-11-15 |
-| 2c-2. The untyped value | `*` and `Object` as types: held in one slot, compared, added, printed, tested with `is`, `as` and `typeof`, and handed to Godot and taken from it with Godot's types kept | `RayQueries` runs in Godot: 9 of the 14 corpus programs. | Built; in review |
-| 2c-3. Errors and labels | `try`, `catch` (by class, by `String`, `int` or `Number`, or anything), `finally` on every way out, any value thrown, labelled `break` and `continue`, `&&=` and `||=` | Each has a program checked against Node, and an error from a Godot value is caught in Godot. | Built; in review |
-| 2c-4 to 2c-6. The rest of the language | In the order the corpus asks for: `Array`, `Object` literals and dynamic access, `Dictionary`, `for in` in general, rest parameters; closures, and the collection methods that take one; accessors and interfaces; the standard library (`String`, `Number`, the top-level functions, `JSON`, `Date`, `RegExp`) | The corpus programs run, and the backlog items marked 2c are closed. | Built on 2026-11-15: `Array`, `Object` literals and dynamic access, `Dictionary`, `for in`, rest parameters, closures and the collection methods that take one, `call` and `apply`, accessors and interfaces (in Godot too), `RegExp`, `Date`, `escape`, the URI functions, and `JSON` |
-| Language server, second slice | Completion, Windows, Rider, and the backlog items marked LS-2 | Completion offers the members of a typed value in VS Code and Rider, on macOS and Windows. | Completion built ahead, on 2026-11-14, and working in VS Code and Rider on macOS. On 2026-11-15 the LS-2 items were built: completion after any dot and of overrides and parameter names, Windows paths and binary I/O, the lexer's closing braces. Left: a person's acceptance in Rider, and a first run on Windows |
-| 2d. Editor features | `[Export]`, `[Signal]`, hot reload, errors in the Godot editor, the cycle collector | Changing a script while the game runs changes the game, and the backlog items marked 2d are closed. | Hot reload built ahead, on 2026-11-14: on desktop and on the iOS Simulator. Since 2026-11-16 a reload updates the objects alive in place and starts no scene again by itself: a constant edited while the game runs changes the objects made from it (a class with no Godot base whose constructor chain depends only on its arguments and constants), a field the game changed since keeps its value, and one line says what was updated, what was not and why. What it costs a debug run was brought from 15.7% to about 2.5% on the objects benchmark on 2026-11-17 (a release build pays nothing). Left of it: classes with a Godot base, objects and Godot's values as arguments and first values, native code (not reloaded yet), and an action in the IDE for the restart that shows the rest (the language's `restart_scene()` is there for it). `[Signal]` built on 2026-11-15. `[Export]` built on 2026-11-15, with GDScript writing a script's public fields and Godot's lists of its properties and methods; in the editor no script object is made. Also on 2026-11-15: script objects on reference-counted objects (`new` included) live while AS3 or Godot holds them; a run longer than 15 seconds stops with Error #1502; the first editor scan's crash found to be Godot's (a decision). The rest planned The cycle collector built on 2026-11-15, in steps each frame. |
-| Clean-up pass | The 9 backlog items no slice touches | The backlog holds only items the owner has ruled on. Stage 3 starts after this. | Planned |
+### Inside Godot
 
-Godot comes before the rest of the language because the engine boundary decides how values are represented.
+- **Scripts on nodes:** properties, methods, signals, singletons, constants, static methods and global
+  functions, with what Godot returns checked against its declared type.
+- **`[Export]` and `[Signal]`.**
+- **Hot reload** that keeps state and updates live objects in place. See [Hot reload](hot-reload.md).
+- **Memory:** reference counting, with a cycle collector that runs in short steps each frame.
+- **iOS:** the interpreter runs in the Simulator and has run on a device.
 
-Read more: stage 2a plan (`docs/superpowers/plans/2026-11-12-stage-2a-interpreter-core.md`), which also lists what
-earlier stages promised to this one.
+### Native code
 
-### Stage 3: native export on desktop
+- **`kas3c cpp` writes a program as C++,** and the Godot extension loads the compiled library.
+- **Every test program gives the same output** on the interpreter and as native code.
+- **Level with or ahead of Godot C#** on all ten frame benchmarks. See [Performance](performance.md).
 
-**Delivers:** release builds that run AS3 as native code.
+### Editors and tools
 
-**Done when:** the conformance suite passes on both the interpreter and native builds, and the speed gate
-passes on real compiled AS3 (not hand-written code, as in stage 0).
+- **Language server:** errors as you type, completion, signature help, go to definition, find references,
+  hover and outline. A change to a million-line project is checked in milliseconds.
+- **Rider plugin:** language support, a project wizard, a `project.godot` settings editor, run
+  configurations for desktop and the iOS Simulator, a live Simulator panel, and a test runner.
+- **VS Code client** for the language server.
+- **A testing library** written in AS3.
 
-**Built ahead, on 2026-11-16:** `kas3c cpp` writes a program as C++; every program of the run tests gives
-the interpreter's output as native code; the Godot extension loads a program library and Godot calls its
-functions directly. Against Godot C# (rough: measured on a machine other work loads, last on 2026-11-17)
-it is ahead on calls into Godot, script-only code, both array benchmarks and the overridden methods, and
-about level on the rest: no frame benchmark is behind by more than its own runs differ, the last three
-that were (`shapes`, `ray_queries`, `sieve`, below) among them. Moving nodes read 1.04 to 1.05 times C#'s
-on a quiet machine, the ranges overlapping, and anything from 0.7 to 1.2 on a loaded one, where its runs
-ranged from 0.84 to 2.9 ms. Whether that passes the speed gate is for a whole table on a quiet machine to
-say. Handing arrays to Godot was the furthest behind (4.9
-times) and is now ahead (0.33 ms a frame against C#'s 0.46, the median of five runs of each): a vector of
-`Vector2`s holds each in its place and goes to Godot in one copy, `push()` is written where the vector has
-room, and a number held untyped costs no call. Signals were the next furthest (3.6 times) and are now level
-(1.62 ms a frame for 20,000 signals against C#'s 1.64, the median of five runs of each, the ranges
-overlapping): `emit()` is Godot's `emit_signal` by its method bind on values made where Godot reads them,
-through the field's own handle where the signal is a field, and a listener given exactly what its
-parameters hold is entered with nothing checked twice or allocated. About a third of that frame is Godot's
-own emitting, which no script language removes; what is left of ours is the `Vector2` a listener is still
-handed in a handle, and three looks for an object by its id for each signal. Moving twenty thousand nodes
-from one script was then the furthest behind (2.8 times, 3.12 ms a frame against C#'s 1.12) and is now
-level (1.03 ms against 0.99, the median of seven runs of each, turn and turn about, the ranges
-overlapping; 9.2 million instructions a frame where it took 31.4 and C# takes 10.0): a handle on a node
-is shared by a count and not copied, the node behind it is read from the handle for as long as Godot has
-freed none of those found (Godot says when one ends, as it tells C#), the script's `Vector2` field is
-read out of its own handle and multiplied where it is, and the cycle collector no longer walks a vector
-of nodes every frame. Most of what is left of that frame is Godot's own getting and setting of a
-position; of ours, the vector's count taken and given back for each node, and two atomic counts for each
-node's handle. The n-body step and the frame that makes twenty thousand objects were then 1.7 and 1.6
-times behind and are now level (91 µs a frame against C#'s 96, and 108 against 111, the median of five
-runs of each, turn and turn about; 1.29 million instructions a frame against C#'s 1.23, and 2.24 against
-2.36): a field of an object whose class is known is written through the class's struct, so that the C++
-compiler knows which field a write is of (it read every Number field again after each write, and kept
-no two fields together), a loop that reads a vector of objects has the vector's length and elements in
-locals, the cycle collector no longer walks a vector of objects that hold no object, an element read to
-be used at once counts no reference, an object stored as the last thing done with it hands its reference
-over, and letting go of an object that holds only numbers is known to run no code. On that frame C#'s
-median leaves out its collector: its slowest frame in a hundred takes 627 µs, more than five times its
-median, where native code's takes 123. The last three rows behind were `shapes` (1.4 to 1.9 times), `ray_queries`
-(1.5) and `sieve` (1.1), and are ahead or level (each the median of five runs, turn and turn about with the
-build before; instructions and cycles a frame counted once .NET had finished optimising, the cycles those
-of every thread, which for C# are its collector's and its finalizer's too). `shapes` takes 94 µs a frame
-against C#'s 168 (2.0 million instructions a frame where it took 5.2 and C# takes 1.9 to 2.7, 0.26 to 0.30
-million cycles against 0.44 to 0.52): a call through a class's method table reaches only the functions the receiver's
-classes have there, all of which are known because the program is whole, so the object's class is
-compared with those the program makes and each one's function is called by its name, which the C++
-compiler puts in the loop as .NET does from the classes it has seen; the call is then known to do only
-what those functions do, so the element counts no reference and the loop keeps the vector's places in
-locals. `ray_queries` takes 2.07 ms against 2.10, the ranges overlapping (37.0 million instructions where
-it took 53.3 and C# takes 42.9): each ray's query is Godot's method called on the objects themselves, the
-Dictionary it gives is made where its handle keeps it, `isEmpty` is called there, the element is asked
-for as the `Vector2` it is, and the register the parameters are read into keeps its handle from one ray
-to the next. What is left of that frame is Godot's own query, and the Dictionary it makes for each ray,
-which native code frees where it is and C# on another thread. `sieve` takes 568 µs against 585, the
-ranges overlapping (5.03 million instructions against 5.28, 1.54 to 1.58 million cycles against 1.67): a vector of
-ints or of uints holds each in four bytes, as C#'s array does, under the interpreter and in native code
-alike, and goes to Godot's array of 32-bit integers in one copy. A count of C#'s instructions is only right in a window after .NET has finished optimising
-the script: in its first few hundred frames it counts two to three times as many (3.4 million a frame of
-n-body where it settles at 1.2), which had made native code look ahead by instructions where it was
-behind. Decided on 2026-11-16: native code is to run in the editor's
-play too, not only in exports, with the interpreter kept for a machine with no C++ toolchain; and tests are
-to run on Steam Deck and Nintendo Switch once build targets are configurations. Left: the library called
-directly everywhere (part done), Godot's values held inline in fields and parameters and, for the types
-larger than a `Vector2`, in vectors, building on Play, reloading native code, threads.
+## In progress
 
-### Stage 4: mobile
+- **Play builds native code for you.** Today you compile the program library by hand. The extension will
+  build it when a project runs, cache it, and fall back to the interpreter when there's no C++ toolchain.
 
-**Delivers:** iOS and Android, as interpreted debug builds and native release builds.
+## Next
 
-**Done when:** the same game runs on both, and the speed gate passes on devices.
+1. **Native code on iOS and in exported games.**
+2. **Hot reload for native code.**
+3. **Godot's larger values inline:** `Vector3`, `Color` and the rest in vectors, fields and parameters.
+4. **Threads.**
+5. **A restart action in the IDE,** to go with hot reload.
+6. **Debugger:** breakpoints and stepping from Rider, in the editor and on a device.
+7. **Android, Windows and Linux.** The code is written to be portable, and none of the three has been built
+   or run.
+8. **Consoles.** Console support lives in a separate repository, because console SDKs are confidential.
 
-**Built ahead, on 2026-11-14:** an interpreted debug build runs on the iOS Simulator, started from Rider,
-and reloads a script when it is saved. Android has no build of the extension yet, and a real phone cannot
-see the folder the scripts are edited in: it needs the edits sent to it.
+## Later
 
-### Stage 5: console
+These are designed separately. Nothing above delivers them, and the design keeps each possible.
 
-**Delivers:** Nintendo Switch through the Kumikae build.
-
-**Done when:** the same test game runs on hardware, as a debug build and as a release build. Work that
-touches console vendor material stays out of this repository.
-
-### Stage 6: tooling
-
-An early [Simulator panel and agent interface](../editors/jetbrains/) builds, passes its tests and has driven a real Simulator through its service; the panel has not yet been used in a Rider window by a person, and idb input is untried. This does not deliver AS3 breakpoints or stepping.
-
-**Delivers:** the rest of the language server (Godot's documentation, code actions, rename), the debug
-adapter, and one JetBrains plugin that covers Rider and the other IDEs.
-
-**Done when:** you can set a breakpoint in Rider and step through AS3, in the editor and on a device.
-
-**Built ahead, on 2026-11-14:** the JetBrains plugin (`editors/jetbrains`): AS3 files with highlighting,
-completion and go to declaration from the language server; a project wizard; run configurations for the
-desktop and for the iOS Simulator (export, build, install, launch); and a panel that shows the Simulator
-through a native helper, at about 60 frames a second with live touch, rotation and text in any script
-(measured by its builder; results in `docs/results/2026-11-jetbrains-simulator.md`). No debugger yet.
-
-Completion improvements are described in the [editor guide](../editors/completion.md): native paired
-typing, lexical scopes, import paths, replacement edits, callable snippets and signature help. The
-[results](results/2026-11-completion.md) record the automated checks and measured limits. This does not
-complete stage 6. The [follow-up results](results/2026-11-completion-followup.md) cover auto-imports,
-override stubs (including qualified defaults and independent getter/setter slots), AS3 statement-block
-templates with linked Tab stops, incremental checking of declarations and bodies with interruptible
-checks, diagnostic range guards and plugin-owned Rider lifetime repairs with split Problems. Empty
-override names work before following members, and background sandbox completion checks isolate
-window-deactivation cancellation. The optional LSP4IJ adapter
-supports IntelliJ IDEA Community/free unified IDEA alongside Rider's native client. The installed
-IDEA and Rider endpoints pass sandbox editing checks; older Community builds and Windows runtime
-validation remain unverified. Android Studio is outside the scope.
-
-The [project experience](results/2026-11-rider-project-experience.md) adds a `project.godot`
-settings editor, compact AS3 packages, scene attachment navigation and [AS3 tests](../testing/README.md)
-with native Rider results. These are editor features, not completion of the debugger stage.
-
-Basic editor highlighting and error reporting arrive earlier, with stage 2.
-
-### Later, designed separately
-
-- `async` and `await` as a first-class part of the language, with work off the main thread and debugger
-  support. A research document comes first: how far to go beyond main-thread-only, what it costs, and what
-  the debugger needs. See language additions (`docs/superpowers/specs/2026-11-12-language-additions.md#async-and-await-research-before-design`).
+- `async` and `await`, with work off the main thread.
+- Language additions from Apache Royale, such as arrow functions, `?.` and `??`.
 - The Flash API (`flash.display.Sprite`, `MovieClip`) as a library on top of Godot nodes.
 - Loading `.swf` files.
 - Web export.
 
-The design keeps each of these possible. No stage above delivers them.
+## Known limits
 
-## What comes next: the rest of Godot's API (stage 2b-3)
+- **Only macOS is tested.** Godot 4.7 on Apple silicon is the one configuration the test suite runs on.
+- **A cycle through a Godot `Array` or `Dictionary` isn't collected.** The collector follows AS3 objects,
+  Godot's reference-counted objects and listeners.
+- **Godot's string-format operator (`"%s" % value`) isn't available.** Use AS3 string concatenation.
+- **A script class with the same name as a Godot class is ambiguous** when it's in the default package. Put
+  it in a package.
+- **The 60 Godot methods that take raw pointers aren't exposed.**
+- **`super` can't reach a virtual method implemented by another C++ extension.** Godot's extension
+  interface has no such call.
+- **The first editor scan of a new project can crash as Godot exits,** if Godot is told to quit at once
+  (`--import`). The fault is in Godot's documentation thread. Later runs are clean.
+- **The Rider plugin has been validated by automated editing checks,** and needs wider use by people.
 
-**Goal:** a script can use everything Godot offers that is not an object's own member.
+## Design decisions
 
-| Part | What it does | Status |
-|---|---|---|
-| A. Singletons, constants, static methods | `Input.isActionPressed("jump")`, a singleton's signals, `Vector2.ZERO`, `Key.ESCAPE`, `Vector2.fromAngle(a)`. A Godot value with parts starts at its zero. Closes 3 backlog items. | Built and reviewed |
-| B. `Int64` | The 64-bit integer type the owner approved. The design (`docs/superpowers/specs/2026-11-14-int64-design.md`) was approved on 2026-11-14. A Godot integer is an `Int64` unless Godot says it is narrower; 1,059 declarations changed and none became narrower; the table kept by hand is gone. | Built and reviewed |
-| C++ clean-up | Asked for by the owner on 2026-11-14. Done: no file is over 800 lines (the largest was 3,087 and is now 723), no function is over 120 except three dispatch switches, no banner comments, rules that were written twice are written once, `vm::Host` is three interfaces, and calls into Godot are about 16% faster. No test changed, and an independent comparison of over 33,000 programs against `main` found no difference in what the compiler produces. See the [guidelines](cpp-guidelines.md), the plan (`docs/superpowers/plans/2026-11-14-cpp-cleanup.md`) and the [figures](results/2026-11-cpp-cleanup.md). | Built and reviewed |
-| Early iOS test | Decided by the owner on 2026-11-14, ahead of stage 4. **AS3 runs on an iPhone and in the iOS Simulator:** the test scene passed 14 of 14 checks on both, with the same scripts as on desktop, in the interpreter. It found that an exported game could not find its scripts on any platform, now fixed. The Simulator uses an export template built from Godot's unmodified source for Apple silicon; no fork. See the [first run](results/2026-11-ios-first-run.md). | Done |
-| C. Global functions and errors | `print`, `lerpf`, `clampi`, `randf` and the rest of Godot's 112 global functions; an uncaught AS3 error shown as a Godot script error, with the `.as` file and line as its source; a freed Godot object is `null` to a script; a `null` in the middle of a call takes Godot's own default. Closes the last 6 backlog items of the stage. | Built; in review |
-
-Read more: stage 2b-3 plan (`docs/superpowers/plans/2026-11-14-stage-2b3-rest-of-godot-api.md`).
-
-**Stage 2b-2 is done, both parts.** Signals, which run now:
-
-- A method is a listener: `timer.timeout.add(onTimeout)`, or `this.onTimeout`, or `other.onTimeout`.
-- `add`, `add(f, true)` for the end of the frame, `addOnce`, `remove`, `removeAll`, `has`, `numListeners`,
-  `emit`. Adding a listener twice does nothing.
-- The same method of the same object is the same listener, however it is written.
-- A listener goes when the object it belongs to is freed. A callable kept elsewhere then refuses to run.
-- A class with no Godot class behind it can listen too.
-- `timer[name].add(f)` reaches a signal by its AS3 name when the name is only known as the program runs.
-- A method fits anywhere Godot takes a function: `array.filter(isBig)`.
-
-Read more: stage 2b-2 plan (`docs/superpowers/plans/2026-11-13-stage-2b2-values-and-signals.md`).
-
-Godot's values, which run now:
-
-- Operators as Godot's own: `position + velocity * delta`, `-v`, `v == w`, `a == b` for two nodes, `v += w`.
-- Text: `trace(v)`, `"at " + v`, `String(v)` and `v.toString()` give Godot's text for the value or object.
-- One part of a value: `position.x = 5`, `position.x += 5`, `transform.origin.y = 3`.
-- Elements by index: `v[0]`, `v[1] = 3`, a packed array's elements.
-- Arguments left out take Godot's defaults, and so does a `null` written last for one.
-- A script's `toString()` is what `str(node)` and `print(node)` show in GDScript.
-- What Godot gives back is checked against the type it was declared as: a wrong one is an AS3 error.
-
-Three promises of stage 1 need AS3's untyped value or its own collections, and moved to stage 2c with them:
-AS3 `Array`, `Vector` and `Object` converting when handed to Godot; `object[name]` other than for a signal;
-and the elements of Godot's untyped collections.
-
-Open items:
-
-- **The [backlog](backlog.md) is being worked off in full, now:** 9 items, of which 1 waits on the
-  owner's answer.
-- **Loops:** the cycle collector frees objects that refer to each other in a loop, also through Godot's
-  reference-counted objects, their AS3 scripts and listeners, in a short step each frame. A loop through
-  a Godot Array or Dictionary is not freed (see the backlog).
-- **Known fault, Godot's:** the first editor scan of a project with the extension crashes as Godot exits when
-  it is told to quit at once (`--import`): the editor's documentation thread for the new classes outlives
-  the documentation. With time for the thread (`--quit-after`), and in every later run, it is clean.
-- **Language server:** Rider and free unified IDEA pass automated sandbox editing checks; a person has
-  still to accept their editing and navigation by hand, and the server has still to be built and run on
-  Windows.
-
-## Decisions made
-
-| Decision | Outcome |
+| Topic | Decision |
 |---|---|
-| Order of the language server and the interpreter | Left to the builder. Order: type errors, Godot's API in AS3, math types, the language server's first slice, then the interpreter. |
-| Royale's language extensions | The owner said on 2026-11-14 to support them as well: abstract classes, arrow functions, import aliases, `?.`, `??`, private constructors, strict function types, type inference, verbatim strings. With Royale's spelling, after stage 2c. See language additions (`docs/superpowers/specs/2026-11-12-language-additions.md`). |
-| C++ guidelines | The owner asked on 2026-11-14 for best practices and a clean-up "for scalability before we keep going". The rules are in [C++ guidelines](cpp-guidelines.md); a check in the test suite enforces the ones a script can judge. |
-| `async`/`await` | The owner wants it first-class, not limited to the main thread, efficient, and with a proper debugger. Research first, after stage 2; no syntax chosen yet. |
-| Deferred review findings | The owner said on 2026-11-12 that all of them are to be fixed. They are listed in the [backlog](backlog.md) and stay there until fixed or ruled on. |
-| Additions to the language | No new keywords or syntax yet; first get things working. The candidates are parked in the language additions (`docs/superpowers/specs/2026-11-12-language-additions.md`) list. |
-| Which Godot integers are `Int64` | Decided on 2026-11-14: every Godot integer is an `Int64` unless Godot's description says it is narrower. `array.size()` and `randi()` are `Int64`; the table kept by hand goes. |
-| 64-bit integers | Decided on 2026-11-12: supported, in the way that is easiest to maintain. A real `Int64` type, given by one rule from Godot's description with no hand-kept table, converting to `int` or `Number` with a range check and never silently. Built in stage 2b-3; until then such values are declared `Number`. |
-| Static fields and null calls | Decided on 2026-11-12, and built: both follow Flash. A class's static fields are set on its first use, and a call on a null object evaluates its arguments before raising the error. |
-| A real AS3 test corpus | Approved. Six open-source projects (about 190,000 lines) are fetched by `compiler/tests/fetch_external.sh` and kept out of this repository. They have already corrected three rules. |
-| How a ruling is made | The owner's rule of 2026-11-16: best in class, as fast as Godot C# or faster, scalable, useful; where AS3 does not decide, C#'s behaviour is the bar. |
-| A freed Godot object as text | Decided on 2026-11-16, and built: it is `null` everywhere. `"" + x`, `String(x)`, `trace`, `str` and `print` give `null`, as C#'s `GD.Str` and `GD.Print` give for a null; `hash` and `isSame` take it as null. |
-| `removeAll()` on a singleton's signal | Decided on 2026-11-16, and built: on a signal the whole game shares (`Input`'s), `removeAll()` and `numListeners` are about the calling script's own listeners (its object's methods, its class's static methods), never another script's, as C# code can take away only the handlers it holds. |
-| Wide integers Godot cuts inside its built-in types | Decided on 2026-11-16: they stand as GDScript has them (`bytes.append(300)` stores 44, `items.insert(4294967297, x)` inserts at 1). Godot's description gives the methods of its built-in types no width mark (it gives one only to the engine classes' methods, which the generator already reads), and C#'s narrower types for them come from classes written by hand. Narrowing them would need a list kept by hand, which the owner chose against. |
-| A whole `Number` where Godot takes any type | Decided on 2026-11-16: it stays a float (`str(x)` of a `Number` that holds 2 is `2.0`), as C# keeps a `double` a `double`. An `int`, a `uint`, an `Int64` and an expression whole by its form go as integers. |
-| Rulings that stand (2026-11-16) | The 60 methods that take raw pointers stay out. `"" + this` without `toString()` is AS3's text, and Godot's text for the node Godot's. A script object of a class that extends none of Godot's stays an error when given to Godot. Godot's integers in an untyped value: one that fits an `int` is one, a larger one an `Int64`. The first editor scan's crash on an immediate quit is Godot's, until Godot fixes it. `super` on a virtual a C++ extension class implements stays out of reach (GDExtension has no such call). Every program's IR carries `RangeError`, which the interpreter raises itself, as it does `TypeError`. Godot's report of a listener it could not call names no method, since GDExtension gives a custom callable no way to name one; the extension's own report, in AS3's words, does. |
-| Godot naming design (`docs/superpowers/specs/2026-11-12-godot-naming-design.md`) | Approved on 2026-11-12: lowerCamel methods (`moveAndSlide`), properties instead of accessors, signals as properties, `_ready` keeping its underscore, and a `Godot` prefix on the five names that clash with AS3's. |
-
-## Decisions waiting on the owner
-
-| Decision | Why it matters |
-|---|---|
-| When to open the repository | The repository is private and has no licence file. Before it opens, the design's description of the console fork must be trimmed. |
-
-## How to follow progress
-
-- **This page and the diagram** change when a stage or part changes status.
-- **Repository:** `AniCanon/kumikae-as3` on GitHub, private.
-- **Branches:** `main` holds finished, reviewed work. Each part is built on its own branch, such as
-  `feat/frontend-types`, and merges when its review is clean.
-- **To update the diagram,** change a status in [`diagrams/build.py`](diagrams/build.py), and then run
-  `python3 docs/diagrams/build.py`.
+| Naming | Godot's API uses AS3 conventions: lowerCamel methods, properties instead of accessors, signals as properties. `_ready` keeps its underscore. Five Godot names that clash with AS3's get a `Godot` prefix, such as `GodotObject`. |
+| Where AS3 doesn't decide | C#'s behavior in Godot is the reference. |
+| No JIT | Native code is always compiled ahead of time, because iOS and consoles forbid generating code at run time. |
+| Integers | A Godot integer is an `Int64` unless Godot says it's narrower. It converts to `int` or `Number` with a range check, never silently. |
+| Freed Godot objects | A freed object reads as `null`. Using it is an AS3 error with a line number, never a crash. |
+| Values held in place | A `Vector.<Vector2>` or `Vector.<Vector2i>` holds the values themselves and can't hold `null`, as in C#. |
+| Static fields and null calls | Both follow Flash: a class's static fields are set on its first use, and a call on `null` evaluates its arguments before raising the error. |
+| Signals shared by the whole game | On a singleton's signal, `removeAll()` removes only the calling script's listeners. |
 
 ## Terms
 
 | Term | Meaning |
 |---|---|
 | Front end | The part of the compiler that reads source code and checks it. |
-| IR | Intermediate representation: the compiler's own form of the program, between source code and running code. |
-| Backend | A way of running the IR. This project has two: the interpreter and the C++ generator. |
-| Debug build | A build that runs your code in the interpreter, so that the debugger and hot reload work. |
-| Release build | A build that runs your code as native code. |
-| JIT | Just-in-time compiler: one that produces machine code while the game runs. iOS and consoles forbid it, so this project never uses one. |
-| Speed gate | The benchmark comparison against Godot C# that a stage must pass. |
-| Conformance suite | AS3 programs with expected output, run on both backends to prove that they behave identically. |
+| IR | Intermediate representation: the compiler's own form of the program, between source and running code. |
+| Back end | A way of running the IR. This project has two: the interpreter and the C++ backend. |
+| Program library | Your scripts compiled to native code, as a library the Godot extension loads. |
+| JIT | Just-in-time compiler: one that produces machine code while the game runs. This project never uses one. |
