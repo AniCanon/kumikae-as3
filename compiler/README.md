@@ -332,7 +332,8 @@ The project's scripts, written as C++ and built into one shared library, are the
 library**. The extension looks for it when it loads the scripts: the file `KAS3_PROGRAM_LIBRARY` names, or
 `bin/libkas3_program.dylib` (`.so`) in the project. If it is there and was built from the scripts as they
 are now (the module's fingerprint, `ir::fingerprint`), the scripts run as native code and Godot's output
-says so; if not, a warning says why and the interpreter runs them. Nothing builds it by itself yet:
+says so; if not, a warning says why and the interpreter runs them. Play builds it by itself (below); by
+hand it is built so:
 
 ```sh
 cd game && kas3c cpp --godot --unit $(find . -name '*.as' | sed 's|^\./||' | LC_ALL=C sort) -o native/
@@ -411,8 +412,73 @@ led there, as the interpreter does it (`runtime/entry.cpp`). What generated code
   with no handle and no call (`runtime/fast.h`, `vector_of()`). A value that is in a handle (a parameter),
   an index out of range and a vector that must grow are the library's.
 
-Not there yet, natively: reloading the scripts while the game runs (the game says so and carries on), and
-the limit on a script's time (Error #1502).
+Not there yet, natively: the scripts reloaded into a running game as native code (an edit moves the game
+onto the interpreter: below), and the limit on a script's time (Error #1502: a loop that never ends is
+stopped by the interpreter and not by native code).
+
+### Play builds the program library
+
+A game run from its project's folder (Godot's Play, an IDE's run configuration, `godot --path`) runs as
+native code with nothing done by hand. The extension does it, since every way of starting a game goes
+through it:
+
+- **Who builds, and when.** As the scripts load, the extension works out which build they need: its key
+  is the scripts as compiled (`ir::fingerprint`), the runtime's layout (`RUNTIME_LAYOUT`), the backend and
+  the runtime's headers this extension carries (one word made as the extension is built,
+  `tools/embed_runtime.py`), the C++ compiler (the file that is the compiler, its size and time) and the
+  flags. If the project's `.godot/kas3` has `libkas3_program_<key>`, it is loaded: no compiler is run, no
+  C++ written and no program started to find that out. If not, the game starts on the interpreter and
+  says so in one line, the scripts are written as C++ on a thread, and the compiler runs beside the game,
+  at a lower priority: when it ends the game says the next run is native. A game closed before then
+  leaves the compiler running, so the next run finds the library anyway.
+- **What it is built from.** The module the extension itself compiled, written by the backend linked into
+  it (one file, as a release is), against the runtime's headers, which the extension carries and writes
+  beside the C++: the library is always built for the layout of the runtime that loads it, wherever the
+  extension is installed (a project's `bin`, the IDE plugin's `native` folder), with no path to this
+  repository. The flags are the ones above, without `-Werror`.
+- **Where it lives.** `.godot/kas3` in the project: a folder Godot does not import, version control
+  already leaves out and no language server reads. Each build has its own names there (`<key>/` with the
+  C++ and `build.log`, the library, `<key>.building` while it is built, `<key>.failed` if it could not
+  be), so a library is never written over: the compiler writes a file of its own that takes the library's
+  name once it is whole. When a build begins, everything of the builds that are neither in use nor among
+  the three newest besides is taken away (a game and its tests are two programs).
+- **No compiler.** One warning names what to install (on macOS, Xcode's command line tools:
+  `xcode-select --install`), and the interpreter runs the scripts. On macOS `/usr/bin/c++` is there
+  without the tools and only offers to install them, in a window: the extension looks for the tools
+  themselves (`DEVELOPER_DIR`, what `xcode-select` chose, Xcode, the command line tools) and never runs
+  it without them. `KAS3_CXX` names another compiler.
+- **A build that fails** is never the scripts' mistake: one warning says where the compiler's output is,
+  the interpreter runs the scripts, and the same build is not tried again (taking `.godot/kas3` away
+  tries everything again). A library that can't be loaded is refused with why, as one given by hand is.
+- **The switch.** The project setting `actionscript/native/play` (on where it is not set) and the
+  environment's `KAS3_NATIVE_PLAY` (`0` against, `1` for), whose word is over the setting's. It is on by
+  default because native code is what a person should get first: it is level with or ahead of Godot C# on
+  every benchmark, where the interpreter is tens of times behind on a script's own code.
+- **An edit while the game runs.** Native code is not reloaded into a running game yet. A game that runs
+  as native code is moved onto the interpreter by the first edit, with everything it holds (its script
+  objects, their fields, static fields, listeners: the objects are laid out the same under both, and the
+  move is the one a reload makes, `vm/reload.h`), says so in the reload's line, and is reloaded from then
+  on as a game that started on the interpreter is. One thing differs: native code remembers nothing of
+  what objects are made with, so an object made before that first edit is not updated in place by a later
+  one; the reload says so by its class, and a restart of the scene shows the new code on it. Each reload
+  has the library of the scripts as they are now built for the next run, which is native again.
+- **Where nothing is built:** the editor itself (it runs no game), a game run from a pack (an export, the
+  iOS Simulator), a system other than macOS and Linux, and a project given a library by hand
+  (`KAS3_PROGRAM_LIBRARY`, or `bin/libkas3_program`), which is used as before. The tests turn it off for
+  every run but those that test it (`tests/play_godot.py`).
+
+Measured on 2026-11-17 on a machine other work loaded (load average 13 to 17), Godot headless, the
+compiler at low priority:
+
+| Project | C++ written | Build | A run that builds (to its end) | A run with the library | With the switch off |
+|---|---|---|---|---|---|
+| `examples/coin-dash` (3 scripts) | 33 KB | 0.6 to 0.8 s | 445 ms | 258 ms | 260 ms |
+| The frame benchmarks (12 scripts) | 211 KB | 0.8 s | 326 ms | 255 ms | 254 ms |
+| `tests/godot_project` (46 scripts, 1,950 lines) | 1.7 MB | 5.8 to 6.7 s | 813 ms | 642 ms | 642 ms |
+
+The runs are whole runs of Godot that quit after a frame or two (the best of seven where they repeat): a
+run with the library costs what a run on the interpreter costs to start, and a run that builds is longer
+by the writing of the C++, which a game that goes on does not wait for.
 
 `tests/bench/languages/run.py` times it beside C#, GDScript and the interpreter ("AS3 native"). A program
 library built for another version of the runtime (`runtime/layout.h`) is refused, and says it must be built
@@ -1045,6 +1111,9 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   test's own. No test here waits on the wall clock where it can be given one: the limit on a script's time is
   the host's clock's (`vm::Clock::elapsed`), the programs of `tests/run/` run with no limit, every group has
   two hours, and the group that runs Godot runs alone and one run at a time over its project.
+- `tests/test_play_cache.cpp`: what Play builds a project's program library by (`godot_ext/play_cache.h`,
+  `godot_ext/toolchain.h`), with folders of the test's own and no Godot; `tests/play_godot.py` (part of the
+  Godot group) plays a project twice, edits it between runs, and takes its compiler away.
 - `tests/test_lsp.cpp`: the server driven in process, one message at a time. It also checks that what the
   server publishes for every golden error file is what `kas3c check` prints, and types through each corpus
   file as an editor would.

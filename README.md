@@ -127,11 +127,13 @@ To see the errors in an editor as you type, see [editors](editors/README.md).
    file, line and column.
 2. **The typed IR** (intermediate representation) is the single definition of what your program means. Both
    ways of running the program read it and nothing else.
-3. **The interpreter** runs the IR directly. The editor and debug builds use it, so you need no C++ toolchain
-   while you work, and you get hot reload and the debugger.
+3. **The interpreter** runs the IR directly. It needs no C++ toolchain, and it is what reloads a game you
+   edit while it runs; the debugger will use it too.
 4. **The C++ generator** turns the IR into C++, and the platform's own C++ compiler turns that into native
-   code. Release builds use it. There is no just-in-time compiler on any platform, because iOS and consoles
-   forbid one.
+   code. Release builds use it, and so does a game you play from its folder on macOS: the first run after
+   an edit starts on the interpreter while the library is built beside it, and the next run is native
+   (with no C++ compiler on the computer, a warning says what to install and the interpreter runs the
+   game). There is no just-in-time compiler on any platform, because iOS and consoles forbid one.
 
 A build is entirely one kind or the other:
 

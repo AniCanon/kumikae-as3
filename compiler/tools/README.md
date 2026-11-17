@@ -6,6 +6,7 @@
 | `check_style.py` | The size limits and the ban on banner comments from [the C++ guide](../../docs/cpp-guidelines.md). Runs with the tests (`style`, `style_self_test`) |
 | `style_baseline.txt` | What is over a limit today. It is empty, and may only stay empty: do not add to it |
 | `bench_recheck.cpp` | Times a re-check after a body, signature, member and hub edit, and after a file joins and leaves the program, until the file and until the program is checked; `--soak N` renames a method, a class and a package and prints resident memory. Uses only the Workspace's long-standing calls, so it builds against an older revision for `tests/bench/recheck.py` |
+| `embed_runtime.py` | Writes, as C++ for the Godot extension, the headers generated code is built against (`runtime/kas3.h` and all it includes, found by following the includes) and one word for those headers and `backend_cpp/` together: what Play builds a project's program library from and by (`godot_ext/play_build.h`). Run by CMake |
 | `case_table.py` | Writes `vm/case_table.cpp`, how `toUpperCase()` and `toLowerCase()` change a character, from the Unicode data of the Python that runs it: `python3 tools/case_table.py vm/case_table.cpp` |
 
 A new rule in the guide that can be checked by a program is added to `check_style.py` with a case in its
