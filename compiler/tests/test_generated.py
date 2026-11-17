@@ -126,6 +126,7 @@ with tempfile.TemporaryDirectory() as where:
             check("the velocity is read out of the field's own handle: none is made for the read",
                   "unbox<Vector2>(c, static_cast<C3_frames_MoveNodes *>(r0)->f2_velocity.handle)" in loop and
                   not re.search(r"store\(c, r\d+, [^;]*f2_velocity\)", loop), loop)
+            check("and multiplied where it is, by the runtime's own formula", "= multiply(a0, r1);" in loop, loop)
 
 with tempfile.TemporaryDirectory() as where:
     written = subprocess.run([kas3c, "cpp", "objects.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "bench"))
