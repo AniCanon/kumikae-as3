@@ -60,6 +60,9 @@ internal object UiProbeGameSettings {
                 }
             }
             check(gold > 120) { "Support Sprint artwork is missing its gold token: $gold pixels." }
+        }
+        if (System.getenv("KUMIKAE_ARTWORK_UI_ONLY") == "1") UiProbeArtworkPicker.run(panel, file, output)
+        app.invokeAndWait {
             children(panel).filterIsInstance<TabControl>().single { it.name == "Display" }.doClick()
         }
         await { children(panel).filterIsInstance<JSpinner>().count() == 2 }

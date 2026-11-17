@@ -2,8 +2,6 @@ package app.anicanon.kumikae.as3.settings
 
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.util.ImageLoader
-import com.intellij.util.ui.ImageUtil
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
@@ -23,14 +21,13 @@ internal object GameArtwork {
         val stamp = file.modificationStamp
         val cache = if (filter) cached else unfiltered
         file.getUserData(cache)?.takeIf { it.stamp == stamp }?.let { return it.artwork }
-        return runCatching {
+        return decode(file, EDGE, filter)?.also { file.putUserData(cache, Preview(stamp, it)) }
+    }
+
+    fun decode(file: VirtualFile, edge: Int, filter: Boolean): Artwork? {
+        return try {
             val source = if (file.extension.equals("svg", true)) {
-                val vector = ImageLoader.loadFromUrl(file.toNioPath().toUri().toURL()) ?: return null
-                Artwork(
-                    ImageUtil.toBufferedImage(vector, false),
-                    ImageUtil.getUserWidth(vector),
-                    ImageUtil.getUserHeight(vector),
-                )
+                VectorArtwork.decode(file, edge)
             } else {
                 file.inputStream.use { stream ->
                     ImageIO.createImageInputStream(stream).use { input ->
@@ -39,7 +36,7 @@ internal object GameArtwork {
                             reader.input = input
                             val w = reader.getWidth(0)
                             val h = reader.getHeight(0)
-                            val step = (maxOf(w, h) / EDGE).coerceAtLeast(1)
+                            val step = (maxOf(w, h) / edge).coerceAtLeast(1)
                             val params = reader.defaultReadParam.apply { setSourceSubsampling(step, step, 0, 0) }
                             Artwork(reader.read(0, params), w, h)
                         } finally {
@@ -48,15 +45,17 @@ internal object GameArtwork {
                     }
                 }
             }
-            val result = bounded(source, filter)
-            file.putUserData(cache, Preview(stamp, result))
-            result
-        }.getOrNull()
+            bounded(source, filter, edge)
+        } catch (canceled: com.intellij.openapi.progress.ProcessCanceledException) {
+            throw canceled
+        } catch (_: Exception) {
+            null
+        }
     }
 
-    internal fun bounded(source: Artwork, filter: Boolean): Artwork {
+    internal fun bounded(source: Artwork, filter: Boolean, edge: Int = EDGE): Artwork {
         val image = source.image
-        val scale = EDGE.toDouble() / maxOf(image.width, image.height)
+        val scale = edge.toDouble() / maxOf(image.width, image.height)
         if (scale >= 1) return source
         val w = (image.width * scale).roundToInt().coerceAtLeast(1)
         val h = (image.height * scale).roundToInt().coerceAtLeast(1)

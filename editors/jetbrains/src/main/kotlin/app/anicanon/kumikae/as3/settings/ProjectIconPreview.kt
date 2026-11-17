@@ -72,24 +72,7 @@ internal class ArtworkButton(title: String, var onChoose: () -> Unit) : JButton(
             g.clip(bounds)
             val asset = artwork
             if (asset != null && layout?.visible != false) {
-                val rect = if (layout == null) {
-                    asset.fit(w, h).apply { translate(x, y) }
-                } else {
-                    val box = layout.placement(asset.width, asset.height)
-                    java.awt.Rectangle(
-                        x + (box.x.toDouble() * w / layout.width).roundToInt(),
-                        y + (box.y.toDouble() * h / layout.height).roundToInt(),
-                        (box.width.toDouble() * w / layout.width).roundToInt().coerceAtLeast(1),
-                        (box.height.toDouble() * h / layout.height).roundToInt().coerceAtLeast(1),
-                    )
-                }
-                val filter = if (layout?.filter == false) {
-                    RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
-                } else {
-                    RenderingHints.VALUE_INTERPOLATION_BILINEAR
-                }
-                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, filter)
-                g.drawImage(asset.image, rect.x, rect.y, rect.width, rect.height, this)
+                asset.draw(g, java.awt.Rectangle(x, y, w, h), layout)
             } else if (asset == null && layout?.visible != false) {
                 icon.paintIcon(this, g, x + (w - icon.iconWidth) / 2, y + (h - icon.iconHeight) / 2)
             }

@@ -2,7 +2,7 @@ package app.anicanon.kumikae.as3.settings
 
 internal enum class GameResourceKind(val title: String, private vararg val types: String) {
     Scene("Main scene", "tscn", "scn"),
-    Icon("Application icon", "png", "svg", "webp", "jpg", "jpeg"),
+    Icon("Application icon", "png", "svg", "webp", "jpg", "jpeg", "bmp", "exr", "hdr", "tga"),
     Splash("Boot splash", "png"),
     ExportIcon("Platform icon override", "png"),
     ;

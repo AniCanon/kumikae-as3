@@ -5,8 +5,6 @@ import app.anicanon.kumikae.as3.project.GameTargetSetup
 import app.anicanon.kumikae.as3.ui.composePanel
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.fileChooser.FileChooser
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.FileEditorProvider
@@ -97,16 +95,16 @@ private class ProjectSettingsEditor(private val project: Project, private val fi
     }
 
     private fun choose(kind: GameResourceKind, selected: (String) -> Unit) {
-        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor().withTitle(
-            kind.title,
-        ).withRoots(file.parent).withFileFilter {
-            kind.accepts(it.name) &&
-                VfsUtilCore.isAncestor(file.parent, it, false)
+        val draft = controller.draft ?: return
+        val current = when (kind) {
+            GameResourceKind.Icon -> draft.icon
+            GameResourceKind.ExportIcon -> draft.exportIcon
+            GameResourceKind.Splash -> draft.splash
+            GameResourceKind.Scene -> return
         }
-        FileChooser.chooseFile(descriptor, project, file.parent) { chosen ->
-            val relative = VfsUtilCore.getRelativePath(chosen, file.parent, '/')
-            if (relative != null) selected("res://$relative")
-        }
+        val layout = if (kind == GameResourceKind.Splash) SplashLayout.read(draft) else null
+        val dialog = ArtworkPickerDialog(project, gameFile.parent, kind, current, layout)
+        if (dialog.showAndGet()) dialog.result?.let(selected)
     }
 
     override fun getFile() = file

@@ -12,7 +12,11 @@ Use **Run → Add Game Target…**, choose a Godot preset, pick a destination in
 **View → Tool Windows → Game Devices** lists the available iOS simulators and Android virtual devices.
 Desktop play, mobile launches and test suites share the **Kumikae AS3** group in Run Configurations.
 
-Click the game icon or splash thumbnail to choose an image from the project. The splash preview uses the project's launch window size, background, filtering and boot stretch mode.
+Click the icon or splash in **General** to open the artwork gallery. Search by filename or folder,
+select a thumbnail and inspect its preview before choosing **Use Icon** or **Use Splash**.
+**Browse…** also accepts local images. **Import and Use** copies the selected file into the game's
+`assets/` folder, giving it a unique name when needed. **Apply** saves the assignment.
+The splash preview uses the project's launch window size, background, filtering and boot stretch mode.
 The main scene list shows the project's scenes. **Display** previews the actual width, height and aspect ratio.
 Rider saves these settings to Godot's files. The **Game** project view identifies source and test
 roots, and the gutter beside an AS3 test runs that method or fixture. Open a scene to inspect its
