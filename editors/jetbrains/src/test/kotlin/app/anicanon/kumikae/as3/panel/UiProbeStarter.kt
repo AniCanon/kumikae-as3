@@ -142,7 +142,7 @@ class UiProbeStarter : ApplicationStarter {
                 "Provide a valid path to the desired application bundle and try again."
             onEdt { menu(moreEntries(controller, prompts), "Install app") }
             await("the failure") { shows(view, "An application bundle was not found") && screen(view).frame == null }
-            check(console.text.contains("[Error] An application bundle")) { "The failure is missing from the console" }
+            await("the error in the visible console") { console.text.contains("[Error] An application bundle") }
             render(view.component, NARROW, TALL, destination.resolve("$prefix-7-failed-input-on.png"))
             checkConsoleWraps(console)
             onEdt {

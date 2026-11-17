@@ -3,31 +3,47 @@ package app.anicanon.kumikae.as3.settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import java.awt.image.BufferedImage
 
 internal interface SettingsRepository {
-    fun preview(path: String): BufferedImage? = null
-    fun loadPreview(path: String, ready: (BufferedImage?) -> Unit) = ready(preview(path))
+    fun preview(path: String): Artwork? = null
+    fun loadPreview(path: String, filter: Boolean, ready: (Artwork?) -> Unit) = ready(preview(path))
     fun load(): ProjectSettings
     fun save(expected: ProjectSettings, draft: ProjectSettings): ProjectSettings
 }
 
 internal class SettingsController(private val repository: SettingsRepository) {
-    var preview by mutableStateOf<BufferedImage?>(null)
+    var preview by mutableStateOf<Artwork?>(null)
         private set
-    var splashPreview by mutableStateOf<BufferedImage?>(null)
+    var splashPreview by mutableStateOf<Artwork?>(null)
         private set
-    var exportPreview by mutableStateOf<BufferedImage?>(null)
+    var exportPreview by mutableStateOf<Artwork?>(null)
         private set
     var sceneLabels by mutableStateOf(emptyMap<String, String>())
+    private var previewGeneration = 0L
     private fun previews(value: ProjectSettings, previous: ProjectSettings? = null) {
-        fun request(path: String, old: String?, current: () -> String?, assign: (BufferedImage?) -> Unit) {
+        if (previous == null) previewGeneration++
+        val generation = previewGeneration
+        fun request(
+            path: String,
+            old: String?,
+            current: () -> String?,
+            filter: Boolean = true,
+            assign: (Artwork?) -> Unit,
+        ) {
             if (path == old) return
             assign(null)
-            if (path.isNotEmpty()) repository.loadPreview(path) { image -> if (current() == path) assign(image) }
+            if (path.isNotEmpty()) {
+                repository.loadPreview(path, filter) { image ->
+                    if (generation == previewGeneration && current() == path) assign(image)
+                }
+            }
         }
         request(value.icon, previous?.icon, { draft?.icon }) { preview = it }
-        request(value.splash, previous?.splash, { draft?.splash }) { splashPreview = it }
+        if (previous == null || value.splash != previous.splash) {
+            request(value.splash, previous?.splash, { draft?.splash }, SplashLayout.read(value).filter) {
+                splashPreview = it
+            }
+        }
         request(value.exportIcon, previous?.exportIcon, { draft?.exportIcon }) { exportPreview = it }
     }
     private var original: ProjectSettings? = null

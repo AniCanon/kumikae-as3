@@ -27,10 +27,7 @@ internal class GameRootNode(private val game: Project, node: PsiDirectoryNode) :
         val image = virtualFile?.let {
             app.anicanon.kumikae.as3.settings.GameArtwork.preview(it, identity.string("application", "config/icon"))
         }
-        data.setIcon(
-            image?.let { javax.swing.ImageIcon(it.getScaledInstance(16, 16, java.awt.Image.SCALE_SMOOTH)) }
-                ?: PluginFiles.mark,
-        )
+        data.setIcon(image?.treeIcon ?: PluginFiles.mark)
     }
     override fun canNavigate() = projectFile != null
     override fun navigate(requestFocus: Boolean) {

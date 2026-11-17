@@ -5,6 +5,24 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SettingsControllerTest {
+    @Test fun `a late thumbnail cannot replace reloaded artwork at the same path`() {
+        val callbacks = mutableListOf<(Artwork?) -> Unit>()
+        val repository = object : SettingsRepository {
+            override fun load() = ProjectSettings.read("[application]\nconfig/icon=\"res://art.png\"\n", "")
+            override fun save(expected: ProjectSettings, draft: ProjectSettings) = draft
+            override fun loadPreview(path: String, filter: Boolean, ready: (Artwork?) -> Unit) {
+                callbacks.add(ready)
+            }
+        }
+        val controller = SettingsController(repository)
+        controller.reload()
+        controller.reload()
+        val image = Artwork(java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_RGB))
+        callbacks.last()(image)
+        callbacks.first()(null)
+        assertEquals(image, controller.preview)
+    }
+
     @Test fun `stale draft cannot overwrite an external edit`() {
         val repository = object : SettingsRepository {
             var value = ProjectSettings.read("[application]\nconfig/name=\"Original\"\n", "")

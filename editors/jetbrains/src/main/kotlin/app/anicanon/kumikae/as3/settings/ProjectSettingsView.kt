@@ -91,12 +91,17 @@ private fun GeneralSettings(
     ComboBox(scenes, value.mainScene, onSelectionChange = { selected ->
         if (selected != null) controller.edit { it.copy(mainScene = selected) }
     }) { Label(choices[it] ?: it.removePrefix("res://").ifEmpty { "Choose a scene" }) }
-    Panel(PanelLayout.Flow(FlowLayout.LEFT, 20, 12)) {
-        ArtworkField(GameResourceKind.Icon, value.icon, controller.preview, choose) { path ->
-            controller.edit { it.copy(icon = path) }
+    Panel(PanelLayout.Border(20, 0), modifier = SwingModifier.emptyBorder(JBUI.insetsTop(16))) {
+        Column(SwingModifier.west()) {
+            ArtworkField(GameResourceKind.Icon, value.icon, controller.preview, choose) { path ->
+                controller.edit { it.copy(icon = path) }
+            }
         }
-        ArtworkField(GameResourceKind.Splash, value.splash, controller.splashPreview, choose) { path ->
-            controller.edit { it.copy(splash = path) }
+        Column(SwingModifier.center()) {
+            val layout = remember(value.projectText, value.width, value.height) { SplashLayout.read(value) }
+            ArtworkField(GameResourceKind.Splash, value.splash, controller.splashPreview, choose, layout) { path ->
+                controller.edit { it.copy(splash = path) }
+            }
         }
     }
 }

@@ -25,7 +25,6 @@ import javax.imageio.ImageIO
 internal object UiProbeGameRun {
     fun run(report: Path, directory: Path) {
         val folder = directory.resolve("game")
-        val device = Files.readString(directory.resolve("owned-device")).trim()
         val trust = TrustedPathsSettings.getInstance()
         val original = trust.getTrustedPaths().toList()
         trust.addTrustedPath(folder.toString())
@@ -34,6 +33,11 @@ internal object UiProbeGameRun {
             val app = ApplicationManager.getApplication()
             try {
                 val root = checkNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(folder))
+                if (System.getenv("KUMIKAE_ARTWORK_UI_ONLY") == "1") {
+                    UiProbeGameSettings.run(project, root, report)
+                    return
+                }
+                val device = Files.readString(directory.resolve("owned-device")).trim()
                 val source = Files.readString(folder.resolve("export_presets.cfg"))
                 app.invokeAndWait {
                     val setup = GameTargetSetup(project, root)

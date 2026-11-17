@@ -1,5 +1,6 @@
 package app.anicanon.kumikae.as3.panel
 
+import app.anicanon.kumikae.as3.settings.ArtworkButton
 import app.anicanon.kumikae.as3.ui.TabControl
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -43,10 +44,20 @@ internal object UiProbeGameSettings {
                 "The project icon did not load"
             }
             capture(panel, output.resolve("godot-settings.png"))
-            val snapshot = ImageIO.read(output.resolve("godot-settings.png").toFile())
-            val expected = 0xffcc59
+            val buttons = children(panel).filterIsInstance<ArtworkButton>().toList()
+            val iconTile = buttons.single { it.splash == null }
+            val snapshot = render(iconTile)
+            if (System.getenv("KUMIKAE_ARTWORK_UI_ONLY") == "1") {
+                val splash = buttons.single { it.splash != null }
+                val artwork = checkNotNull(splash.artwork)
+                check(artwork.width > artwork.height && artwork.image.width > artwork.image.height)
+                check(artwork.width > 1280 && splash.splash?.width == 1200)
+            }
             val gold = (0 until snapshot.width).sumOf { x ->
-                (0 until snapshot.height).count { y -> snapshot.getRGB(x, y) and 0xffffff == expected }
+                (0 until snapshot.height).count { y ->
+                    val rgb = snapshot.getRGB(x, y)
+                    (rgb shr 16 and 255) > 232 && (rgb shr 8 and 255) in 155..220 && (rgb and 255) < 110
+                }
             }
             check(gold > 120) { "Support Sprint artwork is missing its gold token: $gold pixels." }
             children(panel).filterIsInstance<TabControl>().single { it.name == "Display" }.doClick()
@@ -63,6 +74,9 @@ internal object UiProbeGameSettings {
         if (component is Container) component.components.forEach { yieldAll(children(it)) }
     }
     private fun capture(panel: JComponent, path: Path) {
+        ImageIO.write(render(panel), "png", path.toFile())
+    }
+    private fun render(panel: JComponent): BufferedImage {
         val image = BufferedImage(panel.width, panel.height, BufferedImage.TYPE_INT_RGB)
         val g = image.createGraphics()
         try {
@@ -70,7 +84,7 @@ internal object UiProbeGameSettings {
         } finally {
             g.dispose()
         }
-        ImageIO.write(image, "png", path.toFile())
+        return image
     }
     private fun await(condition: () -> Boolean) {
         val limit = System.nanoTime() + 20_000_000_000L

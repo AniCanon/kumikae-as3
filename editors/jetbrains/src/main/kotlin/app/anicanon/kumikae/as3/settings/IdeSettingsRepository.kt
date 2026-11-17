@@ -18,9 +18,9 @@ internal class IdeSettingsRepository(
         main to exports
     }
 
-    override fun loadPreview(path: String, ready: (java.awt.image.BufferedImage?) -> Unit) {
-        com.intellij.openapi.application.ReadAction.nonBlocking<java.awt.image.BufferedImage?> {
-            GameArtwork.preview(file.parent, path)
+    override fun loadPreview(path: String, filter: Boolean, ready: (Artwork?) -> Unit) {
+        com.intellij.openapi.application.ReadAction.nonBlocking<Artwork?> {
+            GameArtwork.preview(file.parent, path, filter)
         }.expireWith(owner).finishOnUiThread(com.intellij.openapi.application.ModalityState.any(), ready)
             .submit(com.intellij.util.concurrency.AppExecutorUtil.getAppExecutorService())
     }

@@ -5,6 +5,7 @@ import app.anicanon.kumikae.as3.scene.SceneDocument
 import app.anicanon.kumikae.as3.scene.SceneNode
 import app.anicanon.kumikae.as3.scene.SceneRepository
 import app.anicanon.kumikae.as3.scene.SceneView
+import app.anicanon.kumikae.as3.settings.Artwork
 import app.anicanon.kumikae.as3.settings.ProjectSettings
 import app.anicanon.kumikae.as3.settings.ProjectSettingsView
 import app.anicanon.kumikae.as3.settings.SettingsController
@@ -59,7 +60,10 @@ internal object UiProbeProjectExperience {
             tab(panel, "Display")
             await { descendants(panel).filterIsInstance<JTextField>().count() == 2 }
             render(panel, destination.resolve("$theme-project-display.png"))
-            edt { descendants(panel).filterIsInstance<javax.swing.JSpinner>().first().value = 1280 }
+            edt {
+                descendants(panel).filterIsInstance<javax.swing.JSpinner>()
+                    .single { it.accessibleContext.accessibleName == "Viewport width" }.value = 1280
+            }
             click(panel, "Apply")
             await { repository.value.width == "1280" }
             click(panel, "Reload")
@@ -91,8 +95,10 @@ internal object UiProbeProjectExperience {
     private fun tab(panel: JComponent, name: String) = edt {
         descendants(panel).filterIsInstance<TabControl>().single { it.name == name }.doClick()
     }
-    private fun click(panel: JComponent, text: String) = edt {
-        descendants(panel).filterIsInstance<JButton>().single { it.text == text }.doClick()
+    private fun click(panel: JComponent, text: String) {
+        fun button() = descendants(panel).filterIsInstance<JButton>().singleOrNull { it.text == text }
+        await { button()?.isEnabled == true }
+        edt { checkNotNull(button()).doClick() }
     }
     private fun descendants(component: Component): Sequence<Component> = sequence {
         yield(component)
@@ -132,7 +138,7 @@ internal class UiProbeSettingsRepository : SettingsRepository {
         "[application]\nconfig/name=\"Support Sprint\"\nrun/main_scene=\"res://main.tscn\"\nconfig/icon=\"res://icon.svg\"\n",
         "[preset.0]\nname=\"iOS\"\nplatform=\"iOS\"\n[preset.0.options]\napplication/bundle_identifier=\"org.example.game\"\n",
     )
-    override fun preview(path: String): BufferedImage = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB).also {
+    override fun preview(path: String): Artwork = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB).also {
         val graphics = it.createGraphics()
         try {
             graphics.color = java.awt.Color(245, 196, 65)
@@ -144,7 +150,7 @@ internal class UiProbeSettingsRepository : SettingsRepository {
         } finally {
             graphics.dispose()
         }
-    }
+    }.let(::Artwork)
     override fun load() = value
     override fun save(expected: ProjectSettings, draft: ProjectSettings): ProjectSettings {
         check(expected.projectText == value.projectText)

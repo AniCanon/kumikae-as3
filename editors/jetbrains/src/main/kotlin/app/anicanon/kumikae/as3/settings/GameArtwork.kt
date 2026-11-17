@@ -7,51 +7,72 @@ import com.intellij.util.ui.ImageUtil
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
+import kotlin.math.roundToInt
 
-/** Share previews across editor tabs and the project tree until Godot's image changes. */
+/** Keep the source dimensions for the inspector and a bounded, unpadded raster for Retina previews. */
 internal object GameArtwork {
-    private data class Preview(val stamp: Long, val image: BufferedImage)
+    private data class Preview(val stamp: Long, val artwork: Artwork)
     private val cached = Key.create<Preview>("kumikae.gameArtwork")
+    private val unfiltered = Key.create<Preview>("kumikae.gameArtwork.unfiltered")
+    private const val EDGE = 960
 
-    fun preview(root: VirtualFile, path: String): BufferedImage? {
+    fun preview(root: VirtualFile, path: String, filter: Boolean = true): Artwork? {
         if (!path.startsWith("res://")) return null
         val file = root.findFileByRelativePath(path.removePrefix("res://")) ?: return null
         if (!GameResourceKind.Icon.accepts(file.name)) return null
         val stamp = file.modificationStamp
-        file.getUserData(cached)?.takeIf { it.stamp == stamp }?.let { return it.image }
+        val cache = if (filter) cached else unfiltered
+        file.getUserData(cache)?.takeIf { it.stamp == stamp }?.let { return it.artwork }
         return runCatching {
-            val edge = 160
-            val image = if (file.extension.equals("svg", true)) {
+            val source = if (file.extension.equals("svg", true)) {
                 val vector = ImageLoader.loadFromUrl(file.toNioPath().toUri().toURL()) ?: return null
-                ImageUtil.toBufferedImage(vector, false)
+                Artwork(
+                    ImageUtil.toBufferedImage(vector, false),
+                    ImageUtil.getUserWidth(vector),
+                    ImageUtil.getUserHeight(vector),
+                )
             } else {
                 file.inputStream.use { stream ->
-                    ImageIO.createImageInputStream(stream).use { source ->
-                        val reader = ImageIO.getImageReaders(source).asSequence().firstOrNull() ?: return null
+                    ImageIO.createImageInputStream(stream).use { input ->
+                        val reader = ImageIO.getImageReaders(input).asSequence().firstOrNull() ?: return null
                         try {
-                            reader.input = source
-                            val step = (maxOf(reader.getWidth(0), reader.getHeight(0)) / edge).coerceAtLeast(1)
+                            reader.input = input
+                            val w = reader.getWidth(0)
+                            val h = reader.getHeight(0)
+                            val step = (maxOf(w, h) / EDGE).coerceAtLeast(1)
                             val params = reader.defaultReadParam.apply { setSourceSubsampling(step, step, 0, 0) }
-                            reader.read(0, params)
+                            Artwork(reader.read(0, params), w, h)
                         } finally {
                             reader.dispose()
                         }
                     }
                 }
             }
-            val preview = BufferedImage(edge, edge, BufferedImage.TYPE_INT_ARGB)
-            val graphics = preview.createGraphics()
-            try {
-                val scale = edge.toDouble() / maxOf(image.getWidth(null), image.getHeight(null)).coerceAtLeast(1)
-                val width = (image.getWidth(null) * scale).toInt().coerceAtLeast(1)
-                val height = (image.getHeight(null) * scale).toInt().coerceAtLeast(1)
-                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-                graphics.drawImage(image, (edge - width) / 2, (edge - height) / 2, width, height, null)
-            } finally {
-                graphics.dispose()
-            }
-            file.putUserData(cached, Preview(stamp, preview))
-            preview
+            val result = bounded(source, filter)
+            file.putUserData(cache, Preview(stamp, result))
+            result
         }.getOrNull()
+    }
+
+    internal fun bounded(source: Artwork, filter: Boolean): Artwork {
+        val image = source.image
+        val scale = EDGE.toDouble() / maxOf(image.width, image.height)
+        if (scale >= 1) return source
+        val w = (image.width * scale).roundToInt().coerceAtLeast(1)
+        val h = (image.height * scale).roundToInt().coerceAtLeast(1)
+        val thumbnail = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
+        val g = thumbnail.createGraphics()
+        try {
+            val interpolation = if (filter) {
+                RenderingHints.VALUE_INTERPOLATION_BILINEAR
+            } else {
+                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+            }
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, interpolation)
+            g.drawImage(image, 0, 0, w, h, null)
+        } finally {
+            g.dispose()
+        }
+        return source.copy(image = thumbnail)
     }
 }
