@@ -27,8 +27,7 @@ namespace {
 
 using What = GodotHost::Worked::What;
 
-// The most operands a worked-out call takes on the stack; one with more goes by name.
-constexpr size_t MOST = 16;
+constexpr size_t MOST = MOST_OPERANDS;
 
 // A type as the name table writes it ("float", "Vector2", "enum::Node.ProcessMode", "Node"), as a Variant
 // type, ANY_VALUE or NO_VALUE.
@@ -93,15 +92,6 @@ Variant zero_of(int p_type) {
 	return zero;
 }
 
-// Where a Variant of a type keeps its bare value, as Godot's entries read and write it.
-void *inside(Variant &p_value, int p_type) {
-	static GDExtensionVariantGetInternalPtrFunc getters[Variant::VARIANT_MAX] = {};
-	if (!getters[p_type]) {
-		getters[p_type] = gdextension_interface::variant_get_ptr_internal_getter((GDExtensionVariantType)p_type);
-	}
-	return getters[p_type](p_value._native_ptr());
-}
-
 // A number or a Boolean as an entry takes it bare.
 union Scalar {
 	double number;
@@ -162,24 +152,6 @@ void argument(const GodotHost::Worked &p_worked, size_t p_parameter, const vm::A
 	}
 	*r_value = to_variant(p_value.kind, p_value.slot);
 }
-
-// The Variants one call holds, made only as they are needed: a Variant is made and let go through Godot,
-// so sixteen of them for a call of one argument would cost more than the call.
-class Values {
-	alignas(Variant) unsigned char memory_[MOST][sizeof(Variant)];
-	size_t made_ = 0;
-
-public:
-	Values() = default;
-	Values(const Values &) = delete;
-	Values &operator=(const Values &) = delete;
-	~Values() {
-		for (size_t i = 0; i < made_; i++) {
-			reinterpret_cast<Variant *>(memory_[i])->~Variant();
-		}
-	}
-	Variant &next() { return *new (memory_[made_++]) Variant(); }
-};
 
 // The handle to make a result of one of Godot's value types in: the one the result's register holds, if it
 // holds that type (each handle is its register's own), or a new one.
@@ -251,6 +223,27 @@ std::optional<bool> run_bare(const GodotHost::Worked &p_worked, GDExtensionObjec
 }
 
 } // namespace
+
+void *inside(Variant &p_value, int p_type) {
+	static GDExtensionVariantGetInternalPtrFunc getters[Variant::VARIANT_MAX] = {};
+	if (!getters[p_type]) {
+		getters[p_type] = gdextension_interface::variant_get_ptr_internal_getter((GDExtensionVariantType)p_type);
+	}
+	return getters[p_type](p_value._native_ptr());
+}
+
+GDExtensionMethodBindPtr method_bind(std::string_view p_class, std::string_view p_method, std::string_view p_hash) {
+	if (p_hash == "-" || p_class.empty()) {
+		return nullptr;
+	}
+	const StringName klass(String::utf8(p_class.data(), (int64_t)p_class.size()));
+	const StringName method(String::utf8(p_method.data(), (int64_t)p_method.size()));
+	ClassDBSingleton *classes = ClassDBSingleton::get_singleton();
+	if (!classes->class_exists(klass) || !classes->class_has_method(klass, method)) {
+		return nullptr;
+	}
+	return gdextension_interface::classdb_get_method_bind(klass._native_ptr(), method._native_ptr(), std::strtoll(std::string(p_hash).c_str(), nullptr, 10));
+}
 
 // A Variant's internal pointer is taken for a handle's own value: a method that changes its value (append)
 // changes the handle, as a call by name on it does.
@@ -445,21 +438,6 @@ namespace {
 
 using Worked = GodotHost::Worked;
 
-// One of Godot's classes' methods by its hash, if this Godot has it: one that is missing (a class of the
-// editor's in an exported game) is left to be reported by name where it is used, not at load.
-GDExtensionMethodBindPtr method_bind(std::string_view p_class, std::string_view p_method, std::string_view p_hash) {
-	if (p_hash == "-" || p_class.empty()) {
-		return nullptr;
-	}
-	const StringName klass(String::utf8(p_class.data(), (int64_t)p_class.size()));
-	const StringName method(String::utf8(p_method.data(), (int64_t)p_method.size()));
-	ClassDBSingleton *classes = ClassDBSingleton::get_singleton();
-	if (!classes->class_exists(klass) || !classes->class_has_method(klass, method)) {
-		return nullptr;
-	}
-	return gdextension_interface::classdb_get_method_bind(klass._native_ptr(), method._native_ptr(), std::strtoll(std::string(p_hash).c_str(), nullptr, 10));
-}
-
 // An operator for the types its operands and its result are held as.
 std::unique_ptr<Worked> operator_of(const ir::Function &p_function, const ir::Instruction &p_in, const std::vector<std::string_view> &p_words,
 		std::string *r_key) {
@@ -583,6 +561,9 @@ std::unique_ptr<GodotHost::Worked> GodotHost::work_out(const ir::Module &p_modul
 			const std::vector<uint32_t> &list = p_function.argument_lists[p_in.c];
 			const std::optional<int> receiver = type_held(p_function, list[0]);
 			*r_key += " " + std::to_string(receiver.value_or(NO_VALUE)) + " " + std::to_string(list.size());
+			if (std::unique_ptr<Worked> emit = emit_of(entry, words)) {
+				return emit;
+			}
 			return method_of(entry, words, receiver.value_or(NO_VALUE), false, list.size() - 1);
 		}
 		case ir::Op::HostCallStatic: {
@@ -645,7 +626,9 @@ const vm::Prepared *GodotHost::prepare(const ir::Module &p_module, const ir::Fun
 	}
 	// One that takes a StringName keeps the name it made for its own call: `isActionPressed("left")` and
 	// `isActionPressed("right")` each keep theirs, and neither is made again.
-	if (std::find(worked->parameters.begin(), worked->parameters.end(), (int)Variant::STRING_NAME) != worked->parameters.end()) {
+	// So does an emit(), which keeps the signal it was last handed (SignalSeen): each place has its own.
+	if (worked->what == What::Emit ||
+			std::find(worked->parameters.begin(), worked->parameters.end(), (int)Variant::STRING_NAME) != worked->parameters.end()) {
 		key += " at " + std::to_string(reinterpret_cast<uintptr_t>(&p_in));
 		worked->own_place = true;
 	}
@@ -697,6 +680,15 @@ bool GodotHost::run(const vm::Prepared &p_prepared, const vm::Argument *p_operan
 			return call_utility(*worked.utility, p_operands, p_count, p_result, r_result, r_error);
 		case What::Construct:
 			return run_construct(worked, p_operands, p_count, p_result, r_result, r_error);
+		case What::Emit: {
+			// The values as a call by name hands them over (to_variant), each made once where Godot reads it.
+			Values values;
+			const Variant *pointers[MOST + 1];
+			for (size_t i = 1; i < p_count; i++) {
+				pointers[i] = new (values.room()) Variant(to_variant(p_operands[i].kind, p_operands[i].slot));
+			}
+			return p_operands[0].kind == ir::Kind::Val && emit_signal(worked, static_cast<const Variant *>(p_operands[0].slot.p), pointers, p_count - 1);
+		}
 	}
 	return false;
 }

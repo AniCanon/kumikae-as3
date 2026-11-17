@@ -368,7 +368,7 @@ bool FunctionWriter::engine_bound(const Instruction &p_in) {
 }
 
 bool FunctionWriter::engine(const Instruction &p_in) {
-	return engine_alias(p_in) || engine_inline(p_in) || engine_value(p_in) || engine_bound(p_in);
+	return engine_alias(p_in) || engine_inline(p_in) || engine_emit(p_in) || engine_value(p_in) || engine_bound(p_in);
 }
 
 } // namespace backend_cpp

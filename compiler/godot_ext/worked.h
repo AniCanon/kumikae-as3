@@ -6,9 +6,13 @@
 #include "godot_host.h"
 
 #include <godot_cpp/core/gdextension_interface_loader.hpp>
+#include <godot_cpp/variant/signal.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
+#include <memory>
+#include <new>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace kas3 {
@@ -24,8 +28,48 @@ struct NameKept {
 	godot::Variant name;
 };
 
+// The most operands a worked-out call takes on the stack; one with more goes by name.
+inline constexpr size_t MOST_OPERANDS = 16;
+
+// Where a Variant of a type keeps its bare value, as Godot's entries read and write it.
+void *inside(godot::Variant &p_value, int p_type);
+
+// One of Godot's classes' methods by its hash, if this Godot has it: one that is missing (a class of the
+// editor's in an exported game) is left to be reported by name where it is used, not at load.
+GDExtensionMethodBindPtr method_bind(std::string_view p_class, std::string_view p_method, std::string_view p_hash);
+
+// The Variants one call holds, made only as they are needed: a Variant is made and let go through Godot,
+// so sixteen of them for a call of one argument would cost more than the call.
+class Values {
+	alignas(godot::Variant) unsigned char memory_[MOST_OPERANDS][sizeof(godot::Variant)];
+	size_t made_ = 0;
+
+public:
+	Values() = default;
+	Values(const Values &) = delete;
+	Values &operator=(const Values &) = delete;
+	~Values() {
+		for (size_t i = 0; i < made_; i++) {
+			reinterpret_cast<godot::Variant *>(memory_[i])->~Variant();
+		}
+	}
+	godot::Variant &next() { return *new (memory_[made_++]) godot::Variant(); }
+	// The memory of the next, for a value made in it: the caller makes one there before anything else.
+	void *room() { return memory_[made_++]; }
+};
+
+// The signal last emitted through one emit() (Worked, What::Emit): the bytes Godot holds it in, with its
+// name as Godot's emit_signal takes one and its object's id. The same bytes are the same signal for as
+// long as the name is kept here, so that the two are asked of Godot only when another signal comes.
+struct SignalSeen {
+	unsigned char bytes[sizeof(godot::Signal)] = {};
+	godot::Variant name;
+	uint64_t object = 0;
+	bool any = false;
+};
+
 struct GodotHost::Worked final : vm::Prepared {
-	enum class What { Operator, Builtin, Bound, Getter, Setter, FieldGet, FieldSet, Constant, Utility, Construct } what = What::Constant;
+	enum class What { Operator, Builtin, Bound, Getter, Setter, FieldGet, FieldSet, Constant, Utility, Construct, Emit } what = What::Constant;
 	std::string name; // Godot's name for it, for the errors it reports.
 	// Operator: Godot's evaluator for these types; the types of its operands, and of what it gives.
 	GDExtensionPtrOperatorEvaluator evaluator = nullptr;
@@ -37,8 +81,9 @@ struct GodotHost::Worked final : vm::Prepared {
 	GDExtensionPtrBuiltInMethod builtin = nullptr;
 	int receiver = NO_VALUE;
 	// Bound, Getter, Setter: a method of a class, found by its hash; the receiver comes first unless it is
-	// static. An accessor that serves several properties takes `index` first.
+	// static. An accessor that serves several properties takes `index` first. Emit: Object's emit_signal.
 	GDExtensionMethodBindPtr bound = nullptr;
+	mutable SignalSeen seen; // Emit.
 	bool is_static = false;
 	// Every parameter and the result are numbers, Booleans or value types held inline (Vector2, Color): with
 	// every argument given, the method bind is called on the bare values, with no Variant at all.
@@ -58,5 +103,13 @@ struct GodotHost::Worked final : vm::Prepared {
 	godot::Variant value;
 	const Utility *utility = nullptr;
 };
+
+// A signal's emit(), which Godot has as a method of the signal that takes any number of values: worked out
+// as Object's emit_signal, called by its method bind (godot_emit.cpp). Nothing for any other entry.
+std::unique_ptr<GodotHost::Worked> emit_of(const ir::EngineName &p_entry, const std::vector<std::string_view> &p_words);
+// Emits the signal a handle holds, with values that are Godot's already: `p_pointers` has room for the
+// signal's name first, then the `p_count` values. False, with nothing done, where the handle holds no
+// signal or the signal's object is gone: what that is, the request by name says.
+bool emit_signal(const GodotHost::Worked &p_worked, const godot::Variant *p_signal, const godot::Variant **p_pointers, size_t p_count);
 
 } // namespace kas3

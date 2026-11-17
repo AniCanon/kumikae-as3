@@ -65,6 +65,7 @@ void FunctionWriter::analyse() {
 	find_inline();
 	singleton_use_.assign(function_.registers.size(), NONE);
 	find_aliases();
+	find_lent_signals();
 	find_borrowed();
 	find_still();
 	find_kept();

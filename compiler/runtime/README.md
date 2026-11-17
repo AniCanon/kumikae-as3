@@ -94,7 +94,9 @@ What this costs, until the split:
 
 - An instruction that asks the engine is carried out with no frame (`engine_thunk.cpp`): the interpreter's
   own request on the values handed over, and a function Godot calls back meanwhile is entered as generated
-  code (`entry.cpp`). It still goes by Godot's names and boxed values, which is most of what it costs.
+  code (`entry.cpp`). It still goes by Godot's names and boxed values, which is most of what it costs. A
+  signal's `emit()` no longer does: generated code hands the host the values as it holds them
+  (`EngineApi::emit`, `GIVEN_WHOLE` and the rest in `engine.h`).
 - Any other thunk is an entry into the interpreter (a frame, a few instructions): 40 to 80 ns, tens of times what
   most operations take. `fast.h` exists for that reason, and each family that becomes a function of plain
   values loses its thunks.

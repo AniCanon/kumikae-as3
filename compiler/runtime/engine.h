@@ -32,7 +32,21 @@ struct EngineApi {
 	// for no handle or a value of another type).
 	void *(*box)(Parts p_type, const void *p_value);
 	void (*unbox)(const void *p_handle, Parts p_type, void *r_value);
+	// A signal's emit() on values held as generated code holds them: `p_emitter` is what the host worked out
+	// for the place (Resolved::bind), `p_signal` the handle on the signal, and each value is given as its
+	// code in `p_held` says (GIVEN_WHOLE and the rest). False, with nothing done, where the handle holds no
+	// signal or the signal's object is gone: the instruction's thunk then says what that is.
+	bool (*emit)(void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count);
 };
+
+// How a value handed to EngineApi::emit is held: a whole number as an int64_t, a Number as a double, a
+// Boolean as a byte, each by its address; one of Godot's values or objects behind a handle as the handle
+// itself (null for none); a value with parts as its struct, by its address (given_parts()).
+inline constexpr uint8_t GIVEN_WHOLE = 0;
+inline constexpr uint8_t GIVEN_NUMBER = 1;
+inline constexpr uint8_t GIVEN_FLAG = 2;
+inline constexpr uint8_t GIVEN_HANDLE = 3;
+inline constexpr uint8_t GIVEN_PARTS = 4; // And the number of the type (Parts) added to it.
 
 // What the host worked out for one place the program asks the engine for something (Program::uses). Empty
 // where it could not, or where the place is not one generated code calls directly: the library's way,
@@ -130,6 +144,11 @@ KAS3_PARTS(Vector4) KAS3_PARTS(Vector4i) KAS3_PARTS(Plane) KAS3_PARTS(Quaternion
 KAS3_PARTS(Projection) KAS3_PARTS(Color)
 #undef KAS3_PARTS
 
+template <typename T>
+constexpr uint8_t given_parts() {
+	return static_cast<uint8_t>(GIVEN_PARTS + static_cast<uint8_t>(PartsOf<T>::code));
+}
+
 // A value held inline as a handle of its own, and a handle's value copied out: where one crosses into what
 // the host and the library hold (a field, an untyped value, an Array, an instruction the library runs).
 template <typename T>
@@ -172,6 +191,18 @@ struct Boxed {
 	~Boxed() { release(c, v); }
 	Boxed(const Boxed &) = delete;
 	Boxed &operator=(const Boxed &) = delete;
+};
+
+// A handle lent by a field, as a handle of its own for as long as one instruction the library runs reads
+// it: what the field holds may be let go of meanwhile.
+struct Held {
+	Context *c;
+	Val v;
+	Held(Context *p_context, Val p_lent) :
+			c(p_context), v(shared(p_context, p_lent)) {}
+	~Held() { release(c, v); }
+	Held(const Held &) = delete;
+	Held &operator=(const Held &) = delete;
 };
 
 } // namespace rt
