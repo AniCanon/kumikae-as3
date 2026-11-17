@@ -98,7 +98,9 @@ Interpreter::~Interpreter() {
 }
 
 void Interpreter::remember_constructions() {
-	if (!constructions_) {
+	// What is remembered is kept in room an object is made with: one made before has none. Native code
+	// keeps freed objects to use again, and tells nobody.
+	if (!constructions_ && !heap_.sized() && !native_) {
 		constructions_ = std::make_unique<Constructions>(module_);
 		heap_.constructions = constructions_.get();
 	}

@@ -35,7 +35,7 @@ void Library::raise_unsupported(const std::string &p_what) {
 
 Object *new_error(Heap &p_heap, uint32_t p_class, Str *p_message) {
 	const ir::Module &module = p_heap.module;
-	Object *error = p_class != ir::NONE ? new_object(p_class, slots_of(module.classes[p_class]), p_heap.list_for(p_class)) : nullptr;
+	Object *error = p_class != ir::NONE ? new_object(p_class, p_heap.object_slots(p_class), p_heap.list_for(p_class)) : nullptr;
 	if (!error) {
 		if (release(p_message)) {
 			free_string(p_message);

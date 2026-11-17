@@ -167,13 +167,33 @@ std::optional<std::string> chain_refused(const Module &p_module, uint32_t p_clas
 	return std::nullopt;
 }
 
+// The class, if it is one whose objects a constructor makes.
+const Class *constructed_class(const Module &p_module, uint32_t p_class) {
+	const Class *klass = p_class < p_module.classes.size() ? &p_module.classes[p_class] : nullptr;
+	return klass && !klass->is_interface && klass->element == Kind::Void && !klass->table && klass->constructor != NONE ? klass : nullptr;
+}
+
 } // namespace
+
+std::optional<std::string> constructor_refusal(const Module &p_module, uint32_t p_class) {
+	const Class *klass = constructed_class(p_module, p_class);
+	if (!klass) {
+		return "it is not a class with a constructor";
+	}
+	if (klass->built_in) {
+		return "it is a class of the library";
+	}
+	if (!klass->native_base.empty()) {
+		return "it extends Godot's " + klass->native_base;
+	}
+	return chain_refused(p_module, p_class);
+}
 
 ConstructorChain constructor_chain(const Module &p_module, uint32_t p_class) {
 	ConstructorChain chain;
-	const Class *klass = p_class < p_module.classes.size() ? &p_module.classes[p_class] : nullptr;
-	if (!klass || klass->is_interface || klass->element != Kind::Void || klass->table || klass->constructor == NONE) {
-		chain.refusal = "it is not a class with a constructor";
+	chain.refusal = constructor_refusal(p_module, p_class);
+	const Class *klass = constructed_class(p_module, p_class);
+	if (!klass) {
 		return chain;
 	}
 	std::vector<uint32_t> reached;
@@ -185,13 +205,6 @@ ConstructorChain constructor_chain(const Module &p_module, uint32_t p_class) {
 				chain.constants.push_back(p_module.globals[in.b].name);
 			}
 		}
-	}
-	if (klass->built_in) {
-		chain.refusal = "it is a class of the library";
-	} else if (!klass->native_base.empty()) {
-		chain.refusal = "it extends Godot's " + klass->native_base;
-	} else {
-		chain.refusal = chain_refused(p_module, p_class);
 	}
 	return chain;
 }

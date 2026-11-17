@@ -61,6 +61,9 @@ struct ConstructorChain {
 	std::string text;
 };
 ConstructorChain constructor_chain(const Module &p_module, uint32_t p_class);
+// The chain's refusal alone (ConstructorChain::refusal), for whoever asks of every class: nothing is put
+// into text.
+std::optional<std::string> constructor_refusal(const Module &p_module, uint32_t p_class);
 
 // A number two modules share if they print alike, their sources' lines are where each other's are, and
 // Godot's name table said the same of each name they use: a program compiled twice from the same sources

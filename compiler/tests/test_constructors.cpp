@@ -27,7 +27,10 @@ static ir::Module compiled(const std::string &p_source, bool p_godot = false) {
 static ir::ConstructorChain chain(const ir::Module &p_module, const char *p_class) {
 	for (uint32_t i = 0; i < p_module.classes.size(); i++) {
 		if (p_module.classes[i].name == p_class) {
-			return ir::constructor_chain(p_module, i);
+			ir::ConstructorChain found = ir::constructor_chain(p_module, i);
+			// The refusal asked for on its own is the chain's: every case here checks both.
+			CHECK_EQ(ir::constructor_refusal(p_module, i).value_or("none"), found.refusal.value_or("none"));
+			return found;
 		}
 	}
 	std::printf("no class named %s\n", p_class);
@@ -175,6 +178,7 @@ static void test_not_a_script_class() {
 	CHECK_EQ(chain(module, "Vector.<int>").refusal.value_or(""), std::string("it is not a class with a constructor"));
 	CHECK_EQ(chain(module, "Error").refusal.value_or(""), std::string("it is a class of the library"));
 	CHECK_EQ(ir::constructor_chain(module, 9999).refusal.value_or(""), std::string("it is not a class with a constructor"));
+	CHECK_EQ(ir::constructor_refusal(module, 9999).value_or(""), std::string("it is not a class with a constructor"));
 }
 
 // The constants are found whether or not the class can be updated: a reload says which class reads one that

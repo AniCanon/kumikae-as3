@@ -1642,6 +1642,10 @@ struct Edited {
 	vm::Object *game = nullptr;
 	bool godot = false; // The sources name Godot's classes.
 	bool remember = true;
+	vm::NativeCode *native = nullptr; // Stands for a program's native code, which this one does not run.
+	// The old program's objects are let go of as soon as they are moved, as Godot's host lets go of each
+	// instance's: they are gone by the time the objects alive are updated.
+	bool let_go_early = false;
 
 	std::unique_ptr<ir::Module> build(const std::string &p_source) {
 		auto built = std::make_unique<ir::Module>();
@@ -1658,6 +1662,9 @@ struct Edited {
 	void start(const std::string &p_source) {
 		module = build(p_source);
 		program = std::make_unique<vm::Interpreter>(*module, recorder);
+		if (native) {
+			program->set_native(native);
+		}
 		if (remember) {
 			program->remember_constructions();
 		}
@@ -1682,9 +1689,14 @@ struct Edited {
 			vm::Reload reload(*program, *fresh);
 			reload.globals(ir::static_changes(*module, *next));
 			moved = reload.object(game);
+			if (let_go_early) {
+				program->release_object(game);
+			}
 			done = reload.update_in_place(ir::run_once_changes(*module, *next));
 		}
-		program->release_object(game);
+		if (!let_go_early) {
+			program->release_object(game);
+		}
 		game = moved;
 		program = std::move(fresh);
 		module = std::move(next);
@@ -1882,6 +1894,7 @@ static void test_reload_in_place_refused() {
 	scripts.hold("spinner", "Spinner");
 	CHECK_EQ(scripts.edit(with(node, "N:Number = 1", "N:Number = 2")), std::string("updated:; Spinner: it extends Godot's Node"));
 	CHECK_EQ(scripts.number("spinner.speed"), 1.0);
+	CHECK_EQ(scripts.program->remembered(), (size_t)1); // The game alone: nothing of an object of Godot's is kept.
 	scripts.end();
 }
 
@@ -1904,7 +1917,7 @@ static void test_reload_in_place_memory() {
 	off.end();
 	Edited on;
 	on.start(source);
-	on.call("fill"); // Many alive at once, and gone again: the table grows, and gives each up.
+	on.call("fill"); // Many alive at once, and gone again: each gives up what was kept of it.
 	CHECK_EQ(on.program->remembered(), (size_t)1);
 	on.call("churn");
 	CHECK_EQ(on.program->remembered(), (size_t)2); // The game and the one it keeps.
@@ -1915,6 +1928,167 @@ static void test_reload_in_place_memory() {
 	on.call("churn");
 	CHECK_EQ(on.program->remembered(), (size_t)2);
 	on.end();
+	// Asked for once an object has been made, nothing is remembered: what is remembered is kept with each
+	// object, and one made before has no room for it.
+	Edited late;
+	late.remember = false;
+	late.start(source);
+	late.program->remember_constructions();
+	late.call("churn");
+	CHECK_EQ(late.program->remembered(), (size_t)0);
+	CHECK_EQ(late.edit(with(source, "N:Number = 1", "N:Number = 5")), std::string("updated:; Shot: what its objects were made with is not remembered"));
+	CHECK_EQ(late.number("kept.n"), 8.0);
+	late.end();
+	// Nor of a program with native code, which keeps freed objects to use again and tells nobody.
+	struct NoNative final : vm::NativeCode {
+		[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
+		void clear_globals() override {}
+		vm::Slot *global(uint32_t) override { return nullptr; }
+		[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
+	} none;
+	Edited compiled;
+	compiled.native = &none;
+	compiled.start(source);
+	compiled.call("churn");
+	CHECK_EQ(compiled.program->remembered(), (size_t)0);
+	compiled.end();
+}
+
+// Which objects are remembered at all, and that what is remembered of one goes with it however it ends: a
+// class whose constructor takes any number of arguments is not, a constructor that raises leaves nothing
+// behind, and text that was an argument or a first value is let go of with the object.
+static void test_reload_in_place_kept() {
+	const std::string source =
+			"package { public class Game { public var a:Named; public var b:Named; public var rest:Rest; public var made:int = 0;\n"
+			"  public function make():void { a = new Named(\"a\" + made, made); b = new Named(\"b\" + made); rest = new Rest(1, 2); made++;\n"
+			"    for (var i:int = 0; i < 40; i++) { try { new Named(\"bad\" + i, i); } catch (e:Error) { } var gone:Named = new Named(\"go\", \"any\" + i); } } } }\n"
+			"class K { public static const N:Number = 1; public static const TAG:String = \"-\"; }\n"
+			"class Named { public var name:String; public var extra:*; public var n:Number = K.N; public var none:String;\n"
+			"  public function Named(p_name:String, p_extra:* = null) { name = p_name + K.TAG; extra = p_extra;\n"
+			"    if (p_name.length > 3) { n += none.length; } } }\n"
+			"class Rest { public var n:Number = K.N; public function Rest(...p_all) { n += p_all.length; } }\n";
+	Edited edited;
+	edited.start(source);
+	edited.call("make");
+	CHECK_EQ(edited.program->remembered(), (size_t)3); // The game and its two: not Rest's, and none that is gone.
+	edited.call("make"); // The two it held are let go of, with the text they were made with.
+	CHECK_EQ(edited.program->remembered(), (size_t)3);
+	const std::string next = with(with(source, "N:Number = 1", "N:Number = 4"), "TAG:String = \"-\"", "TAG:String = \"+\"");
+	CHECK_EQ(edited.edit(next), std::string("updated: Named; Rest: Rest() takes any number of arguments"));
+	CHECK_EQ(edited.text("a.name"), std::string("a1+"));
+	CHECK_EQ(edited.text("b.name"), std::string("b1+"));
+	CHECK_EQ(edited.number("a.n"), 4.0);
+	CHECK_EQ(vm::any::to_number(edited.field("a.extra")), 1.0);
+	CHECK_EQ(edited.number("rest.n"), 3.0);
+	// A second edit starts from what the first gave, and the objects made since are remembered by the new program.
+	edited.call("make");
+	CHECK_EQ(edited.program->remembered(), (size_t)3);
+	CHECK_EQ(edited.edit(with(next, "TAG:String = \"+\"", "TAG:String = \"*\"")), std::string("updated: Named"));
+	CHECK_EQ(edited.text("a.name"), std::string("a2*"));
+	CHECK_EQ(edited.number("b.n"), 4.0);
+	// A move that ends without update_in_place(): what the first values of the objects moved were went
+	// with the old program, and nothing is remembered of them rather than something that may be wrong.
+	std::unique_ptr<ir::Module> another = edited.build(with(next, "N:Number = 4", "N:Number = 6"));
+	auto fresh = std::make_unique<vm::Interpreter>(*another, edited.recorder);
+	vm::Object *moved = nullptr;
+	{
+		vm::Reload reload(*edited.program, *fresh);
+		reload.globals();
+		moved = reload.object(edited.game);
+	}
+	edited.program->release_object(edited.game);
+	edited.game = moved;
+	edited.program = std::move(fresh);
+	edited.module = std::move(another);
+	CHECK_EQ(edited.program->remembered(), (size_t)0);
+	CHECK_EQ(edited.edit(with(next, "N:Number = 4", "N:Number = 9")),
+			std::string("updated:; Named: an object of it was made with an argument or a first value that is not a number, a Boolean, text or null"
+						"; Rest: Rest() takes any number of arguments"));
+	CHECK_EQ(edited.number("a.n"), 4.0);
+	edited.end();
+}
+
+// A class whose constructor can be run again at one time and not at another, and a new constructor that
+// fails and is then put right: an object alive is updated by the first edit after which it can be.
+static void test_reload_in_place_turns() {
+	const std::string source =
+			"package { public class Game { public var a:Loud; public var b:Quiet; public var c:Quiet;\n"
+			"  public function make():void { a = new Loud(2); b = new Quiet(3, \"b\"); c = new Quiet(4); }\n"
+			"  public function push():void { c.n = 50; } } }\n"
+			"class K { public static const N:Number = 1; public static var count:int = 0; }\n"
+			"class Loud { public var n:Number; public var tag:String = \"t\"; public function Loud(p_n:Number) { n = p_n + K.N; K.count++; } }\n"
+			"class Quiet { public var n:Number; public var name:String; public var none:String;\n"
+			"  public function Quiet(p_n:Number, p_name:String = \"q\") { n = p_n + K.N; name = p_name + K.N; } }\n";
+	Edited edited;
+	edited.let_go_early = true;
+	edited.start(source);
+	edited.call("make");
+	// Loud's constructor counts: it can't be run again, and its objects are left. Quiet's can.
+	std::string next = with(source, "N:Number = 1", "N:Number = 2");
+	CHECK_EQ(edited.edit(next), std::string("updated: Quiet; Loud: Loud() reads the static variable K.count"));
+	CHECK_EQ(edited.number("a.n"), 3.0);
+	CHECK_EQ(edited.number("b.n"), 5.0);
+	CHECK_EQ(edited.text("b.name"), std::string("b2"));
+	CHECK_EQ(edited.text("c.name"), std::string("q2"));
+	// It no longer counts: the object made while it did is updated, from what that constructor left it with.
+	next = with(with(next, " K.count++;", ""), "tag:String = \"t\"", "tag:String = \"u\"");
+	CHECK_EQ(edited.edit(next), std::string("updated: Loud"));
+	CHECK_EQ(edited.number("a.n"), 4.0);
+	CHECK_EQ(edited.text("a.tag"), std::string("u"));
+	// Quiet's new constructor fails (a member of null): its objects are as they were. Put right, with another
+	// constant, they are updated from what they were made with, but for a field the game wrote meanwhile.
+	const size_t errors = edited.recorder.errors.size();
+	std::string broken = with(next, "name = p_name + K.N; }", "name = p_name + K.N; n += none.length; }");
+	CHECK_EQ(edited.edit(broken), std::string("updated:; Quiet: its constructor failed when it was run again with the new code"));
+	CHECK(edited.recorder.errors.size() > errors);
+	CHECK_EQ(edited.number("b.n"), 5.0);
+	edited.call("push");
+	next = with(next, "N:Number = 2", "N:Number = 7");
+	CHECK_EQ(edited.edit(next), std::string("updated: Loud Quiet"));
+	CHECK_EQ(edited.number("b.n"), 10.0);
+	CHECK_EQ(edited.text("b.name"), std::string("b7"));
+	CHECK_EQ(edited.number("c.n"), 50.0);
+	CHECK_EQ(edited.text("c.name"), std::string("q7"));
+	CHECK_EQ(edited.number("a.n"), 9.0);
+	// Quiet's constructor prints, and then no longer does: left while it did, and updated by the edit after.
+	std::string printing = with(next, "name = p_name + K.N; }", "name = p_name + K.N; trace(name); }");
+	CHECK_EQ(edited.edit(printing), std::string("updated:; Quiet: Quiet() prints"));
+	printing = with(printing, "N:Number = 7", "N:Number = 8");
+	CHECK_EQ(edited.edit(printing), std::string("updated: Loud; Quiet: Quiet() prints"));
+	CHECK_EQ(edited.number("b.n"), 10.0);
+	CHECK_EQ(edited.number("a.n"), 10.0);
+	CHECK_EQ(edited.edit(with(printing, " trace(name);", "")), std::string("updated: Quiet"));
+	CHECK_EQ(edited.number("b.n"), 11.0);
+	CHECK_EQ(edited.text("b.name"), std::string("b8"));
+	CHECK_EQ(edited.number("c.n"), 50.0);
+	CHECK_EQ(edited.text("c.name"), std::string("q8"));
+	// An edit to nothing a constructor gives, then one that is: the objects carried through the first take it.
+	next = with(with(printing, " trace(name);", ""), "c.n = 50", "c.n = 51");
+	CHECK_EQ(edited.edit(next), std::string("updated:"));
+	CHECK_EQ(edited.edit(with(next, "N:Number = 8", "N:Number = 9")), std::string("updated: Loud Quiet"));
+	CHECK_EQ(edited.number("b.n"), 12.0);
+	CHECK_EQ(edited.number("a.n"), 11.0);
+	edited.end();
+}
+
+// An object made while its constants' class was still being given its static fields read a constant
+// that had no value yet. Its first values are taken to be what the chain gives now, so the field looks
+// written by the program and is left as it is: what the game would hold if it were started again.
+static void test_reload_in_place_early() {
+	const std::string source =
+			"package { public class Game { public var seen:Part; public var late:Part;\n"
+			"  public function make():void { seen = K.early; late = new Part(); } } }\n"
+			"class K { public static var early:Part = new Part(); public static const N:Number = 5; }\n"
+			"class Part { public var n:Number = K.N; }\n";
+	Edited edited;
+	edited.start(source);
+	edited.call("make");
+	CHECK(edited.number("seen.n") != edited.number("seen.n"));
+	CHECK_EQ(edited.number("late.n"), 5.0);
+	CHECK_EQ(edited.edit(with(source, "N:Number = 5", "N:Number = 6")), std::string("updated: Part"));
+	CHECK(edited.number("seen.n") != edited.number("seen.n"));
+	CHECK_EQ(edited.number("late.n"), 6.0);
+	edited.end();
 }
 
 // A field whose Godot class changed takes the old field's object only if it is of the new class: the
@@ -3351,6 +3525,9 @@ int main() {
 	test_reload_in_place_values();
 	test_reload_in_place_refused();
 	test_reload_in_place_memory();
+	test_reload_in_place_kept();
+	test_reload_in_place_turns();
+	test_reload_in_place_early();
 	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_loop_markers();

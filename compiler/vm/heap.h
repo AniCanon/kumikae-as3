@@ -7,8 +7,10 @@
 
 #include "clock.h"
 #include "collector.h"
+#include "constructions.h"
 #include "engine_handles.h"
 #include "engine_source.h"
+#include "fields.h"
 #include "ir.h"
 #include "runtime.h"
 
@@ -28,8 +30,6 @@ struct OperatorName {
 	int number = -1; // Godot's number for it (Variant::Operator), the entry's second word.
 };
 
-class Constructions; // vm/constructions.h
-
 class Heap {
 public:
 	const ir::Module &module;
@@ -40,6 +40,15 @@ public:
 	// Told of each object of a program's class that is freed, where what objects were constructed with is
 	// remembered; null where it is not.
 	Constructions *constructions = nullptr;
+	// How many slots an object of a program's class is made with (runtime.h, new_object): its own
+	// (fields.h), and where what it was constructed with is remembered, the room that is kept in. Every
+	// object of such a class is made with this many, so that the room is there for each one.
+	size_t object_slots(uint32_t p_class) {
+		sized_ = true;
+		return slots_of(module.classes[p_class]) + (constructions ? constructions->room(p_class) : 0);
+	}
+	// Whether an object has been made with object_slots(): from then on, what they say may not change.
+	bool sized() const { return sized_; }
 
 	Heap(const ir::Module &p_module, EngineHandles &p_handles, EngineSource &p_source, Clock &p_clock = SystemClock::instance());
 	Heap(const Heap &) = delete;
@@ -75,6 +84,7 @@ private:
 	std::vector<OperatorName> operators_; // By engine name: what an operator's entry says, read once.
 	std::vector<Object *> lone_functions_;
 	std::vector<Object *> dying_; // Objects whose last reference is gone, still to be freed.
+	bool sized_ = false;
 	bool freeing_ = false; // drop_object() is freeing them: one called meanwhile adds to the list.
 	void let_go(ir::Kind p_kind, Slot &p_slot); // One slot of an object being freed.
 };

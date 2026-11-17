@@ -617,11 +617,18 @@ What is updated, and what is not:
   starts again by itself. Static variables keep the values the game gave them through both; restart the
   game for their new first values.
 
-Remembering what objects were constructed with is the interpreter's, in a table beside the objects
-(`vm/constructions.h`), and is on only in a debug build inside Godot: an exported game, native code and
-`kas3c run` keep nothing. It costs where objects are made: `tests/bench/objects.as`, which does nothing
-but make and drop objects, is 15.7% slower with it on (`KAS3_REMEMBER_CONSTRUCTIONS=1` turns it on in
-`kas3c run`, to measure), and the other benchmark programs are within their spread.
+Remembering what objects were constructed with is the interpreter's, in room each object is made with
+after its own fields (`vm/constructions.h`: one slot, one for each of its constructor's parameters and one
+for each field), and is on only in a debug build inside Godot: an exported game, native code and
+`kas3c run` keep nothing and pay nothing. Of an object whose constructor chain can be run again, only the
+arguments are kept: its first values are worked out at a reload, by the old program's chain. It costs
+where objects are made. `tests/bench/objects.as`, which does nothing but make and drop objects of such a
+class, runs 2.4% more instructions with it on (`KAS3_REMEMBER_CONSTRUCTIONS=1` turns it on in `kas3c run`,
+to measure) and is about 2.5% slower: four sessions of 41 to 81 runs, on and off turn and turn about on a
+machine busy with other work, gave medians of 1.4%, 2.5%, 2.6% and 3.9%. It was 15.7%. A class whose
+chain can't be run again (the same program with a static counter in the constructor) has its first values
+kept as each constructor returns, and costs more: 6.8% more instructions, about 7% to 9% slower. The other
+benchmark programs run within 0.2% of the same number of instructions.
 
 A class that was removed while one of its objects is alive stops the reload, and Godot says to restart.
 An exported game does not watch its scripts.

@@ -24,8 +24,8 @@ host differs.
 | `interpreter_vectors.cpp`, `interpreter_library.cpp` | The interpreter's side of those: its instructions handing registers to the functions (an element in range is read and written in place), and what it answers for `Unmoved` |
 | `table`, `interpreter_properties.cpp`, `interpreter_property_reads.cpp`, `interpreter_property_calls.cpp` | Objects and Dictionaries (`vm::Table`: an object whose one slot holds its `Entries`, keys and values in the order each key was first set) and an Array's properties beyond its indices; a property by name on anything (`DynGet` and the rest; reading one, and whether one is there, in its own file), a property called by its name, the loops over properties, and Godot's Dictionaries copied in |
 | `reload` | Moves a running program's objects, vectors and static fields onto a newer build, by name; what the program's static fields reach, and the container classes a newer build must keep |
-| `constructions` | What each object alive was constructed with (its constructor's arguments, and its fields as the constructor left them), in a table beside the objects, kept only while a host asks (`Interpreter::remember_constructions`): plain values only, so nothing kept holds an object |
-| `reload_update.cpp` | For `reload`: the objects alive updated in place (`update_in_place`). A class whose constructor chain depends only on its arguments and constants (`ir::constructor_chain`) has the new chain run on a throwaway object with what each object was made with, and a field the program has not changed since takes its new first value |
+| `constructions` | What each object alive was constructed with, kept only while a host asks (`Interpreter::remember_constructions`), in room after the object's own slots that it is then made with (`Heap::object_slots`): no table, nothing allocated or looked up as an object is made or freed. Where the class's constructor chain can be run again (`ir::constructor_refusal`), the arguments alone; where it can't, the fields as the constructor left them too. Plain values only, so nothing kept holds an object |
+| `reload_update.cpp` | For `reload`: the objects alive updated in place (`update_in_place`). A class whose constructor chain depends only on its arguments and constants (`ir::constructor_chain`) has the new chain run on a throwaway object with what each object was made with, and a field the program has not changed since takes its new first value. The first values of an object remembered by its arguments alone are what the old program's chain gives, run again here before that program goes |
 | `any`, `interpreter_any.cpp`, `any_operators.cpp` | The untyped value (`*`, `Object`): one slot, a Number as its bits and the rest tagged; ECMAScript's conversions, then its equality, `+`, `<`, `-` and the rest (Godot's own operator first, for one of its values) as functions of plain values |
 | `numeric`, `math.cpp` | Conversions C++ alone would leave undefined; `Math` where AS3 and C's library differ |
 | `text_units`, `case_table.cpp` | Strings by UTF-16 unit: indexing, cutting, searching and joining text held as UTF-8, and changing case (the table is written by `tools/case_table.py`) |
@@ -56,6 +56,10 @@ host differs.
 - **Nothing is allocated per instruction, and no text is built on the path that succeeds.**
 - **The loop is measured, not guessed.** A change to `interpreter_run.cpp` comes with
   `tests/bench/run_bench.py <build> --against <other build>`. A helper in a header has cost 3% before.
+- **An object of a program's class is made with `Heap::object_slots()` slots,** never `slots_of()` alone:
+  where what objects are constructed with is remembered, each has room for it after its own slots, and
+  one made without that room would be written past its end. That is also why remembering is asked for
+  before a program makes anything, and never of a program with native code.
 - **Where a field is is said once, in `fields.h`.** Nothing else turns a field's number into a place in the
   object, or counts an object's slots (`slots_of()`): a field that comes to take more than one slot changes
   that file and the class's description, and no reader. `slot_at()` (`runtime.h`) is for that file and for
