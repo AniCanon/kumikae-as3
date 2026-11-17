@@ -13,14 +13,14 @@ goes into `program.cpp` too: one file for the C++ compiler, which a release is b
 |---|---|
 | `generate.h`, `generate.cpp` | The entry point: the files, or the first thing not translated yet |
 | `support.h`, `support.cpp` | What is refused, asked before anything is written; whether the program reads an Error's stack |
-| `facts.h`, `facts.cpp` | What is known of every function before any is written: which cannot fail, and which fields each may read or write |
+| `facts.h`, `facts.cpp` | What is known of every function before any is written: which cannot fail, and which fields each may read or write (a field of the method's own object by the class that declares it, so that a field of another class in the same slot is not taken for it); and of every call through a method table whose receiver's class is known, the functions the table may hold there and what they do taken together |
 | `function_fields.cpp` | A field of the method's own object kept in a local for the whole function, when a loop uses it and nothing else in that loop can see it; a copy that is the last use of a register, which hands its reference over |
 | `names.h`, `names.cpp` | Identifiers, C++ types and literals for the things of a module |
 | `function_writer.h`, `function_writer.cpp` | One function: its registers as locals, who owns what, labels, the error paths and handlers, and its entry (the same function called with slots) |
 | `patterns.h`, `function_simple.cpp` | The operations that are one C++ statement, as a table (arithmetic, conversions, comparisons), and constants |
 | `function_objects.cpp` | Fields, static fields, classes, jumps, returns and throws |
 | `function_classes.cpp` | The class an object register is known to hold (a parameter declared of it, a new object, a field or an element declared to hold it, a copy), so that a field of it is written through the class's struct, which tells the C++ compiler which field of which class a read or a write is of |
-| `function_calls.cpp` | Calls: direct, through the class's method table, by interface |
+| `function_calls.cpp` | Calls: direct, through the class's method table (by the function's name where the receiver's class says which it is), by interface |
 | `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, `push()` of one value where the vector has room, a `Vector2` or a `Vector2i` copied between a register that holds it inline and a vector's place that holds it whole, Strings, untyped values, properties under a String key, a call through a function value |
 | `function_library.cpp` | An instruction one of the library's functions of plain values carries out whole (`ir/library_entries.h`): the runtime's function of that name called on the instruction's values, where a thunk would have been |
 | `function_engine.cpp` | What asks Godot, where generated code does it itself: which values are held inline, the maths the runtime has for `Vector2` and `Vector3`, a property or a method of a Godot object called on bare values by its method bind, the script's own Godot object and singletons borrowed for the whole function |
@@ -41,6 +41,19 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   `int64_t`, `Str *`, `Object *`, and `Slot` for an untyped value.
 - A call between the program's functions is a C++ call. A virtual call goes through the class's method
   table (`c->classes[object->klass].code[slot]`), an interface call through its interface table.
+- A virtual call whose receiver's class is known is to one of the functions that class and the classes
+  that extend it have in the slot: the program is whole, so all of them are known as it is written
+  (`facts.h`, `TableFacts`). The receiver is known where the lowerer names the class that declares the
+  method (a receiver other than `this`, by its declared type) or where it is the method's own object;
+  any other goes through the table and may do anything. Where every class has the same function there
+  (nothing overrides the method), it is called by its name with no class looked at. Otherwise the object's
+  class is compared with those the program makes objects of with `new`, four at most, and each one's
+  function is called by its name, which the C++ compiler can then put in the caller; the table is asked
+  for any other class, so nothing rests on that list. The call is as those functions are, taken together:
+  where none can fail no error is looked for, and where none runs code that is not looked into, an
+  element read to be the receiver counts no reference and a loop around the call is still written twice
+  (`tests/run/virtual_calls.as`, where an override takes the receiver out of its vector, makes a vector
+  shorter or longer, writes a field the caller keeps in a local, throws, and calls a function value).
 - A register that holds a String, an object or an untyped value owns a reference, except a parameter
   that is never written, which borrows its caller's. A result is the caller's, and a register returned
   hands its reference over. So does a register copied into a variable, a field, a static field or a

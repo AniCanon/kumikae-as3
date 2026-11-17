@@ -113,8 +113,10 @@ void FunctionWriter::settle_reads(bool p_at_once, const std::vector<bool> &p_lan
 				stale();
 			}
 			// A call of a function that runs no code not looked into lets go of no object and stores none
-			// (facts.h): what a register borrows or is lent is still held where it was.
-			const bool quiet = (in.op != Op::Call || !facts_->functions[in.b].opaque) && !runs_code(in);
+			// (facts.h): what a register borrows or is lent is still held where it was. A call through a
+			// method table is every function the table may hold there, or anything where they are not known.
+			const FunctionFacts *callee = is_call(in.op) ? called(pc) : nullptr;
+			const bool quiet = (!is_call(in.op) || (callee && !callee->opaque)) && !runs_code(in);
 			// An object stored in a place of a vector whose elements end alone: what the place held is let go
 			// of after the vector has been used, and with nothing run. The vector's register may borrow;
 			// nothing lent is still good after it (the object let go of may be the one lent).
@@ -207,7 +209,7 @@ void FunctionWriter::find_borrowed() {
 	}
 	bool calm = function_.handlers.empty();
 	for (const Instruction &in : function_.code) {
-		calm = calm && in.op != Op::Call && !may_run_code(module_, function_, in, counts_nothing);
+		calm = calm && !is_call(in.op) && !may_run_code(module_, function_, in, counts_nothing);
 	}
 	if (calm) {
 		settle_reads(false, lands);

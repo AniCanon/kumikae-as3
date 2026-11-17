@@ -27,7 +27,7 @@ void FunctionWriter::find_still() {
 	}
 	std::vector<uint32_t> read, written;
 	for (const Instruction &in : function_.code) {
-		if (in.op == Op::Call || may_run_code(module_, function_, in, counts_nothing)) {
+		if (is_call(in.op) || may_run_code(module_, function_, in, counts_nothing)) {
 			return; // Something in it may run code, and code may write any static field.
 		}
 		if (in.op == Op::GetGlobal && !ir::is_held(kind(in.a))) {

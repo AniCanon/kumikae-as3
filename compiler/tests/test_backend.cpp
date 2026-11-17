@@ -326,6 +326,161 @@ void a_vector_read_to_store_an_object_that_ends_alone_is_borrowed() {
 	CHECK(links.find("store(c, r1, static_cast<C4_Holder *>(r0)->f0_items);") != std::string::npos);
 }
 
+// Holder.sum() (module_of_sum) with `p.grow()` between the element's read and its use: a call through
+// Point's method table, slot 0. Point's grow() is sums on the object's own fields; Deep's is the code given,
+// or Point's own where none is. p_known: the call says which class declares the method, as the lowerer
+// does for a receiver other than `this`. A function of no class makes one object of each class.
+ir::Module module_of_grow(const std::vector<ir::Instruction> *p_override, bool p_known) {
+	using ir::Instruction;
+	using ir::Kind;
+	using ir::Op;
+	const Instruction nothing{ Op::Stmt, 0, 0, 0, 0 };
+	ir::Module module = module_of_sum(nothing, Instruction{ Op::CallVirtual, ir::NONE, 0, 0, 0 });
+	module.functions[0].argument_lists.push_back({ 3 });
+	if (p_known) {
+		module.functions[0].virtual_receivers.emplace_back(10, 0);
+	}
+	const auto method = [&](std::string_view p_name, uint32_t p_owner, std::vector<Kind> p_registers, std::vector<Instruction> p_code) {
+		ir::Function function;
+		function.name = std::string(p_name);
+		function.owner = p_owner;
+		function.parameters = 1;
+		function.required = 1;
+		function.registers = std::move(p_registers);
+		function.code = std::move(p_code);
+		function.code.push_back(Instruction{ Op::ReturnVoid, 0, 0, 0, 0 });
+		module.functions.push_back(std::move(function));
+		return static_cast<uint32_t>(module.functions.size() - 1);
+	};
+	const std::vector<Instruction> sums = { Instruction{ Op::GetField, 1, 0, 0, 0 }, Instruction{ Op::SetField, 0, 1, 1, 0 } };
+	const uint32_t grow = method("Point/grow", 0, { Kind::Obj, Kind::F64 }, sums);
+	module.classes[0].methods = { grow };
+	module.classes[1].methods = { p_override ? method("Deep/grow", 1, { Kind::Obj, Kind::F64, Kind::Obj }, *p_override) : grow };
+	if (!p_known) {
+		module.classes[3].methods = { grow }; // What the call's arguments are written by, where no class is named.
+	}
+	ir::Function makes;
+	makes.name = "makes";
+	makes.is_static = true;
+	makes.registers = { Kind::Obj };
+	makes.code = { Instruction{ Op::New, 0, 0, 0, 0 }, Instruction{ Op::New, 0, 1, 0, 0 }, Instruction{ Op::ReturnVoid, 0, 0, 0, 0 } };
+	module.functions.push_back(std::move(makes));
+	return module;
+}
+
+// A call through a method table is to one of the functions the classes that may be the receiver's have
+// there, and the program is whole: each is known as it is written. Where the program makes objects of a few
+// such classes, the object's class is compared and that class's function called by its name, which the C++
+// compiler can put in the loop; the table is for any other class. The call does what those functions do
+// taken together: where each is sums on the object's own fields, nothing is let go of and nothing can fail,
+// so the element still counts no reference, the loop is still written twice and no error is looked for.
+void a_call_through_a_table_is_what_every_override_is() {
+	// Deep's grow() writes its own object's `x`: slot 0, which in a Holder is the vector. A Holder is no
+	// Point, so the loop still has the vector's length and elements in locals.
+	const std::vector<ir::Instruction> sums = { ir::Instruction{ ir::Op::GetField, 1, 0, 2, 0 }, ir::Instruction{ ir::Op::SetField, 0, 0, 1, 0 } };
+	const backend_cpp::Generated made = backend_cpp::generate(module_of_grow(&sums, true));
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "Holder.cpp");
+	CHECK(text != nullptr);
+	if (!text) {
+		return;
+	}
+	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
+	CHECK(has("r3 = static_cast<Object *>(d2[static_cast<uint32_t>(r1)].p);"));
+	CHECK(!has("store(c, r3, "));
+	CHECK(has("if (k == 0) f1_Point_grow(c, r3);"));
+	CHECK(has("else if (k == 1) f2_Deep_grow(c, r3);"));
+	CHECK(has("else reinterpret_cast<void (*)(Context *, Object *)>(c->classes[k].code[0])(c, r3);"));
+	CHECK(has("if (KAS3_UNLIKELY(deep)) { stack_overflow(c);")); // Neither function counts the depth itself.
+	CHECK(has("(c, r3);\n\t}\n")); // No error is looked for after the call.
+}
+
+// One override that may do more is what the call may do: Deep's grow() makes a Link into a register, and
+// letting go of a Link may be the end of other objects. The element counts a reference again, the loop is
+// written once, and an error is looked for after the call. The classes are compared all the same.
+void an_override_that_may_run_code_makes_the_call_one_that_may() {
+	const std::vector<ir::Instruction> links = { ir::Instruction{ ir::Op::New, 2, 4, 0, 0 } };
+	const backend_cpp::Generated made = backend_cpp::generate(module_of_grow(&links, true));
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "Holder.cpp");
+	CHECK(text != nullptr);
+	if (!text) {
+		return;
+	}
+	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
+	CHECK(has("store(c, r3, static_cast<Object *>((*e).p));"));
+	CHECK(!has("d2["));
+	CHECK(has("else if (k == 1) f2_Deep_grow(c, r3);"));
+	CHECK(has("(c, r3);\n\tif (KAS3_UNLIKELY(c->failing))"));
+}
+
+// A field written through an object that is not the method's own may be a field of any object: Deep's
+// grow() hands its object to a function of no class, which writes slot 0 of what it is given, and slot 0 of
+// a Holder is the vector the loop reads. Nothing is let go of, so the element still counts no reference,
+// but the vector's length and elements are read again each time round.
+void a_field_written_through_any_object_may_be_the_callers() {
+	using ir::Instruction;
+	using ir::Kind;
+	using ir::Op;
+	const std::vector<Instruction> hands = { Instruction{ Op::Call, ir::NONE, 4, 0, 0 } };
+	ir::Module module = module_of_grow(&hands, true);
+	module.functions[2].argument_lists.push_back({ 0 });
+	ir::Function pokes; // Function 4, after `makes`.
+	pokes.name = "pokes";
+	pokes.is_static = true;
+	pokes.parameters = 1;
+	pokes.required = 1;
+	pokes.registers = { Kind::Obj, Kind::F64 };
+	pokes.code = { Instruction{ Op::GetField, 1, 0, 1, 0 }, Instruction{ Op::SetField, 0, 0, 1, 0 }, Instruction{ Op::ReturnVoid, 0, 0, 0, 0 } };
+	module.functions.push_back(std::move(pokes));
+	const backend_cpp::Generated made = backend_cpp::generate(module);
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "Holder.cpp");
+	CHECK(text != nullptr);
+	if (!text) {
+		return;
+	}
+	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
+	CHECK(!has("d2["));
+	CHECK(has("r3 = static_cast<Object *>((*e).p);"));
+	CHECK(!has("store(c, r3, "));
+}
+
+// One function for every class that may be the receiver's is called by its name, with no class compared:
+// no override of it is anywhere in the program.
+void a_method_nothing_overrides_is_called_by_name() {
+	const backend_cpp::Generated made = backend_cpp::generate(module_of_grow(nullptr, true));
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "Holder.cpp");
+	CHECK(text != nullptr);
+	if (!text) {
+		return;
+	}
+	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
+	CHECK(has("\tf1_Point_grow(c, r3);"));
+	CHECK(!has("->klass"));
+	CHECK(!has("store(c, r3, "));
+	CHECK(has("r3 = static_cast<Object *>(d2[static_cast<uint32_t>(r1)].p);"));
+}
+
+// A receiver whose class nothing says (the call names no class, and the receiver is not the method's own
+// object) may be of any class: the call goes through the table and may do anything.
+void a_receiver_of_no_known_class_is_called_through_the_table() {
+	const std::vector<ir::Instruction> sums = { ir::Instruction{ ir::Op::GetField, 1, 0, 2, 0 }, ir::Instruction{ ir::Op::SetField, 0, 2, 1, 0 } };
+	const backend_cpp::Generated made = backend_cpp::generate(module_of_grow(&sums, false));
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "Holder.cpp");
+	CHECK(text != nullptr);
+	if (!text) {
+		return;
+	}
+	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
+	CHECK(has("(c->classes[r3->klass].code[0])(c, r3);"));
+	CHECK(!has("f1_Point_grow(c, r3)"));
+	CHECK(has("store(c, r3, static_cast<Object *>((*e).p));"));
+	CHECK(has("(c, r3);\n\tif (KAS3_UNLIKELY(c->failing))"));
+}
+
 int main() {
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
@@ -336,5 +491,10 @@ int main() {
 	an_element_used_at_once_counts_no_reference();
 	an_object_stored_in_a_place_last_is_handed_over();
 	a_vector_read_to_store_an_object_that_ends_alone_is_borrowed();
+	a_call_through_a_table_is_what_every_override_is();
+	an_override_that_may_run_code_makes_the_call_one_that_may();
+	a_field_written_through_any_object_may_be_the_callers();
+	a_method_nothing_overrides_is_called_by_name();
+	a_receiver_of_no_known_class_is_called_through_the_table();
 	return check::finish();
 }

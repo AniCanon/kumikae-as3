@@ -184,8 +184,21 @@ class FunctionWriter {
 	bool object(const ir::Instruction &p_in); // function_objects.cpp: fields, globals, classes.
 	bool flow(const ir::Instruction &p_in); // Jumps, returns, throws.
 	bool call(const ir::Instruction &p_in); // function_calls.cpp
-	// p_direct: the callee is the very function p_callee, and not one found in a table as the call is made.
-	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target, bool p_direct);
+	// One of the functions a call may be of: when it is the one (a condition on `k`, the receiver's class;
+	// empty for the last, which answers for the rest), and what is called.
+	struct Target {
+		std::string when;
+		std::string function;
+	};
+	// A call written for p_callee's parameters and result, of the first target whose condition holds.
+	// p_looks_first: the depth is looked at here, for a callee that may not count it itself. p_may_fail:
+	// an error is looked for afterwards.
+	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::vector<Target> &p_targets, bool p_looks_first, bool p_may_fail);
+	void call_through_table(const ir::Instruction &p_in);
+	// What the call at an instruction does, itself and through what it calls: the function called by its
+	// name, or every function a method table may hold there. Null where nothing is known (and while the
+	// facts themselves are being found): the call may then do anything. Asked only of a call (is_call()).
+	const FunctionFacts *called(uint32_t p_pc) const;
 	void by_thunk(const ir::Instruction &p_in);
 	void raw_thunk(const ir::Instruction &p_in); // The instruction's thunk, whatever the library has for it.
 	bool by_library(const ir::Instruction &p_in); // function_library.cpp: the library's function, called direct.

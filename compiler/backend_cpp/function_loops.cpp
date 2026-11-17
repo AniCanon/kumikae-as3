@@ -62,7 +62,7 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 		if (runs_code(in)) {
 			return {};
 		}
-		if (in.op == Op::Call && (facts_->functions[in.b].opaque || facts_->functions[in.b].stores_elements)) {
+		if (const FunctionFacts *callee = is_call(in.op) ? called(pc) : nullptr; is_call(in.op) && (!callee || callee->opaque || callee->stores_elements)) {
 			return {};
 		}
 		if (in.op == Op::VecSet) {
@@ -91,7 +91,7 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 		for (uint32_t each : vectors) {
 			const uint32_t slot = borrowed_[each];
 			const bool sets = in.op == Op::SetField && in.b == slot && may_be_this(in.a);
-			if (slot != NONE && (sets || (in.op == Op::Call && facts_->functions[in.b].writes.count(slot)))) {
+			if (slot != NONE && (sets || (is_call(in.op) && may_be_field(module_, called(pc)->writes, function_.owner, slot)))) {
 				return {};
 			}
 		}
