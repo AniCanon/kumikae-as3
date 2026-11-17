@@ -50,7 +50,7 @@ diagnostics so far are sent, the next batch is handled, and it goes on from ther
 Diagnostics are published for each file once it is checked. Document versions and lookahead use the same
 integer validation.
 
-See [the user guide](../../editors/completion.md) and [measurements](../../docs/results/2026-11-completion.md).
+See [the user guide](../../editors/completion.md).
 
 Auto-import and override items include an additional text edit. Override primary ranges remain on one
 line, contain the caret and filter on the method name; metadata and existing modifiers survive. Snippet

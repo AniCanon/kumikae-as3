@@ -4,7 +4,7 @@ Usage: generate.py <extension_api.json> <out.as> [<names.txt>]
 
 The input is Godot's own API description (`godot --dump-extension-api`). The output is one declaration
 file: `native` classes and functions with no bodies, which the compiler reads to learn which names exist.
-The naming rules are in naming.py and docs/superpowers/specs/2026-11-12-godot-naming-design.md.
+The naming rules are in naming.py.
 
 With a third argument it also writes the Godot spelling of every declared class and member, one
 "AS3 name=Godot name" line each, for the bindings.

@@ -61,8 +61,7 @@ starts processes or waits for the server.
 
 The sandbox `UiProbeLanguage` exercises native typing actions. `UiProbeCompletion` exercises the
 native lookup against the bundled server in a disposable project. The compiler tests separately cover
-scope/type semantics, wire capabilities, Unicode ranges and cache invalidation. See the
-[results](../../docs/results/2026-11-completion.md) for observed coverage and remaining limitations.
+scope/type semantics, wire capabilities, Unicode ranges and cache invalidation.
 `UiProbeFocus` scopes the platform's window-deactivation test control to those background sandbox runs
 and restores it on exit. It prevents desktop focus changes from dismissing the test's live lookup;
 ordinary live-editor focus remains controlled by the IDE.
@@ -262,7 +261,7 @@ device that is not running is not asked for its picture.
   presses the real buttons, and renders the light and dark themes to pictures.
   It proves layout and wiring, not behaviour against a real Simulator.
 - A run against a real Simulator goes through the standalone service and
-  `simulator.py`; see the [results](../../docs/results/2026-11-jetbrains-simulator.md).
+  `simulator.py`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the Kotlin and Compose conventions.
 

@@ -25,31 +25,27 @@ STATUS = {
 }
 
 ROADMAP = [
-    ("0", "Speed spike", "Hand-written C++ in the compiler's output shape, measured against C#.",
-     "Result: ahead of C# on 7 of 9 benchmarks, level on 2. Accepted by the owner.", "done"),
-    ("1a", "Parser", "kas3c parse reads AS3 and reports syntax errors.",
-     "Every syntax error has a file, line and column.", "done"),
-    ("1b", "Names", "kas3c check resolves packages, imports, classes and scopes.",
-     "Unknown and duplicate names are reported before running.", "done"),
-    ("1c", "Types", "Every expression has a type; values that don't fit are reported.",
-     "Type errors are reported before running. Checked against 190,000 lines of real AS3.", "done"),
-    ("1d", "Godot's API in AS3", "Godot's 1,036 classes as AS3 declarations: moveAndSlide(), position, Key.ESCAPE.",
-     "Every Godot name checks, and no generated name clashes.", "done"),
-    ("1e", "Godot's math types", "Operators on Vector2 and its relatives: position + velocity * delta.",
-     "Arithmetic on Godot's value types has a type.", "done"),
-    ("L1", "Language server, first slice", "kas3c lsp: errors as you type, go to definition, completion. Works in VS Code and Rider.",
-     "A typing mistake shows up in VS Code and Rider at once.", "done"),
-    ("2", "Interpreter in Godot", "Built so far: Godot's whole API, vectors, Array, switch, Math, untyped values, try/catch, hot reload, RegExp, Date. Next: Object.",
-     "An AS3 script on a CharacterBody2D moves a character.", "now"),
-    ("3", "Native export on desktop", "Release builds compile AS3 to native code through C++.",
-     "The speed gate passes on real compiled AS3.", "planned"),
-    ("4", "Mobile", "iOS and Android, debug and release builds. Built ahead: debug on the iOS Simulator, with hot reload.",
-     "The same game runs on both, and the speed gate passes on devices.", "planned"),
-    ("5", "Console", "Nintendo Switch through the Kumikae build.",
-     "The same game runs on hardware, debug and release.", "planned"),
-    ("6", "Tooling", "The debugger and the rest of the language server. Built ahead: the Rider plugin with its Simulator panel.",
-     "Breakpoints and stepping from Rider, on a device too.", "planned"),
-    ("+", "Later, designed separately", "First-class async/await, the Flash API, SWF loading, web export.",
+    ("1", "Compiler front end", "kas3c parses and type-checks AS3 against Godot's whole API.",
+     "Every error has a file, a line and a column.", "done"),
+    ("2", "Language server", "Errors as you type, completion and navigation, in Rider and VS Code.",
+     "A typing mistake shows up in the editor at once.", "done"),
+    ("3", "Interpreter in Godot", "The AS3 language on nodes: [Export], [Signal], signals, Godot's values.",
+     "An AS3 script on a CharacterBody2D moves a character.", "done"),
+    ("4", "Hot reload", "Save a script and the running game changes, keeping its state.",
+     "A constant edited during play changes the objects on screen.", "done"),
+    ("5", "Native code", "kas3c cpp compiles the same scripts to native code through C++.",
+     "Level with or ahead of Godot C# on every frame benchmark.", "done"),
+    ("6", "Play builds native code", "The extension builds and caches the program library by itself.",
+     "Pressing Play runs native code with no manual step.", "now"),
+    ("7", "Native code on iOS and in exports", "Release builds for devices, and hot reload for native code.",
+     "The same game runs as native code on a phone.", "next"),
+    ("8", "Debugger", "Breakpoints and stepping from Rider.",
+     "You can step through AS3 in the editor and on a device.", "planned"),
+    ("9", "Android, Windows, Linux", "Build and test the extension and the tools on each.",
+     "The test suite passes on each platform.", "planned"),
+    ("10", "Consoles", "Console builds, kept in a separate repository.",
+     "The same game runs on console hardware.", "planned"),
+    ("+", "Later, designed separately", "async/await, Royale's language additions, the Flash API, SWF loading, web export.",
      "", "later"),
 ]
 
@@ -120,13 +116,6 @@ class Svg:
             f.write("\n".join(self.parts) + "\n</svg>\n")
 
 
-def status_of(stage):
-    for number, _, _, _, status in ROADMAP:
-        if number == stage:
-            return status
-    raise KeyError(stage)
-
-
 def pipeline():
     s = Svg(1290, 540, "How an .as file becomes a running game")
     s.text(40, 48, "How an .as file becomes a running game", size=20, weight="bold")
@@ -134,53 +123,49 @@ def pipeline():
 
     s.box(40, 210, 120, 64, ["Player.as", "your source"])
 
-    s.frame(200, 130, 420, 224, "Front end: kas3c   (stage 1)")
-    parts = [("Lexer", "text to tokens", "1a"), ("Parser", "tokens to tree", "1a"),
-             ("Names", "resolve names", "1b"), ("Types", "check types", "1c")]
+    s.frame(200, 130, 420, 224, "Front end: kas3c")
+    parts = [("Lexer", "text to tokens"), ("Parser", "tokens to tree"),
+             ("Names", "resolve names"), ("Types", "check types")]
     x = 216
     s.arrow([(160, 242), (214, 242)])
-    for i, (name, note, stage) in enumerate(parts):
-        s.box(x, 210, 86, 64, [name, note], status_of(stage))
+    for i, (name, note) in enumerate(parts):
+        s.box(x, 210, 86, 64, [name, note])
         if i < len(parts) - 1:
             s.arrow([(x + 86, 242), (x + 97, 242)])
         x += 98
     s.text(410, 316, "Reports every error as file:line:column", size=12, anchor="middle", fill=MUTED)
 
     s.arrow([(596, 242), (658, 242)])
-    s.box(660, 210, 120, 64, ["Typed IR", "one meaning for", "both backends"], status_of("2"))
+    s.box(660, 210, 120, 64, ["Typed IR", "one meaning for", "both back ends"])
 
     s.arrow([(780, 242), (810, 242), (810, 152), (838, 152)])
     s.arrow([(810, 242), (810, 332), (838, 332)])
 
-    s.text(905, 108, "stage 2", size=12, anchor="middle", fill=MUTED)
-    s.box(840, 120, 130, 64, ["Interpreter", "runs the IR"], status_of("2"))
+    s.box(840, 120, 130, 64, ["Interpreter", "runs the IR"])
     s.arrow([(970, 152), (1128, 152)])
     s.text(1049, 144, "no C++ toolchain", size=12, anchor="middle", fill=MUTED)
-    s.box(1130, 120, 120, 64, ["Editor and", "debug builds"])
-    s.text(1190, 204, "hot reload, debugger", size=12, anchor="middle", fill=MUTED)
+    s.box(1130, 120, 120, 64, ["While you", "work"])
+    s.text(1190, 204, "hot reload", size=12, anchor="middle", fill=MUTED)
 
-    s.text(905, 288, "stage 3", size=12, anchor="middle", fill=MUTED)
-    s.box(840, 300, 130, 64, ["C++ generator", "IR to C++"], status_of("3"))
+    s.box(840, 300, 130, 64, ["C++ backend", "IR to C++"])
     s.arrow([(970, 332), (998, 332)])
     s.box(1000, 300, 110, 64, ["C++ compiler", "the platform's own"])
     s.arrow([(1110, 332), (1138, 332)])
     s.box(1140, 300, 110, 64, ["Release", "builds"])
     s.text(1195, 384, "native code, no JIT", size=12, anchor="middle", fill=MUTED)
 
-    s.box(280, 410, 260, 60, ["Godot API bindings", "generated from Godot's own API description"],
-          status_of("2"))
+    s.box(280, 410, 260, 60, ["Godot's API as AS3", "generated from Godot's own API description"])
     s.arrow([(410, 410), (410, 356)])
-    s.text(556, 436, "Also generates the call code", size=12, fill=MUTED)
-    s.text(556, 453, "that both backends use.", size=12, fill=MUTED)
+    s.text(556, 436, "Checked like any other", size=12, fill=MUTED)
+    s.text(556, 453, "AS3 source.", size=12, fill=MUTED)
 
-    s.legend(40, 510, ["done", "now", "next", "planned"])
     s.save("pipeline.svg")
 
 
 def calls():
     s = Svg(1000, 430, "The three kinds of call")
     s.text(40, 48, "The three kinds of call", size=20, weight="bold")
-    s.text(40, 72, "Where the time goes when a script runs, in a release build.", size=13, fill=MUTED)
+    s.text(40, 72, "Where the time goes when a script runs as native code.", size=13, fill=MUTED)
 
     s.frame(40, 100, 280, 280, "Godot engine")
     s.box(70, 190, 220, 100, ["Nodes, physics, rendering", "the engine's own C++"])
@@ -190,12 +175,41 @@ def calls():
     s.box(640, 290, 150, 64, ["Enemy", "a plain AS3 class"])
 
     s.arrow([(320, 166), (638, 166)])
-    s.text(460, 156, "1   _physics_process, signals", size=13, anchor="middle", weight="bold")
+    s.text(460, 156, "1   _physicsProcess, signals", size=13, anchor="middle", weight="bold")
     s.arrow([(640, 198), (322, 198)])
-    s.text(460, 220, "2   move_and_slide()", size=13, anchor="middle", weight="bold")
+    s.text(460, 220, "2   moveAndSlide()", size=13, anchor="middle", weight="bold")
     s.arrow([(715, 214), (715, 288)])
     s.text(730, 256, "3   enemy.hit()", size=13, weight="bold")
     s.save("calls.svg")
+
+
+def hot_reload():
+    s = Svg(1160, 400, "What happens when you save a script")
+    s.text(40, 48, "What happens when you save a script", size=20, weight="bold")
+    s.text(40, 72, "The running game takes the new code and keeps its state.", size=13, fill=MUTED)
+
+    s.box(40, 150, 130, 64, ["You save", "Coin.as"])
+    s.arrow([(170, 182), (208, 182)])
+    s.box(210, 150, 150, 64, ["Compile again", "every script, as one", "program"])
+
+    s.arrow([(360, 182), (400, 182), (400, 300), (438, 300)])
+    s.text(408, 250, "errors", size=12, fill=MUTED)
+    s.box(440, 268, 200, 64, ["Nothing changes", "errors are printed; the game", "keeps the code it had"])
+
+    s.arrow([(360, 182), (438, 182)])
+    s.text(399, 172, "ok", size=12, anchor="middle", fill=MUTED)
+    s.frame(440, 110, 680, 130, "Reload, inside the running game")
+    steps = [("Move objects", "fields keep", "their values"), ("New constants", "take their", "new values"),
+             ("Update in place", "rerun safe", "constructors"), ("Report", "one line: what", "was updated")]
+    x = 458
+    for i, lines in enumerate(steps):
+        s.box(x, 150, 148, 70, list(lines), "done")
+        if i < len(steps) - 1:
+            s.arrow([(x + 148, 185), (x + 164, 185)])
+        x += 166
+
+    s.text(440, 368, "A field the game changed since the object was built is never overwritten.", size=12, fill=MUTED)
+    s.save("hot-reload.svg")
 
 
 def roadmap():
@@ -203,7 +217,7 @@ def roadmap():
     h = top + len(ROADMAP) * (row_h + gap) + 40
     s = Svg(1000, h, "Roadmap")
     s.text(40, 48, "Roadmap", size=20, weight="bold")
-    s.text(40, 72, "Each stage ends in something you can run. The second line is how you know it's done.",
+    s.text(40, 72, "Each step ends in something you can run. The second line is how you know it is done.",
            size=13, fill=MUTED)
     cx = 76
     s.parts.append(
@@ -230,4 +244,5 @@ def roadmap():
 if __name__ == "__main__":
     pipeline()
     calls()
+    hot_reload()
     roadmap()
