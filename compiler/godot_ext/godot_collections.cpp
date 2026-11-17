@@ -21,6 +21,7 @@
 
 #include <cstring>
 #include <limits>
+#include <new>
 
 using namespace godot;
 
@@ -41,6 +42,50 @@ Variant bare_variant(ir::Bare p_type, vm::Slot p_value) {
 	Vector2 value;
 	std::memcpy(static_cast<void *>(&value), &p_value, sizeof(value));
 	return value;
+}
+
+// An Array's places, one after another as Godot keeps them (godot-cpp's own iterators go by the same), to
+// write each without a call: nothing for an empty one.
+Variant *places_of(Array &p_array) {
+	return p_array.is_empty() ? nullptr : &p_array[0];
+}
+
+// A vector's element written where a new Array holds nothing yet: a number or a Boolean is made there, by one
+// call of Godot's, and anything else is what to_variant() gives. The place holds nil, which has nothing to
+// let go of, so a value is made over it as it is.
+void place(Variant *r_place, ir::Kind p_kind, const vm::Slot &p_slot) {
+	switch (p_kind == ir::Kind::Any ? vm::any::tag(p_slot) : vm::AnyTag::Undefined) {
+		case vm::AnyTag::Int:
+			new (r_place) Variant(static_cast<int64_t>(vm::any::to_int_payload(p_slot)));
+			return;
+		case vm::AnyTag::Number:
+			new (r_place) Variant(vm::any::to_number_payload(p_slot));
+			return;
+		case vm::AnyTag::Boolean:
+			new (r_place) Variant(vm::any::to_bool_payload(p_slot));
+			return;
+		default:
+			break;
+	}
+	switch (p_kind) {
+		case ir::Kind::I32:
+			new (r_place) Variant(static_cast<int64_t>(p_slot.i));
+			return;
+		case ir::Kind::U32:
+			new (r_place) Variant(static_cast<int64_t>(p_slot.u));
+			return;
+		case ir::Kind::I64:
+			new (r_place) Variant(p_slot.l);
+			return;
+		case ir::Kind::F64:
+			new (r_place) Variant(p_slot.d);
+			return;
+		case ir::Kind::Bool:
+			new (r_place) Variant(p_slot.b);
+			return;
+		default:
+			*r_place = to_variant(p_kind, p_slot);
+	}
 }
 
 } // namespace
@@ -128,6 +173,7 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 		}
 		Array array;
 		array.resize(static_cast<int64_t>(vector->length));
+		Variant *const places = places_of(array);
 		for (uint32_t i = 0; i < vector->length; i++) {
 			// An object, typed or untyped, goes this same way, so that what it can't be is an error here.
 			const vm::Slot held = element == ir::Kind::Any ? vm::any::filled(vector->data[i]) : vector->data[i];
@@ -135,13 +181,15 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 			const vm::Object *object = element == ir::Kind::Obj ? static_cast<const vm::Object *>(held.p)
 					: untyped_object							? static_cast<const vm::Object *>(vm::any::pointer(held))
 																: nullptr;
-			Variant value;
-			if ((element == ir::Kind::Obj || untyped_object) && !object_element(object, &value, r_error)) {
-				return false;
+			if (element == ir::Kind::Obj || untyped_object) {
+				if (!object_element(object, &places[i], r_error)) {
+					return false;
+				}
+			} else if (bare != ir::Bare::None) {
+				places[i] = bare_variant(bare, held);
+			} else {
+				place(&places[i], element, held);
 			}
-			array[static_cast<int64_t>(i)] = element == ir::Kind::Obj || untyped_object ? value
-					: bare != ir::Bare::None													 ? bare_variant(bare, held)
-																								 : to_variant(element, held);
 		}
 		*r_out = array;
 		return true;
@@ -218,8 +266,9 @@ bool bare_collection(std::string_view p_type, ir::Bare p_bare, const vm::Slot *p
 	}
 	Array array;
 	array.resize(static_cast<int64_t>(p_count));
+	Variant *const places = places_of(array);
 	for (size_t i = 0; i < p_count; i++) {
-		array[static_cast<int64_t>(i)] = bare_variant(p_bare, p_elements[i]);
+		places[i] = bare_variant(p_bare, p_elements[i]);
 	}
 	*r_made = array;
 	return true;
@@ -257,10 +306,13 @@ void *GodotHost::collection(std::string_view p_type, const ir::Class &p_vector, 
 		// An Array, or a place that takes anything: each element as Godot holds a value of its kind.
 		Array array;
 		array.resize(static_cast<int64_t>(p_count));
+		Variant *const places = places_of(array);
 		for (size_t i = 0; i < p_count && ok; i++) {
-			Variant value;
-			ok = p_kind != ir::Kind::Obj || object_element(static_cast<const vm::Object *>(p_elements[i].p), &value, r_error);
-			array[static_cast<int64_t>(i)] = p_kind == ir::Kind::Obj ? value : to_variant(p_kind, p_elements[i]);
+			if (p_kind == ir::Kind::Obj) {
+				ok = object_element(static_cast<const vm::Object *>(p_elements[i].p), &places[i], r_error);
+			} else {
+				place(&places[i], p_kind, p_elements[i]);
+			}
 		}
 		made = array;
 	}
