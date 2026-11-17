@@ -133,6 +133,56 @@ package {
 			return out.join(" ");
 		}
 
+		// A value with parts that is a field of the script, read only to be used at once (an operator, a
+		// method, a part): native code reads it out of the field's own handle, with none made for the read.
+		// A field that holds none is AS3's null error where it is used, a field written between its read and
+		// its use is used as it was read, and a variable given the field keeps its own.
+		private var none:Vector2;
+		private var turned:Transform2D = new Transform2D(0.5, new Vector2(3, 4));
+		private var tint:Color = new Color(0.1, 0.2, 0.3, 0.4);
+
+		private function swap():Number {
+			kept = new Vector2(100, 100);
+			return 2;
+		}
+
+		public function fields():String {
+			var out:Array = [];
+			out.push(kept * 2.5, kept + kept, kept.length(), kept.x, kept.y, kept.dot(kept), -kept, kept == kept, kept.lerp(kept * 3, 0.5));
+			for (var i:int = 0; i < 3; i++) {
+				var p:Vector2 = new Vector2(i, 1);
+				p = p + kept * 0.5;
+				out.push(p);
+			}
+			out.push(turned * kept, turned.origin, turned.rotated(0.25), tint * 0.5, tint.g, tint.lerp(tint, 0.5));
+			var before:Vector2 = kept;
+			out.push(kept * swap(), before, kept * 2);
+			kept = new Vector2(1.5, -2.25);
+			out.push(before, none * 2, none.x);
+			none = null;
+			try {
+				out.push(none * 2);
+			} catch (e:TypeError) {
+				out.push(e.message);
+			}
+			try {
+				out.push(none.x);
+			} catch (e:TypeError) {
+				out.push(e.message);
+			}
+			try {
+				out.push(none.length());
+			} catch (e:TypeError) {
+				out.push(e.message);
+			}
+			try {
+				out.push(kept + none);
+			} catch (e:TypeError) {
+				out.push(e.message);
+			}
+			return out.join(" ");
+		}
+
 		// Every operation generated code does inline on a Vector2, on values a float can't hold exactly,
 		// on large and small ones, and on the zero vector.
 		public function vectors():String {

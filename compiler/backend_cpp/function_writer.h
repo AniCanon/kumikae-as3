@@ -96,6 +96,11 @@ class FunctionWriter {
 	// For a register that is read from a field of `this` only to emit the signal there: the field's slot,
 	// or NONE. Such a register is never given the handle (find_lent_signals).
 	std::vector<uint32_t> signal_from_;
+	// For a register that is read from a field of `this` only to be a value with parts one of Godot's
+	// operators, methods or parts is asked of: the field's slot, or NONE. Such a register is never given
+	// the handle either: the value is copied out of the field's own (bare_operand), and the library, where
+	// the instruction is left to it, is given a handle of its own for as long as it runs (generic).
+	std::vector<uint32_t> value_from_;
 	void find_borrowed();
 	// Per register: it holds an object read out of a vector (or copied from such a register) in a function
 	// where nothing can take the object out of the vector: it counts no reference of its own (rule 2).

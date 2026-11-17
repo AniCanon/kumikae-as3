@@ -281,6 +281,13 @@ func _lifetimes() -> void:
 	row("a listener that changes the field the signal was emitted through", swapped, ["sent", "swapped 1", "sent", "", ear.said()])
 	node.sent.disconnect(ear.hear)
 	node.forget()
+	# What is emitted is worked out by a function that puts another signal in the field.
+	node.struck.connect(ear.hear)
+	var worked := [node.sendSwapping(7), ear.said()]
+	node.struck.emit(7, Vector2(7, 0))
+	row("emit: the signal a field held before a function called for what is emitted changed the field", worked, ["swapped", ear.said()])
+	node.struck.disconnect(ear.hear)
+	node.keepNone()
 	# Left for finish(): a listener called later, at the end of the frame.
 	node.listen("later")
 	node.strike(4)

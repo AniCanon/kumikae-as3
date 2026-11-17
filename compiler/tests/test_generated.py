@@ -16,7 +16,9 @@ timings rest on, so that a change that undoes one fails here and not only in a b
   - a method that calls nothing and cannot fail keeps no count of the depth, and a call of it is not
     followed by a look at whether an error is on its way out;
   - push() of one value onto a vector with room for it is written where it is: no call of the library, and
-    for a Vector2 into a vector that holds each in its place, no handle.
+    for a Vector2 into a vector that holds each in its place, no handle;
+  - a Vector2 that is a field of the script, read only to be multiplied, is read out of the field's own
+    handle: no handle is made for the read and given back after it.
 """
 import os
 import re
@@ -111,6 +113,19 @@ with tempfile.TemporaryDirectory() as where:
         whole = [loop for loop in pushes if "value_place(" in loop]
         check("a Vector2 is pushed into its place as it is: a handle is made only for a vector that must grow or holds none whole",
               len(whole) == 1 and whole[0].index("value_place(") < whole[0].index("Boxed<"), process)
+
+with tempfile.TemporaryDirectory() as where:
+    sources = os.path.join(tests, "bench", "languages")
+    written = subprocess.run([kas3c, "cpp", "--godot", "frames/MoveNodes.as", "-o", where], capture_output=True, text=True, cwd=sources)
+    check("MoveNodes.as is written as C++", written.returncode == 0, written.stderr)
+    if written.returncode == 0:
+        process = functions(where, "frames_MoveNodes.cpp").get("frames_MoveNodes__process", "")
+        moving = [loop for loop in loops(process) if "f2_velocity" in loop]
+        check("MoveNodes' loop is found", len(moving) == 1, process)
+        for loop in moving:
+            check("the velocity is read out of the field's own handle: none is made for the read",
+                  "unbox<Vector2>(c, static_cast<C3_frames_MoveNodes *>(r0)->f2_velocity.handle)" in loop and
+                  not re.search(r"store\(c, r\d+, [^;]*f2_velocity\)", loop), loop)
 
 with tempfile.TemporaryDirectory() as where:
     written = subprocess.run([kas3c, "cpp", "objects.as", "-o", where], capture_output=True, text=True, cwd=os.path.join(tests, "bench"))

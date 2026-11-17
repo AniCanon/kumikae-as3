@@ -218,15 +218,22 @@ void FunctionWriter::dispatch(const Instruction &p_in) {
 
 // An instruction that is not Godot's own done inline. What it reads or writes of values held inline it is
 // given as handles: each is boxed first, and one it writes is copied back out. A call hands a value
-// straight to a parameter that holds the same type inline.
+// straight to a parameter that holds the same type inline. A register that stands for a field's handle
+// (value_from_) is given a handle of its own: what the library runs may write the field meanwhile.
 void FunctionWriter::generic(const Instruction &p_in) {
 	const char *shape = ir::op_shape(p_in.op);
 	const uint32_t operands[3] = { p_in.a, p_in.b, p_in.c };
 	const ir::Function *callee = callee_of(p_in);
 	std::vector<uint32_t> boxed;
+	std::vector<uint32_t> held;
 	const auto box = [&](uint32_t p_register) {
 		if (!parts(p_register).empty() && std::find(boxed.begin(), boxed.end(), p_register) == boxed.end()) {
 			boxed.push_back(p_register);
+		}
+		// (Its one write is the field's read, which gives it nothing.)
+		if (value_from_[p_register] != NONE && p_in.op != Op::GetField && shadow_[p_register].empty() &&
+				std::find(held.begin(), held.end(), p_register) == held.end()) {
+			held.push_back(p_register);
 		}
 	};
 	for (int n = 0; n < 3; n++) {
@@ -242,11 +249,15 @@ void FunctionWriter::generic(const Instruction &p_in) {
 			}
 		}
 	}
-	if (boxed.empty()) {
+	if (boxed.empty() && held.empty()) {
 		dispatch(p_in);
 		return;
 	}
 	line("{");
+	for (uint32_t each : held) {
+		line("Held h" + std::to_string(each) + "(c, " + own_field(value_from_[each]) + ");");
+		shadow_[each] = "h" + std::to_string(each) + ".v";
+	}
 	for (uint32_t each : boxed) {
 		line("Boxed<" + std::string(parts(each)) + "> x" + std::to_string(each) + "(c, " + register_name(each) + ");");
 		shadow_[each] = "x" + std::to_string(each) + ".v";
@@ -258,6 +269,9 @@ void FunctionWriter::generic(const Instruction &p_in) {
 		if ((writes && each == p_in.a) || each == changed) {
 			line(register_name(each) + " = unbox<" + std::string(parts(each)) + ">(c, " + shadow_[each] + ".handle);");
 		}
+		shadow_[each].clear();
+	}
+	for (uint32_t each : held) {
 		shadow_[each].clear();
 	}
 	line("}");

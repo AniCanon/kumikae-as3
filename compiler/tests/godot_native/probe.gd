@@ -62,6 +62,7 @@ func _initialize() -> void:
 	root.add_child(probe)
 	print("PROBE vectors=", probe.call("vectors"))
 	print("PROBE values=", probe.call("values"))
+	print("PROBE fields=", probe.call("fields"))
 	print("PROBE given=", probe.call("given"))
 	print("PROBE carried=", probe.call("carried"))
 	print("PROBE engine=", probe.call("engine"))

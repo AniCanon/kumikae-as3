@@ -168,6 +168,17 @@ package {
 			mine = struck;
 			mine.add(onSwap);
 		}
+		// What is emitted is worked out by a function that puts another signal in the field: the emit is of
+		// the signal the field held when it was read, before the function ran.
+		private function swapping(n:int):int {
+			mine = sent;
+			return n;
+		}
+		public function sendSwapping(n:int):String {
+			mine = struck;
+			mine.emit(swapping(n), new Vector2(n, 0));
+			return mine == sent ? "swapped" : "kept";
+		}
 
 		// A Godot object that carries this script, where an Emits is declared: it is the script's own object,
 		// as a node whose script is a C# class is that class. From Godot (a call, a field set, what a signal
