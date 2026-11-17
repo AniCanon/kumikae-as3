@@ -1,13 +1,21 @@
-// A field of `this` that holds an object, read into a register only to be used at once.
+// A field of `this` that holds an object, read into a register only to be used at once; and an element of
+// a vector read into a variable the same way.
 //
 // `cells[i]`, where cells is a field, reads the field into a register and then the element. The register
 // held a reference of its own for that: one counted and one given back each time, in the middle of a loop,
 // and a register being let go of is something the other rules (a field in a local, a loop written twice)
 // must stop for. But the field itself holds the object for as long as nothing writes the field, so a
 // register that is only ever read from one such field, and only used in straight code right after with
-// nothing between that could write the field or run other code, borrows: it counts nothing and lets go of
-// nothing. What uses it must itself run no code (an element read or written, a length, a comparison, a
-// return): a call that took it would have nothing keeping the object if the callee wrote the field.
+// nothing between that could write the field or let go of an object that may end others, borrows: it counts
+// nothing and lets go of nothing. What uses it must itself be of that kind: an element read or written, a
+// length, a comparison, a return, a call of a function that runs no code not looked into (it stores no
+// object and lets go of none: facts.h), and the store of an object into a place of the vector, where
+// what the place held ends alone (it is let go of after the vector has been used, with nothing run).
+//
+// An element read into a variable (`var p:Particle = slots[i]`) is lent the same way: the vector holds the
+// object until something takes it out, which nothing between the read and the uses may do. What a lent
+// register holds is therefore always held by a vector: it is given only elements and copies of lent
+// registers.
 #include "function_writer.h"
 
 #include <algorithm>
@@ -163,6 +171,13 @@ void FunctionWriter::find_borrowed() {
 						changed = true;
 					}
 				};
+				// What a lent register holds is always held by a vector. A copy of a register that counts a
+				// reference may hold what has left its vector, which that register alone keeps: the copy
+				// counts one too.
+				if (p_at_once && in.op == Op::Move && lent_[in.a] && !lent_[in.b]) {
+					lent_[in.a] = false;
+					changed = true;
+				}
 				const char *shape = ir::op_shape(in.op);
 				const uint32_t operands[3] = { in.a, in.b, in.c };
 				const uint32_t written = writes(in);

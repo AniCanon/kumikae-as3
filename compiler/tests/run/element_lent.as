@@ -8,6 +8,7 @@ package {
 		private var cells:Vector.<Cell> = new Vector.<Cell>();
 		private var small:Vector.<Small> = new Vector.<Small>();
 		private var none:Vector.<Cell>;
+		private var tags:Vector.<Tag> = new Vector.<Tag>();
 
 		public function element_lent() {
 			for (var i:int = 0; i < 6; i++) {
@@ -45,6 +46,9 @@ package {
 			trace(kept.name, kept.value, cells.length);
 			small.length = 2;
 			trace(sumSmall());
+			tags.push(new Tag("t0", 1));
+			tags.push(new Tag("t1", 2));
+			trace(copied(), copiedTag(), small[0].x, tags[0].name);
 			cells.push(new Cell(1, "a"));
 			cells.push(new Cell(2, "b"));
 			cells.push(new Cell(3, "c"));
@@ -150,6 +154,27 @@ package {
 			return text + d.name + c.value;
 		}
 
+		// A copy of a variable that counts a reference (its object has left the vector), which then lets go
+		// of it: the copy counts one of its own, and still has the object when another is made.
+		private function copied():Number {
+			var b:Small = small[0];
+			small[0] = new Small(-1);
+			var a:Small = b;
+			b = small[1];
+			var c:Small = new Small(99);
+			return a.x + c.x + b.x;
+		}
+
+		// The same with objects that hold a String, which are given back to the heap when let go of.
+		private function copiedTag():String {
+			var b:Tag = tags[0];
+			tags[0] = new Tag("new", -1);
+			var a:Tag = b;
+			b = tags[1];
+			var c:Tag = new Tag("made", 99);
+			return a.name + a.x + c.name + b.name;
+		}
+
 		// The element itself is the result: the caller's reference is one more.
 		private function pick(at:int):Cell {
 			var c:Cell = cells[at];
@@ -194,6 +219,16 @@ class Small {
 	public var x:Number;
 
 	public function Small(x:Number) {
+		this.x = x;
+	}
+}
+
+class Tag {
+	public var name:String;
+	public var x:Number;
+
+	public function Tag(name:String, x:Number) {
+		this.name = name;
 		this.x = x;
 	}
 }
