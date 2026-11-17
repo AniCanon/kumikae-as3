@@ -94,6 +94,12 @@ func _physics_process(_delta: float) -> bool:
 	show("given: none", keeper.get_meta("none"), [])
 	show("given: whole numbers", [keeper.get_meta("cells"), typeof(keeper.get_meta("cells")[0])],
 			[[Vector2i(6, -8), Vector2i(3, -4), Vector2i(2147483647, -2147483648)], TYPE_VECTOR2I])
+	var shade := Gradient.new()
+	var red := Color(1, 0, 0.5)
+	var pale := Color(0.25, 0, 0)
+	show("a larger value type", ask("wider", [shade]), joined([2, 4, Color(), Color(0, 1, 0), true, red, pale, red, 2, 3, true, 3, 22,
+			Vector3(20, 2, -16), Vector3(1, 2, 3), false, joined([Vector3(18, 0, -18), Vector3(19, 0, -19)], ",")], "|"))
+	show("a larger value type: to Godot", shade.colors, PackedColorArray([Color(), Color(0, 1, 0), pale]))
 	line.position = Vector2(-1, -2)
 	var list := [Vector2(0.5, 0.25), Vector3(1, 2, 3), null]
 	var cannot := "Error #1034: Type Coercion failed: cannot convert %s to Vector2."

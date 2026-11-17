@@ -108,6 +108,30 @@ package {
 			return after * 100 + line.getPointCount() * 10 + Geometry2D.convexHull(v).size();
 		}
 
+		// A vector of a larger value type holds a handle on each, as before: a place may be null, and reads so.
+		public function wider(shade:Gradient):String {
+			var colors:Vector.<Color> = new Vector.<Color>(1);
+			var count:uint = colors.push(new Color(1, 0, 0.5));
+			colors.push(null);
+			colors[3] = colors[1];
+			colors[1] = new Color(0, 1, 0);
+			var first:Color = colors[0];
+			first.r = 0.25;
+			var said:Array = [count, colors.length, colors[0], colors[1], colors[2] == null, colors[3], first];
+			colors[2] = first;
+			said.push(colors.pop(), colors.indexOf(first), colors.length);
+			shade.colors = colors;
+			colors[0] = null;
+			said.push(colors[0] == null, colors.length);
+			var deep:Vector.<Vector3> = new <Vector3>[new Vector3(1, 2, 3), null];
+			for (var i:int = 0; i < 20; i++) {
+				deep.push(new Vector3(i, 0, -i));
+			}
+			deep[1] = deep[0] + deep[21];
+			said.push(deep.length, deep[1], deep.shift(), deep[0] == deep[1], String(deep.slice(19)));
+			return said.join("|");
+		}
+
 		// What arrives from Godot, typed and untyped, stored into a place; and what is of another type refused.
 		public function taken(line:Line2D, list:Array):String {
 			var v:Vector.<Vector2> = new Vector.<Vector2>(2);

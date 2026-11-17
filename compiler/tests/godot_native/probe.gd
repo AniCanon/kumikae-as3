@@ -40,6 +40,8 @@ func _places() -> void:
 	var keeper := Node.new()
 	print("PROBE given=", places.call("given", line, keeper), " ", line.points, " ", keeper.get_meta("points"), " ", keeper.get_meta("nested"), " ",
 			keeper.get_meta("none"), " ", keeper.get_meta("cells"))
+	var shade := Gradient.new()
+	print("PROBE wider=", places.call("wider", shade), " ", shade.colors)
 	line.position = Vector2(-1, -2)
 	print("PROBE taken=", places.call("taken", line, [Vector2(0.5, 0.25), Vector3(1, 2, 3), null]))
 	line.free()

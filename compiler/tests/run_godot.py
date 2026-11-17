@@ -488,7 +488,7 @@ check("vectors.gd: a value that does not fit a byte is an AS3 error that says so
 # stored, the places themselves handed to Godot as a packed array's elements.
 compare("places.gd", [
     "grown", "no value is refused", "methods", "given: counts", "given: a packed array", "given: an Array of values", "given: inside an Array",
-    "given: none", "given: whole numbers", "taken",
+    "given: none", "given: whole numbers", "a larger value type", "a larger value type: to Godot", "taken",
 ])
 
 # A scene edited while it runs: no edit starts the scene again by itself. An object whose constructor depends
