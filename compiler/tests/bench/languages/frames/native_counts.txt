@@ -3,10 +3,11 @@
 # A frame of Empty, MoveNodes, PerNodeProcess, SignalTraffic, NBody, Sieve, Saxpy, Shapes and Alloc leaves
 # nothing: what MoveNodes and PerNodeProcess count is their start, three for each of 20,000 nodes made (the
 # node, its place among the children, a Number as Godot's integer) and two, and what SignalTraffic counts is
-# its signal made and its listener added. A frame of RayQueries leaves three, for the space it asks of the
-# world once: each ray's query is Godot's method called on the objects themselves, what it gives is made
-# where its handle keeps it, isEmpty is called there, and the element is asked for as the Vector2 it is.
-# What RayQueries counts besides is its start (64 bodies made, each with a shape). ArrayConversion still
+# its signal made and its listener added. A frame of RayQueries leaves three, each once a frame: the world
+# asked for, its space, and the zero a Vector2 variable starts at. Nothing is left for a ray: its query is
+# Godot's method called on the objects themselves, what it gives is made where its handle keeps it,
+# isEmpty is called there, and the element is asked for as the Vector2 it is. What RayQueries counts
+# besides is its start (64 bodies made, each with a shape, and the parameters). ArrayConversion still
 # asks in every frame: the collections handed over. A number that grows is a fast path lost.
 # handles: the handles on Godot's values and objects generated code had the host copy. lookups: the times
 # it asked the engine for the object behind a handle. Neither grows with the frames of MoveNodes or of

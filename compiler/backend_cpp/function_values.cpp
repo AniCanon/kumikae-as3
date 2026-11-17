@@ -394,8 +394,10 @@ bool FunctionWriter::kept_method(const Instruction &p_in) {
 	if (!parameters.empty()) {
 		inside += "\tconst void *const p[] = { " + given + " };\n";
 	}
+	// What the method lets go of (an Array emptied) may be the end of an object whose end runs the program:
+	// an error raised there is this call's, as it is when the library makes the call.
 	const std::string call = "call_part(bind, on, " + std::string(parameters.empty() ? "nullptr" : "p") + ", " + (words[3] == "void" ? "nullptr" : "&v") + ", " +
-			std::to_string(parameters.size()) + ")";
+			std::to_string(parameters.size()) + ");\n\tif (KAS3_UNLIKELY(c->listener_failed) && call_failed(c)) { " + fail() + " }";
 	if (!fits || !value_call(p_in, p_in.a, words[3], guard, inside, call)) {
 		body_ = before;
 		return false;

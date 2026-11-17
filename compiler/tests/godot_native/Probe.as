@@ -373,8 +373,43 @@ package {
 			out.push(isAncestorOf(kid), kid.getIndex() >= 0);
 			removeChild(kid);
 			out.push(isAncestorOf(kid));
+			// One Godot has freed is handed over as none, as the library hands it.
+			var held:CollisionShape2D = new CollisionShape2D();
+			var gone:Node = new Node();
+			held.addChild(gone);
+			out.push(held.isAncestorOf(gone), held.getChildCount());
+			gone.free();
+			out.push(held.getChildCount(), held.isAncestorOf(gone));
+			held.free();
 			kid.free();
 			return out.join("|");
+		}
+
+		// A method of one of Godot's Arrays called where the handle keeps the Array, which lets go of what the
+		// Array held: an object whose end calls back into the script (probe.gd's Dying), where the script
+		// throws. The error comes out of the call that ended the object, as it does under the interpreter.
+		private var mortal:GodotArray = new GodotArray();
+		private var died:int = 0;
+
+		public function dies():void {
+			died++;
+			throw new Error("dying");
+		}
+
+		public function holds(one:RefCounted):int {
+			mortal.append(one);
+			return mortal.size();
+		}
+
+		public function clears():String {
+			var said:String = "";
+			try {
+				mortal.clear();
+				said += "cleared ";
+			} catch (e:Error) {
+				said += "caught " + e.message + " ";
+			}
+			return said + died + " " + mortal.size();
 		}
 
 		// The script's own code, with nothing of Godot's: arithmetic, Strings, an Array, a function value,
