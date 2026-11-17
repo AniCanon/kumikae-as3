@@ -29,6 +29,13 @@ package {
 				total++;
 			}
 			line.free();
+			// An element given by a loop over the vector, by a method of it and to a function called with
+			// each says which of Godot's types it is, as one read by its index does.
+			for each (var q:Vector2 in points) {
+				total++;
+			}
+			points.forEach(function(each:Vector2, index:int, all:Vector.<Vector2>):void {});
+			var last:Vector2 = points.pop();
 			return total;
 		}
 		public function defaults(c:Color):Color {

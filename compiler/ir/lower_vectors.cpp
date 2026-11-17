@@ -198,7 +198,8 @@ void Vectors::vector_loop(ForIn *p_loop) {
 	uint32_t value = array ? l_.convert(at, Kind::Str, position) : at;
 	uint32_t hole = NONE;
 	if (p_loop->each || array) {
-		const uint32_t element = l_.reg(l_.module_.classes[*l_.vector_class(p_loop->collection->type)].element);
+		// One of Godot's says which type it is, as an element read by its index does.
+		const uint32_t element = l_.engine_reg(l_.module_.classes[*l_.vector_class(p_loop->collection->type)].element, p_loop->collection->type->element);
 		l_.emit(Op::VecGet, position, element, vector, at);
 		value = p_loop->each ? element : value;
 		if (array) {
