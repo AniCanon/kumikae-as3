@@ -61,7 +61,9 @@ std::atomic<uint64_t> gone{ 1 };
 
 // Godot tells whoever keeps a binding on an object when the object ends, as it tells C# and godot-cpp of
 // theirs: this one keeps nothing but the count. Under a token of its own, so that it is beside godot-cpp's
-// binding and not in its place. (The extension is not one Godot reloads: its bindings last as long as it.)
+// binding and not in its place. The extension is not one Godot reloads, and must not be made one
+// (`reloadable` in kas3.gdextension, which tests/run_godot.py holds every such file to): its bindings last
+// as long as it, and a callback into a library that has gone would be a crash.
 char watch_token = 0;
 void *watched(void *p_token, void *) {
 	return p_token;

@@ -75,6 +75,11 @@ listed = os.path.join(project, ".godot", "extension_list.cfg")
 if not os.path.exists(listed):
     subprocess.run([godot, *FIRST_SCAN, "--path", project], capture_output=True, text=True, timeout=300)
 check("the extension is listed", os.path.exists(listed) and "kas3.gdextension" in open(listed).read())
+# The extension keeps bindings of its own on Godot's objects, whose callbacks are its code
+# (godot_ext/native_program.cpp, object_behind): Godot must never unload it while a game or the editor runs.
+for described in glob.glob(os.path.join(os.path.dirname(os.path.dirname(tests)), "**", "kas3.gdextension"), recursive=True):
+    if os.sep + "build" not in described and os.sep + ".godot" + os.sep not in described:
+        check("the extension is not one Godot reloads: %s" % described, "reloadable" not in open(described).read())
 
 run = subprocess.run([godot, "--headless", "--path", project, "-s", "driver.gd"], capture_output=True, text=True,
                      timeout=300)
@@ -685,6 +690,13 @@ HOT = """package { import godot.*; public class Hot extends Node2D {
 	public function hold():void { kind = Hot; pusher = seen.push; table = {a: 1, b: 2}; table.setPropertyIsEnumerable("a", false); }
 	public function held():String { var keys:Array = []; for (var k:String in table) { keys.push(k); } return (kind == Hot) + " " + (this is kind) + " " + pusher(99) + " " + keys.join() + " " + table.a; }
 	private function onJoy(device:int, connected:Boolean):void { onRenamed(); }
+	private var keptNode:Node2D; private var crowd:Vector.<Node2D> = new Vector.<Node2D>();
+	public function holdNodes():void { keptNode = new Node2D(); keptNode.position = new Vector2(1, 2); for (var i:int = 0; i < 3; i++) { var made:Node2D = new Node2D(); made.position = new Vector2(i, i); crowd.push(made); } }
+	public function nodesText():String { var out:Array = []; try { out.push(keptNode.position.x); } catch (e:Error) { out.push(e.message); }
+		for (var i:int = 0; i < crowd.length; i++) { try { var each:Node2D = crowd[i]; each.position = each.position + new Vector2(1, 0); out.push(each.position.x); } catch (e:Error) { out.push("gone"); } } return out.join(" "); }
+	public function freeNode(which:int):void { if (which < 0) { keptNode.free(); } else { crowd[which].free(); } }
+	public function goneLine():Number { return keptNode.position.x; }
+	public function dropNodes():void { for (var i:int = 0; i < crowd.length; i++) { if (crowd[i]) { crowd[i].free(); } } crowd.length = 0; }
 } }
 """
 ADDED = "\n\tpublic function added():String { return \"new\"; }"
@@ -723,7 +735,11 @@ def reload_test(label, elsewhere):
                              timeout=300, env=environment)
         output = run.stdout + run.stderr
         values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 22, output[-1500:])
+        check("%s ran to its end" % label, run.returncode == 0 and len(values) == 27, output[-1500:])
+        # A node held across reloads, freed and used again: the error Godot is told of names the line.
+        check("%s: a node held across two reloads and freed since is AS3's error where it is used, with its line" % label,
+              re.search(r"SCRIPT ERROR: TypeError: Error #1009[^\n]*Godot has freed the object\.\n\s+at Hot/goneLine\(\)\[[^\]]*Hot\.as:\d+\]", output) is not None,
+              output[-1500:])
         check("%s: a reload that would drop an object whose class is gone is refused, and names it" % label,
               "an object of the class 'Later' is alive" in output, output[-1500:])
         check("%s: a reload asked for while AS3 runs says it was not made" % label,

@@ -68,6 +68,9 @@ func _process(_delta: float) -> bool:
 		ask("bump")
 		ask("bump")
 		ask("hold")
+		# Nodes held in a field and in a vector, across the reloads that follow.
+		ask("holdNodes")
+		show("before: nodes held in a field and in a vector", ask("nodesText"), "1 1 2 3")
 		other.name = "first"
 		show("before: value", ask("value"), 1)
 		show("before: heard", ask("heard"), 1)
@@ -79,6 +82,9 @@ func _process(_delta: float) -> bool:
 		show("after an edit: a static field keeps its value", ask("total"), 2)
 		show("after an edit: a vector field keeps its elements", ask("seenText"), "1,2")
 		show("after an edit: a method that is new can be called", ask("added"), "new")
+		show("after an edit: the nodes held are the same nodes, and usable", ask("nodesText"), "1 2 3 4")
+		ask("freeNode", [1])
+		show("after an edit: one of them freed since is gone, the others not", ask("nodesText"), "1 3 gone 5")
 		# A class as a value, a method of the library as a value, and a property hidden from loops.
 		show("after an edit: a class value, a method value and a hidden property are kept", ask("held"), "true true 3 b 1")
 		show("after an edit: a vector of a type the new code does not name keeps its elements", ask("bagText"), "2")
@@ -112,6 +118,11 @@ func _process(_delta: float) -> bool:
 	elif stage == 3 and acted():
 		show("once the error is fixed, by a file in a new folder: the new code runs", ask("value"), 3)
 		show("once the error is fixed: the field still has its value", ask("count"), 2)
+		show("after two reloads: the nodes held are usable still", ask("nodesText"), "1 4 gone 6")
+		ask("freeNode", [-1])
+		show("after two reloads: the one in the field freed since is AS3's error",
+				ask("nodesText"), "Error #1009: Cannot access a property or method of a null object reference. Godot has freed the object. 5 gone 7")
+		ask("goneLine")
 		# Saves of the same size that carry the same time (as two within one second do) are told apart by
 		# what they hold. The time is one set here, far ahead, and given to every save of this step: however
 		# long this machine takes between a save and the look at it, the saves stay "within one second" of
@@ -146,6 +157,7 @@ func _process(_delta: float) -> bool:
 		stage = 5
 	elif stage == 5 and acted():
 		show("a class gone while an object of it is alive: the game keeps the scripts it had", ask("value"), 4)
+		ask("dropNodes")
 		node.free()
 		other.free()
 		return true
