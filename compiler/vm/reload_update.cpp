@@ -155,7 +155,9 @@ bool Reload::constant_changed(const std::string &p_name) const {
 Reload::Again Reload::construct_again(Object *p_old, Object *p_object) {
 	Constructions *kept = to_.constructions_.get();
 	Record *record = kept ? kept->record(p_object) : nullptr;
-	if (!record || record->kept == Constructions::NOTHING) {
+	// An object moved here has all of its record, or one still carried: its arguments alone would say
+	// its first values are the new chain's, which is what is about to be found out.
+	if (!record || (record->kept != Constructions::ALL && record->kept != Constructions::CARRIED)) {
 		return Again::NotRemembered;
 	}
 	const ir::Class &klass = to_.module_.classes[p_object->klass];

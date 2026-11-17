@@ -89,8 +89,6 @@ public:
 		const Plan &plan = plans_[p_object->klass];
 		return plan.room != 0 ? record_at(p_object, plan) : nullptr;
 	}
-	// Whether the class's objects are remembered by their arguments alone: its chain can be run again.
-	bool by_arguments(uint32_t p_class) { return plans_[p_class].room != 0 && chain_of(plans_[p_class], p_class) == Chain::Again; }
 	// The object's first values are no longer kept: its arguments are, and its class's chain gives the rest.
 	void keep_arguments_only(Object *p_object);
 	// A record for an object of the class, made by that constructor with that many arguments, in the place
