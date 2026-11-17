@@ -31,6 +31,11 @@ Reload::Reload(Interpreter &p_from, Interpreter &p_to) :
 
 Reload::~Reload() {
 	for (auto &[old, fresh] : moved_) {
+		// What update_in_place() did not settle: its first values go with the old program.
+		Constructions::Record *record = to_.constructions_ ? to_.constructions_->record(fresh) : nullptr;
+		if (record && record->kept == Constructions::CARRIED) {
+			to_.constructions_->forget(fresh);
+		}
 		to_.release_object(fresh);
 	}
 }

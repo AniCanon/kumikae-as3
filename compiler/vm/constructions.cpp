@@ -92,17 +92,17 @@ Constructions::Constructions(const ir::Module &p_module) :
 		plan.at = static_cast<uint32_t>(slots_of(klass));
 		plan.constructor = klass.constructor;
 		plan.most = made.parameters - 1;
-		plan.fields = static_cast<uint32_t>(klass.fields.size());
-		plan.room = 1 + plan.most + plan.fields;
+		plan.room = 1 + plan.most + static_cast<uint32_t>(klass.fields.size());
 		plan.looked_arguments = static_cast<uint32_t>(looked_.size());
 		for (uint32_t i = 0; i < plan.most; i++) {
 			looked(i, made.registers[1 + i]);
 		}
 		plan.looked_fields = static_cast<uint32_t>(looked_.size());
-		for (uint32_t i = 0; i < plan.fields; i++) {
+		for (uint32_t i = 0; i < klass.fields.size(); i++) {
 			looked(i, klass.fields[i].kind);
 		}
 		plan.looked_end = static_cast<uint32_t>(looked_.size());
+		plan.plain_arguments = plan.looked_fields == plan.looked_arguments;
 		owner_[klass.constructor] = index;
 	}
 }
@@ -125,10 +125,12 @@ void Constructions::give_up(const Plan &p_plan, Record *p_record) {
 	}
 }
 
-void Constructions::let_go(const Plan &p_plan, Record *p_record) {
-	give_up(p_plan, p_record);
-	p_record->kept = NOTHING;
-	used_--;
+Constructions::Chain Constructions::chain_of(Plan &p_plan, uint32_t p_class) {
+	if (p_plan.chain == Chain::Unknown) {
+		p_plan.chain = ir::constructor_refusal(module_, p_class) ? Chain::Once : Chain::Again;
+		p_plan.quick = p_plan.chain == Chain::Again && p_plan.plain_arguments;
+	}
+	return p_plan.chain;
 }
 
 Constructions::Record *Constructions::add(Object *p_object, uint32_t p_function, uint32_t p_class, uint32_t p_arguments) {
@@ -152,35 +154,51 @@ Constructions::Record *Constructions::add(Object *p_object, uint32_t p_function,
 }
 
 bool Constructions::keep_arguments(uint32_t p_class, const Slot *p_arguments, size_t p_count) {
-	const Plan &plan = plans_[p_class];
+	Plan &plan = plans_[p_class];
 	Object *object = p_count == 0 ? nullptr : static_cast<Object *>(p_arguments[0].p);
 	// A `super(...)` call runs a base's constructor on an object of another class: the object's own
 	// constructor, which made that call, is the one whose arguments are kept.
 	if (!object || object->klass != p_class || p_count > plan.most + 1) {
 		return false;
 	}
+	Record *record = record_at(object, plan);
+	if (!plan.quick || record->kept != NOTHING) {
+		return keep_looked(plan, p_class, object, p_arguments, p_count);
+	}
 	const uint32_t given = static_cast<uint32_t>(p_count - 1);
-	for (uint32_t i = plan.looked_arguments; i < plan.looked_fields && looked_[i].value < given; i++) {
+	for (uint32_t i = 0; i < given; i++) {
+		record->values[i] = p_arguments[1 + i];
+	}
+	record->kept = ARGUMENTS;
+	record->arguments = given;
+	used_++;
+	return false;
+}
+
+bool Constructions::keep_looked(Plan &p_plan, uint32_t p_class, Object *p_object, const Slot *p_arguments, size_t p_count) {
+	const uint32_t given = static_cast<uint32_t>(p_count - 1);
+	for (uint32_t i = p_plan.looked_arguments; i < p_plan.looked_fields && looked_[i].value < given; i++) {
 		if (!plain(looked_[i].kind, p_arguments[1 + looked_[i].value])) {
-			forget(object);
+			forget(p_object);
 			return false;
 		}
 	}
-	Record *record = record_at(object, plan);
+	Record *record = record_at(p_object, p_plan);
 	if (record->kept != NOTHING) {
-		give_up(plan, record);
+		give_up(p_plan, record);
 	} else {
 		used_++;
 	}
 	for (uint32_t i = 0; i < given; i++) {
 		record->values[i] = p_arguments[1 + i];
 	}
-	for (uint32_t i = plan.looked_arguments; i < plan.looked_fields && looked_[i].value < given; i++) {
+	for (uint32_t i = p_plan.looked_arguments; i < p_plan.looked_fields && looked_[i].value < given; i++) {
 		held(looked_[i].kind, p_arguments[1 + looked_[i].value]);
 	}
 	record->kept = ARGUMENTS;
 	record->arguments = given;
-	return true;
+	// The first values are owed only where the chain can't give them again.
+	return chain_of(p_plan, p_class) == Chain::Once;
 }
 
 void Constructions::constructed(Object *p_object) {
@@ -192,12 +210,12 @@ void Constructions::constructed(Object *p_object) {
 	const ir::Class &klass = module_.classes[p_object->klass];
 	for (uint32_t i = plan.looked_fields; i < plan.looked_end; i++) {
 		if (!plain(looked_[i].kind, field(klass, p_object, looked_[i].value))) {
-			let_go(plan, record);
+			forget(p_object);
 			return;
 		}
 	}
 	Slot *first = record->values + record->arguments;
-	for (uint32_t i = 0; i < plan.fields; i++) {
+	for (uint32_t i = 0; i < klass.fields.size(); i++) {
 		first[i] = field(klass, p_object, i);
 	}
 	for (uint32_t i = plan.looked_fields; i < plan.looked_end; i++) {
@@ -206,25 +224,25 @@ void Constructions::constructed(Object *p_object) {
 	record->kept = ALL;
 }
 
-const Constructions::Record *Constructions::of(const Object *p_object) const {
-	const Plan &plan = plans_[p_object->klass];
+const Constructions::Record *Constructions::of(const Object *p_object) {
+	Plan &plan = plans_[p_object->klass];
 	const Record *record = plan.room != 0 ? record_at(const_cast<Object *>(p_object), plan) : nullptr;
-	return record && record->kept == ALL ? record : nullptr;
+	const bool known = record && (record->kept == ALL || (record->kept == ARGUMENTS && chain_of(plan, p_object->klass) == Chain::Again));
+	return known ? record : nullptr;
 }
 
-void Constructions::hand_over(Object *p_from, Object *p_to) {
-	const Plan &plan = plans_[p_from->klass];
-	if (plan.room == 0 || p_to->klass != p_from->klass || p_from == p_to) {
+void Constructions::keep_arguments_only(Object *p_object) {
+	const Plan &plan = plans_[p_object->klass];
+	Record *record = plan.room != 0 ? record_at(p_object, plan) : nullptr;
+	if (!record || record->kept == NOTHING) {
 		return;
 	}
-	Record *from = record_at(p_from, plan);
-	if (from->kept == NOTHING) {
-		return;
+	if (record->kept == ALL) {
+		for (uint32_t i = plan.looked_fields; i < plan.looked_end; i++) {
+			release_text(looked_[i].kind, record->values[record->arguments + looked_[i].value]);
+		}
 	}
-	forget(p_to);
-	// What the record's text is counted for goes with it.
-	std::copy(&slot_at(p_from, plan.at), &slot_at(p_from, plan.at) + plan.room, &slot_at(p_to, plan.at));
-	from->kept = NOTHING;
+	record->kept = ARGUMENTS;
 }
 
 } // namespace vm

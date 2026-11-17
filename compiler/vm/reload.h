@@ -56,11 +56,28 @@ class Reload {
 	// may each have a private field of one name: the n-th of a name is the n-th.
 	static std::vector<uint32_t> fields_by_name(const ir::Class &p_old, const ir::Class &p_new);
 	// What the old object was constructed with (vm/constructions.h), remembered for the new one: the old
-	// program keeps its own.
+	// program keeps its own. Where the old program kept the arguments alone, the new one has them as
+	// CARRIED until update_in_place() settles them.
 	void carry_record(Object *p_old, Object *p_fresh);
 	bool constant_changed(const std::string &p_name) const;
+	// A throwaway object of a program's class with its constructor run, given the arguments of a record:
+	// the caller's to release. Null if there is no memory or the constructor failed, which is reported as
+	// any error of a call from outside is.
+	static Object *made_again(Interpreter &p_program, uint32_t p_class, const Constructions::Record &p_record);
+	// The first values of an object the old program remembered by its arguments alone, as the new one's
+	// fields hold them: what the old chain gives, run again; for a field that is new or of another kind,
+	// what the object holds. Each belongs to the throwaway it came from (`r_made`, the caller's to release
+	// with the old program) or to the object. False if the old chain could not be run.
+	bool first_values(Object *p_old, Object *p_fresh, std::vector<Slot> *r_values, Object **r_made);
+	// A CARRIED record given its first values, and so ALL; forgotten if they can't be had.
+	void keep_first_values(Object *p_old, Object *p_fresh);
+	// The objects of one class of the new program, each with the old one it was moved from: what is still
+	// CARRIED of them is settled. Left to the new chain where that gives the same (`p_same`: the chain
+	// can be run again, and neither it nor a constant it reads changed), and else given its first values.
+	using Pairs = std::vector<std::pair<Object *, Object *>>;
+	void settle(const Pairs &p_objects, bool p_same);
 	enum class Again { Updated, NotRemembered, Failed };
-	Again construct_again(Object *p_object);
+	Again construct_again(Object *p_old, Object *p_object);
 
 public:
 	Reload(Interpreter &p_from, Interpreter &p_to);
@@ -86,7 +103,10 @@ public:
 	// old first value, takes the new one; a field the program has changed since keeps what it holds. The
 	// new first values are then the ones remembered, so that the next reload starts from them. The
 	// throwaway is freed. A class whose chain can't be run again is left as it is and named with the reason,
-	// and so is one whose object was made with something that is not remembered.
+	// and so is one whose object was made with something that is not remembered. An object the old
+	// program remembered by its arguments alone has its old first values from the old program's chain,
+	// run again here: the old program must still be able to run. A reload that ends without this forgets
+	// what such objects were made with.
 	InPlace update_in_place(const std::vector<std::string> &p_run_once);
 	// Where a function of the old program is in the new one, by its name. NONE if it is gone.
 	uint32_t function(uint32_t p_old) const;
