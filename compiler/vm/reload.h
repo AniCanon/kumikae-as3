@@ -3,11 +3,24 @@
 
 #include "interpreter.h"
 
+#include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace kas3 {
 namespace vm {
+
+// What a reload did for the objects alive whose constructors would give them other values now
+// (Reload::update_in_place), by class as the new program names it, each list in order of the names. A class
+// may be in both: some of its objects updated, others not.
+struct InPlace {
+	std::vector<std::string> updated;
+	// The class, and why, in words that follow its name ("it extends Godot's Node2D").
+	std::vector<std::pair<std::string, std::string>> left;
+};
 
 // Built between two interpreters that share a host: the one that has been running, and one made for the
 // new build that has run nothing yet. Neither may be in the middle of a call.
@@ -24,6 +37,9 @@ class Reload {
 	std::unordered_map<Object *, Object *> moved_; // Each holds one reference to the new object.
 	std::string missing_;
 	std::vector<uint8_t> missing_classes_; // By class of the old program: an object of it had no place.
+	std::vector<std::string> changed_statics_; // What globals() was given: the classes whose static fields' code changed.
+	// By class of the new program: an object of it was made with arguments its new constructor does not take.
+	std::unordered_set<uint32_t> unfit_;
 
 	// An object of the class has no place in the new program: said, and null.
 	Object *lost(uint32_t p_old_class);
@@ -36,6 +52,15 @@ class Reload {
 	Object *moved_vector(Vector *p_old, uint32_t p_class);
 	void carry_fields(Object *p_old, Object *p_fresh);
 	void constants_again(const std::string &p_class);
+	// For each field of the new class, the old class's field of its name, or NONE. A base and its subclass
+	// may each have a private field of one name: the n-th of a name is the n-th.
+	static std::vector<uint32_t> fields_by_name(const ir::Class &p_old, const ir::Class &p_new);
+	// What the old object was constructed with (vm/constructions.h), remembered for the new one: the old
+	// program keeps its own.
+	void carry_record(Object *p_old, Object *p_fresh);
+	bool constant_changed(const std::string &p_name) const;
+	enum class Again { Updated, NotRemembered, Failed };
+	Again construct_again(Object *p_object);
 
 public:
 	Reload(Interpreter &p_from, Interpreter &p_to);
@@ -52,6 +77,17 @@ public:
 	// values is not given them again; one of its fields that is new starts empty. Of the classes named
 	// (those whose static fields' first values changed: ir::static_changes), the constants take the new code's.
 	void globals(const std::vector<std::string> &p_changed = {});
+	// After globals() and after every object alive has been moved: the objects whose constructors would
+	// give them other values now are updated in place. Those are the objects of the classes named (whose
+	// code that runs once changed: ir::run_once_changes) and of the classes whose constructor chain reads a
+	// constant that has another value now. Where the chain depends only on its arguments and constants
+	// (ir::constructor_chain), it is run again with the new code on a throwaway object, with the arguments
+	// the object was made with: a field whose first value comes out different, and which still holds the
+	// old first value, takes the new one; a field the program has changed since keeps what it holds. The
+	// new first values are then the ones remembered, so that the next reload starts from them. The
+	// throwaway is freed. A class whose chain can't be run again is left as it is and named with the reason,
+	// and so is one whose object was made with something that is not remembered.
+	InPlace update_in_place(const std::vector<std::string> &p_run_once);
 	// Where a function of the old program is in the new one, by its name. NONE if it is gone.
 	uint32_t function(uint32_t p_old) const;
 	const std::string &missing() const { return missing_; }

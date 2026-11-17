@@ -19,11 +19,19 @@ protected:
 	// sees an edit (kas3::Project::reload_now). For a tool, or a test, that knows when it has written them.
 	// watch_looks(): how many times the watch has looked at the scripts (kas3::Project::watch_looks), for a
 	// test to wait on instead of the clock.
+	// restart_scene(): the running scene started again from its file (kas3::Project::restart_scene): what
+	// shows the edits a reload could not show on the objects alive. A reload never does it by itself.
 	static void _bind_methods() {
 		godot::ClassDB::bind_method(godot::D_METHOD("reload_scripts"), &AS3Language::reload_scripts);
+		godot::ClassDB::bind_method(godot::D_METHOD("restart_scene"), &AS3Language::restart_scene);
 		godot::ClassDB::bind_method(godot::D_METHOD("watch_looks"), &AS3Language::watch_looks);
 	}
 	int64_t watch_looks() const { return static_cast<int64_t>(kas3::Project::watch_looks()); }
+	void restart_scene() {
+		if (!godot::Engine::get_singleton()->is_editor_hint()) {
+			kas3::Project::restart_scene();
+		}
+	}
 	// A game, never the editor: in the editor no AS3 runs, and an edit is seen when a script is opened.
 	void reload_scripts() {
 		if (!godot::Engine::get_singleton()->is_editor_hint()) {

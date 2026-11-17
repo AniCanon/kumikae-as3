@@ -17,7 +17,8 @@ JavaScript copy of the program, since AS3 and JavaScript share those rules. Stac
 classes follow the AS3 language and were read by hand.
 
 Nothing a program makes may be left alive when it ends: kas3c reports that with status 3. Date's now and the
-zone are fixed (see `environment` below).
+zone are fixed (see `environment` below). Each program in run/ is run once more with what its objects are
+constructed with remembered (KAS3_REMEMBER_CONSTRUCTIONS, as a game being edited has it), and must do the same.
 
 --update rewrites the .out, .err and .ir files. Read the result before committing it.
 """
@@ -81,6 +82,11 @@ for name in names:
     check(name + " status", result.returncode == (1 if fails else 0), "exit %d" % result.returncode)
     if os.path.exists(base + ".ir"):
         compare(name + " ir", run("ir", files, folder).stdout, base + ".ir")
+    # With what objects are constructed with remembered, as a game being edited has it (vm/constructions.h),
+    # a program does the same and leaves nothing alive.
+    remembering = run("run", files, folder, {"KAS3_REMEMBER_CONSTRUCTIONS": "1"})
+    check(name + " with constructions remembered", (remembering.stdout, remembering.stderr, remembering.returncode) ==
+          (result.stdout, result.stderr, result.returncode), "exit %d\n%s" % (remembering.returncode, remembering.stderr[-600:]))
 
 # With a stack too small for what a program does, it ends with Error #1023 and never with a crash: a library
 # callback that calls the library again (callbacks_nest: caught, where the stack holds its first part),

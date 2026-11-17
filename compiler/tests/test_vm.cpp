@@ -1633,6 +1633,290 @@ static void test_reload_constants(const char *p_package, const char *p_class) {
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }
 
+// A game being edited, for the tests of a reload that updates objects in place: one object the host holds
+// (a Game, made with no arguments), moved from build to build as a host moves it.
+struct Edited {
+	Recorder recorder;
+	std::unique_ptr<ir::Module> module;
+	std::unique_ptr<vm::Interpreter> program;
+	vm::Object *game = nullptr;
+	bool godot = false; // The sources name Godot's classes.
+	bool remember = true;
+
+	std::unique_ptr<ir::Module> build(const std::string &p_source) {
+		auto built = std::make_unique<ir::Module>();
+		Compilation compilation;
+		if (godot) {
+			compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+		}
+		compilation.add("Game.as", p_source);
+		compilation.check();
+		CHECK_EQ(compilation.format_diagnostics(false), std::string());
+		CHECK(ir::lower(compilation, built.get(), ir::LowerMode::Library));
+		return built;
+	}
+	void start(const std::string &p_source) {
+		module = build(p_source);
+		program = std::make_unique<vm::Interpreter>(*module, recorder);
+		if (remember) {
+			program->remember_constructions();
+		}
+		CHECK(program->start());
+		game = program->construct(class_named(*module, "Game"), nullptr);
+		CHECK(game != nullptr);
+	}
+	// The game moved onto a build of these sources, as a host does it; what the update says, as one text.
+	// With p_tries, the move is first made and thrown away that many times, as a host does when the new
+	// build lacks a container's class.
+	std::string edit(const std::string &p_source, int p_tries = 0) {
+		std::unique_ptr<ir::Module> next = build(p_source);
+		for (int i = 0; i < p_tries; i++) {
+			vm::Interpreter dropped(*next, recorder);
+			vm::Reload reload(*program, dropped);
+			dropped.release_object(reload.object(game));
+		}
+		auto fresh = std::make_unique<vm::Interpreter>(*next, recorder);
+		vm::InPlace done;
+		vm::Object *moved = nullptr;
+		{
+			vm::Reload reload(*program, *fresh);
+			reload.globals(ir::static_changes(*module, *next));
+			moved = reload.object(game);
+			done = reload.update_in_place(ir::run_once_changes(*module, *next));
+		}
+		program->release_object(game);
+		game = moved;
+		program = std::move(fresh);
+		module = std::move(next);
+		std::string said = "updated:";
+		for (const std::string &name : done.updated) {
+			said += " " + name;
+		}
+		for (const auto &[name, why] : done.left) {
+			said += "; " + name + ": " + why;
+		}
+		return said;
+	}
+	void call(const char *p_method) {
+		vm::Slot result;
+		CHECK(program->call_method(game, p_method, nullptr, 0, &result));
+	}
+	// An object of the class, made by the host as Godot makes a script's, held by a field of the game.
+	void hold(const char *p_field, const char *p_class) {
+		vm::Slot made;
+		made.bits = 0;
+		made.p = program->construct(class_named(*module, p_class), nullptr);
+		CHECK(made.p != nullptr);
+		program->set_field(game, *module->classes[game->klass].field(p_field), made);
+	}
+	// A field of the game, or with a dot of the object one of its fields holds ("token.w").
+	vm::Slot field(const std::string &p_path) {
+		vm::Slot value;
+		value.bits = 0;
+		const size_t dot = p_path.find('.');
+		CHECK(program->get_field(game, p_path.substr(0, dot), &value));
+		if (dot != std::string::npos) {
+			vm::Object *held = static_cast<vm::Object *>(value.p);
+			value.bits = 0;
+			CHECK(held && program->get_field(held, p_path.substr(dot + 1), &value));
+		}
+		return value;
+	}
+	double number(const std::string &p_path) { return field(p_path).d; }
+	std::string text(const std::string &p_path) {
+		const vm::Str *held = static_cast<const vm::Str *>(field(p_path).p);
+		return held ? std::string(held->view()) : std::string("null");
+	}
+	void end() {
+		program->release_object(game);
+		program.reset();
+		module.reset();
+		CHECK_EQ(vm::live_objects(), (size_t)0);
+		CHECK_EQ(vm::live_strings(), (size_t)0);
+	}
+};
+
+static std::string with(std::string p_source, const char *p_from, const char *p_to) {
+	const size_t at = p_source.find(p_from);
+	CHECK(at != std::string::npos);
+	return at == std::string::npos ? p_source : p_source.replace(at, std::string(p_from).size(), p_to);
+}
+
+// A game's own shape: a constant of one class, read by a constructor that hands it up through two
+// `super(...)` calls to the class that sets the fields. Editing the constant while the game runs changes the
+// width of the objects alive, and leaves where the game moved one to.
+static const char *const TOKENS =
+		"package { public class Game { public var token:Token; public var other:Token;\n"
+		"  public function make():void { token = new Token(100, 200); other = new Token(300, 50); }\n"
+		"  public function pull():void { token.x += 7; } public function stretch():void { other.h = 99; } } }\n"
+		"class Tuning { public static const TOKEN_W:Number = 24; public static const TOKEN_H:Number = 90; }\n"
+		"class Box { public var x:Number; public var y:Number; public var w:Number; public var h:Number;\n"
+		"  public function Box(p_x:Number, p_y:Number, p_w:Number, p_h:Number) { x = p_x; this.y = p_y; w = p_w; h = p_h; } }\n"
+		"class Thing extends Box { public var active:Boolean = true;\n"
+		"  public function Thing(p_x:Number, p_y:Number, p_w:Number, p_h:Number) { super(p_x, p_y, p_w, p_h); } }\n"
+		"class Token extends Thing {\n"
+		"  public function Token(sx:Number, sy:Number) { super(sx - Tuning.TOKEN_W / 2, sy - Tuning.TOKEN_H / 2, Tuning.TOKEN_W, Tuning.TOKEN_H); } }\n";
+
+static void test_reload_in_place() {
+	Edited edited;
+	edited.start(TOKENS);
+	edited.call("make");
+	edited.call("pull");
+	CHECK_EQ(edited.number("token.x"), 95.0);
+	CHECK_EQ(edited.program->remembered(), (size_t)3);
+	// The constant alone is edited: no code of Token's changed.
+	CHECK_EQ(edited.edit(with(TOKENS, "TOKEN_W:Number = 24", "TOKEN_W:Number = 30")), std::string("updated: Token"));
+	CHECK_EQ(edited.number("token.w"), 30.0);
+	CHECK_EQ(edited.number("other.w"), 30.0);
+	CHECK_EQ(edited.number("token.x"), 95.0); // Where the game moved it to.
+	CHECK_EQ(edited.number("other.x"), 285.0); // Never moved: where the new width puts it.
+	CHECK_EQ(edited.number("token.h"), 90.0);
+	CHECK_EQ(edited.number("token.y"), 155.0);
+	CHECK_EQ(edited.program->remembered(), (size_t)3);
+	// A second edit starts from what the first one gave; a field the game wrote since keeps what it wrote.
+	edited.call("stretch");
+	const std::string twice = with(with(TOKENS, "TOKEN_W:Number = 24", "TOKEN_W:Number = 40"), "TOKEN_H:Number = 90", "TOKEN_H:Number = 60");
+	CHECK_EQ(edited.edit(twice), std::string("updated: Token"));
+	CHECK_EQ(edited.number("token.w"), 40.0);
+	CHECK_EQ(edited.number("other.x"), 280.0);
+	CHECK_EQ(edited.number("token.x"), 95.0);
+	CHECK_EQ(edited.number("token.h"), 60.0);
+	CHECK_EQ(edited.number("other.h"), 99.0);
+	CHECK_EQ(edited.number("other.y"), 20.0);
+	// An edit that changes nothing a constructor gives says nothing, and one to code that is not a constructor's too.
+	CHECK_EQ(edited.edit(twice), std::string("updated:"));
+	CHECK_EQ(edited.edit(with(twice, "token.x += 7", "token.x += 8")), std::string("updated:"));
+	// Objects made after a reload are made by the new code, and remembered like any other.
+	edited.call("make");
+	CHECK_EQ(edited.number("token.w"), 40.0);
+	CHECK_EQ(edited.program->remembered(), (size_t)3);
+	CHECK_EQ(edited.edit(TOKENS), std::string("updated: Token"));
+	CHECK_EQ(edited.number("token.w"), 24.0);
+	CHECK_EQ(edited.number("token.x"), 88.0);
+	// A constructor's own code edited, and a field's first value.
+	CHECK_EQ(edited.edit(with(with(TOKENS, "w = p_w;", "w = p_w * 2;"), "active:Boolean = true", "active:Boolean = false")),
+			std::string("updated: Token"));
+	CHECK_EQ(edited.number("token.w"), 48.0);
+	CHECK(!edited.field("token.active").b);
+	edited.end();
+}
+
+// First values that are NaN and text, a default left out, a field added, and a move made twice.
+static void test_reload_in_place_values() {
+	const std::string source =
+			"package { public class Game { public var a:Part; public var b:Part;\n"
+			"  public function make():void { a = new Part(); b = new Part(2, \"given\"); b.label = \"mine\"; } } }\n"
+			"class Words { public static const GAP:Number = 0 / 0; public static const NAME:String = \"one\"; }\n"
+			"class Part { public var gap:Number = Words.GAP; public var label:String; public var size:Number; public var free:*; public var any:* = Words.NAME;\n"
+			"  public function Part(p_size:Number = 5, p_label:String = null) { size = p_size; label = p_label == null ? Words.NAME : p_label + Words.NAME; } }\n";
+	Edited edited;
+	edited.start(source);
+	edited.call("make");
+	CHECK(edited.number("a.gap") != edited.number("a.gap"));
+	// NaN is the value the field still holds: it takes the new one. Text is compared by what it says.
+	std::string next = with(with(source, "GAP:Number = 0 / 0", "GAP:Number = 3"), "NAME:String = \"one\"", "NAME:String = \"two\"");
+	CHECK_EQ(edited.edit(next, 2), std::string("updated: Part"));
+	CHECK_EQ(edited.number("a.gap"), 3.0);
+	CHECK_EQ(edited.text("a.label"), std::string("two"));
+	CHECK_EQ(edited.text("b.label"), std::string("mine"));
+	CHECK(vm::any::tag(edited.field("a.any")) == vm::AnyTag::String);
+	CHECK(vm::any::tag(edited.field("a.free")) == vm::AnyTag::Undefined);
+	// A default the object was made without is the new default; an argument that was given is given again.
+	next = with(next, "p_size:Number = 5", "p_size:Number = 8");
+	CHECK_EQ(edited.edit(next), std::string("updated: Part"));
+	CHECK_EQ(edited.number("a.size"), 8.0);
+	CHECK_EQ(edited.number("b.size"), 2.0);
+	// A field that is new has its first value on the objects alive, and NaN again is no change.
+	next = with(with(next, "public var size:Number;", "public var size:Number; public var lives:int = 3;"), "GAP:Number = 3", "GAP:Number = 0 / 0");
+	CHECK_EQ(edited.edit(next), std::string("updated: Part"));
+	CHECK_EQ(edited.field("a.lives").i, 3);
+	CHECK(edited.number("b.gap") != edited.number("b.gap"));
+	CHECK_EQ(edited.edit(with(next, "lives:int = 3", "lives:int = 4")), std::string("updated: Part"));
+	CHECK_EQ(edited.field("b.lives").i, 4);
+	edited.end();
+}
+
+// What can't be made again is left as it is, and named with the reason.
+static void test_reload_in_place_refused() {
+	const std::string source =
+			"package { public class Game { public var a:Reads; public var b:Calls; public var c:Makes; public var d:Holds; public var e:Fine;\n"
+			"  public var f:Fails; public var g:Takes;\n"
+			"  public function make():void { a = new Reads(); b = new Calls(); c = new Makes(); d = new Holds(c); e = new Fine(); f = new Fails(); g = new Takes(1); } } }\n"
+			"class K { public static const N:Number = 1; public static var count:int = 0; public static function next():Number { return count + N; } }\n"
+			"class Reads { public var n:Number = K.N + K.count; }\n"
+			"class Calls { public var n:Number; public function Calls() { n = K.next(); } }\n"
+			"class Makes { public var n:Number = K.N; public var list:Array = []; }\n"
+			"class Holds { public var n:Number = K.N; public var held:Makes; public function Holds(p_held:Makes) { held = p_held; } }\n"
+			"class Fine { public var n:Number = K.N; }\n"
+			"class Fails { public var n:Number = K.N; public var name:String; public function Fails() { n += 0; } }\n"
+			"class Takes { public var n:Number; public function Takes(p_n:Number) { n = p_n + K.N; } }\n"
+			"class Unmade { public var n:Number = K.N + K.count; }\n";
+	Edited edited;
+	edited.start(source);
+	edited.call("make");
+	const size_t errors = edited.recorder.errors.size();
+	// Fails's constructor raises in the new code (a member of null); Takes's takes other arguments.
+	const std::string next = with(with(with(source, "N:Number = 1;", "N:Number = 2;"), "{ n += 0; }", "{ n += name.length; }"), "Takes(p_n:Number)", "Takes(p_n:int)");
+	CHECK_EQ(edited.edit(next),
+			std::string("updated: Fine"
+						"; Calls: K/next() reads the static variable K.count"
+						"; Fails: its constructor failed when it was run again with the new code"
+						"; Holds: an object of it was made with an argument or a first value that is not a number, a Boolean, text or null"
+						"; Makes: Makes() makes an object"
+						"; Reads: Reads() reads the static variable K.count"
+						"; Takes: its constructor's parameters changed"));
+	CHECK(edited.recorder.errors.size() > errors); // The error is the host's to show.
+	CHECK_EQ(edited.number("e.n"), 2.0);
+	CHECK_EQ(edited.number("a.n"), 1.0);
+	CHECK_EQ(edited.number("d.n"), 1.0);
+	CHECK_EQ(edited.number("f.n"), 1.0);
+	CHECK_EQ(edited.number("g.n"), 2.0);
+	edited.end();
+	// A class of Godot's is never made again: the throwaway would be one of Godot's objects.
+	Edited scripts;
+	scripts.godot = true;
+	const std::string node = "package { import godot.*; public class Game { public var spinner:Spinner; } }\n"
+							 "class K { public static const N:Number = 1; }\n"
+							 "import godot.Node;\nclass Spinner extends Node { public var speed:Number = K.N; }\n";
+	scripts.start(node);
+	scripts.hold("spinner", "Spinner");
+	CHECK_EQ(scripts.edit(with(node, "N:Number = 1", "N:Number = 2")), std::string("updated:; Spinner: it extends Godot's Node"));
+	CHECK_EQ(scripts.number("spinner.speed"), 1.0);
+	scripts.end();
+}
+
+// Nothing is remembered that is not asked for, what is remembered goes with its object, and an object that
+// takes a freed one's place is not taken for it.
+static void test_reload_in_place_memory() {
+	const std::string source = "package { public class Game { public var kept:Shot; public var loose:Shot;\n"
+							   "  public function churn():void { for (var i:int = 0; i < 500; i++) { loose = new Shot(i); } kept = new Shot(7); loose = null; }\n"
+							   "  public function fill():Number { var all:Array = []; for (var i:int = 0; i < 300; i++) { all.push(new Shot(i)); }\n"
+							   "    var sum:Number = 0; for (var j:int = 0; j < 300; j += 7) { all[j] = null; } return sum; } } }\n"
+							   "class K { public static const N:Number = 1; }\n"
+							   "class Shot { public var n:Number; public var label:String; public function Shot(p_n:Number) { n = p_n + K.N; label = \"s\" + p_n; } }\n";
+	Edited off;
+	off.remember = false;
+	off.start(source);
+	off.call("churn");
+	CHECK_EQ(off.program->remembered(), (size_t)0);
+	CHECK_EQ(off.edit(with(source, "N:Number = 1", "N:Number = 5")), std::string("updated:; Shot: what its objects were made with is not remembered"));
+	CHECK_EQ(off.number("kept.n"), 8.0);
+	off.end();
+	Edited on;
+	on.start(source);
+	on.call("fill"); // Many alive at once, and gone again: the table grows, and gives each up.
+	CHECK_EQ(on.program->remembered(), (size_t)1);
+	on.call("churn");
+	CHECK_EQ(on.program->remembered(), (size_t)2); // The game and the one it keeps.
+	CHECK_EQ(on.edit(with(source, "N:Number = 1", "N:Number = 5")), std::string("updated: Shot"));
+	CHECK_EQ(on.number("kept.n"), 12.0);
+	CHECK_EQ(on.text("kept.label"), std::string("s7"));
+	CHECK_EQ(on.program->remembered(), (size_t)2);
+	on.call("churn");
+	CHECK_EQ(on.program->remembered(), (size_t)2);
+	on.end();
+}
+
 // A field whose Godot class changed takes the old field's object only if it is of the new class: the
 // calls prepared for the new class would otherwise run on an object of another.
 static void test_reload_engine_class() {
@@ -3063,6 +3347,10 @@ int main() {
 	test_reload_alive();
 	test_reload_constants("", "Game");
 	test_reload_constants("com.example.config", "com.example.config.Game"); // A class in a package: its fields are named with it.
+	test_reload_in_place();
+	test_reload_in_place_values();
+	test_reload_in_place_refused();
+	test_reload_in_place_memory();
 	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_loop_markers();

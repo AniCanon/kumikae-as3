@@ -91,6 +91,12 @@ static std::unique_ptr<vm::Interpreter> new_interpreter(const ir::Module &p_modu
 	const double seconds = ProjectSettings::get_singleton()->get_setting("actionscript/limits/script_timeout_seconds",
 			vm::Interpreter::FLASH_TIME_LIMIT / 1000.0);
 	made->set_time_limit(seconds > 0 ? (uint32_t)std::min(seconds * 1000.0, 4.0e9) : 0);
+	// Where the scripts can be reloaded (a debug build: the watch, the debugger, reload_scripts()), what
+	// objects are constructed with is remembered, so that a reload can update them in place. An exported
+	// game pays nothing for it.
+	if (OS::get_singleton()->is_debug_build()) {
+		made->remember_constructions();
+	}
 	return made;
 }
 
@@ -172,6 +178,10 @@ void Project::watch() {
 	looks++;
 }
 
+// What reloads since the scene last started could not show on the objects alive: the classes left as they
+// were. A restart that is asked for says what it does not make again of them.
+static std::vector<std::string> left_since_start;
+
 // What a scene started again would not make again, of the classes whose code that runs once changed: the
 // Godot objects outside the scene that have their scripts, and objects of them that static fields reach.
 static std::vector<std::string> kept_outside(const vm::Interpreter &p_running, const ir::Module &p_module,
@@ -187,7 +197,7 @@ static std::vector<std::string> kept_outside(const vm::Interpreter &p_running, c
 	for (const auto &[object, owner] : instances_outside(tree ? tree->get_current_scene() : nullptr)) {
 		const godot::Node *node = Object::cast_to<godot::Node>(owner);
 		if (changed(object->klass)) {
-			kept.push_back(String(node ? String(node->get_path()) : owner->to_string()).utf8().get_data());
+			kept.push_back(String(node && node->is_inside_tree() ? String(node->get_path()) : owner->to_string()).utf8().get_data());
 		}
 	}
 	const std::vector<uint8_t> statics = vm::Reload::reached(p_running, {});
@@ -203,7 +213,9 @@ static std::vector<std::string> kept_outside(const vm::Interpreter &p_running, c
 // containers that the new build no longer names, of which an object is alive, is added to the build. False,
 // said, when an object alive has no place in the new program: the game carries on with the one it had.
 static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, GodotHost &p_host, ir::Module *r_module,
-		std::unique_ptr<vm::Interpreter> *r_fresh, Restart *r_restart, const std::vector<std::string> &p_statics) {
+		std::unique_ptr<vm::Interpreter> *r_fresh, Moved *r_moved) {
+	const std::vector<std::string> statics = ir::static_changes(p_old, *r_module);
+	const std::vector<std::string> run_once = ir::run_once_changes(p_old, *r_module);
 	// Each try that fails for want of a container's class adds one of the old build's or more: it ends. (A
 	// vector of vectors needs two: the inner one is met only once the outer one has its class.)
 	for (;;) {
@@ -213,17 +225,15 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 		{
 			vm::Reload moving(p_running, *fresh);
 			if (instances_can_move(moving) && listeners_can_move(moving) && moving.missing().empty()) {
-				moving.globals(p_statics); // Their constants take the new first values; their variables keep theirs.
+				moving.globals(statics); // Their constants take the new first values; their variables keep theirs.
 				move_instances(p_running, moving);
 				move_listeners(p_running, moving, loads + 1);
-				// A class whose code that runs once changed matters only if an object of it is alive.
-				if (!moving.alive(r_restart->classes)) {
-					r_restart->classes.clear();
-					r_restart->kept.clear();
-				}
-				for (const std::string &name : p_statics) {
+				// With every object alive moved and the constants as the new code has them: the objects
+				// whose constructors would give them other values now take those, where that can be done.
+				r_moved->in_place = moving.update_in_place(run_once);
+				for (const std::string &name : statics) {
 					if (moving.statics_given(name)) {
-						r_restart->statics.push_back(name);
+						r_moved->statics.push_back(name);
 					}
 				}
 				*r_fresh = std::move(fresh);
@@ -268,14 +278,9 @@ void Project::reload() {
 		return;
 	}
 	free_instances_freed_elsewhere(); // Before the instances are looked through: their objects are gone.
-	// Code that runs once (a constructor, a field's first value, `_ready`) does not run again for the
-	// objects that are alive: for an edit there to show, the scene is made again from its file.
-	Restart restart;
-	restart.classes = ir::run_once_changes(*program->module_, *module);
-	restart.kept = kept_outside(*program->interpreter_, *program->module_, restart.classes);
+	Moved moved;
 	std::unique_ptr<vm::Interpreter> fresh;
-	if (!move_onto(*program->interpreter_, *program->module_, program->host_, module.get(), &fresh, &restart,
-				ir::static_changes(*program->module_, *module))) {
+	if (!move_onto(*program->interpreter_, *program->module_, program->host_, module.get(), &fresh, &moved)) {
 		return;
 	}
 	loads++;
@@ -294,8 +299,29 @@ void Project::reload() {
 	}
 	AS3Script::refresh_all();
 	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.");
+	say_moved(moved);
+	for (const auto &[name, why] : moved.in_place.left) {
+		if (std::find(left_since_start.begin(), left_since_start.end(), name) == left_since_start.end()) {
+			left_since_start.push_back(name);
+		}
+	}
+	// A reload starts no scene again for the code's sake. A scene whose own file was edited is another
+	// matter: its file is all it is made from. And a scene that is being started again is made once more,
+	// so that its objects have one build's code throughout.
+	Restart restart;
 	restart.scenes = refresh_scenes();
-	restart_scene(restart);
+	kas3::restart_scene(restart);
+}
+
+void Project::restart_scene() {
+	Restart restart;
+	restart.asked = true;
+	restart.classes = std::move(left_since_start);
+	left_since_start.clear();
+	if (program && program->valid_ && !program->native_) {
+		restart.kept = kept_outside(*program->interpreter_, *program->module_, restart.classes);
+	}
+	kas3::restart_scene(restart);
 }
 
 void Project::reload_now() {
@@ -327,6 +353,7 @@ void Project::unload() {
 	loads++;
 	delete program;
 	program = nullptr;
+	left_since_start.clear();
 	forget_reached();
 }
 

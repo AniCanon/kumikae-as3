@@ -28,6 +28,8 @@ struct OperatorName {
 	int number = -1; // Godot's number for it (Variant::Operator), the entry's second word.
 };
 
+class Constructions; // vm/constructions.h
+
 class Heap {
 public:
 	const ir::Module &module;
@@ -35,6 +37,9 @@ public:
 	EngineSource &source;
 	Clock &clock; // The host's time and zone, for Date.
 	Collector collector; // After the module: it reads the classes.
+	// Told of each object of a program's class that is freed, where what objects were constructed with is
+	// remembered; null where it is not.
+	Constructions *constructions = nullptr;
 
 	Heap(const ir::Module &p_module, EngineHandles &p_handles, EngineSource &p_source, Clock &p_clock = SystemClock::instance());
 	Heap(const Heap &) = delete;

@@ -24,6 +24,9 @@ Reload::Reload(Interpreter &p_from, Interpreter &p_to) :
 	}
 	// The new program does not start over: what ran at the start of the old one has run.
 	to_.started_ = from_.started_;
+	if (from_.constructions_) {
+		to_.remember_constructions(); // Before anything is made there.
+	}
 }
 
 Reload::~Reload() {
@@ -160,6 +163,7 @@ Object *Reload::object(Object *p_old) {
 	moved_.emplace(p_old, fresh);
 	retain(fresh);
 	carry_fields(p_old, fresh);
+	carry_record(p_old, fresh);
 	return fresh;
 }
 
@@ -184,27 +188,31 @@ Object *Reload::moved_vector(Vector *p_old, uint32_t p_class) {
 	return vector;
 }
 
+std::vector<uint32_t> Reload::fields_by_name(const ir::Class &p_old, const ir::Class &p_new) {
+	std::vector<uint32_t> found(p_new.fields.size(), ir::NONE);
+	std::unordered_map<std::string_view, size_t> seen;
+	for (size_t i = 0; i < p_new.fields.size(); i++) {
+		size_t skip = seen[p_new.fields[i].name]++;
+		for (size_t j = 0; j < p_old.fields.size() && found[i] == ir::NONE; j++) {
+			if (p_old.fields[j].name == p_new.fields[i].name && skip-- == 0) {
+				found[i] = static_cast<uint32_t>(j);
+			}
+		}
+	}
+	return found;
+}
+
 // The new object's fields, each carried from the old one's field of its name and kind, or empty.
 void Reload::carry_fields(Object *p_old, Object *p_fresh) {
 	const ir::Class &old_class = from_.module_.classes[p_old->klass];
 	const ir::Class &new_class = to_.module_.classes[p_fresh->klass];
-	// A base and its subclass may each have a private field of one name: the n-th of a name is the n-th.
-	std::unordered_map<std::string_view, size_t> seen;
+	const std::vector<uint32_t> named = fields_by_name(old_class, new_class);
 	for (size_t i = 0; i < new_class.fields.size(); i++) {
 		const ir::Field &field = new_class.fields[i];
-		size_t skip = seen[field.name]++;
-		bool carried = false;
-		for (size_t j = 0; j < old_class.fields.size() && !carried; j++) {
-			if (old_class.fields[j].name != field.name || skip-- > 0) {
-				continue;
-			}
-			if (old_class.fields[j].kind == field.kind) {
-				vm::field(new_class, p_fresh, i) = carry_into(field.kind, field.klass, field.engine_type, vm::field(old_class, p_old, j));
-			}
-			carried = true;
-		}
-		if (!carried) {
+		if (named[i] == ir::NONE) {
 			vm::field(new_class, p_fresh, i) = empty_value(field.kind == Kind::F64, field.starts_null);
+		} else if (old_class.fields[named[i]].kind == field.kind) {
+			vm::field(new_class, p_fresh, i) = carry_into(field.kind, field.klass, field.engine_type, vm::field(old_class, p_old, named[i]));
 		}
 	}
 }
@@ -229,6 +237,7 @@ void Reload::globals(const std::vector<std::string> &p_changed) {
 			to_.class_used_[named->second] = from_.class_used_[i];
 		}
 	}
+	changed_statics_ = p_changed;
 	for (const std::string &name : p_changed) {
 		constants_again(name);
 	}

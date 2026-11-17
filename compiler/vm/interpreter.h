@@ -5,6 +5,7 @@
 // resumed.
 #pragma once
 
+#include "constructions.h"
 #include "heap.h"
 #include "interpreter_records.h"
 #include "host.h"
@@ -60,6 +61,8 @@ private:
 	const ir::Module &module_;
 	Host host_;
 	Heap heap_; // Who holds what, and the cycle collector (vm/heap.h). After the module: it reads the classes.
+	// What each object was constructed with, while a host asks for it to be remembered: none otherwise.
+	std::unique_ptr<Constructions> constructions_;
 	// What the library's functions of plain values ask of whoever runs the program (vm/library.h), answered
 	// by this interpreter.
 	struct Asked final : Runner, Unmoved {
@@ -372,6 +375,11 @@ public:
 	// Who carries out the Native instructions of a module whose functions are native code. Without one,
 	// such an instruction raises an error.
 	void set_native(NativeCode *p_native) { native_ = p_native; }
+	// From here on, what each object of the program's own classes is constructed with is remembered
+	// (vm/constructions.h), so that a reload can update the objects alive in place (Reload::update_in_place).
+	// For a host whose program can be reloaded; asked before the program makes anything.
+	void remember_constructions();
+	size_t remembered() const { return constructions_ ? constructions_->size() : 0; } // How many objects are.
 	void set_statement_hook(StatementHook p_hook, void *p_data) { hook_ = p_hook, hook_data_ = p_data; }
 	// A call from outside that runs, with all it calls, for longer than this (in milliseconds) is stopped
 	// with Flash's Error #1502, which no catch or finally stops: an endless loop ends. 0, as an interpreter

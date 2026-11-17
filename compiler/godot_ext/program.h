@@ -65,11 +65,16 @@ public:
 	GodotHost &host() { return host_; }
 	const ir::Module &module() const { return *module_; }
 	// The scripts were edited while the game runs: they are compiled again and, if they compile, every
-	// script object alive is moved onto the new code with what it holds. With errors, the errors are
-	// reported and the game carries on with the scripts it had. Not to be called while a script runs.
+	// script object alive is moved onto the new code with what it holds, and the objects whose constructors
+	// would give them other values now are updated in place where that can be done (vm/reload.h); what was
+	// and what was not is said in one line. With errors, the errors are reported and the game carries on
+	// with the scripts it had. Not to be called while a script runs.
 	static void reload();
 	// The same, asked for now (the language's reload_scripts(), Godot's debugger): refused while AS3 runs.
 	static void reload_now();
+	// The running scene started again from its file, asked for by a person (the language's restart_scene()):
+	// what shows the edits a reload could not show on the objects alive. A reload never does this by itself.
+	static void restart_scene();
 	// Once a frame while the project is a folder a person can edit: looks for changed scripts.
 	static void watch();
 	// How many looks the watch has made, each ended with what it began (a reload too): a test that saves
@@ -88,19 +93,29 @@ void move_instances(vm::Interpreter &p_old, vm::Reload &p_reload);
 // neither the scene nor in it (an autoload, a resource), with each one's Godot object. All, with no scene.
 std::vector<std::pair<vm::Object *, godot::Object *>> instances_outside(const godot::Node *p_scene);
 
-// A scene started again after a reload (restart.cpp): code that runs once changed in `classes`, of which
-// objects are alive. What a restart would not make again is said: `kept` names it; `statics` names the
-// classes whose static fields' first values changed after the fields were given them; `scenes` the scene
-// files that changed (refresh_scenes): the running scene starts again if its own did.
+// What a reload did beyond moving the objects: which classes' objects alive were updated in place and which
+// were left and why (vm::InPlace), and the classes whose static fields' first values changed after the
+// fields were given them (`statics`).
+struct Moved {
+	vm::InPlace in_place;
+	std::vector<std::string> statics;
+};
+// Says it (restart.cpp): one line for what was updated in place and what was not, one for the static fields.
+void say_moved(const Moved &p_moved);
+
+// The running scene started again from its file (restart.cpp). `asked`: a person asked for it; `classes`
+// names those whose objects reloads since the scene started left as they were, and `kept` what of them a
+// restart does not make again. Otherwise it is a reload's doing, which starts the scene again only if the
+// scene's own file changed (`scenes`: the scene files that did, refresh_scenes).
 struct Restart {
+	bool asked = false;
 	std::vector<std::string> classes;
 	std::vector<std::string> kept;
-	std::vector<std::string> statics;
 	std::vector<std::string> scenes;
 };
-// Starts the running scene again, from its file, deferred to when Godot changes scenes; or says why not.
-// While a scene is being started again (from the deferred call to Godot saying the scene changed), a reload
-// starts it once more when it is ready, so that its objects have one build's code throughout.
+// Starts the running scene again, deferred to when Godot changes scenes; or says why not. While a scene is
+// being started again (from the deferred call to Godot saying the scene changed), a reload starts it once
+// more when it is ready, so that its objects have one build's code throughout.
 void restart_scene(const Restart &p_restart);
 // The script object of the AS3 script attached to a Godot object, or null: the script instance holds a
 // reference to it, unless its Godot object is reference-counted (counted.cpp).

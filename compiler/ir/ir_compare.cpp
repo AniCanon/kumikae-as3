@@ -1,5 +1,7 @@
 #include "ir.h"
 
+#include "ir_reach.h"
+
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -43,73 +45,37 @@ std::string instruction_text(const Module &p_module, const Function &p_function,
 	return out;
 }
 
-bool extends_class(const Module &p_module, uint32_t p_class, uint32_t p_base) {
-	for (uint32_t at = p_class; at != NONE && at < p_module.classes.size(); at = p_module.classes[at].base) {
-		if (at == p_base) {
-			return true;
-		}
-	}
-	return false;
-}
+} // namespace
 
-// Functions, as text, one after another in the order they are first reached from `p_start`, with what each
-// calls: by name, on the object itself through its class's method table (an override included), and on
-// another object through the class it is declared as (any subclass's override included) or an interface
-// (any class's that implements it). Each function is read with the class of the object it runs on, so that
-// a field or method of that object is named, not numbered.
-std::string reached_text(const Module &p_module, std::vector<std::pair<uint32_t, uint32_t>> p_start) {
+std::string reached_text(const Module &p_module, std::vector<std::pair<uint32_t, uint32_t>> p_start, std::vector<uint32_t> *r_reached) {
 	auto &pending = p_start; // A function, and the class of the object it runs on.
 	std::unordered_set<uint32_t> seen;
 	std::string out;
-	const auto each_class = [&](const auto &p_take) {
-		for (uint32_t c = 0; c < p_module.classes.size(); c++) {
-			p_take(c, p_module.classes[c]);
-		}
-	};
 	for (size_t next = 0; next < pending.size(); next++) {
 		const uint32_t index = pending[next].first;
 		const uint32_t on = pending[next].second;
 		if (index >= p_module.functions.size() || !seen.insert(index).second) {
 			continue;
 		}
+		if (r_reached) {
+			r_reached->push_back(index);
+		}
 		const Function &function = p_module.functions[index];
 		static const Class none; // A function with no object of a class: nothing is named for one.
 		const Class &klass = on < p_module.classes.size() ? p_module.classes[on] : none;
 		out += "function " + function.name + "\n";
 		for (uint32_t at = 0; at < function.code.size(); at++) {
-			const Instruction &instruction = function.code[at];
-			if (instruction.op == Op::Stmt) {
+			if (function.code[at].op == Op::Stmt) {
 				continue;
 			}
-			out += instruction_text(p_module, function, instruction, klass) + "\n";
-			const bool own = !function.is_static && instruction.c < function.argument_lists.size() &&
-					!function.argument_lists[instruction.c].empty() && function.argument_lists[instruction.c][0] == 0;
-			if (instruction.op == Op::Call) { // A constructor too: `new` calls it.
-				const uint32_t owner = instruction.b < p_module.functions.size() ? p_module.functions[instruction.b].owner : NONE;
-				pending.emplace_back(instruction.b, own ? on : owner);
-			} else if (instruction.op == Op::CallVirtual && own) {
-				if (instruction.b < klass.methods.size()) {
-					pending.emplace_back(klass.methods[instruction.b], on); // On the object itself: what its class runs.
-				}
-			} else if (instruction.op == Op::CallVirtual) {
-				for (const std::pair<uint32_t, uint32_t> &receiver : function.virtual_receivers) {
-					each_class([&](uint32_t p_class, const Class &p_other) {
-						if (receiver.first == at && instruction.b < p_other.methods.size() && extends_class(p_module, p_class, receiver.second)) {
-							pending.emplace_back(p_other.methods[instruction.b], p_class);
-						}
-					});
-				}
-			} else if (instruction.op == Op::CallInterface) {
-				each_class([&](uint32_t p_class, const Class &p_other) {
-					if (instruction.b < p_other.interface_methods.size() && p_other.interface_methods[instruction.b] != NONE) {
-						pending.emplace_back(p_other.interface_methods[instruction.b], p_class);
-					}
-				});
-			}
+			out += instruction_text(p_module, function, function.code[at], klass) + "\n";
+			each_called(p_module, function, at, on, [&](uint32_t p_called, uint32_t p_on, bool) { pending.emplace_back(p_called, p_on); });
 		}
 	}
 	return out;
 }
+
+namespace {
 
 // A class's code that runs once for each of its objects (its constructor, which gives fields their first
 // values, and `_ready`, `_enter_tree`, `_init`), with what it reaches.

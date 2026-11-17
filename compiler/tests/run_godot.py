@@ -484,39 +484,55 @@ check("vectors.gd: no vector where Godot takes a packed array is an AS3 error", 
 check("vectors.gd: a value that does not fit a byte is an AS3 error that says so",
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
 
-# A scene edited while it runs: an edit to `_ready` (code that runs once) starts the scene again; an edit
-# elsewhere keeps the scene and its state.
+# A scene edited while it runs: no edit starts the scene again by itself. An object whose constructor depends
+# only on its arguments and constants is updated in place; what could not be is said, and a restart that is
+# asked for (the language's restart_scene()) shows it.
 RESTART = """package { import godot.*; public class Restart extends Node2D {%s
 	private var word:String;
-	override public function _ready():void { word = "%s"; }
+	private var token:Token = new Token(100);
+	override public function _ready():void { word = "%s"; token.y = 7; }
 	public function said():String { return word%s; }
 	public function limit():String { return LIMIT; }
 	public function firstNow():String { return first; }
+	public function width():Number { return token.w; }
+	public function moved():Number { return token.y; }
 } }
+class Token {
+	public var w:Number;
+	public var y:Number;
+	public function Token(p_y:Number) { w = Restart.WIDTH; y = p_y - Restart.WIDTH; }
+}
 """
 with tempfile.TemporaryDirectory() as edited:
     copy = os.path.join(edited, "project")
     shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
     # The second version also adds a field before the one `_ready` sets: nothing that ran changed. The third
-    # edits `_ready`, a static variable's first value and a constant's: the constant has the new value at
-    # once, the variable keeps the one it was given. The fourth and fifth are saved one after the other,
-    # the fifth while the scene the fourth started is being made: its constructors have run, its `_ready` not.
+    # edits `_ready`, a static variable's first value and two constants: the constants have their new values
+    # at once and the Token made from one is updated in place, the variable keeps the one it was given, and
+    # the scene, whose `_ready` can't be run again, is left as it is until a restart is asked for. The fourth
+    # and fifth are saved one after the other, the fifth while the scene a restart asked for after the
+    # fourth is being made: its constructors have run, its `_ready` not.
     unused = "\n\tpublic var unused:int;"
-    first = "\n\tpublic static var first:String = \"%s\";\n\tpublic static const LIMIT:String = \"%s\";"
+    first = "\n\tpublic static var first:String = \"%s\";\n\tpublic static const LIMIT:String = \"%s\";\n\tpublic static const WIDTH:Number = %s;"
     made = "\n\tpublic var made:String = \"%s\";"
-    for name, text in {"Restart.as": RESTART % (first % ("a", "a"), "one", ""), "restart_body.txt": RESTART % (unused + first % ("a", "a"), "one", ' + "!"'),
-                       "restart_ready.txt": RESTART % (unused + first % ("b", "b"), "three", ' + "!"'),
-                       "restart_four.txt": RESTART % (unused + first % ("b", "b") + made % "four", "four", ' + "!" + made'),
-                       "restart_five.txt": RESTART % (unused + first % ("b", "b") + made % "five", "five", ' + "!" + made')}.items():
+    for name, text in {"Restart.as": RESTART % (first % ("a", "a", 24), "one", ""), "restart_body.txt": RESTART % (unused + first % ("a", "a", 24), "one", ' + "!"'),
+                       "restart_ready.txt": RESTART % (unused + first % ("b", "b", 30), "three", ' + "!"'),
+                       "restart_four.txt": RESTART % (unused + first % ("b", "b", 30) + made % "four", "four", ' + "!" + made'),
+                       "restart_five.txt": RESTART % (unused + first % ("b", "b", 30) + made % "five", "five", ' + "!" + made')}.items():
         with open(os.path.join(copy, name), "w") as file:
             file.write(text)
     run = subprocess.run([godot, "--headless", "--path", copy, "-s", "restart.gd"], capture_output=True, text=True, timeout=300)
     output = run.stdout + run.stderr
     values = re.findall(r"VALUE (.+?)=(.*)\|(.*)", output)
-    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 9, output[-1500:])
+    check("restart.gd ran to its end", run.returncode == 0 and len(values) == 13, output[-1500:])
     for name, got, want in values:
         check("restart.gd: %s" % name, got == want, "got %r, expected %r" % (got, want))
-    check("restart.gd: Godot is told why the scene started again", "so the scene starts again" in output, output[-1500:])
+    check("restart.gd: Godot is told what was updated in place, and what was not and why",
+          "ActionScript: objects updated in place: Token. Not updated: Restart (it extends Godot's Node2D). "
+          "Restart the scene to see the new code on those." in output, output[-1500:])
+    check("restart.gd: a reload starts no scene again by itself", output.count("so the scene starts again") == 2, output[-1500:])
+    check("restart.gd: Godot is told why the scene a restart was asked for starts again",
+          "code that runs once changed in Restart, so the scene starts again" in output, output[-1500:])
     check("restart.gd: Godot is told what is kept outside the scene and not made again",
           re.search(r"not made again[^\n]*/root/Keeper", output) is not None, output[-1500:])
     check("restart.gd: Godot is told a static field's first value changed and is kept",

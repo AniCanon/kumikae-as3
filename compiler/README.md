@@ -586,10 +586,45 @@ times a second. When one changes, every script is compiled again:
   new code. Godot prints `ActionScript: reloaded N scripts.`
 - **If they do not,** the errors are printed and the game carries on with the scripts it had.
 
-What to expect of an object that already exists: a field that is new, or whose type changed, starts
-empty (0, `NaN`, `null`), because the object is not constructed again; a new first value for a field
-shows on objects made afterwards. A class that was removed while one of its objects is alive stops the
-reload, and Godot says to restart. An exported game does not watch its scripts.
+A reload then updates the objects alive in place, and never starts the scene again by itself. A constant
+has its new value at once. An object whose constructor would give it other values now (the code of its
+constructor chain changed: its constructor, its fields' first values, the `super(...)` constructors and
+what they call; or the chain reads a constant that has another value) is given them: the new chain is run
+on a throwaway object with the arguments the object was made with, and each field that still holds its old
+first value takes the new one. A field the game has changed since keeps what it holds: with
+`Rules.COIN_WIDTH` edited, every coin on screen has the new width, and a coin the magnet moved stays where
+it is. A second edit starts from what the first gave. Godot prints one line, for example
+`ActionScript: objects updated in place: Coin. Not updated: Hud (it extends Godot's Control). Restart the
+scene to see the new code on those.`
+
+What is updated, and what is not:
+
+- **Updated:** objects of a class with no Godot base whose constructor chain depends only on its arguments
+  and on constants: it works out numbers, Booleans and text, reads and writes the object's own fields,
+  and calls the object's own methods and static functions that do the same (`ir::constructor_chain`
+  decides, and refuses whatever it cannot prove).
+- **Not updated, and named with the first reason:** a class that extends one of Godot's (a node's `_ready`
+  can't be run again on a throwaway); a chain that reads or writes a static variable, makes an object,
+  asks Godot, the date or a random number, prints, or touches another object; an object that was made
+  with an argument, or whose constructor left a field holding, anything but a number, a Boolean, text or
+  null (those are all that is remembered of an object, so that nothing remembered keeps anything alive);
+  a class whose constructor's parameters changed, or whose new constructor fails. Such an object is as
+  before: a field that is new, or whose type changed, starts empty (0, `NaN`, `null`), and a new first
+  value shows on objects made afterwards.
+- **A restart shows the rest,** when you ask for one: the language's `restart_scene()` starts the running
+  scene again from its file and says what that does not make again (nodes outside the scene, objects
+  static fields hold). An IDE action for it is to come. A scene whose own `.tscn` file was edited still
+  starts again by itself. Static variables keep the values the game gave them through both; restart the
+  game for their new first values.
+
+Remembering what objects were constructed with is the interpreter's, in a table beside the objects
+(`vm/constructions.h`), and is on only in a debug build inside Godot: an exported game, native code and
+`kas3c run` keep nothing. It costs where objects are made: `tests/bench/objects.as`, which does nothing
+but make and drop objects, is 15.7% slower with it on (`KAS3_REMEMBER_CONSTRUCTIONS=1` turns it on in
+`kas3c run`, to measure), and the other benchmark programs are within their spread.
+
+A class that was removed while one of its objects is alive stops the reload, and Godot says to restart.
+An exported game does not watch its scripts.
 
 ## Language server
 
@@ -964,7 +999,8 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   The expected output for numbers, strings and evaluation order was produced by Node from a line-by-line
   JavaScript copy, since AS3 and JavaScript share those rules. `tests/run/refused/` holds one program per
   construct the interpreter does not run yet. Every other test program must run or be refused without
-  crashing, and nothing a program makes may be left alive when it ends.
+  crashing, and nothing a program makes may be left alive when it ends. Each program is run once more with
+  what its objects are constructed with remembered, and must do the same.
 - `tests/run_native.py` (the `native` group): the same programs as native code, written by `kas3c cpp`, built
   with the system's C++ compiler and run, held to the same `.out` and `.err`. `tests/native_skipped.txt`
   lists the programs the backend refuses and why; a program newly refused, or one on the list that now
@@ -972,6 +1008,8 @@ Name resolution adds these rules. Where one differs from Adobe's compiler, it sa
   the sanitizers too.
 - `tests/test_backend.cpp`: the C++ backend on modules made by hand: what it refuses, by name and with
   nothing written.
+- `tests/test_constructors.cpp`: which classes' constructor chains depend only on their arguments and
+  constants (`ir::constructor_chain`), each refusal with its reason, and the constants a chain reads.
 - `tests/test_ir.cpp`, `tests/test_runtime.cpp`, `tests/test_vm.cpp`: the IR printer, the number rules
   (checked against Node), the hook and frames a debugger will use, calls into the interpreter that nest
   and fail, and a script run against a fake engine that records every request.

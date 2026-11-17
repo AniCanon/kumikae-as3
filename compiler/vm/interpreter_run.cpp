@@ -98,6 +98,9 @@ void Interpreter::leave(const Function &p_function, const Instruction &p_in, con
 		value = share(kind, p_registers[p_in.a]);
 	}
 	const uint32_t result = frames_.back().result;
+	if (frames_.back().constructs) {
+		constructions_->constructed(static_cast<Object *>(stack_[frames_.back().base].p));
+	}
 	pop();
 	if (gives && result != NONE && frames_.size() > p_depth) {
 		const Frame &caller = frames_.back();
