@@ -5,6 +5,7 @@
 #include "callable.h"
 #include "program.h"
 
+#include <godot_cpp/core/gdextension_interface_loader.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable_custom.hpp>
 #include <godot_cpp/variant/signal.hpp>
@@ -57,8 +58,11 @@ class BoundMethod : public godot::CallableCustom {
 	void let_go();
 
 	// Whether the script object can still be used: its program is the one loaded, and its owner lives.
+	// Godot asks this twice for every listener it calls, and call() once more: the owner is looked for by
+	// its id alone, since godot-cpp's own way also finds the C++ object it keeps for it, behind a lock.
 	bool alive() const {
-		return object_ && Project::generation() == program_ && (owner_.is_null() || godot::ObjectDB::get_instance(owner_) != nullptr);
+		return object_ && Project::generation() == program_ &&
+				(owner_.is_null() || godot::gdextension_interface::object_get_instance_from_id(owner_) != nullptr);
 	}
 
 	// A listener the cycle collector looks through: one with no Godot object of its own (Godot drops the

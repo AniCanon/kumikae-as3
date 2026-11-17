@@ -126,8 +126,10 @@ void BoundMethod::call(const Variant **p_arguments, int p_argcount, Variant &r_r
 		r_call_error.error = GDEXTENSION_CALL_OK;
 		return;
 	}
-	if (!alive()) {
-		// The tombstone: the object this method belongs to is gone.
+	// The tombstone: the object this method belongs to is gone. Godot has just asked is_valid(), which is
+	// where the owner was looked for (Callable::callp asks before every call of a callable like this one,
+	// and nothing else calls one): it is not looked for again.
+	if (!object_ || Project::generation() != program_) {
 		r_call_error.error = GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL;
 		return;
 	}
@@ -176,7 +178,13 @@ void BoundMethod::call(const Variant **p_arguments, int p_argcount, Variant &r_r
 			Project::get().host().error(text);
 		}
 	}
-	Project::get().interpreter().release_object(object);
+	// What this call held is given back: with nothing more asked where the object has another holder, as
+	// it has unless the listener let go of the last.
+	if (object->references > 1) {
+		vm::release(object);
+	} else {
+		Project::get().interpreter().release_object(object);
+	}
 }
 
 void listener_added(const Callable &p_callable, const Signal &p_signal) {

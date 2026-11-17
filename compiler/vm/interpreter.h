@@ -449,7 +449,13 @@ public:
 	// For a host whose native code is the program (native_code.h says what each is for).
 	void engine_instruction(uint32_t p_function, Slot *p_registers);
 	bool idle(uint32_t p_direct = 0) const { return frames_.empty() && direct_ == p_direct && !failing_ && !stopped_ && !halted_ && !carried_.held; }
-	void entered() { entering(), entries_++; }
+	void entered() {
+		// The clock is started by the first call from outside alone: one made inside another asks nothing.
+		if (entries_ == 0) {
+			entering();
+		}
+		entries_++;
+	}
 	void left() { entries_--; }
 	void report_native(NativeError p_error);
 

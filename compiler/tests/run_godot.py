@@ -221,6 +221,45 @@ check("add after addOnce, and the reverse, are AS3 errors", "at Signals/mixed()"
       output[-800:])
 check("an empty signal says so", "the signal is empty" in output and "at Signals/empty()" in output, output[-800:])
 
+# What a signal carries from AS3's emit() to its listeners and from Godot to a listener written in AS3
+# (Emits.as): the rows are emits_cases.gd's, which the native probe runs too.
+output = compare("emits.gd", [
+    "emit: an int, a Number, a Boolean and a Vector2", "emit: a uint, an Int64 and a sum", "emit: Godot's values with parts",
+    "emit: values made where they are emitted, in a loop", "emit: a String, a node, an untyped value and no Vector2",
+    "emit: nothing, and six values", "emit: one of Godot's own signals", "emit: another object's signal",
+    "emit: one place, whichever signal it is handed, and a signal of no object", "a listener's int and Vector2",
+    "a listener is not given what does not fit", "a listener's uint, Number, Boolean and Int64",
+    "such a listener is not given what does not fit", "a listener's String, node, untyped value and Vector2",
+    "a listener with a default, with the rest, a static one and a function", "the same, given less",
+    "a listener that changes what it was given changes its own", "a listener that keeps what it was given keeps its own",
+    "a listener is not given what fits only in part", "AS3 emits to AS3", "AS3 emits what its own listener does not take",
+    "a listener's error comes out of the emit", "a listener's error nothing catches ends the emitting function",
+    "a listener that emits what it listens to", "a listener for once only", "emit: a signal kept in a field",
+    "emit: a signal of an object freed since", "emit: no signal at all", "a listener freed by the one before it is not called",
+    "a listener that changes the field the signal was emitted through", "a listener called later has heard nothing yet",
+    "a listener called later hears what was emitted",
+])
+for refused in ("argument 1 of Emits/onStruck(), a String, to int", "argument 2 of Emits/onStruck(), a Vector3, to Vector2",
+                "argument 1 of Emits/onStruck(), a float, to int", "argument 2 of Emits/onStruck(), a Object, to Vector2",
+                "argument 2 of Emits/onWide(), a String, to Number", "argument 3 of Emits/onWide(), a int, to Boolean",
+                "argument 4 of Emits/onWide(), a float, to Int64", "argument 2 of Emits/onTurned(), a String, to int"):
+    check("emits.gd: a listener given the wrong kind of value is AS3's TypeError, which names it: " + refused,
+          "TypeError: Error #1034: Type Coercion failed: cannot convert " + refused + "." in output, output[-1500:])
+check("emits.gd: a whole number too wide for a listener's int or uint is AS3's RangeError",
+      "RangeError: 5000000000 does not fit an int.\n\tat Emits/onStruck()" in output and "RangeError: -1 does not fit a uint.\n\tat Emits/onWide()" in output,
+      output[-1500:])
+# From GDScript's emit (too few, too many), from one given less than three of the four listeners take, and
+# from AS3's own emit of one value.
+check("emits.gd: a listener given too few or too many values is AS3's ArgumentError",
+      output.count("ArgumentError: Error #1063: Argument count mismatch on Emits/onStruck(). Expected 2, got 1.") == 2 and
+      "Argument count mismatch on Emits/onStruck(). Expected 2, got 3." in output and
+      "Argument count mismatch on Emits/onStatic(). Expected 2, got 1." in output, output[-1500:])
+check("emits.gd: what AS3 emits that its own listener does not take is refused in the same words",
+      output.count("argument 1 of Emits/onStruck(), a String, to int") == 2, output[-1500:])
+check("emits.gd: an error in a listener that nothing catches is reported with the function that emitted",
+      re.search(r"SCRIPT ERROR: Error: in the listener at 3\n\s+at Emits/onFail\(\)\[res://Emits\.as:\d+\]\n\s+at Emits/strike\(\)\[res://Emits\.as:\d+\]", output)
+      is not None, output[-1500:])
+
 # Godot closing. As the scene tree is taken down, AS3's listeners still run and its static fields still
 # hold their values; and with a main loop that is not a scene tree, an object a static field holds, with a
 # GDScript listener on it, is let go while Godot can still free it.

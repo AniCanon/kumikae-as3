@@ -29,6 +29,7 @@ class Project {
 	std::unique_ptr<NativeProgram> native_;
 	bool loaded_ = false;
 	bool valid_ = false;
+	static uint64_t loads_; // How many times the scripts have been loaded afresh (generation()).
 
 	Project() {}
 
@@ -45,7 +46,8 @@ public:
 	static void unload();
 	// A number that changes every time the scripts are loaded afresh. What belongs to an earlier load
 	// (a script object held by a callable) must not be used with a later one.
-	static uint64_t generation();
+	// Asked each time Godot asks whether a listener is still valid: nothing is called for it.
+	static uint64_t generation() { return loads_; }
 
 	bool valid() const { return valid_; }
 	vm::Interpreter &interpreter() { return native_ ? native_->interpreter() : *interpreter_; }

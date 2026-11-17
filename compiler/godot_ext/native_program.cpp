@@ -1,5 +1,6 @@
 #include "native_program.h"
 
+#include "godot_calls.h"
 #include "handles.h"
 #include "sources.h"
 #include "worked.h"
@@ -13,6 +14,7 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <new>
 
 using namespace godot;
 
@@ -47,11 +49,6 @@ bool has_parts(int p_type) {
 	return false;
 }
 
-// Where a Variant of a type keeps its bare value.
-void *inside(Variant &p_value, int p_type) {
-	return gdextension_interface::variant_get_ptr_internal_getter((GDExtensionVariantType)p_type)(p_value._native_ptr());
-}
-
 // The object behind a handle: by its id, so that one Godot has freed is null.
 void *object_behind(void *p_handle) {
 	const Variant *held = static_cast<const Variant *>(p_handle);
@@ -75,14 +72,74 @@ void unbox(const void *p_handle, rt::Parts p_type, void *r_value) {
 	Variant *held = const_cast<Variant *>(static_cast<const Variant *>(p_handle));
 	const int type = godot_type(p_type);
 	if (held && held->get_type() == type) {
-		std::memcpy(r_value, inside(*held, type), PARTS_SIZES[static_cast<size_t>(p_type)]);
+		const void *value = inside(*held, type);
+		// The small ones are copied where they are: a size known only here would be a call for each.
+		switch (PARTS_SIZES[static_cast<size_t>(p_type)]) {
+			case 8:
+				std::memcpy(r_value, value, 8);
+				break;
+			case 12:
+				std::memcpy(r_value, value, 12);
+				break;
+			case 16:
+				std::memcpy(r_value, value, 16);
+				break;
+			default:
+				std::memcpy(r_value, value, PARTS_SIZES[static_cast<size_t>(p_type)]);
+				break;
+		}
 	}
+}
+
+// A signal emitted by generated code (rt::EngineApi::emit): each value made into Godot's own where Godot
+// reads it, on the stack, as the request by name makes it (to_variant), and the emit the host worked out.
+bool emit_bare(void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count) {
+	if (p_count >= MOST_OPERANDS) {
+		return false;
+	}
+	Values values;
+	// A number or a Boolean as a Variant owns nothing: it is made here and never given back to Godot.
+	alignas(Variant) unsigned char plain[MOST_OPERANDS][sizeof(Variant)];
+	const Variant *pointers[MOST_OPERANDS + 1];
+	for (uint32_t i = 0; i < p_count; i++) {
+		const Variant *handle = nullptr;
+		switch (p_held[i]) {
+			case rt::GIVEN_WHOLE:
+				pointers[i + 1] = new (plain[i]) Variant(*static_cast<const int64_t *>(p_values[i]));
+				break;
+			case rt::GIVEN_NUMBER:
+				pointers[i + 1] = new (plain[i]) Variant(*static_cast<const double *>(p_values[i]));
+				break;
+			case rt::GIVEN_FLAG:
+				pointers[i + 1] = new (plain[i]) Variant(*static_cast<const uint8_t *>(p_values[i]) != 0);
+				break;
+			case rt::GIVEN_HANDLE:
+				// A freed object goes to Godot as what it is to the script: null.
+				handle = static_cast<const Variant *>(p_values[i]);
+				pointers[i + 1] = handle && !is_freed(*handle) ? handle : new (values.room()) Variant();
+				break;
+			default: {
+				// A value with parts: Godot's own maker of a Variant from the bare value of that type.
+				static GDExtensionVariantFromTypeConstructorFunc makers[PARTS] = {};
+				const size_t parts = static_cast<size_t>(p_held[i] - rt::GIVEN_PARTS);
+				if (!makers[parts]) {
+					makers[parts] = gdextension_interface::get_variant_from_type_constructor(
+							(GDExtensionVariantType)godot_type(static_cast<rt::Parts>(parts)));
+				}
+				void *const room = values.room();
+				makers[parts](room, const_cast<void *>(p_values[i]));
+				pointers[i + 1] = static_cast<const Variant *>(room);
+				break;
+			}
+		}
+	}
+	return emit_signal(*static_cast<const GodotHost::Worked *>(p_emitter), static_cast<const Variant *>(p_signal), pointers, p_count);
 }
 
 // Godot's own entry for a call on bare values is handed over as it is: generated code calls it with nothing
 // between, as C# does.
 const rt::EngineApi *api() {
-	static const rt::EngineApi table = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox };
+	static const rt::EngineApi table = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare };
 	return &table;
 }
 
@@ -206,6 +263,11 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 	if (worked && (worked->what == What::Operator || worked->what == What::Builtin || worked->what == What::FieldGet ||
 						  worked->what == What::FieldSet || worked->what == What::Constant)) {
 		return resolve_value(*worked, r_resolved);
+	}
+	if (worked && worked->what == What::Emit) {
+		// A signal's emit(): what was worked out is itself what generated code hands back (EngineApi::emit).
+		r_resolved->bind = const_cast<GodotHost::Worked *>(worked);
+		return true;
 	}
 	if (!worked || !worked->bound || worked->is_static || worked->index >= 0 ||
 			(worked->what != What::Bound && worked->what != What::Getter && worked->what != What::Setter)) {

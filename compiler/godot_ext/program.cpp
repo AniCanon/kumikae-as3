@@ -31,16 +31,12 @@ using namespace godot;
 namespace kas3 {
 
 static Project *program = nullptr;
-static uint64_t loads = 0;
+uint64_t Project::loads_ = 0;
 static const uint64_t WATCH_MILLIS = 200; // Between looks at the scripts.
 static uint64_t looks = 0;
 
 uint64_t Project::watch_looks() {
 	return looks;
-}
-
-uint64_t Project::generation() {
-	return loads;
 }
 
 void Project::before_shutdown() {
@@ -112,7 +108,7 @@ Project &Project::get() {
 		return *program;
 	}
 	program->loaded_ = true;
-	loads++;
+	loads_++;
 	// Taken before the scripts are read: an edit made from here on is one the game has not seen.
 	watch_loaded = watch_seen = scripts_signature();
 	refresh_scenes(); // What they are now: an edit from here on is read again.
@@ -227,7 +223,7 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 			if (instances_can_move(moving) && listeners_can_move(moving) && moving.missing().empty()) {
 				moving.globals(statics); // Their constants take the new first values; their variables keep theirs.
 				move_instances(p_running, moving);
-				move_listeners(p_running, moving, loads + 1);
+				move_listeners(p_running, moving, Project::generation() + 1);
 				// With every object alive moved and the constants as the new code has them: the objects
 				// whose constructors would give them other values now take those, where that can be done.
 				r_moved->in_place = moving.update_in_place(run_once);
@@ -283,7 +279,7 @@ void Project::reload() {
 	if (!move_onto(*program->interpreter_, *program->module_, program->host_, module.get(), &fresh, &moved)) {
 		return;
 	}
-	loads++;
+	loads_++;
 	// The old program goes last: what it still holds (its static fields) is let go while it can be.
 	program->interpreter_.swap(fresh);
 	program->module_.swap(module);
@@ -350,7 +346,7 @@ void Project::unload() {
 		program->interpreter().clear_globals();
 		program->interpreter().collect();
 	}
-	loads++;
+	loads_++;
 	delete program;
 	program = nullptr;
 	left_since_start.clear();

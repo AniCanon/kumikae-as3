@@ -93,6 +93,9 @@ class FunctionWriter {
 	// function_borrowed.cpp. Per register: the slot of the field of `this` it is read from and borrows (it
 	// counts no reference of its own), or NONE.
 	std::vector<uint32_t> borrowed_;
+	// For a register that is read from a field of `this` only to emit the signal there: the field's slot,
+	// or NONE. Such a register is never given the handle (find_lent_signals).
+	std::vector<uint32_t> signal_from_;
 	void find_borrowed();
 	// Per register: it holds an object read out of a vector (or copied from such a register) in a function
 	// where nothing can take the object out of the vector: it counts no reference of its own (rule 2).
@@ -173,6 +176,10 @@ class FunctionWriter {
 	bool engine_alias(const ir::Instruction &p_in);
 	bool engine_inline(const ir::Instruction &p_in);
 	bool engine_bound(const ir::Instruction &p_in);
+	bool emits_bare(const ir::Instruction &p_in) const; // Whether an instruction is an emit() engine_emit() writes.
+	bool engine_emit(const ir::Instruction &p_in); // A signal's emit() on values held bare.
+	bool only_values(const ir::Instruction &p_in) const;
+	void find_lent_signals();
 	// function_values.cpp: Godot's own code for a value type, called on bare values.
 	std::string_view value_type(uint32_t p_register) const;
 	std::optional<std::string> bare_operand(uint32_t p_register, size_t p_at, std::string *r_guard, std::string *r_inside);
