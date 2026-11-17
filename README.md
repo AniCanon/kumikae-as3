@@ -14,8 +14,8 @@ C#. While you work, an interpreter runs your scripts and reloads them when you s
 scripts compile to native code through C++.
 
 > **Status: alpha.** Scripts run in Godot 4.7 on macOS and in the iOS Simulator, with hot reload and editor
-> support in Rider and VS Code. Native code matches or beats Godot C# on the project's frame benchmarks, but
-> you still build it by hand. There is no debugger yet. Windows, Linux and Android are untested. See the
+> support in Rider and VS Code. Native code matches or beats Godot C# on the project's frame benchmarks, and
+> building it when you press Play is opt-in for now. There is no debugger yet. Windows, Linux and Android are untested. See the
 > [roadmap](docs/roadmap.md) for what is built and what comes next.
 
 ## What a script looks like
@@ -123,7 +123,7 @@ difference is a failing test. Read more in [How it works](docs/how-it-works.md).
 | Language server: errors, completion, navigation, hover | Built |
 | Interpreter in Godot: the AS3 language, `[Export]`, `[Signal]`, hot reload | Built |
 | Native code through C++ | Built; level with or ahead of C# on the frame benchmarks |
-| Play builds native code for you | In progress |
+| Native code when you press Play | Built on macOS, opt-in; on by default once hot reload is whole under it |
 | iOS | Interpreter runs in the Simulator and on a device; native code on iOS is next |
 | Rider plugin and VS Code client | Built; no debugger yet |
 | Debugger | Planned |

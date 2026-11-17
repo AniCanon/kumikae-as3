@@ -193,7 +193,7 @@ def missing(godot):
 
 def run_once(program, library=None):
     """{(workload, language): microseconds} from one run of an export; with a program library, AS3 is native."""
-    environment = dict(os.environ)
+    environment = dict(os.environ, KAS3_NATIVE_PLAY="0")  # Native code is the library named, and nothing Play builds.
     environment.pop("KAS3_PROGRAM_LIBRARY", None)
     if library:
         environment["KAS3_PROGRAM_LIBRARY"] = library
@@ -213,7 +213,7 @@ def run_once(program, library=None):
 
 def frame_once(program, bench, language, library=None, more=()):
     """What frames/runner.gd says of one benchmark in one language: its JSON line."""
-    environment = dict(os.environ)
+    environment = dict(os.environ, KAS3_NATIVE_PLAY="0")  # Native code is the library named, and nothing Play builds.
     environment.pop("KAS3_PROGRAM_LIBRARY", None)
     if library:
         environment["KAS3_PROGRAM_LIBRARY"] = library

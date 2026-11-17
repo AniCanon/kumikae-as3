@@ -164,6 +164,7 @@ struct Host final : vm::NativeCode {
 	[[nodiscard]] bool hand_over(vm::NativeError *r_error) override;
 	void clear_globals() override;
 	Slot *global(uint32_t p_index) override { return &globals[p_index]; }
+	bool statics_given(uint32_t p_class) const override { return p_class < class_used.size() && class_used[p_class]; }
 	Host(const Host &) = delete;
 	Host &operator=(const Host &) = delete;
 

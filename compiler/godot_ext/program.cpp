@@ -5,6 +5,7 @@
 #include "instance.h"
 #include "lower.h"
 #include "names.h"
+#include "play_build.h"
 #include "script.h"
 #include "sources.h"
 
@@ -40,6 +41,7 @@ uint64_t Project::watch_looks() {
 }
 
 void Project::before_shutdown() {
+	play::finish();
 	forget_scenes();
 	free_instances_freed_elsewhere();
 	free_detached();
@@ -118,7 +120,12 @@ Project &Project::get() {
 				String::utf8(errors.c_str()));
 		return *program;
 	}
-	if (const std::string library = NativeProgram::path(); !library.empty()) {
+	// A program library the project was given (named, or in its `bin`) before the one Play builds.
+	std::string library = NativeProgram::path();
+	if (library.empty()) {
+		library = play::library_for(*program->module_);
+	}
+	if (!library.empty()) {
 		std::string why;
 		program->native_ = NativeProgram::load(library, *program->module_, program->host_, &why);
 		if (program->native_) {
@@ -155,6 +162,7 @@ void Project::collect_step() {
 	if (program && program->valid_) {
 		program->interpreter().collect_step(COLLECTOR_WORK);
 	}
+	play::poll();
 }
 
 void Project::watch() {
@@ -164,6 +172,9 @@ void Project::watch() {
 		return;
 	}
 	looked = time;
+	if (program && program->valid_ && program->running()) {
+		return; // A reload is made between the scripts' calls: this look is made again.
+	}
 	const uint64_t now = scripts_signature();
 	// An editor writes a file in steps. A change is acted on once it has stayed the same for one look.
 	if (now != watch_loaded && now == watch_seen) {
@@ -249,12 +260,6 @@ static bool move_onto(vm::Interpreter &p_running, const ir::Module &p_old, Godot
 }
 
 void Project::reload() {
-	if (program && program->native_) {
-		// Native code is not moved onto new code yet: the game carries on with what it was built from.
-		UtilityFunctions::push_warning("ActionScript: the scripts changed, but they run as native code, which is not reloaded: build the "
-									   "program library again and start the game again.");
-		return;
-	}
 	if (!program || !program->valid_) {
 		// Nothing is running: the scripts had errors. They are simply loaded again.
 		unload();
@@ -276,15 +281,21 @@ void Project::reload() {
 	free_instances_freed_elsewhere(); // Before the instances are looked through: their objects are gone.
 	Moved moved;
 	std::unique_ptr<vm::Interpreter> fresh;
-	if (!move_onto(*program->interpreter_, *program->module_, program->host_, module.get(), &fresh, &moved)) {
+	// What has been running: the interpreter, or the one a program library's host keeps, whose objects are
+	// laid out as the interpreter's and are moved as they are (vm/reload.h).
+	const bool was_native = program->native_ != nullptr;
+	if (!move_onto(program->interpreter(), *program->module_, program->host_, module.get(), &fresh, &moved)) {
 		return;
 	}
 	loads_++;
 	// The old program goes last: what it still holds (its static fields) is let go while it can be.
+	std::unique_ptr<NativeProgram> native = std::move(program->native_);
 	program->interpreter_.swap(fresh);
 	program->module_.swap(module);
-	fresh->superseded(); // Godot's objects now hold the new program's script objects, not the old one's.
+	// Godot's objects now hold the new program's script objects, not the old one's.
+	(native ? native->interpreter() : *fresh).superseded();
 	fresh.reset();
+	native.reset();
 	module.reset();
 	// The program just let go of was the only other one that held what the host worked out for it.
 	program->host_.release_unused();
@@ -294,8 +305,12 @@ void Project::reload() {
 				String::num_int64((int64_t)used) + " of them the running program's");
 	}
 	AS3Script::refresh_all();
-	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts.");
+	UtilityFunctions::print(String("ActionScript: reloaded ") + String::num_int64((int64_t)count) + " scripts." +
+			(was_native ? " They ran as native code, which is not reloaded in a running game: the interpreter runs them from here on, and "
+						  "the next run is native again."
+						: ""));
 	say_moved(moved);
+	play::build_ahead(*program->module_); // What the scripts are now, as native code for the next run.
 	for (const auto &[name, why] : moved.in_place.left) {
 		if (std::find(left_since_start.begin(), left_since_start.end(), name) == left_since_start.end()) {
 			left_since_start.push_back(name);
@@ -321,7 +336,7 @@ void Project::restart_scene() {
 }
 
 void Project::reload_now() {
-	if (program && program->valid_ && program->interpreter().depth() > 0) {
+	if (program && program->valid_ && program->running()) {
 		UtilityFunctions::push_error("ActionScript: the scripts can't be reloaded while AS3 runs: the reload was not made.");
 		return;
 	}

@@ -194,7 +194,9 @@ exactly those), named so that the split can be checked against it:
 ## Rules
 
 - **`runtime/` includes `vm/` and `ir/`, and no Godot header yet.** The headers generated code sees
-  (`kas3.h` and what it includes) stay small: every generated file reads them.
+  (`kas3.h` and what it includes) stay small: every generated file reads them, and the Godot extension
+  carries them (`tools/embed_runtime.py` follows the includes from `kas3.h`) to build a project's program
+  library wherever it is installed. No two of them may have one file name: they are written into one folder.
 - **Nothing here words an AS3 error.** An error is raised by the shared library.
 - **A fast path is inline in a header, and only that:** what it does not handle goes to `operations.h` or
   to the thunk of the same instruction.

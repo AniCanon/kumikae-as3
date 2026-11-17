@@ -1,5 +1,6 @@
 // The extension's entry point: registers ActionScript 3 as a Godot scripting language.
 #include "language.h"
+#include "play_build.h"
 #include "program.h"
 #include "script.h"
 
@@ -33,6 +34,7 @@ static void terminate(ModuleInitializationLevel p_level) {
 	}
 	ResourceLoader::get_singleton()->remove_resource_format_loader(loader);
 	loader.unref();
+	kas3::play::finish(); // Its thread, if the shutdown before this did not come.
 	kas3::Project::unload();
 	kas3::forget_defaults();
 	Engine::get_singleton()->unregister_script_language(AS3Language::singleton);

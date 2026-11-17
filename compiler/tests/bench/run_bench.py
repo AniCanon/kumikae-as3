@@ -38,7 +38,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 def timed(command, cwd=None):
     start = time.perf_counter()
-    done = subprocess.run(command, capture_output=True, text=True, cwd=cwd, timeout=600)
+    # What is timed in Godot is the interpreter: Play's own build of the project's library is off.
+    done = subprocess.run(command, capture_output=True, text=True, cwd=cwd, timeout=600, env=dict(os.environ, KAS3_NATIVE_PLAY="0"))
     return (time.perf_counter() - start) * 1000.0, done
 
 
