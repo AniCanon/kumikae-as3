@@ -19,6 +19,7 @@ goes into `program.cpp` too: one file for the C++ compiler, which a release is b
 | `function_writer.h`, `function_writer.cpp` | One function: its registers as locals, who owns what, labels, the error paths and handlers, and its entry (the same function called with slots) |
 | `patterns.h`, `function_simple.cpp` | The operations that are one C++ statement, as a table (arithmetic, conversions, comparisons), and constants |
 | `function_objects.cpp` | Fields, static fields, classes, jumps, returns and throws |
+| `function_classes.cpp` | The class an object register is known to hold (a parameter declared of it, a new object, a field or an element declared to hold it, a copy), so that a field of it is written through the class's struct, which tells the C++ compiler which field of which class a read or a write is of |
 | `function_calls.cpp` | Calls: direct, through the class's method table, by interface |
 | `function_fast.cpp` | Operations the library owns, written with an inline path for the usual case and the thunk for the rest: a new object, a vector's elements, `push()` of one value where the vector has room, a `Vector2` or a `Vector2i` copied between a register that holds it inline and a vector's place that holds it whole, Strings, untyped values, properties under a String key, a call through a function value |
 | `function_library.cpp` | An instruction one of the library's functions of plain values carries out whole (`ir/library_entries.h`): the runtime's function of that name called on the instruction's values, where a thunk would have been |
@@ -87,6 +88,13 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   as the function begins, where nothing in the function runs code that could write one (no call, no first
   use of a class, nothing let go of): rule 12, for statics (`tests/run/static_still.as`).
 - `Math.sqrt`, `abs`, `floor` and `ceil` are the machine's own: IEEE 754 gives them one answer.
+- A field of an object other than `this` is written through the struct of the object's class
+  (`static_cast<C10_Body *>(r4)->f3_vx`) where every write of the register agrees on a class
+  (`function_classes.cpp`), and by its number (`field<double>(r4, 3)`) where none is known. Through the
+  struct, the C++ compiler knows that a write of `vx` leaves `mass` and `x` as they were, whichever
+  objects two registers hold: it reads each once, and keeps two fields that sit side by side together.
+  By its number a field is any Number of any object, and every write makes the others be read again. One
+  object reached through two registers is still one object either way (`tests/run/field_classes.as`).
 - A null check is explicit, and left out on `this`.
 - `#line` markers point at the `.as` source.
 

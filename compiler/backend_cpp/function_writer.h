@@ -84,6 +84,13 @@ class FunctionWriter {
 	Touch touch(uint32_t p_pc, uint32_t p_slot) const;
 	void find_kept();
 	std::string own_field(uint32_t p_slot) const; // The field of `this` in memory.
+	// function_classes.cpp. Per register: the class of the program every object it is given is of (that
+	// class or one that extends it), or NONE where nothing says. A field of such an object is written
+	// through the class's struct (field_of), any other by its number.
+	std::vector<uint32_t> class_of_;
+	uint32_t class_written(const ir::Instruction &p_in, const std::vector<uint32_t> &p_known) const;
+	void find_classes();
+	std::string field_of(uint32_t p_object, uint32_t p_slot, ir::Kind p_kind) const; // A field of an object, in memory.
 	std::optional<std::string> kept_local(uint32_t p_object, uint32_t p_slot) const; // The local, if the field is kept.
 	std::string kept_declared() const; // The locals, each given its field's value.
 	// Statements, on one line: the locals written back before an instruction that may see their fields, and
