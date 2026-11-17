@@ -446,7 +446,8 @@ through it:
   `xcode-select --install`), and the interpreter runs the scripts. On macOS `/usr/bin/c++` is there
   without the tools and only offers to install them, in a window: the extension looks for the tools
   themselves (`DEVELOPER_DIR`, what `xcode-select` chose, Xcode, the command line tools) and never runs
-  it without them. `KAS3_CXX` names another compiler.
+  it without them. (The rule is held by a test with folders of its own; a Mac without the tools has not
+  been tried.) `KAS3_CXX` names another compiler.
 - **A build that fails** is never the scripts' mistake: one warning says where the compiler's output is,
   the interpreter runs the scripts, and the same build is not tried again (taking `.godot/kas3` away
   tries everything again). A library that can't be loaded is refused with why, as one given by hand is.
@@ -461,10 +462,15 @@ through it:
   on as a game that started on the interpreter is. One thing differs: native code remembers nothing of
   what objects are made with, so an object made before that first edit is not updated in place by a later
   one; the reload says so by its class, and a restart of the scene shows the new code on it. Each reload
-  has the library of the scripts as they are now built for the next run, which is native again.
+  has the library of the scripts as they are now built for the next run, which is native again: a
+  compiler runs after every save, beside the game, in games that started on the interpreter too.
+- **What native code lacks next to the interpreter** in a game that is played: the limit on a script's
+  time (a loop that never ends is not stopped with Error #1502), in a run of a project's tests as in the
+  game.
 - **Where nothing is built:** the editor itself (it runs no game), a game run from a pack (an export, the
   iOS Simulator), a system other than macOS and Linux, and a project given a library by hand
-  (`KAS3_PROGRAM_LIBRARY`, or `bin/libkas3_program`), which is used as before. The tests turn it off for
+  (`KAS3_PROGRAM_LIBRARY`, or `bin/libkas3_program`), which is used as before. Linux is written as macOS
+  is, with its own flags, and has **not been built or run** there. The tests turn it off for
   every run but those that test it (`tests/play_godot.py`).
 
 Measured on 2026-11-17 on a machine other work loaded (load average 13 to 17), Godot headless, the
