@@ -226,7 +226,10 @@ func _lifetimes() -> void:
 	kept.emit(1, Vector2(1, 0))
 	row("emit: a signal kept in a field", before, "sent " + ear.said())
 	gone.free()
-	row("emit: a signal of an object freed since", node.sendKept(2) + " " + ear.said(), "sent ")
+	# Nothing happens, and nothing is said, as when GDScript emits the same signal.
+	var after: String = node.sendKept(2) + " " + ear.said()
+	kept.emit(2, Vector2(2, 0))
+	row("emit: a signal of an object freed since", after, "sent " + ear.said())
 	node.keepNone()
 	row("emit: no signal at all", node.sendKept(3), "caught Error #1009: Cannot access a property or method of a null object reference.")
 	# A listener's object freed by the listener before it, in the same emit.
