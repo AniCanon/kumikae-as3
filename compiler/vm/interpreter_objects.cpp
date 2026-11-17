@@ -71,7 +71,7 @@ Object *Interpreter::construct(uint32_t p_class, void *p_owner) {
 		}
 		return nullptr;
 	}
-	Object *object = new_object(p_class, slots_of(klass), heap_.list_for(p_class));
+	Object *object = new_object(p_class, heap_.object_slots(p_class), heap_.list_for(p_class));
 	if (!object) {
 		if (p_owner) {
 			host_.handles.drop(p_owner);

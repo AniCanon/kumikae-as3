@@ -155,7 +155,7 @@ Object *Reload::object(Object *p_old) {
 	if (old_class.element != Kind::Void || new_class.element != Kind::Void) {
 		return moved_vector(static_cast<Vector *>(p_old), named->second);
 	}
-	Object *fresh = new_object(named->second, slots_of(new_class), to_.heap_.list_for(named->second));
+	Object *fresh = new_object(named->second, to_.heap_.object_slots(named->second), to_.heap_.list_for(named->second));
 	if (!fresh) {
 		return nullptr;
 	}

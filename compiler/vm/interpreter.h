@@ -377,7 +377,8 @@ public:
 	void set_native(NativeCode *p_native) { native_ = p_native; }
 	// From here on, what each object of the program's own classes is constructed with is remembered
 	// (vm/constructions.h), so that a reload can update the objects alive in place (Reload::update_in_place).
-	// For a host whose program can be reloaded; asked before the program makes anything.
+	// For a host whose program can be reloaded; asked before the program makes anything. Asked once an
+	// object has been made, or of a program with native code, nothing is remembered.
 	void remember_constructions();
 	size_t remembered() const { return constructions_ ? constructions_->size() : 0; } // How many objects are.
 	void set_statement_hook(StatementHook p_hook, void *p_data) { hook_ = p_hook, hook_data_ = p_data; }

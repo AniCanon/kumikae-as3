@@ -135,7 +135,7 @@ Object *new_object(Context *c, uint32_t p_class) {
 		return nullptr;
 	}
 	const ir::Class &klass = c->host->module.classes[p_class];
-	Object *object = vm::new_object(p_class, vm::slots_of(klass), c->host->interpreter->heap().list_for(p_class));
+	Object *object = vm::new_object(p_class, c->host->interpreter->heap().object_slots(p_class), c->host->interpreter->heap().list_for(p_class));
 	if (object) {
 		vm::reset_fields(klass, object);
 	}

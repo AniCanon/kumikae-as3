@@ -1882,6 +1882,7 @@ static void test_reload_in_place_refused() {
 	scripts.hold("spinner", "Spinner");
 	CHECK_EQ(scripts.edit(with(node, "N:Number = 1", "N:Number = 2")), std::string("updated:; Spinner: it extends Godot's Node"));
 	CHECK_EQ(scripts.number("spinner.speed"), 1.0);
+	CHECK_EQ(scripts.program->remembered(), (size_t)1); // The game alone: nothing of an object of Godot's is kept.
 	scripts.end();
 }
 
@@ -1915,6 +1916,52 @@ static void test_reload_in_place_memory() {
 	on.call("churn");
 	CHECK_EQ(on.program->remembered(), (size_t)2);
 	on.end();
+	// Asked for once an object has been made, nothing is remembered: what is remembered is kept with each
+	// object, and one made before has no room for it.
+	Edited late;
+	late.remember = false;
+	late.start(source);
+	late.program->remember_constructions();
+	late.call("churn");
+	CHECK_EQ(late.program->remembered(), (size_t)0);
+	CHECK_EQ(late.edit(with(source, "N:Number = 1", "N:Number = 5")), std::string("updated:; Shot: what its objects were made with is not remembered"));
+	CHECK_EQ(late.number("kept.n"), 8.0);
+	late.end();
+}
+
+// Which objects are remembered at all, and that what is remembered of one goes with it however it ends: a
+// class whose constructor takes any number of arguments is not, a constructor that raises leaves nothing
+// behind, and text that was an argument or a first value is let go of with the object.
+static void test_reload_in_place_kept() {
+	const std::string source =
+			"package { public class Game { public var a:Named; public var b:Named; public var rest:Rest; public var made:int = 0;\n"
+			"  public function make():void { a = new Named(\"a\" + made, made); b = new Named(\"b\" + made); rest = new Rest(1, 2); made++;\n"
+			"    for (var i:int = 0; i < 40; i++) { try { new Named(\"bad\" + i, i); } catch (e:Error) { } var gone:Named = new Named(\"go\", \"any\" + i); } } } }\n"
+			"class K { public static const N:Number = 1; public static const TAG:String = \"-\"; }\n"
+			"class Named { public var name:String; public var extra:*; public var n:Number = K.N; public var none:String;\n"
+			"  public function Named(p_name:String, p_extra:* = null) { name = p_name + K.TAG; extra = p_extra;\n"
+			"    if (p_name.length > 3) { n += none.length; } } }\n"
+			"class Rest { public var n:Number = K.N; public function Rest(...p_all) { n += p_all.length; } }\n";
+	Edited edited;
+	edited.start(source);
+	edited.call("make");
+	CHECK_EQ(edited.program->remembered(), (size_t)3); // The game and its two: not Rest's, and none that is gone.
+	edited.call("make"); // The two it held are let go of, with the text they were made with.
+	CHECK_EQ(edited.program->remembered(), (size_t)3);
+	const std::string next = with(with(source, "N:Number = 1", "N:Number = 4"), "TAG:String = \"-\"", "TAG:String = \"+\"");
+	CHECK_EQ(edited.edit(next), std::string("updated: Named; Rest: Rest() takes any number of arguments"));
+	CHECK_EQ(edited.text("a.name"), std::string("a1+"));
+	CHECK_EQ(edited.text("b.name"), std::string("b1+"));
+	CHECK_EQ(edited.number("a.n"), 4.0);
+	CHECK_EQ(vm::any::to_number(edited.field("a.extra")), 1.0);
+	CHECK_EQ(edited.number("rest.n"), 3.0);
+	// A second edit starts from what the first gave, and the objects made since are remembered by the new program.
+	edited.call("make");
+	CHECK_EQ(edited.program->remembered(), (size_t)3);
+	CHECK_EQ(edited.edit(with(next, "TAG:String = \"+\"", "TAG:String = \"*\"")), std::string("updated: Named"));
+	CHECK_EQ(edited.text("a.name"), std::string("a2*"));
+	CHECK_EQ(edited.number("b.n"), 4.0);
+	edited.end();
 }
 
 // A field whose Godot class changed takes the old field's object only if it is of the new class: the
@@ -3351,6 +3398,7 @@ int main() {
 	test_reload_in_place_values();
 	test_reload_in_place_refused();
 	test_reload_in_place_memory();
+	test_reload_in_place_kept();
 	test_reload_engine_class();
 	test_failed_static_initializer();
 	test_loop_markers();

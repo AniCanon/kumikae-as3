@@ -10,7 +10,7 @@ using ir::Kind;
 
 Object *object_new(Library &p_library, uint32_t p_class) {
 	const ir::Class &klass = p_library.module().classes[p_class];
-	Object *object = new_object(p_class, slots_of(klass), p_library.heap.list_for(p_class));
+	Object *object = new_object(p_class, p_library.heap.object_slots(p_class), p_library.heap.list_for(p_class));
 	if (!object) {
 		p_library.runner.out_of_memory();
 		return nullptr;

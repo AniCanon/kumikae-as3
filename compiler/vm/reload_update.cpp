@@ -23,7 +23,7 @@ void Reload::carry_record(Object *p_old, Object *p_fresh) {
 	const ir::Function *made = new_class.constructor < to_.module_.functions.size() ? &to_.module_.functions[new_class.constructor] : nullptr;
 	bool fits = made && !made->rest && !made->takes_extra && kept->arguments < made->parameters;
 	for (uint32_t i = 0; fits && i < kept->arguments; i++) {
-		fits = made->registers[1 + i] == from_.constructions_->kind_of(*kept, i);
+		fits = made->registers[1 + i] == from_.constructions_->kind_of(p_old->klass, *kept, i);
 	}
 	if (!fits) {
 		unfit_.insert(p_fresh->klass);
@@ -45,7 +45,7 @@ void Reload::carry_record(Object *p_old, Object *p_fresh) {
 		const Slot first = carried ? kept->values[kept->arguments + named[i]] : field(new_class, p_fresh, i);
 		record->values[kept->arguments + i] = Constructions::held(kind, first);
 	}
-	record->fields = static_cast<uint32_t>(new_class.fields.size());
+	record->kept = Constructions::ALL;
 }
 
 // Whether a constant has another value in the new program than it had in the old one. One that holds an
@@ -80,7 +80,7 @@ Reload::Again Reload::construct_again(Object *p_object) {
 		return Again::NotRemembered;
 	}
 	const ir::Class &klass = to_.module_.classes[p_object->klass];
-	Object *again = new_object(p_object->klass, slots_of(klass), to_.heap_.list_for(p_object->klass));
+	Object *again = new_object(p_object->klass, to_.heap_.object_slots(p_object->klass), to_.heap_.list_for(p_object->klass));
 	if (!again) {
 		return Again::Failed;
 	}
