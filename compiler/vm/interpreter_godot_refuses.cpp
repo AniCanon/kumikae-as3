@@ -41,7 +41,7 @@ std::optional<std::string> Interpreter::godot_refuses(Slot p_value, int p_depth)
 			return std::string(ARRAY_PROPERTIES);
 		}
 		for (uint32_t i = 0; i < vector->length && (klass.element == Kind::Any || klass.element == Kind::Obj); i++) {
-			each(klass.element == Kind::Any ? vector->data[i] : any::object(static_cast<Object *>(vector->data[i].p)));
+			each(klass.element == Kind::Any ? slots_of(vector)[i] : any::object(static_cast<Object *>(slots_of(vector)[i].p)));
 		}
 		return why;
 	}

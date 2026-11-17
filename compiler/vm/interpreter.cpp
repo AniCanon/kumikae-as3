@@ -168,7 +168,7 @@ bool Interpreter::push(uint32_t p_function, const Slot *p_arguments, size_t p_co
 			return false;
 		}
 		for (size_t i = fixed; i < p_count; i++) {
-			rest->data[i - fixed] = share(Kind::Any, source[i]);
+			slots_of(rest)[i - fixed] = share(Kind::Any, source[i]);
 		}
 		frame.arguments = static_cast<uint32_t>(std::min(p_count, fixed));
 	}

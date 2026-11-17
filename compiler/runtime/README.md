@@ -35,6 +35,12 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
   today slot and field number are the same, one slot a field. A class is a C++ struct deriving from `Object` (or from its base's
   struct), and a descriptor (`ClassInfo`): name, base, a hash of its layout, each field's name, kind and
   offset, its method table by method number. The host reads descriptors, never C++ types.
+- **A vector's places** are slots, but in a vector of ints or of uints, where each is the four bytes of the
+  number (`vm/README.md`). Generated code reads and writes a place by the kind of the element's register,
+  which is the kind the vector's class holds: `element()` for a slot, `number()` for a number
+  (`fast.h`, which says why the kind is enough). `number()` and `numbers_in()`, which a loop that keeps a
+  vector's places in a local takes them by, give nothing for a vector whose places are slots: that is
+  then the library's, like any other unusual case.
 - **Counts** change only in `retain(c, x)` and `release(c, x)` (`values.h`).
 - **Objects of numbers and Booleans** that the collector does not look at are not given back to the heap
   when generated code lets go of the last reference: `release()` keeps the block on a list for its number of
@@ -121,6 +127,16 @@ What this costs, until the split:
   freed (`Context::gone`) is what it was when the host found it; when the count has moved, or nothing was
   found yet, the host looks by the object's id (`EngineApi::object`), which is where a freed object is
   null. Only a handle on an object is looked at this way: a value lent for a call has no head.
+- **A register given a field's object again keeps its handle** (`store_again()`) where the field still
+  holds the same object: the very handle, where it is one that is shared, or another handle on the object
+  the host found behind both, which Godot still has. No handle is made or let go of, and none is looked
+  behind by its id once each has been asked.
+- **What a method gives in a handle is made there** (`EngineApi::call_kept`): a Dictionary, an Array, a
+  Callable or a RID that a method bind gives is written by Godot over the value a new handle keeps, which
+  starts as the zero of the type the host keeps for the place. A method of such a value is called where a
+  handle keeps the value (`value_in()`, by what the host found for the place: the number such a handle
+  starts with, and where the value is), and an element of a Dictionary under a key the program wrote is
+  asked for as the value with parts it is to be (`EngineApi::keyed`).
 - **A value with parts in a handle is read where the handle keeps it** (`unbox()`): the host says where for
   each type (`EngineApi::value_at`, `value_type`), found from what Godot says of a handle the host makes;
   a type a handle keeps elsewhere, and a handle on anything else, are the host's `unbox`.

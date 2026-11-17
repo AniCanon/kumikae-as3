@@ -122,7 +122,8 @@ void FunctionWriter::find_lent_signals() {
 			const Instruction &in = function_.code[pc];
 			// A call is as its callee is: one that may write the field, or run code nothing looks into, is
 			// not quiet (while the facts are being found, none is).
-			const bool writes_field = in.op == Op::Call && (!facts_ || facts_->functions[in.b].opaque || facts_->functions[in.b].writes.count(from.c));
+			const FunctionFacts *callee = is_call(in.op) ? called(pc) : nullptr;
+			const bool writes_field = is_call(in.op) && (!callee || callee->opaque || may_be_field(module_, callee->writes, function_.owner, from.c));
 			const bool quiet = !may_run_code(module_, function_, in) && !writes_field && !(in.op == Op::SetField && in.b == from.c) &&
 					std::string_view(ir::op_shape(in.op)).find('L') == std::string_view::npos && in.op != Op::Return && in.op != Op::ReturnVoid &&
 					in.op != Op::Throw && in.op != Op::Rethrow;

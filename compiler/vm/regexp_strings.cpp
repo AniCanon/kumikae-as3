@@ -139,7 +139,7 @@ void Interpreter::string_match(const Function &p_function, const Instruction &p_
 				release_object(array);
 				return;
 			}
-			array->data[i] = any::string(piece);
+			slots_of(array)[i] = any::string(piece);
 		}
 	}
 	if (!matches->empty() && !array) {
@@ -335,7 +335,7 @@ Vector *Interpreter::split_by_pattern(Object *p_regexp, std::string_view p_text,
 			release_object(made);
 			return nullptr;
 		}
-		made->data[i] = piece ? any::string(piece) : any::undefined();
+		slots_of(made)[i] = piece ? any::string(piece) : any::undefined();
 	}
 	return made;
 }

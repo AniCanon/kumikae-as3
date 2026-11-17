@@ -64,7 +64,7 @@
 	X(arguments_of, Object *, (Context *c, uint32_t p_function, const Slot *p_parameters, uint32_t p_given, Object *p_callee), \
 			(c, p_function, p_parameters, p_given, p_callee)) \
 	/* The fast paths that are not inline (fast.h says what each takes and leaves). */ \
-	X(element_added, Slot *, (Context *c, Object *p_vector, uint32_t p_index), (c, p_vector, p_index)) \
+	X(element_added, void *, (Context *c, Object *p_vector, uint32_t p_index), (c, p_vector, p_index)) \
 	X(holder_of_any, Object *, (Context *c, Slot p_any), (c, p_any)) \
 	X(key_of_any, Str *, (Context *c, Slot p_any), (c, p_any)) \
 	X(property, Slot *, (const Context *c, Object *p_holder, const Str *p_key), (c, p_holder, p_key)) \

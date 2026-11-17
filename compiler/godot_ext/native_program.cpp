@@ -134,6 +134,49 @@ void unbox(const void *p_handle, rt::Parts p_type, void *r_value) {
 	}
 }
 
+// The types of Godot's values that a handle keeps where generated code reaches them: what a method bind
+// gives into a new handle (call_kept) and what a method of the type is called on where the handle keeps
+// it (rt::value_in). The backend has the same list by name (backend_cpp/names.cpp, in_handle).
+bool in_handle(int p_type) {
+	return p_type == Variant::DICTIONARY || p_type == Variant::ARRAY || p_type == Variant::CALLABLE || p_type == Variant::RID;
+}
+
+// A method bind called on bare values that gives such a value (rt::EngineApi::call_kept): Godot writes it
+// over the value a new handle keeps, which starts as the zero of the type the host kept for the place.
+void *call_kept(const void *p_bind, void *p_object, const void *const *p_arguments, const void *p_zero) {
+	Variant *made = make_handle(*static_cast<const Variant *>(p_zero));
+	gdextension_interface::object_method_bind_ptrcall(p_bind, p_object, p_arguments, inside(*made, made->get_type()));
+	return made;
+}
+
+// What a Dictionary in a handle has under a name, if that is a value with parts of the type asked for
+// (rt::EngineApi::keyed): a new handle on it. The key is the text as a String, as the library gives it.
+void *keyed(const void *p_handle, const void *p_name, rt::Parts p_type) {
+	const Variant *held = static_cast<const Variant *>(p_handle);
+	if (!held || held->get_type() != Variant::DICTIONARY) {
+		return nullptr;
+	}
+	const Variant key = String(*static_cast<const StringName *>(p_name));
+	bool valid = false;
+	const Variant value = held->get(key, &valid);
+	return valid && value.get_type() == godot_type(p_type) ? make_handle(value) : nullptr;
+}
+
+// Where a handle on a value of the type keeps it, in bytes from the handle's start: 0 unless a handle on
+// one starts with the type's number and keeps the value inside itself, as Godot says of one made here.
+uint32_t kept_at(int p_type) {
+	Variant made;
+	GDExtensionCallError error;
+	gdextension_interface::variant_construct((GDExtensionVariantType)p_type, made._native_ptr(), nullptr, 0, &error);
+	int32_t starts = -1;
+	std::memcpy(&starts, made._native_ptr(), sizeof(starts));
+	const char *const from = reinterpret_cast<const char *>(made._native_ptr());
+	const char *const value = static_cast<const char *>(inside(made, p_type));
+	const bool within = error.error == GDEXTENSION_CALL_OK && made.get_type() == p_type && starts == p_type && value >= from + sizeof(starts) &&
+			value + sizeof(void *) <= from + sizeof(Variant);
+	return within ? static_cast<uint32_t>(value - from) : 0;
+}
+
 // A signal emitted by generated code (rt::EngineApi::emit): each value made into Godot's own where Godot
 // reads it, on the stack, as the request by name makes it (to_variant), and the emit the host worked out.
 bool emit_bare(void *p_emitter, void *p_signal, const uint8_t *p_held, const void *const *p_values, uint32_t p_count) {
@@ -207,7 +250,7 @@ void find_values(rt::EngineApi *r_table) {
 
 const rt::EngineApi *api() {
 	static const rt::EngineApi table = [] {
-		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {} };
+		rt::EngineApi made = { gdextension_interface::object_method_bind_ptrcall, &object_behind, &box, &unbox, &emit_bare, {}, {}, &call_kept, &keyed };
 		find_values(&made);
 		return made;
 	}();
@@ -215,10 +258,11 @@ const rt::EngineApi *api() {
 }
 
 // Whether Godot takes or gives a value of the type bare where generated code holds it bare too: a number,
-// a Boolean, a value with parts; for a parameter, a name as well.
+// a Boolean, a value with parts; for a parameter, a name as well, and one of Godot's objects, which
+// generated code hands over as the object behind a handle declared to hold exactly the parameter's class.
 bool crosses_bare(int p_type, bool p_parameter) {
 	return p_type == Variant::BOOL || p_type == Variant::INT || p_type == Variant::FLOAT || has_parts(p_type) ||
-			(p_parameter && p_type == Variant::STRING_NAME);
+			(p_parameter && (p_type == Variant::STRING_NAME || p_type == Variant::OBJECT));
 }
 
 // What Godot declares for the parameters of a method that a call leaves out, bare, into r_defaults: false
@@ -346,7 +390,9 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 			(worked->what != What::Bound && worked->what != What::Getter && worked->what != What::Setter)) {
 		return false;
 	}
-	bool bare = worked->result == NO_VALUE || crosses_bare(worked->result, false);
+	// What a method gives in a handle is made where a new handle keeps it (call_kept).
+	const bool kept = in_handle(worked->result);
+	bool bare = worked->result == NO_VALUE || crosses_bare(worked->result, false) || kept;
 	for (const int parameter : worked->parameters) {
 		bare = bare && crosses_bare(parameter, true);
 	}
@@ -359,6 +405,11 @@ bool NativeProgram::resolve_use(const ir::Function &p_thunk, const ir::Instructi
 		return false;
 	}
 	r_resolved->bind = const_cast<void *>(worked->bound);
+	if (kept) {
+		Variant *zero = make_handle(worked->zero);
+		singletons_.push_back(zero);
+		r_resolved->handle = zero;
+	}
 	return true;
 }
 
@@ -375,8 +426,16 @@ bool NativeProgram::resolve_value(const GodotHost::Worked &p_worked, rt::Resolve
 			}
 			break;
 		case What::Builtin:
-			if (has_parts(p_worked.receiver) && gives && std::all_of(p_worked.parameters.begin(), p_worked.parameters.end(), bare)) {
+			if (!gives || !std::all_of(p_worked.parameters.begin(), p_worked.parameters.end(), bare)) {
+				break;
+			}
+			if (has_parts(p_worked.receiver)) {
 				r_resolved->bind = reinterpret_cast<void *>(p_worked.builtin);
+			} else if (const uint32_t at = !p_worked.is_static && in_handle(p_worked.receiver) ? kept_at(p_worked.receiver) : 0) {
+				// A method of a value a handle keeps, called where the handle keeps it.
+				r_resolved->bind = reinterpret_cast<void *>(p_worked.builtin);
+				r_resolved->type = p_worked.receiver;
+				r_resolved->at = at;
 			}
 			break;
 		case What::FieldGet:

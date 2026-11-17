@@ -54,6 +54,17 @@ bool FunctionWriter::reads_in_place(uint32_t p_register) const {
 	return is_number(kind(p_register)) || (kind(p_register) == Kind::Obj && lent_[p_register]);
 }
 
+// Whether a register's vector holds ints or uints, by the elements read out of it and stored in it: each
+// place is then four bytes, the number itself (runtime/fast.h).
+bool FunctionWriter::narrow_vector(uint32_t p_vector) const {
+	for (const Instruction &in : function_.code) {
+		if ((in.op == Op::VecGet && in.b == p_vector && is_whole(kind(in.a))) || (in.op == Op::VecSet && in.a == p_vector && is_whole(kind(in.c)))) {
+			return true;
+		}
+	}
+	return false;
+}
+
 // The vector registers the loop indexes, if it is one to write twice: none otherwise.
 std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_to) const {
 	std::set<uint32_t> vectors;
@@ -62,7 +73,7 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 		if (runs_code(in)) {
 			return {};
 		}
-		if (in.op == Op::Call && (facts_->functions[in.b].opaque || facts_->functions[in.b].stores_elements)) {
+		if (const FunctionFacts *callee = is_call(in.op) ? called(pc) : nullptr; is_call(in.op) && (!callee || callee->opaque || callee->stores_elements)) {
 			return {};
 		}
 		if (in.op == Op::VecSet) {
@@ -72,6 +83,14 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 			vectors.insert(in.a);
 		} else if (in.op == Op::VecGet && is_whole(kind(in.c)) && reads_in_place(in.a)) {
 			vectors.insert(in.b);
+		}
+	}
+	// A register whose elements are read or stored as ints here and as something else there is of no one
+	// vector's class: nothing is known of its places.
+	for (const Instruction &in : function_.code) {
+		const uint32_t vector = in.op == Op::VecGet ? in.b : in.op == Op::VecSet ? in.a : NONE;
+		if (vector != NONE && vectors.count(vector) && narrow_vector(vector) != is_whole(kind(in.op == Op::VecGet ? in.a : in.c))) {
+			return {};
 		}
 	}
 	for (const ir::Handler &handler : function_.handlers) {
@@ -91,7 +110,7 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 		for (uint32_t each : vectors) {
 			const uint32_t slot = borrowed_[each];
 			const bool sets = in.op == Op::SetField && in.b == slot && may_be_this(in.a);
-			if (slot != NONE && (sets || (in.op == Op::Call && facts_->functions[in.b].writes.count(slot)))) {
+			if (slot != NONE && (sets || (is_call(in.op) && may_be_field(module_, called(pc)->writes, function_.owner, slot)))) {
 				return {};
 			}
 		}
@@ -142,7 +161,8 @@ std::string FunctionWriter::twice_declared() const {
 	std::string out;
 	for (uint32_t each : vectors) {
 		const std::string number = std::to_string(each);
-		out += "\tSlot *d" + number + " = nullptr;\n\tuint32_t n" + number + " = 0;\n\t(void)d" + number + "; (void)n" + number + ";\n";
+		out += std::string("\t") + (narrow_vector(each) ? "int32_t" : "Slot") + " *d" + number + " = nullptr;\n\tuint32_t n" + number + " = 0;\n\t(void)d" + number +
+				"; (void)n" + number + ";\n";
 	}
 	return out;
 }
@@ -167,13 +187,15 @@ bool FunctionWriter::fast_vector(const Instruction &p_in) {
 			if (!local(p_in.b) || !is_whole(kind(p_in.c)) || !reads_in_place(p_in.a)) {
 				return false;
 			}
-			line(reg(p_in.a) + " = " + from_slot(kind(p_in.a), element(p_in.b, p_in.c)) + ";");
+			// A place of ints or uints is the number; any other is a slot.
+			line(reg(p_in.a) + " = " + (narrow_vector(p_in.b) ? "static_cast<" + std::string(type_of(kind(p_in.a))) + ">(" + element(p_in.b, p_in.c) + ")"
+															  : from_slot(kind(p_in.a), element(p_in.b, p_in.c))) + ";");
 			return true;
 		case Op::VecSet:
 			if (!local(p_in.a)) {
 				return false;
 			}
-			line(element(p_in.a, p_in.b) + " = slot(" + reg(p_in.c) + ");");
+			line(element(p_in.a, p_in.b) + " = " + (narrow_vector(p_in.a) ? "static_cast<int32_t>(" + reg(p_in.c) + ")" : "slot(" + reg(p_in.c) + ")") + ";");
 			return true;
 		default:
 			return false;
@@ -191,15 +213,29 @@ std::string FunctionWriter::fast_copy(const Twice &p_loop, const std::vector<boo
 		}
 	}
 	std::string missing;
-	std::string locals;
+	std::string places;
+	std::string lengths;
+	std::vector<std::pair<std::string, std::string>> found; // What holds a vector, and the number of the first register it was read for.
 	for (uint32_t each : p_loop.vectors) {
 		const std::string number = std::to_string(each);
 		// A register that borrows a field may not have been read into yet: the field itself is what it will hold.
-		const std::string held = borrowed_[each] != NONE ? own_field(borrowed_[each]) : register_name(each);
-		missing += (missing.empty() ? "!" : " || !") + held;
-		locals += "\td" + number + " = static_cast<Vector *>(" + held + ")->data;\n\tn" + number + " = static_cast<Vector *>(" + held + ")->length;\n";
+		const std::string held = (borrowed_[each] != NONE ? own_field(borrowed_[each]) : register_name(each)) + (narrow_vector(each) ? "/n" : "/s");
+		// Two registers read from one field hold one vector: the second's places are the first's, said so
+		// that the C++ compiler knows them for the same memory (`y[i] = a * x[i] + y[i]` reads `y` twice).
+		const auto same = std::find_if(found.begin(), found.end(), [&](const auto &p_each) { return p_each.first == held; });
+		if (same != found.end()) {
+			places += "\td" + number + " = d" + same->second + ";\n";
+			lengths += "\tn" + number + " = n" + same->second + ";\n";
+			continue;
+		}
+		found.emplace_back(held, number);
+		const std::string vector = held.substr(0, held.size() - 2);
+		// No places: no vector, one with no room yet, or one whose places are not what the loop reads there.
+		places += "\td" + number + " = " + (narrow_vector(each) ? "numbers_in(" : "slots_in(") + vector + ");\n";
+		missing += (missing.empty() ? "!d" : " || !d") + number;
+		lengths += "\tn" + number + " = static_cast<Vector *>(" + vector + ")->length;\n";
 	}
-	std::string out = "\tif (KAS3_UNLIKELY(" + missing + ")) goto L" + std::to_string(p_loop.from) + ";\n" + locals;
+	std::string out = places + "\tif (KAS3_UNLIKELY(" + missing + ")) goto L" + std::to_string(p_loop.from) + ";\n" + lengths;
 	const uint32_t resume = pc_;
 	fast_ = &p_loop;
 	for (pc_ = p_loop.from; pc_ <= p_loop.to; pc_++) {

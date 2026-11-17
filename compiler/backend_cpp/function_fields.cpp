@@ -40,12 +40,12 @@ FunctionWriter::Touch FunctionWriter::touch(uint32_t p_pc, uint32_t p_slot) cons
 	if (runs_code(in)) {
 		return Touch::Writes;
 	}
-	if (in.op == Op::Call) {
-		const FunctionFacts &callee = facts_->functions[in.b];
-		if (callee.opaque || callee.writes.count(p_slot)) {
+	if (is_call(in.op)) {
+		const FunctionFacts *callee = called(p_pc);
+		if (!callee || callee->opaque || may_be_field(module_, callee->writes, function_.owner, p_slot)) {
 			return Touch::Writes;
 		}
-		return callee.reads.count(p_slot) ? Touch::Reads : Touch::None;
+		return may_be_field(module_, callee->reads, function_.owner, p_slot) ? Touch::Reads : Touch::None;
 	}
 	if (in.op == Op::GetField && in.b != 0 && in.c == p_slot) {
 		return Touch::Reads;

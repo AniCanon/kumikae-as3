@@ -77,8 +77,12 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		case Op::VecGet: {
 			const Kind index = p_function.registers[p_in.c];
 			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
+			if (at && vector->narrow) {
+				r[p_in.a] = place(vector, *at); // An int or a uint: nothing is counted.
+				break;
+			}
 			if (at && !vector->bare) {
-				put(kind, r[p_in.a], share(kind, kind == Kind::Any ? any::filled(vector->data[*at]) : vector->data[*at]));
+				put(kind, r[p_in.a], share(kind, kind == Kind::Any ? any::filled(slots_of(vector)[*at]) : slots_of(vector)[*at]));
 				break;
 			}
 			Slot made;
@@ -91,8 +95,10 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		case Op::VecSet: {
 			const Kind index = p_function.registers[p_in.b];
 			const std::optional<uint32_t> at = element_index(index, r[p_in.b], vector->length);
-			if (at && !vector->bare) {
-				put(kind, vector->data[*at], share(kind, r[p_in.c]));
+			if (at && vector->narrow) {
+				numbers_of(vector)[*at] = r[p_in.c].i;
+			} else if (at && !vector->bare) {
+				put(kind, slots_of(vector)[*at], share(kind, r[p_in.c]));
 			} else {
 				vm::vector_set(library_, vector, index, r[p_in.b], r[p_in.c]);
 			}

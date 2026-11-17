@@ -48,9 +48,15 @@ inline Slot &owner_field(Object *p_object) {
 inline ir::Kind place_kind(const ir::Class &p_class) {
 	return p_class.element_bare == ir::Bare::None ? p_class.element : ir::Kind::Void;
 }
+// Whether each place of a vector of the class is four bytes, the number itself: a vector of ints or of
+// uints (Vector::narrow). An Array's elements are untyped, and a vector of Numbers holds eight bytes each.
+inline bool narrow_places(const ir::Class &p_class) {
+	return p_class.element == ir::Kind::I32 || p_class.element == ir::Kind::U32;
+}
+
 // A new vector of a class: new_vector(), told what the class says its places hold.
 inline Vector *new_vector_of(const ir::Class &p_class, uint32_t p_index, uint32_t p_length, bool p_fixed, Object *p_list) {
-	return new_vector(p_index, p_length, p_fixed, static_cast<uint8_t>(p_class.element_bare), p_list);
+	return new_vector(p_index, p_length, p_fixed, static_cast<uint8_t>(p_class.element_bare), narrow_places(p_class), p_list);
 }
 
 // Every field as it is before anything is written to it (empty_value()).

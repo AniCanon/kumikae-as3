@@ -125,7 +125,7 @@ void free_object(Object *p_object) {
 	std::free(p_object);
 }
 
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, Object *p_list) {
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, bool p_narrow, Object *p_list) {
 	void *memory = allocation_fails() ? nullptr : std::calloc(1, sizeof(Vector));
 	if (!memory) {
 		return nullptr;
@@ -135,6 +135,7 @@ Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_
 	vector->klass = p_class;
 	vector->fixed = p_fixed;
 	vector->bare = p_bare;
+	vector->narrow = p_narrow;
 	objects_alive++;
 	if (!vector_reserve(vector, p_length)) {
 		free_vector(vector);
@@ -157,19 +158,20 @@ bool vector_reserve(Vector *p_vector, uint32_t p_capacity) {
 	if (capacity > UINT32_MAX) {
 		return false;
 	}
-	void *memory = allocation_fails() ? nullptr : std::realloc(p_vector->data, capacity * sizeof(Slot));
+	const size_t size = place_size(p_vector);
+	void *memory = allocation_fails() ? nullptr : std::realloc(p_vector->places, capacity * size);
 	if (!memory) {
 		return false;
 	}
-	p_vector->data = static_cast<Slot *>(memory);
-	std::memset(static_cast<void *>(p_vector->data + p_vector->capacity), 0, (capacity - p_vector->capacity) * sizeof(Slot));
+	p_vector->places = memory;
+	std::memset(static_cast<char *>(memory) + p_vector->capacity * size, 0, (capacity - p_vector->capacity) * size);
 	p_vector->capacity = (uint32_t)capacity;
 	return true;
 }
 
 void free_vector(Vector *p_vector) {
 	list_remove(p_vector);
-	std::free(p_vector->data);
+	std::free(p_vector->places);
 	objects_alive--;
 	std::free(p_vector);
 }

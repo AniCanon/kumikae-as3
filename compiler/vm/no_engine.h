@@ -29,7 +29,7 @@ public:
 		refuse(r_error);
 		return nullptr;
 	}
-	[[nodiscard]] void *collection(std::string_view, const ir::Class &, const Slot *, size_t, std::string *r_error) override {
+	[[nodiscard]] void *collection(std::string_view, const ir::Class &, const Vector *, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;
 	}

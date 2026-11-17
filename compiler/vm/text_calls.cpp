@@ -71,7 +71,7 @@ bool split(Library &p_library, const Slot *p_values, Slot *r_out) {
 			p_library.heap.release_object(made);
 			return false;
 		}
-		made->data[i] = any::string(piece);
+		slots_of(made)[i] = any::string(piece);
 	}
 	r_out->bits = 0;
 	r_out->p = made;

@@ -300,7 +300,7 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 	}
 	const uint32_t at = *p_key.index;
 	// Before the vector grows to take it: no value (null) is none a place can hold whole.
-	if (Slot probe; klass.element_bare != ir::Bare::None && !write_element(library_, klass, probe, value)) {
+	if (Slot probe; klass.element_bare != ir::Bare::None && !place_for(library_, klass, value, &probe)) {
 		drop(klass.element, value);
 		return false;
 	}
@@ -313,7 +313,7 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 		drop(klass.element, value);
 		return false;
 	}
-	return put_element(library_, klass, p_vector->data[at], value);
+	return put_element(library_, p_vector, at, value);
 }
 
 // delete holder[key]: true unless the property is one that can't go (a sealed object's field or method,
@@ -327,7 +327,7 @@ bool Interpreter::delete_property(Slot p_holder, const PropertyKey &p_key, bool 
 		Vector *vector = static_cast<Vector *>(object);
 		if (p_key.index && klass->array) {
 			if (*p_key.index < vector->length) {
-				put(Kind::Any, vector->data[*p_key.index], any::hole());
+				put(Kind::Any, slots_of(vector)[*p_key.index], any::hole());
 			}
 			return true;
 		}

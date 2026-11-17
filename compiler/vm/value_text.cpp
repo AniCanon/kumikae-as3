@@ -242,7 +242,7 @@ bool vector_text(Library &p_library, Vector *p_vector, std::string_view p_separa
 		if (i) {
 			append_text(r_text, p_separator); // Text is joined as Concat joins it: two halves that meet are one character.
 		}
-		Slot element = p_vector->data[i];
+		Slot element = place(p_vector, i);
 		const bool whole = klass.element_bare != ir::Bare::None;
 		if (whole && !read_element(p_library, klass, element, &element)) {
 			done = false; // The value a place holds whole is put into words as the handle it is read as.

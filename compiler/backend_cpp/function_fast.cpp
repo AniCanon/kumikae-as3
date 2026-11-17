@@ -76,6 +76,12 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			if (!whole(p_in.c)) {
 				return false;
 			}
+			if (whole(p_in.a)) {
+				// A vector of ints or of uints holds each in four bytes (runtime/fast.h, number()).
+				line("if (const int32_t *const e = number(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
+				line("\t" + reg(p_in.a) + " = static_cast<" + std::string(type_of(kind(p_in.a))) + ">(*e);");
+				break;
+			}
 			line("if (Slot *const e = element(" + vector_for(p_in.b, p_in.a) + ", " + reg(p_in.c) + ")) {");
 			// An Array's hole is read as undefined (vm/any.h).
 			share(p_in.a, from_slot(kind(p_in.a), kind(p_in.a) == Kind::Any ? "kas3::vm::any::filled(*e)" : "(*e)"));
@@ -84,6 +90,11 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			// An element there is, or one added at the end: a gap, a fixed vector and the rest are the library's.
 			if (!whole(p_in.b)) {
 				return false;
+			}
+			if (whole(p_in.c)) {
+				line("if (int32_t *const e = number_to_write(c, " + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
+				line("\t*e = static_cast<int32_t>(" + reg(p_in.c) + ");");
+				break;
 			}
 			line("if (Slot *const e = element_to_write(c, " + vector_for(p_in.a, p_in.c) + ", " + reg(p_in.b) + ")) {");
 			if (ir::is_held(kind(p_in.c))) {
@@ -100,8 +111,13 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 				return false;
 			}
 			const std::string length = "static_cast<Vector *>(" + reg(list[0]) + ")->length";
-			line("if (Slot *const e = push_room(" + vector_for(list[0], list[1]) + ")) {");
-			line("\t*e = slot(" + (ir::is_held(kind(list[1])) ? "shared(c, " + reg(list[1]) + ")" : reg(list[1])) + ");");
+			if (whole(list[1])) {
+				line("if (int32_t *const e = number_room(" + reg(list[0]) + ")) {");
+				line("\t*e = static_cast<int32_t>(" + reg(list[1]) + ");");
+			} else {
+				line("if (Slot *const e = push_room(" + vector_for(list[0], list[1]) + ")) {");
+				line("\t*e = slot(" + (ir::is_held(kind(list[1])) ? "shared(c, " + reg(list[1]) + ")" : reg(list[1])) + ");");
+			}
 			line(p_in.a == NONE ? "\t" + length + "++;" : "\t" + reg(p_in.a) + " = ++" + length + ";");
 			break;
 		}

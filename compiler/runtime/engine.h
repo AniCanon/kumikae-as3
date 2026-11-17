@@ -68,6 +68,14 @@ struct EngineApi {
 	// (unbox() reads a value there; anything else is the host's unbox).
 	uint8_t value_at[static_cast<size_t>(Parts::Count)];
 	int32_t value_type[static_cast<size_t>(Parts::Count)];
+	// `call`, for a method that gives one of Godot's values that a handle keeps (a Dictionary, a RID): the
+	// value is written where a new handle keeps it, and the handle is the caller's. `p_zero` is the handle
+	// the host keeps on such a value for the place (Resolved::handle), which the new one starts as.
+	void *(*call_kept)(const void *p_bind, void *p_object, const void *const *p_arguments, const void *p_zero);
+	// What a Dictionary in a handle has under a key that is text the program wrote (`p_name`: the name the
+	// host built for it, Context::names), where that is a value with parts of the type asked for: in a new
+	// handle, the caller's. Null for anything else (no Dictionary, no such key, a value of another type).
+	void *(*keyed)(const void *p_handle, const void *p_name, Parts p_type);
 };
 
 // How a value handed to EngineApi::emit is held: a whole number as an int64_t, a Number as a double, a
@@ -87,10 +95,15 @@ struct Resolved {
 	// Godot's value types, its own code for an operator, a method or a part (operate() and the rest, below).
 	void *bind = nullptr;
 	void *object = nullptr; // A singleton's object.
-	// A handle on a singleton, or on a constant's value: the host's own, borrowed, never let go of by
-	// generated code.
+	// A handle on a singleton, on a constant's value, or on the zero of the type a method gives in a handle
+	// (EngineApi::call_kept): the host's own, borrowed, never let go of by generated code.
 	void *handle = nullptr;
 	uint64_t defaults[2] = { 0, 0 }; // The parameters the call leaves out, as Godot declares them, bare.
+	// For a method of one of Godot's values that a handle keeps (a Dictionary's `is_empty`): the number a
+	// handle on such a value starts with, and where the handle keeps the value, in bytes from its start
+	// (value_in()). 0 where the host could not make sure of either.
+	int32_t type = 0;
+	uint32_t at = 0;
 };
 
 //     void *copy_handle(Context *c, void *p_handle);
@@ -160,6 +173,26 @@ inline void *object_of(const Context *c, Ref p_value) {
 	return c->engine->object(p_value.handle);
 }
 
+// A register given the handle a field holds, where it may have one on the same object already: the field
+// of a script read again each time round a loop to call the object in it. A register that has the very
+// handle (one that is shared, which the register's own count keeps) or another handle on the same object,
+// which Godot still has, keeps what it has: it holds that object either way, with a reference of its own
+// where Godot counts them, and no handle is made or let go of. The object behind each handle is the one
+// the host found for it (object_of), asked for once and read from the handle after that; a handle on none
+// or on an object Godot has freed is never the same as another.
+inline void store_again(Context *c, Ref &r_register, Ref p_borrowed) {
+	if (r_register.handle && p_borrowed.handle) {
+		if (r_register.handle == p_borrowed.handle) {
+			return;
+		}
+		void *const there = object_of(c, p_borrowed);
+		if (there && there == object_of(c, r_register)) {
+			return;
+		}
+	}
+	store(c, r_register, p_borrowed);
+}
+
 // The script's own Godot object, which a function finds once: it is the same for as long as no script
 // instance has been freed, and is looked up again (null, if it was this one's) when one has.
 inline void *owner_object(const Context *c, Object *p_this, void *&r_found, uint32_t &r_seen) {
@@ -189,6 +222,17 @@ inline void get_part(void *p_getter, const void *p_of, void *r_value) {
 }
 inline void set_part(void *p_setter, void *p_of, const void *p_value) {
 	reinterpret_cast<void (*)(void *, const void *)>(p_setter)(p_of, p_value);
+}
+
+// Where a handle keeps its value, for a method of the value's type that the host found for a place: null
+// for no handle, a handle on a value of another type, and a type the host could not place.
+inline void *value_in(const Resolved &p_use, void *p_handle) {
+	if (!p_handle || !p_use.at) {
+		return nullptr;
+	}
+	int32_t held;
+	std::memcpy(&held, p_handle, sizeof(held));
+	return held == p_use.type ? static_cast<char *>(p_handle) + p_use.at : nullptr;
 }
 
 template <typename T>

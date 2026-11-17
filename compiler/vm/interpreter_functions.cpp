@@ -99,10 +99,10 @@ void Interpreter::arguments_array(const Instruction &p_in) {
 	}
 	Slot *r = stack_.data() + frame.base;
 	for (uint32_t i = 0; i < count; i++) {
-		made->data[i] = to_any(function.registers[first + i], r[first + i]);
+		slots_of(made)[i] = to_any(function.registers[first + i], r[first + i]);
 	}
 	for (uint32_t i = 0; i < frame.extras; i++) {
-		made->data[count + i] = share(Kind::Any, r[function.registers.size() + i]);
+		slots_of(made)[count + i] = share(Kind::Any, r[function.registers.size() + i]);
 	}
 	Object *callee = make_function(frame.function, first ? static_cast<Object *>(r[0].p) : nullptr);
 	Entries *properties = callee ? properties_of(made) : nullptr;
@@ -250,7 +250,7 @@ void Interpreter::apply_value(const Function &p_function, const Instruction &p_i
 	// may take them out of the Array.
 	SpareSlots given(spare_slots_);
 	for (uint32_t i = 0; array && i < array->length; i++) {
-		given->push_back(share(Kind::Any, any::filled(array->data[i])));
+		given->push_back(share(Kind::Any, any::filled(slots_of(array)[i])));
 	}
 	SpareSlots values(spare_slots_);
 	const bool ok = function_arguments(value, given->size(), given->data(), &*values);

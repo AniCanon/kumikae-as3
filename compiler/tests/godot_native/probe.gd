@@ -10,6 +10,14 @@ var frames := 0
 var waiting: Node2D
 
 
+# Calls back into the script as it is freed (Probe.as, clears()).
+class Dying extends RefCounted:
+	var target
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and target != null:
+			target.call("dies")
+
+
 # Godot calling into a script (Entry.as).
 func _enter() -> void:
 	entry = Node2D.new()
@@ -67,6 +75,13 @@ func _initialize() -> void:
 	print("PROBE given=", probe.call("given"))
 	print("PROBE carried=", probe.call("carried"))
 	print("PROBE engine=", probe.call("engine"))
+	print("PROBE field objects=", probe.call("fieldObjects"))
+	print("PROBE in handles=", probe.call("inHandles"))
+	var dying := Dying.new()
+	dying.target = probe
+	print("PROBE holds=", probe.call("holds", dying))
+	dying = null
+	print("PROBE clears=", probe.call("clears"))
 	print("PROBE script=", probe.call("script", 1000))
 	print("PROBE script again=", probe.call("script", 10))
 	print("PROBE listeners=", probe.call("listeners"))

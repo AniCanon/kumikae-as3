@@ -240,6 +240,178 @@ package {
 			return out.join(" ");
 		}
 
+		// A field that holds one of Godot's objects, read again and again to call it. Native code keeps the
+		// handle a register has while the field still holds the same object: so the field is given another
+		// object between two reads, one Godot counts references of and one it does not, an object is freed
+		// and another put in its place, a listener empties the field while Godot is still in the call that
+		// was made on what it held, and the field holds none.
+		private var query:PhysicsRayQueryParameters2D;
+		private var other:Node2D;
+		private var circle:CircleShape2D;
+		private var emptied:int = 0;
+
+		private function onCircleChanged():void {
+			circle = null;
+			emptied++;
+		}
+
+		public function fieldObjects():String {
+			var out:Array = [];
+			query = new PhysicsRayQueryParameters2D();
+			var first:PhysicsRayQueryParameters2D = query;
+			for (var i:int = 0; i < 6; i++) {
+				if (i == 3) {
+					query = new PhysicsRayQueryParameters2D();
+				}
+				query.from = new Vector2(i, i * 2);
+				query.collisionMask = i + 1;
+				out.push(query.from.x + query.collisionMask);
+			}
+			out.push(first.from.x, first.collisionMask, query.from.x, query.collisionMask);
+			other = new Node2D();
+			for (i = 0; i < 5; i++) {
+				if (i == 2) {
+					other.free();
+					other = new Node2D();
+				}
+				other.position = new Vector2(i, 0);
+				other.rotation += 1;
+				out.push(other.position.x + other.rotation);
+			}
+			other.free();
+			try {
+				other.position = new Vector2(9, 9);
+				out.push("no error");
+			} catch (e:Error) {
+				out.push("freed: " + e.message);
+			}
+			other = null;
+			circle = new CircleShape2D();
+			circle.changed.add(onCircleChanged);
+			circle.radius = 12;
+			out.push(circle === null, emptied);
+			try {
+				circle.radius = 3;
+				out.push("no error");
+			} catch (none:Error) {
+				out.push("none: " + none.message);
+			}
+			query = null;
+			return out.join("|");
+		}
+
+		// What Godot gives in a handle (a Dictionary, a RID) from a method called on bare values,
+		// methods of such a value called where the handle keeps it, and one of Godot's objects handed to a
+		// method or a property that takes exactly its class: an object, none, and one Godot has freed.
+		public function inHandles():String {
+			var out:Array = [];
+			var date:GodotDictionary = Time.getDateDictFromUnixTime(86400 * 366);
+			out.push(date.isEmpty(), date.size(), date["year"], date["month"], date["day"]);
+			Time.getDateDictFromUnixTime(5);
+			for (var i:int = 0; i < 3; i++) {
+				date = Time.getDateDictFromUnixTime(86400 * 31 * i);
+				out.push(date["month"]);
+			}
+			var empty:GodotDictionary = new GodotDictionary();
+			out.push(empty.isEmpty(), empty.size());
+			empty["one"] = 1;
+			out.push(empty.isEmpty(), empty.size());
+			var none:GodotDictionary = null;
+			try {
+				out.push(none.isEmpty());
+			} catch (e:Error) {
+				out.push("none: " + e.message);
+			}
+			// An element of one of Godot's Dictionaries read into a value with parts: the element as that type
+			// at once, and what the two instructions say of one that is not there, or is something else.
+			var places:GodotDictionary = new GodotDictionary();
+			places["at"] = new Vector2(3, 4);
+			places["deep"] = new Vector3(1, 2, 3);
+			places["count"] = 5;
+			for (i = 0; i < 3; i++) {
+				var at:Vector2 = places["at"];
+				out.push(at.x + at.y + i);
+				places["at"] = at * 2.0;
+			}
+			try {
+				var miss:Vector2 = places["nowhere"];
+				out.push(miss);
+			} catch (missing:Error) {
+				out.push("missing: " + missing.message);
+			}
+			try {
+				var wrong:Vector2 = places["deep"];
+				out.push(wrong);
+			} catch (other:Error) {
+				out.push("other: " + other.message);
+			}
+			try {
+				var number:Vector2 = places["count"];
+				out.push(number);
+			} catch (count:Error) {
+				out.push("count: " + count.message);
+			}
+			try {
+				var from:Vector2 = none["at"];
+				out.push(from);
+			} catch (nothing:Error) {
+				out.push("nothing: " + nothing.message);
+			}
+			var item:RID = getCanvasItem();
+			out.push(item.isValid(), item.getID() > 0, new RID().isValid());
+			var holder:CollisionShape2D = new CollisionShape2D();
+			var round:Shape2D = new CircleShape2D();
+			holder.shape = round;
+			out.push(holder.shape == round);
+			round = null;
+			holder.shape = round;
+			out.push(holder.shape == null);
+			holder.free();
+			var kid:Node = new Node();
+			out.push(isAncestorOf(kid));
+			addChild(kid);
+			out.push(isAncestorOf(kid), kid.getIndex() >= 0);
+			removeChild(kid);
+			out.push(isAncestorOf(kid));
+			// One Godot has freed is handed over as none, as the library hands it.
+			var held:CollisionShape2D = new CollisionShape2D();
+			var gone:Node = new Node();
+			held.addChild(gone);
+			out.push(held.isAncestorOf(gone), held.getChildCount());
+			gone.free();
+			out.push(held.getChildCount(), held.isAncestorOf(gone));
+			held.free();
+			kid.free();
+			return out.join("|");
+		}
+
+		// A method of one of Godot's Arrays called where the handle keeps the Array, which lets go of what the
+		// Array held: an object whose end calls back into the script (probe.gd's Dying), where the script
+		// throws. The error comes out of the call that ended the object, as it does under the interpreter.
+		private var mortal:GodotArray = new GodotArray();
+		private var died:int = 0;
+
+		public function dies():void {
+			died++;
+			throw new Error("dying");
+		}
+
+		public function holds(one:RefCounted):int {
+			mortal.append(one);
+			return mortal.size();
+		}
+
+		public function clears():String {
+			var said:String = "";
+			try {
+				mortal.clear();
+				said += "cleared ";
+			} catch (e:Error) {
+				said += "caught " + e.message + " ";
+			}
+			return said + died + " " + mortal.size();
+		}
+
 		// The script's own code, with nothing of Godot's: arithmetic, Strings, an Array, a function value,
 		// an error caught.
 		public function script(rounds:int):String {

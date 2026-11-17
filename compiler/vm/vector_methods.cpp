@@ -26,18 +26,18 @@ uint32_t clamped(int32_t p_index, uint32_t p_length) {
 	return static_cast<uint32_t>(p_index) > p_length ? p_length : static_cast<uint32_t>(p_index);
 }
 
-// The slots from p_from on move by p_by places, up or down. Nothing is retained or released: each
+// The places from p_from on move by p_by places, up or down. Nothing is retained or released: each
 // reference is still held once.
-void shift_slots(Vector *p_vector, uint32_t p_from, uint32_t p_count, int64_t p_by) {
-	std::memmove(static_cast<void *>(p_vector->data + p_from + p_by), static_cast<const void *>(p_vector->data + p_from), p_count * sizeof(Slot));
+void shift_places(Vector *p_vector, uint32_t p_from, uint32_t p_count, int64_t p_by) {
+	move_places(p_vector, static_cast<size_t>(p_from + p_by), p_vector, p_from, p_count);
 }
 
-// Whether each value given can be a place's (write_element()): asked before a vector is changed to take
+// Whether each value given can be a place's (place_for()): asked before a vector is changed to take
 // them, so that one it can't take (null, where a place holds a value whole) leaves the vector as it was.
 bool storable(Library &p_library, const ir::Class &p_class, const Slot *p_values, size_t p_count) {
 	for (size_t i = 0; p_class.element_bare != ir::Bare::None && i < p_count; i++) {
 		Slot probe;
-		if (!write_element(p_library, p_class, probe, p_values[i])) {
+		if (!place_for(p_library, p_class, p_values[i], &probe)) {
 			return false;
 		}
 	}
@@ -46,11 +46,11 @@ bool storable(Library &p_library, const ir::Class &p_class, const Slot *p_values
 
 // A value storable() passed, as a place that holds nothing yet comes to hold it.
 Slot as_place(Library &p_library, const ir::Class &p_class, Slot p_value) {
-	Slot place;
-	place.bits = 0;
-	const bool stored = write_element(p_library, p_class, place, p_value);
+	Slot made;
+	made.bits = 0;
+	const bool stored = place_for(p_library, p_class, p_value, &made);
 	(void)stored;
-	return place;
+	return made;
 }
 
 Slot of_number(uint32_t p_value) {
@@ -94,12 +94,12 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	// Whether the element at an index is the value. One a place holds whole is compared as the handle it is
 	// read as, which the engine may refuse to make.
 	const auto is_at = [&](int64_t p_at) {
-		const Slot place = p_vector->data[p_at];
+		const Slot held = place(p_vector, static_cast<size_t>(p_at));
 		if (klass.element_bare == ir::Bare::None) {
-			return element_is(p_library, kind, kind == Kind::Any ? any::filled(place) : place, value);
+			return element_is(p_library, kind, kind == Kind::Any ? any::filled(held) : held, value);
 		}
 		Slot element;
-		if (!read_element(p_library, klass, place, &element)) {
+		if (!read_element(p_library, klass, held, &element)) {
 			return false;
 		}
 		const bool is = element_is(p_library, kind, element, value);
@@ -160,11 +160,11 @@ void vector_add(Library &p_library, Vector *p_vector, const VectorCall &p_call) 
 		return;
 	}
 	if (added) {
-		shift_slots(p_vector, at, length - at, added);
-		std::fill(p_vector->data + at, p_vector->data + at + added, Slot());
+		shift_places(p_vector, at, length - at, added);
+		clear_places(p_vector, at, at + added);
 	}
 	for (uint32_t i = 0; i < added; i++) {
-		p_vector->data[at + i] = as_place(p_library, klass, p_call.values[first + i]);
+		set_place(p_vector, at + i, as_place(p_library, klass, p_call.values[first + i]));
 	}
 	if (!insert) {
 		give(p_library, p_call, Kind::U32, of_number(p_vector->length));
@@ -194,12 +194,12 @@ void vector_take(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	if (length != 0) {
 		// A hole taken out is undefined, as any read of one is. A value the place held whole leaves as a handle;
 		// any other takes the place's own reference with it.
-		element = kind == Kind::Any ? any::filled(p_vector->data[at]) : p_vector->data[at];
+		element = kind == Kind::Any ? any::filled(place(p_vector, static_cast<size_t>(at))) : place(p_vector, static_cast<size_t>(at));
 		if (klass.element_bare != ir::Bare::None && !read_element(p_library, klass, element, &element)) {
 			return;
 		}
-		shift_slots(p_vector, static_cast<uint32_t>(at) + 1, length - static_cast<uint32_t>(at) - 1, -1);
-		p_vector->data[length - 1].bits = 0;
+		shift_places(p_vector, static_cast<uint32_t>(at) + 1, length - static_cast<uint32_t>(at) - 1, -1);
+		clear_places(p_vector, length - 1, length);
 		p_vector->length = length - 1;
 	}
 	give(p_library, p_call, kind, element);
@@ -215,7 +215,7 @@ void vector_copy(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 		Vector *part = p_library.fresh_vector(p_vector->klass, end - start);
 		for (uint32_t i = start; part && i < end; i++) {
 			// avmplus's generic_slice sets every index of the copy: a hole is an element that holds undefined there.
-			part->data[i - start] = p_library.heap.share(kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i]);
+			set_place(part, i - start, p_library.heap.share(kind, kind == Kind::Any ? any::filled(place(p_vector, i)) : place(p_vector, i)));
 		}
 		if (part) {
 			give(p_library, p_call, Kind::Obj, of_pointer(part));
@@ -243,7 +243,7 @@ void vector_copy(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	for (size_t i = 0; i < p_call.count; i++) {
 		const Vector *from = static_cast<const Vector *>(p_call.values[i].p);
 		for (uint32_t k = 0; k < from->length; k++) {
-			all->data[at++] = p_library.heap.share(kind, from->data[k]);
+			set_place(all, at++, p_library.heap.share(kind, place(from, k)));
 		}
 	}
 	give(p_library, p_call, Kind::Obj, of_pointer(all));
@@ -267,16 +267,16 @@ void array_concat(Library &p_library, Vector *p_array, const VectorCall &p_call)
 	}
 	uint32_t at = 0;
 	for (uint32_t k = 0; k < p_array->length; k++) {
-		all->data[at++] = p_library.heap.share(Kind::Any, p_array->data[k]);
+		slots_of(all)[at++] = p_library.heap.share(Kind::Any, slots_of(p_array)[k]);
 	}
 	for (size_t i = 1; i < p_call.count; i++) {
 		const Slot value = p_call.values[i];
 		if (const Vector *other = spread(value)) {
 			for (uint32_t k = 0; k < other->length; k++) {
-				all->data[at++] = p_library.heap.share(Kind::Any, other->data[k]);
+				slots_of(all)[at++] = p_library.heap.share(Kind::Any, slots_of(other)[k]);
 			}
 		} else {
-			all->data[at++] = p_library.heap.share(Kind::Any, value);
+			slots_of(all)[at++] = p_library.heap.share(Kind::Any, value);
 		}
 	}
 	give(p_library, p_call, Kind::Obj, of_pointer(all));
@@ -303,14 +303,14 @@ void splice(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
 		return;
 	}
 	// What is taken out moves to the new vector as it is: each reference is still held once.
-	std::memcpy(static_cast<void *>(removed->data), static_cast<const void *>(p_vector->data + start), taken * sizeof(Slot));
-	shift_slots(p_vector, start + taken, length - start - taken, static_cast<int64_t>(added) - taken);
+	move_places(removed, 0, p_vector, start, taken);
+	shift_places(p_vector, start + taken, length - start - taken, static_cast<int64_t>(added) - taken);
 	if (grown < length) {
-		std::fill(p_vector->data + grown, p_vector->data + length, Slot());
+		clear_places(p_vector, static_cast<size_t>(grown), length);
 	}
 	p_vector->length = static_cast<uint32_t>(grown);
 	for (uint32_t i = 0; i < added; i++) {
-		p_vector->data[start + i] = as_place(p_library, klass, p_call.values[3 + i]);
+		set_place(p_vector, start + i, as_place(p_library, klass, p_call.values[3 + i]));
 	}
 	give(p_library, p_call, Kind::Obj, of_pointer(removed));
 }
@@ -342,7 +342,11 @@ bool vector_call(Library &p_library, VectorMethod p_method, const Slot *p_values
 			vector_find(p_library, vector, call);
 			break;
 		case VectorMethod::Reverse:
-			std::reverse(vector->data, vector->data + vector->length);
+			if (vector->narrow) {
+				std::reverse(numbers_of(vector), numbers_of(vector) + vector->length);
+			} else {
+				std::reverse(slots_of(vector), slots_of(vector) + vector->length);
+			}
 			give(p_library, call, Kind::Obj, p_library.heap.share(Kind::Obj, of_pointer(vector)));
 			break;
 		case VectorMethod::Slice:

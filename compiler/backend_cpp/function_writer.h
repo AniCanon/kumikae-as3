@@ -68,6 +68,10 @@ class FunctionWriter {
 	std::vector<uint32_t> alias_name_; // For a singleton: its engine name.
 	std::vector<uint32_t> singleton_use_; // And the use the host resolves it by, once written.
 	bool has_owner_alias_ = false;
+	// Per register: it holds one of Godot's objects that a property is read or written of or a method is
+	// called on, so that the object behind its handle is asked for. A field read into such a register again
+	// leaves the handle it has where the field still holds the same object (store_again, runtime/engine.h).
+	std::vector<bool> asked_;
 	// Per register: it holds a value with parts inline. Only one that every instruction writing it gives a
 	// value to (what Godot makes, computes or gives for a property of that type): a register that may be
 	// given null (a field read, a call's result, an untyped value) stays a handle, which can say so.
@@ -156,6 +160,7 @@ class FunctionWriter {
 	std::vector<bool> retried_; // Per instruction: the copy with locals leaves for it in the other (label S).
 	std::vector<uint32_t> loop_vectors(uint32_t p_from, uint32_t p_to) const;
 	bool reads_in_place(uint32_t p_register) const;
+	bool narrow_vector(uint32_t p_vector) const;
 	void find_twice();
 	bool fast_vector(const ir::Instruction &p_in);
 	std::string label(uint32_t p_target) const; // "L12", or "V12" for a jump inside the copy with locals.
@@ -184,8 +189,21 @@ class FunctionWriter {
 	bool object(const ir::Instruction &p_in); // function_objects.cpp: fields, globals, classes.
 	bool flow(const ir::Instruction &p_in); // Jumps, returns, throws.
 	bool call(const ir::Instruction &p_in); // function_calls.cpp
-	// p_direct: the callee is the very function p_callee, and not one found in a table as the call is made.
-	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::string &p_target, bool p_direct);
+	// One of the functions a call may be of: when it is the one (a condition on `k`, the receiver's class;
+	// empty for the last, which answers for the rest), and what is called.
+	struct Target {
+		std::string when;
+		std::string function;
+	};
+	// A call written for p_callee's parameters and result, of the first target whose condition holds.
+	// p_looks_first: the depth is looked at here, for a callee that may not count it itself. p_may_fail:
+	// an error is looked for afterwards.
+	void call_function(const ir::Instruction &p_in, const ir::Function &p_callee, const std::vector<Target> &p_targets, bool p_looks_first, bool p_may_fail);
+	void call_through_table(const ir::Instruction &p_in);
+	// What the call at an instruction does, itself and through what it calls: the function called by its
+	// name, or every function a method table may hold there. Null where nothing is known (and while the
+	// facts themselves are being found): the call may then do anything. Asked only of a call (is_call()).
+	const FunctionFacts *called(uint32_t p_pc) const;
 	void by_thunk(const ir::Instruction &p_in);
 	void raw_thunk(const ir::Instruction &p_in); // The instruction's thunk, whatever the library has for it.
 	bool by_library(const ir::Instruction &p_in); // function_library.cpp: the library's function, called direct.
@@ -196,6 +214,8 @@ class FunctionWriter {
 	// function_engine.cpp
 	void find_aliases();
 	bool holds(uint32_t p_register, std::string_view p_type) const;
+	// Whether a register holds a handle on one of Godot's values or objects of exactly that type.
+	bool holds_handle(uint32_t p_register, std::string_view p_type) const;
 	std::string object_behind(uint32_t p_register);
 	std::optional<std::string> bare_argument(uint32_t p_register, std::string_view p_type, size_t p_at, std::string *r_guard);
 	bool engine(const ir::Instruction &p_in);
@@ -215,6 +235,10 @@ class FunctionWriter {
 	bool value_made(const ir::Instruction &p_in);
 	bool value_part(const ir::Instruction &p_in);
 	bool value_operation(const ir::Instruction &p_in);
+	bool kept_method(const ir::Instruction &p_in);
+	bool value_keyed(const ir::Instruction &p_in);
+	// The instruction that was written with the one before it (value_keyed), for which nothing more is.
+	uint32_t joined_ = ir::NONE;
 	bool value_constant(const ir::Instruction &p_in);
 	bool engine_value(const ir::Instruction &p_in);
 	void forget_whole(uint32_t p_register);

@@ -526,11 +526,12 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		r_value->bits = found == wholes.end() ? 0 : found->second;
 		return found != wholes.end();
 	}
-	[[nodiscard]] void *collection(std::string_view p_type, const ir::Class &p_vector, const vm::Slot *p_elements, size_t p_count, std::string *) override {
+	[[nodiscard]] void *collection(std::string_view p_type, const ir::Class &p_class, const vm::Vector *p_vector, std::string *) override {
 		void *made = box();
 		std::string elements;
-		for (size_t i = 0; i < p_count; i++) {
-			elements += (i ? ", " : "") + (p_vector.element_bare != ir::Bare::None ? show_whole(p_elements[i].bits) : show(vm::Argument{ p_vector.element, p_elements[i] }));
+		for (uint32_t i = 0; i < p_vector->length; i++) {
+			const vm::Slot held = vm::place(p_vector, i);
+			elements += (i ? ", " : "") + (p_class.element_bare != ir::Bare::None ? show_whole(held.bits) : show(vm::Argument{ p_class.element, held }));
 		}
 		log += "collection " + std::string(p_type) + "[" + elements + "] -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;

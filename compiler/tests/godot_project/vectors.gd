@@ -52,6 +52,12 @@ func _physics_process(_delta: float) -> bool:
 	var area := NavigationPolygon.new()
 	ask("outline", [area])
 	show("polygons", [area.get_polygon(0), area.get_polygon(1)], [PackedInt32Array([0, 1, 2]), PackedInt32Array([3, 1, 2])])
+	var wholes := NavigationPolygon.new()
+	ask("wholes", [wholes, node])
+	show("wholes", [wholes.get_polygon(0), wholes.get_polygon(1), wholes.get_polygon(2)],
+			[PackedInt32Array([-9, 7, -1, 2147483647, -2147483648, 0, 12]), PackedInt32Array([5, 6, 2147483647]), PackedInt32Array()])
+	show("unsigned", node.get_meta("unsigned"), [4000000000, 1])
+	show("an unsigned too big for 32 bits", [ask("unsignedTooBig", [wholes]), wholes.get_polygon_count()], [null, 3])
 	var a := Node.new()
 	var b := Node.new()
 	a.name = "a"

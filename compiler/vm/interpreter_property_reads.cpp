@@ -59,7 +59,7 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value) {
 	const ir::Class &klass = module_.classes[p_vector->klass];
 	if (p_key.index && *p_key.index < p_vector->length) {
-		return element_to_any(library_, klass, p_vector->data[*p_key.index], r_value);
+		return element_to_any(library_, klass, place(p_vector, *p_key.index), r_value);
 	}
 	if (p_key.index && !klass.array) {
 		raise_range(*p_key.index, p_vector->length);
@@ -197,7 +197,7 @@ bool Interpreter::has_property(Slot p_holder, const PropertyKey &p_key, bool p_p
 	} else if (klass && klass->element != Kind::Void) {
 		const Vector *vector = static_cast<const Vector *>(object);
 		const bool element = p_key.index && *p_key.index < vector->length &&
-				(!klass->array || !any::is_hole(vector->data[*p_key.index]));
+				(!klass->array || !any::is_hole(slots_of(vector)[*p_key.index]));
 		has = has || element || p_key.text == "length" || (!klass->array && p_key.text == "fixed") ||
 				(klass->array && entry_of(vector->properties, p_key).has_value()) || (p_prototype && library_name(p_holder, p_key.text));
 	} else if (klass) {

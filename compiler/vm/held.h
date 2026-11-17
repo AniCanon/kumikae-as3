@@ -39,7 +39,7 @@ void each_held(const ir::Class &p_class, Object *p_object, Visit &&p_visit) {
 		Vector *vector = static_cast<Vector *>(p_object);
 		const ir::Kind kind = place_kind(p_class);
 		for (uint32_t i = 0; ir::is_held(kind) && i < vector->length; i++) {
-			p_visit(kind, vector->data[i]);
+			p_visit(kind, slots_of(vector)[i]); // A place that holds something counted is a slot.
 		}
 		if (vector->properties) {
 			each_entry(vector->properties, p_visit);
