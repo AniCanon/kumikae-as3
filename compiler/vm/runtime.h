@@ -59,6 +59,11 @@ struct Vector : Object {
 	uint32_t length;
 	uint32_t capacity; // Slots there is room for; those from `length` on are zero.
 	bool fixed; // Its length may not change.
+	// Which of Godot's value types each place holds whole, in the slot itself (ir::Bare, as its number): a
+	// Vector2's two reals. 0 for every other vector, whose places hold what a field of that kind holds. It
+	// is the vector's class that says so (ir::Class::element_bare); here it is beside the length for code
+	// that reads an element without the class.
+	uint8_t bare;
 	Slot *data;
 	Entries *properties; // An Array's properties other than its indices, once it has any (vm/table.h).
 };
@@ -102,8 +107,9 @@ void free_string(Str *p_string);
 // class), or on none if that is null: the list is never left out by mistake.
 Object *new_object(uint32_t p_class, size_t p_fields, Object *p_list);
 void free_object(Object *p_object); // The fields must have been released. It leaves the list it is on.
-// One reference; `p_length` elements, all zero. Null if out of memory.
-Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, Object *p_list);
+// One reference; `p_length` elements, all zero; p_bare is what its class says its places hold whole
+// (Vector::bare). Null if out of memory.
+Vector *new_vector(uint32_t p_class, uint32_t p_length, bool p_fixed, uint8_t p_bare, Object *p_list);
 // Room for at least that many elements, keeping the ones there are. False if out of memory.
 bool vector_reserve(Vector *p_vector, uint32_t p_capacity);
 void free_vector(Vector *p_vector); // The elements and properties must have been released. It leaves its list.

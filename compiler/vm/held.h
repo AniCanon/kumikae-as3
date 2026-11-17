@@ -37,8 +37,9 @@ void each_held(const ir::Class &p_class, Object *p_object, Visit &&p_visit) {
 	}
 	if (p_class.element != ir::Kind::Void) {
 		Vector *vector = static_cast<Vector *>(p_object);
-		for (uint32_t i = 0; ir::is_held(p_class.element) && i < vector->length; i++) {
-			p_visit(p_class.element, vector->data[i]);
+		const ir::Kind kind = place_kind(p_class);
+		for (uint32_t i = 0; ir::is_held(kind) && i < vector->length; i++) {
+			p_visit(kind, vector->data[i]);
 		}
 		if (vector->properties) {
 			each_entry(vector->properties, p_visit);

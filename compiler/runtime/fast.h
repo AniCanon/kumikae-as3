@@ -22,6 +22,15 @@ inline Slot *element(Object *p_vector, uint32_t p_index) {
 	return vector && p_index < vector->length ? vector->data + p_index : nullptr;
 }
 
+// The vector, if its places hold what the code that asks reads and writes there: one of Godot's values
+// whole (p_whole: the type's number, which generated code is written with, as Vector::bare has it), or, for
+// 0, what a field of the element's kind holds. Nothing for a vector of the other sort, and for none: the
+// library reads and writes those. Only a place of one of Godot's values is ever asked about: no other
+// vector holds anything whole.
+inline Object *vector_of(Object *p_vector, uint8_t p_whole) {
+	return p_vector && static_cast<Vector *>(p_vector)->bare == p_whole ? p_vector : nullptr;
+}
+
 // A new object of the class, its fields as an object's are before its constructor runs, with one reference,
 // the caller's. Null for a class whose objects are more than fields (a vector, a table, one that extends one
 // of Godot's: the library makes those), and when there is no memory.

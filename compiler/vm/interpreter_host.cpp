@@ -131,8 +131,8 @@ Outcome collection(Request &p_request) {
 	if (!vector) {
 		return Outcome::Done;
 	}
-	const Kind element = p_request.module.classes[vector->klass].element;
-	p_request.result.p = p_request.host.source.collection(p_request.name(p_request.in.c), element, vector->data, vector->length, &p_request.error);
+	p_request.result.p = p_request.host.source.collection(p_request.name(p_request.in.c), p_request.module.classes[vector->klass], vector->data, vector->length,
+			&p_request.error);
 	return p_request.done(p_request.result.p != nullptr);
 }
 

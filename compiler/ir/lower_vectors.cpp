@@ -41,6 +41,7 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 	if (element == Kind::Val && of && is_godot(of)) {
 		klass.element_type = godot_name(of->name, std::string_view()).value_or(std::string());
 		klass.element_zero = of->klass && value_has_parts(of);
+		klass.element_bare = klass.element_zero ? bare_named(klass.element_type) : Bare::None;
 	}
 	module_.classes.push_back(std::move(klass));
 	const uint32_t index = static_cast<uint32_t>(module_.classes.size()) - 1;

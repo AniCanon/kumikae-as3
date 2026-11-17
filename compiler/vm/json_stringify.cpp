@@ -191,12 +191,15 @@ void Json::close(bool p_any, char p_bracket) {
 
 // JA: every element up to the length it had at the start; one that is gone since is undefined.
 Json::Wrote Json::array(Vector *p_vector) {
-	const Kind element = vm_.module_.classes[p_vector->klass].element;
+	const ir::Class &klass = vm_.module_.classes[p_vector->klass];
 	const uint32_t length = p_vector->length;
 	out_ += '[';
 	for (uint32_t i = 0; i < length; i++) {
 		// A hole is undefined to a replacer, as to anything that reads it.
-		const Slot each = i < p_vector->length ? vm_.to_any(element, element == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i]) : any::undefined();
+		Slot each = any::undefined();
+		if (i < p_vector->length && !element_to_any(vm_.library_, klass, p_vector->data[i], &each)) {
+			return Wrote::Failed;
+		}
 		if (vm_.failing_ || member(i == 0, std::to_string(i), false, each) == Wrote::Failed) {
 			return Wrote::Failed;
 		}

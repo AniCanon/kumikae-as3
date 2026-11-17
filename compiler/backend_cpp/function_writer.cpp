@@ -269,7 +269,7 @@ void FunctionWriter::instruction(const Instruction &p_in) {
 	if (!before.empty()) {
 		line(before);
 	}
-	if (!engine(p_in)) {
+	if (!engine(p_in) && !fast_place(p_in)) {
 		generic(p_in);
 	}
 	if (!after.empty()) {

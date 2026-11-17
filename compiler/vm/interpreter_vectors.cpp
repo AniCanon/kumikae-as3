@@ -71,11 +71,13 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		raise_null();
 		return;
 	}
-	const Kind kind = module_.classes[vector->klass].element;
+	const ir::Class &klass = module_.classes[vector->klass];
+	const Kind kind = klass.element;
 	switch (p_in.op) {
 		case Op::VecGet: {
 			const Kind index = p_function.registers[p_in.c];
-			if (const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length)) {
+			const std::optional<uint32_t> at = element_index(index, r[p_in.c], vector->length);
+			if (at && !vector->bare) {
 				put(kind, r[p_in.a], share(kind, kind == Kind::Any ? any::filled(vector->data[*at]) : vector->data[*at]));
 				break;
 			}
@@ -88,7 +90,8 @@ void Interpreter::vector_op(const Function &p_function, const Instruction &p_in,
 		}
 		case Op::VecSet: {
 			const Kind index = p_function.registers[p_in.b];
-			if (const std::optional<uint32_t> at = element_index(index, r[p_in.b], vector->length)) {
+			const std::optional<uint32_t> at = element_index(index, r[p_in.b], vector->length);
+			if (at && !vector->bare) {
 				put(kind, vector->data[*at], share(kind, r[p_in.c]));
 			} else {
 				vm::vector_set(library_, vector, index, r[p_in.b], r[p_in.c]);

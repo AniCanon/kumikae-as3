@@ -120,8 +120,10 @@ void FunctionWriter::find_inline() {
 			if (!writes || !inline_[in.a]) {
 				continue;
 			}
+			// A vector of a type a slot holds whole has no null place: an element read is a value.
+			const bool element = in.op == Op::VecGet && ir::bare_named(parts_of(function_, in.a)) != ir::Bare::None;
 			const bool gives = in.op == Op::HostNew || in.op == Op::HostOperate || in.op == Op::HostGet || in.op == Op::HostCall ||
-					in.op == Op::HostConstant || in.op == Op::HostCallStatic || (in.op == Op::Move && inline_[in.b]);
+					in.op == Op::HostConstant || in.op == Op::HostCallStatic || (in.op == Op::Move && inline_[in.b]) || element;
 			if (!gives) {
 				inline_[in.a] = false;
 				changed = true;

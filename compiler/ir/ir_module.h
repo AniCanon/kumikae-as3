@@ -109,6 +109,18 @@ struct Field {
 	Constant first = {};
 };
 
+// One of Godot's value types that a slot holds whole: eight bytes, laid out as Godot lays the type out (a
+// build with single-precision reals). A vector of one keeps each value in its place, where a vector of
+// any other of Godot's values keeps a handle on one.
+enum class Bare : uint8_t { None, Vector2, Vector2i };
+// Which of them Godot's name for a type names, and Godot's name for one.
+inline Bare bare_named(std::string_view p_type) {
+	return p_type == "Vector2" ? Bare::Vector2 : p_type == "Vector2i" ? Bare::Vector2i : Bare::None;
+}
+inline std::string_view bare_name(Bare p_bare) {
+	return p_bare == Bare::Vector2 ? "Vector2" : p_bare == Bare::Vector2i ? "Vector2i" : std::string_view();
+}
+
 struct Class {
 	std::string name; // "game.Player"
 	uint32_t base = NONE;
@@ -126,6 +138,10 @@ struct Class {
 	// a C# array of structs does and as a local of that type does.
 	std::string element_type;
 	bool element_zero = false;
+	// For a vector of one of Godot's value types that a slot holds whole: which. Each place then holds the
+	// value itself, never a handle and never null: there is nothing in it to count, copy or let go of.
+	// `element` is Val all the same: what a value read out of a place is, in a register.
+	Bare element_bare = Bare::None;
 	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;

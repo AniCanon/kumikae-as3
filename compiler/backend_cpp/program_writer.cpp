@@ -89,6 +89,7 @@ std::string class_tables(const ir::Module &p_module, uint32_t p_index, std::stri
 		interface_code.push_back(code_pointer(p_module, method < klass.interface_methods.size() ? klass.interface_methods[method] : NONE));
 	}
 	std::string info = "{ " + string_literal(klass.name) + ", " + number(klass.base) + ", " + layout_hash(klass) + ", " + kind_number(klass.element) + ", " + number(klass.element_check) + ", " +
+			std::to_string(static_cast<unsigned>(klass.element_bare)) + ", " +
 			boolean(klass.array) + ", " + boolean(klass.table) + ", " + boolean(klass.dictionary) + ", " + boolean(klass.built_in) + ", " +
 			boolean(klass.is_interface) + ", ";
 	info += array(r_out, "const FieldInfo", prefix + "_fields", fields) + ", " + std::to_string(fields.size()) + ", ";

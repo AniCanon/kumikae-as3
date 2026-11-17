@@ -14,7 +14,7 @@ host differs.
 | `interpreter_godot_refuses.cpp` | Why Godot can't hold an untyped value, checked before a request is made |
 | `heap`, `runtime` | Lifetime of objects and strings: who holds what, with no frame in sight (`Heap`), which the interpreter and the library both work on; and what the library reads once and no frame owns (the host's clock, methods and Godot's operators by name, the one value of each static function) |
 | `interpreter_objects.cpp` | Objects made, their class asked, fields read by a host |
-| `fields.h` | Where an object's fields are: the one accessor every read and write of a field goes through (`field()` by the class's description, `own_field()` for the library's own classes, `owner_field()` for a script object's Godot object), and how many slots a class's objects have |
+| `fields.h` | Where an object's fields are: the one accessor every read and write of a field goes through (`field()` by the class's description, `own_field()` for the library's own classes, `owner_field()` for a script object's Godot object), and how many slots a class's objects have; what a vector's places are kept as (`place_kind()`) |
 | `held.h` | What an object holds: `each_held()`, the one visitor of every container's slots |
 | `collector` | The cycle collector: frees objects that refer to each other in a loop, in steps of bounded work |
 | `library` | The standard library as functions of plain values (slots in, a slot out, no frame): what each is handed (`Library`: the heap, and `Runner`, the few things only whoever runs the program can do), and `Unmoved`, the parts still the interpreter's own that those functions ask for, which shrinks to nothing as each family moves |
@@ -64,6 +64,13 @@ host differs.
   object, or counts an object's slots (`slots_of()`): a field that comes to take more than one slot changes
   that file and the class's description, and no reader. `slot_at()` (`runtime.h`) is for that file and for
   generated code's own accessor (`runtime/values.h`), which is handed the slot by the generator.
+- **A vector of `Vector2`s or of `Vector2i`s holds each value in its place** (`ir::Class::element_bare`,
+  `Vector::bare`): eight bytes, never a handle and never null, with nothing to count (`place_kind()` is then a
+  kind that counts nothing, which is what moving, copying and letting go of places go by). A value crosses
+  into a register, which holds a handle, by `read_element()`, and back by `write_element()` or `put_element()`
+  (`library.h`; untyped, `element_to_any()` and `element_from_any()`): the host makes the handle and reads it
+  (`EngineHandles::boxed`, `unboxed`), and no value (null) stored is AS3's TypeError #1034. Nothing else reads a
+  place of such a vector as its element's kind.
 - **What a container holds is said once, in `each_held()` (`held.h`).** An object's fields, a vector's
   elements, a function value's bound object or environment (its `FUNCTION_FIRST` field): freeing lets go of
   each slot it visits, and the cycle collector follows each. A new container (an Array, a keyed table for

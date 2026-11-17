@@ -3,7 +3,8 @@ extension in the interpreter's place (KAS3_PROGRAM_LIBRARY).
 
 Two things are held:
 
-  probe      tests/godot_native's scripts say, as native code, what they say interpreted, line for line.
+  probe      tests/godot_native's scripts, and the test project's Places.as with them, say, as native code,
+             what they say interpreted, line for line.
   workloads  each workload of tests/bench/languages' CmpAs.as, run small, stays on the fast paths.
   frames     each frame benchmark of tests/bench/languages/frames, run for a few frames, leaves to the
              library what frames/native_counts.txt says: nothing in a loop that should be free of it.
@@ -109,8 +110,9 @@ class Runner:
             return
         sources = os.path.join(self.tests, "godot_native")
         with tempfile.TemporaryDirectory() as where:
-            project = self.project(where, sources)
-            program = self.library("the probe", project, sorted(name for name in os.listdir(sources) if name.endswith(".as")), where)
+            # With the script places.gd holds to GDScript under the interpreter: here it is held to itself as native code.
+            project = self.project(where, sources, sorted(os.listdir(sources)) + [os.path.join(self.tests, "godot_project", "Places.as")])
+            program = self.library("the probe", project, sorted(name for name in os.listdir(project) if name.endswith(".as")), where)
             if not program:
                 return
             said = {}

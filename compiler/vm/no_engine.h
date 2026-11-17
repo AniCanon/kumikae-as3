@@ -29,10 +29,15 @@ public:
 		refuse(r_error);
 		return nullptr;
 	}
-	[[nodiscard]] void *collection(std::string_view, ir::Kind, const Slot *, size_t, std::string *r_error) override {
+	[[nodiscard]] void *collection(std::string_view, const ir::Class &, const Slot *, size_t, std::string *r_error) override {
 		refuse(r_error);
 		return nullptr;
 	}
+	[[nodiscard]] void *boxed(ir::Bare, Slot, std::string *r_error) override {
+		refuse(r_error);
+		return nullptr;
+	}
+	[[nodiscard]] bool unboxed(ir::Bare, void *, Slot *) override { return false; }
 	[[nodiscard]] void *copy(void *p_value) override { return p_value; }
 	void drop(void *) override {}
 	[[nodiscard]] bool present(void *p_value) override { return p_value != nullptr; }

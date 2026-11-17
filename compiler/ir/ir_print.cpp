@@ -196,6 +196,7 @@ std::string print(const Module &p_module) {
 		}
 		if (klass.element != Kind::Void) {
 			out += std::string(" of ") + kind_name(klass.element);
+			out += klass.element_bare != Bare::None ? " held whole" : "";
 		}
 		for (size_t i = 0; i < klass.interfaces.size(); i++) {
 			const uint32_t at = klass.interfaces[i];

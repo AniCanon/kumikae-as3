@@ -2,7 +2,8 @@
 // library, the collector and the hosts, comes through here, so that how a class lays its fields out is said
 // in this file alone. Today each field is one slot, in the order of the class's description
 // (ir::Class::fields, a base's first): a field that takes more than one (one of Godot's values held inline)
-// changes field_slot() and slots_of(), and nothing that calls them.
+// changes field_slot() and slots_of(), and nothing that calls them. What a vector's places are kept as is
+// said here too (place_kind()).
 #pragma once
 
 #include "ir.h"
@@ -38,6 +39,18 @@ inline Slot &own_field(Object *p_object, uint32_t p_field) {
 // every such class (the lowerer's "$owner").
 inline Slot &owner_field(Object *p_object) {
 	return slot_at(p_object, 0);
+}
+
+// What a place of a vector is counted, copied and let go of as: its element's kind, or, where each place
+// holds one of Godot's values whole (ir::Class::element_bare), a kind that counts nothing. A value read
+// out of such a place, or stored into one, is another matter: it crosses into a handle and back
+// (vm/library.h, read_element and write_element).
+inline ir::Kind place_kind(const ir::Class &p_class) {
+	return p_class.element_bare == ir::Bare::None ? p_class.element : ir::Kind::Void;
+}
+// A new vector of a class: new_vector(), told what the class says its places hold.
+inline Vector *new_vector_of(const ir::Class &p_class, uint32_t p_index, uint32_t p_length, bool p_fixed, Object *p_list) {
+	return new_vector(p_index, p_length, p_fixed, static_cast<uint8_t>(p_class.element_bare), p_list);
 }
 
 // Every field as it is before anything is written to it (empty_value()).

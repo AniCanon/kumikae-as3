@@ -32,6 +32,27 @@ void shift_slots(Vector *p_vector, uint32_t p_from, uint32_t p_count, int64_t p_
 	std::memmove(static_cast<void *>(p_vector->data + p_from + p_by), static_cast<const void *>(p_vector->data + p_from), p_count * sizeof(Slot));
 }
 
+// Whether each value given can be a place's (write_element()): asked before a vector is changed to take
+// them, so that one it can't take (null, where a place holds a value whole) leaves the vector as it was.
+bool storable(Library &p_library, const ir::Class &p_class, const Slot *p_values, size_t p_count) {
+	for (size_t i = 0; p_class.element_bare != ir::Bare::None && i < p_count; i++) {
+		Slot probe;
+		if (!write_element(p_library, p_class, probe, p_values[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
+// A value storable() passed, as a place that holds nothing yet comes to hold it.
+Slot as_place(Library &p_library, const ir::Class &p_class, Slot p_value) {
+	Slot place;
+	place.bits = 0;
+	const bool stored = write_element(p_library, p_class, place, p_value);
+	(void)stored;
+	return place;
+}
+
 Slot of_number(uint32_t p_value) {
 	Slot slot;
 	slot.bits = 0;
@@ -57,7 +78,8 @@ std::optional<Slot> sought(Kind p_kind, Slot p_value) {
 // indexOf and lastIndexOf: the index of the first element, from the start or from the end, that is the
 // value, or -1.
 void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
-	const Kind kind = p_library.module().classes[p_vector->klass].element;
+	const ir::Class &klass = p_library.module().classes[p_vector->klass];
+	const Kind kind = klass.element;
 	const uint32_t length = p_vector->length;
 	int32_t found = -1;
 	Slot value = p_call.values[1];
@@ -69,18 +91,36 @@ void vector_find(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 		}
 		value = *element;
 	}
+	// Whether the element at an index is the value. One a place holds whole is compared as the handle it is
+	// read as, which the engine may refuse to make.
+	const auto is_at = [&](int64_t p_at) {
+		const Slot place = p_vector->data[p_at];
+		if (klass.element_bare == ir::Bare::None) {
+			return element_is(p_library, kind, kind == Kind::Any ? any::filled(place) : place, value);
+		}
+		Slot element;
+		if (!read_element(p_library, klass, place, &element)) {
+			return false;
+		}
+		const bool is = element_is(p_library, kind, element, value);
+		p_library.heap.drop(kind, element);
+		return is;
+	};
 	if (p_call.method == VectorMethod::IndexOf || p_call.method == VectorMethod::IndexOfAny) {
-		for (uint32_t i = clamped(p_call.values[2].i, length); i < length && found < 0; i++) {
-			found = element_is(p_library, kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
+		for (uint32_t i = clamped(p_call.values[2].i, length); i < length && found < 0 && !p_library.runner.failing(); i++) {
+			found = is_at(i) ? static_cast<int32_t>(i) : -1;
 		}
 	} else {
 		// From the end if negative; before the start, there is nothing to look at.
 		const int32_t asked = p_call.values[2].i;
 		int64_t from = asked < 0 ? static_cast<int64_t>(length) + asked : asked;
 		from = from >= length ? static_cast<int64_t>(length) - 1 : from;
-		for (int64_t i = from; i >= 0 && found < 0; i--) {
-			found = element_is(p_library, kind, kind == Kind::Any ? any::filled(p_vector->data[i]) : p_vector->data[i], value) ? static_cast<int32_t>(i) : -1;
+		for (int64_t i = from; i >= 0 && found < 0 && !p_library.runner.failing(); i--) {
+			found = is_at(i) ? static_cast<int32_t>(i) : -1;
 		}
+	}
+	if (p_library.runner.failing()) {
+		return;
 	}
 	give(p_library, p_call, Kind::I32, of_number(static_cast<uint32_t>(found)));
 }
@@ -109,13 +149,14 @@ void vector_join(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 
 // push and unshift (any number of elements, giving the new length) and insertAt (one, at an index).
 void vector_add(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
-	const Kind kind = p_library.module().classes[p_vector->klass].element;
+	const ir::Class &klass = p_library.module().classes[p_vector->klass];
 	const uint32_t length = p_vector->length;
 	const bool insert = p_call.method == VectorMethod::InsertAt;
 	const uint32_t first = insert ? 2 : 1; // Where the elements start among the arguments.
 	const uint32_t added = static_cast<uint32_t>(p_call.count) - first;
 	const uint32_t at = insert ? clamped(p_call.values[1].i, length) : p_call.method == VectorMethod::Unshift ? 0 : length;
-	if (added && (length_is_fixed(p_library, p_vector) || !resize_vector(p_library, p_vector, length + added))) {
+	if (added && (length_is_fixed(p_library, p_vector) || !storable(p_library, klass, p_call.values + first, added) ||
+						 !resize_vector(p_library, p_vector, length + added))) {
 		return;
 	}
 	if (added) {
@@ -123,7 +164,7 @@ void vector_add(Library &p_library, Vector *p_vector, const VectorCall &p_call) 
 		std::fill(p_vector->data + at, p_vector->data + at + added, Slot());
 	}
 	for (uint32_t i = 0; i < added; i++) {
-		p_library.heap.put(kind, p_vector->data[at + i], p_library.heap.share(kind, p_call.values[first + i]));
+		p_vector->data[at + i] = as_place(p_library, klass, p_call.values[first + i]);
 	}
 	if (!insert) {
 		give(p_library, p_call, Kind::U32, of_number(p_vector->length));
@@ -132,7 +173,8 @@ void vector_add(Library &p_library, Vector *p_vector, const VectorCall &p_call) 
 
 // pop, shift and removeAt: one element out, given to whoever asked.
 void vector_take(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
-	const Kind kind = p_library.module().classes[p_vector->klass].element;
+	const ir::Class &klass = p_library.module().classes[p_vector->klass];
+	const Kind kind = klass.element;
 	const uint32_t length = p_vector->length;
 	if (length_is_fixed(p_library, p_vector)) {
 		return;
@@ -150,8 +192,12 @@ void vector_take(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	// other numbers, false, null for the rest, and undefined itself for untyped elements.
 	Slot element = empty_value(kind == Kind::F64, false);
 	if (length != 0) {
-		// A hole taken out is undefined, as any read of one is.
+		// A hole taken out is undefined, as any read of one is. A value the place held whole leaves as a handle;
+		// any other takes the place's own reference with it.
 		element = kind == Kind::Any ? any::filled(p_vector->data[at]) : p_vector->data[at];
+		if (klass.element_bare != ir::Bare::None && !read_element(p_library, klass, element, &element)) {
+			return;
+		}
 		shift_slots(p_vector, static_cast<uint32_t>(at) + 1, length - static_cast<uint32_t>(at) - 1, -1);
 		p_vector->data[length - 1].bits = 0;
 		p_vector->length = length - 1;
@@ -161,7 +207,7 @@ void vector_take(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 
 // slice and concat: a new vector that shares the elements.
 void vector_copy(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
-	const Kind kind = p_library.module().classes[p_vector->klass].element;
+	const Kind kind = place_kind(p_library.module().classes[p_vector->klass]);
 	const uint32_t length = p_vector->length;
 	if (p_call.method == VectorMethod::Slice) {
 		const uint32_t start = clamped(p_call.values[1].i, length);
@@ -239,12 +285,12 @@ void array_concat(Library &p_library, Vector *p_array, const VectorCall &p_call)
 // splice(start, count, ...items): takes `count` elements out from `start`, puts the items in their place,
 // and gives back what was taken out.
 void splice(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
-	const Kind kind = p_library.module().classes[p_vector->klass].element;
+	const ir::Class &klass = p_library.module().classes[p_vector->klass];
 	const uint32_t length = p_vector->length;
 	const uint32_t start = clamped(p_call.values[1].i, length);
 	const uint32_t taken = std::min(p_call.values[2].u, length - start);
 	const uint32_t added = static_cast<uint32_t>(p_call.count) - 3;
-	if (taken != added && length_is_fixed(p_library, p_vector)) {
+	if ((taken != added && length_is_fixed(p_library, p_vector)) || !storable(p_library, klass, p_call.values + 3, added)) {
 		return;
 	}
 	const uint64_t grown = static_cast<uint64_t>(length) - taken + added;
@@ -264,7 +310,7 @@ void splice(Library &p_library, Vector *p_vector, const VectorCall &p_call) {
 	}
 	p_vector->length = static_cast<uint32_t>(grown);
 	for (uint32_t i = 0; i < added; i++) {
-		p_vector->data[start + i] = p_library.heap.share(kind, p_call.values[3 + i]);
+		p_vector->data[start + i] = as_place(p_library, klass, p_call.values[3 + i]);
 	}
 	give(p_library, p_call, Kind::Obj, of_pointer(removed));
 }

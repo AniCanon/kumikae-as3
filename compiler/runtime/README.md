@@ -107,6 +107,10 @@ What this costs, until the split:
 - **A value with parts held inline** is boxed into the host's handle wherever it crosses into what the
   library and the host hold: an instruction run by thunk (`Boxed`), a field, an untyped value, an Array.
   Only a register that can never be null is inline; a parameter, a field and a call's result are handles.
+  A place of a vector of `Vector2`s or of `Vector2i`s holds the value itself (`vm/README.md`), and an
+  element of one read by its index is never null: generated code copies the eight bytes between the place
+  and a register that holds the value inline (`vector_of()`, `place_value()`, `value_place()`), and code
+  that holds a handle is kept off such a place by the same test.
 - **The runtime's functions reach a program library through a table** (`api.h`, `c->api`), as the
   engine's do: every out-of-line function generated code calls is one entry of `KAS3_RUNTIME_API`, an
   inline call through the table in a program library and the function itself in the host. A program

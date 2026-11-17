@@ -25,7 +25,7 @@ class Engine on Godot's Node2D
   #4 Engine/signals
   #5 Engine/heard
   new Engine
-class Vector.<Vector2> of GodotValue
+class Vector.<Vector2> of GodotValue held whole
 class Function
   .0 function:int
   .1 first:Object

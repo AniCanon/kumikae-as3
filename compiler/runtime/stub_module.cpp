@@ -118,6 +118,7 @@ ir::Class stub_class(const ClassInfo &p_info) {
 	klass.base = p_info.base;
 	klass.element = static_cast<Kind>(p_info.element);
 	klass.element_check = p_info.element_check;
+	klass.element_bare = static_cast<ir::Bare>(p_info.element_bare);
 	klass.array = p_info.array;
 	klass.table = p_info.table;
 	klass.dictionary = p_info.dictionary;
