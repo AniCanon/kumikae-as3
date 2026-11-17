@@ -27,6 +27,11 @@ Reload::Reload(Interpreter &p_from, Interpreter &p_to) :
 	if (from_.constructions_) {
 		to_.remember_constructions(); // Before anything is made there.
 	}
+	if (from_.constructions_ && to_.constructions_) {
+		for (const std::string &name : from_.constructions_->natively_made()) {
+			to_.constructions_->made_natively(name);
+		}
+	}
 }
 
 Reload::~Reload() {
@@ -223,6 +228,14 @@ void Reload::carry_fields(Object *p_old, Object *p_fresh) {
 	}
 }
 
+Slot Reload::global_of(const Interpreter &p_program, size_t p_index) {
+	return p_program.native_ ? *p_program.native_->global(static_cast<uint32_t>(p_index)) : p_program.globals_[p_index];
+}
+
+bool Reload::used_in(const Interpreter &p_program, size_t p_class) {
+	return p_program.class_used_[p_class] || (p_program.native_ && p_program.native_->statics_given(static_cast<uint32_t>(p_class)));
+}
+
 void Reload::globals(const std::vector<std::string> &p_changed) {
 	const ir::Module &old = from_.module_;
 	const ir::Module &fresh = to_.module_;
@@ -234,13 +247,13 @@ void Reload::globals(const std::vector<std::string> &p_changed) {
 		const auto found = held.find(fresh.globals[i].name);
 		if (found != held.end() && old.globals[found->second].kind == fresh.globals[i].kind) {
 			to_.drop(fresh.globals[i].kind, to_.globals_[i]);
-			to_.globals_[i] = carry_into(fresh.globals[i].kind, fresh.globals[i].klass, fresh.globals[i].engine_type, from_.globals_[found->second]);
+			to_.globals_[i] = carry_into(fresh.globals[i].kind, fresh.globals[i].klass, fresh.globals[i].engine_type, global_of(from_, found->second));
 		}
 	}
 	for (size_t i = 0; i < old.classes.size() && i < from_.class_used_.size(); i++) {
 		const auto named = classes_.find(old.classes[i].name);
 		if (named != classes_.end() && named->second < to_.class_used_.size()) {
-			to_.class_used_[named->second] = from_.class_used_[i];
+			to_.class_used_[named->second] = used_in(from_, i);
 		}
 	}
 	changed_statics_ = p_changed;
@@ -311,7 +324,7 @@ std::vector<uint8_t> Reload::reached(const Interpreter &p_program, const std::ve
 		}
 	};
 	for (size_t i = 0; i < module.globals.size() && i < p_program.globals_.size(); i++) {
-		visit(module.globals[i].kind, p_program.globals_[i]);
+		visit(module.globals[i].kind, global_of(p_program, i));
 	}
 	for (Object *root : p_roots) {
 		if (root && seen.insert(root).second) {

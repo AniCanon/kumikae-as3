@@ -1825,6 +1825,9 @@ struct Edited {
 	// The old program's objects are let go of as soon as they are moved, as Godot's host lets go of each
 	// instance's: they are gone by the time the objects alive are updated.
 	bool let_go_early = false;
+	// The host asks every program it makes to remember, whatever the one before it did (the Godot
+	// extension's, in a debug build): the program a game that ran as native code is moved onto.
+	bool host_remembers = false;
 
 	std::unique_ptr<ir::Module> build(const std::string &p_source) {
 		auto built = std::make_unique<ir::Module>();
@@ -1862,6 +1865,9 @@ struct Edited {
 			dropped.release_object(reload.object(game));
 		}
 		auto fresh = std::make_unique<vm::Interpreter>(*next, recorder);
+		if (host_remembers) {
+			fresh->remember_constructions();
+		}
 		vm::InPlace done;
 		vm::Object *moved = nullptr;
 		{
@@ -2123,6 +2129,7 @@ static void test_reload_in_place_memory() {
 		[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
 		void clear_globals() override {}
 		vm::Slot *global(uint32_t) override { return nullptr; }
+		bool statics_given(uint32_t) const override { return false; }
 		[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
 	} none;
 	Edited compiled;
@@ -2131,6 +2138,62 @@ static void test_reload_in_place_memory() {
 	compiled.call("churn");
 	CHECK_EQ(compiled.program->remembered(), (size_t)0);
 	compiled.end();
+}
+
+// A program whose code is native (a program library's) moved onto a build the interpreter runs, as an edit
+// of a game that runs as native code does it: its static fields are where native code keeps them, a class
+// native code gave its static fields is not given them again, and its objects, of which nothing is
+// remembered, are said to have been made as native code, at this reload and at those after.
+static void test_reload_from_native() {
+	const std::string source =
+			"package { public class Game { public static var count:int = 3; public var kept:Shot = new Shot(2); public var seen:Number = 0;\n"
+			"  public function look():void { seen = count + Late.v; } public function more():void { kept = new Shot(4); } } }\n"
+			"class K { public static const N:Number = 1; }\n"
+			"class Late { public static var v:int = 7; }\n"
+			"class Shot { public var n:Number; public function Shot(p:Number) { n = p + K.N; } }\n";
+	struct Native final : vm::NativeCode {
+		std::vector<vm::Slot> statics;
+		std::vector<uint8_t> used;
+		[[nodiscard]] bool hand_over(vm::NativeError *) override { return false; }
+		void clear_globals() override {}
+		vm::Slot *global(uint32_t p_index) override { return &statics[p_index]; }
+		bool statics_given(uint32_t p_class) const override { return used[p_class] != 0; }
+		[[nodiscard]] bool run_native(uint32_t, uint32_t, uint32_t, vm::Slot *, uint32_t, uint32_t, vm::Slot *) override { return false; }
+	} native;
+	Edited edited;
+	edited.native = &native;
+	edited.host_remembers = true;
+	edited.start(source);
+	CHECK_EQ(edited.program->remembered(), (size_t)0);
+	// What native code would hold by now: its own values of the static fields, and Late used, which the
+	// interpreter standing for it here never touched.
+	const auto global = [&](const char *p_name) {
+		const auto found = std::find_if(edited.module->globals.begin(), edited.module->globals.end(), [&](const ir::Global &p_global) { return p_global.name == p_name; });
+		CHECK(found != edited.module->globals.end());
+		return static_cast<size_t>(found - edited.module->globals.begin());
+	};
+	native.statics.assign(edited.module->globals.size(), vm::Slot{});
+	native.used.assign(edited.module->classes.size(), 0);
+	native.statics[global("Game.count")].i = 42;
+	native.statics[global("Late.v")].i = 9;
+	native.used[class_named(*edited.module, "Game")] = 1;
+	native.used[class_named(*edited.module, "Late")] = 1;
+	const std::string natively = "an object of it was made while the scripts ran as native code, which does not remember what objects are made with";
+	const std::string next = with(source, "N:Number = 1", "N:Number = 5");
+	CHECK_EQ(edited.edit(next), "updated:; Game: Game() makes an object; Shot: " + natively);
+	edited.call("look");
+	CHECK_EQ(edited.number("seen"), 51.0); // 42 and 9: native code's, and Late's 9 not made 7 again.
+	CHECK_EQ(edited.number("kept.n"), 3.0); // As it was made.
+	// The interpreter runs it from here on: an edit after is of a program that remembers, and the object
+	// made before is still one of which nothing is.
+	CHECK_EQ(edited.edit(with(next, "N:Number = 5", "N:Number = 6")), "updated:; Game: Game() makes an object; Shot: " + natively);
+	CHECK_EQ(edited.number("kept.n"), 3.0);
+	// One made since is remembered, and updated in place.
+	edited.call("more");
+	CHECK_EQ(edited.number("kept.n"), 10.0);
+	CHECK_EQ(edited.edit(with(next, "N:Number = 5", "N:Number = 8")), std::string("updated: Shot; Game: Game() makes an object"));
+	CHECK_EQ(edited.number("kept.n"), 12.0);
+	edited.end();
 }
 
 // Which objects are remembered at all, and that what is remembered of one goes with it however it ends: a
@@ -3839,6 +3902,7 @@ int main() {
 	test_reload_in_place_values();
 	test_reload_in_place_refused();
 	test_reload_in_place_memory();
+	test_reload_from_native();
 	test_reload_in_place_kept();
 	test_reload_in_place_turns();
 	test_reload_in_place_early();

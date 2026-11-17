@@ -27,6 +27,8 @@
 #include "runtime.h"
 
 #include <cstdint>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace kas3 {
@@ -100,6 +102,11 @@ public:
 	// it, or a field's first value.
 	ir::Kind kind_of(uint32_t p_class, const Record &p_record, uint32_t p_value) const;
 	size_t size() const { return used_; } // How many objects have one.
+	// The classes, by name, of which an object came here from a program that ran as native code, which
+	// remembers nothing of what objects are made with (vm/reload.h): why such an object has no record.
+	// It is what a reload says, so it is kept for the reloads after, with the names it was given.
+	void made_natively(const std::string &p_class) { native_.insert(p_class); }
+	const std::unordered_set<std::string> &natively_made() const { return native_; }
 
 	// Whether a value of the kind is one that is kept: a number, a Boolean, text, or nothing at all.
 	static bool plain(ir::Kind p_kind, Slot p_value);
@@ -140,6 +147,7 @@ private:
 	std::vector<Plan> plans_; // By class.
 	std::vector<Looked> looked_;
 	size_t used_ = 0;
+	std::unordered_set<std::string> native_;
 
 	static Record *record_at(Object *p_object, const Plan &p_plan) {
 		return reinterpret_cast<Record *>(&slot_at(p_object, p_plan.at));

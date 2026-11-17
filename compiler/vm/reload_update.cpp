@@ -13,6 +13,9 @@ using ir::Kind;
 using Record = Constructions::Record;
 
 void Reload::carry_record(Object *p_old, Object *p_fresh) {
+	if (from_.native_ && to_.constructions_ && to_.constructions_->room(p_fresh->klass) != 0) {
+		to_.constructions_->made_natively(to_.module_.classes[p_fresh->klass].name);
+	}
 	const Record *kept = from_.constructions_ && to_.constructions_ ? from_.constructions_->of(p_old) : nullptr;
 	if (!kept) {
 		return;
@@ -145,8 +148,8 @@ bool Reload::constant_changed(const std::string &p_name) const {
 	if (before >= from_.globals_.size() || from_.module_.globals[before].kind != kind) {
 		return true;
 	}
-	if (Constructions::plain(kind, from_.globals_[before]) && Constructions::plain(kind, to_.globals_[after])) {
-		return !Constructions::same(kind, from_.globals_[before], to_.globals_[after]);
+	if (Constructions::plain(kind, global_of(from_, before)) && Constructions::plain(kind, to_.globals_[after])) {
+		return !Constructions::same(kind, global_of(from_, before), to_.globals_[after]);
 	}
 	const std::string owner = p_name.substr(0, p_name.rfind('.'));
 	return std::find(changed_statics_.begin(), changed_statics_.end(), owner) != changed_statics_.end();
@@ -242,7 +245,9 @@ InPlace Reload::update_in_place(const std::vector<std::string> &p_run_once) {
 		} else if (unknown) {
 			done.left.emplace_back(name, !to_.constructions_ ? "what its objects were made with is not remembered"
 					: unfit_.count(index)					 ? "its constructor's parameters changed"
-															 : "an object of it was made with an argument or a first value that is not a number, a Boolean, text or null");
+					: to_.constructions_->natively_made().count(name)
+							? "an object of it was made while the scripts ran as native code, which does not remember what objects are made with"
+							: "an object of it was made with an argument or a first value that is not a number, a Boolean, text or null");
 		}
 	}
 	std::sort(done.updated.begin(), done.updated.end());
