@@ -26,7 +26,7 @@ goes into `program.cpp` too: one file for the C++ compiler, which a release is b
 | `function_engine.cpp` | What asks Godot, where generated code does it itself: which values are held inline, the maths the runtime has for `Vector2` and `Vector3`, a property or a method of a Godot object called on bare values by its method bind, the script's own Godot object and singletons borrowed for the whole function |
 | `function_signals.cpp` | A signal's `emit()` made by generated code itself: what it hands over is given to the host as it is held (a number, a Boolean, a value with parts by its address, a handle), and a signal that is a field of `this`, read only to be emitted, is emitted through the field's own handle. Which registers stand for a field's handle that way: a signal read to be emitted, and a value with parts read to be asked an operator, a method or a part |
 | `function_borrowed.cpp` | A field of `this` that holds an object, read into a register only to be used at once: the register counts no reference. An object read out of a vector into a variable, in a function that lets go of nothing: the variable counts none either |
-| `function_loops.cpp` | A loop over vectors of numbers written twice: first with each vector's length and elements in locals, which an index out of range leaves for the loop as it always was |
+| `function_loops.cpp` | A loop over vectors of numbers, or of objects it only reads, written twice: first with each vector's length and elements in locals, which an index out of range leaves for the loop as it always was |
 | `function_values.cpp` | Godot's value types with parts: made from their parts and their members read where they are, and Godot's own code for the type (an operator, a method, a part, a constant) found once by the host and called on bare values |
 | `function_whole.cpp` | A sum of ints or uints converted back to one, as 32-bit arithmetic (exact, and three times as fast on `loop.as`), and two such sums compared as the integers they are |
 | `thunks.h`, `thunks.cpp` | The operations left to the library the interpreter has, each one instruction the host carries out |
@@ -64,6 +64,11 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   first copy (labels `V`) has each vector's length and elements in locals and holds an index against the
   local; an index not below it goes to the same instruction of the second copy (labels `S`), the loop as
   it would be alone, which makes the vector longer or raises the error (`tests/run/vector_loops.as`).
+  An element that is an object is read the same way where the variable it is read into counts no
+  reference (the next rule): `var b:Body = bodies[i]` is then one comparison and one read. A field written
+  in the loop through a register whose class is neither the method's class nor one of its bases or
+  subclasses is no field of `this`, whatever its number: the loop still reads the vector's field once
+  (`tests/run/element_lent.as`).
 - A variable given an element of a vector (`var b:Body = bodies[i]`), or a copy of such a variable, counts
   no reference where the whole function lets go of nothing and runs no code that might: no call, nothing
   stored where an object is held, no register that owns an object written (`lent_`, rule 2 of the

@@ -1,4 +1,4 @@
-// A loop over vectors of numbers, written twice.
+// A loop over vectors of numbers, or of objects it only reads, written twice.
 //
 // An element read or written by its index looks at the vector each time: is there one, is the index below
 // its length, where are its elements. In a loop that is most of what the loop does, and a write through
@@ -12,6 +12,8 @@
 // Which loops: one closed by a plain jump back, in which every instruction is one that runs no code
 // (facts.h), a call is of a function that runs none and stores no element, every element stored is a
 // number or a Boolean under an int or uint index, and no register holding a vector it indexes is written.
+// An element that is an object is read that way too, into a register that counts no reference (lent_):
+// `var b:Body = bodies[i]` in a function that lets go of nothing.
 #include "function_writer.h"
 
 #include "names.h"
@@ -46,6 +48,12 @@ uint32_t target_of(const Instruction &p_in) {
 
 } // namespace
 
+// Whether an element read into the register is a plain copy of what the vector's place holds: a number, a
+// Boolean, or an object the register counts no reference to.
+bool FunctionWriter::reads_in_place(uint32_t p_register) const {
+	return is_number(kind(p_register)) || (kind(p_register) == Kind::Obj && lent_[p_register]);
+}
+
 // The vector registers the loop indexes, if it is one to write twice: none otherwise.
 std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_to) const {
 	std::set<uint32_t> vectors;
@@ -62,7 +70,7 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 				return {};
 			}
 			vectors.insert(in.a);
-		} else if (in.op == Op::VecGet && is_whole(kind(in.c)) && is_number(kind(in.a))) {
+		} else if (in.op == Op::VecGet && is_whole(kind(in.c)) && reads_in_place(in.a)) {
 			vectors.insert(in.b);
 		}
 	}
@@ -82,7 +90,8 @@ std::vector<uint32_t> FunctionWriter::loop_vectors(uint32_t p_from, uint32_t p_t
 		}
 		for (uint32_t each : vectors) {
 			const uint32_t slot = borrowed_[each];
-			if (slot != NONE && ((in.op == Op::SetField && in.b == slot) || (in.op == Op::Call && facts_->functions[in.b].writes.count(slot)))) {
+			const bool sets = in.op == Op::SetField && in.b == slot && may_be_this(in.a);
+			if (slot != NONE && (sets || (in.op == Op::Call && facts_->functions[in.b].writes.count(slot)))) {
 				return {};
 			}
 		}
@@ -155,7 +164,7 @@ bool FunctionWriter::fast_vector(const Instruction &p_in) {
 			line(reg(p_in.a) + " = static_cast<" + std::string(type_of(kind(p_in.a))) + ">(n" + std::to_string(p_in.b) + ");");
 			return true;
 		case Op::VecGet:
-			if (!local(p_in.b) || !is_whole(kind(p_in.c)) || !is_number(kind(p_in.a))) {
+			if (!local(p_in.b) || !is_whole(kind(p_in.c)) || !reads_in_place(p_in.a)) {
 				return false;
 			}
 			line(reg(p_in.a) + " = " + from_slot(kind(p_in.a), element(p_in.b, p_in.c)) + ";");

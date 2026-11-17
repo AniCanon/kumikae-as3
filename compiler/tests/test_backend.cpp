@@ -148,11 +148,59 @@ void a_register_of_two_classes_holds_what_they_share() {
 	CHECK(text->find("r1 = field<double>(r2, 0);") != std::string::npos);
 }
 
+// A loop that reads the elements of a vector of objects, in a method that lets go of nothing, is written
+// twice like a loop over numbers: the first copy has the vector's length and elements in locals. A field
+// written in the loop is of an element's class, which `this` is not: its number may be the number of the
+// field the vector is read from, and the loop is still written twice.
+void a_loop_over_a_vector_of_objects_is_written_twice() {
+	using ir::Instruction;
+	using ir::Kind;
+	using ir::Op;
+	// sum(): i = 0; v = this.items; n = v.length; while (i < n) { v = this.items; p = v[i]; p.x = p.x; i++ }
+	ir::Module module = module_of(
+			{ Kind::Obj, Kind::I32, Kind::Obj, Kind::Obj, Kind::F64, Kind::F64, Kind::F64, Kind::Bool, Kind::I32, Kind::F64, Kind::F64 },
+			{ Instruction{ Op::ConstI32, 1, 0, 0, 0 }, Instruction{ Op::GetField, 2, 0, 0, 0 }, Instruction{ Op::VecLength, 8, 2, 0, 0 },
+					Instruction{ Op::I32ToF64, 5, 1, 0, 0 }, Instruction{ Op::I32ToF64, 6, 8, 0, 0 }, Instruction{ Op::LtF64, 7, 5, 6, 0 },
+					Instruction{ Op::JumpIfNot, 7, 15, 0, 0 }, Instruction{ Op::GetField, 2, 0, 0, 0 }, Instruction{ Op::VecGet, 3, 2, 1, 0 },
+					Instruction{ Op::GetField, 4, 3, 0, 0 }, Instruction{ Op::SetField, 3, 0, 4, 0 }, Instruction{ Op::ConstF64, 9, 0, 0, 0 },
+					Instruction{ Op::AddF64, 10, 5, 9, 0 }, Instruction{ Op::F64ToI32, 1, 10, 0, 0 }, Instruction{ Op::Jump, 3, 0, 0, 0 } });
+	module.numbers.push_back(1.0);
+	add_points(module);
+	ir::Class points;
+	points.name = "Vector.<Point>";
+	points.element = Kind::Obj;
+	points.element_check = 0;
+	module.classes.push_back(std::move(points));
+	ir::Class holder;
+	holder.name = "Holder";
+	holder.fields.push_back(ir::Field{ "items", Kind::Obj, 2 });
+	module.classes.push_back(std::move(holder));
+	ir::Function &sum = module.functions[0];
+	sum.name = "Holder/sum";
+	sum.is_static = false;
+	sum.owner = 3;
+	sum.parameters = 1;
+	sum.required = 1;
+	const backend_cpp::Generated made = backend_cpp::generate(module);
+	CHECK_EQ(made.unsupported, std::string());
+	const std::string *text = file_named(made, "Holder.cpp");
+	CHECK(text != nullptr);
+	if (!text) {
+		return;
+	}
+	const auto has = [&](std::string_view p_part) { return text->find(p_part) != std::string::npos; };
+	CHECK(has("d2 = static_cast<Vector *>(static_cast<C3_Holder *>(r0)->f0_items)->data;"));
+	CHECK(has("r3 = static_cast<Object *>(d2[static_cast<uint32_t>(r1)].p);"));
+	CHECK(has("if (Slot *const e = element(r2, r1)) {")); // The loop as it would be alone, which an index out of range leaves for.
+	CHECK(has("static_cast<C0_Point *>(r3)->f0_x = r4;"));
+}
+
 int main() {
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
 	what_is_left_to_the_library_is_one_statement();
 	a_field_of_a_known_class_is_written_through_its_struct();
 	a_register_of_two_classes_holds_what_they_share();
+	a_loop_over_a_vector_of_objects_is_written_twice();
 	return check::finish();
 }

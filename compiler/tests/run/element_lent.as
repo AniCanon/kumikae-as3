@@ -6,6 +6,7 @@ package {
 	public class element_lent {
 		private var cells:Vector.<Cell> = new Vector.<Cell>();
 		private var small:Vector.<Small> = new Vector.<Small>();
+		private var none:Vector.<Cell>;
 
 		public function element_lent() {
 			for (var i:int = 0; i < 6; i++) {
@@ -27,6 +28,16 @@ package {
 			}
 			cells[3] = new Cell(30, "again");
 			trace(replace(1), sum(), last().name);
+			try {
+				trace(bump(8));
+			} catch (e:Error) {
+				trace("bump:", e.message, sum());
+			}
+			try {
+				trace(sumNone());
+			} catch (e:Error) {
+				trace("none:", e.message);
+			}
 			var kept:Cell = pick(0);
 			cells.length = 0;
 			trace(kept.name, kept.value, cells.length);
@@ -65,6 +76,27 @@ package {
 			for (var i:int = 0; i < small.length; i++) {
 				var s:Small = small[i];
 				total += s.x;
+			}
+			return total;
+		}
+
+		// Past the vector's end part of the way through a loop: what the loop did before the error stays done.
+		private function bump(times:int):int {
+			var total:int = 0;
+			for (var i:int = 0; i < times; i++) {
+				var c:Cell = cells[i];
+				c.value += 10;
+				total += c.value;
+			}
+			return total;
+		}
+
+		// A loop over a vector that is not there.
+		private function sumNone():int {
+			var total:int = 0;
+			for (var i:int = 0; i < 3; i++) {
+				var c:Cell = none[i];
+				total += c.value;
 			}
 			return total;
 		}

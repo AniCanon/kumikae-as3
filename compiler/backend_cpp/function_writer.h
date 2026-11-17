@@ -91,6 +91,9 @@ class FunctionWriter {
 	uint32_t class_written(const ir::Instruction &p_in, const std::vector<uint32_t> &p_known) const;
 	void find_classes();
 	std::string field_of(uint32_t p_object, uint32_t p_slot, ir::Kind p_kind) const; // A field of an object, in memory.
+	// Whether the register's object may be the method's own: false only where its class and the method's
+	// are known and neither extends the other, so that a field written through it is never a field of `this`.
+	bool may_be_this(uint32_t p_register) const;
 	std::optional<std::string> kept_local(uint32_t p_object, uint32_t p_slot) const; // The local, if the field is kept.
 	std::string kept_declared() const; // The locals, each given its field's value.
 	// Statements, on one line: the locals written back before an instruction that may see their fields, and
@@ -132,7 +135,7 @@ class FunctionWriter {
 	// Stores a register's value where the instruction says; the register gives up its reference if this
 	// is its last use.
 	void keep(const std::string &p_place, uint32_t p_register, bool p_is_slot);
-	// function_loops.cpp: a loop over vectors of numbers, written twice.
+	// function_loops.cpp: a loop over vectors of numbers, or of objects it only reads, written twice.
 	struct Twice {
 		uint32_t from = 0; // The instruction its jump back goes to, and that jump.
 		uint32_t to = 0;
@@ -142,6 +145,7 @@ class FunctionWriter {
 	const Twice *fast_ = nullptr; // The loop whose copy with locals is being written, if one is.
 	std::vector<bool> retried_; // Per instruction: the copy with locals leaves for it in the other (label S).
 	std::vector<uint32_t> loop_vectors(uint32_t p_from, uint32_t p_to) const;
+	bool reads_in_place(uint32_t p_register) const;
 	void find_twice();
 	bool fast_vector(const ir::Instruction &p_in);
 	std::string label(uint32_t p_target) const; // "L12", or "V12" for a jump inside the copy with locals.

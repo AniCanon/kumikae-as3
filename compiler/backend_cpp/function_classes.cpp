@@ -117,6 +117,14 @@ void FunctionWriter::find_classes() {
 	}
 }
 
+bool FunctionWriter::may_be_this(uint32_t p_register) const {
+	const uint32_t of = class_of_[p_register];
+	if (of == NONE || function_.owner == NONE || is_this(p_register)) {
+		return true;
+	}
+	return shared_class(module_, of, function_.owner) == of || shared_class(module_, of, function_.owner) == function_.owner;
+}
+
 std::string FunctionWriter::field_of(uint32_t p_object, uint32_t p_slot, Kind p_kind) const {
 	const uint32_t of = is_this(p_object) ? function_.owner : class_of_[p_object];
 	if (of != NONE && has_struct(module_.classes[of]) && p_slot < module_.classes[of].fields.size() &&
