@@ -148,8 +148,10 @@ exactly those), named so that the split can be checked against it:
 6. Lifetime: freeing an object with what it holds is the heap's (`Heap::drop_object`), still reached
    through the interpreter's `free_kept()` and `discard()`; an inline allocation path on the context's
    own free lists is not written.
-7. `any.h`: the tag and the payloads as inline functions, so that an untyped value is kept and let go of
-   inline.
+7. `any.h`: an untyped value that holds something counted (a String, an object, an Int64's box, a handle)
+   is still kept and let go of by a call (`shared_any`, `release_any_slow`). The tag, the payloads and
+   whether a value holds anything are inline (`vm/any.h`): a number, a Boolean, null and undefined cost no
+   call, and a Number in an int's range is made untyped where it is (`number_any()`).
 8. Classes as the host's descriptors (`ClassInfo`) where the library takes `ir::Class`: `each_held()`,
    the collector, `is_class`.
 

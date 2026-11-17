@@ -10,6 +10,9 @@
 
 #include "runtime.h"
 
+#include <cmath>
+#include <cstring>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -27,11 +30,47 @@ enum class AnyTag : uint8_t { Undefined, Null, Boolean, Number, Int, String, Obj
 
 namespace any {
 
-Slot undefined();
-Slot null();
-Slot boolean(bool p_value);
-Slot number(double p_value);
-Slot integer(int32_t p_value);
+// The encoding above, in numbers. What needs no more than these is inline here: a value is told from
+// another, made of a number or a Boolean, and found to hold nothing, wherever it is handled, generated code
+// included, with no call.
+inline constexpr uint64_t NUMBER_OFFSET = uint64_t(1) << 48; // Added to a Number's bits: its top 16 bits are never 0.
+inline constexpr uint64_t INT_FLAG = uint64_t(1) << 47;
+inline constexpr uint64_t TAG_MASK = 7;
+inline constexpr uint64_t NULL_BITS = 1 << 3;
+inline constexpr uint64_t FALSE_BITS = 2 << 3;
+inline constexpr uint64_t TRUE_BITS = 3 << 3;
+// The low 3 bits of a pointer that is held.
+enum PointerTag : uint64_t { STRING = 1, OBJECT = 2, VALUE = 3, GODOT = 4, WIDE = 5 };
+
+inline Slot of_bits(uint64_t p_bits) {
+	Slot slot;
+	slot.bits = p_bits;
+	return slot;
+}
+inline bool is_number(Slot p_value) {
+	return (p_value.bits >> 48) != 0;
+}
+
+inline Slot undefined() {
+	return of_bits(0);
+}
+inline Slot null() {
+	return of_bits(NULL_BITS);
+}
+inline Slot boolean(bool p_value) {
+	return of_bits(p_value ? TRUE_BITS : FALSE_BITS);
+}
+inline Slot number(double p_value) {
+	if (std::isnan(p_value)) {
+		p_value = std::numeric_limits<double>::quiet_NaN();
+	}
+	uint64_t raw = 0;
+	std::memcpy(&raw, &p_value, sizeof(raw));
+	return of_bits(raw + NUMBER_OFFSET);
+}
+inline Slot integer(int32_t p_value) {
+	return of_bits(INT_FLAG | static_cast<uint32_t>(p_value));
+}
 // A pointer is held as it is, with no new reference: the caller decides who owns it.
 Slot string(Str *p_string);
 Slot object(Object *p_object);
@@ -59,10 +98,49 @@ inline Slot filled(Slot p_element) {
 	return p_element;
 }
 
-AnyTag tag(Slot p_value);
-bool to_bool_payload(Slot p_value); // For Boolean.
-double to_number_payload(Slot p_value); // For Number.
-int32_t to_int_payload(Slot p_value); // For Int.
+inline AnyTag tag(Slot p_value) {
+	if (is_number(p_value)) {
+		return AnyTag::Number;
+	}
+	if (p_value.bits & INT_FLAG) {
+		return AnyTag::Int;
+	}
+	switch (p_value.bits & TAG_MASK) {
+		case STRING:
+			return AnyTag::String;
+		case OBJECT:
+			return AnyTag::Object;
+		case VALUE:
+			return AnyTag::Value;
+		case GODOT:
+			return AnyTag::Godot;
+		case WIDE:
+			return AnyTag::Wide;
+		default:
+			break;
+	}
+	if (p_value.bits == NULL_BITS) {
+		return AnyTag::Null;
+	}
+	return p_value.bits == FALSE_BITS || p_value.bits == TRUE_BITS ? AnyTag::Boolean : AnyTag::Undefined;
+}
+// Whether the value holds something that is counted or a handle (a String, an object, an Int64's box, one
+// of Godot's): a number, a Boolean, null and undefined hold nothing, and are shared and let go of for free.
+inline bool holds(Slot p_value) {
+	return !is_number(p_value) && !(p_value.bits & INT_FLAG) && (p_value.bits & TAG_MASK) != 0;
+}
+inline bool to_bool_payload(Slot p_value) { // For Boolean.
+	return p_value.bits == TRUE_BITS;
+}
+inline double to_number_payload(Slot p_value) { // For Number.
+	const uint64_t raw = p_value.bits - NUMBER_OFFSET;
+	double out = 0;
+	std::memcpy(&out, &raw, sizeof(out));
+	return out;
+}
+inline int32_t to_int_payload(Slot p_value) { // For Int.
+	return static_cast<int32_t>(static_cast<uint32_t>(p_value.bits));
+}
 void *pointer(Slot p_value); // For String, Object, Value, Godot, Wide; null for the rest.
 // The counted thing the value holds, if it holds one (a String, a script object or a Wide).
 Counted *counted(Slot p_value);

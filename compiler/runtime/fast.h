@@ -6,6 +6,7 @@
 #include "program.h"
 #include "values.h"
 
+#include <cmath>
 #include <limits>
 
 namespace kas3 {
@@ -167,6 +168,22 @@ inline Slot to_any(Context *c, uint32_t p_value) {
 // A Number as an untyped value, as the library makes one (vm/interpreter_any.cpp, any_number): a whole
 // number an int holds as an int, a larger one as an Int64 in a box. False only with no memory for the box.
 //     bool number_to_any(double p_value, Slot *r_any);
+// The same, done here where nothing is made: a whole number an int holds, and a fraction in an int's range.
+// The rest (a larger number, which may want a box, -0 and what is no number) are number_to_any()'s.
+inline bool number_any(Context *c, double p_value, Slot *r_any) {
+	if (KAS3_LIKELY(p_value >= INT32_MIN && p_value <= INT32_MAX)) {
+		const int32_t whole = static_cast<int32_t>(p_value);
+		if (whole != p_value) {
+			*r_any = vm::any::number(p_value);
+			return true;
+		}
+		if (whole != 0 || !std::signbit(p_value)) {
+			*r_any = vm::any::integer(whole);
+			return true;
+		}
+	}
+	return number_to_any(c, p_value, r_any);
+}
 
 // An untyped value as a value of the kind (an ir::Kind), where it already holds one: a number for a number,
 // a String or nothing for a String, an object of the class wanted (any, for NONE) or nothing for an

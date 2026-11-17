@@ -88,6 +88,9 @@ void Heap::drop(Kind p_kind, Slot &p_slot) {
 }
 
 void Heap::drop_any(Slot p_value) {
+	if (!any::holds(p_value)) {
+		return;
+	}
 	switch (any::tag(p_value)) {
 		case AnyTag::String: {
 			Str *string = static_cast<Str *>(any::pointer(p_value));
@@ -121,6 +124,9 @@ void Heap::drop_any(Slot p_value) {
 
 Slot Heap::share(Kind p_kind, Slot p_value) {
 	if (p_kind == Kind::Any) {
+		if (!any::holds(p_value)) {
+			return p_value;
+		}
 		retain(any::counted(p_value));
 		if (any::tag(p_value) == AnyTag::Value) {
 			return any::godot_value(handles.copy(any::pointer(p_value)));

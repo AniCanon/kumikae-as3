@@ -177,7 +177,7 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 				put(p_in.a, "to_any(c, " + reg(p_in.b) + ")");
 				return true;
 			}
-			line("if (Slot w = empty(); number_to_any(c, " + reg(p_in.b) + ", &w)) {");
+			line("if (Slot w = empty(); number_any(c, " + reg(p_in.b) + ", &w)) {");
 			put(p_in.a, "w");
 			break;
 		case Op::FromAny:
@@ -200,7 +200,7 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 			const std::string result = p_in.op == Op::AnySub ? "x.d - y.d" : p_in.op == Op::AnyMul ? "x.d * y.d" : p_in.op == Op::AnyDiv ? "x.d / y.d"
 					: p_in.op == Op::AnyMod ? "std::fmod(x.d, y.d)" : "-x.d";
 			line("if (Slot x = empty(), y = empty(), w = empty(); from_any(c, " + number_kind + ", " + number(NONE) + ", " + reg(p_in.b) + ", &x)" + second +
-					" && number_to_any(c, " + result + ", &w)) {");
+					" && number_any(c, " + result + ", &w)) {");
 			line("(void)y;");
 			put(p_in.a, "w");
 			break;

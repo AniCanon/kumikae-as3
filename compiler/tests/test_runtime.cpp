@@ -120,6 +120,12 @@ static void test_tagged_addresses() {
 	CHECK(any::tag(any::null()) == AnyTag::Null);
 	CHECK(any::tag(any::boolean(true)) == AnyTag::Boolean);
 	CHECK(any::to_bool_payload(any::boolean(true)));
+	// And a held address, tagged or not, is told from every value that holds nothing.
+	CHECK(any::holds(held) && any::holds(beside) && any::holds(any::object(reinterpret_cast<Object *>(tagged))));
+	for (const Slot nothing : { any::undefined(), any::null(), any::boolean(false), any::boolean(true), any::hole(), any::integer(0), any::integer(-1),
+				 any::integer(INT32_MIN), any::number(0.5), any::number(-0.0), any::number(std::nan("")), any::number(1e300), any::number(-1e-300) }) {
+		CHECK(!any::holds(nothing));
+	}
 }
 
 static void test_long_text() {
