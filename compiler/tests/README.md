@@ -37,12 +37,29 @@ cmake -S compiler -B compiler/build-san-godot -DKAS3_SANITIZE=ON -DKAS3_GODOT_CP
 cmake --build compiler/build-san-godot --target kas3_godot
 ```
 
-Godot must then load the sanitizer's runtime before the extension (`DYLD_INSERT_LIBRARIES`, the path
-`/usr/bin/c++ -print-file-name=libclang_rt.asan_osx_dynamic.dylib` gives, set by what starts Godot itself:
-`nice`, `sh` and the system's Python lose such variables). The Godot that is distributed refuses it
-("Sanitizer load violates platform policy": its signature lets nothing unsigned by its maker in), so this
-is not a way the suite can be run yet: it needs a Godot whose signature allows it (one built here, or a
-copy signed again ad hoc), which has not been tried.
+Godot must then load the sanitizer's runtime before the extension, and the Godot that is distributed
+refuses it ("Sanitizer load violates platform policy"). What works on macOS:
+
+1. A copy of Godot's app, signed again ad hoc with an entitlements file that has
+   `com.apple.security.cs.allow-dyld-environment-variables` and
+   `com.apple.security.cs.disable-library-validation` (and the three the app already has for its own
+   use: `allow-jit`, `allow-unsigned-executable-memory`, `disable-executable-page-protection`):
+   `codesign --force --deep -s - --entitlements <file> <copy of Godot.app>`. The installed app is left alone.
+2. A small script that starts that copy, and sets the variables itself (`nice`, `sh` and the system's
+   Python lose `DYLD_` variables on the way): `DYLD_INSERT_LIBRARIES` to what
+   `/usr/bin/c++ -print-file-name=libclang_rt.asan_osx_dynamic.dylib` gives (the runtime of the compiler
+   that built the extension), `ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:detect_container_overflow=0`
+   (Godot itself is not instrumented), `UBSAN_OPTIONS=print_stacktrace=1`, each with a `log_path`.
+3. A copy of `compiler/tests` beside copies of `runtime`, `vm`, `ir`, `src` and `godot` (what generated
+   code is built against), with the sanitized library in its `godot_project/bin`, and
+   `KAS3_GODOT=<the script> python3 <copy>/tests/run_godot.py <copy>/tests compiler/build/kas3c`.
+
+It is not part of `ctest`. It runs every driver, the reloads and the native probe with the extension's own
+code checked: handles and their heads, the look for the object behind one, vectors handed to Godot in one
+copy, listeners called. What it does not check: Godot's own code, and a program library's (generated
+code is built without the sanitizers, and reads a handle's head itself); a handle's memory is kept for
+the next handle when it is freed, so a handle used after it was let go of is not something the sanitizer
+sees either: the tests of freed objects are what hold that.
 
 ## Completion checks and timings
 
