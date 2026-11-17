@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 400" width="1160" height="400" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" role="img" aria-label="What happens when you save a script">
+<title>What happens when you save a script</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5F6368"/></marker></defs>
+<rect x="0.5" y="0.5" width="1159" height="399" rx="14" fill="#FFFFFF" stroke="#DADCE0"/>
+<text x="40" y="48" font-size="20" text-anchor="start" font-weight="bold" fill="#202124">What happens when you save a script</text>
+<text x="40" y="72" font-size="13" text-anchor="start" font-weight="normal" fill="#5F6368">The running game takes the new code and keeps its state.</text>
+<rect x="40" y="150" width="130" height="64" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="105.0" y="179.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">You save</text>
+<text x="105.0" y="195.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">Coin.as</text>
+<polyline points="170,182 208,182" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="210" y="150" width="150" height="64" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="285.0" y="171.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Compile again</text>
+<text x="285.0" y="187.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">every script, as one</text>
+<text x="285.0" y="203.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">program</text>
+<polyline points="360,182 400,182 400,300 438,300" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<text x="408" y="250" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">errors</text>
+<rect x="440" y="268" width="200" height="64" rx="10" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5"/>
+<text x="540.0" y="289.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Nothing changes</text>
+<text x="540.0" y="305.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">errors are printed; the game</text>
+<text x="540.0" y="321.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">keeps the code it had</text>
+<polyline points="360,182 438,182" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<text x="399" y="172" font-size="12" text-anchor="middle" font-weight="normal" fill="#5F6368">ok</text>
+<rect x="440" y="110" width="680" height="130" rx="12" fill="#F8F9FA" stroke="#BDC1C6" stroke-dasharray="6 4"/>
+<text x="454" y="134" font-size="13" text-anchor="start" font-weight="bold" fill="#5F6368">Reload, inside the running game</text>
+<rect x="458" y="150" width="148" height="70" rx="10" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
+<text x="532.0" y="174.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Move objects</text>
+<text x="532.0" y="190.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">fields keep</text>
+<text x="532.0" y="206.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">their values</text>
+<polyline points="606,185 622,185" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="624" y="150" width="148" height="70" rx="10" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
+<text x="698.0" y="174.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">New constants</text>
+<text x="698.0" y="190.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">take their</text>
+<text x="698.0" y="206.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">new values</text>
+<polyline points="772,185 788,185" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="790" y="150" width="148" height="70" rx="10" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
+<text x="864.0" y="174.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Update in place</text>
+<text x="864.0" y="190.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">rerun safe</text>
+<text x="864.0" y="206.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">constructors</text>
+<polyline points="938,185 954,185" fill="none" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="956" y="150" width="148" height="70" rx="10" fill="#DDF4E4" stroke="#1E8E3E" stroke-width="1.5"/>
+<text x="1030.0" y="174.0" font-size="14" text-anchor="middle" font-weight="bold" fill="#202124">Report</text>
+<text x="1030.0" y="190.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">one line: what</text>
+<text x="1030.0" y="206.0" font-size="11.5" text-anchor="middle" font-weight="normal" fill="#5F6368">was updated</text>
+<text x="440" y="368" font-size="12" text-anchor="start" font-weight="normal" fill="#5F6368">A field the game changed since the object was built is never overwritten.</text>
+</svg>
