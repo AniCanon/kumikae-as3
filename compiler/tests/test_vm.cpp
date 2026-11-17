@@ -3278,6 +3278,43 @@ static void test_cycles() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// What the engine gives for a request may be the very handle the result's register holds, held once more
+// (a host that shares a handle on an object where it could copy it, as this one does): the register lets
+// go of what it held all the same, so that every hold is given back.
+static void test_engine_result_is_the_registers_own() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Again.as", "package { import godot.*; public class Again extends Node {\n"
+								"public function again(node:Node2D):Boolean {\n"
+								"  var held:Node = node;\n"
+								"  for (var i:int = 0; i < 3; i++) { held = held as Node2D; }\n"
+								"  return held != null;\n"
+								"} } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *again = interpreter.construct(class_named(module, "Again"), engine.box());
+		vm::Slot node;
+		node.bits = 0;
+		node.p = engine.box();
+		const int before = engine.boxes;
+		vm::Slot result;
+		CHECK(interpreter.call_method(again, "again", &node, 1, &result));
+		CHECK(result.b);
+		CHECK_EQ(engine.boxes, before);
+		engine.boxes--; // The node's own.
+		interpreter.release_object(again);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+}
+
 // A vector of Godot's objects of a class that is never reference-counted (nodes) holds nothing that leads
 // back to a script object: the cycle collector does not look at it, however long it is. One whose elements
 // may be reference-counted (a RefCounted, or Godot's Object, which any object is) is looked at as ever.
@@ -3760,6 +3797,7 @@ int main() {
 	test_kept_by_the_engine();
 	test_script_object_arrives();
 	test_collector_leaves_vectors_of_nodes();
+	test_engine_result_is_the_registers_own();
 	test_no_engine();
 	test_engine_listeners();
 	test_engine_statics();

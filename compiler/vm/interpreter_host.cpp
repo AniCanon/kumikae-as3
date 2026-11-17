@@ -465,8 +465,10 @@ void Interpreter::engine_instruction(uint32_t p_function, Slot *p_registers) {
 }
 
 void Interpreter::settle_asked(const EngineAnswer &p_asked, Slot &r_target) {
-	// The engine wrote the result into the handle the register holds (Wanted::reuse): it stays.
-	if (!(ir::is_engine(p_asked.kind) && p_asked.result.p && p_asked.result.p == r_target.p)) {
+	// The engine wrote the result into the handle the register holds (Wanted::reuse, which only a value's
+	// register offers): it stays. A handle on an object that is the register's own is one more hold of it
+	// (a host may share such a handle where it could copy it), and the register gives its old one back.
+	if (!(p_asked.kind == Kind::Val && p_asked.result.p && p_asked.result.p == r_target.p)) {
 		put(p_asked.kind, r_target, p_asked.result);
 	}
 }
