@@ -77,6 +77,9 @@ struct Plain {
 // The values with parts given to one call as they came: copies of Godot's, on the stack, which the function
 // reads as handles it was lent. A parameter that is written, or kept, copies what it was lent as it does
 // any other (it may change the value in place, which must not be Godot's own); none is a handle to give back.
+// Never an object: a handle on an object has its head before it (handles.h), which the host and generated
+// code read, and a value on the stack has none. worked_out() leaves a parameter that takes an object to the
+// long way, which makes a handle of the host's.
 class Lent {
 	alignas(Variant) unsigned char memory_[MOST_PLAIN][sizeof(Variant)];
 	size_t made_ = 0;

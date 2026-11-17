@@ -377,11 +377,21 @@ led there, as the interpreter does it (`runtime/entry.cpp`). What generated code
   `dot()` and `cross()` are the runtime's own inline code, Godot's formulas to the last bit
   (`runtime/godot_values.h`). A value of such a type in a handle (one read from a field, given as a
   parameter or returned by a script's function, which may be null) is copied out of the handle for the
-  same calls.
+  same calls: read where the handle keeps it, with no call, for the types a handle keeps inside itself
+  (the host finds where as it starts, from what Godot says of a handle it makes). One that is a field of
+  the script, read only to be used at once (`p + velocity * delta`), is copied out of the field's own
+  handle: no handle is made for the read.
 - A property read or written and a method called on a Godot object, when every value that crosses is a
   number, a Boolean, a value with parts or a name written in the program, is Godot's method bind called
   on the bare values. The script's own Godot object is found once in each function, a singleton once
   when the program loads, a name's `StringName` once.
+- A handle on a Godot object that is not reference-counted (a node) is shared, not copied: a variable
+  given `children[i]` is one more holder of the vector's own handle, counted before the handle, under the
+  interpreter too. The object behind a handle is read from the handle once the host has found it twice,
+  for as long as Godot has freed none of the objects found that way: the host keeps a binding of its own
+  on each (as C# and godot-cpp keep theirs), Godot says when one ends, and every handle is then looked up
+  by its object's id again, which is where a freed object is null. So a freed object used again is AS3's
+  error with its line, as it was, and a loop that moves twenty thousand nodes asks for none of them by id.
 - A signal's `emit()`, when every value it carries is a number, a Boolean, a value with parts or one of
   Godot's values or objects in a handle, is `Object`'s `emit_signal` called by its method bind, which the
   host found once, on values it makes where Godot reads them: nothing is boxed and no name is looked up.
