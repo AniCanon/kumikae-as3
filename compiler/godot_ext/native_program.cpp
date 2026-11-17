@@ -154,6 +154,10 @@ std::unique_ptr<NativeProgram> NativeProgram::load(const std::string &p_path, co
 		*r_why = "it has no kas3_program";
 		return nullptr;
 	}
+	if (!rt::same_layout(*program)) {
+		*r_why = rt::OTHER_LAYOUT;
+		return nullptr;
+	}
 	if (program->fingerprint != ir::fingerprint(p_module) || program->function_count != p_module.functions.size() ||
 			program->class_count != p_module.classes.size()) {
 		*r_why = "it was built from other sources than the project's scripts are now";

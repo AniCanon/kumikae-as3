@@ -286,7 +286,11 @@ void LibraryCall::each() {
 			break;
 		}
 		// The element as it is now: what the function does to the vector does not change what filter keeps.
-		Slot element = at < vector->length ? vm_.share(klass.element, klass.element == Kind::Any ? any::filled(vector->data[at]) : vector->data[at]) : any::undefined();
+		Slot element = any::undefined();
+		if (at < vector->length && !read_element(vm_.library_, klass, vector->data[at], &element)) {
+			ok = false;
+			break;
+		}
 		const Slot item = vm_.to_any(klass.element, element);
 		const Slot arguments[3] = { item, any::integer(static_cast<int32_t>(at)), holder_ };
 		const std::optional<Slot> answer = vm_.call_function_within(function, arguments, 3);
@@ -303,14 +307,14 @@ void LibraryCall::each() {
 			value.bits = 0;
 			ok = vm_.from_any(*answer, klass.element, klass.element_check, &value);
 			if (ok && at < made->length) {
-				vm_.put(klass.element, made->data[at], value);
+				ok = put_element(vm_.library_, klass, made->data[at], value);
 			} else if (ok) {
 				vm_.drop(klass.element, value);
 			}
 		} else if (ok && which == EachMethod::Filter && yes) {
 			ok = vm_.resize_vector(made, made->length + 1);
 			if (ok) {
-				made->data[made->length - 1] = vm_.share(klass.element, element);
+				ok = write_element(vm_.library_, klass, made->data[made->length - 1], element);
 			}
 		} else if (ok && (which == EachMethod::Some || which == EachMethod::Every) && yes == (which == EachMethod::Some)) {
 			answer_all = which == EachMethod::Some;

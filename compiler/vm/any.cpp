@@ -14,22 +14,6 @@ namespace vm {
 
 namespace {
 
-constexpr uint64_t NUMBER_OFFSET = uint64_t(1) << 48; // Added to a Number's bits: its top 16 bits are never 0.
-constexpr uint64_t INT_FLAG = uint64_t(1) << 47;
-constexpr uint64_t TAG_MASK = 7;
-constexpr uint64_t NULL_BITS = 1 << 3;
-constexpr uint64_t FALSE_BITS = 2 << 3;
-constexpr uint64_t TRUE_BITS = 3 << 3;
-
-// The low 3 bits of a pointer that is held.
-enum PointerTag : uint64_t { STRING = 1, OBJECT = 2, VALUE = 3, GODOT = 4, WIDE = 5 };
-
-Slot bits(uint64_t p_bits) {
-	Slot slot;
-	slot.bits = p_bits;
-	return slot;
-}
-
 // Android tags the top byte of every heap address on arm64 (0xB4: the hardware ignores it, free() checks
 // it). The encoding needs the top bits clear, so the tag is taken off, and bit 3 (free: every pointer held
 // is 16-aligned) says to put it back. One tag for the whole run, learned from the first address that has
@@ -42,10 +26,10 @@ uint64_t heap_tag = 0;
 	std::abort();
 }
 
-Slot tagged(const void *p_pointer, PointerTag p_tag) {
+Slot tagged(const void *p_pointer, any::PointerTag p_tag) {
 	// No pointer is null with a tag: a null String or object is `null`.
 	if (!p_pointer) {
-		return bits(NULL_BITS);
+		return any::null();
 	}
 	const uint64_t address = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(p_pointer));
 	const uint64_t top = address >> 56;
@@ -62,11 +46,7 @@ Slot tagged(const void *p_pointer, PointerTag p_tag) {
 			unholdable("the platform tags each allocation differently (memory tagging)");
 		}
 	}
-	return bits(rest | (top != 0 ? HEAP_TAGGED : 0) | static_cast<uint64_t>(p_tag));
-}
-
-bool is_number(Slot p_value) {
-	return (p_value.bits >> 48) != 0;
+	return any::of_bits(rest | (top != 0 ? HEAP_TAGGED : 0) | static_cast<uint64_t>(p_tag));
 }
 
 } // namespace
@@ -99,26 +79,6 @@ void free_wide(Wide *p_wide) {
 
 namespace any {
 
-Slot undefined() {
-	return bits(0);
-}
-Slot null() {
-	return bits(NULL_BITS);
-}
-Slot boolean(bool p_value) {
-	return bits(p_value ? TRUE_BITS : FALSE_BITS);
-}
-Slot number(double p_value) {
-	if (std::isnan(p_value)) {
-		p_value = std::numeric_limits<double>::quiet_NaN();
-	}
-	uint64_t raw = 0;
-	std::memcpy(&raw, &p_value, sizeof(raw));
-	return bits(raw + NUMBER_OFFSET);
-}
-Slot integer(int32_t p_value) {
-	return bits(INT_FLAG | static_cast<uint32_t>(p_value));
-}
 Slot string(Str *p_string) {
 	return tagged(p_string, STRING);
 }
@@ -135,45 +95,6 @@ Slot wide(Wide *p_wide) {
 	return tagged(p_wide, WIDE);
 }
 
-AnyTag tag(Slot p_value) {
-	if (is_number(p_value)) {
-		return AnyTag::Number;
-	}
-	if (p_value.bits & INT_FLAG) {
-		return AnyTag::Int;
-	}
-	switch (p_value.bits & TAG_MASK) {
-		case STRING:
-			return AnyTag::String;
-		case OBJECT:
-			return AnyTag::Object;
-		case VALUE:
-			return AnyTag::Value;
-		case GODOT:
-			return AnyTag::Godot;
-		case WIDE:
-			return AnyTag::Wide;
-		default:
-			break;
-	}
-	if (p_value.bits == NULL_BITS) {
-		return AnyTag::Null;
-	}
-	return p_value.bits == FALSE_BITS || p_value.bits == TRUE_BITS ? AnyTag::Boolean : AnyTag::Undefined;
-}
-
-bool to_bool_payload(Slot p_value) {
-	return p_value.bits == TRUE_BITS;
-}
-double to_number_payload(Slot p_value) {
-	const uint64_t raw = p_value.bits - NUMBER_OFFSET;
-	double out = 0;
-	std::memcpy(&out, &raw, sizeof(out));
-	return out;
-}
-int32_t to_int_payload(Slot p_value) {
-	return static_cast<int32_t>(static_cast<uint32_t>(p_value.bits));
-}
 void *pointer(Slot p_value) {
 	if (is_number(p_value) || (p_value.bits & INT_FLAG) || (p_value.bits & TAG_MASK) == 0) {
 		return nullptr;

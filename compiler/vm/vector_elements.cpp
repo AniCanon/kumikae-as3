@@ -86,7 +86,7 @@ bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length) {
 		p_library.runner.out_of_memory();
 		return false;
 	}
-	const Kind kind = p_library.class_of(p_vector).element;
+	const Kind kind = place_kind(p_library.class_of(p_vector));
 	const uint32_t old = p_vector->length;
 	if (p_length >= old) {
 		if (p_library.class_of(p_vector).array) {
@@ -112,6 +112,7 @@ bool resize_vector(Library &p_library, Vector *p_vector, uint32_t p_length) {
 
 // The places of a vector from p_from to its end, empty until now, each given the zero of its Godot value type
 // where the class says so (ir::Class::element_zero). False, with the error raised, if the engine can't make one.
+// A place that holds such a value whole is at its zero already: an empty slot is one.
 bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from) {
 	const ir::Class &klass = p_library.class_of(p_vector);
 	if (klass.element == Kind::Any && klass.element_check != ir::NONE) {
@@ -119,7 +120,7 @@ bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from) {
 		std::fill(p_vector->data + p_from, p_vector->data + p_vector->length, any::null());
 		return true;
 	}
-	if (!klass.element_zero) {
+	if (!klass.element_zero || klass.element_bare != ir::Bare::None) {
 		return true;
 	}
 	for (uint32_t i = p_from; i < p_vector->length; i++) {
@@ -134,7 +135,8 @@ bool fill_zeroes(Library &p_library, Vector *p_vector, uint32_t p_from) {
 }
 
 Vector *vector_new(Library &p_library, uint32_t p_class, uint32_t p_length, bool p_fixed) {
-	Vector *made = p_length <= MAX_VECTOR_LENGTH ? new_vector(p_class, p_length, p_fixed, p_library.heap.list_for(p_class)) : nullptr;
+	Vector *made = p_length <= MAX_VECTOR_LENGTH ? new_vector_of(p_library.module().classes[p_class], p_class, p_length, p_fixed, p_library.heap.list_for(p_class))
+												 : nullptr;
 	if (!made) {
 		p_library.runner.out_of_memory();
 		return nullptr;
@@ -146,11 +148,61 @@ Vector *vector_new(Library &p_library, uint32_t p_class, uint32_t p_length, bool
 	return made;
 }
 
-bool vector_get(Library &p_library, Vector *p_vector, Kind p_index_kind, Slot p_index, Slot *r_out) {
-	const Kind kind = p_library.class_of(p_vector).element;
-	if (const std::optional<uint32_t> at = element_index(p_index_kind, p_index, p_vector->length)) {
-		*r_out = p_library.heap.share(kind, kind == Kind::Any ? any::filled(p_vector->data[*at]) : p_vector->data[*at]);
+bool read_element(Library &p_library, const ir::Class &p_class, Slot p_place, Slot *r_value) {
+	if (p_class.element_bare == ir::Bare::None) {
+		*r_value = p_library.heap.share(p_class.element, p_class.element == Kind::Any ? any::filled(p_place) : p_place);
 		return true;
+	}
+	std::string error;
+	*r_value = of_pointer(p_library.heap.handles.boxed(p_class.element_bare, p_place, &error));
+	if (!r_value->p) {
+		p_library.runner.raise(p_library.module().error_class, error.empty() ? "the engine refused" : error);
+	}
+	return r_value->p != nullptr;
+}
+
+bool write_element(Library &p_library, const ir::Class &p_class, Slot &r_place, Slot p_value) {
+	if (p_class.element_bare == ir::Bare::None) {
+		p_library.heap.put(p_class.element, r_place, p_library.heap.share(p_class.element, p_value));
+		return true;
+	}
+	Slot whole;
+	whole.bits = 0;
+	if (!p_value.p || !p_library.heap.handles.unboxed(p_class.element_bare, p_value.p, &whole)) {
+		return coercion_failed(p_library, p_value.p ? any::godot_value(p_value.p) : any::null(), Kind::Val, p_class.element_check);
+	}
+	r_place = whole;
+	return true;
+}
+
+bool put_element(Library &p_library, const ir::Class &p_class, Slot &r_place, Slot p_owned) {
+	if (p_class.element_bare == ir::Bare::None) {
+		p_library.heap.put(p_class.element, r_place, p_owned);
+		return true;
+	}
+	const bool stored = write_element(p_library, p_class, r_place, p_owned);
+	p_library.heap.drop(Kind::Val, p_owned);
+	return stored;
+}
+
+bool element_to_any(Library &p_library, const ir::Class &p_class, Slot p_place, Slot *r_any) {
+	if (p_class.element_bare == ir::Bare::None) {
+		*r_any = to_any(p_library, p_class.element, p_class.element == Kind::Any ? any::filled(p_place) : p_place);
+		return true;
+	}
+	Slot value;
+	*r_any = read_element(p_library, p_class, p_place, &value) ? any::godot_value(value.p) : any::undefined();
+	return !p_library.runner.failing();
+}
+
+bool element_from_any(Library &p_library, const ir::Class &p_class, Slot p_any, Slot &r_place) {
+	Slot value;
+	return from_any(p_library, p_any, p_class.element, p_class.element_check, &value) && put_element(p_library, p_class, r_place, value);
+}
+
+bool vector_get(Library &p_library, Vector *p_vector, Kind p_index_kind, Slot p_index, Slot *r_out) {
+	if (const std::optional<uint32_t> at = element_index(p_index_kind, p_index, p_vector->length)) {
+		return read_element(p_library, p_library.class_of(p_vector), p_vector->data[*at], r_out);
 	}
 	// An index that names no element: of an Array, the property named by the number; of a Vector, AS3's
 	// RangeError.
@@ -168,11 +220,17 @@ bool vector_set(Library &p_library, Vector *p_vector, Kind p_index_kind, Slot p_
 	const ir::Class &klass = p_library.class_of(p_vector);
 	const uint32_t limit = klass.array ? MAX_VECTOR_LENGTH : p_vector->fixed ? p_vector->length : p_vector->length + 1;
 	if (const std::optional<uint32_t> at = element_index(p_index_kind, p_index, limit)) {
-		if (*at >= p_vector->length && !resize_vector(p_library, p_vector, *at + 1)) {
+		const bool grows = *at >= p_vector->length;
+		if (grows && !resize_vector(p_library, p_vector, *at + 1)) {
 			return false;
 		}
-		p_library.heap.put(klass.element, p_vector->data[*at], p_library.heap.share(klass.element, p_value));
-		return true;
+		if (write_element(p_library, klass, p_vector->data[*at], p_value)) {
+			return true;
+		}
+		if (grows) {
+			p_vector->length = *at; // As it was: the place it grew by held nothing yet.
+		}
+		return false;
 	}
 	if (klass.array && !element_index(p_index_kind, p_index, UINT32_MAX)) {
 		return p_library.unmoved.array_number_set(p_vector, index_number(p_index_kind, p_index), p_value);
@@ -224,7 +282,7 @@ bool vector_from_object(Library &p_library, uint32_t p_class, Slot p_source, Slo
 		Slot element;
 		ok = read(std::to_string(i), &element);
 		if (ok) {
-			ok = from_any(p_library, element, klass.element, klass.element_check, &made->data[i]);
+			ok = element_from_any(p_library, klass, element, made->data[i]);
 			p_library.heap.drop_any(element);
 		}
 	}
@@ -261,8 +319,9 @@ bool vector_from(Library &p_library, uint32_t p_class, Slot p_source, Slot *r_ou
 	bool ok = made != nullptr;
 	for (uint32_t i = 0; ok && i < made->length; i++) {
 		// One taken out of the source as an earlier element spoke is undefined.
-		const Slot element = i < from->length ? to_any(p_library, given, given == Kind::Any ? any::filled(from->data[i]) : from->data[i]) : any::undefined();
-		ok = from_any(p_library, element, klass.element, klass.element_check, &made->data[i]);
+		Slot element = any::undefined();
+		ok = i >= from->length || element_to_any(p_library, p_library.class_of(from), from->data[i], &element);
+		ok = ok && element_from_any(p_library, klass, element, made->data[i]);
 		p_library.heap.drop_any(element);
 	}
 	if (!ok) {

@@ -130,7 +130,8 @@ uint32_t Vectors::vector_call(Call *p_call) {
 		}
 		list.push_back(filled);
 	}
-	const uint32_t out = result == Kind::Void ? NONE : l_.reg(result);
+	// What pop(), shift() and removeAt() give is an element: one of Godot's says which type it is.
+	const uint32_t out = result == Kind::Void ? NONE : l_.engine_reg(result, callee->object->type->element);
 	l_.emit(Op::VecCall, position, out, static_cast<uint32_t>(*method), l_.arguments(std::move(list)));
 	return out == NONE ? 0 : out;
 }

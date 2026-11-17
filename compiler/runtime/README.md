@@ -9,10 +9,11 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 | `kas3.h` | Everything generated code includes |
 | `values.h` | The values (the runtime's own: `vm/runtime.h`'s `Str`, `Object`, `Vector`, `Slot`), the `Context` every generated function takes first, `retain`/`release`, `put`/`store` |
 | `numbers.h` | AS3's arithmetic and conversions on machine numbers, as the interpreter's loop does them |
-| `fast.h` | The fast paths of operations the library owns, each for the usual case only: a vector's element in range, a String joined to another, a new object of a class the collector does not look at, and the rest declared for `calls.cpp` and `properties.cpp` |
+| `fast.h` | The fast paths of operations the library owns, each for the usual case only: a vector's element in range, the place `push()` writes in a vector with room, a String joined to another, a new object of a class the collector does not look at, and the rest declared for `calls.cpp` and `properties.cpp` |
 | `api.h`, `api.cpp` | Every function of the runtime generated code calls out of line, once: the table a program library is handed, and the host's side of it |
 | `operations.h` | What generated code calls out of line: errors and their traces, a class's first use, thunks, `trace` |
 | `program.h` | The table a program library gives its host (`kas3_program`): classes, functions, static fields, strings, thunks, all by number |
+| `layout.h` | The number of the layout a program library and its host share (`RUNTIME_LAYOUT`), which a library's table starts with, and the sizes that hold it to the structs |
 | `engine.h`, `godot_values.h` | Godot with no header of Godot's: handles on its objects and values (`Ref`, `Val`), its values with parts as plain structs with their maths inline, what the host worked out for each place the program calls the engine (`Resolved`), the engine's few entry points (`EngineApi`) |
 | `native_host.h`, `host.cpp` | The host: the context's state, its interpreter, the engine it was given by what embeds it (`Embedder`: none for a program run on its own, the extension's inside Godot) |
 | `errors.cpp` | Raising, catching, the stack trace, the report of an error nothing caught |
@@ -50,6 +51,13 @@ executable, which is what `tests/run_native.py` builds for every program of `tes
 - **Errors** are `c->failing` and `c->pending`. A trace is built on the error path, by each function an
   error leaves (`leave_failed`).
 - **`kas3_program`** is the one symbol a program library exports.
+- **A program library says which layout of the runtime it was built for,** first thing in its table
+  (`Program::layout`, `layout.h`). A host reads nothing more of a table that names another: the extension
+  says the library was built for another version of the runtime and must be built again, and the
+  interpreter runs the scripts; a program run on its own says so and ends with status 2. `RUNTIME_LAYOUT` is
+  one number, raised by hand with every change a library built before it would be misread after (`layout.h`
+  lists them); the sizes of the shared structs are asserted beside it, so a struct that changes size without
+  the number moving does not build.
 
 ## The library: called directly where it is a function of plain values, by thunk where it is not yet
 
@@ -107,6 +115,10 @@ What this costs, until the split:
 - **A value with parts held inline** is boxed into the host's handle wherever it crosses into what the
   library and the host hold: an instruction run by thunk (`Boxed`), a field, an untyped value, an Array.
   Only a register that can never be null is inline; a parameter, a field and a call's result are handles.
+  A place of a vector of `Vector2`s or of `Vector2i`s holds the value itself (`vm/README.md`), and an
+  element of one read by its index is never null: generated code copies the eight bytes between the place
+  and a register that holds the value inline (`vector_of()`, `place_value()`, `value_place()`), and code
+  that holds a handle is kept off such a place by the same test.
 - **The runtime's functions reach a program library through a table** (`api.h`, `c->api`), as the
   engine's do: every out-of-line function generated code calls is one entry of `KAS3_RUNTIME_API`, an
   inline call through the table in a program library and the function itself in the host. A program
@@ -144,8 +156,10 @@ exactly those), named so that the split can be checked against it:
 6. Lifetime: freeing an object with what it holds is the heap's (`Heap::drop_object`), still reached
    through the interpreter's `free_kept()` and `discard()`; an inline allocation path on the context's
    own free lists is not written.
-7. `any.h`: the tag and the payloads as inline functions, so that an untyped value is kept and let go of
-   inline.
+7. `any.h`: an untyped value that holds something counted (a String, an object, an Int64's box, a handle)
+   is still kept and let go of by a call (`shared_any`, `release_any_slow`). The tag, the payloads and
+   whether a value holds anything are inline (`vm/any.h`): a number, a Boolean, null and undefined cost no
+   call, and a Number in an int's range is made untyped where it is (`number_any()`).
 8. Classes as the host's descriptors (`ClassInfo`) where the library takes `ir::Class`: `each_held()`,
    the collector, `is_class`.
 

@@ -299,6 +299,11 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 		return length_is_fixed(p_vector) || *length == old || (resize_vector(p_vector, *length) && fill_zeroes(p_vector, old));
 	}
 	const uint32_t at = *p_key.index;
+	// Before the vector grows to take it: no value (null) is none a place can hold whole.
+	if (Slot probe; klass.element_bare != ir::Bare::None && !write_element(library_, klass, probe, value)) {
+		drop(klass.element, value);
+		return false;
+	}
 	if (!klass.array && (at > p_vector->length || (p_vector->fixed && at == p_vector->length))) {
 		drop(klass.element, value);
 		raise_range(at, p_vector->length);
@@ -308,8 +313,7 @@ bool Interpreter::set_element(Vector *p_vector, const PropertyKey &p_key, Slot p
 		drop(klass.element, value);
 		return false;
 	}
-	put(klass.element, p_vector->data[at], value);
-	return true;
+	return put_element(library_, klass, p_vector->data[at], value);
 }
 
 // delete holder[key]: true unless the property is one that can't go (a sealed object's field or method,

@@ -7,6 +7,8 @@
 #include "godot_values.h"
 #include "values.h"
 
+#include <cstring>
+
 namespace kas3 {
 namespace rt {
 
@@ -142,6 +144,23 @@ inline T unbox(const Context *c, const void *p_handle) {
 	}
 	return value;
 }
+// One of Godot's values that a slot holds whole, read out of a vector's place and as such a place holds it
+// (fast.h, vector_of): the bytes are the same, as Godot lays the type out.
+template <typename T>
+inline T place_value(const Slot &p_place) {
+	static_assert(sizeof(T) == sizeof(Slot), "a slot holds the value whole");
+	T value;
+	std::memcpy(&value, &p_place, sizeof(T));
+	return value;
+}
+template <typename T>
+inline Slot value_place(const T &p_value) {
+	static_assert(sizeof(T) == sizeof(Slot), "a slot holds the value whole");
+	Slot place;
+	std::memcpy(&place, &p_value, sizeof(T));
+	return place;
+}
+
 // A value held inline, as a handle for as long as one instruction the library runs needs it; what the
 // instruction leaves in the handle is the caller's to copy back out.
 template <typename T>

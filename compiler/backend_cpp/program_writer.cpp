@@ -89,6 +89,7 @@ std::string class_tables(const ir::Module &p_module, uint32_t p_index, std::stri
 		interface_code.push_back(code_pointer(p_module, method < klass.interface_methods.size() ? klass.interface_methods[method] : NONE));
 	}
 	std::string info = "{ " + string_literal(klass.name) + ", " + number(klass.base) + ", " + layout_hash(klass) + ", " + kind_number(klass.element) + ", " + number(klass.element_check) + ", " +
+			std::to_string(static_cast<unsigned>(klass.element_bare)) + ", " +
 			boolean(klass.array) + ", " + boolean(klass.table) + ", " + boolean(klass.dictionary) + ", " + boolean(klass.built_in) + ", " +
 			boolean(klass.is_interface) + ", ";
 	info += array(r_out, "const FieldInfo", prefix + "_fields", fields) + ", " + std::to_string(fields.size()) + ", ";
@@ -215,7 +216,8 @@ std::string write_table(const ir::Module &p_module, const ThunkTable &p_thunks, 
 	for (size_t i = 0; i < p_thunks.all().size(); i++) {
 		thunks.push_back(thunk_tables(p_thunks.all()[i], i, tables));
 	}
-	std::string program = "const Program PROGRAM = { ";
+	// By its name: the number is the one of the runtime's headers the library is built against.
+	std::string program = "const Program PROGRAM = { RUNTIME_LAYOUT, ";
 	const auto counted = [&](const std::string &p_type, const std::string &p_name, const std::vector<std::string> &p_items) {
 		program += array(tables, p_type, p_name, p_items) + ", " + std::to_string(p_items.size()) + ", ";
 	};

@@ -484,6 +484,13 @@ check("vectors.gd: no vector where Godot takes a packed array is an AS3 error", 
 check("vectors.gd: a value that does not fit a byte is an AS3 error that says so",
       output.count("does not fit a byte") == 2 and "at Vectors/tooBig()" in output and "at Vectors/negative()" in output, output[-1500:])
 
+# A vector of Vector2s or of Vector2is holds each value in its place: never null, a copy read out and a copy
+# stored, the places themselves handed to Godot as a packed array's elements.
+compare("places.gd", [
+    "grown", "no value is refused", "methods", "given: counts", "given: a packed array", "given: an Array of values", "given: inside an Array",
+    "given: none", "given: whole numbers", "a larger value type", "a larger value type: to Godot", "taken",
+])
+
 # A scene edited while it runs: no edit starts the scene again by itself. An object whose constructor depends
 # only on its arguments and constants is updated in place; what could not be is said, and a restart that is
 # asked for (the language's restart_scene()) shows it.

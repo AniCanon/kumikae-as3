@@ -1,5 +1,7 @@
 #include "typer.h"
 
+#include "held_in_place.h"
+
 namespace kas3 {
 
 void Typer::list(const List<Expr *> &p_list) {
@@ -42,6 +44,21 @@ void Typer::arguments(FunctionDecl *p_function, std::string_view p_name, const L
 	}
 	for (size_t i = 0; i < given && i < most; i++) {
 		store(p_arguments[i], compilation_.type_of(p_function->parameters[i].type, p_element));
+	}
+	// A vector's method given elements: one declared to take the element's type (insertAt), and the values
+	// push(), unshift() and splice() take after the others.
+	const bool adds = p_name == "push" || p_name == "unshift" || p_name == "splice";
+	for (size_t i = 0; p_element && i < given; i++) {
+		if (i < most ? compilation_.type_of(p_function->parameters[i].type, p_element) == p_element : rest && adds) {
+			no_null_place(p_arguments[i], p_element);
+		}
+	}
+}
+
+void Typer::no_null_place(const Expr *p_value, const Type *p_element) {
+	if (p_value && p_value->type && p_value->type->kind == Type::Null && held_in_place(p_element)) {
+		error(p_value->offset, "null can't be stored in a " + quoted(compilation_.type_name(compilation_.vector_type(p_element))) +
+									   ": each of its places holds a " + quoted(compilation_.type_name(p_element)) + " itself");
 	}
 }
 

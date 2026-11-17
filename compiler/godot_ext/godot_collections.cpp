@@ -19,11 +19,96 @@
 #include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/packed_vector4_array.hpp>
 
+#include <cstring>
 #include <limits>
+#include <new>
 
 using namespace godot;
 
 namespace kas3 {
+
+// A slot holds one of these whole, as Godot lays it out: a vector's places are a packed array's elements.
+static_assert(sizeof(Vector2) == sizeof(vm::Slot) && sizeof(Vector2i) == sizeof(vm::Slot), "a slot holds a Vector2 or a Vector2i whole");
+
+namespace {
+
+// One of Godot's values out of the slot that holds it whole (ir::Bare).
+Variant bare_variant(ir::Bare p_type, vm::Slot p_value) {
+	if (p_type == ir::Bare::Vector2i) {
+		Vector2i value;
+		std::memcpy(static_cast<void *>(&value), &p_value, sizeof(value));
+		return value;
+	}
+	Vector2 value;
+	std::memcpy(static_cast<void *>(&value), &p_value, sizeof(value));
+	return value;
+}
+
+// An Array's places, one after another as Godot keeps them (godot-cpp's own iterators go by the same), to
+// write each without a call: nothing for an empty one.
+Variant *places_of(Array &p_array) {
+	return p_array.is_empty() ? nullptr : &p_array[0];
+}
+
+// A vector's element written where a new Array holds nothing yet: a number or a Boolean is made there, by one
+// call of Godot's, and anything else is what to_variant() gives. The place holds nil, which has nothing to
+// let go of, so a value is made over it as it is.
+void place(Variant *r_place, ir::Kind p_kind, const vm::Slot &p_slot) {
+	switch (p_kind == ir::Kind::Any ? vm::any::tag(p_slot) : vm::AnyTag::Undefined) {
+		case vm::AnyTag::Int:
+			new (r_place) Variant(static_cast<int64_t>(vm::any::to_int_payload(p_slot)));
+			return;
+		case vm::AnyTag::Number:
+			new (r_place) Variant(vm::any::to_number_payload(p_slot));
+			return;
+		case vm::AnyTag::Boolean:
+			new (r_place) Variant(vm::any::to_bool_payload(p_slot));
+			return;
+		default:
+			break;
+	}
+	switch (p_kind) {
+		case ir::Kind::I32:
+			new (r_place) Variant(static_cast<int64_t>(p_slot.i));
+			return;
+		case ir::Kind::U32:
+			new (r_place) Variant(static_cast<int64_t>(p_slot.u));
+			return;
+		case ir::Kind::I64:
+			new (r_place) Variant(p_slot.l);
+			return;
+		case ir::Kind::F64:
+			new (r_place) Variant(p_slot.d);
+			return;
+		case ir::Kind::Bool:
+			new (r_place) Variant(p_slot.b);
+			return;
+		default:
+			*r_place = to_variant(p_kind, p_slot);
+	}
+}
+
+} // namespace
+
+void *GodotHost::boxed(ir::Bare p_type, vm::Slot p_value, std::string *) {
+	return make_handle(bare_variant(p_type, p_value));
+}
+
+bool GodotHost::unboxed(ir::Bare p_type, void *p_handle, vm::Slot *r_value) {
+	const Variant &held = *static_cast<const Variant *>(p_handle);
+	r_value->bits = 0;
+	if (p_type == ir::Bare::Vector2 && held.get_type() == Variant::VECTOR2) {
+		const Vector2 value = held;
+		std::memcpy(r_value, static_cast<const void *>(&value), sizeof(value));
+		return true;
+	}
+	if (p_type == ir::Bare::Vector2i && held.get_type() == Variant::VECTOR2I) {
+		const Vector2i value = held;
+		std::memcpy(r_value, static_cast<const void *>(&value), sizeof(value));
+		return true;
+	}
+	return false;
+}
 
 namespace {
 
@@ -79,6 +164,7 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 		return table_element(p_object, r_out, r_error);
 	}
 	const ir::Kind element = module.classes[p_object->klass].element;
+	const ir::Bare bare = module.classes[p_object->klass].element_bare;
 	if (element != ir::Kind::Void) {
 		const vm::Vector *vector = static_cast<const vm::Vector *>(p_object);
 		if (vector->properties && vector->properties->size()) {
@@ -87,6 +173,7 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 		}
 		Array array;
 		array.resize(static_cast<int64_t>(vector->length));
+		Variant *const places = places_of(array);
 		for (uint32_t i = 0; i < vector->length; i++) {
 			// An object, typed or untyped, goes this same way, so that what it can't be is an error here.
 			const vm::Slot held = element == ir::Kind::Any ? vm::any::filled(vector->data[i]) : vector->data[i];
@@ -94,11 +181,15 @@ bool object_element(const vm::Object *p_object, Variant *r_out, std::string *r_e
 			const vm::Object *object = element == ir::Kind::Obj ? static_cast<const vm::Object *>(held.p)
 					: untyped_object							? static_cast<const vm::Object *>(vm::any::pointer(held))
 																: nullptr;
-			Variant value;
-			if ((element == ir::Kind::Obj || untyped_object) && !object_element(object, &value, r_error)) {
-				return false;
+			if (element == ir::Kind::Obj || untyped_object) {
+				if (!object_element(object, &places[i], r_error)) {
+					return false;
+				}
+			} else if (bare != ir::Bare::None) {
+				places[i] = bare_variant(bare, held);
+			} else {
+				place(&places[i], element, held);
 			}
-			array[static_cast<int64_t>(i)] = element == ir::Kind::Obj || untyped_object ? value : to_variant(element, held);
 		}
 		*r_out = array;
 		return true;
@@ -156,12 +247,42 @@ bool values_of(ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, Vari
 	return true;
 }
 
+// A vector whose places hold one of Godot's values whole: the places themselves are a packed array of
+// that type's elements, copied in one go; into an Array, each as a value of its own. Any other packed
+// array holds elements of another type, which the checker refuses before a program runs.
+bool bare_collection(std::string_view p_type, ir::Bare p_bare, const vm::Slot *p_elements, size_t p_count, Variant *r_made, std::string *r_error) {
+	if (p_type == "PackedVector2Array" && p_bare == ir::Bare::Vector2) {
+		PackedVector2Array packed;
+		packed.resize(static_cast<int64_t>(p_count));
+		if (p_count) {
+			std::memcpy(static_cast<void *>(packed.ptrw()), static_cast<const void *>(p_elements), p_count * sizeof(Vector2));
+		}
+		*r_made = packed;
+		return true;
+	}
+	if (p_type.substr(0, 6) == "Packed") {
+		*r_error = "the Vector holds " + std::string(ir::bare_name(p_bare)) + "s, and Godot takes a " + std::string(p_type) + " here";
+		return false;
+	}
+	Array array;
+	array.resize(static_cast<int64_t>(p_count));
+	Variant *const places = places_of(array);
+	for (size_t i = 0; i < p_count; i++) {
+		places[i] = bare_variant(p_bare, p_elements[i]);
+	}
+	*r_made = array;
+	return true;
+}
+
 } // namespace
 
-void *GodotHost::collection(std::string_view p_type, ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, std::string *r_error) {
+void *GodotHost::collection(std::string_view p_type, const ir::Class &p_vector, const vm::Slot *p_elements, size_t p_count, std::string *r_error) {
+	const ir::Kind p_kind = p_vector.element;
 	Variant made;
 	bool ok = true;
-	if (p_type == "PackedByteArray") {
+	if (p_vector.element_bare != ir::Bare::None) {
+		ok = bare_collection(p_type, p_vector.element_bare, p_elements, p_count, &made, r_error);
+	} else if (p_type == "PackedByteArray") {
 		ok = whole_numbers<PackedByteArray>(p_kind, p_elements, p_count, 0, 255, "a byte", &made, r_error);
 	} else if (p_type == "PackedInt32Array") {
 		ok = whole_numbers<PackedInt32Array>(p_kind, p_elements, p_count, INT32_MIN, INT32_MAX, "a 32-bit integer", &made, r_error);
@@ -185,10 +306,13 @@ void *GodotHost::collection(std::string_view p_type, ir::Kind p_kind, const vm::
 		// An Array, or a place that takes anything: each element as Godot holds a value of its kind.
 		Array array;
 		array.resize(static_cast<int64_t>(p_count));
+		Variant *const places = places_of(array);
 		for (size_t i = 0; i < p_count && ok; i++) {
-			Variant value;
-			ok = p_kind != ir::Kind::Obj || object_element(static_cast<const vm::Object *>(p_elements[i].p), &value, r_error);
-			array[static_cast<int64_t>(i)] = p_kind == ir::Kind::Obj ? value : to_variant(p_kind, p_elements[i]);
+			if (p_kind == ir::Kind::Obj) {
+				ok = object_element(static_cast<const vm::Object *>(p_elements[i].p), &places[i], r_error);
+			} else {
+				place(&places[i], p_kind, p_elements[i]);
+			}
 		}
 		made = array;
 	}

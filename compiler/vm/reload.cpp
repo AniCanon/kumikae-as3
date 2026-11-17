@@ -177,14 +177,15 @@ Object *Reload::object(Object *p_old) {
 Object *Reload::moved_vector(Vector *p_old, uint32_t p_class) {
 	const ir::Class &old_class = from_.module_.classes[p_old->klass];
 	const ir::Class &new_class = to_.module_.classes[p_class];
-	Vector *vector = old_class.element == new_class.element ? new_vector(p_class, p_old->length, p_old->fixed, to_.heap_.list_for(p_class)) : nullptr;
+	const bool alike = old_class.element == new_class.element && old_class.element_bare == new_class.element_bare;
+	Vector *vector = alike ? new_vector_of(new_class, p_class, p_old->length, p_old->fixed, to_.heap_.list_for(p_class)) : nullptr;
 	if (!vector) {
 		return lost(p_old->klass);
 	}
 	moved_.emplace(p_old, vector);
 	retain(vector);
 	for (uint32_t i = 0; i < p_old->length; i++) {
-		vector->data[i] = carry(new_class.element, p_old->data[i]);
+		vector->data[i] = carry(place_kind(new_class), p_old->data[i]);
 	}
 	Entries *properties = p_old->properties && p_old->properties->size() ? properties_of(vector) : nullptr;
 	if (properties) {

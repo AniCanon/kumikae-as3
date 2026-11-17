@@ -206,7 +206,7 @@ uint32_t Vectors::vector_each(Call *p_call) {
 	const uint32_t more = l_.reg(Kind::Bool);
 	l_.emit(Op::LtF64, position, more, at, end);
 	const uint32_t exit = l_.emit(Op::JumpIfNot, position, more, 0);
-	const uint32_t item = l_.reg(element);
+	const uint32_t item = l_.engine_reg(element, callee->object->type->element);
 	l_.emit(Op::VecGet, position, item, vector, at);
 	const uint32_t index = l_.convert(l_.convert(at, Kind::I32, position), Kind::Any, position);
 	const uint32_t answer = map || filter || some || every ? l_.reg(Kind::Any) : NONE;

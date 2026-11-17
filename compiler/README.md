@@ -389,11 +389,17 @@ led there, as the interpreter does it (`runtime/entry.cpp`). What generated code
   null, which a struct can't say; a field's slot is read as a handle by everything that shares the
   object with generated code (the library, the collector, Godot reading a property, a reload), by the
   class's description in `vm/`.
+- A place of a `Vector.<Vector2>` or a `Vector.<Vector2i>` holds the value itself (below), so an element
+  read into a variable, stored from one, or added by `push()` is eight bytes copied where the vector is,
+  with no handle and no call (`runtime/fast.h`, `vector_of()`). A value that is in a handle (a parameter),
+  an index out of range and a vector that must grow are the library's.
 
 Not there yet, natively: reloading the scripts while the game runs (the game says so and carries on), and
 the limit on a script's time (Error #1502).
 
-`tests/bench/languages/run.py` times it beside C#, GDScript and the interpreter ("AS3 native").
+`tests/bench/languages/run.py` times it beside C#, GDScript and the interpreter ("AS3 native"). A program
+library built for another version of the runtime (`runtime/layout.h`) is refused, and says it must be built
+again: the interpreter runs the scripts meanwhile.
 
 ## Inside Godot
 
@@ -495,6 +501,16 @@ package {
   when no value is written, as in GDScript. `null` can still be assigned. Any other Godot value (an array,
   a signal) starts missing. So does each place of a vector of one: `new Vector.<Vector2>(3)` holds three
   zero vectors, as a C# array of structs does, and setting a longer `length` adds zeroes.
+- A place of a `Vector.<Vector2>` or of a `Vector.<Vector2i>` holds the value itself, eight bytes, as an
+  element of a packed array or of a C# array does, under the interpreter and in native code alike. It is
+  never null. `null` written where an element goes (`v[0] = null`, an argument of `push()`, `unshift()`,
+  `insertAt()` or `splice()`, an element of `new <Vector2>[...]`) is an error as the program is checked,
+  which the editor shows: `null can't be stored in a 'Vector.<Vector2>': each of its places holds a
+  'Vector2' itself`. A value that turns out to be null as the program runs (`v.push(none)`, an untyped
+  value, a vector converted by `Vector.<Vector2>(list)`) is AS3's TypeError #1034, with the vector as it
+  was. What is read out is a copy, and what is stored is copied in. Handed to Godot where it takes a
+  `PackedVector2Array`, the places are copied as they are, in one go. A vector of a larger value type
+  (`Vector3`, `Color`) still holds a handle on each, which may be null.
 - Godot's integer is an AS3 type, `Int64`. `items.size()`, `randi()` and an object's id are `Int64`s.
   One converts to an `int`, a `uint` or a `Number` where that is expected, and a `RangeError` says so if
   the value does not fit; `int(x)` written out cuts it, as in Flash. Arithmetic on it wraps at 64 bits,

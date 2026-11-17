@@ -20,11 +20,13 @@ struct EngineSource {
 	// class's script attached and p_object, which is being made, as its script's object. The handle that
 	// comes back does not keep the Godot object alive (it is p_object's first field).
 	[[nodiscard]] virtual void *attach_new(uint32_t p_class, Object *p_object, std::string *r_error) = 0;
-	// One of Godot's collections made from a vector's elements, read where the vector holds them, all of
-	// the one kind: a packed array of the type named ("PackedVector2Array"), or an Array for any other
-	// name. An element that does not fit the packed type is refused; a message that starts with
-	// "RangeError: " is raised as AS3's RangeError.
-	[[nodiscard]] virtual void *collection(std::string_view p_type, ir::Kind p_kind, const Slot *p_elements, size_t p_count, std::string *r_error) = 0;
+	// One of Godot's collections made from a vector's elements, read where the vector holds them, as its
+	// class says it holds them (its element's kind, and whether each place holds one of Godot's values
+	// whole): a packed array of the type named ("PackedVector2Array"), or an Array for any other name. An
+	// element that does not fit the packed type is refused; a message that starts with "RangeError: " is
+	// raised as AS3's RangeError.
+	[[nodiscard]] virtual void *collection(std::string_view p_type, const ir::Class &p_vector, const Slot *p_elements, size_t p_count,
+			std::string *r_error) = 0;
 	// A constant the engine keeps for one of its types: Vector2's ZERO.
 	[[nodiscard]] virtual bool constant(std::string_view p_class, std::string_view p_name, const Wanted &p_result, Slot *r_result,
 			std::string *r_error) = 0;

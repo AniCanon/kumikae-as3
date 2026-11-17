@@ -12,10 +12,12 @@
 #include <algorithm>
 #include <map>
 #include <chrono>
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 using namespace kas3;
@@ -488,18 +490,49 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 		log += "attach " + (module ? module->classes[p_class].name : std::to_string(p_class)) + " -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
+	// The Vector2s among the boxes, each as a slot holds one whole: two reals.
+	std::unordered_map<void *, uint64_t> wholes;
+	static uint64_t whole_of(double p_x, double p_y) {
+		const float parts[2] = { static_cast<float>(p_x), static_cast<float>(p_y) };
+		uint64_t bits = 0;
+		std::memcpy(&bits, parts, sizeof(bits));
+		return bits;
+	}
+	static std::string show_whole(uint64_t p_bits) {
+		float parts[2];
+		std::memcpy(parts, &p_bits, sizeof(parts));
+		return "(" + vm::number_to_string(parts[0]) + ", " + vm::number_to_string(parts[1]) + ")";
+	}
 	[[nodiscard]] void *construct(std::string_view p_type, const vm::Argument *p_arguments, size_t p_count, std::string *) override {
 		void *made = box();
 		log += "construct " + std::string(p_type) + "(" + list(p_arguments, p_count) + ") -> #" + std::to_string((intptr_t)made) + "\n";
+		if (p_type == "Vector2") {
+			const auto part = [&](size_t p_at) {
+				const vm::Argument &given = p_arguments[p_at];
+				return given.kind == ir::Kind::I32 ? given.slot.i : given.kind == ir::Kind::I64 ? static_cast<double>(given.slot.l) : given.slot.d;
+			};
+			wholes[made] = p_count == 2 ? whole_of(part(0), part(1)) : 0;
+		}
 		return made;
 	}
-	[[nodiscard]] void *collection(std::string_view p_type, ir::Kind p_kind, const vm::Slot *p_elements, size_t p_count, std::string *) override {
+	[[nodiscard]] void *boxed(ir::Bare p_type, vm::Slot p_value, std::string *) override {
 		void *made = box();
-		std::vector<vm::Argument> elements;
+		log += "boxed " + std::string(ir::bare_name(p_type)) + show_whole(p_value.bits) + " -> #" + std::to_string((intptr_t)made) + "\n";
+		wholes[made] = p_value.bits;
+		return made;
+	}
+	[[nodiscard]] bool unboxed(ir::Bare, void *p_handle, vm::Slot *r_value) override {
+		const auto found = wholes.find(p_handle);
+		r_value->bits = found == wholes.end() ? 0 : found->second;
+		return found != wholes.end();
+	}
+	[[nodiscard]] void *collection(std::string_view p_type, const ir::Class &p_vector, const vm::Slot *p_elements, size_t p_count, std::string *) override {
+		void *made = box();
+		std::string elements;
 		for (size_t i = 0; i < p_count; i++) {
-			elements.push_back(vm::Argument{ p_kind, p_elements[i] });
+			elements += (i ? ", " : "") + (p_vector.element_bare != ir::Bare::None ? show_whole(p_elements[i].bits) : show(vm::Argument{ p_vector.element, p_elements[i] }));
 		}
-		log += "collection " + std::string(p_type) + "[" + list(elements.data(), p_count) + "] -> #" + std::to_string((intptr_t)made) + "\n";
+		log += "collection " + std::string(p_type) + "[" + elements + "] -> #" + std::to_string((intptr_t)made) + "\n";
 		return made;
 	}
 	[[nodiscard]] bool call(void *p_receiver, std::string_view p_method, const vm::Argument *p_arguments, size_t p_count, const vm::Wanted &p_wanted,
@@ -1134,11 +1167,23 @@ static void test_engine_prepared() {
 
 // A vector of one of Godot's value types with parts starts with that type's zero in each place, as a C#
 // array of structs does, and so does each place it grows by; a vector of any other Godot value starts null.
+// A Vector2 is held whole in its place: the engine is asked for nothing as the vector is made or grows, a
+// place read is a new handle on a copy, a place written takes the value out of the handle it is given, no
+// value (null) is refused with the vector as it was, and the places go to the engine as they are.
 static void test_vector_of_values() {
 	const char *source = "package { import godot.*; public class Holder extends Node {\n"
 						 "  public function made():int { var v:Vector.<Vector2> = new Vector.<Vector2>(3); v.length = 5; v.push(new Vector2(1, 2));\n"
 						 "    var missing:int = 0; for (var i:int = 0; i < v.length; i++) { if (v[i] == null) missing++; } return missing; }\n"
 						 "  public function arrays():int { var a:Vector.<GodotArray> = new Vector.<GodotArray>(2); return a[0] == null ? 2 : 0; }\n"
+						 "  public function stores(target:Line2D):String { var v:Vector.<Vector2> = new Vector.<Vector2>(1); var none:Vector2 = null;\n"
+						 "    v.push(new Vector2(1, 2)); v[2] = new Vector2(3, 4.5); var said:String = \"\";\n"
+						 "    try { v.push(none); } catch (a:TypeError) { said += a.message; }\n"
+						 "    try { v[3] = none; } catch (b:TypeError) { said += \"|\" + v.length; }\n"
+						 "    try { v.splice(0, 2, none); } catch (c:TypeError) { said += \"|\" + v.length; }\n"
+						 "    try { v.unshift(v[1], none); } catch (d:TypeError) { said += \"|\" + v.length; }\n"
+						 "    v.reverse(); target.points = v.concat(v.slice(1)); v.length = 1; return said; }\n"
+						 "  public var path:Vector.<Vector2> = new <Vector2>[new Vector2(1, 2), new Vector2(3, 4)];\n"
+						 "  public function give(target:Line2D):void { target.points = path; }\n"
 						 "} }\n";
 	Compilation compilation;
 	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
@@ -1164,13 +1209,42 @@ static void test_vector_of_values() {
 		for (size_t at = engine.log.find("construct Vector2() "); at != std::string::npos; at = engine.log.find("construct Vector2() ", at + 1)) {
 			zeroes++;
 		}
-		CHECK_EQ(zeroes, (size_t)5); // Three made, two grown by; what push() adds is its own.
+		CHECK_EQ(zeroes, (size_t)0); // Three made and two grown by, each a slot that holds the zero whole.
+		CHECK_EQ(engine.boxes, 1); // Every handle a place was read as has been let go of.
+		vm::Slot argument;
+		argument.bits = 0;
+		argument.p = engine.box();
+		engine.log.clear();
+		CHECK(interpreter.call_method(object, "stores", &argument, 1, &result));
+		CHECK_EQ(std::string(static_cast<vm::Str *>(result.p)->view()), std::string("Error #1034: Type Coercion failed: cannot convert null to Vector2.|3|3|3"));
+		CHECK(engine.log.find("collection PackedVector2Array[(3, 4.5), (1, 2), (0, 0), (1, 2), (0, 0)] -> ") != std::string::npos);
+		vm::free_string(static_cast<vm::Str *>(result.p));
+		engine.drop(argument.p);
+		CHECK_EQ(engine.boxes, 1);
 		engine.log.clear();
 		CHECK(interpreter.call_method(object, "arrays", nullptr, 0, &result));
 		CHECK_EQ(result.i, 2);
 		CHECK_EQ(engine.log.find("construct"), std::string::npos);
 		CHECK_EQ(engine.boxes, 1);
+		// A reload carries such a vector's places as they are.
+		ir::Module again;
+		CHECK(ir::lower(compilation, &again, ir::LowerMode::Library));
+		vm::Interpreter fresh(again, engine);
+		vm::Reload reload(interpreter, fresh);
+		vm::Object *moved = reload.object(object);
+		CHECK(moved != nullptr);
+		CHECK_EQ(reload.missing(), std::string());
+		reload.globals();
 		interpreter.release_object(object);
+		if (moved) {
+			argument.p = engine.box();
+			engine.log.clear();
+			CHECK(fresh.call_method(moved, "give", &argument, 1, &result));
+			CHECK(engine.log.find("collection PackedVector2Array[(1, 2), (3, 4)] -> ") != std::string::npos);
+			engine.drop(argument.p);
+			fresh.release_object(moved);
+		}
+		CHECK_EQ(engine.errors, std::string());
 	}
 	CHECK_EQ(vm::live_objects(), (size_t)0);
 }

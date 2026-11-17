@@ -114,6 +114,9 @@ class Typer {
 
 	// Checks the arguments of a call against the function's parameters: how many, then each one's type.
 	void arguments(FunctionDecl *p_function, std::string_view p_name, const List<Expr *> &p_arguments, uint32_t p_offset, const Type *p_element);
+	// A value written where an element of a vector goes: `null` is an error where the vector holds each
+	// element in its place (held_in_place.h).
+	void no_null_place(const Expr *p_value, const Type *p_element);
 
 	// A class in a declaration file that is tagged [Abstract]: one the engine does not let a program create.
 	static bool abstract(const Type *p_instance);

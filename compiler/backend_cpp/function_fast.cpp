@@ -13,6 +13,51 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
+// The vector an element of that register's kind is read from or written to where it is: one whose places
+// hold handles, for one of Godot's values (vector_of(), runtime/fast.h); any at all, for the rest.
+std::string FunctionWriter::vector_for(uint32_t p_vector, uint32_t p_element) const {
+	return kind(p_element) == Kind::Val ? "vector_of(" + reg(p_vector) + ", 0)" : reg(p_vector);
+}
+
+bool FunctionWriter::fast_place(const Instruction &p_in) {
+	const auto whole = [&](uint32_t p_register) { return kind(p_register) == Kind::I32 || kind(p_register) == Kind::U32; };
+	// The register that holds the element inline, and the vector, where the instruction is one of these.
+	uint32_t value = NONE, vector = NONE;
+	if (p_in.op == Op::VecGet && whole(p_in.c)) {
+		value = p_in.a;
+		vector = p_in.b;
+	} else if (p_in.op == Op::VecSet && whole(p_in.b)) {
+		value = p_in.c;
+		vector = p_in.a;
+	} else if (p_in.op == Op::VecCall && static_cast<ir::VectorMethod>(p_in.b) == ir::VectorMethod::Push && function_.argument_lists[p_in.c].size() == 2) {
+		value = function_.argument_lists[p_in.c][1];
+		vector = function_.argument_lists[p_in.c][0];
+	}
+	const ir::Bare bare = value == NONE ? ir::Bare::None : ir::bare_named(parts(value));
+	if (bare == ir::Bare::None) {
+		return false;
+	}
+	// Only a vector that holds values of this very type whole: any other, none at all, an index outside it
+	// and a vector that must grow are the same instruction with the value in a handle, the library's.
+	const std::string of = "vector_of(" + reg(vector) + ", " + std::to_string(static_cast<unsigned>(bare)) + ")";
+	const std::string type(parts(value));
+	if (p_in.op == Op::VecGet) {
+		line("if (const Slot *const e = element(" + of + ", " + reg(p_in.c) + ")) {");
+		line("\t" + reg(value) + " = place_value<" + type + ">(*e);");
+	} else if (p_in.op == Op::VecSet) {
+		line("if (Slot *const e = element_to_write(c, " + of + ", " + reg(p_in.b) + ")) {");
+		line("\t*e = value_place(" + reg(value) + ");");
+	} else {
+		const std::string length = "static_cast<Vector *>(" + reg(vector) + ")->length";
+		line("if (Slot *const e = push_room(" + of + ")) {");
+		line("\t*e = value_place(" + reg(value) + ");");
+		line(p_in.a == NONE ? "\t" + length + "++;" : "\t" + reg(p_in.a) + " = ++" + length + ";");
+	}
+	line("} else");
+	generic(p_in);
+	return true;
+}
+
 bool FunctionWriter::fast_object(const Instruction &p_in) {
 	const auto whole = [&](uint32_t p_register) { return kind(p_register) == Kind::I32 || kind(p_register) == Kind::U32; };
 	if (fast_ && fast_vector(p_in)) {
@@ -31,7 +76,7 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			if (!whole(p_in.c)) {
 				return false;
 			}
-			line("if (Slot *const e = element(" + reg(p_in.b) + ", " + reg(p_in.c) + ")) {");
+			line("if (Slot *const e = element(" + vector_for(p_in.b, p_in.a) + ", " + reg(p_in.c) + ")) {");
 			// An Array's hole is read as undefined (vm/any.h).
 			share(p_in.a, from_slot(kind(p_in.a), kind(p_in.a) == Kind::Any ? "kas3::vm::any::filled(*e)" : "(*e)"));
 			break;
@@ -40,9 +85,22 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 			if (!whole(p_in.b)) {
 				return false;
 			}
-			line("if (Slot *const e = element_to_write(c, " + reg(p_in.a) + ", " + reg(p_in.b) + ")) {");
+			line("if (Slot *const e = element_to_write(c, " + vector_for(p_in.a, p_in.c) + ", " + reg(p_in.b) + ")) {");
 			line(ir::is_held(kind(p_in.c)) ? "\tstore_slot(c, *e, " + reg(p_in.c) + ");" : "\t*e = slot(" + reg(p_in.c) + ");");
 			break;
+		case Op::VecCall: {
+			// push(x) where the vector has room for it: one that must grow, a fixed one and none at all are
+			// the library's. The value is counted before the vector is any longer.
+			const std::vector<uint32_t> &list = function_.argument_lists[p_in.c];
+			if (static_cast<ir::VectorMethod>(p_in.b) != ir::VectorMethod::Push || list.size() != 2) {
+				return false;
+			}
+			const std::string length = "static_cast<Vector *>(" + reg(list[0]) + ")->length";
+			line("if (Slot *const e = push_room(" + vector_for(list[0], list[1]) + ")) {");
+			line("\t*e = slot(" + (ir::is_held(kind(list[1])) ? "shared(c, " + reg(list[1]) + ")" : reg(list[1])) + ");");
+			line(p_in.a == NONE ? "\t" + length + "++;" : "\t" + reg(p_in.a) + " = ++" + length + ";");
+			break;
+		}
 		default:
 			return false;
 	}
@@ -119,7 +177,7 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 				put(p_in.a, "to_any(c, " + reg(p_in.b) + ")");
 				return true;
 			}
-			line("if (Slot w = empty(); number_to_any(c, " + reg(p_in.b) + ", &w)) {");
+			line("if (Slot w = empty(); number_any(c, " + reg(p_in.b) + ", &w)) {");
 			put(p_in.a, "w");
 			break;
 		case Op::FromAny:
@@ -142,7 +200,7 @@ bool FunctionWriter::fast_untyped(const Instruction &p_in) {
 			const std::string result = p_in.op == Op::AnySub ? "x.d - y.d" : p_in.op == Op::AnyMul ? "x.d * y.d" : p_in.op == Op::AnyDiv ? "x.d / y.d"
 					: p_in.op == Op::AnyMod ? "std::fmod(x.d, y.d)" : "-x.d";
 			line("if (Slot x = empty(), y = empty(), w = empty(); from_any(c, " + number_kind + ", " + number(NONE) + ", " + reg(p_in.b) + ", &x)" + second +
-					" && number_to_any(c, " + result + ", &w)) {");
+					" && number_any(c, " + result + ", &w)) {");
 			line("(void)y;");
 			put(p_in.a, "w");
 			break;

@@ -1,7 +1,8 @@
 extends SceneTree
 
-# Calls each method of Probe.as and of Entry.as and prints what it gives: run_godot.py runs this with the
-# interpreter and with the scripts as native code, and holds the two outputs to each other.
+# Calls each method of Probe.as, of Entry.as and of the test project's Places.as and prints what it gives:
+# run_godot.py runs this with the interpreter and with the scripts as native code, and holds the two outputs
+# to each other.
 var killer: Node
 var entry: Node2D
 var frames := 0
@@ -25,6 +26,28 @@ func _enter() -> void:
 	print("PROBE rings again=", entry.call("rings"))
 
 
+# Vectors whose places hold Godot's values themselves (the test project's Places.as, which places.gd holds to
+# what GDScript gives).
+func _places() -> void:
+	var places := Node2D.new()
+	places.set_script(load("res://Places.as"))
+	places.position = Vector2(100, 200)
+	root.add_child(places)
+	print("PROBE grown=", places.call("grown"))
+	print("PROBE refused=", places.call("refused"))
+	print("PROBE methods=", places.call("methods"))
+	var line := Line2D.new()
+	var keeper := Node.new()
+	print("PROBE given=", places.call("given", line, keeper), " ", line.points, " ", keeper.get_meta("points"), " ", keeper.get_meta("nested"), " ",
+			keeper.get_meta("none"), " ", keeper.get_meta("cells"))
+	var shade := Gradient.new()
+	print("PROBE wider=", places.call("wider", shade), " ", shade.colors)
+	line.position = Vector2(-1, -2)
+	print("PROBE taken=", places.call("taken", line, [Vector2(0.5, 0.25), Vector3(1, 2, 3), null]))
+	line.free()
+	keeper.free()
+
+
 func _initialize() -> void:
 	var probe := Node2D.new()
 	probe.set_script(load("res://Probe.as"))
@@ -41,6 +64,7 @@ func _initialize() -> void:
 	print("PROBE fail=", probe.call("fail", 3))
 	print("PROBE after=", probe.call("script", 1))
 	_enter()
+	_places()
 	# A node whose script's object is freed while its _process runs: see Probe.as.
 	killer = Node.new()
 	killer.set_script(load("res://killer.gd"))

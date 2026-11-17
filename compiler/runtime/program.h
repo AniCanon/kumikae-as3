@@ -44,6 +44,7 @@ struct ClassInfo {
 	uint64_t layout; // A hash of the fields' names, kinds and offsets: equal layouts hold objects alike.
 	uint8_t element; // For a Vector.<T>: the ir::Kind of its elements. Void (0) for every other class.
 	uint32_t element_check; // What a value stored into such a vector is checked against (ir::Class::element_check).
+	uint8_t element_bare; // Which of Godot's value types each of its places holds whole (ir::Class::element_bare), or 0.
 	bool array;
 	bool table;
 	bool dictionary;
@@ -129,6 +130,9 @@ struct KnownClasses {
 };
 
 struct Program {
+	// Which layout of the runtime the library was built for (runtime/layout.h, RUNTIME_LAYOUT): the first
+	// thing in the table, and all a host reads of one that names another.
+	uint64_t layout;
 	const char *const *files;
 	uint32_t file_count;
 	const ClassInfo *classes;

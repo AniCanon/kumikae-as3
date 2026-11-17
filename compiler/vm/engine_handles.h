@@ -35,6 +35,11 @@ struct EngineHandles {
 	// One of Godot's values (never an object) copied into a handle that holds one already, in place of a new
 	// handle: what assigning to a variable that has one costs. False if the engine can't: copy() then.
 	[[nodiscard]] virtual bool assign(void *, const void *) { return false; }
+	// One of Godot's values that a slot holds whole (ir::Bare), as a new handle, the caller's: what a place of
+	// a vector of them gives whoever reads it. Null, saying why, where the engine can make none.
+	[[nodiscard]] virtual void *boxed(ir::Bare p_type, Slot p_value, std::string *r_error) = 0;
+	// The value a handle holds, as a slot holds one of that type whole. False for a handle on anything else.
+	[[nodiscard]] virtual bool unboxed(ir::Bare p_type, void *p_handle, Slot *r_value) = 0;
 	// Whether a handle still has something behind it: not if it is null, or an object the engine has freed.
 	// A freed object is null to a script.
 	[[nodiscard]] virtual bool present(void *p_value) = 0;

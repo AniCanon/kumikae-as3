@@ -14,7 +14,8 @@ Str *Library::text(std::string_view p_text) {
 }
 
 Vector *Library::fresh_vector(uint32_t p_class, uint64_t p_length) {
-	Vector *fresh = p_length <= MAX_VECTOR_LENGTH ? new_vector(p_class, static_cast<uint32_t>(p_length), false, heap.list_for(p_class)) : nullptr;
+	Vector *fresh = p_length <= MAX_VECTOR_LENGTH ? new_vector_of(heap.module.classes[p_class], p_class, static_cast<uint32_t>(p_length), false, heap.list_for(p_class))
+												  : nullptr;
 	if (!fresh) {
 		runner.out_of_memory();
 	}

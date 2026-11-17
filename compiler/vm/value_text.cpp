@@ -242,16 +242,23 @@ bool vector_text(Library &p_library, Vector *p_vector, std::string_view p_separa
 		if (i) {
 			append_text(r_text, p_separator); // Text is joined as Concat joins it: two halves that meet are one character.
 		}
-		const Slot element = p_vector->data[i];
+		Slot element = p_vector->data[i];
+		const bool whole = klass.element_bare != ir::Bare::None;
+		if (whole && !read_element(p_library, klass, element, &element)) {
+			done = false; // The value a place holds whole is put into words as the handle it is read as.
+			break;
+		}
 		// A freed Godot object is null here too.
 		const AnyTag tag = kind == Kind::Any ? any::tag(present_or_null(p_library, element)) : AnyTag::Undefined;
 		const bool engine = kind == Kind::Ref || kind == Kind::Val;
 		const bool nothing = kind == Kind::Any ? tag == AnyTag::Null || tag == AnyTag::Undefined
 											   : ir::is_held(kind) && (!element.p || (engine && !p_library.heap.handles.present(element.p)));
-		if (leaves_out && nothing) {
-			continue;
+		if (!(leaves_out && nothing)) {
+			done = p_locale ? locale_text(p_library, kind, element, r_text) : element_text(p_library, kind, element, r_text);
 		}
-		done = p_locale ? locale_text(p_library, kind, element, r_text) : element_text(p_library, kind, element, r_text);
+		if (whole) {
+			p_library.heap.drop(kind, element);
+		}
 	}
 	p_library.runner.wording--;
 	return done;

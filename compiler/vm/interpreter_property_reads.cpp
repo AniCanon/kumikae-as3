@@ -59,8 +59,7 @@ bool Interpreter::get_property(Slot p_holder, const PropertyKey &p_key, Slot *r_
 bool Interpreter::vector_property(Vector *p_vector, const PropertyKey &p_key, Slot p_holder, Slot *r_value) {
 	const ir::Class &klass = module_.classes[p_vector->klass];
 	if (p_key.index && *p_key.index < p_vector->length) {
-		*r_value = to_any(klass.element, klass.element == Kind::Any ? any::filled(p_vector->data[*p_key.index]) : p_vector->data[*p_key.index]);
-		return true;
+		return element_to_any(library_, klass, p_vector->data[*p_key.index], r_value);
 	}
 	if (p_key.index && !klass.array) {
 		raise_range(*p_key.index, p_vector->length);

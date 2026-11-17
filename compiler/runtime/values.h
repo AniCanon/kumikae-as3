@@ -139,7 +139,7 @@ inline Object *shared(Context *c, Object *p_object) {
 	return p_object;
 }
 inline Slot shared(Context *c, Slot p_any) {
-	return shared_any(c, p_any);
+	return vm::any::holds(p_any) ? shared_any(c, p_any) : p_any; // A number, a Boolean or nothing: itself.
 }
 inline void release(Context *c, Str *p_string) {
 	if (p_string && --p_string->references == 0) {
@@ -160,7 +160,9 @@ inline void release(Context *c, Object *p_object) {
 	}
 }
 inline void release(Context *c, Slot p_any) {
-	release_any_slow(c, p_any);
+	if (vm::any::holds(p_any)) {
+		release_any_slow(c, p_any);
+	}
 }
 
 // A register, field or static field that holds a reference is written by one of these. put() takes over a

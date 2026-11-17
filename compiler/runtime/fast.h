@@ -6,6 +6,7 @@
 #include "program.h"
 #include "values.h"
 
+#include <cmath>
 #include <limits>
 
 namespace kas3 {
@@ -20,6 +21,15 @@ inline Slot *element(Object *p_vector, int32_t p_index) {
 inline Slot *element(Object *p_vector, uint32_t p_index) {
 	Vector *const vector = static_cast<Vector *>(p_vector);
 	return vector && p_index < vector->length ? vector->data + p_index : nullptr;
+}
+
+// The vector, if its places hold what the code that asks reads and writes there: one of Godot's values
+// whole (p_whole: the type's number, which generated code is written with, as Vector::bare has it), or, for
+// 0, what a field of the element's kind holds. Nothing for a vector of the other sort, and for none: the
+// library reads and writes those. Only a place of one of Godot's values is ever asked about: no other
+// vector holds anything whole.
+inline Object *vector_of(Object *p_vector, uint8_t p_whole) {
+	return p_vector && static_cast<Vector *>(p_vector)->bare == p_whole ? p_vector : nullptr;
 }
 
 // A new object of the class, its fields as an object's are before its constructor runs, with one reference,
@@ -56,6 +66,15 @@ inline Slot *element_to_write(Context *c, Object *p_vector, uint32_t p_index) {
 }
 inline Slot *element_to_write(Context *c, Object *p_vector, int32_t p_index) {
 	return p_index < 0 ? nullptr : element_to_write(c, p_vector, static_cast<uint32_t>(p_index));
+}
+
+// Where push() of one value writes it, in a vector with room for one more: the room past a vector's end is
+// empty, so nothing is let go of there, and whoever writes it then counts the element in (`length`).
+// Nothing for no vector, a fixed one, or one that must grow first: the library's.
+inline Slot *push_room(Object *p_vector) {
+	Vector *const vector = static_cast<Vector *>(p_vector);
+	const bool room = vector && !vector->fixed && vector->length < vector->capacity && vector->length < vm::MAX_VECTOR_LENGTH;
+	return KAS3_LIKELY(room) ? vector->data + vector->length : nullptr;
 }
 
 // What holds a property, and a key that is a String: null for a register that holds anything else.
@@ -149,6 +168,22 @@ inline Slot to_any(Context *c, uint32_t p_value) {
 // A Number as an untyped value, as the library makes one (vm/interpreter_any.cpp, any_number): a whole
 // number an int holds as an int, a larger one as an Int64 in a box. False only with no memory for the box.
 //     bool number_to_any(double p_value, Slot *r_any);
+// The same, done here where nothing is made: a whole number an int holds, and a fraction in an int's range.
+// The rest (a larger number, which may want a box, -0 and what is no number) are number_to_any()'s.
+inline bool number_any(Context *c, double p_value, Slot *r_any) {
+	if (KAS3_LIKELY(p_value >= INT32_MIN && p_value <= INT32_MAX)) {
+		const int32_t whole = static_cast<int32_t>(p_value);
+		if (whole != p_value) {
+			*r_any = vm::any::number(p_value);
+			return true;
+		}
+		if (whole != 0 || !std::signbit(p_value)) {
+			*r_any = vm::any::integer(whole);
+			return true;
+		}
+	}
+	return number_to_any(c, p_value, r_any);
+}
 
 // An untyped value as a value of the kind (an ir::Kind), where it already holds one: a number for a number,
 // a String or nothing for a String, an object of the class wanted (any, for NONE) or nothing for an

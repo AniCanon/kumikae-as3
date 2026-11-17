@@ -218,7 +218,7 @@ void vector_sort(Library &p_library, Vector *p_vector, const VectorCall &p_call)
 	retain(p_vector);
 	std::vector<uint32_t> order;
 	bool twins = false;
-	if (sort_order(p_library, kind, sorting.elements, compare, options, &order, &twins)) {
+	if (!p_library.runner.failing() && sort_order(p_library, kind, sorting.elements, compare, options, &order, &twins)) {
 		sorted(p_library, p_vector, p_call, sorting, order, twins, options);
 	}
 	for (Slot &each : sorting.elements) {
@@ -231,16 +231,22 @@ namespace {
 
 // What a sort puts in order, each with a reference of its own: every element, but an Array's holes, which
 // stay out of it and come after everything, as avmplus's ArraySort has them ("undefined comes after
-// everything else, and missing properties come after that").
+// everything else, and missing properties come after that"). Fewer than there are, with the error raised,
+// where an element could not be read.
 Sorting elements_to_sort(Library &p_library, Vector *p_vector) {
-	const Kind kind = p_library.module().classes[p_vector->klass].element;
+	const ir::Class &klass = p_library.module().classes[p_vector->klass];
+	const Kind kind = klass.element;
 	Sorting sorting;
 	for (uint32_t i = 0; i < p_vector->length; i++) {
 		if (kind == Kind::Any && any::is_hole(p_vector->data[i])) {
 			sorting.holes.push_back(i);
 			continue;
 		}
-		sorting.elements.push_back(p_library.heap.share(kind, p_vector->data[i]));
+		Slot element;
+		if (!read_element(p_library, klass, p_vector->data[i], &element)) {
+			break;
+		}
+		sorting.elements.push_back(element);
 		sorting.places.push_back(i);
 	}
 	return sorting;
@@ -271,7 +277,8 @@ void sorted(Library &p_library, Vector *p_vector, const VectorCall &p_call, cons
 		}
 	} else {
 		for (uint32_t i = 0; !p_twins && !(p_options & INDEXED) && i < p_order.size() && i < p_vector->length; i++) {
-			p_library.heap.put(kind, p_vector->data[i], p_library.heap.share(kind, p_sorting.elements[p_order[i]]));
+			const bool stored = write_element(p_library, klass, p_vector->data[i], p_sorting.elements[p_order[i]]);
+			(void)stored; // Each was read out of this vector: there is one to store.
 		}
 		for (uint32_t i = static_cast<uint32_t>(p_order.size()); !p_twins && !(p_options & INDEXED) && !p_sorting.holes.empty() && i < p_vector->length; i++) {
 			p_library.heap.put(kind, p_vector->data[i], any::hole());
@@ -379,7 +386,7 @@ void vector_sort_on(Library &p_library, Vector *p_vector, const VectorCall &p_ca
 	retain(p_vector);
 	std::vector<double> numbers;
 	std::vector<std::string> texts;
-	const bool ok = sort_on_keys(p_library, fields, elements, &numbers, &texts);
+	const bool ok = !p_library.runner.failing() && sort_on_keys(p_library, fields, elements, &numbers, &texts);
 	const auto compare = [&](uint32_t p_a, uint32_t p_b) -> std::optional<double> {
 		for (size_t f = 0; f < fields.size(); f++) {
 			const double a = numbers[f * count + p_a], b = numbers[f * count + p_b];

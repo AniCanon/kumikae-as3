@@ -190,6 +190,10 @@ class FunctionWriter {
 	void remember_whole(const ir::Instruction &p_in);
 	// function_fast.cpp: an inline path for the usual case, and the thunk for the rest.
 	bool fast_object(const ir::Instruction &p_in); // A new object, a vector's elements and length.
+	// A vector's place that holds one of Godot's values whole, read into a register that holds it inline or
+	// written from one, with no handle between.
+	bool fast_place(const ir::Instruction &p_in);
+	std::string vector_for(uint32_t p_vector, uint32_t p_element) const;
 	bool fast_text(const ir::Instruction &p_in);
 	bool fast_untyped(const ir::Instruction &p_in);
 	bool fast_call(const ir::Instruction &p_in);
