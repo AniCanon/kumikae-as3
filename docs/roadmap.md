@@ -129,11 +129,17 @@ passes on real compiled AS3 (not hand-written code, as in stage 0).
 **Built ahead, on 2026-11-16:** `kas3c cpp` writes a program as C++; every program of the run tests gives
 the interpreter's output as native code; the Godot extension loads a program library and Godot calls its
 functions directly. Against Godot C# (rough: measured on a loaded machine, last on 2026-11-17) it is ahead
-on calls into Godot, script-only code and both array benchmarks, about level on three, and behind on seven
-(1.2 to 3.6 times): the speed gate is not passed. Handing arrays to Godot was the furthest behind (4.9
+on calls into Godot, script-only code and both array benchmarks, about level on four, and behind on six
+(1.1 to 2.9 times): the speed gate is not passed. Handing arrays to Godot was the furthest behind (4.9
 times) and is now ahead (0.33 ms a frame against C#'s 0.46, the median of five runs of each): a vector of
 `Vector2`s holds each in its place and goes to Godot in one copy, `push()` is written where the vector has
-room, and a number held untyped costs no call. Decided on 2026-11-16: native code is to run in the editor's
+room, and a number held untyped costs no call. Signals were the next furthest (3.6 times) and are now level
+(1.62 ms a frame for 20,000 signals against C#'s 1.64, the median of five runs of each, the ranges
+overlapping): `emit()` is Godot's `emit_signal` by its method bind on values made where Godot reads them,
+through the field's own handle where the signal is a field, and a listener given exactly what its
+parameters hold is entered with nothing checked twice or allocated. About a third of that frame is Godot's
+own emitting, which no script language removes; what is left of ours is the `Vector2` a listener is still
+handed in a handle, and three looks for an object by its id for each signal. Decided on 2026-11-16: native code is to run in the editor's
 play too, not only in exports, with the interpreter kept for a machine with no C++ toolchain; and tests are
 to run on Steam Deck and Nintendo Switch once build targets are configurations. Left: the library called
 directly everywhere (part done), Godot's values held inline in fields and parameters and, for the types

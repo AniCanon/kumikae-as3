@@ -382,9 +382,16 @@ led there, as the interpreter does it (`runtime/entry.cpp`). What generated code
   number, a Boolean, a value with parts or a name written in the program, is Godot's method bind called
   on the bare values. The script's own Godot object is found once in each function, a singleton once
   when the program loads, a name's `StringName` once.
-- Everything else that asks Godot (Strings, Arrays, Callables and signals, untyped values, a method that
-  takes or gives one of those, a value stored in a field) is the interpreter's own instruction, run by
-  its thunk.
+- A signal's `emit()`, when every value it carries is a number, a Boolean, a value with parts or one of
+  Godot's values or objects in a handle, is `Object`'s `emit_signal` called by its method bind, which the
+  host found once, on values it makes where Godot reads them: nothing is boxed and no name is looked up.
+  A signal that is a field of the script, read only to be emitted, is emitted through the field's own
+  handle. A listener written in AS3 that is given exactly what its parameters hold (a whole number for an
+  `int`, a `Vector2` for a `Vector2`) is entered with nothing checked twice or allocated, under the
+  interpreter too; anything else is checked and converted as ever, and says what does not fit.
+- Everything else that asks Godot (Strings, Arrays, Callables, a signal's listeners added and removed,
+  untyped values, a method that takes or gives one of those, a value stored in a field) is the
+  interpreter's own instruction, run by its thunk.
 - A field, a parameter and a result of such a type are still handles. A parameter or a result may be
   null, which a struct can't say; a field's slot is read as a handle by everything that shares the
   object with generated code (the library, the collector, Godot reading a property, a reload), by the
