@@ -46,6 +46,8 @@ std::optional<uint32_t> Lowerer::vector_class(const Type *p_type) {
 		// Which types are held so is the checker's rule too (src/held_in_place.h): it refuses a null written there.
 		klass.element_bare = klass.element_zero && held_in_place(p_type->element) ? bare_named(klass.element_type) : Bare::None;
 	}
+	// Objects of a class of Godot's that is never reference-counted (a node) hold no script object alive.
+	klass.element_counted = element != Kind::Ref || !of || !is_godot(of) || may_be_counted(of);
 	module_.classes.push_back(std::move(klass));
 	const uint32_t index = static_cast<uint32_t>(module_.classes.size()) - 1;
 	vector_classes_[p_type] = index;

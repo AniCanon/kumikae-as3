@@ -667,7 +667,9 @@ struct FakeEngine : vm::Output, vm::EngineHandles, vm::EngineSource {
 	std::map<intptr_t, uint64_t> node_boxes;
 	std::map<uint64_t, Node> nodes;
 	vm::Interpreter *running = nullptr;
+	int handles_asked = 0; // How many times the collector asked whether a handle is on a node.
 	[[nodiscard]] uint64_t node(void *p_handle) override {
+		handles_asked++;
 		auto found = node_boxes.find((intptr_t)p_handle);
 		return found == node_boxes.end() ? 0 : found->second;
 	}
@@ -3276,6 +3278,50 @@ static void test_cycles() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// A vector of Godot's objects of a class that is never reference-counted (nodes) holds nothing that leads
+// back to a script object: the cycle collector does not look at it, however long it is. One whose elements
+// may be reference-counted (a RefCounted, or Godot's Object, which any object is) is looked at as ever.
+static void test_collector_leaves_vectors_of_nodes() {
+	Compilation compilation;
+	compilation.add(GODOT_DECLARATIONS_PATH, godot_declarations(), true);
+	compilation.add("Herd.as", "package { import godot.*; public class Herd extends Node {\n"
+							   "public var nodes:Vector.<Node2D> = new Vector.<Node2D>();\n"
+							   "public var counted:Vector.<RefCounted> = new Vector.<RefCounted>();\n"
+							   "public var any:Vector.<GodotObject> = new Vector.<GodotObject>();\n"
+							   "public function fill(many:int, few:int):void {\n"
+							   "  for (var i:int = 0; i < many; i++) { nodes.push(new Node2D()); }\n"
+							   "  for (var j:int = 0; j < few; j++) { counted.push(new RefCounted()); any.push(new Node2D()); }\n"
+							   "} } }");
+	compilation.check();
+	CHECK_EQ(compilation.format_diagnostics(false), std::string());
+	ir::Module module;
+	CHECK(ir::lower(compilation, &module, ir::LowerMode::Library));
+	CHECK(!module.classes[class_named(module, "Vector.<Node2D>")].element_counted);
+	CHECK(module.classes[class_named(module, "Vector.<RefCounted>")].element_counted);
+	CHECK(module.classes[class_named(module, "Vector.<GodotObject>")].element_counted);
+	{
+		FakeEngine engine;
+		engine.module = &module;
+		vm::Interpreter interpreter(module, engine);
+		CHECK(interpreter.start());
+		vm::Object *herd = interpreter.construct(class_named(module, "Herd"), engine.box());
+		vm::Slot counts[2];
+		counts[0].bits = counts[1].bits = 0;
+		counts[0].i = 100;
+		counts[1].i = 2;
+		CHECK(interpreter.call_method(herd, "fill", counts, 2, nullptr));
+		engine.handles_asked = 0;
+		interpreter.collect();
+		// The script's own Godot object, and the two elements of each of the two vectors that are looked at.
+		CHECK(engine.handles_asked > 0);
+		CHECK(engine.handles_asked < 100);
+		interpreter.release_object(herd);
+		CHECK_EQ(engine.boxes, 0);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // A loop that passes through the engine: a script object holds one of its objects, which holds the script
 // object back (as a Godot object holds a listener that is a method of it). The engine is asked to let go
 // of what it holds; if something else holds a copy, everything stays.
@@ -3713,6 +3759,7 @@ int main() {
 	test_engine_operators();
 	test_kept_by_the_engine();
 	test_script_object_arrives();
+	test_collector_leaves_vectors_of_nodes();
 	test_no_engine();
 	test_engine_listeners();
 	test_engine_statics();

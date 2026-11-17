@@ -142,6 +142,11 @@ struct Class {
 	// value itself, never a handle and never null: there is nothing in it to count, copy or let go of.
 	// `element` is Val all the same: what a value read out of a place is, in a register.
 	Bare element_bare = Bare::None;
+	// For a vector of Godot's objects: whether one of them can be reference-counted (its class is
+	// RefCounted or extends it, or is Godot's Object, which any object is). A vector of objects that never
+	// are (nodes) holds nothing the cycle collector follows (vm/held.h): only a reference-counted object of
+	// Godot's can hold a script object alive. True where nothing is known.
+	bool element_counted = true;
 	// Array: the one class of every Array, a vector of untyped elements with Array's own rules (a read past
 	// the end is undefined, a write past it grows the array, never fixed).
 	bool array = false;
