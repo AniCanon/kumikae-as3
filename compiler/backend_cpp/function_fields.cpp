@@ -184,7 +184,7 @@ void FunctionWriter::find_last_uses() {
 	}
 	for (uint32_t pc = 0; pc < function_.code.size(); pc++) {
 		const Instruction &in = function_.code[pc];
-		const uint32_t from = in.op == Op::Move ? in.b : in.op == Op::SetField ? in.c : in.op == Op::SetGlobal ? in.b : NONE;
+		const uint32_t from = in.op == Op::Move ? in.b : in.op == Op::SetField || in.op == Op::VecSet ? in.c : in.op == Op::SetGlobal ? in.b : NONE;
 		if (from == NONE || from < function_.parameters || !owns(from) || writes[from] != 1 || last_read[from] != pc) {
 			continue;
 		}

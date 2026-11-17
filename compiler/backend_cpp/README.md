@@ -43,8 +43,8 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   table (`c->classes[object->klass].code[slot]`), an interface call through its interface table.
 - A register that holds a String, an object or an untyped value owns a reference, except a parameter
   that is never written, which borrows its caller's. A result is the caller's, and a register returned
-  hands its reference over. So does a register copied into a variable, a field or a static field as
-  the last thing done with it, in the plain case of a value made and then put where it is kept
+  hands its reference over. So does a register copied into a variable, a field, a static field or a
+  vector's place as the last thing done with it, in the plain case of a value made and then put where it is kept
   (`find_last_uses`, `tests/run/last_use.as`); any other last use still takes a reference and gives one
   back. Counts change only in `retain(c, x)` and `release(c, x)`.
 - An error is `c->failing`, tested after each operation that can raise one. The function then goes to

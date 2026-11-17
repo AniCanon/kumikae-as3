@@ -229,6 +229,43 @@ void an_element_used_at_once_counts_no_reference() {
 	CHECK(counted->find("put(c, r3, static_cast<Object *>(o.p));") != std::string::npos);
 }
 
+// An object made and then stored in a vector's place as the last thing done with it is handed over: the
+// place takes the register's reference, where it would count one more for the register to give back
+// later. Stored and then read again, the register keeps its own.
+void an_object_stored_in_a_place_last_is_handed_over() {
+	using ir::Instruction;
+	using ir::Kind;
+	using ir::Op;
+	const auto text_of = [](bool p_read_again) {
+		// one(v:Vector.<Point>): i = 0; made = new Point; v[i] = made; [n = made.x]
+		std::vector<Instruction> code = { Instruction{ Op::ConstI32, 1, 0, 0, 0 }, Instruction{ Op::New, 2, 0, 0, 0 },
+			Instruction{ Op::VecSet, 0, 1, 2, 0 } };
+		if (p_read_again) {
+			code.push_back(Instruction{ Op::GetField, 3, 2, 0, 0 });
+		}
+		ir::Module module = module_of({ Kind::Obj, Kind::I32, Kind::Obj, Kind::F64 }, std::move(code));
+		add_points(module);
+		ir::Class points;
+		points.name = "Vector.<Point>";
+		points.element = Kind::Obj;
+		points.element_check = 0;
+		module.classes.push_back(std::move(points));
+		module.functions[0].parameters = 1;
+		module.functions[0].required = 1;
+		module.functions[0].parameter_classes = { 2 };
+		const backend_cpp::Generated made = backend_cpp::generate(module);
+		CHECK_EQ(made.unsupported, std::string());
+		const std::string *text = file_named(made, "program.cpp");
+		CHECK(text != nullptr);
+		return text ? *text : std::string();
+	};
+	const std::string handed = text_of(false);
+	CHECK(handed.find("{ const Slot old = *e; *e = slot(r2); release(c, static_cast<Object *>(old.p)); }\n\tr2 = nullptr;") != std::string::npos);
+	CHECK(handed.find("store_slot(c, *e, r2);") == std::string::npos);
+	const std::string kept = text_of(true);
+	CHECK(kept.find("store_slot(c, *e, r2);") != std::string::npos);
+}
+
 int main() {
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
@@ -237,5 +274,6 @@ int main() {
 	a_register_of_two_classes_holds_what_they_share();
 	a_loop_over_a_vector_of_objects_is_written_twice();
 	an_element_used_at_once_counts_no_reference();
+	an_object_stored_in_a_place_last_is_handed_over();
 	return check::finish();
 }

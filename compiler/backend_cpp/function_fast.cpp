@@ -86,7 +86,11 @@ bool FunctionWriter::fast_object(const Instruction &p_in) {
 				return false;
 			}
 			line("if (Slot *const e = element_to_write(c, " + vector_for(p_in.a, p_in.c) + ", " + reg(p_in.b) + ")) {");
-			line(ir::is_held(kind(p_in.c)) ? "\tstore_slot(c, *e, " + reg(p_in.c) + ");" : "\t*e = slot(" + reg(p_in.c) + ");");
+			if (ir::is_held(kind(p_in.c))) {
+				keep("*e", p_in.c, true); // The library, where the place is left to it, counts one of its own.
+			} else {
+				line("\t*e = slot(" + reg(p_in.c) + ");");
+			}
 			break;
 		case Op::VecCall: {
 			// push(x) where the vector has room for it: one that must grow, a fixed one and none at all are
