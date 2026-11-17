@@ -12,7 +12,8 @@ These are held, with the probe's project (tests/godot_native), each run by Godot
   compiler   no compiler (an empty PATH): one warning that names what to install, the interpreter runs.
              A compiler that fails: one warning with where its output is, the interpreter runs, and the
              same run again builds nothing. One that writes something that is no library: refused, said.
-             The editor, which runs no game, builds nothing.
+             The editor, which runs no game, builds nothing. A build another run began is waited for
+             while whoever builds it is alive, and begun again when it is not.
   kept       builds that are neither in use nor among the newest are taken away; other files stay.
 
 run_godot.py also runs its reload and restart tests from a native start (reload.gd, restart.gd), which is
@@ -34,6 +35,7 @@ import native_godot
 SWITCH = "KAS3_NATIVE_PLAY"
 BUILDS = "ActionScript: building the scripts as native code"
 USED = "ActionScript: the scripts run as native code."
+STILL = "ActionScript: the scripts are still being built as native code"
 NO_COMPILER = "ActionScript: no C++ compiler was found"
 NOT_BUILT = "ActionScript: the scripts were not built as native code"
 NOT_USED = "is not used ("
@@ -202,6 +204,24 @@ class Runner:
         check("play: the compiler's output is there", os.path.exists(log) and "the stub fails" in open(log).read(), log)
         check("play: the interpreter runs the scripts then, and the failed build is not tried again", USED not in text and BUILDS not in text and
               len(lines) >= 8 and settled(project, 5) and held(project) == after, text[-600:])
+        # A build another run began: waited for while whoever builds it is alive, begun again when it is not.
+        key = os.path.basename(failed[0])[:-len(".failed")] if failed else "none"
+        marker = os.path.join(cache(project), key + ".building")
+        ended = subprocess.run(["/bin/sh", "-c", "echo $$"], capture_output=True, text=True)
+        for label, process, begins in (("one that is alive", str(os.getpid()), False), ("one that is gone", ended.stdout.strip(), True)):
+            if failed:
+                os.remove(failed[0])
+            with open(marker, "w") as file:
+                file.write(process + "\n")
+            status, text, lines = self.run(project, {"KAS3_CXX": fails})
+            check("play: a build %s is building%s" % (label, " is begun again" if begins else ": the run says so and begins none"),
+                  status == 0 and text.count(STILL) == (0 if begins else 1) and text.count(BUILDS) == (1 if begins else 0) and len(lines) >= 8 and
+                  "WARNING" not in text, "exit %d\n%s" % (status, text[-900:]))
+            check("play: the build %s was building ends" % label, settled(project) if begins else os.path.exists(marker), str(held(project)))
+            if not begins:
+                os.remove(marker)
+                with open(failed[0] if failed else marker, "w") as file:
+                    file.write("the C++ compiler failed\n")
         # A compiler that ends well and writes something that is no library.
         junk = stub(where, "junk", 'while [ $# -gt 1 ]; do if [ "$1" = -o ]; then echo junk > "$2"; fi; shift; done\n')
         status, text, _ = self.run(project, {"KAS3_CXX": junk})

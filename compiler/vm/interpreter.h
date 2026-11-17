@@ -457,6 +457,7 @@ public:
 		entries_++;
 	}
 	void left() { entries_--; }
+	bool in_call() const { return entries_ > 0; } // A call from outside is in progress, the interpreter's or native code's.
 	void report_native(NativeError p_error);
 
 	// The cycle collector (vm/collector.h), which frees objects that refer to each other in a loop. A host

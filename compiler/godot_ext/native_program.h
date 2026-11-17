@@ -50,7 +50,7 @@ public:
 	}
 	// Whether a function of the scripts is in progress, generated or the interpreter's: the scripts are not
 	// reloaded meanwhile.
-	bool running() const { return host_->context.depth > 0 || host_->interpreter->depth() > 0; }
+	bool running() const { return host_->interpreter->in_call() || host_->interpreter->depth() > 0 || host_->context.depth > 0; }
 	// The engine freed a script instance: generated code that kept an object it found looks again.
 	void instance_freed() { host_->context.freed.fetch_add(1, std::memory_order_relaxed); }
 };

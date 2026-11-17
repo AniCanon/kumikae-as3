@@ -583,7 +583,7 @@ def restart_test(label, native=False):
     in place by the edit after: that is said, and a restart shows the new code on it as on the rest."""
     with tempfile.TemporaryDirectory() as edited:
         copy = os.path.join(edited, "project")
-        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", "kas3"))
         # The second version also adds a field before the one `_ready` sets: nothing that ran changed. The third
         # edits `_ready`, a static variable's first value and two constants: the constants have their new values
         # at once and the Token made from one is updated in place, the variable keeps the one it was given, and
@@ -742,7 +742,7 @@ def reload_test(label, elsewhere, native=False):
     moves it onto the interpreter, and everything is as it is for a game that started there."""
     with tempfile.TemporaryDirectory() as edited:
         copy = os.path.join(edited, "project")
-        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios"))
+        shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", "kas3"))
         versions = {
             # A vector of a type that only this version names, kept in an untyped field.
             "Hot.as": HOT % (" public function fill():void { bag = new <Vector.<Hot>>[new Vector.<Hot>(), new Vector.<Hot>()]; }", "1", "1", ""),
@@ -811,6 +811,21 @@ reload_test("reload.gd, scripts in a folder elsewhere", True)
 # A game that started as native code, by the library Play built: an edit moves it onto the interpreter.
 reload_test("reload.gd, from native code", False, native=True)
 restart_test("restart.gd, from native code", native=True)
+# A reload asked for in the middle of AS3 while the game runs as native code: refused, as it is under the
+# interpreter. The library is not let go of beneath a function of it that is running.
+with tempfile.TemporaryDirectory() as edited:
+    copy = os.path.join(edited, "project")
+    shutil.copytree(project, copy, ignore=shutil.ignore_patterns("ios", "kas3"))
+    environment = dict(os.environ, **{play_godot.SWITCH: "1"})
+    first = subprocess.run([godot, "--headless", "--path", copy, "--quit-after", "5"], capture_output=True, text=True, timeout=300, env=environment)
+    check("native_guard.gd: a run before builds the library", play_godot.BUILDS in first.stdout + first.stderr and play_godot.settled(copy) and
+          len(play_godot.libraries(copy)) == 1, (first.stdout + first.stderr)[-900:])
+    run = subprocess.run([godot, "--headless", "--path", copy, "-s", "native_guard.gd"], capture_output=True, text=True, timeout=300, env=environment)
+    output = run.stdout + run.stderr
+    check("native_guard.gd: a reload asked for while native code runs is refused, and says so", run.returncode == 0 and play_godot.USED in output and
+          "can't be reloaded while AS3 runs" in output and "ActionScript: reloaded" not in output and "GUARD fired" in output,
+          "exit %d\n%s" % (run.returncode, output[-1500:]))
+    play_godot.settled(copy)
 
 # An exported game keeps its files in a pack, not in a folder: the scripts must be found and read there.
 import tempfile
