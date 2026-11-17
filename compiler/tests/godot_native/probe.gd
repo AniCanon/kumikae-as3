@@ -1,10 +1,11 @@
 extends SceneTree
 
-# Calls each method of Probe.as, of Entry.as and of the test project's Places.as and prints what it gives:
-# run_godot.py runs this with the interpreter and with the scripts as native code, and holds the two outputs
-# to each other.
+# Calls each method of Probe.as, of Entry.as and of the test project's Places.as and Emits.as and prints what
+# it gives: run_godot.py runs this with the interpreter and with the scripts as native code, and holds the two
+# outputs to each other.
 var killer: Node
 var entry: Node2D
+var emits: RefCounted
 var frames := 0
 
 
@@ -48,6 +49,13 @@ func _places() -> void:
 	keeper.free()
 
 
+# What signals carry between AS3 and Godot (the test project's Emits.as, by the rows emits.gd holds to what
+# GDScript gives): what AS3 gave for each.
+func _emits_said(from: int) -> void:
+	for at in range(from, emits.rows.size()):
+		print("PROBE emits ", emits.rows[at][0], "=", emits.rows[at][1])
+
+
 func _initialize() -> void:
 	var probe := Node2D.new()
 	probe.set_script(load("res://Probe.as"))
@@ -65,6 +73,9 @@ func _initialize() -> void:
 	print("PROBE after=", probe.call("script", 1))
 	_enter()
 	_places()
+	emits = load("res://emits_cases.gd").new()
+	emits.begin(root)
+	_emits_said(0)
 	# A node whose script's object is freed while its _process runs: see Probe.as.
 	killer = Node.new()
 	killer.set_script(load("res://killer.gd"))
@@ -82,4 +93,7 @@ func _process(_delta: float) -> bool:
 		return false
 	print("PROBE freed=", killer.get("said") if killer else "no killer")
 	print("PROBE ticked=", entry.call("ticked"))
+	var said: int = emits.rows.size()
+	emits.finish()
+	_emits_said(said)
 	return true
