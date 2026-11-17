@@ -117,6 +117,7 @@ class FunctionWriter {
 	// the instruction is left to it, is given a handle of its own for as long as it runs (generic).
 	std::vector<uint32_t> value_from_;
 	void find_borrowed();
+	void settle_reads(bool p_at_once, const std::vector<bool> &p_lands);
 	// Per register: it holds an object read out of a vector (or copied from such a register) where nothing
 	// can take the object out of the vector while the register is used: in a function that lets go of
 	// nothing, or one in which every use of the register follows the read at once. It counts no reference

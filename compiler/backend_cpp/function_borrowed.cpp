@@ -28,6 +28,16 @@ using ir::Kind;
 using ir::NONE;
 using ir::Op;
 
+namespace {
+
+// The register an instruction writes, or NONE.
+uint32_t written_by(const Instruction &p_in) {
+	const char first = ir::op_shape(p_in.op)[0];
+	return (first == 'R' || first == 'r') && p_in.a != NONE && !first_is_read(p_in.op) ? p_in.a : NONE;
+}
+
+} // namespace
+
 bool FunctionWriter::runs_code(const Instruction &p_in) const {
 	if (p_in.op == Op::GetField && borrowed_[p_in.a] != NONE) {
 		return false;
@@ -86,6 +96,71 @@ void FunctionWriter::read_field(const Instruction &p_in, const std::string &p_fi
 	}
 }
 
+// Every read of a register that borrows follows a read of the field in straight code, with nothing
+// between that could write the field or run code, and is itself of that kind. One that fails stops
+// borrowing, which may make another's reads fail: until none does. p_at_once: the same is asked of a
+// register that is lent, of the read of the element: one used only at once counts nothing in a function
+// that does let go of things, since nothing is let go of between the read and the use.
+void FunctionWriter::settle_reads(bool p_at_once, const std::vector<bool> &p_lands) {
+	for (bool changed = true; changed;) {
+		changed = false;
+		const size_t count = function_.registers.size();
+		std::vector<bool> fresh(count, false);
+		const auto stale = [&]() { std::fill(fresh.begin(), fresh.end(), false); };
+		for (uint32_t pc = 0; pc < function_.code.size(); pc++) {
+			const Instruction &in = function_.code[pc];
+			if (p_lands[pc]) {
+				stale();
+			}
+			// A call of a function that runs no code not looked into lets go of no object and stores none
+			// (facts.h): what a register borrows or is lent is still held where it was.
+			const bool quiet = (in.op != Op::Call || !facts_->functions[in.b].opaque) && !runs_code(in);
+			// An object stored in a place of a vector whose elements end alone: what the place held is let go
+			// of after the vector has been used, and with nothing run. The vector's register may borrow;
+			// nothing lent is still good after it (the object let go of may be the one lent).
+			const bool stores_alone = in.op == Op::VecSet && elements_end_alone(in.a);
+			const auto read = [&](uint32_t p_register) {
+				const bool usable = quiet || (stores_alone && p_register == in.a && p_register != in.c);
+				if (borrowed_[p_register] != NONE && !(fresh[p_register] && usable)) {
+					borrowed_[p_register] = NONE;
+					changed = true;
+				}
+				if (p_at_once && lent_[p_register] && !(fresh[p_register] && quiet)) {
+					lent_[p_register] = false;
+					changed = true;
+				}
+			};
+			// What a lent register holds is always held by a vector. A copy of a register that counts a
+			// reference may hold what has left its vector, which that register alone keeps: the copy
+			// counts one too.
+			if (p_at_once && in.op == Op::Move && lent_[in.a] && !lent_[in.b]) {
+				lent_[in.a] = false;
+				changed = true;
+			}
+			const char *shape = ir::op_shape(in.op);
+			const uint32_t operands[3] = { in.a, in.b, in.c };
+			const uint32_t written = written_by(in);
+			for (int n = 0; n < 3; n++) {
+				if (shape[n] == 'A') {
+					std::for_each(function_.argument_lists[operands[n]].begin(), function_.argument_lists[operands[n]].end(), read);
+				} else if ((shape[n] == 'R' || shape[n] == 'r') && operands[n] != NONE && !(n == 0 && written != NONE)) {
+					read(operands[n]);
+				}
+			}
+			if (!quiet || in.op == Op::Jump || in.op == Op::JumpIf || in.op == Op::JumpIfNot) {
+				stale();
+			} else if (in.op == Op::SetField) {
+				for (uint32_t i = 0; i < count; i++) {
+					fresh[i] = fresh[i] && borrowed_[i] != in.b;
+				}
+			}
+			if (written != NONE && (borrowed_[written] != NONE || (p_at_once && lent_[written]))) {
+				fresh[written] = true;
+			}
+		}
+	}
+}
+
 void FunctionWriter::find_borrowed() {
 	if (!facts_ || !is_this(0)) {
 		return;
@@ -98,10 +173,6 @@ void FunctionWriter::find_borrowed() {
 		refused[handler.reg] = true;
 		lands[handler.target] = true;
 	}
-	const auto writes = [&](const Instruction &p_in) {
-		const char first = ir::op_shape(p_in.op)[0];
-		return (first == 'R' || first == 'r') && p_in.a != NONE && !first_is_read(p_in.op) ? p_in.a : NONE;
-	};
 	// Every write of the register is a read of one object field of `this`.
 	std::vector<uint32_t> slot(count, NONE);
 	for (const Instruction &in : function_.code) {
@@ -112,7 +183,7 @@ void FunctionWriter::find_borrowed() {
 		if (const uint32_t changed = changed_in_place(function_, in); changed != NONE) {
 			refused[changed] = true;
 		}
-		const uint32_t written = writes(in);
+		const uint32_t written = written_by(in);
 		if (written == NONE) {
 			continue;
 		}
@@ -138,71 +209,8 @@ void FunctionWriter::find_borrowed() {
 	for (const Instruction &in : function_.code) {
 		calm = calm && in.op != Op::Call && !may_run_code(module_, function_, in, counts_nothing);
 	}
-	// Every read of a register that borrows follows a read of the field in straight code, with nothing
-	// between that could write the field or run code, and is itself of that kind. One that fails stops
-	// borrowing, which may make another's reads fail: until none does. p_at_once: the same is asked of a
-	// register that is lent, of the read of the element: one used only at once counts nothing in a function
-	// that does let go of things, since nothing is let go of between the read and the use.
-	const auto settle_reads = [&](bool p_at_once) {
-		for (bool changed = true; changed;) {
-			changed = false;
-			std::vector<bool> fresh(count, false);
-			const auto stale = [&]() { std::fill(fresh.begin(), fresh.end(), false); };
-			for (uint32_t pc = 0; pc < function_.code.size(); pc++) {
-				const Instruction &in = function_.code[pc];
-				if (lands[pc]) {
-					stale();
-				}
-				// A call of a function that runs no code not looked into lets go of no object and stores none
-				// (facts.h): what a register borrows or is lent is still held where it was.
-				const bool quiet = (in.op != Op::Call || !facts_->functions[in.b].opaque) && !runs_code(in);
-				// An object stored in a place of a vector whose elements end alone: what the place held is let go
-				// of after the vector has been used, and with nothing run. The vector's register may borrow;
-				// nothing lent is still good after it (the object let go of may be the one lent).
-				const bool stores_alone = in.op == Op::VecSet && elements_end_alone(in.a);
-				const auto read = [&](uint32_t p_register) {
-					const bool usable = quiet || (stores_alone && p_register == in.a && p_register != in.c);
-					if (borrowed_[p_register] != NONE && !(fresh[p_register] && usable)) {
-						borrowed_[p_register] = NONE;
-						changed = true;
-					}
-					if (p_at_once && lent_[p_register] && !(fresh[p_register] && quiet)) {
-						lent_[p_register] = false;
-						changed = true;
-					}
-				};
-				// What a lent register holds is always held by a vector. A copy of a register that counts a
-				// reference may hold what has left its vector, which that register alone keeps: the copy
-				// counts one too.
-				if (p_at_once && in.op == Op::Move && lent_[in.a] && !lent_[in.b]) {
-					lent_[in.a] = false;
-					changed = true;
-				}
-				const char *shape = ir::op_shape(in.op);
-				const uint32_t operands[3] = { in.a, in.b, in.c };
-				const uint32_t written = writes(in);
-				for (int n = 0; n < 3; n++) {
-					if (shape[n] == 'A') {
-						std::for_each(function_.argument_lists[operands[n]].begin(), function_.argument_lists[operands[n]].end(), read);
-					} else if ((shape[n] == 'R' || shape[n] == 'r') && operands[n] != NONE && !(n == 0 && written != NONE)) {
-						read(operands[n]);
-					}
-				}
-				if (!quiet || in.op == Op::Jump || in.op == Op::JumpIf || in.op == Op::JumpIfNot) {
-					stale();
-				} else if (in.op == Op::SetField) {
-					for (uint32_t i = 0; i < count; i++) {
-						fresh[i] = fresh[i] && borrowed_[i] != in.b;
-					}
-				}
-				if (written != NONE && (borrowed_[written] != NONE || (p_at_once && lent_[written]))) {
-					fresh[written] = true;
-				}
-			}
-		}
-	};
 	if (calm) {
-		settle_reads(false);
+		settle_reads(false, lands);
 		if (borrowed_ == hoped) {
 			return;
 		}
@@ -211,7 +219,7 @@ void FunctionWriter::find_borrowed() {
 		borrowed_ = hoped;
 		lent_ = candidates;
 	}
-	settle_reads(true);
+	settle_reads(true, lands);
 }
 
 } // namespace backend_cpp
