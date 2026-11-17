@@ -3359,6 +3359,60 @@ static void test_collector_leaves_vectors_of_nodes() {
 	CHECK_EQ(vm::live_strings(), (size_t)0);
 }
 
+// A vector of objects of a class that holds no object, like every class that extends it, holds nothing
+// that leads back to it: the cycle collector does not look at it, however long it is (a frame of a
+// game that keeps twenty thousand such objects in a vector does not walk them). A vector whose elements
+// may hold an object is looked at as ever: one of a class that holds one, of a class extended by one that
+// does, of an interface, of vectors that are looked at. A loop through such a vector is still freed.
+static void test_collector_leaves_vectors_of_plain_objects() {
+	const char *source = "package { public class Pool {\n"
+						 "public var dots:Vector.<Dot> = new Vector.<Dot>();\n"
+						 "public var rows:Vector.<Vector.<Dot>> = new Vector.<Vector.<Dot>>();\n"
+						 "public var links:Vector.<Link> = new Vector.<Link>();\n"
+						 "public var sorts:Vector.<Sort> = new Vector.<Sort>();\n"
+						 "public var named:Vector.<Named> = new Vector.<Named>();\n"
+						 "public var chains:Vector.<Vector.<Link>> = new Vector.<Vector.<Link>>();\n"
+						 "public function fill(many:int):void {\n"
+						 "  for (var i:int = 0; i < many; i++) { dots.push(new Dot()); }\n"
+						 "  rows.push(dots); links.push(new Link()); named.push(new Dot()); chains.push(links);\n"
+						 "}\n"
+						 "public function tie():void { var knot:Knot = new Knot(); knot.back = sorts; sorts.push(knot); sorts = new Vector.<Sort>(); }\n"
+						 "} }\n"
+						 "interface Named {}\n"
+						 "class Dot implements Named { public var x:Number = 1; public var on:Boolean; }\n"
+						 "class Link { public var next:Link; }\n"
+						 "class Sort { public var n:int; }\n"
+						 "class Knot extends Sort { public var back:Vector.<Sort>; }\n";
+	ir::Module module;
+	compile_cycles(&module, source, "Pool.as");
+	{
+		Recorder recorder;
+		vm::Interpreter interpreter(module, recorder);
+		CHECK(interpreter.start());
+		const auto looked_at = [&](const char *p_class) { return interpreter.heap().list_for(class_named(module, p_class)) != nullptr; };
+		CHECK(!looked_at("Vector.<Dot>"));
+		CHECK(!looked_at("Vector.<Vector.<Dot>>"));
+		CHECK(looked_at("Vector.<Link>"));
+		CHECK(looked_at("Vector.<Sort>")); // A Knot is a Sort, and holds an object.
+		CHECK(looked_at("Vector.<Named>")); // Whatever implements it may.
+		CHECK(looked_at("Vector.<Vector.<Link>>"));
+		vm::Object *pool = interpreter.construct(class_named(module, "Pool"));
+		vm::Slot many;
+		many.bits = 0;
+		many.i = 1000;
+		CHECK(interpreter.call_method(pool, "fill", &many, 1, nullptr));
+		const size_t filled = vm::live_objects();
+		// A vector of Sorts that a Knot inside it holds, and nothing else does.
+		CHECK(interpreter.call_method(pool, "tie", nullptr, 0, nullptr));
+		CHECK_EQ(vm::live_objects(), filled + 2);
+		interpreter.collect();
+		CHECK_EQ(vm::live_objects(), filled);
+		interpreter.release_object(pool);
+	}
+	CHECK_EQ(vm::live_objects(), (size_t)0);
+	CHECK_EQ(vm::live_strings(), (size_t)0);
+}
+
 // A loop that passes through the engine: a script object holds one of its objects, which holds the script
 // object back (as a Godot object holds a listener that is a method of it). The engine is asked to let go
 // of what it holds; if something else holds a copy, everything stays.
@@ -3797,6 +3851,7 @@ int main() {
 	test_kept_by_the_engine();
 	test_script_object_arrives();
 	test_collector_leaves_vectors_of_nodes();
+	test_collector_leaves_vectors_of_plain_objects();
 	test_engine_result_is_the_registers_own();
 	test_no_engine();
 	test_engine_listeners();

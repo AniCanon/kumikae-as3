@@ -81,7 +81,10 @@ host differs.
 - **The collector looks only at what can lead back to a script object** (`may_hold_objects()`, `held.h`): not
   at a vector of numbers, and not at a vector of Godot's objects of a class that is never
   reference-counted (`ir::Class::element_counted`, which the lowerer works out from the class: nodes),
-  since only a reference-counted object of Godot's is a node of the collector's.
+  since only a reference-counted object of Godot's is a node of the collector's. Nor at a vector of
+  objects of a class that, like every class that extends it, is itself not looked at: it holds no
+  object, no untyped value and none of Godot's objects (`classes_looked_at()`, `collector.cpp`). Twenty
+  thousand particles in a vector are not walked every frame.
 - **The cycle collector deletes by trial** (`collector.h`): an object whose count of references is more than
   the references from other objects is held from outside, and so is what it reaches. It needs no list of
   roots. The host calls `collect_step()` with a budget of work; the interpreter collects once more when it
