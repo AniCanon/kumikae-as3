@@ -12,6 +12,7 @@ package {
 		private var items:Vector.<Item> = new Vector.<Item>();
 		private var texts:Vector.<String> = new Vector.<String>(2, true);
 		private var mixed:Array = [];
+		public var slies:Vector.<Sly> = new Vector.<Sly>(1);
 
 		public function last_use() {
 			var total:int = 0;
@@ -53,6 +54,14 @@ package {
 			} catch (e:Error) {
 				trace(e.message, items.length);
 			}
+			trace(sly(), slies.length, slies[0], slies[1]);
+		}
+
+		// The constructor puts another vector in the field the store's vector was read from: the object goes
+		// into the vector that was there before, which goes with it.
+		private function sly():int {
+			slies[0] = new Sly(this, 7);
+			return slies[0] == null ? -1 : slies[0].n;
 		}
 
 		// Each round's object takes the place of the last round's, and is added where the vector ends; one
@@ -91,5 +100,14 @@ class Item {
 			throw new Error("negative");
 		}
 		value = given;
+	}
+}
+
+class Sly {
+	public var n:int;
+
+	public function Sly(owner:last_use, n:int) {
+		owner.slies = new Vector.<Sly>(2);
+		this.n = n;
 	}
 }

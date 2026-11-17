@@ -21,7 +21,19 @@ using ir::NONE;
 using ir::Op;
 
 bool FunctionWriter::runs_code(const Instruction &p_in) const {
-	return may_run_code(module_, function_, p_in, lent_) && !(p_in.op == Op::GetField && borrowed_[p_in.a] != NONE);
+	if (p_in.op == Op::GetField && borrowed_[p_in.a] != NONE) {
+		return false;
+	}
+	// What a register of a class whose objects end alone held is let go of with nothing else ending.
+	const auto ends_alone = [&](uint32_t p_register) { return lent_[p_register] || ends_alone_[p_register]; };
+	if (facts_ && p_in.op == Op::InitClass) {
+		return !facts_->starts_quietly[p_in.a];
+	}
+	if (facts_ && p_in.op == Op::New) {
+		// An object of such a class is made by the host out of memory alone: its constructor is a call of its own.
+		return !(facts_->ends_alone[p_in.b] && ends_alone(p_in.a));
+	}
+	return may_run_code(module_, function_, p_in, lent_) && may_run_code(module_, function_, p_in, ends_alone_);
 }
 
 // The registers that are only ever given an element of a vector, or a copy of such a register: what
@@ -133,9 +145,16 @@ void FunctionWriter::find_borrowed() {
 				if (lands[pc]) {
 					stale();
 				}
-				const bool quiet = in.op != Op::Call && !runs_code(in);
+				// A call of a function that runs no code not looked into lets go of no object and stores none
+				// (facts.h): what a register borrows or is lent is still held where it was.
+				const bool quiet = (in.op != Op::Call || !facts_->functions[in.b].opaque) && !runs_code(in);
+				// An object stored in a place of a vector whose elements end alone: what the place held is let go
+				// of after the vector has been used, and with nothing run. The vector's register may borrow;
+				// nothing lent is still good after it (the object let go of may be the one lent).
+				const bool stores_alone = in.op == Op::VecSet && elements_end_alone(in.a);
 				const auto read = [&](uint32_t p_register) {
-					if (borrowed_[p_register] != NONE && !(fresh[p_register] && quiet)) {
+					const bool usable = quiet || (stores_alone && p_register == in.a && p_register != in.c);
+					if (borrowed_[p_register] != NONE && !(fresh[p_register] && usable)) {
 						borrowed_[p_register] = NONE;
 						changed = true;
 					}

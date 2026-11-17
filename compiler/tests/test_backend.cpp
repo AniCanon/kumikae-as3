@@ -173,6 +173,10 @@ ir::Module module_of_sum(ir::Instruction p_first, ir::Instruction p_between) {
 	holder.name = "Holder";
 	holder.fields.push_back(ir::Field{ "items", Kind::Obj, 2 });
 	module.classes.push_back(std::move(holder));
+	ir::Class link; // An object of it holds another: letting go of one may be the end of more.
+	link.name = "Link";
+	link.fields.push_back(ir::Field{ "next", Kind::Obj, 4 });
+	module.classes.push_back(std::move(link));
 	ir::Function &sum = module.functions[0];
 	sum.name = "Holder/sum";
 	sum.is_static = false;
@@ -205,18 +209,24 @@ void a_loop_over_a_vector_of_objects_is_written_twice() {
 // In a method that does let go of things (it makes an object into a register that held one), an element
 // read into a variable still counts no reference where every use of the variable follows the read at once,
 // with nothing between that could let go of anything: the vector holds the object until then. With
-// something between (an object made into a register that held one), the variable counts one, as ever.
+// something between whose end may be the end of other objects (a Link made into a register that held
+// one), the variable counts one, as ever. A Point, which holds only numbers, ends alone: one let go of
+// between the read and the use takes nothing out of any vector, and the variable still counts nothing.
 void an_element_used_at_once_counts_no_reference() {
 	const ir::Instruction nothing{ ir::Op::Stmt, 0, 0, 0, 0 };
 	const ir::Instruction makes{ ir::Op::New, 11, 0, 0, 0 };
-	const backend_cpp::Generated at_once = backend_cpp::generate(module_of_sum(makes, nothing));
-	const backend_cpp::Generated later = backend_cpp::generate(module_of_sum(nothing, makes));
+	const ir::Instruction links{ ir::Op::New, 11, 4, 0, 0 };
+	const backend_cpp::Generated at_once = backend_cpp::generate(module_of_sum(links, nothing));
+	const backend_cpp::Generated later = backend_cpp::generate(module_of_sum(nothing, links));
+	const backend_cpp::Generated alone = backend_cpp::generate(module_of_sum(nothing, makes));
 	CHECK_EQ(at_once.unsupported, std::string());
 	CHECK_EQ(later.unsupported, std::string());
+	CHECK_EQ(alone.unsupported, std::string());
 	const std::string *text = file_named(at_once, "Holder.cpp");
 	const std::string *counted = file_named(later, "Holder.cpp");
-	CHECK(text != nullptr && counted != nullptr);
-	if (!text || !counted) {
+	const std::string *between = file_named(alone, "Holder.cpp");
+	CHECK(text != nullptr && counted != nullptr && between != nullptr);
+	if (!text || !counted || !between) {
 		return;
 	}
 	CHECK(text->find("put(c, r11, e);") != std::string::npos);
@@ -227,6 +237,9 @@ void an_element_used_at_once_counts_no_reference() {
 	CHECK(text->find("put(c, r3, ") == std::string::npos);
 	CHECK(counted->find("store(c, r3, static_cast<Object *>((*e).p));") != std::string::npos);
 	CHECK(counted->find("put(c, r3, static_cast<Object *>(o.p));") != std::string::npos);
+	CHECK(between->find("put(c, r11, e);") != std::string::npos);
+	CHECK(between->find("r3 = static_cast<Object *>(d2[static_cast<uint32_t>(r1)].p);") != std::string::npos);
+	CHECK(between->find("store(c, r3, ") == std::string::npos);
 }
 
 // An object made and then stored in a vector's place as the last thing done with it is handed over: the
@@ -266,6 +279,53 @@ void an_object_stored_in_a_place_last_is_handed_over() {
 	CHECK(kept.find("store_slot(c, *e, r2);") != std::string::npos);
 }
 
+// `this.items[i] = new Point()`: the vector is read from its field before the object is made, and used
+// after. The register it is read into borrows the field (it counts nothing) where nothing between the
+// two, nor the store itself, can run code: a Point is made out of memory alone, and the Point the place
+// held ends alone. A place that held a Link may end other objects, whose end may run code: the register
+// counts a reference, as ever.
+void a_vector_read_to_store_an_object_that_ends_alone_is_borrowed() {
+	using ir::Instruction;
+	using ir::Kind;
+	using ir::Op;
+	const auto text_of = [](uint32_t p_element) {
+		// fill(): v = this.items; made = new <element>; i = 0; v[i] = made
+		ir::Module module = module_of({ Kind::Obj, Kind::Obj, Kind::Obj, Kind::I32 },
+				{ Instruction{ Op::GetField, 1, 0, 0, 0 }, Instruction{ Op::New, 2, p_element, 0, 0 }, Instruction{ Op::ConstI32, 3, 0, 0, 0 },
+						Instruction{ Op::VecSet, 1, 3, 2, 0 } });
+		add_points(module);
+		ir::Class link;
+		link.name = "Link";
+		link.fields.push_back(ir::Field{ "next", Kind::Obj, 2 });
+		module.classes.push_back(std::move(link));
+		ir::Class items;
+		items.name = "Vector.<T>";
+		items.element = Kind::Obj;
+		items.element_check = p_element;
+		module.classes.push_back(std::move(items));
+		ir::Class holder;
+		holder.name = "Holder";
+		holder.fields.push_back(ir::Field{ "items", Kind::Obj, 3 });
+		module.classes.push_back(std::move(holder));
+		ir::Function &fill = module.functions[0];
+		fill.name = "Holder/fill";
+		fill.is_static = false;
+		fill.owner = 4;
+		fill.parameters = 1;
+		fill.required = 1;
+		const backend_cpp::Generated made = backend_cpp::generate(module);
+		CHECK_EQ(made.unsupported, std::string());
+		const std::string *text = file_named(made, "Holder.cpp");
+		CHECK(text != nullptr);
+		return text ? *text : std::string();
+	};
+	const std::string points = text_of(0);
+	CHECK(points.find("\tr1 = static_cast<C4_Holder *>(r0)->f0_items;") != std::string::npos);
+	CHECK(points.find("store(c, r1, ") == std::string::npos);
+	const std::string links = text_of(2);
+	CHECK(links.find("store(c, r1, static_cast<C4_Holder *>(r0)->f0_items);") != std::string::npos);
+}
+
 int main() {
 	a_program_it_takes_is_written_whole();
 	what_it_cannot_say_exactly_is_refused_by_name();
@@ -275,5 +335,6 @@ int main() {
 	a_loop_over_a_vector_of_objects_is_written_twice();
 	an_element_used_at_once_counts_no_reference();
 	an_object_stored_in_a_place_last_is_handed_over();
+	a_vector_read_to_store_an_object_that_ends_alone_is_borrowed();
 	return check::finish();
 }

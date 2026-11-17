@@ -1,6 +1,7 @@
 #include "facts.h"
 
 #include "function_writer.h"
+#include "program_writer.h"
 #include "thunks.h"
 
 namespace kas3 {
@@ -125,6 +126,29 @@ void follow_calls(const ir::Module &p_module, Facts *r_facts) {
 	}
 }
 
+void look_at_classes(const ir::Module &p_module, Facts *r_facts) {
+	const size_t count = p_module.classes.size();
+	r_facts->ends_alone.assign(count, false);
+	r_facts->starts_quietly.assign(count, true);
+	for (size_t i = 0; i < count; i++) {
+		const ir::Class &klass = p_module.classes[i];
+		bool alone = has_struct(klass) && klass.native_base.empty() && !klass.counted && !klass.built_in;
+		for (const ir::Field &field : klass.fields) {
+			alone = alone && !may_end(field.kind);
+		}
+		r_facts->ends_alone[i] = alone;
+		for (uint32_t at = static_cast<uint32_t>(i); at < count; at = p_module.classes[at].base) {
+			r_facts->starts_quietly[i] = r_facts->starts_quietly[i] && p_module.classes[at].static_init == NONE;
+		}
+	}
+	// An object of a class may be of any class that extends it.
+	for (size_t i = 0; i < count; i++) {
+		for (uint32_t base = p_module.classes[i].base; !r_facts->ends_alone[i] && base < count; base = p_module.classes[base].base) {
+			r_facts->ends_alone[base] = false;
+		}
+	}
+}
+
 } // namespace
 
 bool may_run_code(const ir::Module &p_module, const ir::Function &p_function, const Instruction &p_in) {
@@ -159,6 +183,7 @@ Facts find_facts(const ir::Module &p_module, bool p_keeps_stack) {
 		look(p_module, p_module.functions[i], &facts.functions[i]);
 	}
 	follow_calls(p_module, &facts);
+	look_at_classes(p_module, &facts);
 	return facts;
 }
 

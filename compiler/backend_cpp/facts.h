@@ -28,6 +28,13 @@ struct FunctionFacts {
 
 struct Facts {
 	std::vector<FunctionFacts> functions;
+	// Per class: letting go of an object of it ends nothing but the object. It holds numbers, Booleans and
+	// Strings and nothing whose end could be another's, it is the program's own (not one of Godot's or the
+	// library's), and so is every class that extends it. Such an end runs no code and takes nothing out of
+	// any vector.
+	std::vector<bool> ends_alone;
+	// Per class: its first use runs nothing: neither it nor a class it extends gives static fields values.
+	std::vector<bool> starts_quietly;
 };
 
 // Whether an instruction may run code that nothing here looks into. One that cannot is arithmetic, flow,

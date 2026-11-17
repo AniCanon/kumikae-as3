@@ -78,6 +78,14 @@ It is fixed by the native backend's design, and `function_writer.h` says it agai
   (`var p:Particle = slots[i]; sum += p.x + p.vy;`): the rule of a field of `this` read to be used at
   once, for an element. A variable used again later (after a call, an object stored, a jump) counts one,
   as before.
+- Letting go of an object runs no code where its class is one whose objects end alone (`facts.h`: it
+  holds numbers, Booleans and Strings only, it is the program's own, and every class that extends it is
+  the same). A register known to hold such a class is written, such an object is made (its constructor
+  is a call of its own) and a class with nothing to set up is used with what other registers borrow or
+  are lent still good afterwards; so is a call of a function that runs no code not looked into. In
+  `slots[i] = new Particle(i, frame)` the register `slots` is read into then counts nothing: what the
+  place held ends alone too, after the vector has been used (`tests/run/last_use.as`, where a
+  constructor that puts another vector in the field makes the register count one).
 - `hit.emit(a, b)` asks the host for the emit it worked out once for that place (`c->engine->emit`), with
   the values where they are: nothing is boxed, and no name is looked up. Where `hit` is a field of `this`
   and nothing between the field's read and the emit could write the field or run the program's code, no

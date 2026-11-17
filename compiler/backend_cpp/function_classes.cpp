@@ -112,9 +112,20 @@ void FunctionWriter::find_classes() {
 		}
 	}
 	class_of_.assign(count, NONE);
+	ends_alone_.assign(count, false);
 	for (uint32_t i = 0; i < count; i++) {
 		class_of_[i] = known[i] == UNSEEN || kind(i) != Kind::Obj ? NONE : known[i];
+		ends_alone_[i] = facts_ && class_of_[i] != NONE && facts_->ends_alone[class_of_[i]];
 	}
+}
+
+bool FunctionWriter::elements_end_alone(uint32_t p_vector) const {
+	const uint32_t of = class_of_[p_vector];
+	if (!facts_ || of == NONE || module_.classes[of].element != Kind::Obj) {
+		return false;
+	}
+	const uint32_t element = module_.classes[of].element_check;
+	return element < module_.classes.size() && facts_->ends_alone[element];
 }
 
 bool FunctionWriter::may_be_this(uint32_t p_register) const {
