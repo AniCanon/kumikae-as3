@@ -4,15 +4,13 @@ The plugin integrates ActionScript 3 with Rider's native LSP client and IntelliJ
 unified IDEA through LSP4IJ. Both use the same compiler language server and local typing handlers.
 In IDEA, install and enable **LSP4IJ** (tested version 0.21.0) in **Settings > Plugins**; Rider does not
 require it. It also provides project/run tools and an iOS Simulator panel. See
-[completion and typing assistance](../completion.md) for editor behavior, settings and limits, and
-[completion results](../../docs/results/2026-11-completion.md) for the checks and measurements.
-The Simulator's own measurements are described below. The [completion follow-up results](../../docs/results/2026-11-completion-followup.md)
-cover generated edits, diagnostics, Undo and project lifetime checks. The plugin keeps Rider's split
+[completion and typing assistance](../completion.md) for editor behavior, settings and limits.
+The Simulator's own measurements are described below. The plugin keeps Rider's split
 Problems view and owns the cleanup needed by the tested Rider build. Install, update and uninstall
 require an IDE restart.
 
 The automated validation of 2026-11-16 passes: the verifier finds no internal API in either IDE build, and
-the four sandbox probes pass, hover included. See the [current results](../../docs/results/2026-11-completion-followup.md#validation).
+the four sandbox probes pass, hover included.
 
 Still left for a person: acceptance of the editing workflow by hand (and production focus behavior, which
 the background sandbox cannot show), a first run on Windows, and IDE builds older or newer than the two
@@ -40,10 +38,7 @@ installed ones, which were not verified because that needs a download.
 | Earlier idb ten-minute stream and input | Production service in a small harness | Mean 26.42 frames/s consumed; retained heap 5.655 MiB at one minute and 5.706 MiB at ten minutes. Owned children exited. This was not a ten-minute Rider heap measurement. |
 | idb input against a booted Simulator | `simulator.py` and the sandbox panel probe | Density 3; Home, taps and Settings swipes observed. Earlier text, Lock and Rotate commands were accepted, without a separate visual confirmation. |
 
-The designs (`docs/superpowers/specs/2026-11-14-jetbrains-ios-simulator-design.md` and
-`2026-11-14-simulator-native-design.md`, kept out of the repository)
-compare screen and input options. The [results](../../docs/results/2026-11-jetbrains-simulator.md)
-give the detail behind this table. [ARCHITECTURE.md](ARCHITECTURE.md) describes the
+[ARCHITECTURE.md](ARCHITECTURE.md) describes the
 parts and [CONTRIBUTING.md](CONTRIBUTING.md) the Kotlin and Compose rules.
 
 ## What is implemented

@@ -1,6 +1,6 @@
 """How Godot's names are written in AS3.
 
-The rules are in docs/superpowers/specs/2026-11-12-godot-naming-design.md. Everything that needs a Godot
+The rules are the functions below, with the reason beside each. Everything that needs a Godot
 name in AS3 (the declaration generator here, the bindings later) asks this module, so that there is one
 answer.
 """

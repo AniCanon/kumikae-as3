@@ -18,7 +18,7 @@ authority; this is what gets broken most.
   mouse, a console, a table model, a file browser), mounted through `Native` / `NativeScrollPane`.
 - No second dependency-injection container, no Android `ViewModel`, no coroutines scope of your own where
   `BackgroundTasks` already does the job.
-- A dependency that is not already in `build.gradle.kts` is a question for the owner, not a line to add.
+- A dependency that is not already in `build.gradle.kts` is a question for a maintainer, not a line to add.
 
 ## Where things live
 
@@ -74,9 +74,9 @@ python3 -m unittest discover -s tests -v
 
 ## Do not
 
-- Start the owner's real IDE or change its settings: only the sandbox the Gradle plugin starts.
+- Start a person's real IDE or change its settings: only the sandbox the Gradle plugin starts.
 - Erase, create, shut down or install onto a Simulator that you did not create. Never kill a process you
   did not start; stop the ones you did.
-- Load or download idb, an IDE, a JDK or any tool without the owner's yes.
+- Load or download idb, an IDE, a JDK or any tool without a maintainer's yes.
 - Claim the plugin works in an IDE because it compiles. Say what was seen, by whom, and what was not.
 - Copy anything about a games console, or any personal identifier, into this repository.

@@ -111,8 +111,7 @@ The actor is single-use so callbacks from an old connection cannot affect a new 
 
 ## Measurements and limits
 
-The [results](../../../../docs/results/2026-11-jetbrains-simulator.md) distinguish
-seed-observation-to-paint timing from actual presentation latency. No authoritative
+The measurements distinguish seed-observation-to-paint timing from actual presentation latency. No authoritative
 presentation timestamp is available. The current route reads full-size BGRA and
 targets an 8 ms seed-poll interval including copy/publication work; it has no private
 screen callback ABI. Actor-owned pixel storage is reused with Data copy-on-write
