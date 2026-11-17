@@ -15,6 +15,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.vfs.LocalFileSystem
+import java.awt.Color
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -69,7 +70,6 @@ internal object UiProbeGameRun {
                     env.runner.execute(env)
                 }
                 val repository = project.service<SimulatorHost>().repository
-                val heldSince = System.nanoTime()
                 await("game process on the selected simulator", 225) {
                     val page = repository.consolePage(0)
                     Files.writeString(report.resolve("launch-console.txt"), page.entries.joinToString("") { it.text })
@@ -82,16 +82,29 @@ internal object UiProbeGameRun {
                         processes.lines().any {
                             it.contains("UIKitApplication:") &&
                                 it.contains(bundle)
-                        } &&
-                        System.nanoTime() - heldSince > TimeUnit.SECONDS.toNanos(5)
+                        }
                 }
-                Thread.sleep(2500)
                 check(repository.status().device?.id == device)
                 check(source == Files.readString(folder.resolve("export_presets.cfg")))
-                ImageIO.write(repository.screenshot(device).image, "png", report.resolve("game-run.png").toFile())
+                await("Support Sprint's rendered home screen", 45) {
+                    val image = repository.screenshot(device).image
+                    var cream = 0
+                    var sage = 0
+                    for (x in 0 until 48) {
+                        for (y in 0 until 24) {
+                            val color = Color(image.getRGB(x * image.width / 48, y * image.height / 24))
+                            if (color.red in 235..241 && color.green in 234..240 && color.blue in 225..231) cream++
+                            if (color.red in 174..180 && color.green in 186..192 && color.blue in 171..177) sage++
+                        }
+                    }
+                    val ready = image.width > image.height && cream > 90 && sage > 12
+                    if (ready) ImageIO.write(image, "png", report.resolve("game-run.png").toFile())
+                    ready
+                }
                 Files.writeString(
                     report.resolve("game-run.txt"),
-                    "Rider selected the named preset and destination, built, installed and launched the game. Export presets preserved.\n",
+                    "Rider built the named Godot preset and installed the game on the selected simulator. " +
+                        "Support Sprint reached its home screen. Export presets preserved.\n",
                 )
             } finally {
                 app.invokeAndWait { ProjectManagerEx.getInstanceEx().forceCloseProject(project, false) }
