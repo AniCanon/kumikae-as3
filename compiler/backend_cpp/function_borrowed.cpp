@@ -100,7 +100,7 @@ void FunctionWriter::read_field(const Instruction &p_in, const std::string &p_fi
 // between that could write the field or run code, and is itself of that kind. One that fails stops
 // borrowing, which may make another's reads fail: until none does. p_at_once: the same is asked of a
 // register that is lent, of the read of the element: one used only at once counts nothing in a function
-// that does let go of things, since nothing is let go of between the read and the use.
+// that does let go of things, since nothing takes an object out of a vector between the read and the use.
 void FunctionWriter::settle_reads(bool p_at_once, const std::vector<bool> &p_lands) {
 	for (bool changed = true; changed;) {
 		changed = false;
