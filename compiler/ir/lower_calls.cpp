@@ -99,6 +99,10 @@ uint32_t Calls::written_value(Expr *p_value, Kind p_conversion, uint32_t p_posit
 	return l_.expression(p_value, p_conversion);
 }
 
+bool Calls::kind_named(const Type *p_type) {
+	return l_.check_for(p_type, Kind::Val).value_or(NONE) != NONE;
+}
+
 uint32_t Calls::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 	uint32_t position = p_call->offset;
 	if (p_type == l_.array_ && l_.array_) {
@@ -114,7 +118,10 @@ uint32_t Calls::cast(Call *p_call, Symbol *p_type, Kind p_want) {
 			l_.error(p_call->callee->offset, "a cast to '" + std::string(p_type->name) + "' takes 1 argument but " + std::to_string(p_call->arguments.count) + " were given");
 			return l_.default_value(p_want, position);
 		}
-		if (l_.kind_of(type, &kind) && (kind == Kind::Obj || kind == Kind::Ref || kind == Kind::Val)) {
+		// One of Godot's value types is checked by Godot's name for it: a class with none (an enum's
+		// class of constants) is no cast.
+		const bool named = kind_named(type);
+		if (l_.kind_of(type, &kind) && (kind == Kind::Obj || kind == Kind::Ref || (kind == Kind::Val && named))) {
 			return l_.from_untyped(l_.any_value(p_call->arguments[0]), type, kind, position);
 		}
 	}

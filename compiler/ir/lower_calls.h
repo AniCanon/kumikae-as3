@@ -14,6 +14,8 @@ class Calls {
 
 	uint32_t super_call(Call *p_call);
 	uint32_t cast(Call *p_call, Symbol *p_type, Kind p_want);
+	// Whether Godot has a name for the type, by which a value is checked to be of it.
+	bool kind_named(const Type *p_type);
 	// Error(x), RegExp(x), Date(x): what the library's class does when it is called. Nothing for any other.
 	std::optional<uint32_t> class_function(Call *p_call, Symbol *p_type);
 	uint32_t trace_call(Call *p_call);
